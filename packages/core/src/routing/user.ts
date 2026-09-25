@@ -1,0 +1,83 @@
+/**
+ * Routing pipeline step 4, "Target user" (spec §10.1): the Entry-time decision for a direct call
+ * to a user, and the outcome once ringing ends (§11.2 `user_forward_rules`).
+ */
+
+import type { ForwardTarget } from './targets.js';
+
+/** The SIP release codes of the user step's implicit defaults (§10.1). */
+const RELEASE_CODE_BUSY = 486;
+const RELEASE_CODE_UNAVAILABLE = 480;
+
+export type UserDecision =
+  | { kind: 'forward'; target: ForwardTarget }
+  | { kind: 'ring'; findMe: { number: string; delayS: number }[] }
+  // eslint-disable-next-line no-magic-numbers -- the SIP release codes of the user step's implicit defaults (§10.1)
+  | { kind: 'release'; code: 480 | 486 }
+  | { kind: 'mailbox'; userId: string };
+
+type OutcomeCondition = 'busy' | 'noAnswer' | 'offline';
+type EntryCondition = 'unconditional' | 'dnd' | OutcomeCondition;
+
+/** The implicit default when no rule applies: the user's own mailbox, else `code`. */
+function implicitDefault(
+  user: { id: string; mailboxEnabled: boolean },
+  code: typeof RELEASE_CODE_BUSY | typeof RELEASE_CODE_UNAVAILABLE
+): UserDecision {
+  if (user.mailboxEnabled) {
+    return { kind: 'mailbox', userId: user.id };
+  }
+  return { kind: 'release', code };
+}
+
+/**
+ * The decision for `outcome`: the matching rule, or for `offline` the `noAnswer` rule when
+ * `offline` is absent; else the implicit default, 486 for `busy` and 480 otherwise (§10.1).
+ */
+export function userOutcomeDecision(
+  user: { id: string; mailboxEnabled: boolean },
+  rules: Partial<Record<OutcomeCondition, ForwardTarget>>,
+  outcome: OutcomeCondition
+): UserDecision {
+  const target =
+    rules[outcome] ?? (outcome === 'offline' ? rules.noAnswer : undefined);
+  if (target) {
+    return { kind: 'forward', target };
+  }
+  return implicitDefault(
+    user,
+    outcome === 'busy' ? RELEASE_CODE_BUSY : RELEASE_CODE_UNAVAILABLE
+  );
+}
+
+/**
+ * The Entry-time decision for a direct call to `user`: an unconditional forward wins outright;
+ * DND applies its rule or the implicit default; a user with no registered device and no find-me
+ * entry is decided as the `offline` outcome; otherwise the devices, and any find-me legs, ring
+ * (§10.1 step 4).
+ */
+export function userEntryDecision(
+  user: {
+    id: string;
+    dnd: boolean;
+    mailboxEnabled: boolean;
+    findMe: { number: string; delayS: number }[] | null;
+    registeredDevices: number;
+  },
+  rules: Partial<Record<EntryCondition, ForwardTarget>>
+): UserDecision {
+  if (rules.unconditional) {
+    return { kind: 'forward', target: rules.unconditional };
+  }
+  if (user.dnd) {
+    if (rules.dnd) {
+      return { kind: 'forward', target: rules.dnd };
+    }
+    return implicitDefault(user, RELEASE_CODE_BUSY);
+  }
+  const findMe = user.findMe ?? [];
+  if (user.registeredDevices === 0 && findMe.length === 0) {
+    return userOutcomeDecision(user, rules, 'offline');
+  }
+  return { kind: 'ring', findMe };
+}

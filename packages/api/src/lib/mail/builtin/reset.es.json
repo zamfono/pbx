@@ -1,0 +1,5 @@
+{
+  "subject": "Restablezca su contraseña de {{companyName}}",
+  "bodyText": "Hola {{recipientName}},\n\nRestablezca su contraseña con este enlace:\n\n{{link}}\n\nEste enlace caduca el {{date linkExpiresAt}}. Si no solicitó esto, puede ignorar este correo.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Hola {{recipientName}},</p><p>Restablezca su contraseña con este enlace:</p><p><a href=\"{{link}}\">{{link}}</a></p><p>Este enlace caduca el {{date linkExpiresAt}}. Si no solicitó esto, puede ignorar este correo.</p><p>{{companyName}} · {{fqdn}}</p>"
+}

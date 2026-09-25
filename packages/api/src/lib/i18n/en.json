@@ -1,0 +1,49 @@
+{
+  "login": {
+    "title": "Sign in",
+    "consentIntro": "{client} wants you to sign in.",
+    "consentApprove": "Approve",
+    "consentDeny": "Deny",
+    "email": "E-mail",
+    "password": "Password",
+    "submit": "Sign in",
+    "invalid": "Incorrect e-mail or password.",
+    "forgotLink": "Forgot your password?",
+    "ssoPrefix": "Sign in with "
+  },
+  "forgot": {
+    "title": "Forgot password",
+    "intro": "Enter your e-mail and we will send you a link to set a new password.",
+    "email": "E-mail",
+    "submit": "Send reset link",
+    "sent": "If that address has an account, a reset link is on its way.",
+    "backToLogin": "Back to sign in"
+  },
+  "setPassword": {
+    "title": "Set your password",
+    "password": "New password",
+    "submit": "Set password",
+    "success": "Your password has been set.",
+    "successLoginLink": "Continue to sign in",
+    "invalid": "This link has expired or was already used.",
+    "tooShort": "The password must be at least {min} characters."
+  },
+  "error": {
+    "title": "Sign-in problem",
+    "expired": "This link has expired. Please try again.",
+    "noUser": "No account matches that sign-in.",
+    "domain": "Your e-mail domain is not allowed to sign in here.",
+    "unverifiedEmail": "Your identity provider has not verified this e-mail address.",
+    "issuer": "This sign-in was issued by the wrong identity provider.",
+    "audience": "This sign-in was issued for a different application.",
+    "signature": "This sign-in could not be verified.",
+    "nonce": "This sign-in could not be verified.",
+    "generic": "Something went wrong while signing in.",
+    "backToLogin": "Back to sign in"
+  },
+  "done": {
+    "title": "You are signed in",
+    "message": "You have signed in to {company}.",
+    "mcpHint": "Connect an MCP client with:"
+  }
+}

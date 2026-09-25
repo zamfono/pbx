@@ -1,0 +1,103 @@
+import { z } from 'zod';
+
+import { encrypt, keyringFromEnv } from '../../secretbox.js';
+import { recordChange } from '../runner.js';
+import { defineOperation, OpError } from '../types.js';
+import {
+  eventTypeSchema,
+  httpUrlSchema,
+  loadLiveWebhook,
+  parseEventTypesJson,
+  toWire,
+  type WebhookWire
+} from './_shared.js';
+
+const STATUS_NOT_FOUND = 404;
+
+const inputSchema = z
+  .object({
+    id: z.string(),
+    url: httpUrlSchema.optional(),
+    secret: z.string().min(1).optional(),
+    eventTypes: z.array(eventTypeSchema).nullable().optional(),
+    active: z.boolean().optional()
+  })
+  .strict();
+
+type Input = z.infer<typeof inputSchema>;
+
+/** `value` where given, `before` otherwise, distinguishing an absent key from an explicit `null`. */
+function orBefore<T>(value: T | undefined, before: T): T {
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- `??` would also replace an explicit `null` (a meaningful patch value), not just an absent key
+  return value === undefined ? before : value;
+}
+
+/** The next `event_types_json` value: unchanged while `eventTypes` is absent (§10.6). */
+function nextEventTypesJson(
+  before: string | null,
+  eventTypes: string[] | null | undefined
+): string | null {
+  if (eventTypes === undefined) {
+    return before;
+  }
+  if (eventTypes === null) {
+    return null;
+  }
+  return JSON.stringify(eventTypes);
+}
+
+/** `PATCH /webhooks/{id}` (§10.6): URL, secret, event-type filter and the `active` switch. */
+export const update = defineOperation<Input, WebhookWire>({
+  name: 'webhooks.update',
+  description: 'Changes a webhook',
+  input: inputSchema,
+  minRole: 'admin',
+  entity: input => ({ kind: 'webhook', id: input.id }),
+  run: async (ctx, input) => {
+    const before = await loadLiveWebhook(ctx.db, input.id);
+    if (!before) {
+      throw new OpError(STATUS_NOT_FOUND, 'webhooks: webhook not found');
+    }
+    const url = orBefore(input.url, before.url);
+    const active = orBefore(input.active, before.active === 1);
+    const eventTypesJson = nextEventTypesJson(
+      before.eventTypesJson,
+      input.eventTypes
+    );
+    const secretEnc =
+      input.secret === undefined
+        ? before.secretEnc
+        : encrypt(keyringFromEnv(process.env), input.secret);
+    if (url !== before.url) {
+      recordChange(ctx, { field: 'url', from: before.url, to: url });
+    }
+    if (active !== (before.active === 1)) {
+      recordChange(ctx, {
+        field: 'active',
+        from: before.active === 1,
+        to: active
+      });
+    }
+    if (eventTypesJson !== before.eventTypesJson) {
+      recordChange(ctx, {
+        field: 'eventTypes',
+        from: parseEventTypesJson(before.eventTypesJson),
+        to: parseEventTypesJson(eventTypesJson)
+      });
+    }
+    if (input.secret !== undefined) {
+      recordChange(ctx, { field: 'secret', from: null, to: input.secret });
+    }
+    await ctx.db
+      .updateTable('webhooks')
+      .set({ url, active: active ? 1 : 0, eventTypesJson, secretEnc })
+      .where('id', '=', input.id)
+      .execute();
+    const row = await ctx.db
+      .selectFrom('webhooks')
+      .selectAll()
+      .where('id', '=', input.id)
+      .executeTakeFirstOrThrow();
+    return toWire(row);
+  }
+});

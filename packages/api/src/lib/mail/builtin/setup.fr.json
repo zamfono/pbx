@@ -1,0 +1,5 @@
+{
+  "subject": "Définissez votre mot de passe {{companyName}}",
+  "bodyText": "Bonjour {{recipientName}},\n\n{{#if invitedBy}}{{invitedBy}} a créé votre compte du standard {{companyName}}.{{else}}Votre standard {{companyName}} est prêt.{{/if}} Définissez votre mot de passe via ce lien :\n\n{{link}}\n\nCe lien expire le {{date linkExpiresAt}}.\n{{#unless invitedBy}}\nUne fois connecté, connectez votre assistant IA à {{fqdn}} via MCP pour gérer le standard par chat.\n{{/unless}}\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Bonjour {{recipientName}},</p><p>{{#if invitedBy}}{{invitedBy}} a créé votre compte du standard {{companyName}}.{{else}}Votre standard {{companyName}} est prêt.{{/if}} Définissez votre mot de passe via ce lien :</p><p><a href=\"{{link}}\">{{link}}</a></p><p>Ce lien expire le {{date linkExpiresAt}}.</p>{{#unless invitedBy}}<p>Une fois connecté, connectez votre assistant IA à {{fqdn}} via MCP pour gérer le standard par chat.</p>{{/unless}}<p>{{companyName}} · {{fqdn}}</p>"
+}

@@ -1,0 +1,101 @@
+#!/bin/sh
+# zamfono-cert-hook (images/proxy/Dockerfile, docs/spec.md §6.4 "TLS certificates"). Caddy's
+# `cert_obtained` event runs this on every certificate issuance or renewal, through the
+# caddy-events-exec module deploy/Caddyfile's global `events` block wires up:
+#
+#   on cert_obtained exec /usr/local/bin/zamfono-cert-hook \
+#     {event.data.certificate_path} {event.data.private_key_path} {event.data.identifier}
+#
+# certmagic (config.go, `cfg.emit(ctx, "cert_obtained", …)`) gives `certificate_path` and
+# `private_key_path` as storage KEYS relative to Caddy's storage root — never an absolute
+# path — of the shape "certificates/<issuer>/<domain>/<domain>.crt|.key"
+# (certmagic/storage.go KeyBuilder.SiteCert/SitePrivateKey). The default FileStorage's root is
+# `$XDG_DATA_HOME/caddy` (caddy's storage.go AppDataDir()); the image sets XDG_DATA_HOME=/data,
+# the same volume the `caddy-data` mount backs (§6.3), so the two are joined below rather than
+# assumed absolute. `identifier` is the name the certificate covers; the stack's Caddyfile has
+# one site block, but certmagic can still emit this event for a certificate that is not that
+# site's (an internal one, a renewal in flight for something else), so this hook acts only when
+# it matches $FQDN, the same variable the Caddyfile site address reads (§6.3).
+#
+# The copy this hook makes is what `api` reads instead of Caddy's own store, whose layout is
+# undocumented (§6.4: "`api` reads only the hook's copy, never Caddy's own certificate store").
+# It lands at a fixed pair of its own on the same `caddy-data` volume, $XDG_DATA_HOME/zamfono/
+# cert.pem and privkey.pem, written atomically (temp file, then `mv` within the same directory,
+# so the rename is atomic) and left owned by this image's own uid (1000, the `caddy` user this
+# image runs as, and the uid `api` also runs as — §6.3 "Migrations"). Caddy-events-exec runs
+# handlers in the background by default (its own README), so a hook that hangs never blocks
+# certificate issuance; each step below still logs one line to stderr, which lands in the
+# container's own logs (§7 "Logs").
+#
+# A failed notification to `api` is not fatal (§6.4: hourly poll plus the sync at `api` start
+# are the fallback), so this hook never exits non-zero past argument validation — there is
+# nothing for Caddy to retry that retrying would fix.
+set -eu
+
+log() {
+  echo "zamfono-cert-hook: $1" >&2
+}
+
+cert_rel=${1:?usage: zamfono-cert-hook <certificate_path> <private_key_path> <identifier>}
+key_rel=${2:?usage: zamfono-cert-hook <certificate_path> <private_key_path> <identifier>}
+identifier=${3:-}
+
+if [ "$identifier" != "${FQDN:-}" ]; then
+  log "ignoring the certificate for '$identifier' (stack FQDN is '${FQDN:-<unset>}')"
+  exit 0
+fi
+
+data_home=${XDG_DATA_HOME:-/data}
+storage_root="$data_home/caddy"
+src_crt="$storage_root/$cert_rel"
+src_key="$storage_root/$key_rel"
+
+if [ ! -r "$src_crt" ] || [ ! -r "$src_key" ]; then
+  log "'$src_crt' or '$src_key' is not readable yet; leaving it to the hourly api fallback"
+  exit 0
+fi
+
+dest_dir="$data_home/zamfono"
+mkdir -p "$dest_dir"
+
+tmp_crt=$(mktemp "$dest_dir/.cert.pem.XXXXXX")
+tmp_key=$(mktemp "$dest_dir/.privkey.pem.XXXXXX")
+cleanup() {
+  rm -f "$tmp_crt" "$tmp_key"
+}
+trap cleanup EXIT
+
+log "copying the certificate for '$identifier' onto caddy-data"
+cp "$src_crt" "$tmp_crt"
+cp "$src_key" "$tmp_key"
+# 0640/owned 1000: `api`, the reader, is uid 1000 too (§6.3 "Migrations"); the key stays
+# unreadable to anyone else the volume is mounted into.
+chmod 0640 "$tmp_crt"
+chmod 0600 "$tmp_key"
+mv -f "$tmp_crt" "$dest_dir/cert.pem"
+mv -f "$tmp_key" "$dest_dir/privkey.pem"
+trap - EXIT
+log "copy complete"
+
+# Reaches `api` directly: the `proxy` container shares Asterisk's network namespace
+# (network_mode: service:asterisk, §6.3), which is on the `internal` network `api` is too, the
+# same path deploy/Caddyfile's own `reverse_proxy api:3000` already uses. On a first boot Caddy
+# can issue before `api` listens, after its start sync has already found no copy, so the
+# notification is retried for a minute (caddy-events-exec runs this in the background); a
+# notification still missed after that is not fatal: the hourly poll picks the copy up.
+log "notifying api"
+notified=false
+for _ in $(seq 1 30); do
+  if wget -q -T 5 -O /dev/null --post-data='' http://api:3000/internal/certificate; then
+    notified=true
+    break
+  fi
+  sleep 2
+done
+if [ "$notified" = true ]; then
+  log "api notified"
+else
+  log "api notification failed (non-fatal; the hourly sync will pick this up)"
+fi
+
+log "done"

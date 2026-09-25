@@ -1,0 +1,5 @@
+{
+  "subject": "Passwort für {{companyName}} festlegen",
+  "bodyText": "Hallo {{recipientName}},\n\n{{#if invitedBy}}{{invitedBy}} hat Ihr {{companyName}}-Telefonanlagenkonto erstellt.{{else}}Ihre {{companyName}}-Telefonanlage ist bereit.{{/if}} Legen Sie Ihr Passwort über diesen Link fest:\n\n{{link}}\n\nDieser Link läuft am {{date linkExpiresAt}} ab.\n{{#unless invitedBy}}\nSobald Sie angemeldet sind, verbinden Sie Ihren KI-Assistenten über MCP mit {{fqdn}}, um die Telefonanlage per Chat zu verwalten.\n{{/unless}}\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Hallo {{recipientName}},</p><p>{{#if invitedBy}}{{invitedBy}} hat Ihr {{companyName}}-Telefonanlagenkonto erstellt.{{else}}Ihre {{companyName}}-Telefonanlage ist bereit.{{/if}} Legen Sie Ihr Passwort über diesen Link fest:</p><p><a href=\"{{link}}\">{{link}}</a></p><p>Dieser Link läuft am {{date linkExpiresAt}} ab.</p>{{#unless invitedBy}}<p>Sobald Sie angemeldet sind, verbinden Sie Ihren KI-Assistenten über MCP mit {{fqdn}}, um die Telefonanlage per Chat zu verwalten.</p>{{/unless}}<p>{{companyName}} · {{fqdn}}</p>"
+}

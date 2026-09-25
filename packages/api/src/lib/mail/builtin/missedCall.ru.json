@@ -1,0 +1,5 @@
+{
+  "subject": "Пропущенный звонок на {{didLabel}}",
+  "bodyText": "Здравствуйте, {{recipientName}}!\n\nВы пропустили звонок на {{didLabel}} от {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}} в {{date receivedAt}}.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Здравствуйте, {{recipientName}}!</p><p>Вы пропустили звонок на {{didLabel}} от {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}} в {{date receivedAt}}.</p><p>{{companyName}} · {{fqdn}}</p>"
+}

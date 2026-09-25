@@ -1,0 +1,667 @@
+import { createHash } from 'node:crypto';
+import process from 'node:process';
+import { exportJWK, generateKeyPair, SignJWT, type JWK } from 'jose';
+import { describe, expect, it } from 'vitest';
+
+import { nowIso, type Db } from '@zamfono/shared';
+
+import { encrypt, keyringFromEnv, type Keyring } from '../secretbox.js';
+import { makeTestDb } from '../testDb.js';
+import {
+  discover,
+  finishLogin,
+  sealPendingLogin,
+  ssoConfigFromSettings,
+  startLogin,
+  unsealPendingLogin,
+  type Discovery,
+  type PendingAuthorize,
+  type SsoConfig
+} from './sso.js';
+
+const NOW = '2026-01-01T00:00:00.000Z';
+const NOW_S = Math.floor(Date.parse(NOW) / 1000);
+const TOKEN_TTL_S = 300;
+const ORIGIN = 'https://pbx.example.com';
+const CLIENT_ID = 'test-client';
+const AUTH_CODE = 'auth-code';
+const NONCE = 'test-nonce';
+const KEY_ID = 'kid-1';
+const SECRETBOX_KEY_VALUE = `0:${Buffer.alloc(32, 7).toString('base64')}`;
+
+// `startLogin`/`unsealPendingLogin` read the sealing key from `process.env` themselves, the same
+// way the callback route resolves it (`keyringFromEnv(process.env)`), so it must be set once here.
+process.env.SECRETBOX_KEY = SECRETBOX_KEY_VALUE;
+
+function testKeyring(): Keyring {
+  return keyringFromEnv({ SECRETBOX_KEY: SECRETBOX_KEY_VALUE });
+}
+
+/** The value of a `Set-Cookie` string's first `name=value` pair. */
+function cookieValueOf(cookie: string): string {
+  return cookie.slice(cookie.indexOf('=') + 1, cookie.indexOf(';'));
+}
+
+function pendingAuthorize(state: string): PendingAuthorize {
+  return {
+    clientId: 'outer-client',
+    redirectUri: 'https://app.example.com/callback',
+    codeChallenge: 'challenge',
+    scope: 'openid',
+    state
+  };
+}
+
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'content-type': 'application/json' }
+  });
+}
+
+type TestClaims = {
+  sub: string;
+  email?: string;
+  emailVerified?: boolean;
+  preferredUsername?: string;
+};
+
+/** A self-signed id_token plus the JWKS its `kid` resolves against (§5.2 "id_token validated
+ *  against jwks"). `audience`/`expiresAtS` let a test build a token that fails one specific
+ *  `jwtVerify` check without touching the others. */
+async function issueIdToken(
+  issuer: string,
+  claims: TestClaims,
+  opts: { audience?: string; expiresAtS?: number } = {}
+): Promise<{ idToken: string; jwks: { keys: JWK[] } }> {
+  const { privateKey, publicKey } = await generateKeyPair('RS256');
+  const publicJwk = await exportJWK(publicKey);
+  /* eslint-disable camelcase -- OIDC's standard claim names are snake_case */
+  const payload = {
+    nonce: NONCE,
+    sub: claims.sub,
+    email: claims.email,
+    email_verified: claims.emailVerified,
+    preferred_username: claims.preferredUsername
+  };
+  /* eslint-enable camelcase -- OIDC's standard claim names are snake_case */
+  const idToken = await new SignJWT(payload)
+    .setProtectedHeader({ alg: 'RS256', kid: KEY_ID })
+    .setIssuer(issuer)
+    .setAudience(opts.audience ?? CLIENT_ID)
+    .setIssuedAt(NOW_S)
+    .setExpirationTime(opts.expiresAtS ?? NOW_S + TOKEN_TTL_S)
+    .sign(privateKey);
+  return {
+    idToken,
+    jwks: { keys: [{ ...publicJwk, kid: KEY_ID, alg: 'RS256', use: 'sig' }] }
+  };
+}
+
+/** `input`, whatever `typeof fetch`'s first argument shape the caller used. */
+function urlOf(input: string | URL | Request): string {
+  if (typeof input === 'string') {
+    return input;
+  }
+  return input instanceof URL ? input.toString() : input.url;
+}
+
+function fetchFor(
+  disc: Discovery,
+  jwks: unknown,
+  idToken: string
+): typeof fetch {
+  return (input: string | URL | Request) => {
+    const url = urlOf(input);
+    if (url === disc.tokenEndpoint) {
+      // eslint-disable-next-line camelcase -- RFC 6749 mandates this snake_case wire field
+      return Promise.resolve(jsonResponse({ id_token: idToken }));
+    }
+    if (url === disc.jwksUri) {
+      return Promise.resolve(jsonResponse(jwks));
+    }
+    throw new Error(`sso test: unexpected fetch ${url}`);
+  };
+}
+
+function discoveryFor(issuer: string): Discovery {
+  return {
+    authorizationEndpoint: `${issuer}/authorize`,
+    tokenEndpoint: `${issuer}/token`,
+    jwksUri: `${issuer}/jwks`,
+    issuer
+  };
+}
+
+function oidcConfig(overrides: Partial<SsoConfig> = {}): SsoConfig {
+  return {
+    provider: 'oidc',
+    issuer: 'https://idp.example.com',
+    clientId: CLIENT_ID,
+    clientSecret: null,
+    tenantId: null,
+    allowedDomain: null,
+    label: 'Test IdP',
+    ...overrides
+  };
+}
+
+async function insertUser(
+  db: Db,
+  fields: { id: string; email: string; ssoSubject?: string | null }
+): Promise<void> {
+  await db
+    .insertInto('users')
+    .values({
+      id: fields.id,
+      name: fields.id,
+      email: fields.email,
+      ssoSubject: fields.ssoSubject ?? null,
+      createdAt: nowIso()
+    })
+    .execute();
+}
+
+describe('finishLogin', () => {
+  it('binds sso_subject on the first login matching by e-mail', async () => {
+    const db = await makeTestDb();
+    await insertUser(db, { id: 'alice', email: 'alice@example.com' });
+    const disc = discoveryFor(oidcConfig().issuer);
+    const { idToken, jwks } = await issueIdToken(disc.issuer, {
+      sub: 'sub-1',
+      email: 'alice@example.com',
+      emailVerified: true
+    });
+    const result = await finishLogin(
+      db,
+      oidcConfig(),
+      disc,
+      {
+        code: AUTH_CODE,
+        codeVerifier: NONCE,
+        nonce: NONCE,
+        origin: ORIGIN,
+        now: NOW
+      },
+      fetchFor(disc, jwks, idToken)
+    );
+    expect(result).toEqual({ ok: true, userId: 'alice' });
+    const row = await db
+      .selectFrom('users')
+      .select('ssoSubject')
+      .where('id', '=', 'alice')
+      .executeTakeFirstOrThrow();
+    expect(row.ssoSubject).toBe('sub-1');
+  });
+
+  it('matches a bound user by sub after their e-mail changes', async () => {
+    const db = await makeTestDb();
+    await insertUser(db, {
+      id: 'alice',
+      email: 'alice@example.com',
+      ssoSubject: 'sub-1'
+    });
+    await db
+      .updateTable('users')
+      .set({ email: 'alice.new@example.com' })
+      .where('id', '=', 'alice')
+      .execute();
+    const disc = discoveryFor(oidcConfig().issuer);
+    const { idToken, jwks } = await issueIdToken(disc.issuer, {
+      sub: 'sub-1',
+      email: 'alice@example.com',
+      emailVerified: true
+    });
+    const result = await finishLogin(
+      db,
+      oidcConfig(),
+      disc,
+      {
+        code: AUTH_CODE,
+        codeVerifier: NONCE,
+        nonce: NONCE,
+        origin: ORIGIN,
+        now: NOW
+      },
+      fetchFor(disc, jwks, idToken)
+    );
+    expect(result).toEqual({ ok: true, userId: 'alice' });
+  });
+
+  it('refuses a token whose sub is unknown but whose e-mail is already bound', async () => {
+    const db = await makeTestDb();
+    await insertUser(db, {
+      id: 'alice',
+      email: 'alice@example.com',
+      ssoSubject: 'sub-1'
+    });
+    const disc = discoveryFor(oidcConfig().issuer);
+    const { idToken, jwks } = await issueIdToken(disc.issuer, {
+      sub: 'sub-2',
+      email: 'alice@example.com',
+      emailVerified: true
+    });
+    const result = await finishLogin(
+      db,
+      oidcConfig(),
+      disc,
+      {
+        code: AUTH_CODE,
+        codeVerifier: NONCE,
+        nonce: NONCE,
+        origin: ORIGIN,
+        now: NOW
+      },
+      fetchFor(disc, jwks, idToken)
+    );
+    expect(result).toEqual({ ok: false, reason: 'subMismatch' });
+  });
+
+  it('refuses a google token with an unverified e-mail', async () => {
+    const db = await makeTestDb();
+    await insertUser(db, { id: 'alice', email: 'alice@example.com' });
+    const cfg = oidcConfig({
+      provider: 'google',
+      issuer: 'https://accounts.google.com'
+    });
+    const disc = discoveryFor(cfg.issuer);
+    const { idToken, jwks } = await issueIdToken(disc.issuer, {
+      sub: 'sub-1',
+      email: 'alice@example.com',
+      emailVerified: false
+    });
+    const result = await finishLogin(
+      db,
+      cfg,
+      disc,
+      {
+        code: AUTH_CODE,
+        codeVerifier: NONCE,
+        nonce: NONCE,
+        origin: ORIGIN,
+        now: NOW
+      },
+      fetchFor(disc, jwks, idToken)
+    );
+    expect(result).toEqual({ ok: false, reason: 'unverifiedEmail' });
+  });
+
+  it('refuses an e-mail domain outside settings.sso_allowed_domain', async () => {
+    const db = await makeTestDb();
+    await insertUser(db, { id: 'bob', email: 'bob@other.example.com' });
+    const cfg = oidcConfig({ allowedDomain: 'allowed.example.com' });
+    const disc = discoveryFor(cfg.issuer);
+    const { idToken, jwks } = await issueIdToken(disc.issuer, {
+      sub: 'sub-1',
+      email: 'bob@other.example.com',
+      emailVerified: true
+    });
+    const result = await finishLogin(
+      db,
+      cfg,
+      disc,
+      {
+        code: AUTH_CODE,
+        codeVerifier: NONCE,
+        nonce: NONCE,
+        origin: ORIGIN,
+        now: NOW
+      },
+      fetchFor(disc, jwks, idToken)
+    );
+    expect(result).toEqual({ ok: false, reason: 'domain' });
+  });
+
+  it('refuses an id_token issued for another Microsoft tenant', async () => {
+    const db = await makeTestDb();
+    await insertUser(db, { id: 'carol', email: 'carol@tenant-a.example' });
+    const cfg = oidcConfig({
+      provider: 'microsoft',
+      issuer: 'https://login.microsoftonline.com/tenant-a/v2.0',
+      tenantId: 'tenant-a'
+    });
+    const disc = discoveryFor(cfg.issuer);
+    const { idToken, jwks } = await issueIdToken(
+      'https://login.microsoftonline.com/tenant-b/v2.0',
+      { sub: 'sub-1', preferredUsername: 'carol@tenant-a.example' }
+    );
+    const result = await finishLogin(
+      db,
+      cfg,
+      disc,
+      {
+        code: AUTH_CODE,
+        codeVerifier: NONCE,
+        nonce: NONCE,
+        origin: ORIGIN,
+        now: NOW
+      },
+      fetchFor(disc, jwks, idToken)
+    );
+    expect(result).toEqual({ ok: false, reason: 'issuer' });
+  });
+
+  it('matches a Microsoft login by preferred_username, with no email_verified claim', async () => {
+    const db = await makeTestDb();
+    await insertUser(db, { id: 'carol', email: 'carol@tenant-a.example' });
+    const cfg = oidcConfig({
+      provider: 'microsoft',
+      issuer: 'https://login.microsoftonline.com/tenant-a/v2.0',
+      tenantId: 'tenant-a'
+    });
+    const disc = discoveryFor(cfg.issuer);
+    const { idToken, jwks } = await issueIdToken(disc.issuer, {
+      sub: 'sub-1',
+      preferredUsername: 'carol@tenant-a.example'
+    });
+    const result = await finishLogin(
+      db,
+      cfg,
+      disc,
+      {
+        code: AUTH_CODE,
+        codeVerifier: NONCE,
+        nonce: NONCE,
+        origin: ORIGIN,
+        now: NOW
+      },
+      fetchFor(disc, jwks, idToken)
+    );
+    expect(result).toEqual({ ok: true, userId: 'carol' });
+  });
+
+  it('reports "audience" for an id_token issued for a different client', async () => {
+    const db = await makeTestDb();
+    await insertUser(db, { id: 'erin', email: 'erin@example.com' });
+    const disc = discoveryFor(oidcConfig().issuer);
+    const { idToken, jwks } = await issueIdToken(
+      disc.issuer,
+      { sub: 'sub-1', email: 'erin@example.com', emailVerified: true },
+      { audience: 'someone-elses-client' }
+    );
+    const result = await finishLogin(
+      db,
+      oidcConfig(),
+      disc,
+      {
+        code: AUTH_CODE,
+        codeVerifier: NONCE,
+        nonce: NONCE,
+        origin: ORIGIN,
+        now: NOW
+      },
+      fetchFor(disc, jwks, idToken)
+    );
+    expect(result).toEqual({ ok: false, reason: 'audience' });
+  });
+
+  it('reports "expired" for an id_token past its exp claim', async () => {
+    const db = await makeTestDb();
+    await insertUser(db, { id: 'frank', email: 'frank@example.com' });
+    const disc = discoveryFor(oidcConfig().issuer);
+    const { idToken, jwks } = await issueIdToken(
+      disc.issuer,
+      { sub: 'sub-1', email: 'frank@example.com', emailVerified: true },
+      { expiresAtS: NOW_S - 1 }
+    );
+    const result = await finishLogin(
+      db,
+      oidcConfig(),
+      disc,
+      {
+        code: AUTH_CODE,
+        codeVerifier: NONCE,
+        nonce: NONCE,
+        origin: ORIGIN,
+        now: NOW
+      },
+      fetchFor(disc, jwks, idToken)
+    );
+    expect(result).toEqual({ ok: false, reason: 'expired' });
+  });
+
+  it('reports "signature" for an id_token that does not verify against the JWKS', async () => {
+    const db = await makeTestDb();
+    await insertUser(db, { id: 'gina', email: 'gina@example.com' });
+    const disc = discoveryFor(oidcConfig().issuer);
+    const claims = {
+      sub: 'sub-1',
+      email: 'gina@example.com',
+      emailVerified: true
+    };
+    const { idToken } = await issueIdToken(disc.issuer, claims);
+    // A second, unrelated key pair under the same `kid`: `jwtVerify` finds a key to try and fails
+    // signature verification against it, rather than the mismatched key `idToken` was signed with.
+    const { jwks: mismatchedJwks } = await issueIdToken(disc.issuer, claims);
+    const result = await finishLogin(
+      db,
+      oidcConfig(),
+      disc,
+      {
+        code: AUTH_CODE,
+        codeVerifier: NONCE,
+        nonce: NONCE,
+        origin: ORIGIN,
+        now: NOW
+      },
+      fetchFor(disc, mismatchedJwks, idToken)
+    );
+    expect(result).toEqual({ ok: false, reason: 'signature' });
+  });
+});
+
+describe('startLogin / unsealPendingLogin', () => {
+  it('builds an authorization URL with PKCE S256 and the OIDC scope', () => {
+    const cfg = oidcConfig();
+    const disc = discoveryFor(cfg.issuer);
+    const codeVerifier = 'verifier-1';
+    const { url: rawUrl, cookie } = startLogin(
+      cfg,
+      disc,
+      ORIGIN,
+      'state-1',
+      NONCE,
+      codeVerifier
+    );
+    const url = new URL(rawUrl);
+    expect(url.origin + url.pathname).toBe(disc.authorizationEndpoint);
+    expect(url.searchParams.get('client_id')).toBe(CLIENT_ID);
+    expect(url.searchParams.get('redirect_uri')).toBe(
+      `${ORIGIN}/oauth/callback`
+    );
+    expect(url.searchParams.get('response_type')).toBe('code');
+    expect(url.searchParams.get('scope')).toBe('openid email profile');
+    expect(url.searchParams.get('state')).toBe('state-1');
+    expect(url.searchParams.get('nonce')).toBe(NONCE);
+    expect(url.searchParams.get('code_challenge_method')).toBe('S256');
+    expect(url.searchParams.get('code_challenge')).toBe(
+      createHash('sha256').update(codeVerifier).digest('base64url')
+    );
+    expect(cookie).toContain('HttpOnly');
+    expect(cookie).toContain('Secure');
+    expect(cookie).toContain('SameSite=Lax');
+    expect(cookie).toContain('Path=/oauth');
+    expect(cookie).toContain('Max-Age=600');
+  });
+
+  it('never puts the PKCE verifier itself on the authorization URL (RFC 7636)', () => {
+    const cfg = oidcConfig();
+    const disc = discoveryFor(cfg.issuer);
+    const { url, cookie } = startLogin(
+      cfg,
+      disc,
+      ORIGIN,
+      'state-2',
+      NONCE,
+      'verifier-2'
+    );
+    expect(url).not.toContain('verifier-2');
+    expect(cookie).not.toContain('verifier-2');
+  });
+
+  it('recovers the state, nonce and PKCE verifier startLogin sealed into the cookie', () => {
+    const cfg = oidcConfig();
+    const disc = discoveryFor(cfg.issuer);
+    const { cookie } = startLogin(
+      cfg,
+      disc,
+      ORIGIN,
+      'state-3',
+      NONCE,
+      'verifier-3'
+    );
+    expect(unsealPendingLogin(cookieValueOf(cookie))).toEqual({
+      state: 'state-3',
+      nonce: NONCE,
+      codeVerifier: 'verifier-3',
+      authorizeParams: null
+    });
+  });
+
+  it('returns null while no zamfono_sso cookie was presented', () => {
+    expect(unsealPendingLogin(undefined)).toBeNull();
+  });
+
+  it('returns null for a cookie value that does not unseal under the current keyring', () => {
+    expect(unsealPendingLogin('not-a-sealed-value')).toBeNull();
+  });
+
+  it('carries an outer authorize context sealed in afterwards by sealPendingLogin', () => {
+    const cfg = oidcConfig();
+    const disc = discoveryFor(cfg.issuer);
+    const { cookie } = startLogin(
+      cfg,
+      disc,
+      ORIGIN,
+      'state-4',
+      NONCE,
+      'verifier-4'
+    );
+    const pending = unsealPendingLogin(cookieValueOf(cookie));
+    if (pending === null) {
+      throw new Error('expected a pending login for state-4');
+    }
+    const authorizeParams = pendingAuthorize('outer-state');
+    const resealed = sealPendingLogin({ ...pending, authorizeParams });
+    expect(unsealPendingLogin(cookieValueOf(resealed))).toEqual({
+      ...pending,
+      authorizeParams
+    });
+  });
+});
+
+describe('discover', () => {
+  it('fetches and caches the discovery document for an hour', async () => {
+    const issuer = 'https://idp.example.com';
+    let calls = 0;
+    const fetchImpl = (() => {
+      calls += 1;
+      /* eslint-disable camelcase -- OIDC discovery documents use these snake_case wire fields */
+      return Promise.resolve(
+        jsonResponse({
+          authorization_endpoint: `${issuer}/authorize`,
+          token_endpoint: `${issuer}/token`,
+          jwks_uri: `${issuer}/jwks`,
+          issuer
+        })
+      );
+      /* eslint-enable camelcase -- OIDC discovery documents use these snake_case wire fields */
+    }) as typeof fetch;
+    const cfg = oidcConfig({ issuer });
+    const first = await discover(cfg, fetchImpl);
+    const second = await discover(cfg, fetchImpl);
+    expect(first).toEqual(second);
+    expect(first).toEqual(discoveryFor(issuer));
+    expect(calls).toBe(1);
+  });
+
+  it('rejects a discovery document declaring another issuer (RFC 8414 §3.3)', async () => {
+    const issuer = 'https://idp2.example.com';
+    /* eslint-disable camelcase -- OIDC discovery documents use these snake_case wire fields */
+    const fetchImpl = (() =>
+      Promise.resolve(
+        jsonResponse({
+          authorization_endpoint: `${issuer}/authorize`,
+          token_endpoint: `${issuer}/token`,
+          jwks_uri: `${issuer}/jwks`,
+          issuer: 'https://attacker.example.com'
+        })
+      )) as typeof fetch;
+    /* eslint-enable camelcase -- OIDC discovery documents use these snake_case wire fields */
+    await expect(discover(oidcConfig({ issuer }), fetchImpl)).rejects.toThrow(
+      /issuer/u
+    );
+  });
+});
+
+describe('ssoConfigFromSettings', () => {
+  async function seedSettings(
+    db: Db,
+    fields: Record<string, unknown>
+  ): Promise<void> {
+    await db
+      .insertInto('forwardTargets')
+      .values({ id: 'ft1', userId: 'owner' })
+      .execute();
+    await db
+      .insertInto('dids')
+      .values({
+        id: 'did1',
+        number: '+491234567',
+        targetId: 'ft1',
+        createdAt: NOW
+      })
+      .execute();
+    await db
+      .insertInto('settings')
+      .values({
+        id: 1,
+        companyName: 'Acme',
+        mainDidId: 'did1',
+        country: 'DE',
+        emergencyNumbersJson: '["112"]',
+        ...fields
+      })
+      .execute();
+  }
+
+  it('returns null while sso_provider is unset', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db, {});
+    expect(await ssoConfigFromSettings(db, testKeyring())).toBeNull();
+  });
+
+  it('pins the Microsoft issuer to the configured tenant', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db, {
+      ssoProvider: 'microsoft',
+      ssoClientId: 'ms-client',
+      ssoTenantId: 'tenant-a'
+    });
+    const cfg = await ssoConfigFromSettings(db, testKeyring());
+    expect(cfg).toEqual({
+      provider: 'microsoft',
+      issuer: 'https://login.microsoftonline.com/tenant-a/v2.0',
+      clientId: 'ms-client',
+      clientSecret: null,
+      tenantId: 'tenant-a',
+      allowedDomain: null,
+      label: 'Microsoft'
+    });
+  });
+
+  it('decrypts a stored SSO client secret', async () => {
+    const kr = testKeyring();
+    const db = await makeTestDb();
+    await seedSettings(db, {
+      ssoProvider: 'oidc',
+      ssoClientId: 'oidc-client',
+      ssoIssuer: 'https://idp.example.com',
+      ssoLabel: 'Company IdP',
+      ssoClientSecretEnc: encrypt(kr, 'shh')
+    });
+    const cfg = await ssoConfigFromSettings(db, kr);
+    expect(cfg?.clientSecret).toBe('shh');
+    expect(cfg?.label).toBe('Company IdP');
+  });
+});

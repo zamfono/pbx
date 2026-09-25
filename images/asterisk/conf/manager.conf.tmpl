@@ -1,0 +1,13 @@
+; AMI for outbound registration state (spec §9.4): `system` read for the Registry events,
+; `reporting` write for the PJSIPShowRegistrationsOutbound action, since Asterisk authorises
+; actions against the write classes. Bound to the `internal` network address alone,
+; never 0.0.0.0 (spec §9.1).
+[general]
+enabled = yes
+bindaddr = ${INTERNAL_ADDR}
+port = 5038
+
+[zamfono]
+secret = ${AMI_PASSWORD}
+read = system
+write = reporting

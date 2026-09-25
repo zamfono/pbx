@@ -1,0 +1,67 @@
+/**
+ * The missed-call notification (§10.2 "Mail"): a user whose `notify_missed_calls` is set is told
+ * about a call that rang them and was never answered. `api` renders and sends it; `core` only
+ * posts the request (§3.1 "Mail").
+ */
+import type { MailRequest } from '@zamfono/shared';
+
+import type { Call } from './call.js';
+import { contactName } from './contactName.js';
+import type { Pipeline } from './pipeline.js';
+
+/**
+ * Posts the notification for `call` when it went unanswered and the user it rang wants to hear
+ * about it. The mail is "one per missed inbound call" (§10.2 "Mail"), so a colleague's internal
+ * call notifies no one, and neither does a call that reached nobody in particular — no callee,
+ * an announcement, a menu the caller abandoned.
+ */
+export async function notifyMissedCall(
+  pipeline: Pipeline,
+  call: Call
+): Promise<void> {
+  const { db, apiClient } = pipeline.deps;
+  const userId = call.calleeUserId;
+  if (
+    db === undefined ||
+    apiClient === undefined ||
+    userId === null ||
+    call.direction !== 'inbound'
+  ) {
+    return;
+  }
+  const snapshot = await pipeline.deps.cache.get();
+  const user = snapshot.users.find(row => row.id === userId);
+  if (user?.notifyMissedCalls !== 1) {
+    return;
+  }
+  const did =
+    call.didId === null
+      ? undefined
+      : snapshot.dids.find(row => row.id === call.didId);
+  const request: MailRequest = {
+    kind: 'missedCall',
+    callId: call.id,
+    to: { userId },
+    values: {
+      callerNumber: call.from,
+      callerName: await contactName(db, call.from),
+      receivedAt: call.startedAt,
+      didLabel: did?.label ?? did?.number ?? ''
+    }
+  };
+  await apiClient.mail(request).catch(() => undefined);
+}
+
+/** Closes out a call whose caller left before any outcome was reached (§11.2 `calls.status`
+ * `missed`), with its missed-call mail; an outcome already reached is kept, and so is the row of
+ * a call already closed (`cdr.finish` writes once). */
+export async function finishAbandoned(
+  pipeline: Pipeline,
+  call: Call
+): Promise<void> {
+  if (call.status === null) {
+    call.status = 'missed';
+    await notifyMissedCall(pipeline, call);
+  }
+  await pipeline.deps.cdr.finish(call);
+}

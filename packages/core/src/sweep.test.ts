@@ -1,0 +1,251 @@
+import { afterEach, describe, expect, it } from 'vitest';
+
+import { newId, nowIso, openDb, type Db, type Envelope } from '@zamfono/shared';
+import { migrateForTest } from '@zamfono/shared/testDb.js';
+
+import { ConfigCache, EventBus } from './internal/server.js';
+import { startSweep } from './sweep.js';
+
+const SWEEP_INTERVAL_MS = 5;
+// Real-timer waits around a 5 ms sweep interval: generous enough for several ticks to have run
+// without making the suite slow.
+const SETTLE_MS = 60;
+
+/** Waits for `ms` of real time, so a few `SWEEP_INTERVAL_MS` sweep ticks get to run. */
+function settle(ms: number = SETTLE_MS): Promise<void> {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/** Seeds the settings row and the user/forward-target chain its FKs require. */
+async function seedTenant(
+  db: Db,
+  options: { timezone: string | null }
+): Promise<{ forwardTargetId: string }> {
+  const userId = newId();
+  const forwardTargetId = newId();
+  const didId = newId();
+  await db
+    .insertInto('users')
+    .values({
+      id: userId,
+      name: 'Owner',
+      email: 'owner@example.com',
+      createdAt: nowIso()
+    })
+    .execute();
+  await db
+    .insertInto('forwardTargets')
+    .values({ id: forwardTargetId, userId })
+    .execute();
+  await db
+    .insertInto('dids')
+    .values({
+      id: didId,
+      number: '+15550001',
+      targetId: forwardTargetId,
+      createdAt: nowIso()
+    })
+    .execute();
+  await db
+    .insertInto('settings')
+    .values({
+      id: 1,
+      companyName: 'Zamfono',
+      mainDidId: didId,
+      country: 'DE',
+      timezone: options.timezone,
+      emergencyNumbersJson: '["112"]'
+    })
+    .execute();
+  return { forwardTargetId };
+}
+
+describe('startSweep', () => {
+  // eslint-disable-next-line init-declarations -- assigned per test, stopped in afterEach
+  let sweep: { stop: () => void } | undefined;
+
+  afterEach(() => {
+    sweep?.stop();
+    sweep = undefined;
+  });
+
+  it("emits an ooo transition only at the tick after the rule's scheduled start", async () => {
+    const db = openDb(':memory:');
+    await migrateForTest(db);
+    const { forwardTargetId } = await seedTenant(db, { timezone: 'UTC' });
+    const start = new Date('2026-01-01T00:00:00.000Z');
+    const startsAt = new Date('2026-01-01T00:01:00.000Z');
+    await db
+      .insertInto('oooRules')
+      .values({
+        id: newId(),
+        startsAt: startsAt.toISOString(),
+        expiresAt: null,
+        targetId: forwardTargetId,
+        createdAt: nowIso()
+      })
+      .execute();
+
+    let current = start;
+    const events: Envelope[] = [];
+    const bus = new EventBus();
+    bus.subscribe(event => {
+      events.push(event);
+    });
+    sweep = startSweep(
+      { cache: new ConfigCache(db), bus, now: () => current.toISOString() },
+      SWEEP_INTERVAL_MS
+    );
+    await settle();
+    const tenantOoo = (): Envelope[] =>
+      events.filter(event => event.type === 'ooo' && event.scope === 'tenant');
+    expect(tenantOoo()).toHaveLength(1);
+    expect(tenantOoo()[0]).toMatchObject({ scope: 'tenant', active: false });
+
+    current = new Date('2026-01-01T00:01:30.000Z');
+    await settle();
+    expect(tenantOoo()).toHaveLength(2);
+    expect(tenantOoo()[1]).toMatchObject({
+      scope: 'tenant',
+      active: true,
+      startsAt: startsAt.toISOString(),
+      expiresAt: null
+    });
+
+    current = new Date('2026-01-01T00:02:30.000Z');
+    await settle();
+    expect(tenantOoo()).toHaveLength(2);
+  });
+
+  it('emits an hours transition once when a schedule closes', async () => {
+    const db = openDb(':memory:');
+    await migrateForTest(db);
+    const { forwardTargetId } = await seedTenant(db, { timezone: 'UTC' });
+    const openingHoursId = newId();
+    await db
+      .insertInto('openingHours')
+      .values({
+        id: openingHoursId,
+        closedTargetId: forwardTargetId,
+        createdAt: nowIso()
+      })
+      .execute();
+    // 2026-01-05 is a Monday (ISO weekday 1).
+    await db
+      .insertInto('openingHoursIntervals')
+      .values({ openingHoursId, weekday: 1, opens: '09:00', closes: '17:00' })
+      .execute();
+
+    let current = new Date('2026-01-05T16:59:00.000Z');
+    const events: Envelope[] = [];
+    const bus = new EventBus();
+    bus.subscribe(event => {
+      events.push(event);
+    });
+    sweep = startSweep(
+      { cache: new ConfigCache(db), bus, now: () => current.toISOString() },
+      SWEEP_INTERVAL_MS
+    );
+    await settle();
+    const tenantHours = (): Envelope[] =>
+      events.filter(
+        event => event.type === 'hours' && event.scope === 'tenant'
+      );
+    expect(tenantHours()).toHaveLength(1);
+    expect(tenantHours()[0]).toMatchObject({ scope: 'tenant', open: true });
+
+    current = new Date('2026-01-05T17:00:30.000Z');
+    await settle();
+    expect(tenantHours()).toHaveLength(2);
+    expect(tenantHours()[1]).toMatchObject({ scope: 'tenant', open: false });
+
+    current = new Date('2026-01-05T17:01:00.000Z');
+    await settle();
+    expect(tenantHours()).toHaveLength(2);
+  });
+
+  it('evaluates hours in UTC when the stored timezone is no zone Intl knows, instead of skipping every tick', async () => {
+    const db = openDb(':memory:');
+    await migrateForTest(db);
+    const { forwardTargetId } = await seedTenant(db, {
+      timezone: 'Mars/Olympus'
+    });
+    const openingHoursId = newId();
+    await db
+      .insertInto('openingHours')
+      .values({
+        id: openingHoursId,
+        closedTargetId: forwardTargetId,
+        createdAt: nowIso()
+      })
+      .execute();
+    // 2026-01-05 is a Monday (ISO weekday 1).
+    await db
+      .insertInto('openingHoursIntervals')
+      .values({ openingHoursId, weekday: 1, opens: '09:00', closes: '17:00' })
+      .execute();
+    const events: Envelope[] = [];
+    const bus = new EventBus();
+    bus.subscribe(event => {
+      events.push(event);
+    });
+    sweep = startSweep(
+      {
+        cache: new ConfigCache(db),
+        bus,
+        now: () => '2026-01-05T16:30:00.000Z'
+      },
+      SWEEP_INTERVAL_MS
+    );
+    await settle();
+
+    const tenantHours = events.filter(
+      event => event.type === 'hours' && event.scope === 'tenant'
+    );
+    expect(tenantHours).toHaveLength(1);
+    expect(tenantHours[0]).toMatchObject({ open: true });
+  });
+
+  it("evaluates hours in the stack's TZ while settings.timezone is NULL (§11.4)", async () => {
+    const db = openDb(':memory:');
+    await migrateForTest(db);
+    const { forwardTargetId } = await seedTenant(db, { timezone: null });
+    const openingHoursId = newId();
+    await db
+      .insertInto('openingHours')
+      .values({
+        id: openingHoursId,
+        closedTargetId: forwardTargetId,
+        createdAt: nowIso()
+      })
+      .execute();
+    await db
+      .insertInto('openingHoursIntervals')
+      .values({ openingHoursId, weekday: 1, opens: '09:00', closes: '17:00' })
+      .execute();
+    const events: Envelope[] = [];
+    const bus = new EventBus();
+    bus.subscribe(event => {
+      events.push(event);
+    });
+    // Monday 10:00 UTC: open in UTC, but 05:00 in New York, before opening time.
+    sweep = startSweep(
+      {
+        cache: new ConfigCache(db),
+        bus,
+        now: () => '2026-01-05T10:00:00.000Z',
+        stackTz: 'America/New_York'
+      },
+      SWEEP_INTERVAL_MS
+    );
+    await settle();
+
+    const tenantHours = events.filter(
+      event => event.type === 'hours' && event.scope === 'tenant'
+    );
+    expect(tenantHours).toHaveLength(1);
+    expect(tenantHours[0]).toMatchObject({ open: false });
+  });
+});

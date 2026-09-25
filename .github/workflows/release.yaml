@@ -1,0 +1,138 @@
+# §6.3 "Images". Publishes the five images to ghcr.io/zamfono, and never builds one itself:
+#
+#   push to main   ci.yaml runs inside this workflow, and `publish` pushes the images its
+#                  `images` job built and saved as edge and sha-<short sha>, so what reaches the
+#                  registry is the build the compose jobs brought up on both runtimes.
+#   tag vX.Y.Z     `promote` adds X.Y.Z, X.Y, X and latest to the very manifests main published
+#                  for that commit, so a release is byte-identical to the edge build it came from;
+#                  then `cleanup` drops the sha- images the release contains.
+#
+# A release never moves `edge`, so `latest` only ever names a release and `edge` only ever main.
+name: release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions: {}
+
+# Runs on one ref wait for each other rather than overlap: an older push to main that finished
+# after a newer one would move `edge` back to the older build. Nothing is cancelled, since a
+# cancelled run is a commit whose images never appear; GitHub still keeps at most one run waiting
+# per group, so of several pushes queued behind a running one only the newest publishes.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    if: github.ref_type == 'branch'
+    uses: ./.github/workflows/ci.yaml
+    permissions:
+      contents: read
+
+  publish:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io/zamfono
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: images
+          path: /tmp
+      - run: docker load -i /tmp/images.tar
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push the five images as edge and sha-<short sha>
+        # zamfono/<name>:ci is what ci.yaml's env block tags them; the test-devices image in the
+        # same archive is a test fixture, and the sipp image there is upstream's, so both stay
+        # unpublished. The short sha is the name `promote` looks the build up by when this
+        # commit is released.
+        run: |
+          for name in asterisk migrate core api proxy; do
+            for tag in edge "sha-${GITHUB_SHA::7}"; do
+              docker tag "zamfono/$name:ci" "$REGISTRY/$name:$tag"
+              docker push "$REGISTRY/$name:$tag"
+            done
+          done
+
+  promote:
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    # The wait below allows 45 minutes for main's run of the same commit; this leaves it room.
+    timeout-minutes: 55
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Accept only a vX.Y.Z tag
+        id: tags
+        run: |
+          if [[ ! $GITHUB_REF_NAME =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "::error::$GITHUB_REF_NAME is not a release tag; releases are tagged vX.Y.Z" >&2
+            exit 1
+          fi
+          major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]} patch=${BASH_REMATCH[3]}
+          echo "tags=$major.$minor.$patch $major.$minor $major latest" >>"$GITHUB_OUTPUT"
+      # Full history and origin/main, to check the tagged commit is one main has published.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Require the tagged commit to be on main
+        id: commit
+        run: |
+          # ^{commit} peels an annotated tag to the commit it names.
+          commit=$(git rev-parse "$GITHUB_REF^{commit}")
+          if ! git merge-base --is-ancestor "$commit" origin/main; then
+            echo "::error::$GITHUB_REF_NAME is on $commit, which is not on main; a release tag must be on a commit that went through main" >&2
+            exit 1
+          fi
+          echo "short=${commit::7}" >>"$GITHUB_OUTPUT"
+      - name: Add the release tags to main's build of that commit
+        env:
+          REGISTRY_URL: https://ghcr.io
+          NAMESPACE: zamfono
+          IMAGES: asterisk migrate core api proxy
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          # A commit pushed together with its tag is still in main's CI when this starts.
+          WAIT_TIMEOUT: 2700
+          WAIT_INTERVAL: 30
+          SOURCE_TAG: sha-${{ steps.commit.outputs.short }}
+          TAGS: ${{ steps.tags.outputs.tags }}
+        run: |
+          # TAGS is split into one argument per tag on purpose.
+          # shellcheck disable=SC2086
+          bash .github/scripts/promote-release.sh "$SOURCE_TAG" $TAGS
+
+  cleanup:
+    needs: promote
+    runs-on: ubuntu-latest
+    # Pruning is housekeeping: the release is out once `promote` is green, and a failure here must
+    # not mark it failed.
+    continue-on-error: true
+    permissions:
+      contents: read
+      # A 403 on the DELETE means GITHUB_TOKEN lacks delete rights on the package: each package's
+      # "Manage Actions access" must give the zamfono/pbx repository the Admin role.
+      packages: write
+    steps:
+      # Full history, so each sha- tag can be resolved and checked for ancestry of the release.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Delete the sha- images this release contains
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG: zamfono
+        run: |
+          bash .github/scripts/prune-sha-images.sh "$(git rev-parse "$GITHUB_REF^{commit}")" \
+            asterisk migrate core api proxy

@@ -1,0 +1,31 @@
+# test/load/stress: layered over deploy/compose.yaml + compose.ports.yaml + test/load's own
+# compose.load.yaml (network, static asterisk address, sipp containers). Adds what the
+# heavy-codec profile needs on top:
+#   - sipp (the trunk side, UDP) also mounts /load-gen, where the session puts the AMR-WB pcap
+#     and the -inf DID file
+#   - `devices`: the Ringotel stand-in (test/load/stress/devices/Dockerfile, baresip), TLS
+#     signalling + SDES-SRTP + Opus, its per-process configs and the speech WAV under /load-gen
+services:
+  # The stack's placeholder TLS certificate (images/asterisk/entrypoint.sh) is CN=zamfono; the
+  # devices dial asterisk by that name (baresip resolves through Docker's DNS, not /etc/hosts),
+  # so their server verification can pass against it.
+  asterisk:
+    networks:
+      internal:
+        aliases:
+          - zamfono
+
+  sipp:
+    volumes:
+      - ${LOAD_GEN_DIR:?set by the stress session}:/load-gen
+
+  devices:
+    image: ${DEVICES_IMAGE:-zamfono/load-devices:stress}
+    networks:
+      - internal
+    volumes:
+      - ${LOAD_GEN_DIR:?set by the stress session}:/load-gen
+    entrypoint: ['sleep', 'infinity']
+    depends_on:
+      api:
+        condition: service_healthy

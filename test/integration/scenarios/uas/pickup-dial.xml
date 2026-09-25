@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+  §8 "pickup", the colleague's own device: dials `*8101` (§9.3 "Feature codes") while 101's
+  device rings, is answered into the ringing call, and hangs up after a moment, which ends the
+  call for its caller too. `pickup.xml` starts it (`pickup-dial.sh`) as a sipp run of its own, on
+  its own port: one run holding both dialogs had to take the answer to this INVITE and the CANCEL
+  of 101's ring in whichever order they arrived, and sipp dropped a CANCEL that landed between
+  two steps of it. The colleague's SIP username arrives as `-key user`, its credentials through
+  `-au`/`-ap`.
+-->
+<scenario name="pickup-dial">
+  <send retrans="500">
+    <![CDATA[
+      INVITE sip:*8101@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:*8101@[remote_ip]>
+      Call-ID: [call_id]
+      CSeq: 1 INVITE
+      Contact: <sip:[user]@[local_ip]:[local_port];transport=[transport]>
+      Max-Forwards: 70
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=picker 53655767 2353687639 IN IP[local_ip_type] [local_ip]
+      s=-
+      c=IN IP[media_ip_type] [media_ip]
+      t=0 0
+      m=audio [media_port] RTP/AVP 8
+      a=rtpmap:8 PCMA/8000
+    ]]>
+  </send>
+
+  <recv response="100" optional="true" />
+  <recv response="401" auth="true" />
+
+  <send>
+    <![CDATA[
+      ACK sip:*8101@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch-3]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:*8101@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 1 ACK
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <send retrans="500">
+    <![CDATA[
+      INVITE sip:*8101@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:*8101@[remote_ip]>
+      Call-ID: [call_id]
+      CSeq: 2 INVITE
+      Contact: <sip:[user]@[local_ip]:[local_port];transport=[transport]>
+      [authentication]
+      Max-Forwards: 70
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=picker 53655767 2353687639 IN IP[local_ip_type] [local_ip]
+      s=-
+      c=IN IP[media_ip_type] [media_ip]
+      t=0 0
+      m=audio [media_port] RTP/AVP 8
+      a=rtpmap:8 PCMA/8000
+    ]]>
+  </send>
+
+  <recv response="100" optional="true" />
+  <recv response="180" optional="true" />
+  <recv response="183" optional="true" />
+  <recv response="200" rtd="true" timeout="10000" />
+
+  <send>
+    <![CDATA[
+      ACK sip:*8101@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:*8101@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 2 ACK
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <pause milliseconds="2000" />
+
+  <send retrans="500">
+    <![CDATA[
+      BYE sip:*8101@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:*8101@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 3 BYE
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <recv response="200" crlf="true" />
+</scenario>

@@ -1,0 +1,118 @@
+/**
+ * Steps 2 and 3 of the inbound pipeline (§10.1): the out-of-office rule in effect for a target's
+ * scope, then its opening-hours schedule. Either one ends the call at its own forward target.
+ */
+import { resolveTenantTimeZone, type Scope } from '@zamfono/shared';
+
+import type { Snapshot } from '../internal/server.js';
+import {
+  inEffectOoo,
+  isOpen,
+  scheduleFor,
+  type Schedule
+} from '../routing/schedule.js';
+import {
+  buildOooRules,
+  findForwardTarget,
+  scopeFromRow,
+  type Call,
+  type Owner
+} from './call.js';
+import type { Pipeline } from './pipeline.js';
+
+/** `opening_hours`/`opening_hours_intervals` rows as the `Schedule[]` `scheduleFor` (§10.1 step 3) expects. */
+function buildSchedules(
+  rows: Snapshot['openingHours'],
+  intervalRows: Snapshot['openingHoursIntervals']
+): Schedule[] {
+  return rows
+    .filter(row => row.deletedAt === null)
+    .map(row => ({
+      id: row.id,
+      scope: scopeFromRow(row),
+      active: row.active === 1,
+      closedTargetId: row.closedTargetId,
+      intervals: intervalRows
+        .filter(interval => interval.openingHoursId === row.id)
+        .map(interval => ({
+          weekday: interval.weekday as Schedule['intervals'][number]['weekday'],
+          opens: interval.opens,
+          closes: interval.closes
+        }))
+    }));
+}
+
+type ScopedTarget =
+  | { kind: 'user'; userId: string }
+  | { kind: 'ringGroup'; ringGroupId: string }
+  | { kind: 'menu'; menuId: string };
+
+/** The OOO/hours scope and mailbox owner a scoped target represents; a menu has neither owner. */
+export function targetIdentity(target: ScopedTarget): {
+  scope: Scope;
+  owner: Owner | null;
+} {
+  if (target.kind === 'user') {
+    return { scope: `user:${target.userId}`, owner: { userId: target.userId } };
+  }
+  if (target.kind === 'ringGroup') {
+    const owner = { ringGroupId: target.ringGroupId };
+    return { scope: `ringGroup:${target.ringGroupId}`, owner };
+  }
+  return { scope: `menu:${target.menuId}`, owner: null };
+}
+
+/** The user whose own rule a `scope`'s OOO rule or schedule is, whose call an external target it
+ * forwards to is dialled as (§10.1 step 7); `null` for a ring group, menu or tenant rule. */
+function scopeUser(scope: Scope): string | null {
+  return scope.startsWith('user:') ? scope.slice('user:'.length) : null;
+}
+
+/** Steps 2-3, OOO then opening hours (skipped for internal calls): the first applicable forward target ends the call, returning true. */
+export async function applyOooAndHours(
+  pipeline: Pipeline,
+  call: Call,
+  snapshot: Snapshot,
+  scope: Scope
+): Promise<boolean> {
+  const ooo = inEffectOoo(
+    buildOooRules(snapshot.oooRules),
+    scope,
+    pipeline.deps.now()
+  );
+  call.log.event({ event: 'ooo', scope, active: ooo !== null });
+  if (ooo) {
+    await pipeline.runTarget(
+      call,
+      findForwardTarget(snapshot, ooo.targetId),
+      scopeUser(ooo.scope)
+    );
+    return true;
+  }
+  if (call.direction === 'internal') {
+    return false;
+  }
+  const schedule = scheduleFor(
+    buildSchedules(snapshot.openingHours, snapshot.openingHoursIntervals),
+    scope
+  );
+  if (schedule === null) {
+    return false;
+  }
+  // A zone `Intl` cannot use falls back rather than throwing, which would leave the call unrouted.
+  const timezone = resolveTenantTimeZone(
+    snapshot.settings.timezone,
+    pipeline.deps.stackTz
+  );
+  const open = isOpen(schedule, pipeline.deps.now(), timezone);
+  call.log.event({ event: 'hours', scope, open });
+  if (open) {
+    return false;
+  }
+  await pipeline.runTarget(
+    call,
+    findForwardTarget(snapshot, schedule.closedTargetId),
+    scopeUser(schedule.scope)
+  );
+  return true;
+}

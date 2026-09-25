@@ -1,0 +1,5 @@
+{
+  "subject": "Imposta la tua password {{companyName}}",
+  "bodyText": "Ciao {{recipientName}},\n\n{{#if invitedBy}}{{invitedBy}} ha creato il tuo account del centralino {{companyName}}.{{else}}Il tuo centralino {{companyName}} è pronto.{{/if}} Imposta la tua password con questo link:\n\n{{link}}\n\nQuesto link scade il {{date linkExpiresAt}}.\n{{#unless invitedBy}}\nUna volta effettuato l'accesso, collega il tuo assistente IA a {{fqdn}} tramite MCP per gestire il centralino via chat.\n{{/unless}}\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Ciao {{recipientName}},</p><p>{{#if invitedBy}}{{invitedBy}} ha creato il tuo account del centralino {{companyName}}.{{else}}Il tuo centralino {{companyName}} è pronto.{{/if}} Imposta la tua password con questo link:</p><p><a href=\"{{link}}\">{{link}}</a></p><p>Questo link scade il {{date linkExpiresAt}}.</p>{{#unless invitedBy}}<p>Una volta effettuato l'accesso, collega il tuo assistente IA a {{fqdn}} tramite MCP per gestire il centralino via chat.</p>{{/unless}}<p>{{companyName}} · {{fqdn}}</p>"
+}

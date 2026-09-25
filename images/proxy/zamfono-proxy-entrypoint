@@ -1,0 +1,37 @@
+#!/bin/sh
+# zamfono-proxy-entrypoint (images/proxy/Dockerfile, docs/spec.md §6.4 "TLS certificates"). Runs
+# zamfono-cert-hook once for the certificate Caddy holds for $FQDN, then `exec`s Caddy, which
+# stays PID 1 and receives the container's signals itself.
+#
+# Caddy's `cert_obtained` event alone is not enough: the events app subscribes its handlers in
+# its own Start, and Caddy starts its apps in no fixed order, so an issuance that completes
+# before the events app has started (a `local_certs` one takes a millisecond) reaches no hook.
+# A certificate already in storage when Caddy starts (a restart, a restored caddy-data) emits no
+# event either. The hook is idempotent: it rewrites the same copy, and `api`'s compare-and-
+# schedule pass changes nothing for an unchanged certificate.
+set -eu
+
+reconcile() {
+  data_home=${XDG_DATA_HOME:-/data}
+  storage_root="$data_home/caddy"
+  # Two minutes covers a first ACME issuance; one that takes longer still reaches the hook
+  # through the event, since the events app has started by then.
+  for _ in $(seq 1 120); do
+    # The newest, should more than one issuer's certificate for the name be stored.
+    # shellcheck disable=SC2012 -- names under Caddy's storage carry no newlines
+    crt=$(ls -t "$storage_root"/certificates/*/"$FQDN"/"$FQDN".crt 2>/dev/null | head -1 || true)
+    if [ -n "$crt" ] && [ -r "${crt%.crt}.key" ]; then
+      rel=${crt#"$storage_root"/}
+      zamfono-cert-hook "$rel" "${rel%.crt}.key" "$FQDN"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "zamfono-proxy-entrypoint: no certificate for '$FQDN' after 120s; leaving it to the event" >&2
+}
+
+if [ -n "${FQDN:-}" ]; then
+  reconcile &
+fi
+
+exec "$@"

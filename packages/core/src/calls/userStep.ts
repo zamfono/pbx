@@ -1,0 +1,93 @@
+/**
+ * Routing pipeline step 4, "Target user" (§10.1): the Entry-time decision for a user target —
+ * ring, forward, mailbox or release — and, once `ringUser`'s race ends without an answer, the
+ * busy or noAnswer outcome. A forward is the user's own rule, so an external target is dialled as
+ * their call (§10.1 step 7).
+ */
+import type { Snapshot } from '../internal/server.js';
+import { userEntryDecision, userOutcomeDecision } from '../routing/user.js';
+import { buildUserRules, raiseLogLevel, release, type Call } from './call.js';
+import type { Pipeline } from './pipeline.js';
+import { registeredDevices } from './userDevices.js';
+
+const RELEASE_CODE_UNAVAILABLE = 480;
+/** After `ringUser`'s race concludes without an answer: forward, mailbox, or release (§10.1 step 4). */
+export async function applyRingOutcome(
+  pipeline: Pipeline,
+  call: Call,
+  snapshot: Snapshot,
+  user: { id: string; mailboxEnabled: number },
+  outcome: 'busy' | 'noAnswer'
+): Promise<void> {
+  const decision = userOutcomeDecision(
+    { id: user.id, mailboxEnabled: user.mailboxEnabled === 1 },
+    buildUserRules(snapshot, user.id),
+    outcome
+  );
+  call.log.event({ event: 'ringOutcome', outcome, decision: decision.kind });
+  if (call.ringOnly === true) {
+    return;
+  }
+  if (decision.kind === 'forward') {
+    // §10.1 step 7: the user's own busy or noAnswer rule, so an external target is dialled as
+    // their call.
+    await pipeline.runTarget(call, decision.target, user.id);
+    return;
+  }
+  if (decision.kind === 'mailbox') {
+    await pipeline.deposit(call, { userId: decision.userId });
+    return;
+  }
+  if (decision.kind === 'release') {
+    const status =
+      decision.code === RELEASE_CODE_UNAVAILABLE ? 'missed' : 'busy';
+    await release(pipeline, call, decision.code, status);
+  }
+}
+const RELEASE_CODE_BUSY = 486;
+/** Step 4 "Target user": the Entry-time decision, then its outcome (ring/forward/mailbox/release). */
+export async function runUserStep(
+  pipeline: Pipeline,
+  call: Call,
+  snapshot: Snapshot,
+  userId: string
+): Promise<void> {
+  const user = snapshot.users.find(row => row.id === userId);
+  if (user === undefined) {
+    await release(pipeline, call, RELEASE_CODE_UNAVAILABLE, 'failed');
+    return;
+  }
+  // §7: the target user's diagnostics override counts toward the call's level.
+  raiseLogLevel(call.log, user, pipeline.deps.now());
+  // §10.1 step 4 "no registered device": the devices `ringUser` would ring, not every configured
+  // one, so a user whose phones are all off meets `offline` at once rather than `noAnswer` later.
+  const decision = userEntryDecision(
+    {
+      id: user.id,
+      dnd: user.dnd === 1,
+      mailboxEnabled: user.mailboxEnabled === 1,
+      findMe: user.findMe,
+      registeredDevices: registeredDevices(pipeline, snapshot, userId).length
+    },
+    buildUserRules(snapshot, userId)
+  );
+  if (decision.kind === 'ring') {
+    await pipeline.ringUser(call, userId);
+    return;
+  }
+  if (call.ringOnly === true) {
+    return;
+  }
+  if (decision.kind === 'forward') {
+    // §10.1 step 7: the user's own unconditional, dnd or offline rule, so an external target is
+    // dialled as their call.
+    await pipeline.runTarget(call, decision.target, userId);
+    return;
+  }
+  if (decision.kind === 'mailbox') {
+    await pipeline.deposit(call, { userId: decision.userId });
+    return;
+  }
+  const status = decision.code === RELEASE_CODE_BUSY ? 'busy' : 'missed';
+  await release(pipeline, call, decision.code, status);
+}

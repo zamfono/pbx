@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+  §10.2 "Mailbox access", from the phone: 101's device dials `*96` (§9.3) and the core answers
+  with its menu. `0` barges into the menu and asks for the greeting; after its instructions and
+  the tone the recording runs until `#` ends it. The core confirms it saved the greeting and
+  plays the menu again, and the phone hangs up, the way most callers leave a mailbox. The keys
+  go as SIP INFO (`application/dtmf-relay`), which chan_pjsip accepts on any endpoint: the
+  harness stack advertises `EXTERNAL_IPV4=127.0.0.1` as its media address, so RTP, and with it
+  RFC 4733 key events, never reaches Asterisk from a container. Placed from the phone's own
+  container, as the registered device, on a port of its own; the device's SIP username arrives
+  as `-key user` and its credentials through `-au`/`-ap`.
+-->
+<scenario name="mailbox greeting">
+  <send retrans="500">
+    <![CDATA[
+      INVITE sip:*96@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:*96@[remote_ip]>
+      Call-ID: [call_id]
+      CSeq: 1 INVITE
+      Contact: <sip:[user]@[local_ip]:[local_port];transport=[transport]>
+      Max-Forwards: 70
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=phone 53655770 2353687642 IN IP[local_ip_type] [local_ip]
+      s=-
+      c=IN IP[media_ip_type] [media_ip]
+      t=0 0
+      m=audio [media_port] RTP/AVP 8 101
+      a=rtpmap:8 PCMA/8000
+      a=rtpmap:101 telephone-event/8000
+      a=fmtp:101 0-16
+    ]]>
+  </send>
+
+  <recv response="100" optional="true" />
+  <recv response="401" auth="true" />
+
+  <send>
+    <![CDATA[
+      ACK sip:*96@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch-3]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:*96@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 1 ACK
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <send retrans="500">
+    <![CDATA[
+      INVITE sip:*96@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:*96@[remote_ip]>
+      Call-ID: [call_id]
+      CSeq: 2 INVITE
+      Contact: <sip:[user]@[local_ip]:[local_port];transport=[transport]>
+      [authentication]
+      Max-Forwards: 70
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=phone 53655770 2353687642 IN IP[local_ip_type] [local_ip]
+      s=-
+      c=IN IP[media_ip_type] [media_ip]
+      t=0 0
+      m=audio [media_port] RTP/AVP 8 101
+      a=rtpmap:8 PCMA/8000
+      a=rtpmap:101 telephone-event/8000
+      a=fmtp:101 0-16
+    ]]>
+  </send>
+
+  <recv response="100" optional="true" />
+  <recv response="180" optional="true" />
+  <recv response="183" optional="true" />
+  <recv response="200" rtd="true" timeout="20000" rrs="true" />
+
+  <send>
+    <![CDATA[
+      ACK sip:*96@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:*96@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 2 ACK
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <!-- The counts and the menu start; `0` barges in for the greeting. -->
+  <pause milliseconds="2000" />
+
+  <send retrans="500">
+    <![CDATA[
+      INFO [next_url] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:*96@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 3 INFO
+      Contact: <sip:[user]@[local_ip]:[local_port];transport=[transport]>
+      Max-Forwards: 70
+      Content-Type: application/dtmf-relay
+      Content-Length: [len]
+
+      Signal=0
+      Duration=250
+    ]]>
+  </send>
+
+  <recv response="200" />
+
+  <!-- "After the tone say your unavailable message and then press the pound key", the tone,
+       a few seconds of recording, and `#` ends it. -->
+  <pause milliseconds="9000" />
+
+  <send retrans="500">
+    <![CDATA[
+      INFO [next_url] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:*96@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 4 INFO
+      Contact: <sip:[user]@[local_ip]:[local_port];transport=[transport]>
+      Max-Forwards: 70
+      Content-Type: application/dtmf-relay
+      Content-Length: [len]
+
+      Signal=#
+      Duration=250
+    ]]>
+  </send>
+
+  <recv response="200" />
+
+  <!-- "Your message has been saved", then the menu, and the phone hangs up, the way most
+       callers leave a mailbox. -->
+  <pause milliseconds="4000" />
+
+  <send retrans="500">
+    <![CDATA[
+      BYE [next_url] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:*96@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 5 BYE
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <recv response="200" crlf="true" />
+</scenario>

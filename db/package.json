@@ -1,0 +1,24 @@
+{
+  "name": "zamfono-db",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^26"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "dotenv": "^18.0.3",
+    "kysely": "^0.29.6",
+    "kysely-ctl": "^0.21.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0"
+  },
+  "scripts": {
+    "migrate:create": "sh -c \"printf 'Migration name: '; IFS= read -r name; if [ -z \\\"$name\\\" ]; then echo 'Migration name is required.' >&2; exit 1; fi; kysely migrate make \\\"$name\\\" -c config.ts --no-outdated-check --extension ts\"",
+    "deploy": "kysely migrate latest -c config.ts --no-outdated-check"
+  },
+  "allowScripts": {
+    "better-sqlite3": true
+  }
+}

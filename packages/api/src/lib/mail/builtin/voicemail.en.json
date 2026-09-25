@@ -1,0 +1,5 @@
+{
+  "subject": "New voicemail from {{#if callerName}}{{callerName}}{{else}}{{callerNumber}}{{/if}}",
+  "bodyText": "Hi {{recipientName}},\n\nYou have a new voicemail in {{mailboxName}} from {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}}, received {{date receivedAt}}. Length: {{durationS}} seconds.\n\nThe recording is attached to this e-mail.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Hi {{recipientName}},</p><p>You have a new voicemail in {{mailboxName}} from {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}}, received {{date receivedAt}}. Length: {{durationS}} seconds.</p><p>The recording is attached to this e-mail.</p><p>{{companyName}} · {{fqdn}}</p>"
+}

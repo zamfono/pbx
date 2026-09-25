@@ -1,0 +1,5 @@
+{
+  "subject": "Réinitialisez votre mot de passe {{companyName}}",
+  "bodyText": "Bonjour {{recipientName}},\n\nRéinitialisez votre mot de passe via ce lien :\n\n{{link}}\n\nCe lien expire le {{date linkExpiresAt}}. Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mail.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Bonjour {{recipientName}},</p><p>Réinitialisez votre mot de passe via ce lien :</p><p><a href=\"{{link}}\">{{link}}</a></p><p>Ce lien expire le {{date linkExpiresAt}}. Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mail.</p><p>{{companyName}} · {{fqdn}}</p>"
+}

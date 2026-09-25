@@ -1,0 +1,89 @@
+import { z } from 'zod';
+
+import { encrypt, keyringFromEnv } from '../../secretbox.js';
+import { recordChange } from '../runner.js';
+import { defineOperation, OpError } from '../types.js';
+import {
+  loadLiveTarget,
+  paramsSchema,
+  targetKindSchema,
+  targetToWire,
+  withDefaultForgetPolicy,
+  type BackupTargetWire
+} from './_shared.js';
+
+const STATUS_NOT_FOUND = 404;
+
+const inputSchema = z
+  .object({
+    id: z.string(),
+    kind: targetKindSchema.optional(),
+    params: paramsSchema.optional(),
+    secret: z.string().min(1).optional(),
+    enabled: z.boolean().optional()
+  })
+  .strict();
+
+type Input = z.infer<typeof inputSchema>;
+
+/** `value` where given, `before` otherwise, distinguishing an absent key from an explicit `null`. */
+function orBefore<T>(value: T | undefined, before: T): T {
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- `??` would also replace an explicit `null` (a meaningful patch value), not just an absent key
+  return value === undefined ? before : value;
+}
+
+/** `PATCH /backups/targets/{id}` (§6.5 "Backups"): kind, params, secret and the enabled flag. */
+export const targetsUpdate = defineOperation<Input, BackupTargetWire>({
+  name: 'backups.targets.update',
+  description: 'Changes a backup target',
+  input: inputSchema,
+  minRole: 'admin',
+  entity: input => ({ kind: 'backupTarget', id: input.id }),
+  run: async (ctx, input) => {
+    const before = await loadLiveTarget(ctx.db, input.id);
+    if (!before) {
+      throw new OpError(STATUS_NOT_FOUND, 'backups: target not found');
+    }
+    const kind = orBefore(input.kind, before.kind);
+    const enabled = orBefore(input.enabled, before.enabled === 1);
+    const paramsJson =
+      input.params === undefined
+        ? before.paramsJson
+        : JSON.stringify(withDefaultForgetPolicy(input.params));
+    const secretEnc =
+      input.secret === undefined
+        ? before.secretEnc
+        : encrypt(keyringFromEnv(process.env), input.secret);
+    if (kind !== before.kind) {
+      recordChange(ctx, { field: 'kind', from: before.kind, to: kind });
+    }
+    if (enabled !== (before.enabled === 1)) {
+      recordChange(ctx, {
+        field: 'enabled',
+        from: before.enabled === 1,
+        to: enabled
+      });
+    }
+    if (paramsJson !== before.paramsJson) {
+      recordChange(ctx, {
+        field: 'params',
+        from: JSON.parse(before.paramsJson) as Record<string, unknown>,
+        to: JSON.parse(paramsJson) as Record<string, unknown>
+      });
+    }
+    if (input.secret !== undefined) {
+      recordChange(ctx, { field: 'secret', from: null, to: input.secret });
+    }
+    await ctx.db
+      .updateTable('backupTargets')
+      .set({ kind, paramsJson, enabled: enabled ? 1 : 0, secretEnc })
+      .where('id', '=', input.id)
+      .execute();
+    const row = await ctx.db
+      .selectFrom('backupTargets')
+      .selectAll()
+      .where('id', '=', input.id)
+      .executeTakeFirstOrThrow();
+    return targetToWire(row);
+  }
+});

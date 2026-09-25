@@ -1,0 +1,38 @@
+{
+  "name": "@zamfono/api",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build && esbuild src/server.ts --bundle --platform=node --format=esm --packages=external --outfile=build/server.js",
+    "preview": "vite preview",
+    "postinstall": "svelte-kit sync",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@zamfono/shared": "*",
+    "argon2": "^0.45.1",
+    "better-sqlite3": "^13.0.3",
+    "cron-parser": "^5.10.1",
+    "handlebars": "^4.7.9",
+    "jose": "^6.2.12",
+    "kysely": "^0.29.6",
+    "nodemailer": "^10.0.10",
+    "pino": "^10.3.1",
+    "sodium-native": "^5.1.0",
+    "ws": "^8.21.3",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@apidevtools/swagger-parser": "^13.1.0",
+    "@sveltejs/adapter-node": "^5.5.7",
+    "@sveltejs/kit": "^2.70.3",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@types/sodium-native": "^2.3.9",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^0.28.2",
+    "svelte": "^5.57.1",
+    "vite": "^8.3.1"
+  }
+}

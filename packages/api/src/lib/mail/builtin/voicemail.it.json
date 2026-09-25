@@ -1,0 +1,5 @@
+{
+  "subject": "Nuovo messaggio vocale da {{#if callerName}}{{callerName}}{{else}}{{callerNumber}}{{/if}}",
+  "bodyText": "Ciao {{recipientName}},\n\nHai un nuovo messaggio vocale in {{mailboxName}} da {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}}, ricevuto il {{date receivedAt}}. Durata: {{durationS}} secondi.\n\nLa registrazione è allegata a questa e-mail.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Ciao {{recipientName}},</p><p>Hai un nuovo messaggio vocale in {{mailboxName}} da {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}}, ricevuto il {{date receivedAt}}. Durata: {{durationS}} secondi.</p><p>La registrazione è allegata a questa e-mail.</p><p>{{companyName}} · {{fqdn}}</p>"
+}

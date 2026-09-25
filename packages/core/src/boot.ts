@@ -1,0 +1,127 @@
+/**
+ * The long-lived parts `main()` builds and starts once ARI and AMI are up: the call pipeline with
+ * the collaborators it owns, the timers no call drives, and the HEP collector (§3.1, §7).
+ */
+import process from 'node:process';
+
+import { nowIso, type Db } from '@zamfono/shared';
+
+import { ApiClient } from './apiClient.js';
+import type { AriClient } from './ari/client.js';
+import type { Logger } from './ari/types.js';
+import { Pipeline } from './calls/pipeline.js';
+import { Recorder } from './calls/recording.js';
+import type { TrunkState } from './calls/trunkState.js';
+import { CdrWriter } from './cdr.js';
+import type { CoreEnv } from './env.js';
+import { asteriskAddresses, startHepListener } from './hep.js';
+import type { ConfigCache, EventBus, StateStore } from './internal/server.js';
+import type { Presence } from './presence.js';
+import { startRetention } from './retention.js';
+import { startSweep } from './sweep.js';
+
+// §6.3: the HEP collector's port, fixed in the images alongside the other internal ports.
+const HEP_PORT = 9060;
+
+/**
+ * The call pipeline and the collaborators it owns: the CDR writer (§7 "Call history"), the
+ * recorder (§10.2 "Call recording") and the mail client that carries a deposit to `api`
+ * (§3.1 "Mail") — a `Pipeline` without it releases every deposit unrecorded.
+ */
+export function buildPipeline(deps: {
+  db: Db;
+  ari: AriClient;
+  cache: ConfigCache;
+  state: StateStore;
+  bus: EventBus;
+  log: Logger;
+  mediaDir: string;
+  trunkState: TrunkState;
+  presence: Presence;
+  stackTz: string;
+}): { pipeline: Pipeline; cdr: CdrWriter } {
+  const { db, ari, cache, state, bus, log } = deps;
+  const cdr = new CdrWriter({ db, ari, cache, bus, state, now: nowIso });
+  const recorder = new Recorder({
+    ari,
+    cache,
+    db,
+    mediaDir: deps.mediaDir,
+    log,
+    now: nowIso
+  });
+  // §10.2 "Best effort": a failed mix "is visible in /metrics", which `api` renders from the
+  // live state.
+  state.readRecordingMixFailuresFrom(() => recorder.mixFailureCount);
+  const pipeline = new Pipeline({
+    ari,
+    cache,
+    state,
+    bus,
+    cdr,
+    recorder,
+    now: nowIso,
+    stackTz: deps.stackTz,
+    db,
+    apiClient: new ApiClient(),
+    logger: log,
+    trunkState: deps.trunkState,
+    presence: deps.presence
+  });
+  return { pipeline, cdr };
+}
+
+/**
+ * The timers `core` owns: the minute sweep that emits `ooo`/`hours` transitions (§3.1 "Events")
+ * and the daily retention sweep (§11.6). Neither is driven by a call, so nothing else starts them.
+ */
+export function startBackgroundJobs(deps: {
+  db: Db;
+  cache: ConfigCache;
+  bus: EventBus;
+  log: Logger;
+  env: CoreEnv;
+}): { stop: () => void } {
+  const sweep = startSweep({
+    cache: deps.cache,
+    bus: deps.bus,
+    now: nowIso,
+    stackTz: deps.env.tz
+  });
+  const retention = startRetention({
+    db: deps.db,
+    mediaDir: deps.env.mediaDir,
+    log: deps.log,
+    now: nowIso
+  });
+  return {
+    stop: () => {
+      sweep.stop();
+      retention.stop();
+    }
+  };
+}
+
+/**
+ * §7 level `sip`: Asterisk mirrors every SIP message to this collector, which hands each one to
+ * the call whose Call-ID it carries. `HEP_ENABLED=false` switches the mirror off in both
+ * containers and makes `sip` an invalid level, so nothing listens either.
+ */
+export async function startHepCollector(
+  enabled: boolean,
+  cdr: CdrWriter,
+  log: Logger
+): Promise<{ close: () => void } | null> {
+  if (!enabled) {
+    return null;
+  }
+  const addresses = await asteriskAddresses(process.env);
+  return startHepListener(
+    HEP_PORT,
+    addresses,
+    message => {
+      cdr.sipMessage(message);
+    },
+    log
+  );
+}

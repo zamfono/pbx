@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+  §8 "blind transfer", the transferring phone: it answers the call, then sends a REFER in that
+  dialog naming the transfer target, as a softphone's transfer button does (§10.1 "Transfers and
+  pickup"). Asterisk accepts it with 202 and reports the transfer's progress in NOTIFYs carrying a
+  sipfrag (RFC 3515), and the phone then leaves the call with a BYE (RFC 5589 §6). Asterisk
+  defers its own end of a transferrer's dialog until that BYE arrives, so the stack hanging up
+  the transferrer's channel sends none first.
+
+  The NOTIFYs are not steps here: Asterisk sends the 100 and the 200 sipfrag back to back, faster
+  than a scenario step can answer one before the next arrives, and the `-aa` this side runs with
+  answers each with 200. Whether the transfer reached its target is what the history check
+  asserts.
+
+  The REFER is a request this side originates inside a dialog it answered, so its From is the
+  INVITE's To with the tag this side gave it, its To the INVITE's From, and its Request-URI the
+  Contact Asterisk sent.
+-->
+<scenario name="blind-transfer">
+  <recv request="INVITE" rrs="true">
+    <action>
+      <ereg regexp=".*" search_in="hdr" header="From:" assign_to="remote_party" />
+      <ereg regexp=".*" search_in="hdr" header="To:" assign_to="local_party" />
+    </action>
+  </recv>
+
+  <send>
+    <![CDATA[
+      SIP/2.0 180 Ringing
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[call_number]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Contact: <sip:[local_ip]:[local_port];transport=[transport]>
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <send retrans="500">
+    <![CDATA[
+      SIP/2.0 200 OK
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[call_number]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Contact: <sip:[local_ip]:[local_port];transport=[transport]>
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=phone 53655765 2353687637 IN IP[local_ip_type] [local_ip]
+      s=-
+      c=IN IP[media_ip_type] [media_ip]
+      t=0 0
+      m=audio [media_port] RTP/AVP 8
+      a=rtpmap:8 PCMA/8000
+    ]]>
+  </send>
+
+  <recv request="ACK" rtd="true" crlf="true" />
+
+  <pause milliseconds="1000" />
+
+  <send retrans="500">
+    <![CDATA[
+      REFER [next_url] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: [$local_party];tag=[call_number]
+      To: [$remote_party]
+      Call-ID: [call_id]
+      CSeq: 1 REFER
+      Contact: <sip:[local_ip]:[local_port];transport=[transport]>
+      Refer-To: <sip:+15557777@[remote_ip]>
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <recv response="202" />
+
+  <pause milliseconds="1000" />
+
+  <send retrans="500">
+    <![CDATA[
+      BYE [next_url] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: [$local_party];tag=[call_number]
+      To: [$remote_party]
+      Call-ID: [call_id]
+      CSeq: 2 BYE
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <recv response="200" />
+</scenario>

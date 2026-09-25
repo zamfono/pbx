@@ -1,0 +1,49 @@
+{
+  "login": {
+    "title": "Connexion",
+    "consentIntro": "{client} souhaite que vous vous connectiez.",
+    "consentApprove": "Approuver",
+    "consentDeny": "Refuser",
+    "email": "E-mail",
+    "password": "Mot de passe",
+    "submit": "Se connecter",
+    "invalid": "E-mail ou mot de passe incorrect.",
+    "forgotLink": "Mot de passe oublié ?",
+    "ssoPrefix": "Se connecter avec "
+  },
+  "forgot": {
+    "title": "Mot de passe oublié",
+    "intro": "Saisissez votre e-mail, nous vous enverrons un lien pour définir un nouveau mot de passe.",
+    "email": "E-mail",
+    "submit": "Envoyer le lien",
+    "sent": "Si cette adresse possède un compte, un lien est en route.",
+    "backToLogin": "Retour à la connexion"
+  },
+  "setPassword": {
+    "title": "Définir votre mot de passe",
+    "password": "Nouveau mot de passe",
+    "submit": "Définir le mot de passe",
+    "success": "Votre mot de passe a été défini.",
+    "successLoginLink": "Continuer vers la connexion",
+    "invalid": "Ce lien a expiré ou a déjà été utilisé.",
+    "tooShort": "Le mot de passe doit contenir au moins {min} caractères."
+  },
+  "error": {
+    "title": "Problème de connexion",
+    "expired": "Ce lien a expiré. Veuillez réessayer.",
+    "noUser": "Aucun compte ne correspond à cette connexion.",
+    "domain": "Votre domaine de messagerie n'est pas autorisé à se connecter ici.",
+    "unverifiedEmail": "Votre fournisseur d'identité n'a pas vérifié cette adresse e-mail.",
+    "issuer": "Cette connexion a été émise par le mauvais fournisseur d'identité.",
+    "audience": "Cette connexion a été émise pour une autre application.",
+    "signature": "Cette connexion n'a pas pu être vérifiée.",
+    "nonce": "Cette connexion n'a pas pu être vérifiée.",
+    "generic": "Une erreur est survenue lors de la connexion.",
+    "backToLogin": "Retour à la connexion"
+  },
+  "done": {
+    "title": "Vous êtes connecté",
+    "message": "Vous êtes connecté à {company}.",
+    "mcpHint": "Connectez un client MCP avec :"
+  }
+}

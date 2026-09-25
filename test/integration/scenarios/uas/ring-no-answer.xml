@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+  §8: the phone side of the unanswered path. It rings and never answers, so the ring group runs
+  out its timeout and the call falls through to the group's own outcome.
+-->
+<scenario name="ring-no-answer">
+  <recv request="INVITE" rrs="true" />
+
+  <send retrans="500">
+    <![CDATA[
+      SIP/2.0 180 Ringing
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[call_number]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Contact: <sip:[local_ip]:[local_port];transport=[transport]>
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <recv request="CANCEL" timeout="60000" />
+
+  <send>
+    <![CDATA[
+      SIP/2.0 200 OK
+      [last_Via:]
+      [last_From:]
+      [last_To:]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <send>
+    <![CDATA[
+      SIP/2.0 487 Request Terminated
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[call_number]
+      [last_Call-ID:]
+      CSeq: [cseq] INVITE
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <recv request="ACK" optional="true" />
+</scenario>

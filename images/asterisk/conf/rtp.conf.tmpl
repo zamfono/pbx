@@ -1,0 +1,6 @@
+[general]
+rtpstart = ${RTP_PORT_START}
+rtpend = ${RTP_PORT_END}
+icesupport = yes
+; ICE plus external_media_address/external_signaling_address (pjsip.conf) cover far-end NAT in
+; the ports mode; a macvlan stack owns a routable public address directly.

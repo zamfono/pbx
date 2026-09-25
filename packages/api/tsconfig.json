@@ -1,0 +1,48 @@
+{
+  "extends": ["../../tsconfig.base.json", "./.svelte-kit/tsconfig.json"],
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist"
+  },
+  "references": [
+    {
+      "path": "../shared"
+    }
+  ],
+  "files": [
+    "src/routes/.well-known/oauth-authorization-server/+server.ts",
+    "src/routes/.well-known/oauth-protected-resource/+server.ts",
+    "src/routes/.well-known/openid-configuration/+server.ts",
+    "src/lib/data/emergencyNumbers.json",
+    "src/lib/i18n/de.json",
+    "src/lib/i18n/en.json",
+    "src/lib/i18n/es.json",
+    "src/lib/i18n/fr.json",
+    "src/lib/i18n/it.json",
+    "src/lib/i18n/ru.json",
+    "src/lib/mail/builtin/missedCall.de.json",
+    "src/lib/mail/builtin/missedCall.en.json",
+    "src/lib/mail/builtin/missedCall.es.json",
+    "src/lib/mail/builtin/missedCall.fr.json",
+    "src/lib/mail/builtin/missedCall.it.json",
+    "src/lib/mail/builtin/missedCall.ru.json",
+    "src/lib/mail/builtin/reset.de.json",
+    "src/lib/mail/builtin/reset.en.json",
+    "src/lib/mail/builtin/reset.es.json",
+    "src/lib/mail/builtin/reset.fr.json",
+    "src/lib/mail/builtin/reset.it.json",
+    "src/lib/mail/builtin/reset.ru.json",
+    "src/lib/mail/builtin/setup.de.json",
+    "src/lib/mail/builtin/setup.en.json",
+    "src/lib/mail/builtin/setup.es.json",
+    "src/lib/mail/builtin/setup.fr.json",
+    "src/lib/mail/builtin/setup.it.json",
+    "src/lib/mail/builtin/setup.ru.json",
+    "src/lib/mail/builtin/voicemail.de.json",
+    "src/lib/mail/builtin/voicemail.en.json",
+    "src/lib/mail/builtin/voicemail.es.json",
+    "src/lib/mail/builtin/voicemail.fr.json",
+    "src/lib/mail/builtin/voicemail.it.json",
+    "src/lib/mail/builtin/voicemail.ru.json"
+  ]
+}

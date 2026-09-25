@@ -1,0 +1,426 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
+import { migrateForTest } from '@zamfono/shared/testDb.js';
+
+import { AmiClient } from '../ami/client.js';
+import { AriClient } from '../ari/client.js';
+import { FakeAri } from '../ari/fake.js';
+import type { AriEvent, Channel, Logger } from '../ari/types.js';
+import { eventually } from '../testing/eventually.js';
+import type { Call } from './call.js';
+import {
+  ConfigCache,
+  EventBus,
+  Pipeline,
+  StateStore,
+  type PipelineDeps
+} from './pipeline.js';
+import { TrunkState } from './trunkState.js';
+
+const noopLogger: Logger = {
+  info: () => undefined,
+  warn: () => undefined,
+  error: () => undefined
+};
+
+function fakeCdr(): PipelineDeps['cdr'] & { opened: Call[] } {
+  const opened: Call[] = [];
+  return {
+    opened,
+    open: call => {
+      opened.push(call);
+      return Promise.resolve();
+    },
+    finish: () => Promise.resolve()
+  };
+}
+
+/** A DID whose target is an announcement, so a matched call ends as soon as it has played. */
+async function seedAnnouncementDid(db: Db, number: string): Promise<string> {
+  const audioId = newId();
+  await db
+    .insertInto('audioAssets')
+    .values({
+      id: audioId,
+      label: 'Welcome',
+      kind: 'announcement',
+      filename: `${audioId}.wav`,
+      createdAt: nowIso()
+    })
+    .execute();
+  const targetId = newId();
+  await db
+    .insertInto('forwardTargets')
+    .values({ id: targetId, announcementAudioId: audioId })
+    .execute();
+  const didId = newId();
+  await db
+    .insertInto('dids')
+    .values({ id: didId, number, targetId, createdAt: nowIso() })
+    .execute();
+  return didId;
+}
+
+async function seedTrunk(
+  db: Db,
+  inboundNumberFormat: 'e164' | 'national',
+  inboundAuthUsername: string | null = null
+): Promise<string> {
+  const id = newId();
+  await db
+    .insertInto('trunks')
+    .values({
+      id,
+      name: `trunk ${inboundNumberFormat} ${inboundAuthUsername ?? ''}`,
+      priority: inboundNumberFormat === 'e164' ? 1 : 2,
+      authMode: 'ip',
+      inboundAuth: inboundAuthUsername === null ? 0 : 1,
+      username: inboundAuthUsername,
+      passwordEnc: inboundAuthUsername === null ? null : Buffer.from('sealed'),
+      transport: 'udp',
+      inboundNumberFormat,
+      createdAt: nowIso()
+    })
+    .execute();
+  return id;
+}
+
+/** A `from-trunk` StasisStart for a channel chan_pjsip named after the trunk's endpoint. */
+function inboundEvent(channel: Channel, exten: string): AriEvent {
+  return {
+    type: 'StasisStart',
+    timestamp: nowIso(),
+    application: 'zamfono',
+    args: ['inbound', exten],
+    channel
+  };
+}
+
+function traceEvents(call: Call | undefined): Record<string, unknown>[] {
+  return (call?.log.finish().log ?? '')
+    .split('\n')
+    .filter(line => line !== '')
+    .map(line => JSON.parse(line) as Record<string, unknown>);
+}
+
+describe('inbound number normalization at the trunk boundary (§9.4)', () => {
+  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
+  let db: Db;
+  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
+  let fakeAri: FakeAri;
+  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
+  let ari: AriClient;
+  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
+  let cdr: PipelineDeps['cdr'] & { opened: Call[] };
+  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
+  let pipeline: Pipeline;
+  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
+  let mainDidId: string;
+
+  beforeEach(async () => {
+    db = openDb(':memory:');
+    await migrateForTest(db);
+    mainDidId = await seedAnnouncementDid(db, '+4930123456');
+    await db
+      .insertInto('settings')
+      .values({
+        id: 1,
+        companyName: 'Zamfono',
+        mainDidId,
+        country: 'DE',
+        emergencyNumbersJson: '["112"]'
+      })
+      .execute();
+    fakeAri = new FakeAri();
+    const { url } = await fakeAri.listen();
+    ari = new AriClient({
+      url,
+      user: 'zamfono',
+      password: 'secret',
+      app: 'zamfono',
+      log: noopLogger
+    });
+    await ari.connect();
+    cdr = fakeCdr();
+    pipeline = new Pipeline({
+      ari,
+      cache: new ConfigCache(db),
+      state: new StateStore(),
+      bus: new EventBus(),
+      cdr,
+      now: nowIso,
+      trunkState: null,
+      presence: null
+    });
+  });
+
+  afterEach(async () => {
+    await ari.close();
+    await fakeAri.close();
+    await db.destroy();
+  });
+
+  async function arrive(
+    trunkId: string,
+    called: string,
+    caller: string,
+    endpoint = `trunk-${trunkId}`
+  ): Promise<Call | undefined> {
+    const channel = fakeAri.addChannel({
+      name: `PJSIP/${endpoint}-0000002a`,
+      caller: { number: caller, name: '' }
+    });
+    await pipeline.handleStasisStart(inboundEvent(channel, called));
+    return cdr.opened.find(call => call.callerChannelId === channel.id);
+  }
+
+  it('turns a national trunk’s leading 0 into +<calling code> for both parties', async () => {
+    const trunkId = await seedTrunk(db, 'national');
+
+    const call = await arrive(trunkId, '030123456', '08912345');
+
+    expect(call?.to).toBe('+4930123456');
+    expect(call?.from).toBe('+498912345');
+    // The normalized number matched its DID rather than falling through to the fallback.
+    expect(call?.didId).toBe(mainDidId);
+  });
+
+  it('reads 00 as the international prefix and keeps + on a national trunk', async () => {
+    const trunkId = await seedTrunk(db, 'national');
+
+    const call = await arrive(trunkId, '004930123456', '+43123456');
+
+    expect(call?.to).toBe('+4930123456');
+    expect(call?.from).toBe('+43123456');
+    expect(call?.didId).toBe(mainDidId);
+  });
+
+  it('turns an e164 trunk’s 00 into + and leaves a leading 0 alone', async () => {
+    const trunkId = await seedTrunk(db, 'e164');
+
+    const call = await arrive(trunkId, '004930123456', '08912345');
+
+    expect(call?.to).toBe('+4930123456');
+    expect(call?.from).toBe('08912345');
+    expect(call?.didId).toBe(mainDidId);
+  });
+
+  it('does not read an e164 trunk’s national digits as a national number', async () => {
+    const trunkId = await seedTrunk(db, 'e164');
+
+    const call = await arrive(trunkId, '030123456', '+498912345');
+
+    expect(call?.to).toBe('030123456');
+    expect(call?.didId).toBeNull();
+  });
+
+  it('passes a provider’s account string verbatim and matches it against dids.number', async () => {
+    const trunkId = await seedTrunk(db, 'national');
+    const accountDidId = await seedAnnouncementDid(db, 'acct-4711');
+
+    const call = await arrive(trunkId, 'acct-4711', '');
+
+    expect(call?.to).toBe('acct-4711');
+    expect(call?.from).toBe('anonymous');
+    expect(call?.didId).toBe(accountDidId);
+  });
+
+  it.each([
+    ['RFC 3323 anonymous', 'Anonymous'],
+    ['a provider’s word for a withheld number', 'Restricted'],
+    ['a provider’s word for an unavailable number', 'unavailable']
+  ])(
+    'carries a caller whose user part is %s as anonymous (§9.4 "Withheld caller")',
+    async (_label, user) => {
+      const trunkId = await seedTrunk(db, 'e164');
+
+      const call = await arrive(trunkId, '+4930123456', user);
+
+      expect(call?.from).toBe('anonymous');
+    }
+  );
+
+  it('carries a caller whose identity RFC 3323 privacy suppresses as anonymous, number or not', async () => {
+    const trunkId = await seedTrunk(db, 'e164');
+    const channel = fakeAri.addChannel({
+      name: `PJSIP/trunk-${trunkId}-0000002b`,
+      caller: { number: '+498912345', name: '' }
+    });
+    fakeAri.channelVariables.set(
+      `${channel.id}:PJSIP_HEADER(read,Privacy)`,
+      'id'
+    );
+
+    await pipeline.handleStasisStart(inboundEvent(channel, '+4930123456'));
+
+    const call = cdr.opened.find(entry => entry.callerChannelId === channel.id);
+    expect(call?.from).toBe('anonymous');
+  });
+
+  it('keeps a caller whose Privacy suppresses nothing, and a non-numeric user part verbatim', async () => {
+    const trunkId = await seedTrunk(db, 'e164');
+    const channel = fakeAri.addChannel({
+      name: `PJSIP/trunk-${trunkId}-0000002c`,
+      caller: { number: '+498912345', name: '' }
+    });
+    fakeAri.channelVariables.set(
+      `${channel.id}:PJSIP_HEADER(read,Privacy)`,
+      'none'
+    );
+
+    await pipeline.handleStasisStart(inboundEvent(channel, '+4930123456'));
+    const verbatim = await arrive(trunkId, '+4930123456', 'alice');
+
+    const call = cdr.opened.find(entry => entry.callerChannelId === channel.id);
+    expect(call?.from).toBe('+498912345');
+    expect(verbatim?.from).toBe('alice');
+  });
+
+  it('reads an inbound-auth trunk from the endpoint its digest username names', async () => {
+    // `identify_by = auth_username` delivers the call on the endpoint named by the
+    // Authorization username (§9.4 "Inbound identification"), not on `trunk-<id>`.
+    await seedTrunk(db, 'e164', 'acct-other');
+    const trunkId = await seedTrunk(db, 'national', 'acct-4711');
+
+    const call = await arrive(trunkId, '030123456', '08912345', 'acct-4711');
+
+    expect(call?.to).toBe('+4930123456');
+    expect(call?.from).toBe('+498912345');
+    expect(traceEvents(call)).toContainEqual(
+      expect.objectContaining({ event: 'trunk', trunkId })
+    );
+  });
+
+  it('records the trunk that identified the call in the routing trace', async () => {
+    const trunkId = await seedTrunk(db, 'national');
+
+    const call = await arrive(trunkId, '030123456', '08912345');
+
+    expect(traceEvents(call)).toContainEqual(
+      expect.objectContaining({ event: 'trunk', trunkId })
+    );
+  });
+
+  // §7: the call's level is the maximum of the tenant default and the overrides of the trunk
+  // (among others) that routed it; an expired override no longer counts.
+  it('raises the call to the delivering trunk’s unexpired diagnostics override', async () => {
+    const trunkId = await seedTrunk(db, 'national');
+    await db
+      .updateTable('trunks')
+      .set({ logLevel: 'qos', logLevelExpiresAt: '2999-01-01T00:00:00.000Z' })
+      .where('id', '=', trunkId)
+      .execute();
+
+    const call = await arrive(trunkId, '030123456', '08912345');
+
+    expect(call?.log.level).toBe('qos');
+  });
+
+  it('ignores the delivering trunk’s expired diagnostics override', async () => {
+    const trunkId = await seedTrunk(db, 'national');
+    await db
+      .updateTable('trunks')
+      .set({ logLevel: 'qos', logLevelExpiresAt: '2000-01-01T00:00:00.000Z' })
+      .where('id', '=', trunkId)
+      .execute();
+
+    const call = await arrive(trunkId, '030123456', '08912345');
+
+    expect(call?.log.level).toBe('events');
+  });
+
+  it('counts the call among the delivering trunk’s channels in use until its channel is destroyed', async () => {
+    const trunkId = await seedTrunk(db, 'national');
+    const state = new StateStore();
+    // An AMI client that never connects: inbound counting reads nothing from it.
+    const ami = new AmiClient({
+      host: '127.0.0.1',
+      port: 1,
+      username: 'zamfono',
+      password: 'secret',
+      log: noopLogger
+    });
+    const trunkState = new TrunkState({
+      ari,
+      ami,
+      cache: new ConfigCache(db),
+      state,
+      bus: new EventBus(),
+      now: nowIso
+    });
+    pipeline.deps.trunkState = trunkState;
+
+    const call = await arrive(trunkId, '030123456', '08912345');
+
+    expect(trunkState.activeChannels(trunkId)).toBe(1);
+    expect((await state.snapshot()).trunkChannels).toEqual({ [trunkId]: 1 });
+
+    fakeAri.emit({
+      type: 'ChannelDestroyed',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: { id: call?.callerChannelId }
+    });
+    await eventually(async () => {
+      expect(trunkState.activeChannels(trunkId)).toBe(0);
+      expect((await state.snapshot()).trunkChannels).toEqual({});
+    });
+  });
+
+  it('does not count a call whose channel is destroyed during the config read that names its trunk', async () => {
+    const trunkId = await seedTrunk(db, 'national');
+    const trunkState = new TrunkState({
+      ari,
+      ami: new AmiClient({
+        host: '127.0.0.1',
+        port: 1,
+        username: 'zamfono',
+        password: 'secret',
+        log: noopLogger
+      }),
+      cache: new ConfigCache(db),
+      state: new StateStore(),
+      bus: new EventBus(),
+      now: nowIso
+    });
+    pipeline.deps.trunkState = trunkState;
+    // The inbound entry's config read is held until the caller's hangup has been delivered.
+    const { cache } = pipeline.deps;
+    const readConfig = cache.get.bind(cache);
+    let releaseRead = (): void => undefined;
+    const readHeld = new Promise<void>(resolve => {
+      releaseRead = resolve;
+    });
+    cache.get = async () => {
+      await readHeld;
+      return readConfig();
+    };
+    const channel = fakeAri.addChannel({
+      name: `PJSIP/trunk-${trunkId}-0000002b`,
+      caller: { number: '08912345', name: '' }
+    });
+    const destroyedSeen = new Promise<void>(resolve => {
+      ari.on('event', (event: AriEvent) => {
+        if (event.type === 'ChannelDestroyed') {
+          resolve();
+        }
+      });
+    });
+
+    const entering = pipeline.handleStasisStart(
+      inboundEvent(channel, '030123456')
+    );
+    fakeAri.emit({
+      type: 'ChannelDestroyed',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: { id: channel.id }
+    });
+    await destroyedSeen;
+    releaseRead();
+    await entering;
+
+    expect(trunkState.activeChannels(trunkId)).toBe(0);
+  });
+});

@@ -1,0 +1,25 @@
+; Autoload brings up the installed module set (spec §4, §9.1); the channel, CDR and CEL
+; drivers the stack does not use (chan_pjsip and the core's own call log are the only ones,
+; per spec §9.3/§9.4) are noloaded so they cannot start. HEP_NOLOAD_LINES additionally keeps
+; the HEP modules out of the running process when HEP_ENABLED=false (spec §9.1).
+[modules]
+autoload = yes
+noload => chan_iax2.so
+noload => chan_unistim.so
+noload => chan_websocket.so
+noload => chan_audiosocket.so
+noload => chan_console.so
+noload => cdr_csv.so
+noload => cdr_custom.so
+noload => cdr_manager.so
+noload => cdr_tds.so
+noload => cel_custom.so
+noload => cel_manager.so
+noload => cel_tds.so
+; Auto-provisioning and CLI/AMI PJSIP NOTIFY are outside the MVP (spec §9.3: "registration-only
+; ... without auto-provisioning"); without a phoneprov.conf/pjsip_notify.conf in the image these
+; would otherwise decline to load and show up as a res_pjsip module that failed to start.
+noload => res_phoneprov.so
+noload => res_pjsip_phoneprov_provider.so
+noload => res_pjsip_notify.so
+${HEP_NOLOAD_LINES}

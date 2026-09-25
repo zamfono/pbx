@@ -1,0 +1,5 @@
+{
+  "subject": "Missed call on {{didLabel}}",
+  "bodyText": "Hi {{recipientName}},\n\nYou missed a call on {{didLabel}} from {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}} at {{date receivedAt}}.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Hi {{recipientName}},</p><p>You missed a call on {{didLabel}} from {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}} at {{date receivedAt}}.</p><p>{{companyName}} · {{fqdn}}</p>"
+}

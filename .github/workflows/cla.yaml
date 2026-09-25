@@ -1,0 +1,52 @@
+# The contributor license agreement check of §12 "Open source": a pull request's `cla` commit
+# status stays red until every author of its commits has signed CLA.md, once, by commenting the
+# sentence .github/scripts/cla.mjs names on a pull request. The script keeps the signatures on a
+# branch of their own, `cla-signatures`, which it creates on the first one; that branch must stay
+# unprotected, since this workflow commits to it. Require the `cla` status on main to enforce it.
+#
+# Safe with a fork's code: `pull_request_target` and `issue_comment` run this file from the
+# default branch, the checkout below is the default branch too, and the script reads the pull
+# request's commits and comments through the API only; nothing here runs the pull request.
+name: cla
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  cla:
+    # A comment only runs it when it could sign or asks for a recheck; the script matches exactly.
+    if: >-
+      github.event_name == 'pull_request_target'
+      || (github.event.issue.pull_request
+        && (contains(github.event.comment.body, 'I hereby sign it')
+          || contains(github.event.comment.body, 'recheck')))
+    runs-on: ubuntu-latest
+    # One run per pull request at a time, so a signature and a push cannot set the status out of
+    # order. Signatures from different pull requests may still race; the script retries those.
+    concurrency:
+      group: cla-${{ github.event.pull_request.number || github.event.issue.number }}
+      cancel-in-progress: false
+    permissions:
+      # Commits signatures to the `cla-signatures` branch.
+      contents: write
+      # Posts and updates the check's own comment.
+      pull-requests: write
+      # Sets the `cla` commit status.
+      statuses: write
+    steps:
+      # The default branch, for the script; never the pull request.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { default: check } = await import(`${process.env.GITHUB_WORKSPACE}/.github/scripts/cla.mjs`);
+            await check({ github, context });

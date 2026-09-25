@@ -1,0 +1,261 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
+import { migrateForTest } from '@zamfono/shared/testDb.js';
+
+import { AmiClient } from '../ami/client.js';
+import { AriClient } from '../ari/client.js';
+import { FakeAri } from '../ari/fake.js';
+import { defaultChannel, type Channel, type Logger } from '../ari/types.js';
+import { eventually } from '../testing/eventually.js';
+import { newCall, type Call } from './call.js';
+import {
+  ConfigCache,
+  EventBus,
+  Pipeline,
+  StateStore,
+  type PipelineDeps
+} from './pipeline.js';
+import { TrunkState } from './trunkState.js';
+
+const noopLogger: Logger = {
+  info: () => undefined,
+  warn: () => undefined,
+  error: () => undefined
+};
+
+// Q.850 normal clearing, as ARI's `ChannelDestroyed` carries it.
+const AST_CAUSE_NORMAL = 16;
+const FIND_ME_NUMBER = '+15557000';
+
+function fakeCdr(): PipelineDeps['cdr'] {
+  return { open: () => Promise.resolve(), finish: () => Promise.resolve() };
+}
+
+async function seedSettings(db: Db): Promise<void> {
+  const targetId = newId();
+  await db
+    .insertInto('forwardTargets')
+    .values({ id: targetId, external: '+15550000' })
+    .execute();
+  const mainDidId = newId();
+  await db
+    .insertInto('dids')
+    .values({
+      id: mainDidId,
+      number: '+491110000',
+      targetId,
+      createdAt: nowIso()
+    })
+    .execute();
+  await db
+    .insertInto('settings')
+    .values({
+      id: 1,
+      companyName: 'Zamfono',
+      mainDidId,
+      country: 'DE',
+      emergencyNumbersJson: '["112"]'
+    })
+    .execute();
+}
+
+/** A user with one device and one find-me entry `delayS` seconds into the ring. */
+async function seedUser(db: Db, delayS: number): Promise<string> {
+  const id = newId();
+  await db
+    .insertInto('users')
+    .values({
+      id,
+      name: 'Member',
+      email: `${id}@example.com`,
+      createdAt: nowIso(),
+      mailboxEnabled: 0,
+      ringTimeoutS: 30,
+      findMeJson: JSON.stringify([{ number: FIND_ME_NUMBER, delayS }])
+    })
+    .execute();
+  await db
+    .insertInto('devices')
+    .values({
+      id: newId(),
+      userId: id,
+      label: 'e101-d1',
+      kind: 'manual',
+      sipUsername: 'e101-d1',
+      sipPasswordEnc: Buffer.from('secret'),
+      createdAt: nowIso()
+    })
+    .execute();
+  return id;
+}
+
+/** A trunk and an outbound route over it, so the find-me leg can be dialled. */
+async function seedRoute(db: Db): Promise<string> {
+  const trunkId = newId();
+  await db
+    .insertInto('trunks')
+    .values({
+      id: trunkId,
+      name: 'trunk-1',
+      priority: 1,
+      authMode: 'registration',
+      username: 'user1',
+      passwordEnc: Buffer.from('secret'),
+      inboundAuth: 0,
+      transport: 'udp',
+      calleridHeader: 'from',
+      createdAt: nowIso()
+    })
+    .execute();
+  await db
+    .insertInto('trunkHosts')
+    .values({
+      trunkId,
+      priority: 1,
+      host: 'sip1.example.com',
+      port: null,
+      direction: 'both'
+    })
+    .execute();
+  await db
+    .insertInto('outboundRoutes')
+    .values({ id: newId(), priority: 1, trunkId, createdAt: nowIso() })
+    .execute();
+  return trunkId;
+}
+
+describe('a find-me leg still to come (§10.1 step 4)', () => {
+  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
+  let db: Db;
+  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
+  let fakeAri: FakeAri;
+  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
+  let ari: AriClient;
+  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
+  let pipeline: Pipeline;
+  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
+  let callerChannel: Channel;
+  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
+  let call: Call;
+
+  function destroy(channelId: string, cause: number): void {
+    fakeAri.emit({
+      type: 'ChannelDestroyed',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: defaultChannel({ id: channelId, state: 'Down' }),
+      cause
+    });
+  }
+
+  /** The channel the fake originated to `endpoint` (the fake names a channel after its endpoint). */
+  async function channelTo(endpoint: string): Promise<Channel> {
+    const channel = (await ari.channels.list()).find(
+      entry => entry.name === endpoint
+    );
+    if (!channel) {
+      throw new Error(`no channel originated to ${endpoint}`);
+    }
+    return channel;
+  }
+
+  beforeEach(async () => {
+    db = openDb(':memory:');
+    await migrateForTest(db);
+    await seedSettings(db);
+    fakeAri = new FakeAri();
+    fakeAri.answerAfterMs = 60_000;
+    const { url } = await fakeAri.listen();
+    ari = new AriClient({
+      url,
+      user: 'zamfono',
+      password: 'secret',
+      app: 'zamfono',
+      log: noopLogger
+    });
+    await ari.connect();
+    const state = new StateStore();
+    const trunkState = new TrunkState({
+      ari,
+      ami: new AmiClient({
+        host: '127.0.0.1',
+        port: 1,
+        username: 'zamfono',
+        password: 'secret',
+        log: noopLogger
+      }),
+      cache: new ConfigCache(db),
+      state,
+      bus: new EventBus(),
+      now: nowIso
+    });
+    pipeline = new Pipeline({
+      ari,
+      cache: new ConfigCache(db),
+      state,
+      bus: new EventBus(),
+      cdr: fakeCdr(),
+      now: nowIso,
+      trunkState,
+      presence: null
+    });
+    callerChannel = fakeAri.addChannel({
+      caller: { number: '+15559999', name: '' }
+    });
+    call = newCall({
+      id: newId(),
+      direction: 'inbound',
+      callerChannelId: callerChannel.id,
+      from: '+15559999',
+      to: '+15551000',
+      startedAt: nowIso(),
+      logLevel: 'events',
+      callLogMaxBytes: 1_048_576
+    });
+    pipeline.registerCall(call);
+  });
+
+  afterEach(async () => {
+    await ari.close();
+    await fakeAri.close();
+    await db.destroy();
+  });
+
+  it('keeps the race open after the last device leg ends, and still rings the find-me number', async () => {
+    const userId = await seedUser(db, 1);
+    const trunkId = await seedRoute(db);
+
+    const finished = pipeline.ringUser(call, userId);
+    await eventually(() => {
+      expect(call.legs.size).toBe(1);
+    });
+    destroy((await channelTo('PJSIP/e101-d1')).id, AST_CAUSE_NORMAL);
+
+    const findMeEndpoint = `PJSIP/${FIND_ME_NUMBER}@trunk-${trunkId}`;
+    const findMe = await eventually(() => channelTo(findMeEndpoint), 3000);
+    expect(pipeline.pendingRing.has(call.id)).toBe(true);
+    destroy(findMe.id, AST_CAUSE_NORMAL);
+    await finished;
+
+    expect(call.status).toBe('missed');
+    expect(pipeline.pendingRing.has(call.id)).toBe(false);
+  });
+
+  it('settles the race once a find-me leg that could not be routed was the last one to come', async () => {
+    const userId = await seedUser(db, 1);
+
+    const finished = pipeline.ringUser(call, userId);
+    await eventually(() => {
+      expect(call.legs.size).toBe(1);
+    });
+    destroy((await channelTo('PJSIP/e101-d1')).id, AST_CAUSE_NORMAL);
+    await eventually(() => {
+      expect([...call.legs.values()].map(leg => leg.state)).toEqual(['ended']);
+    });
+    expect(pipeline.pendingRing.has(call.id)).toBe(true);
+    await finished;
+
+    expect(call.status).toBe('missed');
+  });
+});

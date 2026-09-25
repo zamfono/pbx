@@ -1,0 +1,136 @@
+import { z } from 'zod';
+
+type JsonSchema = Record<string, unknown>;
+type QueryFieldKind = 'number' | 'boolean';
+
+/** The JSON-Schema `type`(s) declared for one of `schema`'s own properties, as a `Set` for a quick `has`. */
+function jsonSchemaTypes(propertySchema: JsonSchema): Set<string> {
+  const { type } = propertySchema;
+  if (Array.isArray(type)) {
+    return new Set(
+      type.filter((entry): entry is string => typeof entry === 'string')
+    );
+  }
+  return new Set(typeof type === 'string' ? [type] : []);
+}
+
+/** `z.toJSONSchema`, or `null` for an input it still cannot represent even with `unrepresentable: 'any'`. */
+function safeJsonSchema(input: z.ZodType): JsonSchema | null {
+  try {
+    return z.toJSONSchema(input, { unrepresentable: 'any' });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The operation's own declared type per query-facing field name — `number` for `number`/`integer`,
+ * `boolean` for `boolean`, absent for everything else (including `string`, which is left alone so
+ * a digits-only filter like `search.query`'s `q` is never guessed into a number, §10.3).
+ */
+function queryFieldKinds(input: z.ZodType): Map<string, QueryFieldKind> {
+  const kinds = new Map<string, QueryFieldKind>();
+  const schema = safeJsonSchema(input);
+  if (!schema) {
+    return kinds;
+  }
+  const properties =
+    (schema.properties as Record<string, JsonSchema> | undefined) ?? {};
+  for (const [name, propertySchema] of Object.entries(properties)) {
+    const types = jsonSchemaTypes(propertySchema);
+    if (types.has('number') || types.has('integer')) {
+      kinds.set(name, 'number');
+    } else if (types.has('boolean')) {
+      kinds.set(name, 'boolean');
+    }
+  }
+  return kinds;
+}
+
+/** Converts a raw query string to the operation's declared `number`/`boolean` type; an unparsable value is left as text, so the operation's own validation reports it. */
+function coerceTyped(
+  raw: string,
+  kind: QueryFieldKind
+): string | number | boolean {
+  if (kind === 'boolean') {
+    return raw === 'true' || raw === 'false' ? raw === 'true' : raw;
+  }
+  return raw === '' ? raw : Number(raw);
+}
+
+/** Query values are coerced only where the matched operation's own schema says `number`/`boolean` (§10.3); every other value, `cursor` included, stays the wire string. */
+export function parseQuery(
+  request: Request,
+  input: z.ZodType
+): Record<string, unknown> {
+  const kinds = queryFieldKinds(input);
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of new URL(request.url).searchParams) {
+    const kind = kinds.get(key);
+    out[key] = kind ? coerceTyped(value, kind) : value;
+  }
+  return out;
+}
+
+const OK_STATUS = 200;
+const OCTET_STREAM_CONTENT_TYPE = 'application/octet-stream';
+
+/** An operation's binary result (§10.3 `voicemails.audio`/`recordings.audio`): raw bytes plus the wire content type. */
+type BinaryResult = {
+  bytes: Uint8Array;
+  contentType: string;
+  filename?: string;
+};
+
+function isBinaryResult(output: unknown): output is BinaryResult {
+  if (typeof output !== 'object' || output === null) {
+    return false;
+  }
+  const candidate = output as Record<string, unknown>;
+  return (
+    candidate.bytes instanceof Uint8Array &&
+    typeof candidate.contentType === 'string'
+  );
+}
+
+// `Buffer`/`Uint8Array` is typed over `ArrayBufferLike` (it may back onto a `SharedArrayBuffer`);
+// `Response`'s body type wants one backed by a plain `ArrayBuffer`, so the bytes are copied into a
+// fresh view rather than passed straight through.
+function toResponseBody(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
+  return new Uint8Array(bytes);
+}
+
+/** Escapes a filename for the `content-disposition` quoted-string (RFC 6266 / RFC 2616 §2.2) and strips CR/LF, which `Response` would otherwise reject as a header-value character. */
+function quoteFilename(filename: string): string {
+  return filename
+    .replace(/[\r\n]/gu, '')
+    .replace(/\\/gu, '\\\\')
+    .replace(/"/gu, '\\"');
+}
+
+/** Every operation's result is JSON, except a `Uint8Array`/`Buffer` result or a `{ bytes, contentType, filename? }` one, answered as its own bytes so a download route never gets JSON-wrapped. */
+export function outputResponse(output: unknown): Response {
+  if (output instanceof Uint8Array) {
+    return new Response(toResponseBody(output), {
+      status: OK_STATUS,
+      headers: { 'content-type': OCTET_STREAM_CONTENT_TYPE }
+    });
+  }
+  if (isBinaryResult(output)) {
+    const headers: Record<string, string> = {
+      'content-type': output.contentType
+    };
+    if (output.filename !== undefined) {
+      headers['content-disposition'] =
+        `attachment; filename="${quoteFilename(output.filename)}"`;
+    }
+    return new Response(toResponseBody(output.bytes), {
+      status: OK_STATUS,
+      headers
+    });
+  }
+  return new Response(JSON.stringify(output), {
+    status: OK_STATUS,
+    headers: { 'content-type': 'application/json' }
+  });
+}

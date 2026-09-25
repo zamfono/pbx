@@ -1,0 +1,29 @@
+import { z } from 'zod';
+
+import { defineOperation } from '../types.js';
+import {
+  assertOwnLiveCall,
+  getCoreClient,
+  proxyCallAction
+} from './_shared.js';
+
+const inputSchema = z.object({ id: z.string() }).strict();
+
+/**
+ * `POST /calls/{id}/hangup` (§10.1, §5.7): ends the live call `id`, proxied to `core`; recorded
+ * with the acting user in the call's own history entry rather than the audit log.
+ */
+export const hangup = defineOperation({
+  name: 'calls.hangup',
+  description: 'Hangs up a live call.',
+  input: inputSchema,
+  minRole: 'user',
+  audit: false,
+  run: async (ctx, input) => {
+    await assertOwnLiveCall(ctx, input.id);
+    await proxyCallAction(() =>
+      getCoreClient().hangup(input.id, { actorUserId: ctx.actor.id })
+    );
+    return { id: input.id };
+  }
+});

@@ -1,0 +1,5 @@
+{
+  "subject": "Задайте пароль для {{companyName}}",
+  "bodyText": "Здравствуйте, {{recipientName}}!\n\n{{#if invitedBy}}{{invitedBy}} создал(а) вашу учётную запись АТС {{companyName}}.{{else}}Ваша АТС {{companyName}} готова к работе.{{/if}} Задайте пароль по ссылке:\n\n{{link}}\n\nСрок действия ссылки истекает {{date linkExpiresAt}}.\n{{#unless invitedBy}}\nПосле входа подключите своего ИИ-ассистента к {{fqdn}} по MCP, чтобы управлять АТС через чат.\n{{/unless}}\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Здравствуйте, {{recipientName}}!</p><p>{{#if invitedBy}}{{invitedBy}} создал(а) вашу учётную запись АТС {{companyName}}.{{else}}Ваша АТС {{companyName}} готова к работе.{{/if}} Задайте пароль по ссылке:</p><p><a href=\"{{link}}\">{{link}}</a></p><p>Срок действия ссылки истекает {{date linkExpiresAt}}.</p>{{#unless invitedBy}}<p>После входа подключите своего ИИ-ассистента к {{fqdn}} по MCP, чтобы управлять АТС через чат.</p>{{/unless}}<p>{{companyName}} · {{fqdn}}</p>"
+}

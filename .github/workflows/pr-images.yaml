@@ -1,0 +1,184 @@
+# Publishes a pull request's images for review, including one from a fork, and deletes them when
+# it closes. A reviewer runs them with deploy/compose.pr.yaml. The released images of §6.3
+# "Images" are release.yaml's alone; these go to packages of their own, ghcr.io/zamfono/<name>-pr,
+# tagged <N> (the pull request number, which moves to each newer build) and <N>-<short sha>, and
+# never `latest`.
+#
+# How it stays safe with a fork's code:
+#   - ci.yaml runs the pull request itself, on `pull_request`, with a read-only token, and uploads
+#     the `images` archive; it has nothing to publish with.
+#   - This workflow holds `packages: write`. It runs from the default branch (that is what
+#     `workflow_run` and `pull_request_target` do) and never checks out or runs the pull request:
+#     where it checks out at all, it checks out the default branch, explicitly, for its scripts.
+#   - The archive is the one input the pull request controls. It is only loaded, the five
+#     zamfono/<name>:ci images are taken from it, and they are re-labelled by a bare `FROM` build
+#     (pr-images-tag.sh), which runs nothing from them.
+#   - A maintainer approves by adding the `publish-image` label after reading the diff, and a new
+#     push takes it off again (`unlabel`), so the label always stands for the head that was read.
+#     Pull request, head commit and ci run come from the event and the API, checked against each
+#     other when this runs (pr-images-resolve.sh), never from the archive.
+#
+# Triggers: a ci run of a pull request finishing green (`workflow_run`), the label being added
+# after that (`labeled`, which finds the head's latest green ci run), a push (`synchronize`, which
+# removes the label), and the pull request closing (`closed`, which deletes its images).
+name: pr-images
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+  pull_request_target:
+    types: [labeled, synchronize, closed]
+
+permissions: {}
+
+env:
+  LABEL: publish-image
+  REGISTRY: ghcr.io/zamfono
+  IMAGES: asterisk migrate core api proxy
+
+jobs:
+  resolve:
+    if: >-
+      (github.event_name == 'workflow_run'
+        && github.event.workflow_run.event == 'pull_request'
+        && github.event.workflow_run.conclusion == 'success')
+      || (github.event_name == 'pull_request_target'
+        && github.event.action == 'labeled'
+        && github.event.label.name == 'publish-image')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      publish: ${{ steps.resolve.outputs.publish }}
+      pr: ${{ steps.resolve.outputs.pr }}
+      sha: ${{ steps.resolve.outputs.sha }}
+      run_id: ${{ steps.resolve.outputs.run_id }}
+      source: ${{ steps.resolve.outputs.source }}
+    steps:
+      # The default branch, for the scripts; `pull_request_target` would otherwise check out the
+      # pull request's base branch, which need not be the default one. Never the pull request.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Find the pull request, its head and its ci run, and check the label
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          # Passed through the environment, never into the script text: a head repository is a
+          # name its owner chose. The script validates each value's shape before using it.
+          EVENT: ${{ github.event_name }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+          PR: ${{ github.event.pull_request.number }}
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" = workflow_run ]; then
+            bash .github/scripts/pr-images-resolve.sh workflow_run "$RUN_ID" "$RUN_SHA" "$RUN_REPO"
+          else
+            bash .github/scripts/pr-images-resolve.sh labeled "$PR" "$PR_SHA"
+          fi
+
+  publish:
+    needs: resolve
+    if: needs.resolve.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    # One publish or cleanup per pull request at a time, so an older build can never land after a
+    # newer one; `cleanup` shares the group.
+    concurrency:
+      group: pr-images-${{ needs.resolve.outputs.pr }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      # Reading another run's artifact.
+      actions: read
+      packages: write
+    env:
+      PR: ${{ needs.resolve.outputs.pr }}
+      SHA: ${{ needs.resolve.outputs.sha }}
+    steps:
+      # The default branch, for pr-images-tag.sh, for the reason `resolve` gives.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: images
+          path: ${{ runner.temp }}/pr-images
+          run-id: ${{ needs.resolve.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - run: docker load -i "$RUNNER_TEMP/pr-images/images.tar"
+      - name: Re-label the five images for the pull request
+        env:
+          SOURCE: ${{ needs.resolve.outputs.source }}
+        run: bash .github/scripts/pr-images-tag.sh "$PR" "$SHA" "$SOURCE"
+      # Only now, with nothing from the archive left to handle, does the daemon get a credential.
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push them as <N> and <N>-<short sha>
+        run: |
+          for name in $IMAGES; do
+            for tag in "$PR" "$PR-${SHA::7}"; do
+              docker push "$REGISTRY/$name-pr:$tag"
+            done
+          done
+          {
+            echo "Images of #$PR at \`${SHA::7}\`; review them with deploy/compose.pr.yaml:"
+            echo
+            echo "    ZAMFONO_VERSION=$PR docker compose -f compose.yaml -f compose.ports.yaml -f compose.pr.yaml up -d"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+  unlabel:
+    # A push after the approval is code nobody has read: the label comes off, and its next ci run
+    # publishes nothing until a maintainer reads the new head and adds it back.
+    if: >-
+      github.event_name == 'pull_request_target' && github.event.action == 'synchronize'
+      && contains(github.event.pull_request.labels.*.name, 'publish-image')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Remove the label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh api --method DELETE "/repos/$REPO/issues/$PR/labels/$LABEL" --silent
+
+  cleanup:
+    if: github.event_name == 'pull_request_target' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pr-images-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    # Housekeeping, as release.yaml's `cleanup` is: a failure here marks nothing failed.
+    continue-on-error: true
+    permissions:
+      contents: read
+      # A 403 on the DELETE means GITHUB_TOKEN lacks delete rights on the package: each <name>-pr
+      # package's "Manage Actions access" must give the zamfono/pbx repository the Admin role.
+      packages: write
+    steps:
+      # The default branch, for prune-pr-images.sh, for the reason `resolve` gives.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Delete the pull request's images
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG: zamfono
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          packages=()
+          for name in $IMAGES; do packages+=("$name-pr"); done
+          bash .github/scripts/prune-pr-images.sh "$PR" "${packages[@]}"

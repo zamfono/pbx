@@ -1,0 +1,13 @@
+; Asterisk's built-in `default` class: the five bundled opsound tracks, installed in this image by
+; `asterisk-moh-opsound-wav` and `asterisk-moh-opsound-g722`, played in shuffle (spec §10.2 "Hold
+; music"). It is what a party hears while `settings.hold_moh_audio_id` is NULL, and what a parked
+; call hears in the holding bridge, so it has to exist independently of any rendered class.
+; `mode=files` lets Asterisk pick the g722 variant for a wideband call.
+[default]
+mode=files
+directory=/usr/share/asterisk/moh
+sort=random
+
+; MoH classes are rendered by `api`, one per `moh` audio asset (spec §9.1), onto the shared
+; `asterisk-config` volume and pulled in through this include.
+#include gen/musiconhold.conf

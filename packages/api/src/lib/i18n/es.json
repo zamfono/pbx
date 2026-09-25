@@ -1,0 +1,49 @@
+{
+  "login": {
+    "title": "Iniciar sesión",
+    "consentIntro": "{client} quiere que inicies sesión.",
+    "consentApprove": "Aprobar",
+    "consentDeny": "Rechazar",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "submit": "Iniciar sesión",
+    "invalid": "Correo electrónico o contraseña incorrectos.",
+    "forgotLink": "¿Olvidaste tu contraseña?",
+    "ssoPrefix": "Iniciar sesión con "
+  },
+  "forgot": {
+    "title": "Contraseña olvidada",
+    "intro": "Introduce tu correo electrónico y te enviaremos un enlace para establecer una nueva contraseña.",
+    "email": "Correo electrónico",
+    "submit": "Enviar enlace",
+    "sent": "Si esa dirección tiene una cuenta, un enlace está en camino.",
+    "backToLogin": "Volver al inicio de sesión"
+  },
+  "setPassword": {
+    "title": "Establecer tu contraseña",
+    "password": "Nueva contraseña",
+    "submit": "Establecer contraseña",
+    "success": "Tu contraseña se ha establecido.",
+    "successLoginLink": "Continuar para iniciar sesión",
+    "invalid": "Este enlace ha caducado o ya se ha utilizado.",
+    "tooShort": "La contraseña debe tener al menos {min} caracteres."
+  },
+  "error": {
+    "title": "Problema al iniciar sesión",
+    "expired": "Este enlace ha caducado. Inténtalo de nuevo.",
+    "noUser": "Ninguna cuenta coincide con este inicio de sesión.",
+    "domain": "Tu dominio de correo no tiene permiso para iniciar sesión aquí.",
+    "unverifiedEmail": "Tu proveedor de identidad no ha verificado esta dirección de correo.",
+    "issuer": "Este inicio de sesión fue emitido por el proveedor de identidad equivocado.",
+    "audience": "Este inicio de sesión fue emitido para otra aplicación.",
+    "signature": "Este inicio de sesión no pudo verificarse.",
+    "nonce": "Este inicio de sesión no pudo verificarse.",
+    "generic": "Algo salió mal al iniciar sesión.",
+    "backToLogin": "Volver al inicio de sesión"
+  },
+  "done": {
+    "title": "Has iniciado sesión",
+    "message": "Has iniciado sesión en {company}.",
+    "mcpHint": "Conecta un cliente MCP con:"
+  }
+}

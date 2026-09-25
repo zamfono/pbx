@@ -1,0 +1,5 @@
+{
+  "subject": "Configure su contraseña de {{companyName}}",
+  "bodyText": "Hola {{recipientName}},\n\n{{#if invitedBy}}{{invitedBy}} creó su cuenta de la centralita {{companyName}}.{{else}}Su centralita {{companyName}} está lista.{{/if}} Configure su contraseña con este enlace:\n\n{{link}}\n\nEste enlace caduca el {{date linkExpiresAt}}.\n{{#unless invitedBy}}\nUna vez que haya iniciado sesión, conecte su asistente de IA a {{fqdn}} mediante MCP para gestionar la centralita por chat.\n{{/unless}}\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Hola {{recipientName}},</p><p>{{#if invitedBy}}{{invitedBy}} creó su cuenta de la centralita {{companyName}}.{{else}}Su centralita {{companyName}} está lista.{{/if}} Configure su contraseña con este enlace:</p><p><a href=\"{{link}}\">{{link}}</a></p><p>Este enlace caduca el {{date linkExpiresAt}}.</p>{{#unless invitedBy}}<p>Una vez que haya iniciado sesión, conecte su asistente de IA a {{fqdn}} mediante MCP para gestionar la centralita por chat.</p>{{/unless}}<p>{{companyName}} · {{fqdn}}</p>"
+}

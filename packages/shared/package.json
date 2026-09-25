@@ -1,0 +1,31 @@
+{
+  "name": "@zamfono/shared",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "db:generate": "kysely-generate",
+    "test": "vitest run"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./testDb.js": "./src/testDb.ts"
+  },
+  "types": "./src/index.ts",
+  "kysely-generate": {
+    "camelCase": true,
+    "dialect": "sqlite",
+    "outFile": "./src/generated/db.d.ts",
+    "url": "env(DB_FILE)"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "kysely": "^0.29.6",
+    "libphonenumber-js": "^1.13.14",
+    "uuid": "^14.0.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "kysely-generate": "^0.22.3"
+  }
+}

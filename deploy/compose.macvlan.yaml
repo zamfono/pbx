@@ -1,0 +1,10 @@
+# compose.macvlan.yaml — the asterisk container owns a public address on the host's `public` network
+networks:
+  public:
+    external: true
+
+services:
+  asterisk:
+    networks:
+      public:
+        ipv4_address: ${STACK_IPV4}

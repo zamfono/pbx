@@ -1,0 +1,192 @@
+// Wires Asterisk's ARI events (§9.2 `inbound,<exten>` / `leg,<callId>`) to the Call aggregate's
+// ring/leg/bridge lifecycle (`legs.ts`) and `inbound.ts`'s target-resolution logic.
+import type { Db } from '@zamfono/shared';
+
+import type { AriClient } from '../ari/client.js';
+import type { AriEvent, Channel, Logger } from '../ari/types.js';
+import { ConfigCache, EventBus, StateStore } from '../internal/server.js';
+import type { Presence } from '../presence.js';
+import type { ForwardTarget } from '../routing/targets.js';
+import type { Call, Owner } from './call.js';
+import { enterTarget, handleInboundStart, runTarget } from './inbound.js';
+import {
+  handleChannelEnded,
+  handleDtmf,
+  legWentUp,
+  type FindMeAcceptWait,
+  type RingResolver
+} from './legs.js';
+import type { ParticipationRecorder } from './recordParticipation.js';
+import { ringUser } from './ringUser.js';
+import type { TrunkState } from './trunkState.js';
+import { deposit, type MailSender } from './voicemail.js';
+
+export { ConfigCache, EventBus, StateStore };
+
+export type PipelineDeps = {
+  ari: AriClient;
+  cache: ConfigCache;
+  state: StateStore;
+  bus: EventBus;
+  // A minimal, structural stand-in for Task 32's `CdrWriter`, ahead of that task's own file.
+  cdr: {
+    open(call: Call): Promise<void>;
+    finish(call: Call): Promise<void>;
+    captureQos?(call: Call): Promise<void>;
+    registerLeg?(call: Call, channelId: string): void;
+  };
+  // §10.2 "Call recording": the answer and end points below hand every participation to the
+  // recorder, which decides per participation whether the effective flag is set. Structural so a
+  // test Pipeline can stand one in; `null` for a Pipeline that records nothing.
+  recorder?: ParticipationRecorder | null;
+  now: () => string;
+  // The stack's `TZ` (§11.4 `timezone`: "NULL = stack `TZ`, else UTC"), `CoreEnv.tz`; optional so
+  // a test Pipeline that never evaluates opening hours need not supply it (absent = UTC).
+  stackTz?: string;
+  // Voicemail deposit's own collaborators (§3.1): optional so a test Pipeline that never deposits
+  // a call need not supply them; `main.ts`'s real Pipeline always does.
+  db?: Db;
+  apiClient?: MailSender;
+  // Process-level logging (§10.1 "Emergency calls": an ERROR line while no live trunk exists);
+  // optional so a test Pipeline that never needs it can omit it.
+  logger?: Logger;
+  // --- Task 31 ---
+  // Required, `null` until `main.ts` constructs them (§10.2 "Presence and BLF", "Three-way
+  // calls"), so a `Pipeline` states at construction whether it carries them: `addParty.ts`'s
+  // `addParty` reaches `outboundExternal.ts`'s `originateExternalLeg` through `trunkState` for an
+  // external `*5` target, and the ring/answer/end call sites in `outbound.ts`, `legs.ts`,
+  // `legsEnded.ts`, `ringGroup.ts` and `ringGroupDial.ts` call `presence.setCallState`.
+  trunkState: TrunkState | null;
+  presence: Presence | null;
+  // --- end Task 31 ---
+};
+
+// One Pipeline per `core` process, wired directly to its `AriClient`'s event stream so
+// constructing it is the only wiring a caller needs to do. The ring/leg/bridge state below is
+// public so `legs.ts`'s functions, taking `this` as their first argument, can read and write it.
+export class Pipeline {
+  readonly deps: PipelineDeps;
+  readonly callByChannel = new Map<string, Call>();
+  readonly pendingRing = new Map<string, RingResolver>();
+  readonly findMeTimers = new Map<string, ReturnType<typeof setTimeout>[]>();
+  readonly pendingFindMeAccept = new Map<string, FindMeAcceptWait>();
+  // Set by Task 30's wiring (`setOutboundHandler`); `null` until then, so an `outbound,<exten>`
+  // Stasis entry is a no-op rather than a crash.
+  private outboundHandler: ((ev: AriEvent) => Promise<void>) | null = null;
+
+  constructor(deps: PipelineDeps) {
+    this.deps = deps;
+    this.deps.ari.on('event', (ev: AriEvent) => {
+      // A rejection here is a fault in the routing of one call, never a reason to stop handling
+      // the stream. The call's own trace stops where the throw happened and says nothing about
+      // it, so the log line is the only account of what went wrong.
+      this.routeEvent(ev).catch((error: unknown) => {
+        // §7: a call-related line carries the call's correlation id.
+        this.deps.logger?.error(
+          { err: error, event: ev.type, callId: this.callIdOf(ev) },
+          'pipeline: routing failed'
+        );
+      });
+    });
+  }
+
+  /** The call `ev` belongs to, by its channel or, for a leg or click-to-dial channel that has not
+   * been tracked yet, by the call id its Stasis arguments carry; `null` before any call exists. */
+  private callIdOf(ev: AriEvent): string | null {
+    const channel = ev.channel as Channel | undefined;
+    const tracked =
+      channel === undefined ? undefined : this.callByChannel.get(channel.id);
+    if (tracked !== undefined) {
+      return tracked.id;
+    }
+    const [kind, callId] =
+      (ev.args as (string | undefined)[] | undefined) ?? [];
+    return (kind === 'leg' || kind === 'click') && callId !== undefined
+      ? callId
+      : null;
+  }
+
+  private async routeEvent(ev: AriEvent): Promise<void> {
+    if (ev.type === 'StasisStart') {
+      await this.handleStasisStart(ev);
+      return;
+    }
+    if (ev.type === 'ChannelStateChange') {
+      const channel = ev.channel as Channel;
+      if (channel.state === 'Up') {
+        await legWentUp(this, channel.id);
+      }
+      return;
+    }
+    if (ev.type === 'ChannelDtmfReceived') {
+      handleDtmf(this, ev);
+      return;
+    }
+    if (ev.type === 'ChannelHangupRequest') {
+      const call = this.callByChannel.get((ev.channel as Channel).id);
+      if (call !== undefined) {
+        await this.deps.cdr.captureQos?.(call);
+      }
+      return;
+    }
+    if (ev.type === 'ChannelDestroyed' || ev.type === 'StasisEnd') {
+      await handleChannelEnded(this, ev);
+    }
+  }
+
+  async handleStasisStart(ev: AriEvent): Promise<void> {
+    const args = (ev.args as string[] | undefined) ?? [];
+    const kind = args[0];
+    if (kind === 'inbound') {
+      await handleInboundStart(this, ev);
+      return;
+    }
+    if (kind === 'outbound') {
+      await this.outboundHandler?.(ev);
+      return;
+    }
+    if (kind === 'leg') {
+      await legWentUp(this, (ev.channel as Channel).id);
+    }
+    // A `snoop,<channelId>` entry is the recorder's own spy channel (§10.2): `Recorder` holds its
+    // id from the originate and drives its recording directly, so the pipeline leaves it alone.
+  }
+
+  /** Wires Task 30's `handleOutbound` for `outbound,<exten>` Stasis entries (§9.2). */
+  setOutboundHandler(handler: (ev: AriEvent) => Promise<void>): void {
+    this.outboundHandler = handler;
+  }
+
+  registerCall(call: Call): void {
+    this.callByChannel.set(call.callerChannelId, call);
+  }
+
+  /** §10.1 step 7, dialling an external target as `asUser`, the forwarding user (`inbound.ts`). */
+  async runTarget(
+    call: Call,
+    target: ForwardTarget,
+    asUser: string | null
+  ): Promise<void> {
+    await runTarget(this, call, target, asUser);
+  }
+
+  /** Entry's hop-free re-entry (§10.1 step 1/6): a matched menu option or a menu's live-extension
+   * match, neither of which counts a hop (§10.1 step 7). */
+  async enterTarget(
+    call: Call,
+    target: ForwardTarget,
+    asUser: string | null
+  ): Promise<void> {
+    await enterTarget(this, call, target, asUser);
+  }
+
+  async ringUser(call: Call, userId: string): Promise<void> {
+    await ringUser(this, call, userId);
+  }
+
+  /** §10.1 steps 4 and 5: the mailbox outcome of a ring that went unanswered. Routed through the
+   * pipeline because `call.ts` holds those outcomes and `voicemail.ts` reads `call.ts`. */
+  async deposit(call: Call, mailbox: Owner): Promise<void> {
+    await deposit(this, call, mailbox);
+  }
+}

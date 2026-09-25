@@ -1,0 +1,132 @@
+/**
+ * The REST surface Asterisk 22's ARI offers, as the promise-returning namespaces `AriClient`
+ * exposes (§3, §9.2). Each wrapper maps one call onto its ARI method and path; the HTTP itself is
+ * `restTransport.ts`'s.
+ */
+import { channelRtpStatistics, channelVariable } from './channelReads.js';
+import { ModuleReloader } from './moduleReloader.js';
+import type { AriRequests } from './restTransport.js';
+import type {
+  AsteriskApi,
+  BridgesApi,
+  ChannelsApi,
+  DeviceStatesApi,
+  Endpoint,
+  EndpointsApi,
+  HangupOptions,
+  MailboxesApi,
+  PlaybacksApi
+} from './types.js';
+
+/** Every namespace of the ARI REST surface, keyed as `AriClient` exposes them. */
+export type AriRestApi = {
+  channels: ChannelsApi;
+  bridges: BridgesApi;
+  playbacks: PlaybacksApi;
+  deviceStates: DeviceStatesApi;
+  mailboxes: MailboxesApi;
+  endpoints: EndpointsApi;
+  asterisk: AsteriskApi;
+};
+
+function hangup(
+  rest: AriRequests,
+  id: string,
+  opts?: HangupOptions
+): Promise<void> {
+  const query = new URLSearchParams();
+  if (opts?.reasonCode !== undefined) {
+    query.set('reason_code', String(opts.reasonCode));
+  } else if (opts?.reason !== undefined) {
+    query.set('reason', opts.reason);
+  }
+  const queryString = query.toString();
+  return rest.void(
+    'DELETE',
+    queryString === '' ? `channels/${id}` : `channels/${id}?${queryString}`
+  );
+}
+
+function buildChannelsApi(rest: AriRequests): ChannelsApi {
+  return {
+    originate: params => rest.json('POST', 'channels', params),
+    answer: id => rest.void('POST', `channels/${id}/answer`),
+    hangup: (id, opts) => hangup(rest, id, opts),
+    play: (id, media, playbackId) =>
+      rest.json('POST', `channels/${id}/play`, { media, playbackId }),
+    record: (id, params) => rest.void('POST', `channels/${id}/record`, params),
+    snoop: (id, params) => rest.json('POST', `channels/${id}/snoop`, params),
+    rtpStatistics: id => channelRtpStatistics(rest.json, id),
+    setVar: (id, name, value) =>
+      rest.void('POST', `channels/${id}/variable`, {
+        variable: name,
+        value
+      }),
+    getVariable: (id, name) => channelVariable(rest.json, id, name),
+    continueInDialplan: (id, params) =>
+      rest.void('POST', `channels/${id}/continue`, params),
+    list: () => rest.json('GET', 'channels'),
+    ring: id => rest.void('POST', `channels/${id}/ring`),
+    startMoh: (id, mohClass) =>
+      rest.void('POST', `channels/${id}/moh`, { mohClass }),
+    stopMoh: id => rest.void('DELETE', `channels/${id}/moh`),
+    sendDtmf: (id, dtmf) => rest.void('POST', `channels/${id}/dtmf`, { dtmf })
+  };
+}
+
+function buildBridgesApi(rest: AriRequests): BridgesApi {
+  return {
+    create: params => rest.json('POST', 'bridges', params),
+    addChannel: (bridgeId, channelId) =>
+      rest.void('POST', `bridges/${bridgeId}/addChannel`, {
+        channel: channelId
+      }),
+    removeChannel: (bridgeId, channelId) =>
+      rest.void('POST', `bridges/${bridgeId}/removeChannel`, {
+        channel: channelId
+      }),
+    destroy: bridgeId => rest.void('DELETE', `bridges/${bridgeId}`),
+    list: () => rest.json('GET', 'bridges'),
+    startMoh: (bridgeId, mohClass) =>
+      rest.void('POST', `bridges/${bridgeId}/moh`, { mohClass }),
+    play: (bridgeId, media) =>
+      rest.json('POST', `bridges/${bridgeId}/play`, { media })
+  };
+}
+
+/**
+ * Module reloads go through one `ModuleReloader` per client, which runs them one at a time and
+ * retries the ones Asterisk refuses while another reload runs (`moduleReloader.ts`).
+ */
+function buildAsteriskApi(rest: AriRequests): AsteriskApi {
+  const reloader = new ModuleReloader(name =>
+    rest.void('PUT', `asterisk/modules/${name}`)
+  );
+  return { reloadModule: name => reloader.reload(name) };
+}
+
+/** The whole ARI REST surface over `rest`. */
+export function buildRestApi(rest: AriRequests): AriRestApi {
+  return {
+    channels: buildChannelsApi(rest),
+    bridges: buildBridgesApi(rest),
+    playbacks: {
+      stop: id => rest.void('DELETE', `playbacks/${id}`)
+    },
+    deviceStates: {
+      put: (name, state) =>
+        rest.void('PUT', `deviceStates/${name}`, { deviceState: state })
+    },
+    mailboxes: {
+      put: (name, oldMessages, newMessages) =>
+        rest.void('PUT', `mailboxes/${name}`, {
+          oldMessages,
+          newMessages
+        })
+    },
+    endpoints: {
+      list: () => rest.json<Endpoint[]>('GET', 'endpoints')
+    },
+    asterisk: buildAsteriskApi(rest)
+  };
+}

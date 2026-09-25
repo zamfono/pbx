@@ -1,0 +1,5 @@
+{
+  "subject": "Llamada perdida en {{didLabel}}",
+  "bodyText": "Hola {{recipientName}},\n\nHa perdido una llamada en {{didLabel}} de {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}} a las {{date receivedAt}}.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Hola {{recipientName}},</p><p>Ha perdido una llamada en {{didLabel}} de {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}} a las {{date receivedAt}}.</p><p>{{companyName}} · {{fqdn}}</p>"
+}

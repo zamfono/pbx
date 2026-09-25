@@ -1,0 +1,13 @@
+# Test-only global option (test/integration/compose.test.yaml, cert-sync.sh, §6.4): mounted into
+# /etc/caddy/global.d/, the directory deploy/Caddyfile's own global options block imports
+# (`import /etc/caddy/global.d/*.caddy`, harmless when nothing is mounted there, as production
+# runs it). Caddy allows exactly one global options block, so the seam for a test addition is an
+# import target, not a second block wrapping the shipped file — this line is folded into
+# deploy/Caddyfile's own block instead of opening one of its own.
+#
+# `local_certs` switches automatic HTTPS to Caddy's internal CA: no internet reachable, no ACME
+# challenge to answer, and Caddy still issues and stores a certificate for `${FQDN}` the same way
+# it would a real one, which is what lets the harness prove the certificate sync (§6.4) against
+# the real pinned proxy image. deploy/Caddyfile itself is never edited or copied, and production's
+# compose file does not mount anything at /etc/caddy/global.d/.
+local_certs

@@ -1,0 +1,67 @@
+# Keeps every dependency the repository pins current: the workflows' action SHAs, npm (the root
+# workspace, whose lockfile covers packages/*, and db/ with its own) and the Dockerfiles' base
+# images. No `docker-compose` ecosystem entry remains for /deploy: every image deploy/compose.yaml
+# runs is now one of the stack's own (§6.3 "Images"), named through `${ZAMFONO_VERSION}`, which
+# this ecosystem cannot parse a version out of to bump; the `docker` ecosystem below bumps the
+# base images each Dockerfile pins instead, images/proxy/Dockerfile's Caddy tags included.
+#
+# Every ecosystem waits seven days after a release before proposing it (`cooldown`): a hijacked or
+# broken release is usually pulled within days, and a release published just before a push does
+# not turn into a pull request at once. Security updates ignore the cooldown.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    # One PR, so the pair that must match (upload-artifact and download-artifact) moves together.
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directories: [/, /db]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    # Minor and patch releases come in one PR for the dev and one for the prod dependencies. A major
+    # gets a PR of its own, since it may need code changes and a blocked one must not hold up the
+    # rest, except where packages only work at matching majors: vite-plugin-svelte and vitest each
+    # peer on vite, and @eslint/js is released alongside eslint.
+    groups:
+      vite-major:
+        patterns: [vite, '@sveltejs/vite-plugin-svelte', vitest, '@vitest/*']
+        update-types: [major]
+      eslint-major:
+        patterns: [eslint, '@eslint/js']
+        update-types: [major]
+      dev-minor-and-patch:
+        dependency-type: development
+        update-types: [minor, patch]
+      prod-minor-and-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+    ignore:
+      # typescript-eslint (peer `<6.1.0`) and @sveltejs/kit (peer `^5.3.3 || ^6.0.0`) do not accept
+      # TypeScript 7 yet. Remove this once both do; until then a PR would only fail the peer check.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: docker
+    directories:
+      - /images/api
+      - /images/core
+      - /images/asterisk
+      - /images/proxy
+      - /db
+      - /test/load/stress/devices
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      base-images:
+        patterns: ['*']

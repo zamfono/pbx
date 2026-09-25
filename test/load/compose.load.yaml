@@ -1,0 +1,103 @@
+# test/load: the resource-sizing harness's own compose overlay (docs/spec.md §6.6 "Sizing
+# envelope"). Layered over the shipped deploy/compose.yaml + deploy/compose.ports.yaml the same
+# way test/integration/compose.test.yaml is, so what this measures is the stack an operator runs
+# in "ports" mode, not a copy of it -- ports mode is what actually publishes the RTP range on the
+# host, which is what §6.6's port-count math is about.
+#
+# Differences from compose.test.yaml, both driven by needing real bidirectional RTP under many
+# concurrent calls rather than one scripted call:
+#   - images default to the :load tag this harness builds itself, kept apart from :ci
+#   - sipp-provider also gets NET_RAW (compose.test.yaml only grants it to sipp), since
+#     load-provider.xml/load-provider-ulaw.xml call play_pcap_audio too
+#   - an extra read-only mount, /load-scenarios, carries this directory's own scenario XML;
+#     /scenarios (test/integration/scenarios) stays mounted too, so phone.sh and
+#     bootstrap-token.sh keep working unmodified
+#   - sipp-provider alone also gets /load-gen, a session-scratch directory holding the ulaw pcap
+#     make_ulaw_pcap.py generates at run time (not committed -- it is a derived binary, rebuilt
+#     from sipp's own shipped g711a.pcap every session)
+#   - `internal` gets a fixed subnet and asterisk a static address on it, so session.sh can put a
+#     known-good EXTERNAL_IPV4 in .env before the stack ever comes up. "ports" mode's
+#     EXTERNAL_IPV4 (images/asterisk/entrypoint.sh: external_media_address/
+#     external_signaling_address) is meant for the host's real public/LAN address, reachable by a
+#     genuine external SIP client through the published RTP port range; sipp/sipp-provider here
+#     are containers on this same `internal` bridge, not on the host's network namespace at all,
+#     so the harness's original 127.0.0.1 (test/integration/run.sh's own value, copied verbatim
+#     into session.sh at first) told every peer to send RTP into its own container-local loopback
+#     -- signalling still worked (it goes over the `internal` network by container name and never
+#     touches this address), but audio never reached asterisk. Confirmed by hand: `asterisk`'s own
+#     veth showed real outbound RTP under load (it can address sipp/sipp-provider correctly, from
+#     their own SDP) but near-zero inbound (sipp/sipp-provider could not address asterisk).
+# Asterisk's actual local RTP port range still comes from RTP_PORT_START/END in .env regardless of
+# this address -- unrelated to which address gets advertised in SDP.
+networks:
+  internal:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+
+services:
+  asterisk:
+    image: ${ASTERISK_IMAGE:-zamfono/asterisk:load}
+    environment:
+      SIP_UDP_ENABLED: 'true'
+      SIP_TCP_ENABLED: 'true'
+    networks:
+      internal:
+        ipv4_address: 172.28.0.10
+
+  migrate:
+    image: ${MIGRATE_IMAGE:-zamfono/migrate:load}
+
+  core:
+    image: ${CORE_IMAGE:-zamfono/core:load}
+
+  api:
+    image: ${API_IMAGE:-zamfono/api:load}
+    ports:
+      - '127.0.0.1:${API_PORT:-8140}:3000'
+
+  # The same `proxy` image the stack ships (docker-bake.hcl's `proxy` target, like the other
+  # four); PROXY_IMAGE exists only to try another build.
+  proxy:
+    image: ${PROXY_IMAGE:?set by session.sh}
+
+  sipp:
+    image: ${SIPP_IMAGE:-ctaloi/sipp:latest}
+    networks:
+      - internal
+    volumes:
+      - ${SCENARIOS_DIR:?set by session.sh}:/scenarios:ro
+      - ${LOAD_SCENARIOS_DIR:?set by session.sh}:/load-scenarios:ro
+    entrypoint: ['sleep', 'infinity']
+    cap_add:
+      - NET_RAW
+    depends_on:
+      api:
+        condition: service_healthy
+
+  sipp-phone:
+    image: ${SIPP_IMAGE:-ctaloi/sipp:latest}
+    networks:
+      - internal
+    volumes:
+      - ${SCENARIOS_DIR:?set by session.sh}:/scenarios:ro
+      - ${LOAD_SCENARIOS_DIR:?set by session.sh}:/load-scenarios:ro
+    entrypoint: ['sleep', 'infinity']
+    depends_on:
+      api:
+        condition: service_healthy
+
+  sipp-provider:
+    image: ${SIPP_IMAGE:-ctaloi/sipp:latest}
+    networks:
+      - internal
+    volumes:
+      - ${SCENARIOS_DIR:?set by session.sh}:/scenarios:ro
+      - ${LOAD_SCENARIOS_DIR:?set by session.sh}:/load-scenarios:ro
+      - ${LOAD_GEN_DIR:?set by session.sh}:/load-gen
+    entrypoint: ['sleep', 'infinity']
+    cap_add:
+      - NET_RAW
+    depends_on:
+      api:
+        condition: service_healthy

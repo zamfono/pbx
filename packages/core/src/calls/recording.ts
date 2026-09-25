@@ -1,0 +1,225 @@
+/**
+ * Per-participation call recording (§10.2 "Call recording", "Recording semantics"): two snoop
+ * channels on the recorded leg, mixed into one stereo file once the leg leaves the bridge.
+ */
+import path from 'node:path';
+
+import { newId, type Db } from '@zamfono/shared';
+
+import type { AriClient } from '../ari/client.js';
+import type { Logger } from '../ari/types.js';
+import type { ConfigCache, Snapshot } from '../internal/server.js';
+import type { Call, Leg } from './call.js';
+import {
+  startSnoopPair,
+  waitForRecordingFinished
+} from './recordingChannels.js';
+import { ffmpegMix, type Mixer } from './recordingMix.js';
+import { recordFormatFor } from './recordingRate.js';
+import { storeParticipation } from './recordingStore.js';
+
+// §11.6: the raw per-leg pair and the mixed output live in `media/recordings/`. The name given to
+// ARI is relative to Asterisk's recording directory, which the asterisk image resolves to the
+// shared media volume, so the same relative prefix names the file on both sides.
+const RECORDINGS_DIR_NAME = 'recordings';
+
+export type RecorderDeps = {
+  ari: AriClient;
+  cache: ConfigCache;
+  db: Db;
+  mediaDir: string;
+  mix?: Mixer;
+  log: Logger;
+  now: () => string;
+};
+
+type Participation = {
+  id: string;
+  callId: string;
+  userId: string | null;
+  leftChannelId: string;
+  rightChannelId: string;
+  leftPath: string;
+  rightPath: string;
+  outPath: string;
+};
+
+/** The OR-resolution of §10.2 "Recording semantics": the participant's own flag, or the flag of
+ * the ring group that routed this participation. A participation outside a group is governed by
+ * the user flag alone, and a leg with no user behind it, such as an outbound call's trunk leg, is
+ * no user's participation at all ("A recording captures one user's participation"). */
+function recordingEnabled(snapshot: Snapshot, call: Call, leg: Leg): boolean {
+  if (leg.userId === null) {
+    return false;
+  }
+  const user = snapshot.users.find(row => row.id === leg.userId);
+  const group =
+    call.ringGroupId === null
+      ? undefined
+      : snapshot.ringGroups.find(row => row.id === call.ringGroupId);
+  return user?.recordCalls === 1 || group?.recordCalls === 1;
+}
+
+/** A participation is one user's in one call: a transferee's channel records in the call it
+ * leaves and, from the transfer on, in the call it carries on (§10.2 "Start and end"). */
+function participationKey(callId: string, channelId: string): string {
+  return `${callId}:${channelId}`;
+}
+
+export class Recorder {
+  private readonly deps: RecorderDeps;
+  private readonly mix: Mixer;
+  private readonly participations = new Map<string, Participation>();
+  private mixFailures = 0;
+
+  constructor(deps: RecorderDeps) {
+    this.deps = deps;
+    this.mix = deps.mix ?? ffmpegMix;
+  }
+
+  /** Mixes failed since construction (§7 "Metrics" `zamfono_recording_mix_failures_total`). */
+  get mixFailureCount(): number {
+    return this.mixFailures;
+  }
+
+  /** Starts recording `leg`'s participation when the effective flag (§10.2) is set, at answer;
+   * never for an unanswered call, a voicemail deposit or a feature-code service call, none of
+   * which ever reach `onLegUp`. */
+  async onLegUp(call: Call, leg: Leg): Promise<void> {
+    const snapshot = await this.deps.cache.get();
+    if (!recordingEnabled(snapshot, call, leg)) {
+      return;
+    }
+    await this.start(call.id, leg.userId, leg.channelId);
+  }
+
+  /** Starts recording the calling party's own participation when their `record_calls` flag is
+   * set (§10.2 "Internal calls": a call between two flagged users produces two recordings, one
+   * per side). The caller is never a `Leg` — it has no routing group of its own — so its flag is
+   * evaluated alone, unlike `onLegUp`'s OR-resolution with the routing group. */
+  async onCallerUp(call: Call): Promise<void> {
+    await this.startOnOwnFlag(call.id, call.callerUserId, call.callerChannelId);
+  }
+
+  /** Starts recording a transferee's participation in the call it now carries on (§10.1
+   * attended transfer; §10.2 "The next participation after a transfer is evaluated on its own
+   * flags"). No group routed it there, so its user flag is evaluated alone, like the caller's. */
+  async onTransfereeUp(
+    call: Call,
+    transferee: { channelId: string; userId: string | null }
+  ): Promise<void> {
+    await this.startOnOwnFlag(call.id, transferee.userId, transferee.channelId);
+  }
+
+  private async startOnOwnFlag(
+    callId: string,
+    userId: string | null,
+    channelId: string
+  ): Promise<void> {
+    if (userId === null) {
+      return;
+    }
+    const snapshot = await this.deps.cache.get();
+    const user = snapshot.users.find(row => row.id === userId);
+    if (user?.recordCalls !== 1) {
+      return;
+    }
+    await this.start(callId, userId, channelId);
+  }
+
+  /** Starts `channelId`'s snoop pair. Best effort (§10.2 "A snoop or mixing failure never affects
+   * the call"): a pair that cannot start logs an error, leaves no half of itself behind, and the
+   * call goes on unrecorded. */
+  private async start(
+    callId: string,
+    userId: string | null,
+    channelId: string
+  ): Promise<void> {
+    const id = newId();
+    const dir = path.join(this.deps.mediaDir, RECORDINGS_DIR_NAME);
+    // Asterisk names the raw file after its format: `<id>-l.wav` at 8 kHz, `<id>-l.wav16` at 16.
+    const format = await recordFormatFor(
+      this.deps.ari,
+      channelId,
+      this.deps.log
+    );
+    const leftPath = path.join(dir, `${id}-l.${format}`);
+    const rightPath = path.join(dir, `${id}-r.${format}`);
+    const snoops = await startSnoopPair(this.deps.ari, channelId, {
+      left: { name: `${RECORDINGS_DIR_NAME}/${id}-l`, file: leftPath },
+      right: { name: `${RECORDINGS_DIR_NAME}/${id}-r`, file: rightPath },
+      format
+    }).catch((error: unknown) => {
+      this.deps.log.error(
+        { error, callId, channelId },
+        'recording could not start; the call goes on unrecorded'
+      );
+      return null;
+    });
+    if (snoops === null) {
+      return;
+    }
+    const [leftChannelId, rightChannelId] = snoops;
+    this.participations.set(participationKey(callId, channelId), {
+      id,
+      callId,
+      userId,
+      leftChannelId,
+      rightChannelId,
+      leftPath,
+      rightPath,
+      outPath: path.join(dir, `${id}.wav`)
+    });
+  }
+
+  /** Ends `leg`'s recording, mixes its two raw files, and inserts the `recordings` row; a mix
+   * failure keeps the raw files for manual salvage and never touches the call itself. */
+  async onLegEnded(call: Call, leg: Leg): Promise<void> {
+    await this.end(call, leg.channelId);
+  }
+
+  /** The caller-side counterpart of `onLegEnded`, for a participation started by `onCallerUp`. */
+  async onCallerEnded(call: Call): Promise<void> {
+    await this.end(call, call.callerChannelId);
+  }
+
+  private async end(call: Call, channelId: string): Promise<void> {
+    const key = participationKey(call.id, channelId);
+    const participation = this.participations.get(key);
+    if (participation === undefined) {
+      return;
+    }
+    this.participations.delete(key);
+    // Registered before the hangup that stops the recordings, so neither `RecordingFinished`
+    // event can fire (and be missed) before this module is listening for it.
+    const leftFinished = waitForRecordingFinished(
+      this.deps.ari,
+      `${RECORDINGS_DIR_NAME}/${participation.id}-l`
+    );
+    const rightFinished = waitForRecordingFinished(
+      this.deps.ari,
+      `${RECORDINGS_DIR_NAME}/${participation.id}-r`
+    );
+    await Promise.all([
+      this.deps.ari.channels
+        .hangup(participation.leftChannelId)
+        .catch(() => undefined),
+      this.deps.ari.channels
+        .hangup(participation.rightChannelId)
+        .catch(() => undefined)
+    ]);
+    await Promise.all([leftFinished, rightFinished]);
+    const stored = await storeParticipation(
+      {
+        db: this.deps.db,
+        mix: this.mix,
+        log: this.deps.log,
+        now: this.deps.now
+      },
+      participation
+    );
+    if (!stored) {
+      this.mixFailures += 1;
+    }
+  }
+}

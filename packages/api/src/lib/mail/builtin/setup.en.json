@@ -1,0 +1,5 @@
+{
+  "subject": "Set your {{companyName}} password",
+  "bodyText": "Hi {{recipientName}},\n\n{{#if invitedBy}}{{invitedBy}} created your {{companyName}} phone system account.{{else}}Your {{companyName}} phone system is ready.{{/if}} Set your password using the link below:\n\n{{link}}\n\nThis link expires {{date linkExpiresAt}}.\n{{#unless invitedBy}}\nOnce you are signed in, connect your AI assistant to {{fqdn}} over MCP to manage the phone system by chat.\n{{/unless}}\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Hi {{recipientName}},</p><p>{{#if invitedBy}}{{invitedBy}} created your {{companyName}} phone system account.{{else}}Your {{companyName}} phone system is ready.{{/if}} Set your password using the link below:</p><p><a href=\"{{link}}\">{{link}}</a></p><p>This link expires {{date linkExpiresAt}}.</p>{{#unless invitedBy}}<p>Once you are signed in, connect your AI assistant to {{fqdn}} over MCP to manage the phone system by chat.</p>{{/unless}}<p>{{companyName}} · {{fqdn}}</p>"
+}

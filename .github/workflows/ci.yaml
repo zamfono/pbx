@@ -1,0 +1,242 @@
+# §8 "Testing Strategy". Five jobs: the unit suites; the image builds (the five the stack ships
+# plus the TLS/SRTP scenario's baresip device), saved together with the upstream image the harness
+# runs into one archive; each image's own checks; and the stack brought up on each runtime. The
+# last three start from that archive and run side by side. The two runtime jobs exist
+# because §6.3 "Runtimes" names four features of the compose file that behave differently under
+# Docker and Podman, and nothing but running it both ways tells us they still do.
+#
+# On a pull request the token is read-only, whoever opened it. Publishing a pull request's images
+# for review is pr-images.yaml's job; it takes the archive this run uploads, and nothing else.
+name: ci
+
+on:
+  pull_request:
+  # Pushes to main and release tags run this through release.yaml, which publishes the images the
+  # `images` job saved (§6.3 "Images"); a push trigger of its own would run it a second time.
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  # The image tags the compose overlay expects; built once, loaded into each job after `images`.
+  ASTERISK_IMAGE: zamfono/asterisk:ci
+  MIGRATE_IMAGE: zamfono/migrate:ci
+  CORE_IMAGE: zamfono/core:ci
+  API_IMAGE: zamfono/api:ci
+  PROXY_IMAGE: zamfono/proxy:ci
+  # test/integration/scenarios/device-tls-srtp's baresip device (test/load/stress's own image,
+  # test/load/stress/devices/Dockerfile), which compose.test.yaml's `devices` service names.
+  DEVICES_IMAGE: zamfono/test-devices:ci
+  # The upstream sipp image compose.test.yaml runs, by the exact name it asks the runtime for.
+  # `images` pulls it into the archive, so no later job pulls from Docker Hub and both runtimes
+  # bring up the same bytes. release.yaml pushes only the five zamfono/ images, so this stays
+  # unpublished.
+  SIPP_IMAGE: ctaloi/sipp:latest
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '26'
+          cache: npm
+      # The audio suites skip themselves when ffmpeg is absent, which would make this job green
+      # while testing none of the transcoding paths (§10.2 "Attachments", §11.6).
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - run: npm ci
+      # db/ is a package of its own, outside the workspaces (its image installs only it); lint
+      # type-checks db/config.ts and the migrations, which need its dependencies.
+      - run: npm ci --prefix db
+      - name: Unit suites, refusing a run that skipped one
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee /tmp/test.log
+          # A suite that gates itself on an absent tool reports green while testing nothing; in CI
+          # the tool is installed, so a skip means the environment is wrong.
+          if grep -qE '[0-9]+ skipped' /tmp/test.log; then
+            echo "a suite skipped itself; CI must exercise every one" >&2
+            exit 1
+          fi
+      - run: npm run typecheck
+      - run: npm run lint
+      # The git tag is the only version source (§6.3 "Images", §7 "Version"); a package.json
+      # "version" would be a second one nothing keeps in step with it.
+      - name: No tracked package.json carries a "version" field
+        run: node scripts/check-no-package-version.mjs
+      # docs/spec.md §6.3 quotes deploy/compose.yaml and its overlays verbatim; nothing else keeps
+      # a copy-pasted listing in step with the file it quotes.
+      - name: The compose listings in docs/spec.md §6.3 match deploy/
+        run: node scripts/check-spec-compose-listings.mjs
+      # eslint-plugin-prettier covers only the code ESLint lints; this covers everything else
+      # (Markdown, YAML, CSS, JSON), with the deliberate exceptions listed in .prettierignore.
+      - run: npm run format:check
+
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # `use: false` leaves the runner's own builder the default, so the plain `docker build` of
+      # the label step below still sees the images bake loaded into the daemon; only bake runs on
+      # this one, a docker-container builder, which the gha cache needs.
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        id: buildx
+        with:
+          use: false
+          # The step before the save removes this builder itself, to free its disk.
+          cleanup: false
+      - name: Build the five images, plus the TLS/SRTP scenario's baresip device
+        # docker-bake.hcl names the six targets, with the Dockerfiles and contexts they always
+        # had, and takes their tags from the env block above; bake builds them in parallel, and
+        # `load` puts them in the local daemon. `source: .` builds this checkout, not a fetch of
+        # the ref.
+        #
+        # The layer cache serves pull requests alone. On a push to main, which is what release.yaml
+        # runs this for, these are the images `publish` pushes: they are built reading no cache and
+        # with their base images pulled afresh, so each carries the current Debian and Node layers
+        # and the packages resolved today, never a layer an older run baked. Main still writes the
+        # cache (CACHE_TO): a pull request may read main's cache, main never reads a pull
+        # request's, so a new pull request starts from main's layers rather than from nothing.
+        #
+        # REVISION is the full commit each image's org.opencontainers.image.revision label (and,
+        # on api/core, ZAMFONO_REVISION) carries (§6.3 "Images", §7 "Version"). `github.sha` is
+        # this event's merge commit on a pull_request run, not the head a reviewer reads or
+        # pr-images-tag.sh re-labels with, so a pull request build uses the actual head sha instead.
+        uses: docker/bake-action@018cb6412ab401ebaa809aa5f85966b74628600f # v7.4.0
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          source: .
+          files: docker-bake.hcl
+          load: true
+          no-cache: ${{ github.event_name != 'pull_request' }}
+          pull: ${{ github.event_name != 'pull_request' }}
+          vars: |
+            CACHE_FROM=${{ github.event_name == 'pull_request' && 'gha' || '' }}
+            CACHE_TO=gha
+            REVISION=${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Label the asterisk image with the Asterisk version it installed
+        # A Dockerfile LABEL cannot read what a RUN installed, so the version is read from the built
+        # image and stamped onto it by a build that adds nothing but the label. It happens before
+        # the save below, so the labelled image is the one tested and published.
+        run: |
+          version=$(docker run --rm --entrypoint dpkg-query "$ASTERISK_IMAGE" -W -f='${Version}' asterisk)
+          test -n "$version"
+          echo "asterisk $version"
+          echo "FROM $ASTERISK_IMAGE" \
+            | docker build --label "org.zamfono.asterisk.version=$version" -t "$ASTERISK_IMAGE" -
+      - name: Pull the upstream image the harness runs
+        run: docker pull "$SIPP_IMAGE"
+      - name: Remove the bake builder
+        # Its layer store holds a second copy of every image and their build stages, and the
+        # runner's disk cannot fit that, the loaded images and the archive below at once. Bake has
+        # already loaded the images into the daemon and exported the cache, so nothing needs it.
+        run: |
+          docker buildx rm "${{ steps.buildx.outputs.name }}"
+          df -h /
+      - name: Save the images for the jobs below
+        run: |
+          docker save -o /tmp/images.tar \
+            "$MIGRATE_IMAGE" "$CORE_IMAGE" "$API_IMAGE" "$ASTERISK_IMAGE" "$PROXY_IMAGE" \
+            "$DEVICES_IMAGE" "$SIPP_IMAGE"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: images
+          path: /tmp/images.tar
+          retention-days: 1
+
+  image-tests:
+    needs: images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: images
+          path: /tmp
+      - run: docker load -i /tmp/images.tar
+      - name: Exercise each image's own checks
+        # db/test.sh, deploy/test.sh and the three images/*/test.sh each default to their own
+        # :test tag and build it themselves when run standalone; here they're pointed at the
+        # images the `images` job built, via IMAGE/IMAGE_TAG and via API_IMAGE/CORE_IMAGE/
+        # PROXY_IMAGE from the env block above, so nothing is built twice and what is checked is
+        # the archive release.yaml publishes, asterisk with its label. `publish` there needs this
+        # whole workflow, this job included, so a failed check stops the push as a failed build
+        # does.
+        run: |
+          IMAGE="$MIGRATE_IMAGE" bash db/test.sh
+          bash deploy/test.sh
+          IMAGE_TAG="$API_IMAGE" bash images/api/test.sh
+          IMAGE_TAG="$ASTERISK_IMAGE" bash images/asterisk/test.sh
+          IMAGE_TAG="$PROXY_IMAGE" bash images/proxy/test.sh
+
+  compose-docker:
+    needs: images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: images
+          path: /tmp
+      - run: docker load -i /tmp/images.tar
+      - name: Bring the stack up and run the sipp scenarios
+        run: bash test/integration/run.sh
+        env:
+          COMPOSE: docker compose
+
+  compose-podman:
+    needs: images
+    # Podman runs healthchecks and restart policies through systemd (§6.3 "Runtimes"), so the
+    # runner has to be a systemd host rather than a container. §4 asks for Podman ≥ 5: Ubuntu
+    # 24.04, which `ubuntu-latest` still names, ships 4.9, while the 26.04 image carries 5.7 from
+    # its own archive. The label is pinned so the move of `ubuntu-latest` cannot change it.
+    runs-on: ubuntu-26.04
+    env:
+      # §6.3 documents Podman rootful, so everything below runs as root. `podman compose` hands the
+      # file to the docker-compose plugin and points it at `$DOCKER_HOST`; naming the rootful
+      # socket here means it can never reach the runner user's rootless one, or Docker's.
+      DOCKER_HOST: unix:///run/podman/podman.sock
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: images
+          path: /tmp
+      - name: Install Podman 5
+        run: |
+          sudo apt-get update
+          # aardvark-dns is only a Recommends of netavark, and without it no service resolves another
+          # by name: core's first ARI connect to `asterisk` fails with EAI_AGAIN.
+          sudo apt-get install -y --no-install-recommends podman aardvark-dns
+          version=$(sudo podman version --format '{{.Client.Version}}')
+          echo "podman $version"
+          if [ "${version%%.*}" -lt 5 ]; then
+            echo "::error::Podman $version is older than the 5 that §4 requires" >&2
+            exit 1
+          fi
+      - name: Serve the rootful Podman socket, with Docker out of the way
+        run: |
+          # The image runs Docker too. Stopping it proves nothing below falls back to Docker's
+          # store; its compose plugin needs no daemon and stays, since it is the provider.
+          sudo systemctl stop docker.service docker.socket
+          sudo systemctl enable --now podman.socket
+          sudo test -S "${DOCKER_HOST#unix://}"
+          if [ "$(sudo podman info --format '{{.Host.Security.Rootless}}')" != false ]; then
+            echo "::error::Podman is running rootless; §6.3 documents it rootful" >&2
+            exit 1
+          fi
+      - run: sudo podman load -i /tmp/images.tar
+      - name: Bring the stack up and run the sipp scenarios
+        # `env` carries the image tags, `COMPOSE` and `DOCKER_HOST` across sudo; the runner's
+        # sudo-rs ignores `-E`.
+        run: |
+          sudo env COMPOSE="$COMPOSE" DOCKER_HOST="$DOCKER_HOST" \
+            ASTERISK_IMAGE="$ASTERISK_IMAGE" MIGRATE_IMAGE="$MIGRATE_IMAGE" CORE_IMAGE="$CORE_IMAGE" \
+            API_IMAGE="$API_IMAGE" PROXY_IMAGE="$PROXY_IMAGE" DEVICES_IMAGE="$DEVICES_IMAGE" \
+            SIPP_IMAGE="$SIPP_IMAGE" \
+            bash test/integration/run.sh
+        env:
+          COMPOSE: podman compose

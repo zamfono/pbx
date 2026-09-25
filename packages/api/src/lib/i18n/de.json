@@ -1,0 +1,49 @@
+{
+  "login": {
+    "title": "Anmelden",
+    "consentIntro": "{client} möchte, dass Sie sich anmelden.",
+    "consentApprove": "Zustimmen",
+    "consentDeny": "Ablehnen",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "submit": "Anmelden",
+    "invalid": "E-Mail oder Passwort ist falsch.",
+    "forgotLink": "Passwort vergessen?",
+    "ssoPrefix": "Anmelden mit "
+  },
+  "forgot": {
+    "title": "Passwort vergessen",
+    "intro": "Geben Sie Ihre E-Mail-Adresse ein, wir senden Ihnen einen Link zum Setzen eines neuen Passworts.",
+    "email": "E-Mail",
+    "submit": "Link senden",
+    "sent": "Falls zu dieser Adresse ein Konto existiert, ist ein Link unterwegs.",
+    "backToLogin": "Zurück zur Anmeldung"
+  },
+  "setPassword": {
+    "title": "Passwort setzen",
+    "password": "Neues Passwort",
+    "submit": "Passwort setzen",
+    "success": "Ihr Passwort wurde gesetzt.",
+    "successLoginLink": "Weiter zur Anmeldung",
+    "invalid": "Dieser Link ist abgelaufen oder wurde bereits verwendet.",
+    "tooShort": "Das Passwort muss mindestens {min} Zeichen lang sein."
+  },
+  "error": {
+    "title": "Problem bei der Anmeldung",
+    "expired": "Dieser Link ist abgelaufen. Bitte versuchen Sie es erneut.",
+    "noUser": "Kein Konto passt zu dieser Anmeldung.",
+    "domain": "Ihre E-Mail-Domain ist hier nicht zur Anmeldung berechtigt.",
+    "unverifiedEmail": "Ihr Identitätsanbieter hat diese E-Mail-Adresse nicht bestätigt.",
+    "issuer": "Diese Anmeldung stammt vom falschen Identitätsanbieter.",
+    "audience": "Diese Anmeldung wurde für eine andere Anwendung ausgestellt.",
+    "signature": "Diese Anmeldung konnte nicht überprüft werden.",
+    "nonce": "Diese Anmeldung konnte nicht überprüft werden.",
+    "generic": "Bei der Anmeldung ist ein Fehler aufgetreten.",
+    "backToLogin": "Zurück zur Anmeldung"
+  },
+  "done": {
+    "title": "Sie sind angemeldet",
+    "message": "Sie sind bei {company} angemeldet.",
+    "mcpHint": "Verbinden Sie einen MCP-Client mit:"
+  }
+}

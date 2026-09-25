@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+  §3 "SIP over TLS with SRTP for clients", §9.1 transport-tls, §9.3/§10.4: a Ringotel-class device
+  registers over SIP TLS with SDES-SRTP, which no other scenario exercises (the sipp phones speak
+  UDP, no SRTP). The trunk side here is plain sipp, offering G.711 A-law over UDP like
+  `inbound-recording-trunk-hangup`; the device side is a real baresip device
+  (`device-tls-srtp.setup.sh`), so it is Asterisk, not this script, that terminates the SRTP and
+  transcodes to the device's Opus. The call goes straight to the device's own DID
+  (`device-tls-srtp.setup.sh`'s `+15551009`, hardcoded here rather than `[service]`, the way
+  `inbound-trunk-auth` dials its own DID directly), not the ring group `[service]`/`$MAIN_DID`
+  names, so the device answers whether or not the ring group scenarios have run yet.
+-->
+<scenario name="device tls srtp">
+  <send retrans="500">
+    <![CDATA[
+      INVITE sip:+15551009@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:+15559999@[local_ip]>;tag=[call_number]
+      To: <sip:+15551009@[remote_ip]>
+      Call-ID: [call_id]
+      CSeq: 1 INVITE
+      Contact: <sip:+15559999@[local_ip]:[local_port];transport=[transport]>
+      Max-Forwards: 70
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=user1 53655765 2353687637 IN IP[local_ip_type] [local_ip]
+      s=-
+      c=IN IP[media_ip_type] [media_ip]
+      t=0 0
+      m=audio [media_port] RTP/AVP 8
+      a=rtpmap:8 PCMA/8000
+    ]]>
+  </send>
+
+  <recv response="100" optional="true" />
+  <recv response="180" optional="true" />
+  <recv response="183" optional="true" />
+  <recv response="200" rtd="true" timeout="30000" />
+
+  <send>
+    <![CDATA[
+      ACK sip:+15551009@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:+15559999@[local_ip]>;tag=[call_number]
+      To: <sip:+15551009@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 1 ACK
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <!-- The trunk speaks its own A-law voice sample for about 6.5 s, so both legs carry real audio
+       (the device's own account plays a sine tone from `ausine`, back over Opus/SRTP) while the
+       call is up, then hangs up while the device is still on the line, the way an inbound call
+       ordinarily ends and `inbound-recording-trunk-hangup` already exercises for the plain phone. -->
+  <nop>
+    <action>
+      <exec play_pcap_audio="/sipp/g711a.pcap" />
+    </action>
+  </nop>
+  <pause milliseconds="6000" />
+
+  <send retrans="500">
+    <![CDATA[
+      BYE sip:+15551009@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:+15559999@[local_ip]>;tag=[call_number]
+      To: <sip:+15551009@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 2 BYE
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <recv response="200" crlf="true" />
+</scenario>

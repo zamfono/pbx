@@ -1,0 +1,12 @@
+# compose.ports.yaml — the stack uses the host's address; ports are published on asterisk, the owner
+# of the shared namespace, so they cover Caddy as well. Every port maps 1:1.
+services:
+  asterisk:
+    ports:
+      - "80:80/tcp"
+      - "443:443/tcp"
+      - "5060:5060/udp"
+      - "5060:5060/tcp"
+      - "5061:5061/tcp"
+      - "${RTP_PORT_START:-10000}-${RTP_PORT_END:-10200}:\
+         ${RTP_PORT_START:-10000}-${RTP_PORT_END:-10200}/udp"   # one string; the escaped line break joins it

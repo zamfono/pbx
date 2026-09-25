@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+# The phone side of one scenario, in the `sipp-phone` container.
+#
+#   phone.sh <compose> register <sip-username> <sip-password>  — bind the contact, once per run
+#   phone.sh <compose> unregister <sip-username> <sip-password>
+#                                                              — remove the contact again
+#   phone.sh <compose> answer <uas-scenario> <sip-username> <caller-username> <caller-password>
+#                                                              — serve exactly one call
+#   phone.sh <compose> listen <uas-scenario>                   — the same, for a device that is
+#                                                                not registered
+#   phone.sh <compose> call <uac-scenario> <sip-username> <sip-password>
+#                                                              — place one call of its own
+#   phone.sh <compose> wait-call                               — wait for that call to end
+#   phone.sh <compose> invites                                 — INVITEs this run received
+#
+# Separate sipp runs, because one process cannot hold the port twice: `register` binds the
+# contact to the port and exits, and each later run takes that port over for one call. `-aa`
+# answers the OPTIONS probes that keep the contact qualified while that run is up, and the
+# explicit `pjsip qualify` spares the harness the AOR's own probe interval. Every run traces the
+# messages it exchanges, so a scenario can assert that nothing rang the phone.
+set -euo pipefail
+
+compose=$1
+action=$2
+PORT=5070
+QUALIFY_ATTEMPTS=20
+REGISTER_ATTEMPTS=10
+CALL_ATTEMPTS=90
+MESSAGES=/tmp/phone-messages.log
+CALL_EXIT=/tmp/phone-call.exit
+
+dc() {
+  # shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+  $compose "$@"
+}
+
+# Ends whatever the previous scenario left running on the port, and its trace with it.
+stop_phone() {
+  dc exec -T sipp-phone sh -c "pkill sipp || true; rm -f $MESSAGES $CALL_EXIT"
+  sleep 1
+}
+
+# One REGISTER exchange, `register.xml` binding the contact or `unregister.xml` removing it.
+# Retried, the way a phone retries: the device's endpoint reaches Asterisk through a config render
+# and a PJSIP reload, and a REGISTER that arrives before that reload lands is answered 401 by the
+# artificial endpoint, with no auth object to match the credentials against.
+registration() {
+  local scenario=$1 sip_username=$2 sip_password=$3
+  stop_phone
+  for attempt in $(seq 1 $REGISTER_ATTEMPTS); do
+    if dc exec -T sipp-phone sipp -sf "/scenarios/uas/$scenario.xml" \
+      -key user "$sip_username" -au "$sip_username" -ap "$sip_password" \
+      -m 1 -p "$PORT" -timeout 15s -nostdin asterisk:5060 >/dev/null 2>&1; then
+      return 0
+    fi
+    echo "   $scenario attempt $attempt did not complete, retrying" >&2
+    sleep 2
+  done
+  echo "the device's $scenario never completed" >&2
+  return 1
+}
+
+# The contact is only reachable once something answers the probe, and the core reads a device
+# as registered from that reachability (§9.3), so the call waits for it.
+await_reachable() {
+  local sip_username=$1
+  for _ in $(seq 1 $QUALIFY_ATTEMPTS); do
+    dc exec -T asterisk asterisk -rx "pjsip qualify $sip_username" >/dev/null 2>&1 || true
+    sleep 1
+    if dc exec -T asterisk asterisk -rx 'pjsip show contacts' 2>/dev/null \
+      | grep "$sip_username.*Avail" >/dev/null; then
+      return 0
+    fi
+  done
+  echo "the device never reached the reachable state" >&2
+  return 1
+}
+
+# No call limit: `-aa` answers the OPTIONS probes that keep the contact qualified, and sipp counts
+# each of those against `-m`, so a limit is spent on a probe before the call arrives. The run is
+# ended by the `pkill` the next scenario starts with. The caller account is the device a scenario
+# places a call of its own from, as a consultation or a pickup does; `[pass]` hands its password
+# to a call the scenario starts as a sipp run of its own (`pickup-dial.sh`).
+serve() {
+  local uas_scenario=$1 caller_username=${2:-} caller_password=${3:-} account=''
+  if [ -n "$caller_username" ]; then
+    account="-key user '$caller_username' -key pass '$caller_password'"
+    account="$account -au '$caller_username' -ap '$caller_password'"
+  fi
+  stop_phone
+  dc exec -T -d sipp-phone sh -c \
+    "sipp -sf /scenarios/uas/$uas_scenario.xml -p $PORT -aa -nostdin \
+      -trace_msg -message_file $MESSAGES $account \
+      asterisk:5060 > /tmp/$uas_scenario.log 2>&1"
+}
+
+case $action in
+  register) registration register "$3" "$4" ;;
+  unregister) registration unregister "$3" "$4" ;;
+  answer)
+    serve "$3" "$5" "$6"
+    await_reachable "$4"
+    ;;
+  listen) serve "$3" ;;
+  call)
+    # A call the phone places itself is one call, so `-m 1` ends the run with it; `-aa` still
+    # answers the probes meanwhile, so the device stays registered while it is on the call.
+    stop_phone
+    dc exec -T -d sipp-phone sh -c \
+      "sipp -sf /scenarios/uas/$3.xml -p $PORT -aa -nostdin -m 1 -timeout 90s \
+        -trace_msg -message_file $MESSAGES \
+        -key user '$4' -au '$4' -ap '$5' asterisk:5060 > /tmp/$3.log 2>&1; \
+        echo \$? > $CALL_EXIT"
+    await_reachable "$4"
+    ;;
+  wait-call)
+    for _ in $(seq 1 $CALL_ATTEMPTS); do
+      if code=$(dc exec -T sipp-phone cat "$CALL_EXIT" 2>/dev/null); then
+        [ "$(printf '%s' "$code" | tr -d '\r')" = 0 ] && exit 0
+        echo "the phone's own call ended with sipp exit $code" >&2
+        exit 1
+      fi
+      sleep 1
+    done
+    echo "the phone's own call never ended" >&2
+    exit 1
+    ;;
+  invites)
+    # sipp heads each traced message with a line naming its direction; a received INVITE is one
+    # whose first line after a `message received` header is the request line.
+    dc exec -T sipp-phone sh -c "cat $MESSAGES 2>/dev/null || true" | tr -d '\r' | awk '
+      /message received/ { received = 1; next }
+      received && NF { if ($1 == "INVITE") count++; received = 0 }
+      END { print count + 0 }'
+    ;;
+  *)
+    echo "phone.sh: unknown action '$action'" >&2
+    exit 1
+    ;;
+esac

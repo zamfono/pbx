@@ -1,0 +1,132 @@
+# Values in ${…} come from the deployment's .env, which Compose reads for interpolation only. Each
+# service receives exactly the variables it uses, so the encryption key and the JWT secret exist in
+# the api container alone. Fixed paths (/data/zamfono.sqlite3, /media, /etc/asterisk/gen) and fixed
+# internal ports (api 3000, core 3000, Asterisk ARI 8088 and AMI 5038, HEP 9060/udp) are baked into the images.
+# The public address is attached by exactly one overlay, compose.macvlan.yaml or compose.ports.yaml
+# (§6.1); this file alone runs the stack with no public reachability.
+networks:
+  internal:
+
+services:
+  asterisk:
+    image: ghcr.io/zamfono/asterisk:${ZAMFONO_VERSION:-latest}   # debian:trixie-slim + asterisk from the Zamfono APT repo + envsubst entrypoint
+    networks:
+      internal:
+    environment:
+      STACK_IPV4: ${STACK_IPV4:-}               # macvlan mode: transports bind this address (§9.1)
+      EXTERNAL_IPV4: ${EXTERNAL_IPV4:-}         # ports mode: address written into SIP and SDP (§9.1)
+      RTP_PORT_START: ${RTP_PORT_START:-10000}
+      RTP_PORT_END: ${RTP_PORT_END:-10200}
+      ARI_PASSWORD: ${ARI_PASSWORD}             # ARI user is 'zamfono', fixed in ari.conf
+      AMI_PASSWORD: ${AMI_PASSWORD}             # AMI user is 'zamfono', read-only, fixed in manager.conf (§9.1)
+      HEP_ENABLED: ${HEP_ENABLED:-true}         # hep.conf enabled=…; collector core:9060 (§7)
+      SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-true} # false binds transport-udp to loopback (§9.1)
+      SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-true} # false binds transport-tcp to loopback (§9.1)
+      TZ: ${TZ:-UTC}
+    volumes:
+      - media:/media
+      - asterisk-config:/etc/asterisk/gen       # rendered by api: pjsip_users/trunks, hints, MoH, TLS cert
+    restart: unless-stopped
+
+  migrate:
+    image: ghcr.io/zamfono/migrate:${ZAMFONO_VERSION:-latest}   # node:26-slim + kysely-ctl + db/migrations; applies pending migrations, then exits
+    networks:
+      - internal
+    environment:
+      DB_FILE: /data/zamfono.sqlite3
+    volumes:
+      - db:/data
+    restart: "no"                 # a container that exited 0 is the success api and core wait for
+
+  core:
+    image: ghcr.io/zamfono/core:${ZAMFONO_VERSION:-latest}   # node:26-slim + ffmpeg (recording mix, §10.2)
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      asterisk:
+        condition: service_started
+      api:
+        condition: service_healthy   # api's config propagation is up
+    networks:
+      - internal
+    environment:
+      ARI_URL: http://asterisk:8088/ari
+      ARI_PASSWORD: ${ARI_PASSWORD}
+      AMI_HOST: asterisk:5038
+      AMI_PASSWORD: ${AMI_PASSWORD}             # outbound registration state (§9.4)
+      HEP_ENABLED: ${HEP_ENABLED:-true}         # HEP listener on 9060/udp (§7)
+      STACK_IPV4: ${STACK_IPV4:-}               # Asterisk's own addresses, for the SIP message direction (§7)
+      EXTERNAL_IPV4: ${EXTERNAL_IPV4:-}
+      CALL_LOG_MAX_BYTES: ${CALL_LOG_MAX_BYTES:-1048576}
+      ZAMFONO_VERSION: ${ZAMFONO_VERSION:-latest}   # the tag pulled, reported as the version (§7)
+      TZ: ${TZ:-UTC}
+    volumes:
+      - media:/media
+      - db:/data                  # /data/zamfono.sqlite3
+    healthcheck:                  # internal HTTP server (§3): ARI connected + DB open
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+    restart: unless-stopped
+
+  api:
+    image: ghcr.io/zamfono/api:${ZAMFONO_VERSION:-latest}    # node:26-slim + ffmpeg + restic/rclone
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - internal
+    environment:
+      ORIGIN: https://${FQDN}                   # SvelteKit adapter-node: OAuth issuer, redirect and link base (§5.2)
+      ADDRESS_HEADER: X-Forwarded-For           # client address for rate limiting (§5.5)
+      XFF_DEPTH: "1"                            # trust exactly one proxy hop (Caddy)
+      CORE_URL: http://core:3000                # live-call actions, reload triggers, event stream (§3)
+      JWT_SECRET: ${JWT_SECRET}
+      SECRETBOX_KEY: ${SECRETBOX_KEY}           # encryption key for every *_enc column (§5.4)
+      SECRETBOX_KEY_PREVIOUS: ${SECRETBOX_KEY_PREVIOUS:-}   # set only during a key rotation (§5.4)
+      HEP_ENABLED: ${HEP_ENABLED:-true}         # false rejects call_log_level 'sip' (§7)
+      SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-true} # false rejects trunks on that transport; both false reject plain devices (§9.3, §9.4)
+      SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-true}
+      TLS_RELOAD_HOUR: ${TLS_RELOAD_HOUR:-}     # certificate swap hour when settings.tls_reload_hour is NULL (§6.4)
+      METRICS_TOKEN: ${METRICS_TOKEN:-}         # empty = GET /metrics answers 404 (§7)
+      ZAMFONO_VERSION: ${ZAMFONO_VERSION:-latest}   # the tag pulled, reported as the version (§7)
+      TZ: ${TZ:-UTC}
+      # first-boot seed, read only while the database holds no user (§6.3 "First boot")
+      BOOTSTRAP_OWNER_EMAIL: ${BOOTSTRAP_OWNER_EMAIL}
+      BOOTSTRAP_OWNER_NAME: ${BOOTSTRAP_OWNER_NAME}
+      BOOTSTRAP_OWNER_PASSWORD_HASH: ${BOOTSTRAP_OWNER_PASSWORD_HASH:-}   # empty = set-password mail; requires SMTP_HOST
+      COMPANY_NAME: ${COMPANY_NAME}
+      MAIN_DID: ${MAIN_DID}
+      MAIL_FROM: ${MAIL_FROM:-}                 # required when SMTP_HOST is set
+      SMTP_HOST: ${SMTP_HOST:-}                 # the mail relay, seeded into settings.smtp_* (§10.2 "Mail"); empty = no mail until an owner sets one
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_SECURITY: ${SMTP_SECURITY:-tls}      # tls | starttls
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      COUNTRY: ${COUNTRY}                       # ISO 3166-1 alpha-2
+      EXT_LENGTH: ${EXT_LENGTH:-3}
+    volumes:
+      - media:/media
+      - db:/data
+      - asterisk-config:/etc/asterisk/gen
+      - caddy-data:/caddy-data:ro               # certificate sync source (§6.4)
+    healthcheck:                                # gates core's start; 200 = database open, no pending migration (§6.3 "Health")
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+    restart: unless-stopped
+
+  proxy:
+    image: ghcr.io/zamfono/proxy:${ZAMFONO_VERSION:-latest}   # Caddy, built with caddy-events-exec (images/proxy/Dockerfile), uid 1000
+    network_mode: service:asterisk   # binds :80 and :443 on the stack IP; reaches api over internal
+    depends_on:
+      - asterisk
+    environment:
+      FQDN: ${FQDN}                             # Caddyfile site address, Let's Encrypt; also read by the cert_obtained hook (§6.4)
+      METRICS_TOKEN: ${METRICS_TOKEN:-}         # Caddyfile refuses /metrics while unset (§7)
+    volumes:
+      - caddy-data:/data
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    restart: unless-stopped
+
+volumes:
+  media:
+  db:
+  caddy-data:
+  asterisk-config:

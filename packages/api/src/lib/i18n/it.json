@@ -1,0 +1,49 @@
+{
+  "login": {
+    "title": "Accedi",
+    "consentIntro": "{client} vuole che tu acceda.",
+    "consentApprove": "Approva",
+    "consentDeny": "Rifiuta",
+    "email": "E-mail",
+    "password": "Password",
+    "submit": "Accedi",
+    "invalid": "E-mail o password errati.",
+    "forgotLink": "Password dimenticata?",
+    "ssoPrefix": "Accedi con "
+  },
+  "forgot": {
+    "title": "Password dimenticata",
+    "intro": "Inserisci la tua e-mail: ti invieremo un link per impostare una nuova password.",
+    "email": "E-mail",
+    "submit": "Invia link",
+    "sent": "Se a quell'indirizzo esiste un account, un link è in arrivo.",
+    "backToLogin": "Torna all'accesso"
+  },
+  "setPassword": {
+    "title": "Imposta la tua password",
+    "password": "Nuova password",
+    "submit": "Imposta password",
+    "success": "La tua password è stata impostata.",
+    "successLoginLink": "Continua per accedere",
+    "invalid": "Questo link è scaduto o è già stato usato.",
+    "tooShort": "La password deve contenere almeno {min} caratteri."
+  },
+  "error": {
+    "title": "Problema di accesso",
+    "expired": "Questo link è scaduto. Riprova.",
+    "noUser": "Nessun account corrisponde a questo accesso.",
+    "domain": "Il tuo dominio e-mail non è autorizzato ad accedere qui.",
+    "unverifiedEmail": "Il tuo provider di identità non ha verificato questo indirizzo e-mail.",
+    "issuer": "Questo accesso è stato emesso dal provider di identità sbagliato.",
+    "audience": "Questo accesso è stato emesso per un'altra applicazione.",
+    "signature": "Non è stato possibile verificare questo accesso.",
+    "nonce": "Non è stato possibile verificare questo accesso.",
+    "generic": "Si è verificato un errore durante l'accesso.",
+    "backToLogin": "Torna all'accesso"
+  },
+  "done": {
+    "title": "Hai effettuato l'accesso",
+    "message": "Hai effettuato l'accesso a {company}.",
+    "mcpHint": "Connetti un client MCP con:"
+  }
+}

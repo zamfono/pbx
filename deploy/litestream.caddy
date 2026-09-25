@@ -1,0 +1,4 @@
+# litestream.caddy — mounted into /etc/caddy/conf.d/ by compose.dr.yaml (§6.5)
+handle /metrics/litestream {
+	reverse_proxy litestream:9090
+}

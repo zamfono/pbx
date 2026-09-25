@@ -1,0 +1,15 @@
+.git
+# Docker matches a pattern without "**/" against the context root only (unlike .gitignore, which
+# matches a slash-free pattern at any depth), so these are spelled with "**/" to reach every
+# workspace package's own copy.
+**/node_modules
+**/dist
+**/build
+packages/api/.svelte-kit
+**/*.tsbuildinfo
+coverage
+# The api build bundles the admin guide that `zamfono.help` serves into its server chunk (§10.5),
+# so docs/guide is part of the context while the rest of docs is not. A later pattern wins in
+# Docker, so the exception is spelled after the directory it reaches into.
+docs
+!docs/guide

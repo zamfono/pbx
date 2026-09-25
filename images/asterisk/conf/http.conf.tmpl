@@ -1,0 +1,6 @@
+; ARI's transport. The container owns the public IP, so this binds to the `internal`
+; network address alone, never 0.0.0.0 (spec §9.1).
+[general]
+enabled = yes
+bindaddr = ${INTERNAL_ADDR}
+bindport = 8088

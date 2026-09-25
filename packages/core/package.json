@@ -1,0 +1,18 @@
+{
+  "name": "@zamfono/core",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@zamfono/shared": "*",
+    "kysely": "^0.29.6",
+    "pino": "^10.3.1",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1"
+  }
+}

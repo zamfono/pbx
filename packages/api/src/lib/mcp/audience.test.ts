@@ -1,0 +1,39 @@
+import { describe, expect, it } from 'vitest';
+
+import { signAccessToken } from '../auth/jwt.js';
+import { authenticate } from './auth.js';
+import { JWT_SECRET, ORIGIN, seededDeps } from './testKit.js';
+
+const MS_PER_SECOND = 1000;
+
+/** A request to `/mcp` carrying an access token signed for `audience`. */
+function requestFor(audience: string): Request {
+  const token = signAccessToken(
+    JWT_SECRET,
+    { sub: 'owner', role: 'owner', cid: null },
+    Math.floor(Date.now() / MS_PER_SECOND),
+    audience
+  );
+  return new Request(`${ORIGIN}/mcp`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}` }
+  });
+}
+
+// MCP 2026-07-28 authorization, "Token Handling": "MCP servers MUST validate that access tokens
+// were issued specifically for them as the intended audience, according to RFC 8707 Section 2."
+describe('MCP token audience', () => {
+  it('accepts a token issued for this MCP server', async () => {
+    const deps = await seededDeps();
+    const authenticated = await authenticate(deps, requestFor(`${ORIGIN}/mcp`));
+    expect(authenticated?.actor.id).toBe('owner');
+  });
+
+  it('refuses a token issued for another resource, even one this server signed', async () => {
+    const deps = await seededDeps();
+    expect(
+      await authenticate(deps, requestFor('https://other.example/mcp'))
+    ).toBeNull();
+    expect(await authenticate(deps, requestFor(ORIGIN))).toBeNull();
+  });
+});

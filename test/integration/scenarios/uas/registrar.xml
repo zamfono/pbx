@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+  §8: the second provider's registrar, in the `sipp-provider` container. A `registration` trunk
+  registers here (§9.4 "Auth mode"); each REGISTER is accepted, and the user part and `line` tag
+  of the contact Asterisk registered (§9.4 "Inbound identification") are written where the
+  provider's calling run reads them back as its injection file (`-inf`): the INVITE it then sends
+  goes to that contact, as a provider's does, so the user part is its called party and the tag
+  the only thing that identifies it.
+
+  Run with `-aa` and no call limit, like the phone's answering run: every re-registration is a
+  call of its own.
+-->
+<scenario name="registrar">
+  <recv request="REGISTER">
+    <action>
+      <ereg regexp="sip:([^@;>[:space:]]+)@" search_in="hdr" header="Contact:" assign_to="uri,user" />
+      <ereg regexp="line=[^;>[:space:]]+" search_in="hdr" header="Contact:" assign_to="line" />
+      <exec command="echo SEQUENTIAL > /tmp/registrar-line.csv; echo '[$user];[$line];' >> /tmp/registrar-line.csv" />
+    </action>
+  </recv>
+
+  <!-- The whole `sip:<user>@` match the user part is captured from; only the user is written. -->
+  <Reference variables="uri" />
+
+  <send>
+    <![CDATA[
+      SIP/2.0 200 OK
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[call_number]
+      [last_Call-ID:]
+      [last_CSeq:]
+      [last_Contact:];expires=120
+      Expires: 120
+      Content-Length: 0
+    ]]>
+  </send>
+</scenario>

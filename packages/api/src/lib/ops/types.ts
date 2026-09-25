@@ -1,0 +1,96 @@
+/* eslint-disable max-classes-per-file -- OpError and its two fixed-shape subclasses form one error hierarchy */
+import type { Transaction } from 'kysely';
+import type { z } from 'zod';
+
+import type { DB } from '@zamfono/shared';
+
+/** RBAC roles, ordered most to least privileged (§5.3). */
+export type Role = 'owner' | 'admin' | 'user';
+
+/** How an operation call reached the runner; recorded in `audit_log.channel` (§5.7). */
+export type Channel = 'rest' | 'mcp' | 'ui' | 'undo' | 'job';
+
+/** The authenticated caller of an operation. */
+export type Actor = { id: string; name: string; role: Role };
+
+/** Built by the runner for every call; `run` holds only what differs between operations (§10.3). */
+export type Context = {
+  actor: Actor;
+  db: Transaction<DB>;
+  now: string;
+  channel: Channel;
+  clientId?: string;
+  clientName?: string;
+  requestId: string;
+};
+
+/**
+ * One operation module's export (§10.3). The REST route table, the MCP tool list and the
+ * OpenAPI document are all generated from the registry these fill.
+ */
+export type Operation<In, Out> = {
+  name: string;
+  description: string;
+  input: z.ZodType<In>;
+  minRole: Role;
+  readOnly?: boolean;
+  confirm?: (input: In) => string;
+  /** `false` opts a write out of the audit log: presence, read flags, live-call actions (§5.7). */
+  audit?: false;
+  /**
+   * Marks an audited call that changes no state of its entity: a test send, a sent reset link, a
+   * credential reveal, a manual backup run (§5.8 "pure actions", §5.7 "reveals a secret"). Such an
+   * entry never counts as a later live change blocking an undo of the entity's earlier entries
+   * (§5.8).
+   */
+  pureAction?: true;
+  /** Omitted on reads; required for the audit_log row's entity columns on a write. */
+  entity?: (input: In, out: Out) => { kind: string; id: string | null };
+  run(ctx: Context, input: In): Promise<Out>;
+};
+
+/** Identity function that lets an operation module's `In`/`Out` be inferred from its body. */
+export function defineOperation<In, Out>(
+  op: Operation<In, Out>
+): Operation<In, Out> {
+  return op;
+}
+
+/** Thrown by an operation's `run`, or by the runner itself, to answer with an RFC 9457 problem. */
+export class OpError extends Error {
+  constructor(
+    // eslint-disable-next-line no-magic-numbers -- the RFC 9457 status codes an operation may answer with
+    public status: 400 | 401 | 403 | 404 | 409 | 422 | 503,
+    public title: string,
+    public detail?: unknown
+  ) {
+    super(title);
+    this.name = 'OpError';
+  }
+}
+
+const STATUS_CONFLICT = 409;
+
+/** Raised by the runner when a `confirm`-guarded operation is called without confirmation (§10.3). */
+export class ConfirmationRequired extends OpError {
+  constructor(public question: string) {
+    super(STATUS_CONFLICT, 'confirmation required', {
+      confirmationRequired: true,
+      question
+    });
+    this.name = 'ConfirmationRequired';
+  }
+}
+
+/** Raised when a write is refused because other rows still reference or would collide with it. */
+export class Conflict extends OpError {
+  constructor(
+    title: string,
+    public references: { kind: string; id: string; label: string }[]
+  ) {
+    super(STATUS_CONFLICT, title, { references });
+    this.name = 'Conflict';
+  }
+}
+
+/* eslint-enable max-classes-per-file */

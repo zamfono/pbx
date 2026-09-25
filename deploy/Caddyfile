@@ -1,0 +1,47 @@
+# Caddyfile — the stack's only public HTTP listener (§6.1). Site address and metrics token come
+# from the proxy service's environment. Everything TLS is Caddy's default: Let's Encrypt, TLS 1.2+,
+# and :80 answering with a redirect to HTTPS.
+#
+# The global options block, first and only (Caddy allows exactly one): the `cert_obtained` hook
+# that copies a new certificate onto caddy-data and notifies `api` (§6.4, images/proxy/Dockerfile
+# for the plugin and the hook script itself). `import`ing a glob that matches nothing is
+# harmless, which is what lets the test harness add its own global option — switching automatic
+# HTTPS to Caddy's internal CA, so it can prove §6.4 with no internet reachable
+# (test/integration/Caddyfile.local-ca) — by mounting a snippet here instead of wrapping this
+# file, since a second global block of its own would make Caddy refuse the config.
+{
+	events {
+		on cert_obtained exec /usr/local/bin/zamfono-cert-hook {event.data.certificate_path} {event.data.private_key_path} {event.data.identifier}
+	}
+	import /etc/caddy/global.d/*.caddy
+}
+
+{$FQDN} {
+	log                                      # access log to stdout, shipped with the container logs (§7)
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	# /metrics and /metrics/*: bearer token from .env; refused outright while the token is unset (§7)
+	@metrics path /metrics /metrics/*
+	handle @metrics {
+		@authorized expression `{env.METRICS_TOKEN} != "" && {header.Authorization} == "Bearer " + {env.METRICS_TOKEN}`
+		handle @authorized {
+			import /etc/caddy/conf.d/*.caddy     # the DR overlay drops litestream.caddy here (§6.5)
+			handle {
+				reverse_proxy api:3000
+			}
+		}
+		handle {
+			respond 404
+		}
+	}
+
+	# /internal/*: the process-to-process endpoints of §3.1 are served on the internal network only
+	handle /internal/* {
+		respond 404
+	}
+
+	# everything else, /healthz and the /events WebSocket included; X-Forwarded-For is set by default (§5.5)
+	handle {
+		reverse_proxy api:3000
+	}
+}
