@@ -4,7 +4,7 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
-**2026-09-27 · §9.4 Trunk order and Emergency trunks, §10.1 Emergency calls, §10.3 Trunks and Health, §11.2 trunks.** Emergency calls try only trunks with the new, required `trunks.emergency` flag, still in trunk order, and fail with 503 while none is live. A write that leaves no trunk flagged warns, `/healthz` reports it and the admin UI shows it. Emergency calls tried every trunk before.
+**2026-09-27 · §9.4 Trunk order and Emergency trunks, §10.1 Emergency calls, §10.3 Trunks and Health, §11.2 trunks.** Emergency calls try only trunks with the new, required `trunks.emergency` flag, still in trunk order, and fail with 503 while none is live. A write that leaves no trunk flagged warns and `/healthz` reports it. Emergency calls tried every trunk before.
 *Why:* requested by the product owner; a trunk in another country than the company, the only trunk of a German instance being a US one, received `112` verbatim with a German caller-ID, which its provider rejects or routes to an emergency centre other than the company's.
 
 **2026-09-25 · §6.4 TLS certificates.** The `proxy` image's entrypoint runs the `cert_obtained` hook once at start for the certificate Caddy already holds, then starts Caddy.
@@ -937,7 +937,7 @@ The user and trunk levels are tri-state, NULL meaning inherit. A withheld call i
 
 **Trunk order.** `trunks.priority` (1 = first) is the tenant's trunk order: the order of `GET /trunks`, rewritten as a whole by `PUT /trunks/order`. A new trunk appends. Emergency calls (§10.1) try the emergency trunks in this order; nothing else consumes it in the MVP.
 
-**Emergency trunks.** `trunks.emergency` states that the provider carries emergency calls to the emergency service of the company's registered address, which a provider in another country does not. It is required on `POST /trunks`, so every trunk carries the admin's explicit choice. While no trunk has it set, emergency calls fail (§10.1): a write that leaves the tenant in that state returns the warning `no emergency trunk; emergency calls will fail`, `/healthz` reports it in its body, and the admin UI shows it on the trunks page.
+**Emergency trunks.** `trunks.emergency` states that the provider carries emergency calls to the emergency service of the company's registered address, which a provider in another country does not. It is required on `POST /trunks`, so every trunk carries the admin's explicit choice. While no trunk has it set, emergency calls fail (§10.1): a write that leaves the tenant in that state returns the warning `no emergency trunk; emergency calls will fail` and `/healthz` reports it in its body.
 
 **Cross-trunk failover** is route fallthrough for ordinary calls, so a second trunk carries them exactly when a matching route names it, and the trunk order (§10.1) for emergency calls. A call whose last route failed hears the announcement for a failed call, `please-try-call-later`, in the tenant's language. Where the tenant's prompt set lacks it (the German, Spanish and Russian sets), the caller hears the special information tone of ITU-T E.180 instead, three short rising tones of 950, 1400 and 1800 Hz for 330 ms each, repeated three times, and the call is then released.
 
