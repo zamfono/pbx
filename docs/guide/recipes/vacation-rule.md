@@ -28,8 +28,9 @@ caller would.
    `menus` or `tenant` equivalent) — active periods in one scope must not overlap, and the write
    is refused if they do.
 2. Create the rule: `POST /users/{id}/ooo` (or the matching scoped path) with `active: true`,
-   optional `startsAt`/`expiresAt`, and `target` — most often `{ "kind": "mailboxUser", "userId":
-"…" }` or `{ "kind": "external", "external": "+49…" }` for a colleague covering the desk.
+   optional `startsAt`/`expiresAt`, and `target`. Most often that is a mailbox,
+   `{ "kind": "mailboxUser", "userId": "…" }`, or a colleague covering the desk,
+   `{ "kind": "external", "external": "+49…" }`.
 3. To end the vacation early, `PATCH /ooo/{id}` with `active: false`, or `DELETE /ooo/{id}`.
 
 Every write is undoable (`guardrails`): reactivating an ended rule, or restoring the previous
