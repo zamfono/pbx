@@ -88,9 +88,9 @@ function anyLiveEmergencyTrunk(
 /**
  * Emergency calls (§10.1 "Emergency calls"): the tenant's emergency trunks in priority order, no
  * route, caller list, CLIR or cap, failing over to the next live one on any non-answer and only
- * failing the call once none remains; a trunk without `trunks.emergency` is never tried. The answer joins the bridge `bridgeJoin.ts`'s registry
- * hands over for `call`, if any — `*5`'s added leg joining the running conversation (§10.2
- * "Three-way calls") — else a bridge of its own.
+ * failing the call once none remains; a trunk without `trunks.emergency` is never tried. The
+ * answer joins the bridge `bridgeJoin.ts`'s registry hands over for `call`, if any — `*5`'s added
+ * leg joining the running conversation (§10.2 "Three-way calls") — else a bridge of its own.
  */
 export async function dialEmergency(
   pipeline: Pipeline,
