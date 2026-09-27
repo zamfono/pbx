@@ -93,6 +93,19 @@ print([t['id'] for t in json.load(sys.stdin)['items'] if t['name'] == sys.argv[1
 " "$1"
 }
 
+# Live trunk `$1` as `GET /trunks` lists it, without the live status the core merges in (§9.4
+# "Provisioning and status"): what a teardown compares to the setup's copy to show it left the
+# trunk as it found it.
+trunk_snapshot() {
+  api GET /trunks | python3 -c "
+import json, sys
+trunk = [t for t in json.load(sys.stdin)['items'] if t['id'] == sys.argv[1]][0]
+trunk.pop('status', None)
+trunk.pop('statusChangedAt', None)
+print(json.dumps(trunk, sort_keys=True))
+" "$1"
+}
+
 # The outbound routes as `PUT /outboundRoutes` takes them back, in evaluation order: a setup saves
 # them, and its teardown puts them back as they were.
 routes_body() {

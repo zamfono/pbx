@@ -7,6 +7,8 @@ Usage: python3 _callerid-check.py <trunk-host> < /tmp/trunk-messages.log
 import re
 import sys
 
+from _sip_trace import received_invites
+
 trunk_host = re.escape(sys.argv[1])
 PRESENTED = r"<sip:\+15551000@[^>]+>"
 ACCOUNT = rf"<sip:ci-pai-acct@{trunk_host}>"
@@ -20,30 +22,6 @@ EXPECTED = [
     ("+15557102", "both, withheld", r'^"Anonymous" <sip:anonymous@anonymous\.invalid>',
      rf"^{PRESENTED}$", "id"),
 ]
-
-
-def received_invites(trace):
-    """Each received INVITE's request line and headers, the first per Call-ID."""
-    invites, seen = [], set()
-    for block in re.split(r"\n-{10,}[^\n]*\n", "\n" + trace.replace("\r", "")):
-        if "message received" not in block:
-            continue
-        lines = block.split("\n")
-        start = next((i for i, line in enumerate(lines) if line.startswith("INVITE ")), None)
-        if start is None:
-            continue
-        headers = []
-        for line in lines[start + 1:]:
-            if not line.strip():
-                break
-            name, _, value = line.partition(":")
-            headers.append((name.strip().lower(), value.strip()))
-        call_id = next((value for name, value in headers if name == "call-id"), None)
-        if call_id in seen:
-            continue
-        seen.add(call_id)
-        invites.append((lines[start], headers))
-    return invites
 
 
 problems = []

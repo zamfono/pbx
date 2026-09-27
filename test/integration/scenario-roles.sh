@@ -39,6 +39,7 @@ trunk_uas_for() {
   case $1 in
     inbound-forward-external | inbound-*-transfer | inbound-three-way) echo answer-outbound ;;
     inbound-ring-group-skip-busy | outbound-callerid) echo answer-outbound ;;
+    outbound-emergency-trunk-order) echo answer-outbound ;;
     outbound-fallthrough | outbound-routes-exhausted) echo refuse-403 ;;
     *) echo '' ;;
   esac
@@ -69,6 +70,11 @@ caller_args_for() {
       echo "-key user $SIP_USERNAME -au $SIP_USERNAME -ap $SIP_PASSWORD \
         -inf /scenarios/outbound-callerid.csv"
       ;;
+    # The same for the emergency scenario's control call and its emergency call.
+    outbound-emergency-trunk-order)
+      echo "-key user $SIP_USERNAME -au $SIP_USERNAME -ap $SIP_PASSWORD \
+        -inf /scenarios/outbound-emergency-trunk-order.csv"
+      ;;
     outbound-*) echo "-key user $SIP_USERNAME -au $SIP_USERNAME -ap $SIP_PASSWORD" ;;
     # The trunk endpoint's own name, which the setup wrote where the run reads it.
     inbound-trunk-spoof) echo '-inf /tmp/spoof.csv' ;;
@@ -77,10 +83,11 @@ caller_args_for() {
 }
 
 # How many calls the caller's run places, one after the other: one per dialled number of the
-# caller-ID scenario's injection file, one otherwise.
+# caller-ID and the emergency scenarios' injection files, one otherwise.
 calls_for() {
   case $1 in
     outbound-callerid) echo 6 ;;
+    outbound-emergency-trunk-order) echo 2 ;;
     *) echo 1 ;;
   esac
 }
