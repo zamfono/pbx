@@ -49,7 +49,7 @@ print(value)
 # against and rejects it outright, which was confirmed by hand: the transcode step's ramp never
 # reached any channels and its caller sipp exited 1 until this was added.
 api POST /trunks \
-  "{\"name\":\"load-trunk\",\"authMode\":\"ip\",\"codecs\":[\"alaw\",\"ulaw\"],\"hosts\":[
+  "{\"name\":\"load-trunk\",\"emergency\":true,\"authMode\":\"ip\",\"codecs\":[\"alaw\",\"ulaw\"],\"hosts\":[
      {\"host\":\"$sipp_ip\",\"direction\":\"inbound\"},
      {\"host\":\"$provider_ip\",\"direction\":\"outbound\"}
    ]}" \

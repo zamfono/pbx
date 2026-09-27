@@ -29,6 +29,7 @@ $compose exec -T -d sipp-provider sh -c \
 provider_ip=$(container_ip sipp-provider)
 trunk_id=$(api POST /trunks "{
   \"name\": \"ci-registration\",
+  \"emergency\": false,
   \"authMode\": \"registration\",
   \"username\": \"ci-reg-acct\",
   \"password\": \"ci-reg-secret\",

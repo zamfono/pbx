@@ -99,6 +99,7 @@ async function seedRoute(db: Db): Promise<string> {
       id: trunkId,
       name: 'trunk-1',
       priority: 1,
+      emergency: 1,
       authMode: 'registration',
       username: 'user1',
       passwordEnc: Buffer.from('secret'),

@@ -624,7 +624,8 @@ describe('apiHealth', () => {
       core: { reachable: false, ari: false },
       mail: 'notConfigured',
       keyRotationRemaining: 0,
-      certificateSync: 'unknown'
+      certificateSync: 'unknown',
+      emergencyTrunk: false
     });
     expect(healthStatus(health)).toBe(HTTP_SERVICE_UNAVAILABLE);
   });

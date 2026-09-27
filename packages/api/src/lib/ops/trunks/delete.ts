@@ -3,10 +3,11 @@ import { z } from 'zod';
 import { propagate, recordChange } from '../runner.js';
 import { Conflict, defineOperation, OpError } from '../types.js';
 import { loadTrunkRow, STATUS_NOT_FOUND } from './_shared.js';
+import { emergencyTrunkWarnings } from './_writeChecks.js';
 
 const inputSchema = z.object({ id: z.string().min(1) }).strict();
 type Input = z.infer<typeof inputSchema>;
-type Output = { id: string };
+type Output = { id: string; warnings: string[] };
 
 export const deleteTrunk = defineOperation<Input, Output>({
   name: 'trunks.delete',
@@ -43,6 +44,6 @@ export const deleteTrunk = defineOperation<Input, Output>({
       .execute();
     recordChange(ctx, { field: 'deletedAt', from: null, to: ctx.now });
     propagate(ctx, ['pjsip']);
-    return { id: input.id };
+    return { id: input.id, warnings: await emergencyTrunkWarnings(ctx.db) };
   }
 });

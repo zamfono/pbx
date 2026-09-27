@@ -156,6 +156,7 @@ async function seedExternalRoute(db: Db): Promise<string> {
       id: trunkId,
       name: 'trunk-1',
       priority: 1,
+      emergency: 1,
       authMode: 'ip',
       username: null,
       passwordEnc: null,

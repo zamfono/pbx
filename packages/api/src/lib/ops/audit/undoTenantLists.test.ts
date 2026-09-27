@@ -73,7 +73,12 @@ async function createTrunk(db: Db, name: string): Promise<string> {
   const { trunk } = await runOperation<unknown, { trunk: { id: string } }>(
     db,
     'trunks.create',
-    { name, authMode: 'ip', hosts: [{ host: 'sip.provider.example' }] },
+    {
+      name,
+      emergency: true,
+      authMode: 'ip',
+      hosts: [{ host: 'sip.provider.example' }]
+    },
     asRun()
   );
   return trunk.id;

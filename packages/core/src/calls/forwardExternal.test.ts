@@ -142,6 +142,7 @@ async function seedTrunkRoute(
       id: trunkId,
       name: `trunk-${priority}`,
       priority,
+      emergency: 1,
       authMode: 'registration',
       username: `user${priority}`,
       passwordEnc: Buffer.from('secret'),

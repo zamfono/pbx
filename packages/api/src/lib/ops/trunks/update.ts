@@ -40,6 +40,7 @@ import {
   assertNameAvailable,
   assertPaiHasIdentity,
   assertTransportEnabled,
+  emergencyTrunkWarnings,
   hostWarnings
 } from './_writeChecks.js';
 import {
@@ -51,6 +52,7 @@ const inputSchema = z
   .object({
     id: z.string().min(1),
     name: z.string().min(1).optional(),
+    emergency: z.boolean().optional(),
     authMode: z.enum(AUTH_MODES).optional(),
     username: z.string().min(1).nullable().optional(),
     password: z.string().min(1).optional(),
@@ -126,6 +128,7 @@ function trunkColumns(
 ): Record<string, unknown> {
   return {
     name: merged.name,
+    emergency: merged.emergency ? 1 : 0,
     authMode: merged.authMode,
     username: merged.username,
     passwordEnc: merged.passwordEnc,
@@ -214,6 +217,12 @@ export const update = defineOperation<Input, Output>({
       status: 'unknown',
       statusChangedAt: null
     });
-    return { trunk, warnings: input.hosts ? hostWarnings(input.hosts) : [] };
+    return {
+      trunk,
+      warnings: [
+        ...(input.hosts ? hostWarnings(input.hosts) : []),
+        ...(await emergencyTrunkWarnings(ctx.db))
+      ]
+    };
   }
 });

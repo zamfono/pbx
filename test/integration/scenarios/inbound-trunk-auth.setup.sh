@@ -15,6 +15,7 @@ compose=$4
 provider_ip=$(container_ip sipp-provider)
 trunk_id=$(api POST /trunks "{
   \"name\": \"ci-auth\",
+  \"emergency\": false,
   \"authMode\": \"ip\",
   \"inboundAuth\": true,
   \"username\": \"ci-auth-acct\",

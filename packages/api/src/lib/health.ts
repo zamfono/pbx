@@ -3,6 +3,7 @@ import { sql } from 'kysely';
 import { pendingMigrations, type Db } from '@zamfono/shared';
 
 import { ENC_COLUMNS } from './jobs/keyRotation.js';
+import { hasEmergencyTrunk } from './ops/trunks/_shared.js';
 import type { Keyring } from './secretbox.js';
 
 const HTTP_OK = 200;
@@ -23,6 +24,8 @@ export type ApiHealth = {
   mail: 'configured' | 'notConfigured';
   keyRotationRemaining: number;
   certificateSync: 'ok' | 'missing' | 'unknown';
+  /** Whether a live trunk carries emergency calls (§9.4 "Emergency trunks"). */
+  emergencyTrunk: boolean;
 };
 
 /** What `apiHealth` needs to compute a body; a caller resolves each check its own way. */
@@ -119,6 +122,19 @@ async function mailConfigured(db: Db): Promise<'configured' | 'notConfigured'> {
 }
 
 /**
+ * Whether a live trunk has `trunks.emergency` set (§9.4 "Emergency trunks"): without one,
+ * emergency calls fail (§10.1). A database that cannot answer — no `trunks` table yet, before
+ * the first migration — reports none; `migrated` already says why.
+ */
+async function emergencyTrunkPresent(db: Db): Promise<boolean> {
+  try {
+    return await hasEmergencyTrunk(db);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * `api`'s own liveness plus the fields a client cannot otherwise observe (§6.3 "Health"):
  * `ok` is true only while the database is open and holds no pending migration, since `api`
  * never runs one itself (§6.3 "Migrations").
@@ -128,6 +144,7 @@ export async function apiHealth(deps: ApiHealthDeps): Promise<ApiHealth> {
   const pending = dbOpen ? await pendingMigrationsOrNull(deps.db) : [];
   const migrated = dbOpen && pending !== null && pending.length === 0;
   const mail = dbOpen ? await mailConfigured(deps.db) : 'notConfigured';
+  const emergencyTrunk = dbOpen && (await emergencyTrunkPresent(deps.db));
   const core = await deps.checkCore();
   return {
     ok: dbOpen && migrated,
@@ -136,7 +153,8 @@ export async function apiHealth(deps: ApiHealthDeps): Promise<ApiHealth> {
     core,
     mail,
     keyRotationRemaining: deps.keyRotationRemaining,
-    certificateSync: deps.certificateSync
+    certificateSync: deps.certificateSync,
+    emergencyTrunk
   };
 }
 

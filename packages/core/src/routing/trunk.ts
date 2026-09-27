@@ -99,16 +99,20 @@ export function shouldFallThrough(failure: AttemptFailure): boolean {
 /** No provisional response within this budget of an outbound INVITE marks the trunk dead (§9.4 "Route fallthrough"). */
 export const ATTEMPT_NO_RESPONSE_MS = 8000;
 
-/** Emergency trunks to try, in `trunks.priority` order, `unreachable` ones skipped (§10.1 "Emergency calls"). */
+/**
+ * Emergency trunks to try (§10.1 "Emergency calls"): only those with `trunks.emergency` set (§9.4
+ * "Emergency trunks"), in `trunks.priority` order, `unreachable` ones skipped.
+ */
 export function emergencyTrunks(
   trunks: {
     id: string;
     priority: number;
+    emergency: boolean;
     status: 'registered' | 'unreachable' | 'unknown';
   }[]
 ): string[] {
   return trunks
-    .filter(trunk => trunk.status !== 'unreachable')
+    .filter(trunk => trunk.emergency && trunk.status !== 'unreachable')
     .sort((left, right) => left.priority - right.priority)
     .map(trunk => trunk.id);
 }

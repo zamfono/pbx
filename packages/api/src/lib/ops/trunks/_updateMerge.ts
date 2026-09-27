@@ -57,6 +57,7 @@ export function mergeScalars(row: TrunkRow, input: MergeInput): Merged {
   const required = authMode === 'registration' || inboundAuth;
   return {
     name: input.name ?? row.name,
+    emergency: input.emergency ?? row.emergency === 1,
     authMode,
     username: required ? orRow(input.username, row.username) : null,
     inboundAuth,

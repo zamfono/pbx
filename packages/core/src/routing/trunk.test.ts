@@ -115,12 +115,40 @@ describe('shouldFallThrough', () => {
 describe('emergencyTrunks', () => {
   it('tries trunks in priority order, skipping unreachable ones', () => {
     const trunks = [
-      { id: 'second', priority: 2, status: 'registered' as const },
-      { id: 'dead', priority: 1, status: 'unreachable' as const },
-      { id: 'first', priority: 3, status: 'unknown' as const }
+      {
+        id: 'second',
+        priority: 2,
+        emergency: true,
+        status: 'registered' as const
+      },
+      {
+        id: 'dead',
+        priority: 1,
+        emergency: true,
+        status: 'unreachable' as const
+      },
+      { id: 'first', priority: 3, emergency: true, status: 'unknown' as const }
     ];
 
     expect(emergencyTrunks(trunks)).toEqual(['second', 'first']);
+  });
+
+  it('never tries a trunk without the emergency flag (§9.4 "Emergency trunks")', () => {
+    const foreign = {
+      id: 'foreign',
+      priority: 1,
+      emergency: false,
+      status: 'registered' as const
+    };
+    const local = {
+      id: 'local',
+      priority: 2,
+      emergency: true,
+      status: 'registered' as const
+    };
+
+    expect(emergencyTrunks([foreign, local])).toEqual(['local']);
+    expect(emergencyTrunks([foreign])).toEqual([]);
   });
 });
 

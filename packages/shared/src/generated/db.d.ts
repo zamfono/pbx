@@ -377,6 +377,7 @@ export interface Trunks {
   codecsJson: string | null;
   createdAt: string;
   deletedAt: string | null;
+  emergency: number;
   id: string;
   inboundAuth: Generated<number>;
   inboundNumberFormat: Generated<string>;

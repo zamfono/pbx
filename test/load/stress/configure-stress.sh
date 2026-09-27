@@ -46,7 +46,7 @@ api PATCH /settings '{"codecs":["opus"]}' >/dev/null
 hosts="{\"host\":\"$trunk_ip\",\"direction\":\"inbound\"}"
 [ -n "$provider_ip" ] && hosts+=",{\"host\":\"$provider_ip\",\"direction\":\"outbound\"}"
 api POST /trunks \
-  "{\"name\":\"amrwb-trunk\",\"authMode\":\"ip\",\"transport\":\"udp\",\"codecs\":[\"amrwb\"],
+  "{\"name\":\"amrwb-trunk\",\"emergency\":true,\"authMode\":\"ip\",\"transport\":\"udp\",\"codecs\":[\"amrwb\"],
     \"hosts\":[$hosts]}" >/dev/null
 
 : > "$out_dir/creds.csv"

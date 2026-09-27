@@ -30,7 +30,8 @@ arguments:
    without an explicit expiry lapses automatically after 7 days.
 4. For a trunk suspected of failing calls outbound, check `GET /trunks/{id}` for its registration
    and reachability status before reading its call log; an `unreachable` trunk is skipped in
-   trunk-order failover and in emergency-call dialling alike.
+   trunk-order failover and in emergency-call dialling alike, and a trunk without `emergency`
+   set never carries an emergency call at all (see `emergency-calls`).
 5. Reproduce the call at the raised level, then re-read its trace; drop the override back to the
    tenant default once done, since a diagnostics override left on is a bigger `calls.log` for
    every call the entity takes part in.

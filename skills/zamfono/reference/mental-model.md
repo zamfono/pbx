@@ -9,7 +9,8 @@ that single tenant; there is no cross-tenant sharing.
   **devices**. Each device is one SIP registration (a softphone or a desk phone). A user's
   extension is shared by all their devices; only the device slug differs.
 - **Trunk** — a connection to a PSTN or SIP provider. Trunks carry the tenant's inbound and
-  outbound calls and are tried in a configured order.
+  outbound calls and are tried in a configured order; only those flagged `emergency` carry
+  emergency calls.
 - **DID** — a phone number the tenant owns, routed on arrival to a forward target. A **DID
   block** groups a contiguous range of numbers under one fallback target, for a provider that
   hands over a whole range instead of individual DIDs.
@@ -29,15 +30,15 @@ Every place that routes a call somewhere else — a DID, a menu option, a forwar
 out-of-office rule, a group fallback, an opening-hours closed target — points at one of the same
 seven target kinds:
 
-| Kind | Meaning |
-|---|---|
-| `user` | rings that user, entering the routing pipeline |
-| `ringGroup` | rings that group, entering the routing pipeline |
-| `external` | dials an external number through the outbound routes |
-| `mailboxUser` | deposits the caller directly in a user's mailbox, no ringing |
+| Kind               | Meaning                                                            |
+| ------------------ | ------------------------------------------------------------------ |
+| `user`             | rings that user, entering the routing pipeline                     |
+| `ringGroup`        | rings that group, entering the routing pipeline                    |
+| `external`         | dials an external number through the outbound routes               |
+| `mailboxUser`      | deposits the caller directly in a user's mailbox, no ringing       |
 | `mailboxRingGroup` | deposits the caller directly in a ring group's mailbox, no ringing |
-| `announcement` | plays an audio asset and ends the call |
-| `menu` | plays a menu's greeting and collects DTMF |
+| `announcement`     | plays an audio asset and ends the call                             |
+| `menu`             | plays a menu's greeting and collects DTMF                          |
 
 A `user` or `ringGroup` target re-enters the routing pipeline and counts a hop toward the
 three-hop forwarding limit (`routing-order`); a `menu` target re-enters without counting a hop.

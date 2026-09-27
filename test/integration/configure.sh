@@ -34,7 +34,7 @@ print(value)
 
 # An `ip` trunk identified by the calling container's address (§9.4 "Inbound identification").
 api POST /trunks \
-  "{\"name\":\"ci-trunk\",\"authMode\":\"ip\",\"hosts\":[{\"host\":\"$trunk_ip\",\"direction\":\"both\"}]}" \
+  "{\"name\":\"ci-trunk\",\"emergency\":true,\"authMode\":\"ip\",\"hosts\":[{\"host\":\"$trunk_ip\",\"direction\":\"both\"}]}" \
   >/dev/null
 
 user_id=$(api POST /users \

@@ -28,6 +28,7 @@ async function createTrunk(
     'trunks.create',
     {
       name: overrides.name ?? 'Provider A',
+      emergency: true,
       authMode: 'ip',
       hosts: [{ host: 'sip.provider.example' }],
       ...overrides

@@ -124,6 +124,7 @@ type TrunkOverrides = {
   calleridHeader?: 'from' | 'pai' | 'both';
   calleridDidId?: string | null;
   maxChannels?: number | null;
+  emergency?: boolean;
 };
 
 async function seedTrunk(
@@ -139,6 +140,7 @@ async function seedTrunk(
       id,
       name: `trunk-${priority}`,
       priority,
+      emergency: Number(overrides.emergency ?? true),
       authMode,
       username: authMode === 'registration' ? `user${priority}` : null,
       passwordEnc: authMode === 'registration' ? Buffer.from('secret') : null,
@@ -860,6 +862,38 @@ describe('outbound dialing', () => {
 
     expect(call.status).toBe('answered');
     expect(attemptEndpoints(fakeAri)).toEqual([`PJSIP/112@trunk-${trunk2}`]);
+  });
+
+  it('never dials a trunk without the emergency flag, even ahead in the trunk order (§9.4 "Emergency trunks")', async () => {
+    const mainDidId = await seedDid(db, '+491110000');
+    await seedSettings(db, mainDidId, { emergencyNumbers: ['112'] });
+    await seedTrunk(db, 1, { emergency: false });
+    const trunk2 = await seedTrunk(db, 2);
+
+    const call = await dial('112');
+
+    expect(call.status).toBe('answered');
+    expect(attemptEndpoints(fakeAri)).toEqual([`PJSIP/112@trunk-${trunk2}`]);
+  });
+
+  it('fails with an ERROR line while only trunks without the emergency flag are live (§10.1)', async () => {
+    const mainDidId = await seedDid(db, '+491110000');
+    await seedSettings(db, mainDidId, { emergencyNumbers: ['112'] });
+    await seedTrunk(db, 1, { emergency: false });
+    let loggedError: Record<string, unknown> | string | null = null;
+    pipeline.deps.logger = {
+      info: () => undefined,
+      warn: () => undefined,
+      error: fields => {
+        loggedError = fields;
+      }
+    };
+
+    const call = await dial('112');
+
+    expect(call.status).toBe('failed');
+    expect(attemptEndpoints(fakeAri)).toEqual([]);
+    expect(loggedError).not.toBeNull();
   });
 
   it('logs ERROR and keeps its trace at events despite a none tenant default when no trunk is live', async () => {

@@ -22,6 +22,7 @@ $compose exec -T -d sipp-provider sh -c \
 provider_ip=$(container_ip sipp-provider)
 second_id=$(api POST /trunks "{
   \"name\": \"ci-second\",
+  \"emergency\": false,
   \"authMode\": \"ip\",
   \"hosts\": [{ \"host\": \"$provider_ip\", \"direction\": \"outbound\" }]
 }" | jsonfield trunk.id)

@@ -9,7 +9,8 @@ that single tenant; there is no cross-tenant sharing.
   **devices**. Each device is one SIP registration (a softphone or a desk phone). A user's
   extension is shared by all their devices; only the device slug differs.
 - **Trunk** — a connection to a PSTN or SIP provider. Trunks carry the tenant's inbound and
-  outbound calls and are tried in a configured order.
+  outbound calls and are tried in a configured order; only those flagged `emergency` carry
+  emergency calls.
 - **DID** — a phone number the tenant owns, routed on arrival to a forward target. A **DID
   block** groups a contiguous range of numbers under one fallback target, for a provider that
   hands over a whole range instead of individual DIDs.

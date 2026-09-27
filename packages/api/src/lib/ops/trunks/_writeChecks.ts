@@ -2,6 +2,7 @@ import type { Db } from '@zamfono/shared';
 
 import { OpError } from '../types.js';
 import {
+  hasEmergencyTrunk,
   STATUS_UNPROCESSABLE_ENTITY,
   type CallerIdHeader,
   type HostInput,
@@ -144,4 +145,16 @@ export function hostWarnings(hosts: HostInput[]): string[] {
   return hosts.some(host => typeof host.port === 'number')
     ? [SRV_DISABLED_WARNING]
     : [];
+}
+
+export const NO_EMERGENCY_TRUNK_WARNING =
+  'no emergency trunk; emergency calls will fail';
+
+/**
+ * One warning when the write just made leaves no live trunk with `trunks.emergency` set, since
+ * emergency calls then fail (§9.4 "Emergency trunks", §10.1 "Emergency calls"). Read after the
+ * write, so it reports the state the write left behind, whatever that state was before.
+ */
+export async function emergencyTrunkWarnings(db: Db): Promise<string[]> {
+  return (await hasEmergencyTrunk(db)) ? [] : [NO_EMERGENCY_TRUNK_WARNING];
 }

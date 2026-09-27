@@ -16,6 +16,7 @@ compose=$4
 trunk_ip=$(container_ip sipp)
 pai_id=$(api POST /trunks "{
   \"name\": \"ci-pai\",
+  \"emergency\": false,
   \"authMode\": \"ip\",
   \"inboundAuth\": true,
   \"username\": \"ci-pai-acct\",
@@ -25,6 +26,7 @@ pai_id=$(api POST /trunks "{
 }" | jsonfield trunk.id)
 both_id=$(api POST /trunks "{
   \"name\": \"ci-both\",
+  \"emergency\": false,
   \"authMode\": \"ip\",
   \"callerIdHeader\": \"both\",
   \"hosts\": [{ \"host\": \"$trunk_ip\", \"direction\": \"outbound\" }]

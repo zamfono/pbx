@@ -1,5 +1,5 @@
-/** Emergency calls (§10.1 "Emergency calls"): the tenant's trunks in priority order, bypassing
- * outbound routing entirely. */
+/** Emergency calls (§10.1 "Emergency calls"): the tenant's emergency trunks in priority order,
+ * bypassing outbound routing entirely. */
 import { effectiveLevel, type LogLevel } from '../callLog.js';
 import type { Snapshot } from '../internal/server.js';
 import { emergencyTrunks } from '../routing/trunk.js';
@@ -71,20 +71,24 @@ async function attemptEmergencyTrunk(params: {
   return outcome;
 }
 
-/** Whether any of the tenant's trunks is live, anything but `unreachable` (§9.4 "Trunk order"), the
- * same view `emergencyTrunks` dials from. */
-function anyLiveTrunk(pipeline: Pipeline, snapshot: Snapshot): boolean {
+/** Whether any of the tenant's emergency trunks is live, anything but `unreachable` (§9.4 "Trunk
+ * order", "Emergency trunks"), the same view `emergencyTrunks` dials from. */
+function anyLiveEmergencyTrunk(
+  pipeline: Pipeline,
+  snapshot: Snapshot
+): boolean {
   return snapshot.trunks.some(
     row =>
       row.deletedAt === null &&
+      row.emergency === 1 &&
       pipeline.deps.state.trunks.get(row.id)?.status !== 'unreachable'
   );
 }
 
 /**
- * Emergency calls (§10.1 "Emergency calls"): the tenant's trunks in priority order, no route,
- * caller list, CLIR or cap, failing over to the next live trunk on any non-answer and only
- * failing the call once none remains. The answer joins the bridge `bridgeJoin.ts`'s registry
+ * Emergency calls (§10.1 "Emergency calls"): the tenant's emergency trunks in priority order, no
+ * route, caller list, CLIR or cap, failing over to the next live one on any non-answer and only
+ * failing the call once none remains; a trunk without `trunks.emergency` is never tried. The answer joins the bridge `bridgeJoin.ts`'s registry
  * hands over for `call`, if any — `*5`'s added leg joining the running conversation (§10.2
  * "Three-way calls") — else a bridge of its own.
  */
@@ -106,6 +110,7 @@ export async function dialEmergency(
       .map(row => ({
         id: row.id,
         priority: row.priority,
+        emergency: row.emergency === 1,
         status: pipeline.deps.state.trunks.get(row.id)?.status ?? 'unknown'
       }))
   );
@@ -132,13 +137,13 @@ export async function dialEmergency(
     }
   }
   call.log.event({ event: 'emergencyFailed' });
-  // §10.1 "Emergency calls": an ERROR log line "only while no live trunk exists", alongside the
-  // routing-trace line above; live trunks that were tried and failed are no such outage.
-  // Statuses are read at the failure, the moment the line reports on.
-  if (!anyLiveTrunk(pipeline, snapshot)) {
+  // §10.1 "Emergency calls": an ERROR log line "only while no live emergency trunk exists",
+  // alongside the routing-trace line above; live emergency trunks that were tried and failed are
+  // no such outage. Statuses are read at the failure, the moment the line reports on.
+  if (!anyLiveEmergencyTrunk(pipeline, snapshot)) {
     pipeline.deps.logger?.error(
       { callId: call.id, number },
-      'emergency call failed: no live trunk'
+      'emergency call failed: no live emergency trunk'
     );
   }
   await release(pipeline, call, SIP_SERVICE_UNAVAILABLE, 'failed');

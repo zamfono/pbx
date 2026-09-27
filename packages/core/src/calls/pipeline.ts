@@ -47,8 +47,8 @@ export type PipelineDeps = {
   // a call need not supply them; `main.ts`'s real Pipeline always does.
   db?: Db;
   apiClient?: MailSender;
-  // Process-level logging (§10.1 "Emergency calls": an ERROR line while no live trunk exists);
-  // optional so a test Pipeline that never needs it can omit it.
+  // Process-level logging (§10.1 "Emergency calls": an ERROR line while no live emergency trunk
+  // exists); optional so a test Pipeline that never needs it can omit it.
   logger?: Logger;
   // --- Task 31 ---
   // Required, `null` until `main.ts` constructs them (§10.2 "Presence and BLF", "Three-way

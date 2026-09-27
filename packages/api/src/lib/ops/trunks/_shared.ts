@@ -57,6 +57,8 @@ export type HostWire = {
 /** The scalar (non-host, non-status) fields of a trunk, in their wire shape (§9.4, §10.3). */
 export type TrunkScalars = {
   name: string;
+  /** `trunks.emergency`: only these trunks carry emergency calls (§9.4 "Emergency trunks"). */
+  emergency: boolean;
   authMode: AuthMode;
   username: string | null;
   inboundAuth: boolean;
@@ -91,6 +93,17 @@ export async function loadTrunkRow(
     .where('id', '=', id)
     .where('deletedAt', 'is', null)
     .executeTakeFirst();
+}
+
+/** Whether any live trunk has `trunks.emergency` set (§9.4 "Emergency trunks"). */
+export async function hasEmergencyTrunk(db: Db): Promise<boolean> {
+  const row = await db
+    .selectFrom('trunks')
+    .select('id')
+    .where('emergency', '=', 1)
+    .where('deletedAt', 'is', null)
+    .executeTakeFirst();
+  return row !== undefined;
 }
 
 export async function loadTrunkHosts(
@@ -132,6 +145,7 @@ export async function replaceTrunkHosts(
 export function scalarsFromRow(row: TrunkRow): TrunkScalars {
   return {
     name: row.name,
+    emergency: row.emergency === 1,
     authMode: row.authMode as AuthMode,
     username: row.username,
     inboundAuth: row.inboundAuth === 1,

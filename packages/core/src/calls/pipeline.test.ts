@@ -100,6 +100,7 @@ async function seedTrunkWithRoute(db: Db): Promise<string> {
       id,
       name: `trunk-${id}`,
       priority: 1,
+      emergency: 1,
       authMode: 'registration',
       username: 'u',
       passwordEnc: Buffer.from('secret'),

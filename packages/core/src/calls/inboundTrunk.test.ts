@@ -74,6 +74,7 @@ async function seedTrunk(
       id,
       name: `trunk ${inboundNumberFormat} ${inboundAuthUsername ?? ''}`,
       priority: inboundNumberFormat === 'e164' ? 1 : 2,
+      emergency: 1,
       authMode: 'ip',
       inboundAuth: inboundAuthUsername === null ? 0 : 1,
       username: inboundAuthUsername,

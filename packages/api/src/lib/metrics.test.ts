@@ -63,6 +63,7 @@ async function insertTrunk(
       id,
       name: overrides.name ?? 'main',
       priority: overrides.priority ?? 1,
+      emergency: 1,
       authMode: 'registration',
       username: 'trunkuser',
       passwordEnc: Buffer.from('placeholder'),

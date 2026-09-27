@@ -24,6 +24,7 @@ async function seedTrunk(
       id: newId(),
       name: `trunk-of-${username}-${String(inboundAuth)}`,
       priority: 1,
+      emergency: 1,
       authMode: 'registration',
       username,
       passwordEnc: Buffer.from('placeholder'),

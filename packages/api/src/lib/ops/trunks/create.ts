@@ -28,6 +28,7 @@ import {
   assertNameAvailable,
   assertPaiHasIdentity,
   assertTransportEnabled,
+  emergencyTrunkWarnings,
   hostWarnings
 } from './_writeChecks.js';
 import {
@@ -40,6 +41,8 @@ import {
 const inputSchema = z
   .object({
     name: z.string().min(1),
+    // Required, so every trunk carries the admin's explicit choice (§9.4 "Emergency trunks").
+    emergency: z.boolean(),
     authMode: z.enum(AUTH_MODES),
     username: z.string().min(1).optional(),
     password: z.string().min(1).optional(),
@@ -94,6 +97,7 @@ async function insertTrunkRow(
       id: resolved.id,
       name: input.name,
       priority: resolved.priority,
+      emergency: input.emergency ? 1 : 0,
       authMode: input.authMode,
       username: resolved.credentialsRequired ? (input.username ?? null) : null,
       passwordEnc,
@@ -159,6 +163,7 @@ function assertNoStrayRegistrationFields(input: Input): void {
 
 function recordCreateChanges(ctx: Context, input: Input): void {
   recordChange(ctx, { field: 'name', from: null, to: input.name });
+  recordChange(ctx, { field: 'emergency', from: null, to: input.emergency });
   if (input.username !== undefined || input.password !== undefined) {
     recordChange(ctx, { field: 'password', from: null, to: input.password });
   }
@@ -230,6 +235,12 @@ export const create = defineOperation<Input, Output>({
       status: 'unknown',
       statusChangedAt: null
     });
-    return { trunk, warnings: hostWarnings(input.hosts) };
+    return {
+      trunk,
+      warnings: [
+        ...hostWarnings(input.hosts),
+        ...(await emergencyTrunkWarnings(ctx.db))
+      ]
+    };
   }
 });

@@ -32,6 +32,7 @@ async function createTrunkAndCatchAll(
     'trunks.create',
     {
       name: 'Provider A',
+      emergency: true,
       authMode: 'ip',
       hosts: [{ host: 'sip.provider.example' }]
     },

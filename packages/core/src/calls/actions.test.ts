@@ -118,6 +118,7 @@ async function seedExternalRoute(
       id: trunkId,
       name: 'trunk-1',
       priority: 1,
+      emergency: 1,
       authMode: 'ip',
       username: null,
       passwordEnc: null,

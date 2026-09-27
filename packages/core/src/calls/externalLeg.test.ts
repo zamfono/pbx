@@ -122,6 +122,7 @@ async function seedTrunk(
       id,
       name: `trunk-${priority}`,
       priority,
+      emergency: 1,
       authMode,
       username: authMode === 'registration' ? `user${priority}` : null,
       passwordEnc: authMode === 'registration' ? Buffer.from('secret') : null,
