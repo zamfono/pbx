@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-09-27 · §9.4 Trunk order and Emergency trunks, §10.1 Emergency calls, §10.3 Trunks and Health, §11.2 trunks.** Emergency calls try only trunks with the new, required `trunks.emergency` flag, still in trunk order, and fail with 503 while none is live. A write that leaves no trunk flagged warns, `/healthz` reports it and the admin UI shows it. Emergency calls tried every trunk before.
+*Why:* requested by the product owner; a trunk in another country than the company, the only trunk of a German instance being a US one, received `112` verbatim with a German caller-ID, which its provider rejects or routes to an emergency centre other than the company's.
+
 **2026-09-25 · §6.4 TLS certificates.** The `proxy` image's entrypoint runs the `cert_obtained` hook once at start for the certificate Caddy already holds, then starts Caddy.
 *Why:* found in CI: Caddy's events app subscribes its handlers only when it starts, and Caddy starts its apps in no fixed order, so an issuance that completes first (near-instant with the harness's `local_certs`) reaches no hook and `api` never gets a copy; a certificate already stored at start emits no event at all.
 
@@ -932,7 +935,9 @@ The user and trunk levels are tri-state, NULL meaning inherit. A withheld call i
 
 **Provisioning and status.** Trunk changes regenerate `pjsip_trunks.conf` through the same mechanism as the endpoint generation (§9.1, §9.3) and trigger a PJSIP reload. Trunk status, `registered`, `unreachable` or `unknown`, is live state the core holds in memory and resyncs at boot. For `ip` trunks it is the `qualify` reachability of the first host, carried by the ARI `ContactStatusChange` events. For `registration` trunks it is the registration outcome, which ARI does not carry: the core reads it at boot with the AMI action `PJSIPShowRegistrationsOutbound` and follows it through AMI `Registry` events, whose `Username` and `Domain` are the registration's client URI, `sip:<username>@<registrar host>`, and server URI, `sip:<registrar host>[:<port>]`, as `pjsip_trunks.conf` carries them; `Registered` maps to `registered`, and `Rejected`, `Failed` and `Unregistered` to `unreachable`. `api` merges `status` and `statusChangedAt` into `GET /trunks` responses at read time from the core's internal API, answering `unknown` while the core is unreachable, and relays the core's `trunk.status` event on `/events`; the `/metrics` gauge comes from the same source. Nothing about it is stored (§10.1). Per-host reachability is post-MVP.
 
-**Trunk order.** `trunks.priority` (1 = first) is the tenant's trunk order: the order of `GET /trunks`, rewritten as a whole by `PUT /trunks/order`. A new trunk appends. Emergency calls (§10.1) try trunks in this order; nothing else consumes it in the MVP.
+**Trunk order.** `trunks.priority` (1 = first) is the tenant's trunk order: the order of `GET /trunks`, rewritten as a whole by `PUT /trunks/order`. A new trunk appends. Emergency calls (§10.1) try the emergency trunks in this order; nothing else consumes it in the MVP.
+
+**Emergency trunks.** `trunks.emergency` states that the provider carries emergency calls to the emergency service of the company's registered address, which a provider in another country does not. It is required on `POST /trunks`, so every trunk carries the admin's explicit choice. While no trunk has it set, emergency calls fail (§10.1): a write that leaves the tenant in that state returns the warning `no emergency trunk; emergency calls will fail`, `/healthz` reports it in its body, and the admin UI shows it on the trunks page.
 
 **Cross-trunk failover** is route fallthrough for ordinary calls, so a second trunk carries them exactly when a matching route names it, and the trunk order (§10.1) for emergency calls. A call whose last route failed hears the announcement for a failed call, `please-try-call-later`, in the tenant's language. Where the tenant's prompt set lacks it (the German, Spanish and Russian sets), the caller hears the special information tone of ITU-T E.180 instead, three short rising tones of 950, 1400 and 1800 Hz for 330 ms each, repeated three times, and the call is then released.
 
@@ -1038,7 +1043,7 @@ Two processes run for the life of the stack; `migrate` is a third container that
 5. a `dids` row: the company's own numbers are routed to their target internally and never leave through a trunk;
 6. otherwise an external number. Every authenticated user may dial any external number. The core selects trunk and caller-ID through `outbound_routes` (§9.4), originates the second leg (with host failover for `ip` trunks, over the registrar's flow for `registration` trunks), falls through to the next matching route when the trunk could not carry the call (§9.4, Route fallthrough), and bridges.
 
-**Emergency calls** bypass outbound routing: no route, caller list, CLIR level or channel cap applies. They try the tenant's trunks in `trunks.priority` order (§9.4, "Trunk order"), skipping `unreachable` ones and failing over to the next on timeout or error, and fail with 503 and an `ERROR` log line only while no live trunk exists. They present the caller's own number, never anonymous, and their routing trace is kept at level `events` whatever the tenant default. They reach the emergency service responsible for the address the provider has registered for the presented number, which is the company's address: a softphone in a home office dialling 112 is answered by the office's local emergency centre. The admin guide carries this warning for remote workers.
+**Emergency calls** bypass outbound routing: no route, caller list, CLIR level or channel cap applies. They try the tenant's emergency trunks, those with `trunks.emergency` set, in `trunks.priority` order (§9.4, "Trunk order"), skipping `unreachable` ones and failing over to the next on timeout or error, and fail with 503 and an `ERROR` log line only while no live emergency trunk exists. A trunk without the flag never carries one, since a provider outside the company's country cannot route its emergency numbers to the company's local emergency centre: a US trunk has no use for `112`, and a German number has no E911 record. They present the caller's own number, never anonymous, and their routing trace is kept at level `events` whatever the tenant default. They reach the emergency service responsible for the address the provider has registered for the presented number, which is the company's address: a softphone in a home office dialling 112 is answered by the office's local emergency centre. The admin guide carries this warning for remote workers.
 
 Timers, the hop counter and busy handling live entirely in the core.
 
@@ -1208,7 +1213,7 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Provisioning** (min. role: owner) — `POST /provisioning/ringotel/setup` (input: Ringotel `domain`, `region`, `packageid`) — runs `createOrganization` + `createBranch` (§10.4) and stores the ids in `settings`
 
-**Trunks** (min. role: admin) — `GET/POST /trunks`, `GET/PATCH/DELETE /trunks/{id}` (auth mode, inbound auth, transport — refused for a disabled transport, §9.4 —, codecs, clir, max channels, hosts, status), `PUT /trunks/order` (the ordered trunk ids, §9.4 "Trunk order"), `GET/PUT /outboundRoutes` (the ordered routes, each with its users, user groups and numbers, replaced as a whole)
+**Trunks** (min. role: admin) — `GET/POST /trunks`, `GET/PATCH/DELETE /trunks/{id}` (auth mode, inbound auth, transport — refused for a disabled transport, §9.4 —, emergency — required on create, §9.4 "Emergency trunks" —, codecs, clir, max channels, hosts, status), `PUT /trunks/order` (the ordered trunk ids, §9.4 "Trunk order"), `GET/PUT /outboundRoutes` (the ordered routes, each with its users, user groups and numbers, replaced as a whole)
 
 **Extensions & DIDs** (min. role: admin) — `GET/POST /dids`, `PATCH/DELETE /dids/{id}` (`target`, a forward target of any kind, §11.2), `GET/POST /didBlocks`, `PATCH/DELETE /didBlocks/{id}` (`PATCH` edits label, digits and fallback target; `base` is immutable, since the DIDs inside are matched by it); a number is the normalized international form or a provider's verbatim called-party string (§11.3)
 
@@ -1252,7 +1257,7 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Search** (min. role: user) — `GET /search?q=` (users, ring groups, contacts; §10.2 "Search")
 
-**Health** (min. role: none (public, unauthenticated — served through the proxy so the §7 external uptime check can reach it)) — `GET /healthz` (HTTP status = `api`'s own liveness, the open and migrated database; body fields for core and its ARI connection, mail configured, key rotation remaining (§5.4), certificate sync (§6.4); no version or configuration values)
+**Health** (min. role: none (public, unauthenticated — served through the proxy so the §7 external uptime check can reach it)) — `GET /healthz` (HTTP status = `api`'s own liveness, the open and migrated database; body fields for core and its ARI connection, mail configured, key rotation remaining (§5.4), certificate sync (§6.4), emergency trunk present (§9.4 "Emergency trunks"); no version or configuration values)
 
 **Metrics** (min. role: bearer `METRICS_TOKEN` from `.env`; 404 while unset) — `GET /metrics` (Prometheus, §7); `GET /metrics/litestream` with the DR overlay
 
@@ -1490,8 +1495,10 @@ CREATE TABLE device_blf_keys (
 
 -- trunks — PSTN connectivity (§9.4).
 --   priority:                  the tenant's trunk order, 1 = first (§9.4, "Trunk order"); emergency calls
---                              try trunks in this order (§10.1); a new trunk appends; rewritten as a whole
---                              by PUT /trunks/order
+--                              try the emergency trunks in this order (§10.1); a new trunk appends; rewritten
+--                              as a whole by PUT /trunks/order
+--   emergency:                 1 = the provider carries emergency calls to the company's local emergency
+--                              service; only these trunks carry them (§9.4, "Emergency trunks"; §10.1)
 --   username, password_enc:    required for auth_mode 'registration' and for inbound_auth; NULL otherwise
 --   clir:                      withhold the number on calls over this trunk (§9.4); NULL = inherit the
 --                              tenant default; 1 requires a PAI-carrying callerid_header (CHECK)
@@ -1511,6 +1518,7 @@ CREATE TABLE trunks (
   id                    TEXT    PRIMARY KEY,
   name                  TEXT    NOT NULL UNIQUE,
   priority              INTEGER NOT NULL UNIQUE CHECK (priority >= 1),
+  emergency             INTEGER NOT NULL CHECK (emergency IN (0,1)),
   auth_mode             TEXT    NOT NULL CHECK (auth_mode IN ('registration','ip')),
   username              TEXT,
   password_enc          BLOB,
