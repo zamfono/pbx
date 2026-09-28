@@ -6,8 +6,7 @@ it received and what it answered them with.
   2  not emergency            no INVITE at all, though its qualify was answered
   3  emergency, answers       exactly one INVITE, to 112, answered 200, presenting the caller's
                               own number (the main number, 101 has none of their own), shown
-  4  emergency, catch-all     exactly one INVITE opening a call, the control call's, and none
-                              to 112, in a dialog or out of one
+  4  emergency, catch-all     exactly one INVITE, the control call's, and none to 112
 
 Usage: python3 _emergency-check.py <trace-1> <trace-2> <trace-3> <trace-4> <control-number>
 """
@@ -45,17 +44,6 @@ traces = [read(path) for path in sys.argv[1:5]]
 control = sys.argv[5]
 invites = [received_invites(trace) for trace in traces]
 problems = []
-# `ci-trunk`'s side serves every scenario's calls from the same address, and Asterisk keeps
-# retransmitting an earlier scenario's re-INVITE that side never answered (seen after
-# `outbound-callerid`, To-tagged, for its +15557101/2 calls) into this trace: an INVITE inside a
-# dialog opens no call and is reported, not counted, unless it is for 112.
-calls = received_invites(traces[3], in_dialog=False)
-for start, headers in invites[3]:
-    if called([(start, headers)]) != [control]:
-        where = "opening a call" if (start, headers) in calls else "inside a dialog"
-        print(f"   trunk 4, {where}: {start} " + " ".join(
-            f"{name}: {value}" for name, value in headers
-            if name in ("from", "to", "call-id", "cseq", "user-agent")))
 if "112" in called(invites[3]) + to_users(invites[3]):
     problems.append(f"trunk 4 got an INVITE for 112: {called(invites[3])}")
 
@@ -80,9 +68,9 @@ for _, headers in invites[2][:1]:
     if privacies:
         problems.append(f"trunk 3's INVITE withheld the number: Privacy {privacies}")
     print(f"   trunk 3: From {froms} PAI {pais} Privacy {privacies}")
-if called(calls) != [control]:
-    problems.append(f"trunk 4 got calls to {called(calls)}, not the control call's {control} "
-                    "alone")
+if called(invites[3]) != [control]:
+    problems.append(f"trunk 4 got INVITEs to {called(invites[3])}, not the control call's "
+                    f"{control} alone")
 if problems:
     sys.exit("; ".join(problems))
 print(f"   112: 503 on trunk 1, trunk 2 passed by, answered on trunk 3; {control} on trunk 4")

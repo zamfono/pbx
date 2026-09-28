@@ -28,15 +28,12 @@ def messages(trace):
     return result
 
 
-def received_invites(trace, in_dialog=True):
+def received_invites(trace):
     """Each received INVITE's request line and headers, the first per Call-ID (a retransmission
-    shares its call's Call-ID); with `in_dialog` false, only those that open a call, whose To
-    carries no tag yet."""
+    shares its call's Call-ID)."""
     invites, seen = [], set()
     for direction, start, headers in messages(trace):
         if direction != "received" or not start.startswith("INVITE "):
-            continue
-        if not in_dialog and any(name == "to" and ";tag=" in value for name, value in headers):
             continue
         call_id = next((value for name, value in headers if name == "call-id"), None)
         if call_id in seen:
