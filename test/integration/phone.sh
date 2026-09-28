@@ -60,19 +60,43 @@ registration() {
   return 1
 }
 
+# The status `pjsip show contacts` gives the device's contact: `NonQual` until its first qualify
+# result lands, then `Avail` or `Unavail`; nothing while it has no contact.
+contact_status() {
+  local sip_username=$1
+  dc exec -T asterisk asterisk -rx 'pjsip show contacts' 2>/dev/null \
+    | awk -v aor="$sip_username/" '$1 == "Contact:" && index($2, aor) == 1 { print $4 }'
+}
+
+# Asterisk qualifies a new contact at once, and by then `register` has exited, so nothing answers
+# that probe. It applies each probe's result as the probe completes, not in the order the probes
+# were sent: that probe's timeout, `qualify_timeout` after it, would mark the contact unreachable
+# even after the next run answered a newer probe, and the core would skip the device (§9.3). So a
+# registration ends only once that first result has landed.
+await_first_qualify() {
+  local sip_username=$1 status=''
+  for _ in $(seq 1 $QUALIFY_ATTEMPTS); do
+    status=$(contact_status "$sip_username")
+    case $status in
+      Avail | Unavail) return 0 ;;
+    esac
+    sleep 1
+  done
+  echo "the device's new contact never got its first qualify result (status '${status:-none}')" >&2
+  return 1
+}
+
 # The contact is only reachable once something answers the probe, and the core reads a device
 # as registered from that reachability (§9.3), so the call waits for it.
 await_reachable() {
-  local sip_username=$1
+  local sip_username=$1 status=''
   for _ in $(seq 1 $QUALIFY_ATTEMPTS); do
     dc exec -T asterisk asterisk -rx "pjsip qualify $sip_username" >/dev/null 2>&1 || true
     sleep 1
-    if dc exec -T asterisk asterisk -rx 'pjsip show contacts' 2>/dev/null \
-      | grep "$sip_username.*Avail" >/dev/null; then
-      return 0
-    fi
+    status=$(contact_status "$sip_username")
+    [ "$status" = Avail ] && return 0
   done
-  echo "the device never reached the reachable state" >&2
+  echo "the device never reached the reachable state (status '${status:-none}')" >&2
   return 1
 }
 
@@ -98,7 +122,10 @@ serve() {
 }
 
 case $action in
-  register) registration register "$3" "$4" ;;
+  register)
+    registration register "$3" "$4"
+    await_first_qualify "$3"
+    ;;
   unregister) registration unregister "$3" "$4" ;;
   answer)
     serve "$3" "$5" "$6"
