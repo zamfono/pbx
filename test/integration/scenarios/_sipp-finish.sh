@@ -16,16 +16,23 @@ runs=/tmp/sipp-runs
 bound=$1
 status=0
 
+# Every sipp process still alive, pid and command line. A zombie is none: sipp's `exec` action
+# (`pickup.xml`) leaves the process that ran the command to the container's init, `sleep`, which
+# never reaps it.
+live_sipp() {
+  ps -e -o pid= -o stat= -o comm= -o args= | awk '$3 == "sipp" && $2 !~ /^Z/ { $2 = $3 = ""; print }'
+}
+
 # The runs `_sipp-run.sh` started, and any sipp started without it (a scenario's own `sipp -m 1`).
 running() {
-  pgrep -x sipp >/dev/null || pgrep -f _sipp-run.sh >/dev/null
+  [ -n "$(live_sipp)" ] || pgrep -f _sipp-run.sh >/dev/null
 }
 
 pkill -USR1 -x sipp 2>/dev/null
 polls=0
 while running; do
   if [ "$polls" -ge $((bound * 4)) ]; then
-    pgrep -a -x sipp | sed "s/^/still in a call after ${bound} s: /"
+    live_sipp | sed "s/^/still in a call after ${bound} s: /"
     pkill -9 -x sipp 2>/dev/null
     status=1
     break
