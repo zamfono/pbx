@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Stops the provider's registrar and removes the trunk and DID `inbound-trunk-registration.setup.sh`
-# created.
+# Removes the trunk and DID `inbound-trunk-registration.setup.sh` created; the provider's registrar
+# has already ended with the scenario (`run-scenarios.sh`'s `finish_sipp_runs`).
 set -euo pipefail
 
 api_base=$1
@@ -12,6 +12,4 @@ compose=$3
 read -r trunk_id did_id < "$(state_file registration)"
 api_delete "/dids/$did_id"
 api_delete "/trunks/$trunk_id"
-# shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
-$compose exec -T sipp-provider sh -c 'pkill sipp || true'
 rm -f "$(state_file registration)"

@@ -16,6 +16,11 @@
   The NOTIFYs are not steps here, as in `blind-transfer.xml`: `-aa` answers them.
 -->
 <scenario name="attended-transfer">
+  <!-- Asterisk's qualify probe opens a call of its own on this run: answered and ended here, it
+       leaves no call behind waiting for an INVITE, so the run ends once its real calls have
+       (`_sipp-finish.sh`). -->
+  <recv request="OPTIONS" optional="true" next="probe" />
+
   <recv request="INVITE" rrs="true">
     <action>
       <ereg regexp=".*" search_in="hdr" header="From:" assign_to="remote_party" />
@@ -201,4 +206,21 @@
   </send>
 
   <recv response="200" />
+
+  <nop next="done" />
+
+  <label id="probe" />
+  <send>
+    <![CDATA[
+      SIP/2.0 200 OK
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[call_number]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <label id="done" />
 </scenario>

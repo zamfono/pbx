@@ -20,10 +20,11 @@ compose=$4
 ATTEMPTS=45
 
 # shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
-$compose exec -T sipp-provider sh -c 'pkill sipp || true; rm -f /tmp/registrar-line.csv'
+$compose exec -T sipp-provider rm -f /tmp/registrar-line.csv
 # shellcheck disable=SC2086
 $compose exec -T -d sipp-provider sh -c \
-  "sipp -sf /scenarios/uas/refuse-register.xml -p 5060 -m 1 -nostdin asterisk:5060 \
+  "sh /scenarios/_sipp-run.sh provider-refuse-register \
+    -sf /scenarios/uas/refuse-register.xml -p 5060 -m 1 -nostdin asterisk:5060 \
     > /tmp/refuse-register.log 2>&1"
 
 provider_ip=$(container_ip sipp-provider)
@@ -57,7 +58,8 @@ done
 }
 # shellcheck disable=SC2086
 $compose exec -T -d sipp-provider sh -c \
-  'sipp -sf /scenarios/uas/registrar.xml -p 5060 -aa -nostdin asterisk:5060 > /tmp/registrar.log 2>&1'
+  'sh /scenarios/_sipp-run.sh provider-registrar \
+    -sf /scenarios/uas/registrar.xml -p 5060 -aa -nostdin asterisk:5060 > /tmp/registrar.log 2>&1'
 
 status=unknown
 for _ in $(seq 1 $ATTEMPTS); do

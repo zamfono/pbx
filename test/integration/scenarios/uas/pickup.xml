@@ -11,6 +11,11 @@
   username and password arrive as `-key user` and `-key pass`.
 -->
 <scenario name="pickup">
+  <!-- Asterisk's qualify probe opens a call of its own on this run: answered and ended here, it
+       leaves no call behind waiting for an INVITE, so the run ends once its real calls have
+       (`_sipp-finish.sh`). -->
+  <recv request="OPTIONS" optional="true" next="probe" />
+
   <recv request="INVITE" rrs="true">
     <action>
       <ereg regexp="[0-9]+" search_in="hdr" header="CSeq:" assign_to="invite_cseq" />
@@ -67,4 +72,21 @@
   </send>
 
   <recv request="ACK" />
+
+  <nop next="done" />
+
+  <label id="probe" />
+  <send>
+    <![CDATA[
+      SIP/2.0 200 OK
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[call_number]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <label id="done" />
 </scenario>

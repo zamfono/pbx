@@ -34,10 +34,10 @@ dc() {
   $compose "$@"
 }
 
-# Ends whatever the previous scenario left running on the port, and its trace with it.
-stop_phone() {
-  dc exec -T sipp-phone sh -c "pkill sipp || true; rm -f $MESSAGES $CALL_EXIT"
-  sleep 1
+# Clears the previous run's trace. The run itself has already ended: the previous scenario's own
+# end waited for it (`run-scenarios.sh`'s `finish_sipp_runs`).
+clear_phone_trace() {
+  dc exec -T sipp-phone rm -f "$MESSAGES" "$CALL_EXIT"
 }
 
 # One REGISTER exchange, `register.xml` binding the contact or `unregister.xml` removing it.
@@ -46,7 +46,7 @@ stop_phone() {
 # artificial endpoint, with no auth object to match the credentials against.
 registration() {
   local scenario=$1 sip_username=$2 sip_password=$3
-  stop_phone
+  clear_phone_trace
   for attempt in $(seq 1 $REGISTER_ATTEMPTS); do
     if dc exec -T sipp-phone sipp -sf "/scenarios/uas/$scenario.xml" \
       -key user "$sip_username" -au "$sip_username" -ap "$sip_password" \
@@ -77,19 +77,22 @@ await_reachable() {
 }
 
 # No call limit: `-aa` answers the OPTIONS probes that keep the contact qualified, and sipp counts
-# each of those against `-m`, so a limit is spent on a probe before the call arrives. The run is
-# ended by the `pkill` the next scenario starts with. The caller account is the device a scenario
-# places a call of its own from, as a consultation or a pickup does; `[pass]` hands its password
-# to a call the scenario starts as a sipp run of its own (`pickup-dial.sh`).
+# each of those against `-m`, so a limit is spent on a probe before the call arrives. The run ends
+# with its scenario instead, once its calls have (`run-scenarios.sh`'s `finish_sipp_runs`), the
+# probes having ended their own (the scenario's opening `OPTIONS` branch). The caller account is
+# the device a scenario places a call of its own from, as a consultation or a pickup does;
+# `[pass]` hands its password to a call the scenario starts as a sipp run of its own
+# (`pickup-dial.sh`).
 serve() {
   local uas_scenario=$1 caller_username=${2:-} caller_password=${3:-} account=''
   if [ -n "$caller_username" ]; then
     account="-key user '$caller_username' -key pass '$caller_password'"
     account="$account -au '$caller_username' -ap '$caller_password'"
   fi
-  stop_phone
+  clear_phone_trace
   dc exec -T -d sipp-phone sh -c \
-    "sipp -sf /scenarios/uas/$uas_scenario.xml -p $PORT -aa -nostdin \
+    "sh /scenarios/_sipp-run.sh phone-$uas_scenario \
+      -sf /scenarios/uas/$uas_scenario.xml -p $PORT -aa -nostdin \
       -trace_msg -message_file $MESSAGES $account \
       asterisk:5060 > /tmp/$uas_scenario.log 2>&1"
 }
@@ -105,9 +108,10 @@ case $action in
   call)
     # A call the phone places itself is one call, so `-m 1` ends the run with it; `-aa` still
     # answers the probes meanwhile, so the device stays registered while it is on the call.
-    stop_phone
+    clear_phone_trace
     dc exec -T -d sipp-phone sh -c \
-      "sipp -sf /scenarios/uas/$3.xml -p $PORT -aa -nostdin -m 1 -timeout 90s \
+      "sh /scenarios/_sipp-run.sh phone-$3 \
+        -sf /scenarios/uas/$3.xml -p $PORT -aa -nostdin -m 1 -timeout 90s \
         -trace_msg -message_file $MESSAGES \
         -key user '$4' -au '$4' -ap '$5' asterisk:5060 > /tmp/$3.log 2>&1; \
         echo \$? > $CALL_EXIT"

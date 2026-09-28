@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Puts the routes back, removes the second provider's trunk `outbound-fallthrough.setup.sh`
-# created and stops that provider's side.
+# Puts the routes back and removes the second provider's trunk `outbound-fallthrough.setup.sh`
+# created; that provider's side has already ended with the scenario (`run-scenarios.sh`'s
+# `finish_sipp_runs`).
 set -euo pipefail
 
 api_base=$1
@@ -11,6 +12,4 @@ compose=$3
 
 put_routes "$(cat "$(state_file fallthrough-routes)")"
 api_delete "/trunks/$(cat "$(state_file fallthrough)")"
-# shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
-$compose exec -T sipp-provider sh -c 'pkill sipp || true'
 rm -f "$(state_file fallthrough)" "$(state_file fallthrough-routes)"

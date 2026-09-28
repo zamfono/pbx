@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Stops the second provider's three sides, removes the three trunks
-# `outbound-emergency-trunk-order.setup.sh` created, puts the trunk order back, and checks that
-# `ci-trunk` reads as it did before the setup, its flag and its priority included.
+# Removes the three trunks `outbound-emergency-trunk-order.setup.sh` created, puts the trunk order
+# back, and checks that `ci-trunk` reads as it did before the setup, its flag and its priority
+# included. The second provider's three sides have already ended with the scenario
+# (`run-scenarios.sh`'s `finish_sipp_runs`).
 set -euo pipefail
 
 api_base=$1
@@ -10,8 +11,6 @@ compose=$3
 # shellcheck source=_lib.sh
 . "$(dirname "$0")/_lib.sh"
 
-# shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
-$compose exec -T sipp-provider sh -c 'pkill sipp || true'
 read -r refuse_id plain_id answer_id ci_id < "$(state_file emergency-order)"
 for id in "$refuse_id" "$plain_id" "$answer_id"; do
   api_delete "/trunks/$id"

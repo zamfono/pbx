@@ -1,10 +1,10 @@
 # Sourced by `run.sh`: plays every `scenarios/*.xml` against the tenant it configured, each paired
 # with the phone-side (and, for a call that leaves again, the trunk-side) scenario it expects
-# (`scenario-roles.sh`), and checks after each one that Asterisk holds no channel any more and,
-# where the scenario has a `<name>.check.sh`, that the history records what the spec says the call
-# leaves behind. Reads `run.sh`'s own `COMPOSE`, `compose_files`, `compose_cmd`, `here`, `API`,
-# `token`, `GROUP_EXT`, `SIP_USERNAME`, `SIP_PASSWORD`, `MAIN_DID` and `fail`, and `only.sh`'s
-# `name_selected`.
+# (`scenario-roles.sh`), and checks after each one that Asterisk holds no channel any more, that
+# every sipp run the scenario started ended with its calls and, where the scenario has a
+# `<name>.check.sh`, that the history records what the spec says the call leaves behind. Reads
+# `run.sh`'s own `COMPOSE`, `compose_files`, `compose_cmd`, `here`, `API`, `token`, `GROUP_EXT`,
+# `SIP_USERNAME`, `SIP_PASSWORD`, `MAIN_DID` and `fail`, and `only.sh`'s `name_selected`.
 #
 # A scenario's setup, check and teardown are called with the api base and the token, then (after
 # the group extension, for the setup) the compose command, so they can drive the containers too.
@@ -18,6 +18,10 @@
 CALLER_PORT=5080
 IDLE_ATTEMPTS=10
 QUALIFY_ATTEMPTS=20
+# How long a scenario's sipp runs get to end once its calls are over; a run still in a call by
+# then never ends on its own (`_sipp-finish.sh`).
+FINISH_SECONDS=5
+SIPP_SERVICES=(sipp sipp-phone sipp-provider)
 
 asterisk_cli() {
   $COMPOSE "${compose_files[@]}" exec -T asterisk asterisk -rx "$1"
@@ -38,8 +42,8 @@ trunk_contacts() {
 start_trunk_side() {
   $COMPOSE "${compose_files[@]}" exec -T sipp rm -f /tmp/trunk-messages.log
   $COMPOSE "${compose_files[@]}" exec -T -d sipp sh -c \
-    "sipp -sf /scenarios/uas/$1.xml -p 5060 -aa -nostdin -trace_msg \
-      -message_file /tmp/trunk-messages.log asterisk:5060 > /tmp/$1.log 2>&1"
+    "sh /scenarios/_sipp-run.sh trunk-$1 -sf /scenarios/uas/$1.xml -p 5060 -aa -nostdin \
+      -trace_msg -message_file /tmp/trunk-messages.log asterisk:5060 > /tmp/$1.log 2>&1"
   local contacts endpoint
   for _ in $(seq 1 $QUALIFY_ATTEMPTS); do
     for endpoint in $(trunk_contacts | awk '{ print $1 }'); do
@@ -66,6 +70,20 @@ assert_no_channels() {
     sleep 1
   done
   fail "channels outlived the call in $1: $(asterisk_cli 'core show channels concise')"
+}
+
+# A SIP dialog ends with its scenario: every sipp run the scenario started, on whichever side, is
+# asked to end once its calls have, and one still in a call, or one that broke a call off, fails
+# the scenario (`_sipp-finish.sh`) instead of carrying its dialog over to the next scenario's run
+# on the same address, which would answer a retransmission of it as a call of its own.
+finish_sipp_runs() {
+  local service report leftovers=''
+  for service in "${SIPP_SERVICES[@]}"; do
+    report=$($COMPOSE "${compose_files[@]}" exec -T "$service" \
+      sh /scenarios/_sipp-finish.sh "$FINISH_SECONDS" 2>&1) \
+      || leftovers="$leftovers"$'\n'"$service: $report"
+  done
+  [ -z "$leftovers" ] || fail "a SIP dialog outlived $1:$leftovers"
 }
 
 # The phone's own call is up once both of its legs are: the phone's and the trunk's.
@@ -107,6 +125,12 @@ start_phone_side() {
 }
 
 echo '== running the sipp scenarios =='
+# A stack a `KEEP=1` run left up (run.sh's `REUSE=1`) may still hold the sipp runs of the scenario
+# that run failed in; from here on, every scenario finds its sides idle (`finish_sipp_runs`).
+for service in "${SIPP_SERVICES[@]}"; do
+  $COMPOSE "${compose_files[@]}" exec -T "$service" \
+    sh -c 'pkill -9 -x sipp; rm -rf /tmp/sipp-runs' || true
+done
 for scenario in "$here"/scenarios/*.xml; do
   [ -f "$scenario" ] || continue
   name=$(basename "$scenario" .xml)
@@ -127,7 +151,6 @@ for scenario in "$here"/scenarios/*.xml; do
   # The trunk side answers before the phone starts, since the phone's own call may leave over it.
   trunk_uas=$(trunk_uas_for "$name")
   caller_port=5060
-  $COMPOSE "${compose_files[@]}" exec -T sipp sh -c 'pkill sipp || true' || true
   if [ -n "$trunk_uas" ]; then
     caller_port=$CALLER_PORT
     start_trunk_side "$trunk_uas"
@@ -146,6 +169,7 @@ for scenario in "$here"/scenarios/*.xml; do
     bash "$here/phone.sh" "$compose_cmd" wait-call || fail "the phone's own call failed in $name"
   fi
   assert_no_channels "$name"
+  finish_sipp_runs "$name"
   check="$here/scenarios/$name.check.sh"
   if [ -f "$check" ]; then
     bash "$check" "$API" "$token" "$compose_cmd" || fail "the history check for $name failed"

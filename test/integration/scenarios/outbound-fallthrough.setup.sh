@@ -13,10 +13,9 @@ compose=$4
 . "$(dirname "$0")/_lib.sh"
 
 # shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
-$compose exec -T sipp-provider sh -c 'pkill sipp || true'
-# shellcheck disable=SC2086
 $compose exec -T -d sipp-provider sh -c \
-  'sipp -sf /scenarios/uas/answer-progress.xml -p 5060 -aa -nostdin asterisk:5060 \
+  'sh /scenarios/_sipp-run.sh provider-answer-progress \
+    -sf /scenarios/uas/answer-progress.xml -p 5060 -aa -nostdin asterisk:5060 \
     > /tmp/answer-progress.log 2>&1'
 
 provider_ip=$(container_ip sipp-provider)
