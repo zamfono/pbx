@@ -50,7 +50,9 @@
     ]]>
   </send>
 
-  <recv request="ACK" optional="true" />
+  <!-- The ACK every 487 is owed, awaited: sipp cannot end a call's branch on an optional
+       message, and a run still waiting for it holds the transaction open. -->
+  <recv request="ACK" />
 
   <nop next="done" />
 
