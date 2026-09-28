@@ -9,6 +9,9 @@
 #   both, shown     From: <sip:+15551000@…>, one PAI <sip:+15551000@…>
 #   both, withheld  From: "Anonymous" <sip:anonymous@anonymous.invalid>, the same PAI, Privacy: id
 #
+# and none of them is followed by an INVITE or UPDATE inside its dialog, which would re-assert the
+# party the call was bridged to instead of the presented number (the trunks' `send_connected_line`).
+#
 # The withheld call over the `from` trunk sent no INVITE at all: its one route was skipped for CLIR
 # and the call refused with 403.
 set -euo pipefail

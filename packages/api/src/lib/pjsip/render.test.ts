@@ -160,6 +160,7 @@ describe('render', () => {
         'allow = !all,ulaw',
         'transport = transport-tcp',
         'direct_media = no',
+        'send_connected_line = no',
         'auth = trunk-t2',
         'identify_by = auth_username'
       ].join('\n')

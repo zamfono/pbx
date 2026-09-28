@@ -134,6 +134,13 @@ function callerIdLines(trunk: Trunk): string[] {
   return lines;
 }
 
+// The provider learns the caller's identity from the call's own INVITE alone (§9.4 "Caller-ID",
+// "Anonymous calls (CLIR)"): PJSIP's default `send_connected_line = yes` would re-INVITE (or
+// UPDATE) the answered call with the bridged party's identity, the internal extension and display
+// name in `P-Asserted-Identity`, and assert that identity in the 200 OK to an inbound call, even
+// where the number is withheld. Both endpoints of a trunk leave it off.
+const TRUNK_CONNECTED_LINE = 'send_connected_line = no';
+
 // `outbound_auth` answers a digest challenge whenever the trunk has its own auth section; `auth`
 // is added for `inboundAuth`, so a call its host list identifies is challenged too (§9.4
 // "Inbound identification"). `identify_by = ip` leaves the endpoint only the mechanisms §5.6
@@ -151,7 +158,8 @@ function renderTrunkEndpoint(trunk: Trunk, tenantCodecs: string[]): string {
     formatAllow(codecs),
     `aors = ${name}`,
     `transport = transport-${trunk.transport}`,
-    'direct_media = no'
+    'direct_media = no',
+    TRUNK_CONNECTED_LINE
   ];
   if (trunk.outboundProxy !== null) {
     lines.push(`outbound_proxy = ${escapeConfigValue(trunk.outboundProxy)}`);
@@ -191,6 +199,7 @@ function renderTrunkAuthEndpoint(
     formatAllow(trunk.codecs ?? tenantCodecs),
     `transport = transport-${trunk.transport}`,
     'direct_media = no',
+    TRUNK_CONNECTED_LINE,
     `auth = ${trunkSectionName(trunk)}`,
     'identify_by = auth_username'
   ].join('\n');

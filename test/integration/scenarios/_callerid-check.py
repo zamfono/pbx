@@ -1,13 +1,17 @@
 """The trunk side's view of `outbound-callerid` (§9.4 "Caller-ID", "Anonymous calls (CLIR)"):
 the INVITEs sipp traced as received, in order, one per call (a retransmission shares its call's
 Call-ID), each checked for the From, P-Asserted-Identity and Privacy its trunk's layout gives.
+After the answer no INVITE or UPDATE arrives inside a call's dialog: chan_pjsip asserts the
+channel's current connected line in every one it sends, which by then is the party the call was
+bridged to (the extension and its display name), not the presented number; nothing in these
+calls, a few seconds each and never held, has anything else to renegotiate.
 
 Usage: python3 _callerid-check.py <trunk-host> < /tmp/trunk-messages.log
 """
 import re
 import sys
 
-from _sip_trace import received_invites
+from _sip_trace import messages, received_invites
 
 trunk_host = re.escape(sys.argv[1])
 PRESENTED = r"<sip:\+15551000@[^>]+>"
@@ -25,7 +29,8 @@ EXPECTED = [
 
 
 problems = []
-invites = received_invites(sys.stdin.read())
+trace = sys.stdin.read()
+invites = received_invites(trace)
 if len(invites) != len(EXPECTED):
     problems.append(f"{len(invites)} INVITEs reached the trunk side, not {len(EXPECTED)}")
 for (request, headers), (number, layout, from_re, pai_re, privacy) in zip(invites, EXPECTED):
@@ -41,6 +46,16 @@ for (request, headers), (number, layout, from_re, pai_re, privacy) in zip(invite
     if privacies != ([] if privacy is None else [privacy]):
         problems.append(f"{layout}: Privacy {privacies}")
     print(f"   {layout}: From {froms} PAI {pais} Privacy {privacies}")
+in_dialog = {}
+for direction, start, headers in messages(trace):
+    if (direction == "received" and start.split(" ", 1)[0] in ("INVITE", "UPDATE")
+            and any(name == "to" and ";tag=" in value for name, value in headers)):
+        # One report per request, its retransmissions sharing its Call-ID and CSeq.
+        key = tuple(value for name, value in headers if name in ("call-id", "cseq"))
+        in_dialog.setdefault(key, [f"{name}: {value}" for name, value in headers
+                                   if name in ("to", "from", "p-asserted-identity", "privacy")])
+for (_, cseq), identity in in_dialog.items():
+    problems.append(f"an in-dialog {cseq} after the answer, {identity}")
 if problems:
     sys.exit("; ".join(problems))
-print(f"   {len(invites)} INVITEs with the header layout of their trunk")
+print(f"   {len(invites)} INVITEs with the header layout of their trunk, none inside a dialog")

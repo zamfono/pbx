@@ -133,3 +133,28 @@ describe('renderTrunksConf registration retries', () => {
     expect(parsedValues(conf, 'max_retries')).toEqual([]);
   });
 });
+
+describe('renderTrunksConf connected line', () => {
+  // §9.4 "Caller-ID", "Anonymous calls (CLIR)": the provider is told the presented number by the
+  // call's own INVITE, never the bridged party's identity by a later connected-line update.
+  test('neither endpoint of a trunk sends connected-line updates, whatever its header layout', () => {
+    for (const callerIdHeader of ['from', 'pai', 'both'] as const) {
+      const conf = renderTrunk({
+        ...registrationTrunk,
+        username: 'trunkuser',
+        inboundAuth: true,
+        callerIdHeader
+      });
+      const endpoints = conf
+        .split('\n\n')
+        .filter(block => block.split('\n').includes('type = endpoint'));
+      expect(endpoints.map(block => block.split('\n')[0])).toEqual([
+        '[trunk-t1]',
+        '[trunkuser]'
+      ]);
+      for (const endpoint of endpoints) {
+        expect(parsedValues(endpoint, 'send_connected_line')).toEqual(['no']);
+      }
+    }
+  });
+});
