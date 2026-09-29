@@ -29,6 +29,10 @@ bring_up_stack() {
   owner_hash=$(printf '%s' "$OWNER_PASSWORD" \
     | "$RUNTIME" run --rm -i --entrypoint node "${API_IMAGE:-zamfono/api:ci}" hash-password.mjs)
 
+  # The updater drives the runtime this run brings the stack up on (§6.3 "Updates").
+  local socket=/var/run/docker.sock
+  [ "$RUNTIME" != podman ] || socket=/run/podman/podman.sock
+
   cat > "$repo/deploy/.env" <<ENV
 FQDN=$FQDN
 EXTERNAL_IPV4=127.0.0.1
@@ -40,6 +44,8 @@ JWT_SECRET=$(openssl rand -base64 32)
 SECRETBOX_KEY=1:$(openssl rand -base64 32)
 SECRETBOX_KEY_PREVIOUS=
 BACKUP_PASSWORD=$(openssl rand -hex 32)
+UPDATER_TOKEN=$(openssl rand -hex 24)
+CONTAINER_SOCKET=$socket
 SMTP_HOST=
 SMTP_PORT=
 SMTP_SECURITY=
@@ -181,4 +187,30 @@ print(local[0]["id"] if len(local) == 1 else "")
   done
   [ "$status" = ok ] || fail "the backup run ended $status: $(api GET "/backups/runs/$run_id")"
   echo "   run $run_id ok after ${attempt}s"
+}
+
+# §6.3 "Updates": the updater found its own Compose project and the runtime's socket, so
+# system.info carries its status rather than why it has none, and system.update reaches it with
+# the token api holds: from this checkout, which pins no release, the updater refuses with 409 for
+# that reason (or api does first, without a recent backup). Selectable as `updater`; after
+# `backups`, on every shard, since it asks for the runtime of this run.
+step_updater() {
+  echo '== reaching the updater through system.info and system.update =='
+  local info refusal
+  info=$(api GET /system/info) || fail "GET /system/info did not answer"
+  printf '%s' "$info" | python3 -c '
+import json, sys
+update = json.load(sys.stdin)["update"]
+if "unavailable" in update or "last" not in update:
+    sys.exit("the updater is not usable: %s" % json.dumps(update))
+' || fail "system.info reports no usable updater"
+  refusal=$(curl -sS -X POST "$API/api/v1/system/update" "${FWD[@]}" \
+    -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+    -d '{"confirm":true}' -w '\n%{http_code}')
+  case $refusal in
+    *'pins no release'*$'\n'409 | *'no backup finished ok'*$'\n'409)
+      echo "   refused as expected: ${refusal%$'\n'*}"
+      ;;
+    *) fail "system.update did not answer as expected: $refusal" ;;
+  esac
 }

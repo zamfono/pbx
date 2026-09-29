@@ -19,7 +19,7 @@ fi
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
 files=(compose.yaml compose.ports.yaml compose.macvlan.yaml Caddyfile litestream.caddy .env.example README.md
-  setup.sh setup/ui.sh setup/checks.sh setup/envfile.sh setup/boot-unit.sh)
+  setup.sh update.sh setup/ui.sh setup/checks.sh setup/envfile.sh setup/boot-unit.sh)
 
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
@@ -27,19 +27,19 @@ mkdir -p "$stage/zamfono/setup"
 for f in "${files[@]}"; do cp "$root/deploy/$f" "$stage/zamfono/$f"; done
 # The release notes, with every upgrade's own steps, next to the files they are about.
 cp "$root/CHANGELOG.md" "$stage/zamfono/CHANGELOG.md"
-# Every file 644 but the one the operator runs, whatever the checkout's modes were.
+# Every file 644 but the ones the operator runs, whatever the checkout's modes were.
 chmod 644 "$stage"/zamfono/{.env.example,*,setup/*} 2>/dev/null || true
-chmod 755 "$stage/zamfono/setup" "$stage/zamfono/setup.sh"
+chmod 755 "$stage/zamfono/setup" "$stage/zamfono/setup.sh" "$stage/zamfono/update.sh"
 
 sed -i "s/\${ZAMFONO_VERSION:-latest}/\${ZAMFONO_VERSION:-$version}/g" "$stage/zamfono/compose.yaml"
 if grep -q ':-latest}' "$stage/zamfono/compose.yaml"; then
   echo "deploy-bundle.sh: compose.yaml still defaults to latest somewhere" >&2
   exit 1
 fi
-# Five images, plus the two copies Compose passes to api and core (§7 "Version").
+# Six images, plus the two copies Compose passes to api and core (§7 "Version").
 pinned=$(grep -c "\${ZAMFONO_VERSION:-$version}" "$stage/zamfono/compose.yaml")
-if [[ $pinned -ne 7 ]]; then
-  echo "deploy-bundle.sh: expected 7 ZAMFONO_VERSION defaults in compose.yaml, pinned $pinned" >&2
+if [[ $pinned -ne 8 ]]; then
+  echo "deploy-bundle.sh: expected 8 ZAMFONO_VERSION defaults in compose.yaml, pinned $pinned" >&2
   exit 1
 fi
 sed -i "s#github.com/zamfono/pbx/blob/main/#github.com/zamfono/pbx/blob/v$version/#g" "$stage/zamfono/README.md"

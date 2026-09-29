@@ -7,6 +7,8 @@ node_modules
 /*.tgz
 .env
 .env.integration-state
+# the updater's state and log in a stack directory (deploy/ under the integration harness)
+.update/
 .eslintcache
 coverage
 

@@ -167,6 +167,14 @@ main() {
   : "${ARI_PASSWORD:=$(random_hex)}"
   : "${AMI_PASSWORD:=$(random_hex)}"
   : "${BACKUP_PASSWORD:=$(random_hex)}"
+: "${UPDATER_TOKEN:=$(random_hex)}"
+  if [[ -z ${CONTAINER_SOCKET:-} ]]; then
+    if [[ $runtime == podman ]]; then
+      CONTAINER_SOCKET=/run/podman/podman.sock
+    else
+      CONTAINER_SOCKET=/var/run/docker.sock
+    fi
+  fi
 
   if [[ -n $interactive ]]; then
     ui_yesno "Write .env with these values?\n\nMode: $ZAMFONO_MODE ($address)\nHost name: $FQDN\nCompany: $COMPANY_NAME\nMain number: $MAIN_DID ($COUNTRY)\nOwner: $BOOTSTRAP_OWNER_NAME <$BOOTSTRAP_OWNER_EMAIL>\nMail relay: ${SMTP_HOST:-none}" Write Abort ||
@@ -174,9 +182,9 @@ main() {
   fi
 
   write_env .env FQDN STACK_IPV4 EXTERNAL_IPV4 ARI_PASSWORD AMI_PASSWORD JWT_SECRET SECRETBOX_KEY \
-    BACKUP_PASSWORD SMTP_HOST SMTP_PORT SMTP_SECURITY SMTP_USER SMTP_PASSWORD MAIL_FROM \
-    BOOTSTRAP_OWNER_EMAIL BOOTSTRAP_OWNER_NAME BOOTSTRAP_OWNER_PASSWORD_HASH COMPANY_NAME MAIN_DID \
-    COUNTRY EXT_LENGTH TZ
+    BACKUP_PASSWORD UPDATER_TOKEN CONTAINER_SOCKET SMTP_HOST SMTP_PORT SMTP_SECURITY SMTP_USER \
+    SMTP_PASSWORD MAIL_FROM BOOTSTRAP_OWNER_EMAIL BOOTSTRAP_OWNER_NAME BOOTSTRAP_OWNER_PASSWORD_HASH \
+    COMPANY_NAME MAIN_DID COUNTRY EXT_LENGTH TZ
 
   echo "Wrote $PWD/.env (readable by root only)."
   echo "Keep a copy of it off this host: SECRETBOX_KEY is the only way to read the encrypted data,"

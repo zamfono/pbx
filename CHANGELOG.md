@@ -43,6 +43,14 @@ why the specified behaviour changed; the commit history, how.
   backup target on the new `backups` volume when it has never had one, and `setup.sh` generates
   the password. It is on the same host, so it covers a broken database or a bad upgrade, not a
   lost host; add a target elsewhere for that.
+- `update.sh` in the bundle updates a stack in one command: it downloads the release, checks it
+  against `SHA256SUMS`, installs it without touching `.env`, adds the new settings it can
+  generate, and recreates the stack the right way for Docker or Podman. A breaking release shows
+  its notes and asks first.
+- `system.update` (`POST /system/update`) updates from an MCP client or the API: the new `updater`
+  service, reachable only inside the stack, runs `update.sh` to a newer, non-breaking release once
+  a backup finished within the hour. `system.info` now shows the latest release and how the last
+  update went.
 - The admin skill's tool list names each tool's REST endpoints, and the guide names each step by
   its MCP tool first, with the REST call beside it (`users.create` (`POST /users`)), so an MCP
   client no longer has to work out which tool a REST call is.
@@ -55,8 +63,20 @@ why the specified behaviour changed; the commit history, how.
 
 ### Upgrade notes
 
-- **Default backups:** add a `BACKUP_PASSWORD` to `.env` (`openssl rand -hex 24`) before `up -d`,
-  and keep it with your copy of `.env`; the stack then creates its local backup target at start.
+- **Update with `update.sh`**, which this release introduces. Take it from the bundle once, then
+  run it; it adds `BACKUP_PASSWORD`, `UPDATER_TOKEN` and `CONTAINER_SOCKET` to `.env`:
+
+  ```bash
+  curl -fsSL https://github.com/zamfono/pbx/releases/download/v0.0.6/zamfono-deploy.tar.gz \
+    | tar xz --strip-components=1 zamfono/update.sh zamfono/setup
+  ./update.sh 0.0.6
+  ```
+
+  Keep the new `BACKUP_PASSWORD` with your copy of `.env`: it opens the local backups.
+
+- **By hand instead:** add `BACKUP_PASSWORD` and `UPDATER_TOKEN` (`openssl rand -hex 24` each) and
+  `CONTAINER_SOCKET` (`/var/run/docker.sock`, or `/run/podman/podman.sock` on Podman) to `.env`
+  before `up -d`.
 
 ## [0.0.5] - 2026-09-29
 

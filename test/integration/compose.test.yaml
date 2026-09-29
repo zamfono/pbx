@@ -29,6 +29,9 @@ services:
   core:
     image: ${CORE_IMAGE:-zamfono/core:ci}
 
+  updater:
+    image: ${UPDATER_IMAGE:-zamfono/updater:ci}
+
   api:
     image: ${API_IMAGE:-zamfono/api:ci}
     # The scenarios drive the REST surface directly rather than through Caddy, so a failure is the

@@ -83,7 +83,8 @@
 | `settings.get` | `GET /settings` | Reads the tenant settings row, with secrets masked | admin | no |
 | `settings.update` | `PATCH /settings` | Updates the tenant settings row | admin | no |
 | `stats.query` | `GET /stats` | Buckets a call metric (answerRate, ringToAnswer, avgCallLength, callVolume) over a time range. | admin | no |
-| `system.info` | `GET /system/info` | Reads the version and commit the stack runs, for api and core separately. | user | no |
+| `system.info` | `GET /system/info` | Reads the version and commit the stack runs, for api and core separately, and the latest release and last update. | user | no |
+| `system.update` | `POST /system/update` | Updates the stack to the latest release, or to version, if newer and non-breaking; needs a backup run finished ok within the last hour. system.info reports the progress. | owner | yes |
 | `trunks.create` | `POST /trunks` | Creates a SIP trunk and its ordered host list. | admin | no |
 | `trunks.delete` | `DELETE /trunks/{id}` | Soft-deletes a SIP trunk. | admin | yes |
 | `trunks.get` | `GET /trunks/{id}` | Reads one SIP trunk. | admin | no |

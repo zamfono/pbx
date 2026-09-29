@@ -1,0 +1,9 @@
+{
+  "name": "@zamfono/updater",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  }
+}

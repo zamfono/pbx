@@ -166,6 +166,7 @@ fi
 . "$here/run-scenarios.sh"
 
 name_selected backups && step_backups
+name_selected updater && step_updater
 
 if shard_owns_steps && name_selected trunk-status; then
   run_trunk_status_step

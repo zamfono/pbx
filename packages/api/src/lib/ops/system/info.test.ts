@@ -6,6 +6,7 @@ import { runOperation, type RunInput } from '../runner.js';
 
 import '../index.js';
 
+import { setUpdaterClient } from './_updater.js';
 import { setCoreVersionLookup } from './info.js';
 
 // The lowest role: every signed-in user may read what the stack runs.
@@ -20,8 +21,14 @@ const CORE = {
   display: '0.0.4 (abc1234)'
 };
 
+const NO_UPDATER = {
+  unavailable:
+    'UPDATER_TOKEN is not set in .env; updates run only by update.sh on the host'
+};
+
 afterEach(() => {
   setCoreVersionLookup(undefined);
+  setUpdaterClient(undefined);
   delete process.env.ZAMFONO_VERSION;
   delete process.env.ZAMFONO_REVISION;
 });
@@ -40,7 +47,8 @@ describe('system.info', () => {
         revision: '79c1041aaaaaaa',
         display: '0.0.5 (79c1041)'
       },
-      core: CORE
+      core: CORE,
+      update: NO_UPDATER
     });
   });
 
@@ -53,7 +61,36 @@ describe('system.info', () => {
       await runOperation(await makeTestDb(), 'system.info', {}, asUser)
     ).toEqual({
       api: { version: 'dev', revision: '', display: 'dev' },
-      core: null
+      core: null,
+      update: NO_UPDATER
+    });
+  });
+
+  it('passes on what the updater reports, or why it could not', async () => {
+    const status = {
+      current: '0.0.6',
+      latest: { version: '0.0.7', url: 'https://example', publishedAt: '' },
+      updatable: true,
+      breaking: false,
+      last: { state: 'idle' as const }
+    };
+    setUpdaterClient(() => ({
+      status: () => Promise.resolve(status),
+      update: () => Promise.reject(new Error('unused'))
+    }));
+    const db = await makeTestDb();
+    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+      update: status
+    });
+
+    setUpdaterClient(() => ({
+      status: () => Promise.reject(new Error('connect ECONNREFUSED')),
+      update: () => Promise.reject(new Error('unused'))
+    }));
+    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+      update: {
+        unavailable: 'the updater did not answer: connect ECONNREFUSED'
+      }
     });
   });
 });

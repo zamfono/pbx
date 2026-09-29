@@ -59,7 +59,7 @@ jobs:
         env:
           REGISTRY_URL: https://ghcr.io
           NAMESPACE: zamfono
-          IMAGES: asterisk migrate core api proxy
+          IMAGES: asterisk migrate core api proxy updater
           REGISTRY_USER: ${{ github.actor }}
           REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
           # A commit pushed together with its tag is still in main's CI when this starts.
@@ -134,4 +134,4 @@ jobs:
           ORG: zamfono
         run: |
           bash .github/scripts/prune-sha-images.sh "$(git rev-parse "$GITHUB_REF^{commit}")" \
-            asterisk migrate core api proxy
+            asterisk migrate core api proxy updater

@@ -15,7 +15,9 @@ a breaking change, minor for something new, patch for fixes. Two things are this
   everything an operator of a stack deals with, `CHANGELOG.md`'s audience: the REST and MCP
   operations, the `.env` settings, the compose files and the documented commands. A change is
   breaking when its release needs **Upgrade notes** the operator has to act on, such as a newly
-  required API field or a changed command.
+  required API field or a changed command. The choice has a consequence: `system.update` installs any newer
+  release that is not breaking without an operator reading its notes, so a release it may take
+  needs nothing beyond what `update.sh` does itself.
 - **Before 1.0.0**, where Semantic Versioning sets no rule ("anything MAY change at any time"),
   the middle number takes over the major's role, the convention Cargo and npm's `^` ranges read:
 
@@ -63,9 +65,9 @@ The step from `0.X.Y` to `1.0.0` is a decision, made when the project is ready, 
    sha256sum -c --ignore-missing SHA256SUMS
    gh attestation verify zamfono-deploy.tar.gz --repo zamfono/pbx
    tar xzf zamfono-deploy.tar.gz --strip-components=1
-   grep -c ':-X.Y.Z}' compose.yaml    # 7: five images and the two ZAMFONO_VERSION defaults
+   grep -c ':-X.Y.Z}' compose.yaml    # 8: six images and the two ZAMFONO_VERSION defaults
    export DOCKER_CONFIG=$(mktemp -d)   # no stored registry login
-   for n in asterisk migrate core api proxy; do docker manifest inspect ghcr.io/zamfono/$n:X.Y.Z >/dev/null && echo "$n ok"; done
+   for n in asterisk migrate core api proxy updater; do docker manifest inspect ghcr.io/zamfono/$n:X.Y.Z >/dev/null && echo "$n ok"; done
    ```
 
 ## When a release is broken

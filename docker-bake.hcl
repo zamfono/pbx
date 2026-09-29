@@ -14,6 +14,7 @@ variable "CORE_IMAGE" { default = "zamfono/core:ci" }
 variable "API_IMAGE" { default = "zamfono/api:ci" }
 variable "ASTERISK_IMAGE" { default = "zamfono/asterisk:ci" }
 variable "PROXY_IMAGE" { default = "zamfono/proxy:ci" }
+variable "UPDATER_IMAGE" { default = "zamfono/updater:ci" }
 variable "DEVICES_IMAGE" { default = "zamfono/test-devices:ci" }
 
 # `gha` reads (CACHE_FROM) or writes (CACHE_TO) the GitHub Actions layer cache, one scope per
@@ -54,7 +55,7 @@ function "cache_to" {
 }
 
 group "default" {
-  targets = ["migrate", "core", "api", "asterisk", "proxy", "test-devices"]
+  targets = ["migrate", "core", "api", "asterisk", "proxy", "updater", "test-devices"]
 }
 
 target "migrate" {
@@ -106,6 +107,16 @@ target "proxy" {
   cache-to   = cache_to("proxy")
   # Everything but the `build` stage, which FRESH leaves to the cache (see FRESH above).
   no-cache-filter = FRESH ? ["runtime"] : []
+}
+
+target "updater" {
+  context    = "."
+  dockerfile = "images/updater/Dockerfile"
+  tags       = [UPDATER_IMAGE]
+  args       = { ZAMFONO_REVISION = REVISION }
+  cache-from = cache_from("updater")
+  cache-to   = cache_to("updater")
+  no-cache   = FRESH
 }
 
 target "test-devices" {

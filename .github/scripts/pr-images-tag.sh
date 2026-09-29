@@ -1,12 +1,12 @@
 #!/bin/bash
-# Re-labels a pull request's five images for pr-images.yaml's `publish` job, after it has loaded
-# the pull request's ci archive (docs/spec.md §6.3 "Images" names the five).
+# Re-labels a pull request's six images for pr-images.yaml's `publish` job, after it has loaded
+# the pull request's ci archive (docs/spec.md §6.3 "Images" names the six).
 #
 # Usage: pr-images-tag.sh <pr number> <head sha> <head repository URL>
-# Environment: REGISTRY (ghcr.io/zamfono), IMAGES (asterisk migrate core api proxy).
+# Environment: REGISTRY (ghcr.io/zamfono), IMAGES (asterisk migrate core api proxy updater).
 #
 # The archive is the pull request's own output and may hold anything; only zamfono/<name>:ci for
-# the five names is used, and every other image in it is ignored. Each becomes
+# the six names is used, and every other image in it is ignored. Each becomes
 # $REGISTRY/<name>-pr:<N> and :<N>-<short sha>, never `latest`, through a build of a bare `FROM`
 # that adds labels and nothing else, so nothing from the pull request runs. An image with ONBUILD
 # triggers is refused, since a `FROM` would run those. It runs before the registry login, so the

@@ -1,4 +1,4 @@
-# §8 "Testing Strategy". Five jobs: the unit suites; the image builds (the five the stack ships
+# §8 "Testing Strategy". Five jobs: the unit suites; the image builds (the six the stack ships
 # plus the TLS/SRTP scenario's baresip device), saved together with the upstream image the harness
 # runs into one archive; each image's own checks; and the stack brought up on each runtime. The
 # last three start from that archive and run side by side. The two runtime jobs exist
@@ -25,12 +25,13 @@ env:
   CORE_IMAGE: zamfono/core:ci
   API_IMAGE: zamfono/api:ci
   PROXY_IMAGE: zamfono/proxy:ci
+  UPDATER_IMAGE: zamfono/updater:ci
   # test/integration/scenarios/device-tls-srtp's baresip device (test/load/stress's own image,
   # test/load/stress/devices/Dockerfile), which compose.test.yaml's `devices` service names.
   DEVICES_IMAGE: zamfono/test-devices:ci
   # The upstream sipp image compose.test.yaml runs, by the exact name it asks the runtime for.
   # `images` pulls it into the archive, so no later job pulls from Docker Hub and both runtimes
-  # bring up the same bytes. main.yaml pushes only the five zamfono/ images, so this stays
+  # bring up the same bytes. main.yaml pushes only the six zamfono/ images, so this stays
   # unpublished.
   SIPP_IMAGE: ctaloi/sipp:latest
 
@@ -88,7 +89,7 @@ jobs:
           use: false
           # The step before the save removes this builder itself, to free its disk.
           cleanup: false
-      - name: Build the five images, plus the TLS/SRTP scenario's baresip device
+      - name: Build the six images, plus the TLS/SRTP scenario's baresip device
         # docker-bake.hcl names the six targets, with the Dockerfiles and contexts they always
         # had, and takes their tags from the env block above; bake builds them in parallel, and
         # `load` puts them in the local daemon. `source: .` builds this checkout, not a fetch of
@@ -141,7 +142,7 @@ jobs:
         run: |
           docker save -o /tmp/images.tar \
             "$MIGRATE_IMAGE" "$CORE_IMAGE" "$API_IMAGE" "$ASTERISK_IMAGE" "$PROXY_IMAGE" \
-            "$DEVICES_IMAGE" "$SIPP_IMAGE"
+            "$UPDATER_IMAGE" "$DEVICES_IMAGE" "$SIPP_IMAGE"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: images
@@ -174,6 +175,7 @@ jobs:
           IMAGE_TAG="$API_IMAGE" bash images/api/test.sh
           IMAGE_TAG="$ASTERISK_IMAGE" bash images/asterisk/test.sh
           IMAGE_TAG="$PROXY_IMAGE" bash images/proxy/test.sh
+          IMAGE_TAG="$UPDATER_IMAGE" bash images/updater/test.sh
 
   compose-docker:
     name: compose-docker (${{ matrix.install }})
@@ -277,7 +279,8 @@ jobs:
         run: |
           sudo env COMPOSE="$COMPOSE" DOCKER_HOST="$DOCKER_HOST" \
             ASTERISK_IMAGE="$ASTERISK_IMAGE" MIGRATE_IMAGE="$MIGRATE_IMAGE" CORE_IMAGE="$CORE_IMAGE" \
-            API_IMAGE="$API_IMAGE" PROXY_IMAGE="$PROXY_IMAGE" DEVICES_IMAGE="$DEVICES_IMAGE" \
+            API_IMAGE="$API_IMAGE" PROXY_IMAGE="$PROXY_IMAGE" UPDATER_IMAGE="$UPDATER_IMAGE" \
+            DEVICES_IMAGE="$DEVICES_IMAGE" \
             SIPP_IMAGE="$SIPP_IMAGE" \
             DIAG_DIR="$DIAG_DIR" SHARD="$SHARD" UPGRADE_FROM="$UPGRADE_FROM" \
             bash test/integration/run.sh

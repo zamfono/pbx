@@ -161,6 +161,7 @@ const STATIC_ROUTES: RouteTuple[] = [
   ['GET', '/backups/runs/{id}', 'backups.runs.get'],
   ['GET', '/settings', 'settings.get'],
   ['GET', '/system/info', 'system.info'],
+  ['POST', '/system/update', 'system.update'],
   ['PATCH', '/settings', 'settings.update'],
   ['GET', '/search', 'search.query'],
   ['GET', '/audit', 'audit.list'],

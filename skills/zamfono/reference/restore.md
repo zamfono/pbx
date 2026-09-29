@@ -7,7 +7,11 @@ Moving a stack to another host, or recovering it after data loss, is the same pr
 
 - **`.env`**, preserved from the original host: it holds the secretbox encryption key, the JWT
   secret and the ARI password.
-- **The restic repository location and password for each target**, from the operator's own record of
+- **The default `local` target** needs nothing beyond `.env`: its repository is `/backups/restic`
+  on the `backups` volume and its password is `BACKUP_PASSWORD`. It lives on the same host as the
+  stack, so it restores a broken database or a bad upgrade, but a lost host takes it along; that
+  is what a target elsewhere is for.
+- **The restic repository location and password for each other target**, from the operator's own record of
   what was entered in `backups.targets.create` (`POST /backups/targets`) when the target was
   created, or an out-of-band copy kept alongside `.env` — a target's encrypted repository password
   lives inside the database itself, so it is not available until after a restic-based restore has

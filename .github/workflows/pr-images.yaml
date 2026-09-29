@@ -10,7 +10,7 @@
 #   - This workflow holds `packages: write`. It runs from the default branch (that is what
 #     `workflow_run` and `pull_request_target` do) and never checks out or runs the pull request:
 #     where it checks out at all, it checks out the default branch, explicitly, for its scripts.
-#   - The archive is the one input the pull request controls. It is only loaded, the five
+#   - The archive is the one input the pull request controls. It is only loaded, the six
 #     zamfono/<name>:ci images are taken from it, and they are re-labelled by a bare `FROM` build
 #     (pr-images-tag.sh), which runs nothing from them.
 #   - A maintainer approves by adding the `publish-image` label after reading the diff, and a new
@@ -35,7 +35,7 @@ permissions: {}
 env:
   LABEL: publish-image
   REGISTRY: ghcr.io/zamfono
-  IMAGES: asterisk migrate core api proxy
+  IMAGES: asterisk migrate core api proxy updater
 
 jobs:
   resolve:
@@ -114,7 +114,7 @@ jobs:
           run-id: ${{ needs.resolve.outputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - run: docker load -i "$RUNNER_TEMP/pr-images/images.tar"
-      - name: Re-label the five images for the pull request
+      - name: Re-label the six images for the pull request
         env:
           SOURCE: ${{ needs.resolve.outputs.source }}
         run: bash .github/scripts/pr-images-tag.sh "$PR" "$SHA" "$SOURCE"

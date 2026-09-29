@@ -46,13 +46,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Push the five images as edge and sha-<short sha>
+      - name: Push the six images as edge and sha-<short sha>
         # zamfono/<name>:ci is what ci.yaml's env block tags them; the test-devices image in the
         # same archive is a test fixture, and the sipp image there is upstream's, so both stay
         # unpublished. The short sha is the name `promote` looks the build up by when this
         # commit is released.
         run: |
-          for name in asterisk migrate core api proxy; do
+          for name in asterisk migrate core api proxy updater; do
             for tag in edge "sha-${GITHUB_SHA::7}"; do
               docker tag "zamfono/$name:ci" "$REGISTRY/$name:$tag"
               docker push "$REGISTRY/$name:$tag"

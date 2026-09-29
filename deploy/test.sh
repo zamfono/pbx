@@ -4,11 +4,11 @@
 #
 # Caddy isn't assumed to be installed on the host (it isn't, on the CI runner): the Caddyfile is
 # validated inside the `proxy` image instead, built fresh here unless PROXY_IMAGE is already set
-# (e.g. by the CI job that builds all five images before running this script), the same pattern
+# (e.g. by the CI job that builds all six images before running this script), the same pattern
 # API_IMAGE and CORE_IMAGE follow below.
 #
 # API_IMAGE and CORE_IMAGE name the images to check; if one is already built (e.g. by the CI
-# job that builds all five images before running this script), the build here is skipped so the
+# job that builds all six images before running this script), the build here is skipped so the
 # check doesn't redo work the caller already did. Left unset, all three default to a local :test
 # tag and get built fresh, as a standalone run has nothing to reuse.
 set -eu
@@ -48,7 +48,7 @@ tar -xzf "$bundle_dir/zamfono-deploy.tar.gz" -C "$bundle_dir/x" --strip-componen
 # ZAMFONO_VERSION empty, as .env.example leaves it: every image is the bundle's own release.
 bundle_images=$(cd "$bundle_dir/x" && ZAMFONO_VERSION= docker compose --env-file "$env_file" \
   -f compose.yaml -f compose.ports.yaml config --images)
-[ "$(echo "$bundle_images" | grep -c ':1\.2\.3$')" -eq 5 ]
+[ "$(echo "$bundle_images" | grep -c ':1\.2\.3$')" -eq 6 ]
 
 echo "==> setup.sh (non-interactive, in the unpacked bundle)"
 [ -x "$bundle_dir/x/setup.sh" ]
@@ -73,6 +73,9 @@ if (cd "$bundle_dir/x" && ./setup.sh </dev/null >/dev/null 2>&1); then
   echo "setup.sh overwrote an existing .env" >&2
   exit 1
 fi
+
+echo "==> update.sh (a local release, a stub runtime)"
+bash "$script_dir/update-test.sh" "$bundle_dir/x"
 
 echo "==> Caddyfile"
 docker run --rm -e FQDN=x -v "$script_dir/Caddyfile:/etc/caddy/Caddyfile:ro" "$PROXY_IMAGE" \

@@ -231,7 +231,7 @@ Generate the secrets:
 openssl rand -base64 32                       # JWT_SECRET
 printf '1:%s' "$(openssl rand -base64 32)"    # SECRETBOX_KEY
 openssl rand -hex 24                          # ARI_PASSWORD, and again for AMI_PASSWORD
-openssl rand -hex 24                          # BACKUP_PASSWORD
+openssl rand -hex 24                          # BACKUP_PASSWORD, and again for UPDATER_TOKEN
 ```
 
 **Keep a copy of `.env` outside the host.** `SECRETBOX_KEY` is the only way to read the encrypted
@@ -241,8 +241,9 @@ start. That covers a broken database or a bad upgrade, not a lost host: add a ta
 (`backups.targets.create`) before you rely on the stack.
 
 Fill in `FQDN`, `COMPANY_NAME`, `MAIN_DID`, `COUNTRY`, `BOOTSTRAP_OWNER_EMAIL`,
-`BOOTSTRAP_OWNER_NAME` and, if you have one, the mail relay (`SMTP_*`, `MAIL_FROM`). The comments
-in `.env.example` explain each value.
+`BOOTSTRAP_OWNER_NAME`, `CONTAINER_SOCKET` (`/var/run/docker.sock`, or `/run/podman/podman.sock`
+on Podman) and, if you have one, the mail relay (`SMTP_*`, `MAIL_FROM`). The comments in
+`.env.example` explain each value.
 
 The owner's password hash comes from the `api` image itself, so you never type a password into a
 file:
@@ -311,12 +312,41 @@ systemctl daemon-reload && systemctl enable zamfono.service
 
 ## 8. Upgrading
 
-Run a backup first (`POST /backups/runs`). Then unpack the new release's bundle over the stack
-directory — it replaces the stack's files and never touches `.env` — and pull its images, with the
-same overlay as always:
+Run a backup first (`backups.runs.start`, `POST /backups/runs`). Then, in the stack directory:
 
 ```bash
 cd /srv/zamfono
+./update.sh            # the latest release; ./update.sh 0.0.7 for one in particular
+./update.sh --check    # only say what an update would do
+```
+
+It downloads the release's bundle, checks it against the release's `SHA256SUMS`, unpacks it over
+the stack directory (never touching `.env`), adds the settings a newer `.env.example` introduced
+that it can generate, and lists the others, pulls the images and recreates the stack: on Podman
+through the boot unit of step 7 if there is one, otherwise removing `proxy` first. It refuses an
+older release. A breaking one (a new minor while 0.x, a new major from 1.0.0 on) shows the release
+notes in between and asks first; `--yes` answers for a run without a terminal.
+
+A stack from `v0.0.5` or earlier has no `update.sh` yet. Take it, and its helpers, from the newest
+bundle once, then run it:
+
+```bash
+curl -fsSL https://github.com/zamfono/pbx/releases/latest/download/zamfono-deploy.tar.gz \
+  | tar xz --strip-components=1 zamfono/update.sh zamfono/setup
+./update.sh
+```
+
+**From an MCP client or the API**, the owner updates without a shell: `system.info` shows the
+latest release, whether it can be installed this way, and how the last update went, and
+`system.update` installs it. It runs the same `update.sh` in the `updater` service, only to a newer
+release that is not breaking, and only once a backup run finished `ok` within the last hour. The
+updater needs `UPDATER_TOKEN` and `CONTAINER_SOCKET` in `.env`, which `setup.sh` and `update.sh`
+write.
+
+**By hand**, the steps `update.sh` takes are: unpack the new bundle over the stack directory, then
+pull and recreate with the same overlay as always:
+
+```bash
 curl -fsSL https://github.com/zamfono/pbx/releases/latest/download/zamfono-deploy.tar.gz \
   | tar xz --strip-components=1
 docker compose -f compose.yaml -f <overlay> pull
@@ -339,8 +369,11 @@ A unit installed by `v0.0.3` or earlier stops with `stop` rather than `down`; sw
 sed -i 's/ stop$/ down/' /etc/systemd/system/zamfono.service && systemctl daemon-reload
 ```
 
-Before pulling, read the new release's **Upgrade notes** in `CHANGELOG.md`, which the bundle now holds and the release page shows: anything an upgrade needs beyond these commands is there. Compare the new `.env.example` with your `.env`: a release that adds a setting adds it there. If
-you set `ZAMFONO_VERSION` in `.env`, change it to the new release too.
+Read the new release's **Upgrade notes** in `CHANGELOG.md`, which the bundle holds and the release
+page shows: anything an upgrade needs beyond these commands is there. Compare the new
+`.env.example` with your `.env`: a release that adds a setting adds it there, and `update.sh`
+names the ones it did not fill in. If you set `ZAMFONO_VERSION` in `.env`, `update.sh` changes it
+to the new release; by hand, change it yourself.
 
 Migrations only go forward. A bad release is undone by restoring the snapshot the upgrade began
 with ([`docs/guide/restore.md`](https://github.com/zamfono/pbx/blob/main/docs/guide/restore.md)) and unpacking the previous release's
