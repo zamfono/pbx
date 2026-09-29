@@ -4,10 +4,14 @@ import { z } from 'zod';
 import { decrypt, encrypt, type Keyring } from '../secretbox.js';
 import { PendingAuthorizeSchema, type PendingAuthorize } from './ssoCookie.js';
 
-/** The `zamfono_consent` cookie's name and `Path`: scoped to `/oauth`, same as the SSO cookie,
- *  since only `/oauth/authorize`'s own actions ever need to read it. */
+/** The `zamfono_consent` cookie's name and `Path`. Only the consent step reads it, but that step
+ *  is a remote `form`: a browser running the page's JavaScript submits it to
+ *  `/_app/remote/<id>`, and without JavaScript to `/oauth/authorize?/remote=<id>`, so no path
+ *  narrower than `/` reaches both. (The SSO cookie keeps `/oauth`: it is read by
+ *  `/oauth/callback`, an ordinary GET.) The cookie stays `HttpOnly`, `Secure`, `SameSite=Lax`,
+ *  sealed, single-use and 300 s long. */
 export const CONSENT_COOKIE_NAME = 'zamfono_consent';
-export const CONSENT_COOKIE_PATH = '/oauth';
+export const CONSENT_COOKIE_PATH = '/';
 // The consent step (§5.2 "Authentication pages": "a consent step naming the requesting client")
 // only has to survive the round trip to the approve/deny button, so it is far shorter-lived than
 // the SSO cookie's 600 s.

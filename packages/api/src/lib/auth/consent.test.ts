@@ -34,16 +34,23 @@ const pending = {
 /** Captures what `setConsentCookie` writes: the sealed value and the cookie options. */
 function captureCookie(kr: Keyring): {
   value: string;
-  options: { maxAge?: number };
+  options: { maxAge?: number; path?: string };
 } {
-  const written: { value: string; options: { maxAge?: number } } = {
+  const written: {
+    value: string;
+    options: { maxAge?: number; path?: string };
+  } = {
     value: '',
     options: {}
   };
   setConsentCookie(
     {
       cookies: {
-        set: (name: string, value: string, options: { maxAge?: number }) => {
+        set: (
+          name: string,
+          value: string,
+          options: { maxAge?: number; path?: string }
+        ) => {
           expect(name).toBe(CONSENT_COOKIE_NAME);
           written.value = value;
           written.options = options;
@@ -57,6 +64,13 @@ function captureCookie(kr: Keyring): {
 }
 
 describe('consent cookie', () => {
+  it('is sent to the remote-function endpoint an enhanced consent form posts to', () => {
+    // SvelteKit submits a remote `form` to `/_app/remote/<id>` when the page's JavaScript runs;
+    // a cookie scoped to `/oauth` never reached it, and every browser approval failed.
+    const written = captureCookie(testKeyring());
+    expect(written.options.path).toBe('/');
+  });
+
   it('unseals a fresh cookie into the pending decision', () => {
     const kr = testKeyring();
     const written = captureCookie(kr);
