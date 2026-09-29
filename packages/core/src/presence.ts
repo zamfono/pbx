@@ -129,6 +129,9 @@ export class Presence {
     }
     const reachable = info.contact_status === 'Reachable';
     this.online.set(info.aor, reachable);
+    // `last_registered_at` is when the device last became reachable (§3, §11): Asterisk publishes
+    // `ContactStatusChange` only when a contact's status changes (`res_pjsip`'s OPTIONS
+    // qualifier), so a REGISTER refresh of a contact already reachable raises no event to stamp.
     if (reachable) {
       await this.deps.db
         .updateTable('devices')

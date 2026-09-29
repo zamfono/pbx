@@ -11,6 +11,24 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Added
+
+- The call log's routing trace says more: why the user step decided as it did (DND, offline with
+  the number of registered phones, a forward) and why a call reached voicemail, the opening hours
+  also when none apply, the answering channel with its device or trunk, the codecs both sides
+  negotiated, the caller ID each outbound attempt presented, and who ended the call (caller,
+  callee or the system) with the cause. The `diagnose-bad-call` recipe lists the lines.
+
+### Fixed
+
+- The `qos` level's `call_qos` rows had no jitter or loss and a round trip of 0, and only the
+  caller's leg had one: the core read fields Asterisk does not send, and read the leg that hung up
+  after its channel had gone. Each leg that carried media now has a row with jitter and round trip
+  in milliseconds and loss in percent, read every few seconds while the call runs, a
+  mailbox-answered caller's included; a round trip not yet measured is empty rather than 0.
+- `lastRegisteredAt` on a device is documented as what it is: when the device last became
+  reachable, not its latest registration refresh, which Asterisk reports no event for.
+
 ## [0.0.6] - 2026-09-29
 
 ### Fixed

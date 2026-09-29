@@ -43,6 +43,8 @@ export type DeviceOut = {
   transport: Transport;
   allowedIps: string[] | null;
   sipUsername: string;
+  /** When the device last became reachable (§11 `devices.last_registered_at`), not its latest
+   * REGISTER refresh; whether it is registered now is live state (§10.1). */
   lastRegisteredAt: string | null;
   createdAt: string;
 };
