@@ -77,6 +77,7 @@ claude mcp add --transport http zamfono https://<your FQDN>/mcp
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `deploy/`         | everything you copy to the host: compose files, overlays, Caddyfile, `.env.example`; each release attaches it as `zamfono-deploy.tar.gz` |
 | `docs/guide/`     | the admin guide above                                                                                                                    |
+| `CHANGELOG.md`    | what each release changes for operators, with its upgrade notes; each release's description                                              |
 | `docs/spec.md`    | the full technical specification — the contract the code is built against                                                                |
 | `images/`         | the Dockerfiles for `asterisk`, `api`, `core` and `proxy`                                                                                |
 | `db/`             | the schema migration and the one-shot `migrate` image                                                                                    |

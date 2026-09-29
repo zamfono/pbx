@@ -87,6 +87,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      # The release's description is its CHANGELOG.md section (`bundle` below); a tag nobody wrote
+      # notes for stops here, before any image is tagged, rather than after a half release.
+      - name: Require the release's section in CHANGELOG.md
+        run: |
+          git show "$GITHUB_REF:CHANGELOG.md" >"$RUNNER_TEMP/CHANGELOG.md"
+          bash .github/scripts/changelog-section.sh "${GITHUB_REF_NAME#v}" "$RUNNER_TEMP/CHANGELOG.md" >/dev/null
       - name: Require the tagged commit to be on main
         id: commit
         run: |
@@ -128,6 +134,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Pack deploy/ with compose.yaml pinned to this release
         run: bash .github/scripts/deploy-bundle.sh "${GITHUB_REF_NAME#v}" "$RUNNER_TEMP/bundle"
+      - name: Cut the release's notes from CHANGELOG.md
+        run: bash .github/scripts/changelog-section.sh "${GITHUB_REF_NAME#v}" >"$RUNNER_TEMP/notes.md"
       # Lets an operator check a download came from this workflow at this tag:
       # gh attestation verify zamfono-deploy.tar.gz --repo zamfono/pbx
       - name: Attest the two archives' provenance
@@ -137,14 +145,16 @@ jobs:
       - name: Publish the GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # A re-run, or a release a maintainer wrote by hand first, keeps its notes and gets the
-        # archives replaced; the bundle is reproducible, so a re-run uploads the same bytes.
+        # The description is the version's CHANGELOG.md section, also on a re-run or a release a
+        # maintainer opened by hand first, whose notes it replaces; the bundle is reproducible, so
+        # a re-run uploads the same bytes.
         run: |
           assets=("$RUNNER_TEMP"/bundle/{zamfono-deploy.tar.gz,zamfono-deploy.zip,SHA256SUMS})
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
             gh release upload "$GITHUB_REF_NAME" --clobber "${assets[@]}"
           else
-            gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes \
+            gh release create "$GITHUB_REF_NAME" --verify-tag --notes-file "$RUNNER_TEMP/notes.md" \
               --title "$GITHUB_REF_NAME" "${assets[@]}"
           fi
 

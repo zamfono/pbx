@@ -25,6 +25,8 @@ stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/zamfono/setup"
 for f in "${files[@]}"; do cp "$root/deploy/$f" "$stage/zamfono/$f"; done
+# The release notes, with every upgrade's own steps, next to the files they are about.
+cp "$root/CHANGELOG.md" "$stage/zamfono/CHANGELOG.md"
 # Every file 644 but the one the operator runs, whatever the checkout's modes were.
 chmod 644 "$stage"/zamfono/{.env.example,*,setup/*} 2>/dev/null || true
 chmod 755 "$stage/zamfono/setup" "$stage/zamfono/setup.sh"

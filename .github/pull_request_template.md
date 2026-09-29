@@ -9,6 +9,12 @@ Closes #
 - [ ] No behaviour described in `docs/spec.md` changes, or
 - [ ] `docs/spec.md` is updated in this pull request, with a paragraph in its change log
 
+**Operators:**
+
+- [ ] Nothing an operator sees changes, or
+- [ ] `CHANGELOG.md`'s `[Unreleased]` section says what changes for them, with **Upgrade notes** for
+      anything an upgrade needs beyond deploy/README.md step 8
+
 **Checked locally:**
 
 - [ ] `npm test`, `npm run typecheck`, `npm run lint`, `npm run format:check`

@@ -335,7 +335,7 @@ A unit installed by `v0.0.3` or earlier stops with `stop` rather than `down`; sw
 sed -i 's/ stop$/ down/' /etc/systemd/system/zamfono.service && systemctl daemon-reload
 ```
 
-Compare the new `.env.example` with your `.env`: a release that adds a setting adds it there. If
+Before pulling, read the new release's **Upgrade notes** in `CHANGELOG.md`, which the bundle now holds and the release page shows: anything an upgrade needs beyond these commands is there. Compare the new `.env.example` with your `.env`: a release that adds a setting adds it there. If
 you set `ZAMFONO_VERSION` in `.env`, change it to the new release too.
 
 Migrations only go forward. A bad release is undone by restoring the snapshot the upgrade began

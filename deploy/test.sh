@@ -52,6 +52,7 @@ bundle_images=$(cd "$bundle_dir/x" && ZAMFONO_VERSION= docker compose --env-file
 
 echo "==> setup.sh (non-interactive, in the unpacked bundle)"
 [ -x "$bundle_dir/x/setup.sh" ]
+[ -f "$bundle_dir/x/CHANGELOG.md" ]
 # The password hasher defaults to the bundle's own api image.
 (cd "$bundle_dir/x" && bash -c '. setup/checks.sh && api_image') | grep -qx 'ghcr.io/zamfono/api:1.2.3'
 (cd "$bundle_dir/x" && SETUP_NONINTERACTIVE=1 ZAMFONO_MODE=ports EXTERNAL_IPV4=198.51.100.7 \
