@@ -50,6 +50,9 @@ export type BranchProvision = {
   inboundFormat: '';
   /** The caller-ID name the app sends when calling the PBX; empty, since the core sets it. */
   displayname: '';
+  // The tenant's emergency numbers (§10.1 "Emergency calls", §11.4 `emergency_numbers_json`),
+  // which a mobile app dials through the phone's own cellular dialer rather than the PBX.
+  emergency: { title: string; number: string }[];
   // A Ringotel user registers up to this many times (§10.4); moves with `settings.ringotelMaxRegs`.
   maxregs: number;
   // The tenant-wide colleague presence panel (§10.4 "Colleague presence"), one entry per
@@ -66,7 +69,10 @@ export type BranchProvision = {
 export function buildBranchProvision(
   settings: Pick<
     SettingsRow,
-    'codecsJson' | 'featureCodesJson' | 'ringotelMaxRegs'
+    | 'codecsJson'
+    | 'emergencyNumbersJson'
+    | 'featureCodesJson'
+    | 'ringotelMaxRegs'
   >,
   parkingSlots: string[],
   blfs: { number: string; title: string }[]
@@ -114,6 +120,9 @@ export function buildBranchProvision(
     regexpires: REGISTRATION_TTL_S,
     inboundFormat: '',
     displayname: '',
+    emergency: (JSON.parse(settings.emergencyNumbersJson) as string[]).map(
+      number => ({ title: number, number })
+    ),
     maxregs: settings.ringotelMaxRegs,
     blfs
   };

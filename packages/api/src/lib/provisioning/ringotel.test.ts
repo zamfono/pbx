@@ -107,7 +107,8 @@ describe('buildBranchProvision', () => {
         codecsJson: '["opus","g722","alaw"]',
         featureCodesJson:
           '{"pickup":"*8","dndOn":"*90","dndOff":"*91","mailbox":"*95","ownVoicemail":"*96","deposit":"*97","addParty":"*5","clirOn":"#31#","clirOff":"*31#","park":"*70"}',
-        ringotelMaxRegs: 3
+        ringotelMaxRegs: 3,
+        emergencyNumbersJson: '["112","110"]'
       },
       ['701'],
       [{ number: '101', title: 'Anna Huber' }]
@@ -135,7 +136,8 @@ describe('buildBranchProvision', () => {
         codecsJson: '["opus"]',
         featureCodesJson:
           '{"pickup":"*8","dndOn":"*90","dndOff":"*91","mailbox":"*95","ownVoicemail":"*96","deposit":"*97","addParty":"*5","clirOn":"#31#","clirOff":"*31#","park":"*70"}',
-        ringotelMaxRegs: 3
+        ringotelMaxRegs: 3,
+        emergencyNumbersJson: '["112","110"]'
       },
       [],
       []
@@ -152,6 +154,10 @@ describe('buildBranchProvision', () => {
       displayname: ''
     });
     expect(provision).not.toHaveProperty('internal');
+    expect(provision.emergency).toEqual([
+      { title: '112', number: '112' },
+      { title: '110', number: '110' }
+    ]);
   });
 });
 

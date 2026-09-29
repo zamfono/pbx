@@ -26,16 +26,17 @@ export function reloadKindsFor(
 // provision object also carries the DND, voicemail and park feature codes ("Branch provision
 // profile"), so a feature-code change moves it too, or the app would dial retired codes.
 // The connection's `country`, the default the app reads phone numbers against to match callers to
-// contacts, follows the tenant's country.
+// contacts, follows the tenant's country, and its `emergency` list the tenant's emergency numbers.
 const TENANT_PROFILE_COLUMNS = new Set([
   'codecsJson',
+  'emergencyNumbersJson',
   'ringotelMaxRegs',
   'language',
   'featureCodesJson',
   'country'
 ]);
 
-/** Pushes the tenant's Ringotel profile (codecs, `ringotelMaxRegs`, feature codes, language) when it changed. */
+/** Pushes the tenant's Ringotel profile (codecs, `ringotelMaxRegs`, feature codes, emergency numbers, language, country) when it changed. */
 export async function maybePushTenantProfile(
   ctx: Context,
   columns: Record<string, unknown>
