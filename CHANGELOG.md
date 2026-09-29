@@ -11,6 +11,34 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Fixed
+
+- Internal calls between Ringotel apps did not always pass through the PBX, so they could be
+  missing from the call history, recordings and presence: the connection kept Ringotel's default,
+  "through PBX if possible", since the setting Zamfono sent has no effect. The connection now
+  routes every call through the PBX, calls to one's own extension and video calls included, and
+  the caller name the PBX sends wins over the app's contacts.
+- After an Asterisk restart, a stack restart or an update, the Ringotel apps stayed unreachable
+  until their next registration, up to an hour. The stack now has Ringotel re-register every app
+  once Asterisk is back, and the apps re-register every two minutes anyway.
+- What Ringotel answered to a device's push, and the re-registration after a restart, was only in
+  the call's result and the container log, which an update discards. Each is now an audit entry
+  (`ringotel.push` on the device, `ringotel.rereg`), and a `ringotel` device created or rotated
+  before Ringotel is set up now says so in a `warnings` entry instead of nothing.
+
+### Added
+
+- `system.info` shows when `api` and `core` started (`startedAt`) and when Asterisk did
+  (`core.asteriskStartedAt`), so a restart is visible.
+
+### Upgrade notes
+
+- **Ringotel connections change at their next push**: the first device, user, extension or
+  profile change after the upgrade, or the upgrade's own restart, rewrites the connection's
+  settings. Internal calls then always go through the PBX, the PBX's caller name wins over the
+  app's contacts, apps stay registered while closed and re-register every two minutes. Settings
+  changed by hand in the Ringotel Shell for these are overwritten.
+
 ## [0.0.6] - 2026-09-29
 
 ### Fixed

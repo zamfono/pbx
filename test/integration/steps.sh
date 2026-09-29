@@ -200,10 +200,15 @@ step_updater() {
   info=$(api GET /system/info) || fail "GET /system/info did not answer"
   printf '%s' "$info" | python3 -c '
 import json, sys
-update = json.load(sys.stdin)["update"]
+info = json.load(sys.stdin)
+update = info["update"]
 if "unavailable" in update or "last" not in update:
     sys.exit("the updater is not usable: %s" % json.dumps(update))
-' || fail "system.info reports no usable updater"
+# §10.3 System, §10.4 "After a restart": core dates itself and the Asterisk it is connected to.
+core = info["core"] or {}
+if not core.get("startedAt") or not core.get("asteriskStartedAt"):
+    sys.exit("system.info carries no core start times: %s" % json.dumps(core))
+' || fail "system.info reports no usable updater, or no core start times"
   refusal=$(curl -sS -X POST "$API/api/v1/system/update" "${FWD[@]}" \
     -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
     -d '{"confirm":true}' -w '\n%{http_code}')
