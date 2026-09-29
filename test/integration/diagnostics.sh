@@ -40,7 +40,7 @@ dump_diagnostics() {
   mkdir -p "$dir"
   diag_compose ps -a > "$dir/ps.txt" 2>&1 || true
   local service
-  for service in core asterisk api proxy sipp sipp-phone sipp-provider devices; do
+  for service in migrate core asterisk api proxy sipp sipp-phone sipp-provider devices; do
     diag_compose logs --no-color --timestamps "$service" > "$dir/$service.log" 2>&1 || true
   done
   diag_compose exec -T core node -e "$recent_calls_js" > "$dir/calls.jsonl" 2>&1 || true

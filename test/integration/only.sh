@@ -15,3 +15,24 @@ name_selected() {
   done
   return 1
 }
+
+# `SHARD=<k>/<n>` splits the sipp scenarios over n runs of their own stacks, CI's way of playing
+# them in parallel: this run plays every n-th one, from the k-th on, in the scenarios' own order,
+# so the split does not depend on ONLY. The named steps after the scenarios (`trunk-status`,
+# `cert-sync`) run on the last shard alone; the stack's prerequisites run on every shard.
+SHARD=${SHARD:-1/1}
+[[ $SHARD =~ ^([1-9][0-9]*)/([1-9][0-9]*)$ ]] && ((BASH_REMATCH[1] <= BASH_REMATCH[2])) || {
+  echo "SHARD=$SHARD is not <k>/<n> with 1 <= k <= n" >&2
+  exit 1
+}
+SHARD_INDEX=${BASH_REMATCH[1]}
+SHARD_COUNT=${BASH_REMATCH[2]}
+
+# Whether the scenario at 0-based position `$1` is this shard's.
+shard_selected() {
+  (($1 % SHARD_COUNT == SHARD_INDEX - 1))
+}
+
+shard_owns_steps() {
+  ((SHARD_INDEX == SHARD_COUNT))
+}

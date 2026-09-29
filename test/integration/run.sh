@@ -31,6 +31,15 @@
 #     stack leaves it up on exit too (as if KEEP=1), so further REUSE=1 runs can chase it; tear it
 #     down by hand (the message on exit gives the exact command) once done.
 #
+#   SHARD=<k>/<n> bash test/integration/run.sh
+#     Plays every n-th scenario, from the k-th on, on a stack of its own; the named steps after the
+#     scenarios run on the last shard only (only.sh). CI plays the scenarios as two shards.
+#
+#   UPGRADE_FROM=latest|<X.Y.Z> bash test/integration/run.sh
+#     Starts the stack as that release, from its published bundle and images, and upgrades it to
+#     the build under test the way deploy/README.md step 8 does before anything else runs; what
+#     that release seeded must survive (upgrade.sh).
+#
 # Examples:
 #   ONLY=inbound-hold bash test/integration/run.sh
 #   KEEP=1 bash test/integration/run.sh
@@ -104,6 +113,8 @@ OWNER_EMAIL='owner@ci.test'
 . "$here/trunk-status.sh"
 # shellcheck source=cert-sync.sh
 . "$here/cert-sync.sh"
+# shellcheck source=upgrade.sh
+. "$here/upgrade.sh"
 
 api() {
   local method=$1 path=$2 body=${3:-}
@@ -137,6 +148,12 @@ token=$(bash "$here/bootstrap-token.sh" "$API" "$OWNER_EMAIL" "$OWNER_PASSWORD" 
   || fail "could not obtain an access token through the authorization-code flow"
 [ -n "$token" ] || fail "the token endpoint returned nothing"
 
+if [ -n "${UPGRADE_FROM:-}" ] && [ "$reused" = false ]; then
+  upgrade_after=$(mktemp)
+  upgrade_snapshot "$upgrade_after"
+  upgrade_verify "$UPGRADE_BEFORE" "$upgrade_after"
+fi
+
 if [ "$reused" = true ]; then
   load_state
 else
@@ -148,14 +165,14 @@ fi
 # shellcheck source=run-scenarios.sh
 . "$here/run-scenarios.sh"
 
-if name_selected trunk-status; then
+if shard_owns_steps && name_selected trunk-status; then
   run_trunk_status_step
 fi
 
 # Last (see cert-sync.sh's own comment for why): every sipp scenario, including device-tls-srtp,
 # has already run its teardown, and nothing after this reads through Asterisk's TLS transport or
 # depends on api staying up.
-if name_selected cert-sync; then
+if shard_owns_steps && name_selected cert-sync; then
   [ "$reused" = true ] \
     && echo 'REUSE=1: cert-sync restarts api again; safe, but repeats the brief TLS-registration outage §6.4 describes' >&2
   run_cert_sync_step

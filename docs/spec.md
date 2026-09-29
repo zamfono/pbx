@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-09-29 · §8 Integration.** The integration run tests the upgrade from the latest release on both runtimes, and splits the scenarios over two parallel runs per runtime, a fresh install and an upgraded one.
+*Why:* requested by the product owner after the Podman upgrade failure, which no test could see: every run started a fresh stack, so neither replacing the containers nor migrating a database a release had written was ever exercised.
+
 **2026-09-29 · §6.3 Upgrades.** On Podman an upgrade runs `down` before `up -d`, and the boot unit stops with `down`.
 *Why:* found upgrading a Podman test stack to 0.0.3: `up -d` after a pull failed with "has dependent containers which must be removed before it", since Podman, unlike Docker, will not remove the `asterisk` container `proxy` shares a network namespace with.
 
@@ -783,7 +786,7 @@ The database is therefore never the reason to re-architect; the single-tenant st
 ## 8. Testing Strategy
 
 - **Unit**: routing pipeline (OOO/forwarding/ring-group decision logic) as pure functions against fixture configs — the highest-value tests, no Asterisk needed.
-- **Integration**: a Compose test profile with Asterisk + app + [`sipp`](https://github.com/SIPp/sipp) scenarios (inbound → ring group → answer; → no answer → voicemail; OOO; forwarding chains; blind and attended transfer; pickup). Runs in CI on Docker Compose and on Podman (§6.3, "Runtimes").
+- **Integration**: a Compose test profile with Asterisk + app + [`sipp`](https://github.com/SIPp/sipp) scenarios (inbound → ring group → answer; → no answer → voicemail; OOO; forwarding chains; blind and attended transfer; pickup). Runs in CI on Docker Compose and on Podman (§6.3, "Runtimes"), each as two parallel runs that split the scenarios: one on a fresh install, and one on a stack started as the latest release and upgraded to the build under test as §6.3 "Upgrades" describes, where everything that release's first boot seeded must read the same afterwards.
 - **Operations**: the operations layer (§10.3) called directly against an in-memory SQLite — RBAC, audit diffs, undo. The REST catch-all and the MCP adapter each get one smoke test; they are glue over the same functions.
 - Manual checklist for device/NAT matrices (office, home office, mobile network).
 

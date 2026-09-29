@@ -8,9 +8,8 @@
 # FWD, RUNTIME, OWNER_EMAIL, OWNER_PASSWORD, MAIN_DID, FQDN and fail; sets SIP_USERNAME,
 # SIP_PASSWORD and GROUP_EXT for `run-scenarios.sh` to read.
 
-# `run.sh`'s own `.env`, the healthcheck wait and the two runtime-ordering prerequisites §6.3
-# names inline (migrate's exit code, the api healthcheck): everything a fresh stack needs before
-# any tenant configuration can be driven over REST. Skipped entirely under REUSE=1.
+# `run.sh`'s own `.env`, then the stack itself, started fresh or, with UPGRADE_FROM, upgraded from
+# a release (upgrade.sh), and `await_stack_ready`. Skipped entirely under REUSE=1.
 bring_up_stack() {
   # Checked before anything binds: a pre-existing listener would answer every probe below, and
   # Docker reports the port as published either way, so the run would silently test another
@@ -62,9 +61,19 @@ SIP_TCP_ENABLED=true
 METRICS_TOKEN=
 ENV
 
-  echo '== bringing the stack up =='
-  $COMPOSE "${compose_files[@]}" up -d
+  if [ -n "${UPGRADE_FROM:-}" ]; then
+    upgrade_from_release
+  else
+    echo '== bringing the stack up =='
+    $COMPOSE "${compose_files[@]}" up -d
+  fi
+  await_stack_ready
+}
 
+# The two runtime-ordering prerequisites §6.3 names inline (migrate's exit code, the api
+# healthcheck), then `core`: what a stack needs, fresh or just upgraded, before any tenant
+# configuration can be driven over REST.
+await_stack_ready() {
   echo '== §6.3 Runtimes: migrate ran to completion before api started =='
   local migrate_exit
   migrate_exit=$($COMPOSE "${compose_files[@]}" ps -a --format '{{.Service}} {{.ExitCode}}' \

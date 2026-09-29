@@ -10,7 +10,8 @@
 # the group extension, for the setup) the compose command, so they can drive the containers too.
 #
 # `ONLY=<glob>[,<glob>...]` (run.sh's own usage block, `only.sh`'s `name_selected`) plays only the
-# scenarios whose name matches one of the globs, for reproducing one or a few by hand.
+# scenarios whose name matches one of the globs, for reproducing one or a few by hand; `SHARD=k/n`
+# (`only.sh`'s `shard_selected`) plays every n-th, for CI's parallel runs.
 
 # shellcheck source=scenario-roles.sh
 . "$here/scenario-roles.sh"
@@ -131,7 +132,10 @@ for service in "${SIPP_SERVICES[@]}"; do
   $COMPOSE "${compose_files[@]}" exec -T "$service" \
     sh -c 'pkill -9 -x sipp; rm -rf /tmp/sipp-runs' || true
 done
+position=-1
 for scenario in "$here"/scenarios/*.xml; do
+  position=$((position + 1))
+  shard_selected "$position" || continue
   [ -f "$scenario" ] || continue
   name=$(basename "$scenario" .xml)
   name_selected "$name" || continue
