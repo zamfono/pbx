@@ -23,7 +23,8 @@ arguments:
      and hand them to the employee for their softphone (see `tested-softphones`) or desk phone.
    - With `ringotel`, the credentials are pushed to Ringotel instead of returned, and the device
      onboards through Ringotel's own activation e-mail and QR code; no credentials need to be
-     typed in by hand.
+     typed in by hand. The stack must be connected to Ringotel first (`ringotel-setup`), and a
+     `warnings` entry in the response means Ringotel refused the device; it says why.
 3. Set forwarding, if the role needs it, with `PUT /users/{id}/forwarding` — the classic
    unconditional/busy/no-answer/DND/offline rules, each a forward target (`mental-model`).
 4. Add the employee to any ring group they belong to via `PATCH /ringGroups/{id}` with the

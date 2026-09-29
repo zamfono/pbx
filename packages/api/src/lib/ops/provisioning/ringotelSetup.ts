@@ -2,17 +2,20 @@ import { z } from 'zod';
 
 import {
   createRingotelClient,
+  RingotelError,
   type RingotelClient
 } from '../../provisioning/ringotelClient.js';
 import { keyringFromEnv } from '../../secretbox.js';
 import { onRollback } from '../runner.js';
 import { loadSettings } from '../settings/_shared.js';
-import { defineOperation } from '../types.js';
+import { defineOperation, OpError } from '../types.js';
 import {
   assertNotSetUp,
   createConnection,
+  followPackageMaxRegs,
   organizationParams,
   stackBranchAddress,
+  STATUS_CONFLICT,
   storeRingotelIds
 } from './ringotelConnection.js';
 import { assertOffered } from './ringotelOptions.js';
@@ -35,6 +38,38 @@ async function discardOrganization(
     throw new Error(
       `ringotel: setup failed (${reason}) and organization ${orgId} could not be deleted; adopt it with provisioning.ringotelAdopt, or delete it in the Ringotel Shell before retrying`,
       { cause: deleteError }
+    );
+  }
+}
+
+/**
+ * `createOrganization` for `input`, with a taken domain answered as what it usually is (§10.4):
+ * an organization that already exists in this Ringotel account, created in the Ringotel Shell or
+ * left by an earlier setup, which `provisioning.ringotelAdopt` takes over. The refusal names its
+ * id, so the adoption is one call.
+ */
+async function createOrganization(
+  client: RingotelClient,
+  params: Record<string, unknown>
+): Promise<{ id: string }> {
+  try {
+    return await client.call<{ id: string }>('createOrganization', params);
+  } catch (error) {
+    if (
+      !(error instanceof RingotelError) ||
+      !/already exists/iu.test(error.ringotelMessage)
+    ) {
+      throw error;
+    }
+    const domain = String(params.domain);
+    const existing = (
+      await client.call<{ id: string; domain: string }[]>('getOrganizations')
+    ).find(org => org.domain === domain);
+    throw new OpError(
+      STATUS_CONFLICT,
+      existing === undefined
+        ? `provisioning: Ringotel refused domain ${domain} (${error.ringotelMessage}); choose another domain`
+        : `provisioning: the Ringotel account already has an organization with domain ${domain}, id ${existing.id}; if it is this stack's, adopt it: provisioning.ringotelAdopt { orgId: '${existing.id}', domain: '${domain}' }`
     );
   }
 }
@@ -71,8 +106,8 @@ export const ringotelSetup = defineOperation<Input, Output>({
     const client = createRingotelClient(settings, keyringFromEnv(process.env));
     // The region is immutable once the organization exists (§10.4), so a value the account does
     // not offer is refused here, naming the ones it does, before anything is created.
-    await assertOffered(client, input.region, input.packageid);
-    const org = await client.call<{ id: string }>('createOrganization', {
+    const chosen = await assertOffered(client, input.region, input.packageid);
+    const org = await createOrganization(client, {
       name: settings.companyName,
       domain: input.domain,
       region: input.region,
@@ -83,6 +118,7 @@ export const ringotelSetup = defineOperation<Input, Output>({
     // write, the audit row or the commit itself, deletes the organization again, and the
     // connection with it.
     onRollback(ctx, cause => discardOrganization(client, org.id, cause));
+    await followPackageMaxRegs(ctx, chosen.maxregs);
     const branchId = await createConnection(ctx, client, org.id, address);
     await storeRingotelIds(ctx, client, org.id, branchId);
     return { ringotelOrgId: org.id, ringotelBranchId: branchId };

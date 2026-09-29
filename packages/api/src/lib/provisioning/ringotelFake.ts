@@ -22,7 +22,11 @@ export type FakeRingotelUser = {
   options?: Record<string, unknown>;
 };
 
-export type FakeRingotelOrganization = { id: string; domain: string };
+export type FakeRingotelOrganization = {
+  id: string;
+  domain: string;
+  packageid?: number;
+};
 
 /** A connection as the fake keeps it: its organization, and the address the latest
  *  `createBranch`/`updateBranch` wrote. */
@@ -96,13 +100,18 @@ export const FAKE_REGIONS = [
   { id: '5', name: 'Europe (London)' }
 ];
 export const FAKE_PACKAGES = [
-  { id: 1, name: 'Essentials' },
-  { id: 2, name: 'Pro' }
+  { id: 1, name: 'Essentials', maxregs: 3 },
+  { id: 2, name: 'Pro', maxregs: 6 }
 ];
 
 const HANDLERS: Record<string, Handler> = {
   getRegions: () => FAKE_REGIONS,
-  getPackages: () => FAKE_PACKAGES,
+  getPackages: () =>
+    FAKE_PACKAGES.map(({ id, name, maxregs }) => ({
+      id,
+      name,
+      features: { maxregs }
+    })),
   getOrganizations: fake => fake.organizations,
   createOrganization: (fake, params) => {
     const domain = text(params, 'domain');

@@ -1,6 +1,12 @@
 import { newId, nowIso, type Db, type ReloadKind } from '@zamfono/shared';
 
 import {
+  runAfterPropagationHooks,
+  takeAfterPropagationHooks,
+  withWarnings,
+  type AfterPropagationHook
+} from './afterPropagationHooks.js';
+import {
   beginAudit,
   readAudit,
   readPropagates,
@@ -20,6 +26,7 @@ import {
 
 export { maskContent, recordChange, setUndoable } from './audit.js';
 export { onPropagate, propagate } from './propagationHooks.js';
+export { afterPropagation } from './afterPropagationHooks.js';
 export { onRollback } from './rollbackHooks.js';
 
 /** What the runner needs beyond the operation's own input to build a `Context` (§10.3). */
@@ -155,6 +162,7 @@ type Committed = {
   output: unknown;
   kinds: ReloadKind[];
   propagates: boolean;
+  after: AfterPropagationHook[];
 };
 
 /**
@@ -184,7 +192,8 @@ async function executeInTransaction(
       return {
         output,
         kinds: readReloadKinds(ctx),
-        propagates: readPropagates(ctx)
+        propagates: readPropagates(ctx),
+        after: takeAfterPropagationHooks(ctx)
       };
     });
   } catch (error) {
@@ -214,7 +223,7 @@ export async function runOperation<In, Out>(
   const parsedInput = parseInput(op, input);
   checkRole(op, run.actor);
   checkConfirmation(op, run, parsedInput);
-  const { output, kinds, propagates } = await executeInTransaction(db, {
+  const { output, kinds, propagates, after } = await executeInTransaction(db, {
     op,
     run,
     name,
@@ -228,7 +237,9 @@ export async function runOperation<In, Out>(
   if (!op.readOnly && propagates) {
     await notifyPropagation(name, kinds);
   }
-  return output as Out;
+  // What had to wait for Asterisk to hold the write (`afterPropagation`), such as Ringotel
+  // registering a new device; its problems are the result's warnings, since the write stands.
+  return withWarnings(output, await runAfterPropagationHooks(db, after)) as Out;
 }
 /* eslint-enable @typescript-eslint/no-unused-vars */
 /* eslint-enable @typescript-eslint/no-unnecessary-type-parameters */

@@ -12,8 +12,9 @@ const STATUS_BAD_REQUEST = 400;
 
 /** A region an organization can be created in, as Ringotel names it (§10.4 "Organization"). */
 type Region = { id: string; name: string };
-/** A plan `packageid` selects, as the account offers it. */
-type Package = { id: number; name: string };
+/** A plan `packageid` selects, as the account offers it, with the registrations per user it
+ *  allows (`features.maxregs`), where Ringotel names them. */
+type Package = { id: number; name: string; maxregs?: number };
 type Output = { regions: Region[]; packages: Package[] };
 
 /**
@@ -23,19 +24,27 @@ type Output = { regions: Region[]; packages: Package[] };
  */
 export async function ringotelOffer(client: RingotelClient): Promise<Output> {
   const regions = await client.call<Region[]>('getRegions');
-  const packages = await client.call<Package[]>('getPackages');
+  const packages =
+    await client.call<
+      { id: number; name: string; features?: { maxregs?: unknown } }[]
+    >('getPackages');
   return {
     regions: regions.map(({ id, name }) => ({ id, name })),
-    packages: packages.map(({ id, name }) => ({ id, name }))
+    packages: packages.map(({ id, name, features }) =>
+      typeof features?.maxregs === 'number'
+        ? { id, name, maxregs: features.maxregs }
+        : { id, name }
+    )
   };
 }
 
-/** Refuses a `region` or `packageid` the account does not offer, naming the ones it does. */
+/** Refuses a `region` or `packageid` the account does not offer, naming the ones it does, and
+ *  returns the chosen package. */
 export async function assertOffered(
   client: RingotelClient,
   region: string,
   packageid: number
-): Promise<void> {
+): Promise<Package> {
   const offer = await ringotelOffer(client);
   const list = (items: { id: string | number; name: string }[]): string =>
     items.map(item => `${item.id} (${item.name})`).join(', ');
@@ -45,12 +54,14 @@ export async function assertOffered(
       `provisioning: Ringotel offers no region ${region}; choose one of ${list(offer.regions)}`
     );
   }
-  if (!offer.packages.some(item => item.id === packageid)) {
+  const chosen = offer.packages.find(item => item.id === packageid);
+  if (chosen === undefined) {
     throw new OpError(
       STATUS_BAD_REQUEST,
       `provisioning: Ringotel offers no package ${packageid}; choose one of ${list(offer.packages)}`
     );
   }
+  return chosen;
 }
 
 export const ringotelOptions = defineOperation<Record<string, never>, Output>({

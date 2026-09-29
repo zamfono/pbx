@@ -12,12 +12,14 @@ import {
   assertNotSetUp,
   connectionFields,
   createConnection,
+  followPackageMaxRegs,
   organizationParams,
   stackBranchAddress,
   STATUS_CONFLICT,
   STATUS_NOT_FOUND,
   storeRingotelIds
 } from './ringotelConnection.js';
+import { ringotelOffer } from './ringotelOptions.js';
 
 const inputSchema = z
   .object({
@@ -38,19 +40,21 @@ type Output = { ringotelOrgId: string; ringotelBranchId: string };
 async function findOrganization(
   client: RingotelClient,
   input: Input
-): Promise<void> {
+): Promise<{ packageid?: number }> {
   const organizations =
-    await client.call<{ id: string; domain: string }[]>('getOrganizations');
-  if (
-    !organizations.some(
-      org => org.id === input.orgId && org.domain === input.domain
-    )
-  ) {
+    await client.call<{ id: string; domain: string; packageid?: number }[]>(
+      'getOrganizations'
+    );
+  const found = organizations.find(
+    org => org.id === input.orgId && org.domain === input.domain
+  );
+  if (found === undefined) {
     throw new OpError(
       STATUS_NOT_FOUND,
       `provisioning: the Ringotel account has no organization ${input.orgId} with domain ${input.domain}`
     );
   }
+  return found;
 }
 
 /** Only an organization without users is adopted, so no stack takes over one already in use. */
@@ -128,8 +132,15 @@ export const ringotelAdopt = defineOperation<Input, Output>({
     // changes nothing at Ringotel.
     const address = stackBranchAddress();
     const client = createRingotelClient(settings, keyringFromEnv(process.env));
-    await findOrganization(client, input);
+    const organization = await findOrganization(client, input);
     await assertEmpty(client, input);
+    if (organization.packageid !== undefined) {
+      const { packages } = await ringotelOffer(client);
+      await followPackageMaxRegs(
+        ctx,
+        packages.find(item => item.id === organization.packageid)?.maxregs
+      );
+    }
     const branchId = await adoptConnection(ctx, client, input, address);
     await client.call('updateOrganization', {
       id: input.orgId,

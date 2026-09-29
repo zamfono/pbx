@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
-import { activeRingotelProvider } from '../../provisioning/index.js';
 import { encrypt, keyringFromEnv } from '../../secretbox.js';
 import { newSipPassword } from '../../sip.js';
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
+import { pushToRingotel } from './_ringotelPush.js';
 import { liveDevice } from './_shared.js';
 
 /** `POST /devices/{id}/rotate` (§5.2): a new SIP password, for a credential suspected leaked. */
@@ -26,11 +26,18 @@ export const rotate = defineOperation({
     recordChange(ctx, { field: 'sipPassword', from: null, to: password });
     propagate(ctx, ['pjsip']);
     if (row.kind === 'ringotel') {
-      const provider = await activeRingotelProvider(ctx.db);
-      await provider?.onCredentialsRotated(row, {
-        username: row.sipUsername,
-        password
-      });
+      pushToRingotel(
+        ctx,
+        provider =>
+          provider.onCredentialsRotated(row, {
+            username: row.sipUsername,
+            password
+          }),
+        {
+          what: `device ${input.id}'s new password is stored`,
+          retry: 'rotating again retries it'
+        }
+      );
     }
     return { sipUsername: row.sipUsername, sipPassword: password };
   }

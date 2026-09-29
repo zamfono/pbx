@@ -2,13 +2,13 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
-import { activeRingotelProvider } from '../../provisioning/index.js';
 import { encrypt, keyringFromEnv } from '../../secretbox.js';
 import { newSipPassword } from '../../sip.js';
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import { userExtension } from '../users/_extensions.js';
 import { liveUser } from '../users/_shared.js';
+import { pushToRingotel } from './_ringotelPush.js';
 import {
   assertDeviceCreateScope,
   assertNoExistingRingotelDevice,
@@ -44,6 +44,8 @@ type Output = {
   device: ReturnType<typeof toDeviceOut>;
   sipUsername?: string;
   sipPassword?: string;
+  /** A `ringotel` device Ringotel refused: the device stands, and this says why (§10.4). */
+  warnings?: string[];
 };
 
 /** `POST /users/{id}/devices` (§10.3, §9.3): creates a SIP device, returning a manual one's credentials once. */
@@ -102,8 +104,14 @@ export const create = defineOperation({
     propagate(ctx, ['pjsip']);
     const row = await liveDevice(ctx.db, id);
     if (input.kind === 'ringotel') {
-      const provider = await activeRingotelProvider(ctx.db);
-      await provider?.onDeviceCreated(row, { username, password });
+      pushToRingotel(
+        ctx,
+        provider => provider.onDeviceCreated(row, { username, password }),
+        {
+          what: `device ${id} is created, but it has no Ringotel user yet`,
+          retry: 'devices.rotate on the device creates it'
+        }
+      );
       return { device: toDeviceOut(row) };
     }
     return {

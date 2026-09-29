@@ -284,3 +284,88 @@ describe('provisioning.ringotelSetup with a region the account does not offer', 
     expect(fake.organizations).toEqual([]);
   });
 });
+
+describe('the registrations per user follow the package (§10.4, §11.4)', () => {
+  async function maxRegs(db: Db): Promise<number> {
+    return (
+      await db
+        .selectFrom('settings')
+        .select('ringotelMaxRegs')
+        .executeTakeFirstOrThrow()
+    ).ringotelMaxRegs;
+  }
+
+  it("setup takes the chosen package's, Pro's 6", async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    install([]);
+
+    await runOperation(
+      db,
+      'provisioning.ringotelSetup',
+      { domain: 'testco', region: '3', packageid: 2 },
+      confirmed
+    );
+
+    expect(await maxRegs(db)).toBe(6);
+  });
+
+  it("adopt takes the adopted organization's package's", async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    install([{ ...TARGET, packageid: 2 }]);
+
+    await runOperation(
+      db,
+      'provisioning.ringotelAdopt',
+      { orgId: 'org-9', domain: 'zamfono-test' },
+      confirmed
+    );
+
+    expect(await maxRegs(db)).toBe(6);
+  });
+
+  it('leaves a value an owner set alone', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    await db.updateTable('settings').set({ ringotelMaxRegs: 4 }).execute();
+    install([]);
+
+    await runOperation(
+      db,
+      'provisioning.ringotelSetup',
+      { domain: 'testco', region: '3', packageid: 2 },
+      confirmed
+    );
+
+    expect(await maxRegs(db)).toBe(4);
+  });
+});
+
+describe('provisioning.ringotelSetup with a domain the account already has', () => {
+  it('answers 409 naming the organization and the adoption that takes it over', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    const fake = install([TARGET]);
+
+    await expect(
+      runOperation(
+        db,
+        'provisioning.ringotelSetup',
+        { domain: 'zamfono-test', region: '3', packageid: 2 },
+        confirmed
+      )
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      runOperation(
+        db,
+        'provisioning.ringotelSetup',
+        { domain: 'zamfono-test', region: '3', packageid: 2 },
+        confirmed
+      )
+    ).rejects.toThrow(
+      "provisioning.ringotelAdopt { orgId: 'org-9', domain: 'zamfono-test' }"
+    );
+    expect(fake.organizations).toEqual([TARGET]);
+  });
+});

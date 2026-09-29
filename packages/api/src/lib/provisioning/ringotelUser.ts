@@ -7,7 +7,7 @@
  */
 import { decrypt, keyringFromEnv } from '../secretbox.js';
 import { ringotelLog } from './ringotelBranchHooks.js';
-import type { RingotelProviderDeps } from './ringotelClient.js';
+import { RingotelError, type RingotelProviderDeps } from './ringotelClient.js';
 import {
   blfEntries,
   deviceBlfKeys,
@@ -25,17 +25,29 @@ export async function createRemoteUser(
 ): Promise<string> {
   const { orgId, branchId } = await resolveIds(deps.db);
   const { name, email, ext } = await userProfile(deps.db, device.userId);
-  const created = await deps.client.call<{ id: string }>('createUser', {
-    orgid: orgId,
-    branchid: branchId,
-    name,
-    email,
-    extension: ext,
-    username: sipCredentials.username,
-    authname: sipCredentials.username,
-    password: sipCredentials.password,
-    status: 1
-  });
+  // `null`, or no `id`, where Ringotel created nothing (checked below).
+  const created = await deps.client.call<{ id?: unknown } | null>(
+    'createUser',
+    {
+      orgid: orgId,
+      branchid: branchId,
+      name,
+      email,
+      extension: ext,
+      username: sipCredentials.username,
+      authname: sipCredentials.username,
+      password: sipCredentials.password,
+      status: 1
+    }
+  );
+  // A user that was not created must never pass for one that was (§10.4): the device would
+  // stand with no Ringotel user behind it, and nothing would say so.
+  if (created === null || typeof created.id !== 'string' || created.id === '') {
+    throw new RingotelError(
+      'createUser',
+      `answered without a user id: ${JSON.stringify(created)}`
+    );
+  }
   return created.id;
 }
 

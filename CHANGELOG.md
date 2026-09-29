@@ -11,6 +11,24 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Fixed
+
+- A `ringotel` device reached Ringotel before Asterisk knew it: Ringotel's test registration
+  failed, it created no user and sent no activation e-mail, and `devices.create` still reported
+  success. The device now reaches Ringotel once Asterisk holds it, the same for a rotated
+  password, and a device Ringotel refuses carries a `warnings` entry naming Ringotel's reason;
+  `devices.rotate` pushes it again.
+- Every Ringotel refusal reaches the caller with Ringotel's own message instead of an internal
+  error, and `provisioning.ringotelSetup` answers a domain the account already has with the
+  `provisioning.ringotelAdopt` call that takes it over.
+- Ringotel setup and adoption set the registrations per user (`ringotelMaxRegs`) to what the
+  package allows, 6 for Pro, while it is still at its default of 3.
+
+### Added
+
+- A `ringotel-setup` help topic (`zamfono.help`): connecting the stack to Ringotel, from the API
+  key through setup or adoption to the first device.
+
 ### Changed
 
 - The `api` and `core` images are smaller: they no longer carry the development tooling

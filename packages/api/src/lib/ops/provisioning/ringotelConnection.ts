@@ -3,7 +3,7 @@ import type { RingotelClient } from '../../provisioning/ringotelClient.js';
 import { branchBlfEntries } from '../../provisioning/ringotelRoster.js';
 import { provisionExistingDevices } from '../../provisioning/ringotelUser.js';
 import { loadParkingSlots } from '../parking/_shared.js';
-import { recordChange, setUndoable } from '../runner.js';
+import { propagate, recordChange, setUndoable } from '../runner.js';
 import { loadSettings, type SettingsRow } from '../settings/_shared.js';
 import { OpError, type Context } from '../types.js';
 
@@ -51,6 +51,41 @@ export function organizationParams(settings: SettingsRow): {
   lang: string;
 } {
   return { hidePassInEmail: true, lang: settings.language };
+}
+
+// `settings.ringotel_max_regs`'s default (§11.4), the one a stack follows its package from.
+const DEFAULT_MAX_REGS = 3;
+
+/**
+ * Sets `settings.ringotelMaxRegs` to `maxregs`, the registrations per user the organization's
+ * package allows (6 for Pro, `ringotelOffer`), while it is still at its default, so a value an
+ * owner chose stays. Run before the connection's profile is written, which carries it.
+ */
+export async function followPackageMaxRegs(
+  ctx: Context,
+  maxregs: number | undefined
+): Promise<void> {
+  const settings = await loadSettings(ctx.db);
+  if (
+    settings.ringotelMaxRegs !== DEFAULT_MAX_REGS ||
+    maxregs === undefined ||
+    maxregs < 1 ||
+    maxregs === DEFAULT_MAX_REGS
+  ) {
+    return;
+  }
+  await ctx.db
+    .updateTable('settings')
+    .set({ ringotelMaxRegs: maxregs })
+    .where('id', '=', 1)
+    .execute();
+  recordChange(ctx, {
+    field: 'ringotelMaxRegs',
+    from: DEFAULT_MAX_REGS,
+    to: maxregs
+  });
+  // `max_contacts` on every `ringotel` endpoint follows it (§10.4).
+  propagate(ctx, ['pjsip']);
 }
 
 /** The connection's name, address and provision profile (§10.4), as this stack wants it. */

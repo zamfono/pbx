@@ -60,7 +60,7 @@ export function defineOperation<In, Out>(
 export class OpError extends Error {
   constructor(
     // eslint-disable-next-line no-magic-numbers -- the RFC 9457 status codes an operation may answer with
-    public status: 400 | 401 | 403 | 404 | 409 | 422 | 503,
+    public status: 400 | 401 | 403 | 404 | 409 | 422 | 502 | 503,
     public title: string,
     public detail?: unknown
   ) {

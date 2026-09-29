@@ -1,7 +1,56 @@
+import pino from 'pino';
+
 import type { Db } from '@zamfono/shared';
 
+import { OpError } from '../ops/types.js';
 import { decrypt, type Keyring } from '../secretbox.js';
 import type { SettingsRow } from './types.js';
+
+const STATUS_BAD_GATEWAY = 502;
+// One line per call: the method, how long it took and whether Ringotel refused it, never the
+// parameters, which carry SIP passwords.
+const log = pino({ name: 'ringotel' });
+
+/**
+ * A call Ringotel answered with an error (§10.4): an operation's caller receives it as a 502
+ * carrying Ringotel's own message, not as a bare internal error.
+ */
+export class RingotelError extends OpError {
+  constructor(
+    public method: string,
+    public ringotelMessage: string
+  ) {
+    super(
+      STATUS_BAD_GATEWAY,
+      `ringotel: '${method}' failed: ${ringotelMessage}`
+    );
+    this.name = 'RingotelError';
+  }
+}
+
+/**
+ * Ringotel's refusal in `body`, or `null` for a result. It reports some refusals as a top-level
+ * `error`, and others inside a `result` that holds an `error` of its own and HTTP 200: `createUser`
+ * answers `{"result":{"error":"<user> registration failed - Unauthorized","status":-1}}` and
+ * creates nothing when its test registration against the PBX fails.
+ */
+function refusal(
+  response: Response,
+  body: RingotelRpcResponse<unknown>
+): string | null {
+  const nested = body.result as { error?: unknown } | null | undefined;
+  const error =
+    body.error ??
+    (typeof nested === 'object' && nested !== null ? nested.error : undefined);
+  if (error === undefined || error === null) {
+    return response.ok ? null : `HTTP ${response.status}`;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  const message = (error as { message?: unknown }).message;
+  return typeof message === 'string' ? message : JSON.stringify(error);
+}
 
 const RINGOTEL_API_URL = 'https://shell.ringotel.co/api';
 
@@ -53,6 +102,7 @@ export function createRingotelClient(
       method: string,
       params?: Record<string, unknown>
     ): Promise<T> {
+      const started = Date.now();
       const signal = AbortSignal.timeout(timeoutMs);
       const response = await fetchImpl(RINGOTEL_API_URL, {
         method: 'POST',
@@ -74,10 +124,13 @@ export function createRingotelClient(
         throw cause;
       });
       const body = (await response.json()) as RingotelRpcResponse<T>;
-      if (!response.ok || body.error !== undefined) {
-        throw new Error(
-          `ringotel: '${method}' failed: ${JSON.stringify(body.error ?? response.status)}`
-        );
+      const refused = refusal(response, body);
+      log.info(
+        { method, ms: Date.now() - started, refused: refused ?? undefined },
+        refused === null ? 'ringotel: call answered' : 'ringotel: call refused'
+      );
+      if (refused !== null) {
+        throw new RingotelError(method, refused);
       }
       return body.result as T;
     }
