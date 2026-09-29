@@ -9,6 +9,10 @@ const MS_PER_SECOND = 1000;
 const HTTPS_SCHEME = 'https://';
 const LOOPBACK_HOST = '127.0.0.1';
 const HTTP_SCHEME = 'http:';
+// OpenID Connect Dynamic Client Registration §2: `application_type` defaults to `web`. The
+// specification requires it only of `/oauth/register` (§5.2); a metadata document may omit it,
+// as claude.ai's does.
+const DEFAULT_APPLICATION_TYPE = 'web';
 
 /** An OAuth client, however it registered (§5.2). */
 export type ClientMeta = {
@@ -92,7 +96,7 @@ function parseCimdDocument(
     client_id: docClientId,
     client_name: name,
     redirect_uris: redirectUris,
-    application_type: applicationType
+    application_type: applicationType = DEFAULT_APPLICATION_TYPE
   } = doc;
   if (
     docClientId !== clientIdUrl ||

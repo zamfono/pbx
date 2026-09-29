@@ -66,4 +66,56 @@ describe('fetchCimd', () => {
   it('refuses a non-HTTPS client id', async () => {
     expect(await fetchCimd('http://client.example/metadata.json')).toBeNull();
   });
+
+  it('reads a document without application_type as a web client', async () => {
+    // claude.ai's own document, as it served it on 2026-09-29.
+    const url = 'https://claude.ai/oauth/mcp-oauth-client-metadata';
+    const fetchImpl = (() =>
+      Promise.resolve(
+        new Response(
+          /* eslint-disable camelcase -- RFC 7591 mandates these snake_case wire fields */
+          JSON.stringify({
+            client_id: url,
+            client_name: 'Claude',
+            client_uri: 'https://claude.ai',
+            redirect_uris: ['https://claude.ai/api/mcp/auth_callback'],
+            grant_types: [
+              'authorization_code',
+              'refresh_token',
+              'urn:ietf:params:oauth:grant-type:jwt-bearer'
+            ],
+            response_types: ['code'],
+            token_endpoint_auth_method: 'none'
+          }),
+          /* eslint-enable camelcase -- RFC 7591 mandates these snake_case wire fields */
+          { headers: { 'content-type': 'application/json' } }
+        )
+      )) as typeof fetch;
+    expect(await fetchCimd(url, fetchImpl)).toEqual({
+      clientId: url,
+      kind: 'cimd',
+      name: 'Claude',
+      redirectUris: ['https://claude.ai/api/mcp/auth_callback'],
+      applicationType: 'web'
+    });
+  });
+
+  it('still refuses an application_type other than native or web', async () => {
+    const url = 'https://client.example/other-type.json';
+    const fetchImpl = (() =>
+      Promise.resolve(
+        new Response(
+          /* eslint-disable camelcase -- RFC 7591 mandates these snake_case wire fields */
+          JSON.stringify({
+            client_id: url,
+            client_name: 'Odd',
+            redirect_uris: ['https://client.example/callback'],
+            application_type: 'service'
+          }),
+          /* eslint-enable camelcase -- RFC 7591 mandates these snake_case wire fields */
+          { headers: { 'content-type': 'application/json' } }
+        )
+      )) as typeof fetch;
+    expect(await fetchCimd(url, fetchImpl)).toBeNull();
+  });
 });
