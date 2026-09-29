@@ -165,6 +165,8 @@ fi
 # shellcheck source=run-scenarios.sh
 . "$here/run-scenarios.sh"
 
+name_selected backups && step_backups
+
 if shard_owns_steps && name_selected trunk-status; then
   run_trunk_status_step
 fi

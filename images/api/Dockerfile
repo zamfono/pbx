@@ -63,8 +63,8 @@ RUN apt-get update \
 	   openssh-client sshpass \
 	   asterisk-moh-opsound-wav asterisk-moh-opsound-g722 \
 	&& rm -rf /var/lib/apt/lists/* \
-	&& mkdir -p /etc/asterisk/gen \
-	&& chown node:node /etc/asterisk/gen
+	&& mkdir -p /etc/asterisk/gen /backups \
+	&& chown node:node /etc/asterisk/gen /backups
 COPY --from=build /app/node_modules node_modules
 COPY --from=build /app/packages/shared/dist packages/shared/dist
 COPY --from=build /app/packages/shared/package.json packages/shared/package.json

@@ -20,6 +20,8 @@ why the specified behaviour changed; the commit history, how.
 - The call log's `sip` level recorded nothing for a call refused at once. Such a call now records
   its INVITE, its final response and the ACK, and at the default `events` level the trace names a
   number that matched no DID before the 404.
+- A backup to a new target failed on its first run: nothing created the target's restic
+  repository. The first run now creates it.
 - The Ringotel connection now carries the tenant's country, which the apps use to match callers'
   numbers to contacts, and follows a change of it.
 - A `ringotel` device reached Ringotel before Asterisk knew it: Ringotel's test registration
@@ -37,6 +39,10 @@ why the specified behaviour changed; the commit history, how.
 
 - A `ringotel-setup` help topic (`zamfono.help`): connecting the stack to Ringotel, from the API
   key through setup or adoption to the first device.
+- Backups from the first night on: a stack with `BACKUP_PASSWORD` in `.env` creates a `local`
+  backup target on the new `backups` volume when it has never had one, and `setup.sh` generates
+  the password. It is on the same host, so it covers a broken database or a bad upgrade, not a
+  lost host; add a target elsewhere for that.
 - The admin skill's tool list names each tool's REST endpoints, and the guide names each step by
   its MCP tool first, with the REST call beside it (`users.create` (`POST /users`)), so an MCP
   client no longer has to work out which tool a REST call is.
@@ -46,6 +52,11 @@ why the specified behaviour changed; the commit history, how.
 - The `api` and `core` images are smaller: they no longer carry the development tooling
   (about 150 MB each), and they share their ffmpeg layer, so a stack pulls it once instead of
   twice.
+
+### Upgrade notes
+
+- **Default backups:** add a `BACKUP_PASSWORD` to `.env` (`openssl rand -hex 24`) before `up -d`,
+  and keep it with your copy of `.env`; the stack then creates its local backup target at start.
 
 ## [0.0.5] - 2026-09-29
 

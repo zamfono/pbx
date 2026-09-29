@@ -30,6 +30,7 @@ import {
   type ExecFn
 } from './backupBackends.js';
 import {
+  ensureRepository,
   parseResticSummary,
   pruneSnapshots,
   RESTIC_BIN
@@ -96,6 +97,7 @@ export async function performBackup(
       RESTIC_REPOSITORY: repository,
       RESTIC_PASSWORD: secret.resticPassword
     };
+    await ensureRepository(deps.exec, { ...process.env, ...fullEnv }, options);
     await sql`VACUUM INTO ${snapshotFile}`.execute(db);
     const { stdout } = await deps.exec(
       RESTIC_BIN,

@@ -23,6 +23,7 @@ import { scheduleRetention } from './lib/jobs/retention.js';
 import { propagateAtBoot } from './lib/propagation.js';
 import { keyringFromEnv, type Keyring } from './lib/secretbox.js';
 import { seedIfEmpty } from './lib/seed.js';
+import { seedBackupTarget } from './lib/seedBackupTarget.js';
 import { WebhookDispatcher } from './lib/webhooks.js';
 
 // Global Constraints "Fixed internal ports": api's port is never configurable per stack.
@@ -99,9 +100,10 @@ async function acceptEventsSocket(
 }
 
 /**
- * First boot and the background jobs this bundle owns (§6.3 "First boot", §6.5 backups, §5.9 the
- * daily purge). The seed runs to completion first and its failure propagates, so the process never
- * reaches `server.listen` on a database without an owner, a settings row or its parking slots.
+ * First boot, the default backup target and the background jobs this bundle owns (§6.3 "First
+ * boot", §6.5 backups, §5.9 the daily purge). The seed runs to completion first and its failure
+ * propagates, so the process never reaches `server.listen` on a database without an owner, a
+ * settings row or its parking slots.
  * The Asterisk configuration is then rendered from that database (§3.1, §9.1), before `api`
  * reports healthy and so before `core` starts and reloads it.
  */
@@ -113,6 +115,7 @@ export async function startBootJobs(
   const mediaDir = mediaDirFromEnv();
   const seeded = await seedIfEmpty(db, process.env, kr, mediaDir, logger);
   logger.info({ seeded }, 'boot: first-boot seed');
+  await seedBackupTarget(db, process.env, kr, logger);
   await propagateAtBoot(db, logger);
   scheduleBackups(db, kr, { exec: execCommand, mediaDir, bus });
   scheduleRetention(db);

@@ -231,10 +231,14 @@ Generate the secrets:
 openssl rand -base64 32                       # JWT_SECRET
 printf '1:%s' "$(openssl rand -base64 32)"    # SECRETBOX_KEY
 openssl rand -hex 24                          # ARI_PASSWORD, and again for AMI_PASSWORD
+openssl rand -hex 24                          # BACKUP_PASSWORD
 ```
 
 **Keep a copy of `.env` outside the host.** `SECRETBOX_KEY` is the only way to read the encrypted
-columns; a backup of the database is useless without it.
+columns; a backup of the database is useless without it. `BACKUP_PASSWORD` opens the local backups:
+with it set, the stack backs up every night to the `backups` volume on this host from its first
+start. That covers a broken database or a bad upgrade, not a lost host: add a target elsewhere
+(`backups.targets.create`) before you rely on the stack.
 
 Fill in `FQDN`, `COMPANY_NAME`, `MAIN_DID`, `COUNTRY`, `BOOTSTRAP_OWNER_EMAIL`,
 `BOOTSTRAP_OWNER_NAME` and, if you have one, the mail relay (`SMTP_*`, `MAIL_FROM`). The comments

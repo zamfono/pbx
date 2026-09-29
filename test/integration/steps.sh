@@ -39,6 +39,7 @@ AMI_PASSWORD=ci-ami
 JWT_SECRET=$(openssl rand -base64 32)
 SECRETBOX_KEY=1:$(openssl rand -base64 32)
 SECRETBOX_KEY_PREVIOUS=
+BACKUP_PASSWORD=$(openssl rand -hex 32)
 SMTP_HOST=
 SMTP_PORT=
 SMTP_SECURITY=
@@ -150,4 +151,34 @@ register_device() {
   echo '== registering the answering device =='
   bash "$here/phone.sh" "$compose_cmd" register "$SIP_USERNAME" "$SIP_PASSWORD" >/dev/null \
     || fail "the answering device never registered"
+}
+
+# §6.5 "Default target": the stack's start created a `local` target from BACKUP_PASSWORD (on the
+# upgrade shard, the start of the release under test on a database the old one wrote, which had
+# none), and a manual run against it creates the repository and backs up for real, through the
+# image's own restic. Selectable as `backups`; cheap enough to run on every shard.
+json_key() {
+  python3 -c 'import json, sys; print(json.load(sys.stdin)[sys.argv[1]])' "$1"
+}
+
+step_backups() {
+  echo '== backing up to the default local target =='
+  local target_id run_id status='running' attempt
+  target_id=$(api GET /backups/targets | python3 -c '
+import json, sys
+local = [t for t in json.load(sys.stdin)["items"]
+         if t["kind"] == "local" and t["params"].get("path") == "/backups/restic" and t["enabled"]]
+print(local[0]["id"] if len(local) == 1 else "")
+') || fail "GET /backups/targets did not answer"
+  [ -n "$target_id" ] || fail "the stack has no default local backup target"
+  run_id=$(api POST /backups/runs "{\"targetId\":\"$target_id\"}" | json_key id) \
+    || fail "POST /backups/runs refused the default target"
+  # The scheduler polls for queued runs; a first run also initializes the repository.
+  for attempt in $(seq 1 60); do
+    status=$(api GET "/backups/runs/$run_id" | json_key status)
+    [ "$status" = running ] || break
+    sleep 1
+  done
+  [ "$status" = ok ] || fail "the backup run ended $status: $(api GET "/backups/runs/$run_id")"
+  echo "   run $run_id ok after ${attempt}s"
 }

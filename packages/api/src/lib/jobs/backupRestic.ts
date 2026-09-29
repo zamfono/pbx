@@ -1,6 +1,6 @@
 /**
- * The restic commands a backup run issues (§6.5): reading the snapshot id and size from
- * `restic backup --json`, and applying the target's keep-daily/weekly/monthly policy with
+ * The restic commands a backup run issues (§6.5): creating a target's repository on its first run,
+ * reading the snapshot id and size from `restic backup --json`, and applying the target's keep-daily/weekly/monthly policy with
  * `restic forget --prune`. `backup.ts` holds the run lifecycle around them.
  */
 import process from 'node:process';
@@ -13,6 +13,32 @@ const logger = pino({ name: 'backup' });
 export const RESTIC_BIN = 'restic';
 
 type Summary = { snapshotId: string; bytes: number };
+
+// restic's exit code for "no repository at this location" (restic 0.17 on), which a wrong
+// password (12) or an unreachable backend (1) is not.
+const RESTIC_NO_REPOSITORY = 10;
+
+/**
+ * Creates the target's repository when there is none at its location yet, so a new target,
+ * the default `local` one included (§6.5), needs no `restic init` by hand. Anything else that
+ * keeps `restic cat config` from reading the repository, a wrong password or a backend that does
+ * not answer, fails the run as it is: initializing over it would be wrong or would fail anyway.
+ */
+export async function ensureRepository(
+  exec: ExecFn,
+  env: NodeJS.ProcessEnv,
+  options: readonly string[]
+): Promise<void> {
+  try {
+    await exec(RESTIC_BIN, ['cat', 'config', ...options], { env });
+  } catch (error) {
+    if ((error as { code?: unknown }).code !== RESTIC_NO_REPOSITORY) {
+      throw error;
+    }
+    logger.info('no restic repository at the target yet; initializing it');
+    await exec(RESTIC_BIN, ['init', ...options], { env });
+  }
+}
 
 export function parseResticSummary(stdout: string): Summary {
   const lines = stdout.split('\n').filter(line => line.trim() !== '');

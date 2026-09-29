@@ -66,6 +66,8 @@ echo "$setup_config" | grep -qF "COMPANY_NAME: O'Brien & \$\$ons"
 echo "$setup_config" | grep -qF 'BOOTSTRAP_OWNER_PASSWORD_HASH: $$argon2id$$v=19$$m=65536,p=4,t=3$$c2FsdA$$aGFzaA'
 echo "$setup_config" | grep -qF 'COUNTRY: DE'
 echo "$setup_config" | grep -qE 'SECRETBOX_KEY: "?1:'
+echo "$setup_config" | grep -qE 'BACKUP_PASSWORD: "?[0-9a-f]{48}'
+echo "$setup_config" | grep -qF 'source: backups'
 # A second run must refuse: the .env it would replace holds the only SECRETBOX_KEY.
 if (cd "$bundle_dir/x" && ./setup.sh </dev/null >/dev/null 2>&1); then
   echo "setup.sh overwrote an existing .env" >&2

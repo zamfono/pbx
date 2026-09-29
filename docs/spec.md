@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-09-29 · §6.3 Compose file and Environment, §6.5 Backups.** A stack with `BACKUP_PASSWORD` in `.env` that has never had a backup target creates a `local` one on a new `backups` volume at start; a run creates its target's repository when there is none.
+*Why:* requested by the product owner, so a stack backs up from its first night instead of once someone adds a target; making it, the first run against any new target was found to fail, since nothing ran `restic init`. The password is in `.env` because the database, where every other target's password lives, is what the restore recovers.
+
 **2026-09-29 · §12 Admin skill.** The tool catalog also lists each operation's REST endpoints, and the guide names each step by its operation, with the REST call beside it.
 *Why:* requested by the product owner: the skill and the guide described only REST calls, while an MCP client calls tools, and nothing said which tool a `POST /users` was.
 
@@ -546,6 +549,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       SECRETBOX_KEY: ${SECRETBOX_KEY}           # encryption key for every *_enc column (§5.4)
       SECRETBOX_KEY_PREVIOUS: ${SECRETBOX_KEY_PREVIOUS:-}   # set only during a key rotation (§5.4)
+      BACKUP_PASSWORD: ${BACKUP_PASSWORD:-}     # restic password of the default local backup target; empty = none (§6.5)
       HEP_ENABLED: ${HEP_ENABLED:-true}         # false rejects call_log_level 'sip' (§7)
       SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-true} # false rejects trunks on that transport; both false reject plain devices (§9.3, §9.4)
       SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-true}
@@ -572,6 +576,7 @@ services:
       - db:/data
       - asterisk-config:/etc/asterisk/gen
       - caddy-data:/caddy-data:ro               # certificate sync source (§6.4)
+      - backups:/backups                        # the default local backup target's repository (§6.5)
     healthcheck:                                # gates core's start; 200 = database open, no pending migration (§6.3 "Health")
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
     restart: unless-stopped
@@ -592,6 +597,7 @@ services:
 volumes:
   media:
   db:
+  backups:
   caddy-data:
   asterisk-config:
 ```
@@ -696,6 +702,7 @@ handle /metrics/litestream {
 - `FQDN`, plus `STACK_IPV4` (macvlan mode) or `EXTERNAL_IPV4` (ports mode), §6.1;
 - `RTP_PORT_START`, `RTP_PORT_END`, `ARI_PASSWORD` and `AMI_PASSWORD` for Asterisk;
 - the JWT secret and the encryption key `SECRETBOX_KEY`, plus `SECRETBOX_KEY_PREVIOUS` while a key rotation is under way (§5.4). The encryption key is the only way to read the `*_enc` columns and secret settings, so `.env` is restored before the database in any recovery (§6.5);
+- optional `BACKUP_PASSWORD`, the restic password of the default backup target (§6.5 "Default target");
 - the optional mail relay as a first-boot seed: `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY`, `SMTP_USER`, `SMTP_PASSWORD`, copied into `settings.smtp_*` where owners edit them afterwards (§10.2 "Mail");
 - the first-boot seed ("First boot");
 - optional `TZ`, `TLS_RELOAD_HOUR` (§6.4), `CALL_LOG_MAX_BYTES` and `HEP_ENABLED` (§7, default `true`), `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED` (§9.1, default `true`), `METRICS_TOKEN` (§7; absent = no metrics endpoint), and `ZAMFONO_VERSION`, the tag of the five `zamfono/` images (default `latest`), which Compose also passes to `api` and `core` as the version they report (§7).
@@ -744,6 +751,8 @@ All hours resolve in the tenant's time zone: `settings.timezone` (an IANA name),
 
 - Target kinds: `local` (host path or volume), `ftp` and `ftps`, `sftp`, `s3`, `webdav`. Local, sftp and s3 use restic's native backends; ftp(s) and webdav go through restic's rclone backend.
 - Retention is a per-target restic forget policy in `params_json`, default 7 daily, 4 weekly, 6 monthly.
+- Default target: when `.env` sets `BACKUP_PASSWORD` and the stack has never had a target, live or deleted, `api` creates a `local` target at start, its repository `/backups/restic` on the `backups` volume and `BACKUP_PASSWORD` its restic password, so a restore needs only `.env` to open it. It shares the host with the stack: it covers a damaged database or a bad upgrade, not the loss of the host.
+- A run creates its target's repository when there is none at the location yet.
 - The restic repository password lives in the target's `secret_enc` next to the backend credentials. That column is readable only with the `.env` encryption key, so every restore starts from the preserved `.env` (§6.3).
 - Every run is a `backup_runs` row (§11.2), the store behind `GET /backups/runs`, and emits `backup.started`, `backup.finished` (snapshot id, bytes, duration) and `backup.failed` events over `/events` and webhooks (§10.6).
 - A row still `running` when `api` starts belongs to a run its previous process did not finish; the start marks it `failed` with error `interrupted`.
