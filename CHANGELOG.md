@@ -11,6 +11,8 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-09-29
+
 ### Added
 
 - `provisioning.ringotelAdopt` (`POST /provisioning/ringotel/adopt`): takes over a Ringotel
@@ -27,6 +29,8 @@ why the specified behaviour changed; the commit history, how.
 
 - `provisioning.ringotelSetup` refuses a region or package the account does not offer before it
   creates anything, and names the ones it does.
+- The release bundle holds this `CHANGELOG.md`, and each release's description is its section
+  here.
 
 ## [0.0.4] - 2026-09-29
 
@@ -108,7 +112,8 @@ why the specified behaviour changed; the commit history, how.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.0.5...HEAD
+[0.0.5]: https://github.com/zamfono/pbx/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/zamfono/pbx/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/zamfono/pbx/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/zamfono/pbx/compare/v0.0.1...v0.0.2
