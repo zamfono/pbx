@@ -50,6 +50,35 @@ export function userOutcomeDecision(
   );
 }
 
+type EntryUser = {
+  id: string;
+  dnd: boolean;
+  mailboxEnabled: boolean;
+  findMe: { number: string; delayS: number }[] | null;
+  registeredDevices: number;
+};
+
+/**
+ * Why `userEntryDecision` decides as it does, for the routing trace (§7 "fallback taken"): an
+ * `unconditional` forward, DND, `offline` (no registered device and no find-me entry), or `null`
+ * when the user's devices ring.
+ */
+export function userEntryCondition(
+  user: EntryUser,
+  rules: Partial<Record<EntryCondition, ForwardTarget>>
+): 'unconditional' | 'dnd' | 'offline' | null {
+  if (rules.unconditional) {
+    return 'unconditional';
+  }
+  if (user.dnd) {
+    return 'dnd';
+  }
+  if (user.registeredDevices === 0 && (user.findMe ?? []).length === 0) {
+    return 'offline';
+  }
+  return null;
+}
+
 /**
  * The Entry-time decision for a direct call to `user`: an unconditional forward wins outright;
  * DND applies its rule or the implicit default; a user with no registered device and no find-me
@@ -57,27 +86,21 @@ export function userOutcomeDecision(
  * (§10.1 step 4).
  */
 export function userEntryDecision(
-  user: {
-    id: string;
-    dnd: boolean;
-    mailboxEnabled: boolean;
-    findMe: { number: string; delayS: number }[] | null;
-    registeredDevices: number;
-  },
+  user: EntryUser,
   rules: Partial<Record<EntryCondition, ForwardTarget>>
 ): UserDecision {
-  if (rules.unconditional) {
+  const condition = userEntryCondition(user, rules);
+  if (condition === 'unconditional' && rules.unconditional) {
     return { kind: 'forward', target: rules.unconditional };
   }
-  if (user.dnd) {
+  if (condition === 'dnd') {
     if (rules.dnd) {
       return { kind: 'forward', target: rules.dnd };
     }
     return implicitDefault(user, RELEASE_CODE_BUSY);
   }
-  const findMe = user.findMe ?? [];
-  if (user.registeredDevices === 0 && findMe.length === 0) {
+  if (condition === 'offline') {
     return userOutcomeDecision(user, rules, 'offline');
   }
-  return { kind: 'ring', findMe };
+  return { kind: 'ring', findMe: user.findMe ?? [] };
 }

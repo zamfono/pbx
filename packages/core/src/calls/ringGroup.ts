@@ -72,7 +72,7 @@ async function applyGroupFallback(
     return;
   }
   if (action.kind === 'mailbox') {
-    await pipeline.deposit(call, { ringGroupId: action.ringGroupId });
+    await pipeline.deposit(call, { ringGroupId: action.ringGroupId }, outcome);
     return;
   }
   await release(pipeline, call, action.code, 'missed');

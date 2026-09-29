@@ -151,6 +151,21 @@ describe('applyOooAndHours', () => {
     expect(ran[0]).toMatchObject({ id: closedTargetId });
   });
 
+  it('traces the opening-hours evaluation also when no schedule applies (§7)', async () => {
+    await seedTenantHours(db, 'UTC');
+    await db.deleteFrom('openingHoursIntervals').execute();
+    await db.deleteFrom('openingHours').execute();
+    const snapshot = await new ConfigCache(db).get();
+    const { pipeline } = stubPipeline('2026-01-05T10:00:00.000Z');
+    const call = inboundCall();
+
+    await applyOooAndHours(pipeline, call, snapshot, 'tenant');
+
+    expect(call.log.finish().log).toContain(
+      '"event":"hours","scope":"tenant","schedule":null'
+    );
+  });
+
   it('prefers settings.timezone over the stack TZ', async () => {
     await seedTenantHours(db, 'UTC');
     const snapshot = await new ConfigCache(db).get();

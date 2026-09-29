@@ -18,6 +18,8 @@ export type GroupLeg = {
   userId: string | null;
   memberKey: string;
   state: 'ringing' | 'ended';
+  /** The device a member's own leg rings; absent for an external (forwarded) member leg. */
+  deviceId?: string;
 };
 
 // --- Task 31 ---
@@ -106,7 +108,8 @@ async function originateDevices(
       channelId: channel.id,
       userId: owner.userId,
       memberKey: owner.memberKey,
-      state: 'ringing'
+      state: 'ringing',
+      deviceId: device.id
     };
     tracked.set(channel.id, leg);
     pipeline.deps.cdr.registerLeg?.(call, channel.id);

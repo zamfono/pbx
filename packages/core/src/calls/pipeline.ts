@@ -8,6 +8,7 @@ import { ConfigCache, EventBus, StateStore } from '../internal/server.js';
 import type { Presence } from '../presence.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import type { Call, Owner } from './call.js';
+import { noteHangupRequest } from './callEnd.js';
 import { enterTarget, handleInboundStart, runTarget } from './inbound.js';
 import {
   handleChannelEnded,
@@ -19,7 +20,7 @@ import {
 import type { ParticipationRecorder } from './recordParticipation.js';
 import { ringUser } from './ringUser.js';
 import type { TrunkState } from './trunkState.js';
-import { deposit, type MailSender } from './voicemail.js';
+import { deposit, type DepositReason, type MailSender } from './voicemail.js';
 
 export { ConfigCache, EventBus, StateStore };
 
@@ -125,6 +126,7 @@ export class Pipeline {
     if (ev.type === 'ChannelHangupRequest') {
       const call = this.callByChannel.get((ev.channel as Channel).id);
       if (call !== undefined) {
+        noteHangupRequest(call, ev);
         await this.deps.cdr.captureQos?.(call);
       }
       return;
@@ -186,7 +188,11 @@ export class Pipeline {
 
   /** §10.1 steps 4 and 5: the mailbox outcome of a ring that went unanswered. Routed through the
    * pipeline because `call.ts` holds those outcomes and `voicemail.ts` reads `call.ts`. */
-  async deposit(call: Call, mailbox: Owner): Promise<void> {
-    await deposit(this, call, mailbox);
+  async deposit(
+    call: Call,
+    mailbox: Owner,
+    reason: DepositReason | null = null
+  ): Promise<void> {
+    await deposit(this, call, mailbox, reason);
   }
 }

@@ -25,6 +25,24 @@ const RELEASE_CODE_SERVER_ERROR = 500;
  * `baseUrl` field. */
 export type MailSender = Pick<ApiClient, 'mail'>;
 
+/**
+ * Why a call reached a mailbox, for the `voicemail` trace line (§7 "fallback taken"): the user's
+ * DND or `offline` at Entry, a ring's `busy` or `noAnswer` outcome, a ring group's `unanswered` or
+ * `unavailable` fallback, a mailbox as the forward target itself (`target`), an anonymous caller
+ * rejected (`rejectAnonymous`), the hop limit (`hopLimit`) or the `*97` feature code (`feature`).
+ */
+export type DepositReason =
+  | 'dnd'
+  | 'offline'
+  | 'busy'
+  | 'noAnswer'
+  | 'unanswered'
+  | 'unavailable'
+  | 'target'
+  | 'rejectAnonymous'
+  | 'hopLimit'
+  | 'feature';
+
 /** The mailbox owner's display name and greeting, from the config snapshot (FK-guaranteed present). */
 function findOwner(
   snapshot: Snapshot,
@@ -57,7 +75,8 @@ function mailDeps(
 async function recordMessage(
   pipeline: Pipeline,
   call: Call,
-  mailbox: Owner
+  mailbox: Owner,
+  reason: DepositReason | null
 ): Promise<void> {
   const deps = mailDeps(pipeline);
   if (deps === null) {
@@ -77,7 +96,7 @@ async function recordMessage(
   // asterisk image's own configuration; this name is core's side of that path.
   const recordingName = `voicemail/${id}`;
 
-  call.log.event({ event: 'voicemail', mailbox });
+  call.log.event({ event: 'voicemail', mailbox, reason });
   await pipeline.deps.ari.channels
     .answer(call.callerChannelId)
     .catch(() => undefined);
@@ -100,7 +119,13 @@ async function recordMessage(
     snapshot.settings.voicemailMaxS
   );
   if (outcome.kind !== 'finished') {
-    call.log.event({ event: 'voicemailFailed', mailbox, reason: outcome.kind });
+    // A recording that ended with the channel, the caller having hung up, is a caller who left
+    // no message, not a fault.
+    const failure =
+      outcome.kind === 'destroyed' && call.ending?.by === 'caller'
+        ? 'callerHungUp'
+        : outcome.kind;
+    call.log.event({ event: 'voicemailFailed', mailbox, reason: failure });
     // A caller already gone left no message rather than hitting a recording fault.
     const callerLeft =
       outcome.kind === 'destroyed' || call.callerEnded === true;
@@ -138,15 +163,17 @@ async function recordMessage(
  * ordinary end of a message, and only the recording's outcome, which follows the channel, says
  * whether the call ends as `voicemail` with the voicemail mail alone (§10.2 "Mail") or as
  * `missed`. A flow that stops short of closing the row after the caller left still closes it.
+ * `reason` is why the call reached the mailbox, for its trace line (§7 "fallback taken").
  */
 export async function deposit(
   pipeline: Pipeline,
   call: Call,
-  mailbox: Owner
+  mailbox: Owner,
+  reason: DepositReason | null = null
 ): Promise<void> {
   call.depositing = true;
   try {
-    await recordMessage(pipeline, call, mailbox);
+    await recordMessage(pipeline, call, mailbox, reason);
   } finally {
     // eslint-disable-next-line require-atomic-updates -- the deposit is this flag's only writer; nothing else clears it meanwhile
     call.depositing = false;

@@ -435,7 +435,11 @@ describe('CallActions', () => {
       requestId: 'req-1',
       target: '102'
     });
-    expect(lines.at(-1)).toMatchObject({ event: 'hangup', actorUserId });
+    // The REST hangup, then the end it made: the core's own, not a party's (§7).
+    expect(lines.slice(-2)).toMatchObject([
+      { event: 'hangup', actorUserId },
+      { event: 'ended', by: 'system' }
+    ]);
   });
 
   it('dials an external target through the user routes and trunks after the device answers', async () => {

@@ -11,6 +11,7 @@ import { targetFromRow, type ForwardTarget } from '../routing/targets.js';
 import { notifyMissedCall } from './missedCall.js';
 import type { Pipeline } from './pipeline.js';
 import { sipToHangupCause } from './releaseCause.js';
+import type { DepositReason } from './voicemail.js';
 
 export type CallsRow = Selectable<DB['calls']>;
 
@@ -22,6 +23,10 @@ export type Leg = {
   userId: string | null;
   state: 'ringing' | 'up' | 'ended';
   endCause: number | null;
+  /** The device a `device` or `member` leg rings, the trunk a `trunk` leg dials over; for the
+   * routing trace's `answered` line (§7). */
+  deviceId?: string;
+  trunkId?: string;
 };
 
 export type Call = {
@@ -62,6 +67,15 @@ export type Call = {
   depositing?: boolean;
   /** The caller's own channel has ended (`legsEnded.ts`'s `endCallerCall`). */
   callerEnded?: boolean;
+  /** Who ended the call (`callEnd.ts`): the first hangup request on the caller or an answered
+   * leg, and whether the `ended` trace line is written yet. */
+  ending?: CallEnding;
+};
+
+export type CallEnding = {
+  by: 'caller' | 'callee' | 'system';
+  channelId: string;
+  logged: boolean;
 };
 
 export type NewCallParams = {
@@ -167,10 +181,14 @@ export async function endTargetOwner(
   call: Call,
   owner: Owner | null,
   snapshot: Snapshot,
-  fallback: { code: number; status: CallsRow['status'] }
+  fallback: {
+    code: number;
+    status: CallsRow['status'];
+    reason: DepositReason;
+  }
 ): Promise<void> {
   if (owner !== null && ownerMailboxEnabled(owner, snapshot)) {
-    await pipeline.deposit(call, owner);
+    await pipeline.deposit(call, owner, fallback.reason);
     return;
   }
   await release(pipeline, call, fallback.code, fallback.status);

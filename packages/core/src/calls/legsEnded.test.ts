@@ -6,8 +6,10 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import type { AriEvent, Logger } from '../ari/types.js';
+import { eventually } from '../testing/eventually.js';
 import { settleAnswered } from './answer.js';
 import { newCall, type Call, type Leg } from './call.js';
+import { noteHangupRequest } from './callEnd.js';
 import { trackLeg, type RingOutcome } from './legs.js';
 import { handleChannelEnded } from './legsEnded.js';
 import {
@@ -263,5 +265,119 @@ describe('handleChannelEnded, the caller channel', () => {
     pipeline.pendingRing.clear();
     call.legs.clear();
     await expect(ringOutcomeFor([17, 21])).resolves.toBe('noAnswer');
+  });
+
+  /** The call's routing-trace lines so far. */
+  function traceLines(): Record<string, unknown>[] {
+    return (call.log.finish().log ?? '')
+      .split('\n')
+      .filter(line => line !== '')
+      .map(line => JSON.parse(line) as Record<string, unknown>);
+  }
+
+  function hangupRequest(channelId: string, soft = false): AriEvent {
+    return {
+      type: 'ChannelHangupRequest',
+      channel: { id: channelId },
+      cause: 16,
+      ...(soft ? { soft: true } : {})
+    } as unknown as AriEvent;
+  }
+
+  it('traces the callee who hung up an answered call, with the cause, once (§7)', async () => {
+    answeredLeg();
+    call.status = 'answered';
+    fakeAri.addChannel({ id: CALLER_CHANNEL });
+
+    noteHangupRequest(call, hangupRequest(MEMBER_CHANNEL));
+    await handleChannelEnded(pipeline, {
+      type: 'ChannelDestroyed',
+      channel: { id: MEMBER_CHANNEL },
+      cause: 16,
+      // eslint-disable-next-line camelcase -- ARI's own event field name
+      cause_txt: 'Normal Clearing',
+      // eslint-disable-next-line camelcase -- ARI's own event field name
+      tech_cause: 200
+    } as unknown as AriEvent);
+    // The core then hangs the caller up: its own, soft, request, which changes nothing.
+    noteHangupRequest(call, hangupRequest(CALLER_CHANNEL, true));
+    await handleChannelEnded(pipeline, callerDestroyed());
+
+    expect(traceLines().filter(line => line.event === 'ended')).toEqual([
+      {
+        callId: call.id,
+        event: 'ended',
+        by: 'callee',
+        channelId: MEMBER_CHANNEL,
+        cause: 16,
+        causeTxt: 'Normal Clearing',
+        sipCode: 200
+      }
+    ]);
+  });
+
+  it('traces a caller who hung up while ringing, and the core hanging up as system', async () => {
+    noteHangupRequest(call, hangupRequest(CALLER_CHANNEL));
+    await handleChannelEnded(pipeline, callerDestroyed());
+    expect(traceLines()).toContainEqual(
+      expect.objectContaining({ event: 'ended', by: 'caller' })
+    );
+
+    const released = newCall({
+      id: newId(),
+      direction: 'inbound',
+      callerChannelId: 'caller-2',
+      from: '+15559999',
+      to: '+15551000',
+      startedAt: nowIso(),
+      logLevel: 'events',
+      callLogMaxBytes: 1_048_576
+    });
+    pipeline.registerCall(released);
+    noteHangupRequest(released, hangupRequest('caller-2', true));
+    await handleChannelEnded(pipeline, destroyed('caller-2'));
+    expect(released.log.finish().log).toContain('"by":"system"');
+  });
+
+  it('traces the answering trunk leg by its trunk, and the codecs of both sides (§7)', async () => {
+    const trunkChannel = 'trunk-1';
+    fakeAri.addChannel({ id: CALLER_CHANNEL });
+    fakeAri.addChannel({ id: trunkChannel });
+    fakeAri.channelVariables.set(
+      `${CALLER_CHANNEL}:CHANNEL(audionativeformat)`,
+      '(g722)'
+    );
+    fakeAri.channelVariables.set(
+      `${trunkChannel}:CHANNEL(audionativeformat)`,
+      '(alaw)'
+    );
+    call.legs.set(trunkChannel, {
+      channelId: trunkChannel,
+      kind: 'trunk',
+      userId: null,
+      state: 'ringing',
+      endCause: null,
+      trunkId: 'trunk-a'
+    });
+
+    await settleAnswered(pipeline, call, trunkChannel);
+
+    const answered = traceLines().find(line => line.event === 'answered');
+    expect(answered).toEqual({
+      callId: call.id,
+      event: 'answered',
+      channelId: trunkChannel,
+      leg: 'trunk',
+      trunkId: 'trunk-a'
+    });
+    await eventually(() => {
+      expect(traceLines()).toContainEqual({
+        callId: call.id,
+        event: 'codecs',
+        channelId: trunkChannel,
+        caller: 'g722',
+        callee: 'alaw'
+      });
+    });
   });
 });

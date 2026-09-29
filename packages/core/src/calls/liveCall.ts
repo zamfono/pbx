@@ -5,6 +5,7 @@
  * resolution, is `routeToTarget.ts`'s.
  */
 import type { Call, CallsRow } from './call.js';
+import { traceSystemEnd } from './callEnd.js';
 import { clearFindMeTimers } from './legs.js';
 import { notifyMissedCall } from './missedCall.js';
 import type { Pipeline } from './pipeline.js';
@@ -41,6 +42,10 @@ export async function closeCall(
   status: CallsRow['status'],
   hangupChannels: boolean
 ): Promise<void> {
+  // §7: the RTP statistics are read while the channels still exist, and before the legs below
+  // stop counting as up.
+  await pipeline.deps.cdr.captureQos?.(call);
+  traceSystemEnd(call);
   if (call.depositing === true) {
     // §10.2 "Voicemail": a caller in a mailbox deposit is hung up like one ending the message
     // themselves, and the deposit closes the row once the recording's outcome follows.
@@ -49,9 +54,6 @@ export async function closeCall(
       .catch(() => undefined);
     return;
   }
-  // §7: the RTP statistics are read while the channels still exist, and before the legs below
-  // stop counting as up.
-  await pipeline.deps.cdr.captureQos?.(call);
   const pending = pipeline.pendingRing.get(call.id);
   if (pending !== undefined) {
     clearTimeout(pending.timer);

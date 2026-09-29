@@ -566,6 +566,14 @@ describe('deposit', () => {
 
     const started = deposit(pipeline, call, { userId });
     await requestTo(fakeAri, 'POST', `channels/${channel.id}/record`);
+    // The caller's BYE: Asterisk's own hangup request, not the core's (soft) one.
+    fakeAri.emit({
+      type: 'ChannelHangupRequest',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: defaultChannel({ id: channel.id }),
+      cause: 16
+    });
     fakeAri.emit({
       type: 'ChannelDestroyed',
       timestamp: nowIso(),
@@ -574,6 +582,9 @@ describe('deposit', () => {
     });
     await started;
 
+    expect(call.log.finish().log).toContain(
+      `"event":"voicemailFailed","mailbox":{"userId":"${userId}"},"reason":"callerHungUp"`
+    );
     expect(cdr.statuses).toEqual(['missed']);
     expect(apiClient.sent.map(request => request.kind)).toEqual(['missedCall']);
     const rows = await db.selectFrom('voicemails').selectAll().execute();

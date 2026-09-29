@@ -53,11 +53,16 @@ export async function enterTarget(
   asUser: string | null
 ): Promise<void> {
   if (target.kind === 'mailboxUser') {
-    await deposit(pipeline, call, { userId: target.userId });
+    await deposit(pipeline, call, { userId: target.userId }, 'target');
     return;
   }
   if (target.kind === 'mailboxRingGroup') {
-    await deposit(pipeline, call, { ringGroupId: target.ringGroupId });
+    await deposit(
+      pipeline,
+      call,
+      { ringGroupId: target.ringGroupId },
+      'target'
+    );
     return;
   }
   if (target.kind === 'announcement') {
@@ -97,7 +102,8 @@ export async function enterTarget(
   ) {
     await endTargetOwner(pipeline, call, owner, snapshot, {
       code: RELEASE_CODE_REJECTED,
-      status: 'blocked'
+      status: 'blocked',
+      reason: 'rejectAnonymous'
     });
     return;
   }
@@ -142,7 +148,8 @@ export async function runTarget(
     }
     await endTargetOwner(pipeline, call, owner, snapshot, {
       code: RELEASE_CODE_UNAVAILABLE,
-      status: 'missed'
+      status: 'missed',
+      reason: 'hopLimit'
     });
     return;
   }

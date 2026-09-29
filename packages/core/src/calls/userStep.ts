@@ -5,7 +5,11 @@
  * their call (§10.1 step 7).
  */
 import type { Snapshot } from '../internal/server.js';
-import { userEntryDecision, userOutcomeDecision } from '../routing/user.js';
+import {
+  userEntryCondition,
+  userEntryDecision,
+  userOutcomeDecision
+} from '../routing/user.js';
 import { buildUserRules, raiseLogLevel, release, type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { registeredDevices } from './userDevices.js';
@@ -35,7 +39,7 @@ export async function applyRingOutcome(
     return;
   }
   if (decision.kind === 'mailbox') {
-    await pipeline.deposit(call, { userId: decision.userId });
+    await pipeline.deposit(call, { userId: decision.userId }, outcome);
     return;
   }
   if (decision.kind === 'release') {
@@ -61,16 +65,25 @@ export async function runUserStep(
   raiseLogLevel(call.log, user, pipeline.deps.now());
   // §10.1 step 4 "no registered device": the devices `ringUser` would ring, not every configured
   // one, so a user whose phones are all off meets `offline` at once rather than `noAnswer` later.
-  const decision = userEntryDecision(
-    {
-      id: user.id,
-      dnd: user.dnd === 1,
-      mailboxEnabled: user.mailboxEnabled === 1,
-      findMe: user.findMe,
-      registeredDevices: registeredDevices(pipeline, snapshot, userId).length
-    },
-    buildUserRules(snapshot, userId)
-  );
+  const entryUser = {
+    id: user.id,
+    dnd: user.dnd === 1,
+    mailboxEnabled: user.mailboxEnabled === 1,
+    findMe: user.findMe,
+    registeredDevices: registeredDevices(pipeline, snapshot, userId).length
+  };
+  const rules = buildUserRules(snapshot, userId);
+  const decision = userEntryDecision(entryUser, rules);
+  const reason = userEntryCondition(entryUser, rules);
+  // §7 "fallback taken": what the user step decided and why, with the device count `offline`
+  // reads, so a call that never rang a phone says whether any was registered.
+  call.log.event({
+    event: 'user',
+    userId,
+    decision: decision.kind,
+    ...(reason === null ? {} : { reason }),
+    registeredDevices: entryUser.registeredDevices
+  });
   if (decision.kind === 'ring') {
     await pipeline.ringUser(call, userId);
     return;
@@ -85,7 +98,12 @@ export async function runUserStep(
     return;
   }
   if (decision.kind === 'mailbox') {
-    await pipeline.deposit(call, { userId: decision.userId });
+    // A mailbox at Entry is DND's or `offline`'s implicit default (§10.1 step 4).
+    await pipeline.deposit(
+      call,
+      { userId: decision.userId },
+      reason === 'dnd' ? 'dnd' : 'offline'
+    );
     return;
   }
   const status = decision.code === RELEASE_CODE_BUSY ? 'busy' : 'missed';

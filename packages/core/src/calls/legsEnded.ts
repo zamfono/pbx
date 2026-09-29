@@ -5,6 +5,7 @@
  */
 import type { AriEvent, Channel } from '../ari/types.js';
 import type { Call } from './call.js';
+import { traceChannelEnded } from './callEnd.js';
 import { externalAttemptDialsOn } from './externalLeg.js';
 import { clearFindMeTimers, endLeg, hangupLeg } from './legs.js';
 import { finishAbandoned } from './missedCall.js';
@@ -154,6 +155,9 @@ export async function handleChannelEnded(
   const call = pipeline.callByChannel.get(channelId);
   if (call === undefined) {
     return;
+  }
+  if (ev.type === 'ChannelDestroyed') {
+    traceChannelEnded(call, ev);
   }
   if (channelId === call.callerChannelId) {
     // Only `ChannelDestroyed` ends the caller: a channel leaving Stasis need not be gone, and an

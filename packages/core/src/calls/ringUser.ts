@@ -23,7 +23,7 @@ async function ringDevices(
   pipeline: Pipeline,
   call: Call,
   userId: string,
-  devices: readonly { sipUsername: string }[],
+  devices: readonly { id: string; sipUsername: string }[],
   language: string
 ): Promise<void> {
   // §10.2 "Phone book": the contact's display name is the caller-ID name on the device legs.
@@ -47,7 +47,8 @@ async function ringDevices(
       kind: 'device',
       userId,
       state: 'ringing',
-      endCause: null
+      endCause: null,
+      deviceId: device.id
     });
     call.log.event({ event: 'rungDevice', channelId: channel.id, userId });
     // A phone that declined at once (486, 603) ended before it was tracked (§10.1 step 4).

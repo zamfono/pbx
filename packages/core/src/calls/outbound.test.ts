@@ -711,13 +711,30 @@ describe('outbound dialing', () => {
     await finished;
 
     expect(call.status).toBe('answered');
-    const causes = (call.log.finish().log ?? '')
+    const lines = (call.log.finish().log ?? '')
       .split('\n')
       .filter(Boolean)
-      .map(line => JSON.parse(line) as { event?: string; cause?: unknown })
-      .filter(entry => entry.event === 'attempt')
-      .map(entry => entry.cause);
-    expect(causes).toEqual([403, 'answered']);
+      .map(line => JSON.parse(line) as Record<string, unknown>);
+    const attempts = lines.filter(entry => entry.event === 'attempt');
+    expect(attempts.map(entry => entry.cause)).toEqual([403, 'answered']);
+    // §7: each attempt names the caller ID it presented, and the answer the trunk it came over.
+    expect(attempts[1]).toMatchObject({
+      trunkId: trunk2,
+      callerId: {
+        number: '+491110000',
+        format: 'e164',
+        header: 'from',
+        withheld: false
+      }
+    });
+    expect(lines).toContainEqual(
+      expect.objectContaining({
+        event: 'answered',
+        channelId: leg2.channelId,
+        leg: 'trunk',
+        trunkId: trunk2
+      })
+    );
   });
 
   it('ends on a 603 before alerting, the callee declining, without trying the next route', async () => {

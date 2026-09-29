@@ -158,7 +158,8 @@ async function attemptOnce(
     kind: 'trunk',
     userId: null,
     state: 'ringing',
-    endCause: null
+    endCause: null,
+    trunkId: trunk.id
   });
   // The live view (§10.6) shows the call ringing its external target from the first INVITE on.
   callRinging(pipeline.deps, call);
@@ -175,6 +176,14 @@ async function attemptOnce(
     routeId: route?.id ?? null,
     trunkId: trunk.id,
     endpoint,
+    // The caller ID the INVITE presented: the number as formatted for the trunk, the format and
+    // header(s) the trunk takes it in, and whether it was withheld (§9.4 "Caller ID", CLIR).
+    callerId: {
+      number: ctx.identity.number,
+      format: trunk.calleridFormat,
+      header: trunk.calleridHeader,
+      withheld: ctx.identity.withhold
+    },
     cause: attemptCause(outcome)
   });
   if (outcome.kind === 'answered') {

@@ -9,8 +9,24 @@
  */
 import type { Call, Leg } from './call.js';
 import { callUp } from './callState.js';
+import { traceCodecs } from './codecTrace.js';
 import type { Pipeline } from './pipeline.js';
 import { recordAnsweredParticipation } from './recordParticipation.js';
+
+/** What the `answered` line says of the leg that answered: its channel and kind, and whose it is —
+ * the trunk a `trunk` leg went out over, else the user and, for a phone, the device. */
+function answeredLeg(leg: Leg): Record<string, unknown> {
+  const owner =
+    leg.kind === 'trunk'
+      ? { trunkId: leg.trunkId ?? null }
+      : { userId: leg.userId };
+  return {
+    channelId: leg.channelId,
+    leg: leg.kind,
+    ...owner,
+    ...(leg.deviceId === undefined ? {} : { deviceId: leg.deviceId })
+  };
+}
 
 /**
  * Makes `leg` the answer of `call`, or returns false when another answer already won. Runs no
@@ -33,7 +49,7 @@ export function claimAnswer(
   leg.state = 'up';
   call.legs.set(leg.channelId, leg);
   pipeline.callByChannel.set(leg.channelId, call);
-  call.log.event({ event: 'answered', userId: leg.userId, ...trace });
+  call.log.event({ event: 'answered', ...answeredLeg(leg), ...trace });
   return true;
 }
 
@@ -94,6 +110,12 @@ export async function bridgeAnswered(
     await recorder?.onLegUp(call, leg);
   }
   callUp(pipeline.deps, call);
+  traceCodecs(
+    pipeline,
+    call,
+    leg,
+    existingBridgeId === null ? call.callerChannelId : null
+  );
   return true;
 }
 

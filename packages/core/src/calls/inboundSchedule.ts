@@ -97,6 +97,9 @@ export async function applyOooAndHours(
     scope
   );
   if (schedule === null) {
+    // §7 "OOO evaluation": a trace that shows no hours line would not say whether they were
+    // evaluated at all.
+    call.log.event({ event: 'hours', scope, schedule: null });
     return false;
   }
   // A zone `Intl` cannot use falls back rather than throwing, which would leave the call unrouted.
@@ -105,7 +108,8 @@ export async function applyOooAndHours(
     pipeline.deps.stackTz
   );
   const open = isOpen(schedule, pipeline.deps.now(), timezone);
-  call.log.event({ event: 'hours', scope, open });
+  // `schedule` is the scope whose opening hours applied: the target's own, else the tenant's.
+  call.log.event({ event: 'hours', scope, schedule: schedule.scope, open });
   if (open) {
     return false;
   }

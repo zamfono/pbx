@@ -228,6 +228,27 @@ describe('user step against registration', () => {
     expect(Date.now() - started).toBeLessThan(900);
   });
 
+  it('traces why the user step sent the call to the mailbox (§7 "fallback taken")', async () => {
+    const userId = await seedUser(db, ['e101-da']);
+
+    await runUserStep(pipeline, call, await pipeline.deps.cache.get(), userId);
+
+    const lines = (call.log.finish().log ?? '')
+      .split('\n')
+      .map(line => JSON.parse(line) as Record<string, unknown>);
+    expect(lines).toContainEqual({
+      callId: call.id,
+      event: 'user',
+      userId,
+      decision: 'mailbox',
+      reason: 'offline',
+      registeredDevices: 0
+    });
+    expect(lines).toContainEqual(
+      expect.objectContaining({ event: 'voicemail', reason: 'offline' })
+    );
+  });
+
   it('rings the registered phone, then applies the noAnswer rule on timeout', async () => {
     const userId = await seedUser(db, ['e101-da', 'e101-db']);
     await seedAnnouncementRule(db, userId, 'offline', 'offline.wav');

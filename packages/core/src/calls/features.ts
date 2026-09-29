@@ -195,7 +195,7 @@ async function depositFeature(
     await release(pipeline, call, RELEASE_CODE_NOT_FOUND, 'failed');
     return;
   }
-  await deposit(pipeline, call, owner);
+  await deposit(pipeline, call, owner, 'feature');
 }
 
 /** Dispatches one feature-code dial (§9.3 table); unimplemented and unreachable keys share one refusal. */
