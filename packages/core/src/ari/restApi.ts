@@ -95,6 +95,25 @@ function buildBridgesApi(rest: AriRequests): BridgesApi {
 }
 
 /**
+ * Asterisk's `startup_time` (`2026-09-29T10:00:00.000+0000`, an offset without a colon) as ISO
+ * 8601 UTC; anything else is an error, since a start time nobody can compare says nothing.
+ */
+export function isoStartupTime(raw: unknown): string {
+  if (typeof raw === 'string') {
+    const parsed = Date.parse(
+      raw.replace(
+        /(?<hours>[+-]\d{2})(?<minutes>\d{2})$/u,
+        '$<hours>:$<minutes>'
+      )
+    );
+    if (!Number.isNaN(parsed)) {
+      return new Date(parsed).toISOString();
+    }
+  }
+  throw new Error(`ARI: unreadable startup_time ${JSON.stringify(raw)}`);
+}
+
+/**
  * Module reloads go through one `ModuleReloader` per client, which runs them one at a time and
  * retries the ones Asterisk refuses while another reload runs (`moduleReloader.ts`).
  */
@@ -102,7 +121,16 @@ function buildAsteriskApi(rest: AriRequests): AsteriskApi {
   const reloader = new ModuleReloader(name =>
     rest.void('PUT', `asterisk/modules/${name}`)
   );
-  return { reloadModule: name => reloader.reload(name) };
+  return {
+    reloadModule: name => reloader.reload(name),
+    startupTime: async () => {
+      const info = await rest.json<{ status?: { startup_time?: unknown } }>(
+        'GET',
+        'asterisk/info?only=status'
+      );
+      return isoStartupTime(info.status?.startup_time);
+    }
+  };
 }
 
 /** The whole ARI REST surface over `rest`. */

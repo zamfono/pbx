@@ -2,6 +2,8 @@
  * The core↔api internal API (§3, §3.1). `core` serves these on its internal HTTP+WS port; `api`
  * serves `/internal/mail`.
  */
+import type { ZamfonoVersion } from './version.js';
+
 export type ReloadKind = 'pjsip' | 'dialplan' | 'moh';
 
 /** `POST /internal/configChanged` → 204, once core has dropped its config cache, reloaded `reload`
@@ -64,6 +66,17 @@ export type HangupRequest = { actorUserId: string };
 
 /** `POST /internal/mwi/{mailbox}` → 204: core re-reads the mailbox's counts and pushes MWI (§3.1, §9.3). */
 export type MwiMailbox = `user:${string}` | `ringGroup:${string}`;
+
+/**
+ * `GET /internal/version` (§7 "Version"): what `core` runs, since when, and since when the
+ * Asterisk it is connected to runs. `asteriskStartedAt` is `null` while ARI is down or does not
+ * answer; a new value means a new Asterisk, which holds none of the registrations the one before
+ * held (§10.4 "After a restart").
+ */
+export type CoreVersionResponse = ZamfonoVersion & {
+  startedAt: string;
+  asteriskStartedAt: string | null;
+};
 
 /** `GET /healthz` (200 iff `ok`). */
 export type CoreHealth = { ok: boolean; ari: boolean; db: boolean };

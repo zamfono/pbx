@@ -195,17 +195,24 @@ describe('startInternalServer', () => {
     });
   });
 
-  it('answers /internal/version with the version and commit this core runs', async () => {
+  it('answers /internal/version with the version and commit this core runs, and since when', async () => {
     process.env.ZAMFONO_VERSION = '0.0.5';
     process.env.ZAMFONO_REVISION = 'a04ac57deadbeef';
     try {
       const response = await fetch(`http://127.0.0.1:${port}/internal/version`);
       expect(response.status).toBe(HTTP_OK);
-      await expect(response.json()).resolves.toEqual({
+      const body = (await response.json()) as Record<string, unknown>;
+      expect(body).toEqual({
         version: '0.0.5',
         revision: 'a04ac57deadbeef',
-        display: '0.0.5 (a04ac57)'
+        display: '0.0.5 (a04ac57)',
+        startedAt: expect.any(String) as unknown,
+        // The fake Asterisk's `startup_time`, `+0000` read as UTC.
+        asteriskStartedAt: '2026-09-29T08:00:00.000Z'
       });
+      expect(Date.parse(body.startedAt as string)).toBeLessThanOrEqual(
+        Date.now()
+      );
     } finally {
       delete process.env.ZAMFONO_VERSION;
       delete process.env.ZAMFONO_REVISION;
