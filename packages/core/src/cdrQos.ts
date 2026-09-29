@@ -19,9 +19,11 @@ import { carriedMedia, qosFigures, type QosFigures } from './qosFigures.js';
 // §7: `call_qos` is written at diagnostics level `qos` and `sip`, never at `none`/`events`.
 const QOS_ELIGIBLE_LEVELS: ReadonlySet<LogLevel> = new Set(['qos', 'sip']);
 
-/** How often a call's legs are read while it runs: Asterisk's own RTCP interval, so each sample
- * can carry a fresh receiver report. */
-export const QOS_SAMPLE_MS = 5000;
+/** How often a call's legs are read while it runs. The packet counts and this side's jitter move
+ * with every packet, the peer's figures with its RTCP reports (every 5 s by default); a short call
+ * that ends by a hangup keeps only what the samples before it read, so they come well inside
+ * that. One GET per leg, and only for a call at level `qos` or above. */
+export const QOS_SAMPLE_MS = 2000;
 
 type QosTarget = { channelId: string; role: 'caller' | 'callee' };
 
