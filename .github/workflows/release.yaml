@@ -5,7 +5,8 @@
 #                  registry is the build the compose jobs brought up on both runtimes.
 #   tag vX.Y.Z     `promote` adds X.Y.Z, X.Y, X and latest to the very manifests main published
 #                  for that commit, so a release is byte-identical to the edge build it came from;
-#                  then `cleanup` drops the sha- images the release contains.
+#                  then `bundle` publishes the GitHub release with deploy/ attached, and
+#                  `cleanup` drops the sha- images the release contains.
 #
 # A release never moves `edge`, so `latest` only ever names a release and `edge` only ever main.
 name: release
@@ -112,6 +113,40 @@ jobs:
           # TAGS is split into one argument per tag on purpose.
           # shellcheck disable=SC2086
           bash .github/scripts/promote-release.sh "$SOURCE_TAG" $TAGS
+
+  # The release exists only once its images carry its tags, so a bundle never names a version
+  # that cannot be pulled.
+  bundle:
+    needs: promote
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      # Sigstore signing of the provenance below, and storing it with the repository.
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Pack deploy/ with compose.yaml pinned to this release
+        run: bash .github/scripts/deploy-bundle.sh "${GITHUB_REF_NAME#v}" "$RUNNER_TEMP/bundle"
+      # Lets an operator check a download came from this workflow at this tag:
+      # gh attestation verify zamfono-deploy.tar.gz --repo zamfono/pbx
+      - name: Attest the two archives' provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: ${{ runner.temp }}/bundle/SHA256SUMS
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # A re-run, or a release a maintainer wrote by hand first, keeps its notes and gets the
+        # archives replaced; the bundle is reproducible, so a re-run uploads the same bytes.
+        run: |
+          assets=("$RUNNER_TEMP"/bundle/{zamfono-deploy.tar.gz,zamfono-deploy.zip,SHA256SUMS})
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" --clobber "${assets[@]}"
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes \
+              --title "$GITHUB_REF_NAME" "${assets[@]}"
+          fi
 
   cleanup:
     needs: promote

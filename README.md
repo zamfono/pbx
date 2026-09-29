@@ -20,58 +20,23 @@ The stack holds no host-specific values. Everything that varies lives in `.env`.
 
 ## Deploying
 
-Copy `deploy/` to the host and fill in `.env`:
-
-```bash
-cp deploy/.env.example deploy/.env
-```
-
-Then pick how the stack reaches its public address — this is the one structural decision, and it
-is the overlay you name on every `docker compose` command from then on:
+`deploy/README.md` walks through it step by step: both runtimes, both ways of attaching the stack
+to its public address, the firewall rules and the `.env`. In short:
 
 | Overlay                | Use it when                             | What it does                                                                                                   |
 | ---------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `compose.ports.yaml`   | one stack on a machine with one address | publishes ports on the host; `EXTERNAL_IPV4` tells Asterisk which address to write into SIP and SDP            |
 | `compose.macvlan.yaml` | several stacks on one host              | the `asterisk` container owns a public address on a `macvlan`/`ipvlan` network named `public`; no NAT anywhere |
 
-Generate the secrets `.env` asks for:
+Every release carries `deploy/` as one download, pinned to that release's images. Unpack it on
+the host, run `setup.sh` to write `.env`, and bring it up with the overlay you picked:
 
 ```bash
-openssl rand -base64 32                       # JWT_SECRET
-printf '1:%s' "$(openssl rand -base64 32)"    # SECRETBOX_KEY
-```
-
-The owner's password hash comes from the `api` image itself, so you never type a password into a
-file:
-
-```bash
-read -rs PW && printf '%s' "$PW" | docker compose run --rm --no-deps -T api node hash-password.mjs
-```
-
-Put the result in `.env` **in single quotes**. An Argon2id hash contains `$`, and Compose reads an
-unquoted `$` as a variable reference — the hash arrives at the container with pieces missing and
-the owner can never log in:
-
-```bash
-BOOTSTRAP_OWNER_PASSWORD_HASH='$argon2id$v=19$m=65536,p=4,t=3$...'
-```
-
-Leave `BOOTSTRAP_OWNER_PASSWORD_HASH` empty instead and the owner gets a set-password mail — which
-needs `SMTP_HOST` to be set.
-
-Bring it up:
-
-```bash
+mkdir -p /srv/zamfono && cd /srv/zamfono
+curl -fsSL https://github.com/zamfono/pbx/releases/latest/download/zamfono-deploy.tar.gz \
+  | tar xz --strip-components=1
+./setup.sh              # asks, generates the secrets, writes .env
 docker compose -f compose.yaml -f compose.ports.yaml up -d
-```
-
-The `migrate` container applies the schema and exits before `api` starts. On the first boot with an
-empty database, `api` seeds the owner, the settings, your `MAIN_DID`, nine parking slots and the
-bundled hold music — then never seeds again.
-
-Check it came up:
-
-```bash
 curl -fsS https://<your FQDN>/healthz
 ```
 
@@ -108,17 +73,17 @@ claude mcp add --transport http zamfono https://<your FQDN>/mcp
 
 ## Repository layout
 
-| Path              | What it is                                                                          |
-| ----------------- | ----------------------------------------------------------------------------------- |
-| `deploy/`         | everything you copy to the host: compose files, overlays, Caddyfile, `.env.example` |
-| `docs/guide/`     | the admin guide above                                                               |
-| `docs/spec.md`    | the full technical specification — the contract the code is built against           |
-| `images/`         | the Dockerfiles for `asterisk`, `api`, `core` and `proxy`                           |
-| `db/`             | the schema migration and the one-shot `migrate` image                               |
-| `packages/shared` | the database schema types, wire contracts and shared helpers                        |
-| `packages/core`   | the ARI client and the call pipeline                                                |
-| `packages/api`    | the operations layer, REST, MCP, OAuth, events and background jobs                  |
-| `skills/zamfono/` | the admin skill for Claude Code and Codex                                           |
+| Path              | What it is                                                                                                                               |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `deploy/`         | everything you copy to the host: compose files, overlays, Caddyfile, `.env.example`; each release attaches it as `zamfono-deploy.tar.gz` |
+| `docs/guide/`     | the admin guide above                                                                                                                    |
+| `docs/spec.md`    | the full technical specification — the contract the code is built against                                                                |
+| `images/`         | the Dockerfiles for `asterisk`, `api`, `core` and `proxy`                                                                                |
+| `db/`             | the schema migration and the one-shot `migrate` image                                                                                    |
+| `packages/shared` | the database schema types, wire contracts and shared helpers                                                                             |
+| `packages/core`   | the ARI client and the call pipeline                                                                                                     |
+| `packages/api`    | the operations layer, REST, MCP, OAuth, events and background jobs                                                                       |
+| `skills/zamfono/` | the admin skill for Claude Code and Codex                                                                                                |
 
 ## Developing
 
