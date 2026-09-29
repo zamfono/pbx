@@ -33,6 +33,8 @@ bring_up_stack() {
   local socket=/var/run/docker.sock
   [ "$RUNTIME" != podman ] || socket=/run/podman/podman.sock
 
+  # HEP_ENABLED is on, as a stack ships it (§7): the `*-sip-log-*` scenarios read the SIP
+  # messages Asterisk mirrors to the core.
   cat > "$repo/deploy/.env" <<ENV
 FQDN=$FQDN
 EXTERNAL_IPV4=127.0.0.1
@@ -62,7 +64,7 @@ EXT_LENGTH=3
 TZ=UTC
 TLS_RELOAD_HOUR=3
 CALL_LOG_MAX_BYTES=1048576
-HEP_ENABLED=false
+HEP_ENABLED=true
 SIP_UDP_ENABLED=true
 SIP_TCP_ENABLED=true
 METRICS_TOKEN=
