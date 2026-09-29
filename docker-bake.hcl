@@ -22,6 +22,14 @@ variable "DEVICES_IMAGE" { default = "zamfono/test-devices:ci" }
 variable "CACHE_FROM" { default = "" }
 variable "CACHE_TO" { default = "" }
 
+# FRESH builds every layer anew, reading no cache: ci.yaml sets it on a push to main, whose images
+# `publish` pushes, so each carries the current Debian and Node layers and the packages resolved
+# today. One stage is the exception: proxy's `build`, which compiles Caddy with its plugin from
+# inputs pinned in images/proxy/Dockerfile (the builder image, whose tag's current digest is part
+# of the cache key, Caddy's version, the plugin's), so a cached binary is the one a fresh compile
+# would produce, three minutes sooner. Its runtime stage, which ships, is built fresh like the rest.
+variable "FRESH" { default = false }
+
 # The full commit these images are built from (docs/spec.md §6.3 "Images", §7 "Version"), a build
 # arg on the five stack images alone; test-devices ships to no registry and reports no version.
 # Default empty, so a local `bake --load` still builds, just with no revision label or env.
@@ -30,6 +38,12 @@ variable "REVISION" { default = "" }
 function "cache_from" {
   params = [scope]
   result = CACHE_FROM == "gha" ? ["type=gha,scope=${scope}"] : []
+}
+
+# The cache proxy's pinned build stage reads in CI whether or not the run is FRESH.
+function "pinned_cache_from" {
+  params = [scope]
+  result = CACHE_TO == "gha" ? ["type=gha,scope=${scope}"] : []
 }
 
 # mode=max keeps the build stages' layers too, not only the final image's: the node images do
@@ -50,6 +64,7 @@ target "migrate" {
   args       = { ZAMFONO_REVISION = REVISION }
   cache-from = cache_from("migrate")
   cache-to   = cache_to("migrate")
+  no-cache   = FRESH
 }
 
 target "core" {
@@ -59,6 +74,7 @@ target "core" {
   args       = { ZAMFONO_REVISION = REVISION }
   cache-from = cache_from("core")
   cache-to   = cache_to("core")
+  no-cache   = FRESH
 }
 
 target "api" {
@@ -68,6 +84,7 @@ target "api" {
   args       = { ZAMFONO_REVISION = REVISION }
   cache-from = cache_from("api")
   cache-to   = cache_to("api")
+  no-cache   = FRESH
 }
 
 target "asterisk" {
@@ -77,6 +94,7 @@ target "asterisk" {
   args       = { ZAMFONO_REVISION = REVISION }
   cache-from = cache_from("asterisk")
   cache-to   = cache_to("asterisk")
+  no-cache   = FRESH
 }
 
 target "proxy" {
@@ -84,8 +102,10 @@ target "proxy" {
   dockerfile = "images/proxy/Dockerfile"
   tags       = [PROXY_IMAGE]
   args       = { ZAMFONO_REVISION = REVISION }
-  cache-from = cache_from("proxy")
+  cache-from = pinned_cache_from("proxy")
   cache-to   = cache_to("proxy")
+  # Everything but the `build` stage, which FRESH leaves to the cache (see FRESH above).
+  no-cache-filter = FRESH ? ["runtime"] : []
 }
 
 target "test-devices" {
@@ -94,4 +114,5 @@ target "test-devices" {
   tags       = [DEVICES_IMAGE]
   cache-from = cache_from("test-devices")
   cache-to   = cache_to("test-devices")
+  no-cache   = FRESH
 }

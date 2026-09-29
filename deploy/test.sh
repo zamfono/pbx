@@ -90,4 +90,5 @@ else
   docker build -f "$repo_root/images/core/Dockerfile" -t "$CORE_IMAGE" "$repo_root" >/dev/null
 fi
 
+
 echo "OK"

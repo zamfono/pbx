@@ -11,6 +11,12 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Changed
+
+- The `api` and `core` images are smaller: they no longer carry the development tooling
+  (about 150 MB each), and they share their ffmpeg layer, so a stack pulls it once instead of
+  twice.
+
 ## [0.0.5] - 2026-09-29
 
 ### Added

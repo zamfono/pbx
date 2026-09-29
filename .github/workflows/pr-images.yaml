@@ -1,6 +1,6 @@
 # Publishes a pull request's images for review, including one from a fork, and deletes them when
 # it closes. A reviewer runs them with deploy/compose.pr.yaml. The released images of §6.3
-# "Images" are release.yaml's alone; these go to packages of their own, ghcr.io/zamfono/<name>-pr,
+# "Images" are main.yaml's and release.yaml's alone; these go to packages of their own, ghcr.io/zamfono/<name>-pr,
 # tagged <N> (the pull request number, which moves to each newer build) and <N>-<short sha>, and
 # never `latest`.
 #

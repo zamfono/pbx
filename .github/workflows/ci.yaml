@@ -11,7 +11,7 @@ name: ci
 
 on:
   pull_request:
-  # Pushes to main and release tags run this through release.yaml, which publishes the images the
+  # Pushes to main run this through main.yaml, which publishes the images the
   # `images` job saved (§6.3 "Images"); a push trigger of its own would run it a second time.
   workflow_call:
 
@@ -30,7 +30,7 @@ env:
   DEVICES_IMAGE: zamfono/test-devices:ci
   # The upstream sipp image compose.test.yaml runs, by the exact name it asks the runtime for.
   # `images` pulls it into the archive, so no later job pulls from Docker Hub and both runtimes
-  # bring up the same bytes. release.yaml pushes only the five zamfono/ images, so this stays
+  # bring up the same bytes. main.yaml pushes only the five zamfono/ images, so this stays
   # unpublished.
   SIPP_IMAGE: ctaloi/sipp:latest
 
@@ -94,10 +94,11 @@ jobs:
         # `load` puts them in the local daemon. `source: .` builds this checkout, not a fetch of
         # the ref.
         #
-        # The layer cache serves pull requests alone. On a push to main, which is what release.yaml
-        # runs this for, these are the images `publish` pushes: they are built reading no cache and
+        # The layer cache serves pull requests. On a push to main, which is what main.yaml runs
+        # this for, these are the images `publish` pushes: FRESH builds them reading no cache and
         # with their base images pulled afresh, so each carries the current Debian and Node layers
-        # and the packages resolved today, never a layer an older run baked. Main still writes the
+        # and the packages resolved today, never a layer an older run baked; the one exception,
+        # proxy's pinned Caddy compile, docker-bake.hcl's FRESH explains. Main still writes the
         # cache (CACHE_TO): a pull request may read main's cache, main never reads a pull
         # request's, so a new pull request starts from main's layers rather than from nothing.
         #
@@ -111,9 +112,9 @@ jobs:
           source: .
           files: docker-bake.hcl
           load: true
-          no-cache: ${{ github.event_name != 'pull_request' }}
           pull: ${{ github.event_name != 'pull_request' }}
           vars: |
+            FRESH=${{ github.event_name != 'pull_request' }}
             CACHE_FROM=${{ github.event_name == 'pull_request' && 'gha' || '' }}
             CACHE_TO=gha
             REVISION=${{ github.event.pull_request.head.sha || github.sha }}
@@ -162,17 +163,20 @@ jobs:
         # :test tag and build it themselves when run standalone; here they're pointed at the
         # images the `images` job built, via IMAGE/IMAGE_TAG and via API_IMAGE/CORE_IMAGE/
         # PROXY_IMAGE from the env block above, so nothing is built twice and what is checked is
-        # the archive release.yaml publishes, asterisk with its label. `publish` there needs this
+        # the archive main.yaml publishes, asterisk with its label. `publish` there needs this
         # whole workflow, this job included, so a failed check stops the push as a failed build
         # does.
         run: |
           IMAGE="$MIGRATE_IMAGE" bash db/test.sh
           bash deploy/test.sh
+          # One bake run built api and core, so their identical ffmpeg step is one shared layer.
+          python3 images/shared-layer.py "$API_IMAGE" "$CORE_IMAGE" 'install -y --no-install-recommends ffmpeg '
           IMAGE_TAG="$API_IMAGE" bash images/api/test.sh
           IMAGE_TAG="$ASTERISK_IMAGE" bash images/asterisk/test.sh
           IMAGE_TAG="$PROXY_IMAGE" bash images/proxy/test.sh
 
   compose-docker:
+    name: compose-docker (${{ matrix.install }})
     needs: images
     runs-on: ubuntu-latest
     # Two runs of their own stacks, in parallel, each playing half the sipp scenarios (run.sh's
@@ -213,6 +217,7 @@ jobs:
           if-no-files-found: ignore
 
   compose-podman:
+    name: compose-podman (${{ matrix.install }})
     needs: images
     # Podman runs healthchecks and restart policies through systemd (§6.3 "Runtimes"), so the
     # runner has to be a systemd host rather than a container. §4 asks for Podman ≥ 5: Ubuntu

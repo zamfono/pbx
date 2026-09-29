@@ -34,11 +34,24 @@ RUN node -e "\
 # `import.meta.glob` over `docs/guide/**/*.md` (§10.5), so those files are inputs to the build.
 COPY docs/guide docs/guide
 RUN npm run build -w packages/api
+# The compile is done: the development dependencies (the TypeScript and test toolchain, the
+# linters, the SvelteKit build tooling) leave node_modules before the runtime stage copies it.
+# Without its lifecycle scripts: api's `prepare` runs `svelte-kit sync`, which the prune has just
+# removed, and the native modules were built by `npm ci` already.
+RUN npm prune --omit=dev --ignore-scripts
 
 FROM node:26-slim
 # Links the published package to its repository (§6.3 "Images").
 LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
 WORKDIR /app
+# Byte for byte the same as images/core/Dockerfile's first runtime step: bake builds the two images
+# in one run, builds an identical step once, and both images then share its ~460 MB layer, in CI's
+# archive and in an operator's pull (deploy/test.sh checks that they do).
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends ffmpeg \
+	&& rm -rf /var/lib/apt/lists/* \
+	&& mkdir -p /data /media \
+	&& chown node:node /data /media
 # The opsound packages carry the five bundled hold-music tracks (§10.2 "Hold music") as plain
 # data under /usr/share/asterisk/moh, in the 8 kHz wav and 16 kHz g722 variants. `api` is the
 # process that seeds them into the media volume and the `audio_assets` table on first boot
@@ -46,12 +59,12 @@ WORKDIR /app
 # backend (§6.5) spawns `ssh` from openssh-client, wrapped in `sshpass` to feed it the target's
 # password (`backupBackends.ts`).
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends ffmpeg restic rclone \
+	&& apt-get install -y --no-install-recommends restic rclone \
 	   openssh-client sshpass \
 	   asterisk-moh-opsound-wav asterisk-moh-opsound-g722 \
 	&& rm -rf /var/lib/apt/lists/* \
-	&& mkdir -p /data /media /etc/asterisk/gen \
-	&& chown node:node /data /media /etc/asterisk/gen
+	&& mkdir -p /etc/asterisk/gen \
+	&& chown node:node /etc/asterisk/gen
 COPY --from=build /app/node_modules node_modules
 COPY --from=build /app/packages/shared/dist packages/shared/dist
 COPY --from=build /app/packages/shared/package.json packages/shared/package.json

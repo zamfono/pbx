@@ -27,11 +27,19 @@ RUN node -e "\
 	pkg.exports['.'] = './dist/index.js'; \
 	pkg.types = './dist/index.d.ts'; \
 	fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + '\n');"
+# The compile is done: the development dependencies (the TypeScript and test toolchain, the
+# linters, the SvelteKit build tooling) leave node_modules before the runtime stage copies it.
+# Without its lifecycle scripts: api's `prepare` runs `svelte-kit sync`, which the prune has just
+# removed, and the native modules were built by `npm ci` already.
+RUN npm prune --omit=dev --ignore-scripts
 
 FROM node:26-slim
 # Links the published package to its repository (§6.3 "Images").
 LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
 WORKDIR /app
+# Byte for byte the same as images/api/Dockerfile's first runtime step: bake builds the two images
+# in one run, builds an identical step once, and both images then share its ~460 MB layer, in CI's
+# archive and in an operator's pull (deploy/test.sh checks that they do).
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends ffmpeg \
 	&& rm -rf /var/lib/apt/lists/* \

@@ -1,72 +1,24 @@
-# §6.3 "Images". Publishes the five images to ghcr.io/zamfono, and never builds one itself:
-#
-#   push to main   ci.yaml runs inside this workflow, and `publish` pushes the images its
-#                  `images` job built and saved as edge and sha-<short sha>, so what reaches the
-#                  registry is the build the compose jobs brought up on both runtimes.
-#   tag vX.Y.Z     `promote` adds X.Y.Z, X.Y, X and latest to the very manifests main published
-#                  for that commit, so a release is byte-identical to the edge build it came from;
-#                  then `bundle` publishes the GitHub release with deploy/ attached, and
-#                  `cleanup` drops the sha- images the release contains.
-#
-# A release never moves `edge`, so `latest` only ever names a release and `edge` only ever main.
+# §6.3 "Images", a vX.Y.Z tag: `promote` adds X.Y.Z, X.Y, X and latest to the very manifests main
+# published for that commit (main.yaml), so a release is byte-identical to the edge build it came
+# from and is never rebuilt; then `bundle` publishes the GitHub release with deploy/ attached and
+# the version's CHANGELOG.md section as its description, and `cleanup` drops the sha- images the
+# release contains. RELEASING.md is the maintainer's side of it.
 name: release
 
 on:
   push:
-    branches: [main]
     tags: ['v*']
 
 permissions: {}
 
-# Runs on one ref wait for each other rather than overlap: an older push to main that finished
-# after a newer one would move `edge` back to the older build. Nothing is cancelled, since a
-# cancelled run is a commit whose images never appear; GitHub still keeps at most one run waiting
-# per group, so of several pushes queued behind a running one only the newest publishes.
+# One run per tag at a time; a re-pushed tag waits for the run before it rather than overlapping.
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  ci:
-    if: github.ref_type == 'branch'
-    uses: ./.github/workflows/ci.yaml
-    permissions:
-      contents: read
-
-  publish:
-    needs: ci
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    env:
-      REGISTRY: ghcr.io/zamfono
-    steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: images
-          path: /tmp
-      - run: docker load -i /tmp/images.tar
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Push the five images as edge and sha-<short sha>
-        # zamfono/<name>:ci is what ci.yaml's env block tags them; the test-devices image in the
-        # same archive is a test fixture, and the sipp image there is upstream's, so both stay
-        # unpublished. The short sha is the name `promote` looks the build up by when this
-        # commit is released.
-        run: |
-          for name in asterisk migrate core api proxy; do
-            for tag in edge "sha-${GITHUB_SHA::7}"; do
-              docker tag "zamfono/$name:ci" "$REGISTRY/$name:$tag"
-              docker push "$REGISTRY/$name:$tag"
-            done
-          done
-
   promote:
-    if: github.ref_type == 'tag'
+    name: Tag the release images
     runs-on: ubuntu-latest
     # The wait below allows 45 minutes for main's run of the same commit; this leaves it room.
     timeout-minutes: 55
@@ -123,6 +75,7 @@ jobs:
   # The release exists only once its images carry its tags, so a bundle never names a version
   # that cannot be pulled.
   bundle:
+    name: GitHub release with the bundle
     needs: promote
     runs-on: ubuntu-latest
     permissions:
@@ -159,6 +112,7 @@ jobs:
           fi
 
   cleanup:
+    name: Prune the release's sha- images
     needs: promote
     runs-on: ubuntu-latest
     # Pruning is housekeeping: the release is out once `promote` is green, and a failure here must

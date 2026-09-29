@@ -39,7 +39,7 @@ The step from `0.X.Y` to `1.0.0` is a decision, made when the project is ready, 
    bash .github/scripts/changelog-section.sh X.Y.Z
    ```
 
-2. **Push `main` and wait for it to pass.** The `release` workflow's run for the commit must end
+2. **Push `main` and wait for it to pass.** The `main` workflow's run for the commit must end
    green, `publish` included: `promote` tags the images `publish` pushed as
    `sha-<short commit>`, and waits at most 45 minutes for them. A job that failed on a known
    flaky test is re-run (`gh run rerun <run> --failed`); a red commit is never tagged.

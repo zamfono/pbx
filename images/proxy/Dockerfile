@@ -19,7 +19,7 @@ WORKDIR /build
 # — `gh api repos/mholt/caddy-events-exec/tags`); it ships one Go module, `events.handlers.exec`.
 RUN xcaddy build --with github.com/mholt/caddy-events-exec@v0.1.0 --output /build/caddy
 
-FROM caddy:2.11.4
+FROM caddy:2.11.4 AS runtime
 # Links the published package to its repository (§6.3 "Images").
 LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
 
