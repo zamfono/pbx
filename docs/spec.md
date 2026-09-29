@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-09-29 · §3, §7 Levels, §11 `devices` and `call_qos`.** The routing trace also records the opening-hours evaluation when no schedule applies, the user step's decision with its reason and registered-device count, why a call reached a mailbox, the answering channel with its device or trunk, the codecs each side negotiated, the caller ID each trunk attempt presented, and who ended the call with the cause. `call_qos` is read every few seconds while the call runs, each leg keeping its last reading; its columns are defined (the worse direction's jitter and loss, the last measured round trip, NULL for what was never measured), and a leg without media has no row. `devices.last_registered_at` is the last time the device became reachable, not its latest REGISTER.
+*Why:* found on a 0.0.6 stack: every answered call had one `call_qos` row, the caller's, with jitter and loss NULL and a round trip of 0, since the core read fields `RTPstat` does not have; the leg that hung up first was read after its channel had gone, and a mailbox-answered call had none. Its log did not say why a call went to voicemail, although §11.3 has every fallback decision logged, nor who hung up. Asterisk raises `ContactStatusChange` only on a change of state, so a REGISTER refresh never reached the column its name suggests it tracks.
+
 **2026-09-29 · §6.3 Images, Compose file, Environment and Updates, §10.3 System.** The bundle carries `update.sh`, which downloads, verifies and installs a release and recreates the stack; a sixth image, `updater`, on the internal network only, runs it for the new `POST /system/update` (owner, confirmation, after a backup within the hour), only to a newer, non-breaking release; `GET /system/info` reports the latest release and the last update.
 *Why:* requested by the product owner: an upgrade was a sequence of commands to type correctly on the host, different on Podman, and an MCP client could see its version but neither whether a newer one existed nor install it. The updater drives the runtime through its socket rather than through the host's systemd, as the product owner chose, so it works the same on Docker and Podman.
 
@@ -144,7 +147,7 @@ Three long-running application services run per stack, plus the TLS proxy and a 
 
 - `api` owns the configuration tables: users, devices, trunks, trunk_hosts, outbound_routes, outbound_route_users, outbound_route_user_groups, outbound_route_numbers, dids, did_blocks, ring_groups, ring_group_members, user_groups, user_group_users, user_group_groups, extensions, device_blf_keys, forward_targets, user_forward_rules, ring_group_forward_rules, opening_hours, opening_hours_intervals, audio_assets, contacts, contact_phones, settings, ooo_rules, menus, menu_targets, blocked_numbers, mail_templates, tokens, oauth_clients, webhooks, backup_targets, backup_runs, audit_log.
 - `core` owns the runtime tables: calls, call_qos, voicemails, recordings, presence_log.
-- Known cross-writes: `api` updates and deletes `voicemails` and `recordings` rows through their REST endpoints and, after a voicemail change, calls `core`'s internal `/internal/mwi/{mailbox}` so the MWI counts follow (§9.3). `core` toggles `users.dnd` through the `*90`/`*91` feature codes and stamps `devices.last_registered_at` from `ContactStatusChange` events, a timestamp of an event rather than a state; a greeting recorded by phone (§10.2) makes `core` insert the `audio_assets` row, write its file to `media/prompts/` and set the mailbox's `mailbox_audio_id`. Live state such as a trunk's registration status never lands in a table (§10.1); `api` reads it from the core when a request needs it.
+- Known cross-writes: `api` updates and deletes `voicemails` and `recordings` rows through their REST endpoints and, after a voicemail change, calls `core`'s internal `/internal/mwi/{mailbox}` so the MWI counts follow (§9.3). `core` toggles `users.dnd` through the `*90`/`*91` feature codes and stamps `devices.last_registered_at` when a `ContactStatusChange` event reports the device's contact `Reachable`, a timestamp of an event rather than a state: the last time the device became reachable, not its latest REGISTER, since Asterisk raises no event for a registration refresh; a greeting recorded by phone (§10.2) makes `core` insert the `audio_assets` row, write its file to `media/prompts/` and set the mailbox's `mailbox_audio_id`. Live state such as a trunk's registration status never lands in a table (§10.1); `api` reads it from the core when a request needs it.
 
 **Config propagation.** After a config write, `api` regenerates the PJSIP configuration where needed and calls `core`'s internal `/internal/configChanged` endpoint. `core` invalidates its config cache and triggers the Asterisk reload over its ARI connection.
 
@@ -810,8 +813,8 @@ The database is therefore never the reason to re-architect; the single-tenant st
 
 **Per-call diagnostics level.** Four levels, `none`, `events`, `qos` and `sip`, each adding to the previous. A call's level is resolved at call setup as the maximum of the tenant default (`settings.call_log_level`, default `events`) and the overrides of the user, the trunk and the ring group that routed the call (`users.log_level`, `trunks.log_level`, `ring_groups.log_level`). An override can only raise the level, so its values are `events`, `qos` and `sip`, and NULL means no override; `none` exists only as the tenant default. Overrides expire automatically (`log_level_expires_at`); a request that sets a level without an expiry gets one 7 days out, so diagnostics never stay on by oversight. Level changes are audited like any other mutation (§5.7).
 
-- `events`: a structured routing trace — DID match, or the number that matched none before a 404 release, OOO evaluation, members rung, answers and declines, fallback taken, trunk and host selection, and every REST live-call action (transfer, pickup, hangup) with the acting user. Appended to `calls.log` as JSON lines, written once at call end.
-- `qos`: a per-leg RTCP summary, read through ARI `GET /channels/{id}/rtp_statistics` before the leg is hung up, stored in `call_qos` (§11) and queryable alongside the call history.
+- `events`: a structured routing trace — DID match, or the number that matched none before a 404 release, OOO and opening-hours evaluation (also when no schedule applies), members rung, answers (with the answering channel and its device, or its trunk) and declines, the codecs each side of the bridge negotiated, fallback taken and why (the user step's decision with its reason and registered-device count, the reason a call reached a mailbox), trunk and host selection with the caller ID each attempt presented, who ended the call (caller, callee, or the system itself) with the cause, and every REST live-call action (transfer, pickup, hangup) with the acting user. Appended to `calls.log` as JSON lines, written once at call end.
+- `qos`: a per-leg RTCP summary, read through ARI `GET /channels/{id}/rtp_statistics` every few seconds while the call runs and once more before the leg is hung up, each leg keeping its last reading, since a party that hangs up takes its statistics with its channel; stored in `call_qos` (§11) and queryable alongside the call history. A leg that carried no media has no row.
 - `sip`: the call's SIP messages, stored in `calls.log`. Asterisk mirrors every SIP message it sends or receives to `core` over HEP, the Homer Encapsulation Protocol (`res_hep` and `res_hep_pjsip`; collector address in the static `hep.conf`, §9.1). `core`'s UDP listener correlates by Call-ID and keeps messages only for calls at this level. A message is outbound when its source address is one of Asterisk's own: `STACK_IPV4` or `EXTERNAL_IPV4` from the environment plus the `asterisk` service's address on `internal`, since the transports bind the stack address in macvlan mode and the container address in ports mode (§9.1); every other message is inbound. A call at this level holds its join to the SIP dialog before routing starts and closes a few seconds after it ends, so a call refused at once still records its INVITE, its final response and the ACK.
 
 `HEP_ENABLED=false` in `.env` (§6.3) switches the mirror off in both containers and makes `sip` an invalid level, so the ladder ends at `qos`.
@@ -1515,7 +1518,9 @@ CREATE TABLE users (
 --                       list; required for 'plain', NULL for 'tls'
 --   sip_password_enc:   recoverable by design — Asterisk needs the plaintext in pjsip_users.conf;
 --                       revealed to admins only through the audited operation (§5.2)
---   last_registered_at: cross-written by core from ContactStatusChange events (§3)
+--   last_registered_at: cross-written by core when a ContactStatusChange event reports the
+--                       contact Reachable: when the device last became reachable, not its latest
+--                       REGISTER refresh, which raises no event (§3)
 CREATE TABLE devices (
   id                 TEXT    PRIMARY KEY,
   user_id            TEXT    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -2197,10 +2202,15 @@ CREATE TABLE calls (
   log                 TEXT
 );
 
--- call_qos — per-leg RTCP summary at hangup (§7, level ≥ qos).
+-- call_qos — per-leg RTCP summary, as of the leg's last reading before hangup (§7, level ≥ qos).
 --   channel_id: the leg's Asterisk channel; part of the key because a transfer adds a further
 --               callee leg, so 'role' alone would not be unique
 --   role:       the leg's side of the call
+--   jitter_ms:  interarrival jitter, the worse of the leg's own measurement and the peer's
+--               receiver report; NULL when neither measured any
+--   loss_pct:   lost packets in percent, the worse direction: missed on receive against expected,
+--               or reported missing by the peer against sent
+--   rtt_ms:     the last round trip measured from an RTCP receiver report; NULL while none arrived
 CREATE TABLE call_qos (
   call_id    TEXT    NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
   channel_id TEXT    NOT NULL,
