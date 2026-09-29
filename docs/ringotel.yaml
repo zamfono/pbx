@@ -2916,7 +2916,7 @@ components:
 
         **Caller ID / inbound matching**
 
-        - `displayname` **string**. Caller ID name sent to the PBX. Shell label "Display name", hint "Will serve as Caller ID name when making calls to your PBX" (Miscellaneous section). Default `""`. *(Shell UI bundle aa7d197e, 2026-09-29.)* This is the field `docs/spec.md` §10.4 names as the unconfirmed candidate for the core's caller-ID override winning over app-local contacts.
+        - `displayname` **string**. Caller ID name sent to the PBX. Shell label "Display name", hint "Will serve as Caller ID name when making calls to your PBX" (Miscellaneous section). Default `""`. *(Shell UI bundle aa7d197e, 2026-09-29.)* It does not make the PBX's caller name win over the app's contact book; that is `keepCallerName` (verified live 2026-09-29).
 
         - `inboundFormat` **string**. Reformats inbound caller numbers before they are matched to contacts. Shell label "Reformat inbound numbers", hint "Used to match callers to contacts". Possible values: `""` "Disabled", `e164` "+E.164", `national` "National (strip + and country code)", `national0` "National with leading 0". Default `""`.
 
@@ -2942,7 +2942,7 @@ components:
 
         **Internal call routing**
 
-        - `internal` **boolean**. Default `false`. *(Shell UI bundle: the Shell's own save logic clears this to `false` whenever `internalRouting` is not `3` — i.e. it only stays meaningful together with `internalRouting: 3`. This is the field `docs/spec.md` §10.4 names as the unconfirmed candidate for forcing internal calls through the PBX; going by this Shell logic, `internalRouting: 1` is the field that actually does that, and `internal` should likely be left `false`/omitted — not verified live.)*
+        - `internal` **boolean**. Default `false`. *(Shell UI bundle: the Shell's own save logic clears this to `false` whenever `internalRouting` is not `3` — i.e. it only stays meaningful together with `internalRouting: 3`. A legacy field: it stayed `false` through every setting of Internal calls routing, Route video calls and Route users' calls on a live branch (verified live 2026-09-29); `internalRouting: 1` is what forces internal calls through the PBX.)*
 
         - `internalRouting` **int**. How internal (extension-to-extension) calls are routed. Shell label "Internal calls routing", hint "Select how to route internal calls between the extensions". Possible values: `1` "Route internal calls through PBX only", `2` "Route internal calls through PBX if possible", `3` "Do not route internal calls through PBX". Default `2`. *(Verified live 2026-09-29: toggling this control and re-fetching the branch returned `internalRouting: 1` and `internalRouting: 3` for those two settings.)*
 
