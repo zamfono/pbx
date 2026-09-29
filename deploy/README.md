@@ -397,8 +397,8 @@ container. Where that log survives depends on the runtime's log driver:
 
 - **Docker** keeps a container's log in a file it deletes with the container, so a log from before
   the last upgrade is gone. To keep them, make the journal Docker's default log driver; containers
-  created from then on, on the next `up -d` or upgrade, log there, and `journalctl
-  CONTAINER_NAME=…` reads them as above:
+  created from then on, on the next `up -d` or upgrade, log there, and `journalctl` reads them as
+  above:
 
   ```bash
   echo '{ "log-driver": "journald" }' > /etc/docker/daemon.json   # merge by hand if the file exists
