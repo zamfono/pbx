@@ -162,7 +162,7 @@ export async function handleInboundStart(
   // watched from here so a hangup during the config read below is not missed.
   const countInboundLeg = pipeline.deps.trunkState?.watchInboundLeg(channel.id);
   const snapshot = await pipeline.deps.cache.get();
-  const { trunkId, called, from } = await inboundBoundary(
+  const { trunkId, called, calledFromTo, from } = await inboundBoundary(
     pipeline.deps.ari,
     channel,
     args[1] ?? '',
@@ -189,7 +189,13 @@ export async function handleInboundStart(
   await pipeline.deps.cdr.open(call);
   pipeline.registerCall(call);
   // §9.4 "Inbound numbers": the trunk that identified the call is recorded in its routing trace.
-  call.log.event({ event: 'trunk', trunkId });
+  // The called number's source is recorded where it was not the Request-URI (§9.4), so a
+  // registration trunk's routing on its `To` header shows in the trace at the `events` level.
+  call.log.event(
+    calledFromTo
+      ? { event: 'trunk', trunkId, calledFrom: 'to' }
+      : { event: 'trunk', trunkId }
+  );
   await setChannelLanguage(
     pipeline.deps.ari,
     call.callerChannelId,
@@ -213,6 +219,9 @@ export async function handleInboundStart(
     snapshot.settings.fallbackTargetId
   );
   if (resolved.kind === 'release') {
+    // Why the call is refused, at the default `events` level: the number looked up matched no
+    // DID, no number block and there is no tenant-wide fallback (§10.1 Entry).
+    call.log.event({ event: 'entry', result: 'noDid', called: call.to });
     await release(pipeline, call, resolved.code, 'failed');
     return;
   }

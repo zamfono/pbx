@@ -227,6 +227,61 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
     expect(call?.didId).toBe(accountDidId);
   });
 
+  it('takes the dialled number from To when the Request-URI names the registration account', async () => {
+    // mucpbx on 2026-09-29: `INVITE sip:zamfono-test@…;line=…`, `To: <sip:+498995409700@…>`.
+    const trunkId = await seedTrunk(db, 'e164');
+    const channel = fakeAri.addChannel({
+      name: `PJSIP/trunk-${trunkId}-0000002a`,
+      caller: { number: '+49892315194925', name: '' }
+    });
+    fakeAri.channelVariables.set(
+      `${channel.id}:PJSIP_HEADER(read,To)`,
+      '<sip:+4930123456@46.224.111.67:5060;user=phone>'
+    );
+
+    await pipeline.handleStasisStart(inboundEvent(channel, 'zamfono-test'));
+    const call = cdr.opened.find(item => item.callerChannelId === channel.id);
+
+    expect(call?.to).toBe('+4930123456');
+    expect(call?.didId).toBe(mainDidId);
+  });
+
+  it('normalizes a national number in To with the trunk’s format', async () => {
+    const trunkId = await seedTrunk(db, 'national');
+    const channel = fakeAri.addChannel({
+      name: `PJSIP/trunk-${trunkId}-0000002a`,
+      caller: { number: '0301111', name: '' }
+    });
+    fakeAri.channelVariables.set(
+      `${channel.id}:PJSIP_HEADER(read,To)`,
+      '"Office" <sip:030123456@provider.example>;tag=x'
+    );
+
+    await pipeline.handleStasisStart(inboundEvent(channel, 'acct-4711'));
+    const call = cdr.opened.find(item => item.callerChannelId === channel.id);
+
+    expect(call?.to).toBe('+4930123456');
+  });
+
+  it('keeps the account name when To names the account too', async () => {
+    const trunkId = await seedTrunk(db, 'national');
+    const accountDidId = await seedAnnouncementDid(db, 'acct-4711');
+    const channel = fakeAri.addChannel({
+      name: `PJSIP/trunk-${trunkId}-0000002a`,
+      caller: { number: '', name: '' }
+    });
+    fakeAri.channelVariables.set(
+      `${channel.id}:PJSIP_HEADER(read,To)`,
+      '<sip:acct-4711@provider.example>'
+    );
+
+    await pipeline.handleStasisStart(inboundEvent(channel, 'acct-4711'));
+    const call = cdr.opened.find(item => item.callerChannelId === channel.id);
+
+    expect(call?.to).toBe('acct-4711');
+    expect(call?.didId).toBe(accountDidId);
+  });
+
   it.each([
     ['RFC 3323 anonymous', 'Anonymous'],
     ['a provider’s word for a withheld number', 'Restricted'],
@@ -300,6 +355,42 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
 
     expect(traceEvents(call)).toContainEqual(
       expect.objectContaining({ event: 'trunk', trunkId })
+    );
+  });
+
+  it('says in the routing trace which number matched no DID before it releases with 404', async () => {
+    const trunkId = await seedTrunk(db, 'e164');
+
+    const call = await arrive(trunkId, 'zamfono-test', '+49892315194925');
+
+    expect(traceEvents(call)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event: 'entry',
+          result: 'noDid',
+          called: 'zamfono-test'
+        }),
+        expect.objectContaining({ event: 'release', code: 404 })
+      ])
+    );
+  });
+
+  it('records a called number taken from To in the routing trace', async () => {
+    const trunkId = await seedTrunk(db, 'e164');
+    const channel = fakeAri.addChannel({
+      name: `PJSIP/trunk-${trunkId}-0000002a`,
+      caller: { number: '+49892315194925', name: '' }
+    });
+    fakeAri.channelVariables.set(
+      `${channel.id}:PJSIP_HEADER(read,To)`,
+      '<sip:+4930123456@provider.example;user=phone>'
+    );
+
+    await pipeline.handleStasisStart(inboundEvent(channel, 'zamfono-test'));
+    const call = cdr.opened.find(item => item.callerChannelId === channel.id);
+
+    expect(traceEvents(call)).toContainEqual(
+      expect.objectContaining({ event: 'trunk', trunkId, calledFrom: 'to' })
     );
   });
 

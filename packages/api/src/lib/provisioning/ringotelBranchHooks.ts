@@ -190,6 +190,8 @@ export async function ringotelTenantProfileChanged(
   await deps.client.call('updateBranch', {
     id: settings.ringotelBranchId,
     orgid: settings.ringotelOrgId,
+    // The default country the app matches phone numbers against (the Shell's "Country").
+    country: settings.country,
     provision
   });
   // The organization's `params` object is written whole (§10.4), so every push carries

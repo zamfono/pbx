@@ -348,6 +348,45 @@ describe('CdrWriter', () => {
     expect(log).toContain('INVITE sip:101@pbx');
   });
 
+  it('records the dialog of a call released at once, its final response included (§7 level sip)', async () => {
+    // next.app.zamfono.com on 2026-09-29: a DID that matched nothing released the call 12 ms in,
+    // before its Call-ID was read, and Asterisk's 404 left after the log had been written.
+    await seedSettings(db, 'sip');
+    const call = buildCall('sip');
+    fakeAri.addChannel({ id: call.callerChannelId });
+    fakeAri.channelVariables.set(
+      `${call.callerChannelId}:CHANNEL(pjsip,call-id)`,
+      'call-id-404@10.0.0.1'
+    );
+    cdr = new CdrWriter({
+      db,
+      ari,
+      cache: new ConfigCache(db),
+      bus,
+      state: new StateStore(),
+      now: () => NOW,
+      sipTailMs: 50
+    });
+
+    await cdr.open(call);
+    expect(cdr.knowsCallId('call-id-404@10.0.0.1')).toBe(true);
+    const finishing = cdr.finish(call);
+    cdr.sipMessage({
+      callId: 'call-id-404@10.0.0.1',
+      at: '2026-01-01T00:00:01.000Z',
+      direction: 'out',
+      payload: 'SIP/2.0 404 Not Found'
+    });
+    await finishing;
+
+    const row = await db
+      .selectFrom('calls')
+      .select('log')
+      .where('id', '=', call.id)
+      .executeTakeFirstOrThrow();
+    expect(row.log).toContain('SIP/2.0 404 Not Found');
+  });
+
   it('drops a HEP message whose Call-ID belongs to no open call', () => {
     const call = buildCall('sip');
 

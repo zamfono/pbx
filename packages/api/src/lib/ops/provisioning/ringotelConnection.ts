@@ -95,6 +95,7 @@ export async function connectionFields(
 ): Promise<{
   name: string;
   address: string;
+  country: string;
   provision: ReturnType<typeof buildBranchProvision>;
 }> {
   const settings = await loadSettings(ctx.db);
@@ -103,6 +104,9 @@ export async function connectionFields(
   return {
     name: settings.companyName,
     address,
+    // The default country the app matches phone numbers against to find a caller among the
+    // contacts (the Shell's "Country"), the tenant's own (§11.4).
+    country: settings.country,
     provision: buildBranchProvision(settings, parkingSlots, blfs)
   };
 }

@@ -8,6 +8,12 @@ const DIGITS_WITH_OPTIONAL_PLUS = /^\+?[0-9]+$/u;
 
 export type InboundNumberFormat = 'e164' | 'national';
 
+/** Whether `raw` is a number the trunk boundary normalizes, digits with an optional leading `+`
+ *  (§9.4 "Inbound number normalization"), rather than a string it passes verbatim. */
+export function isInboundNumber(raw: string): boolean {
+  return DIGITS_WITH_OPTIONAL_PLUS.test(raw);
+}
+
 /** The calling code of a country, e.g. `'DE'` → `'49'`. */
 export function callingCode(country: string): string {
   return getCountryCallingCode(country as CountryCode);

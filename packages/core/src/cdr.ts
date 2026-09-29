@@ -22,7 +22,15 @@ export type CdrWriterDeps = {
   bus: EventBus;
   state: StateStore;
   now: () => string;
+  /** How long a `sip`-level call keeps collecting mirrored messages after it ends; tests pass 0. */
+  sipTailMs?: number;
 };
+
+// §7 level `sip`: the messages that end a dialog leave after its call does. Asterisk sends a
+// refused call's final response once the core has released it, and the provider's ACK follows a
+// round trip later, so a call rejected at Entry within milliseconds (a DID that matches nothing)
+// would record none of its own dialog. A `sip`-level call waits this long before it closes.
+const SIP_TAIL_MS = 2000;
 
 // `calls.status` has no NULL branch (CHECK enum, §11.2); a call that reaches `finish()` without
 // ever picking an outcome (a bug elsewhere in the pipeline) is recorded as `failed` rather than
@@ -88,7 +96,7 @@ export class CdrWriter {
   /** Joins a leg's SIP dialog to `call` (§7 level `sip`: the call's SIP messages are every
    * dialog's, not the caller's alone). */
   registerLeg(call: Call, channelId: string): void {
-    this.sip.register(call, channelId);
+    this.sip.register(call, channelId).catch(() => undefined);
   }
 
   /** Inserts `call`'s `calls` row now, under the placeholder status, so anything that references
@@ -98,7 +106,12 @@ export class CdrWriter {
    * (`inbound.ts`, `outbound.ts`, `transfers.ts`, `actions.ts`, `parkingRingback.ts`) awaits it
    * before anything that may reference the call. */
   async open(call: Call): Promise<void> {
-    this.sip.register(call, call.callerChannelId);
+    // At level `sip` the join is in place before routing starts: a call released at once would
+    // otherwise be gone before its Call-ID is read, and its dialog would reach no call at all.
+    const joined = this.sip.register(call, call.callerChannelId);
+    if (call.log.level === 'sip') {
+      await joined;
+    }
     await this.deps.db
       .insertInto('calls')
       .values({
@@ -129,6 +142,11 @@ export class CdrWriter {
       return;
     }
     this.finished.add(call.id);
+    if (call.log.level === 'sip') {
+      await new Promise(resolve => {
+        setTimeout(resolve, this.deps.sipTailMs ?? SIP_TAIL_MS);
+      });
+    }
     this.sip.forget(call);
     callEnded(this.deps, call);
     const { log, truncated } = call.log.finish();

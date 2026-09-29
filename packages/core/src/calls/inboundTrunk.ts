@@ -5,6 +5,7 @@
  */
 import {
   ANONYMOUS,
+  isInboundNumber,
   normalizeInbound,
   type InboundNumberFormat
 } from '@zamfono/shared';
@@ -21,6 +22,8 @@ export type InboundBoundary = {
   /** The trunk that identified the call, or `null` when no trunk row matches its endpoint. */
   trunkId: string | null;
   called: string;
+  /** Whether `called` came from the `To` header rather than the Request-URI (`calledParty`). */
+  calledFromTo: boolean;
   from: string;
 };
 
@@ -95,6 +98,36 @@ export function inboundTrunk(
  * it to no caller-ID field unless the endpoint trusts inbound identity, and then only alongside
  * a `P-Asserted-Identity`.
  */
+// A SIP URI's user part in a header value, `+498995409700` in
+// `<sip:+498995409700@46.224.111.67:5060;user=phone>`.
+const URI_USER = /sips?:(?<user>[^@;>]+)@/iu;
+
+/**
+ * The called party as the provider meant it (§9.4 "Inbound number normalization"): the
+ * Request-URI's user part, unless that is no number and the `To` header's is. A registration
+ * trunk's provider addresses the INVITE to the contact the stack registered, whose user part is
+ * the account name, and carries the dialled number in `To` alone; one whose `To` names the
+ * account too keeps the verbatim account name, which a `dids` row of that name matches.
+ */
+async function calledParty(
+  ari: AriClient,
+  channel: Channel,
+  requestUriUser: string
+): Promise<{ called: string; fromTo: boolean }> {
+  if (isInboundNumber(requestUriUser)) {
+    return { called: requestUriUser, fromTo: false };
+  }
+  const to = await ari.channels.getVariable(
+    channel.id,
+    'PJSIP_HEADER(read,To)'
+  );
+  const user = URI_USER.exec(to ?? '')?.groups?.user;
+  const decoded = user === undefined ? undefined : decodeURIComponent(user);
+  return decoded !== undefined && isInboundNumber(decoded)
+    ? { called: decoded, fromTo: true }
+    : { called: requestUriUser, fromTo: false };
+}
+
 export async function inboundBoundary(
   ari: AriClient,
   channel: Channel,
@@ -110,9 +143,11 @@ export async function inboundBoundary(
     ? (trunk.inboundNumberFormat as InboundNumberFormat)
     : DEFAULT_FORMAT;
   const country = snapshot.settings.country;
+  const { called, fromTo } = await calledParty(ari, channel, calledRaw);
   return {
     trunkId: trunk?.id ?? null,
-    called: normalizeInbound(calledRaw, format, country),
+    calledFromTo: fromTo,
+    called: normalizeInbound(called, format, country),
     from: callerWithheld(channel.caller.number, privacy)
       ? ANONYMOUS
       : normalizeInbound(channel.caller.number, format, country)

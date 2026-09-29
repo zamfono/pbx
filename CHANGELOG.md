@@ -13,6 +13,16 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- Calls over a registration trunk whose provider addresses the INVITE to the account name and
+  names the dialled number only in `To` (mucpbx among them) were refused with 404. The dialled
+  number is now taken from `To` when the Request-URI's is no number, and the routing trace says
+  so (`calledFrom: to`).
+- The call log's `sip` level recorded nothing for a call refused at once. Such a call now records
+  its INVITE, its final response and the ACK, and at the default `events` level the trace names a
+  number that matched no DID before the 404.
+- The Ringotel connection now carries the tenant's country, which the apps use to match callers'
+  numbers to contacts, and follows a change of it.
+
 - A `ringotel` device reached Ringotel before Asterisk knew it: Ringotel's test registration
   failed, it created no user and sent no activation e-mail, and `devices.create` still reported
   success. The device now reaches Ringotel once Asterisk holds it, the same for a rotated

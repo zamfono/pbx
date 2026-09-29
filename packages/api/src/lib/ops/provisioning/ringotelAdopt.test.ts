@@ -13,6 +13,7 @@ import { makeTestDb } from '../../testDb.js';
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';
 
+import '../settings/index.js';
 import './index.js';
 
 process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
@@ -367,5 +368,27 @@ describe('provisioning.ringotelSetup with a domain the account already has', () 
       "provisioning.ringotelAdopt { orgId: 'org-9', domain: 'zamfono-test' }"
     );
     expect(fake.organizations).toEqual([TARGET]);
+  });
+});
+
+describe("the connection carries the tenant's country (§10.4)", () => {
+  it('is created with it, and pushed again when the country changes', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    const fake = install([]);
+
+    await runOperation(
+      db,
+      'provisioning.ringotelSetup',
+      { domain: 'testco', region: '3', packageid: 2 },
+      confirmed
+    );
+    const created = fake.calls.find(call => call.method === 'createBranch');
+    expect(created?.params.country).toBe('DE');
+
+    fake.calls.length = 0;
+    await runOperation(db, 'settings.update', { country: 'AT' }, confirmed);
+    const pushed = fake.calls.find(call => call.method === 'updateBranch');
+    expect(pushed?.params.country).toBe('AT');
   });
 });

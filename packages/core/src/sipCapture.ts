@@ -70,9 +70,10 @@ export class SipCapture {
     }
   }
 
-  /** Joins `channelId`'s SIP dialog to `call`, handing it the messages held for that dialog. */
-  register(call: Call, channelId: string): void {
-    this.ari.channels
+  /** Joins `channelId`'s SIP dialog to `call`, handing it the messages held for that dialog;
+   *  resolves once the join is in place, or has failed, which a caller may wait for. */
+  register(call: Call, channelId: string): Promise<void> {
+    return this.ari.channels
       .getVariable(channelId, 'CHANNEL(pjsip,call-id)')
       .then(callId => {
         if (callId !== null && callId !== '') {

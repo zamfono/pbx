@@ -43,10 +43,13 @@ did_id=$(did_to_group ci-reg-acct "$(ci_group)")
 printf '%s %s\n' "$trunk_id" "$did_id" > "$(state_file registration)"
 
 # The refusing run ends once it has answered its REGISTERs; the registrar then takes the port.
+# A zombie is no run: the container's init, `sleep`, reaps nothing, so an earlier scenario's
+# detached sipp that ended stays in the process table (`_sipp-finish.sh`'s `live_sipp` alike).
 refused=false
 for _ in $(seq 1 $ATTEMPTS); do
   # shellcheck disable=SC2086
-  if ! $compose exec -T sipp-provider pgrep sipp >/dev/null 2>&1; then
+  if ! $compose exec -T sipp-provider sh -c \
+    "ps -e -o stat= -o comm= | awk '\$2 == \"sipp\" && \$1 !~ /^Z/' | grep -q ." 2>/dev/null; then
     refused=true
     break
   fi
