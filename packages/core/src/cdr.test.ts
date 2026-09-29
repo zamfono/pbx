@@ -5,6 +5,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from './ari/client.js';
 import { FakeAri } from './ari/fake.js';
+import { fakeRtpStatistics } from './ari/fakeRtp.js';
 import type { Logger } from './ari/types.js';
 import type { LogLevel } from './callLog.js';
 import { newCall, type Call } from './calls/call.js';
@@ -242,7 +243,14 @@ describe('CdrWriter', () => {
     ari.channels.rtpStatistics = channelId =>
       Promise.resolve(
         channelId === 'caller-channel'
-          ? { jitter: 1.5, loss: 0.2, rtt: 42 }
+          ? fakeRtpStatistics({
+              rxjitter: 0.0015,
+              txjitter: 0.001,
+              rxcount: 998,
+              rxploss: 2,
+              txploss: 0,
+              rtt: 0.042
+            })
           : null
       );
     // §7: `call_qos` is gated on this call's own resolved level, independent of the tenant
@@ -271,8 +279,7 @@ describe('CdrWriter', () => {
 
   it('writes no call_qos row below the resolved level qos', async () => {
     await seedSettings(db, 'events');
-    ari.channels.rtpStatistics = () =>
-      Promise.resolve({ jitter: 1, loss: 0, rtt: 1 });
+    ari.channels.rtpStatistics = () => Promise.resolve(fakeRtpStatistics());
     const call = buildCall('events');
     call.status = 'answered';
 
@@ -290,8 +297,7 @@ describe('CdrWriter', () => {
     // §7: the resolved level is the max of the tenant default and this call's own overrides; a
     // high tenant default alone, with no override on this particular call, keeps it at `events`.
     await seedSettings(db, 'qos');
-    ari.channels.rtpStatistics = () =>
-      Promise.resolve({ jitter: 1, loss: 0, rtt: 1 });
+    ari.channels.rtpStatistics = () => Promise.resolve(fakeRtpStatistics());
     const call = buildCall('events');
     call.status = 'answered';
 
@@ -403,8 +409,7 @@ describe('CdrWriter', () => {
     await seedSettings(db, 'qos');
     const call = buildCall('qos');
     fakeAri.addChannel({ id: call.callerChannelId });
-    ari.channels.rtpStatistics = () =>
-      Promise.resolve({ jitter: 3, loss: 1, rtt: 20 });
+    ari.channels.rtpStatistics = () => Promise.resolve(fakeRtpStatistics());
     await cdr.open(call);
     call.answeredAt = '2026-01-01T00:00:01.000Z';
     call.status = 'answered';

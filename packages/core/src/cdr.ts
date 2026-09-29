@@ -24,6 +24,9 @@ export type CdrWriterDeps = {
   now: () => string;
   /** How long a `sip`-level call keeps collecting mirrored messages after it ends; tests pass 0. */
   sipTailMs?: number;
+  /** How often an open call's legs are read for `call_qos` (§7 level `qos`); 0 samples only at the
+   * call-ending paths. Default `QOS_SAMPLE_MS`. */
+  qosSampleMs?: number;
 };
 
 // §7 level `sip`: the messages that end a dialog leave after its call does. Asterisk sends a
@@ -61,9 +64,10 @@ function withTruncationMarker(
  * §10.6).
  *
  * §7 reads `rtp_statistics` "before the leg is hung up", and a destroyed channel answers nothing,
- * so every path that ends a call calls `captureQos` while its channels still exist and `finish`
- * writes what that snapshot holds. A remote hangup reaches `captureQos` through
- * `ChannelHangupRequest`, the last event before the channel goes.
+ * so an open call's legs are read every few seconds while it runs (`QosSnapshots.watch`), every
+ * path that ends a call calls `captureQos` while its channels still exist, and `finish` writes the
+ * last reading of each. A remote hangup reaches `captureQos` through `ChannelHangupRequest`, but
+ * the channel that hung up may answer nothing by then, which is what the periodic reading covers.
  */
 export class CdrWriter {
   private readonly deps: CdrWriterDeps;
@@ -72,7 +76,7 @@ export class CdrWriter {
 
   constructor(deps: CdrWriterDeps) {
     this.deps = deps;
-    this.qos = new QosSnapshots(deps.ari, deps.db);
+    this.qos = new QosSnapshots(deps.ari, deps.db, deps.qosSampleMs);
     this.sip = new SipCapture(deps.ari);
   }
 
@@ -109,6 +113,8 @@ export class CdrWriter {
     // At level `sip` the join is in place before routing starts: a call released at once would
     // otherwise be gone before its Call-ID is read, and its dialog would reach no call at all.
     const joined = this.sip.register(call, call.callerChannelId);
+    // §7 level `qos`: a leg's statistics go with its channel, so they are read while it runs.
+    this.qos.watch(call);
     if (call.log.level === 'sip') {
       await joined;
     }
@@ -179,6 +185,10 @@ export class CdrWriter {
 
   /** Holds `call`'s `call_qos` rows, read while its channels still exist, until `finish`. */
   async captureQos(call: Call): Promise<void> {
+    // A hangup request reaching a call already closed out has nothing left to add to it.
+    if (this.finished.has(call.id)) {
+      return;
+    }
     await this.qos.capture(call);
   }
 }

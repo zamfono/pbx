@@ -6,6 +6,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
+import { fakeRtpStatistics } from '../ari/fakeRtp.js';
 import type { Logger } from '../ari/types.js';
 import type { LogLevel } from '../callLog.js';
 import { CdrWriter } from '../cdr.js';
@@ -994,7 +995,9 @@ describe('transfers', () => {
       reads += 1;
       readChannels.push(channelId);
       return Promise.resolve(
-        gone.has(channelId) ? null : { jitter: reads, loss: 0, rtt: 10 }
+        gone.has(channelId)
+          ? null
+          : fakeRtpStatistics({ txjitter: reads / 1000, rxjitter: 0 })
       );
     };
     /** `channelId`'s hangup request, resolving once the core has read its QoS for it. */

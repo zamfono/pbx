@@ -10,8 +10,14 @@ import {
 } from './fakeChannel.js';
 import { splitResource, type RouteResult } from './fakeHttp.js';
 import { FakePlaybacks } from './fakePlayback.js';
+import { readRtpStatistics } from './fakeRtp.js';
 import { FakeAriTransport, type FakeRequest } from './fakeTransport.js';
-import { defaultChannel, type AriEvent, type Channel } from './types.js';
+import {
+  defaultChannel,
+  type AriEvent,
+  type Channel,
+  type RtpStatistics
+} from './types.js';
 
 const DEFAULT_ANSWER_AFTER_MS = 10;
 // A real playback takes some time to reach the end; a fixed short delay lets code that awaits
@@ -56,6 +62,10 @@ export class FakeAri {
   readonly channelVariables = new Map<string, string>();
   /** What `GET /ari/endpoints` reports; `Presence.resyncOnBoot` reads it to seed registration. */
   readonly endpoints: FakeEndpoint[] = [];
+  /** `GET /channels/{id}/rtp_statistics` per channel id; a channel not listed answers the
+   * realistic default body (`fakeRtpStatistics`), and `null` answers 404, as Asterisk does for a
+   * channel without an RTP instance. */
+  readonly rtpStatistics = new Map<string, RtpStatistics | null>();
 
   /**
    * Reports `sipUsername` as online, as a phone that has REGISTERed would appear: both in the
@@ -222,7 +232,7 @@ export class FakeAri {
       return this.snoop(id, body);
     }
     if (action === 'rtp_statistics' && method === 'GET') {
-      return { status: HTTP_OK, body: null };
+      return readRtpStatistics(this.rtpStatistics, id);
     }
     if (method === 'GET' && action === 'variable') {
       return readChannelVariable(this.channelVariables, id, qs);
