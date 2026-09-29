@@ -18,8 +18,11 @@ const asUser: RunInput = {
 const CORE = {
   version: '0.0.4',
   revision: 'abc1234ffff',
-  display: '0.0.4 (abc1234)'
+  display: '0.0.4 (abc1234)',
+  startedAt: '2026-09-29T08:00:05.000Z',
+  asteriskStartedAt: '2026-09-29T08:00:00.000Z'
 };
+const STARTED_AT = expect.any(String) as unknown;
 
 const NO_UPDATER = {
   unavailable:
@@ -45,11 +48,27 @@ describe('system.info', () => {
       api: {
         version: '0.0.5',
         revision: '79c1041aaaaaaa',
-        display: '0.0.5 (79c1041)'
+        display: '0.0.5 (79c1041)',
+        startedAt: STARTED_AT
       },
       core: CORE,
       update: NO_UPDATER
     });
+  });
+
+  it("dates api's start to this process's own, so a restart is visible", async () => {
+    const out = await runOperation<unknown, { api: { startedAt: string } }>(
+      await makeTestDb(),
+      'system.info',
+      {},
+      asUser
+    );
+
+    const startedMs = Date.parse(out.api.startedAt);
+    expect(startedMs).toBeLessThanOrEqual(Date.now());
+    expect(startedMs).toBeGreaterThan(
+      Date.now() - (process.uptime() + 1) * 1000
+    );
   });
 
   it('reports core as null while core does not answer', async () => {
@@ -60,7 +79,12 @@ describe('system.info', () => {
     expect(
       await runOperation(await makeTestDb(), 'system.info', {}, asUser)
     ).toEqual({
-      api: { version: 'dev', revision: '', display: 'dev' },
+      api: {
+        version: 'dev',
+        revision: '',
+        display: 'dev',
+        startedAt: STARTED_AT
+      },
       core: null,
       update: NO_UPDATER
     });

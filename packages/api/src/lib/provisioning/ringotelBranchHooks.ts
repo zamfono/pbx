@@ -1,6 +1,7 @@
 /**
  * The branch-level `ringotel` hooks (§10.4): the colleague roster and the tenant profile both
- * rewrite the branch's whole `provision` object via `updateBranch`, so they share this module.
+ * push every key Zamfono owns of the branch's `provision` object via `updateBranch`, so they share
+ * this module.
  */
 import pino from 'pino';
 
@@ -176,6 +177,27 @@ export async function ringotelRosterChanged(
   await pushDevicePanels(deps, orgId, remoteUsers, liveExtSet);
 }
 
+/**
+ * The branch fields Zamfono owns, as every `updateBranch` push but the roster's carries them: the
+ * default country the app matches phone numbers against (the Shell's "Country") and every key of
+ * the provision profile (§10.4).
+ */
+async function branchUpdate(
+  deps: RingotelProviderDeps,
+  settings: SettingsRow,
+  branchId: string,
+  orgId: string
+): Promise<Record<string, unknown>> {
+  const parkingSlots = await loadParkingSlots(deps.db);
+  const blfs = await branchBlfEntries(deps.db);
+  return {
+    id: branchId,
+    orgid: orgId,
+    country: settings.country,
+    provision: buildBranchProvision(settings, parkingSlots, blfs)
+  };
+}
+
 /** `onTenantProfileChanged` (§10.4): codecs, `maxRegs` and feature codes via `updateBranch`, language via `updateOrganization`. */
 export async function ringotelTenantProfileChanged(
   deps: RingotelProviderDeps,
@@ -184,20 +206,35 @@ export async function ringotelTenantProfileChanged(
   if (settings.ringotelOrgId === null || settings.ringotelBranchId === null) {
     return;
   }
-  const parkingSlots = await loadParkingSlots(deps.db);
-  const blfs = await branchBlfEntries(deps.db);
-  const provision = buildBranchProvision(settings, parkingSlots, blfs);
-  await deps.client.call('updateBranch', {
-    id: settings.ringotelBranchId,
-    orgid: settings.ringotelOrgId,
-    // The default country the app matches phone numbers against (the Shell's "Country").
-    country: settings.country,
-    provision
-  });
+  await deps.client.call(
+    'updateBranch',
+    await branchUpdate(
+      deps,
+      settings,
+      settings.ringotelBranchId,
+      settings.ringotelOrgId
+    )
+  );
   // The organization's `params` object is written whole (§10.4), so every push carries
   // `hidePassInEmail: true` alongside the language.
   await deps.client.call('updateOrganization', {
     id: settings.ringotelOrgId,
     params: { hidePassInEmail: true, lang: settings.language }
+  });
+}
+
+/**
+ * `onPbxRestarted` (§10.4 "After a restart"): the Shell's "Reset registrations", which is
+ * `updateBranch` with the branch's fields and `rereg: true`; Ringotel then re-registers every user
+ * of the connection, which a new Asterisk holds no contact of.
+ */
+export async function ringotelPbxRestarted(
+  deps: RingotelProviderDeps
+): Promise<void> {
+  const { orgId, branchId } = await resolveIds(deps.db);
+  const settings = await loadSettings(deps.db);
+  await deps.client.call('updateBranch', {
+    ...(await branchUpdate(deps, settings, branchId, orgId)),
+    rereg: true
   });
 }

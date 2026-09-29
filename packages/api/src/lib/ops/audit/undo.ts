@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
+import { OUTCOME_OPERATIONS } from '../outcomeLog.js';
 import { registry } from '../registry.js';
 import { Conflict, defineOperation, OpError, type Context } from '../types.js';
 import { isTenantListOperation, revertTenantList } from './_listReverts.js';
@@ -68,7 +69,8 @@ async function loadUndoableEntry(
 /**
  * The later, still-live changes for the same entity that keep `id` from being undone (§5.8).
  * Undone entries and undo entries do not count, and neither does an operation marked
- * `pureAction`: a test send or a credential reveal changes nothing an undo would build on. Every
+ * `pureAction`, nor an outcome row (`OUTCOME_OPERATIONS`): a test send, a credential reveal or
+ * what Ringotel answered to a push changes nothing an undo would build on. Every
  * other entry does, undoable or not, since a secret rotation or a hard delete is still a change.
  */
 async function laterLiveChanges(
@@ -86,7 +88,11 @@ async function laterLiveChanges(
     .where('undoneAt', 'is', null)
     .where('operation', '!=', 'audit.undo')
     .execute();
-  return later.filter(row => registry.get(row.operation)?.pureAction !== true);
+  return later.filter(
+    row =>
+      registry.get(row.operation)?.pureAction !== true &&
+      !OUTCOME_OPERATIONS.has(row.operation)
+  );
 }
 
 /** Refuses with a 409 naming any later live change for `entry`'s entity (§5.8). */
