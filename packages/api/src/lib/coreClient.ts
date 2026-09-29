@@ -12,7 +12,8 @@ import type {
   PickupRequest,
   ReloadKind,
   StateResponse,
-  TransferRequest
+  TransferRequest,
+  ZamfonoVersion
 } from '@zamfono/shared';
 
 const HTTP_NOT_FOUND = 404;
@@ -127,6 +128,17 @@ export function coreRefusal(error: unknown): CoreRefusal | null {
     return null;
   }
   return { status, title: body.title, detail: body.detail };
+}
+
+/** The version `core` reports it runs (§7 "Version"), from its internal API at `baseUrl`. */
+export async function fetchCoreVersion(
+  baseUrl: string = coreUrlFromEnv(),
+  fetchFn: typeof fetch = fetch
+): Promise<ZamfonoVersion> {
+  const url = `${baseUrl}/internal/version`;
+  const response = await fetchFn(url);
+  await throwIfNotOk(response, url);
+  return (await response.json()) as ZamfonoVersion;
 }
 
 /** `core`'s internal API at `baseUrl` (default `coreUrlFromEnv()`). */

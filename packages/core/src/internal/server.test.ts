@@ -195,6 +195,23 @@ describe('startInternalServer', () => {
     });
   });
 
+  it('answers /internal/version with the version and commit this core runs', async () => {
+    process.env.ZAMFONO_VERSION = '0.0.5';
+    process.env.ZAMFONO_REVISION = 'a04ac57deadbeef';
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/internal/version`);
+      expect(response.status).toBe(HTTP_OK);
+      await expect(response.json()).resolves.toEqual({
+        version: '0.0.5',
+        revision: 'a04ac57deadbeef',
+        display: '0.0.5 (a04ac57)'
+      });
+    } finally {
+      delete process.env.ZAMFONO_VERSION;
+      delete process.env.ZAMFONO_REVISION;
+    }
+  });
+
   it('reloads res_pjsip and invalidates the config cache on configChanged', async () => {
     const first = await cache.get();
     const second = await cache.get();

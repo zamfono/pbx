@@ -67,7 +67,9 @@
 | `parking.get` | Reads the set of parking-slot extensions | admin | no |
 | `parking.set` | Replaces the set of parking-slot extensions | admin | no |
 | `presenceLog.snapshot` | Snapshots each user's presence state as of a past timestamp. | admin | no |
-| `provisioning.ringotelSetup` | Creates the Ringotel organization and connection, and stores their ids. | owner | no |
+| `provisioning.ringotelAdopt` | Adopts an existing, empty Ringotel organization (by id and domain) and one of its connections, or a new one, instead of creating them. | owner | yes |
+| `provisioning.ringotelOptions` | Lists the Ringotel regions and packages the account offers, the choices provisioning.ringotelSetup takes. | owner | no |
+| `provisioning.ringotelSetup` | Creates the Ringotel organization and connection, and stores their ids; provisioning.ringotelOptions lists the regions and packages it takes. | owner | no |
 | `recordings.audio` | Returns a recording's mixed audio. | admin | no |
 | `recordings.delete` | Permanently deletes a call recording and its audio file. | admin | yes |
 | `recordings.list` | Lists call recordings. | admin | no |
@@ -81,6 +83,7 @@
 | `settings.get` | Reads the tenant settings row, with secrets masked | admin | no |
 | `settings.update` | Updates the tenant settings row | admin | no |
 | `stats.query` | Buckets a call metric (answerRate, ringToAnswer, avgCallLength, callVolume) over a time range. | admin | no |
+| `system.info` | Reads the version and commit the stack runs, for api and core separately. | user | no |
 | `trunks.create` | Creates a SIP trunk and its ordered host list. | admin | no |
 | `trunks.delete` | Soft-deletes a SIP trunk. | admin | yes |
 | `trunks.get` | Reads one SIP trunk. | admin | no |

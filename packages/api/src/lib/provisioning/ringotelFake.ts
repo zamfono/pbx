@@ -24,9 +24,14 @@ export type FakeRingotelUser = {
 
 export type FakeRingotelOrganization = { id: string; domain: string };
 
+/** A connection as the fake keeps it: its organization, and the address the latest
+ *  `createBranch`/`updateBranch` wrote. */
+export type FakeRingotelBranch = { id: string; orgid: string; address: string };
+
 export type RingotelFake = {
   calls: FakeRingotelCall[];
   organizations: FakeRingotelOrganization[];
+  branches: FakeRingotelBranch[];
   users: FakeRingotelUser[];
   deletedUsers: FakeRingotelUser[];
   /** The `provision` object of the latest `createBranch`/`updateBranch`. */
@@ -84,7 +89,20 @@ const USER_FIELDS = [
   'password'
 ] as const;
 
+/** A slice of what the live account answered on 2026-09-29: ids are strings for regions and
+ *  numbers for packages. */
+export const FAKE_REGIONS = [
+  { id: '3', name: 'Europe (Frankfurt)' },
+  { id: '5', name: 'Europe (London)' }
+];
+export const FAKE_PACKAGES = [
+  { id: 1, name: 'Essentials' },
+  { id: 2, name: 'Pro' }
+];
+
 const HANDLERS: Record<string, Handler> = {
+  getRegions: () => FAKE_REGIONS,
+  getPackages: () => FAKE_PACKAGES,
   getOrganizations: fake => fake.organizations,
   createOrganization: (fake, params) => {
     const domain = text(params, 'domain');
@@ -104,10 +122,28 @@ const HANDLERS: Record<string, Handler> = {
   updateOrganization: () => null,
   createBranch: (fake, params) => {
     fake.branchProvision = params.provision as Record<string, unknown>;
-    return { id: `branch-${fake.calls.length}` };
+    const id = `branch-${fake.calls.length}`;
+    fake.branches.push({
+      id,
+      orgid: text(params, 'orgid'),
+      address: text(params, 'address')
+    });
+    return { id };
   },
   updateBranch: (fake, params) => {
     fake.branchProvision = params.provision as Record<string, unknown>;
+    const branch = fake.branches.find(item => item.id === text(params, 'id'));
+    if (branch && typeof params.address === 'string') {
+      branch.address = params.address;
+    }
+    return null;
+  },
+  getBranches: (fake, params) =>
+    fake.branches.filter(branch => branch.orgid === text(params, 'orgid')),
+  deleteBranch: (fake, params) => {
+    fake.branches = fake.branches.filter(
+      branch => branch.id !== text(params, 'id')
+    );
     return null;
   },
   getUsers: (fake, params) => {
@@ -182,12 +218,14 @@ function answer(fake: RingotelFake, call: FakeRingotelCall): unknown {
 export function installRingotelFake(
   organizations: FakeRingotelOrganization[] = [
     { id: 'org-1', domain: 'testco' }
-  ]
+  ],
+  branches: FakeRingotelBranch[] = []
 ): RingotelFake {
   const realFetch = globalThis.fetch;
   const fake: RingotelFake = {
     calls: [],
     organizations: [...organizations],
+    branches: branches.map(branch => ({ ...branch })),
     users: [],
     deletedUsers: [],
     branchProvision: null,

@@ -3,7 +3,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { installRingotelFake } from '../../provisioning/ringotelFake.js';
+import {
+  FAKE_PACKAGES,
+  FAKE_REGIONS,
+  installRingotelFake
+} from '../../provisioning/ringotelFake.js';
 import { encrypt, keyringFromEnv } from '../../secretbox.js';
 import { makeTestDb } from '../../testDb.js';
 import { runOperation, type RunInput } from '../runner.js';
@@ -52,8 +56,14 @@ async function seedSettings(db: Db): Promise<void> {
 
 type FetchCall = { method: string; params: Record<string, unknown> };
 
-/** Stubs `globalThis.fetch` to record every Ringotel RPC call and answer from `results`. */
-function stubFetch(results: Record<string, unknown>): FetchCall[] {
+/** Stubs `globalThis.fetch` to record every Ringotel RPC call and answer from `results`; the
+ *  region and package lists setup checks its input against answer as the fake's do. */
+function stubFetch(stubbed: Record<string, unknown>): FetchCall[] {
+  const results: Record<string, unknown> = {
+    getRegions: FAKE_REGIONS,
+    getPackages: FAKE_PACKAGES,
+    ...stubbed
+  };
   const calls: FetchCall[] = [];
   globalThis.fetch = ((_url: string, init?: RequestInit) => {
     const body = JSON.parse(init?.body as string) as FetchCall;
@@ -94,7 +104,12 @@ describe('provisioning.ringotelSetup', () => {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1'
     });
-    expect(calls[0]).toEqual({
+    // The region and package lists come first (`assertOffered`), then the organization.
+    expect(calls.slice(0, 2).map(call => call.method)).toEqual([
+      'getRegions',
+      'getPackages'
+    ]);
+    expect(calls[2]).toEqual({
       method: 'createOrganization',
       params: {
         name: 'Test Co',
@@ -104,10 +119,10 @@ describe('provisioning.ringotelSetup', () => {
         params: { hidePassInEmail: true, lang: 'de' }
       }
     });
-    expect(calls[1]?.method).toBe('createBranch');
-    expect(calls[1]?.params.orgid).toBe('org-1');
-    expect(calls[1]?.params.address).toBe('pbx.example.com:5061');
-    const provision = calls[1]?.params.provision as {
+    expect(calls[3]?.method).toBe('createBranch');
+    expect(calls[3]?.params.orgid).toBe('org-1');
+    expect(calls[3]?.params.address).toBe('pbx.example.com:5061');
+    const provision = calls[3]?.params.provision as {
       protocol: string;
       features: string;
       codecs: { codec: string; frame: number }[];
@@ -297,6 +312,8 @@ describe('provisioning.ringotelSetup', () => {
     ).rejects.toThrow(/audit write failed/u);
 
     expect(ringotel.calls.map(call => call.method)).toEqual([
+      'getRegions',
+      'getPackages',
       'createOrganization',
       'createBranch',
       'deleteOrganization'

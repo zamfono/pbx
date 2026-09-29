@@ -5,13 +5,14 @@ import pino from 'pino';
 import { addressKey } from './lib/addressKey.js';
 import { crossSiteFormRejection } from './lib/auth/crossSiteForms.js';
 import { isRole, verifyAccessToken } from './lib/auth/jwt.js';
-import { createCoreClient } from './lib/coreClient.js';
+import { createCoreClient, fetchCoreVersion } from './lib/coreClient.js';
 import { getDb } from './lib/db.js';
 import { getCertSyncScheduler } from './lib/jobs/certSync.js';
 import { reencryptSweep } from './lib/jobs/keyRotation.js';
 import { Limiter, type LimitKind } from './lib/limiter.js';
 import { recordApiRequestSeconds } from './lib/metrics.js';
 import { onPropagate } from './lib/ops/runner.js';
+import { setCoreVersionLookup } from './lib/ops/system/info.js';
 import {
   coreTrunkStatusLookup,
   setTrunkStatusLookup
@@ -74,6 +75,8 @@ function tryKeyring(): Keyring | null {
 async function startBackgroundJobs(): Promise<void> {
   // §9.4 "Provisioning and status": trunk status is the core's live state, read per request.
   setTrunkStatusLookup(coreTrunkStatusLookup(createCoreClient()));
+  // §7 "Version": `system.info` asks `core` what it runs, per request.
+  setCoreVersionLookup(() => fetchCoreVersion());
   try {
     getCertSyncScheduler();
   } catch (error) {

@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-09-29 · §7 Version, §10.3 Provisioning and System, §10.4 Organization, §11.4.** `POST /provisioning/ringotel/adopt` takes over an existing, empty Ringotel organization by id and domain together; `GET /provisioning/ringotel/options` lists the account's regions and packages, which setup now checks its input against; `GET /system/info` returns the version `api` and `core` each run.
+*Why:* requested by the product owner after connecting a test stack through MCP: its organization existed already, created in the Ringotel Shell, and setup can only create; the region had to be found by querying Ringotel's API by hand, and it lists a region its documentation does not; and no tool could read the stack's version, which reached only the MCP handshake.
+
 **2026-09-29 · §8 Integration.** The integration run tests the upgrade from the latest release on both runtimes, and splits the scenarios over two parallel runs per runtime, a fresh install and an upgraded one.
 *Why:* requested by the product owner after the Podman upgrade failure, which no test could see: every run started a fresh stack, so neither replacing the containers nor migrating a database a release had written was ever exercised.
 
@@ -767,7 +770,7 @@ The database is therefore never the reason to re-architect; the single-tenant st
 
 **Logs.** Both Node processes write structured JSON logs (pino) to stdout, where `docker logs` and the host log shipper pick them up. Every call-related line carries the per-call correlation id, which is `calls.id` (§11). Asterisk logs are captured the same way, with its `full` log at `notice` level by default. Shipping the logs off the host is the operator's concern; the stack's only requirement on a shipper is that it reads container stdout.
 
-**Version.** `api` and `core` report the stack's version as `<ZAMFONO_VERSION> (<short ZAMFONO_REVISION>)`, the tag the deployment pulled and the commit its images were built from: `1.2.3 (a1b2c3d)` for a release, `edge (a1b2c3d)` for main's latest build. A stack on `latest` knows its commit but not the release number, which the release that names the commit supplies. Both processes log it in their first line at start; `api` also exports it in `/metrics` as `zamfono_build_info{version, revision} 1` and as the MCP `serverInfo.version` (§10.5). `/healthz` never shows it (§10.3), and neither do SIP headers.
+**Version.** `api` and `core` report the stack's version as `<ZAMFONO_VERSION> (<short ZAMFONO_REVISION>)`, the tag the deployment pulled and the commit its images were built from: `1.2.3 (a1b2c3d)` for a release, `edge (a1b2c3d)` for main's latest build. A stack on `latest` knows its commit but not the release number, which the release that names the commit supplies. Both processes log it in their first line at start; `api` also exports it in `/metrics` as `zamfono_build_info{version, revision} 1` and as the MCP `serverInfo.version` (§10.5), and `GET /system/info` returns `api`'s and `core`'s each (§10.3), for any signed-in user: the handshake's `serverInfo` reaches no tool, and the two can differ while one container still runs an older image. `/healthz` never shows it (§10.3), and neither do SIP headers.
 
 **Per-call diagnostics level.** Four levels, `none`, `events`, `qos` and `sip`, each adding to the previous. A call's level is resolved at call setup as the maximum of the tenant default (`settings.call_log_level`, default `events`) and the overrides of the user, the trunk and the ring group that routed the call (`users.log_level`, `trunks.log_level`, `ring_groups.log_level`). An override can only raise the level, so its values are `events`, `qos` and `sip`, and NULL means no override; `none` exists only as the tenant default. Overrides expire automatically (`log_level_expires_at`); a request that sets a level without an expiry gets one 7 days out, so diagnostics never stay on by oversight. Level changes are audited like any other mutation (§5.7).
 
@@ -1220,7 +1223,7 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Devices** (min. role: user (own, `tls` only) / admin; `plain` devices, reveal and rotate admin) — `GET /users/{id}/devices`, `POST` (transport class + allowlist for `plain`, refused while both plain transports are disabled, §9.3; returns the SIP credentials), `PATCH /devices/{id}` (label, `allowedIps`), `DELETE /devices/{id}`, `GET /devices/{id}/credentials` (reveal, audited), `POST /devices/{id}/rotate` (new password, re-pushed and returned), `GET/PUT /devices/{id}/blf` (the `ringotel` device's BLF panel, an ordered list of extensions and parking slots replaced as a whole, §10.4)
 
-**Provisioning** (min. role: owner) — `POST /provisioning/ringotel/setup` (input: Ringotel `domain`, `region`, `packageid`) — runs `createOrganization` + `createBranch` (§10.4) and stores the ids in `settings`
+**Provisioning** (min. role: owner) — `POST /provisioning/ringotel/setup` (input: Ringotel `domain`, `region`, `packageid`) — runs `createOrganization` + `createBranch` (§10.4) and stores the ids in `settings`; a `region` or `packageid` the account does not offer is refused before anything is created, naming the ones it does. `GET /provisioning/ringotel/options` lists those choices live (`getRegions`, `getPackages`), since Ringotel adds regions and the packages are the account's own. `POST /provisioning/ringotel/adopt` (input: `orgId`, `domain`, optional `branchId`; confirmed) takes over an organization that already exists instead (§10.4)
 
 **Trunks** (min. role: admin) — `GET/POST /trunks`, `GET/PATCH/DELETE /trunks/{id}` (auth mode, inbound auth, transport — refused for a disabled transport, §9.4 —, emergency — required on create, §9.4 "Emergency trunks" —, codecs, clir, max channels, hosts, status), `PUT /trunks/order` (the ordered trunk ids, §9.4 "Trunk order"), `GET/PUT /outboundRoutes` (the ordered routes, each with its users, user groups and numbers, replaced as a whole)
 
@@ -1268,6 +1271,8 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Health** (min. role: none (public, unauthenticated — served through the proxy so the §7 external uptime check can reach it)) — `GET /healthz` (HTTP status = `api`'s own liveness, the open and migrated database; body fields for core and its ARI connection, mail configured, key rotation remaining (§5.4), certificate sync (§6.4), emergency trunk present (§9.4 "Emergency trunks"); no version or configuration values)
 
+**System** (min. role: user) — `GET /system/info` — the version and commit `api` runs and the ones `core` reports (§7 "Version"), `core` as `null` while it does not answer
+
 **Metrics** (min. role: bearer `METRICS_TOKEN` from `.env`; 404 while unset) — `GET /metrics` (Prometheus, §7); `GET /metrics/litestream` with the DR overlay
 
 Versioning: URL prefix `v1`; additive changes only within v1.
@@ -1302,7 +1307,7 @@ interface ProvisioningProvider {
 
 **Account** (Ringotel Shell) — the operator holds the API key; one account across all customer stacks (key scope below)
 
-**Organization** — one per customer stack, created by `POST /provisioning/ringotel/setup` (§10.3) via `createOrganization`. Required by Ringotel: `name`, a globally unique `domain`, and the `region` (immutable after creation; `3` = Europe/Frankfurt); `packageid` selects the Ringotel plan. Always `hidePassInEmail: true` in the organization's nested `params` object, so onboarding mails carry no plaintext SIP password, and `lang` = `settings.language` there
+**Organization** — one per customer stack, created by `POST /provisioning/ringotel/setup` (§10.3) via `createOrganization`, or adopted by `POST /provisioning/ringotel/adopt` when it already exists (created in the Ringotel Shell, or left behind by a setup whose cleanup failed). The account's API key reaches every customer's organization, so adoption finds the organization only by its id and its domain together, and only while it has no users; it points the named connection, or a new one it creates, at this stack as setup's would be, and writes the organization's `params` as setup does. Required by Ringotel: `name`, a globally unique `domain`, and the `region` (immutable after creation; `3` = Europe/Frankfurt); `packageid` selects the Ringotel plan. Always `hidePassInEmail: true` in the organization's nested `params` object, so onboarding mails carry no plaintext SIP password, and `lang` = `settings.language` there
 
 **Branch** ("connection", the provisioning template) — the stack's Asterisk; one per stack, created by the same setup operation via `createBranch`, with `address` = stack FQDN and SIP-TLS port plus the provision profile below
 
@@ -2325,7 +2330,7 @@ A DID's `number` is what the trunk boundary produces (§9.4): the international 
 | `sso_issuer`, `sso_client_id`, `sso_allowed_domain` 👑 | upstream OIDC configuration; the issuer is preset for `microsoft` and `google` and required for `oidc` (CHECK); the client id is required whenever a provider is set (CHECK) | NULL | §5 |
 | `sso_tenant_id` 👑 | the customer's Entra tenant id; required for `microsoft` (CHECK) and the authority the preset discovers against, so tokens from any other tenant fail issuer validation (§5.2) | NULL | §5 |
 | `sso_client_secret_enc` 🔒👑 | upstream OIDC client secret | NULL | §5 |
-| `ringotel_org_id`, `ringotel_branch_id` | Ringotel provisioning object ids, written by the setup operation (§10.3), read-only through `PATCH` | NULL | §10.4 |
+| `ringotel_org_id`, `ringotel_branch_id` | Ringotel provisioning object ids, written by the setup or adopt operation (§10.3), read-only through `PATCH` | NULL | §10.4 |
 | `ringotel_max_regs` 👑 | registrations per Ringotel user; written into the branch profile and rendered as `max_contacts` on every `ringotel` endpoint | `3` | §10.4 |
 | `ringotel_api_token_enc` 🔒👑 | Ringotel Admin API bearer token | NULL | §10.4 |
 

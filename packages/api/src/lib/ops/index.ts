@@ -22,6 +22,7 @@ import './recordings/index.js';
 import './ringGroups/index.js';
 import './search/index.js';
 import './settings/index.js';
+import './system/index.js';
 import './stats/index.js';
 import './trunks/index.js';
 import './userGroups/index.js';

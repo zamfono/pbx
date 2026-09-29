@@ -10,6 +10,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import {
   newId,
   nowIso,
+  resolveVersion,
   type CoreHealth,
   type Db,
   type Envelope,
@@ -127,6 +128,12 @@ async function routeRequest(
   }
   if (request.method === 'GET' && url.pathname === '/internal/state') {
     await handleState(deps, response);
+    return;
+  }
+  // The version this `core` runs (§7 "Version"), for `api`'s `system.info`: during an upgrade, or
+  // with one container left on an old image, it can differ from `api`'s own.
+  if (request.method === 'GET' && url.pathname === '/internal/version') {
+    respondJson(response, HTTP_OK, resolveVersion(process.env));
     return;
   }
   if (
