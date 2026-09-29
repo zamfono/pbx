@@ -11,6 +11,25 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Fixed
+
+- The call log's `sip` level recorded no SIP message at all: Asterisk refused its collector
+  address `core:9060`, since it takes a numeric address only, and mirrored nothing. It now sends
+  to the address `core` has, and follows it when `core` is recreated.
+- Every device registration was lost whenever the containers were recreated, as an update does,
+  and a phone stayed unreachable until it registered again.
+
+### Changed
+
+- Asterisk keeps its astdb, which holds the device registrations, on a new `astdb` volume.
+- `deploy/README.md` says where container logs survive an upgrade (Podman's journal) and how to
+  keep them on Docker ("Logs").
+
+### Upgrade notes
+
+- The `astdb` volume is created by the upgrade's own `up -d`; nothing to do. It starts empty, so
+  the registrations of this one upgrade are still lost: devices come back as they re-register.
+
 ## [0.0.6] - 2026-09-29
 
 ### Fixed
