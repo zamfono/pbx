@@ -45,15 +45,18 @@ detect_tz() {
 }
 
 # check_dns FQDN ADDRESS — warns unless the name resolves to exactly that IPv4 and has no AAAA.
+# DNS only (`-s dns`): Let's Encrypt sees the public records, while /etc/hosts maps a server's own
+# name to 127.0.1.1 on Debian. `ahostsv6` also lists every IPv4 address as `::ffff:a.b.c.d`,
+# which is no AAAA record.
 check_dns() {
   local found
-  found=$({ getent ahostsv4 "$1" 2>/dev/null || true; } | awk '{print $1}' | sort -u | tr '\n' ' ')
+  found=$({ getent -s dns ahostsv4 "$1" 2>/dev/null || true; } | awk '{print $1}' | sort -u | tr '\n' ' ')
   if [[ -z $found ]]; then
     warn "$1 does not resolve yet. Let's Encrypt needs its A record pointing at $2 before the first start."
   elif [[ $found != "$2 " ]]; then
     warn "$1 resolves to ${found% }, not $2. Let's Encrypt will fail until the A record is fixed."
   fi
-  if { getent ahostsv6 "$1" 2>/dev/null || true; } | grep -q ':'; then
+  if { getent -s dns ahostsv6 "$1" 2>/dev/null || true; } | awk '{print $1}' | grep -qv '^::ffff:'; then
     warn "$1 has an AAAA record. The stack listens on IPv4 only; remove it."
   fi
 }
