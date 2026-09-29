@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-09-29 · §6.3 Compose file, §7 Levels, §9.1.** `hep.conf` names the numeric address `core` resolves to, which the Asterisk entrypoint follows, rendering the file again and reloading `res_hep` when `core` is recreated at another address; the astdb, where the PJSIP contacts live, moves to a directory of its own on a new `astdb` volume.
+*Why:* found on a 0.0.6 stack: level `sip` recorded no SIP message at all, since `res_hep` accepts no hostname and refused `core:9060` ("Failed to create address"), and every registration was lost whenever the containers were recreated, as an update does, since the astdb lived in the container's own layer. A fixed address for `core` was considered and not taken: it needs a fixed subnet on `internal`, which can collide with the host's own networks, and changing `internal` under a running stack makes the update that brings it fail with the stack stopped when `system.update`'s updater, itself attached to `internal`, runs it.
+
 **2026-09-29 · §6.3 Images, Compose file, Environment and Updates, §10.3 System.** The bundle carries `update.sh`, which downloads, verifies and installs a release and recreates the stack; a sixth image, `updater`, on the internal network only, runs it for the new `POST /system/update` (owner, confirmation, after a backup within the hour), only to a newer, non-breaking release; `GET /system/info` reports the latest release and the last update.
 *Why:* requested by the product owner: an upgrade was a sequence of commands to type correctly on the host, different on Podman, and an MCP client could see its version but neither whether a newer one existed nor install it. The updater drives the runtime through its socket rather than through the host's systemd, as the product owner chose, so it works the same on Docker and Podman.
 
@@ -489,13 +492,14 @@ services:
       RTP_PORT_END: ${RTP_PORT_END:-10200}
       ARI_PASSWORD: ${ARI_PASSWORD}             # ARI user is 'zamfono', fixed in ari.conf
       AMI_PASSWORD: ${AMI_PASSWORD}             # AMI user is 'zamfono', read-only, fixed in manager.conf (§9.1)
-      HEP_ENABLED: ${HEP_ENABLED:-true}         # hep.conf enabled=…; collector core:9060 (§7)
+      HEP_ENABLED: ${HEP_ENABLED:-true}         # hep.conf enabled=…; collector = core's current address (§7)
       SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-true} # false binds transport-udp to loopback (§9.1)
       SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-true} # false binds transport-tcp to loopback (§9.1)
       TZ: ${TZ:-UTC}
     volumes:
       - media:/media
       - asterisk-config:/etc/asterisk/gen       # rendered by api: pjsip_users/trunks, hints, MoH, TLS cert
+      - astdb:/var/lib/asterisk/astdb           # PJSIP contacts: registrations survive a recreated container (§9.1)
     restart: unless-stopped
 
   migrate:
@@ -615,6 +619,7 @@ volumes:
   backups:
   caddy-data:
   asterisk-config:
+  astdb:
 ```
 
 **Attachment overlays.** Exactly one of the two is added with a second `-f` (§6.1).
@@ -812,7 +817,7 @@ The database is therefore never the reason to re-architect; the single-tenant st
 
 - `events`: a structured routing trace — DID match, or the number that matched none before a 404 release, OOO evaluation, members rung, answers and declines, fallback taken, trunk and host selection, and every REST live-call action (transfer, pickup, hangup) with the acting user. Appended to `calls.log` as JSON lines, written once at call end.
 - `qos`: a per-leg RTCP summary, read through ARI `GET /channels/{id}/rtp_statistics` before the leg is hung up, stored in `call_qos` (§11) and queryable alongside the call history.
-- `sip`: the call's SIP messages, stored in `calls.log`. Asterisk mirrors every SIP message it sends or receives to `core` over HEP, the Homer Encapsulation Protocol (`res_hep` and `res_hep_pjsip`; collector address in the static `hep.conf`, §9.1). `core`'s UDP listener correlates by Call-ID and keeps messages only for calls at this level. A message is outbound when its source address is one of Asterisk's own: `STACK_IPV4` or `EXTERNAL_IPV4` from the environment plus the `asterisk` service's address on `internal`, since the transports bind the stack address in macvlan mode and the container address in ports mode (§9.1); every other message is inbound. A call at this level holds its join to the SIP dialog before routing starts and closes a few seconds after it ends, so a call refused at once still records its INVITE, its final response and the ACK.
+- `sip`: the call's SIP messages, stored in `calls.log`. Asterisk mirrors every SIP message it sends or receives to `core` over HEP, the Homer Encapsulation Protocol (`res_hep` and `res_hep_pjsip`; collector address in `hep.conf`, §9.1). `core`'s UDP listener correlates by Call-ID and keeps messages only for calls at this level. A message is outbound when its source address is one of Asterisk's own: `STACK_IPV4` or `EXTERNAL_IPV4` from the environment plus the `asterisk` service's address on `internal`, since the transports bind the stack address in macvlan mode and the container address in ports mode (§9.1); every other message is inbound. A call at this level holds its join to the SIP dialog before routing starts and closes a few seconds after it ends, so a call refused at once still records its INVITE, its final response and the ACK.
 
 `HEP_ENABLED=false` in `.env` (§6.3) switches the mirror off in both containers and makes `sip` an invalid level, so the ladder ends at `qos`.
 
@@ -841,7 +846,8 @@ Asterisk's own configuration ships in the image, is mounted read-only, and is te
   - Binding: `STACK_IPV4` when set, else `0.0.0.0`. When `EXTERNAL_IPV4` is set, every transport carries it as `external_media_address` and `external_signaling_address`, so SIP and SDP name the host's public address in the ports mode (§6.1).
   - The RTP port range.
 - `ari.conf` and `http.conf` enable ARI with credentials from the environment, and `manager.conf` enables AMI for one user, `zamfono`, with `AMI_PASSWORD` from the environment, the `system` read class for the `Registry` events and the `reporting` write class for the `PJSIPShowRegistrationsOutbound` action the core uses (§9.4), since Asterisk authorises AMI actions against the write classes. The container owns the public IP, so `bindaddr` is never `0.0.0.0`: the entrypoint resolves the container's address on the `internal` network at start and binds ARI and AMI to it alone.
-- `hep.conf` names `core`'s UDP listener on the internal network as HEP collector, with `enabled=no` when `HEP_ENABLED=false` (§7).
+- `hep.conf` names `core`'s UDP listener on the internal network as HEP collector, with `enabled=no` when `HEP_ENABLED=false` (§7). `res_hep` takes a numeric address only, and `core` starts after Asterisk and gets a new address whenever it is recreated, so the entrypoint renders the address `core` resolves to (the loopback until it resolves) and keeps following it: when the address changes, it renders the file again and reloads `res_hep`.
+- `asterisk.conf` puts the astdb, where the PJSIP contacts live (`sorcery.conf`), in a directory of its own on the `astdb` volume, so registrations survive a recreated container.
 - `indications.conf` holds one tone zone, ITU-T E.180's, whose special information tone the core plays for a failed call (§9.4 "Cross-trunk failover").
 - `extensions.conf` is the minimal dialplan; every context ends in `Stasis(zamfono,<context-tag>)`.
 - `rtp.conf` sets the RTP range from `RTP_PORT_START` and `RTP_PORT_END` (default 10000–10200/udp) and the ICE and STUN settings for far-end NAT where needed.
