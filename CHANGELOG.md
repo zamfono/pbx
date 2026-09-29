@@ -2,7 +2,7 @@
 
 What changes for the people who run a Zamfono stack, release by release. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow
-[Semantic Versioning](https://semver.org/). Each release's section is also its GitHub release's
+[Semantic Versioning](https://semver.org/) as `RELEASING.md` applies it. Each release's section is also its GitHub release's
 description, and ships in its bundle next to `compose.yaml`.
 
 **Upgrade notes** say what to do beyond deploy/README.md step 8's usual upgrade; a release

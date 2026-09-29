@@ -121,7 +121,7 @@ request deletes the images. `deploy/compose.pr.yaml` swaps the five images for t
 
 ## Contributing, security and license
 
-Read `CONTRIBUTING.md` before opening a pull request; contributions are accepted under the
+Read `CONTRIBUTING.md` before opening a pull request, and `RELEASING.md` before tagging a release; contributions are accepted under the
 contributor license agreement in `CLA.md`, which the CLA bot asks you to sign once. Report
 vulnerabilities privately as `SECURITY.md` describes, never in a public issue.
 
