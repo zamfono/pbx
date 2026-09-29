@@ -171,14 +171,29 @@ curl -fsSL https://github.com/zamfono/pbx/releases/latest/download/zamfono-deplo
   | tar xz --strip-components=1
 ```
 
-For one particular release, replace `latest/download` with `download/vX.Y.Z`. Each release lists
-the archives' checksums in its `SHA256SUMS`, and carries a signed attestation that they were built
-by this repository's release workflow at that tag. To check a downloaded archive (download it to a
-file rather than piping it into `tar`):
+For one particular release, replace `latest/download` with `download/vX.Y.Z`.
+
+To check a download, save it to a file instead of piping it into `tar`. Each release lists the
+archives' checksums in `SHA256SUMS`, which needs nothing beyond coreutils:
+
+```bash
+base=https://github.com/zamfono/pbx/releases/latest/download
+curl -fsSLO "$base/zamfono-deploy.tar.gz" && curl -fsSLO "$base/SHA256SUMS"
+sha256sum -c --ignore-missing SHA256SUMS
+tar xzf zamfono-deploy.tar.gz --strip-components=1
+```
+
+That proves the file arrived intact. Each release also carries a signed attestation that the
+archives were built by this repository's release workflow at that tag, which proves where they
+came from. Checking it needs GitHub CLI 2.49 or newer, logged in (`gh auth login`), so it is
+usually easiest on your own machine, against the same file:
 
 ```bash
 gh attestation verify zamfono-deploy.tar.gz --repo zamfono/pbx
 ```
+
+On the server itself, Debian 13's own `gh` (2.46) has no `attestation` command; GitHub's
+repository has a current one (<https://github.com/cli/cli/blob/trunk/docs/install_linux.md>).
 
 The bundle's `compose.yaml` pulls the images of its own release. Leave `ZAMFONO_VERSION` in `.env`
 empty to keep it that way; set it only to follow something else, such as `edge` for testing.
