@@ -103,7 +103,7 @@ describe('SipCapture', () => {
 
     capture.message(message('caller@10.0.0.1', 'INVITE sip:101@pbx SIP/2.0'));
     capture.message(message('caller@10.0.0.1', 'SIP/2.0 100 Trying'));
-    capture.register(call, channelId);
+    await capture.register(call, channelId);
     await joined();
     capture.message(message('caller@10.0.0.1', 'SIP/2.0 180 Ringing'));
 
@@ -116,8 +116,8 @@ describe('SipCapture', () => {
 
   it('joins every leg dialog to the call, not the caller alone', async () => {
     const call = buildCall();
-    capture.register(call, channelWithCallId('caller@10.0.0.1'));
-    capture.register(call, channelWithCallId('leg@10.0.0.2'));
+    await capture.register(call, channelWithCallId('caller@10.0.0.1'));
+    await capture.register(call, channelWithCallId('leg@10.0.0.2'));
     await joined();
 
     capture.message(
@@ -133,7 +133,7 @@ describe('SipCapture', () => {
 
     capture.message(message('late@10.0.0.1', 'INVITE sip:101@pbx SIP/2.0'));
     clock += 60_000;
-    capture.register(call, channelId);
+    await capture.register(call, channelId);
     await joined();
 
     expect(loggedPayloads(call)).toEqual([]);
@@ -144,7 +144,7 @@ describe('SipCapture', () => {
     const channelId = channelWithCallId('caller@10.0.0.1');
 
     capture.message(message('other@10.0.0.9', 'OPTIONS sip:pbx SIP/2.0'));
-    capture.register(call, channelId);
+    await capture.register(call, channelId);
     await joined();
 
     expect(loggedPayloads(call)).toEqual([]);
