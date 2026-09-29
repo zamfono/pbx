@@ -24,8 +24,15 @@ until one is flagged.
 
 The emergency service that answers is the one responsible for the address the trunk provider has
 on file for the presented number — the company's registered address, not the caller's physical
-location. A softphone used from a home office, or from anywhere else than the office, that dials
-an emergency number is answered by the office's local emergency centre, not the caller's own.
+location. A desktop softphone or a desk phone used from a home office, or from anywhere else than
+the office, that dials an emergency number is answered by the office's local emergency centre, not
+the caller's own.
+
+The Ringotel mobile app is the exception. The stack gives it the tenant's emergency numbers
+(`emergencyNumbers` in `settings.update`), and it dials them through the phone's own cellular
+network: the call reaches the emergency centre where the person is, with the phone's location, and
+works without mobile data or a reachable PBX. Such a call never passes through Zamfono, so it has
+no call-history entry, uses no emergency trunk and leaves no trace.
 
 Tell every remote worker this before they rely on a Zamfono extension for emergencies from
 somewhere other than the office (see `remote-workers`).

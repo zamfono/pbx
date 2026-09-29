@@ -28,6 +28,11 @@ why the specified behaviour changed; the commit history, how.
 
 ### Added
 
+- The Ringotel mobile apps dial the tenant's emergency numbers through the phone's own cellular
+  network, reaching the emergency centre where the person is, with the phone's location, even
+  without mobile data. Such a call bypasses the PBX: it has no call-history entry and uses no
+  emergency trunk. Desktop apps and desk phones still dial them through the PBX's emergency
+  trunks. The numbers follow `emergencyNumbers` in `settings.update`.
 - `system.info` shows when `api` and `core` started (`startedAt`) and when Asterisk did
   (`core.asteriskStartedAt`), so a restart is visible.
 
@@ -36,7 +41,8 @@ why the specified behaviour changed; the commit history, how.
 - **Ringotel connections change at their next push**: the first device, user, extension or
   profile change after the upgrade, or the upgrade's own restart, rewrites the connection's
   settings. Internal calls then always go through the PBX, the PBX's caller name wins over the
-  app's contacts, apps stay registered while closed and re-register every two minutes. Settings
+  app's contacts, apps stay registered while closed and re-register every two minutes, and the
+  mobile apps dial emergency numbers over the cellular network. Settings
   changed by hand in the Ringotel Shell for these are overwritten.
 
 ## [0.0.6] - 2026-09-29
