@@ -20,6 +20,8 @@ umask 077
 . setup/checks.sh
 # shellcheck source=setup/envfile.sh
 . setup/envfile.sh
+# shellcheck source=setup/boot-unit.sh
+. setup/boot-unit.sh
 
 if [[ -n ${SETUP_NONINTERACTIVE:-} || ! -t 0 ]]; then
   interactive=
@@ -183,41 +185,15 @@ main() {
   else
     check_public_network
   fi
+  boot_unit=
   [[ $runtime != podman || -z $interactive ]] || offer_boot_unit
   echo
   echo "Open the firewall (README.md, step 3), then start the stack:"
-  echo "  cd $PWD && ${compose[*]} -f compose.yaml -f $overlay up -d"
-}
-
-# Podman restarts nothing after a reboot for a stack on `unless-stopped` (README.md, step 7).
-offer_boot_unit() {
-  local name unit
-  name=$(basename "$PWD")
-  [[ $name == zamfono* ]] || name=zamfono-$name
-  unit=/etc/systemd/system/$name.service
-  [[ -e $unit ]] && return 0
-  ui_yesno "Podman does not start the stack after a reboot on its own.\n\nInstall $unit to do that?" || return 0
-  cat >"$unit" <<EOF
-[Unit]
-Description=Zamfono stack in $PWD
-Wants=network-online.target
-After=network-online.target podman.socket
-Requires=podman.socket
-
-[Service]
-Type=oneshot
-RemainAfterExit=true
-WorkingDirectory=$PWD
-ExecStart=$(command -v podman) compose -f compose.yaml -f $overlay up -d
-ExecStop=$(command -v podman) compose -f compose.yaml -f $overlay stop
-
-[Install]
-WantedBy=multi-user.target
-EOF
-  chmod 644 "$unit"
-  systemctl daemon-reload
-  systemctl enable "$name.service" >/dev/null 2>&1
-  echo "Installed and enabled $name.service."
+  if [[ -n $boot_unit ]]; then
+    print_unit_usage
+  else
+    echo "  cd $PWD && ${compose[*]} -f compose.yaml -f $overlay up -d"
+  fi
 }
 
 main "$@"

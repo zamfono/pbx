@@ -278,7 +278,8 @@ port 80.
 
 ## 7. Podman only: start the stack at boot
 
-`setup.sh` offers to install this unit, named after the stack directory. By hand, one unit per
+`setup.sh` offers to install this unit, named after the stack directory, and then prints the
+`systemctl` commands to start, stop and inspect the stack through it. By hand, one unit per
 stack directory (here `/srv/zamfono`; mode A shown):
 
 ```ini

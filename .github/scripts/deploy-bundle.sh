@@ -19,7 +19,7 @@ fi
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
 files=(compose.yaml compose.ports.yaml compose.macvlan.yaml Caddyfile litestream.caddy .env.example README.md
-  setup.sh setup/ui.sh setup/checks.sh setup/envfile.sh)
+  setup.sh setup/ui.sh setup/checks.sh setup/envfile.sh setup/boot-unit.sh)
 
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
