@@ -39,8 +39,8 @@ audio without joining the call.
 `undo`, `job`), the operation name, the entity and a field-level diff. Every configuration change
 writes one.
 
-**Undo** — reverting one audit entry's diff through `POST /audit/{id}/undo`. See `guardrails` and
-the `undo` recipe.
+**Undo** — reverting one audit entry's diff through `audit.undo` (`POST /audit/{id}/undo`). See
+`guardrails` and the `undo` recipe.
 
 **Soft delete** — marking a config row `deletedAt` instead of removing it. The row and its id stay
 reachable for undo until the retention job purges it.

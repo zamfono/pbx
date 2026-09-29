@@ -22,7 +22,6 @@ why the specified behaviour changed; the commit history, how.
   number that matched no DID before the 404.
 - The Ringotel connection now carries the tenant's country, which the apps use to match callers'
   numbers to contacts, and follows a change of it.
-
 - A `ringotel` device reached Ringotel before Asterisk knew it: Ringotel's test registration
   failed, it created no user and sent no activation e-mail, and `devices.create` still reported
   success. The device now reaches Ringotel once Asterisk holds it, the same for a rotated
@@ -38,6 +37,9 @@ why the specified behaviour changed; the commit history, how.
 
 - A `ringotel-setup` help topic (`zamfono.help`): connecting the stack to Ringotel, from the API
   key through setup or adoption to the first device.
+- The admin skill's tool list names each tool's REST endpoints, and the guide names each step by
+  its MCP tool first, with the REST call beside it (`users.create` (`POST /users`)), so an MCP
+  client no longer has to work out which tool a REST call is.
 
 ### Changed
 

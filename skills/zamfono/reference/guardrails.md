@@ -5,17 +5,17 @@ enforces that.
 
 ## Every write is audited
 
-Every operation that changes configuration, destroys data or reveals a secret writes an
-`audit_log` entry: who did it, on which channel (`rest`, `mcp`, `ui`, `undo`, `job`), what
-changed, field by field. `GET /audit` lists it, filterable by entity, actor, channel, operation
-and time range. Secret values (passwords, API tokens, `*_enc` settings) are masked in the diff.
+Every operation that changes configuration, destroys data or reveals a secret writes an `audit_log`
+entry: who did it, on which channel (`rest`, `mcp`, `ui`, `undo`, `job`), what changed, field by
+field. `audit.list` (`GET /audit`) lists it, filterable by entity, actor, channel, operation and
+time range. Secret values (passwords, API tokens, `*_enc` settings) are masked in the diff.
 
 ## Most changes are undoable
 
-`POST /audit/{id}/undo` reverts one entry by writing its recorded values back. It is refused,
-naming the conflicting row, when a later live change to the same entity exists, when the change
-would recreate a duplicate (a reused extension, e-mail or DID number), or when the entry itself
-is not undoable — a secret-bearing change, a one-shot action such as a manual backup run or a
+`audit.undo` (`POST /audit/{id}/undo`) reverts one entry by writing its recorded values back. It is
+refused, naming the conflicting row, when a later live change to the same entity exists, when the
+change would recreate a duplicate (a reused extension, e-mail or DID number), or when the entry
+itself is not undoable — a secret-bearing change, a one-shot action such as a manual backup run or a
 sent e-mail, or a hard delete whose file is already gone. See the `undo` recipe for the full
 walk-through.
 

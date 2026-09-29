@@ -7,11 +7,11 @@ Moving a stack to another host, or recovering it after data loss, is the same pr
 
 - **`.env`**, preserved from the original host: it holds the secretbox encryption key, the JWT
   secret and the ARI password.
-- **The restic repository location and password for each target**, from the operator's own
-  record of what was entered in `POST /backups/targets` when the target was created, or an
-  out-of-band copy kept alongside `.env` — a target's encrypted repository password lives inside
-  the database itself, so it is not available until after a restic-based restore has already
-  produced that database.
+- **The restic repository location and password for each target**, from the operator's own record of
+  what was entered in `backups.targets.create` (`POST /backups/targets`) when the target was
+  created, or an out-of-band copy kept alongside `.env` — a target's encrypted repository password
+  lives inside the database itself, so it is not available until after a restic-based restore has
+  already produced that database.
 - **The database**, from `litestream restore` (with the optional continuous-replication overlay
   running, using that overlay's own bucket credentials) or from the latest restic snapshot
   otherwise.
@@ -39,5 +39,5 @@ the last restic snapshot.
   updates.
 - The replication bucket needs server-side encryption — the WAL stream itself is not
   client-side encrypted, unlike the restic repository.
-- `GET /backups/runs` and the `backup.finished`/`backup.failed` events show the age and status of
-  the restic runs a restore would fall back to.
+- `backups.runs.list` (`GET /backups/runs`) and the `backup.finished`/`backup.failed` events show
+  the age and status of the restic runs a restore would fall back to.

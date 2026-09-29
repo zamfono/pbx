@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-09-29 · §12 Admin skill.** The tool catalog also lists each operation's REST endpoints, and the guide names each step by its operation, with the REST call beside it.
+*Why:* requested by the product owner: the skill and the guide described only REST calls, while an MCP client calls tools, and nothing said which tool a `POST /users` was.
+
 **2026-09-29 · §7 Levels, §9.4 Inbound number normalization.** The called party falls back to the `To` user when the Request-URI's is no number and `To`'s is; the routing trace names a number that matched no DID; a `sip`-level call joins its dialog before routing and closes a few seconds after it ends.
 *Why:* found on a test stack: every call over a registration trunk was refused with 404, its Request-URI naming the account `zamfono-test` and its `To` the dialled `+498995409700`, as the provider's capture showed; the trace said only `release 404`, and level `sip` recorded nothing, since the calls ended within 20 ms, before their Call-ID was joined and before Asterisk's 404 left.
 
@@ -2389,7 +2392,7 @@ Nothing in this section is designed by this document, and nothing in this docume
 
 - a thin `SKILL.md` with the `claude mcp add` and `codex mcp` connect lines and a pointer to read the reference files before the first change;
 - `reference/*.md`, copied from the same `docs/guide/` files that `zamfono.help` serves (§10.5);
-- a tool catalog generated from the operation registry, so it cannot drift.
+- a tool catalog generated from the operation registry and the REST route table, so it cannot drift; the guide names each step by its operation, the MCP tool, with the REST call beside it.
 
 **SIP brute-force banning.** A fail2ban-style sidecar in the Asterisk network namespace acting on `res_security_log` events with a packet filter; it needs `CAP_NET_ADMIN`. The MVP relies on endpoint identification without an `anonymous` endpoint and on 24-character random passwords (§5.6).
 

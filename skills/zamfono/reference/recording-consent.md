@@ -14,7 +14,7 @@ operator's and the tenant's responsibility to establish before turning `recordCa
 user or group, for example through a greeting on the relevant DID, an IVR prompt, or a beep
 injected by the trunk provider.
 
-`GET /recordings` and downloading a recording's audio are `admin`/`owner` only, including
-recordings of a user's own calls. Recordings are purged after `settings.recordingRetentionDays`
-(default 90 days) by a daily job; a shorter retention is one way to reduce exposure once a
-recording has served its purpose.
+`recordings.list` (`GET /recordings`) and downloading a recording's audio are `admin`/`owner` only,
+including recordings of a user's own calls. Recordings are purged after
+`settings.recordingRetentionDays` (default 90 days) by a daily job; a shorter retention is one way
+to reduce exposure once a recording has served its purpose.

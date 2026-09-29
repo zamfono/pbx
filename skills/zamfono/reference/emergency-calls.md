@@ -11,13 +11,14 @@ never anonymous.
 ## Emergency trunks
 
 Only a trunk with `emergency` set ever carries an emergency call; every trunk states it, since
-`POST /trunks` requires the field. Set it only on a trunk whose provider routes emergency numbers
-to the emergency service of the company's registered address. A trunk whose provider is in
-another country than the company must not be flagged: a US provider has no use for `112`, and a
-German number has no E911 record there, so the call would be rejected or reach the wrong
-emergency centre. Without any flagged trunk, every emergency call fails: a trunk create, update
-or delete that leaves the tenant in that state returns the warning `no emergency trunk; emergency
-calls will fail`, and `GET /healthz` reports `emergencyTrunk: false` until one is flagged.
+`trunks.create` (`POST /trunks`) requires the field. Set it only on a trunk whose provider routes
+emergency numbers to the emergency service of the company's registered address. A trunk whose
+provider is in another country than the company must not be flagged: a US provider has no use for
+`112`, and a German number has no E911 record there, so the call would be rejected or reach the
+wrong emergency centre. Without any flagged trunk, every emergency call fails: a trunk create,
+update or delete that leaves the tenant in that state returns the warning
+`no emergency trunk; emergency calls will fail`, and `GET /healthz` reports `emergencyTrunk: false`
+until one is flagged.
 
 ## Where the call is answered
 

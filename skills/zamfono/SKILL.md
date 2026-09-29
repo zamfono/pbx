@@ -24,11 +24,16 @@ copied by hand.
 
 Read `reference/mental-model.md`, `reference/routing-order.md` and `reference/guardrails.md`
 before configuring anything: they cover the entities, the forward-target vocabulary and what the
-operations layer refuses outright. `reference/glossary.md` and the recipe files
-(`reference/onboard-employee.md`, `reference/vacation-rule.md`, `reference/diagnose-bad-call.md`,
-`reference/undo.md`) cover the rest of the guide. `reference/tools.md` lists every operation this
-skill can call, generated from the stack's own operation registry so it never drifts from it. The
-`zamfono.help` tool itself is not an operation and so is not in that list; see below for it.
+operations layer refuses outright. The other files in `reference/` are the rest of the admin
+guide: the glossary, background topics, and step-by-step recipes for common tasks, each named
+after its task (`onboard-employee.md`, `undo.md`, …); list the directory rather than relying on
+this paragraph.
+
+`reference/tools.md` lists every operation, generated from the stack's own operation registry and
+REST route table so it never drifts from either. An operation's name is the MCP tool's name: the
+guide writes a step as `` `users.create` (`POST /users`) ``, where the first is the tool to call
+and the parenthesis the same call over REST. The `zamfono.help` tool itself is not an operation
+and so is not in that list; see below for it.
 
 ## Working with the stack
 
