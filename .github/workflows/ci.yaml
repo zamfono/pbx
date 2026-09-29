@@ -186,6 +186,15 @@ jobs:
         run: bash test/integration/run.sh
         env:
           COMPOSE: docker compose
+          # run.sh collects everything there on a failure (test/integration/diagnostics.sh).
+          DIAG_DIR: ${{ runner.temp }}/diagnostics
+      - name: Keep the failure's diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: diagnostics-docker
+          path: ${{ runner.temp }}/diagnostics
+          if-no-files-found: ignore
 
   compose-podman:
     needs: images
@@ -230,13 +239,22 @@ jobs:
           fi
       - run: sudo podman load -i /tmp/images.tar
       - name: Bring the stack up and run the sipp scenarios
-        # `env` carries the image tags, `COMPOSE` and `DOCKER_HOST` across sudo; the runner's
-        # sudo-rs ignores `-E`.
+        # `env` carries the image tags, `COMPOSE`, `DOCKER_HOST` and `DIAG_DIR` across sudo; the
+        # runner's sudo-rs ignores `-E`.
         run: |
           sudo env COMPOSE="$COMPOSE" DOCKER_HOST="$DOCKER_HOST" \
             ASTERISK_IMAGE="$ASTERISK_IMAGE" MIGRATE_IMAGE="$MIGRATE_IMAGE" CORE_IMAGE="$CORE_IMAGE" \
             API_IMAGE="$API_IMAGE" PROXY_IMAGE="$PROXY_IMAGE" DEVICES_IMAGE="$DEVICES_IMAGE" \
             SIPP_IMAGE="$SIPP_IMAGE" \
+            DIAG_DIR="$DIAG_DIR" \
             bash test/integration/run.sh
         env:
           COMPOSE: podman compose
+          DIAG_DIR: ${{ runner.temp }}/diagnostics
+      - name: Keep the failure's diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: diagnostics-podman
+          path: ${{ runner.temp }}/diagnostics
+          if-no-files-found: ignore

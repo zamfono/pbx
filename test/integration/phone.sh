@@ -24,6 +24,9 @@ compose=$1
 action=$2
 PORT=5070
 QUALIFY_ATTEMPTS=20
+# Asterisk's default `qualify_timeout`, which the rendered AORs keep (packages/api/src/lib/pjsip),
+# plus a second for the result to reach the contact's status; in microseconds.
+STALE_PROBE_WINDOW_US=4000000
 REGISTER_ATTEMPTS=10
 CALL_ATTEMPTS=90
 MESSAGES=/tmp/phone-messages.log
@@ -86,15 +89,27 @@ await_first_qualify() {
   return 1
 }
 
+# The time in microseconds, whatever the locale's decimal separator.
+now_us() {
+  echo "${EPOCHREALTIME//[.,]/}"
+}
+
 # The contact is only reachable once something answers the probe, and the core reads a device
-# as registered from that reachability (§9.3), so the call waits for it.
+# as registered from that reachability (§9.3), so the call waits for it. Between two runs nothing
+# answers the AOR's own periodic probe, and a probe sent then times out `qualify_timeout` later,
+# possibly after this run's explicit one was answered: Asterisk applies each result as its probe
+# completes (see `await_first_qualify`), so that stale timeout would mark the contact unreachable
+# after all, and the call would find the phone offline. So `Avail` counts only once every probe
+# sent before this run started (`$2`, from `now_us`) has had its result.
 await_reachable() {
-  local sip_username=$1 status=''
+  local sip_username=$1 started=$2 status=''
   for _ in $(seq 1 $QUALIFY_ATTEMPTS); do
     dc exec -T asterisk asterisk -rx "pjsip qualify $sip_username" >/dev/null 2>&1 || true
     sleep 1
     status=$(contact_status "$sip_username")
-    [ "$status" = Avail ] && return 0
+    if [ "$status" = Avail ] && (($(now_us) - started >= STALE_PROBE_WINDOW_US)); then
+      return 0
+    fi
   done
   echo "the device never reached the reachable state (status '${status:-none}')" >&2
   return 1
@@ -128,13 +143,15 @@ case $action in
     ;;
   unregister) registration unregister "$3" "$4" ;;
   answer)
+    started=$(now_us)
     serve "$3" "$5" "$6"
-    await_reachable "$4"
+    await_reachable "$4" "$started"
     ;;
   listen) serve "$3" ;;
   call)
     # A call the phone places itself is one call, so `-m 1` ends the run with it; `-aa` still
     # answers the probes meanwhile, so the device stays registered while it is on the call.
+    started=$(now_us)
     clear_phone_trace
     dc exec -T -d sipp-phone sh -c \
       "sh /scenarios/_sipp-run.sh phone-$3 \
@@ -142,7 +159,7 @@ case $action in
         -trace_msg -message_file $MESSAGES \
         -key user '$4' -au '$4' -ap '$5' asterisk:5060 > /tmp/$3.log 2>&1; \
         echo \$? > $CALL_EXIT"
-    await_reachable "$4"
+    await_reachable "$4" "$started"
     ;;
   wait-call)
     for _ in $(seq 1 $CALL_ATTEMPTS); do

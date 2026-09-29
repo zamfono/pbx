@@ -14,6 +14,15 @@ const db = new DatabaseSync('/data/zamfono.sqlite3', { readOnly: true });
 const rows = db.prepare('SELECT * FROM calls ORDER BY started_at DESC LIMIT 20').all();
 for (const row of rows) console.log(JSON.stringify(row));
 "
+# The users' presence changes as the core recorded them (§3.1 `presence_log`): whether a member a
+# ring group skipped was `offline` (its contact unreachable) or `busy` (still in a call) at the
+# time, which is all a group's `unavailable` result leaves to tell those apart.
+presence_log_js="
+const { DatabaseSync } = require('node:sqlite');
+const db = new DatabaseSync('/data/zamfono.sqlite3', { readOnly: true });
+const rows = db.prepare('SELECT * FROM presence_log ORDER BY since DESC LIMIT 100').all();
+for (const row of rows) console.log(JSON.stringify(row));
+"
 
 diag_compose() {
   $COMPOSE "${compose_files[@]}" "$@"
@@ -35,6 +44,7 @@ dump_diagnostics() {
     diag_compose logs --no-color --timestamps "$service" > "$dir/$service.log" 2>&1 || true
   done
   diag_compose exec -T core node -e "$recent_calls_js" > "$dir/calls.jsonl" 2>&1 || true
+  diag_compose exec -T core node -e "$presence_log_js" > "$dir/presence-log.jsonl" 2>&1 || true
   diag_compose exec -T asterisk asterisk -rx 'core show channels verbose' \
     > "$dir/channels.txt" 2>&1 || true
   diag_compose exec -T asterisk asterisk -rx 'pjsip show contacts' \
