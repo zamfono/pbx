@@ -295,7 +295,7 @@ Type=oneshot
 RemainAfterExit=true
 WorkingDirectory=/srv/zamfono
 ExecStart=/usr/bin/podman compose -f compose.yaml -f compose.ports.yaml up -d
-ExecStop=/usr/bin/podman compose -f compose.yaml -f compose.ports.yaml stop
+ExecStop=/usr/bin/podman compose -f compose.yaml -f compose.ports.yaml down
 
 [Install]
 WantedBy=multi-user.target
@@ -317,6 +317,22 @@ curl -fsSL https://github.com/zamfono/pbx/releases/latest/download/zamfono-deplo
   | tar xz --strip-components=1
 docker compose -f compose.yaml -f <overlay> pull
 docker compose -f compose.yaml -f <overlay> up -d
+```
+
+**Podman** refuses to replace `asterisk` while `proxy` still shares its network namespace, so
+`up -d` after a pull fails with "has dependent containers which must be removed before it".
+Remove the containers first — `down` keeps every volume — or, with the boot unit of step 7,
+restart it, which does the same:
+
+```bash
+podman compose -f compose.yaml -f <overlay> pull
+systemctl restart zamfono.service    # or: podman compose ... down && podman compose ... up -d
+```
+
+A unit installed by `v0.0.3` or earlier stops with `stop` rather than `down`; switch it once:
+
+```bash
+sed -i 's/ stop$/ down/' /etc/systemd/system/zamfono.service && systemctl daemon-reload
 ```
 
 Compare the new `.env.example` with your `.env`: a release that adds a setting adds it there. If

@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-09-29 · §6.3 Upgrades.** On Podman an upgrade runs `down` before `up -d`, and the boot unit stops with `down`.
+*Why:* found upgrading a Podman test stack to 0.0.3: `up -d` after a pull failed with "has dependent containers which must be removed before it", since Podman, unlike Docker, will not remove the `asterisk` container `proxy` shares a network namespace with.
+
 **2026-09-29 · §6.3 Images and Upgrades.** A release tag also publishes a GitHub release with `deploy/`'s operator files attached as one attested archive, whose `compose.yaml` defaults to the release's own images; an upgrade unpacks the new bundle before pulling. The bundle carries `setup.sh`, which writes a first `.env`. Operators copied `deploy/` from the repository and wrote `.env` by hand before.
 *Why:* requested by the product owner; files copied from `main` could be ahead of the `latest` images they pulled, and the bundle is the one copy of those files taken from the released commit. The hand-written `.env` held the pitfalls the README had to warn about (an unquoted hash, both or neither address set, a missing secret), which the script rules out.
 
@@ -694,7 +697,7 @@ handle /metrics/litestream {
 
 Without the hash variable the owner receives the set-password mail instead, so either the hash or a mail relay must be present at first boot. The seed variables are ignored once the database holds a user. Everything else is created by the owner through REST or MCP after the first login: the first trunk, which brings the catch-all outbound route with it (§9.4), the Ringotel organization and branch (§10.4), the users.
 
-**Upgrades** are a backup run (`POST /backups/runs`, §6.5), then unpacking the new release's bundle over the stack's files, which leaves `.env` alone, and `docker compose pull && docker compose up -d`; a deployment pinned through `ZAMFONO_VERSION` edits it to the new release first. The `migrate` service applies pending migrations and exits, `api` starts on its success, and `core` starts once `api` reports healthy. Asterisk's static configuration is regenerated from the environment on start.
+**Upgrades** are a backup run (`POST /backups/runs`, §6.5), then unpacking the new release's bundle over the stack's files, which leaves `.env` alone, and `docker compose pull && docker compose up -d`; a deployment pinned through `ZAMFONO_VERSION` edits it to the new release first. On Podman, `down` comes between the two: Podman refuses to remove `asterisk` while `proxy` still shares its network namespace, which Docker allows, so `up -d` cannot replace it; `down` keeps every volume, and the Podman boot unit stops with `down` for the same reason. The `migrate` service applies pending migrations and exits, `api` starts on its success, and `core` starts once `api` reports healthy. Asterisk's static configuration is regenerated from the environment on start.
 
 **Health.** `GET /healthz` is the liveness endpoint. Its HTTP status reflects only the process's own liveness, for `api` the open database with no migration pending, for `core` its database and ARI connection; every other check is a field in the body. Compose health checks run on `core` and `api`, and the `api` check gates `core`'s start, which is why `api`'s status never depends on `core`. Every long-running service has `restart: unless-stopped`; `migrate` has `restart: "no"`.
 
