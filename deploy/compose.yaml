@@ -19,13 +19,14 @@ services:
       RTP_PORT_END: ${RTP_PORT_END:-10200}
       ARI_PASSWORD: ${ARI_PASSWORD}             # ARI user is 'zamfono', fixed in ari.conf
       AMI_PASSWORD: ${AMI_PASSWORD}             # AMI user is 'zamfono', read-only, fixed in manager.conf (§9.1)
-      HEP_ENABLED: ${HEP_ENABLED:-true}         # hep.conf enabled=…; collector core:9060 (§7)
+      HEP_ENABLED: ${HEP_ENABLED:-true}         # hep.conf enabled=…; collector = core's current address (§7)
       SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-true} # false binds transport-udp to loopback (§9.1)
       SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-true} # false binds transport-tcp to loopback (§9.1)
       TZ: ${TZ:-UTC}
     volumes:
       - media:/media
       - asterisk-config:/etc/asterisk/gen       # rendered by api: pjsip_users/trunks, hints, MoH, TLS cert
+      - astdb:/var/lib/asterisk/astdb           # PJSIP contacts: registrations survive a recreated container (§9.1)
     restart: unless-stopped
 
   migrate:
@@ -145,3 +146,4 @@ volumes:
   backups:
   caddy-data:
   asterisk-config:
+  astdb:
