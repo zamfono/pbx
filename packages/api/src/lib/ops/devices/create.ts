@@ -44,7 +44,7 @@ type Output = {
   device: ReturnType<typeof toDeviceOut>;
   sipUsername?: string;
   sipPassword?: string;
-  /** A `ringotel` device Ringotel refused: the device stands, and this says why (§10.4). */
+  /** A `ringotel` device Ringotel refused, or no Ringotel setup: the device stands, and this says why (§10.4). */
   warnings?: string[];
 };
 
@@ -104,14 +104,15 @@ export const create = defineOperation({
     propagate(ctx, ['pjsip']);
     const row = await liveDevice(ctx.db, id);
     if (input.kind === 'ringotel') {
-      pushToRingotel(
-        ctx,
-        provider => provider.onDeviceCreated(row, { username, password }),
-        {
+      pushToRingotel(ctx, {
+        trigger: 'devices.create',
+        deviceId: id,
+        push: provider => provider.onDeviceCreated(row, { username, password }),
+        failure: {
           what: `device ${id} is created, but it has no Ringotel user yet`,
           retry: 'devices.rotate on the device creates it'
         }
-      );
+      });
       return { device: toDeviceOut(row) };
     }
     return {

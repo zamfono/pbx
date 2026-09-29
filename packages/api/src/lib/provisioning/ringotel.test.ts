@@ -107,7 +107,8 @@ describe('buildBranchProvision', () => {
         codecsJson: '["opus","g722","alaw"]',
         featureCodesJson:
           '{"pickup":"*8","dndOn":"*90","dndOff":"*91","mailbox":"*95","ownVoicemail":"*96","deposit":"*97","addParty":"*5","clirOn":"#31#","clirOff":"*31#","park":"*70"}',
-        ringotelMaxRegs: 3
+        ringotelMaxRegs: 3,
+        emergencyNumbersJson: '["112","110"]'
       },
       ['701'],
       [{ number: '101', title: 'Anna Huber' }]
@@ -127,6 +128,36 @@ describe('buildBranchProvision', () => {
       park: '*70',
       slots: [{ alias: 'Parking 701', slot: '701' }]
     });
+  });
+
+  it('routes every call through the PBX and lets its caller name win (§10.4)', () => {
+    const provision = buildBranchProvision(
+      {
+        codecsJson: '["opus"]',
+        featureCodesJson:
+          '{"pickup":"*8","dndOn":"*90","dndOff":"*91","mailbox":"*95","ownVoicemail":"*96","deposit":"*97","addParty":"*5","clirOn":"#31#","clirOff":"*31#","park":"*70"}',
+        ringotelMaxRegs: 3,
+        emergencyNumbersJson: '["112","110"]'
+      },
+      [],
+      []
+    );
+
+    expect(provision).toMatchObject({
+      internalRouting: 1,
+      extst: true,
+      extvc: true,
+      keepreg: true,
+      keepCallerName: true,
+      regexpires: 120,
+      inboundFormat: '',
+      displayname: ''
+    });
+    expect(provision).not.toHaveProperty('internal');
+    expect(provision.emergency).toEqual([
+      { title: '112', number: '112' },
+      { title: '110', number: '110' }
+    ]);
   });
 });
 
@@ -346,5 +377,46 @@ describe('createRingotelProvider', () => {
         params: { hidePassInEmail: true, lang: 'en' }
       }
     });
+  });
+
+  it('onPbxRestarted resets the registrations: updateBranch with the profile and rereg', async () => {
+    const db = await makeTestDb();
+    await seed(db);
+    const { client, calls } = fakeClient();
+    const provider = createRingotelProvider({ client, db });
+
+    await provider.onPbxRestarted?.();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.method).toBe('updateBranch');
+    expect(calls[0]?.params).toMatchObject({
+      id: 'branch-1',
+      orgid: 'org-1',
+      rereg: true,
+      provision: { internalRouting: 1, keepreg: true }
+    });
+  });
+
+  it('returns the Ringotel user id it created or updated, for the audit entry', async () => {
+    const db = await makeTestDb();
+    const { userId } = await seed(db);
+    const device = await seedDevice(db, userId);
+    const { client } = fakeClient({
+      getUsers: [{ id: 'ru-1', extension: '101' }]
+    });
+    const provider = createRingotelProvider({ client, db, now: () => NOW });
+
+    await expect(
+      provider.onDeviceCreated(device, {
+        username: 'e101-abcde',
+        password: 'p'
+      })
+    ).resolves.toEqual({ remoteId: 'ru-new' });
+    await expect(
+      provider.onCredentialsRotated(device, {
+        username: 'e101-abcde',
+        password: 'q'
+      })
+    ).resolves.toEqual({ remoteId: 'ru-1' });
   });
 });

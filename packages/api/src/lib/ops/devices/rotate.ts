@@ -26,18 +26,19 @@ export const rotate = defineOperation({
     recordChange(ctx, { field: 'sipPassword', from: null, to: password });
     propagate(ctx, ['pjsip']);
     if (row.kind === 'ringotel') {
-      pushToRingotel(
-        ctx,
-        provider =>
+      pushToRingotel(ctx, {
+        trigger: 'devices.rotate',
+        deviceId: input.id,
+        push: provider =>
           provider.onCredentialsRotated(row, {
             username: row.sipUsername,
             password
           }),
-        {
+        failure: {
           what: `device ${input.id}'s new password is stored`,
           retry: 'rotating again retries it'
         }
-      );
+      });
     }
     return { sipUsername: row.sipUsername, sipPassword: password };
   }

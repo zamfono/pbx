@@ -1,35 +1,104 @@
+import pino from 'pino';
+
+import type { Db } from '@zamfono/shared';
+
 import {
   activeRingotelProvider,
-  type ProvisioningProvider
+  type ProvisioningProvider,
+  type PushReceipt
 } from '../../provisioning/index.js';
+import {
+  callerOf,
+  outcomeChanges,
+  recordOutcome,
+  type OutcomeCaller
+} from '../outcomeLog.js';
 import { afterPropagation } from '../runner.js';
 import type { Context } from '../types.js';
+
+const log = pino({ name: 'ringotel' });
+
+type PushOutcome =
+  | { outcome: 'pushed'; receipt: PushReceipt }
+  | { outcome: 'refused' | 'skipped'; reason: string };
+
+type Push = {
+  /** The operation whose write this push follows, e.g. `devices.create`. */
+  trigger: string;
+  deviceId: string;
+  push: (provider: ProvisioningProvider) => Promise<PushReceipt>;
+  /** What stands whatever Ringotel answers, and how to push again. */
+  failure: { what: string; retry: string };
+};
+
+/**
+ * The `ringotel.push` audit row (§5.7, §10.4): what Ringotel answered, attributed to the caller of
+ * the operation it follows, so the answer outlives the logs and the result's warnings. A row that
+ * cannot be written is logged, since the write it records has committed already.
+ */
+async function auditPush(
+  db: Db,
+  caller: OutcomeCaller,
+  push: Push,
+  result: PushOutcome
+): Promise<void> {
+  const changes = outcomeChanges({
+    outcome: result.outcome,
+    trigger: push.trigger,
+    ringotelUserId:
+      result.outcome === 'pushed'
+        ? (result.receipt?.remoteId ?? null)
+        : undefined,
+    reason: result.outcome === 'pushed' ? undefined : result.reason
+  });
+  await recordOutcome(db, {
+    caller,
+    operation: 'ringotel.push',
+    entity: { kind: 'device', id: push.deviceId },
+    changes
+  }).catch((error: unknown) => {
+    log.error(
+      { error, deviceId: push.deviceId, outcome: result.outcome },
+      'ringotel: the push outcome could not be audited'
+    );
+  });
+}
+
+/** Runs the push against the tenant's Ringotel provider, never throwing. */
+async function attempt(db: Db, push: Push): Promise<PushOutcome> {
+  const provider = await activeRingotelProvider(db);
+  if (provider === null) {
+    return { outcome: 'skipped', reason: 'Ringotel is not set up' };
+  }
+  try {
+    return { outcome: 'pushed', receipt: await push.push(provider) };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return { outcome: 'refused', reason };
+  }
+}
 
 /**
  * Pushes a `ringotel` device's change to Ringotel once its write has committed and Asterisk holds
  * it (§10.4): an activated Ringotel user registers against the PBX with its SIP credentials
  * before Ringotel accepts it, and fails with "Unauthorized" while Asterisk does not know them
- * yet, which inside the operation's transaction it never does. A refusal leaves the stored write
- * standing and becomes a warning of the operation's result naming Ringotel's reason and `retry`,
- * the way to try again. A stack without a Ringotel setup pushes nothing: `ringotelSetup` and
- * `ringotelAdopt` provision such devices when they run.
+ * yet, which inside the operation's transaction it never does. The stored write stands whatever
+ * happens: a refusal becomes a warning of the operation's result naming Ringotel's reason and
+ * `retry`, the way to try again; a stack without a Ringotel setup pushes nothing and warns that
+ * `ringotelSetup` or `ringotelAdopt` will provision the device. Every outcome, success included,
+ * is a `ringotel.push` audit row on the device.
  */
-export function pushToRingotel(
-  ctx: Context,
-  push: (provider: ProvisioningProvider) => Promise<void>,
-  failure: { what: string; retry: string }
-): void {
+export function pushToRingotel(ctx: Context, push: Push): void {
+  const caller = callerOf(ctx);
   afterPropagation(ctx, async db => {
-    const provider = await activeRingotelProvider(db);
-    if (provider === null) {
+    const result = await attempt(db, push);
+    await auditPush(db, caller, push, result);
+    if (result.outcome === 'pushed') {
       return null;
     }
-    try {
-      await push(provider);
-      return null;
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      return `${failure.what}, but Ringotel refused it (${reason}); ${failure.retry}`;
+    if (result.outcome === 'skipped') {
+      return `${push.failure.what}: Ringotel is not set up, so nothing reached it; provisioning.ringotelSetup or provisioning.ringotelAdopt pushes the device when it runs`;
     }
+    return `${push.failure.what}, but Ringotel refused it (${result.reason}); ${push.failure.retry}`;
   });
 }

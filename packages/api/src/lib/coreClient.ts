@@ -6,14 +6,14 @@
 import process from 'node:process';
 
 import type {
+  CoreVersionResponse,
   HangupRequest,
   MwiMailbox,
   OriginateRequest,
   PickupRequest,
   ReloadKind,
   StateResponse,
-  TransferRequest,
-  ZamfonoVersion
+  TransferRequest
 } from '@zamfono/shared';
 
 const HTTP_NOT_FOUND = 404;
@@ -130,15 +130,18 @@ export function coreRefusal(error: unknown): CoreRefusal | null {
   return { status, title: body.title, detail: body.detail };
 }
 
-/** The version `core` reports it runs (§7 "Version"), from its internal API at `baseUrl`. */
+/**
+ * The version `core` reports it runs (§7 "Version"), since when, and since when its Asterisk
+ * runs, from its internal API at `baseUrl`.
+ */
 export async function fetchCoreVersion(
   baseUrl: string = coreUrlFromEnv(),
   fetchFn: typeof fetch = fetch
-): Promise<ZamfonoVersion> {
+): Promise<CoreVersionResponse> {
   const url = `${baseUrl}/internal/version`;
   const response = await fetchFn(url);
   await throwIfNotOk(response, url);
-  return (await response.json()) as ZamfonoVersion;
+  return (await response.json()) as CoreVersionResponse;
 }
 
 /** `core`'s internal API at `baseUrl` (default `coreUrlFromEnv()`). */

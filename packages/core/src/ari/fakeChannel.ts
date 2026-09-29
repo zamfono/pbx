@@ -73,6 +73,9 @@ export function fakeEndpoint(sipUsername: string): FakeEndpoint {
   };
 }
 
+/** When the fake Asterisk "started", in Asterisk's own `startup_time` format. */
+export const FAKE_ASTERISK_STARTUP_TIME = '2026-09-29T08:00:00.000+0000';
+
 /**
  * Routes the fake models no state for: device states and mailboxes acknowledge, and the endpoint
  * list answers whatever the fake was told to report. Playbacks stay with the fake itself, since
@@ -94,6 +97,13 @@ export function routeMisc(
   }
   if (path.startsWith('asterisk/modules/') && method === 'PUT') {
     return { status: HTTP_OK, body: {} };
+  }
+  if (path === 'asterisk/info' && method === 'GET') {
+    return {
+      status: HTTP_OK,
+      // eslint-disable-next-line camelcase -- ARI's own field name
+      body: { status: { startup_time: FAKE_ASTERISK_STARTUP_TIME } }
+    };
   }
   return { status: HTTP_NOT_FOUND, body: { message: 'Not found' } };
 }
