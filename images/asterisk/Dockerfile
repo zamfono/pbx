@@ -50,7 +50,7 @@ RUN ln -s es_MX_f_Allison /usr/share/asterisk/sounds/es \
 # "Migrations").
 RUN usermod -u 1000 asterisk \
     && groupmod -g 1000 asterisk \
-    && mkdir -p /media /etc/asterisk/gen /var/run/asterisk \
+    && mkdir -p /media /etc/asterisk/gen /var/run/asterisk /var/lib/asterisk/astdb \
     && chown -R asterisk:asterisk \
        /etc/asterisk /var/lib/asterisk /var/log/asterisk /var/spool/asterisk /var/run/asterisk \
        /media \
