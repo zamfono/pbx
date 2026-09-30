@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-09-30 · §9.1, §9.3 Transport policy, §9.4 Signaling, §11.2 `trunks`.** A TLS trunk checks its provider's certificate while the new `trunks.tls_verify` is set, and `trunks.srtp` encrypts its media with SDES-SRTP, refused on a trunk whose transport is not `tls`. PJSIP checks certificates per transport, so `transport-tls` gets `verify_server=yes` against the system CA bundle, which Asterisk applies to outgoing connections alone, and a second transport, `transport-tls-noverify` on 5062, unpublished in the ports mode, where its Contact names 5061, carries the trunks that check nothing. A new trunk has `tls_verify` set; an existing TLS trunk gets it cleared, since nothing was checked before, so the upgrade changes no trunk's behaviour.
+*Why:* requested by the product owner: groundwork for forwarding calls to SIP endpoints that require TLS and SRTP, such as OpenAI's Realtime SIP endpoint, with certificate checking as an option per trunk, like Ringotel's "ignore certificate errors" inverted; before, no trunk could use SRTP and no provider certificate was checked.
+
 **2026-09-30 · §6.3 Compose file, §10.3 System.** `GET /system/info` also returns `stack`: `domain`, the `FQDN` read from `ORIGIN`, and `ipv4`, the address SIP and media use, `EXTERNAL_IPV4` in the ports mode and `STACK_IPV4` in the macvlan mode, each `null` while unset. `api` receives `STACK_IPV4` and `EXTERNAL_IPV4` for it; there is no IPv6 counterpart until §12's switch-on.
 *Why:* requested by the product owner: an administrator or MCP client reading `system.info` could not tell which domain and public address the stack answers on.
 
@@ -918,7 +921,8 @@ The database is therefore never the reason to re-architect; the single-tenant st
 Asterisk's own configuration ships in the image, is mounted read-only, and is templated from environment variables at container start by an `envsubst` entrypoint.
 
 - `pjsip.conf` holds transports only; the public side is IPv4 in the MVP (§6.1 for the IP model, §12 for the IPv6 switch-on):
-  - `transport-tls`: SIP over TLS on 5061, for clients, accepting TLS 1.2 or newer and refusing older versions. It has `allow_reload=yes` and reads the stack certificate from the `asterisk-config` volume, where `api` keeps it synced from Caddy (§6.4). It has no switch, since every client depends on it.
+  - `transport-tls`: SIP over TLS on 5061, for clients, accepting TLS 1.2 or newer and refusing older versions. It has `allow_reload=yes` and reads the stack certificate from the `asterisk-config` volume, where `api` keeps it synced from Caddy (§6.4). It has no switch, since every client depends on it. It also carries the TLS trunks that check their provider's certificate (§9.4 "Signaling"): `verify_server=yes` against the system CA bundle (`ca_list_path=/etc/ssl/certs`, wildcard certificates allowed), which Asterisk applies to outgoing connections alone, so a connecting client is not asked for anything.
+  - `transport-tls-noverify`: the same TLS server on 5062 with `verify_server=no`, for the TLS trunks that do not check their provider's certificate; PJSIP checks certificates per transport, not per endpoint. The ports mode does not publish 5062, so there its Contact and Via name port 5061 (`external_signaling_port`), where a provider opening its own connection reaches `transport-tls`; in the macvlan mode 5062 is reachable at the stack address.
   - `transport-udp` and `transport-tcp`: port 5060, for trunks per provider requirement and for allowlisted desk-phone registration (§9.3). `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED` (`.env`, default `true`) switch them individually; a disabled transport is still defined but bound to `127.0.0.1`, so the rendered configuration stays valid under every flag combination while nothing outside the container reaches the port. A macvlan stack (§6.2.1) has no host firewall in front of it, so these flags are how such a stack becomes TLS-only.
   - Binding: `STACK_IPV4` when set, else `0.0.0.0`. When `EXTERNAL_IPV4` is set, every transport carries it as `external_media_address` and `external_signaling_address`, so SIP and SDP name the host's public address in the ports mode (§6.1).
   - The RTP port range.
@@ -960,7 +964,7 @@ Clients are third-party classic SIP softphones such as Ringotel; desk phones are
 - `tls`: SIP over TLS with SRTP, from anywhere, no IP restriction.
 - `plain`: UDP or TCP, only from the device's admin-configured IP allowlist, rendered as `permit=<devices.allowed_ips_json>`; typically office addresses for desk phones. Creating a `plain` device is refused while both plain transports are disabled (`SIP_UDP_ENABLED`, `SIP_TCP_ENABLED`, §9.1).
 
-PJSIP transports carry no ACL and an endpoint ACL applies to every transport alike, so a `tls` device's credentials are technically accepted over UDP and TCP as well. This is an accepted residual risk (§5.6): the passwords are 24 random characters, and a leaked credential is equally usable over TLS. Hardware desk phones are supported registration-only in the MVP, without auto-provisioning (no vendor templates, no DHCP option 66, no TFTP).
+PJSIP transports carry no ACL and an endpoint ACL applies to every transport alike, so a `tls` device's credentials are technically accepted over UDP and TCP as well, and any device's over `transport-tls-noverify` where its port is reachable (§9.1). This is an accepted residual risk (§5.6): the passwords are 24 random characters, and a leaked credential is equally usable over TLS. Hardware desk phones are supported registration-only in the MVP, without auto-provisioning (no vendor templates, no DHCP option 66, no TFTP).
 
 **NAT.** Clients work from the office and from home without a VPN. Endpoints carry `rewrite_contact=yes`, `rtp_symmetric=yes`, `force_rport=yes` and `direct_media=no`. Media always flows through Asterisk, which recording, presence and internal routing depend on.
 
@@ -1016,7 +1020,7 @@ SIP trunks are first-class, admin-configurable objects managed through the REST 
 - Outbound: INVITEs reuse the open connection whenever they resolve to the server it is connected to, which holds for a single SRV target or one with the highest priority. Behind several equal-weight SRV targets an INVITE may open a second connection to another server; a provider that requires the registered connection for every request is entered with one explicit registrar host, so registration and INVITEs resolve identically.
 - State: which server a trunk is registered at, and over which connection, is PJSIP's (`pjsip show registrations`, transport states). The application keeps no copy, since the core originates legs as `PJSIP/<number>@<trunk>` and the endpoint resolves them.
 
-**Signaling.** UDP, TCP or TLS; an outbound proxy is optional. A trunk transport that `SIP_UDP_ENABLED` or `SIP_TCP_ENABLED` switches off (§9.1) is refused on write; a trunk configured before the switch turns `unreachable`.
+**Signaling.** UDP, TCP or TLS; an outbound proxy is optional. A trunk transport that `SIP_UDP_ENABLED` or `SIP_TCP_ENABLED` switches off (§9.1) is refused on write; a trunk configured before the switch turns `unreachable`. A TLS trunk checks its provider's certificate while `trunks.tls_verify` is set, the default for a new trunk: the certificate must chain to a public CA and name the host dialled, else the connection is closed and the trunk turns `unreachable`. With it cleared, for a provider with a self-signed certificate, nothing is checked; the two use `transport-tls` and `transport-tls-noverify` respectively (§9.1). `trunks.srtp` encrypts the trunk's media with SDES-SRTP (`media_encryption=sdes`) like a `tls` device's (§9.3); SDES carries the keys in the SDP, so it is refused on a trunk whose transport is not `tls`.
 
 **Codecs.** `trunks.codecs_json` is the trunk's ordered offer; NULL means the tenant default `settings.codecs_json` (§11.4). Client and trunk lists need not overlap: Asterisk transcodes between the legs of a bridged call, so a G.711-only provider never blocks an Opus client, at the cost of CPU on that call.
 
@@ -1662,6 +1666,9 @@ CREATE TABLE device_blf_keys (
 --   inbound_number_format:     how the provider delivers numbers; normalized to E.164 at the
 --                              boundary (§9.4)
 --   codecs_json:               ordered JSON array of codec names; NULL = settings.codecs_json (§9.4)
+--   srtp:                      1 = SDES-SRTP media; transport 'tls' only (CHECK) (§9.4, "Signaling")
+--   tls_verify:                1 = the provider's certificate is checked (§9.4, "Signaling"); applies
+--                              while transport is 'tls', kept for a later switch to it otherwise
 --   log_level(_expires_at):    per-trunk diagnostics override, auto-expiring (§7)
 CREATE TABLE trunks (
   id                    TEXT    PRIMARY KEY,
@@ -1673,6 +1680,8 @@ CREATE TABLE trunks (
   password_enc          BLOB,
   inbound_auth          INTEGER NOT NULL DEFAULT 0,
   transport             TEXT    NOT NULL DEFAULT 'udp' CHECK (transport IN ('udp','tcp','tls')),
+  srtp                  INTEGER NOT NULL DEFAULT 0 CHECK (srtp IN (0,1) AND (srtp = 0 OR transport = 'tls')),
+  tls_verify            INTEGER NOT NULL DEFAULT 1 CHECK (tls_verify IN (0,1)),
   outbound_proxy        TEXT,
   register_expiry_s     INTEGER,
   register_retry_s      INTEGER,
