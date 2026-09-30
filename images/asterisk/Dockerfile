@@ -77,7 +77,9 @@ COPY conf/asterisk.conf conf/extensions.conf conf/logger.conf conf/sorcery.conf 
 COPY conf/musiconhold.conf.static /etc/asterisk/musiconhold.conf
 
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Run by Asterisk itself through hep.conf's `#exec` (spec §7, §9.1).
+COPY hep-capture-address.sh /usr/local/bin/hep-capture-address
+RUN chmod +x /entrypoint.sh /usr/local/bin/hep-capture-address
 
 # The commit this image was built from (§6.3 "Images", §7 "Version"), passed by
 # docker-bake.hcl's REVISION variable. Declared this late so a value that changes on every build
