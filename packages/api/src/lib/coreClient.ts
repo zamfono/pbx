@@ -20,7 +20,8 @@ import type {
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
 const DEFAULT_CORE_URL = 'http://core:3000';
-// `/healthz` and `/metrics` answer within this even while `core` hangs (§6.3 "Health", §7).
+// `/healthz`, `/metrics` and `system.info` answer within this even while `core` hangs (§6.3
+// "Health", §7, §10.3), and a hung `core` holds up no re-registration check (§10.4).
 const CORE_HEALTH_TIMEOUT_MS = 3000;
 
 export type OriginateOutcome =
@@ -135,14 +136,17 @@ export function coreRefusal(error: unknown): CoreRefusal | null {
 
 /**
  * The version `core` reports it runs (§7 "Version"), since when, and since when its Asterisk
- * runs, from its internal API at `baseUrl`.
+ * runs, from its internal API at `baseUrl`. Rejects when `core` does not answer within
+ * `CORE_HEALTH_TIMEOUT_MS`, as `fetchCoreHealth` does.
  */
 export async function fetchCoreVersion(
   baseUrl: string = coreUrlFromEnv(),
   fetchFn: typeof fetch = fetch
 ): Promise<CoreVersionResponse> {
   const url = `${baseUrl}/internal/version`;
-  const response = await fetchFn(url);
+  const response = await fetchFn(url, {
+    signal: AbortSignal.timeout(CORE_HEALTH_TIMEOUT_MS)
+  });
   await throwIfNotOk(response, url);
   return (await response.json()) as CoreVersionResponse;
 }

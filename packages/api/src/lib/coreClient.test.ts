@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   CoreRequestError,
   createCoreClient,
-  fetchCoreHealth
+  fetchCoreHealth,
+  fetchCoreVersion
 } from './coreClient.js';
 
 const HTTP_INTERNAL_SERVER_ERROR = 500;
@@ -195,6 +196,25 @@ describe('fetchCoreHealth', () => {
     );
 
     await expect(fetchCoreHealth('http://core:3000', fetchFn)).rejects.toThrow(
+      'aborted'
+    );
+  });
+});
+
+describe('fetchCoreVersion', () => {
+  it('rejects once its timeout aborts a request core never answers', async () => {
+    // A core that hangs: `system.info` then answers `core: null` rather than hanging with it.
+    const fetchFn = (_url: string | URL | Request, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new Error('aborted'));
+        });
+      });
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValueOnce(
+      AbortSignal.timeout(HANG_TIMEOUT_MS)
+    );
+
+    await expect(fetchCoreVersion('http://core:3000', fetchFn)).rejects.toThrow(
       'aborted'
     );
   });
