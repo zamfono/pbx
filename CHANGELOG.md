@@ -17,6 +17,10 @@ why the specified behaviour changed; the commit history, how.
   light and a dark variant (`/logo.svg`, `/logo.png`, `/logoDark.svg`, `/logoDark.png`), and the
   MCP server names itself with it: MCP clients that show a server's icon, title or website now show
   Zamfono's.
+- `system.info` (`GET /system/info`) shows the stack's domain and the public IPv4 address its
+  phones, trunks and audio use, as `stack.domain` and `stack.ipv4`: the `FQDN` and the
+  `EXTERNAL_IPV4` or `STACK_IPV4` of `.env`, whichever the stack's network mode sets. Nothing in
+  `.env` changes; an update brings the new `compose.yaml` that hands the address to `api`.
 
 ### Changed
 

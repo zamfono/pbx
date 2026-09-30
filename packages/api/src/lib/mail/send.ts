@@ -7,6 +7,7 @@ import type { Db, MailRequest } from '@zamfono/shared';
 
 import { voicemailAttachment } from '../audio/transcode.js';
 import type { Keyring } from '../secretbox.js';
+import { stackDomain } from '../stackAddress.js';
 import { tenantTimeZone } from '../tenantTimeZone.js';
 import { resolveRecipients } from './recipients.js';
 import { createTransportFor, relayFromSettings } from './relay.js';
@@ -26,19 +27,6 @@ const RETRY_BACKOFF_MS = [
   THIRD_RETRY_DELAY_MS
 ];
 const DEFAULT_ATTEMPTS = RETRY_BACKOFF_MS.length + 1;
-
-/** The stack's public hostname (§10.2 `fqdn`), read from `ORIGIN` (§6.3); empty when unset or unparseable. */
-function fqdnFromOrigin(): string {
-  const origin = process.env.ORIGIN;
-  if (!origin) {
-    return '';
-  }
-  try {
-    return new URL(origin).hostname;
-  } catch {
-    return '';
-  }
-}
 
 type Attachment = { filename: string; content: Buffer; contentType: string };
 
@@ -114,7 +102,7 @@ export async function sendMail(
     ...req.values,
     companyName: settings.companyName,
     recipientName: recipients.name,
-    fqdn: fqdnFromOrigin()
+    fqdn: stackDomain(process.env) ?? ''
   };
   const rendered = template.render(values, {
     language,

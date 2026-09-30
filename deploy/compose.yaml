@@ -94,6 +94,8 @@ services:
       SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-true}
       TLS_RELOAD_HOUR: ${TLS_RELOAD_HOUR:-}     # certificate swap hour when settings.tls_reload_hour is NULL (§6.4)
       METRICS_TOKEN: ${METRICS_TOKEN:-}         # empty = GET /metrics answers 404 (§7)
+      STACK_IPV4: ${STACK_IPV4:-}               # the stack's public address, shown by system.info (§10.3)
+      EXTERNAL_IPV4: ${EXTERNAL_IPV4:-}
       ZAMFONO_VERSION: ${ZAMFONO_VERSION:-latest}   # the tag pulled, reported as the version (§7)
       TZ: ${TZ:-UTC}
       # first-boot seed, read only while the database holds no user (§6.3 "First boot")

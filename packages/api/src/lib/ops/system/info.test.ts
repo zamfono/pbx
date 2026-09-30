@@ -35,6 +35,9 @@ afterEach(() => {
   setUpdaterClient(undefined);
   delete process.env.ZAMFONO_VERSION;
   delete process.env.ZAMFONO_REVISION;
+  delete process.env.ORIGIN;
+  delete process.env.STACK_IPV4;
+  delete process.env.EXTERNAL_IPV4;
 });
 
 describe('system.info', () => {
@@ -54,7 +57,8 @@ describe('system.info', () => {
       },
       core: CORE,
       update: NO_UPDATER,
-      ringotel: { profilePending: false }
+      ringotel: { profilePending: false },
+      stack: { domain: null, ipv4: null }
     });
   });
 
@@ -89,7 +93,8 @@ describe('system.info', () => {
       },
       core: null,
       update: NO_UPDATER,
-      ringotel: { profilePending: false }
+      ringotel: { profilePending: false },
+      stack: { domain: null, ipv4: null }
     });
   });
 
@@ -138,6 +143,22 @@ describe('system.info', () => {
 
     expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
       ringotel: { profilePending: true }
+    });
+  });
+
+  it("reports the stack's domain and the IPv4 address SIP and media use (§6.1)", async () => {
+    const db = await makeTestDb();
+    process.env.ORIGIN = 'https://pbx.example.com';
+    process.env.STACK_IPV4 = '203.0.113.34';
+    process.env.EXTERNAL_IPV4 = '';
+    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+      stack: { domain: 'pbx.example.com', ipv4: '203.0.113.34' }
+    });
+
+    process.env.STACK_IPV4 = '';
+    process.env.EXTERNAL_IPV4 = '198.51.100.7';
+    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+      stack: { domain: 'pbx.example.com', ipv4: '198.51.100.7' }
     });
   });
 });

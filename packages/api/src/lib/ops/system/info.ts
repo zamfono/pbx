@@ -10,6 +10,7 @@ import {
 
 import { errorMessage } from '../../errors.js';
 import { isProfilePending } from '../../provisioning/profilePending.js';
+import { stackDomain, stackIpv4 } from '../../stackAddress.js';
 import { defineOperation } from '../types.js';
 import { updaterClient, type UpdaterStatus } from './_updater.js';
 
@@ -36,6 +37,11 @@ type Output = {
    * in force on the PBX but has not reached Ringotel yet (§10.4 "Tenant profile push").
    */
   ringotel: { profilePending: boolean };
+  /**
+   * The stack's public name and the IPv4 address SIP and media use (§6.1): `EXTERNAL_IPV4` in the
+   * ports mode, `STACK_IPV4` in the macvlan mode; each `null` while `.env` does not set it.
+   */
+  stack: { domain: string | null; ipv4: string | null };
 };
 
 async function updateStatus(): Promise<Output['update']> {
@@ -69,13 +75,13 @@ export function setCoreVersionLookup(
 
 /**
  * `GET /system/info` (§7 "Version", §10.3): the version and commit `api` and `core` each run and
- * since when, when Asterisk started, the latest release with how the last update went (§6.3 "Updates"), and whether a tenant profile change still waits for Ringotel (§10.4), for anyone signed in. The MCP `serverInfo.version` carries `api`'s too, but only in the connection
+ * since when, when Asterisk started, the latest release with how the last update went (§6.3 "Updates"), whether a tenant profile change still waits for Ringotel (§10.4), and the stack's domain and public IPv4 address (§6.1), for anyone signed in. The MCP `serverInfo.version` carries `api`'s too, but only in the connection
  * handshake, which no tool can read; `/healthz` answers without a login and never shows it.
  */
 export const info = defineOperation<Record<string, never>, Output>({
   name: 'system.info',
   description:
-    'Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update, and whether a tenant profile change still waits for Ringotel.',
+    'Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update, whether a tenant profile change still waits for Ringotel, and the domain of the stack and the public IPv4 address its SIP and media use.',
   input: z.object({}).strict(),
   minRole: 'user',
   readOnly: true,
@@ -91,7 +97,8 @@ export const info = defineOperation<Record<string, never>, Output>({
       api: { ...resolveVersion(process.env), startedAt: apiStartedAt },
       core,
       update,
-      ringotel: { profilePending }
+      ringotel: { profilePending },
+      stack: { domain: stackDomain(process.env), ipv4: stackIpv4(process.env) }
     };
   }
 });
