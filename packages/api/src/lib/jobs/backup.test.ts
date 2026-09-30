@@ -14,6 +14,7 @@ import { nextRun } from './cronExpression.js';
 
 const KEY_BYTE_LENGTH = 32;
 const SNAPSHOT_BYTES = 12345;
+const SNAPSHOT_TOTAL_BYTES = 27_000_000;
 
 function testKeyring(): Keyring {
   return keyringFromEnv({
@@ -61,7 +62,8 @@ function resticBackupOutput(snapshotId: string, bytes: number): string {
     JSON.stringify({
       message_type: 'summary',
       snapshot_id: snapshotId,
-      data_added: bytes
+      data_added: bytes,
+      total_bytes_processed: SNAPSHOT_TOTAL_BYTES
     })
   ].join('\n');
   /* eslint-enable camelcase -- restic's own --json field names */
@@ -420,7 +422,8 @@ describe('failBackupRun', () => {
         targetId,
         status: 'running',
         snapshotId: null,
-        bytes: null,
+        bytesAdded: null,
+        bytesTotal: null,
         error: null,
         startedAt: nowIso(),
         finishedAt: null
@@ -432,7 +435,8 @@ describe('failBackupRun', () => {
       targetId,
       status: 'running' as const,
       snapshotId: null,
-      bytes: null,
+      bytesAdded: null,
+      bytesTotal: null,
       error: null,
       startedAt: nowIso(),
       finishedAt: null
@@ -469,7 +473,7 @@ describe('failBackupRun', () => {
 });
 
 describe('runBackup: run lifecycle', () => {
-  it('starts a run "running", ending "ok" with the restic snapshot id and bytes', async () => {
+  it('starts a run "running", ending "ok" with the restic snapshot id and sizes', async () => {
     const db = await migratedDb();
     const kr = testKeyring();
     const targetId = await insertTarget(
@@ -506,11 +510,25 @@ describe('runBackup: run lifecycle', () => {
     expect(sawRunning).toBe(true);
     expect(run.status).toBe('ok');
     expect(run.snapshotId).toBe('snap1');
-    expect(run.bytes).toBe(SNAPSHOT_BYTES);
+    expect(run.bytesAdded).toBe(SNAPSHOT_BYTES);
+    expect(run.bytesTotal).toBe(SNAPSHOT_TOTAL_BYTES);
+    const row = await db
+      .selectFrom('backupRuns')
+      .selectAll()
+      .where('id', '=', run.id)
+      .executeTakeFirstOrThrow();
+    expect(row).toMatchObject({
+      bytesAdded: SNAPSHOT_BYTES,
+      bytesTotal: SNAPSHOT_TOTAL_BYTES
+    });
     expect(published.map(ev => ev.type)).toEqual([
       'backup.started',
       'backup.finished'
     ]);
+    expect(published[1]).toMatchObject({
+      bytesAdded: SNAPSHOT_BYTES,
+      bytesTotal: SNAPSHOT_TOTAL_BYTES
+    });
   });
 
   it('marks a run "failed" with the error and emits backup.failed', async () => {
@@ -563,7 +581,8 @@ describe('markInterruptedRuns', () => {
         targetId,
         status: 'running',
         snapshotId: null,
-        bytes: null,
+        bytesAdded: null,
+        bytesTotal: null,
         error: null,
         startedAt: nowIso(),
         finishedAt: null
@@ -601,7 +620,8 @@ describe('markInterruptedRuns', () => {
         targetId,
         status: 'running',
         snapshotId: null,
-        bytes: null,
+        bytesAdded: null,
+        bytesTotal: null,
         error: null,
         startedAt: bootAt,
         finishedAt: null

@@ -44,4 +44,6 @@ the last restic snapshot.
 - The replication bucket needs server-side encryption — the WAL stream itself is not
   client-side encrypted, unlike the restic repository.
 - `backups.runs.list` (`GET /backups/runs`) and the `backup.finished`/`backup.failed` events show
-  the age and status of the restic runs a restore would fall back to.
+  the age and status of the restic runs a restore would fall back to. A run's `bytesTotal` is its
+  snapshot's full size; `bytesAdded` is only what it uploaded after deduplication, so a run far
+  smaller than the one before it is the usual case, not an incomplete backup.

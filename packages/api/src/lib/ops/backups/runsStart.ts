@@ -43,7 +43,8 @@ export const runsStart = defineOperation<Input, BackupRunWire>({
         targetId: target.id,
         status: 'running',
         snapshotId: null,
-        bytes: null,
+        bytesAdded: null,
+        bytesTotal: null,
         error: null,
         startedAt: ctx.now,
         finishedAt: null

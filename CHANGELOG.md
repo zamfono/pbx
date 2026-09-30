@@ -18,6 +18,23 @@ why the specified behaviour changed; the commit history, how.
   MCP server names itself with it: MCP clients that show a server's icon, title or website now show
   Zamfono's.
 
+### Changed
+
+- A backup run shows two sizes instead of one: `bytesTotal`, the full size of its snapshot, and
+  `bytesAdded`, what it uploaded after restic's deduplication. The run's `bytes` field is gone
+  from `backups.runs.list` and `backups.runs.get` (`GET /backups/runs`, `GET /backups/runs/{id}`)
+  and from the `backup.finished` event on `/events` and webhooks; it held what is now
+  `bytesAdded`, which is why a run far smaller than the one before it looked incomplete. Runs from
+  before the upgrade keep that value as `bytesAdded`, with no `bytesTotal`.
+
+### Upgrade notes
+
+- **Anything that reads a backup run's `bytes`**, such as a monitoring script, an MCP client's
+  prompt or a webhook receiver for `backup.finished`, has to read `bytesAdded` instead for the
+  same value, or `bytesTotal` for the snapshot's size: `bytes` is no longer sent. This makes the
+  release a breaking one, so `update.sh` shows these notes and asks first, and `system.update`
+  does not install it.
+
 ## [0.0.7] - 2026-09-30
 
 ### Fixed

@@ -37,7 +37,8 @@ export interface AuditLog {
 }
 
 export interface BackupRuns {
-  bytes: number | null;
+  bytesAdded: number | null;
+  bytesTotal: number | null;
   error: string | null;
   finishedAt: string | null;
   id: string;

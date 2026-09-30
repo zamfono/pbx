@@ -1,6 +1,6 @@
 /**
  * The restic commands a backup run issues (§6.5): creating a target's repository on its first run,
- * reading the snapshot id and size from `restic backup --json`, and applying the target's keep-daily/weekly/monthly policy with
+ * reading the snapshot id and sizes from `restic backup --json`, and applying the target's keep-daily/weekly/monthly policy with
  * `restic forget --prune`. `backup.ts` holds the run lifecycle around them.
  */
 import process from 'node:process';
@@ -12,7 +12,20 @@ import type { ExecFn, Params } from './backupBackends.js';
 const logger = pino({ name: 'backup' });
 export const RESTIC_BIN = 'restic';
 
-type Summary = { snapshotId: string; bytes: number };
+/**
+ * A run's result from restic's summary message (§6.5): `bytesAdded` is `data_added`, what the run
+ * uploaded after deduplication, `bytesTotal` is `total_bytes_processed`, the snapshot's full size.
+ * Either is `null` when the summary does not carry it.
+ */
+type Summary = {
+  snapshotId: string;
+  bytesAdded: number | null;
+  bytesTotal: number | null;
+};
+
+function byteCount(value: unknown): number | null {
+  return typeof value === 'number' ? value : null;
+}
 
 // restic's exit code for "no repository at this location" (restic 0.17 on), which a wrong
 // password (12) or an unreachable backend (1) is not.
@@ -52,7 +65,8 @@ export function parseResticSummary(stdout: string): Summary {
     }
     return {
       snapshotId: parsed.snapshot_id,
-      bytes: typeof parsed.data_added === 'number' ? parsed.data_added : 0
+      bytesAdded: byteCount(parsed.data_added),
+      bytesTotal: byteCount(parsed.total_bytes_processed)
     };
   }
   throw new Error('backup: restic produced no summary line');

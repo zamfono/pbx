@@ -9,7 +9,8 @@ const MIGRATIONS_DIR = path.resolve(
   '../../../db/migrations'
 );
 
-export async function migrateForTest(db: Db): Promise<void> {
+/** Applies the migrations up to and including `to`, or all of them when it is left out. */
+export async function migrateForTest(db: Db, to?: string): Promise<void> {
   const migrator = new Migrator({
     db,
     provider: new FileMigrationProvider({
@@ -18,7 +19,9 @@ export async function migrateForTest(db: Db): Promise<void> {
       migrationFolder: MIGRATIONS_DIR
     })
   });
-  const { error } = await migrator.migrateToLatest();
+  const { error } = await (to === undefined
+    ? migrator.migrateToLatest()
+    : migrator.migrateTo(to));
   if (error) {
     throw error instanceof Error
       ? error

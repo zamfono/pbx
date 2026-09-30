@@ -61,6 +61,32 @@ async function emit(bus: Bus, now: () => string, ev: Event): Promise<void> {
   await bus.enqueue(envelope);
 }
 
+/**
+ * Marks `run` `failed` with `error` and emits `backup.failed` (§6.5): the backup itself failed,
+ * or a queued run's target is gone by the time the scheduler picks it up.
+ */
+export async function failBackupRun(
+  db: Db,
+  deps: BackupJobDeps,
+  run: BackupRunRow,
+  error: string
+): Promise<BackupRunRow> {
+  const now = deps.now ?? nowIso;
+  const finishedAt = now();
+  await db
+    .updateTable('backupRuns')
+    .set({ status: 'failed', error, finishedAt })
+    .where('id', '=', run.id)
+    .execute();
+  await emit(deps.bus, now, {
+    type: 'backup.failed',
+    targetId: run.targetId,
+    runId: run.id,
+    error
+  });
+  return { ...run, status: 'failed', error, finishedAt };
+}
+
 /** Runs `target`'s backup for the already-`running` `run` row (§6.5), through to `ok`/`failed`. */
 export async function performBackup(
   db: Db,
@@ -104,11 +130,11 @@ export async function performBackup(
       ['backup', snapshotFile, deps.mediaDir, '--json', ...options],
       { env: { ...process.env, ...fullEnv } }
     );
-    const { snapshotId, bytes } = parseResticSummary(stdout);
+    const { snapshotId, bytesAdded, bytesTotal } = parseResticSummary(stdout);
     const finishedAt = now();
     await db
       .updateTable('backupRuns')
-      .set({ status: 'ok', snapshotId, bytes, finishedAt })
+      .set({ status: 'ok', snapshotId, bytesAdded, bytesTotal, finishedAt })
       .where('id', '=', run.id)
       .execute();
     await pruneSnapshots(deps.exec, fullEnv, options, loadParams(target));
@@ -118,25 +144,22 @@ export async function performBackup(
       targetId: target.id,
       runId: run.id,
       snapshotId,
-      bytes,
+      bytesAdded,
+      bytesTotal,
       durationS
     });
-    return { ...run, status: 'ok', snapshotId, bytes, error: null, finishedAt };
+    return {
+      ...run,
+      status: 'ok',
+      snapshotId,
+      bytesAdded,
+      bytesTotal,
+      error: null,
+      finishedAt
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const finishedAt = now();
-    await db
-      .updateTable('backupRuns')
-      .set({ status: 'failed', error: message, finishedAt })
-      .where('id', '=', run.id)
-      .execute();
-    await emit(deps.bus, now, {
-      type: 'backup.failed',
-      targetId: target.id,
-      runId: run.id,
-      error: message
-    });
-    return { ...run, status: 'failed', error: message, finishedAt };
+    return await failBackupRun(db, deps, run, message);
   } finally {
     await rm(snapshotDir, { recursive: true, force: true });
   }
@@ -161,7 +184,8 @@ export async function createBackupRun(
     targetId: target.id,
     status: 'running',
     snapshotId: null,
-    bytes: null,
+    bytesAdded: null,
+    bytesTotal: null,
     error: null,
     startedAt: (deps.now ?? nowIso)(),
     finishedAt: null
@@ -179,30 +203,4 @@ export async function runBackup(
 ): Promise<BackupRunRow> {
   const { run, target } = await createBackupRun(db, targetId, deps);
   return performBackup(db, kr, run, target, deps);
-}
-
-/**
- * Marks a queued `run` `failed` with `error` and emits `backup.failed` (§6.5): its target is
- * gone by the time the scheduler picks it up.
- */
-export async function failBackupRun(
-  db: Db,
-  deps: BackupJobDeps,
-  run: BackupRunRow,
-  error: string
-): Promise<BackupRunRow> {
-  const now = deps.now ?? nowIso;
-  const finishedAt = now();
-  await db
-    .updateTable('backupRuns')
-    .set({ status: 'failed', error, finishedAt })
-    .where('id', '=', run.id)
-    .execute();
-  await emit(deps.bus, now, {
-    type: 'backup.failed',
-    targetId: run.targetId,
-    runId: run.id,
-    error
-  });
-  return { ...run, status: 'failed', error, finishedAt };
 }

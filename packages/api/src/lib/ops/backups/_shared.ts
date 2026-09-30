@@ -74,7 +74,9 @@ export type BackupRunWire = {
   targetId: string;
   status: 'failed' | 'ok' | 'running';
   snapshotId: string | null;
-  bytes: number | null;
+  // §6.5: what the run uploaded after deduplication, and the snapshot's full size.
+  bytesAdded: number | null;
+  bytesTotal: number | null;
   error: string | null;
   startedAt: string;
   finishedAt: string | null;
@@ -86,7 +88,8 @@ export function runToWire(row: BackupRunRow): BackupRunWire {
     targetId: row.targetId,
     status: row.status as 'failed' | 'ok' | 'running',
     snapshotId: row.snapshotId,
-    bytes: row.bytes,
+    bytesAdded: row.bytesAdded,
+    bytesTotal: row.bytesTotal,
     error: row.error,
     startedAt: row.startedAt,
     finishedAt: row.finishedAt

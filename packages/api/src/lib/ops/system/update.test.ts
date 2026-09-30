@@ -52,7 +52,8 @@ async function backupFinished(db: Db, ageMs: number): Promise<void> {
       targetId,
       status: 'ok',
       snapshotId: 'snap',
-      bytes: 1,
+      bytesAdded: 1,
+      bytesTotal: 1,
       error: null,
       startedAt: finishedAt,
       finishedAt

@@ -53,7 +53,8 @@ export type Event =
       targetId: string;
       runId: string;
       snapshotId: string;
-      bytes: number;
+      bytesAdded: number | null;
+      bytesTotal: number | null;
       durationS: number;
     }
   | { type: 'backup.failed'; targetId: string; runId: string; error: string };

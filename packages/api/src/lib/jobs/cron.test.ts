@@ -86,7 +86,8 @@ async function insertRun(
     targetId,
     status: 'running',
     snapshotId: null,
-    bytes: null,
+    bytesAdded: null,
+    bytesTotal: null,
     error: null,
     startedAt,
     finishedAt: null
@@ -177,7 +178,7 @@ describe('scheduleBackups: the manual runs handed over', () => {
       .where('id', '=', runId)
       .executeTakeFirstOrThrow();
     expect(row.snapshotId).toBe('snap-queued');
-    expect(row.bytes).toBe(SNAPSHOT_BYTES);
+    expect(row.bytesAdded).toBe(SNAPSHOT_BYTES);
     expect(published.map(ev => ev.type)).toEqual([
       'backup.started',
       'backup.finished'
@@ -286,7 +287,8 @@ describe('scheduleBackups: the manual runs handed over', () => {
         targetId,
         status: 'running',
         snapshotId: null,
-        bytes: null,
+        bytesAdded: null,
+        bytesTotal: null,
         error: null,
         startedAt: nowIso(),
         finishedAt: null
