@@ -8,10 +8,7 @@ import {
   healthStatus,
   type CoreReachability
 } from '../../lib/health.js';
-import {
-  getCertSyncScheduler,
-  type CertSyncStatus
-} from '../../lib/jobs/certSync.js';
+import { certSyncStatus } from '../../lib/jobs/certSync.js';
 import { keyringFromEnv, type Keyring } from '../../lib/secretbox.js';
 
 const keyringCache: { resolved: boolean; keyring: Keyring | null } = {
@@ -35,20 +32,6 @@ function resolveKeyring(): Keyring | null {
     keyringCache.resolved = true;
   }
   return keyringCache.keyring;
-}
-
-/**
- * The certificate-sync scheduler's status (§6.4), read the same instance the boot started
- * (`jobs/background.ts`).
- * `ORIGIN` absent or malformed must not turn the public `/healthz` into a 500, so a scheduler
- * that fails to construct reports `'unknown'`, the same as one that has not polled yet.
- */
-function resolveCertificateSync(): CertSyncStatus {
-  try {
-    return getCertSyncScheduler().status();
-  } catch {
-    return 'unknown';
-  }
 }
 
 /**
@@ -79,7 +62,7 @@ export async function GET(): Promise<Response> {
     keyRotationRemaining: keyring
       ? await countKeyRotationRemaining(db, keyring)
       : 0,
-    certificateSync: resolveCertificateSync()
+    certificateSync: certSyncStatus()
   });
   return Response.json(health, { status: healthStatus(health) });
 }

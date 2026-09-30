@@ -242,3 +242,16 @@ export function getCertSyncScheduler(): CertSyncScheduler {
   });
   return schedulerCache.scheduler;
 }
+
+/**
+ * The running scheduler's status, as `/healthz` and `/metrics` report it (§6.4, §7). `ORIGIN`
+ * absent or malformed must not turn either into a 500, so a scheduler that fails to construct
+ * reports `'unknown'`, the same as one that has not polled yet.
+ */
+export function certSyncStatus(): CertSyncStatus {
+  try {
+    return getCertSyncScheduler().status();
+  } catch {
+    return 'unknown';
+  }
+}

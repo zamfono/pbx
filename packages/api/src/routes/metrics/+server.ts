@@ -6,10 +6,7 @@ import { resolveVersion } from '@zamfono/shared';
 
 import { createCoreClient, fetchCoreHealth } from '../../lib/coreClient.js';
 import { getDb } from '../../lib/db.js';
-import {
-  getCertSyncScheduler,
-  type CertSyncStatus
-} from '../../lib/jobs/certSync.js';
+import { certSyncStatus } from '../../lib/jobs/certSync.js';
 import { renderMetrics } from '../../lib/metrics.js';
 
 const STATUS_NOT_FOUND = 404;
@@ -22,19 +19,6 @@ const PROMETHEUS_CONTENT_TYPE = 'text/plain; version=0.0.4';
 async function checkAri(): Promise<boolean> {
   const body = await fetchCoreHealth();
   return body.ari;
-}
-
-/**
- * The certificate-sync scheduler's status (§6.4, §7), read the same instance the boot
- * started (`jobs/background.ts`). `ORIGIN` absent or malformed must not turn `/metrics` into a 500, so a scheduler
- * that fails to construct reports `'unknown'`, the same as one that has not polled yet.
- */
-function resolveCertificateSync(): CertSyncStatus {
-  try {
-    return getCertSyncScheduler().status();
-  } catch {
-    return 'unknown';
-  }
 }
 
 /** Whether `authorization` is exactly `Bearer <token>`, compared in constant time (§7 `METRICS_TOKEN`: a static shared secret, so a byte-by-byte comparison would leak it through timing). */
@@ -64,7 +48,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     dbFile: process.env.DB_FILE ?? '',
     checkAri,
     coreState: () => coreClient.state(),
-    certSyncStatus: resolveCertificateSync,
+    certSyncStatus,
     version: resolveVersion(process.env)
   });
   return new Response(body, {
