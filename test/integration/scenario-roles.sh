@@ -42,6 +42,7 @@ phone_mode_for() {
 trunk_uas_for() {
   case $1 in
     inbound-forward-external | inbound-*-transfer | inbound-three-way) echo answer-outbound ;;
+    inbound-forward-diversion-last) echo answer-outbound ;;
     inbound-ring-group-skip-busy | outbound-callerid) echo answer-outbound ;;
     outbound-emergency-trunk-order | outbound-sip-log-answered) echo answer-outbound ;;
     outbound-fallthrough | outbound-routes-exhausted) echo refuse-403 ;;
