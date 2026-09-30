@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-09-30 · §3.1 Events, §10 layout, §10.2 Out of office and Opening hours.** `core`'s OOO/opening-hours sweep no longer runs every minute: it runs at the next instant a scope's OOO rule starts or expires or its opening hours open or close, at once after a config change, and at least hourly, so a transition event goes out at the transition itself.
+*Why:* approved by the product owner: the minute interval sent an `ooo` or `hours` event up to 60 s after the boundary, and after a config change, while a timer to the next edge costs less than 1440 evaluations a day.
+
 **2026-09-30 · §6.3 Compose file.** The listing names `api`'s and `core`'s identical healthcheck once, as the top-level extension `x-healthz` their `healthcheck.test` refers to; what either container runs is unchanged.
 *Why:* requested by the product owner: the same `fetch(…/healthz)` one-liner stood twice in the file, and a third time in `update.sh`, which now waits with `up --wait` on that healthcheck instead.
 
@@ -171,7 +174,7 @@ Three long-running application services run per stack, plus the TLS proxy and a 
 
 **Mail.** `api` is the only mail sender: it holds the templates (§10.2 "Mail") and is the one process that can read the relay password, since the encryption key exists in the `api` container alone (§6.3). `core` posts a mail request, the kind, the placeholder values and the attachment path, to `api`'s internal `/internal/mail` endpoint; the retries of §10.2 run in `api`. `api`'s `/internal/*` paths are reachable from the `internal` network only: Caddy answers 404 for the prefix (§6.3), and `api` refuses a request for it that carries `X-Forwarded-For`, which only the proxy hop sets (§5.5).
 
-**Events.** `core` produces all call, presence, OOO and opening-hours events. Its minute sweep for OOO and opening hours writes nothing; it evaluates and emits. `api` produces the `backup.*` events of its own jobs, subscribes to `core` over the internal WebSocket, and fans both streams out to authenticated `/events` clients and to webhooks (§10.6).
+**Events.** `core` produces all call, presence, OOO and opening-hours events. Its sweep for OOO and opening hours writes nothing; it evaluates and emits. It runs at the next instant any scope's OOO rule starts or expires or its opening hours open or close, at once after a config change, and at least hourly. `api` produces the `backup.*` events of its own jobs, subscribes to `core` over the internal WebSocket, and fans both streams out to authenticated `/events` clients and to webhooks (§10.6).
 
 **Independence.** Either process can restart on its own. An `api` restart never affects live calls.
 
@@ -1036,7 +1039,7 @@ packages/
 │       ├── cdr.ts       # call history writer
 │       ├── hep.ts       # HEP listener for the SIP messages Asterisk mirrors (§7); off when HEP_ENABLED=false
 │       ├── callLog.ts   # capped per-call log buffer (§7)
-│       ├── sweep.ts     # minute sweep emitting OOO and opening-hours transitions (§10.2)
+│       ├── sweep.ts     # sweep emitting OOO and opening-hours transitions as they happen (§10.2)
 │       └── internal/    # internal HTTP+WS server for `api` (actions, state, events, reload)
 ├── api/                 # container 2: SvelteKit (adapter-node) — operations, REST, OAuth, MCP, /events
 │   └── src/
@@ -1138,9 +1141,9 @@ Timers, the hop counter and busy handling live entirely in the core.
 
 **Ring groups.** The core dials member devices with `POST /channels` (originate): all at once for `simultaneous`, one by one with a per-member timeout for `sequential`, the same over a shuffled order for `random`. The first answer wins and the other legs are hung up. The group greeting plays to the caller before ringing; the group's hold music replaces ringback while members ring.
 
-**Out of office.** `ooo_rules` holds any number of rules per scope (user, ring group, menu, tenant), so future absences can be scheduled in advance. Active periods must not overlap within a scope, which is validated on write. The target's in-effect rule wins over the tenant's. Each rule has an optional scheduled start, an expiry (after the start; NULL means until deactivated) and a forward target (§11, `forward_targets`): mailbox, external number, announcement, menu, or routing to a user or another group. Start and expiry are evaluated on each call; a minute-interval sweep in `core` emits the transition events and writes nothing (§3.1).
+**Out of office.** `ooo_rules` holds any number of rules per scope (user, ring group, menu, tenant), so future absences can be scheduled in advance. Active periods must not overlap within a scope, which is validated on write. The target's in-effect rule wins over the tenant's. Each rule has an optional scheduled start, an expiry (after the start; NULL means until deactivated) and a forward target (§11, `forward_targets`): mailbox, external number, announcement, menu, or routing to a user or another group. Start and expiry are evaluated on each call; a sweep in `core` emits the transition events at the start and expiry themselves and writes nothing (§3.1).
 
-**Opening hours.** `opening_hours` and `opening_hours_intervals` (§11) hold recurring weekly open intervals, one schedule per user, ring group, menu or tenant scope. Outside every interval, inbound calls route to the schedule's closed target. Times are in the tenant time zone (`settings.timezone`). Precedence: an in-effect OOO rule, then the target's own schedule, then the tenant schedule. The OOO minute sweep also emits open and close transitions on `/events`. One-off closures are OOO rules; public-holiday calendars are future work.
+**Opening hours.** `opening_hours` and `opening_hours_intervals` (§11) hold recurring weekly open intervals, one schedule per user, ring group, menu or tenant scope. Outside every interval, inbound calls route to the schedule's closed target. Times are in the tenant time zone (`settings.timezone`). Precedence: an in-effect OOO rule, then the target's own schedule, then the tenant schedule. The OOO sweep also emits open and close transitions on `/events`, at the interval edges themselves. One-off closures are OOO rules; public-holiday calendars are future work.
 
 **Voicemail.** Over ARI: answer, play the mailbox greeting or the language default prompt (`settings.language`) when none is set, then `POST /channels/{id}/record` capped at `settings.voicemail_max_s`, with a 5 s silence stop and `#` to end. The silence threshold is a constant: it has to outlast a caller's pause for thought, 2 to 3 seconds, and stay short enough that a dropped line does not record long stretches of dead air, which leaves no room for a per-tenant choice. The file lands on the media volume and a row in `voicemails`. MWI is updated through the ARI mailboxes API, the e-mail notification with the audio attached follows the rules in "Mail", and a `voicemail.new` event is emitted.
 
