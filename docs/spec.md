@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-09-30 · §10 layout, §10.3 Icons, §10.5 Protocol revision.** The MCP `serverInfo` carries `title` "Zamfono", the repository as `websiteUrl` and the logo as `icons`, an SVG and a 192 px PNG each for a light and a dark background, which the stack serves itself under `ORIGIN` from `packages/api/static/`, public like `/healthz`, together with `/favicon.ico` and `/favicon.svg`, which the authentication pages link. `serverInfo` was `name` and `version` alone, and the stack served no icon.
+*Why:* requested by the product owner, who supplied the logo: MCP clients show a server's icon and title, and some fall back to the domain's favicon.
+
 **2026-09-30 · §5.7, §10.1 Emergency calls, §10.3 Settings, Health and System, §10.4 Branch provision profile and Tenant profile push, §11.2, §11.4.** Product-owner decision: a change to the tenant's emergency numbers is never lost to a Ringotel outage. `PATCH /settings` stores and propagates every change to a Ringotel profile column first and runs `onTenantProfileChanged` after the commit, where a refusal is a `warnings` entry and a `ringotel.profile` outcome row (the third outcome operation of §5.7) instead of a 502 that rolled the write back. The new `settings.ringotel_profile_pending` column, set in the write's transaction, stays set after a refusal; the next `updateBranch` push Ringotel takes of any kind clears it, the roster's now carrying the branch `country` too, and `api` retries once at its start and at each `asterisk.started`, with no timer. `GET /system/info` shows it as `ringotel.profilePending`, `/healthz` as `ringotelProfilePending`.
 *Why:* requested by the product owner: the profile push ran inside the operation's transaction, so a Ringotel outage failed the whole update and the PBX did not get the new emergency numbers either; the whole profile moves after the commit, not the emergency numbers alone, since one `updateBranch` carries all of it and a split would have left some profile fields able to fail the write and others not.
 
@@ -1072,6 +1075,7 @@ packages/
 │       ├── sweep.ts     # sweep emitting OOO and opening-hours transitions as they happen (§10.2)
 │       └── internal/    # internal HTTP+WS server for `api` (actions, state, events, reload)
 ├── api/                 # container 2: SvelteKit (adapter-node) — operations, REST, OAuth, MCP, /events
+│   ├── static/              # the logo and favicons, served as they are (§10.3 "Icons")
 │   └── src/
 │       ├── server.ts            # entry: http server, SvelteKit handler, /events WS; stops on SIGTERM
 │       ├── hooks.server.ts      # init: first-boot seed and every background job (lib/jobs/background.ts); token → actor resolution, rate limits (§5)
@@ -1370,6 +1374,8 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Health** (min. role: none (public, unauthenticated — served through the proxy so the §7 external uptime check can reach it)) — `GET /healthz` (HTTP status = `api`'s own liveness, the open and migrated database; body fields for core and its ARI connection, mail configured, key rotation remaining (§5.4), certificate sync (§6.4), emergency trunk present (§9.4 "Emergency trunks"), Ringotel profile pending (§10.4 "Tenant profile push"); no version or configuration values)
 
+**Icons** (min. role: none (public, unauthenticated)) — `GET /favicon.ico`, `GET /favicon.svg` (black, white under a dark color scheme), `GET /logo.svg` and `GET /logo.png` (192 px) for a light background, `GET /logoDark.svg` and `GET /logoDark.png` for a dark one: static files of `packages/api/static/`, named in the MCP `serverInfo` (§10.5) and linked from the authentication pages (§5.2), and at the paths a client that shows a domain's favicon asks for
+
 **System** (min. role: user) — `GET /system/info` — the version and commit `api` runs and the ones `core` reports (§7 "Version"), each with its process's `startedAt`, and `core`'s `asteriskStartedAt` (§10.4 "After a restart"), `core` as `null` while it does not answer within three seconds, with the updater's latest release, whether `system.update` takes it and the last update's outcome (§6.3 "Updates"), and `ringotel.profilePending`, whether a tenant profile change has not reached Ringotel yet (§10.4 "Tenant profile push"); owner, with confirmation: `POST /system/update` (`version` optional) — hands the update to the updater once a backup run finished `ok` within the hour, refused otherwise; not undoable
 
 **Metrics** (min. role: bearer `METRICS_TOKEN` from `.env`; 404 while unset) — `GET /metrics` (Prometheus, §7); `GET /metrics/litestream` with the DR overlay
@@ -1459,7 +1465,7 @@ Linphone and Zoiper are not candidates for mobile, since their push reliability 
 
 The `api` service exposes the v1 operations as a Model Context Protocol server over Streamable HTTP at `/mcp`. Any MCP client — Claude Code, Codex, ops tooling, later the tenant UI's assistant (§12) — can administer the stack conversationally. In the MVP, which has no UI, this is the human-friendly admin surface.
 
-**Protocol revision** 2026-07-28. The server is stateless: there is no `Mcp-Session-Id`, and version, client info and capabilities travel in each request's `_meta`. It implements `server/discover`, every result carries `resultType`, list results carry `ttlMs` and `cacheScope`, and `tools/list` returns tools in a deterministic order so clients can cache and hit prompt caches. The server is dual-era: an `initialize` request selects legacy 2025-11-25 semantics for clients that have not moved yet. Its `serverInfo` is `{ name: "zamfono", version }`, the version of §7.
+**Protocol revision** 2026-07-28. The server is stateless: there is no `Mcp-Session-Id`, and version, client info and capabilities travel in each request's `_meta`. It implements `server/discover`, every result carries `resultType`, list results carry `ttlMs` and `cacheScope`, and `tools/list` returns tools in a deterministic order so clients can cache and hit prompt caches. The server is dual-era: an `initialize` request selects legacy 2025-11-25 semantics for clients that have not moved yet. Its `serverInfo` is `{ name: "zamfono", title: "Zamfono", version, websiteUrl, icons }`: the version of §7, the repository `https://github.com/zamfono/pbx` as the website, and the logo the stack serves itself (§10.3 "Icons") under `ORIGIN`, an SVG and a 192 px PNG each for a light and for a dark background.
 
 **Context budget.** What a client loads at session start is the server `instructions` and the tool list, so both stay small. `instructions`, returned by `server/discover` and by the legacy `initialize`, is under 512 characters and self-contained: what Zamfono is, that every write is audited and undoable, and to call `zamfono.help` before configuring anything. Tool descriptions are one line each.
 
