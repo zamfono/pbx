@@ -1,12 +1,12 @@
 /**
  * A call's forwarding context (§9.4 "Forwarded calls"): the forward hops it took, each with the
  * diverting party and a reason, and what a trunk leg dialled for a forward target carries of
- * them, the `REDIRECTING` data chan_pjsip builds `Diversion` from and the custom headers of
- * `forwardHeaders.ts`.
+ * them, the `REDIRECTING` data chan_pjsip builds `Diversion` from and a `sip` target's headers,
+ * rendered by `forwardHeaders.ts`.
  */
 import type { Snapshot } from '../internal/server.js';
 import type { Call } from './call.js';
-import { forwardHeaders, headerVariables } from './forwardHeaders.js';
+import { headerVariables, type SipHeader } from './forwardHeaders.js';
 
 /**
  * Asterisk's `REDIRECTING` reasons a forward hop maps to (§9.4 "Forwarded calls"), and the
@@ -17,11 +17,15 @@ import { forwardHeaders, headerVariables } from './forwardHeaders.js';
 export type RedirectingReason =
   'away' | 'time_of_day' | 'cfu' | 'cfb' | 'cfnr' | 'unavailable' | 'dnd';
 
-/** One forward hop: who diverted the call, and why. */
+/** One forward hop: who diverted the call, and why. `party` and `extension` are the diverting
+ * party's kind and extension, a menu's `null`, which a `sip` target's headers name (§9.4 "Header
+ * templates"). */
 export type Diversion = {
   number: string;
   name: string | null;
   reason: RedirectingReason;
+  party: 'user' | 'ringGroup' | 'menu';
+  extension: string | null;
 };
 
 /** The entity a hop diverts from: the target the call was on when its rule applied. */
@@ -53,32 +57,45 @@ function userNumber(snapshot: Snapshot, userId: string): string | null {
   );
 }
 
-/** `party`'s number and name: a user's primary number or extension, a ring group's extension, a
- * menu's called number, the one an inbound call dialled. */
+type PartyIdentity = Omit<Diversion, 'number' | 'reason'> & {
+  number: string | null;
+};
+
+/** `party`'s number, name and extension: a user's primary number or extension, a ring group's
+ * extension, a menu's called number, the one an inbound call dialled. */
 function partyIdentity(
   snapshot: Snapshot,
   call: Call,
   party: DivertingParty
-): { number: string | null; name: string | null } {
+): PartyIdentity {
   if ('userId' in party) {
     return {
       number: userNumber(snapshot, party.userId),
-      name: snapshot.users.find(row => row.id === party.userId)?.name ?? null
+      name: snapshot.users.find(row => row.id === party.userId)?.name ?? null,
+      party: 'user',
+      extension:
+        snapshot.extensions.find(row => row.userId === party.userId)?.ext ??
+        null
     };
   }
   if ('ringGroupId' in party) {
+    const extension =
+      snapshot.extensions.find(row => row.ringGroupId === party.ringGroupId)
+        ?.ext ?? null;
     return {
-      number:
-        snapshot.extensions.find(row => row.ringGroupId === party.ringGroupId)
-          ?.ext ?? null,
+      number: extension,
       name:
         snapshot.ringGroups.find(row => row.id === party.ringGroupId)?.name ??
-        null
+        null,
+      party: 'ringGroup',
+      extension
     };
   }
   return {
     number: call.direction === 'inbound' ? call.to : null,
-    name: snapshot.menus.find(row => row.id === party.menuId)?.name ?? null
+    name: snapshot.menus.find(row => row.id === party.menuId)?.name ?? null,
+    party: 'menu',
+    extension: null
   };
 }
 
@@ -92,8 +109,8 @@ export function diversionFor(
   party: DivertingParty,
   reason: RedirectingReason
 ): Diversion | null {
-  const { number, name } = partyIdentity(snapshot, call, party);
-  return number === null ? null : { number, name, reason };
+  const { number, ...identity } = partyIdentity(snapshot, call, party);
+  return number === null ? null : { number, reason, ...identity };
 }
 
 /** Records `diversion`, the hop a forward is taking, in the call's context (§10.1 step 7). */
@@ -140,22 +157,15 @@ export function redirectingVariables(
 }
 
 /** A trunk leg dialled for a forward target: the hops that led to it, the call's own and, for a
- * ring-group member's followed forward, the member's (§10.1 step 5). */
-export type ForwardLeg = { diversions: Diversion[] };
+ * ring-group member's followed forward, the member's (§10.1 step 5), and the headers it sends, a
+ * `sip` target's rendered for it and none for an `external` one (§9.4 "Forwarded calls"). */
+export type ForwardLeg = { diversions: Diversion[]; headers: SipHeader[] };
 
 /** The forwarding context `forward`'s leg carries (§9.4 "Forwarded calls"): its `REDIRECTING`
- * data and the custom headers for the call it belongs to. */
-export function forwardVariables(
-  call: Call,
-  forward: ForwardLeg
-): Record<string, string> {
+ * data and its headers, every header the leg adds, so any other joins them here. */
+export function forwardVariables(forward: ForwardLeg): Record<string, string> {
   return {
     ...redirectingVariables(forward.diversions),
-    ...headerVariables(
-      forwardHeaders({
-        caller: call.from,
-        called: call.direction === 'inbound' ? call.to : null
-      })
-    )
+    ...headerVariables(forward.headers)
   };
 }

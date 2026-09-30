@@ -11,7 +11,12 @@ import type { Call } from './call.js';
 import { softphoneCallerId } from './contactName.js';
 import { recordEvents, redeliverEarlyEvents } from './earlyEvents.js';
 import { ringExternalLeg } from './externalLeg.js';
-import { CONDITION_REASONS, diversionFor } from './forwardContext.js';
+import {
+  CONDITION_REASONS,
+  diversionFor,
+  type ForwardLeg
+} from './forwardContext.js';
+import { sipForwardLeg } from './forwardValues.js';
 import type { GroupLeg } from './groupLegs.js';
 import { originateLeg } from './legOriginate.js';
 import type { Pipeline } from './pipeline.js';
@@ -138,9 +143,13 @@ async function originateExternalLeg(
     { userId: memberKey },
     CONDITION_REASONS.unconditional
   );
-  const forward = {
-    diversions: hop === null ? [...call.diversions] : [...call.diversions, hop]
-  };
+  const diversions =
+    hop === null ? [...call.diversions] : [...call.diversions, hop];
+  // An external leg is originated without a wait, alongside the members' (§10.1 step 5).
+  const forward: ForwardLeg =
+    target.kind === 'sip'
+      ? await sipForwardLeg(pipeline, call, target, diversions, member.snapshot)
+      : { diversions, headers: [] };
   await ringExternalLeg(
     pipeline,
     call,

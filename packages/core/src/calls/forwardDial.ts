@@ -17,6 +17,7 @@ import {
 } from './conclude.js';
 import { attemptRoute } from './dialAttempt.js';
 import type { ForwardLeg } from './forwardContext.js';
+import { sipForwardLeg } from './forwardValues.js';
 import { dialExternal } from './outboundExternal.js';
 import type { Pipeline } from './pipeline.js';
 import { liveTrunk, prepareRoute } from './routeSelection.js';
@@ -45,12 +46,12 @@ function unusableCause(
  * one with no outbound host, is released with 503 as an external forward no route carries.
  */
 async function dialSipTarget(
-  ctx: { pipeline: Pipeline; trunkState: TrunkState; forward: ForwardLeg },
+  ctx: { pipeline: Pipeline; trunkState: TrunkState },
   call: Call,
   target: SipTarget,
   asUser: string | null
 ): Promise<void> {
-  const { pipeline, trunkState, forward } = ctx;
+  const { pipeline, trunkState } = ctx;
   const snapshot = await pipeline.deps.cache.get();
   const trunk = liveTrunk(snapshot, target.trunkId);
   const unusable = unusableCause(trunk, snapshot);
@@ -81,6 +82,13 @@ async function dialSipTarget(
     await concludeExhausted(pipeline, call, prepared.failure.kind);
     return;
   }
+  const forward = await sipForwardLeg(
+    pipeline,
+    call,
+    target,
+    [...call.diversions],
+    snapshot
+  );
   const outcome = await attemptRoute(
     {
       pipeline,
@@ -121,16 +129,12 @@ export async function dialForwardTarget(
     await release(pipeline, call, FORWARD_TARGET_UNAVAILABLE, 'failed');
     return;
   }
-  const forward: ForwardLeg = { diversions: [...call.diversions] };
   if (target.kind === 'sip') {
-    await dialSipTarget(
-      { pipeline, trunkState, forward },
-      call,
-      target,
-      asUser
-    );
+    await dialSipTarget({ pipeline, trunkState }, call, target, asUser);
     return;
   }
+  // An external forward carries `Diversion` alone (§9.4 "Forwarded calls").
+  const forward: ForwardLeg = { diversions: [...call.diversions], headers: [] };
   await dialExternal(
     { pipeline, trunkState, forward },
     call,

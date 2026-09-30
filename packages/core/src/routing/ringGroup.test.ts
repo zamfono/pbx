@@ -124,7 +124,8 @@ describe('ringable', () => {
       id: 'target-1',
       kind: 'sip',
       trunkId: 'trunk-1',
-      user: 'proj_1'
+      user: 'proj_1',
+      headers: []
     };
     const members = [{ ...baseMember('user-1'), unconditional: target }];
 

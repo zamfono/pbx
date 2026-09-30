@@ -2,12 +2,18 @@
  * The shared forward-target vocabulary (spec §11.2 `forward_targets`) and hop counting for
  * routing pipeline step 7, "Forward targets" (§10.1).
  */
+import type { SipHeaderTemplate } from '@zamfono/shared';
 
 export type ForwardTarget = { id: string } & (
   | { kind: 'user'; userId: string }
   | { kind: 'ringGroup'; ringGroupId: string }
   | { kind: 'external'; number: string }
-  | { kind: 'sip'; trunkId: string; user: string }
+  | {
+      kind: 'sip';
+      trunkId: string;
+      user: string;
+      headers: SipHeaderTemplate[];
+    }
   | { kind: 'mailboxUser'; userId: string }
   | { kind: 'mailboxRingGroup'; ringGroupId: string }
   | { kind: 'announcement'; audioId: string }
@@ -23,6 +29,8 @@ export type ForwardTargetsRow = {
   external: string | null;
   sipTrunkId: string | null;
   sipUser: string | null;
+  /** `sip_headers_json` as the config snapshot parses it (§9.4 "Header templates"). */
+  sipHeaders: SipHeaderTemplate[] | null;
   mailboxUserId: string | null;
   mailboxRingGroupId: string | null;
   announcementAudioId: string | null;
@@ -42,7 +50,14 @@ export function targetFromRow(row: ForwardTargetsRow): ForwardTarget {
     return { id, kind: 'external', number: row.external };
   }
   if (row.sipTrunkId !== null && row.sipUser !== null) {
-    return { id, kind: 'sip', trunkId: row.sipTrunkId, user: row.sipUser };
+    // `api` sets the headers on every sip row; one without sends none.
+    return {
+      id,
+      kind: 'sip',
+      trunkId: row.sipTrunkId,
+      user: row.sipUser,
+      headers: row.sipHeaders ?? []
+    };
   }
   if (row.mailboxUserId !== null) {
     return { id, kind: 'mailboxUser', userId: row.mailboxUserId };

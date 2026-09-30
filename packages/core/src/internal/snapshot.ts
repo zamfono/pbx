@@ -9,7 +9,8 @@ import {
   validateFeatureCodes,
   type Db,
   type DB,
-  type FeatureCodes
+  type FeatureCodes,
+  type SipHeaderTemplate
 } from '@zamfono/shared';
 
 // The tables the ARI routing pipeline reads; the tables `api` alone consults (auth, audit,
@@ -77,6 +78,12 @@ type ParsedDevice = Omit<Selectable<DB['devices']>, 'allowedIpsJson'> & {
 type ParsedTrunk = Omit<Selectable<DB['trunks']>, 'codecsJson'> & {
   codecs: string[] | null;
 };
+type ParsedForwardTarget = Omit<
+  Selectable<DB['forwardTargets']>,
+  'sipHeadersJson'
+> & {
+  sipHeaders: SipHeaderTemplate[] | null;
+};
 type ParsedSettings = Omit<
   Selectable<DB['settings']>,
   'codecsJson' | 'emergencyNumbersJson' | 'featureCodesJson'
@@ -86,10 +93,14 @@ type ParsedSettings = Omit<
   featureCodes: FeatureCodes;
 };
 
-type TableRows = Omit<RawTableRows, 'users' | 'devices' | 'trunks'> & {
+type TableRows = Omit<
+  RawTableRows,
+  'users' | 'devices' | 'trunks' | 'forwardTargets'
+> & {
   users: ParsedUser[];
   devices: ParsedDevice[];
   trunks: ParsedTrunk[];
+  forwardTargets: ParsedForwardTarget[];
 };
 
 /** Every config table the routing pipeline reads, loaded in one transaction (§3.1). */
@@ -137,6 +148,19 @@ function parseTrunk(row: Selectable<DB['trunks']>): ParsedTrunk {
   };
 }
 
+function parseForwardTarget(
+  row: Selectable<DB['forwardTargets']>
+): ParsedForwardTarget {
+  const { sipHeadersJson, ...rest } = row;
+  return {
+    ...rest,
+    sipHeaders: parseNullableJson(
+      'forwardTargets.sipHeadersJson',
+      sipHeadersJson
+    ) as SipHeaderTemplate[] | null
+  };
+}
+
 function parseSettings(row: Selectable<DB['settings']>): ParsedSettings {
   const { codecsJson, emergencyNumbersJson, featureCodesJson, ...rest } = row;
   return {
@@ -178,6 +202,7 @@ async function loadSnapshot(trx: Transaction<DB>): Promise<Snapshot> {
     users: tables.users.map(parseUser),
     devices: tables.devices.map(parseDevice),
     trunks: tables.trunks.map(parseTrunk),
+    forwardTargets: tables.forwardTargets.map(parseForwardTarget),
     settings: parseSettings(settingsRow)
   };
 }

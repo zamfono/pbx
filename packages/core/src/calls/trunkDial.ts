@@ -159,7 +159,7 @@ export async function originateTrunkLeg(
   }
   if (ctx.forward !== undefined) {
     // The one place a forwarded leg's `REDIRECTING` data and custom headers are applied.
-    Object.assign(variables, forwardVariables(call, ctx.forward));
+    Object.assign(variables, forwardVariables(ctx.forward));
   }
   // §7: the trunk carrying the call's leg counts toward its diagnostics level.
   raiseLogLevel(call.log, trunk, pipeline.deps.now());

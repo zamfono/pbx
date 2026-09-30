@@ -1,12 +1,21 @@
+/* eslint-disable no-template-curly-in-string -- a literal ${…} is what these tests send and expect back */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
+import {
+  DEFAULT_SIP_HEADERS,
+  newId,
+  nowIso,
+  openDb,
+  type Db,
+  type SipHeaderTemplate
+} from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri, isPlacement } from '../ari/fake.js';
 import { defaultChannel, type Channel, type Logger } from '../ari/types.js';
+import type { ForwardTarget } from '../routing/targets.js';
 import { eventually } from '../testing/eventually.js';
 import { newCall, type Call } from './call.js';
 import {
@@ -126,8 +135,28 @@ async function seedSipTrunk(db: Db, hosts = 2, priority = 1): Promise<string> {
   return trunkId;
 }
 
-function sipTargetId(db: Db, trunkId: string): Promise<string> {
-  return seedTarget(db, { sipTrunkId: trunkId, sipUser: SIP_USER });
+/** A sip target's row, with the default headers unless `headers` are given. */
+function sipTargetId(
+  db: Db,
+  trunkId: string,
+  headers: readonly SipHeaderTemplate[] = DEFAULT_SIP_HEADERS
+): Promise<string> {
+  return seedTarget(db, {
+    sipTrunkId: trunkId,
+    sipUser: SIP_USER,
+    sipHeadersJson: JSON.stringify(headers)
+  });
+}
+
+/** A DID's own sip target, as the pipeline enters it, with the default headers. */
+function sipTarget(trunkId: string): ForwardTarget {
+  return {
+    id: '',
+    kind: 'sip',
+    trunkId,
+    user: SIP_USER,
+    headers: [...DEFAULT_SIP_HEADERS]
+  };
 }
 
 async function seedRule(
@@ -262,11 +291,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     const call = inboundCall();
 
     const legs = await dialled(
-      pipeline.enterTarget(
-        call,
-        { id: '', kind: 'sip', trunkId, user: SIP_USER },
-        null
-      )
+      pipeline.enterTarget(call, sipTarget(trunkId), null)
     );
 
     expect(legs.map(leg => leg.endpoint)).toEqual([
@@ -283,11 +308,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
   it('fails over to the next outbound host on a 503 (§9.4 "Hosts")', async () => {
     const trunkId = await seedSipTrunk(db);
     const call = inboundCall();
-    const started = pipeline.enterTarget(
-      call,
-      { id: '', kind: 'sip', trunkId, user: SIP_USER },
-      null
-    );
+    const started = pipeline.enterTarget(call, sipTarget(trunkId), null);
     await dialled(started);
     const first = await eventually(() => {
       const leg = [...call.legs.values()].find(
@@ -349,6 +370,58 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     expect(legs.at(0)?.variables?.['CALLERID(num)']).toBe('+15551000');
   });
 
+  it("renders a target's templated headers: the called user, the last forwarder and its reason", async () => {
+    const trunkId = await seedSipTrunk(db);
+    const bea = await seedUser(db, 'Bea', '177');
+    const ai = await seedUser(db, 'AI Agent', '178');
+    await db
+      .insertInto('oooRules')
+      .values({
+        id: newId(),
+        scopeUserId: bea,
+        active: 1,
+        targetId: await seedTarget(db, { userId: ai }),
+        createdAt: nowIso()
+      })
+      .execute();
+    const headers = [
+      { name: 'X-Called', value: '{{calledExtension}} {{calledName}}' },
+      {
+        name: 'X-Forwarded-By',
+        value: '{{forwardedByExtension}} {{forwardedByName}} {{forwardReason}}'
+      },
+      { name: 'X-Hops', value: '{{hopCount}} {{direction}} {{language}}' },
+      // No phone book entry and no internal caller: rendered empty, left out.
+      { name: 'X-Caller-Name', value: '{{callerName}}' },
+      { name: 'X-Literal', value: '${CALLERID(num)} {{did}}' }
+    ];
+    await seedRule(
+      db,
+      ai,
+      'unconditional',
+      await sipTargetId(db, trunkId, headers)
+    );
+    const call = inboundCall();
+
+    const legs = await dialled(
+      pipeline.enterTarget(call, { id: '', kind: 'user', userId: bea }, null)
+    );
+
+    const variables = legs.at(0)?.variables ?? {};
+    expect(
+      Object.fromEntries(
+        Object.entries(variables).filter(([name]) =>
+          name.startsWith('PJSIP_HEADER(')
+        )
+      )
+    ).toEqual({
+      'PJSIP_HEADER(add,X-Called)': '177 Bea',
+      'PJSIP_HEADER(add,X-Forwarded-By)': '178 AI Agent unconditional',
+      'PJSIP_HEADER(add,X-Hops)': '2 inbound en',
+      'PJSIP_HEADER(add,X-Literal)': `\${CALLERID(num)} ${CALLED}`
+    });
+  });
+
   it('omits X-Zamfono-Caller for a withheld caller and names a user by their own number', async () => {
     const trunkId = await seedSipTrunk(db);
     const ai = await seedUser(db, 'AI Agent', '178');
@@ -386,7 +459,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     });
   });
 
-  it('carries the forwarding context on an external forward too', async () => {
+  it('carries the Diversion alone on an external forward, no custom header', async () => {
     const trunkId = newId();
     await db
       .insertInto('trunks')
@@ -430,12 +503,14 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     expect(legs.map(leg => leg.endpoint)).toEqual([
       `PJSIP/+15557777@trunk-${trunkId}/sip:sip.carrier.example`
     ]);
-    expect(forwardContext(legs.at(0))).toMatchObject({
+    expect(forwardContext(legs.at(0))).toEqual({
+      'REDIRECTING(orig-num,i)': '177',
+      'REDIRECTING(orig-name,i)': 'Bea',
+      'REDIRECTING(orig-reason,i)': 'cfu',
       'REDIRECTING(from-num,i)': '177',
+      'REDIRECTING(from-name,i)': 'Bea',
       'REDIRECTING(reason,i)': 'cfu',
-      'REDIRECTING(count,i)': '1',
-      'PJSIP_HEADER(add,X-Zamfono-Caller)': CALLER,
-      'PJSIP_HEADER(add,X-Zamfono-Did)': CALLED
+      'REDIRECTING(count,i)': '1'
     });
   });
 
@@ -504,11 +579,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     ] as const) {
       const call = inboundCall();
       // eslint-disable-next-line no-await-in-loop -- one call per unusable trunk
-      await pipeline.enterTarget(
-        call,
-        { id: '', kind: 'sip', trunkId: id, user: SIP_USER },
-        null
-      );
+      await pipeline.enterTarget(call, sipTarget(id), null);
       expect(traceEvents(call)).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ event: 'sipTarget', trunkId: id, cause }),
