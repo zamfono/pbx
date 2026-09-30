@@ -18,19 +18,27 @@
 # answers the OPTIONS probes that keep the contact qualified while that run is up, and the
 # explicit `pjsip qualify` spares the harness the AOR's own probe interval. Every run traces the
 # messages it exchanges, so a scenario can assert that nothing rang the phone.
+#
+# `PHONE_PORT` plays a second device beside the first, on a port of its own in the same container
+# (a colleague's phone a scenario rings or picks up with); its trace, its runs' tags and their
+# logs are its own too, so the two never mix.
 set -euo pipefail
 
 compose=$1
 action=$2
-PORT=5070
+PORT=${PHONE_PORT:-5070}
+# The first device's names stay what they always were; a second one's carry its port, and its
+# media ports are its own, clear of the 6000 onwards sipp takes by default.
+SUFFIX=${PHONE_PORT:+-$PHONE_PORT}
+MEDIA_ARGS=${PHONE_PORT:+-mp $((PHONE_PORT + 2000))}
 QUALIFY_ATTEMPTS=20
 # Asterisk's default `qualify_timeout`, which the rendered AORs keep (packages/api/src/lib/pjsip),
 # plus a second for the result to reach the contact's status; in microseconds.
 STALE_PROBE_WINDOW_US=4000000
 REGISTER_ATTEMPTS=10
 CALL_ATTEMPTS=90
-MESSAGES=/tmp/phone-messages.log
-CALL_EXIT=/tmp/phone-call.exit
+MESSAGES=/tmp/phone$SUFFIX-messages.log
+CALL_EXIT=/tmp/phone$SUFFIX-call.exit
 
 dc() {
   # shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
@@ -130,10 +138,10 @@ serve() {
   fi
   clear_phone_trace
   dc exec -T -d sipp-phone sh -c \
-    "sh /scenarios/_sipp-run.sh phone-$uas_scenario \
-      -sf /scenarios/uas/$uas_scenario.xml -p $PORT -aa -nostdin \
+    "sh /scenarios/_sipp-run.sh phone$SUFFIX-$uas_scenario \
+      -sf /scenarios/uas/$uas_scenario.xml -p $PORT $MEDIA_ARGS -aa -nostdin \
       -trace_msg -message_file $MESSAGES $account \
-      asterisk:5060 > /tmp/$uas_scenario.log 2>&1"
+      asterisk:5060 > /tmp/$uas_scenario$SUFFIX.log 2>&1"
 }
 
 case $action in
