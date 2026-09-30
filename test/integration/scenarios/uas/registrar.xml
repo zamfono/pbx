@@ -11,6 +11,14 @@
   call of its own.
 -->
 <scenario name="registrar">
+  <!-- A stray OPTIONS/NOTIFY/INFO (Asterisk's qualify probe, or another request the calling run's
+       container sends port 5060) can open a call of its own here, on a Call-ID the REGISTER
+       below never uses: answered and ended here, it leaves no call waiting for that REGISTER
+       (see uas/ring-no-answer.xml, which guards its INVITE the same way). -->
+  <recv request="OPTIONS" optional="true" next="probe" />
+  <recv request="NOTIFY" optional="true" next="probe" />
+  <recv request="INFO" optional="true" next="probe" />
+
   <recv request="REGISTER">
     <action>
       <ereg regexp="sip:([^@;>[:space:]]+)@" search_in="hdr" header="Contact:" assign_to="uri,user" />
@@ -35,4 +43,21 @@
       Content-Length: 0
     ]]>
   </send>
+
+  <nop next="done" />
+
+  <label id="probe" />
+  <send>
+    <![CDATA[
+      SIP/2.0 200 OK
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[call_number]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <label id="done" />
 </scenario>
