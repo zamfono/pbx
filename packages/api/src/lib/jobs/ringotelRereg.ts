@@ -9,6 +9,7 @@ import pino from 'pino';
 
 import type { CoreVersionResponse, Db } from '@zamfono/shared';
 
+import { errorMessage } from '../errorMessage.js';
 import {
   JOB_CALLER,
   outcomeChanges,
@@ -79,7 +80,7 @@ async function reregister(
     () => ({ outcome: 'reregistered', reason: undefined }),
     (error: unknown) => ({
       outcome: 'refused',
-      reason: error instanceof Error ? error.message : String(error)
+      reason: errorMessage(error)
     })
   );
   if (outcome.reason === undefined) {

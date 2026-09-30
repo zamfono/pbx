@@ -2,6 +2,7 @@ import pino from 'pino';
 
 import type { Db } from '@zamfono/shared';
 
+import { errorMessage } from '../../errorMessage.js';
 import {
   activeRingotelProvider,
   type ProvisioningProvider,
@@ -76,7 +77,7 @@ async function attempt(db: Db, push: Push): Promise<PushOutcome> {
   try {
     return { outcome: 'pushed', receipt: await push.push(provider) };
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
+    const reason = errorMessage(error);
     return { outcome: 'refused', reason };
   }
 }

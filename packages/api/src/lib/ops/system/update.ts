@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { errorMessage } from '../../errorMessage.js';
 import { setUndoable } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import { updaterClient, UpdaterRefusal, type UpdateState } from './_updater.js';
@@ -35,7 +36,7 @@ function passOn(error: unknown): never {
   }
   throw new OpError(
     STATUS_UNAVAILABLE,
-    `system.update: the updater did not answer: ${error instanceof Error ? error.message : String(error)}`
+    `system.update: the updater did not answer: ${errorMessage(error)}`
   );
 }
 

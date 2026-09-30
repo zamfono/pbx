@@ -5,6 +5,7 @@
  * provider" (§5.2), so a device whose Ringotel user is missing is provisioned when one of its
  * hooks next needs that user, rather than failing the Zamfono operation.
  */
+import { errorMessage } from '../errorMessage.js';
 import { decrypt, keyringFromEnv } from '../secretbox.js';
 import { ringotelLog } from './ringotelBranchHooks.js';
 import { RingotelError, type RingotelProviderDeps } from './ringotelClient.js';
@@ -137,7 +138,7 @@ export async function provisionExistingDevices(
       const remoteId = await provisionDevice(deps, orgId, device);
       outcomes.push({ deviceId: device.id, remoteId });
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
+      const reason = errorMessage(error);
       outcomes.push({ deviceId: device.id, reason });
     }
   }

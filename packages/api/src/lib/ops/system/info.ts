@@ -8,6 +8,7 @@ import {
   type ZamfonoVersion
 } from '@zamfono/shared';
 
+import { errorMessage } from '../../errorMessage.js';
 import { isProfilePending } from '../../provisioning/profilePending.js';
 import { defineOperation } from '../types.js';
 import { updaterClient, type UpdaterStatus } from './_updater.js';
@@ -46,7 +47,7 @@ async function updateStatus(): Promise<Output['update']> {
     };
   }
   return client.status().catch((error: unknown) => ({
-    unavailable: `the updater did not answer: ${error instanceof Error ? error.message : String(error)}`
+    unavailable: `the updater did not answer: ${errorMessage(error)}`
   }));
 }
 

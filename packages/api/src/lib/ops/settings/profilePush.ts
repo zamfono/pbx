@@ -11,6 +11,7 @@ import pino from 'pino';
 
 import type { Db } from '@zamfono/shared';
 
+import { errorMessage } from '../../errorMessage.js';
 import { activeRingotelProvider } from '../../provisioning/index.js';
 import { setProfilePending } from '../../provisioning/profilePending.js';
 import { afterPropagation } from '../afterPropagationHooks.js';
@@ -43,7 +44,7 @@ async function attempt(db: Db): Promise<ProfileOutcome> {
     await provider.onTenantProfileChanged?.(await loadSettings(db));
     return { outcome: 'pushed' };
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
+    const reason = errorMessage(error);
     return { outcome: 'refused', reason };
   }
 }

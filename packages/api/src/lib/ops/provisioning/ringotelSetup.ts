@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { errorMessage } from '../../errorMessage.js';
 import {
   createRingotelClient,
   RingotelError,
@@ -34,7 +35,7 @@ async function discardOrganization(
   try {
     await client.call('deleteOrganization', { id: orgId });
   } catch (deleteError) {
-    const reason = cause instanceof Error ? cause.message : String(cause);
+    const reason = errorMessage(cause);
     throw new Error(
       `ringotel: setup failed (${reason}) and organization ${orgId} could not be deleted; adopt it with provisioning.ringotelAdopt, or delete it in the Ringotel Shell before retrying`,
       { cause: deleteError }

@@ -18,6 +18,7 @@ import {
   type Event
 } from '@zamfono/shared';
 
+import { errorMessage } from '../errorMessage.js';
 import {
   loadLiveTarget,
   type BackupRunRow,
@@ -158,7 +159,7 @@ export async function performBackup(
       finishedAt
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     return await failBackupRun(db, deps, run, message);
   } finally {
     await rm(snapshotDir, { recursive: true, force: true });

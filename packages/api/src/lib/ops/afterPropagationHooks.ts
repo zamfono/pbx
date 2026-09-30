@@ -1,5 +1,6 @@
 import type { Db } from '@zamfono/shared';
 
+import { errorMessage } from '../errorMessage.js';
 import type { Context } from './types.js';
 
 /**
@@ -44,7 +45,7 @@ export async function runAfterPropagationHooks(
   for (const hook of list) {
     // eslint-disable-next-line no-await-in-loop -- each may depend on what the one before did
     const warning = await hook(db).catch((error: unknown) =>
-      error instanceof Error ? error.message : String(error)
+      errorMessage(error)
     );
     if (warning !== null) {
       warnings.push(warning);
