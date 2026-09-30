@@ -1,10 +1,9 @@
 /** Schedules the daily retention purge (§5.9 last paragraph): `runPurge` once at boot, then on a fixed interval for the process's life. */
 import pino from 'pino';
 
-import { nowIso, type Db } from '@zamfono/shared';
+import { MS_PER_DAY, nowIso, type Db } from '@zamfono/shared';
 
 import { runPurge } from './purge.js';
-import { MS_PER_DAY } from './scheduleMath.js';
 
 const logger = pino({ name: 'retention' });
 

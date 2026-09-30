@@ -4,7 +4,7 @@
  */
 import process from 'node:process';
 
-import type { Db } from '@zamfono/shared';
+import { MS_PER_DAY, type Db } from '@zamfono/shared';
 
 import { loadIntervals, loadSchedule } from '../ops/hours/_shared.js';
 import { liveOooRulesInScope } from '../ops/ooo/_shared.js';
@@ -16,7 +16,6 @@ import {
   localParts,
   longestClosedGap,
   MINUTES_PER_HOUR,
-  MS_PER_DAY,
   zonedInstant
 } from './scheduleMath.js';
 

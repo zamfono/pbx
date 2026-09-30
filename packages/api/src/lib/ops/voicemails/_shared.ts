@@ -1,12 +1,12 @@
 import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
-import process from 'node:process';
 import { sql, type Selectable, type Transaction } from 'kysely';
 
 import type { DB, MwiMailbox } from '@zamfono/shared';
 
 import { transcodeForDownload } from '../../audio/transcode.js';
 import { createCoreClient, type CoreClient } from '../../coreClient.js';
+import { mediaDirFromEnv } from '../../mediaDir.js';
 import { OpError, type Role } from '../types.js';
 
 const STATUS_NOT_FOUND = 404;
@@ -125,11 +125,6 @@ export function mailboxKey(
 }
 
 const VOICEMAIL_SUBDIR = 'voicemail';
-
-/** The shared media volume root (`MEDIA_DIR`), read at call time so tests can override it. */
-function mediaDirFromEnv(): string {
-  return process.env.MEDIA_DIR ?? '/media';
-}
 
 /** Removes a voicemail's audio file from the media volume; missing files are not an error. */
 export async function deleteVoicemailFile(

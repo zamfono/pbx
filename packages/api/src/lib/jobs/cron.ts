@@ -1,4 +1,5 @@
 /** Cron-expression scheduling for the backup job (§6.5 "Backups"), and the manual runs' queue. */
+import { setTimeout as sleep } from 'node:timers/promises';
 import pino from 'pino';
 
 import { nowIso, type Db } from '@zamfono/shared';
@@ -100,23 +101,11 @@ export async function markInterruptedRuns(
 }
 
 /**
- * Resolves after `ms`, or immediately once `signal` aborts (a fresh, local timer per call). The
- * abort listener is removed on the timer path too, since `signal` is the long-lived scheduler
- * signal and outlives any single call.
+ * Resolves after `ms`, or at once when `signal` aborts: a stop, which the loop checks next, so
+ * the rejection an abort gives is no failure.
  */
 function delay(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise(resolve => {
-    const timer: { id?: NodeJS.Timeout } = {};
-    const onAbort = (): void => {
-      clearTimeout(timer.id);
-      resolve();
-    };
-    timer.id = setTimeout(() => {
-      signal.removeEventListener('abort', onAbort);
-      resolve();
-    }, ms);
-    signal.addEventListener('abort', onAbort, { once: true });
-  });
+  return sleep(ms, undefined, { signal }).catch(() => undefined);
 }
 
 export type BackupScheduler = {

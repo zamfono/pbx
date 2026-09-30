@@ -1,10 +1,11 @@
 import { z } from 'zod';
 
+import { MS_PER_DAY } from '@zamfono/shared';
+
 import { recordChange } from '../runner.js';
 import { OpError, type Context } from '../types.js';
 
 const STATUS_UNPROCESSABLE_ENTITY = 422;
-const MS_PER_DAY = 86_400_000;
 
 /**
  * §7: an override set without an expiry gets one this far out, so diagnostics never stay on by

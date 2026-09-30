@@ -22,6 +22,7 @@ import type { Db, Envelope } from '@zamfono/shared';
 import { coreUrlFromEnv, fetchCoreVersion } from '../coreClient.js';
 import { connectCoreEvents } from '../coreEvents.js';
 import { publishEvent } from '../eventSink.js';
+import { mediaDirFromEnv } from '../mediaDir.js';
 import { propagateAtBoot } from '../propagation.js';
 import type { Keyring } from '../secretbox.js';
 import { seedIfEmpty } from '../seed.js';
@@ -34,13 +35,7 @@ import { reencryptSweep } from './keyRotation.js';
 import { scheduleRetention } from './retention.js';
 import { watchAsteriskRestarts } from './ringotelRereg.js';
 
-const DEFAULT_MEDIA_DIR = '/media';
 const execFileAsync = promisify(execFile);
-
-/** The shared media volume root (`MEDIA_DIR`, `images/api/Dockerfile`), read at call time so tests can override it. */
-function mediaDirFromEnv(): string {
-  return process.env.MEDIA_DIR ?? DEFAULT_MEDIA_DIR;
-}
 
 /**
  * Production `ExecFn` for `scheduleBackups` (`backup.ts`/`backupBackends.ts`): runs `file`,
