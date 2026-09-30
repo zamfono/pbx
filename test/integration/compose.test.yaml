@@ -118,6 +118,22 @@ services:
       api:
         condition: service_healthy
 
+  # `inbound-forward-sip`'s trunk host (§9.4 "SIP targets"): a TLS front, a few lines of Node the
+  # scenario's setup runs, relaying to the `sipp` container over TCP, since the harness's sipp (3.5.1) offers no TLS
+  # version Asterisk's transports accept. The scenario's setup copies its self-signed certificate
+  # in and starts it; idle otherwise, like the sipp containers. The image is the one api and core
+  # are built from.
+  sip-tls:
+    image: ${TLS_FRONT_IMAGE:-node:26-slim}
+    networks:
+      - internal
+    volumes:
+      - ${SCENARIOS_DIR:?set by run.sh}:/scenarios:ro
+    entrypoint: ['sleep', 'infinity']
+    depends_on:
+      api:
+        condition: service_healthy
+
   # `device-tls-srtp`'s device side: baresip, the same image test/load/stress runs its Ringotel
   # stand-ins from (test/load/stress/devices/Dockerfile), registering over TLS with SDES-SRTP,
   # Opus (§3, §9.1 transport-tls, §9.3/§10.4). Idle like the sipp containers; the scenario's own

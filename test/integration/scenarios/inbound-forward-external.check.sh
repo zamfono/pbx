@@ -2,14 +2,22 @@
 # §8 "forwarding chains", §10.1 step 5: the ring group's only member forwards unconditionally to
 # an external number (inbound-forward-external.setup.sh), so the call still reaches the group but
 # is answered over the trunk rather than by any user — the call history still carries the group
-# that routed it, but no answering user (§10.2 "Call history").
+# that routed it, but no answering user (§10.2 "Call history"). The leg carries the forwarding
+# context (§9.4 "Forwarded calls"): the caller, the dialled main number and a `Diversion` naming
+# the member, extension 101, forwarding unconditionally.
 set -euo pipefail
 
 api_base=$1
 token=$2
+compose=$3
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck source=_lib.sh
 . "$here/_lib.sh"
+
+# shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+$compose exec -T sipp cat /tmp/trunk-messages.log \
+  | python3 "$here/_forward-context-check.py" "sip:+15557777@$(container_ip sipp)" \
+    '+15559999' '+15551000' '^"CI Phone" <sip:101@[^>]+>;reason=unconditional$'
 
 group_id=$(ci_group)
 newest_call | python3 -c '
