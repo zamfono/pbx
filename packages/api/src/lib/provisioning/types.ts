@@ -35,7 +35,7 @@ export type ProvisioningProvider = {
   onDeviceBlfChanged?(device: DeviceRow, keys: string[]): Promise<void>;
   /** Any user or extension change: a provider that renders a tenant-wide roster re-renders it. */
   onRosterChanged?(users: UserRow[]): Promise<void>;
-  /** `codecs`, `ringotelMaxRegs`, `featureCodes` or `language` changed on the tenant `settings` row. */
+  /** `codecs`, `ringotelMaxRegs`, `featureCodes`, `emergencyNumbers`, `country` or `language` changed on the tenant `settings` row. */
   onTenantProfileChanged?(settings: SettingsRow): Promise<void>;
   /** Asterisk restarted and holds no registration: a provider whose apps register re-registers them. */
   onPbxRestarted?(): Promise<void>;

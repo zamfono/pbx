@@ -198,7 +198,7 @@ async function branchUpdate(
   };
 }
 
-/** `onTenantProfileChanged` (§10.4): codecs, `maxRegs` and feature codes via `updateBranch`, language via `updateOrganization`. */
+/** `onTenantProfileChanged` (§10.4): codecs, `maxRegs`, feature codes, emergency numbers and country via `updateBranch`, language via `updateOrganization`. */
 export async function ringotelTenantProfileChanged(
   deps: RingotelProviderDeps,
   settings: SettingsRow
