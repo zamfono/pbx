@@ -2,6 +2,7 @@ import type { Selectable, Transaction } from 'kysely';
 
 import type { DB } from '@zamfono/shared';
 
+import { assertAudioAvailable } from '../audio/_shared.js';
 import {
   deleteForwardTarget,
   insertForwardTarget,
@@ -24,25 +25,8 @@ export type { TargetSpec };
 /** A `ring_groups` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type RingGroupRow = Selectable<DB['ringGroups']>;
 
-const STATUS_NOT_FOUND = 404;
 const STATUS_UNPROCESSABLE_ENTITY = 422;
 const DECIMAL_BASE = 10;
-
-/** Throws 404 when `audioId` names no live `audio_assets` row (`ring_groups.*_audio_id`, `ON DELETE SET NULL`). */
-async function assertAudioAvailable(
-  db: Transaction<DB>,
-  audioId: string
-): Promise<void> {
-  const row = await db
-    .selectFrom('audioAssets')
-    .select('id')
-    .where('id', '=', audioId)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!row) {
-    throw new OpError(STATUS_NOT_FOUND, `audio asset '${audioId}' not found`);
-  }
-}
 
 /**
  * Throws 404 when any of a ring group's greeting, MoH or mailbox audio id names no live row;

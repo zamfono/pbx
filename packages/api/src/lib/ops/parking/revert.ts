@@ -1,11 +1,10 @@
 import { revertBlfKeys } from '../audit/_cascadeRevert.js';
 import { replayOperation } from '../audit/_replay.js';
 import type { ChangeEntry } from '../audit/_shared.js';
+import type { DroppedBlfKey } from '../devices/_shared.js';
 import { OpError, type Context } from '../types.js';
 
 const STATUS_CONFLICT = 409;
-
-type DroppedBlfKey = { deviceId: string; ext: string; position: number };
 
 /**
  * Reverts one `parking.set` entry (§5.8, §11.1 "extensions": parking-slot rows are "replaced as a

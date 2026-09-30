@@ -129,22 +129,6 @@ export async function assertCallerIdDidValid(
   }
 }
 
-/** Throws `OpError(404)` unless `audioId` names a live `audio_assets` row (`users.mailbox_audio_id`, §5.9). */
-export async function assertMailboxAudioAvailable(
-  db: Transaction<DB>,
-  audioId: string
-): Promise<void> {
-  const row = await db
-    .selectFrom('audioAssets')
-    .select('id')
-    .where('id', '=', audioId)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!row) {
-    throw new OpError(STATUS_NOT_FOUND, `audio asset '${audioId}' not found`);
-  }
-}
-
 /** Throws `OpError(409)` when `email` is already used by another live user (`users_email` UNIQUE). */
 export async function assertEmailAvailable(
   db: Transaction<DB>,

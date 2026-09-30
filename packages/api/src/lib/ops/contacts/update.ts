@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { DB } from '@zamfono/shared';
 
 import { recordChange, recordFieldChanges } from '../runner.js';
-import { defineOperation, OpError, type Context } from '../types.js';
+import { defineOperation, OpError } from '../types.js';
 import {
   contactPhones,
   phoneSchema,

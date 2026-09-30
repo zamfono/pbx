@@ -2,10 +2,13 @@ import type { Selectable, Transaction } from 'kysely';
 
 import type { DB } from '@zamfono/shared';
 
-import { Conflict, OpError } from '../types.js';
+import { Conflict, OpError, type Context } from '../types.js';
 
 /** A `devices` row as Kysely's `CamelCasePlugin` maps it (§11.2); never carries the raw password. */
 export type DeviceRow = Selectable<DB['devices']>;
+
+/** One `device_blf_keys` row, as an audit diff records the keys a removed extension drops. */
+export type DroppedBlfKey = { deviceId: string; ext: string; position: number };
 
 const STATUS_NOT_FOUND = 404;
 const STATUS_FORBIDDEN = 403;
@@ -119,4 +122,19 @@ export function assertDeviceCreateScope(
       'devices: may create only your own tls device'
     );
   }
+}
+
+/**
+ * The `device_blf_keys` rows the FK cascade drops when extension `ext` is removed, captured before
+ * the delete so the audit diff can record them (§5.9, §11.2 "extensions").
+ */
+export async function loadDroppedBlfKeys(
+  ctx: Context,
+  ext: string
+): Promise<DroppedBlfKey[]> {
+  return ctx.db
+    .selectFrom('deviceBlfKeys')
+    .select(['deviceId', 'ext', 'position'])
+    .where('ext', '=', ext)
+    .execute();
 }

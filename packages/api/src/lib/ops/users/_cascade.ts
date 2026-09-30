@@ -1,6 +1,7 @@
 import { revokeUserTokens } from '../../auth/tokens.js';
 import { activeRingotelProvider } from '../../provisioning/index.js';
 import type { DeviceRow } from '../../provisioning/types.js';
+import { loadDroppedBlfKeys } from '../devices/_shared.js';
 import { pushRoster } from '../roster.js';
 import { propagate, recordChange } from '../runner.js';
 import type { Context } from '../types.js';
@@ -13,7 +14,6 @@ type DeviceSnapshot = {
   transport: string;
   sipUsername: string;
 };
-type DroppedBlfKey = { deviceId: string; ext: string; position: number };
 
 const RINGOTEL_KIND = 'ringotel';
 
@@ -62,17 +62,6 @@ async function releaseProvisionedDevices(
     // eslint-disable-next-line no-await-in-loop -- the Ringotel RPC has no batch delete; sequential pushes are the plain reading of the API
     await provider.onDeviceDeleted(device);
   }
-}
-
-async function loadDroppedBlfKeys(
-  ctx: Context,
-  ext: string
-): Promise<DroppedBlfKey[]> {
-  return ctx.db
-    .selectFrom('deviceBlfKeys')
-    .select(['deviceId', 'ext', 'position'])
-    .where('ext', '=', ext)
-    .execute();
 }
 
 /**

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { assertAudioAvailable } from '../audio/_shared.js';
 import { pushRoster } from '../roster.js';
 import { propagate } from '../runner.js';
 import {
@@ -13,7 +14,6 @@ import { maybeRenameExtension, type AffectedDevice } from './_rename.js';
 import {
   assertCallerIdDidValid,
   assertEmailAvailable,
-  assertMailboxAudioAvailable,
   assertNotLastOwner,
   findMeSchema,
   liveUser,
@@ -185,7 +185,7 @@ export const update = defineOperation({
       await assertCallerIdDidValid(ctx.db, input.calleridDidId);
     }
     if (input.mailboxAudioId !== undefined && input.mailboxAudioId !== null) {
-      await assertMailboxAudioAvailable(ctx.db, input.mailboxAudioId);
+      await assertAudioAvailable(ctx.db, input.mailboxAudioId);
     }
 
     const affectedDevices = await maybeRenameExtension(ctx, input);

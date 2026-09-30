@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import type { DroppedBlfKey } from '../devices/_shared.js';
 import { pushRoster } from '../roster.js';
 import { propagate, recordChange } from '../runner.js';
 import { Conflict, defineOperation, OpError, type Context } from '../types.js';
@@ -21,8 +22,6 @@ const inputSchema = z
 
 type Input = z.infer<typeof inputSchema>;
 type Output = { slots: string[] };
-
-type DroppedBlfKey = { deviceId: string; ext: string; position: number };
 
 /** Refuses a slot whose length does not match the tenant-wide `settings.ext_length` (§11.2 "extensions"). */
 async function guardExtLength(

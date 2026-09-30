@@ -10,7 +10,7 @@ import {
   recordLogLevelChanges,
   resolveLogLevel
 } from '../settings/logLevel.js';
-import { defineOperation, OpError, type Context } from '../types.js';
+import { defineOperation, OpError } from '../types.js';
 import {
   memberSchema,
   replaceMembers,

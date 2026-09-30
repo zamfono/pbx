@@ -4,6 +4,9 @@ import type { DB } from '@zamfono/shared';
 
 import type { AudioKind } from '../../audio/types.js';
 import { findForwardTargetOwners } from '../forwardTargetOwners.js';
+import { OpError } from '../types.js';
+
+const STATUS_NOT_FOUND = 404;
 
 /** An `audio_assets` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type AudioAssetRow = Selectable<DB['audioAssets']>;
@@ -93,4 +96,20 @@ export async function findAudioAssetReferences(
     })),
     ...announcements
   ];
+}
+
+/** Throws `OpError(404)` unless `audioId` names a live `audio_assets` row (a ring group's audio ids, `users.mailbox_audio_id`, §5.9). */
+export async function assertAudioAvailable(
+  db: Transaction<DB>,
+  audioId: string
+): Promise<void> {
+  const row = await db
+    .selectFrom('audioAssets')
+    .select('id')
+    .where('id', '=', audioId)
+    .where('deletedAt', 'is', null)
+    .executeTakeFirst();
+  if (!row) {
+    throw new OpError(STATUS_NOT_FOUND, `audio asset '${audioId}' not found`);
+  }
 }
