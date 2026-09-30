@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-09-30 · §6.5 Backups, §10.3 Backups, §10.6 Realtime events, §11.2 `backup_runs`.** `backup_runs.bytes` becomes `bytes_added`, restic's `data_added`, which it always held, and the new `bytes_total` records restic's `total_bytes_processed`, the snapshot's full size; runs and the `backup.finished` event carry both as `bytesAdded` and `bytesTotal` instead of `bytes`. A run recorded before the change keeps its value as `bytes_added`, its `bytes_total` NULL.
+*Why:* requested by the product owner: `bytes` held only what a run added after deduplication, so an operator and an MCP client read a 0.58 MB run after a 27 MB one as a possibly incomplete backup.
+
 **2026-09-30 · §10 layout, §10.3 Icons, §10.5 Protocol revision.** The MCP `serverInfo` carries `title` "Zamfono", the repository as `websiteUrl` and the logo as `icons`, an SVG and a 192 px PNG each for a light and a dark background, which the stack serves itself under `ORIGIN` from `packages/api/static/`, public like `/healthz`, together with `/favicon.ico` and `/favicon.svg`, which the authentication pages link. `serverInfo` was `name` and `version` alone, and the stack served no icon.
 *Why:* requested by the product owner, who supplied the logo: MCP clients show a server's icon and title, and some fall back to the domain's favicon.
 
@@ -837,7 +840,7 @@ All hours resolve in the tenant's time zone: `settings.timezone` (an IANA name),
 - Default target: when `.env` sets `BACKUP_PASSWORD` and the stack has never had a target, live or deleted, `api` creates a `local` target at start, its repository `/backups/restic` on the `backups` volume and `BACKUP_PASSWORD` its restic password, so a restore needs only `.env` to open it. It shares the host with the stack: it covers a damaged database or a bad upgrade, not the loss of the host.
 - A run creates its target's repository when there is none at the location yet.
 - The restic repository password lives in the target's `secret_enc` next to the backend credentials. That column is readable only with the `.env` encryption key, so every restore starts from the preserved `.env` (§6.3).
-- Every run is a `backup_runs` row (§11.2), the store behind `GET /backups/runs`, and emits `backup.started`, `backup.finished` (snapshot id, bytes, duration) and `backup.failed` events over `/events` and webhooks (§10.6).
+- Every run is a `backup_runs` row (§11.2), the store behind `GET /backups/runs`, and emits `backup.started`, `backup.finished` (snapshot id, bytes added and total, duration) and `backup.failed` events over `/events` and webhooks (§10.6). A run records two sizes from restic's summary: `bytes_added` (`data_added`), what it uploaded after deduplication, and `bytes_total` (`total_bytes_processed`), the snapshot's full size.
 - A row still `running` when `api` starts belongs to a run its previous process did not finish; the start marks it `failed` with error `interrupted`.
 
 The restore procedure is part of the admin guide.
@@ -1364,7 +1367,7 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Mail templates** (min. role: admin) — `GET /mailTemplates` (effective templates, each marked `builtin` or `tenant`), `GET/PUT/DELETE /mailTemplates/{kind}/{language}`, `POST /mailTemplates/{kind}/test` (sends to the caller with sample values) — §10.2 "Mail"
 
-**Backups** (min. role: admin) — `GET/POST /backups/targets`, `PATCH/DELETE /backups/targets/{id}`; `GET /backups/runs` (history and status), `POST /backups/runs` (start a run), `GET /backups/runs/{id}`
+**Backups** (min. role: admin) — `GET/POST /backups/targets`, `PATCH/DELETE /backups/targets/{id}`; `GET /backups/runs` (history and status), `POST /backups/runs` (start a run), `GET /backups/runs/{id}`; a run carries `bytesAdded` and `bytesTotal` (§6.5)
 
 **Settings** (min. role: admin; owners for the columns marked 👑 in §11.4) — `GET/PATCH /settings` — the columns of the singleton row (§11.4) under their wire names; unknown fields rejected, secret values masked; a change to the tenant's Ringotel profile reaches Ringotel after the write committed, and a refusal is a `warnings` entry of the result, never a failed write (§10.4 "Tenant profile push")
 
@@ -1497,7 +1500,7 @@ Server-to-client messages:
 { "type": "hours", "scope": "ringGroup:0198b7c1-…", "open": false }          // scope: tenant | user:<id> | ringGroup:<id> | menu:<id>
 { "type": "trunk.status", "trunkId": "0198f0b3-…", "status": "unreachable" }
 { "type": "history.appended", "callId": "0198c2d4-…" }
-{ "type": "backup.finished", "targetId": "0198e511-…", "snapshotId": "…", "bytes": 123456789, "durationS": 42 }
+{ "type": "backup.finished", "targetId": "0198e511-…", "snapshotId": "…", "bytesAdded": 580000, "bytesTotal": 27000000, "durationS": 42 }
 ```
 
 Subscribers render presence, live call state and OOO status from this stream, without polling.
@@ -2200,12 +2203,15 @@ CREATE TABLE backup_targets (
 -- and the source of the backup.* events. Purged by api's daily job after recording_retention_days.
 --   status:      'running' until the run ends
 --   snapshot_id: the restic snapshot; set on 'ok'
+--   bytes_added: restic's data_added, what the run uploaded after deduplication; set on 'ok'
+--   bytes_total: restic's total_bytes_processed, the snapshot's full size; set on 'ok'
 CREATE TABLE backup_runs (
   id          TEXT    PRIMARY KEY,
   target_id   TEXT    NOT NULL REFERENCES backup_targets(id) ON DELETE CASCADE,
   status      TEXT    NOT NULL CHECK (status IN ('running','ok','failed')),
   snapshot_id TEXT,
-  bytes       INTEGER,
+  bytes_added INTEGER,
+  bytes_total INTEGER,
   error       TEXT,
   started_at  TEXT    NOT NULL,
   finished_at TEXT
