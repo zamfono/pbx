@@ -6,7 +6,9 @@
 # was for, in `X-Called`, and the last hop's reason in `X-Forward` beside a `${EXTEN}` sent as
 # written; and one `Diversion`, the last hop's: 178's unconditional forward (Asterisk sends the
 # redirecting party alone; 177's out-of-office hop is the leg's `REDIRECTING` original party, which
-# chan_pjsip does not send). The history names 177 as the callee it was placed to.
+# chan_pjsip does not send). The history names 177 as the callee it was placed to. The trunk is
+# `unmonitored` by then (`qualify` off, §9.4 "Provisioning and status"), so one answered attempt
+# also shows the core tried a trunk nothing probes.
 set -euo pipefail
 
 api_base=$1

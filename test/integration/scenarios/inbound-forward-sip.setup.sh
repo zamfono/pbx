@@ -4,7 +4,10 @@
 # TLS trunk, with templated headers. The trunk's host is the `sip-tls` container on 5061, a TLS
 # front with a self-signed certificate (`tlsVerify` off) relaying to the `sipp` container's TCP
 # port 5063, where `uas/answer-sip-target.xml` answers with plain RTP (`srtp` off: sipp does no
-# SRTP), tracing what it received for the check. Leaves the ids the teardown removes in the scenario's state.
+# SRTP), tracing what it received for the check. The trunk also stands for an endpoint that
+# answers no OPTIONS (§9.4 "Provisioning and status"): created with `qualify` on before the front
+# listens, it turns `unreachable`, and with `qualify` switched off `unmonitored`, which the call
+# then reaches. Leaves the ids the teardown removes in the scenario's state.
 set -euo pipefail
 
 api_base=$1
@@ -27,8 +30,7 @@ $compose cp "$tls_dir/cert.pem" sip-tls:/tmp/sip-target-tls/cert.pem >&2
 $compose cp "$tls_dir/key.pem" sip-tls:/tmp/sip-target-tls/key.pem >&2
 rm -rf "$tls_dir"
 
-# The trunk side listens before the trunk exists, so the trunk's first qualify is answered. The
-# UAS's Contact names the front, so Asterisk's BYE takes the TLS connection back through it.
+# The UAS's Contact names the front, so Asterisk's BYE takes the TLS connection back through it.
 # shellcheck disable=SC2086
 $compose exec -T sipp rm -f /tmp/sip-target-messages.log
 # shellcheck disable=SC2086
@@ -36,21 +38,6 @@ $compose exec -T -d sipp sh -c \
   "sh /scenarios/_sipp-run.sh trunk-sip-target -sf /scenarios/uas/answer-sip-target.xml \
     -t t1 -p 5063 -key front $(container_ip sip-tls) -aa -nostdin \
     -trace_msg -message_file /tmp/sip-target-messages.log > /tmp/answer-sip-target.log 2>&1"
-# The TLS front: every TLS connection Asterisk opens to 5061 is relayed byte for byte to the UAS
-# over TCP, with the pid written where the teardown stops it.
-# shellcheck disable=SC2086
-$compose exec -T -d sip-tls node -e "
-  const fs = require('node:fs');
-  const dir = '/tmp/sip-target-tls';
-  const options = { cert: fs.readFileSync(dir + '/cert.pem'), key: fs.readFileSync(dir + '/key.pem') };
-  require('node:tls').createServer(options, client => {
-    const upstream = require('node:net').connect(5063, 'sipp');
-    const close = () => { client.destroy(); upstream.destroy(); };
-    client.pipe(upstream);
-    upstream.pipe(client);
-    for (const socket of [client, upstream]) { socket.on('error', close); socket.on('close', close); }
-  }).listen(5061, () => fs.writeFileSync(dir + '/front.pid', String(process.pid)));
-"
 
 trunk_id=$(api POST /trunks '{
   "name": "ci-sip-target",
@@ -84,18 +71,75 @@ api PUT "/users/$agent/forwarding" "{\"rules\":[{\"condition\":\"unconditional\"
 printf '%s %s %s %s\n' "$trunk_id" "$forwarder" "$agent" "$did_id" \
   > "$(state_file inbound-forward-sip)"
 
-# The core skips an unreachable trunk without an INVITE (§9.4 "Route fallthrough"): the call waits
-# until the new trunk's qualify over TLS has been answered.
+# The trunk's status as `api` serves it from the core (§9.4 "Provisioning and status"), and its
+# contact's as `pjsip show contacts` gives it.
+trunk_status() {
+  api GET "/trunks/$trunk_id" | jsonfield status
+}
+contact_status() {
+  # shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+  $compose exec -T asterisk asterisk -rx 'pjsip show contacts' \
+    | awk -v t="trunk-$trunk_id/" '$1 == "Contact:" && index($2, t) == 1 { print $4 }'
+}
+
+# Nothing listens on the front's port yet, so the trunk's probe fails: the core skips the trunk
+# without an INVITE (§9.4 "Route fallthrough"), as it would skip one whose endpoint ignores OPTIONS.
+unreachable=
 for _ in $(seq 1 30); do
   # shellcheck disable=SC2086
   $compose exec -T asterisk asterisk -rx "pjsip qualify trunk-$trunk_id" >/dev/null 2>&1 || true
   sleep 1
-  # shellcheck disable=SC2086
-  if $compose exec -T asterisk asterisk -rx 'pjsip show contacts' \
-    | awk -v t="trunk-$trunk_id/" '$1 == "Contact:" && index($2, t) == 1 { print $4 }' \
-    | grep -qx Avail; then
-    exit 0
+  if [ "$(trunk_status)" = unreachable ]; then
+    unreachable=1
+    break
   fi
 done
-echo "the TLS trunk trunk-$trunk_id never became reachable" >&2
+if [ -z "$unreachable" ]; then
+  echo "the TLS trunk trunk-$trunk_id never turned unreachable with its front down" >&2
+  exit 1
+fi
+
+# `qualify` off renders `qualify_frequency = 0`: Asterisk stops probing, and the core reports the
+# trunk `unmonitored`, which no pre-check skips, whatever the contact still says. The contact's
+# own status, `NonQual` for one never probed, is printed for the run's log.
+api PATCH "/trunks/$trunk_id" '{"qualify":false}' >/dev/null
+unmonitored=
+for _ in $(seq 1 30); do
+  if [ "$(trunk_status)" = unmonitored ]; then
+    unmonitored=1
+    break
+  fi
+  sleep 1
+done
+if [ -z "$unmonitored" ]; then
+  echo "trunk-$trunk_id with qualify off reads status '$(trunk_status)', not unmonitored" >&2
+  exit 1
+fi
+echo "trunk-$trunk_id with qualify off: contact '$(contact_status)', status unmonitored" >&2
+
+# The TLS front: every TLS connection Asterisk opens to 5061 is relayed byte for byte to the UAS
+# over TCP, with the pid written where the teardown stops it.
+# shellcheck disable=SC2086
+$compose exec -T -d sip-tls node -e "
+  const fs = require('node:fs');
+  const dir = '/tmp/sip-target-tls';
+  const options = { cert: fs.readFileSync(dir + '/cert.pem'), key: fs.readFileSync(dir + '/key.pem') };
+  require('node:tls').createServer(options, client => {
+    const upstream = require('node:net').connect(5063, 'sipp');
+    const close = () => { client.destroy(); upstream.destroy(); };
+    client.pipe(upstream);
+    upstream.pipe(client);
+    for (const socket of [client, upstream]) { socket.on('error', close); socket.on('close', close); }
+  }).listen(5061, () => fs.writeFileSync(dir + '/front.pid', String(process.pid)));
+"
+
+# The call waits for the front to listen, which it says by writing its pid.
+for _ in $(seq 1 30); do
+  # shellcheck disable=SC2086
+  if $compose exec -T sip-tls test -s /tmp/sip-target-tls/front.pid; then
+    exit 0
+  fi
+  sleep 1
+done
+echo "the TLS front for trunk-$trunk_id never listened" >&2
 exit 1
