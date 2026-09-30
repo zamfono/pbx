@@ -42,6 +42,7 @@ const registrationTrunk: Trunk = {
   transport: 'udp',
   srtp: false,
   tlsVerify: true,
+  qualify: true,
   outboundProxy: 'sip:sbc.provider-a.example;lr;transport=udp',
   registerExpiryS: null,
   registerRetryS: null,
@@ -202,5 +203,43 @@ describe('renderTrunksConf TLS and SRTP', () => {
     expect(
       parsedValues(renderTrunk(withAuthEndpoint), 'media_encryption')
     ).toEqual([]);
+  });
+});
+
+// §9.4 "Provisioning and status": `qualify` switches an `ip` trunk's OPTIONS probe; a
+// `registration` trunk's status is its registration's, so it is never probed either way.
+describe('renderTrunksConf qualify', () => {
+  const ipTrunk: Trunk = {
+    ...registrationTrunk,
+    authMode: 'ip',
+    username: null,
+    password: null,
+    outboundProxy: null
+  };
+
+  test('an ip trunk is probed every 60 s with qualify on and never with it off', () => {
+    expect(
+      parsedValues(
+        renderTrunk({ ...ipTrunk, qualify: true }),
+        'qualify_frequency'
+      )
+    ).toEqual(['60']);
+    expect(
+      parsedValues(
+        renderTrunk({ ...ipTrunk, qualify: false }),
+        'qualify_frequency'
+      )
+    ).toEqual(['0']);
+  });
+
+  test('qualify is ignored on a registration trunk', () => {
+    for (const qualify of [true, false]) {
+      expect(
+        parsedValues(
+          renderTrunk({ ...registrationTrunk, qualify }),
+          'qualify_frequency'
+        )
+      ).toEqual([]);
+    }
   });
 });

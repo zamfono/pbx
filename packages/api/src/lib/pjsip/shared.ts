@@ -36,6 +36,7 @@ export type RenderInput = {
     transport: 'udp' | 'tcp' | 'tls';
     srtp: boolean;
     tlsVerify: boolean;
+    qualify: boolean;
     outboundProxy: string | null;
     registerExpiryS: number | null;
     registerRetryS: number | null;

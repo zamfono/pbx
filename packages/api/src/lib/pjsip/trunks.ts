@@ -68,8 +68,10 @@ function renderTrunkAuth(trunk: Trunk): string | null {
 /**
  * The outbound target: the highest-priority `outbound`/`both` host, when the trunk has one.
  * `ip` trunks additionally OPTIONS-probe it so their status has a `ContactStatusChange` to
- * report (§9.4 "Provisioning and status"); `registration` trunks get their status from AMI
- * `Registry` events instead (§9.4), so no qualify is needed on their static contact.
+ * report (§9.4 "Provisioning and status"), unless `qualify` is off for an endpoint that answers
+ * no OPTIONS: `qualify_frequency = 0` is Asterisk's "never qualify", and the contact then reads
+ * `NonQualified`. `registration` trunks get their status from AMI `Registry` events instead
+ * (§9.4), so no qualify is needed on their static contact and `qualify` is ignored for them.
  */
 function renderTrunkAor(trunk: Trunk): string {
   const name = trunkSectionName(trunk.id);
@@ -80,7 +82,8 @@ function renderTrunkAor(trunk: Trunk): string {
     lines.push(`contact = ${sipHostUri(firstOutboundHost)}`);
   }
   if (trunk.authMode === 'ip') {
-    lines.push(`qualify_frequency = ${TRUNK_QUALIFY_FREQUENCY_S}`);
+    const frequency = trunk.qualify ? TRUNK_QUALIFY_FREQUENCY_S : 0;
+    lines.push(`qualify_frequency = ${frequency}`);
   }
   if (trunk.outboundProxy !== null) {
     lines.push(`outbound_proxy = ${escapeConfigValue(trunk.outboundProxy)}`);

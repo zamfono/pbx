@@ -56,6 +56,7 @@ const input: RenderInput = {
       transport: 'udp',
       srtp: false,
       tlsVerify: true,
+      qualify: true,
       outboundProxy: null,
       registerExpiryS: 3600,
       registerRetryS: 30,
@@ -83,6 +84,7 @@ const input: RenderInput = {
       transport: 'tcp',
       srtp: false,
       tlsVerify: true,
+      qualify: true,
       outboundProxy: null,
       registerExpiryS: null,
       registerRetryS: null,
@@ -103,6 +105,8 @@ const input: RenderInput = {
       transport: 'tls',
       srtp: true,
       tlsVerify: false,
+      // An endpoint that answers no OPTIONS (§9.4 "Provisioning and status").
+      qualify: false,
       outboundProxy: null,
       registerExpiryS: null,
       registerRetryS: null,
@@ -259,7 +263,17 @@ describe('render', () => {
   });
 
   test('the ip trunk aor is qualified so ContactStatusChange events fire', () => {
-    expect(rendered['pjsip_trunks.conf']).toContain('qualify_frequency = 60');
+    const t2Aor = rendered['pjsip_trunks.conf']
+      .split('[trunk-t2]\ntype = aor')[1]
+      ?.split('\n\n')[0];
+    expect(t2Aor).toContain('qualify_frequency = 60');
+  });
+
+  test('an ip trunk with qualify off is never probed', () => {
+    const t3Aor = rendered['pjsip_trunks.conf']
+      .split('[trunk-t3]\ntype = aor')[1]
+      ?.split('\n\n')[0];
+    expect(t3Aor).toContain('qualify_frequency = 0');
   });
 
   test('the registration trunk aor carries no qualify_frequency', () => {

@@ -67,6 +67,9 @@ export type TrunkScalars = {
   srtp: boolean;
   /** `trunks.tls_verify`: the provider's certificate is checked; applies while `transport` is `tls`. */
   tlsVerify: boolean;
+  /** `trunks.qualify`: an `ip` trunk's contact is OPTIONS-probed for its status; ignored for
+   * `registration` (§9.4 "Provisioning and status"). */
+  qualify: boolean;
   outboundProxy: string | null;
   registerExpiryS: number | null;
   registerRetryS: number | null;
@@ -156,6 +159,7 @@ export function scalarsFromRow(row: TrunkRow): TrunkScalars {
     transport: row.transport as Transport,
     srtp: row.srtp === 1,
     tlsVerify: row.tlsVerify === 1,
+    qualify: row.qualify === 1,
     outboundProxy: row.outboundProxy,
     registerExpiryS: row.registerExpiryS,
     registerRetryS: row.registerRetryS,

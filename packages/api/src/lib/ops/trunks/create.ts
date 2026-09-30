@@ -52,6 +52,9 @@ const inputSchema = z
     srtp: z.boolean().optional(),
     // Default true: a new TLS trunk checks the provider's certificate (§9.4 "Signaling").
     tlsVerify: z.boolean().optional(),
+    // Default true: a new `ip` trunk's contact is probed for its status (§9.4 "Provisioning and
+    // status"); false for an endpoint that answers no OPTIONS.
+    qualify: z.boolean().optional(),
     outboundProxy: z.string().min(1).optional(),
     registerExpiryS: z.number().int().positive().optional(),
     registerRetryS: z.number().int().positive().optional(),
@@ -85,6 +88,18 @@ type ResolvedCreate = {
   credentialsRequired: boolean;
 };
 
+/** The trunk's 0/1 switches, each at its new-trunk default unless `input` names it (§11.2). */
+function switchColumns(
+  input: Input
+): Record<'inboundAuth' | 'srtp' | 'tlsVerify' | 'qualify', 0 | 1> {
+  return {
+    inboundAuth: input.inboundAuth === true ? 1 : 0,
+    srtp: input.srtp === true ? 1 : 0,
+    tlsVerify: input.tlsVerify === false ? 0 : 1,
+    qualify: input.qualify === false ? 0 : 1
+  };
+}
+
 /** Inserts `resolved.id`'s `trunks` row from `input` and its resolved defaults. */
 async function insertTrunkRow(
   ctx: Context,
@@ -105,10 +120,8 @@ async function insertTrunkRow(
       authMode: input.authMode,
       username: resolved.credentialsRequired ? (input.username ?? null) : null,
       passwordEnc,
-      inboundAuth: input.inboundAuth === true ? 1 : 0,
+      ...switchColumns(input),
       transport: resolved.transport,
-      srtp: input.srtp === true ? 1 : 0,
-      tlsVerify: input.tlsVerify === false ? 0 : 1,
       outboundProxy: input.outboundProxy ?? null,
       registerExpiryS:
         input.authMode === 'registration'
