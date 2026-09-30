@@ -8,9 +8,17 @@ import { OpError } from './types.js';
 const STATUS_NOT_FOUND = 404;
 
 /**
+ * A `sip` target's request-URI user part (§9.4 "SIP targets"): RFC 3261's unreserved `.`, `_`,
+ * `~`, `-` and the user-unreserved `+` beside letters and digits, a subset that needs no escaping
+ * and cannot reach into the `PJSIP/<user>@<endpoint>` dial string; `forward_targets`' CHECK holds
+ * the same.
+ */
+const SIP_USER_PATTERN = /^[A-Za-z0-9._~+-]{1,64}$/u;
+
+/**
  * The shared target vocabulary a ring group's forwarding rule or a menu's fallback/DTMF option
  * points at (§11.2 `forward_targets`). One of the union's variants maps to exactly one of the
- * table's seven exclusive columns.
+ * table's eight exclusive targets, `sip`'s being its column pair.
  */
 export const targetSpecSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('user'), userId: z.string() }),
@@ -18,6 +26,13 @@ export const targetSpecSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('external'),
     external: z.string().refine(isE164, 'external must be E.164')
+  }),
+  z.object({
+    kind: z.literal('sip'),
+    trunkId: z.string(),
+    user: z
+      .string()
+      .regex(SIP_USER_PATTERN, 'user must be 1-64 of A-Z a-z 0-9 . _ ~ + -')
   }),
   z.object({ kind: z.literal('mailboxUser'), userId: z.string() }),
   z.object({ kind: z.literal('mailboxRingGroup'), ringGroupId: z.string() }),
@@ -37,6 +52,9 @@ function forwardTargetColumns(spec: TargetSpec): Record<string, string> {
   if (spec.kind === 'external') {
     return { external: spec.external };
   }
+  if (spec.kind === 'sip') {
+    return { sipTrunkId: spec.trunkId, sipUser: spec.user };
+  }
   if (spec.kind === 'mailboxUser') {
     return { mailboxUserId: spec.userId };
   }
@@ -53,6 +71,8 @@ type ForwardTargetColumns = {
   userId: string | null;
   ringGroupId: string | null;
   external: string | null;
+  sipTrunkId: string | null;
+  sipUser: string | null;
   mailboxUserId: string | null;
   mailboxRingGroupId: string | null;
   announcementAudioId: string | null;
@@ -69,6 +89,10 @@ export function rowToTarget(row: ForwardTargetColumns): TargetSpec {
   }
   if (row.external !== null) {
     return { kind: 'external', external: row.external };
+  }
+  // The table's CHECK sets `sip_user` exactly when `sip_trunk_id` is set.
+  if (row.sipTrunkId !== null && row.sipUser !== null) {
+    return { kind: 'sip', trunkId: row.sipTrunkId, user: row.sipUser };
   }
   if (row.mailboxUserId !== null) {
     return { kind: 'mailboxUser', userId: row.mailboxUserId };
@@ -88,7 +112,7 @@ export function rowToTarget(row: ForwardTargetColumns): TargetSpec {
 /** Throws 404 when `id` names no live row of `table` (a `forward_targets` column's `RESTRICT` FK). */
 async function assertLiveRow(
   db: Transaction<DB>,
-  table: 'users' | 'ringGroups' | 'menus' | 'audioAssets',
+  table: 'users' | 'ringGroups' | 'menus' | 'audioAssets' | 'trunks',
   id: string,
   label: string
 ): Promise<void> {
@@ -125,6 +149,10 @@ async function assertTargetAvailable(
   }
   if (spec.kind === 'menu') {
     await assertLiveRow(db, 'menus', spec.menuId, 'menu');
+    return;
+  }
+  if (spec.kind === 'sip') {
+    await assertLiveRow(db, 'trunks', spec.trunkId, 'trunk');
   }
 }
 
@@ -142,6 +170,8 @@ export async function insertForwardTarget(
       userId: null,
       ringGroupId: null,
       external: null,
+      sipTrunkId: null,
+      sipUser: null,
       mailboxUserId: null,
       mailboxRingGroupId: null,
       announcementAudioId: null,

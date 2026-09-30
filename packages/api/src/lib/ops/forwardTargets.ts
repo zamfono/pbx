@@ -4,7 +4,9 @@ import {
   targetSpecSchema,
   type TargetSpec
 } from './forwardTargetSpec.js';
-import type { Context } from './types.js';
+import { OpError, type Context } from './types.js';
+
+const STATUS_FORBIDDEN = 403;
 
 // `TargetSpec` (§11.2 `forward_targets`) is the wire union every area that owns a forwarding
 // rule, fallback or menu option accepts and returns; `targetSpecSchema` already validates it,
@@ -13,13 +15,28 @@ export { targetSpecSchema as targetInputSchema };
 export type TargetInput = TargetSpec;
 
 /**
+ * §10.3 "Forward targets": a `sip` target is set or kept by an `admin` or `owner` alone, since it
+ * sends calls to whatever host its trunk names (§9.4 "SIP targets"). The one check for every
+ * operation a `user` may call, their own forwarding, OOO rules and opening hours: each writes its
+ * targets through `createTarget`, and `ooo.update` calls this for the target it keeps. The
+ * admin-only operations need it only through `createTarget`, where it always passes.
+ */
+export function assertMayHoldTarget(ctx: Context, target: TargetInput): void {
+  if (target.kind === 'sip' && ctx.actor.role === 'user') {
+    throw new OpError(STATUS_FORBIDDEN, 'a sip target is set by an admin');
+  }
+}
+
+/**
  * Inserts a `forward_targets` row for `input`, owned by the caller's rule, and returns its id;
- * 404s when `input` points at a row that is not live (§5.9).
+ * 403s for a `sip` target a `user` may not set, 404s when `input` points at a row that is not
+ * live (§5.9).
  */
 export async function createTarget(
   ctx: Context,
   input: TargetInput
 ): Promise<string> {
+  assertMayHoldTarget(ctx, input);
   return insertForwardTarget(ctx.db, input);
 }
 

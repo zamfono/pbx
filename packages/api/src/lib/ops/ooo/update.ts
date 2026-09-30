@@ -6,6 +6,7 @@ import {
   targetInputSchema,
   type TargetInput
 } from '../dids/_shared.js';
+import { assertMayHoldTarget } from '../forwardTargets.js';
 import { orBefore } from '../patch.js';
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError, type Context } from '../types.js';
@@ -117,6 +118,10 @@ export const update = defineOperation<Input, Output>({
       await assertNoOverlap(ctx, scope, input.id, startsAt, expiresAt);
     }
     const beforeTarget = await resolveTarget(ctx.db, before.targetId);
+    if (input.target === undefined) {
+      // A rule kept as it is keeps its target, which a `user` may not do for a `sip` one.
+      assertMayHoldTarget(ctx, beforeTarget);
+    }
     const targetId =
       input.target === undefined
         ? before.targetId

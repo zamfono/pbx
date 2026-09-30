@@ -15,6 +15,7 @@ import {
   purgeOrphanForwardTargets,
   purgeOwnRuleRows
 } from './purgeForwardTargets.js';
+import { purgeDidBlocks, purgeTrunks } from './purgeGuarded.js';
 import { purgeExpiredTokens, purgeOauthClients } from './purgeOauthTokens.js';
 
 /** Every table with both an `id` and a `deleted_at` column, the shape the purge sweeps by age. */
@@ -122,32 +123,6 @@ async function purgeAuditLog(
     .execute();
 }
 
-/**
- * §5.9: a due `did_blocks` row is hard-deleted once no live DID's number lies within it — the
- * number begins with the block's base and, for a digits block, has the block's digit count.
- * Membership is derived from the number, so the condition is the one `did_blocks_purge_guard`
- * enforces; a block still holding a live DID stays soft-deleted and is reconsidered daily until
- * the admin retargets or removes those DIDs.
- */
-async function purgeDidBlocks(
-  trx: Transaction<DB>,
-  cutoff: string
-): Promise<void> {
-  await trx
-    .deleteFrom('didBlocks')
-    .where('deletedAt', 'is not', null)
-    .where('deletedAt', '<', cutoff)
-    .where(
-      sql<boolean>`not exists (
-        select 1 from dids
-        where dids.deleted_at is null
-          and dids.number glob did_blocks.base || '*'
-          and (did_blocks.digits is null
-            or length(dids.number) = length(did_blocks.base) + did_blocks.digits))`
-    )
-    .execute();
-}
-
 /** §11.6 "Retention": `backup_runs` rows beyond `recording_retention_days`. */
 async function purgeBackupRuns(
   trx: Transaction<DB>,
@@ -159,9 +134,9 @@ async function purgeBackupRuns(
 /**
  * Runs the full daily purge in one transaction (§5.9 last paragraph): an about-to-be-purged
  * entity's own forward-rule rows and stale schedules first, then orphaned `forward_targets`,
- * then the config entities and their files, then the remaining entities in FK order (outbound
- * routes before the trunks they reference), a second orphan sweep for targets the entity purge
- * just freed, and finally the security and history retention windows.
+ * then the config entities and their files, then the remaining entities in FK order, a second
+ * orphan sweep for targets the entity purge just freed, the trunks no route or target references
+ * any more, and finally the security and history retention windows.
  *
  * A due DID, block or menu is only hard-deleted later in this same pass (`dueIds` only computes
  * users/ring groups/menus up front; dids/blocks purge further down), so at the first orphan sweep
@@ -205,12 +180,13 @@ export async function runPurge(db: Db, now: string): Promise<void> {
     const audioFilenames = await purgeAudioAssets(trx, softDeleteCutoff);
 
     await purgeSoftDeleted(trx, 'outboundRoutes', softDeleteCutoff);
-    await purgeSoftDeleted(trx, 'trunks', softDeleteCutoff);
     await purgeSoftDeleted(trx, 'dids', softDeleteCutoff);
     await purgeDidBlocks(trx, softDeleteCutoff);
     await purgeSoftDeleted(trx, 'backupTargets', softDeleteCutoff);
 
     await purgeOrphanForwardTargets(trx);
+    // After the sweep, so a `sip` target the purges above just orphaned no longer holds it.
+    await purgeTrunks(trx, softDeleteCutoff);
 
     await purgeExpiredTokens(trx, now);
     await purgeOauthClients(trx, now);
