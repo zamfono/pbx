@@ -11,6 +11,8 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.0.7] - 2026-09-30
+
 ### Fixed
 
 - Changing the emergency numbers, or any setting the Ringotel apps' profile carries (codecs,
@@ -298,7 +300,8 @@ why the specified behaviour changed; the commit history, how.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.0.6...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.0.7...HEAD
+[0.0.7]: https://github.com/zamfono/pbx/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/zamfono/pbx/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/zamfono/pbx/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/zamfono/pbx/compare/v0.0.3...v0.0.4
