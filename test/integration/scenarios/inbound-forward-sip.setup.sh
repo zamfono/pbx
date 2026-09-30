@@ -7,7 +7,8 @@
 # SRTP), tracing what it received for the check. The trunk also stands for an endpoint that
 # answers no OPTIONS (§9.4 "Provisioning and status"): created with `qualify` on before the front
 # listens, it turns `unreachable`, and with `qualify` switched off `unmonitored`, which the call
-# then reaches. Leaves the ids the teardown removes in the scenario's state.
+# then reaches. Its `diversion` is `all`, so the call's INVITE carries every forward hop (§9.4
+# "Forwarded calls"). Leaves the ids the teardown removes in the scenario's state.
 set -euo pipefail
 
 api_base=$1
@@ -46,6 +47,7 @@ trunk_id=$(api POST /trunks '{
   "transport": "tls",
   "tlsVerify": false,
   "srtp": false,
+  "diversion": "all",
   "hosts": [{ "host": "sip-tls", "port": 5061, "direction": "outbound" }]
 }' | jsonfield trunk.id)
 

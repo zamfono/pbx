@@ -4,9 +4,10 @@
 # there. Its INVITE carries the target's headers as rendered (§9.4 "Header templates"): the
 # original caller in `X-Zamfono-Caller`, the dialled DID in `X-Zamfono-Did`, 177, the user the call
 # was for, in `X-Called`, and the last hop's reason in `X-Forward` beside a `${EXTEN}` sent as
-# written; and one `Diversion`, the last hop's: 178's unconditional forward (Asterisk sends the
-# redirecting party alone; 177's out-of-office hop is the leg's `REDIRECTING` original party, which
-# chan_pjsip does not send). The history names 177 as the callee it was placed to. The trunk is
+# written; and, the trunk's `diversion` being `all`, one `Diversion` field with both hops, newest
+# first, each by the party's own number and never its extension: 178's unconditional forward by
+# the main number, 178 having none of its own, then 177's out-of-office by 177's own number, the
+# DID the call dialled. The history names 177 as the callee it was placed to. The trunk is
 # `unmonitored` by then (`qualify` off, §9.4 "Provisioning and status"), so one answered attempt
 # also shows the core tried a trunk nothing probes.
 set -euo pipefail
@@ -21,7 +22,7 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck disable=SC2016 -- the `${EXTEN}` is the literal text under test
 await_trace sipp /tmp/sip-target-messages.log 1 \
   | python3 "$here/_forward-context-check.py" 'sip:proj_ci123@sip-tls:5061' \
-    '^"CI Agent" <sip:178@[^>]+>;reason=unconditional$' \
+    '^"CI Agent" <sip:\+15551000@[^>]+>;reason=unconditional, "CI Away" <sip:\+15551077@[^>]+>;reason=away$' \
     'X-Zamfono-Caller=+15559999' 'X-Zamfono-Did=+15551077' 'X-Called=177' \
     'X-Forward=unconditional ${EXTEN}'
 

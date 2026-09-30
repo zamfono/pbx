@@ -2,9 +2,9 @@
 # §8 "forwarding chains", §10.1 step 5: the ring group's only member forwards unconditionally to
 # an external number (inbound-forward-external.setup.sh), so the call still reaches the group but
 # is answered over the trunk rather than by any user — the call history still carries the group
-# that routed it, but no answering user (§10.2 "Call history"). The leg carries the forwarding
-# context (§9.4 "Forwarded calls"): a `Diversion` naming the member, extension 101, forwarding
-# unconditionally, and no custom header, which an external forward's carrier has no use for.
+# that routed it, but no answering user (§10.2 "Call history"). The leg carries no custom header,
+# which an external forward's carrier has no use for, and no `Diversion` (§9.4 "Forwarded calls"):
+# the trunk's `diversion` is `off`, the default, and chan_pjsip sends none of its own.
 set -euo pipefail
 
 api_base=$1
@@ -15,8 +15,7 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 . "$here/_lib.sh"
 
 await_trace sipp /tmp/trunk-messages.log 1 \
-  | python3 "$here/_forward-context-check.py" "sip:+15557777@$(container_ip sipp)" \
-    '^"CI Phone" <sip:101@[^>]+>;reason=unconditional$'
+  | python3 "$here/_forward-context-check.py" "sip:+15557777@$(container_ip sipp)" -
 
 group_id=$(ci_group)
 newest_call | python3 -c '
