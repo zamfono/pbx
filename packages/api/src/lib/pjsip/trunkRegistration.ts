@@ -4,7 +4,12 @@
  */
 import { registrationUris, trunkSectionName } from '@zamfono/shared';
 
-import { escapeConfigValue, hostsByDirection, type Trunk } from './shared.js';
+import {
+  escapeConfigValue,
+  hostsByDirection,
+  trunkTransport,
+  type Trunk
+} from './shared.js';
 
 // Asterisk's own `retry_interval` default, which a trunk without `register_retry_s` keeps.
 const DEFAULT_RETRY_S = 60;
@@ -52,7 +57,7 @@ export function renderTrunkRegistration(trunk: Trunk): string | null {
   const lines = [
     `[${name}]`,
     'type = registration',
-    `transport = transport-${trunk.transport}`,
+    `transport = ${trunkTransport(trunk)}`,
     `outbound_auth = ${name}`,
     `client_uri = ${escapeConfigValue(clientUri)}`,
     `server_uri = ${serverUri}`,

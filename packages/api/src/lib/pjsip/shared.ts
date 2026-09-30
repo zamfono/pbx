@@ -34,6 +34,8 @@ export type RenderInput = {
     password: string | null;
     inboundAuth: boolean;
     transport: 'udp' | 'tcp' | 'tls';
+    srtp: boolean;
+    tlsVerify: boolean;
     outboundProxy: string | null;
     registerExpiryS: number | null;
     registerRetryS: number | null;
@@ -118,6 +120,19 @@ export function compareStrings(left: string, right: string): number {
 
 export function formatAllow(codecs: string[]): string {
   return `allow = !all,${codecs.join(',')}`;
+}
+
+/**
+ * The PJSIP transport a trunk's endpoint and registration name (§9.1, §9.4 "Signaling"). PJSIP
+ * checks a server certificate per transport, not per endpoint, so a `tls` trunk that does not
+ * check its provider's certificate uses `transport-tls-noverify`, the second TLS transport, and
+ * every other `tls` trunk the checking `transport-tls` the devices connect to.
+ */
+export function trunkTransport(trunk: Trunk): string {
+  if (trunk.transport === 'tls' && !trunk.tlsVerify) {
+    return 'transport-tls-noverify';
+  }
+  return `transport-${trunk.transport}`;
 }
 
 export function hostsByDirection(

@@ -24,6 +24,20 @@ export function assertTransportEnabled(transport: Transport): void {
   }
 }
 
+/**
+ * Throws 422 for `srtp` on a trunk whose transport is not `tls`, mirroring the `trunks` CHECK
+ * constraint of §11.2: SDES carries the media keys in the SDP, which only TLS keeps private
+ * (§9.4 "Signaling").
+ */
+export function assertSrtpNeedsTls(srtp: boolean, transport: Transport): void {
+  if (srtp && transport !== 'tls') {
+    throw new OpError(
+      STATUS_UNPROCESSABLE_ENTITY,
+      "srtp requires transport 'tls'"
+    );
+  }
+}
+
 /** Throws 422 for `clir = true` on a trunk whose header layout carries no PAI (§9.4 "Anonymous calls"). */
 export function assertClirAllowed(
   clir: boolean | null,

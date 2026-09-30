@@ -21,6 +21,14 @@ why the specified behaviour changed; the commit history, how.
   phones, trunks and audio use, as `stack.domain` and `stack.ipv4`: the `FQDN` and the
   `EXTERNAL_IPV4` or `STACK_IPV4` of `.env`, whichever the stack's network mode sets. Nothing in
   `.env` changes; an update brings the new `compose.yaml` that hands the address to `api`.
+- Two trunk settings for providers reached over TLS (`trunks.create`, `trunks.update`,
+  `POST /trunks`, `PATCH /trunks/{id}`): `tlsVerify` checks the provider's certificate against
+  the public certificate authorities and its name against the host dialled, and a connection
+  that fails the check is closed; `srtp` encrypts the trunk's media (SDES-SRTP), which some
+  providers require. Both apply to a trunk whose `transport` is `tls`; `srtp` is refused on any
+  other. A new trunk has `tlsVerify` on and `srtp` off. Existing TLS trunks keep working
+  unchanged: they get `tlsVerify` off, as nothing checked their certificate before, and can be
+  switched on once the provider presents a publicly trusted one.
 
 ### Changed
 

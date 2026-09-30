@@ -39,6 +39,7 @@ import {
   assertInboundAuthUsernameFree,
   assertNameAvailable,
   assertPaiHasIdentity,
+  assertSrtpNeedsTls,
   assertTransportEnabled,
   emergencyTrunkWarnings,
   hostWarnings
@@ -58,6 +59,8 @@ const inputSchema = z
     password: z.string().min(1).optional(),
     inboundAuth: z.boolean().optional(),
     transport: z.enum(TRANSPORTS).optional(),
+    srtp: z.boolean().optional(),
+    tlsVerify: z.boolean().optional(),
     outboundProxy: z.string().min(1).nullable().optional(),
     registerExpiryS: z.number().int().positive().nullable().optional(),
     registerRetryS: z.number().int().positive().nullable().optional(),
@@ -97,6 +100,7 @@ async function assertUpdateAllowed(
   const credentialsRequired =
     merged.authMode === 'registration' || merged.inboundAuth;
   assertTransportEnabled(merged.transport);
+  assertSrtpNeedsTls(merged.srtp, merged.transport);
   assertClirAllowed(merged.clir, merged.callerIdHeader);
   assertCredentialsConsistency(
     credentialsRequired,
@@ -134,6 +138,8 @@ function trunkColumns(
     passwordEnc: merged.passwordEnc,
     inboundAuth: merged.inboundAuth ? 1 : 0,
     transport: merged.transport,
+    srtp: merged.srtp ? 1 : 0,
+    tlsVerify: merged.tlsVerify ? 1 : 0,
     outboundProxy: merged.outboundProxy,
     registerExpiryS: merged.registerExpiryS,
     registerRetryS: merged.registerRetryS,

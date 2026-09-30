@@ -135,6 +135,8 @@ async function loadTrunks(db: Db, kr: Keyring): Promise<RenderInput['trunks']> {
         : decrypt(kr, row.passwordEnc).toString('utf8'),
     inboundAuth: row.inboundAuth === 1,
     transport: row.transport as 'tcp' | 'tls' | 'udp',
+    srtp: row.srtp === 1,
+    tlsVerify: row.tlsVerify === 1,
     outboundProxy: row.outboundProxy,
     registerExpiryS: row.registerExpiryS,
     registerRetryS: row.registerRetryS,

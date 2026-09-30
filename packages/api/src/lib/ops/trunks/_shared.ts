@@ -63,6 +63,10 @@ export type TrunkScalars = {
   username: string | null;
   inboundAuth: boolean;
   transport: Transport;
+  /** `trunks.srtp`: SDES-SRTP media, `tls` trunks only (§9.4 "Signaling"). */
+  srtp: boolean;
+  /** `trunks.tls_verify`: the provider's certificate is checked; applies while `transport` is `tls`. */
+  tlsVerify: boolean;
   outboundProxy: string | null;
   registerExpiryS: number | null;
   registerRetryS: number | null;
@@ -150,6 +154,8 @@ export function scalarsFromRow(row: TrunkRow): TrunkScalars {
     username: row.username,
     inboundAuth: row.inboundAuth === 1,
     transport: row.transport as Transport,
+    srtp: row.srtp === 1,
+    tlsVerify: row.tlsVerify === 1,
     outboundProxy: row.outboundProxy,
     registerExpiryS: row.registerExpiryS,
     registerRetryS: row.registerRetryS,

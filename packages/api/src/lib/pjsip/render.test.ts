@@ -11,7 +11,8 @@ function fixture(name: string): string {
 
 // One manual `plain` device and one `ringotel` device on the same user, one `registration`
 // trunk (`line=yes`, `support_outbound=yes`) and one `ip` trunk with a `both` and an
-// `inbound` CIDR host plus `inbound_auth` (§9.3, §9.4).
+// `inbound` CIDR host plus `inbound_auth`, and one `ip` trunk over TLS with SRTP that does not
+// check its provider's certificate (§9.3, §9.4).
 const input: RenderInput = {
   settings: {
     codecs: ['opus', 'g722', 'alaw'],
@@ -53,6 +54,8 @@ const input: RenderInput = {
       password: 'trunkpass1234567890',
       inboundAuth: false,
       transport: 'udp',
+      srtp: false,
+      tlsVerify: true,
       outboundProxy: null,
       registerExpiryS: 3600,
       registerRetryS: 30,
@@ -78,6 +81,8 @@ const input: RenderInput = {
       password: 'ippass1234567890',
       inboundAuth: true,
       transport: 'tcp',
+      srtp: false,
+      tlsVerify: true,
       outboundProxy: null,
       registerExpiryS: null,
       registerRetryS: null,
@@ -86,6 +91,30 @@ const input: RenderInput = {
       hosts: [
         { priority: 1, host: '203.0.113.10', port: null, direction: 'both' },
         { priority: 2, host: '10.0.0.0/8', port: null, direction: 'inbound' }
+      ]
+    },
+    {
+      id: 't3',
+      name: 'Trunk C',
+      authMode: 'ip',
+      username: null,
+      password: null,
+      inboundAuth: false,
+      transport: 'tls',
+      srtp: true,
+      tlsVerify: false,
+      outboundProxy: null,
+      registerExpiryS: null,
+      registerRetryS: null,
+      callerIdHeader: 'from',
+      codecs: null,
+      hosts: [
+        {
+          priority: 1,
+          host: 'sip.provider-c.example',
+          port: 5061,
+          direction: 'both'
+        }
       ]
     }
   ],
@@ -171,7 +200,7 @@ describe('render', () => {
     const sections = rendered['pjsip_trunks.conf']
       .split('\n\n')
       .filter(block => /^\[trunk-[^\]]+\]\ntype = endpoint\n/u.test(block));
-    expect(sections).toHaveLength(2);
+    expect(sections).toHaveLength(3);
     for (const section of sections) {
       expect(section.split('\n')).toContain('identify_by = ip');
     }

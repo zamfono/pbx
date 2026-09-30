@@ -27,6 +27,7 @@ import {
   assertInboundAuthUsernameFree,
   assertNameAvailable,
   assertPaiHasIdentity,
+  assertSrtpNeedsTls,
   assertTransportEnabled,
   emergencyTrunkWarnings,
   hostWarnings
@@ -48,6 +49,9 @@ const inputSchema = z
     password: z.string().min(1).optional(),
     inboundAuth: z.boolean().optional(),
     transport: z.enum(TRANSPORTS).optional(),
+    srtp: z.boolean().optional(),
+    // Default true: a new TLS trunk checks the provider's certificate (§9.4 "Signaling").
+    tlsVerify: z.boolean().optional(),
     outboundProxy: z.string().min(1).optional(),
     registerExpiryS: z.number().int().positive().optional(),
     registerRetryS: z.number().int().positive().optional(),
@@ -103,6 +107,8 @@ async function insertTrunkRow(
       passwordEnc,
       inboundAuth: input.inboundAuth === true ? 1 : 0,
       transport: resolved.transport,
+      srtp: input.srtp === true ? 1 : 0,
+      tlsVerify: input.tlsVerify === false ? 0 : 1,
       outboundProxy: input.outboundProxy ?? null,
       registerExpiryS:
         input.authMode === 'registration'
@@ -182,6 +188,7 @@ export const create = defineOperation<Input, Output>({
     const required =
       input.authMode === 'registration' || input.inboundAuth === true;
     assertTransportEnabled(transport);
+    assertSrtpNeedsTls(input.srtp === true, transport);
     assertClirAllowed(input.clir ?? null, callerIdHeader);
     assertCredentialsConsistency(
       required,

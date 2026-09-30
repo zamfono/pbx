@@ -7,6 +7,7 @@ import {
   formatAllow,
   hostsByDirection,
   joinSections,
+  trunkTransport,
   type RenderInput,
   type Trunk,
   type TrunkHost
@@ -141,6 +142,13 @@ function callerIdLines(trunk: Trunk): string[] {
 // where the number is withheld. Both endpoints of a trunk leave it off.
 const TRUNK_CONNECTED_LINE = 'send_connected_line = no';
 
+// SDES-SRTP media for an `srtp` trunk, as on a `tls` device (§9.3 "Transport policy"): the keys
+// travel in the SDP, which only TLS keeps private, hence `tls` trunks alone carry it (§9.4
+// "Signaling"). Both endpoints of the trunk carry it, since either may answer the provider.
+function mediaEncryptionLines(trunk: Trunk): string[] {
+  return trunk.srtp ? ['media_encryption = sdes'] : [];
+}
+
 // `outbound_auth` answers a digest challenge whenever the trunk has its own auth section; `auth`
 // is added for `inboundAuth`, so a call its host list identifies is challenged too (§9.4
 // "Inbound identification"). `identify_by = ip` leaves the endpoint only the mechanisms §5.6
@@ -157,9 +165,10 @@ function renderTrunkEndpoint(trunk: Trunk, tenantCodecs: string[]): string {
     'context = from-trunk',
     formatAllow(codecs),
     `aors = ${name}`,
-    `transport = transport-${trunk.transport}`,
+    `transport = ${trunkTransport(trunk)}`,
     'direct_media = no',
-    TRUNK_CONNECTED_LINE
+    TRUNK_CONNECTED_LINE,
+    ...mediaEncryptionLines(trunk)
   ];
   if (trunk.outboundProxy !== null) {
     lines.push(`outbound_proxy = ${escapeConfigValue(trunk.outboundProxy)}`);
@@ -197,9 +206,10 @@ function renderTrunkAuthEndpoint(
     'type = endpoint',
     'context = from-trunk',
     formatAllow(trunk.codecs ?? tenantCodecs),
-    `transport = transport-${trunk.transport}`,
+    `transport = ${trunkTransport(trunk)}`,
     'direct_media = no',
     TRUNK_CONNECTED_LINE,
+    ...mediaEncryptionLines(trunk),
     `auth = ${trunkSectionName(trunk.id)}`,
     'identify_by = auth_username'
   ].join('\n');

@@ -63,6 +63,8 @@ export function mergeScalars(row: TrunkRow, input: MergeInput): Merged {
     inboundAuth,
     passwordEnc: required ? mergedPasswordEnc(row, input) : null,
     transport: input.transport ?? (row.transport as Transport),
+    srtp: input.srtp ?? row.srtp === 1,
+    tlsVerify: input.tlsVerify ?? row.tlsVerify === 1,
     outboundProxy: orRow(input.outboundProxy, row.outboundProxy),
     registerExpiryS:
       authMode === 'registration'

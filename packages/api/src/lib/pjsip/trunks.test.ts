@@ -40,6 +40,8 @@ const registrationTrunk: Trunk = {
   password: 'ab;cd\\;ef',
   inboundAuth: false,
   transport: 'udp',
+  srtp: false,
+  tlsVerify: true,
   outboundProxy: 'sip:sbc.provider-a.example;lr;transport=udp',
   registerExpiryS: null,
   registerRetryS: null,
@@ -156,5 +158,49 @@ describe('renderTrunksConf connected line', () => {
         expect(parsedValues(endpoint, 'send_connected_line')).toEqual(['no']);
       }
     }
+  });
+});
+
+describe('renderTrunksConf TLS and SRTP', () => {
+  const tlsTrunk: Trunk = {
+    ...registrationTrunk,
+    username: 'trunkuser',
+    password: 'pass',
+    outboundProxy: null,
+    transport: 'tls'
+  };
+
+  // §9.1, §9.4 "Signaling": PJSIP checks a server certificate per transport, so the trunk's
+  // `tls_verify` picks the TLS transport its endpoint and registration name.
+  test('a tls trunk that checks its certificate uses transport-tls, one that does not transport-tls-noverify', () => {
+    expect(
+      parsedValues(renderTrunk({ ...tlsTrunk, tlsVerify: true }), 'transport')
+    ).toEqual(['transport-tls', 'transport-tls']);
+    expect(
+      parsedValues(renderTrunk({ ...tlsTrunk, tlsVerify: false }), 'transport')
+    ).toEqual(['transport-tls-noverify', 'transport-tls-noverify']);
+  });
+
+  test('tls_verify is ignored on a trunk that does not use tls', () => {
+    const conf = renderTrunk({ ...registrationTrunk, tlsVerify: false });
+    expect(parsedValues(conf, 'transport')).toEqual([
+      'transport-udp',
+      'transport-udp'
+    ]);
+  });
+
+  test('an srtp trunk encrypts its media on both of its endpoints; without srtp neither does', () => {
+    const withAuthEndpoint: Trunk = { ...tlsTrunk, inboundAuth: true };
+    const conf = renderTrunk({ ...withAuthEndpoint, srtp: true });
+    const endpoints = conf
+      .split('\n\n')
+      .filter(block => block.split('\n').includes('type = endpoint'));
+    expect(endpoints).toHaveLength(2);
+    for (const endpoint of endpoints) {
+      expect(parsedValues(endpoint, 'media_encryption')).toEqual(['sdes']);
+    }
+    expect(
+      parsedValues(renderTrunk(withAuthEndpoint), 'media_encryption')
+    ).toEqual([]);
   });
 });
