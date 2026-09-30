@@ -74,26 +74,71 @@ describe('announceAsteriskStartOnConnect (§10.4 "After a restart")', () => {
     expect(envelopes).toEqual([]);
   });
 
-  it('logs an unreadable start time as a warning and announces nothing', async () => {
-    const log = spyLogger();
-    const failure = new Error('ARI: unreadable startup_time "soon"');
-    // A client whose Asterisk does not say: only the event and `asterisk.startupTime` matter.
-    const stub = Object.assign(new EventEmitter(), {
-      asterisk: { startupTime: vi.fn().mockRejectedValue(failure) }
-    });
-    const bus = new EventBus();
-    const frames: CoreStreamFrame[] = [];
-    bus.subscribeStream(frame => {
-      frames.push(frame);
-    });
-    announceAsteriskStartOnConnect(stub as unknown as AriClient, bus, log);
-    stub.emit('connected');
-    await vi.waitFor(() => {
+  it('reads an unreadable start time again until it is read, and announces it then', async () => {
+    vi.useFakeTimers();
+    try {
+      const log = spyLogger();
+      const failure = new Error('ARI: unreadable startup_time "soon"');
+      // A client whose Asterisk does not say at first: only the events and
+      // `asterisk.startupTime` matter.
+      const stub = Object.assign(new EventEmitter(), {
+        asterisk: {
+          startupTime: vi
+            .fn()
+            .mockRejectedValueOnce(failure)
+            .mockRejectedValueOnce(failure)
+            .mockResolvedValue(STARTED)
+        }
+      });
+      const bus = new EventBus();
+      const frames: CoreStreamFrame[] = [];
+      bus.subscribeStream(frame => {
+        frames.push(frame);
+      });
+      announceAsteriskStartOnConnect(stub as unknown as AriClient, bus, log);
+      stub.emit('connected');
+      await vi.advanceTimersByTimeAsync(0);
       expect(log.warn).toHaveBeenCalledWith(
         { error: failure },
         expect.stringContaining('asterisk start time unavailable')
       );
-    });
-    expect(frames).toEqual([]);
+      expect(frames).toEqual([]);
+
+      // The ARI clients' backoff: a second, then two.
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(frames).toEqual([]);
+      await vi.advanceTimersByTimeAsync(2000);
+
+      expect(stub.asterisk.startupTime).toHaveBeenCalledTimes(3);
+      expect(frames).toEqual([
+        { type: 'asterisk.started', asteriskStartedAt: STARTED }
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops reading once the connection whose start it reads has dropped', async () => {
+    vi.useFakeTimers();
+    try {
+      const stub = Object.assign(new EventEmitter(), {
+        asterisk: {
+          startupTime: vi.fn().mockRejectedValue(new Error('ARI: 503'))
+        }
+      });
+      announceAsteriskStartOnConnect(
+        stub as unknown as AriClient,
+        new EventBus(),
+        spyLogger()
+      );
+      stub.emit('connected');
+      await vi.advanceTimersByTimeAsync(0);
+      stub.emit('disconnected');
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      expect(stub.asterisk.startupTime).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
