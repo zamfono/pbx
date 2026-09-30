@@ -7,9 +7,9 @@ import { bridgeAnswered, claimAnswer } from './answer.js';
 // Task 31's own import: the join-bridge registry `winBatch` below also reads.
 import { takeJoinBridge } from './bridgeJoin.js';
 import type { Call, Leg } from './call.js';
+import { hangupAllRinging, type GroupLeg } from './groupLegs.js';
 // --- end Task 31 ---
 import type { Pipeline } from './pipeline.js';
-import { hangupAllRinging, type GroupLeg } from './ringGroupOriginate.js';
 
 /**
  * The first accepted answer in a batch: bridges it with the caller, ends every other leg, and

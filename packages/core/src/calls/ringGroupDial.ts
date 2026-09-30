@@ -10,15 +10,15 @@ import type { MemberLeg } from '../routing/ringGroup.js';
 import type { Call } from './call.js';
 import { callRinging } from './callState.js';
 import { externalAttemptDialsOn } from './externalLeg.js';
-// --- Task 31 ---
-import { registerActiveBatch, unregisterActiveBatch } from './groupPickup.js';
-import type { Pipeline } from './pipeline.js';
 import {
   hangupAllRinging,
   hangupMemberSiblings,
-  originateBatch,
   type GroupLeg
-} from './ringGroupOriginate.js';
+} from './groupLegs.js';
+// --- Task 31 ---
+import { registerActiveBatch, unregisterActiveBatch } from './groupPickup.js';
+import type { Pipeline } from './pipeline.js';
+import { originateBatch } from './ringGroupOriginate.js';
 import { winBatch } from './ringGroupWin.js';
 
 export { activeBatchHasRingingLeg, stopGroupRinging } from './groupPickup.js';
@@ -125,9 +125,10 @@ function createBatchRace(
   const tracked = new Map<string, GroupLeg>();
   const { promise, resolve } = Promise.withResolvers<BatchOutcome>();
   let settled = false;
-  // Legs are originated one at a time; a leg ending mid-origination must not settle the batch as
-  // unanswered while its siblings haven't been dialed yet, and a win in flight (still awaiting its
-  // own bridge/answer steps) must not be pre-empted by a sibling's own end landing in that window.
+  // Legs are originated at once, each at its own pace; a leg ending mid-origination must not
+  // settle the batch as unanswered while its siblings haven't been dialed yet, and a win in
+  // flight (still awaiting its own bridge/answer steps) must not be pre-empted by a sibling's own
+  // end landing in that window.
   let originatingDone = false;
   let winInProgress = false;
   const settle = (outcome: BatchOutcome): void => {

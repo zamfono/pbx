@@ -385,7 +385,54 @@ describe('user step against registration', () => {
 
     await runUserStep(pipeline, call, await pipeline.deps.cache.get(), userId);
 
-    expect(joined).toEqual([...call.legs.keys()]);
+    expect(joined.toSorted()).toEqual([...call.legs.keys()].toSorted());
     expect(joined).toHaveLength(2);
+  });
+
+  // §9.3 "One endpoint per device": the core dials a user's devices in parallel, so no device
+  // waits for another's create, `StasisStart` and SIP join before it rings.
+  it('places every device at once, none waiting for another to be dialled', async () => {
+    const userId = await seedUser(db, ['e101-da', 'e101-db']);
+    // Level `sip`, where each leg's dial waits for its dialog's join.
+    await db
+      .updateTable('users')
+      .set({ logLevel: 'sip', logLevelExpiresAt: '2999-01-01T00:00:00.000Z' })
+      .where('id', '=', userId)
+      .execute();
+    await register('e101-da');
+    await register('e101-db');
+    const bothJoining = Promise.withResolvers<undefined>();
+    let joining = 0;
+    pipeline.deps.cdr.joinLeg = async () => {
+      joining += 1;
+      if (joining === 2) {
+        bothJoining.resolve(undefined);
+      }
+      // Held until the other device's join has begun as well: placed one after the other, the
+      // first would never be dialled.
+      await bothJoining.promise;
+    };
+
+    await runUserStep(pipeline, call, await pipeline.deps.cache.get(), userId);
+
+    expect(joining).toBe(2);
+    expect(
+      fakeAri.calls.filter(entry => entry.path.endsWith('/dial'))
+    ).toHaveLength(2);
+  });
+
+  // §10.1 step 4: `users.ring_timeout_s` governs how long the devices ring, however long it is;
+  // Asterisk's own dial timeout would cut every ring at 30 s.
+  it("dials every device leg with no timeout of Asterisk's", async () => {
+    const userId = await seedUser(db, ['e101-da', 'e101-db']);
+    await register('e101-da');
+    await register('e101-db');
+
+    await runUserStep(pipeline, call, await pipeline.deps.cache.get(), userId);
+
+    const timeouts = fakeAri.calls
+      .filter(entry => entry.path.endsWith('/dial'))
+      .map(entry => (entry.body as { timeout?: number }).timeout);
+    expect(timeouts).toEqual([0, 0]);
   });
 });
