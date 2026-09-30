@@ -248,4 +248,72 @@ describe('startSweep', () => {
     expect(tenantHours).toHaveLength(1);
     expect(tenantHours[0]).toMatchObject({ open: false });
   });
+
+  // §10.6 `ooo` carries the rule's window: subscribers showing "away until …" must see it move.
+  it('emits an ooo event when the running rule is edited or handed over to the next back to back', async () => {
+    const db = openDb(':memory:');
+    await migrateForTest(db);
+    const { forwardTargetId } = await seedTenant(db, { timezone: 'UTC' });
+    const ruleId = newId();
+    await db
+      .insertInto('oooRules')
+      .values({
+        id: ruleId,
+        startsAt: '2026-01-01T00:00:00.000Z',
+        expiresAt: '2026-01-01T01:00:00.000Z',
+        targetId: forwardTargetId,
+        createdAt: nowIso()
+      })
+      .execute();
+    let current = '2026-01-01T00:30:00.000Z';
+    const events: Envelope[] = [];
+    const bus = new EventBus();
+    bus.subscribe(event => {
+      events.push(event);
+    });
+    const cache = new ConfigCache(db);
+    sweep = startSweep({ cache, bus, now: () => current }, SWEEP_INTERVAL_MS);
+    await settle();
+    const tenantOoo = (): Envelope[] =>
+      events.filter(event => event.type === 'ooo' && event.scope === 'tenant');
+    expect(tenantOoo()).toHaveLength(1);
+
+    // Extended while it runs.
+    await db
+      .updateTable('oooRules')
+      .set({ expiresAt: '2026-01-01T02:00:00.000Z' })
+      .where('id', '=', ruleId)
+      .execute();
+    cache.invalidate();
+    await settle();
+    expect(tenantOoo()).toHaveLength(2);
+    expect(tenantOoo()[1]).toMatchObject({
+      active: true,
+      startsAt: '2026-01-01T00:00:00.000Z',
+      expiresAt: '2026-01-01T02:00:00.000Z'
+    });
+
+    // A second rule starting as the first expires: active throughout, another window.
+    await db
+      .insertInto('oooRules')
+      .values({
+        id: newId(),
+        startsAt: '2026-01-01T02:00:00.000Z',
+        expiresAt: null,
+        targetId: forwardTargetId,
+        createdAt: nowIso()
+      })
+      .execute();
+    cache.invalidate();
+    await settle();
+    current = '2026-01-01T02:30:00.000Z';
+    await settle();
+    expect(tenantOoo().slice(2)).toEqual([
+      expect.objectContaining({
+        active: true,
+        startsAt: '2026-01-01T02:00:00.000Z',
+        expiresAt: null
+      })
+    ]);
+  });
 });

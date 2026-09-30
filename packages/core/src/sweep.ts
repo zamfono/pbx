@@ -3,7 +3,8 @@
  * and opening hours writes nothing, it evaluates and emits; §10.2 "Out of office", "Opening
  * hours"; §10.6 `ooo`/`hours`). Every scope in the config snapshot - the tenant, every user, ring
  * group and menu - gets its own in-effect OOO rule and open state; only a change from the previous
- * evaluation goes on the bus, so a client renders live status without polling. It runs at the
+ * evaluation goes on the bus (a rule starting or ending, the window of the rule in effect moving,
+ * opening hours opening or closing), so a client renders live status without polling. It runs at the
  * next transition instant of any scope, at once after a config change, and at least hourly.
  */
 import { resolveTenantTimeZone, type Scope } from '@zamfono/shared';
@@ -82,9 +83,21 @@ function evaluateScope(
   };
 }
 
+/** Whether `state`'s OOO differs from `prior`'s as an `ooo` event carries it: active or not, and
+ * the in-effect rule's `startsAt`/`expiresAt`. */
+function oooChanged(prior: ScopeState | undefined, state: ScopeState): boolean {
+  return (
+    prior?.oooActive !== state.oooActive ||
+    prior.oooStartsAt !== state.oooStartsAt ||
+    prior.oooExpiresAt !== state.oooExpiresAt
+  );
+}
+
 /**
  * Evaluates every scope in `snapshot` and emits an `ooo` or `hours` event for a scope that has no
- * recorded state yet (the initial sweep) or whose active/open state changed since `previous`.
+ * recorded state yet (the initial sweep) or whose active/open state changed since `previous`, and
+ * an `ooo` event as well for one whose rule in effect has another window: the rule edited while it
+ * runs, or handed over to the next back to back.
  * Returns the next instant any scope can change at (`nextTransition`), `null` for none this week.
  */
 function tick(
@@ -105,7 +118,7 @@ function tick(
   for (const scope of allScopes(snapshot)) {
     const state = evaluateScope(scope, oooRules, schedules, nowIso, timezone);
     const prior = previous.get(scope);
-    if (prior?.oooActive !== state.oooActive) {
+    if (oooChanged(prior, state)) {
       deps.bus.emit({
         type: 'ooo',
         scope,
