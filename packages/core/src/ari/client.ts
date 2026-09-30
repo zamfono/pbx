@@ -2,6 +2,10 @@
 import { EventEmitter } from 'node:events';
 import WebSocket from 'ws';
 
+import {
+  reconnectBackoff,
+  type ReconnectBackoff
+} from '../reconnectBackoff.js';
 import { buildRestApi } from './restApi.js';
 import { ariRequests, authHeaders } from './restTransport.js';
 import {
@@ -16,10 +20,6 @@ import {
   type MailboxesApi,
   type PlaybacksApi
 } from './types.js';
-
-const RECONNECT_INITIAL_DELAY_MS = 1000;
-const RECONNECT_MAX_DELAY_MS = 30000;
-const RECONNECT_BACKOFF_FACTOR = 2;
 
 export type AriClientOptions = {
   url: string;
@@ -43,13 +43,18 @@ export class AriClient extends EventEmitter {
   readonly asterisk: AsteriskApi;
   private readonly options: AriClientOptions;
   private socket: WebSocket | null = null;
-  private reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly reconnect: ReconnectBackoff;
   private closing = false;
 
   constructor(options: AriClientOptions) {
     super();
     this.options = options;
+    this.reconnect = reconnectBackoff(
+      () => (this.closing ? Promise.resolve() : this.connectOnce()),
+      (error: unknown) => {
+        this.options.log.error({ error }, 'ARI reconnect failed');
+      }
+    );
     const api = buildRestApi(ariRequests(options));
     this.channels = api.channels;
     this.bridges = api.bridges;
@@ -67,10 +72,7 @@ export class AriClient extends EventEmitter {
 
   async close(): Promise<void> {
     this.closing = true;
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
+    this.reconnect.cancel();
     const socket = this.socket;
     if (!socket) {
       return;
@@ -93,7 +95,7 @@ export class AriClient extends EventEmitter {
 
       socket.on('open', () => {
         opened = true;
-        this.reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
+        this.reconnect.reset();
         this.emit('connected');
         resolve();
       });
@@ -104,7 +106,7 @@ export class AriClient extends EventEmitter {
         this.socket = null;
         this.emit('disconnected');
         if (!this.closing) {
-          this.scheduleReconnect();
+          this.reconnect.schedule();
         }
         if (!opened) {
           reject(new Error('ARI WebSocket closed before it opened'));
@@ -114,23 +116,6 @@ export class AriClient extends EventEmitter {
         this.options.log.error({ error: error.message }, 'ARI WebSocket error');
       });
     });
-  }
-
-  private scheduleReconnect(): void {
-    const delay = this.reconnectDelayMs;
-    this.reconnectDelayMs = Math.min(
-      delay * RECONNECT_BACKOFF_FACTOR,
-      RECONNECT_MAX_DELAY_MS
-    );
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null;
-      if (this.closing) {
-        return;
-      }
-      this.connectOnce().catch((error: unknown) => {
-        this.options.log.error({ error }, 'ARI reconnect failed');
-      });
-    }, delay);
   }
 
   private handleMessage(raw: string): void {

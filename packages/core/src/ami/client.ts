@@ -3,10 +3,11 @@ import { EventEmitter } from 'node:events';
 import { createConnection, type Socket } from 'node:net';
 
 import type { Logger } from '../ari/types.js';
+import {
+  reconnectBackoff,
+  type ReconnectBackoff
+} from '../reconnectBackoff.js';
 
-const RECONNECT_INITIAL_DELAY_MS = 1000;
-const RECONNECT_MAX_DELAY_MS = 30000;
-const RECONNECT_BACKOFF_FACTOR = 2;
 const FRAME_SEPARATOR = '\r\n\r\n';
 const LINE_SEPARATOR = '\r\n';
 const HEADER_SEPARATOR = ': ';
@@ -65,13 +66,18 @@ export class AmiClient extends EventEmitter {
   private buffer = '';
   private actionCounter = 0;
   private readonly pending = new Map<string, PendingAction>();
-  private reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly reconnect: ReconnectBackoff;
   private closing = false;
 
   constructor(options: AmiClientOptions) {
     super();
     this.options = options;
+    this.reconnect = reconnectBackoff(
+      () => (this.closing ? Promise.resolve() : this.connectOnce()),
+      (error: unknown) => {
+        this.options.log.error({ error }, 'AMI reconnect failed');
+      }
+    );
   }
 
   connect(): Promise<void> {
@@ -81,10 +87,7 @@ export class AmiClient extends EventEmitter {
 
   async close(): Promise<void> {
     this.closing = true;
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
+    this.reconnect.cancel();
     this.rejectPending(new Error('AMI client closed'));
     const socket = this.socket;
     if (!socket) {
@@ -144,7 +147,7 @@ export class AmiClient extends EventEmitter {
         this.login()
           .then(() => {
             loggedIn = true;
-            this.reconnectDelayMs = RECONNECT_INITIAL_DELAY_MS;
+            this.reconnect.reset();
             this.emit('connected');
             resolve();
           })
@@ -158,7 +161,7 @@ export class AmiClient extends EventEmitter {
         this.rejectPending(new Error('AMI connection closed'));
         this.emit('disconnected');
         if (!this.closing) {
-          this.scheduleReconnect();
+          this.reconnect.schedule();
         }
         if (!loggedIn) {
           reject(new Error('AMI connection closed before login completed'));
@@ -168,23 +171,6 @@ export class AmiClient extends EventEmitter {
         this.options.log.error({ error: error.message }, 'AMI socket error');
       });
     });
-  }
-
-  private scheduleReconnect(): void {
-    const delay = this.reconnectDelayMs;
-    this.reconnectDelayMs = Math.min(
-      delay * RECONNECT_BACKOFF_FACTOR,
-      RECONNECT_MAX_DELAY_MS
-    );
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null;
-      if (this.closing) {
-        return;
-      }
-      this.connectOnce().catch((error: unknown) => {
-        this.options.log.error({ error }, 'AMI reconnect failed');
-      });
-    }, delay);
   }
 
   private rejectPending(error: Error): void {
