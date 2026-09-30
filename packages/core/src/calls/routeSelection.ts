@@ -36,14 +36,22 @@ export function routesFor(
   return matchingRoutes(buildRoutes(snapshot), caller, number);
 }
 
+/** Trunk `trunkId`, `undefined` once soft-deleted or gone. */
+export function liveTrunk(
+  snapshot: Snapshot,
+  trunkId: string
+): TrunkRow | undefined {
+  return snapshot.trunks.find(
+    row => row.id === trunkId && row.deletedAt === null
+  );
+}
+
 /** `route`'s trunk, `undefined` once soft-deleted. */
 export function routeTrunk(
   snapshot: Snapshot,
   route: Route
 ): TrunkRow | undefined {
-  return snapshot.trunks.find(
-    row => row.id === route.trunkId && row.deletedAt === null
-  );
+  return liveTrunk(snapshot, route.trunkId);
 }
 
 /**
@@ -55,7 +63,8 @@ export function prepareRoute(params: {
   pipeline: Pipeline;
   trunkState: TrunkState;
   call: Call;
-  route: Route;
+  /** `null` for a SIP target, which bypasses `outbound_routes` (§9.4 "SIP targets"). */
+  route: Route | null;
   trunk: TrunkRow;
   callerUser: UserRow | null;
   clirPerCall: boolean | null;
@@ -69,7 +78,7 @@ export function prepareRoute(params: {
   ): { ok: false; failure: AttemptFailure } => {
     call.log.event({
       event: 'attempt',
-      routeId: route.id,
+      routeId: route?.id ?? null,
       trunkId: trunk.id,
       cause: failure.kind
     });

@@ -45,7 +45,7 @@ function logAttempt(attempt: Attempt, cause: string | number): void {
   attempt.logged = true;
   attempt.leg.call.log.event({
     event: 'attempt',
-    routeId: attempt.candidate.route.id,
+    routeId: attempt.candidate.route?.id ?? null,
     trunkId: attempt.candidate.trunk.id,
     endpoint: attempt.candidate.endpoint,
     cause

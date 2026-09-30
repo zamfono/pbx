@@ -6,10 +6,12 @@
 import type { Snapshot } from '../internal/server.js';
 import { channelLanguageVariable } from '../prompts.js';
 import type { MemberLeg } from '../routing/ringGroup.js';
+import type { ForwardTarget } from '../routing/targets.js';
 import type { Call } from './call.js';
 import { softphoneCallerId } from './contactName.js';
 import { recordEvents, redeliverEarlyEvents } from './earlyEvents.js';
 import { ringExternalLeg } from './externalLeg.js';
+import { CONDITION_REASONS, diversionFor } from './forwardContext.js';
 import type { GroupLeg } from './groupLegs.js';
 import { originateLeg } from './legOriginate.js';
 import type { Pipeline } from './pipeline.js';
@@ -115,24 +117,41 @@ export type BatchLegs = {
   end: (leg: GroupLeg, cause: number | null) => void;
 };
 
-/** Rings a member's unconditional forward to an external number as the member's leg (§10.1 step 5),
- * dialled as the member's own call (§9.4 "Outbound routing", §10.1 step 7) by `externalLeg.ts`;
- * each attempt's channel is tracked under the member, a superseded one dropped from the batch. */
+/** Rings a member's unconditional forward to an external number or a SIP target as the member's
+ * leg (§10.1 step 5), dialled as the member's own call (§9.4 "Outbound routing", §10.1 step 7) by
+ * `externalLeg.ts`, with the member's forward as its last hop (§9.4 "Forwarded calls"); each
+ * attempt's channel is tracked under the member, a superseded one dropped from the batch. */
 async function originateExternalLeg(
   pipeline: Pipeline,
   call: Call,
-  target: { number: string; memberKey: string },
-  batch: BatchLegs
+  target: Extract<ForwardTarget, { kind: 'external' | 'sip' }>,
+  member: { memberKey: string; batch: BatchLegs; snapshot: Snapshot }
 ): Promise<void> {
   if (call.answeredAt !== null) {
     return;
   }
+  const { memberKey, batch } = member;
   const { tracked } = batch;
-  const { memberKey } = target;
+  const hop = diversionFor(
+    member.snapshot,
+    call,
+    { userId: memberKey },
+    CONDITION_REASONS.unconditional
+  );
+  const forward = {
+    diversions: hop === null ? [...call.diversions] : [...call.diversions, hop]
+  };
   await ringExternalLeg(
     pipeline,
     call,
-    { number: target.number, asUser: memberKey },
+    target.kind === 'sip'
+      ? {
+          number: target.user,
+          asUser: memberKey,
+          trunkId: target.trunkId,
+          forward
+        }
+      : { number: target.number, asUser: memberKey, forward },
     {
       track: channelId => {
         const leg: GroupLeg = {
@@ -189,13 +208,12 @@ async function originateMemberLeg(
     );
     return;
   }
-  if (leg.target.kind === 'external') {
-    await originateExternalLeg(
-      pipeline,
-      call,
-      { number: leg.target.number, memberKey: leg.userId },
-      batch
-    );
+  if (leg.target.kind === 'external' || leg.target.kind === 'sip') {
+    await originateExternalLeg(pipeline, call, leg.target, {
+      memberKey: leg.userId,
+      batch,
+      snapshot
+    });
   }
 }
 

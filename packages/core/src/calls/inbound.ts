@@ -1,6 +1,6 @@
 /** Inbound call entry (§10.1 step 1; §9.2 `inbound,<exten>`) and pipeline steps 2-4, 6 and 7
  * (ring groups are Task 29): OOO, opening hours, the target-user and target-menu steps,
- * reject-anonymous, and forward-target hop counting. */
+ * reject-anonymous, and each target kind's dispatch; hop counting is `runTarget.ts`'s. */
 import { newId } from '@zamfono/shared';
 
 import type { AriEvent, Channel } from '../ari/types.js';
@@ -10,11 +10,7 @@ import {
   rejectAnonymous,
   resolveInbound
 } from '../routing/entry.js';
-import {
-  nextHop,
-  targetFromRow,
-  type ForwardTarget
-} from '../routing/targets.js';
+import { targetFromRow, type ForwardTarget } from '../routing/targets.js';
 import { announce } from './announce.js';
 import {
   callLogMaxBytesFromEnv,
@@ -23,20 +19,18 @@ import {
   raiseLogLevel,
   release,
   toLogLevel,
-  type Call,
-  type Owner
+  type Call
 } from './call.js';
+import { dialForwardTarget } from './forwardDial.js';
 import { applyOooAndHours, targetIdentity } from './inboundSchedule.js';
 import { inboundBoundary } from './inboundTrunk.js';
 import { playMenu } from './menu.js';
-import { dialForwardTarget } from './outboundExternal.js';
 import type { Pipeline } from './pipeline.js';
 import { ringGroup } from './ringGroup.js';
 import { runUserStep } from './userStep.js';
 import { deposit } from './voicemail.js';
 
 const RELEASE_CODE_REJECTED = 603;
-const RELEASE_CODE_UNAVAILABLE = 480;
 // A DID/block's forward_targets row missing from the snapshot (FK-guaranteed present).
 const RELEASE_CODE_SERVER_ERROR = 500;
 
@@ -69,8 +63,8 @@ export async function enterTarget(
     await announce(pipeline, call, target.audioId);
     return;
   }
-  if (target.kind === 'external') {
-    await dialForwardTarget(pipeline, call, target.number, asUser);
+  if (target.kind === 'external' || target.kind === 'sip') {
+    await dialForwardTarget(pipeline, call, target, asUser);
     return;
   }
 
@@ -126,35 +120,6 @@ export async function enterTarget(
   // The last of `ForwardTarget`'s kinds: the two mailboxes, the announcement, the user and the
   // menu each returned above.
   await ringGroup(pipeline, call, target.ringGroupId);
-}
-
-/** Step 7 "Forward targets": hop counting, then dispatch, or the hop-limit mailbox fallback.
- * `asUser` is `enterTarget`'s: the forwarding user, `null` for a forward nobody's own rule made. */
-export async function runTarget(
-  pipeline: Pipeline,
-  call: Call,
-  target: ForwardTarget,
-  asUser: string | null
-): Promise<void> {
-  const hop = nextHop(call.hops, target);
-  if (!hop.ok) {
-    call.log.event({ event: 'hopLimit', hops: call.hops });
-    const snapshot = await pipeline.deps.cache.get();
-    let owner: Owner | null = null;
-    if (call.calleeUserId !== null) {
-      owner = { userId: call.calleeUserId };
-    } else if (call.ringGroupId !== null) {
-      owner = { ringGroupId: call.ringGroupId };
-    }
-    await endTargetOwner(pipeline, call, owner, snapshot, {
-      code: RELEASE_CODE_UNAVAILABLE,
-      status: 'missed',
-      reason: 'hopLimit'
-    });
-    return;
-  }
-  call.hops = hop.hops;
-  await enterTarget(pipeline, call, target, asUser);
 }
 
 /** A `from-trunk` StasisStart (§9.2): both numbers normalized with the delivering trunk's

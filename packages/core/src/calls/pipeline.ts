@@ -9,7 +9,8 @@ import type { Presence } from '../presence.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import type { Call, Owner } from './call.js';
 import { noteHangupRequest } from './callEnd.js';
-import { enterTarget, handleInboundStart, runTarget } from './inbound.js';
+import type { Diversion } from './forwardContext.js';
+import { enterTarget, handleInboundStart } from './inbound.js';
 import {
   handleChannelEnded,
   handleDtmf,
@@ -19,6 +20,7 @@ import {
 } from './legs.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 import { ringUser } from './ringUser.js';
+import { runTarget } from './runTarget.js';
 import type { TrunkState } from './trunkState.js';
 import { deposit, type DepositReason, type MailSender } from './voicemail.js';
 
@@ -210,13 +212,15 @@ export class Pipeline {
     this.callByChannel.set(call.callerChannelId, call);
   }
 
-  /** §10.1 step 7, dialling an external target as `asUser`, the forwarding user (`inbound.ts`). */
+  /** §10.1 step 7, dialling an external target as `asUser`, the forwarding user, `diversion` the
+   * forward hop it is, `null` for none (`runTarget.ts`). */
   async runTarget(
     call: Call,
     target: ForwardTarget,
-    asUser: string | null
+    asUser: string | null,
+    diversion: Diversion | null = null
   ): Promise<void> {
-    await runTarget(this, call, target, asUser);
+    await runTarget(this, call, target, asUser, diversion);
   }
 
   /** Entry's hop-free re-entry (§10.1 step 1/6): a matched menu option or a menu's live-extension

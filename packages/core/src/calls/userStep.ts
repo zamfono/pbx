@@ -11,6 +11,7 @@ import {
   userOutcomeDecision
 } from '../routing/user.js';
 import { buildUserRules, raiseLogLevel, release, type Call } from './call.js';
+import { CONDITION_REASONS, diversionFor } from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';
 import { registeredDevices } from './userDevices.js';
 
@@ -34,8 +35,14 @@ export async function applyRingOutcome(
   }
   if (decision.kind === 'forward') {
     // §10.1 step 7: the user's own busy or noAnswer rule, so an external target is dialled as
-    // their call.
-    await pipeline.runTarget(call, decision.target, user.id);
+    // their call, and a hop of theirs.
+    const diversion = diversionFor(
+      snapshot,
+      call,
+      { userId: user.id },
+      CONDITION_REASONS[outcome]
+    );
+    await pipeline.runTarget(call, decision.target, user.id, diversion);
     return;
   }
   if (decision.kind === 'mailbox') {
@@ -93,8 +100,12 @@ export async function runUserStep(
   }
   if (decision.kind === 'forward') {
     // §10.1 step 7: the user's own unconditional, dnd or offline rule, so an external target is
-    // dialled as their call.
-    await pipeline.runTarget(call, decision.target, userId);
+    // dialled as their call, and a hop of theirs.
+    const diversion =
+      reason === null
+        ? null
+        : diversionFor(snapshot, call, { userId }, CONDITION_REASONS[reason]);
+    await pipeline.runTarget(call, decision.target, userId, diversion);
     return;
   }
   if (decision.kind === 'mailbox') {

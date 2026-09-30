@@ -20,6 +20,7 @@ import {
   type Candidate,
   type RouteCursor
 } from './externalLegRoutes.js';
+import type { ForwardLeg } from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';
 import type { TrunkLeg } from './provisional.js';
 import { originateTrunkLeg } from './trunkDial.js';
@@ -38,10 +39,21 @@ export type ExternalLegOwner = {
   end: (channelId: string, cause: number | null) => void;
 };
 
-/** A leg's route cursor (`externalLegRoutes.ts`), with the number it dials and the race that holds it. */
+/** A leg's route cursor (`externalLegRoutes.ts`), with the number it dials, the race that holds
+ * it and, for a forward target, the hops that led to it (§9.4 "Forwarded calls"). */
 export type ExternalLeg = RouteCursor & {
   number: string;
   owner: ExternalLegOwner;
+  forward: ForwardLeg | undefined;
+};
+
+/** What a race leg dials: `number` as `asUser`'s call through the matching routes, or, with
+ * `trunkId`, a SIP target's user part over that trunk alone (§9.4 "SIP targets"). */
+export type ExternalLegTarget = {
+  number: string;
+  asUser: string | null;
+  trunkId?: string;
+  forward?: ForwardLeg;
 };
 
 /** Watches the newly originated `trunkLeg` and hands it to the race in place of `previous`, or
@@ -72,7 +84,7 @@ async function dialFrom(
   first: Candidate,
   previous: string | null
 ): Promise<void> {
-  const { pipeline, trunkState, call, number, owner } = leg;
+  const { pipeline, trunkState, call, number, owner, forward } = leg;
   for (
     let candidate: Candidate | null = first;
     candidate !== null;
@@ -86,7 +98,7 @@ async function dialFrom(
     const early = recordEvents(pipeline.deps.ari);
     // eslint-disable-next-line no-await-in-loop -- attempts are dialled one at a time, in fallthrough order
     const trunkLeg = await originateTrunkLeg(
-      { pipeline, call, trunkState, trunk, number, identity },
+      { pipeline, call, trunkState, trunk, number, identity, forward },
       endpoint
     ).catch(() => null);
     if (trunkLeg !== null) {
@@ -97,7 +109,7 @@ async function dialFrom(
     early.stop();
     call.log.event({
       event: 'attempt',
-      routeId: candidate.route.id,
+      routeId: candidate.route?.id ?? null,
       trunkId: trunk.id,
       endpoint,
       cause: 'placementFailed'
@@ -135,17 +147,19 @@ export function externalAttemptDialsOn(
 /**
  * Rings `target.number` as one of the race's legs: dialled as `target.asUser`'s own call (§9.4
  * "Outbound routing": a user's forwards and find-me legs count as that user's calls), which picks
- * the routes, the presented number and the CLIR level. A number no route carries is not rung,
- * with a line at level `events`, and the race rings on without it.
+ * the routes, the presented number and the CLIR level, or a SIP target's user part over its own
+ * trunk. A number no route carries is not rung, with a line at level `events`, and the race rings
+ * on without it.
  */
 export async function ringExternalLeg(
   pipeline: Pipeline,
   call: Call,
-  target: { number: string; asUser: string | null },
+  target: ExternalLegTarget,
   owner: ExternalLegOwner
 ): Promise<void> {
   const { trunkState } = pipeline.deps;
-  if (trunkState === null || !isE164(target.number)) {
+  const dialable = target.trunkId !== undefined || isE164(target.number);
+  if (trunkState === null || !dialable) {
     call.log.event({ event: 'externalLegUnrouted', number: target.number });
     return;
   }
@@ -153,7 +167,8 @@ export async function ringExternalLeg(
   const leg: ExternalLeg = {
     ...openCursor({ pipeline, trunkState, call, snapshot }, target),
     number: target.number,
-    owner
+    owner,
+    forward: target.forward
   };
   const first = nextRoute(leg);
   if (first === null) {

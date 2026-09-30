@@ -13,6 +13,7 @@ import {
   type Strategy
 } from '../routing/ringGroup.js';
 import { raiseLogLevel, release, type Call } from './call.js';
+import { CONDITION_REASONS, diversionFor } from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
 import { ringBatch } from './ringGroupDial.js';
@@ -67,8 +68,14 @@ async function applyGroupFallback(
 ): Promise<void> {
   const action = groupFallback(group, rules, outcome);
   if (action.kind === 'forward') {
-    // §10.1 step 7: a ring group's fallback forwards without a caller.
-    await pipeline.runTarget(call, action.target, null);
+    // §10.1 step 7: a ring group's fallback forwards without a caller, a hop of the group's.
+    const diversion = diversionFor(
+      await pipeline.deps.cache.get(),
+      call,
+      { ringGroupId: group.ringGroupId },
+      CONDITION_REASONS[outcome]
+    );
+    await pipeline.runTarget(call, action.target, null, diversion);
     return;
   }
   if (action.kind === 'mailbox') {

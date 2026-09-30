@@ -8,6 +8,11 @@ import type { Snapshot } from '../internal/server.js';
 import { inEffectOoo, isOpen, scheduleFor } from '../routing/schedule.js';
 import { buildOooRules, buildSchedules } from '../routing/scheduleRows.js';
 import { findForwardTarget, type Call, type Owner } from './call.js';
+import {
+  diversionFor,
+  type DivertingParty,
+  type RedirectingReason
+} from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';
 
 type ScopedTarget =
@@ -36,6 +41,26 @@ function scopeUser(scope: Scope): string | null {
   return scope.startsWith('user:') ? scope.slice('user:'.length) : null;
 }
 
+/** The hop an OOO rule or a closed schedule makes (§9.4 "Forwarded calls"): the call's target,
+ * `scope`, is the party diverting it, whichever scope the rule itself belongs to. */
+function scheduleDiversion(
+  snapshot: Snapshot,
+  call: Call,
+  scope: Scope,
+  reason: RedirectingReason
+): ReturnType<typeof diversionFor> {
+  const [kind, id = ''] = scope.split(':');
+  let party: DivertingParty | null = null;
+  if (kind === 'user') {
+    party = { userId: id };
+  } else if (kind === 'ringGroup') {
+    party = { ringGroupId: id };
+  } else if (kind === 'menu') {
+    party = { menuId: id };
+  }
+  return party === null ? null : diversionFor(snapshot, call, party, reason);
+}
+
 /** Steps 2-3, OOO then opening hours (skipped for internal calls): the first applicable forward target ends the call, returning true. */
 export async function applyOooAndHours(
   pipeline: Pipeline,
@@ -53,7 +78,8 @@ export async function applyOooAndHours(
     await pipeline.runTarget(
       call,
       findForwardTarget(snapshot, ooo.targetId),
-      scopeUser(ooo.scope)
+      scopeUser(ooo.scope),
+      scheduleDiversion(snapshot, call, scope, 'away')
     );
     return true;
   }
@@ -84,7 +110,8 @@ export async function applyOooAndHours(
   await pipeline.runTarget(
     call,
     findForwardTarget(snapshot, schedule.closedTargetId),
-    scopeUser(schedule.scope)
+    scopeUser(schedule.scope),
+    scheduleDiversion(snapshot, call, scope, 'time_of_day')
   );
   return true;
 }

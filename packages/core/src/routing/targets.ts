@@ -7,18 +7,22 @@ export type ForwardTarget = { id: string } & (
   | { kind: 'user'; userId: string }
   | { kind: 'ringGroup'; ringGroupId: string }
   | { kind: 'external'; number: string }
+  | { kind: 'sip'; trunkId: string; user: string }
   | { kind: 'mailboxUser'; userId: string }
   | { kind: 'mailboxRingGroup'; ringGroupId: string }
   | { kind: 'announcement'; audioId: string }
   | { kind: 'menu'; menuId: string }
 );
 
-/** A `forward_targets` row: exactly one target column is set, enforced by the table's CHECK. */
+/** A `forward_targets` row: exactly one target is set, `sip`'s being its column pair, enforced by
+ * the table's CHECK. */
 export type ForwardTargetsRow = {
   id: string;
   userId: string | null;
   ringGroupId: string | null;
   external: string | null;
+  sipTrunkId: string | null;
+  sipUser: string | null;
   mailboxUserId: string | null;
   mailboxRingGroupId: string | null;
   announcementAudioId: string | null;
@@ -36,6 +40,9 @@ export function targetFromRow(row: ForwardTargetsRow): ForwardTarget {
   }
   if (row.external !== null) {
     return { id, kind: 'external', number: row.external };
+  }
+  if (row.sipTrunkId !== null && row.sipUser !== null) {
+    return { id, kind: 'sip', trunkId: row.sipTrunkId, user: row.sipUser };
   }
   if (row.mailboxUserId !== null) {
     return { id, kind: 'mailboxUser', userId: row.mailboxUserId };
@@ -64,7 +71,8 @@ export const MAX_HOPS = 3;
 
 /**
  * Counts one more hop for a `user` or `ringGroup` target re-entering at Entry; a `menu` target
- * re-enters without counting, and every other kind neither counts nor re-enters (§10.1 step 7).
+ * re-enters without counting, and every other kind, `external` and `sip` included, neither counts
+ * nor re-enters (§10.1 step 7).
  */
 export function nextHop(
   hops: number,

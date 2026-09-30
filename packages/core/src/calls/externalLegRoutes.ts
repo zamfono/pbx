@@ -1,7 +1,8 @@
 /**
  * An external leg's walk down its matching routes (§9.4 "Outbound routing", "Route fallthrough",
  * "Hosts"), one dial target at a time: `externalLeg.ts` asks for the first, and for the next each
- * time an attempt fails before alerting. Pre-checks and caller identity are `routeSelection.ts`'s.
+ * time an attempt fails before alerting. A SIP target's leg walks its own trunk's hosts alone,
+ * with no route (§9.4 "SIP targets"). Pre-checks and caller identity are `routeSelection.ts`'s.
  */
 import type { Snapshot } from '../internal/server.js';
 import {
@@ -12,32 +13,43 @@ import {
 import type { Call } from './call.js';
 import type { AttemptIdentity, TrunkRow, UserRow } from './callerIdentity.js';
 import type { Pipeline } from './pipeline.js';
-import { prepareRoute, routesFor, routeTrunk } from './routeSelection.js';
+import {
+  liveTrunk,
+  prepareRoute,
+  routesFor,
+  routeTrunk
+} from './routeSelection.js';
 import { dialTargets, retriesNextHost } from './trunkDial.js';
 import type { TrunkState } from './trunkState.js';
 
-/** One dial target of a matching route, with the trunk and the identity the attempt presents. */
+/** One dial target of a matching route, with the trunk and the identity the attempt presents;
+ * `route` is `null` for a SIP target's. */
 export type Candidate = {
-  route: Route;
+  route: Route | null;
   trunk: TrunkRow;
   identity: AttemptIdentity;
   endpoint: string;
 };
 
-/** A leg's cursor: the matching routes not yet tried, and the current route's remaining hosts. */
+/** One way out a leg has: a matching route and its trunk (`undefined` once soft-deleted), or a
+ * SIP target's own trunk with no route. */
+type Way = { route: Route | null; trunk: TrunkRow | undefined };
+
+/** A leg's cursor: the ways out not yet tried, and the current one's remaining hosts. */
 export type RouteCursor = {
   pipeline: Pipeline;
   trunkState: TrunkState;
   call: Call;
   callerUser: UserRow | null;
   snapshot: Snapshot;
-  routes: Route[];
+  routes: Way[];
   current: Candidate | null;
   endpoints: string[];
   lastFailureKind: AttemptFailure['kind'] | null;
 };
 
-/** A cursor over `target.number`'s matching routes for a call made as `target.asUser`. */
+/** A cursor over `target.number`'s matching routes for a call made as `target.asUser`, or over
+ * `target.trunkId` alone for a SIP target's user part. */
 export function openCursor(
   ctx: {
     pipeline: Pipeline;
@@ -45,25 +57,32 @@ export function openCursor(
     call: Call;
     snapshot: Snapshot;
   },
-  target: { number: string; asUser: string | null }
+  target: { number: string; asUser: string | null; trunkId?: string }
 ): RouteCursor {
   const { snapshot } = ctx;
+  const routes: Way[] =
+    target.trunkId === undefined
+      ? routesFor(snapshot, target.number, target.asUser).map(route => ({
+          route,
+          trunk: routeTrunk(snapshot, route)
+        }))
+      : [{ route: null, trunk: liveTrunk(snapshot, target.trunkId) }];
   return {
     ...ctx,
     callerUser:
       target.asUser === null
         ? null
         : (snapshot.users.find(row => row.id === target.asUser) ?? null),
-    routes: routesFor(snapshot, target.number, target.asUser),
+    routes,
     current: null,
     endpoints: [],
     lastFailureKind: null
   };
 }
 
-/** `route`'s first dial target once its pre-checks pass (§9.4 "Route fallthrough"), else `null`. */
-function candidateFor(leg: RouteCursor, route: Route): Candidate | null {
-  const trunk = routeTrunk(leg.snapshot, route);
+/** `way`'s first dial target once its pre-checks pass (§9.4 "Route fallthrough"), else `null`. */
+function candidateFor(leg: RouteCursor, way: Way): Candidate | null {
+  const { route, trunk } = way;
   if (!trunk) {
     leg.lastFailureKind = 'unreachable';
     return null;
@@ -95,11 +114,11 @@ function candidateFor(leg: RouteCursor, route: Route): Candidate | null {
 
 export function nextRoute(leg: RouteCursor): Candidate | null {
   for (
-    let route = leg.routes.shift();
-    route !== undefined;
-    route = leg.routes.shift()
+    let way = leg.routes.shift();
+    way !== undefined;
+    way = leg.routes.shift()
   ) {
-    const candidate = candidateFor(leg, route);
+    const candidate = candidateFor(leg, way);
     if (candidate !== null) {
       return candidate;
     }

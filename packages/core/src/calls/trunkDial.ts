@@ -12,6 +12,7 @@ import { channelLanguageVariable } from '../prompts.js';
 import type { AttemptFailure } from '../routing/trunk.js';
 import { raiseLogLevel, type Call } from './call.js';
 import type { AttemptIdentity, TrunkRow } from './callerIdentity.js';
+import { forwardVariables, type ForwardLeg } from './forwardContext.js';
 import { originateLeg } from './legOriginate.js';
 import type { Pipeline } from './pipeline.js';
 import type { TrunkLeg } from './provisional.js';
@@ -128,6 +129,9 @@ export type TrunkLegCtx = {
   trunk: TrunkRow;
   number: string;
   identity: AttemptIdentity;
+  /** A leg dialled for a forward target, `external` or `sip`: the hops that led to it, whose
+   * context it carries (§9.4 "Forwarded calls"); absent for a user's own dial. */
+  forward?: ForwardLeg;
 };
 
 /**
@@ -152,6 +156,10 @@ export async function originateTrunkLeg(
     // `trust_id_outbound` keeps the real number in the asserted identity (§9.4 "Anonymous calls
     // (CLIR)", RFC 3325).
     variables['CONNECTEDLINE(pres)'] = 'prohib';
+  }
+  if (ctx.forward !== undefined) {
+    // The one place a forwarded leg's `REDIRECTING` data and custom headers are applied.
+    Object.assign(variables, forwardVariables(call, ctx.forward));
   }
   // §7: the trunk carrying the call's leg counts toward its diagnostics level.
   raiseLogLevel(call.log, trunk, pipeline.deps.now());

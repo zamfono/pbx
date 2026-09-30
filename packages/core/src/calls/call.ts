@@ -7,6 +7,7 @@ import type { DB, Scope } from '@zamfono/shared';
 import { CallLog, type LogLevel } from '../callLog.js';
 import type { Snapshot } from '../internal/server.js';
 import { targetFromRow, type ForwardTarget } from '../routing/targets.js';
+import type { Diversion } from './forwardContext.js';
 import { notifyMissedCall } from './missedCall.js';
 import type { Pipeline } from './pipeline.js';
 import { sipToHangupCause } from './releaseCause.js';
@@ -42,6 +43,8 @@ export type Call = {
   bridgeId: string | null;
   legs: Map<string, Leg>;
   hops: number;
+  /** The forward hops taken so far, first first (§9.4 "Forwarded calls"). */
+  diversions: Diversion[];
   log: CallLog;
   startedAt: string;
   answeredAt: string | null;
@@ -101,6 +104,7 @@ export function newCall(params: NewCallParams): Call {
     bridgeId: null,
     legs: new Map(),
     hops: 0,
+    diversions: [],
     log: new CallLog(params.id, logLevel, callLogMaxBytes),
     answeredAt: null,
     status: null,

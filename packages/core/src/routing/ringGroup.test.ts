@@ -119,6 +119,20 @@ describe('ringable', () => {
     expect(result).toEqual([{ userId: 'user-1', via: 'forward', target }]);
   });
 
+  it('follows a member\'s unconditional forward to a SIP target (§9.4 "SIP targets")', () => {
+    const target: ForwardTarget = {
+      id: 'target-1',
+      kind: 'sip',
+      trunkId: 'trunk-1',
+      user: 'proj_1'
+    };
+    const members = [{ ...baseMember('user-1'), unconditional: target }];
+
+    const result = ringable(members, true);
+
+    expect(result).toEqual([{ userId: 'user-1', via: 'forward', target }]);
+  });
+
   // §10.1 step 5: "members who are DND, offline or under an in-effect OOO rule are skipped".
   it.each([
     { state: 'DND', overrides: { dnd: true } },

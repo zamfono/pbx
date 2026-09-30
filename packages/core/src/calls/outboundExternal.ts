@@ -13,10 +13,11 @@ import {
   type Route
 } from '../routing/trunk.js';
 import { settleAnswered } from './answer.js';
-import { release, type Call } from './call.js';
+import type { Call } from './call.js';
 import type { TrunkRow } from './callerIdentity.js';
 import { concludeExhausted, concludeFinal } from './conclude.js';
 import { attemptRoute, type AttemptOutcome } from './dialAttempt.js';
+import type { ForwardLeg } from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';
 import { prepareRoute, routesFor, routeTrunk } from './routeSelection.js';
 import type { TrunkState } from './trunkState.js';
@@ -34,6 +35,7 @@ async function tryRoute(params: {
   asUser: string | null;
   clirPerCall: boolean | null;
   snapshot: Snapshot;
+  forward: ForwardLeg | undefined;
 }): Promise<AttemptOutcome> {
   const { pipeline, trunkState, call, route, trunk, number, asUser, snapshot } =
     params;
@@ -53,11 +55,20 @@ async function tryRoute(params: {
       route,
       trunk,
       number,
-      identity: prepared.identity
+      identity: prepared.identity,
+      forward: params.forward
     },
     snapshot
   );
 }
+
+/** Who dials an external leg: the pipeline and trunk state, and for a leg dialled for a forward
+ * target, the hops that led to it (§9.4 "Forwarded calls"). */
+export type ExternalDialCtx = {
+  pipeline: Pipeline;
+  trunkState: TrunkState;
+  forward?: ForwardLeg;
+};
 
 /** `originateExternalLeg`'s outcome: an answered leg, a final (non-fallthrough) failure, or the
  * route list exhausted — the same three cases `dialExternal`'s own settlement distinguishes, and
@@ -79,7 +90,7 @@ export type ExternalDialResult =
  * outbound step 6, or `addParty`'s `*5` to an external number.
  */
 export async function originateExternalLeg(
-  ctx: { pipeline: Pipeline; trunkState: TrunkState },
+  ctx: ExternalDialCtx,
   call: Call,
   number: string,
   asUser: string | null,
@@ -106,7 +117,8 @@ export async function originateExternalLeg(
       number,
       asUser,
       clirPerCall,
-      snapshot
+      snapshot,
+      forward: ctx.forward
     });
     if (attempted.kind === 'answered') {
       return { kind: 'answered', channelId: attempted.channelId };
@@ -125,7 +137,7 @@ export async function originateExternalLeg(
  * each in turn and falling through per §9.4 "Route fallthrough" until one answers or exhausted.
  */
 export async function dialExternal(
-  ctx: { pipeline: Pipeline; trunkState: TrunkState },
+  ctx: ExternalDialCtx,
   call: Call,
   number: string,
   asUser: string | null,
@@ -148,27 +160,4 @@ export async function dialExternal(
     return;
   }
   await concludeExhausted(pipeline, call, result.lastFailureKind);
-}
-
-/**
- * §10.1 step 7: an external forward target is dialled out like any other outbound call, so §9.4's
- * route, trunk and caller-ID rules apply, "as the forwarding user's call": `asUser` is the user
- * whose own rule forwarded, not the original caller, and `null` when a DID, menu, ring group or
- * tenant rule forwards. A pipeline with no trunk state cannot reach a trunk at all, and releases
- * rather than pretending to try.
- */
-const FORWARD_TARGET_UNAVAILABLE = 480;
-
-export async function dialForwardTarget(
-  pipeline: Pipeline,
-  call: Call,
-  number: string,
-  asUser: string | null
-): Promise<void> {
-  const { trunkState } = pipeline.deps;
-  if (trunkState === null) {
-    await release(pipeline, call, FORWARD_TARGET_UNAVAILABLE, 'failed');
-    return;
-  }
-  await dialExternal({ pipeline, trunkState }, call, number, asUser, null);
 }
