@@ -1,7 +1,8 @@
 /**
  * The call a click-to-dial originate places (§10.2 "Click-to-dial"): built before any device of
  * the user rings, its trace naming the actor, and dialled once one of them answers, exactly as
- * that device would have dialled the target. `actions.ts` owns the ring and the action surface.
+ * that device would have dialled the target. `actions.ts` owns the action surface, `ownDevices.ts`
+ * the ring.
  */
 import { newId, type OriginateRequest } from '@zamfono/shared';
 
@@ -27,19 +28,18 @@ function extensionOf(snapshot: Snapshot, userId: string): string {
 }
 
 /** The originated call, from the user's own extension to `resolved`, with the actor in its trace;
- * `callerChannelId` is the first device's pre-assigned channel until one of them answers. */
+ * it has no caller channel (`callerChannelId` "") until one of the user's devices answers. */
 export function newOriginatedCall(
   pipeline: Pipeline,
   snapshot: Snapshot,
   req: OriginateRequest,
-  resolved: ResolvedTarget,
-  callerChannelId: string
+  resolved: ResolvedTarget
 ): Call {
   const startedAt = pipeline.deps.now();
   const call = newCall({
     id: newId(),
     direction: resolved.direction,
-    callerChannelId,
+    callerChannelId: '',
     from: extensionOf(snapshot, req.userId),
     to: resolved.to,
     startedAt,

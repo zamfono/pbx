@@ -96,7 +96,7 @@ export class Pipeline {
     });
   }
 
-  /** The call `ev` belongs to, by its channel or, for a leg or click-to-dial channel that has not
+  /** The call `ev` belongs to, by its channel or, for a leg channel that has not
    * been tracked yet, by the call id its Stasis arguments carry; `null` before any call exists. */
   private callIdOf(ev: AriEvent): string | null {
     const channel = ev.channel as Channel | undefined;
@@ -107,9 +107,7 @@ export class Pipeline {
     }
     const [kind, callId] =
       (ev.args as (string | undefined)[] | undefined) ?? [];
-    return (kind === 'leg' || kind === 'click') && callId !== undefined
-      ? callId
-      : null;
+    return kind === 'leg' && callId !== undefined ? callId : null;
   }
 
   /**
@@ -186,6 +184,18 @@ export class Pipeline {
     }
     // A `snoop,<channelId>` entry is the recorder's own spy channel (§10.2): `Recorder` holds its
     // id from the originate and drives its recording directly, so the pipeline leaves it alone.
+  }
+
+  /** Routes `exten` as dialled from `channel`, a device channel already in the app and answered
+   * (an API pickup's, `actions.ts`), exactly as its own `outbound,<exten>` entry would be. */
+  async dialFrom(channel: Channel, exten: string): Promise<void> {
+    await this.outboundHandler?.({
+      type: 'StasisStart',
+      timestamp: new Date().toISOString(),
+      application: 'zamfono',
+      args: ['outbound', exten],
+      channel
+    });
   }
 
   /** Wires Task 30's `handleOutbound` for `outbound,<exten>` Stasis entries (§9.2). */

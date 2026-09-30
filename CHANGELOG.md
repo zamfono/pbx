@@ -39,7 +39,8 @@ why the specified behaviour changed; the commit history, how.
   is empty rather than 0.
 - At the call log's `sip` level, a leg refused at once (a trunk answering 403 within
   milliseconds) recorded none of its SIP messages. Each leg the PBX places now joins the call's
-  capture before its INVITE leaves.
+  capture before its INVITE leaves, the user's own phones a click-to-dial or an API pickup rings
+  included.
 - A ring group change that left its members alone (its strategy, ring timeout, mailbox or
   diagnostics level) did not reach call routing until some other change reloaded the
   configuration; raising a group to `qos` or `sip` had no effect on its calls.

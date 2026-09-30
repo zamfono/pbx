@@ -6,7 +6,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri, isPlacement, placedCallerId } from '../ari/fake.js';
-import { defaultChannel, type Logger } from '../ari/types.js';
+import { defaultChannel, type Channel, type Logger } from '../ari/types.js';
 import { CdrWriter } from '../cdr.js';
 import {
   ConfigCache,
@@ -282,13 +282,27 @@ describe('CallActions', () => {
     return `http://127.0.0.1:${started.port}`;
   }
 
+  /** Every channel placed, in order. A created channel's id is Asterisk's, assigned at the
+   * create, so it is read from the `dial` that follows it. */
   function originates(): OriginateRecord[] {
+    const dialled = fakeAri.calls
+      .filter(
+        entry =>
+          entry.method === 'POST' && /^channels\/[^/]+\/dial$/u.test(entry.path)
+      )
+      .map(entry => entry.path.split('/')[1]);
+    let next = 0;
     return fakeAri.calls
       .filter(entry => isPlacement(entry))
-      .map(entry => ({
-        ...(entry.body as OriginateRecord),
-        callerId: placedCallerId(entry)
-      }));
+      .map(entry => {
+        const body = entry.body as OriginateRecord;
+        const created = entry.path === 'channels/create';
+        return {
+          ...body,
+          channelId: body.channelId ?? (created ? dialled[next++] : undefined),
+          callerId: placedCallerId(entry)
+        };
+      });
   }
 
   function hungUp(channelId: string): boolean {
@@ -399,9 +413,10 @@ describe('CallActions', () => {
         'PJSIP/e101-a',
         'PJSIP/e101-b'
       ]);
+      // Placed as any leg of the call is (§7 level `sip`: created, joined, then dialled).
       expect(dialled.slice(0, 2).map(entry => entry.appArgs)).toEqual([
-        `click,${callId}`,
-        `click,${callId}`
+        `leg,${callId}`,
+        `leg,${callId}`
       ]);
       // The device that answered first carries the call; the other one is hung up.
       const deviceChannelIds = dialled
@@ -595,7 +610,7 @@ describe('CallActions', () => {
     await seedDevice(db, fakeAri, callerId, 'e101-a');
     await seedDevice(db, fakeAri, callerId, 'e101-b');
     await devicesUp();
-    const registerLeg = vi.spyOn(cdr, 'registerLeg');
+    const joinLeg = vi.spyOn(cdr, 'joinLeg');
 
     const result = await actions.originate({
       userId: callerId,
@@ -610,7 +625,7 @@ describe('CallActions', () => {
       .map(entry => entry.channelId);
     expect(rung).toHaveLength(2);
     expect(
-      registerLeg.mock.calls.map(([call, channelId]) => [call.id, channelId])
+      joinLeg.mock.calls.map(([call, channelId]) => [call.id, channelId])
     ).toEqual(rung.map(channelId => [callId, channelId]));
   });
 
@@ -660,6 +675,58 @@ describe('CallActions', () => {
     for (const entry of rung) {
       expect(entry.variables?.['CHANNEL(language)']).toBe('de');
     }
+  });
+
+  // §7 level `sip`: a device refusing at once (a 603 within milliseconds) is gone before a read
+  // after a one-step originate could reach it; placed as any leg is, it has joined by then.
+  it('joins a device that refuses at once to the SIP capture before it is dialled, and ends the call unanswered', async () => {
+    await setUp();
+    fakeAri.answerAfterMs = 60_000;
+    const callerId = await seedUser(db, '101');
+    await seedDevice(db, fakeAri, callerId, 'e101-a');
+    await devicesUp();
+    const trail: string[] = [];
+    const joinLeg = vi.spyOn(cdr, 'joinLeg').mockImplementation((_call, id) => {
+      trail.push(`join ${id}`);
+      return Promise.resolve();
+    });
+    fakeAri.onOriginate = channel => {
+      trail.push(`dial ${channel.id}`);
+      fakeAri.emit({
+        type: 'ChannelDestroyed',
+        timestamp: nowIso(),
+        application: 'zamfono',
+        channel,
+        cause: 21
+      });
+    };
+
+    const result = await actions.originate({
+      userId: callerId,
+      target: '102',
+      actorUserId: callerId,
+      requestId: 'req-refused'
+    });
+
+    const callId = 'callId' in result ? result.callId : '';
+    const [device] = originates();
+    expect(joinLeg).toHaveBeenCalledOnce();
+    expect(trail).toEqual([
+      `join ${device?.channelId ?? ''}`,
+      `dial ${device?.channelId ?? ''}`
+    ]);
+    const row = await eventually(async () => {
+      const written = await db
+        .selectFrom('calls')
+        .select(['status', 'log', 'endedAt'])
+        .where('id', '=', callId)
+        .executeTakeFirstOrThrow();
+      expect(written.endedAt).not.toBeNull();
+      return written;
+    });
+    expect(row.status).toBe('failed');
+    expect(row.log).toContain('"event":"declined"');
+    expect(row.log).toContain('"event":"originate","result":"unanswered"');
   });
 
   it('answers 409 noRegisteredDevice when the user has devices but none is registered', async () => {
@@ -799,8 +866,13 @@ describe('CallActions', () => {
     });
   });
 
-  it('picks up a ringing call by ringing the picker devices with *8<ext>, and refuses 409 notRinging otherwise', async () => {
+  it('picks up a ringing call by ringing the picker devices and dialling *8<ext> with the one that answers, and refuses 409 notRinging otherwise', async () => {
     await setUp();
+    const dials: { args: unknown; channelId: string }[] = [];
+    pipeline.setOutboundHandler(ev => {
+      dials.push({ args: ev.args, channelId: (ev.channel as Channel).id });
+      return Promise.resolve();
+    });
     const calleeId = await seedUser(db, '101');
     const pickerId = await seedUser(db, '102');
     await seedDevice(db, fakeAri, pickerId, 'e102-a');
@@ -815,10 +887,16 @@ describe('CallActions', () => {
       'PJSIP/e102-a',
       'PJSIP/e102-b'
     ]);
-    expect(dialled.map(entry => entry.appArgs)).toEqual([
-      'outbound,*8101',
-      'outbound,*8101'
-    ]);
+    // Both ring in a race of their own; the first to answer dials `*8101` as the feature code would.
+    const [first, second] = dialled.map(entry => entry.appArgs);
+    expect(first).toMatch(/^leg,/u);
+    expect(second).toBe(first);
+    await eventually(() => {
+      expect(dials).toEqual([
+        { args: ['outbound', '*8101'], channelId: dialled[0]?.channelId }
+      ]);
+      expect(hungUp(dialled[1]?.channelId ?? '')).toBe(true);
+    });
 
     const answered = await answeredCall(calleeId);
     await expect(
@@ -853,7 +931,7 @@ describe('CallActions', () => {
     await seedDevice(db, fakeAri, pickerId, 'e102-b');
     await devicesUp();
     const ringing = ringingCall(calleeId);
-    const registerLeg = vi.spyOn(cdr, 'registerLeg');
+    const joinLeg = vi.spyOn(cdr, 'joinLeg');
 
     await actions.pickup(ringing.id, {
       userId: pickerId,
@@ -863,7 +941,7 @@ describe('CallActions', () => {
     const rung = originates().map(entry => entry.channelId);
     expect(rung).toHaveLength(2);
     expect(
-      registerLeg.mock.calls.map(([call, channelId]) => [call.id, channelId])
+      joinLeg.mock.calls.map(([call, channelId]) => [call.id, channelId])
     ).toEqual(rung.map(channelId => [ringing.id, channelId]));
     clearTimeout(pipeline.pendingRing.get(ringing.id)?.timer);
   });

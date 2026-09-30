@@ -37,9 +37,11 @@ type QosTarget = { channelId: string; role: Role };
 // The caller's own channel, plus every leg bridged in (`up`) right now; a leg still ringing, or one
 // that ended unanswered, never carried the call's own media.
 function qosTargets(call: Call): QosTarget[] {
-  const targets: QosTarget[] = [
-    { channelId: call.callerChannelId, role: 'caller' }
-  ];
+  // A click-to-dial call has no caller channel ("") until the user's device answers.
+  const targets: QosTarget[] =
+    call.callerChannelId === ''
+      ? []
+      : [{ channelId: call.callerChannelId, role: 'caller' }];
   for (const leg of call.legs.values()) {
     if (leg.state === 'up') {
       targets.push({ channelId: leg.channelId, role: 'callee' });
@@ -84,6 +86,10 @@ export class QosRows {
    * level decides only at the write.
    */
   note(call: Call): void {
+    const targets = qosTargets(call);
+    if (targets.length === 0 && !this.calls.has(call.id)) {
+      return;
+    }
     const tracked = this.calls.get(call.id) ?? {
       call,
       roles: new Map<string, Role>(),
@@ -92,7 +98,7 @@ export class QosRows {
       written: false
     };
     this.calls.set(call.id, tracked);
-    for (const target of qosTargets(call)) {
+    for (const target of targets) {
       // A channel that has ended keeps the row it had; the caller's stays the call's caller.
       if (tracked.ended.has(target.channelId)) {
         continue;
