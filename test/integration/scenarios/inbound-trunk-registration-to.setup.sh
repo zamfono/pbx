@@ -17,11 +17,13 @@ compose=$4
 ATTEMPTS=45
 
 # shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
-$compose exec -T sipp-provider rm -f /tmp/registrar-line.csv
+$compose exec -T sipp-provider rm -f /tmp/registrar-line.csv /tmp/registrar-messages.log
 # shellcheck disable=SC2086
 $compose exec -T -d sipp-provider sh -c \
   'sh /scenarios/_sipp-run.sh provider-registrar \
-    -sf /scenarios/uas/registrar.xml -p 5060 -aa -nostdin asterisk:5060 > /tmp/registrar.log 2>&1'
+    -sf /scenarios/uas/registrar.xml -p 5060 -aa -nostdin \
+    -trace_msg -message_file /tmp/registrar-messages.log \
+    asterisk:5060 > /tmp/registrar.log 2>&1'
 
 provider_ip=$(container_ip sipp-provider)
 trunk_id=$(api POST /trunks "{
