@@ -6,8 +6,10 @@
 # sipp sends no RTCP, so a round trip is never measured here: it is held to be null or a real
 # one, never the 0 an unmeasured one used to read as. Jitter and loss are measured on a leg that
 # received RTP; with `measured`, the scenario's sides both played audio (sipp's pcap), so every
-# leg's jitter and loss must be numbers, else each is only held to be a number or null. The rows
-# are printed, for the run's log.
+# leg's jitter and loss must be numbers, and every leg must have received and sent packets
+# (`rxPackets`, `txPackets` above 0: a leg whose peer's audio never arrived reads 0 received);
+# else each is only held to be a number or null, a count a whole number. The rows are printed,
+# for the run's log.
 #
 # Usage: _qos-check.sh <api-base> <token> [measured]
 set -euo pipefail
@@ -33,6 +35,14 @@ for row in rows:
         value = row[field]
         if value is not None and not isinstance(value, (int, float)):
             sys.exit("call_qos row %s has a %s that is no number" % (row, field))
+    for field in ("rxPackets", "txPackets"):
+        value = row[field]
+        if value is not None and (not isinstance(value, int) or isinstance(value, bool)
+                                  or value < 0):
+            sys.exit("call_qos row %s has a %s that is no packet count" % (row, field))
+        if measured and not (isinstance(value, int) and value > 0):
+            sys.exit("call_qos row %s counts no packet in %s on a leg that carried audio"
+                     % (row, field))
     if row["rttMs"] is not None and not row["rttMs"] > 0:
         sys.exit("call_qos row %s has a round trip neither measured nor null" % row)
     if measured and (row["jitterMs"] is None or row["lossPct"] is None):
