@@ -103,12 +103,14 @@ async function seedRegistrationTrunk(
   return id;
 }
 
-/** An `ip` trunk, whose status is its first host's `qualify` reachability (§9.4). */
+/** An `ip` trunk, whose status is its first host's `qualify` reachability (§9.4), or
+ * `unmonitored` with `qualify` 0. */
 async function seedIpTrunk(
   db: Db,
   name: string,
   priority: number,
-  deletedAt: string | null = null
+  deletedAt: string | null = null,
+  qualify = 1
 ): Promise<string> {
   const id = newId();
   await db
@@ -124,7 +126,8 @@ async function seedIpTrunk(
       inboundAuth: 0,
       transport: 'udp',
       createdAt: nowIso(),
-      deletedAt
+      deletedAt,
+      qualify
     })
     .execute();
   await db
@@ -156,6 +159,8 @@ describe('TrunkState', () => {
   // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let bus: EventBus;
   // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
+  let cache: ConfigCache;
+  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let trunkState: TrunkState;
 
   beforeEach(async () => {
@@ -183,10 +188,11 @@ describe('TrunkState', () => {
     await ami.connect();
     state = new StateStore();
     bus = new EventBus();
+    cache = new ConfigCache(db);
     trunkState = new TrunkState({
       ari,
       ami,
-      cache: new ConfigCache(db),
+      cache,
       state,
       bus,
       now: nowIso
@@ -375,6 +381,102 @@ describe('TrunkState', () => {
     expect(state.trunks.size).toBe(0);
     expect(emitted).toHaveLength(0);
     unsubscribe();
+  });
+
+  // §9.4 "Provisioning and status": `trunks.qualify` off renders `qualify_frequency = 0`, so
+  // Asterisk probes nothing and the contact reads `NonQualified`; the trunk is `unmonitored`.
+  describe('an ip trunk with qualify off', () => {
+    async function setQualify(trunkId: string, qualify: number): Promise<void> {
+      await db
+        .updateTable('trunks')
+        .set({ qualify })
+        .where('id', '=', trunkId)
+        .execute();
+      // What `/internal/configChanged` does before it refreshes (§3.1).
+      cache.invalidate();
+      await trunkState.refreshMonitoring();
+    }
+
+    it('is unmonitored at boot whatever its endpoint reports', async () => {
+      await seedSettings(db);
+      const trunkId = await seedIpTrunk(db, 'agent', 1, null, 0);
+      fakeAri.endpoints.push({
+        technology: 'PJSIP',
+        resource: trunkSectionName(trunkId),
+        state: 'offline',
+        // eslint-disable-next-line camelcase -- ARI's own field name
+        channel_ids: []
+      });
+
+      await trunkState.resyncContacts();
+
+      expect(state.trunks.get(trunkId)?.status).toBe('unmonitored');
+    });
+
+    it('stays unmonitored on any ContactStatusChange, with one trunk.status event', async () => {
+      await seedSettings(db);
+      const trunkId = await seedIpTrunk(db, 'agent', 1, null, 0);
+      const emitted: Envelope[] = [];
+      const unsubscribe = bus.subscribe(envelope => {
+        emitted.push(envelope);
+      });
+
+      contactStatus(trunkSectionName(trunkId), 'NonQualified');
+      await eventually(() => {
+        expect(state.trunks.get(trunkId)?.status).toBe('unmonitored');
+      });
+      // A probe result from before the switch, which a reload can still deliver.
+      contactStatus(trunkSectionName(trunkId), 'Unreachable');
+      await sleep(SETTLE_MS);
+
+      expect(state.trunks.get(trunkId)?.status).toBe('unmonitored');
+      expect(emitted).toHaveLength(1);
+      expect(emitted[0]).toMatchObject({
+        type: 'trunk.status',
+        trunkId,
+        status: 'unmonitored'
+      });
+      unsubscribe();
+    });
+
+    it('turns unmonitored when qualify is switched off, and unknown until its first probe when switched back on', async () => {
+      await seedSettings(db);
+      const trunkId = await seedIpTrunk(db, 'agent', 1);
+      contactStatus(trunkSectionName(trunkId), 'Unreachable');
+      await eventually(() => {
+        expect(state.trunks.get(trunkId)?.status).toBe('unreachable');
+      });
+
+      await setQualify(trunkId, 0);
+      expect(state.trunks.get(trunkId)?.status).toBe('unmonitored');
+
+      await setQualify(trunkId, 1);
+      expect(state.trunks.get(trunkId)?.status).toBe('unknown');
+      contactStatus(trunkSectionName(trunkId), 'Reachable');
+      await eventually(() => {
+        expect(state.trunks.get(trunkId)?.status).toBe('registered');
+      });
+    });
+
+    it('leaves a probed trunk and a registration trunk alone on a refresh', async () => {
+      await seedSettings(db);
+      const probedId = await seedIpTrunk(db, 'carrier', 2);
+      const registrationId = await seedRegistrationTrunk(
+        db,
+        'acct1',
+        'sip.example.com'
+      );
+      contactStatus(trunkSectionName(probedId), 'Reachable');
+      await eventually(() => {
+        expect(state.trunks.get(probedId)?.status).toBe('registered');
+      });
+
+      // `qualify` means nothing to a registration trunk, whose status is its registration's.
+      await setQualify(registrationId, 0);
+
+      expect(state.trunks.get(probedId)?.status).toBe('registered');
+      expect(state.trunks.has(registrationId)).toBe(false);
+    });
   });
 
   it("serves each trunk's channels in use in the live state until it carries none (§7, §9.4)", async () => {

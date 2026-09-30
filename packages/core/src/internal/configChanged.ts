@@ -1,7 +1,8 @@
 /**
  * Handles `POST /internal/configChanged` (§3.1 "Config propagation"): validates the body,
  * invalidates the config cache, reloads the named Asterisk modules over ARI, and recomputes
- * presence from the new configuration (§10.2 "Presence and BLF").
+ * presence (§10.2 "Presence and BLF") and the `unmonitored` trunk statuses (§9.4 "Provisioning
+ * and status") from the new configuration.
  */
 import type http from 'node:http';
 
@@ -102,10 +103,14 @@ async function readConfigChangedBody(
 /** `presence.ts`'s `Presence`, as far as a config change needs it; `null` recomputes nothing. */
 export type PresenceRefresh = { refreshAll: () => Promise<void> };
 
+/** `trunkState.ts`'s `TrunkState`, as far as a config change needs it; `null` recomputes nothing. */
+export type TrunkMonitoringRefresh = { refreshMonitoring: () => Promise<void> };
+
 export type ConfigChangedDeps = {
   cache: ConfigCache;
   ari: AriClient;
   presence: PresenceRefresh | null;
+  trunks: TrunkMonitoringRefresh | null;
 };
 
 /**
@@ -156,6 +161,8 @@ export async function handleConfigChanged(
   // A write `api` made can change a user's presence without any call or registration event:
   // DND set over REST, the last device deleted (§5.7, §10.2). `*90`/`*91` refresh on their own.
   await deps.presence?.refreshAll();
+  // A trunk's `qualify` switched either way (§9.4 "Provisioning and status").
+  await deps.trunks?.refreshMonitoring();
   response.writeHead(HTTP_NO_CONTENT);
   response.end();
 }

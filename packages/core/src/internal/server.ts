@@ -25,7 +25,8 @@ import { handleActionRoute } from './actionRoutes.js';
 import {
   handleConfigChanged,
   respondJson,
-  type PresenceRefresh
+  type PresenceRefresh,
+  type TrunkMonitoringRefresh
 } from './configChanged.js';
 import { EventBus } from './eventBus.js';
 import { ConfigCache, type Snapshot } from './snapshot.js';
@@ -63,6 +64,8 @@ type InternalDeps = {
   actions: CallActions | null;
   /** Recomputed after every config change (`configChanged.ts`); `null` leaves presence alone. */
   presence: PresenceRefresh | null;
+  /** The `unmonitored` trunk statuses, likewise; `null` leaves them alone. */
+  trunks: TrunkMonitoringRefresh | null;
 };
 
 async function handleHealthz(

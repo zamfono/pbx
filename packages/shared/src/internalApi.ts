@@ -12,7 +12,7 @@ export type ReloadKind = 'pjsip' | 'dialplan' | 'moh';
 export type ConfigChangedRequest = { reload: ReloadKind[] };
 
 export type TrunkStatus = {
-  status: 'registered' | 'unreachable' | 'unknown';
+  status: 'registered' | 'unreachable' | 'unmonitored' | 'unknown';
   statusChangedAt: string | null;
 };
 

@@ -14,6 +14,7 @@ import type { ConfigCache, EventBus, StateStore } from '../internal/server.js';
 import {
   contactEventStatus,
   endpointStatuses,
+  monitoringStatuses,
   registrationDetailStatuses,
   registrationTrunks,
   registryEventStatus,
@@ -135,6 +136,22 @@ export class TrunkState {
     const snapshot = await this.deps.cache.get();
     this.apply(
       endpointStatuses(snapshot, await this.deps.ari.endpoints.list())
+    );
+  }
+
+  /**
+   * Settles the `unmonitored` statuses after a config change (`/internal/configChanged`, §3.1):
+   * a trunk whose `qualify` was just switched off gets no reliable `ContactStatusChange` saying
+   * so, and one switched back on is `unknown` until its first probe answers (§9.4 "Provisioning
+   * and status").
+   */
+  async refreshMonitoring(): Promise<void> {
+    const snapshot = await this.deps.cache.get();
+    this.apply(
+      monitoringStatuses(
+        snapshot,
+        trunkId => this.deps.state.trunks.get(trunkId)?.status
+      )
     );
   }
 

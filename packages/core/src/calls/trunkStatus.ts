@@ -1,7 +1,8 @@
 /**
  * What Asterisk reports about a trunk, read as the trunk's status (spec §9.4 "Provisioning and
  * status"): `ip` trunks by the `qualify` reachability of their first host's contact, from the ARI
- * endpoint list at boot and `ContactStatusChange` after; `registration` trunks by their
+ * endpoint list at boot and `ContactStatusChange` after, or `unmonitored` while `trunks.qualify` is
+ * off and nothing probes that contact; `registration` trunks by their
  * registration outcome, from AMI `PJSIPShowRegistrationsOutbound` at boot and `Registry` events
  * after. Pure mappings from a snapshot and Asterisk's answer to `[trunkId, status]` pairs, which
  * `TrunkState` applies to the live state.
@@ -9,14 +10,15 @@
 import {
   registrationUris,
   trunkSectionName,
-  type TrunkHost
+  type TrunkHost,
+  type TrunkStatus as TrunkStatusWire
 } from '@zamfono/shared';
 
 import type { AmiEvent } from '../ami/client.js';
 import type { AriEvent, Endpoint } from '../ari/types.js';
 import type { Snapshot } from '../internal/server.js';
 
-export type TrunkStatus = 'registered' | 'unreachable';
+export type TrunkStatus = TrunkStatusWire['status'];
 export type StatusChange = [trunkId: string, status: TrunkStatus];
 
 /** AMI `Registry`/`OutboundRegistrationDetail` status → trunk status; `Partial` since an unmapped AMI status looks up as `undefined` at runtime. */
@@ -40,6 +42,12 @@ function liveTrunks(snapshot: Snapshot): Snapshot['trunks'] {
 
 function ipTrunks(snapshot: Snapshot): Snapshot['trunks'] {
   return liveTrunks(snapshot).filter(trunk => trunk.authMode === 'ip');
+}
+
+/** An `ip` trunk whose contact Asterisk never probes (`qualify_frequency = 0`): its contact reads
+ * `NonQualified` and says nothing about the provider, so the trunk is `unmonitored`. */
+function unprobed(trunk: Snapshot['trunks'][number]): boolean {
+  return trunk.authMode === 'ip' && trunk.qualify === 0;
 }
 
 /** `trunk`'s `outbound`/`both` hosts, in priority order (§9.4 "Hosts"). */
@@ -125,6 +133,11 @@ export function contactEventStatus(
   if (trunk === undefined) {
     return null;
   }
+  // Whatever the contact says, `NonQualified` or a probe result from before the switch, which a
+  // reload can still deliver: nothing measures this trunk now.
+  if (unprobed(trunk)) {
+    return [trunk.id, 'unmonitored'];
+  }
   if (info?.contact_status === 'Reachable') {
     return [trunk.id, 'registered'];
   }
@@ -139,11 +152,33 @@ export function endpointStatuses(
   endpoints: Endpoint[]
 ): StatusChange[] {
   return ipTrunks(snapshot).flatMap(trunk => {
+    if (unprobed(trunk)) {
+      return [[trunk.id, 'unmonitored'] as StatusChange];
+    }
     const endpoint = endpoints.find(
       entry => entry.resource === trunkSectionName(trunk.id)
     );
     const status =
       endpoint === undefined ? undefined : ENDPOINT_STATUS[endpoint.state];
     return status === undefined ? [] : [[trunk.id, status] as StatusChange];
+  });
+}
+
+/**
+ * The statuses a config change settles without waiting for Asterisk: every `ip` trunk whose
+ * `qualify` is off is `unmonitored`, and a trunk that was `unmonitored` but is probed again, or is
+ * now a `registration` trunk, is `unknown` until its first probe or registration outcome arrives.
+ */
+export function monitoringStatuses(
+  snapshot: Snapshot,
+  current: (trunkId: string) => TrunkStatus | undefined
+): StatusChange[] {
+  return liveTrunks(snapshot).flatMap(trunk => {
+    if (unprobed(trunk)) {
+      return [[trunk.id, 'unmonitored'] as StatusChange];
+    }
+    return current(trunk.id) === 'unmonitored'
+      ? [[trunk.id, 'unknown'] as StatusChange]
+      : [];
   });
 }

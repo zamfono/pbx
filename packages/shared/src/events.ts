@@ -44,7 +44,7 @@ export type Event =
   | {
       type: 'trunk.status';
       trunkId: string;
-      status: 'registered' | 'unreachable' | 'unknown';
+      status: 'registered' | 'unreachable' | 'unmonitored' | 'unknown';
     }
   | { type: 'history.appended'; callId: string }
   | { type: 'backup.started'; targetId: string; runId: string }

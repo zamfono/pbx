@@ -119,7 +119,8 @@ describe('startInternalServer', () => {
         state,
         bus: new EventBus(),
         actions: null,
-        presence: null
+        presence: null,
+        trunks: null
       },
       ANY_FREE_PORT
     );
@@ -288,7 +289,8 @@ describe('startInternalServer', () => {
         state: new StateStore(),
         bus,
         actions: null,
-        presence: null
+        presence: null,
+        trunks: null
       },
       ANY_FREE_PORT
     );
@@ -346,7 +348,8 @@ describe('startInternalServer', () => {
         state: new StateStore(),
         bus,
         actions: null,
-        presence: null
+        presence: null,
+        trunks: null
       },
       ANY_FREE_PORT
     );

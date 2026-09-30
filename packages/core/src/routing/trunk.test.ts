@@ -133,6 +133,19 @@ describe('emergencyTrunks', () => {
     expect(emergencyTrunks(trunks)).toEqual(['second', 'first']);
   });
 
+  it('tries an unmonitored trunk, which is never probed (§9.4 "Provisioning and status")', () => {
+    const trunks = [
+      {
+        id: 'unprobed',
+        priority: 1,
+        emergency: true,
+        status: 'unmonitored' as const
+      }
+    ];
+
+    expect(emergencyTrunks(trunks)).toEqual(['unprobed']);
+  });
+
   it('never tries a trunk without the emergency flag (§9.4 "Emergency trunks")', () => {
     const foreign = {
       id: 'foreign',

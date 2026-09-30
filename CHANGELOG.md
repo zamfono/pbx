@@ -20,6 +20,15 @@ why the specified behaviour changed; the commit history, how.
   back, and removed if they leave it out, since the call replaces the rules as a whole. An
   external forward is dialled as the user's own call, so a number their outbound routes do not
   carry is stored but refused when a call is forwarded.
+- A trunk setting `qualify` (`trunks.create`, `trunks.update`, `POST /trunks`,
+  `PATCH /trunks/{id}`), on unless given: with it off, the stack stops sending an `ip` trunk's
+  provider the OPTIONS request it checks reachability with every 60 seconds, for an endpoint that
+  never answers one, such as possibly OpenAI's Realtime SIP endpoint, and so showed `unreachable`
+  and had every call to it skipped. Such a trunk reports the new status `unmonitored`
+  (`trunks.get`, `GET /trunks`, the `trunk.status` event), is always tried, and fails over only
+  when a call over it fails; `zamfono_trunk_registered` in `/metrics` has no line for it.
+  `qualify` has no effect on a `registration` trunk, whose status is its registration's. Existing
+  trunks keep `qualify` on.
 - A call's QoS rows (`calls.get`, `GET /calls/{id}`, at diagnostics level `qos`) count each
   leg's RTP packets, `rxPackets` received from its far end and `txPackets` sent to it. An answered
   leg with `rxPackets: 0` received no audio at all from that side, typically a phone behind NAT

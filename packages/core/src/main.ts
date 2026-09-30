@@ -150,7 +150,7 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
     const actions = new CallActions(pipeline);
     await resyncOnBoot({ db, ari, now: nowIso, pipeline, log });
     const server = await startInternalServer(
-      { db, ari, cache, state, bus, actions, presence },
+      { db, ari, cache, state, bus, actions, presence, trunks: trunkState },
       CORE_INTERNAL_PORT
     );
     // --- end Task 33 ---

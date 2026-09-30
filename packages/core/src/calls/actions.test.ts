@@ -274,7 +274,8 @@ describe('CallActions', () => {
         state: new StateStore(),
         bus: new EventBus(),
         actions,
-        presence: null
+        presence: null,
+        trunks: null
       },
       ANY_FREE_PORT
     );

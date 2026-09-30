@@ -121,7 +121,7 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
       expect(state.presence.get(userId)?.status).toBe('available');
     });
     const started = await startInternalServer(
-      { db, ari, cache, state, bus, actions: null, presence },
+      { db, ari, cache, state, bus, actions: null, presence, trunks: null },
       ANY_FREE_PORT
     );
     close = started.close;
@@ -165,5 +165,47 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
         call.path === 'deviceStates/Stasis:presence-101'
     );
     expect(hints.at(-1)?.body).toEqual({ deviceState: 'BUSY' });
+  });
+
+  it('refreshes the trunks\' unmonitored statuses once the cache is dropped (§9.4 "Provisioning and status")', async () => {
+    const cache = new ConfigCache(db);
+    let invalidatedFirst: boolean | null = null;
+    const invalidate = cache.invalidate.bind(cache);
+    let invalidated = false;
+    cache.invalidate = () => {
+      invalidated = true;
+      invalidate();
+    };
+    const started = await startInternalServer(
+      {
+        db,
+        ari,
+        cache,
+        state: new StateStore(),
+        bus: new EventBus(),
+        actions: null,
+        presence: null,
+        trunks: {
+          refreshMonitoring: () => {
+            invalidatedFirst = invalidated;
+            return Promise.resolve();
+          }
+        }
+      },
+      ANY_FREE_PORT
+    );
+    close = started.close;
+
+    const response = await fetch(
+      `http://127.0.0.1:${started.port}/internal/configChanged`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reload: ['pjsip'] })
+      }
+    );
+
+    expect(response.status).toBe(HTTP_NO_CONTENT);
+    expect(invalidatedFirst).toBe(true);
   });
 });

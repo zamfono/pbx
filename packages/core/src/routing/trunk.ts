@@ -5,7 +5,7 @@
  * pipeline passes in the rows already loaded for a call.
  */
 
-import { callingCode } from '@zamfono/shared';
+import { callingCode, type TrunkStatus } from '@zamfono/shared';
 
 export type Route = {
   id: string;
@@ -101,14 +101,15 @@ export const ATTEMPT_NO_RESPONSE_MS = 8000;
 
 /**
  * Emergency trunks to try (§10.1 "Emergency calls"): only those with `trunks.emergency` set (§9.4
- * "Emergency trunks"), in `trunks.priority` order, `unreachable` ones skipped.
+ * "Emergency trunks"), in `trunks.priority` order, `unreachable` ones skipped; an `unmonitored`
+ * one, never probed, is tried like an `unknown` one (§9.4 "Provisioning and status").
  */
 export function emergencyTrunks(
   trunks: {
     id: string;
     priority: number;
     emergency: boolean;
-    status: 'registered' | 'unreachable' | 'unknown';
+    status: TrunkStatus['status'];
   }[]
 ): string[] {
   return trunks
