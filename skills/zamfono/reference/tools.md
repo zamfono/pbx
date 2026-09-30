@@ -102,7 +102,7 @@
 | `users.get` | `GET /users/{id}` | Reads one live user by id. | user | no |
 | `users.list` | `GET /users` | Lists the tenant's live users, paginated. | admin | no |
 | `users.resetPassword` | `POST /users/{id}/resetPassword` | Issues a new one-time link to set a user's password. | admin | no |
-| `users.setForwarding` | `PUT /users/{id}/forwarding` | Replaces a user's call-forwarding rules as a whole. | admin | no |
+| `users.setForwarding` | `PUT /users/{id}/forwarding` | Replaces a user's call-forwarding rules as a whole; a user sets their own, without sip targets, an admin anyone's. | user | no |
 | `users.setPresence` | `PUT /users/{id}/presence` | Sets a user's do-not-disturb state. | user | no |
 | `users.update` | `PATCH /users/{id}` | Updates a user's profile; admins write every field, a user only their self-service subset. | user | no |
 | `voicemails.audio` | `GET /voicemails/{id}/audio` | Returns a voicemail's recorded audio. | user | no |

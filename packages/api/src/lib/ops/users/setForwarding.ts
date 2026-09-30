@@ -10,6 +10,7 @@ import {
   targetInputSchema
 } from './_shared.js';
 
+const STATUS_FORBIDDEN = 403;
 const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 /** §11.2 `user_forward_rules` CHECK: the classic CFU/CFB/CFNR conditions plus presence-aware ones. */
@@ -30,14 +31,26 @@ const inputSchema = z
   })
   .strict();
 
-/** `PUT /users/{id}/forwarding` (§10.3, §11.2): replaces a user's forwarding rules as a whole. */
+/**
+ * `PUT /users/{id}/forwarding` (§10.3, §11.2): replaces a user's forwarding rules as a whole,
+ * self-service on a `user` actor's own id (§10.3 "Users"). A `sip` target is refused for a `user`
+ * through `createTarget`, an admin-set rule sent back unchanged included, while one the input
+ * leaves out is removed like any other rule (§10.3 "Forward targets").
+ */
 export const setForwarding = defineOperation({
   name: 'users.setForwarding',
-  description: "Replaces a user's call-forwarding rules as a whole.",
+  description:
+    "Replaces a user's call-forwarding rules as a whole; a user sets their own, without sip targets, an admin anyone's.",
   input: inputSchema,
-  minRole: 'admin',
+  minRole: 'user',
   entity: input => ({ kind: 'user', id: input.id }),
   run: async (ctx, input) => {
+    if (ctx.actor.role === 'user' && ctx.actor.id !== input.id) {
+      throw new OpError(
+        STATUS_FORBIDDEN,
+        'users: may set only your own forwarding'
+      );
+    }
     await liveUser(ctx.db, input.id);
     const seenConditions = new Set<string>();
     for (const rule of input.rules) {

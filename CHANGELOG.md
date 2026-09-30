@@ -13,6 +13,13 @@ why the specified behaviour changed; the commit history, how.
 
 ### Added
 
+- Users set their own call forwarding: `users.setForwarding` (`PUT /users/{id}/forwarding`) is
+  self-service on a user's own account, refused with 403 for anyone else's, and audited under the
+  user's name; admins still set anyone's. A user may forward to anything they can already use
+  elsewhere, but not to a `sip` target: a rule an admin set to one is refused if the user sends it
+  back, and removed if they leave it out, since the call replaces the rules as a whole. An
+  external forward is dialled as the user's own call, so a number their outbound routes do not
+  carry is stored but refused when a call is forwarded.
 - A call's QoS rows (`calls.get`, `GET /calls/{id}`, at diagnostics level `qos`) count each
   leg's RTP packets, `rxPackets` received from its far end and `txPackets` sent to it. An answered
   leg with `rxPackets: 0` received no audio at all from that side, typically a phone behind NAT
