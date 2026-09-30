@@ -41,19 +41,36 @@ for _ in $(seq 1 50); do
 done
 
 # The stub runtime: `docker compose version` answers, `up --help` names --wait unless
-# STUB_NO_WAIT (podman-compose's has none), everything else is recorded and succeeds.
+# STUB_PODMAN_COMPOSE, which also has no `rm`, as podman-compose has neither; everything else is
+# recorded and succeeds, bar a pull under STUB_FAIL_PULL and an `up` under STUB_FAIL_UP.
 mkdir -p "$work/bin"
 cat >"$work/bin/docker" <<'STUB'
 #!/usr/bin/env bash
 if [[ $* == 'compose up --help' ]]; then
-  [[ -n ${STUB_NO_WAIT:-} ]] || echo '      --wait    Wait for services to be running|healthy.'
+  [[ -n ${STUB_PODMAN_COMPOSE:-} ]] || echo '      --wait    Wait for services to be running|healthy.'
   exit 0
 fi
 echo "$*" >>"$STUB_LOG"
-[[ -z ${STUB_FAIL_PULL:-} || $* != *' pull'* ]]
+if [[ -n ${STUB_PODMAN_COMPOSE:-} && $* == *' rm '* ]]; then
+  echo "podman-compose: error: argument command: invalid choice: 'rm'" >&2
+  exit 2
+fi
+[[ -z ${STUB_FAIL_PULL:-} || $* != *' pull'* ]] && [[ -z ${STUB_FAIL_UP:-} || $* != *' up -d'* ]]
 STUB
 chmod 755 "$work/bin/docker"
 cp "$work/bin/docker" "$work/bin/podman"
+# The stub systemctl, for the boot unit's path: `cat` shows the unit, the rest is recorded.
+cat >"$work/bin/systemctl" <<'STUB'
+#!/usr/bin/env bash
+if [[ $1 == cat ]]; then
+  cat "$ZAMFONO_UNIT_DIR/$2"
+  exit
+fi
+echo "systemctl $*" >>"$STUB_LOG"
+STUB
+chmod 755 "$work/bin/systemctl"
+# No boot unit unless a case installs one.
+mkdir -p "$work/units"
 
 # A stack as 1.2.3 set it up, before update.sh existed to add the updater's settings.
 fresh_stack() {
@@ -65,7 +82,12 @@ fresh_stack() {
 
 update() {
   (cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_RUNTIME=docker \
-    ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh "$@" </dev/null)
+    ZAMFONO_UNIT_DIR="$work/units" ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh "$@" </dev/null)
+}
+
+podman_update() {
+  (cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_RUNTIME=podman \
+    ZAMFONO_UNIT_DIR="$work/units" ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh "$@" </dev/null)
 }
 
 pin() {
@@ -91,21 +113,21 @@ grep -q 'Updated 1.2.3 -> 1.2.4' "$work/out" || fail "no report of the update"
 
 echo "  - on Podman without a boot unit"
 fresh_stack
-(cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_RUNTIME=podman \
-  ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh 1.2.4 </dev/null >"$work/out" 2>&1) ||
-  { cat "$work/out"; fail "the update on Podman failed"; }
+podman_update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update on Podman failed"; }
 grep -qx "CONTAINER_SOCKET='/run/podman/podman.sock'" "$work/stack/.env" ||
   fail "no Podman CONTAINER_SOCKET added"
-# Podman will not replace asterisk while proxy shares its network namespace (§6.3).
-grep -qx 'compose -f compose.yaml -f compose.ports.yaml rm -sf proxy' "$work/runtime.log" ||
-  fail "proxy was not removed before up -d on Podman"
+# Podman will not replace asterisk while proxy shares its network namespace (§6.3): down, then up.
+[[ $(grep -E ' (down|up -d|rm)' "$work/runtime.log") == "compose -f compose.yaml -f compose.ports.yaml down
+compose -f compose.yaml -f compose.ports.yaml up -d --wait --wait-timeout 180" ]] ||
+  fail "no down before up -d on Podman: $(cat "$work/runtime.log")"
 
-echo "  - on podman-compose, which has no up --wait: api's and core's /healthz polled instead"
+echo "  - on podman-compose, which has no up --wait and no rm: api's and core's /healthz polled"
 fresh_stack
-(cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_RUNTIME=podman \
-  STUB_NO_WAIT=1 ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh 1.2.4 </dev/null >"$work/out" 2>&1) ||
+STUB_PODMAN_COMPOSE=1 podman_update 1.2.4 >"$work/out" 2>&1 ||
   { cat "$work/out"; fail "the update on podman-compose failed"; }
 grep -q 'no up --wait' "$work/out" || fail "no word of the polling path: $(cat "$work/out")"
+grep -qx 'compose -f compose.yaml -f compose.ports.yaml down' "$work/runtime.log" ||
+  fail "no down on podman-compose: $(cat "$work/runtime.log")"
 grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d' "$work/runtime.log" ||
   fail "no plain up -d on podman-compose: $(cat "$work/runtime.log")"
 for service in api core; do
@@ -113,6 +135,37 @@ for service in api core; do
     "$work/runtime.log" || fail "$service's /healthz was not polled"
 done
 grep -q 'Updated 1.2.3 -> 1.2.4' "$work/out" || fail "no report of the update on podman-compose"
+
+echo "  - on Podman with the boot unit: its restart, then an up that recreates nothing waits"
+fresh_stack
+cat >"$work/units/zamfono-test.service" <<UNIT
+[Service]
+WorkingDirectory=$work/stack
+ExecStart=/usr/bin/podman compose -f compose.yaml -f compose.ports.yaml up -d
+ExecStop=/usr/bin/podman compose -f compose.yaml -f compose.ports.yaml down
+UNIT
+podman_update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update through the unit failed"; }
+[[ $(grep -E '^systemctl| (down|up -d|rm)' "$work/runtime.log") == "systemctl restart zamfono-test.service
+compose -f compose.yaml -f compose.ports.yaml up -d --no-recreate --wait --wait-timeout 180" ]] ||
+  fail "no unit restart and up --no-recreate --wait: $(cat "$work/runtime.log")"
+fresh_stack
+STUB_PODMAN_COMPOSE=1 podman_update 1.2.4 >"$work/out" 2>&1 ||
+  { cat "$work/out"; fail "the update through the unit on podman-compose failed"; }
+grep -q ' up -d' "$work/runtime.log" && fail "an up after the unit's restart without --wait"
+grep -q ' exec -T api node -e fetch(' "$work/runtime.log" || fail "api's /healthz was not polled"
+rm "$work/units/zamfono-test.service"
+
+echo "  - an update whose stack does not come up healthy is finished by a rerun"
+fresh_stack
+STUB_FAIL_UP=1 update 1.2.4 >"$work/out" 2>&1 && fail "an update whose up failed reported success"
+grep -q 'did not report healthy' "$work/out" || fail "no word of the failed up: $(cat "$work/out")"
+: >"$work/runtime.log"
+update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the rerun failed"; }
+grep -q 'finishing it' "$work/out" || fail "the rerun did not finish the update: $(cat "$work/out")"
+grep -q ' pull' "$work/runtime.log" && fail "the rerun pulled again"
+grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d --wait --wait-timeout 180' \
+  "$work/runtime.log" || fail "the rerun did not recreate the stack"
+update 1.2.4 | grep -q 'Already on 1.2.4' || fail "the finished update is still pending"
 
 fresh_stack
 update 1.2.4 >/dev/null 2>&1 || fail "the update to 1.2.4 failed"

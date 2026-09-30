@@ -59,6 +59,11 @@ why the specified behaviour changed; the commit history, how.
   reachable, not its latest registration refresh, which Asterisk reports no event for.
 - `/metrics` waited for as long as `core` took to answer its health check, so a hung `core` hung
   the scrape too. It now gives up after three seconds, as `/healthz` does.
+- `update.sh` on Podman without the boot unit, with `podman-compose` as the provider of
+  `podman compose`, stopped after installing the new files and left the old containers running:
+  `podman-compose` has no `rm` for removing `proxy`. Without the unit, `update.sh` now takes the
+  stack `down` before `up -d` on Podman. A rerun, which said "Already on" the new release, now
+  finishes an update that stopped before its stack reported healthy.
 
 ### Added
 

@@ -24,6 +24,10 @@ umask 077
 . setup/checks.sh
 # shellcheck source=setup/envfile.sh
 . setup/envfile.sh
+# shellcheck source=setup/versions.sh
+. setup/versions.sh
+# shellcheck source=setup/recreate.sh
+. setup/recreate.sh
 
 # ZAMFONO_REPO_URL is for deploy/update-test.sh, which serves releases of its own.
 REPO=${ZAMFONO_REPO_URL:-https://github.com/zamfono/pbx}
@@ -32,6 +36,11 @@ REPO=${ZAMFONO_REPO_URL:-https://github.com/zamfono/pbx}
 STACK_SERVICES=(asterisk migrate core api proxy)
 # How long `up` waits for the recreated services to report healthy.
 WAIT_SECONDS=180
+# Names the release an update installed until its stack reports healthy, so that a rerun after a
+# failure there finishes that update rather than saying it is already on it.
+PENDING=.update-pending
+# ZAMFONO_UNIT_DIR is for deploy/update-test.sh, which installs a boot unit of its own.
+UNIT_DIR=${ZAMFONO_UNIT_DIR:-/etc/systemd/system}
 
 assume_yes=
 check_only=
@@ -49,34 +58,6 @@ for arg in "$@"; do
   esac
 done
 updater=${ZAMFONO_UPDATER:-}
-
-v_version() { [[ $1 =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; }
-
-# version_cmp A B — prints -1, 0 or 1 as A is older than, the same as or newer than B.
-# shellcheck disable=SC2206 # the split on IFS=. is the point
-version_cmp() {
-  local IFS=. i
-  local -a a=($1) b=($2)
-  for i in 0 1 2; do
-    if ((a[i] < b[i])); then echo -1 && return; fi
-    if ((a[i] > b[i])); then echo 1 && return; fi
-  done
-  echo 0
-}
-
-# breaking FROM TO — RELEASING.md's policy: a new major from 1.0.0 on, a new minor while 0.x.
-# With version_cmp, what the updater's judgeUpdate also decides; update-policy.tsv holds the cases
-# both are tested against, and the updater's run is refused here whatever it judged.
-# shellcheck disable=SC2206 # the split on IFS=. is the point
-breaking() {
-  local IFS=.
-  local -a a=($1) b=($2)
-  if ((a[0] == 0 && b[0] == 0)); then
-    ((a[1] != b[1]))
-  else
-    ((a[0] != b[0]))
-  fi
-}
 
 # The release this directory runs: .env's ZAMFONO_VERSION when set, else the bundle's own pin.
 current_version() {
@@ -124,7 +105,7 @@ compose_files() {
 find_unit() {
   local candidate
   [[ -z $updater ]] && command -v systemctl >/dev/null 2>&1 || return 0
-  for candidate in /etc/systemd/system/zamfono*.service; do
+  for candidate in "$UNIT_DIR"/zamfono*.service; do
     [[ -e $candidate ]] || continue
     if grep -qxF "WorkingDirectory=$PWD" "$candidate"; then
       basename "$candidate"
@@ -188,30 +169,13 @@ release_notes() {
   ' "$1"
 }
 
-# Whether this Compose can `up --wait`: docker-compose can, Docker's own and the one `podman
-# compose` hands the files to as deploy/README.md step 2 installs it; podman-compose cannot.
-compose_waits() {
-  local help
-  help=$("${compose[@]}" up --help 2>/dev/null) || return 1
-  [[ $help == *--wait* ]]
-}
-
-unhealthy() {
-  fail "the stack did not report healthy within $((WAIT_SECONDS / 60)) minutes; see:" \
-    "${compose[*]} ${files[*]} ps, and its logs"
-}
-
-# Without `up --wait`: api's and core's healthcheck, compose.yaml's x-healthz, run until each
-# passes, within WAIT_SECONDS in all.
-HEALTHZ="fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
-await_healthz() {
-  local service deadline=$((SECONDS + WAIT_SECONDS))
-  for service in api core; do
-    until "${compose[@]}" "${files[@]}" exec -T "$service" node -e "$HEALTHZ" >/dev/null 2>&1; do
-      ((SECONDS < deadline)) || unhealthy
-      sleep 2
-    done
-  done
+# Sets files, the compose files' arguments, and services, the ones `pull` and `up` name.
+stack_args() {
+  local file_args
+  file_args=$(compose_files)
+  read -ra files <<<"$file_args"
+  services=()
+  [[ -z $updater ]] || services=("${STACK_SERVICES[@]}")
 }
 
 main() {
@@ -230,7 +194,13 @@ main() {
 
   case $(version_cmp "$target" "$from") in
     0)
-      echo "Already on $from."
+      [[ $(cat "$PENDING" 2>/dev/null) == "$from" ]] || { echo "Already on $from." && exit 0; }
+      echo "The update to $from stopped before its stack reported healthy; finishing it."
+      [[ -z $check_only ]] || exit 0
+      stack_args
+      recreate_stack
+      rm -f "$PENDING"
+      echo "Updated to $from. What changed: CHANGELOG.md, or $REPO/releases/tag/v$from"
       exit 0
       ;;
     -1) fail "$target is older than $from: migrations only go forward (README.md, step 8)" ;;
@@ -266,11 +236,7 @@ main() {
     fi
   fi
 
-  local file_args
-  file_args=$(compose_files)
-  read -ra files <<<"$file_args"
-  local -a services=()
-  [[ -z $updater ]] || services=("${STACK_SERVICES[@]}")
+  stack_args
   # Pulled before anything here changes, with the running release's files told the new version,
   # so a failed pull leaves the stack as it was and a rerun retries it. A service the new release
   # adds is pulled by `up -d` below.
@@ -278,32 +244,11 @@ main() {
   ZAMFONO_VERSION=$target "${compose[@]}" "${files[@]}" pull "${services[@]}" ||
     fail "pulling the $target images failed; nothing was changed, and a rerun retries"
 
+  echo "$target" >"$PENDING"
   install_bundle
   update_env
-  # `--wait` returns once every service it starts is healthy, or running where it has no
-  # healthcheck, and `migrate` has exited 0. Podman refuses to replace `asterisk` while `proxy`
-  # shares its network namespace (§6.3), so proxy goes first; the boot unit's restart does the same
-  # with `down`, and its `up -d` does not wait, so an `up` that recreates nothing waits for it.
-  local -a wait_args=()
-  if compose_waits; then
-    echo "Recreating the stack; up --wait waits for its healthchecks ..."
-    wait_args=(--wait --wait-timeout "$WAIT_SECONDS")
-  else
-    echo "Recreating the stack; this Compose has no up --wait, so it polls api and core ..."
-  fi
-  if [[ $runtime == podman && -n $unit ]]; then
-    echo "Restarting $unit ..."
-    systemctl restart "$unit"
-    if ((${#wait_args[@]} > 0)); then
-      "${compose[@]}" "${files[@]}" up -d --no-recreate "${wait_args[@]}" || unhealthy
-    fi
-  else
-    if [[ $runtime == podman || -n $updater ]]; then
-      "${compose[@]}" "${files[@]}" rm -sf proxy
-    fi
-    "${compose[@]}" "${files[@]}" up -d "${wait_args[@]}" "${services[@]}" || unhealthy
-  fi
-  ((${#wait_args[@]} > 0)) || await_healthz
+  recreate_stack
+  rm -f "$PENDING"
   echo "Updated $from -> $target. What changed: CHANGELOG.md, or $REPO/releases/tag/v$target"
 }
 
