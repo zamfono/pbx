@@ -78,7 +78,7 @@ export const setMenuTargets = defineOperation({
     const rows: { menuId: string; digits: string; targetId: string }[] = [];
     for (const option of input.targets) {
       // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; inserts must serialize
-      const targetId = await insertForwardTarget(ctx.db, option.target);
+      const targetId = await insertForwardTarget(ctx, option.target);
       rows.push({ menuId: input.id, digits: option.digits, targetId });
     }
     if (rows.length > 0) {

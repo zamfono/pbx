@@ -80,7 +80,7 @@ export const setRingGroupForwarding = defineOperation({
     const rows: { groupId: string; condition: string; targetId: string }[] = [];
     for (const rule of input.rules) {
       // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; inserts must serialize
-      const targetId = await insertForwardTarget(ctx.db, rule.target);
+      const targetId = await insertForwardTarget(ctx, rule.target);
       rows.push({ groupId: input.id, condition: rule.condition, targetId });
     }
     if (rows.length > 0) {

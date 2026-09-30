@@ -24,6 +24,12 @@ export function afterPropagation(
   hooks.set(ctx, list);
 }
 
+/** Notes `warning`, found while `ctx`'s operation writes, for its result: it joins the hooks'
+ * warnings, since the write it warns about stands. */
+export function noteWarning(ctx: Context, warning: string): void {
+  afterPropagation(ctx, () => Promise.resolve(warning));
+}
+
 /** Takes `ctx`'s hooks for the runner, in registration order, and forgets them. */
 export function takeAfterPropagationHooks(
   ctx: Context

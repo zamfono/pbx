@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { DEFAULT_SIP_HEADERS, newId, nowIso, type Db } from '@zamfono/shared';
 
 import { runPurge } from '../jobs/purge.js';
 import { makeTestDb } from '../testDb.js';
@@ -104,7 +104,9 @@ describe('sip forward targets', () => {
     const db = await seedTenant(await makeTestDb());
     const trunkId = await createTrunk(db);
     const did = await createDid(db, sipTarget(trunkId));
-    expect(did.target).toEqual(sipTarget(trunkId));
+    // A write without headers gets the defaults, which every read returns (§10.3).
+    const stored = { ...sipTarget(trunkId), headers: DEFAULT_SIP_HEADERS };
+    expect(did.target).toEqual(stored);
     const row = await db
       .selectFrom('dids')
       .innerJoin('forwardTargets', 'forwardTargets.id', 'dids.targetId')
@@ -124,9 +126,7 @@ describe('sip forward targets', () => {
       unknown,
       { items: { target: unknown }[] }
     >(db, 'dids.list', {}, asRun());
-    expect(listed.items.map(item => item.target)).toContainEqual(
-      sipTarget(trunkId)
-    );
+    expect(listed.items.map(item => item.target)).toContainEqual(stored);
   });
 
   it('refuses a user part outside the safe subset, and a trunk that is not live', async () => {

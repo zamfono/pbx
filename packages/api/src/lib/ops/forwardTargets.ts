@@ -37,7 +37,7 @@ export async function createTarget(
   input: TargetInput
 ): Promise<string> {
   assertMayHoldTarget(ctx, input);
-  return insertForwardTarget(ctx.db, input);
+  return insertForwardTarget(ctx, input);
 }
 
 /**

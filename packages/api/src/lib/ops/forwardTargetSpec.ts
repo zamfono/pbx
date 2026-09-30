@@ -1,9 +1,17 @@
 import type { Transaction } from 'kysely';
 import { z } from 'zod';
 
-import { isE164, newId, type DB } from '@zamfono/shared';
+import {
+  DEFAULT_SIP_HEADERS,
+  isE164,
+  newId,
+  type DB,
+  type SipHeaderTemplate
+} from '@zamfono/shared';
 
-import { OpError } from './types.js';
+import { noteWarning } from './afterPropagationHooks.js';
+import { sipHeadersSchema, udpHeadersWarning } from './sipHeaders.js';
+import { OpError, type Context } from './types.js';
 
 const STATUS_NOT_FOUND = 404;
 
@@ -32,7 +40,10 @@ export const targetSpecSchema = z.discriminatedUnion('kind', [
     trunkId: z.string(),
     user: z
       .string()
-      .regex(SIP_USER_PATTERN, 'user must be 1-64 of A-Z a-z 0-9 . _ ~ + -')
+      .regex(SIP_USER_PATTERN, 'user must be 1-64 of A-Z a-z 0-9 . _ ~ + -'),
+    // §9.4 "Header templates": left out on a write, the defaults, which the write returns as
+    // every read does.
+    headers: sipHeadersSchema.default(() => [...DEFAULT_SIP_HEADERS])
   }),
   z.object({ kind: z.literal('mailboxUser'), userId: z.string() }),
   z.object({ kind: z.literal('mailboxRingGroup'), ringGroupId: z.string() }),
@@ -53,7 +64,11 @@ function forwardTargetColumns(spec: TargetSpec): Record<string, string> {
     return { external: spec.external };
   }
   if (spec.kind === 'sip') {
-    return { sipTrunkId: spec.trunkId, sipUser: spec.user };
+    return {
+      sipTrunkId: spec.trunkId,
+      sipUser: spec.user,
+      sipHeadersJson: JSON.stringify(spec.headers)
+    };
   }
   if (spec.kind === 'mailboxUser') {
     return { mailboxUserId: spec.userId };
@@ -73,6 +88,7 @@ type ForwardTargetColumns = {
   external: string | null;
   sipTrunkId: string | null;
   sipUser: string | null;
+  sipHeadersJson: string | null;
   mailboxUserId: string | null;
   mailboxRingGroupId: string | null;
   announcementAudioId: string | null;
@@ -90,9 +106,15 @@ export function rowToTarget(row: ForwardTargetColumns): TargetSpec {
   if (row.external !== null) {
     return { kind: 'external', external: row.external };
   }
-  // The table's CHECK sets `sip_user` exactly when `sip_trunk_id` is set.
+  // The table's CHECK sets `sip_user` exactly when `sip_trunk_id` is set, and this module sets
+  // `sip_headers_json` with them.
   if (row.sipTrunkId !== null && row.sipUser !== null) {
-    return { kind: 'sip', trunkId: row.sipTrunkId, user: row.sipUser };
+    return {
+      kind: 'sip',
+      trunkId: row.sipTrunkId,
+      user: row.sipUser,
+      headers: JSON.parse(row.sipHeadersJson ?? '[]') as SipHeaderTemplate[]
+    };
   }
   if (row.mailboxUserId !== null) {
     return { kind: 'mailboxUser', userId: row.mailboxUserId };
@@ -156,12 +178,33 @@ async function assertTargetAvailable(
   }
 }
 
-/** Inserts one owned `forward_targets` row for `spec`, returning its id (§11.2). */
+/** Notes the warning a `sip` target's headers get over its trunk on `ctx`'s result (§10.3). */
+async function warnForSipHeaders(
+  ctx: Context,
+  spec: Extract<TargetSpec, { kind: 'sip' }>
+): Promise<void> {
+  const trunk = await ctx.db
+    .selectFrom('trunks')
+    .select(['name', 'transport'])
+    .where('id', '=', spec.trunkId)
+    .executeTakeFirstOrThrow();
+  const warning = udpHeadersWarning(spec.headers, trunk);
+  if (warning !== null) {
+    noteWarning(ctx, warning);
+  }
+}
+
+/** Inserts one owned `forward_targets` row for `spec`, returning its id (§11.2); a `sip` target's
+ * headers too large for its UDP trunk are a warning of the operation's result (§10.3). */
 export async function insertForwardTarget(
-  db: Transaction<DB>,
+  ctx: Context,
   spec: TargetSpec
 ): Promise<string> {
+  const { db } = ctx;
   await assertTargetAvailable(db, spec);
+  if (spec.kind === 'sip') {
+    await warnForSipHeaders(ctx, spec);
+  }
   const id = newId();
   await db
     .insertInto('forwardTargets')
@@ -172,6 +215,7 @@ export async function insertForwardTarget(
       external: null,
       sipTrunkId: null,
       sipUser: null,
+      sipHeadersJson: null,
       mailboxUserId: null,
       mailboxRingGroupId: null,
       announcementAudioId: null,

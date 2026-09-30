@@ -110,7 +110,7 @@ async function resolvedFallbackTargetId(
       .where('id', '=', before.fallbackTargetId)
       .executeTakeFirstOrThrow()
   );
-  const newTargetId = await insertForwardTarget(ctx.db, fallbackTarget);
+  const newTargetId = await insertForwardTarget(ctx, fallbackTarget);
   // The diff names this operation's own input field and carries the wire target, so `audit.undo`
   // replays it straight back through `menus.update` (§5.8).
   recordChange(ctx, {

@@ -1,0 +1,209 @@
+/* eslint-disable no-template-curly-in-string -- a literal ${…} is what these tests send and expect back */
+import { describe, expect, it } from 'vitest';
+
+import { newId, nowIso, type Db } from '@zamfono/shared';
+
+import { makeTestDb } from '../testDb.js';
+import { runOperation, type RunInput } from './runner.js';
+import type { Actor } from './types.js';
+
+import './dids/index.js';
+import './trunks/index.js';
+import './users/index.js';
+
+process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
+
+const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
+
+function asRun(): RunInput {
+  return { actor: owner, channel: 'rest', requestId: 'req-1' };
+}
+
+/** Seeds the tenant `settings` singleton, which the DID operations read. */
+async function seedTenant(db: Db): Promise<Db> {
+  const targetId = newId();
+  await db
+    .insertInto('forwardTargets')
+    .values({ id: targetId, external: '+490000000' })
+    .execute();
+  const didId = newId();
+  await db
+    .insertInto('dids')
+    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
+    .execute();
+  await db
+    .insertInto('settings')
+    .values({
+      id: 1,
+      companyName: 'Test Co',
+      country: 'DE',
+      emergencyNumbersJson: '["112"]',
+      mainDidId: didId
+    })
+    .execute();
+  return db;
+}
+
+/** A trunk named `name` on `transport`, the first one taking the catch-all route. */
+async function createTrunk(
+  db: Db,
+  name: string,
+  transport: 'udp' | 'tls'
+): Promise<string> {
+  const { trunk } = await runOperation<unknown, { trunk: { id: string } }>(
+    db,
+    'trunks.create',
+    {
+      name,
+      emergency: true,
+      authMode: 'ip',
+      transport,
+      hosts: [{ host: `${name.toLowerCase()}.example` }]
+    },
+    asRun()
+  );
+  return trunk.id;
+}
+
+type Header = { name: string; value: string };
+type DidOut = { id: string; target: unknown; warnings?: string[] };
+
+async function createDid(
+  db: Db,
+  trunkId: string,
+  headers?: Header[]
+): Promise<DidOut> {
+  const target = {
+    kind: 'sip',
+    trunkId,
+    user: 'proj_abc123',
+    ...(headers === undefined ? {} : { headers })
+  };
+  return runOperation<unknown, DidOut>(
+    db,
+    'dids.create',
+    { number: `+43${String(Math.floor(Math.random() * 1e8))}`, target },
+    asRun()
+  );
+}
+
+async function storedHeaders(db: Db, didId: string): Promise<unknown> {
+  const row = await db
+    .selectFrom('dids')
+    .innerJoin('forwardTargets', 'forwardTargets.id', 'dids.targetId')
+    .select('forwardTargets.sipHeadersJson')
+    .where('dids.id', '=', didId)
+    .executeTakeFirstOrThrow();
+  return row.sipHeadersJson === null ? null : JSON.parse(row.sipHeadersJson);
+}
+
+/** A header whose value renders to `callerName`'s 64 bytes, `copies` times. */
+function nameHeader(name: string, copies: number): Header {
+  return { name, value: '{{callerName}}'.repeat(copies) };
+}
+
+// §9.4 "Header templates", §10.3 "Forward targets": a sip target's configurable headers.
+describe('sip target headers', () => {
+  it('stores the headers given, none for an empty list, and returns them on reads', async () => {
+    const db = await seedTenant(await makeTestDb());
+    const trunkId = await createTrunk(db, 'OpenAI', 'tls');
+    const headers = [
+      { name: 'X-Called', value: '{{calledExtension}}' },
+      { name: 'x-reason', value: 'via {{ forwardReason }} ${EXTEN}' }
+    ];
+    const did = await createDid(db, trunkId, headers);
+    expect(did.target).toMatchObject({ headers });
+    expect(did.warnings).toBeUndefined();
+    expect(await storedHeaders(db, did.id)).toEqual(headers);
+
+    const none = await createDid(db, trunkId, []);
+    expect(none.target).toMatchObject({ headers: [] });
+    expect(await storedHeaders(db, none.id)).toEqual([]);
+  });
+
+  it('refuses bad names, duplicates, bad values and oversized headers with 422', async () => {
+    const db = await seedTenant(await makeTestDb());
+    const trunkId = await createTrunk(db, 'OpenAI', 'tls');
+    const refused: Header[][] = [
+      [{ name: 'Diversion', value: 'a' }],
+      [{ name: 'X-', value: 'a' }],
+      [{ name: 'X_Called', value: 'a' }],
+      [{ name: `X-${'a'.repeat(65)}`, value: 'a' }],
+      [
+        { name: 'X-Called', value: 'a' },
+        { name: 'x-CALLED', value: 'b' }
+      ],
+      [{ name: 'X-Called', value: '{{calledNumber}}' }],
+      [{ name: 'X-Called', value: '{{calledExtension}' }],
+      [{ name: 'X-Called', value: '{{#if did}}{{did}}{{/if}}' }],
+      [{ name: 'X-Called', value: 'a\r\nVia: evil' }],
+      // Eight values at the 256-byte cap: 8 × (8 + 2 + 256) = 2128 bytes.
+      Array.from({ length: 8 }, (_unused, index) =>
+        nameHeader(`X-Name-${String(index)}`, 5)
+      )
+    ];
+    for (const headers of refused) {
+      // eslint-disable-next-line no-await-in-loop -- each list is refused on its own
+      await expect(createDid(db, trunkId, headers)).rejects.toMatchObject({
+        status: 422
+      });
+    }
+  });
+
+  it('limits the size, not the count', async () => {
+    const db = await seedTenant(await makeTestDb());
+    const trunkId = await createTrunk(db, 'OpenAI', 'tls');
+    // 7 × 266 = 1862 bytes, under 2048.
+    await createDid(
+      db,
+      trunkId,
+      Array.from({ length: 7 }, (_unused, index) =>
+        nameHeader(`X-Name-${String(index)}`, 5)
+      )
+    );
+    // A hundred small headers: 100 × (5 + 2 + 1) = 800 bytes.
+    const many = Array.from({ length: 100 }, (_unused, index) => ({
+      name: `X-${String(index).padStart(3, '0')}`,
+      value: 'a'
+    }));
+    const did = await createDid(db, trunkId, many);
+    expect(await storedHeaders(db, did.id)).toEqual(many);
+  });
+
+  it('warns for headers too large for an INVITE over a UDP trunk, and writes them', async () => {
+    const db = await seedTenant(await makeTestDb());
+    const udpId = await createTrunk(db, 'Carrier', 'udp');
+    const tlsId = await createTrunk(db, 'OpenAI', 'tls');
+    const large = [nameHeader('X-Caller-Name', 3)];
+    const warned = await createDid(db, udpId, large);
+    expect(warned.warnings).toEqual([
+      "sip target headers may push an INVITE over UDP trunk 'Carrier' past 1300 bytes"
+    ]);
+    expect(await storedHeaders(db, warned.id)).toEqual(large);
+    // The defaults fit (81 bytes), and TLS carries any size.
+    expect((await createDid(db, udpId)).warnings).toBeUndefined();
+    expect((await createDid(db, tlsId, large)).warnings).toBeUndefined();
+
+    // The shared target writer warns on every operation that writes through it.
+    const forwarding = await runOperation<unknown, { warnings?: string[] }>(
+      db,
+      'users.setForwarding',
+      {
+        id: 'owner',
+        rules: [
+          {
+            condition: 'busy',
+            target: {
+              kind: 'sip',
+              trunkId: udpId,
+              user: 'agent',
+              headers: large
+            }
+          }
+        ]
+      },
+      asRun()
+    );
+    expect(forwarding.warnings).toHaveLength(1);
+  });
+});

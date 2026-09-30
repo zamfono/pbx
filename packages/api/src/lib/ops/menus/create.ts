@@ -38,7 +38,7 @@ export const createMenu = defineOperation({
     await assertAudioAvailable(ctx.db, input.audioId);
     const id = newId();
     const fallbackTargetId = await insertForwardTarget(
-      ctx.db,
+      ctx,
       input.fallbackTarget
     );
     await ctx.db
