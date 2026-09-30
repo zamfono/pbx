@@ -4,18 +4,19 @@
  * an unconditional forward — and its `ring_group_forward_rules`, for `ringGroup.ts`.
  */
 import type { Snapshot } from '../internal/server.js';
-import { expandMembers, type MemberState } from '../routing/ringGroup.js';
+import type { MemberState } from '../routing/ringGroup.js';
 import { ownInEffectOoo } from '../routing/schedule.js';
 import { buildOooRules } from '../routing/scheduleRows.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import { buildUserRules, findForwardTarget } from './call.js';
+import { groupMemberUserIds } from './extensionOwner.js';
 import type { Pipeline } from './pipeline.js';
 import { isUserInCall, registeredDevices } from './userDevices.js';
 
 export type GroupOutcome = 'unanswered' | 'unavailable';
 export type GroupRules = Partial<Record<GroupOutcome, ForwardTarget>>;
 
-/** `ring_group_members`, flattened through `expandMembers`, as the `MemberState[]` `ringable` (§10.1 step 5) expects;
+/** `ring_group_members`, flattened through `groupMemberUserIds`, as the `MemberState[]` `ringable` (§10.1 step 5) expects;
  * `busy` holds the devices carrying a call (`busyDevices`). */
 export function buildMemberStates(
   pipeline: Pipeline,
@@ -24,31 +25,7 @@ export function buildMemberStates(
   now: string,
   busy: ReadonlySet<string>
 ): MemberState[] {
-  const userGroupUsers = new Map<string, string[]>();
-  for (const row of snapshot.userGroupUsers) {
-    const list = userGroupUsers.get(row.groupId) ?? [];
-    list.push(row.userId);
-    userGroupUsers.set(row.groupId, list);
-  }
-  const userGroupGroups = new Map<string, string[]>();
-  for (const row of snapshot.userGroupGroups) {
-    const list = userGroupGroups.get(row.parentGroupId) ?? [];
-    list.push(row.childGroupId);
-    userGroupGroups.set(row.parentGroupId, list);
-  }
-  const liveUserIds = new Set(
-    snapshot.users.filter(user => user.deletedAt === null).map(user => user.id)
-  );
-  const memberRows = snapshot.ringGroupMembers.filter(
-    row => row.groupId === groupId
-  );
-  const userIds = expandMembers(
-    groupId,
-    memberRows,
-    userGroupUsers,
-    userGroupGroups,
-    liveUserIds
-  );
+  const userIds = groupMemberUserIds(snapshot, groupId);
   const oooRules = buildOooRules(snapshot.oooRules);
   return userIds.map(userId => {
     const unconditional =

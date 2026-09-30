@@ -1,7 +1,7 @@
 /** Who owns a dialled extension, for the feature codes that take one (§9.3 "Feature codes":
- * `*5<ext>`, `*8<ext>`, `*95<ext>`, `*97<ext>`), and a ring group's members for `*95`'s
- * permission check (§10.2 "Mailbox access"). Its coverage lives in `features.test.ts` alongside
- * the feature codes'. */
+ * `*5<ext>`, `*8<ext>`, `*95<ext>`, `*97<ext>`), and a ring group's members, for `*95`'s
+ * permission check (§10.2 "Mailbox access") and the group's ring plan (§10.1 step 5). Its
+ * coverage lives in `features.test.ts` and `ringGroupState.test.ts`. */
 import type { Snapshot } from '../internal/server.js';
 import { expandMembers } from '../routing/ringGroup.js';
 import type { Owner } from './call.js';
@@ -21,14 +21,14 @@ export function ownerForExt(snapshot: Snapshot, ext: string): Owner | null {
   return null;
 }
 
-/** `groupId`'s member user ids: `ring_group_members` rows taken directly, and each user-group row
- * flattened through `userGroupUsers`/`userGroupGroups` (nested groups included), the same
- * expansion `routing/ringGroup.ts`'s own ring plan uses (§11.2 `ring_group_members`'s exclusive
- * arc `user_id`/`user_group_id`). */
-export function ringGroupMemberIds(
+/** `groupId`'s member user ids in ring order: `ring_group_members` rows taken directly, and each
+ * user-group row flattened through `user_group_users`/`user_group_groups` (nested groups
+ * included) by `routing/ringGroup.ts`'s `expandMembers`, soft-deleted users dropped (§10.1 step 5,
+ * §11.2 `ring_group_members`'s exclusive arc `user_id`/`user_group_id`). */
+export function groupMemberUserIds(
   snapshot: Snapshot,
   groupId: string
-): Set<string> {
+): string[] {
   const userGroupUsers = new Map<string, string[]>();
   for (const row of snapshot.userGroupUsers) {
     const list = userGroupUsers.get(row.groupId) ?? [];
@@ -47,13 +47,19 @@ export function ringGroupMemberIds(
   const memberRows = snapshot.ringGroupMembers.filter(
     row => row.groupId === groupId
   );
-  return new Set(
-    expandMembers(
-      groupId,
-      memberRows,
-      userGroupUsers,
-      userGroupGroups,
-      liveUserIds
-    )
+  return expandMembers(
+    groupId,
+    memberRows,
+    userGroupUsers,
+    userGroupGroups,
+    liveUserIds
   );
+}
+
+/** `groupId`'s member user ids (`groupMemberUserIds`) as a set, for `*95`'s membership check. */
+export function ringGroupMemberIds(
+  snapshot: Snapshot,
+  groupId: string
+): Set<string> {
+  return new Set(groupMemberUserIds(snapshot, groupId));
 }
