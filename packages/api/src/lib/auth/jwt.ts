@@ -37,6 +37,15 @@ function sign(secret: string, signingInput: string): string {
   return createHmac('sha256', secret).update(signingInput).digest('base64url');
 }
 
+/** The secret every access token is signed and verified with (§5.2 `JWT_SECRET`). */
+export function requiredJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required.');
+  }
+  return secret;
+}
+
 /** Type guard for the RBAC roles a JWT `role` claim (or a `users.role` column) may hold. */
 export function isRole(value: unknown): value is Role {
   return value === 'owner' || value === 'admin' || value === 'user';

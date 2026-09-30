@@ -1,7 +1,11 @@
 import { createHmac } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { signAccessToken, verifyAccessToken } from './jwt.js';
+import {
+  requiredJwtSecret,
+  signAccessToken,
+  verifyAccessToken
+} from './jwt.js';
 
 const SECRET = 'test-secret';
 const NOW_S = 1_700_000_000;
@@ -95,5 +99,20 @@ describe('jwt', () => {
 
   it('rejects a malformed token', () => {
     expect(verifyAccessToken(SECRET, 'not-a-jwt', NOW_S)).toBeNull();
+  });
+});
+
+describe('requiredJwtSecret', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('reads JWT_SECRET, throwing while it is unset', () => {
+    vi.stubEnv('JWT_SECRET', SECRET);
+    expect(requiredJwtSecret()).toBe(SECRET);
+    vi.stubEnv('JWT_SECRET', '');
+    expect(() => requiredJwtSecret()).toThrow(
+      'JWT_SECRET environment variable is required.'
+    );
   });
 });

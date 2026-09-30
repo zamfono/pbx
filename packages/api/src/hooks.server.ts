@@ -6,7 +6,11 @@ import { MS_PER_SECOND } from '@zamfono/shared';
 
 import { addressKey } from './lib/addressKey.js';
 import { crossSiteFormRejection } from './lib/auth/crossSiteForms.js';
-import { isRole, verifyAccessToken } from './lib/auth/jwt.js';
+import {
+  isRole,
+  requiredJwtSecret,
+  verifyAccessToken
+} from './lib/auth/jwt.js';
 import { createCoreClient, fetchCoreVersion } from './lib/coreClient.js';
 import { getDb } from './lib/db.js';
 import { startBackgroundJobs } from './lib/jobs/background.js';
@@ -125,14 +129,6 @@ function rateLimitResponse(
   });
 }
 
-function jwtSecret(): string {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error('JWT_SECRET environment variable is required.');
-  }
-  return secret;
-}
-
 /**
  * The bearer token's `Actor` and OAuth client id, or both `null` for a missing token, a bad
  * signature, or a deleted account (§5.2, §5.3, §5.9); the role is read fresh from `users` so a
@@ -145,7 +141,7 @@ async function resolveActor(request: Request): Promise<AuthResult> {
   }
   const nowS = Math.floor(Date.now() / MS_PER_SECOND);
   const claims = verifyAccessToken(
-    jwtSecret(),
+    requiredJwtSecret(),
     header.slice(BEARER_PREFIX.length),
     nowS
   );
