@@ -14,8 +14,7 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck source=_lib.sh
 . "$here/_lib.sh"
 
-# shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
-$compose exec -T sipp cat /tmp/sip-target-messages.log \
+await_trace sipp /tmp/sip-target-messages.log 1 \
   | python3 "$here/_forward-context-check.py" 'sip:proj_ci123@sip-tls:5061' \
     '+15559999' '+15551077' '^"CI Agent" <sip:178@[^>]+>;reason=unconditional$'
 

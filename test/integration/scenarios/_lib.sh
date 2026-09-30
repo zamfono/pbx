@@ -203,3 +203,24 @@ await_ended_call() {
   echo "call $1 never ended within $attempt s" >&2
   return 1
 }
+
+# Prints sipp message trace `$2` in container `$1` once it holds at least `$3` received INVITEs
+# and has stopped growing: sipp writes it as the messages go, and a check that reads it the moment
+# the call ended can find the INVITE not yet written. After 15 s it prints what is there, and the
+# check reports what is missing.
+await_trace() {
+  local attempt content previous='' count
+  for attempt in $(seq 1 15); do
+    # shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+    content=$($compose exec -T "$1" cat "$2" 2>/dev/null || true)
+    count=$(printf '%s\n' "$content" | grep -c '^INVITE ' || true)
+    if [ "$count" -ge "$3" ] && [ "$content" = "$previous" ]; then
+      printf '%s\n' "$content"
+      return 0
+    fi
+    previous=$content
+    sleep 1
+  done
+  echo "$2 in $1 held $count of $3 INVITEs after $attempt s" >&2
+  printf '%s\n' "$content"
+}

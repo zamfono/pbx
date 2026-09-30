@@ -19,12 +19,12 @@ CONTROL=+15557401
 
 traces=$(mktemp -d)
 trap 'rm -rf "$traces"' EXIT
-for n in 1 2 3; do
-  # shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
-  $compose exec -T sipp-provider cat "/tmp/emergency-$n-messages.log" > "$traces/$n.log"
+# Each trunk side's trace once it holds the INVITEs it should (trunk 2 none) and is written out.
+for side in 1:1 2:0 3:1; do
+  await_trace sipp-provider "/tmp/emergency-${side%:*}-messages.log" "${side#*:}" \
+    > "$traces/${side%:*}.log"
 done
-# shellcheck disable=SC2086
-$compose exec -T sipp cat /tmp/trunk-messages.log > "$traces/4.log"
+await_trace sipp /tmp/trunk-messages.log 1 > "$traces/4.log"
 python3 "$(dirname "$0")/_emergency-check.py" \
   "$traces/1.log" "$traces/2.log" "$traces/3.log" "$traces/4.log" "$CONTROL"
 

@@ -23,8 +23,7 @@ compose=$3
 . "$(dirname "$0")/_lib.sh"
 
 trunk_ip=$(container_ip sipp)
-# shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
-$compose exec -T sipp cat /tmp/trunk-messages.log \
+await_trace sipp /tmp/trunk-messages.log 5 \
   | python3 "$(dirname "$0")/_callerid-check.py" "$trunk_ip"
 
 newest_call | python3 -c '
