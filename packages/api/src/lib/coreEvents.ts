@@ -5,9 +5,11 @@
  */
 import { WebSocket } from 'ws';
 
-import type { CoreStreamFrame, Envelope } from '@zamfono/shared';
-
-import { rawDataToString } from './events.js';
+import {
+  rawDataToString,
+  type CoreStreamFrame,
+  type Envelope
+} from '@zamfono/shared';
 
 // ponytail: fixed 1 s reconnect delay; add backoff if a `core` outage causes a reconnect storm
 // worth damping.

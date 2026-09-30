@@ -13,4 +13,5 @@ export * from './internalApi.js';
 export * from './mwiMailbox.js';
 export * from './asteriskNames.js';
 export * from './repeat.js';
+export * from './rawData.js';
 export * from './version.js';

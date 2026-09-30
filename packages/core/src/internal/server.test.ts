@@ -6,6 +6,7 @@ import {
   newId,
   nowIso,
   openDb,
+  rawDataToString,
   type Db,
   type LiveCall,
   type Presence,
@@ -15,7 +16,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
-import { rawDataToString, type Logger } from '../ari/types.js';
+import type { Logger } from '../ari/types.js';
 import {
   ConfigCache,
   EventBus,

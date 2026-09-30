@@ -1,6 +1,5 @@
 // Shapes shared between the thin ARI client and the in-process fake ARI server (§3, §9.2).
 import { randomUUID } from 'node:crypto';
-import type WebSocket from 'ws';
 
 /** Minimal structural logger contract satisfied by pino (constructed in main.ts). */
 export type Logger = {
@@ -167,17 +166,6 @@ export type AsteriskApi = {
   /** `GET /asterisk/info?only=status`: when this Asterisk started, as ISO 8601 UTC. */
   startupTime: () => Promise<string>;
 };
-
-/** Parses a WebSocket frame's payload into a UTF-8 string regardless of its `RawData` shape. */
-export function rawDataToString(data: WebSocket.RawData): string {
-  if (Array.isArray(data)) {
-    return Buffer.concat(data).toString('utf8');
-  }
-  if (data instanceof ArrayBuffer) {
-    return Buffer.from(data).toString('utf8');
-  }
-  return data.toString('utf8');
-}
 
 /** Parses one ARI event frame, logging and returning `null` on malformed JSON instead of throwing. */
 export function tryParseAriEvent(raw: string, log: Logger): AriEvent | null {

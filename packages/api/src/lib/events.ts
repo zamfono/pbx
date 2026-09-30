@@ -26,17 +26,6 @@ export function tryParseJson(text: string): unknown {
   }
 }
 
-/** `ws`'s `RawData` (`Buffer | ArrayBuffer | Buffer[]`) as a UTF-8 string. */
-export function rawDataToString(data: WebSocket.RawData): string {
-  if (Array.isArray(data)) {
-    return Buffer.concat(data).toString('utf8');
-  }
-  if (data instanceof ArrayBuffer) {
-    return Buffer.from(data).toString('utf8');
-  }
-  return data.toString('utf8');
-}
-
 /**
  * Whether `actor` may see `ev` on `/events` (§10.6): `admin`/`owner` see everything, a `user`
  * only their own presence and calls plus the tenant-scope `ooo`/`hours` events. Ring-group

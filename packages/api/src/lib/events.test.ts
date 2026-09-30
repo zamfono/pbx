@@ -2,11 +2,18 @@ import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocket, WebSocketServer } from 'ws';
 
-import { newId, nowIso, openDb, type Db, type Envelope } from '@zamfono/shared';
+import {
+  newId,
+  nowIso,
+  openDb,
+  rawDataToString,
+  type Db,
+  type Envelope
+} from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { signAccessToken } from './auth/jwt.js';
-import { EventHub, rawDataToString, visibleTo } from './events.js';
+import { EventHub, visibleTo } from './events.js';
 import { authenticateEventsSocket } from './eventsAuth.js';
 import type { Actor } from './ops/types.js';
 

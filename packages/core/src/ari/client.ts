@@ -2,6 +2,8 @@
 import { EventEmitter } from 'node:events';
 import WebSocket from 'ws';
 
+import { rawDataToString } from '@zamfono/shared';
+
 import {
   reconnectBackoff,
   type ReconnectBackoff
@@ -9,7 +11,6 @@ import {
 import { buildRestApi } from './restApi.js';
 import { ariRequests, authHeaders } from './restTransport.js';
 import {
-  rawDataToString,
   tryParseAriEvent,
   type AsteriskApi,
   type BridgesApi,
