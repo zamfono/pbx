@@ -74,11 +74,6 @@ const UNSAFE_CONFIG_PATTERN = /[\r\n[\]]/u;
 // admits `/` and `..`, so that id is checked against this stricter shape instead.
 const ID_PATTERN = /^[0-9a-z-]+$/iu;
 
-/** The trunk's PJSIP section name; the core dials `PJSIP/<number>@trunk-<id>` (§9.4 "Flows"). */
-export function trunkSectionName(trunk: { id: string }): string {
-  return `trunk-${trunk.id}`;
-}
-
 /** Throws when `ext` is not dialplan-safe digits (§9.3), since it is written into config verbatim. */
 export function assertExtension(ext: string): void {
   if (!EXTENSION_PATTERN.test(ext)) {

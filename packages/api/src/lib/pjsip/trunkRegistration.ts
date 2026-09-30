@@ -2,14 +2,9 @@
  * A `registration` trunk's outbound `REGISTER` (§9.4 "Auth mode", "Flows"), the one section of
  * `pjsip_trunks.conf` only that auth mode carries.
  */
-import { registrationUris } from '@zamfono/shared';
+import { registrationUris, trunkSectionName } from '@zamfono/shared';
 
-import {
-  escapeConfigValue,
-  hostsByDirection,
-  trunkSectionName,
-  type Trunk
-} from './shared.js';
+import { escapeConfigValue, hostsByDirection, type Trunk } from './shared.js';
 
 // Asterisk's own `retry_interval` default, which a trunk without `register_retry_s` keeps.
 const DEFAULT_RETRY_S = 60;
@@ -49,7 +44,7 @@ export function renderTrunkRegistration(trunk: Trunk): string | null {
   if (trunk.authMode !== 'registration' || trunk.username === null) {
     return null;
   }
-  const name = trunkSectionName(trunk);
+  const name = trunkSectionName(trunk.id);
   const { clientUri, serverUri } = registrationUris({
     username: trunk.username,
     hosts: hostsByDirection(trunk, ['outbound', 'both'])

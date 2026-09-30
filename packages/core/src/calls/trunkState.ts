@@ -21,7 +21,7 @@ import {
   type TrunkStatus
 } from './trunkStatus.js';
 
-export { outboundHosts, trunkSectionName } from './trunkStatus.js';
+export { outboundHosts } from './trunkStatus.js';
 
 type TrunkStateDeps = {
   ari: AriClient;

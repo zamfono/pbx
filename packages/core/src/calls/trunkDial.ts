@@ -4,6 +4,8 @@
  * ended. Shared by `dialAttempt.ts`, which waits for each attempt's outcome, and `externalLeg.ts`,
  * whose attempts ring alongside a ring race's other legs.
  */
+import { trunkSectionName } from '@zamfono/shared';
+
 import type { AriEvent } from '../ari/types.js';
 import type { Snapshot } from '../internal/server.js';
 import { channelLanguageVariable } from '../prompts.js';
@@ -77,10 +79,6 @@ export function endedSipStatus(event: AriEvent): number {
     techCause <= SIP_FINAL_HIGH
     ? techCause
     : causeToSipStatus(event.cause);
-}
-
-function trunkSectionName(trunkId: string): string {
-  return `trunk-${trunkId}`;
 }
 
 /**

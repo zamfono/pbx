@@ -1,3 +1,5 @@
+import { trunkSectionName } from '@zamfono/shared';
+
 import {
   assertSafeConfigValue,
   compareStrings,
@@ -6,7 +8,6 @@ import {
   formatHostUri,
   hostsByDirection,
   joinSections,
-  trunkSectionName,
   type RenderInput,
   type Trunk,
   type TrunkHost
@@ -54,7 +55,7 @@ function renderTrunkAuth(trunk: Trunk): string | null {
   if (username === null || password === null || !trunkNeedsAuthSection(trunk)) {
     return null;
   }
-  const name = trunkSectionName(trunk);
+  const name = trunkSectionName(trunk.id);
   return [
     `[${name}]`,
     'type = auth',
@@ -71,7 +72,7 @@ function renderTrunkAuth(trunk: Trunk): string | null {
  * `Registry` events instead (§9.4), so no qualify is needed on their static contact.
  */
 function renderTrunkAor(trunk: Trunk): string {
-  const name = trunkSectionName(trunk);
+  const name = trunkSectionName(trunk.id);
   const lines = [`[${name}]`, 'type = aor'];
   const outboundHosts = hostsByDirection(trunk, ['outbound', 'both']);
   const [firstOutboundHost] = outboundHosts;
@@ -100,7 +101,7 @@ function renderTrunkIdentify(trunk: Trunk): string | null {
   if (hosts.length === 0) {
     return null;
   }
-  const name = trunkSectionName(trunk);
+  const name = trunkSectionName(trunk.id);
   return [
     `[${name}]`,
     'type = identify',
@@ -149,7 +150,7 @@ const TRUNK_CONNECTED_LINE = 'send_connected_line = no';
 // (`renderTrunkAuthEndpoint`). PJSIP's default, `username,ip`, would also hand the trunk any
 // request whose `From` user is `trunk-<id>`, from any address.
 function renderTrunkEndpoint(trunk: Trunk, tenantCodecs: string[]): string {
-  const name = trunkSectionName(trunk);
+  const name = trunkSectionName(trunk.id);
   const codecs = trunk.codecs ?? tenantCodecs;
   const lines = [
     `[${name}]`,
@@ -200,7 +201,7 @@ function renderTrunkAuthEndpoint(
     `transport = transport-${trunk.transport}`,
     'direct_media = no',
     TRUNK_CONNECTED_LINE,
-    `auth = ${trunkSectionName(trunk)}`,
+    `auth = ${trunkSectionName(trunk.id)}`,
     'identify_by = auth_username'
   ].join('\n');
 }

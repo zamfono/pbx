@@ -1,3 +1,5 @@
+import { mwiMailboxOf, presenceHintDevice } from '@zamfono/shared';
+
 import { MOH_CLASSES_DIR } from '../audio/mohLayout.js';
 import {
   assertExtension,
@@ -7,7 +9,6 @@ import {
   escapeConfigValue,
   formatAllow,
   joinSections,
-  trunkSectionName,
   type Device,
   type Rendered,
   type RenderInput
@@ -15,7 +16,6 @@ import {
 import { renderTrunksConf } from './trunks.js';
 
 export type { RenderInput, Rendered };
-export { trunkSectionName };
 
 function assertSafeDevice(device: Device, ringGroupIds: string[]): void {
   assertSafeConfigValue(device.userId, 'device.userId');
@@ -49,8 +49,8 @@ function renderDeviceAor(
 ): string {
   const maxContacts = device.kind === 'ringotel' ? ringotelMaxRegs : 1;
   const mailboxes = [
-    `user:${device.userId}`,
-    ...ringGroupIds.map(id => `ringGroup:${id}`)
+    mwiMailboxOf({ userId: device.userId }),
+    ...ringGroupIds.map(ringGroupId => mwiMailboxOf({ ringGroupId }))
   ].join(',');
   return [
     `[${device.sipUsername}]`,
@@ -161,7 +161,7 @@ function renderHintsConf(input: RenderInput): string {
   ].sort(compareStrings);
   const lines = exts.map(ext => {
     assertExtension(ext);
-    return `exten => ${ext},hint,Stasis:presence-${ext}`;
+    return `exten => ${ext},hint,${presenceHintDevice(ext)}`;
   });
   return `${lines.join('\n')}\n`;
 }

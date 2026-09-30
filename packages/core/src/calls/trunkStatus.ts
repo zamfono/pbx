@@ -6,7 +6,11 @@
  * after. Pure mappings from a snapshot and Asterisk's answer to `[trunkId, status]` pairs, which
  * `TrunkState` applies to the live state.
  */
-import { registrationUris, type TrunkHost } from '@zamfono/shared';
+import {
+  registrationUris,
+  trunkSectionName,
+  type TrunkHost
+} from '@zamfono/shared';
 
 import type { AmiEvent } from '../ami/client.js';
 import type { AriEvent, Endpoint } from '../ari/types.js';
@@ -29,11 +33,6 @@ const ENDPOINT_STATUS: Partial<Record<string, TrunkStatus>> = {
   online: 'registered',
   offline: 'unreachable'
 };
-
-/** The trunk's PJSIP section name, matching Task 4's `trunkSectionName` (§9.4 "Flows"). */
-export function trunkSectionName(trunkId: string): string {
-  return `trunk-${trunkId}`;
-}
 
 function liveTrunks(snapshot: Snapshot): Snapshot['trunks'] {
   return snapshot.trunks.filter(trunk => trunk.deletedAt === null);

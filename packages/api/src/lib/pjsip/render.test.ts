@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
-import { render, trunkSectionName, type RenderInput } from './render.js';
+import { render, type RenderInput } from './render.js';
 
 function fixture(name: string): string {
   const path = fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
@@ -338,10 +338,6 @@ describe('render', () => {
     expect(moh).toContain('mode = files');
     expect(moh).toContain('directory = /media/prompts/moh/m1/');
     expect(moh).toContain('directory = /media/prompts/moh/m2/');
-  });
-
-  test('trunkSectionName is trunk-<id>', () => {
-    expect(trunkSectionName({ id: 't1' })).toBe('trunk-t1');
   });
 
   test('render refuses an invalid extension', () => {

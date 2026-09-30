@@ -4,6 +4,8 @@
  * two PUTs sent back to back can reach Asterisk in either order and leave a stale hint showing;
  * holding the next state until the previous PUT has answered keeps the last computed one last.
  */
+import { presenceHintDevice } from '@zamfono/shared';
+
 import type { AriClient } from './ari/client.js';
 import type { DeviceState } from './ari/types.js';
 
@@ -37,7 +39,7 @@ export class HintPusher {
       this.pending.delete(ext);
       // eslint-disable-next-line no-await-in-loop -- one PUT at a time per ext is the point
       await this.ari.deviceStates
-        .put(`Stasis:presence-${ext}`, state)
+        .put(presenceHintDevice(ext), state)
         .catch(() => undefined);
       state = this.pending.get(ext);
     }

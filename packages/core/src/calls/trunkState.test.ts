@@ -5,6 +5,7 @@ import {
   nowIso,
   openDb,
   registrationUris,
+  trunkSectionName,
   type Db,
   type Envelope
 } from '@zamfono/shared';
@@ -18,7 +19,7 @@ import type { FakeEndpoint } from '../ari/fakeChannel.js';
 import type { Logger } from '../ari/types.js';
 import { eventually } from '../testing/eventually.js';
 import { ConfigCache, EventBus, StateStore } from './pipeline.js';
-import { trunkSectionName, TrunkState } from './trunkState.js';
+import { TrunkState } from './trunkState.js';
 
 const noopLogger: Logger = {
   info: () => undefined,

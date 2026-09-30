@@ -7,13 +7,13 @@ import {
   ANONYMOUS,
   isInboundNumber,
   normalizeInbound,
+  trunkSectionName,
   type InboundNumberFormat
 } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import type { Channel } from '../ari/types.js';
 import type { Snapshot } from '../internal/snapshot.js';
-import { trunkSectionName } from './trunkState.js';
 
 /** `trunks.inbound_number_format`'s column default, for a call no trunk row accounts for. */
 const DEFAULT_FORMAT: InboundNumberFormat = 'e164';

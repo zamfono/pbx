@@ -1,4 +1,4 @@
-import type { Db } from '@zamfono/shared';
+import { TRUNK_SECTION_PREFIX, type Db } from '@zamfono/shared';
 
 import { OpError } from '../types.js';
 import {
@@ -109,7 +109,7 @@ export async function assertInboundAuthUsernameFree(
   username: string,
   excludeId?: string
 ): Promise<void> {
-  if (username.includes(';') || username.startsWith('trunk-')) {
+  if (username.includes(';') || username.startsWith(TRUNK_SECTION_PREFIX)) {
     throw new OpError(
       STATUS_UNPROCESSABLE_ENTITY,
       `username cannot name an inbound-auth endpoint: ${username}`
