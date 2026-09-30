@@ -4,7 +4,13 @@
  * behalf (§3.1 "Mail"). Separate from the deposit flow itself, which is about the call. The MWI
  * push after any later mailbox change (§9.3 "MWI", `refreshMwi`) reads the same counts.
  */
-import type { Db, MailRequest, MwiMailbox } from '@zamfono/shared';
+import {
+  mwiMailboxOf,
+  parseMwiMailbox,
+  type Db,
+  type MailRequest,
+  type MwiMailbox
+} from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import type { Call, Owner } from './call.js';
@@ -14,12 +20,6 @@ import type { MailSender } from './voicemail.js';
 
 // §11.6: voicemail recordings live here, the directory Asterisk's recording base resolves to.
 const VOICEMAIL_DIR = '/media/voicemail';
-
-function mailboxName(mailbox: Owner): MwiMailbox {
-  return 'userId' in mailbox
-    ? `user:${mailbox.userId}`
-    : `ringGroup:${mailbox.ringGroupId}`;
-}
 
 /** The mailbox's current old (read) and new (unread) counts (§9.3 "MWI"); `refreshMwi` reuses it. */
 export async function mwiCounts(
@@ -44,11 +44,10 @@ export async function refreshMwi(
   deps: { ari: AriClient; db: Db },
   mailbox: MwiMailbox
 ): Promise<void> {
-  const ownerId = mailbox.slice(mailbox.indexOf(':') + 1);
-  const owner = mailbox.startsWith('user:')
-    ? { userId: ownerId }
-    : { ringGroupId: ownerId };
-  const { oldMessages, newMessages } = await mwiCounts(deps.db, owner);
+  const { oldMessages, newMessages } = await mwiCounts(
+    deps.db,
+    parseMwiMailbox(mailbox)
+  );
   await deps.ari.mailboxes
     .put(mailbox, oldMessages, newMessages)
     .catch(() => undefined);
@@ -86,7 +85,7 @@ export async function persistVoicemail(ctx: DepositContext): Promise<void> {
     })
     .execute();
 
-  const name = mailboxName(mailbox);
+  const name = mwiMailboxOf(mailbox);
   const { oldMessages, newMessages } = await mwiCounts(db, mailbox);
   await pipeline.deps.ari.mailboxes
     .put(name, oldMessages, newMessages)

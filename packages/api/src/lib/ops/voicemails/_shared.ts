@@ -3,7 +3,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { sql, type Selectable, type Transaction } from 'kysely';
 
-import type { DB, MwiMailbox } from '@zamfono/shared';
+import { mwiMailboxOf, type DB, type MwiMailbox } from '@zamfono/shared';
 
 import { transcodeForDownload } from '../../audio/transcode.js';
 import { createCoreClient, type CoreClient } from '../../coreClient.js';
@@ -109,15 +109,15 @@ export function assertVoicemailScope(
   }
 }
 
-/** The `MwiMailbox` a voicemail row's owning mailbox is addressed as (§3.1, §9.3). */
+/** The `MwiMailbox` a voicemail row's owning mailbox is addressed as (§3.1, §9.3, `mwiMailboxOf`). */
 export function mailboxKey(
   row: Pick<VoicemailRow, 'mailboxUserId' | 'mailboxRingGroupId'>
 ): MwiMailbox {
   if (row.mailboxUserId !== null) {
-    return `user:${row.mailboxUserId}`;
+    return mwiMailboxOf({ userId: row.mailboxUserId });
   }
   if (row.mailboxRingGroupId !== null) {
-    return `ringGroup:${row.mailboxRingGroupId}`;
+    return mwiMailboxOf({ ringGroupId: row.mailboxRingGroupId });
   }
   throw new Error(
     'voicemails: row has neither a user nor a ring group mailbox'
