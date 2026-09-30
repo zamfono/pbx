@@ -5,11 +5,14 @@
  */
 import { stat } from 'node:fs/promises';
 
-import type { Db, StateResponse, ZamfonoVersion } from '@zamfono/shared';
+import {
+  MS_PER_SECOND,
+  type Db,
+  type StateResponse,
+  type ZamfonoVersion
+} from '@zamfono/shared';
 
 import type { CertSyncStatus } from './jobs/certSync.js';
-
-const MS_PER_SECOND = 1000;
 
 /* eslint-disable no-magic-numbers -- Prometheus's suggested latency-histogram bucket bounds, meaningful only as this literal list */
 const API_REQUEST_SECONDS_BUCKETS = [

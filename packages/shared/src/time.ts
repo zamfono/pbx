@@ -1,3 +1,6 @@
+/** One second in milliseconds, for every `*_s` setting and timeout a timer or `Date` counts in ms. */
+export const MS_PER_SECOND = 1000;
+
 /** One calendar day of 24 hours, in milliseconds: the unit of every `*_days` retention and window setting. */
 export const MS_PER_DAY = 86_400_000;
 

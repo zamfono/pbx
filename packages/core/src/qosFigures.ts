@@ -4,6 +4,7 @@
  * seconds and loss as packet counts; the row holds milliseconds and a percentage, one value per
  * figure for both directions of the leg.
  */
+import { MS_PER_SECOND } from '@zamfono/shared';
 
 /** The variable, as `ast_rtp_instance_get_quality` (main/rtp_engine.c) writes it for a channel
  * with an RTP instance: `ssrc=%u;themssrc=%u;lp=%u;rxjitter=%f;rxcount=%u;txjitter=%f;txcount=%u;
@@ -69,7 +70,6 @@ export type QosFigures = {
   rttMs: number | null;
 };
 
-const MS_PER_SECOND = 1000;
 const PERCENT = 100;
 // Two decimals: finer than any jitter buffer or loss threshold anyone reads, and short in JSON.
 const ROUNDING = 100;

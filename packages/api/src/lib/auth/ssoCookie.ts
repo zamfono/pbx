@@ -6,9 +6,10 @@
  */
 import { z } from 'zod';
 
+import { MS_PER_SECOND } from '@zamfono/shared';
+
 import { decrypt, encrypt, keyringFromEnv } from '../secretbox.js';
 
-const MS_PER_SECOND = 1000;
 /** How long a pending SSO login lasts: it survives the round trip to the IdP's own login and MFA
  *  pages, far longer than the 60 s an authorization code lives. */
 export const PENDING_LOGIN_TTL_S = 600;

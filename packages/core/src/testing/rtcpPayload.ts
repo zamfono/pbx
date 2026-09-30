@@ -4,9 +4,10 @@
 // receiver report's `sender_information` null.
 /* eslint-disable camelcase -- the keys are Asterisk's own JSON field names */
 
+import { MS_PER_SECOND } from '@zamfono/shared';
+
 const RTCP_SR = 200;
 const RTCP_RR = 201;
-const MS_PER_SECOND = 1000;
 const NTP_UNIX_OFFSET_S = 2_208_988_800;
 const FIXED_POINT_ONE = 65_536;
 const UINT32_RANGE = 4_294_967_296;

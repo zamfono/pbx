@@ -3,6 +3,8 @@
  * the first-digit and inter-digit timers, and Task 16's `menuStep` deciding when a typed string
  * resolves.
  */
+import { MS_PER_SECOND } from '@zamfono/shared';
+
 import type { AriClient } from '../ari/client.js';
 import type { AriEvent, Channel } from '../ari/types.js';
 import {
@@ -11,8 +13,6 @@ import {
   type MenuMap
 } from '../routing/menu.js';
 import { isChannelGone } from './playback.js';
-
-const MILLISECONDS_PER_SECOND = 1000;
 
 export type CollectResult =
   | { kind: 'match'; targetId: string; typed: string }
@@ -84,7 +84,7 @@ export function collectMenuInput(
       clearTimeout(timer);
       const ms =
         typed === ''
-          ? firstDigitTimeoutS * MILLISECONDS_PER_SECOND
+          ? firstDigitTimeoutS * MS_PER_SECOND
           : INTER_DIGIT_TIMEOUT_MS;
       timer = setTimeout(() => {
         settle(resultOf(map, typed, true));

@@ -3,6 +3,8 @@
  * caller and the wait for Asterisk's outcome of it, split out of `voicemail.ts`, which owns the
  * deposit's flow, so both stay under the repository's `max-lines` lint rule.
  */
+import { MS_PER_SECOND } from '@zamfono/shared';
+
 import type { AriClient } from '../ari/client.js';
 import type { AriEvent, RecordParams } from '../ari/types.js';
 import { isChannelGone } from './playback.js';
@@ -10,7 +12,6 @@ import { isChannelGone } from './playback.js';
 // §10.2 "Voicemail": the silence stop is a fixed constant, not a per-tenant setting, since it has
 // to outlast a caller's pause for thought and stay short enough not to record dead air.
 const VOICEMAIL_SILENCE_SECONDS = 5;
-const MILLISECONDS_PER_SECOND = 1000;
 // The `RecordingFinished`/`RecordingFailed` fallback's margin past `maxDurationSeconds`.
 const RECORDING_FALLBACK_BUFFER_S = 5;
 
@@ -103,8 +104,7 @@ export async function recordCaller(
   maxDurationSeconds: number
 ): Promise<RecordingOutcome> {
   const timeoutMs =
-    (maxDurationSeconds + RECORDING_FALLBACK_BUFFER_S) *
-    MILLISECONDS_PER_SECOND;
+    (maxDurationSeconds + RECORDING_FALLBACK_BUFFER_S) * MS_PER_SECOND;
   return recordAndWait(
     ari,
     channelId,

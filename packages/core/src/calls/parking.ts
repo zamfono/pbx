@@ -3,6 +3,8 @@
  * `parkingRetrieval.ts` and the timeout ring-back `parkingRingback.ts`. Its DTMF-menu siblings
  * `mailbox.ts` and `voicemail.ts`'s `deposit` share this file's own suite, `features.test.ts`,
  * rather than one `*.test.ts` each. */
+import { MS_PER_SECOND } from '@zamfono/shared';
+
 import type { Snapshot } from '../internal/server.js';
 import type { Presence } from '../presence.js';
 import { release, type Call } from './call.js';
@@ -17,8 +19,6 @@ import { moveParkedParty, ringParkerBack } from './parkingRingback.js';
 // --- end Task 31 ---
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
-
-const MILLISECONDS_PER_SECOND = 1000;
 
 export type ParkedEntry = {
   call: Call;
@@ -180,7 +180,7 @@ export async function park(
       parked: active,
       partyChannelId
     }).catch(() => undefined);
-  }, snapshot.settings.parkingTimeoutS * MILLISECONDS_PER_SECOND);
+  }, snapshot.settings.parkingTimeoutS * MS_PER_SECOND);
   timer.unref();
   slots.set(ext, { call: active, parkerUserId, partyChannelId, timer });
   slotByChannel(pipeline).set(partyChannelId, ext);

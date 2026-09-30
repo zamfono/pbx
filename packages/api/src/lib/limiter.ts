@@ -1,10 +1,11 @@
 import pino from 'pino';
 
+import { MS_PER_SECOND } from '@zamfono/shared';
+
 // §5.5: lockouts and limit hits are logged with the account or address.
 const logger = pino({ name: 'limiter' });
 
 // §5.5 rate limits: the endpoint's key and the window it counts attempts in.
-const MS_PER_SECOND = 1000;
 const MINUTE_MS = 60_000;
 const HOUR_MS = 3_600_000;
 const LOGIN_ADDRESS_LIMIT = 60;

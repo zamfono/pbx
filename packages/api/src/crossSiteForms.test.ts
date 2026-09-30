@@ -2,14 +2,13 @@ import process from 'node:process';
 import type { Config, RequestEvent } from '@sveltejs/kit';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { nowIso } from '@zamfono/shared';
+import { MS_PER_SECOND, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { handle } from './hooks.server.js';
 import { signAccessToken } from './lib/auth/jwt.js';
 import { getDb } from './lib/db.js';
 
-const MS_PER_SECOND = 1000;
 const JWT_SECRET = 'test-secret';
 const ORIGIN = 'https://pbx.example.com';
 const FORM = { 'content-type': 'application/x-www-form-urlencoded' };

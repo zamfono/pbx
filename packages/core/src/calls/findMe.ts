@@ -2,6 +2,8 @@
  * Find-me legs (§10.1 step 4): the delayed external legs a user's `find_me` list adds to their own
  * ring, and the accept prompt that keeps a voicemail box on the far end from swallowing the call.
  */
+import { MS_PER_SECOND } from '@zamfono/shared';
+
 import { defaultPrompt } from '../prompts.js';
 import type { Call, Leg } from './call.js';
 import { ringExternalLeg, type ExternalLegOwner } from './externalLeg.js';
@@ -9,8 +11,6 @@ import { endLeg, hangupLeg, trackLeg, type FindMeAcceptWait } from './legs.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
 import { concludeRing, endRingingLeg } from './ringConclusion.js';
-
-const MILLISECONDS_PER_SECOND = 1000;
 
 type FindMeEntry = { number: string; delayS: number };
 
@@ -136,7 +136,7 @@ export function scheduleFindMeLegs(
         .finally(() => {
           settleFindMeEntry(pipeline, call, timer);
         });
-    }, entry.delayS * MILLISECONDS_PER_SECOND);
+    }, entry.delayS * MS_PER_SECOND);
     timer.unref();
     return timer;
   });

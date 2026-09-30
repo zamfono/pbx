@@ -2,6 +2,8 @@ import process from 'node:process';
 import type { Handle, RequestEvent, ServerInit } from '@sveltejs/kit';
 import pino from 'pino';
 
+import { MS_PER_SECOND } from '@zamfono/shared';
+
 import { addressKey } from './lib/addressKey.js';
 import { crossSiteFormRejection } from './lib/auth/crossSiteForms.js';
 import { isRole, verifyAccessToken } from './lib/auth/jwt.js';
@@ -22,7 +24,6 @@ import { propagateConfig } from './lib/propagation.js';
 import { keyringFromEnv, type Keyring } from './lib/secretbox.js';
 
 const BEARER_PREFIX = 'Bearer ';
-const MS_PER_SECOND = 1000;
 const UNAUTHORIZED_STATUS = 401;
 const NOT_FOUND_STATUS = 404;
 const TOO_MANY_REQUESTS_STATUS = 429;

@@ -8,6 +8,7 @@ import { sql } from 'kysely';
 import { WebSocket, WebSocketServer } from 'ws';
 
 import {
+  MS_PER_SECOND,
   resolveVersion,
   type CoreHealth,
   type CoreVersionResponse,
@@ -36,7 +37,6 @@ export type { Snapshot };
 const HTTP_OK = 200;
 const HTTP_NOT_FOUND = 404;
 const HTTP_SERVICE_UNAVAILABLE = 503;
-const MS_PER_SECOND = 1000;
 
 // When this process started, however late this module loads: `system.info` shows it (§10.3), so
 // a restart is visible.

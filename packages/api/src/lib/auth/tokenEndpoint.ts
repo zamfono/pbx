@@ -1,3 +1,5 @@
+import { MS_PER_SECOND } from '@zamfono/shared';
+
 import type { AuthCodeStore } from './codes.js';
 import { ACCESS_TOKEN_TTL_S, isRole, signAccessToken } from './jwt.js';
 import {
@@ -13,7 +15,6 @@ import { mcpResourceUri, requestedResourceAcceptable } from './resource.js';
 import { issueRefresh, rotateRefresh } from './tokens.js';
 
 const BEARER_TOKEN_TYPE = 'Bearer';
-const MS_PER_SECOND = 1000;
 
 export type TokenDeps = BaseDeps & {
   jwtSecret: string;

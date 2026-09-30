@@ -2,6 +2,7 @@ import process from 'node:process';
 import { z } from 'zod';
 
 import {
+  MS_PER_SECOND,
   resolveVersion,
   type CoreVersionResponse,
   type ZamfonoVersion
@@ -10,8 +11,6 @@ import {
 import { isProfilePending } from '../../provisioning/profilePending.js';
 import { defineOperation } from '../types.js';
 import { updaterClient, type UpdaterStatus } from './_updater.js';
-
-const MS_PER_SECOND = 1000;
 
 // When this process started, however late this module loads, so a restart is visible (§10.3).
 const apiStartedAt = new Date(

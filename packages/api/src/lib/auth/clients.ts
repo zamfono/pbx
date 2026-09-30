@@ -1,11 +1,10 @@
-import type { Db } from '@zamfono/shared';
+import { MS_PER_SECOND, type Db } from '@zamfono/shared';
 
 import { decrypt, encrypt, type Keyring } from '../secretbox.js';
 
 // §5.2 "Client registration": the client-id-metadata-document fetch is cached in memory per the
 // document's own Cache-Control max-age; a document without one is fetched every time.
 const CACHE_CONTROL_MAX_AGE = /max-age=(?<seconds>\d+)/u;
-const MS_PER_SECOND = 1000;
 const HTTPS_SCHEME = 'https://';
 const LOOPBACK_HOST = '127.0.0.1';
 const HTTP_SCHEME = 'http:';

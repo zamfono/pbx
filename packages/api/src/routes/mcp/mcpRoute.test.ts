@@ -2,7 +2,7 @@ import process from 'node:process';
 import type { RequestEvent } from '@sveltejs/kit';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { nowIso } from '@zamfono/shared';
+import { MS_PER_SECOND, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { signAccessToken } from '../../lib/auth/jwt.js';
@@ -12,7 +12,6 @@ import { POST } from './+server.js';
 
 const ORIGIN = 'https://pbx.example';
 const JWT_SECRET = 'test-secret';
-const MS_PER_SECOND = 1000;
 const CURRENT = '2026-07-28';
 
 process.env.DB_FILE = ':memory:';

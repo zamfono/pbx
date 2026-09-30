@@ -1,14 +1,13 @@
 /** Key `0` of the mailbox menu (§10.2 "Mailbox access"): a greeting recorded by phone, which
  * makes `core` insert the `audio_assets` row and set the mailbox's `mailbox_audio_id` (§3.1
  * "Known cross-writes"). The menu itself is `mailbox.ts`'s. */
-import { newId } from '@zamfono/shared';
+import { MS_PER_SECOND, newId } from '@zamfono/shared';
 
 import { waitForRecording } from './ariWaits.js';
 import type { Call, Owner } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
 
-const MILLISECONDS_PER_SECOND = 1000;
 // media/prompts/ (§11.6): a recorded greeting's own spool path, matching `assetMedia`'s convention.
 const PROMPTS_DIR_NAME = 'prompts';
 const RECORDING_FALLBACK_BUFFER_S = 5;
@@ -44,8 +43,7 @@ export async function recordGreeting(
   const finished = waitForRecording(
     ari,
     name,
-    (MAILBOX_GREETING_MAX_S + RECORDING_FALLBACK_BUFFER_S) *
-      MILLISECONDS_PER_SECOND
+    (MAILBOX_GREETING_MAX_S + RECORDING_FALLBACK_BUFFER_S) * MS_PER_SECOND
   );
   await ari.channels
     .record(call.callerChannelId, {

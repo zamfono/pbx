@@ -1,3 +1,5 @@
+import { MS_PER_DAY } from '@zamfono/shared';
+
 import {
   ringotelLog,
   ringotelPbxRestarted,
@@ -27,7 +29,7 @@ export type { RingotelProviderDeps } from './ringotelClient.js';
 
 // Ringotel's recoverDeletedUser (§10.4) accepts a deletion only within this window; after it,
 // onDeviceCreated falls back to a fresh createUser.
-const RECOVER_WINDOW_MS = 86_400_000;
+const RECOVER_WINDOW_MS = MS_PER_DAY;
 
 /**
  * `onDeviceCreated` (§10.4): `createUser` for a genuinely new device; `recoverDeletedUser`

@@ -4,6 +4,8 @@
  * once answered or the batch's timeout elapses. Kept off `pipeline.pendingRing`, which Task 27's
  * single-user ring race owns; `ringGroup.ts` is the only caller.
  */
+import { MS_PER_SECOND } from '@zamfono/shared';
+
 import type { AriEvent, Channel } from '../ari/types.js';
 import type { Snapshot } from '../internal/server.js';
 import type { MemberLeg } from '../routing/ringGroup.js';
@@ -27,7 +29,6 @@ export { activeBatchHasRingingLeg, stopGroupRinging } from './groupPickup.js';
 // (mirrors legs.ts's own mapping for the single-user ring race).
 const AST_CAUSE_USER_BUSY = 17;
 const AST_CAUSE_CALL_REJECTED = 21;
-const MILLISECONDS_PER_SECOND = 1000;
 
 /** A batch's outcome: `answered` bridges the caller, `unanswered` moves the plan to its next
  * batch or fallback, `abandoned` means the caller's own channel ended while the batch rang —
@@ -198,7 +199,7 @@ export async function ringBatch(
   // --- end Task 31 ---
   const timer = setTimeout(() => {
     race.settle('unanswered');
-  }, batch.timeoutS * MILLISECONDS_PER_SECOND);
+  }, batch.timeoutS * MS_PER_SECOND);
   timer.unref();
 
   await originateBatch(pipeline, call, snapshot, batch.legs, {

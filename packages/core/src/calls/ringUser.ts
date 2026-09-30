@@ -2,6 +2,8 @@
 // find-me legs, then, once the race ends without an answer, the busy or noAnswer outcome. The race
 // itself — the first accepted answer winning, a leg ending early — is `legs.ts`'s.
 
+import { MS_PER_SECOND } from '@zamfono/shared';
+
 import { channelLanguageVariable } from '../prompts.js';
 import { takeJoinBridge } from './bridgeJoin.js';
 import { release, type Call } from './call.js';
@@ -16,7 +18,6 @@ import { concludeRing, placeAll } from './ringConclusion.js';
 import { devicesToRing, registeredDevices } from './userDevices.js';
 import { applyRingOutcome } from './userStep.js';
 
-const MILLISECONDS_PER_SECOND = 1000;
 const RELEASE_CODE_UNAVAILABLE = 480;
 
 type DeviceRing = {
@@ -131,7 +132,7 @@ export async function ringUser(
     Promise.withResolvers<RingOutcome>();
   const timer = setTimeout(() => {
     concludeRing(pipeline, call);
-  }, user.ringTimeoutS * MILLISECONDS_PER_SECOND);
+  }, user.ringTimeoutS * MS_PER_SECOND);
   timer.unref();
   pipeline.pendingRing.set(call.id, {
     resolve: resolveOutcome,

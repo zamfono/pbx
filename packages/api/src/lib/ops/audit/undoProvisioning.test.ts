@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { MS_PER_DAY, newId, nowIso, type Db } from '@zamfono/shared';
 
 import { installRingotelFake } from '../../provisioning/ringotelFake.js';
 import { encrypt, keyringFromEnv } from '../../secretbox.js';
@@ -19,7 +19,6 @@ process.env.ORIGIN ??= 'https://pbx.example.test';
 const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 const START = new Date('2026-06-01T12:00:00.000Z');
 const HOUR_MS = 3_600_000;
-const DAY_MS = 86_400_000;
 
 function asRun(): RunInput {
   return { actor: owner, channel: 'rest', requestId: 'req-1', confirm: true };
@@ -165,7 +164,7 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
     const remoteId = ringotel.users[0]?.id;
 
     await runOperation(db, 'devices.delete', { id: deviceId }, asRun());
-    advance(DAY_MS + HOUR_MS);
+    advance(MS_PER_DAY + HOUR_MS);
     const callsBeforeUndo = ringotel.calls.length;
     await undoLatest(db, 'devices.delete');
 

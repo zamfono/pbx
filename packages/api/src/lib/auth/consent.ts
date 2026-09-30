@@ -1,6 +1,8 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { z } from 'zod';
 
+import { MS_PER_SECOND } from '@zamfono/shared';
+
 import { decrypt, encrypt, type Keyring } from '../secretbox.js';
 import { PendingAuthorizeSchema, type PendingAuthorize } from './ssoCookie.js';
 
@@ -16,7 +18,6 @@ export const CONSENT_COOKIE_PATH = '/';
 // only has to survive the round trip to the approve/deny button, so it is far shorter-lived than
 // the SSO cookie's 600 s.
 const CONSENT_TTL_S = 300;
-const MS_PER_SECOND = 1000;
 
 const PendingConsentSchema = z.object({
   userId: z.string(),

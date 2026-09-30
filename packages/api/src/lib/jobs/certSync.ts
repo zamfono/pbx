@@ -12,7 +12,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import pino from 'pino';
 
-import { MINUTES_PER_HOUR, type Db } from '@zamfono/shared';
+import { MINUTES_PER_HOUR, MS_PER_SECOND, type Db } from '@zamfono/shared';
 
 import { createCoreClient, type CoreClient } from '../coreClient.js';
 import { getDb } from '../db.js';
@@ -170,7 +170,6 @@ export type CertSyncScheduler = {
 };
 
 const SECONDS_PER_MINUTE = 60;
-const MS_PER_SECOND = 1000;
 // Coarser than the day-scale timing this job targets is enough (§6.4): the resolved moment is
 // held across polls (`pendingChangeByDeps`), so a poll every hour still applies a scheduled
 // change within the hour it comes due.

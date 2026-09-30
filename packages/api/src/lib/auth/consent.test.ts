@@ -2,6 +2,8 @@ import { randomBytes } from 'node:crypto';
 import type { RequestEvent } from '@sveltejs/kit';
 import { describe, expect, it } from 'vitest';
 
+import { MS_PER_SECOND } from '@zamfono/shared';
+
 import { encrypt, keyringFromEnv, type Keyring } from '../secretbox.js';
 import {
   CONSENT_COOKIE_NAME,
@@ -10,7 +12,6 @@ import {
 } from './consent.js';
 
 const KEY_BYTE_LENGTH = 32;
-const MS_PER_SECOND = 1000;
 const CONSENT_TTL_S = 300;
 
 function testKeyring(): Keyring {

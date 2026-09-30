@@ -9,6 +9,8 @@
  * count, the peer's, and the last round trip the peer's reports gave, whatever the call's level,
  * which is decided at the write, as for the summary.
  */
+import { MS_PER_SECOND } from '@zamfono/shared';
+
 import { roundFigure, type QosFigures } from './qosFigures.js';
 import type { RtcpHepReport, RtcpReportBlock } from './rtcpReport.js';
 
@@ -34,7 +36,6 @@ type RtcpLeg = {
 // lost with the ARI connection, a channel of no call) is dropped: a leg with media reports every
 // few seconds, even on hold. Five minutes.
 const STALE_MS = 300_000;
-const MS_PER_SECOND = 1000;
 const PERCENT = 100;
 // NTP counts seconds from 1900, the Unix clock from 1970.
 const NTP_UNIX_OFFSET_S = 2_208_988_800;

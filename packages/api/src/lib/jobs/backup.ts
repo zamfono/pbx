@@ -10,6 +10,7 @@ import path from 'node:path';
 import { sql } from 'kysely';
 
 import {
+  MS_PER_SECOND,
   newId,
   nowIso,
   type Db,
@@ -38,7 +39,6 @@ import {
 
 export type { ExecFn } from './backupBackends.js';
 
-const MS_PER_SECOND = 1000;
 // 0700: the snapshot is a full-database VACUUM, secrets and password hashes included.
 const SNAPSHOT_DIR_MODE = 0o700;
 

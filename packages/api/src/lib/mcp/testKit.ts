@@ -1,7 +1,7 @@
 import process from 'node:process';
 import { z } from 'zod';
 
-import { nowIso, resolveVersion } from '@zamfono/shared';
+import { MS_PER_SECOND, nowIso, resolveVersion } from '@zamfono/shared';
 
 import { signAccessToken } from '../auth/jwt.js';
 import { mcpResourceUri } from '../auth/resource.js';
@@ -21,7 +21,6 @@ export const CLIENT_ID = 'client-1';
 const CLIENT_NAME = 'Ops Console';
 export const CURRENT = '2026-07-28';
 export const LEGACY = '2025-11-25';
-const MS_PER_SECOND = 1000;
 const SSE_SEPARATOR = '\n\n';
 const STATUS_CONFLICT = 409;
 

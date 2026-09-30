@@ -8,6 +8,8 @@
  * (`RingResolver.handOver`), which makes it the caller of the click-to-dial call, or dials the
  * pickup code with it.
  */
+import { MS_PER_SECOND } from '@zamfono/shared';
+
 import type { Channel } from '../ari/types.js';
 import type { Snapshot } from '../internal/server.js';
 import { channelLanguageVariable } from '../prompts.js';
@@ -19,8 +21,6 @@ import type { Pipeline } from './pipeline.js';
 import { placeAll } from './ringConclusion.js';
 
 export type Device = Snapshot['devices'][number];
-
-const MILLISECONDS_PER_SECOND = 1000;
 
 export type OwnRingParams = {
   /** The call whose legs the devices are, and whose ring race they run in. */
@@ -129,7 +129,7 @@ export function ringOwnDevices(
   let answered: Leg | null = null;
   const timer = setTimeout(() => {
     concludeRing(pipeline, host);
-  }, params.timeoutS * MILLISECONDS_PER_SECOND);
+  }, params.timeoutS * MS_PER_SECOND);
   timer.unref();
   pipeline.pendingRing.set(host.id, {
     resolve,

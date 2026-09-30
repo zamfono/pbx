@@ -9,6 +9,8 @@
 import { createSocket } from 'node:dgram';
 import { lookup as dnsLookup } from 'node:dns/promises';
 
+import { MS_PER_SECOND } from '@zamfono/shared';
+
 import type { Logger } from './ari/types.js';
 import { dispatchHep, type HepHandlers } from './hepDispatch.js';
 
@@ -29,7 +31,6 @@ const CHUNK_TYPE_PROTOCOL_TYPE = 0x000b;
 const CHUNK_TYPE_PAYLOAD = 0x000f;
 const CHUNK_TYPE_CORRELATION_ID = 0x0011;
 const IPV4_LEN = 4;
-const MILLISECONDS_PER_SECOND = 1000;
 const MICROSECONDS_PER_MILLISECOND = 1000;
 export type ParsedHep = {
   callId: string;
@@ -158,8 +159,7 @@ export function parseHep(
   const timestampUsec =
     readUInt32Chunk(chunks.get(CHUNK_TYPE_TIMESTAMP_USEC)) ?? 0;
   const atMs =
-    timestampSec * MILLISECONDS_PER_SECOND +
-    timestampUsec / MICROSECONDS_PER_MILLISECOND;
+    timestampSec * MS_PER_SECOND + timestampUsec / MICROSECONDS_PER_MILLISECOND;
 
   const srcIpChunk = chunks.get(CHUNK_TYPE_SRC_IPV4);
   const srcIp = srcIpChunk ? ipv4ToString(srcIpChunk) : undefined;

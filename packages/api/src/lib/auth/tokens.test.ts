@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Db } from '@zamfono/shared';
+import { MS_PER_DAY, type Db } from '@zamfono/shared';
 
 import { makeTestDb } from '../testDb.js';
 import { upsertClient } from './clients.js';
@@ -14,7 +14,6 @@ import {
 } from './tokens.js';
 
 const NOW = '2026-01-01T00:00:00.000Z';
-const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
 
 function afterMs(iso: string, ms: number): string {
@@ -47,7 +46,7 @@ describe('issueRefresh / rotateRefresh', () => {
     const db = await makeTestDb();
     await seedClient(db, 'client-1');
     const issued = await issueRefresh(db, 'owner', 'client-1', NOW);
-    expect(issued.expiresAt).toBe(afterMs(NOW, 30 * DAY_MS));
+    expect(issued.expiresAt).toBe(afterMs(NOW, 30 * MS_PER_DAY));
   });
 
   it('rotates a live token, returning a new one', async () => {
@@ -75,7 +74,7 @@ describe('issueRefresh / rotateRefresh', () => {
     const db = await makeTestDb();
     await seedClient(db, 'client-1');
     const issued = await issueRefresh(db, 'owner', 'client-1', NOW);
-    const past = afterMs(NOW, 30 * DAY_MS + 1);
+    const past = afterMs(NOW, 30 * MS_PER_DAY + 1);
     expect(await rotateRefresh(db, issued.raw, past)).toEqual({
       ok: false,
       reason: 'expired'
@@ -109,7 +108,7 @@ describe('issueRefresh / rotateRefresh', () => {
     }
     // The purge keeps an expired refresh row 30 more days (§5.2 "Client rows"); it is past
     // the replay window then, so presenting it must not end the live session.
-    const pastExpiry = afterMs(NOW, 30 * DAY_MS + 1);
+    const pastExpiry = afterMs(NOW, 30 * MS_PER_DAY + 1);
     expect(await rotateRefresh(db, first.raw, pastExpiry)).toEqual({
       ok: false,
       reason: 'expired'
@@ -151,7 +150,7 @@ describe('issueResetToken / redeemResetToken', () => {
     const db = await makeTestDb();
     const setup = await issueResetToken(db, 'owner', 'setup', NOW);
     const reset = await issueResetToken(db, 'owner', 'reset', NOW);
-    expect(setup.expiresAt).toBe(afterMs(NOW, 7 * DAY_MS));
+    expect(setup.expiresAt).toBe(afterMs(NOW, 7 * MS_PER_DAY));
     expect(reset.expiresAt).toBe(afterMs(NOW, HOUR_MS));
   });
 

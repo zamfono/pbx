@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import { MS_PER_SECOND } from '@zamfono/shared';
+
 import { signAccessToken } from '../auth/jwt.js';
 import { authenticate } from './auth.js';
 import { JWT_SECRET, ORIGIN, seededDeps } from './testKit.js';
-
-const MS_PER_SECOND = 1000;
 
 /** A request to `/mcp` carrying an access token signed for `audience`. */
 function requestFor(audience: string): Request {

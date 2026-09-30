@@ -1,4 +1,4 @@
-import type { Db } from '@zamfono/shared';
+import { MS_PER_SECOND, type Db } from '@zamfono/shared';
 
 import { isRole, verifyAccessToken } from '../auth/jwt.js';
 import { mcpResourceUri } from '../auth/resource.js';
@@ -7,7 +7,6 @@ import type { Actor } from '../ops/types.js';
 // §10.5 "Auth": an MCP request acts as the user its OAuth 2.1 bearer token names, and a mutating
 // tool call is audited under that user plus the MCP client's OAuth client id and name.
 const STATUS_UNAUTHORIZED = 401;
-const MS_PER_SECOND = 1000;
 const BEARER_PREFIX = 'Bearer ';
 
 /** What the MCP endpoint needs beyond the request itself. */
