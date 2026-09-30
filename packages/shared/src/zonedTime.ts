@@ -1,5 +1,7 @@
 /**
- * Wall-clock arithmetic in an IANA time zone, for the opening-hours evaluation in `schedule.ts`:
+ * Wall-clock arithmetic in an IANA time zone, for core's opening-hours evaluation
+ * (`packages/core/src/routing/schedule.ts`) and api's maintenance-moment resolution
+ * (`packages/api/src/lib/jobs/reloadTiming.ts`, §6.4 "Reload timing"):
  * reading the local date, weekday and time of an instant, converting a local date and time back
  * to an instant across DST transitions, and calendar-day and weekday shifts. Every computation
  * goes through `Intl` rather than a date library.
@@ -26,7 +28,7 @@ const WEEKDAY_NUMBERS: Record<string, Weekday> = {
   Sun: 7
 };
 
-type LocalDateTime = {
+export type LocalDateTime = {
   year: number;
   month: number;
   day: number;
@@ -55,7 +57,7 @@ export function localParts(instant: number, timeZone: string): LocalDateTime {
   const weekday =
     weekdayName === undefined ? undefined : WEEKDAY_NUMBERS[weekdayName];
   if (weekday === undefined) {
-    throw new Error(`schedule: unrecognized weekday "${weekdayName ?? ''}"`);
+    throw new Error(`zonedTime: unrecognized weekday "${weekdayName ?? ''}"`);
   }
   return {
     year: Number(map.year),

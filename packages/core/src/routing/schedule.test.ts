@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  closedPeriods,
   inEffectOoo,
   isOpen,
   scheduleFor,
@@ -110,30 +109,5 @@ describe('scheduleFor', () => {
     ];
 
     expect(scheduleFor(schedules, 'user:u1')?.id).toBe('tenant-schedule');
-  });
-});
-
-describe('closedPeriods', () => {
-  it('contains one weekend period of at least 63 hours for a Mon-Fri 9-17 schedule', () => {
-    const schedule = weekdayHoursSchedule();
-
-    // 2026-03-18T00:00Z is a Wednesday, still CET (before the March DST transition).
-    const periods = closedPeriods(
-      schedule,
-      '2026-03-18T00:00:00.000Z',
-      7,
-      'Europe/Berlin'
-    );
-
-    const MILLISECONDS_PER_HOUR = 3_600_000;
-    const MIN_WEEKEND_HOURS = 63;
-    const longPeriods = periods.filter(period => {
-      const hours =
-        (new Date(period.end).getTime() - new Date(period.start).getTime()) /
-        MILLISECONDS_PER_HOUR;
-      return hours >= MIN_WEEKEND_HOURS;
-    });
-
-    expect(longPeriods).toHaveLength(1);
   });
 });

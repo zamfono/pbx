@@ -4,21 +4,20 @@
  */
 import process from 'node:process';
 
-import type { Db } from '@zamfono/shared';
+import {
+  addDays,
+  localParts,
+  MINUTES_PER_HOUR,
+  MS_PER_DAY,
+  zonedTimeToInstant,
+  type Db
+} from '@zamfono/shared';
 
 import { loadIntervals, loadSchedule } from '../ops/hours/_shared.js';
 import { liveOooRulesInScope } from '../ops/ooo/_shared.js';
 import { loadSettings } from '../ops/settings/_shared.js';
 import { tenantTimeZone } from '../tenantTimeZone.js';
-import {
-  addDays,
-  DAYS_TO_SCAN,
-  localParts,
-  longestClosedGap,
-  MINUTES_PER_HOUR,
-  MS_PER_DAY,
-  zonedInstant
-} from './scheduleMath.js';
+import { DAYS_TO_SCAN, longestClosedGap } from './scheduleMath.js';
 
 const DEFAULT_RELOAD_HOUR = 3;
 const MIDPOINT_DIVISOR = 2;
@@ -91,7 +90,7 @@ function nextHourOccurrenceMs(
 ): number {
   const local = localParts(fromMs, timezone);
   const targetMinuteOfDay = hour * MINUTES_PER_HOUR;
-  const todayMs = zonedInstant(
+  const todayMs = zonedTimeToInstant(
     local.year,
     local.month,
     local.day,
@@ -102,7 +101,7 @@ function nextHourOccurrenceMs(
     return todayMs;
   }
   const tomorrow = addDays(local, 1);
-  return zonedInstant(
+  return zonedTimeToInstant(
     tomorrow.year,
     tomorrow.month,
     tomorrow.day,
