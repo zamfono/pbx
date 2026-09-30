@@ -1,4 +1,4 @@
-import { MS_PER_DAY } from '../../jobs/scheduleMath.js';
+import { MS_PER_DAY } from '@zamfono/shared';
 
 export const METRICS = [
   'answerRate',

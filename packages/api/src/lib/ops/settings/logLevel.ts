@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { MS_PER_DAY } from '../../jobs/scheduleMath.js';
+import { MS_PER_DAY } from '@zamfono/shared';
+
 import { recordChange } from '../runner.js';
 import { OpError, type Context } from '../types.js';
 

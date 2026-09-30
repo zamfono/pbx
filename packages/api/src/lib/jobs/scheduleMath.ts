@@ -11,7 +11,6 @@ import {
   type OpeningInterval
 } from '@zamfono/shared';
 
-export { MS_PER_DAY } from '@zamfono/shared';
 export const DAYS_TO_SCAN = 7;
 
 /** `now`, `days` earlier, as the ISO string every `_at`/`_json` column compares against. */

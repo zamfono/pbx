@@ -1,8 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 
-import type { Db } from '@zamfono/shared';
-
-import { MS_PER_DAY } from '../jobs/scheduleMath.js';
+import { MS_PER_DAY, type Db } from '@zamfono/shared';
 
 // §11.2 `tokens`: refresh tokens rotate every 30 days, a setup link is valid 7 days, a
 // self-requested reset link 1 hour.
