@@ -118,9 +118,30 @@ update 1.2.5 >"$work/out" 2>&1 && fail "a mismatching bundle was installed"
 grep -q 'does not match' "$work/out" || fail "no word of the mismatch: $(cat "$work/out")"
 [[ $(pin) == 'ZAMFONO_VERSION:-1.2.3' ]] || fail "a mismatching bundle changed compose.yaml"
 
-echo "  - a new minor from 1.0 on is no breaking update"
+echo "  - the policy of update-policy.tsv, which the updater's judgeUpdate is tested against too"
 fresh_stack
-update --check 1.3.0 | grep -qx '1.2.3 -> 1.3.0 (update)' || fail "1.3.0 is not a plain update"
+while IFS=$'\t' read -r from to verdict; do
+  [[ -z $from || $from == '#'* ]] && continue
+  sed -i '/^ZAMFONO_VERSION=/d' "$work/stack/.env"
+  echo "ZAMFONO_VERSION=$from" >>"$work/stack/.env"
+  case $verdict in
+    same) expected="Already on $from." ;;
+    older) expected= ;;
+    update) expected="$from -> $to (update)" ;;
+    breaking) expected="$from -> $to (breaking update)" ;;
+    *) fail "update-policy.tsv: unknown verdict $verdict" ;;
+  esac
+  got=$(update --check "$to" 2>/dev/null) || got=
+  [[ $got == "$expected" ]] || fail "$from to $to: update.sh said '$got'; the table: $verdict"
+  # The updater's run refuses what judgeUpdate refuses, bar the release it is on, which it reports.
+  if (cd "$work/stack" && ZAMFONO_UPDATER=1 ZAMFONO_REPO_URL="http://127.0.0.1:$port" \
+    ./update.sh --check "$to" </dev/null >/dev/null 2>&1); then
+    [[ $verdict == update || $verdict == same ]] || fail "$from to $to: the updater's run took it"
+  else
+    [[ $verdict == older || $verdict == breaking ]] || fail "$from to $to: the updater's run refused it"
+  fi
+done <"$repo_root/deploy/update-policy.tsv"
+fresh_stack
 
 echo "  - a breaking release needs --yes without a terminal"
 update 2.0.0 >"$work/out" 2>&1 && fail "a breaking update ran without --yes"
