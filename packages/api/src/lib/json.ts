@@ -6,3 +6,12 @@ export function tryParseJson(text: string): unknown {
     return undefined;
   }
 }
+
+/** `request.json()`, or `undefined` when the body is not valid JSON. */
+export async function tryReadJson(request: Request): Promise<unknown> {
+  try {
+    return await request.json();
+  } catch {
+    return undefined;
+  }
+}

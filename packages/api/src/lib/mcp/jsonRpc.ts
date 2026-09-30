@@ -35,15 +35,6 @@ export function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-/** `req.json()`, or `undefined` when the body is not valid JSON. */
-export async function attemptJson(req: Request): Promise<unknown> {
-  try {
-    return await req.json();
-  } catch {
-    return undefined;
-  }
-}
-
 export function parseMessage(body: unknown): IncomingMessage | null {
   const record = asRecord(body);
   if (!record || typeof record.method !== 'string') {

@@ -4,6 +4,7 @@ import pino from 'pino';
 import { z } from 'zod';
 
 import { getDb } from '../../../lib/db.js';
+import { tryReadJson } from '../../../lib/json.js';
 import { sendMail } from '../../../lib/mail/index.js';
 import { keyringFromEnv } from '../../../lib/secretbox.js';
 
@@ -56,17 +57,8 @@ const mailRequestSchema = z.discriminatedUnion('kind', [
   })
 ]);
 
-/** Parses `request`'s JSON body, or `undefined` for a body that is not valid JSON. */
-async function readJsonBody(request: Request): Promise<unknown> {
-  try {
-    return await request.json();
-  } catch {
-    return undefined;
-  }
-}
-
 async function handleMailRequest(request: Request): Promise<Response> {
-  const parsed = mailRequestSchema.safeParse(await readJsonBody(request));
+  const parsed = mailRequestSchema.safeParse(await tryReadJson(request));
   if (!parsed.success) {
     return new Response(null, { status: STATUS_BAD_REQUEST });
   }

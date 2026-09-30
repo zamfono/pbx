@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { tryReadJson } from '../json.js';
 import type { Keyring } from '../secretbox.js';
 import { encodeMetadataClientId } from './clients.js';
 import {
@@ -28,15 +29,6 @@ const RegisterRequestSchema = z.object({
 
 export type RegisterDeps = BaseDeps & { keyring: Keyring };
 
-/** `req.json()`, or `undefined` when the body is not valid JSON. */
-async function attemptJson(req: Request): Promise<unknown> {
-  try {
-    return await req.json();
-  } catch {
-    return undefined;
-  }
-}
-
 /**
  * `POST /oauth/register` (RFC 7591): stateless — the returned `client_id` is the metadata
  * itself, encrypted (§5.2), so an invalid or abandoned registration writes nothing. The §5.5
@@ -46,7 +38,7 @@ export async function registerEndpoint(
   deps: RegisterDeps,
   req: Request
 ): Promise<Response> {
-  const body = await attemptJson(req);
+  const body = await tryReadJson(req);
   if (body === undefined) {
     return oauthError(STATUS_BAD_REQUEST, 'invalid_client_metadata');
   }

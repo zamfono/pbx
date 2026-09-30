@@ -1,5 +1,6 @@
 import pino from 'pino';
 
+import { tryReadJson } from './json.js';
 import {
   authenticate,
   unauthorizedResponse,
@@ -16,7 +17,6 @@ import {
 } from './mcp/era.js';
 import INSTRUCTIONS_RAW from './mcp/instructions.txt?raw';
 import {
-  attemptJson,
   JSONRPC_INTERNAL_ERROR,
   JSONRPC_INVALID_PARAMS,
   JSONRPC_INVALID_REQUEST,
@@ -153,7 +153,7 @@ export async function handleMcpRequest(
   if (!auth) {
     return unauthorizedResponse(deps.origin);
   }
-  const body = await attemptJson(request);
+  const body = await tryReadJson(request);
   if (body === undefined) {
     return jsonRpcError(null, JSONRPC_PARSE_ERROR, 'invalid JSON');
   }
