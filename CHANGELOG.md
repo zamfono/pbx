@@ -33,9 +33,10 @@ why the specified behaviour changed; the commit history, how.
 - The `qos` level's `call_qos` rows had no jitter or loss and a round trip of 0, and only the
   caller's leg had one: the core read fields Asterisk does not send, and read the leg that hung up
   after its channel had gone. Each bridged leg now has a row with jitter and round trip in
-  milliseconds and loss in percent, read every few seconds while the call runs, a
-  mailbox-answered caller's included; what was not measured (a round trip without RTCP, a leg no
-  audio reached) is empty rather than 0.
+  milliseconds and loss in percent, a mailbox-answered caller's included, taken from the summary
+  Asterisk records on the leg as it hangs up, whichever side hangs up first, so nothing is polled
+  while the call runs; what was not measured (a round trip without RTCP, a leg no audio reached)
+  is empty rather than 0.
 - At the call log's `sip` level, a leg refused at once (a trunk answering 403 within
   milliseconds) recorded none of its SIP messages. Each leg the PBX places now joins the call's
   capture before its INVITE leaves.

@@ -33,7 +33,10 @@ export type PipelineDeps = {
   cdr: {
     open(call: Call): Promise<void>;
     finish(call: Call): Promise<void>;
-    captureQos?(call: Call): Promise<void>;
+    /** §7 level `qos`: notes the call's channels as the ones its `call_qos` rows come from. */
+    noteQosLegs?(call: Call): void;
+    /** §7 level `qos`: a channel's `ChannelDestroyed`, carrying its `RTPAUDIOQOS`. */
+    channelEnded?(channel: Channel): Promise<void>;
     registerLeg?(call: Call, channelId: string): void;
     /** `registerLeg`, resolving once the join is in place (`legOriginate.ts`). */
     joinLeg?(call: Call, channelId: string): Promise<void>;
@@ -109,7 +112,34 @@ export class Pipeline {
       : null;
   }
 
+  /**
+   * §7 level `qos`: a call's channels are noted before and after each of its events is handled,
+   * since handling one may take a leg out of the call (a leg the caller's hangup ends) and put
+   * one in (a leg answering), and a channel's own `ChannelDestroyed` is handed on with the
+   * `RTPAUDIOQOS` it carries once that note is taken.
+   */
   private async routeEvent(ev: AriEvent): Promise<void> {
+    const channel = ev.channel as Channel | undefined;
+    const before =
+      channel === undefined ? undefined : this.callByChannel.get(channel.id);
+    if (before !== undefined) {
+      this.deps.cdr.noteQosLegs?.(before);
+    }
+    const qosWritten =
+      ev.type === 'ChannelDestroyed' && channel !== undefined
+        ? this.deps.cdr.channelEnded?.(channel)
+        : undefined;
+    await Promise.all([this.dispatch(ev), qosWritten]);
+    const after =
+      channel === undefined ? undefined : this.callByChannel.get(channel.id);
+    for (const call of new Set([before, after])) {
+      if (call !== undefined) {
+        this.deps.cdr.noteQosLegs?.(call);
+      }
+    }
+  }
+
+  private async dispatch(ev: AriEvent): Promise<void> {
     if (ev.type === 'StasisStart') {
       await this.handleStasisStart(ev);
       return;
@@ -129,7 +159,6 @@ export class Pipeline {
       const call = this.callByChannel.get((ev.channel as Channel).id);
       if (call !== undefined) {
         noteHangupRequest(call, ev);
-        await this.deps.cdr.captureQos?.(call);
       }
       return;
     }

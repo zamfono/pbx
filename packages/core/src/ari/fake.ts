@@ -1,4 +1,5 @@
 // In-process fake ARI server: HTTP + WebSocket, an in-memory channel/bridge model, for tests only.
+import type { RtpQos } from '../qosFigures.js';
 import { routeBridge, type Bridge } from './fakeBridge.js';
 import {
   contactReachable,
@@ -11,14 +12,9 @@ import {
 import { fakeCreate, fakeDial, fakeOriginate } from './fakeDial.js';
 import { splitResource, type RouteResult } from './fakeHttp.js';
 import { FakePlaybacks } from './fakePlayback.js';
-import { readRtpStatistics } from './fakeRtp.js';
+import { fakeChannelVars } from './fakeRtp.js';
 import { FakeAriTransport, type FakeRequest } from './fakeTransport.js';
-import {
-  defaultChannel,
-  type AriEvent,
-  type Channel,
-  type RtpStatistics
-} from './types.js';
+import { defaultChannel, type AriEvent, type Channel } from './types.js';
 
 export { isPlacement, placedCallerId } from './fakeDial.js';
 
@@ -65,10 +61,10 @@ export class FakeAri {
   readonly channelVariables = new Map<string, string>();
   /** What `GET /ari/endpoints` reports; `Presence.resyncOnBoot` reads it to seed registration. */
   readonly endpoints: FakeEndpoint[] = [];
-  /** `GET /channels/{id}/rtp_statistics` per channel id; a channel not listed answers the
-   * realistic default body (`fakeRtpStatistics`), and `null` answers 404, as Asterisk does for a
-   * channel without an RTP instance. */
-  readonly rtpStatistics = new Map<string, RtpStatistics | null>();
+  /** The `RTPAUDIOQOS` each channel's ending events carry in `channelvars` (§7 level `qos`), per
+   * channel id: a channel not listed carries the realistic default (`fakeRtpAudioQos`), and one
+   * listed as `null` none, as Asterisk leaves it for a channel without an RTP instance. */
+  readonly rtpQos = new Map<string, Partial<RtpQos> | null>();
 
   /**
    * Reports `sipUsername` as online, as a phone that has REGISTERed would appear: both in the
@@ -119,12 +115,19 @@ export class FakeAri {
     this.transport.disconnectClient();
   }
 
+  /** Sends `event`, its channel carrying `channelvars` as a stack whose ari.conf names
+   * `RTPAUDIOQOS` sends them, unless the test gave its own. */
   emit(event: AriEvent): void {
+    const channel = event.channel as Partial<Channel> | undefined;
     if (event.type === 'StasisStart') {
-      const channel = event.channel as Channel | undefined;
       this.snoopsOutsideStasis.delete(channel?.id ?? '');
     }
-    this.transport.send(event);
+    if (channel?.id === undefined || channel.channelvars !== undefined) {
+      this.transport.send(event);
+      return;
+    }
+    const channelvars = fakeChannelVars(this.rtpQos, event.type, channel.id);
+    this.transport.send({ ...event, channel: { ...channel, channelvars } });
   }
 
   addChannel(overrides: Partial<Channel>): Channel {
@@ -208,9 +211,6 @@ export class FakeAri {
     }
     if (action === 'snoop' && method === 'POST') {
       return this.snoop(id, body);
-    }
-    if (action === 'rtp_statistics' && method === 'GET') {
-      return readRtpStatistics(this.rtpStatistics, id);
     }
     if (method === 'GET' && action === 'variable') {
       return readChannelVariable(this.channelVariables, id, qs);

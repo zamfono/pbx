@@ -113,7 +113,7 @@ export async function persistVoicemail(ctx: DepositContext): Promise<void> {
   apiClient.mail(mailRequest).catch(() => undefined);
 
   call.status = 'voicemail';
-  await pipeline.deps.cdr.captureQos?.(call);
+  pipeline.deps.cdr.noteQosLegs?.(call);
   await pipeline.deps.ari.channels
     .hangup(call.callerChannelId)
     .catch(() => undefined);

@@ -158,8 +158,8 @@ export async function release(
   if (status === 'missed') {
     await notifyMissedCall(pipeline, call);
   }
-  // §7: the RTP statistics are read while the channel still exists.
-  await pipeline.deps.cdr.captureQos?.(call);
+  // §7: the channel whose `call_qos` row this call has is noted before it goes.
+  pipeline.deps.cdr.noteQosLegs?.(call);
   await pipeline.deps.ari.channels
     .hangup(call.callerChannelId, { reasonCode: sipToHangupCause(code) })
     .catch(() => undefined);

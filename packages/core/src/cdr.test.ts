@@ -5,8 +5,8 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from './ari/client.js';
 import { FakeAri } from './ari/fake.js';
-import { fakeRtpStatistics } from './ari/fakeRtp.js';
-import type { Logger } from './ari/types.js';
+import { fakeRtpAudioQos } from './ari/fakeRtp.js';
+import { defaultChannel, type Channel, type Logger } from './ari/types.js';
 import type { LogLevel } from './callLog.js';
 import { newCall, type Call } from './calls/call.js';
 import { CdrWriter } from './cdr.js';
@@ -19,6 +19,11 @@ const noopLogger: Logger = {
 };
 
 const NOW = '2026-01-01T00:05:00.000Z';
+
+/** `id`'s `ChannelDestroyed` channel, carrying the `RTPAUDIOQOS` Asterisk set as it hung up. */
+function endedChannel(id: string, rtpAudioQos = fakeRtpAudioQos()): Channel {
+  return defaultChannel({ id, channelvars: { RTPAUDIOQOS: rtpAudioQos } });
+}
 
 async function seedForwardTargetUser(db: Db, userId: string): Promise<string> {
   const id = newId();
@@ -240,24 +245,25 @@ describe('CdrWriter', () => {
 
   it('writes a call_qos row per channel at the resolved level qos and above', async () => {
     await seedSettings(db, 'events');
-    ari.channels.rtpStatistics = channelId =>
-      Promise.resolve(
-        channelId === 'caller-channel'
-          ? fakeRtpStatistics({
-              rxjitter: 0.0015,
-              txjitter: 0.001,
-              rxcount: 998,
-              rxploss: 2,
-              txploss: 0,
-              rtt: 0.042
-            })
-          : null
-      );
     // §7: `call_qos` is gated on this call's own resolved level, independent of the tenant
     // default seeded above — an override from the user, trunk or ring group that routed this
     // call can raise it past the tenant's own setting.
     const call = buildCall('qos');
     call.status = 'answered';
+    cdr.noteQosLegs(call);
+    await cdr.channelEnded(
+      endedChannel(
+        'caller-channel',
+        fakeRtpAudioQos({
+          rxjitter: 0.0015,
+          txjitter: 0.001,
+          rxcount: 998,
+          rxploss: 2,
+          txploss: 0,
+          rtt: 0.042
+        })
+      )
+    );
 
     await cdr.finish(call);
 
@@ -279,9 +285,10 @@ describe('CdrWriter', () => {
 
   it('writes no call_qos row below the resolved level qos', async () => {
     await seedSettings(db, 'events');
-    ari.channels.rtpStatistics = () => Promise.resolve(fakeRtpStatistics());
     const call = buildCall('events');
     call.status = 'answered';
+    cdr.noteQosLegs(call);
+    await cdr.channelEnded(endedChannel('caller-channel'));
 
     await cdr.finish(call);
 
@@ -297,9 +304,10 @@ describe('CdrWriter', () => {
     // §7: the resolved level is the max of the tenant default and this call's own overrides; a
     // high tenant default alone, with no override on this particular call, keeps it at `events`.
     await seedSettings(db, 'qos');
-    ari.channels.rtpStatistics = () => Promise.resolve(fakeRtpStatistics());
     const call = buildCall('events');
     call.status = 'answered';
+    cdr.noteQosLegs(call);
+    await cdr.channelEnded(endedChannel('caller-channel'));
 
     await cdr.finish(call);
 
@@ -405,20 +413,17 @@ describe('CdrWriter', () => {
 
     expect(call.log.finish().log ?? '').not.toContain('OPTIONS');
   });
-  it('writes call_qos from the snapshot taken before the hangup (§7)', async () => {
+  it('writes the call_qos row of a channel that ends after the call is written (§7)', async () => {
     await seedSettings(db, 'qos');
     const call = buildCall('qos');
-    fakeAri.addChannel({ id: call.callerChannelId });
-    ari.channels.rtpStatistics = () => Promise.resolve(fakeRtpStatistics());
     await cdr.open(call);
     call.answeredAt = '2026-01-01T00:00:01.000Z';
     call.status = 'answered';
 
-    // §7 reads rtp_statistics "before the leg is hung up"; every call-ending path hangs the caller
-    // up first, so the read has to happen at the last moment the channel still exists.
-    await cdr.captureQos(call);
-    await ari.channels.hangup(call.callerChannelId);
+    // Every call-ending path hangs the caller up and writes the call without waiting for its
+    // `ChannelDestroyed`, which carries the statistics Asterisk set as it hung the channel up.
     await cdr.finish(call);
+    await cdr.channelEnded(endedChannel(call.callerChannelId));
 
     const rows = await db
       .selectFrom('callQos')

@@ -42,9 +42,9 @@ export async function closeCall(
   status: CallsRow['status'],
   hangupChannels: boolean
 ): Promise<void> {
-  // §7: the RTP statistics are read while the channels still exist, and before the legs below
-  // stop counting as up.
-  await pipeline.deps.cdr.captureQos?.(call);
+  // §7: the channels whose `call_qos` rows this call has are noted before the legs below stop
+  // counting as up.
+  pipeline.deps.cdr.noteQosLegs?.(call);
   traceSystemEnd(call);
   if (call.depositing === true) {
     // §10.2 "Voicemail": a caller in a mailbox deposit is hung up like one ending the message
