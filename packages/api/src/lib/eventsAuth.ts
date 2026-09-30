@@ -8,7 +8,7 @@ import type { WebSocket } from 'ws';
 import { MS_PER_SECOND, rawDataToString, type Db } from '@zamfono/shared';
 
 import { isRole, verifyAccessToken } from './auth/jwt.js';
-import { tryParseJson } from './events.js';
+import { tryParseJson } from './json.js';
 import type { Actor } from './ops/types.js';
 
 // §10.6: a connection that sends anything other than the auth frame first, or nothing, within

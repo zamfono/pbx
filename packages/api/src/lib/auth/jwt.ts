@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import process from 'node:process';
 
+import { tryParseJson } from '../json.js';
 import type { Role } from '../ops/types.js';
 
 // §5.2: an access token lives 15 minutes; `api` is the only party that ever verifies it, so
@@ -34,15 +35,6 @@ function base64UrlDecode(value: string): string {
 
 function sign(secret: string, signingInput: string): string {
   return createHmac('sha256', secret).update(signingInput).digest('base64url');
-}
-
-/** `JSON.parse(text)`, or `undefined` when `text` is not valid JSON. */
-function tryParseJson(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
 }
 
 /** Type guard for the RBAC roles a JWT `role` claim (or a `users.role` column) may hold. */

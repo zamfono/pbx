@@ -17,15 +17,6 @@ import type { Actor } from './ops/types.js';
 const RING_GROUP_MAILBOX_PREFIX = 'ringGroup:';
 const USER_MAILBOX_PREFIX = 'user:';
 
-/** `JSON.parse(text)`, or `undefined` when `text` is not valid JSON. */
-export function tryParseJson(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-}
-
 /**
  * Whether `actor` may see `ev` on `/events` (§10.6): `admin`/`owner` see everything, a `user`
  * only their own presence and calls plus the tenant-scope `ooo`/`hours` events. Ring-group

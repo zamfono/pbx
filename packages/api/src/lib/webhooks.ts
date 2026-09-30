@@ -7,7 +7,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 
 import { publicEnvelope, type Db, type Envelope } from '@zamfono/shared';
 
-import { tryParseJson } from './events.js';
+import { tryParseJson } from './json.js';
 import { decrypt, type Keyring } from './secretbox.js';
 
 // §10.6: three attempts total per delivery, a 5 s timeout per request, and the two backoff
