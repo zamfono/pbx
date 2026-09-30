@@ -27,8 +27,6 @@ why the specified behaviour changed; the commit history, how.
   other, each up to a few seconds after the one before. They now all ring at once.
 - A leg with one-way audio, whose far end sent nothing back, read a packet loss of 0 % in
   `call_qos`, a perfect line. Its loss now reads as not measured.
-- When the core could not read the Asterisk start time after Asterisk restarted, the Ringotel apps
-  were not re-registered. The core now reads it again until it can.
 - Editing a running out-of-office rule's end or start, or a rule that follows another back to
   back, sent no `ooo` event, so the live status kept the old end time. It now updates at once.
 - The `ooo` and `hours` events, and the live OOO and opening-hours status they drive, came up to
@@ -66,11 +64,6 @@ why the specified behaviour changed; the commit history, how.
   milliseconds) recorded none of its SIP messages. Each leg the PBX places now joins the call's
   capture before its INVITE leaves, the user's own phones a click-to-dial or an API pickup rings
   included.
-- A call could hang, ringing on for its caller until they gave up, when Asterisk refused to place
-  one of its legs, as a loaded host did by answering a leg's dial before the leg was ready. A leg
-  that cannot be placed now counts as one that ended at once: the ring goes on with the other
-  phones or reaches its fallback, an outbound call tries its next route, and the trace says
-  `placementFailed`.
 - A pickup over the API (`POST /calls/{id}/pickup`) that went wrong left no trace of why: which
   of the picker's phones rang, declined or could not be reached was written nowhere. The picked-up
   call's own history now carries those lines, as `pickupRing` entries naming each step.
@@ -81,9 +74,8 @@ why the specified behaviour changed; the commit history, how.
   reachable, not its latest registration refresh, which Asterisk reports no event for.
 - `/metrics` waited for as long as `core` took to answer its health check, so a hung `core` hung
   the scrape too. It now gives up after three seconds, as `/healthz` does.
-- `system.info` waited as long as a hung `core` took to report its version, and so did the check
-  for an Asterisk restart each time `api` reconnects to `core`. Both give up after three seconds;
-  `system.info` then shows `core` as `null`.
+- `system.info` waited as long as a hung `core` took to report its version. It now gives up after
+  three seconds and shows `core` as `null`.
 - `update.sh` on Podman without the boot unit, with `podman-compose` as the provider of
   `podman compose`, stopped after installing the new files and left the old containers running:
   `podman-compose` has no `rm` for removing `proxy`. Without the unit, `update.sh` now takes the
@@ -108,7 +100,8 @@ why the specified behaviour changed; the commit history, how.
   the number of registered phones, a forward) and why a call reached voicemail, the opening hours
   also when none apply, the answering channel with its device or trunk, the codecs both sides
   negotiated, the caller ID each outbound attempt presented, and who ended the call (caller,
-  callee or the system) with the cause. The `diagnose-bad-call` recipe lists the lines.
+  callee or the system) with the cause, and a leg Asterisk could not place (`placementFailed`),
+  which counts as one that ended at once. The `diagnose-bad-call` recipe lists the lines.
 
 ### Changed
 
@@ -126,12 +119,14 @@ why the specified behaviour changed; the commit history, how.
 
 - **Ringotel connections change at their next push**: the first user, extension, ring-group,
   parking or profile change after the upgrade, or the upgrade's own restart (which re-registers
-  the apps), rewrites the connection's settings; a device change does not. Internal calls then always go through the PBX, the PBX's caller name wins over the
-  app's contacts, apps stay registered while closed and re-register every two minutes, and the
-  mobile apps dial emergency numbers over the cellular network. Settings
-  changed by hand in the Ringotel Shell for these are overwritten.
+  the apps), rewrites the connection's settings; a device change does not. Internal calls then
+  always go through the PBX, the PBX's caller name wins over the app's contacts, apps stay
+  registered while closed and re-register every two minutes, and the mobile apps dial emergency
+  numbers over the cellular network. Settings changed by hand in the Ringotel Shell for these are
+  overwritten.
 - The `astdb` volume is created by the upgrade's own `up -d`; nothing to do. It starts empty, so
-  the registrations of this one upgrade are still lost: devices come back as they re-register.
+  phones registered over UDP register again after this one upgrade; those over TLS or TCP do so
+  after every restart anyway, the Ringotel apps at once.
 
 ## [0.0.6] - 2026-09-29
 
