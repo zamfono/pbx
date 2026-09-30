@@ -12,6 +12,7 @@ import {
   nowIso,
   resolveVersion,
   type CoreHealth,
+  type CoreVersionResponse,
   type Db,
   type Envelope,
   type Event,
@@ -38,6 +39,13 @@ export type { Snapshot };
 const HTTP_OK = 200;
 const HTTP_NOT_FOUND = 404;
 const HTTP_SERVICE_UNAVAILABLE = 503;
+const MS_PER_SECOND = 1000;
+
+// When this process started, however late this module loads: `system.info` shows it (§10.3), so
+// a restart is visible.
+const processStartedAt = new Date(
+  Date.now() - process.uptime() * MS_PER_SECOND
+).toISOString();
 
 /** The live-call actions (§3), `calls/actions.ts`'s `CallActions`; `null` leaves their routes 404. */
 export type CallActions = {
@@ -103,6 +111,27 @@ async function handleHealthz(
   respondJson(response, body.ok ? HTTP_OK : HTTP_SERVICE_UNAVAILABLE, body);
 }
 
+/**
+ * `GET /internal/version` (§7 "Version"): what this `core` runs and since when, and when the
+ * Asterisk it is connected to started, `null` while ARI is down or does not say; `api` watches the
+ * latter to re-register the Ringotel apps after an Asterisk restart (§10.4 "After a restart").
+ */
+async function handleVersion(
+  deps: InternalDeps,
+  ariConnected: boolean,
+  response: http.ServerResponse
+): Promise<void> {
+  const asteriskStartedAt = ariConnected
+    ? await deps.ari.asterisk.startupTime().catch(() => null)
+    : null;
+  const body: CoreVersionResponse = {
+    ...resolveVersion(process.env),
+    startedAt: processStartedAt,
+    asteriskStartedAt
+  };
+  respondJson(response, HTTP_OK, body);
+}
+
 async function handleState(
   deps: InternalDeps,
   response: http.ServerResponse
@@ -133,7 +162,7 @@ async function routeRequest(
   // The version this `core` runs (§7 "Version"), for `api`'s `system.info`: during an upgrade, or
   // with one container left on an old image, it can differ from `api`'s own.
   if (request.method === 'GET' && url.pathname === '/internal/version') {
-    respondJson(response, HTTP_OK, resolveVersion(process.env));
+    await handleVersion(deps, isAriConnected(), response);
     return;
   }
   if (

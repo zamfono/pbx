@@ -33,6 +33,8 @@ bring_up_stack() {
   local socket=/var/run/docker.sock
   [ "$RUNTIME" != podman ] || socket=/run/podman/podman.sock
 
+  # HEP_ENABLED is on, as a stack ships it (§7): the `*-sip-log-*` scenarios read the SIP
+  # messages Asterisk mirrors to the core.
   cat > "$repo/deploy/.env" <<ENV
 FQDN=$FQDN
 EXTERNAL_IPV4=127.0.0.1
@@ -62,7 +64,7 @@ EXT_LENGTH=3
 TZ=UTC
 TLS_RELOAD_HOUR=3
 CALL_LOG_MAX_BYTES=1048576
-HEP_ENABLED=false
+HEP_ENABLED=true
 SIP_UDP_ENABLED=true
 SIP_TCP_ENABLED=true
 METRICS_TOKEN=
@@ -200,10 +202,15 @@ step_updater() {
   info=$(api GET /system/info) || fail "GET /system/info did not answer"
   printf '%s' "$info" | python3 -c '
 import json, sys
-update = json.load(sys.stdin)["update"]
+info = json.load(sys.stdin)
+update = info["update"]
 if "unavailable" in update or "last" not in update:
     sys.exit("the updater is not usable: %s" % json.dumps(update))
-' || fail "system.info reports no usable updater"
+# §10.3 System, §10.4 "After a restart": core dates itself and the Asterisk it is connected to.
+core = info["core"] or {}
+if not core.get("startedAt") or not core.get("asteriskStartedAt"):
+    sys.exit("system.info carries no core start times: %s" % json.dumps(core))
+' || fail "system.info reports no usable updater, or no core start times"
   refusal=$(curl -sS -X POST "$API/api/v1/system/update" "${FWD[@]}" \
     -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
     -d '{"confirm":true}' -w '\n%{http_code}')

@@ -11,16 +11,25 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
-### Added
-
-- The call log's routing trace says more: why the user step decided as it did (DND, offline with
-  the number of registered phones, a forward) and why a call reached voicemail, the opening hours
-  also when none apply, the answering channel with its device or trunk, the codecs both sides
-  negotiated, the caller ID each outbound attempt presented, and who ended the call (caller,
-  callee or the system) with the cause. The `diagnose-bad-call` recipe lists the lines.
-
 ### Fixed
 
+- Internal calls between Ringotel apps did not always pass through the PBX, so they could be
+  missing from the call history, recordings and presence: the connection kept Ringotel's default,
+  "through PBX if possible", since the setting Zamfono sent has no effect. The connection now
+  routes every call through the PBX, calls to one's own extension and video calls included, and
+  the caller name the PBX sends wins over the app's contacts.
+- After an Asterisk restart, a stack restart or an update, the Ringotel apps stayed unreachable
+  until their next registration, up to an hour. The stack now has Ringotel re-register every app
+  once Asterisk is back, and the apps re-register every two minutes anyway.
+- What Ringotel answered to a device's push, and the re-registration after a restart, was only in
+  the call's result and the container log, which an update discards. Each is now an audit entry
+  (`ringotel.push` on the device, `ringotel.rereg`), and a `ringotel` device created or rotated
+  before Ringotel is set up now says so in a `warnings` entry instead of nothing.
+- The call log's `sip` level recorded no SIP message at all: Asterisk refused its collector
+  address `core:9060`, since it takes a numeric address only, and mirrored nothing. It now sends
+  to the address `core` has, and follows it when `core` is recreated.
+- Every device registration was lost whenever the containers were recreated, as an update does,
+  and a phone stayed unreachable until it registered again.
 - The `qos` level's `call_qos` rows had no jitter or loss and a round trip of 0, and only the
   caller's leg had one: the core read fields Asterisk does not send, and read the leg that hung up
   after its channel had gone. Each bridged leg now has a row with jitter and round trip in
@@ -32,6 +41,38 @@ why the specified behaviour changed; the commit history, how.
   configuration; raising a group to `qos` or `sip` had no effect on its calls.
 - `lastRegisteredAt` on a device is documented as what it is: when the device last became
   reachable, not its latest registration refresh, which Asterisk reports no event for.
+
+### Added
+
+- The Ringotel mobile apps dial the tenant's emergency numbers through the phone's own cellular
+  network, reaching the emergency centre where the person is, with the phone's location, even
+  without mobile data. Such a call bypasses the PBX: it has no call-history entry and uses no
+  emergency trunk. Desktop apps and desk phones still dial them through the PBX's emergency
+  trunks. The numbers follow `emergencyNumbers` in `settings.update`.
+- `system.info` shows when `api` and `core` started (`startedAt`) and when Asterisk did
+  (`core.asteriskStartedAt`), so a restart is visible.
+- The call log's routing trace says more: why the user step decided as it did (DND, offline with
+  the number of registered phones, a forward) and why a call reached voicemail, the opening hours
+  also when none apply, the answering channel with its device or trunk, the codecs both sides
+  negotiated, the caller ID each outbound attempt presented, and who ended the call (caller,
+  callee or the system) with the cause. The `diagnose-bad-call` recipe lists the lines.
+
+### Changed
+
+- Asterisk keeps its astdb, which holds the device registrations, on a new `astdb` volume.
+- `deploy/README.md` says where container logs survive an upgrade (Podman's journal) and how to
+  keep them on Docker ("Logs").
+
+### Upgrade notes
+
+- **Ringotel connections change at their next push**: the first device, user, extension or
+  profile change after the upgrade, or the upgrade's own restart, rewrites the connection's
+  settings. Internal calls then always go through the PBX, the PBX's caller name wins over the
+  app's contacts, apps stay registered while closed and re-register every two minutes, and the
+  mobile apps dial emergency numbers over the cellular network. Settings
+  changed by hand in the Ringotel Shell for these are overwritten.
+- The `astdb` volume is created by the upgrade's own `up -d`; nothing to do. It starts empty, so
+  the registrations of this one upgrade are still lost: devices come back as they re-register.
 
 ## [0.0.6] - 2026-09-29
 

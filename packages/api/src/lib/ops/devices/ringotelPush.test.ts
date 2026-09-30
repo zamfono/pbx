@@ -92,6 +92,17 @@ async function seed(db: Db): Promise<string> {
   return userId;
 }
 
+/** The device's `ringotel.push` audit rows, oldest first. */
+async function pushRows(db: Db, deviceId: string) {
+  return db
+    .selectFrom('auditLog')
+    .selectAll()
+    .where('operation', '=', 'ringotel.push')
+    .where('entityId', '=', deviceId)
+    .orderBy('id')
+    .execute();
+}
+
 describe('a ringotel device reaches Ringotel once Asterisk holds it (§10.4)', () => {
   it('is created at Ringotel only after its configuration propagated', async () => {
     const db = await makeTestDb();
@@ -155,5 +166,97 @@ describe('a ringotel device reaches Ringotel once Asterisk holds it (§10.4)', (
 
     expect(events[0]).toBe('propagated');
     expect(events).toContain('updateUser');
+  });
+
+  it('records each push outcome as a ringotel.push audit row on the device (§5.7)', async () => {
+    const db = await makeTestDb();
+    const userId = await seed(db);
+    const fake = install();
+    const created = await runOperation<unknown, { device: { id: string } }>(
+      db,
+      'devices.create',
+      { userId, label: 'Phone', kind: 'ringotel' },
+      admin
+    );
+    fake.failing.add('updateUser');
+    await runOperation(db, 'devices.rotate', { id: created.device.id }, admin);
+
+    const rows = await pushRows(db, created.device.id);
+    expect(rows.map(row => [row.channel, row.actorUserId])).toEqual([
+      ['mcp', 'admin'],
+      ['mcp', 'admin']
+    ]);
+    expect(rows.map(row => row.undoable)).toEqual([0, 0]);
+    expect(rows.map(row => JSON.parse(row.changesJson) as unknown)).toEqual([
+      [
+        { field: 'outcome', from: null, to: 'pushed' },
+        { field: 'trigger', from: null, to: 'devices.create' },
+        { field: 'ringotelUserId', from: null, to: fake.users[0]?.id }
+      ],
+      [
+        { field: 'outcome', from: null, to: 'refused' },
+        { field: 'trigger', from: null, to: 'devices.rotate' },
+        {
+          field: 'reason',
+          from: null,
+          to: expect.stringContaining('updateUser') as unknown
+        }
+      ]
+    ]);
+  });
+
+  it('warns and audits a skip when Ringotel is not set up', async () => {
+    const db = await makeTestDb();
+    const userId = await seed(db);
+    await db
+      .updateTable('settings')
+      .set({ ringotelOrgId: null, ringotelBranchId: null })
+      .execute();
+
+    const output = await runOperation<
+      unknown,
+      { device: { id: string }; warnings?: string[] }
+    >(
+      db,
+      'devices.create',
+      { userId, label: 'Phone', kind: 'ringotel' },
+      admin
+    );
+
+    expect(output.warnings).toEqual([
+      expect.stringMatching(/Ringotel is not set up/u)
+    ]);
+    const rows = await pushRows(db, output.device.id);
+    expect(JSON.parse(rows[0]?.changesJson ?? '[]')).toEqual([
+      { field: 'outcome', from: null, to: 'skipped' },
+      { field: 'trigger', from: null, to: 'devices.create' },
+      { field: 'reason', from: null, to: 'Ringotel is not set up' }
+    ]);
+  });
+
+  it('leaves an undo of the creation possible after its push was audited', async () => {
+    const db = await makeTestDb();
+    const userId = await seed(db);
+    install();
+    const created = await runOperation<unknown, { device: { id: string } }>(
+      db,
+      'devices.create',
+      { userId, label: 'Phone', kind: 'ringotel' },
+      admin
+    );
+    const entry = await db
+      .selectFrom('auditLog')
+      .select('id')
+      .where('operation', '=', 'devices.create')
+      .executeTakeFirstOrThrow();
+
+    await runOperation(db, 'audit.undo', { id: entry.id }, admin);
+
+    const device = await db
+      .selectFrom('devices')
+      .select('deletedAt')
+      .where('id', '=', created.device.id)
+      .executeTakeFirstOrThrow();
+    expect(device.deletedAt).not.toBeNull();
   });
 });

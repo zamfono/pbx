@@ -382,6 +382,33 @@ bundle (`download/vX.Y.Z`) before `up -d`.
 Always `up -d` the whole stack, never `asterisk` alone: `proxy` lives in `asterisk`'s network
 namespace, and a recreated `asterisk` leaves it on the old one.
 
+## Logs
+
+`compose logs <service>` reads the running container's own log, and an upgrade recreates every
+container. Where that log survives depends on the runtime's log driver:
+
+- **Podman** on a systemd host logs to the journal (`podman info --format '{{.Host.LogDriver}}'`
+  says `journald`), which outlives the container. Read an earlier container's log by its name, as
+  `podman ps` shows it:
+
+  ```bash
+  journalctl CONTAINER_NAME=zamfono-core-1 --since yesterday
+  ```
+
+- **Docker** keeps a container's log in a file it deletes with the container, so a log from before
+  the last upgrade is gone. To keep them, make the journal Docker's default log driver; containers
+  created from then on, on the next `up -d` or upgrade, log there, and `journalctl` reads them as
+  above:
+
+  ```bash
+  echo '{ "log-driver": "journald" }' > /etc/docker/daemon.json   # merge by hand if the file exists
+  systemctl restart docker
+  ```
+
+`compose.yaml` names no log driver itself: a host without journald could then start no container.
+The journal survives a reboot only where it is persistent, which it is when `/var/log/journal`
+exists.
+
 ## Next
 
 Connect an MCP client and read [`docs/guide/`](https://github.com/zamfono/pbx/blob/main/docs/guide) — both are described in the

@@ -16,8 +16,15 @@ if [ -z "${IMAGE_TAG:-}" ]; then
   docker build --platform linux/amd64 -t "$IMAGE_TAG" .
 fi
 
+# The second run, with HEP on and the astdb on a volume, that the first one's HEP_ENABLED=false
+# cannot cover (see the end of this file).
+HEP_CONTAINER=zamfono-asterisk-test-hep
+ASTDB_VOLUME=zamfono-asterisk-test-astdb
+HEP_FOLLOW_TIMEOUT_S=10
+
 cleanup() {
-  docker rm -f "$CONTAINER" > /dev/null 2>&1 || true
+  docker rm -f "$CONTAINER" "$HEP_CONTAINER" > /dev/null 2>&1 || true
+  docker volume rm "$ASTDB_VOLUME" > /dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -28,9 +35,11 @@ docker run -d --name "$CONTAINER" --platform linux/amd64 \
   -e AMI_PASSWORD=y \
   "$IMAGE_TAG" > /dev/null
 
+# The container whose logs a failure prints: the one under test at the time.
+current=$CONTAINER
 fail() {
   echo "FAIL: $1" >&2
-  docker logs "$CONTAINER" >&2 || true
+  docker logs "$current" >&2 || true
   exit 1
 }
 
@@ -39,16 +48,18 @@ fail() {
 # only proves the socket is up races every assertion that follows.
 # `grep` reads the whole output rather than `grep -q`: under pipefail, `-q` exiting at the first
 # match can kill the still-writing CLI with SIGPIPE and fail the pipeline despite the match.
-ready=false
-for _ in $(seq 1 "$STARTUP_TIMEOUT_S"); do
-  if docker exec "$CONTAINER" asterisk -rx 'dialplan show from-trunk' 2>/dev/null \
-       | grep 'Stasis(zamfono,inbound,${EXTEN})' >/dev/null; then
-    ready=true
-    break
-  fi
-  sleep 1
-done
-[ "$ready" = true ] || fail "asterisk did not finish booting within ${STARTUP_TIMEOUT_S}s"
+await_ready() {
+  local _
+  for _ in $(seq 1 "$STARTUP_TIMEOUT_S"); do
+    if docker exec "$current" asterisk -rx 'dialplan show from-trunk' 2>/dev/null \
+         | grep 'Stasis(zamfono,inbound,${EXTEN})' >/dev/null; then
+      return 0
+    fi
+    sleep 1
+  done
+  fail "asterisk did not finish booting within ${STARTUP_TIMEOUT_S}s"
+}
+await_ready
 
 TRANSPORTS=$(docker exec "$CONTAINER" asterisk -rx 'pjsip show transports')
 echo "$TRANSPORTS" | grep -q 'transport-udp.*127.0.0.1:5060' \
@@ -137,5 +148,54 @@ INDICATION_ITU=$(docker exec "$CONTAINER" asterisk -rx 'indication show itu')
 echo "$INDICATION_ITU" \
   | grep -qE '^itu[[:space:]]+info[[:space:]]+950/330,1400/330,1800/330,0/1000$' \
   || fail "the itu zone's info playlist is not 950/330,1400/330,1800/330,0/1000"
+
+docker exec "$CONTAINER" grep -qx 'enabled = no' /etc/asterisk/hep.conf \
+  || fail "hep.conf is not enabled = no while HEP_ENABLED=false"
+
+# §7, §9.1: with HEP on, hep.conf names the numeric address `core` resolves to, since res_hep
+# refuses a hostname ("Failed to create address") and then mirrors nothing at all, and follows
+# that address once `core` is recreated at another one; an /etc/hosts entry plays `core` here.
+# The astdb, where registrations live, sits on a volume and must outlive the container (§9.1).
+docker volume create "$ASTDB_VOLUME" > /dev/null
+start_hep_container() {
+  docker run -d --name "$HEP_CONTAINER" --platform linux/amd64 \
+    --add-host core:192.0.2.10 \
+    -e ARI_PASSWORD=x \
+    -e AMI_PASSWORD=y \
+    -v "$ASTDB_VOLUME:/var/lib/asterisk/astdb" \
+    "$IMAGE_TAG" > /dev/null
+}
+current=$HEP_CONTAINER
+start_hep_container
+await_ready
+
+docker exec "$HEP_CONTAINER" grep -qx 'capture_address = 192.0.2.10:9060' /etc/asterisk/hep.conf \
+  || fail "hep.conf does not name core's resolved address 192.0.2.10:9060"
+docker logs "$HEP_CONTAINER" 2>&1 | grep 'Failed to create address' > /dev/null \
+  && fail "res_hep could not parse hep.conf's capture_address"
+
+docker exec "$HEP_CONTAINER" sh -c \
+  'sed s/192.0.2.10/192.0.2.11/ /etc/hosts > /tmp/hosts && cat /tmp/hosts > /etc/hosts'
+followed=false
+for _ in $(seq 1 "$HEP_FOLLOW_TIMEOUT_S"); do
+  if docker logs "$HEP_CONTAINER" 2>&1 | grep 'HEP collector is now 192.0.2.11:9060' > /dev/null; then
+    followed=true
+    break
+  fi
+  sleep 1
+done
+[ "$followed" = true ] \
+  || fail "res_hep was not reloaded for core's new address within ${HEP_FOLLOW_TIMEOUT_S}s"
+docker exec "$HEP_CONTAINER" grep -qx 'capture_address = 192.0.2.11:9060' /etc/asterisk/hep.conf \
+  || fail "hep.conf does not name core's new address 192.0.2.11:9060"
+
+docker exec "$HEP_CONTAINER" test -f /var/lib/asterisk/astdb/astdb.sqlite3 \
+  || fail "the astdb is not under /var/lib/asterisk/astdb, the volume's mount point"
+docker exec "$HEP_CONTAINER" asterisk -rx 'database put zamfono probe kept' > /dev/null
+docker rm -f "$HEP_CONTAINER" > /dev/null
+start_hep_container
+await_ready
+docker exec "$HEP_CONTAINER" asterisk -rx 'database get zamfono probe' | grep 'Value: kept' > /dev/null \
+  || fail "an astdb entry did not survive a recreated container"
 
 echo "PASS"

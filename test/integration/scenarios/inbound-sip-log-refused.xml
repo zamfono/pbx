@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+  §7 level `sip`, a call refused at once: the tenant's level is `sip` (`_sip-log-setup.sh`), and
+  the trunk offers `+15550404`, which matches no DID, no number block and no fallback, so the core
+  releases it with 404 (§10.1 Entry) within milliseconds, before any leg is dialled. Its log must
+  still hold the INVITE, the 404 and the ACK (§7).
+-->
+<scenario name="inbound-sip-log-refused">
+  <send retrans="500">
+    <![CDATA[
+      INVITE sip:+15550404@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:+15559999@[local_ip]>;tag=[call_number]
+      To: <sip:+15550404@[remote_ip]>
+      Call-ID: [call_id]
+      CSeq: 1 INVITE
+      Contact: <sip:+15559999@[local_ip]:[local_port];transport=[transport]>
+      Max-Forwards: 70
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=user1 53655765 2353687637 IN IP[local_ip_type] [local_ip]
+      s=-
+      c=IN IP[media_ip_type] [media_ip]
+      t=0 0
+      m=audio [media_port] RTP/AVP 8
+      a=rtpmap:8 PCMA/8000
+    ]]>
+  </send>
+
+  <recv response="100" optional="true" />
+  <recv response="404" />
+
+  <!-- The ACK of a failure response is the INVITE's own transaction: its branch, three messages
+       back (the INVITE, the optional 100, the 404). -->
+  <send>
+    <![CDATA[
+      ACK sip:+15550404@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch-3]
+      From: <sip:+15559999@[local_ip]>;tag=[call_number]
+      To: <sip:+15550404@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 1 ACK
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+</scenario>

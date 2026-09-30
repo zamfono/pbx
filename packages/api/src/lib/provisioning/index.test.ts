@@ -65,7 +65,7 @@ describe('providerFor', () => {
     const provider = providerFor('manual');
     await expect(
       provider.onDeviceCreated({} as never, { username: 'x', password: 'y' })
-    ).resolves.toBeUndefined();
+    ).resolves.toBeNull();
   });
 
   it("builds a Ringotel provider for 'ringotel'", () => {

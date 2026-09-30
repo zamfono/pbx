@@ -315,6 +315,27 @@ describe('settings', () => {
     expect(provision.callpark.park).toBe('*60');
   });
 
+  it('pushes the branch profile on an emergency-number change, which it carries (§10.1, §10.4)', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    await enableRingotel(db);
+    const calls = stubFetch();
+
+    await runOperation(
+      db,
+      'settings.update',
+      { emergencyNumbers: ['112', '110'] },
+      asRun()
+    );
+
+    const provision = calls.find(call => call.method === 'updateBranch')?.params
+      ?.provision as { emergency: { title: string; number: string }[] };
+    expect(provision.emergency).toEqual([
+      { title: '112', number: '112' },
+      { title: '110', number: '110' }
+    ]);
+  });
+
   it('pushes nothing on an unrelated field even once Ringotel is provisioned', async () => {
     const db = await makeTestDb();
     await seedSettings(db);

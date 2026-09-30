@@ -2896,9 +2896,9 @@ components:
 
         Defines softphone features and connection settings.
 
-        - `multitenant` **boolean**. Multi-tenant mode. You should send this option only if your PBX is multi-tenant and does not support local-domain parameter of the Contact SIP header.
+        - `multitenant` **boolean**. Multi-tenant mode. You should send this option only if your PBX is multi-tenant and does not support local-domain parameter of the Contact SIP header. Default `false`.
 
-        - `protocol` **string**. Transport protocol. Possible values: `sip`, `sips`, `sip-tcp`, `DNS-NAPTR`.
+        - `protocol` **string**. Transport protocol. Possible values: `sip` (Shell label "SIP (UDP)", the default), `sip-tcp` ("SIP (TCP)"), `sips` ("SIPS (TLS/SRTP)"), `DNS-NAPTR`.
 
         - `codecs` **array**. Defines the list of audio codecs enabled for this connection. Each object in the list must contain parameters `codec` and `frame`, where:
 
@@ -2906,9 +2906,156 @@ components:
 
           - `frame` **int**. Audio codec framesize (in ms), e.g. 20.
 
-        - `regexpires` **int**. SIP re-registration timeout.
+          Default `[{codec: "G.711 Alaw", frame: 20}, {codec: "G.711 Ulaw", frame: 20}]`.
 
-        - `dtmfmode` **string**. Selected DTMF mode for this connection. Possible vlaues: `rfc2833`, `inband`, `sip info`.
+        - `regexpires` **int**. SIP re-registration timeout, in seconds. Shell label "Registration TTL", hint "the new TTL is applied after the next SIP re-registration". Default `3600`.
+
+        - `dtmfmode` **string**. Selected DTMF mode for this connection. Possible vlaues: `rfc2833`, `inband`, `sip info`. Default `rfc2833`.
+
+        The fields below are not documented anywhere in Ringotel's own Admin API description; they were read out of the Shell web app's Angular bundle (labels, hints, defaults, allowed values) and, where noted, cross-checked against a live branch. Every field lives directly under `provision` unless stated otherwise.
+
+        **Caller ID / inbound matching**
+
+        - `displayname` **string**. Caller ID name sent to the PBX. Shell label "Display name", hint "Will serve as Caller ID name when making calls to your PBX" (Miscellaneous section). Default `""`. *(Shell UI bundle aa7d197e, 2026-09-29.)* It does not make the PBX's caller name win over the app's contact book; that is `keepCallerName` (verified live 2026-09-29).
+
+        - `inboundFormat` **string**. Reformats inbound caller numbers before they are matched to contacts. Shell label "Reformat inbound numbers", hint "Used to match callers to contacts". Possible values: `""` "Disabled", `e164` "+E.164", `national` "National (strip + and country code)", `national0` "National with leading 0". Default `""`.
+
+        **Registration**
+
+        - `keepreg` **boolean**. Keeps the softphone's SIP registration alive when the user is offline in the app. Shell label "Keep registrations when users are offline". Default `false`. *(Verified live 2026-09-29: label and semantics confirmed against a live branch; also see "Partial updates" under `updateBranch` below — a push that omits `keepreg` leaves the stored value unchanged instead of resetting it.)*
+
+        - `plength` **int**. Terminal password length, used when generating a "Terminal password" for the transport/port combinations `getBranchOptions` (below) returns. Default `32` (min `3`, max `32`).
+
+        - `private` **boolean**. Default `false`. Shown as a "Private user list" indicator on the connection's card in the connections list; no editable Shell control for it was found in this bundle. *(Ambiguous.)*
+
+        - `directmedia` **boolean**. Present in the connection-edit form model, default `false`; no bound UI control was found in this bundle. *(Ambiguous — UI-code only, no visible label.)*
+
+        - `username` / `authname` / `authpass` **string**. Shell labels "Username", "Authname", "Auth password" — the identity this connection registers with as a SIP trunk. Shown only for a "VOIP connection"/hunt-group-type connection, alongside `withReg`/`noreg` below; cleared to `""` whenever the branch has no `huntgroup`.
+
+        - `maxregs` **int**. Max. simultaneous registrations per softphone user (desktop, mobile, and Terminal-password SIP endpoints count together). Shell label "Max. registrations per user" / "Max. number of parallel registrations per softphone user (including SIP endpoints registered with Terminal password)". No default (empty in the Shell forms); Zamfono writes this from `settings.ringotel_max_regs` (§11.4, default 3). *(Shell UI bundle: on save the Shell does `parseInt(maxregs, 10)` when the field is set, and omits the key entirely from the request when it is empty, rather than sending `0`.)*
+
+        - `noreg` **boolean**. Disables SIP registration entirely for this connection. Default `false`. The Shell's own checkbox is worded the other way round ("Register with the connection", control name `withReg`, on the connection's identity/trunk fields alongside `username`/`authname`/`authpass`); on save it sends `noreg: !withReg` and drops `withReg`, and on load it sets `withReg = !noreg`. *(Shell UI bundle; the on-screen label for `withReg` itself could not be pinned down in the minified bundle — ambiguous.)*
+
+        - `lines` **int**. Max. lines (concurrent calls) per connection. Shell label "Max lines per connection", hint "specify 0 for unlimited". Default `10` (min `0`, max `999`). Only sent for a "VOIP connection"-type connection; omitted otherwise. *(Shell UI bundle.)*
+
+        - `1push` **boolean** (key is the literal string `"1push"`). Sends only one mobile push notification instead of one per ring attempt. Shell label "Send one push notification", hint "This option can be useful for Queues or Ring groups with sequential ring strategy. It doesn't try to send a second push notification in the case of the user's mobile app not being woken up by the first one." Default `false`.
+
+        **Internal call routing**
+
+        - `internal` **boolean**. Default `false`. *(Shell UI bundle: the Shell's own save logic clears this to `false` whenever `internalRouting` is not `3` — i.e. it only stays meaningful together with `internalRouting: 3`. A legacy field: it stayed `false` through every setting of Internal calls routing, Route video calls and Route users' calls on a live branch (verified live 2026-09-29); `internalRouting: 1` is what forces internal calls through the PBX.)*
+
+        - `internalRouting` **int**. How internal (extension-to-extension) calls are routed. Shell label "Internal calls routing", hint "Select how to route internal calls between the extensions". Possible values: `1` "Route internal calls through PBX only", `2` "Route internal calls through PBX if possible", `3` "Do not route internal calls through PBX". Default `2`. *(Verified live 2026-09-29: toggling this control and re-fetching the branch returned `internalRouting: 1` and `internalRouting: 3` for those two settings.)*
+
+        - `extst` **boolean**. Routes a user's calls to their own extension number through the PBX. Shell label "Route users' calls to their extension number through PBX". Default `false`. *(Verified live 2026-09-29.)*
+
+        - `extvc` **boolean**. Routes video calls through the PBX. Shell label "Route video calls through PBX". Default `false`. *(Verified live 2026-09-29.)*
+
+        - `keepCallerName` **boolean**. Shell label "Prioritize Caller Name from the PBX", hint "Prioritize the Caller Name sent by the PBX over the local contact name saved in the app contact book." Default `false`. *(Verified live 2026-09-29.)*
+
+        **Security**
+
+        - `noverify` **boolean**. Skip SSL/TLS certificate verification. Shell label "Do not verify server certificate". Default `true` in the connection-creation wizard.
+
+        - `nosrtp` **boolean**. Disables SRTP. Shell label "Disable SRTP". Default `false`.
+
+        - `ipcheck` **boolean**. Enables the `iptable` allow-list below. Section hint "Allow users to connect only from the specified networks". Default `false`.
+
+        - `iptable` **array**. IP allow-list, checked only when `ipcheck` is `true`. Each entry: `net` **string** and `mask` **string**, both IPv4 dotted-quad (the Shell validates both with an IPv4 regex).
+
+        - `acceptedCNs` **string**. Shell label "Allowed CNs", hint "Specify Common Name (CN) of an SSL/TLS certificate. Provide multiple CNs separated by comma. Specify * to allow any certificate." Default `""`.
+
+        - `ip_list` **array** of **string**. Shell label "List of allowed IPs", hint "Provide a list of IP addresses to add to the whitelist. Separate multiple IPs with commas." Default `[]`. *(Shell UI bundle: the Shell's own form field is a single comma-separated string; on save it is split on `,`, each entry trimmed, and empty entries dropped before being sent as this array — the same transform is duplicated in both the connection-settings and the Features save routines.)*
+
+        - `proxy` **object**. Outbound SIP proxy. `paddr` **string** (Shell label "Address"), `pauth` **string** ("Auth. username"), `ppass` **string** ("Password"). Default `{}`.
+
+        - `httpsproxy` **object**. `address` **string**, Shell label "HTTPS proxy server address". Default `{}`.
+
+        **Codecs**
+
+        - `app` **object**. `g711` **boolean**, default `false`. Not directly editable: it is derived from a UI-only "Use OPUS audio codec" checkbox (hint "Enabling the OPUS audio codec between the softphone apps and a softphone server improves call quality on low bandwidth/congested networks, but may cause small audio delays."); on save the Shell sets `app.g711 = !opusCheckboxChecked`. *(Shell UI bundle; matches the codec handling already in `packages/api`'s `buildBranchProvision`.)*
+
+        - `tones` **object**. `Progress` **string**, `Ringback` **string**, `Ringback2` **string** — names of the standard telephony tone sets returned by `getBranchOptions` (below), keyed by the connection's `country`. Only `Ringback` has a dedicated Shell control ("Ringback tone", hint "Choose the country that you would like to use when creating the standard telephony tones."); `Progress`/`Ringback2` follow the selected country. Default `{}`.
+
+        **SIP headers**
+
+        - `sipheaders` **array**. Extra SIP headers added to outgoing INVITEs to the PBX. Shell label "SIP Headers", hint "Specify additional SIP headers that our server will send in INVITE to the PBX during outgoing calls". Each entry: `name` **string** (1-64 chars, e.g. `X-Auth-Token`), `value` **string** (1-2048 chars, e.g. `Test12#`). Entries with an empty `name` or `value` are filtered out before saving. Default `[]`.
+
+        **PBX features (Features tab)**
+
+        - `features` **string**. A single "PBX Features" checkbox in the Shell; sent as `"pbx"` when checked, `""` otherwise. Hint: "Provide feature codes configured on your PBX to handle them on your server." Zamfono always sends `"pbx"` (§10.4).
+
+        - `dnd` **object**. Do-not-disturb feature codes: `on` **string** (Shell label "Activate DND"), `off` **string** ("Deactivate DND").
+
+        - `vmail` **object**. Voicemail feature codes and prompts: `ext` **string** ("Dial voicemail"), `on` **string** ("Activate VM"), `off` **string** ("Deactivate VM"), `spref` **string** ("Prefix"), `mess` **string** ("New voicemail message", default `"You have a new message"`), `name` **string** (default `"Voicemail"`), `unsolicited` **boolean** (no on-screen label resolved; controls unsolicited MWI subscription per §9.3/§10.4, where Zamfono always sends `false`).
+
+        - `forwarding` **object**. Call-forward feature codes, all **string**: `cfon`/`cfoff` ("Activate"/"Deactivate Call Forward"), `cfbon`/`cfboff` ("Activate"/"Deactivate Call Forward Busy"), `cfuon`/`cfuoff` ("Activate"/"Deactivate Call Forward Unavailable"). *(Shell UI bundle: the Features tab's form also has `cfnon`/`cfnoff`, "Activate"/"Deactivate Call Forward on No Answer", which do not appear in this file's own `createBranch`/`updateBranch` examples — whether the API accepts them is unconfirmed, ambiguous.)*
+
+        - `callwaiting` **object**. `on` **string** ("Activate CW"), `off` **string** ("Deactivate CW").
+
+        - `callpark` **object**. `park` **string** (Shell label "Call Park prefix", hint "Added to the call park slot to park a call"), `retrieve` **string** ("Call Park Retrieve prefix", hint "Added to the call park slot to retrieve a call"), `subscribe` **string** ("BLF subscription prefix", hint "Added to the call park slot to subscribe for slot's status"), `slots` **array** of `{alias: string, slot: string}` ("Parking slots"). *(Shell UI bundle: the Shell offers two client-only presets, "FreeSwitch" (`park`/`retrieve`/`subscribe` = `"*"`/`"*"`/`"park+*"`) and "Asterisk" (all three `""`), that only prefill this form; the preset name itself is never sent.)*
+
+        - `blfs` **array**. The branch-wide colleague-presence (BLF) list, edited on the Features tab under "Speed Dial Numbers & Features BLF Indicators". Each entry: `number` **string**, `title` **string**, and optionally `options: {notify: boolean, dial: string}`.
+
+        - `speeddial` **array**. Each entry: `number` **string**, `title` **string**, `gsm` **boolean** ("Dial this number using the native cellular dialer (mobiles only)."). *(Shell UI bundle: an entry titled `"Voicemail"` with `gsm: false` has its `gsm` key removed entirely before saving.)*
+
+        - `emergency` **array**. Emergency numbers list, edited alongside `speeddial`/`blfs`. Each entry: `title` **string**, `number` **string**.
+
+        - `custompages` **array**. "Custom Web Pages": opens a web page or third-party app on an incoming/answered call. Each entry: `title` **string**, `url` **string**. On save, `url` is prefixed with `http://` unless it already starts with `http://` or `https://`. Supports the placeholders `$userid$`, `$domain$`, `$number$`, `$username$`, `$email$`, `$mobile$` in the URL.
+
+        - `fallback` **object**. "GSM Dialling": lets the app fall back to the native GSM dialer. Wire fields: `type` **string** (Shell sets it to `"gsm"` when enabled, `""` otherwise), `prefix` **string** (Shell label "Access number (optional)", hint "Added before the calling number"; cleared to `""` when disabled), `opt` **boolean** ("Add to lines selection"). The Shell form also has a client-only `enabled` checkbox that drives `type`/`prefix` on save and is itself never sent.
+
+        **App behavior toggles**
+
+        These are all **boolean**, default `false` unless noted. Most are worded as a positive checkbox in the Shell and negated on save (`provision.noX = !checkbox`):
+
+        - `noptions` — "Show call settings": allow users to configure call settings from within the app (call forwarding, voicemail, call waiting).
+        - `norec` — "Allow call recording".
+        - `nostates` — "Allow state change": Online/DND/At the desk from the app.
+        - `novideo` — "Allow video calls": 1-on-1 video calls.
+        - `nochats` — "Allow internal chat".
+        - `noblocks` — "Allow to block numbers".
+        - `nochangepass` — "Allow to change password".
+        - `notranscription` — "Save call transcription" (AI Assistant section).
+
+        These are sent as-is, not negated:
+
+        - `screenshotPrevention` — "Screenshot prevention" (Windows desktop app only).
+        - `pcdelay` — "Delay incoming calls to the desktop app".
+        - `autoanswer` — "Auto-answer calls" (desktop app only).
+        - `noautoansopt` — "Hide auto-answer option in the desktop app.", hint "Enable auto-answer for all incoming calls (desktop app only)".
+        - `autostart` — no on-screen label resolved in this bundle; ambiguous.
+        - `sms2phone` — "Send SMS to connected SIP endpoints", hint "If users do not have a registered softphone application, forward incoming SMS to the connected SIP endpoints."
+        - `sms2email` — "Send missed SMS, voicemail and call notifications to email", hint "When users are offline, send notifications to email address (if specified in settings) about missed SMS, voicemail messages, or calls received offline."
+        - `nologae` — "Don't log \"Answered elsewhere\"", hint "If enabled, users will not receive notifications about calls answered by other extensions."
+        - `nologmc` — "Don't log Missed calls", hint "If enabled, users will not receive missed call notifications."
+        - `norecents` — "Disable call history syncing in iPhone Recents".
+        - `noupdates` — "Do not notify about updates (Desktop app only)".
+        - `beta_updates` — "Subscribe for beta updates (Desktop app only)".
+        - `aiconnect` — "Enable AI Assistant" (see AI Assistant below).
+
+        - `calldelay` **int**. "\"At the desk\" status call delay", in seconds. Default `10` (min `0`, max `99`).
+
+        - `autoansdelay` **int**. Referenced by the Shell's own save transform (`parseInt` when `autoanswer` is true, else `0`), but no bound form control for it was found in this bundle. *(Ambiguous — UI-code only.)*
+
+        - `sms` **int**. SMS Settings. Possible values: `0` "Disabled", `1` "via SIP SIMPLE", `2` "via API", `3` "via Integrations". Default `0`. Hint: "Enable SMS functionality to allow users to send and receive SMS and MMS messages via PBX (via SIP SIMPLE), Messaging API, or Integrations. After the change, logged in users will need to log in to their apps again."
+
+        - `paging` **int**. The Shell's own checkbox coerces this with `!!paging` on load but sends `paging ? 1 : 0` on save, alongside an "Access number (optional)" input and an "Add to lines selection" checkbox on the same card. Default `0`. *(Shell UI bundle; the exact wire shape beyond the 0/1 integer was not fully resolved — ambiguous.)*
+
+        - `visibility` **int**. Shell label "Users visibility". Possible values: `0` "Default", `1` "Private", `2` "Standalone", `3` "Supervisory". Default `0`.
+
+        - `application` **string**. "Screen pop-up URL/Path". Cleared to `""` whenever `popup` is `""`. Default `""`.
+
+        - `popup` **int** (sent as a string, then parsed on save). Shell label "Screen pop-up". Possible values: `0` "Screen pop-ups are disabled", `1` "Open screen pop-up on incoming call", `2` "Open screen pop-up after answering an incoming call", `3` "Manual opening of screen pop-up". Default `0`/`""`.
+
+        **AI Assistant** *(beta; not part of Zamfono's own provisioning, documented here since it lives in the same `provision` object)*
+
+        - `aiLanguagePrompt` **string**. Shell label "Language". `""` means "Auto" (auto-detect); otherwise one of the org's configured AI languages. Default `""`.
+        - `aiTranscriptionPrompt` **string**. "(Optional) Transcription prompt". Default `""`.
+        - `aiSummarizationPrompt` **string**. "(Optional) Summarization prompt", hint "Concise instructions on how to process conversation transcripts." Default `""`. The Shell offers a client-only prompt-template picker ("Sales call summary" / "Support ticket summary" / "Recruiting screen notes" / "Custom prompt") that only prefills this text; the template choice itself is never sent.
+
+        **Dial plan (hunt groups)**
+
+        `huntgroup` **object**, a sibling of `provision` (not nested inside it), present only for a "Hunt group"-type connection: `users` **array** of extension user IDs, `delay` **int** (seconds before rollover, default `20`), `mode` **int** (`0` "Parallel", `1` "Sequential", `2` "Random", Shell label "Calls distribution mode", hint "Select mode for distributing incoming calls to the assigned users."). *(Shell UI bundle; not exercised against a live branch — ambiguous beyond the label/value mapping.)*
 
         ---
 
@@ -3049,6 +3196,18 @@ components:
         ###### **`orgid`** **string**
 
         Organization ID.
+
+        ---
+
+        #### Optional parameters
+
+        `provision` **object.** Same fields as `provision` in `createBranch`'s params (see the full field-by-field reference there, including which fields are read from the Shell UI bundle vs. verified live) — this file documents it once to avoid duplicating ~90 fields.
+
+        ###### **Partial updates**
+
+        `updateBranch` **merges** the `provision` object you send into the branch's stored one rather than replacing it whole: a key you omit keeps its previously stored value. *(Verified live 2026-09-29: a push whose `provision` omitted `keepreg` was followed by a `getBranches` that still showed `keepreg: true` from before the push.)* `docs/spec.md` §10.4 notes that Zamfono relies on the opposite assumption — that the provider writes the whole object on every push so the two sides cannot drift — which only holds if Zamfono's own `buildBranchProvision` always includes every key it cares about; a key Zamfono never sends (and never clears) stays whatever the Shell last set it to.
+
+        `rereg` **boolean**, top-level (sibling of `provision`, not inside it). Sent as `true` only when the Shell's "Reset registrations" button (next to "Save changes" on the connection Settings tab) triggers the save; forces the connection's registrations to be reset. Omitted (not `false`) on an ordinary save. *(Shell UI bundle aa7d197e, 2026-09-29; not exercised live by this task.)*
 
         ---
 
@@ -3252,11 +3411,11 @@ components:
 
         #### Result
 
-        `devices` **array**. List of available transport protocols and associated SIP ports for generating terminal passwords.
+        `devices` **array**. List of available transport protocols and associated SIP ports for generating terminal passwords. Each entry: `proto` **string** (e.g. `sips`, `sip-tcp`, or `sip:<port>` for plain UDP), `port` **int**, `name` **string** (a display label, e.g. `"TLS (5061)"`). *(Verified live 2026-09-29: returned `sips`/5061, `sip-tcp`/5062, `sip:5070`/5070.)*
 
-        `tones` **object**. Contains lists of available Ringback and Progress tones.
+        `tones` **object**. Contains lists of available Ringback and Progress tones, keyed by tone-set name (`Ringback`, `Ringback2`, `Progress` — matching `provision.tones` in `createBranch`/`updateBranch` above); each value is an array of tone label strings (`Ringback`'s labels are country names, e.g. `"United States"`, `"United Kingdom"`; `Progress`/`Ringback2` are generic, e.g. `"Progress 1"`, `"Ringback 1"`). *(Verified live 2026-09-29.)*
 
-        `services` **array**. Contains a list of available integrations.
+        `services` **array**. Contains a list of available third-party integrations for this organization's region. Each entry: `id` **string**, `name` **string**, `types` **int** (a bitmask of integration categories), `logo` **string** (URL), `state` **int**, `properties` **array** of **string** (the labels of the credential fields the integration needs, e.g. `"Username"`, `"API key"`), `props` **object** (one empty-string entry per `properties` label, to be filled in when connecting the integration), and optionally `description` **string** / `options` **string**. *(Verified live 2026-09-29.)*
 
         ---
       examples:
@@ -3280,25 +3439,27 @@ components:
               type: string
               description: The ID of your organization
       description: |-
-        #### **Returns available provisioning options specific to an organization's region**
+        #### **Returns saved connection templates**
+
+        A template is a named, reusable snapshot of a connection's settings, saved from the "Save as a template" action on a connection's card in the Shell. Templates are selectable from the "Update from template" dropdown while creating or editing a connection, at which point the Shell copies the template's `params` object into the connection form. *(Shell UI bundle aa7d197e, 2026-09-29 — this method's own result was not captured live by this task.)*
 
         ---
 
         #### Parameters
 
-        ###### **`orgid`** **string**
-
-        The ID of your organization
+        This method takes no parameters beyond `method`/`params`; templates are scoped to the account, not to a single organization. *(Shell UI bundle: `getTemplates` is called with no `params`, see the example below.)*
 
         ---
 
         #### Result
 
-        `devices` **array**. List of available transport protocols and associated SIP ports for generating terminal passwords.
+        Array of template objects:
 
-        `tones` **object**. Contains lists of available Ringback and Progress tones.
+        `id` **string**. Template ID.
 
-        `services` **array**. Contains a list of available integrations.
+        `name` **string**. Template name.
+
+        `params` **object**. A snapshot of the fields used to prefill a connection: at least `address` **string** (`host:port`, split apart again in the Shell before prefilling the address/port inputs), `country` **string** (ISO code), `provision` **object** (same shape as `provision` in `createBranch`/`updateBranch` above), and, for a hunt-group template, `huntgroup` **object**. *(Shell UI bundle; field list inferred from `onTemplateSelected()`'s use of `template.params`, not from a captured live response — ambiguous beyond these four keys.)*
 
         ---
       examples:
@@ -4223,7 +4384,7 @@ components:
 
                 Additional user options.
 
-                - `blfs` **array**. The list of BLF indicators set for this specific user.
+                - `blfs` **array**. The list of BLF indicators set for this specific user. Whether this replaces or adds to the branch-wide `provision.blfs` list (§10.4 "Colleague presence") when both are present is not stated by Ringotel and is unconfirmed by this task; settle it against a live branch before relying on it.
 
                   - `number` **string**. BLF subscription number of the PBX feature.
 
@@ -4307,7 +4468,7 @@ components:
 
         Additional user options.
 
-        - `blfs` **array**. The list of BLF indicators set for this specific user.
+        - `blfs` **array**. The list of BLF indicators set for this specific user. Whether this replaces or adds to the branch-wide `provision.blfs` list (§10.4 "Colleague presence") when both are present is not stated by Ringotel and is unconfirmed by this task; settle it against a live branch before relying on it.
 
           - `number` **string**. BLF subscription number of the PBX feature.
 

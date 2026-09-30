@@ -1,5 +1,6 @@
 import {
   ringotelLog,
+  ringotelPbxRestarted,
   ringotelRosterChanged,
   ringotelTenantProfileChanged
 } from './ringotelBranchHooks.js';
@@ -17,6 +18,7 @@ import { createRemoteUser, ensureRemoteUser } from './ringotelUser.js';
 import type {
   DeviceRow,
   ProvisioningProvider,
+  PushReceipt,
   SipCredentials
 } from './types.js';
 
@@ -37,7 +39,7 @@ async function ringotelDeviceCreated(
   deps: RingotelProviderDeps,
   device: DeviceRow,
   sipCredentials: SipCredentials
-): Promise<void> {
+): Promise<PushReceipt> {
   const { orgId } = await resolveIds(deps.db);
   const { name, email, ext } = await userProfile(deps.db, device.userId);
   const nowMs = Date.parse(deps.now ? deps.now() : new Date().toISOString());
@@ -46,18 +48,23 @@ async function ringotelDeviceCreated(
     deletedAt !== null && nowMs - Date.parse(deletedAt) <= RECOVER_WINDOW_MS;
   if (isRecovery) {
     const domain = await resolveDomain(deps.client, orgId);
-    await deps.client.call('recoverDeletedUser', {
-      domain,
-      name,
-      email,
-      extension: ext,
-      username: sipCredentials.username,
-      authname: sipCredentials.username,
-      password: sipCredentials.password
-    });
-    return;
+    const recovered = await deps.client.call<{ id?: unknown } | null>(
+      'recoverDeletedUser',
+      {
+        domain,
+        name,
+        email,
+        extension: ext,
+        username: sipCredentials.username,
+        authname: sipCredentials.username,
+        password: sipCredentials.password
+      }
+    );
+    return typeof recovered?.id === 'string'
+      ? { remoteId: recovered.id }
+      : null;
   }
-  await createRemoteUser(deps, device, sipCredentials);
+  return { remoteId: await createRemoteUser(deps, device, sipCredentials) };
 }
 
 /**
@@ -93,7 +100,7 @@ async function ringotelCredentialsRotated(
   deps: RingotelProviderDeps,
   device: DeviceRow,
   sipCredentials: SipCredentials
-): Promise<void> {
+): Promise<PushReceipt> {
   const { orgId, branchId } = await resolveIds(deps.db);
   const { ext } = await userProfile(deps.db, device.userId);
   const remoteId = await findRingotelUserId(deps.client, orgId, branchId, ext);
@@ -102,14 +109,14 @@ async function ringotelCredentialsRotated(
       { deviceId: device.id, ext },
       'ringotel: no Ringotel user for this ringotel device; creating it'
     );
-    await createRemoteUser(deps, device, sipCredentials);
-    return;
+    return { remoteId: await createRemoteUser(deps, device, sipCredentials) };
   }
   await deps.client.call('updateUser', {
     orgid: orgId,
     id: remoteId,
     password: sipCredentials.password
   });
+  return { remoteId };
 }
 
 /**
@@ -135,7 +142,7 @@ async function ringotelBlfChanged(
   });
 }
 
-/** `ringotel` (§10.4): drives the Ringotel Admin API for the six `ProvisioningProvider` hooks. */
+/** `ringotel` (§10.4): drives the Ringotel Admin API for the seven `ProvisioningProvider` hooks. */
 export function createRingotelProvider(
   deps: RingotelProviderDeps
 ): ProvisioningProvider {
@@ -149,6 +156,7 @@ export function createRingotelProvider(
       ringotelBlfChanged(deps, device, keys),
     onRosterChanged: users => ringotelRosterChanged(deps, users),
     onTenantProfileChanged: settings =>
-      ringotelTenantProfileChanged(deps, settings)
+      ringotelTenantProfileChanged(deps, settings),
+    onPbxRestarted: () => ringotelPbxRestarted(deps)
   };
 }

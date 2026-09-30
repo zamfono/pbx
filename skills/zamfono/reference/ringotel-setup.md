@@ -36,7 +36,18 @@ QR code instead of typing SIP credentials. The owner connects the stack once.
    SIP account reaches Asterisk, Ringotel registers it and sends the activation e-mail to the
    user's address, so the user needs one.
 
-If Ringotel refuses a device, the device is still created and the response carries a `warnings`
-entry with Ringotel's reason; `devices.rotate` (`POST /devices/{id}/rotate`) pushes it again with a
-new password. Nothing is ever pushed to Ringotel before the setup or adoption: those provision the
-existing `ringotel` devices when they run.
+Every push that follows a device's creation or password rotation leaves a `ringotel.push` entry
+on the device in `audit.list` (`GET /audit?entityKind=device&entityId=…`): its `outcome` is
+`pushed` with the Ringotel user id, `refused` with Ringotel's reason, or `skipped` while Ringotel is
+not set up. If Ringotel refuses a device, the device is still created and the response carries a
+`warnings` entry with Ringotel's reason; `devices.rotate` (`POST /devices/{id}/rotate`) pushes it
+again with a new password. Nothing is ever pushed to Ringotel before the setup or adoption: a
+`ringotel` device created earlier gets a warning saying so, and the setup or adoption provisions
+it when it runs.
+
+The stack owns the connection's settings and rewrites them at every push, so a change made in the
+Ringotel Shell does not last: every call, internal ones included, goes through the PBX, the caller
+name the PBX sends wins over the app's contacts, apps stay registered while closed, and they
+re-register every two minutes. When Asterisk restarts, an update included, the stack tells
+Ringotel to re-register every app once Asterisk is back (a `ringotel.rereg` entry in
+`audit.list`), so the apps are reachable again without waiting for their next registration.

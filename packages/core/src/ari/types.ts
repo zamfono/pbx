@@ -173,6 +173,8 @@ export type MailboxesApi = {
 export type EndpointsApi = { list: () => Promise<Endpoint[]> };
 export type AsteriskApi = {
   reloadModule: (name: AsteriskModule) => Promise<void>;
+  /** `GET /asterisk/info?only=status`: when this Asterisk started, as ISO 8601 UTC. */
+  startupTime: () => Promise<string>;
 };
 
 /** Parses a WebSocket frame's payload into a UTF-8 string regardless of its `RawData` shape. */

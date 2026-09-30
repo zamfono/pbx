@@ -13,6 +13,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 
 import { resolveVersion, type Db } from '@zamfono/shared';
 
+import { fetchCoreVersion } from './lib/coreClient.js';
 import { connectCoreEvents } from './lib/coreEvents.js';
 import { getDb } from './lib/db.js';
 import { EventHub } from './lib/events.js';
@@ -20,6 +21,7 @@ import { authenticateEventsSocket } from './lib/eventsAuth.js';
 import type { Bus, ExecFn } from './lib/jobs/backup.js';
 import { scheduleBackups } from './lib/jobs/cron.js';
 import { scheduleRetention } from './lib/jobs/retention.js';
+import { scheduleRingotelRereg } from './lib/jobs/ringotelRereg.js';
 import { propagateAtBoot } from './lib/propagation.js';
 import { keyringFromEnv, type Keyring } from './lib/secretbox.js';
 import { seedIfEmpty } from './lib/seed.js';
@@ -152,6 +154,9 @@ export async function main(): Promise<void> {
       });
     }
   });
+  // §10.4 "After a restart": a new Asterisk holds no registration, so the Ringotel apps are told
+  // to register again once `core` reports it.
+  scheduleRingotelRereg({ db, lookup: () => fetchCoreVersion() });
   const handler = await loadHandler();
   const server = http.createServer(handler);
   const wss = new WebSocketServer({ noServer: true });
