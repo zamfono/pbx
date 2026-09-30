@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-09-30 · §7 Levels, §10.3 Call history, §11.2 `call_qos`.** A `call_qos` row also carries the leg's packet counts, `rx_packets` and `tx_packets`: the packets its RTP instance received from and sent to the peer, `RTPAUDIOQOS`'s `rxcount` and `txcount`, 0 when the summary counted none and NULL when it named no count. A row from RTCP reports alone takes `tx_packets` from Asterisk's latest sender report, which counts the same packets up to that report, and leaves `rx_packets` NULL, since the peer's sender report counts what the peer sent, not what reached Asterisk. `GET /calls/{id}` returns them as `rxPackets` and `txPackets`.
+*Why:* requested by the product owner: a device whose audio never reached the stack (NAT, a blocked RTP port) read as "nothing measured", the same as a phone that sends no RTCP.
+
 **2026-09-30 · §9.4 Forwarded calls, §10.1 steps 2-5 and 7.** A trunk leg the core dials for a forward target, `external` or `sip`, carries the forwarding context: each forward hop (an OOO rule, a closed schedule, a user's `unconditional`, `busy`, `noAnswer`, `dnd` or `offline` rule, a group's `unanswered` or `unavailable` rule, a member's followed `unconditional` forward) is recorded with the diverting user's or group's number and name and a reason, and the leg's `REDIRECTING` data carries the first hop as the original and the last as the redirecting party with their count, from which chan_pjsip sends one `Diversion` (RFC 5806), the last hop's; `X-Zamfono-Caller` carries the original caller's number unless it is withheld, `X-Zamfono-Did` the called company number of an inbound call. Before, a forwarded leg carried neither, and a carrier or an AI agent answering it could not tell who called or who forwarded.
 *Why:* requested by the product owner: an AI agent reached through a `sip` target, and a carrier on an `external` forward, needs the original caller and the forwarding party; this is a visible change to what an `external` forward sends its carrier.
 
@@ -902,7 +905,7 @@ The database is therefore never the reason to re-architect; the single-tenant st
 **Per-call diagnostics level.** Four levels, `none`, `events`, `qos` and `sip`, each adding to the previous. A call's level is resolved at call setup as the maximum of the tenant default (`settings.call_log_level`, default `events`) and the overrides of the user, the trunk and the ring group that routed the call (`users.log_level`, `trunks.log_level`, `ring_groups.log_level`). An override can only raise the level, so its values are `events`, `qos` and `sip`, and NULL means no override; `none` exists only as the tenant default. Overrides expire automatically (`log_level_expires_at`); a request that sets a level without an expiry gets one 7 days out, so diagnostics never stay on by oversight. Level changes are audited like any other mutation (§5.7).
 
 - `events`: a structured routing trace — DID match, or the number that matched none before a 404 release, OOO and opening-hours evaluation (also when no schedule applies), members rung (a device or trunk leg Asterisk would not place marked `cause: placementFailed`), answers (with the answering channel and its device, or its trunk) and declines, the codecs each side of the bridge negotiated, fallback taken and why (the user step's decision with its reason and registered-device count, the reason a call reached a mailbox), trunk and host selection with the caller ID each attempt presented, who ended the call (caller, callee, or the system itself) with the cause, and every REST live-call action (transfer, pickup, hangup) with the acting user; an API pickup's ring on the picker's own phones is relayed into the picked-up call's trace as `pickupRing` lines, `step` naming the original event. Appended to `calls.log` as JSON lines, written once at call end.
-- `qos`: a per-leg RTCP summary, as Asterisk sets it on the leg's channel when the leg is hung up (the `RTPAUDIOQOS` variable, which ARI's events carry through `ari.conf`'s `channelvars`), taken from the channel's `ChannelDestroyed` whichever side hung up; stored in `call_qos` (§11) and queryable alongside the call history. The RTCP reports Asterisk mirrors to `core` over HEP (`res_hep_rtcp`, next to the SIP messages of level `sip`, at any level while `HEP_ENABLED` is on) fill in a figure the summary left unmeasured, the summary keeping every figure it measured, and give the row of a leg whose `ChannelDestroyed` never arrived: loss as the packets one side reported missed against those the other side's latest sender report counted, the round trip from the peer's report on Asterisk's last sender report. Jitter is the summary's alone, since a report gives it in the codec's clock units. A bridged leg no RTP packet reached has a row with nothing measured.
+- `qos`: a per-leg RTCP summary, as Asterisk sets it on the leg's channel when the leg is hung up (the `RTPAUDIOQOS` variable, which ARI's events carry through `ari.conf`'s `channelvars`), taken from the channel's `ChannelDestroyed` whichever side hung up; stored in `call_qos` (§11) and queryable alongside the call history. The RTCP reports Asterisk mirrors to `core` over HEP (`res_hep_rtcp`, next to the SIP messages of level `sip`, at any level while `HEP_ENABLED` is on) fill in a figure the summary left unmeasured, the summary keeping every figure it measured, and give the row of a leg whose `ChannelDestroyed` never arrived: loss as the packets one side reported missed against those the other side's latest sender report counted, the round trip from the peer's report on Asterisk's last sender report. Jitter is the summary's alone, since a report gives it in the codec's clock units. Each row also counts the packets the leg's RTP instance received from the peer and sent to it (`RTPAUDIOQOS`'s `rxcount` and `txcount`); a row from the reports alone takes the sent count from Asterisk's latest sender report and has no received count, since the peer's sender report counts what the peer sent, not what arrived. A bridged leg no RTP packet reached has a row with nothing measured but a received count of 0, which tells a device whose audio never reached the stack (NAT, a blocked RTP port) from one that sends no RTCP.
 - `sip`: the call's SIP messages, stored in `calls.log`. Asterisk mirrors every SIP message it sends or receives to `core` over HEP, the Homer Encapsulation Protocol (`res_hep` and `res_hep_pjsip`; collector address in `hep.conf`, resolved again each time `core`'s ARI connection opens, §9.1). `core`'s UDP listener correlates by Call-ID and keeps messages only for calls at this level. The RTCP reports Asterisk mirrors to the same listener go to `qos` and never into the log: only a datagram of HEP protocol type SIP is logged, or one without a type whose payload opens with a SIP start line. A message is outbound when its source address is one of Asterisk's own: `STACK_IPV4` or `EXTERNAL_IPV4` from the environment plus the `asterisk` service's address on `internal`, since the transports bind the stack address in macvlan mode and the container address in ports mode (§9.1); every other message is inbound. A call at this level holds its join to the SIP dialog before routing starts, joins each leg it places before the leg's INVITE leaves (the channel created, then dialled), and closes a few seconds after it ends, so a call refused at once, or a leg a trunk refuses at once, still records its INVITE, its final response and the ACK.
 
 `HEP_ENABLED=false` in `.env` (§6.3) switches the mirror off in both containers and makes `sip` an invalid level, so the ladder ends at `qos`.
@@ -1381,7 +1384,7 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Recordings** (min. role: admin) — `GET /recordings`, `GET /recordings/{id}/audio`, `DELETE`
 
-**Call history** (min. role: user (own: caller, callee or answerer) / admin (all)) — `GET /calls?direction=&from=&to=&userId=&ringGroupId=&status=`
+**Call history** (min. role: user (own: caller, callee or answerer) / admin (all)) — `GET /calls?direction=&from=&to=&userId=&ringGroupId=&status=`, `GET /calls/{id}` (one ended call with its `log` and its `qos` rows, §7: each leg's `channelId`, `role`, `jitterMs`, `lossPct`, `rttMs`, `rxPackets` and `txPackets`, §11.2 `call_qos`)
 
 **Presence log** (min. role: admin) — `GET /presence/log?at=&userId=` (status snapshot at a past timestamp)
 
@@ -2345,6 +2348,13 @@ CREATE TABLE calls (
 --               once any packet was received, or reported missing by the peer against sent,
 --               once the peer sent a receiver report; NULL when neither direction was measured
 --   rtt_ms:     the last round trip measured from an RTCP receiver report; NULL while none arrived
+--   rx_packets: packets the leg's RTP instance received from the peer (RTPAUDIOQOS rxcount); 0 on a
+--               bridged leg no packet reached; NULL when the summary named no count, or for a row
+--               from RTCP reports alone, whose peer sender report counts what the peer sent, not
+--               what arrived
+--   tx_packets: packets the leg's RTP instance sent to the peer (RTPAUDIOQOS txcount); for a row
+--               from RTCP reports alone, the count of Asterisk's latest sender report; NULL when
+--               neither counted any
 CREATE TABLE call_qos (
   call_id    TEXT    NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
   channel_id TEXT    NOT NULL,
@@ -2352,6 +2362,8 @@ CREATE TABLE call_qos (
   jitter_ms  REAL,
   loss_pct   REAL,
   rtt_ms     REAL,
+  rx_packets INTEGER CHECK (rx_packets >= 0),
+  tx_packets INTEGER CHECK (tx_packets >= 0),
   PRIMARY KEY (call_id, channel_id)
 );
 
