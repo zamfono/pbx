@@ -1,11 +1,10 @@
-import { trunkSectionName } from '@zamfono/shared';
+import { sipHostUri, trunkSectionName } from '@zamfono/shared';
 
 import {
   assertSafeConfigValue,
   compareStrings,
   escapeConfigValue,
   formatAllow,
-  formatHostUri,
   hostsByDirection,
   joinSections,
   type RenderInput,
@@ -77,7 +76,7 @@ function renderTrunkAor(trunk: Trunk): string {
   const outboundHosts = hostsByDirection(trunk, ['outbound', 'both']);
   const [firstOutboundHost] = outboundHosts;
   if (firstOutboundHost !== undefined) {
-    lines.push(`contact = ${formatHostUri(firstOutboundHost)}`);
+    lines.push(`contact = ${sipHostUri(firstOutboundHost)}`);
   }
   if (trunk.authMode === 'ip') {
     lines.push(`qualify_frequency = ${TRUNK_QUALIFY_FREQUENCY_S}`);

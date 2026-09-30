@@ -1,6 +1,17 @@
 import { describe, expect, test } from 'vitest';
 
-import { registrationUris } from './trunks.js';
+import { registrationUris, sipHostUri } from './trunks.js';
+
+describe('sipHostUri', () => {
+  test('host without and with port', () => {
+    expect(sipHostUri({ host: 'sip.example.net', port: null })).toBe(
+      'sip:sip.example.net'
+    );
+    expect(sipHostUri({ host: '192.0.2.1', port: 5080 })).toBe(
+      'sip:192.0.2.1:5080'
+    );
+  });
+});
 
 describe('registrationUris', () => {
   test('host without port', () => {

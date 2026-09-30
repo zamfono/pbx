@@ -120,15 +120,6 @@ export function formatAllow(codecs: string[]): string {
   return `allow = !all,${codecs.join(',')}`;
 }
 
-export function formatHostUri(host: {
-  host: string;
-  port: number | null;
-}): string {
-  return host.port === null
-    ? `sip:${host.host}`
-    : `sip:${host.host}:${host.port}`;
-}
-
 export function hostsByDirection(
   trunk: Trunk,
   directions: readonly TrunkHost['direction'][]

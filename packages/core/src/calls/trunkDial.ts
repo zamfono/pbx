@@ -4,7 +4,7 @@
  * ended. Shared by `dialAttempt.ts`, which waits for each attempt's outcome, and `externalLeg.ts`,
  * whose attempts ring alongside a ring race's other legs.
  */
-import { trunkSectionName } from '@zamfono/shared';
+import { sipHostUri, trunkSectionName } from '@zamfono/shared';
 
 import type { AriEvent } from '../ari/types.js';
 import type { Snapshot } from '../internal/server.js';
@@ -91,9 +91,7 @@ function hostDialTarget(
   trunkId: string,
   host: { host: string; port: number | null }
 ): string {
-  const uri =
-    host.port === null ? `sip:${host.host}` : `sip:${host.host}:${host.port}`;
-  return `${trunkSectionName(trunkId)}/${uri}`;
+  return `${trunkSectionName(trunkId)}/${sipHostUri(host)}`;
 }
 
 /**
