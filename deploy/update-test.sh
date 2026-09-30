@@ -40,10 +40,15 @@ for _ in $(seq 1 50); do
   sleep 0.1
 done
 
-# The stub runtime: `docker compose version` answers, everything else is recorded and succeeds.
+# The stub runtime: `docker compose version` answers, `up --help` names --wait unless
+# STUB_NO_WAIT (podman-compose's has none), everything else is recorded and succeeds.
 mkdir -p "$work/bin"
 cat >"$work/bin/docker" <<'STUB'
 #!/usr/bin/env bash
+if [[ $* == 'compose up --help' ]]; then
+  [[ -n ${STUB_NO_WAIT:-} ]] || echo '      --wait    Wait for services to be running|healthy.'
+  exit 0
+fi
 echo "$*" >>"$STUB_LOG"
 [[ -z ${STUB_FAIL_PULL:-} || $* != *' pull'* ]]
 STUB
@@ -79,8 +84,8 @@ grep -qx "CONTAINER_SOCKET='/var/run/docker.sock'" "$work/stack/.env" || fail "n
 [[ $(stat -c %a "$work/stack/.env") == 600 ]] || fail ".env is no longer private"
 grep -qx 'compose -f compose.yaml -f compose.ports.yaml pull' "$work/runtime.log" ||
   fail "no pull of the whole stack: $(cat "$work/runtime.log")"
-grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d' "$work/runtime.log" ||
-  fail "no up -d of the whole stack"
+grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d --wait --wait-timeout 180' \
+  "$work/runtime.log" || fail "no up -d --wait of the whole stack"
 grep -q 'rm -sf proxy' "$work/runtime.log" && fail "Docker needs no removal of proxy"
 grep -q 'Updated 1.2.3 -> 1.2.4' "$work/out" || fail "no report of the update"
 
@@ -94,6 +99,20 @@ grep -qx "CONTAINER_SOCKET='/run/podman/podman.sock'" "$work/stack/.env" ||
 # Podman will not replace asterisk while proxy shares its network namespace (§6.3).
 grep -qx 'compose -f compose.yaml -f compose.ports.yaml rm -sf proxy' "$work/runtime.log" ||
   fail "proxy was not removed before up -d on Podman"
+
+echo "  - on podman-compose, which has no up --wait: api's and core's /healthz polled instead"
+fresh_stack
+(cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_RUNTIME=podman \
+  STUB_NO_WAIT=1 ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh 1.2.4 </dev/null >"$work/out" 2>&1) ||
+  { cat "$work/out"; fail "the update on podman-compose failed"; }
+grep -q 'no up --wait' "$work/out" || fail "no word of the polling path: $(cat "$work/out")"
+grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d' "$work/runtime.log" ||
+  fail "no plain up -d on podman-compose: $(cat "$work/runtime.log")"
+for service in api core; do
+  grep -q "^compose -f compose.yaml -f compose.ports.yaml exec -T $service node -e fetch(" \
+    "$work/runtime.log" || fail "$service's /healthz was not polled"
+done
+grep -q 'Updated 1.2.3 -> 1.2.4' "$work/out" || fail "no report of the update on podman-compose"
 
 fresh_stack
 update 1.2.4 >/dev/null 2>&1 || fail "the update to 1.2.4 failed"
@@ -118,9 +137,33 @@ update 1.2.5 >"$work/out" 2>&1 && fail "a mismatching bundle was installed"
 grep -q 'does not match' "$work/out" || fail "no word of the mismatch: $(cat "$work/out")"
 [[ $(pin) == 'ZAMFONO_VERSION:-1.2.3' ]] || fail "a mismatching bundle changed compose.yaml"
 
-echo "  - a new minor from 1.0 on is no breaking update"
+echo "  - the policy of update-policy.tsv, which the updater's judgeUpdate is tested against too"
 fresh_stack
-update --check 1.3.0 | grep -qx '1.2.3 -> 1.3.0 (update)' || fail "1.3.0 is not a plain update"
+rows=0
+while IFS=$'\t' read -r from to verdict; do
+  [[ -z $from || $from == '#'* ]] && continue
+  rows=$((rows + 1))
+  sed -i '/^ZAMFONO_VERSION=/d' "$work/stack/.env"
+  echo "ZAMFONO_VERSION=$from" >>"$work/stack/.env"
+  case $verdict in
+    same) expected="Already on $from." ;;
+    older) expected= ;;
+    update) expected="$from -> $to (update)" ;;
+    breaking) expected="$from -> $to (breaking update)" ;;
+    *) fail "update-policy.tsv: unknown verdict $verdict" ;;
+  esac
+  got=$(update --check "$to" 2>/dev/null) || got=
+  [[ $got == "$expected" ]] || fail "$from to $to: update.sh said '$got'; the table: $verdict"
+  # The updater's run refuses what judgeUpdate refuses, bar the release it is on, which it reports.
+  if (cd "$work/stack" && ZAMFONO_UPDATER=1 ZAMFONO_REPO_URL="http://127.0.0.1:$port" \
+    ./update.sh --check "$to" </dev/null >/dev/null 2>&1); then
+    [[ $verdict == update || $verdict == same ]] || fail "$from to $to: the updater's run took it"
+  else
+    [[ $verdict == older || $verdict == breaking ]] || fail "$from to $to: the updater's run refused it"
+  fi
+done <"$repo_root/deploy/update-policy.tsv"
+((rows > 0)) || fail "update-policy.tsv holds no case"
+fresh_stack
 
 echo "  - a breaking release needs --yes without a terminal"
 update 2.0.0 >"$work/out" 2>&1 && fail "a breaking update ran without --yes"
@@ -140,7 +183,7 @@ grep -qx 'compose -f compose.yaml -f compose.ports.yaml pull asterisk migrate co
   "$work/runtime.log" || fail "the updater pulled more than the stack: $(cat "$work/runtime.log")"
 grep -qx 'compose -f compose.yaml -f compose.ports.yaml rm -sf proxy' "$work/runtime.log" ||
   fail "the updater did not remove proxy first"
-grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d asterisk migrate core api proxy' \
-  "$work/runtime.log" || fail "the updater recreated more than the stack"
+grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d --wait --wait-timeout 180 asterisk'\
+' migrate core api proxy' "$work/runtime.log" || fail "the updater recreated more than the stack"
 grep -q '^CONTAINER_SOCKET=' "$work/stack/.env" && fail "the updater guessed a CONTAINER_SOCKET"
 echo "  update.sh OK"

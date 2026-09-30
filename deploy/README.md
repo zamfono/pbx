@@ -74,6 +74,8 @@ systemctl enable --now podman.socket
 `aardvark-dns` is what lets the services find each other by name. Without it `core` fails to
 reach `asterisk`. `docker-compose` is the Compose provider `podman compose` hands the files to,
 the same one CI uses; it talks to the root socket enabled above and needs no Docker daemon.
+It is the recommended provider. `podman-compose` also works: it has no `up --wait`, so
+`update.sh` checks the services' health itself instead.
 
 Podman does **not** restart the stack after a reboot on its own: its `podman-restart.service`
 only covers `restart: always`, and the stack uses `unless-stopped`. Step 7 adds a unit for that.
@@ -323,8 +325,8 @@ cd /srv/zamfono
 It downloads the release's bundle, checks it against the release's `SHA256SUMS`, unpacks it over
 the stack directory (never touching `.env`), adds the settings a newer `.env.example` introduced
 that it can generate, and lists the others, pulls the images and recreates the stack: on Podman
-through the boot unit of step 7 if there is one, otherwise removing `proxy` first. It refuses an
-older release. A breaking one (a new minor while 0.x, a new major from 1.0.0 on) shows the release
+through the boot unit of step 7 if there is one, otherwise removing `proxy` first. It then waits
+up to three minutes for every service to report healthy. It refuses an older release. A breaking one (a new minor while 0.x, a new major from 1.0.0 on) shows the release
 notes in between and asks first; `--yes` answers for a run without a terminal.
 
 A stack from `v0.0.5` or earlier has no `update.sh` yet. Take it, and its helpers, from the newest

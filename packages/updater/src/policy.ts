@@ -3,6 +3,10 @@
  * that RELEASING.md's policy calls non-breaking, the same major from 1.0.0 on and the same minor
  * while 0.x. A breaking update needs an operator reading its upgrade notes, so it is refused here
  * and left to `update.sh` on the host.
+ *
+ * `update.sh` decides the same with its own few lines of bash, since it runs on hosts without Node,
+ * and refuses the updater's run of anything this would refuse, as the last word. Both are tested
+ * against one table, `deploy/update-policy.tsv`: a change to the policy is a change to it.
  */
 export type Version = readonly [number, number, number];
 

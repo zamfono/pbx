@@ -72,6 +72,9 @@ why the specified behaviour changed; the commit history, how.
 - Asterisk keeps its astdb, which holds the device registrations, on a new `astdb` volume.
 - `deploy/README.md` says where container logs survive an upgrade (Podman's journal) and how to
   keep them on Docker ("Logs").
+- `update.sh` reports an update done once every service is healthy, `core` included, not only
+  `api`; it waits up to three minutes, as before. With `podman-compose` as the provider of
+  `podman compose`, which cannot wait on healthchecks, it checks `api` and `core` itself.
 
 ### Upgrade notes
 

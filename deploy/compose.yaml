@@ -4,6 +4,10 @@
 # internal ports (api 3000, core 3000, Asterisk ARI 8088 and AMI 5038, HEP 9060/udp) are baked into the images.
 # The public address is attached by exactly one overlay, compose.macvlan.yaml or compose.ports.yaml
 # (§6.1); this file alone runs the stack with no public reachability.
+# api's and core's healthcheck: GET /healthz on the internal port answers 200. The script holds no
+# space, since Podman's Docker-compatible API splits a CMD argument at its spaces.
+x-healthz: &healthz ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+
 networks:
   internal:
 
@@ -65,7 +69,7 @@ services:
       - media:/media
       - db:/data                  # /data/zamfono.sqlite3
     healthcheck:                  # internal HTTP server (§3): ARI connected + DB open
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      test: *healthz
     restart: unless-stopped
 
   api:
@@ -113,7 +117,7 @@ services:
       - caddy-data:/caddy-data:ro               # certificate sync source (§6.4)
       - backups:/backups                        # the default local backup target's repository (§6.5)
     healthcheck:                                # gates core's start; 200 = database open, no pending migration (§6.3 "Health")
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      test: *healthz
     restart: unless-stopped
 
   proxy:
