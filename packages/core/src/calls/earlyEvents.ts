@@ -1,10 +1,10 @@
 /**
- * The events of a channel the core originates that arrive before its originate returns. Asterisk
- * dials the channel while it answers the originate request, so a far end that answers or refuses
- * at once (a trunk's 403, a phone's 486, within milliseconds) can have its `ChannelStateChange` or
- * `ChannelDestroyed` reach the core before anything tracks the channel's id, and every listener
- * keyed by that id drops it. Recording the stream from before the originate lets those events be
- * handled once the channel is tracked (§9.4 "Route fallthrough", §10.1 steps 4 and 5).
+ * The events of a channel the core places that arrive before its placement returns (created, then
+ * dialled, `legOriginate.ts`). Asterisk dials the channel while it answers the dial request, so a
+ * far end that answers or refuses at once (a trunk's 403, a phone's 486, within milliseconds) can
+ * have its `ChannelStateChange` or `ChannelDestroyed` reach the core before anything tracks the
+ * channel's id, and every listener keyed by that id drops it. Recording the stream from before the
+ * create lets those events be handled once the channel is tracked (§9.4 "Route fallthrough", §10.1 steps 4 and 5).
  */
 import type { AriClient } from '../ari/client.js';
 import type { AriEvent, Channel } from '../ari/types.js';
