@@ -79,8 +79,8 @@ grep -qx "CONTAINER_SOCKET='/var/run/docker.sock'" "$work/stack/.env" || fail "n
 [[ $(stat -c %a "$work/stack/.env") == 600 ]] || fail ".env is no longer private"
 grep -qx 'compose -f compose.yaml -f compose.ports.yaml pull' "$work/runtime.log" ||
   fail "no pull of the whole stack: $(cat "$work/runtime.log")"
-grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d' "$work/runtime.log" ||
-  fail "no up -d of the whole stack"
+grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d --wait --wait-timeout 180' \
+  "$work/runtime.log" || fail "no up -d --wait of the whole stack"
 grep -q 'rm -sf proxy' "$work/runtime.log" && fail "Docker needs no removal of proxy"
 grep -q 'Updated 1.2.3 -> 1.2.4' "$work/out" || fail "no report of the update"
 
@@ -140,7 +140,7 @@ grep -qx 'compose -f compose.yaml -f compose.ports.yaml pull asterisk migrate co
   "$work/runtime.log" || fail "the updater pulled more than the stack: $(cat "$work/runtime.log")"
 grep -qx 'compose -f compose.yaml -f compose.ports.yaml rm -sf proxy' "$work/runtime.log" ||
   fail "the updater did not remove proxy first"
-grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d asterisk migrate core api proxy' \
-  "$work/runtime.log" || fail "the updater recreated more than the stack"
+grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d --wait --wait-timeout 180 asterisk'\
+' migrate core api proxy' "$work/runtime.log" || fail "the updater recreated more than the stack"
 grep -q '^CONTAINER_SOCKET=' "$work/stack/.env" && fail "the updater guessed a CONTAINER_SOCKET"
 echo "  update.sh OK"

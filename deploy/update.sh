@@ -30,6 +30,8 @@ REPO=${ZAMFONO_REPO_URL:-https://github.com/zamfono/pbx}
 # The services a release replaces; the updater's run leaves out the updater itself, which the
 # next update from the host, or any `up -d`, brings to its new image.
 STACK_SERVICES=(asterisk migrate core api proxy)
+# How long `up` waits for the recreated services to report healthy.
+WAIT_SECONDS=180
 
 assume_yes=
 check_only=
@@ -184,19 +186,6 @@ release_notes() {
   ' "$1"
 }
 
-await_api() {
-  local _
-  for _ in $(seq 1 90); do
-    if "${compose[@]}" "${files[@]}" exec -T api node -e \
-      "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))" \
-      >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 2
-  done
-  fail "api did not report healthy within 3 minutes; see: ${compose[*]} ${files[*]} logs api"
-}
-
 main() {
   [[ -f .env ]] || fail "there is no .env here; install with setup.sh first (README.md, step 5)"
   if [[ -n $updater ]]; then
@@ -263,18 +252,22 @@ main() {
 
   install_bundle
   update_env
-  # Podman refuses to replace `asterisk` while `proxy` shares its network namespace (§6.3), so
-  # proxy goes first; the boot unit's restart does the same with `down`.
+  # `--wait` returns once every service it starts is healthy, or running where it has no
+  # healthcheck, and `migrate` has exited 0; Docker and Podman alike, since `podman compose` hands
+  # the files to the same Compose. Podman refuses to replace `asterisk` while `proxy` shares its
+  # network namespace (§6.3), so proxy goes first; the boot unit's restart does the same with
+  # `down`, and its `up -d` does not wait, so an `up` that recreates nothing waits for it.
+  local -a wait_args=(--wait --wait-timeout "$WAIT_SECONDS")
   if [[ $runtime == podman && -n $unit ]]; then
     echo "Restarting $unit ..."
     systemctl restart "$unit"
-  else
-    if [[ $runtime == podman || -n $updater ]]; then
-      "${compose[@]}" "${files[@]}" rm -sf proxy
-    fi
-    "${compose[@]}" "${files[@]}" up -d "${services[@]}"
+    wait_args+=(--no-recreate)
+  elif [[ $runtime == podman || -n $updater ]]; then
+    "${compose[@]}" "${files[@]}" rm -sf proxy
   fi
-  await_api
+  "${compose[@]}" "${files[@]}" up -d "${wait_args[@]}" "${services[@]}" ||
+    fail "the stack did not report healthy within $((WAIT_SECONDS / 60)) minutes; see:" \
+      "${compose[*]} ${files[*]} ps, and its logs"
   echo "Updated $from -> $target. What changed: CHANGELOG.md, or $REPO/releases/tag/v$target"
 }
 
