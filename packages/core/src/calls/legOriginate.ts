@@ -7,7 +7,14 @@
  *
  * The leg is otherwise the originate's: the same endpoint, app arguments and variables, the
  * caller ID as the originate sets it (the channel's caller and connected line, from which
- * chan_pjsip builds `From` and `P-Asserted-Identity`), and the same 30 s dial timeout.
+ * chan_pjsip builds `From` and `P-Asserted-Identity`).
+ *
+ * The dial sets no timeout of its own: "Timers ... live entirely in the core" (§10.1). The ring a
+ * leg belongs to ends it (a user's `ring_timeout_s`, a ring group's per-member or total timeout,
+ * a find-me leg's share of its user's), and a trunk leg that alerted rings on until it is
+ * answered or refused (§9.4 "Route fallthrough"). ARI's own default for `dial` is none as well
+ * (`timeout` 0, `app_control_dial` in res/stasis/control.c); 30 s, `POST /channels`' default,
+ * cut every longer ring short while legs still passed it.
  *
  * Asterisk answers the create before the channel is in the app: it hands the channel to Stasis
  * on a thread of its own (`ari_channel_thread`, res/ari/resource_channels.c), and a dial reaching
@@ -24,8 +31,8 @@ import type { AriEvent, Channel, OriginateParams } from '../ari/types.js';
 import type { Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 
-// ARI's own originate default, which every leg rang under before it was dialled in two steps.
-const ORIGINATE_TIMEOUT_S = 30;
+// `POST /channels/{id}/dial`'s "no timeout": the ring the leg is part of times it out.
+const NO_DIAL_TIMEOUT = 0;
 // How long a created channel may take to enter the app before it counts as not placed.
 export const STASIS_WAIT_MS = 5000;
 
@@ -126,7 +133,7 @@ export async function originateLeg(
     throw new PlacementError('stasis');
   }
   try {
-    await ari.channels.dial(channel.id, timeout ?? ORIGINATE_TIMEOUT_S);
+    await ari.channels.dial(channel.id, timeout ?? NO_DIAL_TIMEOUT);
   } catch (error: unknown) {
     await ari.channels.hangup(channel.id).catch(() => undefined);
     throw new PlacementError('dial', error);
