@@ -502,6 +502,38 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       ATTEMPT_NO_RESPONSE_MS + 5000
     );
 
+    // §9.4 "Route fallthrough": the budget covers only the wait for a first response. An answer
+    // landing while its end-of-budget read is still under way is the race's, never hung up.
+    it(
+      'keeps an attempt answered while its 8 s budget read is still under way',
+      async () => {
+        const forwarding = await seedUser(db);
+        await seedExternalForward(db, forwarding, '+15557777');
+        await seedDevice(db, forwarding, 'member-forwarding');
+        const trunk1 = await seedTrunk(db, 1);
+        await seedRoute(db, 1, trunk1);
+        const groupId = await seedRingGroup(db, [forwarding]);
+        // The read of the channel's hangup-cause hash is slow to answer.
+        fakeAri.requestDelayMs = request =>
+          request.method === 'GET' && request.path.endsWith('/variable')
+            ? 600
+            : 0;
+
+        const finished = ringGroup(pipeline, call, groupId);
+        await membersRinging(call, 1);
+        const first = await channelTo(ari, `PJSIP/+15557777@trunk-${trunk1}`);
+        await sleep(ATTEMPT_NO_RESPONSE_MS + 200);
+        emit('ChannelStateChange', first.id, { state: 'Up' });
+        await finished;
+        // Past the read's own answer, which reports no provisional response.
+        await sleep(800);
+
+        expect(call.status).toBe('answered');
+        expect(hangups(fakeAri, first.id)).toBe(0);
+      },
+      ATTEMPT_NO_RESPONSE_MS + 5000
+    );
+
     it('falls through to the next route on a 403, which only tech_cause tells from a 603', async () => {
       const forwarding = await seedUser(db);
       await seedExternalForward(db, forwarding, '+15557777');

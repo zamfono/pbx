@@ -5,7 +5,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
 import { FakeAri, isPlacement } from '../ari/fake.js';
-import type { Channel, Logger } from '../ari/types.js';
+import { defaultChannel, type Channel, type Logger } from '../ari/types.js';
 import { Presence } from '../presence.js';
 import { eventually } from '../testing/eventually.js';
 import { newCall, type Call } from './call.js';
@@ -124,6 +124,21 @@ function originatedEndpoints(fakeAri: FakeAri): string[] {
     .map(entry => (entry.body as { endpoint?: string }).endpoint ?? '');
 }
 
+/** The channel ids of the device legs placed so far, in the order they were created. */
+function placedChannelIds(fakeAri: FakeAri): string[] {
+  return fakeAri.calls
+    .filter(entry => isPlacement(entry))
+    .map(entry => (entry.body as { channelId?: string }).channelId ?? '');
+}
+
+function traceEvents(call: Call, name: string): Record<string, unknown>[] {
+  return (call.log.finish().log ?? '')
+    .split('\n')
+    .filter(Boolean)
+    .map(line => JSON.parse(line) as Record<string, unknown>)
+    .filter(line => line.event === name);
+}
+
 function playedMedia(fakeAri: FakeAri, channelId: string): string[] {
   return fakeAri.calls
     .filter(
@@ -210,6 +225,26 @@ describe('user step against registration', () => {
     await eventually(() => {
       expect(presence.isRegistered(sipUsername)).toBe(true);
     });
+  }
+
+  /** `channelId`'s `ChannelStateChange` to `Up`: its phone answered. */
+  function answer(channelId: string): void {
+    fakeAri.emit({
+      type: 'ChannelStateChange',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: defaultChannel({ id: channelId, state: 'Up' })
+    });
+  }
+
+  /** Whether `channelId` was added to a bridge: its answer was bridged with the caller. */
+  function bridged(channelId: string): boolean {
+    return fakeAri.calls.some(
+      entry =>
+        entry.method === 'POST' &&
+        /^bridges\/[^/]+\/addChannel$/u.test(entry.path) &&
+        JSON.stringify(entry.body ?? entry.qs).includes(channelId)
+    );
   }
 
   it('applies the offline rule at once, ringing nothing, when every phone of the user is off', async () => {
@@ -434,5 +469,95 @@ describe('user step against registration', () => {
       .filter(entry => entry.path.endsWith('/dial'))
       .map(entry => (entry.body as { timeout?: number }).timeout);
     expect(timeouts).toEqual([0, 0]);
+  });
+
+  // §10.1 step 4 "first answer wins": exactly one outcome settles the ring. On a loaded host a
+  // phone's 200 OK reaches the core ahead of its own dial's response, and its answer, claimed as
+  // the leg is tracked, was still being bridged when the ring found no leg ringing and concluded
+  // it unanswered: the call went to voicemail and the answered phone stayed up, bridged to nobody.
+  it('bridges a phone that answered before its own dial returned, never concluding the ring unanswered', async () => {
+    const userId = await seedUser(db, ['e101-da']);
+    await seedAnnouncementRule(db, userId, 'noAnswer', 'noanswer.wav');
+    await register('e101-da');
+    fakeAri.requestDelayMs = request => {
+      const dial = /^channels\/(?<id>[^/]+)\/dial$/u.exec(request.path);
+      if (dial?.groups?.id === undefined) {
+        return 0;
+      }
+      // The answer is on the WebSocket while the dial's own response is still held.
+      answer(dial.groups.id);
+      return 50;
+    };
+
+    await runUserStep(pipeline, call, await pipeline.deps.cache.get(), userId);
+
+    const [legId = ''] = placedChannelIds(fakeAri);
+    expect(call.answeredAt).not.toBeNull();
+    expect(bridged(legId)).toBe(true);
+    expect(traceEvents(call, 'ringOutcome')).toEqual([]);
+    expect(playedMedia(fakeAri, callerChannel.id)).toEqual([]);
+  });
+
+  it('bridges the phone that answered though the other phone declines while the answer is still being bridged', async () => {
+    const userId = await seedUser(db, ['e101-da', 'e101-db']);
+    await seedAnnouncementRule(db, userId, 'noAnswer', 'noanswer.wav');
+    await register('e101-da');
+    await register('e101-db');
+    // The answer's bridge is slow to come, so the decline lands while it is still being bridged.
+    fakeAri.requestDelayMs = request =>
+      request.method === 'POST' && request.path === 'bridges' ? 200 : 0;
+
+    const step = runUserStep(
+      pipeline,
+      call,
+      await pipeline.deps.cache.get(),
+      userId
+    );
+    await eventually(() => {
+      expect(traceEvents(call, 'rungDevice')).toHaveLength(2);
+    });
+    const [answering = '', declining = ''] = placedChannelIds(fakeAri);
+    answer(answering);
+    await eventually(() => {
+      expect(traceEvents(call, 'answered')).toHaveLength(1);
+    });
+    fakeAri.emit({
+      type: 'ChannelDestroyed',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: defaultChannel({ id: declining }),
+      cause: 21
+    });
+    await step;
+
+    expect(bridged(answering)).toBe(true);
+    expect(traceEvents(call, 'ringOutcome')).toEqual([]);
+    expect(playedMedia(fakeAri, callerChannel.id)).toEqual([]);
+  });
+
+  // The other order: the ring timed out first, so a phone answering afterwards is not bridged
+  // with a caller already on their way to the noAnswer rule; its leg is hung up, never left up.
+  it('hangs up, never bridges, a phone answering after its ring timed out', async () => {
+    const userId = await seedUser(db, ['e101-da']);
+    await seedAnnouncementRule(db, userId, 'noAnswer', 'noanswer.wav');
+    await register('e101-da');
+
+    await runUserStep(pipeline, call, await pipeline.deps.cache.get(), userId);
+    const [legId = ''] = placedChannelIds(fakeAri);
+    answer(legId);
+
+    await eventually(() => {
+      expect(
+        fakeAri.calls.some(
+          entry =>
+            entry.method === 'DELETE' && entry.path === `channels/${legId}`
+        )
+      ).toBe(true);
+    });
+    expect(bridged(legId)).toBe(false);
+    expect(traceEvents(call, 'answered')).toEqual([]);
+    expect(playedMedia(fakeAri, callerChannel.id)).toEqual([
+      'sound:/media/prompts/noanswer'
+    ]);
   });
 });

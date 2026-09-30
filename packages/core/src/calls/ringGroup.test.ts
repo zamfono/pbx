@@ -454,6 +454,98 @@ describe('ringGroup', () => {
     expect(call.bridgeId).not.toBeNull();
   });
 
+  // §10.1 step 5 "the first answer wins": exactly one outcome settles a batch. Its timeout landing
+  // while a member's answer is still being bridged must not ring the next batch nor fall back.
+  it('a batch timeout landing while the winner is still bridging does not move on to the next batch', async () => {
+    const groupId = await seedRingGroup(db, {
+      strategy: 'sequential',
+      ringTimeoutS: 1
+    });
+    const userA = await seedUser(db);
+    const userB = await seedUser(db);
+    await seedDevice(db, userA, 'slow-a');
+    await seedDevice(db, userB, 'slow-b');
+    await seedMember(db, groupId, 0, userA);
+    await seedMember(db, groupId, 1, userB);
+    fakeAri.answerAfterMs = 60_000;
+    // The winner's bridge comes only after the batch's one-second timeout.
+    fakeAri.requestDelayMs = request =>
+      request.method === 'POST' && request.path === 'bridges' ? 1500 : 0;
+
+    const finished = ringGroup(pipeline, call, groupId);
+    await membersRinging(call, 1);
+    const listed = await ari.channels.list();
+    const winner = listed.find(entry => entry.name === 'PJSIP/slow-a');
+    if (!winner) {
+      throw new Error('the first member should ring');
+    }
+    fakeAri.emit({
+      type: 'ChannelStateChange',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: defaultChannel({ id: winner.id, state: 'Up' })
+    });
+
+    await finished;
+    expect(originates(fakeAri)).toHaveLength(1);
+    expect(call.status).toBe('answered');
+    expect(call.answeredByUserId).toBe(userA);
+    expect(call.bridgeId).not.toBeNull();
+    expect(hangups(fakeAri, winner.id)).toBe(0);
+  }, 10_000);
+
+  // The other order: the batch timed out first while a sibling was still being placed, so a
+  // member answering afterwards is hung up, never bridged with a caller already moving on.
+  it('a member answering after its batch timed out is hung up, never bridged', async () => {
+    const groupId = await seedRingGroup(db, {
+      strategy: 'simultaneous',
+      ringTimeoutS: 1
+    });
+    const users = [await seedUser(db), await seedUser(db), await seedUser(db)];
+    for (const [index, userId] of users.entries()) {
+      // eslint-disable-next-line no-await-in-loop -- members keep their positions in order
+      await seedDevice(db, userId, `late-${index}`);
+      // eslint-disable-next-line no-await-in-loop -- members keep their positions in order
+      await seedMember(db, groupId, index, userId);
+    }
+    fakeAri.answerAfterMs = 60_000;
+    // late-1 rings only after the timeout; late-2 is still being placed when late-1 answers.
+    const dialDelays: Record<string, number> = {
+      'PJSIP/late-1': 1500,
+      'PJSIP/late-2': 2500
+    };
+    fakeAri.requestDelayMs = request => {
+      const dial = /^channels\/(?<id>[^/]+)\/dial$/u.exec(request.path);
+      const created = fakeAri.calls.find(
+        entry =>
+          entry.path === 'channels/create' &&
+          (entry.body as { channelId?: string }).channelId === dial?.groups?.id
+      );
+      const endpoint = (created?.body as { endpoint?: string } | undefined)
+        ?.endpoint;
+      return dial === null ? 0 : (dialDelays[endpoint ?? ''] ?? 0);
+    };
+
+    const finished = ringGroup(pipeline, call, groupId);
+    await membersRinging(call, 2);
+    const listed = await ari.channels.list();
+    const late = listed.find(entry => entry.name === 'PJSIP/late-1');
+    if (!late) {
+      throw new Error('the second member should ring');
+    }
+    fakeAri.emit({
+      type: 'ChannelStateChange',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: defaultChannel({ id: late.id, state: 'Up' })
+    });
+
+    await finished;
+    expect(traceEvents(call, 'answered')).toEqual([]);
+    expect(call.bridgeId).toBeNull();
+    expect(hangups(fakeAri, late.id)).toBeGreaterThan(0);
+  }, 10_000);
+
   it('two members answering back to back: only the first wins, bridged once, traced once, recorded and shown up', async () => {
     const groupId = await seedRingGroup(db, {
       strategy: 'simultaneous',
