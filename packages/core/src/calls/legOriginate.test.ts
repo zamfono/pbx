@@ -124,7 +124,8 @@ describe('originateLeg (§7 level sip)', () => {
       'join leg-1',
       'stasisStart',
       'joined',
-      'dial leg-1 30'
+      // No timeout of Asterisk's: the ring the leg belongs to times it out (§10.1).
+      'dial leg-1 0'
     ]);
   });
 

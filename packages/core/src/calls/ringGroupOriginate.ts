@@ -1,5 +1,5 @@
 /**
- * A ring-group batch's own originate step (§10.1 step 5): dials one `MemberLeg` at a time onto
+ * A ring-group batch's own originate step (§10.1 step 5): dials every `MemberLeg` at once onto
  * the batch's own `tracked` map. Owned and raced by `ringGroupDial.ts`; kept in its own module so
  * both stay under the size limits (§ Global Constraints).
  */
@@ -10,51 +10,10 @@ import type { Call } from './call.js';
 import { softphoneCallerId } from './contactName.js';
 import { recordEvents, redeliverEarlyEvents } from './earlyEvents.js';
 import { ringExternalLeg } from './externalLeg.js';
+import type { GroupLeg } from './groupLegs.js';
 import { originateLeg } from './legOriginate.js';
 import type { Pipeline } from './pipeline.js';
 import { devicesToRing } from './userDevices.js';
-
-export type GroupLeg = {
-  channelId: string;
-  userId: string | null;
-  memberKey: string;
-  state: 'ringing' | 'ended';
-  /** The device a member's own leg rings; absent for an external (forwarded) member leg. */
-  deviceId?: string;
-};
-
-// --- Task 31 ---
-// The hangup helpers `ringGroupDial.ts`'s batch race uses; kept here so both files stay under the
-// repository's `max-lines`/`max-lines-per-function` rules.
-/** Ends every one of `memberKey`'s still-ringing legs (§10.1 step 5: `allow_reject` stops ringing all of a declining member's devices). */
-export function hangupMemberSiblings(
-  pipeline: Pipeline,
-  tracked: Map<string, GroupLeg>,
-  memberKey: string
-): void {
-  for (const [channelId, leg] of tracked) {
-    if (leg.memberKey === memberKey && leg.state === 'ringing') {
-      leg.state = 'ended';
-      pipeline.deps.ari.channels.hangup(channelId).catch(() => undefined);
-    }
-  }
-}
-
-/** Ends every still-ringing tracked leg; called once a batch concludes, win or not. */
-export async function hangupAllRinging(
-  pipeline: Pipeline,
-  tracked: Map<string, GroupLeg>
-): Promise<void> {
-  for (const [channelId, leg] of tracked) {
-    if (leg.state !== 'ringing') {
-      continue;
-    }
-    leg.state = 'ended';
-    // eslint-disable-next-line no-await-in-loop -- losing legs are hung up one at a time; a batch has at most a handful
-    await pipeline.deps.ari.channels.hangup(channelId).catch(() => undefined);
-  }
-}
-// --- end Task 31 ---
 
 /** A member leg's owner: whose devices ring (`userId`) and which member it counts against for
  * `allow_reject` purposes (`memberKey`) — the same member, unless a forward rings someone else. */
@@ -75,9 +34,58 @@ function hangUpIfAlreadyWon(
   pipeline.deps.ari.channels.hangup(leg.channelId).catch(() => undefined);
 }
 
-/** Originates every registered device of `owner.userId`, tagging each channel under `owner.memberKey`;
- * for a member already in a call, the devices other than the one carrying it (§10.1 step 5, with
- * `skip_busy` cleared: "rung on their other devices as call waiting"). */
+/** Originates one of `owner`'s devices, tracked under `owner.memberKey`. */
+async function originateDevice(
+  pipeline: Pipeline,
+  call: Call,
+  member: { owner: LegOwner; callerId: string; language: string },
+  device: { id: string; sipUsername: string },
+  tracked: Map<string, GroupLeg>
+): Promise<void> {
+  const { owner } = member;
+  const early = recordEvents(pipeline.deps.ari);
+  const channel = await originateLeg(pipeline, call, {
+    endpoint: `PJSIP/${device.sipUsername}`,
+    app: 'zamfono',
+    appArgs: `leg,${call.id}`,
+    callerId: member.callerId,
+    // §9.1 "every channel's language": a member's leg has been through no entry of its own.
+    variables: channelLanguageVariable(member.language)
+  })
+    .catch(() => null)
+    .finally(early.stop);
+  if (channel === null) {
+    // Refused before it rang (`legOriginate.ts`): the member's device leaves the batch.
+    call.log.event({
+      event: 'ringGroupMember',
+      deviceId: device.id,
+      userId: owner.userId,
+      cause: 'placementFailed'
+    });
+    return;
+  }
+  const leg: GroupLeg = {
+    channelId: channel.id,
+    userId: owner.userId,
+    memberKey: owner.memberKey,
+    state: 'ringing',
+    deviceId: device.id
+  };
+  tracked.set(channel.id, leg);
+  call.log.event({
+    event: 'ringGroupMember',
+    channelId: channel.id,
+    userId: owner.userId
+  });
+  hangUpIfAlreadyWon(pipeline, call, leg);
+  // A member's phone that declined at once (486, 603) ended before it was tracked (§10.1 step 5).
+  redeliverEarlyEvents(pipeline.deps.ari, early, channel.id);
+}
+
+/** Originates every registered device of `owner.userId` at once (§9.3 "One endpoint per device"),
+ * tagging each channel under `owner.memberKey`; for a member already in a call, the devices other
+ * than the one carrying it (§10.1 step 5, with `skip_busy` cleared: "rung on their other devices
+ * as call waiting"). */
 async function originateDevices(
   pipeline: Pipeline,
   call: Call,
@@ -89,49 +97,15 @@ async function originateDevices(
   const devices = await devicesToRing(pipeline, snapshot, owner.userId);
   // §10.2 "Phone book": the contact's display name is the caller-ID name on the member legs.
   const callerId = await softphoneCallerId(pipeline, call);
-  for (const device of devices) {
-    if (call.answeredAt !== null) {
-      break;
-    }
-    const early = recordEvents(pipeline.deps.ari);
-    // eslint-disable-next-line no-await-in-loop -- a member's own devices are originated one at a time; a user has at most a handful
-    const channel = await originateLeg(pipeline, call, {
-      endpoint: `PJSIP/${device.sipUsername}`,
-      app: 'zamfono',
-      appArgs: `leg,${call.id}`,
-      callerId,
-      // §9.1 "every channel's language": a member's leg has been through no entry of its own.
-      variables: channelLanguageVariable(snapshot.settings.language)
-    })
-      .catch(() => null)
-      .finally(early.stop);
-    if (channel === null) {
-      // Refused before it rang (`legOriginate.ts`): the member's device leaves the batch.
-      call.log.event({
-        event: 'ringGroupMember',
-        deviceId: device.id,
-        userId: owner.userId,
-        cause: 'placementFailed'
-      });
-      continue;
-    }
-    const leg: GroupLeg = {
-      channelId: channel.id,
-      userId: owner.userId,
-      memberKey: owner.memberKey,
-      state: 'ringing',
-      deviceId: device.id
-    };
-    tracked.set(channel.id, leg);
-    call.log.event({
-      event: 'ringGroupMember',
-      channelId: channel.id,
-      userId: owner.userId
-    });
-    hangUpIfAlreadyWon(pipeline, call, leg);
-    // A member's phone that declined at once (486, 603) ended before it was tracked (§10.1 step 5).
-    redeliverEarlyEvents(pipeline.deps.ari, early, channel.id);
+  if (call.answeredAt !== null) {
+    return;
   }
+  const member = { owner, callerId, language: snapshot.settings.language };
+  await Promise.all(
+    devices.map(device =>
+      originateDevice(pipeline, call, member, device, tracked)
+    )
+  );
 }
 
 /** A batch's legs as `ringGroupDial.ts`'s race holds them: the tracked channels, and the race's own
@@ -225,8 +199,9 @@ async function originateMemberLeg(
   }
 }
 
-/** One `ringPlan` batch's members, originated one at a time; stops early once the batch has
- * already been won so a member later in the batch is never rung after the caller is bridged. */
+/** One `ringPlan` batch's members, originated at once (a `simultaneous` batch rings every member
+ * together, §10.1 step 5); none once the batch has already been won, so a member is never rung
+ * after the caller is bridged. */
 export async function originateBatch(
   pipeline: Pipeline,
   call: Call,
@@ -234,11 +209,10 @@ export async function originateBatch(
   legs: MemberLeg[],
   batch: BatchLegs
 ): Promise<void> {
-  for (const leg of legs) {
-    if (call.answeredAt !== null) {
-      break;
-    }
-    // eslint-disable-next-line no-await-in-loop -- a batch's members are originated one at a time; a ring group has at most a handful
-    await originateMemberLeg(pipeline, call, snapshot, leg, batch);
+  if (call.answeredAt !== null) {
+    return;
   }
+  await Promise.all(
+    legs.map(leg => originateMemberLeg(pipeline, call, snapshot, leg, batch))
+  );
 }

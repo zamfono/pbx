@@ -12,14 +12,72 @@ import { findMeLegsPending, scheduleFindMeLegs } from './findMe.js';
 import { originateLeg } from './legOriginate.js';
 import { hangupLeg, trackLeg, type RingOutcome } from './legs.js';
 import type { Pipeline } from './pipeline.js';
-import { concludeRing } from './ringConclusion.js';
+import { concludeRing, placeAll } from './ringConclusion.js';
 import { devicesToRing, registeredDevices } from './userDevices.js';
 import { applyRingOutcome } from './userStep.js';
 
 const MILLISECONDS_PER_SECOND = 1000;
 const RELEASE_CODE_UNAVAILABLE = 480;
 
-/** Originates one leg per device of `userId`'s, each tracked on `call` as a ringing device leg. */
+type DeviceRing = {
+  userId: string;
+  callerId: string;
+  language: string;
+};
+
+/** Originates one leg for `device`, tracked on `call` as a ringing device leg. */
+async function ringDevice(
+  pipeline: Pipeline,
+  call: Call,
+  ring: DeviceRing,
+  device: { id: string; sipUsername: string }
+): Promise<void> {
+  const { userId } = ring;
+  const early = recordEvents(pipeline.deps.ari);
+  const channel = await originateLeg(pipeline, call, {
+    endpoint: `PJSIP/${device.sipUsername}`,
+    app: 'zamfono',
+    appArgs: `leg,${call.id}`,
+    callerId: ring.callerId,
+    // §9.1 "every channel's language": a device leg has been through no entry of its own.
+    variables: channelLanguageVariable(ring.language)
+  })
+    .catch(() => null)
+    .finally(early.stop);
+  if (channel === null) {
+    // Refused before it rang (`legOriginate.ts`): the device leaves the race as if it declined.
+    call.log.event({
+      event: 'rungDevice',
+      deviceId: device.id,
+      userId,
+      cause: 'placementFailed'
+    });
+    return;
+  }
+  trackLeg(pipeline, call, {
+    channelId: channel.id,
+    kind: 'device',
+    userId,
+    state: 'ringing',
+    endCause: null,
+    deviceId: device.id
+  });
+  call.log.event({ event: 'rungDevice', channelId: channel.id, userId });
+  // A phone that declined at once (486, 603) ended before it was tracked (§10.1 step 4).
+  redeliverEarlyEvents(pipeline.deps.ari, early, channel.id);
+  // --- Task 31 --- (§10.1 step 4: a win landing during this originate must not leave its leg ringing,
+  // nor must the race ending unanswered meanwhile, its timeout or its last other leg ending)
+  const leg = call.legs.get(channel.id);
+  const raceOver =
+    call.answeredAt !== null || !pipeline.pendingRing.has(call.id);
+  if (raceOver && leg?.state === 'ringing') {
+    await hangupLeg(pipeline, leg);
+  }
+  // --- end Task 31 ---
+}
+
+/** Originates one leg per device of `userId`'s, all at once (`placeAll`), each placed in its own
+ * order (created, joined, dialled, `legOriginate.ts`). */
 async function ringDevices(
   pipeline: Pipeline,
   call: Call,
@@ -29,48 +87,10 @@ async function ringDevices(
 ): Promise<void> {
   // §10.2 "Phone book": the contact's display name is the caller-ID name on the device legs.
   const callerId = await softphoneCallerId(pipeline, call);
-  for (const device of devices) {
-    const early = recordEvents(pipeline.deps.ari);
-    // eslint-disable-next-line no-await-in-loop -- devices are originated one at a time; a user has at most a handful
-    const channel = await originateLeg(pipeline, call, {
-      endpoint: `PJSIP/${device.sipUsername}`,
-      app: 'zamfono',
-      appArgs: `leg,${call.id}`,
-      callerId,
-      // §9.1 "every channel's language": a device leg has been through no entry of its own.
-      variables: channelLanguageVariable(language)
-    })
-      .catch(() => null)
-      .finally(early.stop);
-    if (channel === null) {
-      // Refused before it rang (`legOriginate.ts`): the device leaves the race as if it declined.
-      call.log.event({
-        event: 'rungDevice',
-        deviceId: device.id,
-        userId,
-        cause: 'placementFailed'
-      });
-      continue;
-    }
-    trackLeg(pipeline, call, {
-      channelId: channel.id,
-      kind: 'device',
-      userId,
-      state: 'ringing',
-      endCause: null,
-      deviceId: device.id
-    });
-    call.log.event({ event: 'rungDevice', channelId: channel.id, userId });
-    // A phone that declined at once (486, 603) ended before it was tracked (§10.1 step 4).
-    redeliverEarlyEvents(pipeline.deps.ari, early, channel.id);
-    // --- Task 31 --- (§10.1 step 4: a win landing during this originate must not leave its leg ringing)
-    const leg = call.legs.get(channel.id);
-    if (call.answeredAt !== null && leg?.state === 'ringing') {
-      // eslint-disable-next-line no-await-in-loop -- see above
-      await hangupLeg(pipeline, leg);
-    }
-    // --- end Task 31 ---
-  }
+  const ring: DeviceRing = { userId, callerId, language };
+  await placeAll(pipeline, call, devices, device =>
+    ringDevice(pipeline, call, ring, device)
+  );
 }
 
 /**

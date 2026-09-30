@@ -16,6 +16,7 @@ import { recordEvents, redeliverEarlyEvents } from './earlyEvents.js';
 import { originateLeg } from './legOriginate.js';
 import { concludeRing, hangupLeg, trackLeg, type RingOutcome } from './legs.js';
 import type { Pipeline } from './pipeline.js';
+import { placeAll } from './ringConclusion.js';
 
 export type Device = Snapshot['devices'][number];
 
@@ -52,58 +53,68 @@ export type OwnRing = {
   outcome: Promise<OwnRingOutcome>;
 };
 
-/** Places one leg per device on `host`, each tracked as a ringing device leg. A device whose
- * placement fails leaves the ring; one placed after the race settled is hung up. */
+/** Places one leg for `device` on `host`, tracked as a ringing device leg. A placement that
+ * fails leaves the ring; one placed after the race settled is hung up. */
+async function placeDevice(
+  pipeline: Pipeline,
+  params: OwnRingParams,
+  placed: Map<string, Channel>,
+  device: Device
+): Promise<void> {
+  const { host, sipCall, userId, callerId, language } = params;
+  const early = recordEvents(pipeline.deps.ari);
+  const channel = await originateLeg(pipeline, sipCall, {
+    endpoint: `PJSIP/${device.sipUsername}`,
+    app: 'zamfono',
+    appArgs: `leg,${host.id}`,
+    callerId,
+    variables: channelLanguageVariable(language)
+  })
+    .catch(() => null)
+    .finally(early.stop);
+  if (channel === null) {
+    host.log.event({
+      event: 'rungDevice',
+      deviceId: device.id,
+      userId,
+      cause: 'placementFailed'
+    });
+    return;
+  }
+  placed.set(channel.id, channel);
+  trackLeg(pipeline, host, {
+    channelId: channel.id,
+    kind: 'device',
+    userId,
+    state: 'ringing',
+    endCause: null,
+    deviceId: device.id
+  });
+  host.log.event({ event: 'rungDevice', channelId: channel.id, userId });
+  // A phone that declined or answered at once did so before it was tracked.
+  redeliverEarlyEvents(pipeline.deps.ari, early, channel.id);
+  const leg = host.legs.get(channel.id);
+  if (!pipeline.pendingRing.has(host.id) && leg?.state === 'ringing') {
+    await hangupLeg(pipeline, leg);
+  }
+}
+
+/** Places one leg per device on `host`, all at once (`placeAll`), each in its own order (created,
+ * joined, dialled). */
 async function placeDevices(
   pipeline: Pipeline,
   params: OwnRingParams,
   placed: Map<string, Channel>
 ): Promise<void> {
-  const { host, sipCall, userId, callerId, timeoutS, language } = params;
-  for (const device of params.devices) {
-    const early = recordEvents(pipeline.deps.ari);
-    // eslint-disable-next-line no-await-in-loop -- devices are placed one at a time; a user has at most a handful
-    const channel = await originateLeg(pipeline, sipCall, {
-      endpoint: `PJSIP/${device.sipUsername}`,
-      app: 'zamfono',
-      appArgs: `leg,${host.id}`,
-      callerId,
-      timeout: timeoutS,
-      variables: channelLanguageVariable(language)
-    })
-      .catch(() => null)
-      .finally(early.stop);
-    if (channel === null) {
-      host.log.event({
-        event: 'rungDevice',
-        deviceId: device.id,
-        userId,
-        cause: 'placementFailed'
-      });
-      continue;
-    }
-    placed.set(channel.id, channel);
-    trackLeg(pipeline, host, {
-      channelId: channel.id,
-      kind: 'device',
-      userId,
-      state: 'ringing',
-      endCause: null,
-      deviceId: device.id
-    });
-    host.log.event({ event: 'rungDevice', channelId: channel.id, userId });
-    // A phone that declined or answered at once did so before it was tracked.
-    redeliverEarlyEvents(pipeline.deps.ari, early, channel.id);
-    const leg = host.legs.get(channel.id);
-    if (!pipeline.pendingRing.has(host.id) && leg?.state === 'ringing') {
-      // eslint-disable-next-line no-await-in-loop -- see above
-      await hangupLeg(pipeline, leg);
-    }
-  }
-  // Nothing rings: no device could be placed, or each ended before the next was.
-  const ringing = [...host.legs.values()].some(leg => leg.state === 'ringing');
+  await placeAll(pipeline, params.host, params.devices, device =>
+    placeDevice(pipeline, params, placed, device)
+  );
+  // Nothing rings: no device could be placed, or each ended before the last was.
+  const ringing = [...params.host.legs.values()].some(
+    leg => leg.state === 'ringing'
+  );
   if (!ringing) {
-    concludeRing(pipeline, host);
+    concludeRing(pipeline, params.host);
   }
 }
 

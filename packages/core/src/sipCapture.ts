@@ -1,12 +1,13 @@
 /**
  * §7 level `sip`: Asterisk mirrors a call's SIP messages to `core` over HEP, which carries the
  * Call-ID and nothing that names the call. Each channel's own `CHANNEL(pjsip,call-id)` is the
- * join: the caller's when the call opens and every leg's as it is originated, dropped when the
- * call closes, so a message can only reach a call that is still open.
+ * join: the caller's when the call opens and every leg's as it is created, before its dial sends
+ * the INVITE (`legOriginate.ts`), dropped when the call closes, so a message can only reach a call
+ * that is still open.
  *
- * A dialog's first messages race its join: the caller's INVITE and early responses reach the
- * collector before the channel enters Stasis, and a leg's INVITE leaves while its originate is
- * still being answered. A message for no known Call-ID is therefore held briefly and handed to
+ * A dialog's first messages can race its join: the caller's INVITE and early responses reach the
+ * collector before the channel enters Stasis, and below level `sip` a leg is dialled without
+ * waiting for its join. A message for no known Call-ID is therefore held briefly and handed to
  * the call its Call-ID joins within that time; anything else (a REGISTER, an OPTIONS ping, a
  * dialog of no call) ages out.
  */
@@ -22,7 +23,7 @@ export type SipMessage = {
 };
 
 // How long an unmatched message waits for its Call-ID to be joined: the join is one ARI read
-// after StasisStart or an originate, so seconds cover it with a wide margin.
+// after StasisStart or a leg's create, so seconds cover it with a wide margin.
 const HOLD_MS = 5000;
 // A ceiling on held messages, so a burst of traffic belonging to no call cannot grow the queue
 // without limit before it ages out.

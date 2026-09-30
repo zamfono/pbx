@@ -6,9 +6,9 @@
  * rings at most one batch at a time (`ringGroup.ts`'s own sequential loop).
  */
 import type { Call } from './call.js';
+import type { GroupLeg } from './groupLegs.js';
 import type { Pipeline } from './pipeline.js';
 import type { BatchOutcome } from './ringGroupDial.js';
-import type { GroupLeg } from './ringGroupOriginate.js';
 
 export type ActiveBatch = {
   tracked: Map<string, GroupLeg>;

@@ -44,8 +44,8 @@ export function concludeRing(pipeline: Pipeline, call: Call): void {
   pending.resolve(outcome);
 }
 
-/** A ringing leg ended with Q.850 `cause`; the ring race ends once none is still ringing and no
- * find-me leg is still to come (§10.1 step 4). */
+/** A ringing leg ended with Q.850 `cause`; the ring race ends once none is still ringing, being
+ * placed, nor, as a find-me leg, still to come (§10.1 step 4). */
 export function endRingingLeg(
   pipeline: Pipeline,
   call: Call,
@@ -58,7 +58,31 @@ export function endRingingLeg(
   const stillRinging = [...call.legs.values()].some(
     other => other.state === 'ringing'
   );
-  if (!stillRinging && !findMeLegsPending(pipeline, call.id)) {
+  const placing = pipeline.pendingRing.get(call.id)?.placing ?? 0;
+  if (!stillRinging && placing === 0 && !findMeLegsPending(pipeline, call.id)) {
     concludeRing(pipeline, call);
   }
+}
+
+/** Places every one of `items` at once (§9.3 "One endpoint per device": the core dials a user's
+ * devices in parallel), each counted on `call`'s ring race while it is still being placed. */
+export async function placeAll<T>(
+  pipeline: Pipeline,
+  call: Call,
+  items: readonly T[],
+  place: (item: T) => Promise<void>
+): Promise<void> {
+  const pending = pipeline.pendingRing.get(call.id);
+  if (pending !== undefined) {
+    pending.placing = (pending.placing ?? 0) + items.length;
+  }
+  await Promise.all(
+    items.map(item =>
+      place(item).finally(() => {
+        if (pending !== undefined) {
+          pending.placing = (pending.placing ?? 1) - 1;
+        }
+      })
+    )
+  );
 }

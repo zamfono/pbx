@@ -26,17 +26,27 @@ arguments:
    (`GET /calls`) listing with `from`/`to` and `userId`/`ringGroupId` until the one call stands out,
    then read it with `calls.get` (`GET /calls/{id}`). The lines that answer the usual questions:
    - `ooo`, `hours`: whether an out-of-office rule or opening hours applied; `hours` with
-     `schedule: null` means no opening hours cover the target.
+     `schedule: <scope>` names whose opening hours decided (the target's own, or the tenant's it
+     falls back to) and `open`; `schedule: null` means no opening hours cover the target.
    - `user`: the user step's `decision` (ring, forward, mailbox, release), its `reason` (`dnd`,
      `offline`, `unconditional`) and `registeredDevices`; `offline` with 0 devices means no phone
      of the user was registered.
    - `voicemail`: the mailbox and the `reason` the call reached it (`dnd`, `offline`, `busy`,
      `noAnswer`, `unanswered`, `unavailable`, `target`, `hopLimit`, …); `voicemailFailed` why no
-     message was kept (`callerHungUp`, `hangup` during the greeting, `failed`).
+     message was kept (`callerHungUp`, `hangup` during the greeting, `destroyed` when the channel
+     went during the recording without the caller hanging up, `failed`, and `missingDeps`, a
+     `core` running without its database or its link to `api`, when the call is released).
    - `rungDevice`, `ringGroupMember`, `declined` (with the Q.850 `cause`), `answered` (the
      `channelId`, the `leg` kind and the `userId` and `deviceId`, or the `trunkId` of a trunk leg).
+     A `rungDevice` or `ringGroupMember` with `cause: placementFailed` and a `deviceId` in place of
+     a `channelId` is a phone Asterisk would not place at all: it never rang.
    - `attempt`: one per outbound INVITE, with the trunk, the endpoint, the `callerId` presented
-     (`number`, `format`, `header`, `withheld`) and the `cause`.
+     (`number`, `format`, `header`, `withheld`) and the `cause`. An `attempt` with
+     `cause: placementFailed` has no `callerId`: Asterisk would not place the leg, no INVITE left,
+     and the next host or route was tried.
+   - `pickupRing`: a pickup through the API rings the picker's own phones first; those lines, in
+     the picked-up call's trace, carry the original event in `step` (`rungDevice`, `declined`, …),
+     so a pickup that never connected shows which of the picker's phones rang or failed.
    - `codecs`: the codec each side of the bridge negotiated; two different ones mean Asterisk
      transcodes.
    - `ended`: who ended the call — `caller`, `callee`, or `system` (a release, a hangup through
@@ -44,7 +54,9 @@ arguments:
 3. If the trace does not explain the symptom (a call that never reached a device, dropped audio,
    choppy or one-way audio), raise the diagnostics level for the specific user, trunk or ring
    group under suspicion to `qos` (adds a per-leg RTCP summary: `jitterMs`, `lossPct` and `rttMs`
-   per leg, the worse of both directions, `rttMs` null until the far end sent an RTCP report) or
+   per leg, the worse of both directions, `rttMs` null until the far end sent an RTCP report,
+   `jitterMs` and `lossPct` null for a leg that received nothing and whose far end never
+   reported, as one-way audio can leave it) or
    `sip` (adds the SIP messages themselves, HEP-mirrored from Asterisk) rather than raising it
    tenant-wide. An override without an explicit expiry lapses automatically after 7 days.
 4. For a trunk suspected of failing calls outbound, check `trunks.get` (`GET /trunks/{id}`) for its

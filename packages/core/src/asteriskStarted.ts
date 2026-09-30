@@ -8,25 +8,53 @@
 import type { AriClient } from './ari/client.js';
 import type { Logger } from './ari/types.js';
 import type { EventBus } from './internal/server.js';
+import { reconnectBackoff, type ReconnectBackoff } from './reconnectBackoff.js';
 
-/** Registers the announcement on every ARI connection from now on. */
+/** Registers the announcement on every ARI connection from now on. A start time that cannot be
+ * read is read again, after the ARI clients' own backoff, until it is or the connection drops:
+ * `api`'s stream may stay up across the reconnect, so nothing else would tell it. */
 export function announceAsteriskStartOnConnect(
   ari: AriClient,
   bus: EventBus,
   log: Logger
 ): void {
-  ari.on('connected', () => {
-    ari.asterisk.startupTime().then(
-      asteriskStartedAt => {
-        bus.announce({ type: 'asterisk.started', asteriskStartedAt });
-      },
-      (error: unknown) => {
-        // `api`'s next stream (re)connect reads the start from `/internal/version` instead.
-        log.warn(
-          { error },
-          'asterisk start time unavailable: api is not told of this ARI connection'
-        );
-      }
+  // Counts connections, so a read still under way for one that dropped announces nothing.
+  let connection = 0;
+  let reads: ReconnectBackoff | null = null;
+  const unreadable = (error: unknown): void => {
+    log.warn(
+      { error },
+      'asterisk start time unavailable: read again before api is told of this ARI connection'
     );
+  };
+  ari.on('connected', () => {
+    reads?.cancel();
+    connection += 1;
+    const current = connection;
+    const read = async (): Promise<void> => {
+      const asteriskStartedAt = await ari.asterisk.startupTime();
+      if (current === connection) {
+        bus.announce({ type: 'asterisk.started', asteriskStartedAt });
+      }
+    };
+    const backoff = reconnectBackoff(read, (error: unknown) => {
+      if (current === connection) {
+        unreadable(error);
+        backoff.schedule();
+      }
+    });
+    reads = backoff;
+    // The first read at once, each further one after the backoff's delay.
+    read().catch((error: unknown) => {
+      if (current === connection) {
+        unreadable(error);
+        backoff.schedule();
+      }
+    });
+  });
+  ari.on('disconnected', () => {
+    // The next connection reads its own Asterisk's start.
+    connection += 1;
+    reads?.cancel();
   });
 }

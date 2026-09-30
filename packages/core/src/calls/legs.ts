@@ -29,6 +29,9 @@ export type RingResolver = {
   /** Set for a ring on a user's own phones that an action started (`ownDevices.ts`): the leg that
    * answers is handed to it instead of being bridged with a caller the call does not have yet. */
   handOver?: (leg: Leg) => void;
+  /** Device legs still being placed, all at once (`ringUser.ts`, `ownDevices.ts`): the race does
+   * not end on its last ringing leg while one is still to ring. */
+  placing?: number;
 };
 
 /** A find-me leg awaiting its accept key; `timer`, the accept window, starts once the prompt
