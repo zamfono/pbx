@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -29,52 +30,57 @@ describe('parseVersion', () => {
   });
 });
 
-describe('compareVersions', () => {
-  it('orders by number, not by text', () => {
-    expect(
-      compareVersions(version('0.0.10'), version('0.0.9'))
-    ).toBeGreaterThan(0);
-    expect(compareVersions(version('1.0.0'), version('0.9.9'))).toBeGreaterThan(
-      0
+/** deploy/update-policy.tsv: the rows update.sh is tested against too (deploy/update-test.sh). */
+type Case = { from: string; to: string; verdict: string };
+
+function policyTable(): Case[] {
+  const url = new URL('../../../deploy/update-policy.tsv', import.meta.url);
+  return readFileSync(url, 'utf8')
+    .split('\n')
+    .filter(line => line !== '' && !line.startsWith('#'))
+    .map(line => {
+      const [from = '', to = '', verdict = ''] = line.split('\t');
+      return { from, to, verdict };
+    });
+}
+
+describe('judgeUpdate, against deploy/update-policy.tsv', () => {
+  const table = policyTable();
+
+  it('reads a table that has every verdict', () => {
+    expect(new Set(table.map(row => row.verdict))).toEqual(
+      new Set(['same', 'older', 'update', 'breaking'])
     );
-    expect(compareVersions(version('0.1.0'), version('0.1.0'))).toBe(0);
-  });
-});
-
-describe('isBreaking', () => {
-  it('while 0.x, a new minor is breaking and a new patch is not', () => {
-    expect(isBreaking(version('0.0.5'), version('0.0.6'))).toBe(false);
-    expect(isBreaking(version('0.0.6'), version('0.1.0'))).toBe(true);
   });
 
-  it('from 1.0.0 on, only a new major is breaking', () => {
-    expect(isBreaking(version('1.2.3'), version('1.9.0'))).toBe(false);
-    expect(isBreaking(version('1.9.0'), version('2.0.0'))).toBe(true);
-    expect(isBreaking(version('0.9.0'), version('1.0.0'))).toBe(true);
-  });
-});
+  it.each(table)(
+    '$from to $to: $verdict',
+    ({ from: fromText, to: toText, verdict }) => {
+      const from = version(fromText);
+      const to = version(toText);
+      const judged = judgeUpdate(from, to);
+      switch (verdict) {
+        case 'same':
+        case 'older':
+          expect(judged).toMatchObject({ ok: false, reason: 'notNewer' });
+          expect(compareVersions(to, from) === 0).toBe(verdict === 'same');
+          break;
+        case 'update':
+          expect(judged).toEqual({ ok: true });
+          expect(isBreaking(from, to)).toBe(false);
+          break;
+        case 'breaking':
+          expect(judged).toMatchObject({ ok: false, reason: 'breaking' });
+          expect(isBreaking(from, to)).toBe(true);
+          break;
+        default:
+          throw new Error(`update-policy.tsv: unknown verdict ${verdict}`);
+      }
+    }
+  );
 
-describe('judgeUpdate', () => {
-  it('allows a newer non-breaking release', () => {
-    expect(judgeUpdate(version('0.0.5'), version('0.0.7'))).toEqual({
-      ok: true
-    });
-  });
-
-  it('refuses the same or an older release', () => {
-    expect(judgeUpdate(version('0.0.6'), version('0.0.6'))).toMatchObject({
-      ok: false,
-      reason: 'notNewer'
-    });
-    expect(judgeUpdate(version('0.0.6'), version('0.0.5'))).toMatchObject({
-      ok: false,
-      reason: 'notNewer'
-    });
-  });
-
-  it('refuses a breaking release, naming update.sh', () => {
+  it('names update.sh when it refuses a breaking release', () => {
     const verdict = judgeUpdate(version('0.0.6'), version('0.1.0'));
-    expect(verdict).toMatchObject({ ok: false, reason: 'breaking' });
     expect(verdict.ok ? '' : verdict.message).toContain('update.sh');
   });
 });

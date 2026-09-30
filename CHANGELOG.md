@@ -46,6 +46,9 @@ why the specified behaviour changed; the commit history, how.
   that cannot be placed now counts as one that ended at once: the ring goes on with the other
   phones or reaches its fallback, an outbound call tries its next route, and the trace says
   `placementFailed`.
+- A pickup over the API (`POST /calls/{id}/pickup`) that went wrong left no trace of why: which
+  of the picker's phones rang, declined or could not be reached was written nowhere. The picked-up
+  call's own history now carries those lines, as `pickupRing` entries naming each step.
 - A ring group change that left its members alone (its strategy, ring timeout, mailbox or
   diagnostics level) did not reach call routing until some other change reloaded the
   configuration; raising a group to `qos` or `sip` had no effect on its calls.
@@ -77,6 +80,9 @@ why the specified behaviour changed; the commit history, how.
 - A backup started by hand (`POST /backups/runs`) begins at once, instead of up to five seconds
   later, and `api` stops as soon as the stack is stopped or updated, instead of after Docker's
   ten-second grace period.
+- `update.sh` reports an update done once every service is healthy, `core` included, not only
+  `api`; it waits up to three minutes, as before. With `podman-compose` as the provider of
+  `podman compose`, which cannot wait on healthchecks, it checks `api` and `core` itself.
 
 ### Upgrade notes
 

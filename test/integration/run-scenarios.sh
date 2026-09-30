@@ -1,6 +1,6 @@
-# Sourced by `run.sh`: plays every `scenarios/*.xml` against the tenant it configured, each paired
-# with the phone-side (and, for a call that leaves again, the trunk-side) scenario it expects
-# (`scenario-roles.sh`), and checks after each one that Asterisk holds no channel any more, that
+# Sourced by `run.sh`: plays every `scenarios/*.xml` (and `*.call.sh`, below) against the tenant it
+# configured, each paired with the phone-side (and, for a call that leaves again, the trunk-side)
+# scenario it expects (`scenario-roles.sh`), and checks after each one that Asterisk holds no channel any more, that
 # every sipp run the scenario started ended with its calls and, where the scenario has a
 # `<name>.check.sh`, that the history records what the spec says the call leaves behind. Reads
 # `run.sh`'s own `COMPOSE`, `compose_files`, `compose_cmd`, `here`, `API`, `token`, `GROUP_EXT`,
@@ -8,6 +8,10 @@
 #
 # A scenario's setup, check and teardown are called with the api base and the token, then (after
 # the group extension, for the setup) the compose command, so they can drive the containers too.
+#
+# A call that no SIP side places, but the REST API (a click-to-dial, §10.2), is a scenario of its
+# own too: `<name>.call.sh` in place of `<name>.xml`, called like a check, places it and returns
+# once the call has ended, and the phone and trunk sides answer it as they would any other.
 #
 # `ONLY=<glob>[,<glob>...]` (run.sh's own usage block, `only.sh`'s `name_selected`) plays only the
 # scenarios whose name matches one of the globs, for reproducing one or a few by hand; `SHARD=k/n`
@@ -133,11 +137,13 @@ for service in "${SIPP_SERVICES[@]}"; do
     sh -c 'pkill -9 -x sipp; rm -rf /tmp/sipp-runs' || true
 done
 position=-1
-for scenario in "$here"/scenarios/*.xml; do
+for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
   position=$((position + 1))
   shard_selected "$position" || continue
   [ -f "$scenario" ] || continue
-  name=$(basename "$scenario" .xml)
+  name=$(basename "$scenario")
+  name=${name%.xml}
+  name=${name%.call.sh}
   name_selected "$name" || continue
   echo "-- $name"
   # A scenario that needs tenant state of its own arranges it here and undoes it afterwards, so
@@ -163,12 +169,16 @@ for scenario in "$here"/scenarios/*.xml; do
   caller=$(caller_container_for "$name")
   # The second provider's own port 5060 belongs to its registrar, where a scenario runs one.
   [ "$caller" = sipp ] || caller_port=$CALLER_PORT
-  # shellcheck disable=SC2046 -- the extra arguments are separate words by design
-  $COMPOSE "${compose_files[@]}" exec -T "$caller" \
-    sipp -sf "/scenarios/$name.xml" -s "$MAIN_DID" -m "$(calls_for "$name")" -l 1 \
-      -p "$caller_port" -timeout 90s \
-      $(caller_args_for "$name") -nostdin asterisk:5060 \
-    || fail "sipp scenario $name did not complete"
+  if [ "$scenario" = "$here/scenarios/$name.call.sh" ]; then
+    bash "$scenario" "$API" "$token" "$compose_cmd" || fail "the API call of $name did not complete"
+  else
+    # shellcheck disable=SC2046 -- the extra arguments are separate words by design
+    $COMPOSE "${compose_files[@]}" exec -T "$caller" \
+      sipp -sf "/scenarios/$name.xml" -s "$MAIN_DID" -m "$(calls_for "$name")" -l 1 \
+        -p "$caller_port" -timeout 90s \
+        $(caller_args_for "$name") -nostdin asterisk:5060 \
+      || fail "sipp scenario $name did not complete"
+  fi
   if [ "$(phone_mode_for "$name")" = call ]; then
     bash "$here/phone.sh" "$compose_cmd" wait-call || fail "the phone's own call failed in $name"
   fi

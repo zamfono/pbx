@@ -3,22 +3,25 @@
 # row per leg, the caller's and the callee's, however the call ended. The core reads no channel's
 # statistics while a call runs; each row is what Asterisk set on its leg as it hung up, pushed
 # with the leg's ChannelDestroyed, so the trunk side hanging up first still has its row.
-# What sipp's media makes measurable here varies (it sends no RTCP, and the harness's RTP need
-# not reach Asterisk's media ports at all), so each figure is only held to be a number or null,
-# and a round trip never the 0 an unmeasured one used to read as. The rows are printed, for the
-# run's log.
+# sipp sends no RTCP, so a round trip is never measured here: it is held to be null or a real
+# one, never the 0 an unmeasured one used to read as. Jitter and loss are measured on a leg that
+# received RTP; with `measured`, the scenario's sides both played audio (sipp's pcap), so every
+# leg's jitter and loss must be numbers, else each is only held to be a number or null. The rows
+# are printed, for the run's log.
 #
-# Usage: _qos-check.sh <api-base> <token>
+# Usage: _qos-check.sh <api-base> <token> [measured]
 set -euo pipefail
 
 api_base=$1
 token=$2
+measured=${3:-}
 # shellcheck source=_lib.sh
 . "$(dirname "$0")/_lib.sh"
 
 call_id=$(api GET /calls | jsonfield items.0.id)
 api GET "/calls/$call_id" | python3 -c '
 import json, sys
+measured = sys.argv[1] == "measured"
 call = json.load(sys.stdin)
 rows = call["qos"]
 roles = sorted(row["role"] for row in rows)
@@ -32,5 +35,7 @@ for row in rows:
             sys.exit("call_qos row %s has a %s that is no number" % (row, field))
     if row["rttMs"] is not None and not row["rttMs"] > 0:
         sys.exit("call_qos row %s has a round trip neither measured nor null" % row)
+    if measured and (row["jitterMs"] is None or row["lossPct"] is None):
+        sys.exit("call_qos row %s measured no jitter or loss on a leg that carried audio" % row)
 print("call_qos of call %s: %s" % (call["id"], rows))
-'
+' "$measured"

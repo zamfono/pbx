@@ -137,3 +137,69 @@ print(json.dumps({"routes": ahead + json.loads(sys.argv[1])}))
 put_routes() {
   api PUT /outboundRoutes "{\"routes\": $1}" >/dev/null
 }
+
+# A colleague's phone beside 101's in the `sipp-phone` container, on a port of its own
+# (`phone.sh`'s `PHONE_PORT`): the target a click-to-dial rings, or the picker's phone of an API
+# pickup.
+COLLEAGUE_PORT=5072
+
+# Creates user `$1` (email `$2`, extension `$3`) with a device on the phone container's subnet,
+# the answering device's own allowlist, and registers it from the colleague's port. Leaves
+# `<user-id> <sip-username> <sip-password>` in the scenario state `$4`.
+add_colleague() {
+  local name=$1 email=$2 ext=$3 state=$4 member_id allowed user_id sip_username sip_password
+  member_id=$(user_with_ext 101)
+  allowed=$(api GET "/users/$member_id/devices" | python3 -c "
+import json, sys
+print(json.dumps(json.load(sys.stdin)['items'][0]['allowedIps']))
+")
+  user_id=$(api POST /users "{\"name\":\"$name\",\"email\":\"$email\",\"extension\":\"$ext\"}" \
+    | jsonfield user.id)
+  read -r sip_username sip_password < <(api POST "/users/$user_id/devices" \
+    "{\"kind\":\"manual\",\"label\":\"ci-colleague\",\"transport\":\"plain\",\"allowedIps\":$allowed}" \
+    | python3 -c "
+import json, sys
+device = json.load(sys.stdin)
+print(device['sipUsername'], device['sipPassword'])
+")
+  printf '%s %s %s\n' "$user_id" "$sip_username" "$sip_password" > "$(state_file "$state")"
+  await_endpoint "$sip_username"
+  PHONE_PORT=$COLLEAGUE_PORT bash "$(dirname "${BASH_SOURCE[0]}")/../phone.sh" "$compose" \
+    register "$sip_username" "$sip_password" >&2
+}
+
+# Serves the colleague of scenario state `$2` with phone scenario `$1` (`uas/<name>.xml`) and
+# waits until their device is reachable, as `phone.sh answer` serves 101's.
+serve_colleague() {
+  local uas=$1 user_id sip_username sip_password
+  read -r user_id sip_username sip_password < "$(state_file "$2")"
+  PHONE_PORT=$COLLEAGUE_PORT bash "$(dirname "${BASH_SOURCE[0]}")/../phone.sh" "$compose" \
+    answer "$uas" "$sip_username" "" "" >&2
+}
+
+# The user id of the colleague of scenario state `$1`.
+colleague_id() {
+  local user_id _rest
+  read -r user_id _rest < "$(state_file "$1")"
+  printf '%s\n' "$user_id"
+}
+
+# Deletes the colleague of scenario state `$1`, and with them their device.
+remove_colleague() {
+  api_delete "/users/$(colleague_id "$1")"
+  rm -f "$(state_file "$1")"
+}
+
+# Waits up to `$2` seconds for call `$1` to reach the history, which lists a call once it has
+# ended, and prints it with its trace.
+await_ended_call() {
+  local attempt
+  for attempt in $(seq 1 "$2"); do
+    if api GET "/calls/$1" 2>/dev/null; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "call $1 never ended within $attempt s" >&2
+  return 1
+}

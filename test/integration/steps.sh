@@ -34,10 +34,11 @@ bring_up_stack() {
   [ "$RUNTIME" != podman ] || socket=/run/podman/podman.sock
 
   # HEP_ENABLED is on, as a stack ships it (§7): the `*-sip-log-*` scenarios read the SIP
-  # messages Asterisk mirrors to the core.
+  # messages Asterisk mirrors to the core. EXTERNAL_IPV4 is `asterisk`'s own fixed address on
+  # `internal` (compose.test.yaml), where the sipp peers send their media.
   cat > "$repo/deploy/.env" <<ENV
 FQDN=$FQDN
-EXTERNAL_IPV4=127.0.0.1
+EXTERNAL_IPV4=10.213.47.10
 RTP_PORT_START=10000
 RTP_PORT_END=10200
 ARI_PASSWORD=ci-ari

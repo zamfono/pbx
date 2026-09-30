@@ -17,6 +17,7 @@ import {
 } from '@zamfono/shared';
 
 import type { Snapshot } from '../internal/server.js';
+import { RelayedCallLog } from '../relayedCallLog.js';
 import { callLogMaxBytesFromEnv, newCall, type Call } from './call.js';
 import { findLiveCall } from './callLookup.js';
 import { beginOriginatedCall, newOriginatedCall } from './clickToDial.js';
@@ -165,6 +166,9 @@ export class CallActions {
     });
     // The ring's own race, on a call of its own that is never written: the answered device's `*8`
     // dial is the call the picker takes part in, and sets the picker in `target`'s call itself.
+    // Its trace (the devices rung, declined or never placed) lands in `target`'s own, so a pickup
+    // that failed is explained in the history of the call it was for (§7 "every REST live-call
+    // action").
     const host = newCall({
       id: newId(),
       direction: 'internal',
@@ -175,6 +179,12 @@ export class CallActions {
       logLevel: target.log.level,
       callLogMaxBytes: callLogMaxBytesFromEnv()
     });
+    host.log = new RelayedCallLog(
+      host.id,
+      target.log,
+      'pickupRing',
+      callLogMaxBytesFromEnv()
+    );
     const ring = ringOwnDevices(this.pipeline, {
       host,
       // §7 level `sip`: each device's dialog rings for the picked-up call and, answered, becomes

@@ -11,6 +11,10 @@ uas_for() {
     inbound-blind-transfer) echo blind-transfer ;;
     inbound-attended-transfer) echo attended-transfer ;;
     inbound-pickup) echo pickup ;;
+    inbound-api-pickup*) echo ring-no-answer ;;
+    click-to-dial-external | click-to-dial-extension) echo answer-speak-hangup ;;
+    click-to-dial-unanswered) echo ring-no-answer ;;
+    click-to-dial-declined) echo decline ;;
     inbound-three-way) echo three-way ;;
     inbound-hold) echo hold ;;
     inbound-recording-trunk-hangup) echo answer-speak ;;
@@ -42,6 +46,8 @@ trunk_uas_for() {
     outbound-emergency-trunk-order | outbound-sip-log-answered) echo answer-outbound ;;
     outbound-fallthrough | outbound-routes-exhausted) echo refuse-403 ;;
     outbound-sip-log-refused) echo refuse-403 ;;
+    # The number a click-to-dial reaches over the trunk answers and speaks back.
+    click-to-dial-external) echo answer-speak ;;
     *) echo '' ;;
   esac
 }

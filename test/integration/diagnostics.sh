@@ -49,7 +49,8 @@ dump_diagnostics() {
     > "$dir/channels.txt" 2>&1 || true
   diag_compose exec -T asterisk asterisk -rx 'pjsip show contacts' \
     > "$dir/contacts.txt" 2>&1 || true
-  # The sipp sides' own screens and message traces (`phone.sh`, `run-scenarios.sh`).
+  # The sipp sides' own screens and message traces (`phone.sh`, `run-scenarios.sh`, the
+  # registration scenarios' `-message_file /tmp/registrar-messages.log`).
   for service in sipp sipp-phone sipp-provider; do
     diag_compose exec -T "$service" sh -c \
       'for f in /tmp/*.log /tmp/*.exit; do [ -f "$f" ] && { echo "### $f"; cat "$f"; }; done' \

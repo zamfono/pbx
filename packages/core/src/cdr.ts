@@ -74,8 +74,12 @@ export class CdrWriter {
 
   constructor(deps: CdrWriterDeps) {
     this.deps = deps;
-    this.qos = new QosRows(deps.db);
+    this.qos = new QosRows(deps.db, deps.ari.channels);
     this.sip = new SipCapture(deps.ari);
+    // §7 level `qos`: a `ChannelDestroyed` sent while the connection was down never arrives.
+    deps.ari.on('connected', () => {
+      this.qos.resync().catch(() => undefined);
+    });
   }
 
   /** §7 level `sip`: the mirrored SIP messages, joined to their call by Call-ID. */
