@@ -75,6 +75,8 @@ export interface CallQos {
   lossPct: number | null;
   role: string;
   rttMs: number | null;
+  rxPackets: number | null;
+  txPackets: number | null;
 }
 
 export interface Calls {
