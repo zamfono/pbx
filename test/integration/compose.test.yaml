@@ -2,6 +2,19 @@
 # that play every side of a call — the trunks that deliver an inbound call, and the phone that
 # registers and answers it. Layered over compose.yaml and compose.ports.yaml, so what CI exercises
 # is the file an operator runs, not a copy of it.
+#
+# `internal` has a fixed subnet and `asterisk` a fixed address on it, which `.env` names as
+# `EXTERNAL_IPV4` (steps.sh): the ports mode writes that address into SIP and SDP (§9.1), and the
+# sipp containers are peers on `internal`, not clients on the host's network, so it has to be the
+# one they reach Asterisk at. With the host's own loopback there, as before, every peer sent its
+# RTP to its own loopback and no packet reached Asterisk; a leg's `call_qos` row read all null.
+# Outside Docker's and Podman's default address pools, like test/load's own (`compose.load.yaml`).
+networks:
+  internal:
+    ipam:
+      config:
+        - subnet: 10.213.47.0/24
+
 services:
   asterisk:
     image: ${ASTERISK_IMAGE:-zamfono/asterisk:ci}
@@ -19,6 +32,7 @@ services:
       SIP_TCP_ENABLED: 'true'
     networks:
       internal:
+        ipv4_address: 10.213.47.10
         aliases:
           - zamfono
           - ${FQDN:?set by run.sh}

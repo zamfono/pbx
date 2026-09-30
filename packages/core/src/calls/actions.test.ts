@@ -975,6 +975,57 @@ describe('CallActions', () => {
     clearTimeout(pipeline.pendingRing.get(ringing.id)?.timer);
   });
 
+  // §7: the pickup's own ring runs on a call that is never written, so its trace lands in the
+  // picked-up call's, where a pickup that rang nobody is explained.
+  it('writes the trace of a pickup ring that never rang into the picked-up call, each line attributed to it', async () => {
+    await setUp();
+    fakeAri.failOriginate = { status: 500 };
+    const calleeId = await seedUser(db, '101');
+    const pickerId = await seedUser(db, '102');
+    await seedDevice(db, fakeAri, pickerId, 'e102-a');
+    await devicesUp();
+    const ringing = ringingCall(calleeId);
+
+    await actions.pickup(ringing.id, {
+      userId: pickerId,
+      actorUserId: pickerId
+    });
+    // The ring's outcome settles in promise callbacks after the placement; let them run.
+    await new Promise(resolve => {
+      setImmediate(resolve);
+    });
+    clearTimeout(pipeline.pendingRing.get(ringing.id)?.timer);
+    ringing.status = 'missed';
+    await cdr.finish(ringing);
+
+    const row = await db
+      .selectFrom('calls')
+      .select('log')
+      .where('id', '=', ringing.id)
+      .executeTakeFirstOrThrow();
+    const lines = (row.log ?? '')
+      .split('\n')
+      .map(line => JSON.parse(line) as Record<string, unknown>);
+    expect(lines).toContainEqual(
+      expect.objectContaining({
+        callId: ringing.id,
+        event: 'pickupRing',
+        step: 'rungDevice',
+        userId: pickerId,
+        cause: 'placementFailed'
+      })
+    );
+    expect(lines).toContainEqual(
+      expect.objectContaining({
+        event: 'pickup',
+        userId: pickerId,
+        result: 'unanswered'
+      })
+    );
+    // Nothing of the ring reads as the picked-up call's own trace.
+    expect(lines.some(line => line.event === 'rungDevice')).toBe(false);
+  });
+
   function hintStates(ext: string): (string | undefined)[] {
     return fakeAri.calls
       .filter(

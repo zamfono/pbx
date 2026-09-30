@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
@@ -43,6 +43,13 @@ async function openCall(
   return call;
 }
 
+/** Asterisk's channel list, holding the channels `ids` names (mutable, for a test to change). */
+function holding(ids: string[]): { list: () => Promise<Channel[]> } {
+  return {
+    list: () => Promise.resolve(ids.map(id => defaultChannel({ id })))
+  };
+}
+
 function answerWith(call: Call, channelId: string): void {
   call.legs.set(channelId, {
     channelId,
@@ -76,7 +83,7 @@ describe('QosRows (§7 level qos)', () => {
   }
 
   it('writes one row per up leg, in milliseconds and percent, from what each hangup left', async () => {
-    const qos = new QosRows(db);
+    const qos = new QosRows(db, holding([]));
     const call = await openCall(db);
     qos.note(call);
     answerWith(call, 'leg');
@@ -109,7 +116,7 @@ describe('QosRows (§7 level qos)', () => {
   });
 
   it('reads the exact variable Asterisk 22 sets, fields it does not read included', async () => {
-    const qos = new QosRows(db);
+    const qos = new QosRows(db, holding([]));
     const call = await openCall(db);
     qos.note(call);
 
@@ -135,7 +142,7 @@ describe('QosRows (§7 level qos)', () => {
   });
 
   it('keeps the row of a leg that hung up and left the call before it ended', async () => {
-    const qos = new QosRows(db);
+    const qos = new QosRows(db, holding([]));
     const call = await openCall(db);
     answerWith(call, 'leg');
     qos.note(call);
@@ -157,7 +164,7 @@ describe('QosRows (§7 level qos)', () => {
   });
 
   it('writes the row of a leg hung up after the call was written, as it goes', async () => {
-    const qos = new QosRows(db);
+    const qos = new QosRows(db, holding([]));
     const call = await openCall(db);
     qos.note(call);
     answerWith(call, 'leg');
@@ -172,7 +179,7 @@ describe('QosRows (§7 level qos)', () => {
   });
 
   it('writes no row for a channel without an RTP instance, nor twice for one', async () => {
-    const qos = new QosRows(db);
+    const qos = new QosRows(db, holding([]));
     const call = await openCall(db);
     answerWith(call, 'local');
     qos.note(call);
@@ -191,7 +198,7 @@ describe('QosRows (§7 level qos)', () => {
   });
 
   it('writes a row of nothing measured for a leg that carried no media, not zeros', async () => {
-    const qos = new QosRows(db);
+    const qos = new QosRows(db, holding([]));
     const call = await openCall(db);
     qos.note(call);
 
@@ -225,7 +232,7 @@ describe('QosRows (§7 level qos)', () => {
   });
 
   it('writes nothing below level qos, before or after the write, unless routing raised it', async () => {
-    const qos = new QosRows(db);
+    const qos = new QosRows(db, holding([]));
     const low = await openCall(db, 'events');
     qos.note(low);
     answerWith(low, 'leg');
@@ -242,5 +249,47 @@ describe('QosRows (§7 level qos)', () => {
     expect(await rowsOf(raised)).toEqual([
       expect.objectContaining({ channelId: 'caller-2', role: 'caller' })
     ]);
+  });
+
+  // A `ChannelDestroyed` lost while the ARI connection was down never arrives.
+  it('lets go of a written call’s channel Asterisk no longer holds once the tail has passed, and keeps one that lives on', async () => {
+    const live = ['caller'];
+    const qos = new QosRows(db, holding(live), 20);
+    const call = await openCall(db);
+    qos.note(call);
+    answerWith(call, 'leg');
+    await qos.write(call);
+    expect(qos.awaited).toBe(2);
+
+    await vi.waitFor(() => {
+      expect(qos.awaited).toBe(1);
+    });
+    // The caller lives on (a transferred caller in the call it was handed to) and still has its row.
+    await qos.channelEnded(ended('caller'));
+    expect(qos.awaited).toBe(0);
+    expect(await rowsOf(call)).toEqual([
+      expect.objectContaining({ channelId: 'caller', role: 'caller' })
+    ]);
+  });
+
+  it('lets go of every awaited channel Asterisk no longer holds as ARI reconnects, of a call not written yet too', async () => {
+    const live = ['caller'];
+    const qos = new QosRows(db, holding(live));
+    const call = await openCall(db);
+    const other = await openCall(db, 'qos', 'caller-2');
+    qos.note(call);
+    answerWith(call, 'leg');
+    qos.note(call);
+    qos.note(other);
+    expect(qos.awaited).toBe(3);
+
+    await qos.resync();
+
+    expect(qos.awaited).toBe(1);
+    // The gone channel was let go for good: noted again, it is not awaited a second time.
+    qos.note(other);
+    expect(qos.awaited).toBe(1);
+    await qos.write(other);
+    expect(await rowsOf(other)).toEqual([]);
   });
 });

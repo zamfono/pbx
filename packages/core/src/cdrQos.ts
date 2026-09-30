@@ -14,41 +14,35 @@
  * the caller's own channel from the start, a leg once it is up. A channel may end before its call
  * is written (the party who hangs up first), whose row is held until `write`, or after (a leg
  * the core hangs up as the call ends), whose row is written as its channel goes.
+ *
+ * A channel whose `ChannelDestroyed` never reaches the core (an event lost while the ARI
+ * connection was down) would otherwise be waited for until the process ends. So a call's channels
+ * still awaited a while after its write, and every awaited channel once the ARI connection opens
+ * again, are checked against the channels Asterisk still holds, and one it no longer holds is let
+ * go without a row: its figures went with the event.
  */
 import type { Db } from '@zamfono/shared';
 
-import type { Channel } from './ari/types.js';
+import type { Channel, ChannelsApi } from './ari/types.js';
 import type { LogLevel } from './callLog.js';
 import type { Call } from './calls/call.js';
 import {
   parseRtpAudioQos,
   qosFigures,
   RTP_AUDIO_QOS_VARIABLE,
-  type QosFigures
+  type QosFigures,
+  type RtpQos
 } from './qosFigures.js';
+import { qosTargets, type QosTarget, type Role } from './qosTargets.js';
 
 // §7: `call_qos` is written at diagnostics level `qos` and `sip`, never at `none`/`events`.
 const QOS_ELIGIBLE_LEVELS: ReadonlySet<LogLevel> = new Set(['qos', 'sip']);
 
-type Role = 'caller' | 'callee';
-
-type QosTarget = { channelId: string; role: Role };
-
-// The caller's own channel, plus every leg bridged in (`up`) right now; a leg still ringing, or one
-// that ended unanswered, never carried the call's own media.
-function qosTargets(call: Call): QosTarget[] {
-  // A click-to-dial call has no caller channel ("") until the user's device answers.
-  const targets: QosTarget[] =
-    call.callerChannelId === ''
-      ? []
-      : [{ channelId: call.callerChannelId, role: 'caller' }];
-  for (const leg of call.legs.values()) {
-    if (leg.state === 'up') {
-      targets.push({ channelId: leg.channelId, role: 'callee' });
-    }
-  }
-  return targets;
-}
+// How long after a call's write its channels still awaited are checked against Asterisk's: the
+// legs the core hangs up as the call ends are gone within moments, and their `ChannelDestroyed`
+// follows; one still missing by then was lost, unless its channel lives on in another call (a
+// transferred caller), which keeps it awaited.
+const QOS_TAIL_MS = 10_000;
 
 /** One `call_qos` row. */
 type QosRow = QosTarget & QosFigures & { callId: string };
@@ -70,12 +64,25 @@ function eligible(call: Call): boolean {
 /** The rows `CdrWriter` collects from its calls' channels as they end, and their write. */
 export class QosRows {
   private readonly db: Db;
+  private readonly channels: Pick<ChannelsApi, 'list'>;
+  private readonly tailMs: number;
   private readonly calls = new Map<string, Tracked>();
   // Every tracked call a channel's row belongs to: a transfer makes one channel part of two.
   private readonly callsByChannel = new Map<string, Set<string>>();
 
-  constructor(db: Db) {
+  constructor(
+    db: Db,
+    channels: Pick<ChannelsApi, 'list'>,
+    tailMs = QOS_TAIL_MS
+  ) {
     this.db = db;
+    this.channels = channels;
+    this.tailMs = tailMs;
+  }
+
+  /** How many channels' rows are still awaited; a test seam. */
+  get awaited(): number {
+    return this.callsByChannel.size;
   }
 
   /**
@@ -118,30 +125,53 @@ export class QosRows {
    * own (no audio).
    */
   async channelEnded(channel: Channel): Promise<void> {
-    const callIds = this.callsByChannel.get(channel.id);
-    if (callIds === undefined) {
-      return;
-    }
-    this.callsByChannel.delete(channel.id);
     const stat = parseRtpAudioQos(
       channel.channelvars?.[RTP_AUDIO_QOS_VARIABLE]
     );
+    await this.insert(this.settle(channel.id, stat));
+  }
+
+  /**
+   * Lets go of every awaited channel Asterisk no longer holds, as the ARI connection opens again:
+   * a `ChannelDestroyed` sent while it was down never arrives. Only channels awaited before the
+   * listing count, since one noted after it may be newer than the list.
+   */
+  async resync(): Promise<void> {
+    await this.dropGone([...this.callsByChannel.keys()]);
+  }
+
+  /** Settles each of `channelIds` still awaited that Asterisk no longer holds, without a row. */
+  private async dropGone(channelIds: readonly string[]): Promise<void> {
+    if (channelIds.length === 0) {
+      return;
+    }
+    const live = new Set((await this.channels.list()).map(({ id }) => id));
+    for (const channelId of channelIds) {
+      if (!live.has(channelId)) {
+        this.settle(channelId, null);
+      }
+    }
+  }
+
+  /** `channelId` ended with `stat`: it is no longer awaited for any call, and the rows it gives
+   * are returned for a call already written, held for one that is not. */
+  private settle(channelId: string, stat: RtpQos | null): QosRow[] {
+    const callIds = this.callsByChannel.get(channelId);
+    if (callIds === undefined) {
+      return [];
+    }
+    this.callsByChannel.delete(channelId);
     const now: QosRow[] = [];
     for (const callId of callIds) {
       const tracked = this.calls.get(callId);
-      const role = tracked?.roles.get(channel.id);
+      const role = tracked?.roles.get(channelId);
       if (tracked === undefined || role === undefined) {
         continue;
       }
-      tracked.roles.delete(channel.id);
-      tracked.ended.add(channel.id);
+      tracked.roles.delete(channelId);
+      tracked.ended.add(channelId);
       if (stat !== null) {
-        const row = {
-          callId,
-          channelId: channel.id,
-          role,
-          ...qosFigures(stat)
-        };
+        const row = { callId, channelId, role, ...qosFigures(stat) };
         if (!tracked.written) {
           tracked.held.push(row);
         } else if (eligible(tracked.call)) {
@@ -150,7 +180,7 @@ export class QosRows {
       }
       this.forgetIfDone(tracked);
     }
-    await this.insert(now);
+    return now;
   }
 
   /** Writes `call`'s rows whose channels have ended, and has every row still to come written as
@@ -169,7 +199,20 @@ export class QosRows {
       return;
     }
     this.forgetIfDone(tracked);
+    this.checkAfterTail(tracked);
     await this.insert(rows);
+  }
+
+  /** Once the tail has passed, lets go of `tracked`'s channels still awaited that Asterisk no
+   * longer holds; a failed listing leaves them to the next reconnect's `resync`. */
+  private checkAfterTail(tracked: Tracked): void {
+    if (tracked.roles.size === 0) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      this.dropGone([...tracked.roles.keys()]).catch(() => undefined);
+    }, this.tailMs);
+    timer.unref();
   }
 
   /** Stops waiting for `tracked`'s channels: below level `qos` nothing of it is written. */
