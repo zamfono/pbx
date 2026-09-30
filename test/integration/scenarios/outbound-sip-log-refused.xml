@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+  §7 level `sip`, an outbound call whose trunk leg is refused at once: the tenant's level is `sip`
+  (`_sip-log-setup.sh`), and 101's device dials `+15557501`, which only the catch-all route
+  carries, over `ci-trunk`, whose side answers the INVITE with 403 within milliseconds
+  (`uas/refuse-403.xml`). The leg is gone before anything could read its Call-ID after the
+  INVITE, so only a join made before it left records the trunk leg's dialog. With no further
+  route the core answers the caller itself, plays the failed-call prompt and releases the call:
+  the `recv request="BYE"` below, not one this scenario sends. The device's SIP username arrives
+  as `-key user`, its credentials through `-au`/`-ap`.
+-->
+<scenario name="outbound-sip-log-refused">
+  <send retrans="500">
+    <![CDATA[
+      INVITE sip:+15557501@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:+15557501@[remote_ip]>
+      Call-ID: [call_id]
+      CSeq: 1 INVITE
+      Contact: <sip:[user]@[local_ip]:[local_port];transport=[transport]>
+      Max-Forwards: 70
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=phone 53655768 2353687640 IN IP[local_ip_type] [local_ip]
+      s=-
+      c=IN IP[media_ip_type] [media_ip]
+      t=0 0
+      m=audio [media_port] RTP/AVP 8
+      a=rtpmap:8 PCMA/8000
+    ]]>
+  </send>
+
+  <recv response="100" optional="true" />
+  <recv response="401" auth="true" />
+
+  <send>
+    <![CDATA[
+      ACK sip:+15557501@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch-3]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:+15557501@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 1 ACK
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <send retrans="500">
+    <![CDATA[
+      INVITE sip:+15557501@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:+15557501@[remote_ip]>
+      Call-ID: [call_id]
+      CSeq: 2 INVITE
+      Contact: <sip:[user]@[local_ip]:[local_port];transport=[transport]>
+      [authentication]
+      Max-Forwards: 70
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=phone 53655768 2353687640 IN IP[local_ip_type] [local_ip]
+      s=-
+      c=IN IP[media_ip_type] [media_ip]
+      t=0 0
+      m=audio [media_port] RTP/AVP 8
+      a=rtpmap:8 PCMA/8000
+    ]]>
+  </send>
+
+  <recv response="100" optional="true" />
+  <recv response="180" optional="true" />
+  <recv response="183" optional="true" />
+  <recv response="200" rtd="true" timeout="15000" />
+
+  <send>
+    <![CDATA[
+      ACK sip:+15557501@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:+15557501@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 2 ACK
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <!-- The failed-call prompt, or the special information tone, plays for a few seconds; the core
+       then releases the call itself. -->
+  <recv request="BYE" timeout="20000" />
+
+  <send>
+    <![CDATA[
+      SIP/2.0 200 OK
+      [last_Via:]
+      [last_From:]
+      [last_To:]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Content-Length: 0
+    ]]>
+  </send>
+</scenario>

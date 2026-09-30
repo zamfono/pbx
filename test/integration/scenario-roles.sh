@@ -41,6 +41,7 @@ trunk_uas_for() {
     inbound-ring-group-skip-busy | outbound-callerid) echo answer-outbound ;;
     outbound-emergency-trunk-order | outbound-sip-log-answered) echo answer-outbound ;;
     outbound-fallthrough | outbound-routes-exhausted) echo refuse-403 ;;
+    outbound-sip-log-refused) echo refuse-403 ;;
     *) echo '' ;;
   esac
 }

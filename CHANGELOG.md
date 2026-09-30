@@ -36,6 +36,9 @@ why the specified behaviour changed; the commit history, how.
   milliseconds and loss in percent, read every few seconds while the call runs, a
   mailbox-answered caller's included; what was not measured (a round trip without RTCP, a leg no
   audio reached) is empty rather than 0.
+- At the call log's `sip` level, a leg refused at once (a trunk answering 403 within
+  milliseconds) recorded none of its SIP messages. Each leg the PBX places now joins the call's
+  capture before its INVITE leaves.
 - A ring group change that left its members alone (its strategy, ring timeout, mailbox or
   diagnostics level) did not reach call routing until some other change reloaded the
   configuration; raising a group to `qos` or `sip` had no effect on its calls.
