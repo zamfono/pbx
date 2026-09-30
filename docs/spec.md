@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-09-30 · §6.3 Compose file, §10.3 System.** `GET /system/info` also returns `stack`: `domain`, the `FQDN` read from `ORIGIN`, and `ipv4`, the address SIP and media use, `EXTERNAL_IPV4` in the ports mode and `STACK_IPV4` in the macvlan mode, each `null` while unset. `api` receives `STACK_IPV4` and `EXTERNAL_IPV4` for it; there is no IPv6 counterpart until §12's switch-on.
+*Why:* requested by the product owner: an administrator or MCP client reading `system.info` could not tell which domain and public address the stack answers on.
+
 **2026-09-30 · §10 layout.** The `shared/` line also names the Asterisk object names `api` renders into the generated config and `core` addresses at runtime, such as a trunk's `trunk-<id>` section and an extension's `Stasis:presence-<ext>` hint.
 *Why:* found in a refactor: each process kept its own copy of these names, which the two must spell alike.
 
@@ -635,6 +638,8 @@ services:
       SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-true}
       TLS_RELOAD_HOUR: ${TLS_RELOAD_HOUR:-}     # certificate swap hour when settings.tls_reload_hour is NULL (§6.4)
       METRICS_TOKEN: ${METRICS_TOKEN:-}         # empty = GET /metrics answers 404 (§7)
+      STACK_IPV4: ${STACK_IPV4:-}               # the stack's public address, shown by system.info (§10.3)
+      EXTERNAL_IPV4: ${EXTERNAL_IPV4:-}
       ZAMFONO_VERSION: ${ZAMFONO_VERSION:-latest}   # the tag pulled, reported as the version (§7)
       TZ: ${TZ:-UTC}
       # first-boot seed, read only while the database holds no user (§6.3 "First boot")
@@ -1388,7 +1393,7 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Icons** (min. role: none (public, unauthenticated)) — `GET /favicon.ico`, `GET /favicon.svg` (black, white under a dark color scheme), `GET /logo.svg` and `GET /logo.png` (192 px) for a light background, `GET /logoDark.svg` and `GET /logoDark.png` for a dark one: static files of `packages/api/static/`, named in the MCP `serverInfo` (§10.5) and linked from the authentication pages (§5.2), and at the paths a client that shows a domain's favicon asks for
 
-**System** (min. role: user) — `GET /system/info` — the version and commit `api` runs and the ones `core` reports (§7 "Version"), each with its process's `startedAt`, and `core`'s `asteriskStartedAt` (§10.4 "After a restart"), `core` as `null` while it does not answer within three seconds, with the updater's latest release, whether `system.update` takes it and the last update's outcome (§6.3 "Updates"), and `ringotel.profilePending`, whether a tenant profile change has not reached Ringotel yet (§10.4 "Tenant profile push"); owner, with confirmation: `POST /system/update` (`version` optional) — hands the update to the updater once a backup run finished `ok` within the hour, refused otherwise; not undoable
+**System** (min. role: user) — `GET /system/info` — the version and commit `api` runs and the ones `core` reports (§7 "Version"), each with its process's `startedAt`, and `core`'s `asteriskStartedAt` (§10.4 "After a restart"), `core` as `null` while it does not answer within three seconds, with the updater's latest release, whether `system.update` takes it and the last update's outcome (§6.3 "Updates"), `ringotel.profilePending`, whether a tenant profile change has not reached Ringotel yet (§10.4 "Tenant profile push"), and `stack`: `domain`, the `FQDN` read from `ORIGIN`, and `ipv4`, the address SIP and media use (§6.1), `EXTERNAL_IPV4` in the ports mode and `STACK_IPV4` in the macvlan mode, each `null` while unset; owner, with confirmation: `POST /system/update` (`version` optional) — hands the update to the updater once a backup run finished `ok` within the hour, refused otherwise; not undoable
 
 **Metrics** (min. role: bearer `METRICS_TOKEN` from `.env`; 404 while unset) — `GET /metrics` (Prometheus, §7); `GET /metrics/litestream` with the DR overlay
 
