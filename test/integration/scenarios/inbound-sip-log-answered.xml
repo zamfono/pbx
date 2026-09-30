@@ -3,6 +3,8 @@
   §7 level `sip`, an answered call: the tenant's level is `sip` (`_sip-log-setup.sh`), and the
   call is `inbound-ring-group-answer`'s, over the trunk to the ring group, answered by the phone
   and ended by the trunk side, so its log must hold both legs' SIP messages in both directions.
+  The trunk speaks for longer than Asterisk's 5 s RTCP interval, so Asterisk sends RTCP reports on
+  both legs and mirrors them over HEP, and the log must hold none of them.
 -->
 <scenario name="inbound-sip-log-answered">
   <send retrans="500">
@@ -46,7 +48,13 @@
     ]]>
   </send>
 
-  <pause milliseconds="2000" />
+  <!-- sipp's own A-law voice sample (about 6.5 s), which Asterisk relays to the phone. -->
+  <nop>
+    <action>
+      <exec play_pcap_audio="/sipp/g711a.pcap" />
+    </action>
+  </nop>
+  <pause milliseconds="7000" />
 
   <send retrans="500">
     <![CDATA[

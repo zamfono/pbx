@@ -8,6 +8,9 @@ import { defaultChannel, type Channel } from './ari/types.js';
 import type { LogLevel } from './callLog.js';
 import { newCall, type Call } from './calls/call.js';
 import { QosRows } from './cdrQos.js';
+import { RtcpQos } from './rtcpQos.js';
+import { parseRtcpReport, type RtcpHepReport } from './rtcpReport.js';
+import { fixedPoint, ntpMiddle, rtcpPayload } from './testing/rtcpPayload.js';
 
 /** `id`'s `ChannelDestroyed` channel, carrying `rtpAudioQos` as its `RTPAUDIOQOS`. */
 function ended(id: string, rtpAudioQos = fakeRtpAudioQos()): Channel {
@@ -57,6 +60,38 @@ function answerWith(call: Call, channelId: string): void {
     userId: null,
     state: 'up',
     endCause: null
+  });
+}
+
+const T0 = 1_790_000_000_000;
+
+/** The RTCP reports of a leg whose phone answers Asterisk's sender report of 1000 packets 80 ms
+ * later on the wire, missing 30 of them (3 %). */
+function rtcpOfLeg(sipCallId: string): RtcpHepReport[] {
+  const reports: [RtcpHepReport['sender'], number, string][] = [
+    ['asterisk', T0, rtcpPayload({ ssrc: 7, sent: 1000, atMs: T0 })],
+    [
+      'peer',
+      T0 + 330,
+      rtcpPayload({
+        ssrc: 8,
+        blocks: [
+          {
+            sourceSsrc: 7,
+            packetsLost: 30,
+            lsr: ntpMiddle(T0),
+            dlsr: fixedPoint(0.25)
+          }
+        ]
+      })
+    ]
+  ];
+  return reports.map(([sender, atMs, payload]) => {
+    const report = parseRtcpReport(payload);
+    if (report === null) {
+      throw new Error('not a report');
+    }
+    return { callId: sipCallId, atMs, sender, report };
   });
 }
 
@@ -317,5 +352,47 @@ describe('QosRows (§7 level qos)', () => {
     expect(qos.awaited).toBe(1);
     await qos.write(other);
     expect(await rowsOf(other)).toEqual([]);
+  });
+
+  it('fills from the leg’s RTCP reports what RTPAUDIOQOS left unmeasured, and keeps what it measured', async () => {
+    const rtcp = new RtcpQos();
+    const qos = new QosRows(db, holding([]), undefined, rtcp);
+    const call = await openCall(db);
+    qos.note(call);
+    rtcp.join('caller', 'caller-call-id');
+    for (const report of rtcpOfLeg('caller-call-id')) {
+      rtcp.report(report);
+    }
+
+    // Asterisk measured jitter and loss but no round trip (0).
+    await qos.channelEnded(ended('caller', fakeRtpAudioQos({ rtt: 0 })));
+    await qos.write(call);
+
+    const [row] = await rowsOf(call);
+    expect(row).toMatchObject({ jitterMs: 3.4, lossPct: 1 });
+    expect(row?.rttMs).toBeCloseTo(80, 1);
+  });
+
+  it('writes the row of a leg whose ChannelDestroyed was lost from its RTCP reports', async () => {
+    const rtcp = new RtcpQos();
+    const qos = new QosRows(db, holding([]), undefined, rtcp);
+    const call = await openCall(db);
+    qos.note(call);
+    rtcp.join('caller', 'caller-call-id');
+    for (const report of rtcpOfLeg('caller-call-id')) {
+      rtcp.report(report);
+    }
+    await qos.write(call);
+
+    await qos.resync();
+
+    const [row] = await rowsOf(call);
+    expect(row).toMatchObject({
+      channelId: 'caller',
+      jitterMs: null,
+      lossPct: 3
+    });
+    expect(row?.rttMs).toBeCloseTo(80, 1);
+    expect(rtcp.joined()).toEqual([]);
   });
 });

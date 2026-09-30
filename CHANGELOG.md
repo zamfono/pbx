@@ -26,6 +26,11 @@ why the specified behaviour changed; the commit history, how.
   and from the `backup.finished` event on `/events` and webhooks; it held what is now
   `bytesAdded`, which is why a run far smaller than the one before it looked incomplete. Runs from
   before the upgrade keep that value as `bytesAdded`, with no `bytesTotal`.
+- `call_qos` also draws on the RTCP reports Asterisk mirrors to `core`: a leg's packet loss or
+  round trip that Asterisk's own summary at hangup left unmeasured is taken from them, and a leg
+  whose hangup event was lost, while the connection to Asterisk was down, still gets its row. This
+  works at every diagnostics level while `HEP_ENABLED` is on, the default; with it off, the rows are
+  as before.
 
 ### Fixed
 
@@ -35,6 +40,9 @@ why the specified behaviour changed; the commit history, how.
   delivered, so `system.info` and `/healthz` no longer showed it pending and it was never sent
   again. The profile now stays pending until Ringotel has taken all of it, and the stack sends it
   again when `api` starts, when Asterisk restarts or with the next change to the apps' profile.
+- A call's `sip`-level log listed Asterisk's RTCP reports, JSON lines such as
+  `{"ssrc":…,"type":200,…}`, as if they were SIP messages, close to half the lines of a call
+  with audio. The log now holds the call's SIP messages only.
 
 ### Upgrade notes
 

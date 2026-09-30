@@ -6,7 +6,8 @@ argument, each `<direction> <first-line regex>`: `in ^INVITE ` is an INVITE Aste
 `out ^SIP/2\\.0 200 ` a 200 it sent. Only a message Asterisk actually mirrored over HEP, and the
 core joined to the call by its Call-ID, can be there, so a stack whose res_hep sends nothing
 (a hostname in hep.conf's capture_address) or that files a message under the wrong direction
-fails here.
+fails here. Every SIP line must also be a SIP message, a request or a response: the RTCP reports
+Asterisk mirrors over HEP too belong to level `qos`, never to this log.
 
     newest_call | python3 _sip-log-check.py +15551000 'in ^INVITE ' 'out ^SIP/2\\.0 200 '
 """
@@ -14,6 +15,8 @@ fails here.
 import json
 import re
 import sys
+
+SIP_START_LINE = re.compile(r"^(?:[A-Z]+ \S+ SIP/2\.0$|SIP/2\.0 \d{3}\b)")
 
 
 def main() -> None:
@@ -33,6 +36,9 @@ def main() -> None:
     problems = []
     if call.get("toUri") != to:
         problems.append(f"the newest call went to {call.get('toUri')!r}, not {to}")
+    not_sip = [first for _, first in messages if not SIP_START_LINE.match(first)]
+    if not_sip:
+        problems.append(f"{len(not_sip)} lines that are no SIP message, such as {not_sip[0][:80]!r}")
     for direction, pattern in expected:
         if not any(d == direction and re.search(pattern, first) for d, first in messages):
             problems.append(f"no {direction} message matching {pattern!r}")

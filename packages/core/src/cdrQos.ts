@@ -19,7 +19,11 @@
  * connection was down) would otherwise be waited for until the process ends. So a call's channels
  * still awaited a while after its write, and every awaited channel once the ARI connection opens
  * again, are checked against the channels Asterisk still holds, and one it no longer holds is let
- * go without a row: its figures went with the event.
+ * go without a row, unless the RTCP reports Asterisk mirrored over HEP measured it.
+ *
+ * Those reports (`rtcpReport.ts`, `rtcpQos.ts`) fill each figure the summary leaves null, the
+ * summary winning every figure it measured: both come from the same reports, and the summary is
+ * the one Asterisk kept to the end of the leg.
  */
 import type { Db } from '@zamfono/shared';
 
@@ -30,10 +34,10 @@ import {
   parseRtpAudioQos,
   qosFigures,
   RTP_AUDIO_QOS_VARIABLE,
-  type QosFigures,
-  type RtpQos
+  type QosFigures
 } from './qosFigures.js';
 import { qosTargets, type QosTarget, type Role } from './qosTargets.js';
+import { RtcpQos, withRtcp } from './rtcpQos.js';
 
 // §7: `call_qos` is written at diagnostics level `qos` and `sip`, never at `none`/`events`.
 const QOS_ELIGIBLE_LEVELS: ReadonlySet<LogLevel> = new Set(['qos', 'sip']);
@@ -66,6 +70,7 @@ export class QosRows {
   private readonly db: Db;
   private readonly channels: Pick<ChannelsApi, 'list'>;
   private readonly tailMs: number;
+  private readonly rtcp: RtcpQos;
   private readonly calls = new Map<string, Tracked>();
   // Every tracked call a channel's row belongs to: a transfer makes one channel part of two.
   private readonly callsByChannel = new Map<string, Set<string>>();
@@ -73,11 +78,13 @@ export class QosRows {
   constructor(
     db: Db,
     channels: Pick<ChannelsApi, 'list'>,
-    tailMs = QOS_TAIL_MS
+    tailMs = QOS_TAIL_MS,
+    rtcp = new RtcpQos()
   ) {
     this.db = db;
     this.channels = channels;
     this.tailMs = tailMs;
+    this.rtcp = rtcp;
   }
 
   /** How many channels' rows are still awaited; a test seam. */
@@ -118,44 +125,57 @@ export class QosRows {
   }
 
   /**
-   * A channel's `ChannelDestroyed`: its row, from the `RTPAUDIOQOS` the event carries, for every
-   * call it was noted for, held for a call not written yet and written now for one that was. A
-   * channel without an RTP instance (a Local channel) has no row. A leg whose instance saw no
-   * packet still has one, of nothing measured: a bridged leg without media is a finding of its
-   * own (no audio).
+   * A channel's `ChannelDestroyed`: its row, from the `RTPAUDIOQOS` the event carries and the
+   * channel's RTCP reports, for every call it was noted for, held for a call not written yet and
+   * written now for one that was. A channel without an RTP instance (a Local channel) has no row.
+   * A leg whose instance saw no packet still has one, of nothing measured: a bridged leg without
+   * media is a finding of its own (no audio).
    */
   async channelEnded(channel: Channel): Promise<void> {
     const stat = parseRtpAudioQos(
       channel.channelvars?.[RTP_AUDIO_QOS_VARIABLE]
     );
-    await this.insert(this.settle(channel.id, stat));
+    await this.insert(
+      this.settle(channel.id, stat === null ? null : qosFigures(stat))
+    );
   }
 
   /**
    * Lets go of every awaited channel Asterisk no longer holds, as the ARI connection opens again:
-   * a `ChannelDestroyed` sent while it was down never arrives. Only channels awaited before the
-   * listing count, since one noted after it may be newer than the list.
+   * a `ChannelDestroyed` sent while it was down never arrives; so do the Call-ID joins of such
+   * channels (`RtcpQos`). Only channels awaited or joined before the listing count, since one
+   * noted after it may be newer than the list.
    */
   async resync(): Promise<void> {
-    await this.dropGone([...this.callsByChannel.keys()]);
-  }
-
-  /** Settles each of `channelIds` still awaited that Asterisk no longer holds, without a row. */
-  private async dropGone(channelIds: readonly string[]): Promise<void> {
-    if (channelIds.length === 0) {
+    const awaited = [...this.callsByChannel.keys()];
+    const joined = this.rtcp.joined();
+    if (awaited.length === 0 && joined.length === 0) {
       return;
     }
-    const live = new Set((await this.channels.list()).map(({ id }) => id));
-    for (const channelId of channelIds) {
-      if (!live.has(channelId)) {
-        this.settle(channelId, null);
-      }
-    }
+    const live = await this.liveChannels();
+    await this.settleGone(awaited, live);
+    this.rtcp.release(joined, live);
   }
 
-  /** `channelId` ended with `stat`: it is no longer awaited for any call, and the rows it gives
-   * are returned for a call already written, held for one that is not. */
-  private settle(channelId: string, stat: RtpQos | null): QosRow[] {
+  private async liveChannels(): Promise<ReadonlySet<string>> {
+    return new Set((await this.channels.list()).map(({ id }) => id));
+  }
+
+  /** Settles each of `channelIds` still awaited that is not `live`, with the row its RTCP reports
+   * give, if any. */
+  private async settleGone(
+    channelIds: readonly string[],
+    live: ReadonlySet<string>
+  ): Promise<void> {
+    const gone = channelIds.filter(channelId => !live.has(channelId));
+    await this.insert(gone.flatMap(channelId => this.settle(channelId, null)));
+  }
+
+  /** `channelId` ended with the `summary` its `RTPAUDIOQOS` gives: it is no longer awaited for
+   * any call, and the rows it gives, with its RTCP reports, are returned for a call already
+   * written, held for one that is not. */
+  private settle(channelId: string, summary: QosFigures | null): QosRow[] {
+    const figures = withRtcp(summary, this.rtcp.take(channelId));
     const callIds = this.callsByChannel.get(channelId);
     if (callIds === undefined) {
       return [];
@@ -170,8 +190,8 @@ export class QosRows {
       }
       tracked.roles.delete(channelId);
       tracked.ended.add(channelId);
-      if (stat !== null) {
-        const row = { callId, channelId, role, ...qosFigures(stat) };
+      if (figures !== null) {
+        const row = { callId, channelId, role, ...figures };
         if (!tracked.written) {
           tracked.held.push(row);
         } else if (eligible(tracked.call)) {
@@ -210,7 +230,10 @@ export class QosRows {
       return;
     }
     const timer = setTimeout(() => {
-      this.dropGone([...tracked.roles.keys()]).catch(() => undefined);
+      const awaited = [...tracked.roles.keys()];
+      this.liveChannels()
+        .then(async live => this.settleGone(awaited, live))
+        .catch(() => undefined);
     }, this.tailMs);
     timer.unref();
   }

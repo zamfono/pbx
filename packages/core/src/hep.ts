@@ -2,13 +2,15 @@
  * HEPv3 (Homer Encapsulation Protocol) listener. Asterisk mirrors every SIP
  * message it sends or receives to this UDP listener (spec §7, §9.1
  * `hep.conf`), which correlates messages by Call-ID for the `sip` diagnostics
- * level.
+ * level, and every RTCP report its RTP instances send or receive
+ * (`res_hep_rtcp`), which feed the level `qos` figures and never the SIP log.
  */
 
 import { createSocket } from 'node:dgram';
 import { lookup as dnsLookup } from 'node:dns/promises';
 
 import type { Logger } from './ari/types.js';
+import { dispatchHep, type HepHandlers } from './hepDispatch.js';
 
 const HEP_MAGIC = 'HEP3';
 // Generic header: magic (4 bytes) + total datagram length (2 bytes).
@@ -20,18 +22,25 @@ const CHUNK_TYPE_ID_OFFSET = 2;
 const CHUNK_LENGTH_OFFSET = 4;
 const CHUNK_VENDOR_GENERIC = 0;
 const CHUNK_TYPE_SRC_IPV4 = 0x0003;
+const CHUNK_TYPE_DST_IPV4 = 0x0004;
 const CHUNK_TYPE_TIMESTAMP_SEC = 0x0009;
 const CHUNK_TYPE_TIMESTAMP_USEC = 0x000a;
+const CHUNK_TYPE_PROTOCOL_TYPE = 0x000b;
 const CHUNK_TYPE_PAYLOAD = 0x000f;
 const CHUNK_TYPE_CORRELATION_ID = 0x0011;
 const IPV4_LEN = 4;
 const MILLISECONDS_PER_SECOND = 1000;
 const MICROSECONDS_PER_MILLISECOND = 1000;
-
-type ParsedHep = {
+export type ParsedHep = {
   callId: string;
   at: string;
+  /** The capture time in milliseconds since the epoch, to the microsecond HEP carries. */
+  atMs: number;
   direction: 'in' | 'out';
+  /** Whether the destination address is one of Asterisk's own. */
+  toAsterisk: boolean;
+  /** The HEP protocol type (chunk 0x000b); null when the datagram carries none. */
+  protocol: number | null;
   payload: string;
 };
 
@@ -109,9 +118,15 @@ function ipv4ToString(chunk: Buffer): string {
   return Array.from(chunk.subarray(0, IPV4_LEN)).join('.');
 }
 
+/** Reads a one-byte chunk, or null if the chunk is absent or empty. */
+function readUInt8Chunk(chunk: Buffer | undefined): number | null {
+  return chunk && chunk.length > 0 ? chunk.readUInt8(0) : null;
+}
+
 /**
  * Parses one HEPv3 datagram (chunks with vendor id 0: 0x0009/0x000a
- * timestamp, 0x0011 correlation id, 0x000f payload, 0x0003 source IPv4).
+ * timestamp, 0x0011 correlation id, 0x000f payload, 0x0003/0x0004 source and
+ * destination IPv4, 0x000b protocol type).
  * Returns null for anything that is not a well-formed HEPv3 datagram
  * carrying both a correlation id and a payload.
  */
@@ -142,20 +157,24 @@ export function parseHep(
     readUInt32Chunk(chunks.get(CHUNK_TYPE_TIMESTAMP_SEC)) ?? 0;
   const timestampUsec =
     readUInt32Chunk(chunks.get(CHUNK_TYPE_TIMESTAMP_USEC)) ?? 0;
-  const at = new Date(
+  const atMs =
     timestampSec * MILLISECONDS_PER_SECOND +
-      timestampUsec / MICROSECONDS_PER_MILLISECOND
-  ).toISOString();
+    timestampUsec / MICROSECONDS_PER_MILLISECOND;
 
   const srcIpChunk = chunks.get(CHUNK_TYPE_SRC_IPV4);
   const srcIp = srcIpChunk ? ipv4ToString(srcIpChunk) : undefined;
+  const dstIpChunk = chunks.get(CHUNK_TYPE_DST_IPV4);
+  const dstIp = dstIpChunk ? ipv4ToString(dstIpChunk) : undefined;
   const direction =
     srcIp !== undefined && ownAddresses.has(srcIp) ? 'out' : 'in';
 
   return {
     callId: callIdChunk.toString('utf8'),
-    at,
+    at: new Date(atMs).toISOString(),
+    atMs,
     direction,
+    toAsterisk: dstIp !== undefined && ownAddresses.has(dstIp),
+    protocol: readUInt8Chunk(chunks.get(CHUNK_TYPE_PROTOCOL_TYPE)),
     payload: payloadChunk.toString('utf8')
   };
 }
@@ -175,13 +194,14 @@ function safeParseHep(
 }
 
 /**
- * Starts the UDP HEP collector on `port`, calling `onMessage` per SIP message. `listening`
- * resolves with the port once the socket is bound, which for `0` is the one the OS picked.
+ * Starts the UDP HEP collector on `port`, handing each SIP message and RTCP report to `handlers`
+ * (`dispatchHep`). `listening` resolves with the port once the socket is bound, which for `0` is
+ * the one the OS picked.
  */
 export function startHepListener(
   port: number,
   ownAddresses: ReadonlySet<string>,
-  onMessage: (message: NonNullable<ReturnType<typeof parseHep>>) => void,
+  handlers: HepHandlers,
   log: Logger
 ): { close(): void; listening: Promise<number> } {
   const socket = createSocket('udp4');
@@ -192,7 +212,7 @@ export function startHepListener(
   socket.on('message', datagram => {
     const parsed = safeParseHep(log, datagram, ownAddresses);
     if (parsed) {
-      onMessage(parsed);
+      dispatchHep(parsed, handlers);
     }
   });
   const listening = new Promise<number>(resolve => {

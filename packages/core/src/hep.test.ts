@@ -3,6 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { Logger } from './ari/types.js';
 import { asteriskAddresses, parseHep, startHepListener } from './hep.js';
+import { dispatchHep } from './hepDispatch.js';
+import type { RtcpHepReport } from './rtcpReport.js';
+import type { SipMessage } from './sipCapture.js';
+import { rtcpPayload } from './testing/rtcpPayload.js';
 
 const noopLogger: Logger = {
   info: () => undefined,
@@ -16,6 +20,8 @@ const CHUNK_HEADER_LEN = 6;
 const CHUNK_TYPE_SRC_IPV4 = 0x0003;
 const CHUNK_TYPE_DST_IPV4 = 0x0004;
 const CHUNK_TYPE_TIMESTAMP_SEC = 0x0009;
+const CHUNK_TYPE_TIMESTAMP_USEC = 0x000a;
+const CHUNK_TYPE_PROTOCOL_TYPE = 0x000b;
 const CHUNK_TYPE_PAYLOAD = 0x000f;
 const CHUNK_TYPE_CORRELATION_ID = 0x0011;
 
@@ -39,17 +45,29 @@ function encodeUint32(value: number): Buffer {
   return buf;
 }
 
+/** A datagram as res_hep sends one, its protocol-type chunk left out when `protocolType` is
+ * null (res_hep always sends it; another HEP agent may not). */
 function encodeHepDatagram(options: {
   srcIp: string;
   dstIp: string;
   callId: string;
   payload: string;
   timestampSec: number;
+  timestampUsec?: number;
+  protocolType?: number | null;
 }): Buffer {
+  const protocolType = options.protocolType ?? null;
   const chunks = Buffer.concat([
     encodeChunk(CHUNK_TYPE_SRC_IPV4, encodeIpv4(options.srcIp)),
     encodeChunk(CHUNK_TYPE_DST_IPV4, encodeIpv4(options.dstIp)),
     encodeChunk(CHUNK_TYPE_TIMESTAMP_SEC, encodeUint32(options.timestampSec)),
+    encodeChunk(
+      CHUNK_TYPE_TIMESTAMP_USEC,
+      encodeUint32(options.timestampUsec ?? 0)
+    ),
+    ...(protocolType === null
+      ? []
+      : [encodeChunk(CHUNK_TYPE_PROTOCOL_TYPE, Buffer.from([protocolType]))]),
     encodeChunk(
       CHUNK_TYPE_CORRELATION_ID,
       Buffer.from(options.callId, 'ascii')
@@ -161,14 +179,17 @@ describe('asteriskAddresses', () => {
 
 describe('startHepListener', () => {
   it('parses a received datagram and dispatches it to onMessage', async () => {
-    const received: NonNullable<ReturnType<typeof parseHep>>[] = [];
+    const received: SipMessage[] = [];
     // Any free port, never one reserved and released first for another process to take; the
     // datagram goes out once the socket is bound, so it is not sent to a port nobody holds yet.
     const listener = startHepListener(
       0,
       new Set(['203.0.113.10']),
-      message => {
-        received.push(message);
+      {
+        sip: message => {
+          received.push(message);
+        },
+        rtcp: () => undefined
       },
       noopLogger
     );
@@ -178,8 +199,9 @@ describe('startHepListener', () => {
       srcIp: '203.0.113.10',
       dstIp: '198.51.100.20',
       callId: 'listener-test',
-      payload: 'BYE',
-      timestampSec: 0
+      payload: 'BYE sip:101@198.51.100.20 SIP/2.0\r\n\r\n',
+      timestampSec: 0,
+      protocolType: 1
     });
     const sender = createSocket('udp4');
     await new Promise<void>((resolve, reject) => {
@@ -200,5 +222,145 @@ describe('startHepListener', () => {
     listener.close();
     expect(received[0]?.callId).toBe('listener-test');
     expect(received[0]?.direction).toBe('out');
+  });
+});
+
+// §7: level `sip` holds the call's SIP messages; the RTCP reports res_hep_rtcp mirrors under the
+// same Call-ID feed level `qos` instead.
+describe('dispatchHep', () => {
+  const ASTERISK = '172.20.0.5';
+  const PHONE = '198.51.100.20';
+  const OWN: ReadonlySet<string> = new Set([ASTERISK]);
+  const INVITE =
+    'INVITE sip:101@172.20.0.5 SIP/2.0\r\nCall-ID: abc@198.51.100.20\r\n\r\n';
+  const REPORT = rtcpPayload({
+    ssrc: 1_203_774_560,
+    sent: 250,
+    blocks: [{ sourceSsrc: 3_581_287_122, packetsLost: 3 }]
+  });
+
+  function dispatched(options: {
+    srcIp: string;
+    dstIp: string;
+    payload: string;
+    protocolType: number | null;
+  }): { sip: SipMessage[]; rtcp: RtcpHepReport[] } {
+    const sip: SipMessage[] = [];
+    const rtcp: RtcpHepReport[] = [];
+    const parsed = parseHep(
+      encodeHepDatagram({
+        ...options,
+        callId: 'abc@198.51.100.20',
+        timestampSec: 1_790_000_000,
+        timestampUsec: 250_500
+      }),
+      OWN
+    );
+    if (parsed !== null) {
+      dispatchHep(parsed, {
+        sip: message => sip.push(message),
+        rtcp: report => rtcp.push(report)
+      });
+    }
+    return { sip, rtcp };
+  }
+
+  it('hands a SIP message (type 1) to the SIP log', () => {
+    const { sip, rtcp } = dispatched({
+      srcIp: PHONE,
+      dstIp: ASTERISK,
+      payload: INVITE,
+      protocolType: 1
+    });
+
+    expect(sip).toEqual([
+      {
+        callId: 'abc@198.51.100.20',
+        at: '2026-09-21T14:13:20.250Z',
+        direction: 'in',
+        payload: INVITE
+      }
+    ]);
+    expect(rtcp).toEqual([]);
+  });
+
+  it('hands an RTCP report (type 5) to QoS, never to the SIP log, the peer’s when sent to Asterisk', () => {
+    const { sip, rtcp } = dispatched({
+      srcIp: PHONE,
+      dstIp: ASTERISK,
+      payload: REPORT,
+      protocolType: 5
+    });
+
+    expect(sip).toEqual([]);
+    expect(rtcp).toEqual([
+      {
+        callId: 'abc@198.51.100.20',
+        atMs: 1_790_000_000_250.5,
+        sender: 'peer',
+        report: {
+          ssrc: 1_203_774_560,
+          sentPackets: 250,
+          blocks: [
+            { sourceSsrc: 3_581_287_122, packetsLost: 3, lsr: 0, dlsr: 0 }
+          ]
+        }
+      }
+    ]);
+  });
+
+  it('marks an RTCP report from one of Asterisk’s addresses as its own', () => {
+    const { rtcp } = dispatched({
+      srcIp: ASTERISK,
+      dstIp: PHONE,
+      payload: REPORT,
+      protocolType: 5
+    });
+
+    expect(rtcp.map(({ sender }) => sender)).toEqual(['asterisk']);
+  });
+
+  it('drops an RTCP report between two addresses neither of which is Asterisk’s, and one that is no report', () => {
+    expect(
+      dispatched({
+        srcIp: PHONE,
+        dstIp: '203.0.113.9',
+        payload: REPORT,
+        protocolType: 5
+      })
+    ).toEqual({ sip: [], rtcp: [] });
+    expect(
+      dispatched({
+        srcIp: PHONE,
+        dstIp: ASTERISK,
+        payload: '{"ssrc":1,"type":204}',
+        protocolType: 5
+      })
+    ).toEqual({ sip: [], rtcp: [] });
+  });
+
+  it('drops a datagram of any other protocol type, whatever its payload', () => {
+    expect(
+      dispatched({
+        srcIp: PHONE,
+        dstIp: ASTERISK,
+        payload: INVITE,
+        protocolType: 4
+      })
+    ).toEqual({ sip: [], rtcp: [] });
+  });
+
+  it('logs a datagram without a protocol type only when its payload opens with a SIP start line', () => {
+    const response = 'SIP/2.0 200 OK\r\nCall-ID: abc@198.51.100.20\r\n\r\n';
+    const untyped = (payload: string): SipMessage[] =>
+      dispatched({ srcIp: ASTERISK, dstIp: PHONE, payload, protocolType: null })
+        .sip;
+
+    expect(untyped(INVITE).map(({ payload }) => payload)).toEqual([INVITE]);
+    expect(untyped(response).map(({ direction }) => direction)).toEqual([
+      'out'
+    ]);
+    expect(untyped(REPORT)).toEqual([]);
+    expect(untyped('BYE')).toEqual([]);
   });
 });

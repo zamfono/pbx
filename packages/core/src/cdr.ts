@@ -14,6 +14,8 @@ import type { Call } from './calls/call.js';
 import { callEnded } from './calls/callState.js';
 import { QosRows } from './cdrQos.js';
 import type { ConfigCache, EventBus, StateStore } from './internal/server.js';
+import { RtcpQos } from './rtcpQos.js';
+import type { RtcpHepReport } from './rtcpReport.js';
 import { SipCapture, type SipMessage } from './sipCapture.js';
 
 export type CdrWriterDeps = {
@@ -72,9 +74,13 @@ export class CdrWriter {
 
   private readonly qos: QosRows;
 
+  /** §7 level `qos`: the RTCP reports Asterisk mirrors, by the Call-ID of the channel they are
+   * about, for the rows `qos` writes. */
+  private readonly rtcp = new RtcpQos();
+
   constructor(deps: CdrWriterDeps) {
     this.deps = deps;
-    this.qos = new QosRows(deps.db, deps.ari.channels);
+    this.qos = new QosRows(deps.db, deps.ari.channels, undefined, this.rtcp);
     this.sip = new SipCapture(deps.ari);
     // §7 level `qos`: a `ChannelDestroyed` sent while the connection was down never arrives.
     deps.ari.on('connected', () => {
@@ -99,16 +105,30 @@ export class CdrWriter {
     this.sip.message(message);
   }
 
+  /** One RTCP report Asterisk mirrored, for its leg's `call_qos` row (§7 level `qos`). */
+  rtcpReport(report: RtcpHepReport): void {
+    this.rtcp.report(report);
+  }
+
   /** Joins a leg's SIP dialog to `call` (§7 level `sip`: the call's SIP messages are every
    * dialog's, not the caller's alone). */
   registerLeg(call: Call, channelId: string): void {
-    this.sip.register(call, channelId).catch(() => undefined);
+    this.join(call, channelId).catch(() => undefined);
   }
 
   /** `registerLeg`, resolving once the join is in place or has failed: a leg created but not yet
    * dialled (`legOriginate.ts`) joins before its INVITE leaves. */
   joinLeg(call: Call, channelId: string): Promise<void> {
-    return this.sip.register(call, channelId);
+    return this.join(call, channelId);
+  }
+
+  /** Joins `channelId`'s Call-ID to `call` for its SIP messages, and to the channel for its RTCP
+   * reports. */
+  private async join(call: Call, channelId: string): Promise<void> {
+    const sipCallId = await this.sip.register(call, channelId);
+    if (sipCallId !== null) {
+      this.rtcp.join(channelId, sipCallId);
+    }
   }
 
   /** Inserts `call`'s `calls` row now, under the placeholder status, so anything that references
@@ -124,7 +144,7 @@ export class CdrWriter {
     const joined =
       call.callerChannelId === ''
         ? Promise.resolve()
-        : this.sip.register(call, call.callerChannelId);
+        : this.join(call, call.callerChannelId);
     // §7 level `qos`: the caller's channel has a `call_qos` row from the start.
     this.qos.note(call);
     if (call.log.level === 'sip') {

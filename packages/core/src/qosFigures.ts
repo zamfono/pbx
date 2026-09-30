@@ -74,7 +74,8 @@ const PERCENT = 100;
 // Two decimals: finer than any jitter buffer or loss threshold anyone reads, and short in JSON.
 const ROUNDING = 100;
 
-function round(value: number): number {
+/** A figure rounded to the two decimals every `call_qos` column holds. */
+export function roundFigure(value: number): number {
   return Math.round(value * ROUNDING) / ROUNDING;
 }
 
@@ -94,7 +95,7 @@ function jitterMs(stat: RtpQos): number | null {
   if (worst === 0 && count(stat.rxcount) === 0) {
     return null;
   }
-  return round(worst * MS_PER_SECOND);
+  return roundFigure(worst * MS_PER_SECOND);
 }
 
 /** Whether a receiver report from the peer arrived: it carries the round trip, the peer's jitter
@@ -124,14 +125,16 @@ function lossPct(stat: RtpQos): number | null {
   if (sent > 0 && peerReported(stat)) {
     shares.push(Math.min(count(stat.txploss), sent) / sent);
   }
-  return shares.length === 0 ? null : round(Math.max(...shares) * PERCENT);
+  return shares.length === 0
+    ? null
+    : roundFigure(Math.max(...shares) * PERCENT);
 }
 
 /** The last round trip measured; null while no receiver report arrived, which Asterisk reports as
  * 0 (an unmeasured round trip is never 0 ms). */
 function rttMs(stat: RtpQos): number | null {
   const rtt = count(stat.rtt);
-  return rtt === 0 ? null : round(rtt * MS_PER_SECOND);
+  return rtt === 0 ? null : roundFigure(rtt * MS_PER_SECOND);
 }
 
 /** The `call_qos` figures of one leg's statistics. */

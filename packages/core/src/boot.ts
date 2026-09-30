@@ -103,9 +103,11 @@ export function startBackgroundJobs(deps: {
 }
 
 /**
- * §7 level `sip`: Asterisk mirrors every SIP message to this collector, which hands each one to
- * the call whose Call-ID it carries. `HEP_ENABLED=false` switches the mirror off in both
- * containers and makes `sip` an invalid level, so nothing listens either.
+ * §7 levels `sip` and `qos`: Asterisk mirrors every SIP message and RTCP report to this collector,
+ * which hands a message to the call whose Call-ID it carries and a report to its leg's QoS
+ * figures, whatever the call's level. `HEP_ENABLED=false` switches the mirror off in both
+ * containers and makes `sip` an invalid level, so nothing listens either, and `call_qos` rows
+ * come from `RTPAUDIOQOS` alone.
  */
 export async function startHepCollector(
   enabled: boolean,
@@ -119,8 +121,13 @@ export async function startHepCollector(
   return startHepListener(
     HEP_PORT,
     addresses,
-    message => {
-      cdr.sipMessage(message);
+    {
+      sip: message => {
+        cdr.sipMessage(message);
+      },
+      rtcp: report => {
+        cdr.rtcpReport(report);
+      }
     },
     log
   );

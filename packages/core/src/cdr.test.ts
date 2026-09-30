@@ -11,6 +11,8 @@ import type { LogLevel } from './callLog.js';
 import { newCall, type Call } from './calls/call.js';
 import { CdrWriter } from './cdr.js';
 import { ConfigCache, EventBus, StateStore } from './internal/server.js';
+import { parseRtcpReport } from './rtcpReport.js';
+import { fixedPoint, ntpMiddle, rtcpPayload } from './testing/rtcpPayload.js';
 
 const noopLogger: Logger = {
   info: () => undefined,
@@ -432,5 +434,50 @@ describe('CdrWriter', () => {
       .execute();
     expect(rows).toHaveLength(1);
     expect(rows[0]?.role).toBe('caller');
+  });
+
+  it('takes a leg’s RTCP reports, joined by its Call-ID, into its call_qos row (§7 level qos)', async () => {
+    await seedSettings(db, 'qos');
+    const call = buildCall('qos');
+    fakeAri.addChannel({ id: call.callerChannelId });
+    fakeAri.channelVariables.set(
+      `${call.callerChannelId}:CHANNEL(pjsip,call-id)`,
+      'call-id-rtcp@10.0.0.1'
+    );
+    await cdr.open(call);
+    await waitFor(() => cdr.knowsCallId('call-id-rtcp@10.0.0.1'));
+    const sentAt = 1_790_000_000_000;
+    const report = parseRtcpReport(
+      rtcpPayload({
+        ssrc: 8,
+        blocks: [
+          { sourceSsrc: 7, lsr: ntpMiddle(sentAt), dlsr: fixedPoint(0.1) }
+        ]
+      })
+    );
+    if (report === null) {
+      throw new Error('not a report');
+    }
+    cdr.rtcpReport({
+      callId: 'call-id-rtcp@10.0.0.1',
+      atMs: sentAt + 150,
+      sender: 'peer',
+      report
+    });
+    call.answeredAt = '2026-01-01T00:00:01.000Z';
+    call.status = 'answered';
+
+    await cdr.finish(call);
+    await cdr.channelEnded(
+      endedChannel(call.callerChannelId, fakeRtpAudioQos({ rtt: 0 }))
+    );
+
+    const row = await db
+      .selectFrom('callQos')
+      .select(['jitterMs', 'rttMs'])
+      .where('callId', '=', call.id)
+      .executeTakeFirstOrThrow();
+    expect(row.jitterMs).toBe(3.4);
+    expect(row.rttMs).toBeCloseTo(50, 1);
   });
 });
