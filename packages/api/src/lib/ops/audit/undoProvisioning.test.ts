@@ -5,6 +5,7 @@ import { newId, nowIso, type Db } from '@zamfono/shared';
 import { installRingotelFake } from '../../provisioning/ringotelFake.js';
 import { encrypt, keyringFromEnv } from '../../secretbox.js';
 import { makeTestDb } from '../../testDb.js';
+import { onPropagate } from '../propagationHooks.js';
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';
 
@@ -73,7 +74,10 @@ async function userWithRingotelDevice(
 }
 
 /** Undoes the latest live `operation` entry, as `POST /audit/{id}/undo` would (§5.8). */
-async function undoLatest(db: Db, operation: string): Promise<void> {
+async function undoLatest(
+  db: Db,
+  operation: string
+): Promise<{ warnings?: string[] }> {
   const entry = await db
     .selectFrom('auditLog')
     .select('id')
@@ -81,8 +85,15 @@ async function undoLatest(db: Db, operation: string): Promise<void> {
     .where('undoneAt', 'is', null)
     .orderBy('createdAt', 'desc')
     .executeTakeFirstOrThrow();
-  await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+  return runOperation(db, 'audit.undo', { id: entry.id }, asRun());
 }
+
+// Whether the undo's configuration had reached Asterisk when a Ringotel call went out.
+let propagated = false;
+onPropagate(() => {
+  propagated = true;
+  return Promise.resolve();
+});
 
 function advance(ms: number): void {
   vi.setSystemTime(new Date(Date.now() + ms));
@@ -93,6 +104,7 @@ const realFetch = globalThis.fetch;
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(START);
+  propagated = false;
 });
 
 afterEach(() => {
@@ -190,5 +202,52 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
 
     expect(ringotel.calls.map(call => call.method)).toContain('createUser');
     expect(ringotel.users.map(user => user.extension)).toEqual(['101']);
+  });
+  it('pushes the restored device once the undo propagated, auditing it as audit.undo', async () => {
+    const db = await makeTestDb();
+    await seedTenant(db);
+    const ringotel = installRingotelFake();
+    const { deviceId } = await userWithRingotelDevice(db, 'anna@x.test', '101');
+    await runOperation(db, 'devices.delete', { id: deviceId }, asRun());
+    advance(HOUR_MS);
+    propagated = false;
+    const fakeFetch = globalThis.fetch;
+    const sentBeforePropagation: unknown[] = [];
+    globalThis.fetch = ((url: string, init?: RequestInit) => {
+      if (!propagated) {
+        sentBeforePropagation.push(init?.body);
+      }
+      return fakeFetch(url, init);
+    }) as typeof fetch;
+    ringotel.failing.add('recoverDeletedUser');
+
+    const output = await undoLatest(db, 'devices.delete');
+
+    // §10.4: Ringotel registers the user against the PBX before it accepts it, which inside the
+    // undo's transaction Asterisk could not answer yet.
+    expect(sentBeforePropagation).toEqual([]);
+    expect(output.warnings).toEqual([
+      expect.stringMatching(
+        /is restored, but it has no Ringotel user yet, but Ringotel refused it .*devices[.]rotate/u
+      )
+    ]);
+    const row = await db
+      .selectFrom('auditLog')
+      .select('changesJson')
+      .where('operation', '=', 'ringotel.push')
+      .where('entityId', '=', deviceId)
+      .orderBy('id', 'desc')
+      .executeTakeFirstOrThrow();
+    expect(JSON.parse(row.changesJson)).toEqual([
+      { field: 'outcome', from: null, to: 'refused' },
+      { field: 'trigger', from: null, to: 'audit.undo' },
+      { field: 'reason', from: null, to: expect.any(String) as unknown }
+    ]);
+    const restored = await db
+      .selectFrom('devices')
+      .select('deletedAt')
+      .where('id', '=', deviceId)
+      .executeTakeFirstOrThrow();
+    expect(restored.deletedAt).toBeNull();
   });
 });

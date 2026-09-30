@@ -64,6 +64,11 @@ why the specified behaviour changed; the commit history, how.
   `podman-compose` has no `rm` for removing `proxy`. Without the unit, `update.sh` now takes the
   stack `down` before `up -d` on Podman. A rerun, which said "Already on" the new release, now
   finishes an update that stopped before its stack reported healthy.
+- Undoing the deletion of a `ringotel` device, or of its user, pushed the device to Ringotel
+  inside the undo, before Asterisk held it again, so Ringotel could refuse the app's registration
+  and a refusal failed the undo. The push now follows the undo as a device creation's does: a
+  refusal is a `warnings` entry, and the outcome a `ringotel.push` audit entry (trigger
+  `audit.undo`).
 
 ### Added
 

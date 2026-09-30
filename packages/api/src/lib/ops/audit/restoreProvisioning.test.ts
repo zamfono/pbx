@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { DeviceRow } from '../../provisioning/types.js';
 import { makeTestDb } from '../../testDb.js';
+import { takeAfterPropagationHooks } from '../afterPropagationHooks.js';
 import type { Context } from '../types.js';
 import { restoreProvisionedDevices } from './restoreProvisioning.js';
 
@@ -24,6 +25,8 @@ vi.mock('../../secretbox.js', () => ({
   decrypt: () => Buffer.from('sip-secret')
 }));
 
+const actor = { id: 'owner', name: 'Owner', role: 'owner' };
+
 describe('restoreProvisionedDevices', () => {
   beforeEach(() => {
     created.length = 0;
@@ -45,15 +48,29 @@ describe('restoreProvisionedDevices', () => {
       })
       .execute();
 
-    await restoreProvisionedDevices(
-      { db } as unknown as Context,
-      'device',
-      'dev-1'
-    );
+    const ctx = { db, actor, channel: 'rest' } as unknown as Context;
+    await restoreProvisionedDevices(ctx, 'device', 'dev-1');
 
+    // Nothing reaches Ringotel inside the undo's transaction: the push waits until Asterisk
+    // holds the restored endpoint (§10.4), as a creation's does.
+    expect(created).toHaveLength(0);
+    const hooks = takeAfterPropagationHooks(ctx);
+    expect(hooks).toHaveLength(1);
+    expect(await hooks[0]?.(db)).toBeNull();
     // §10.4: `onDeviceCreated` is what recovers a user deleted inside Ringotel's 24-hour window
     // and creates a fresh one after it, so a restore goes through the same door a create does.
     expect(created.map(device => device.id)).toEqual(['dev-1']);
+    const row = await db
+      .selectFrom('auditLog')
+      .select('changesJson')
+      .where('operation', '=', 'ringotel.push')
+      .where('entityId', '=', 'dev-1')
+      .executeTakeFirstOrThrow();
+    expect(JSON.parse(row.changesJson)).toContainEqual({
+      field: 'trigger',
+      from: null,
+      to: 'audit.undo'
+    });
   });
 
   it('pushes nothing for a manual device', async () => {
@@ -71,12 +88,10 @@ describe('restoreProvisionedDevices', () => {
       })
       .execute();
 
-    await restoreProvisionedDevices(
-      { db } as unknown as Context,
-      'device',
-      'dev-2'
-    );
+    const ctx = { db, actor, channel: 'rest' } as unknown as Context;
+    await restoreProvisionedDevices(ctx, 'device', 'dev-2');
 
+    expect(takeAfterPropagationHooks(ctx)).toHaveLength(0);
     expect(created).toHaveLength(0);
   });
 });

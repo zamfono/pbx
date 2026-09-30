@@ -5,9 +5,9 @@
  * that, because it already chooses between recovering a user deleted within Ringotel's own 24-hour
  * window and creating a fresh one after it.
  */
-import { activeRingotelProvider } from '../../provisioning/index.js';
 import type { DeviceRow } from '../../provisioning/types.js';
 import { decrypt, keyringFromEnv } from '../../secretbox.js';
+import { pushToRingotel } from '../devices/_ringotelPush.js';
 import type { Context } from '../types.js';
 
 const RINGOTEL_KIND = 'ringotel';
@@ -38,9 +38,12 @@ async function restoredDevices(
 }
 
 /**
- * Pushes every `ringotel` device a restore brought back. The SIP password is the one already on
- * the row: a restore returns the device exactly as it was, so the phone that holds those
- * credentials keeps working.
+ * Pushes every `ringotel` device a restore brought back, once the undo has committed and Asterisk
+ * holds the restored endpoint (§10.4), like a creation's push: Ringotel registers the user against
+ * the PBX before it accepts it. The SIP password is the one already on the row: a restore returns
+ * the device exactly as it was, so the phone that holds those credentials keeps working. Each
+ * outcome is a `ringotel.push` row with the trigger `audit.undo`, and a refusal a warning of the
+ * undo's result.
  */
 export async function restoreProvisionedDevices(
   ctx: Context,
@@ -50,19 +53,22 @@ export async function restoreProvisionedDevices(
   const devices = (await restoredDevices(ctx, entityKind, entityId)).filter(
     device => device.kind === RINGOTEL_KIND
   );
-  if (devices.length === 0) {
-    return;
-  }
-  const provider = await activeRingotelProvider(ctx.db);
-  if (!provider) {
-    return;
-  }
-  const keyring = keyringFromEnv(process.env);
   for (const device of devices) {
-    // eslint-disable-next-line no-await-in-loop -- the Ringotel RPC has no batch create; sequential pushes are the plain reading of the API
-    await provider.onDeviceCreated(device, {
-      username: device.sipUsername,
-      password: decrypt(keyring, device.sipPasswordEnc).toString()
+    pushToRingotel(ctx, {
+      trigger: 'audit.undo',
+      deviceId: device.id,
+      push: provider =>
+        provider.onDeviceCreated(device, {
+          username: device.sipUsername,
+          password: decrypt(
+            keyringFromEnv(process.env),
+            device.sipPasswordEnc
+          ).toString()
+        }),
+      failure: {
+        what: `device ${device.id} is restored, but it has no Ringotel user yet`,
+        retry: 'devices.rotate on the device creates it'
+      }
     });
   }
 }
