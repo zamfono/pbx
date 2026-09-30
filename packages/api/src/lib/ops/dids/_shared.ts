@@ -1,12 +1,10 @@
 import type { Db } from '@zamfono/shared';
 
 import {
-  insertForwardTarget,
   rowToTarget,
   targetSpecSchema,
   type TargetSpec
 } from '../forwardTargetSpec.js';
-import type { Context } from '../types.js';
 
 /**
  * The union of forward-target kinds a DID, a block's fallback or a rule can point at
@@ -18,17 +16,8 @@ export const targetInputSchema = targetSpecSchema;
 
 export type TargetInput = TargetSpec;
 
-/**
- * Inserts a `forward_targets` row for `input` and returns its id, after checking that the row it
- * references is live (§5.9): a target pointing at a soft-deleted user, ring group, menu or audio
- * asset would block that row's hard purge on its `RESTRICT` FK (§11.1).
- */
-export async function createTarget(
-  ctx: Context,
-  input: TargetInput
-): Promise<string> {
-  return insertForwardTarget(ctx.db, input);
-}
+// One `createTarget` for every area that owns a target (§5.9), a DID's included.
+export { createTarget } from '../forwardTargets.js';
 
 /** Loads and converts the `forward_targets` row `targetId` points at; `targetId` is never NULL. */
 export async function resolveTarget(
