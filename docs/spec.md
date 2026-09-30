@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-09-30 · §6.3 Compose file.** The listing names `api`'s and `core`'s identical healthcheck once, as the top-level extension `x-healthz` their `healthcheck.test` refers to; what either container runs is unchanged.
+*Why:* requested by the product owner: the same `fetch(…/healthz)` one-liner stood twice in the file, and a third time in `update.sh`, which now waits with `up --wait` on that healthcheck instead.
+
 **2026-09-30 · §7 Levels, §9.1, §11 `call_qos`.** `call_qos` is no longer read through ARI while the call runs: each leg's row comes from the `RTPAUDIOQOS` variable Asterisk sets on its channel as it is hung up, which ARI's events carry once `ari.conf` names it in `channelvars`, read from the channel's `ChannelDestroyed`. A side that received no packet counts no receive loss.
 *Why:* decided by the product owner: reading every leg of a `qos` call every few seconds, only because a party that hangs up takes its statistics with its channel, polls Asterisk for figures it pushes by itself at the one moment they are final; a leg that hung up between two readings lost its last seconds. A leg that received nothing reads one packet missed out of none, which is no measured loss.
 
