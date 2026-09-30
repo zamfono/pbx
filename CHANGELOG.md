@@ -34,7 +34,9 @@ why the specified behaviour changed; the commit history, how.
   address `core:9060`, since it takes a numeric address only, and mirrored nothing. It now sends
   to the address `core` has, and follows it when `core` is recreated.
 - Every device registration was lost whenever the containers were recreated, as an update does,
-  and a phone stayed unreachable until it registered again.
+  and a phone stayed unreachable until it registered again. Registrations over UDP now survive;
+  those over TLS or TCP, the Ringotel apps' among them, end with any Asterisk restart, which
+  prunes them at start: such devices register again, and the apps are told to at once.
 - The `qos` level's `call_qos` rows had no jitter or loss and a round trip of 0, and only the
   caller's leg had one: the core read fields Asterisk does not send, and read the leg that hung up
   after its channel had gone. Each bridged leg now has a row with jitter and round trip in

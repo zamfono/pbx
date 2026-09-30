@@ -121,7 +121,7 @@ done
 chown -R asterisk:asterisk "$GEN_DIR"
 
 # The astdb, where the PJSIP contacts live (sorcery.conf), sits on a volume of its own
-# (asterisk.conf's astdbdir), so registrations survive a recreated container (spec §9.1). A
+# (asterisk.conf's astdbdir), so UDP registrations survive a recreated container (spec §9.1). A
 # volume the runtime created root-owned, or a bind mount, is handed to the user Asterisk runs as.
 mkdir -p "$ASTDB_DIR"
 chown asterisk:asterisk "$ASTDB_DIR"

@@ -30,7 +30,7 @@ services:
     volumes:
       - media:/media
       - asterisk-config:/etc/asterisk/gen       # rendered by api: pjsip_users/trunks, hints, MoH, TLS cert
-      - astdb:/var/lib/asterisk/astdb           # PJSIP contacts: registrations survive a recreated container (§9.1)
+      - astdb:/var/lib/asterisk/astdb           # PJSIP contacts: UDP registrations survive a recreated container (§9.1)
     restart: unless-stopped
 
   migrate:
