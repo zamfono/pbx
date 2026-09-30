@@ -83,7 +83,7 @@ function createAmiClient(env: CoreEnv, log: Logger): AmiClient {
 
 /**
  * Boots `core`: opens the database, connects ARI then AMI, starts the internal server and the
- * minute sweep. On any failure it closes both clients before rethrowing, so neither leaves a
+ * OOO/hours sweep. On any failure it closes both clients before rethrowing, so neither leaves a
  * reconnect timer running: an unclosed `AriClient`/`AmiClient` keeps Node's event loop alive on a
  * rejected connect, which would otherwise turn a fatal boot into a process that never exits. The
  * returned handle releases everything the boot started, in the reverse order.
@@ -153,7 +153,7 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
       CORE_INTERNAL_PORT
     );
     // --- end Task 33 ---
-    // The minute sweep (§3.1 "Events", §10.2) is the only source of `ooo` and `hours` events: it
+    // The OOO/hours sweep (§3.1 "Events", §10.2) is the only source of `ooo` and `hours` events: it
     // evaluates every scope against the clock and emits on a transition, which no call path does.
     const jobs = startBackgroundJobs({ db, cache, bus, log, env });
     const hep = await startHepCollector(env.hepEnabled, cdr, log);

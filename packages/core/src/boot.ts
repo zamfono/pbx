@@ -72,7 +72,7 @@ export function buildPipeline(deps: {
 }
 
 /**
- * The timers `core` owns: the minute sweep that emits `ooo`/`hours` transitions (§3.1 "Events")
+ * The timers `core` owns: the sweep that emits `ooo`/`hours` transitions (§3.1 "Events")
  * and the daily retention sweep (§11.6). Neither is driven by a call, so nothing else starts them.
  */
 export function startBackgroundJobs(deps: {

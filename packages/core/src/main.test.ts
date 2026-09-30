@@ -109,7 +109,7 @@ describe('main', () => {
     expect(amiClose).toHaveBeenCalledTimes(1);
   });
 
-  it('starts the minute sweep, so a scope entering or leaving OOO emits a transition', async () => {
+  it('starts the OOO/hours sweep, so a scope entering or leaving OOO emits a transition', async () => {
     const fakeAri = new FakeAri();
     const fakeAmi = new FakeAmi();
     const ari = await fakeAri.listen();

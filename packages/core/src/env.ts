@@ -79,7 +79,7 @@ function parseTz(raw: string | undefined): string {
 }
 
 // amiHost's port, callLogMaxBytes and tz are validated here and carried on `CoreEnv` for the
-// call pipeline, the minute sweep and the HEP listener; tz is the tenant clock while
+// call pipeline, the OOO/hours sweep and the HEP listener; tz is the tenant clock while
 // `settings.timezone` is NULL (§11.4). hepEnabled accepts any value other than the literal
 // string 'false' as true.
 export function readEnv(env: NodeJS.ProcessEnv): CoreEnv {
