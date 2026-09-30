@@ -16,10 +16,9 @@ describe('errorMessage', () => {
 describe('attempt', () => {
   it("returns fn's value, or undefined when it throws", () => {
     expect(attempt(() => 1)).toBe(1);
-    expect(
-      attempt(() => {
-        throw new Error('missing');
-      })
-    ).toBeUndefined();
+    const fails = (): number => {
+      throw new Error('missing');
+    };
+    expect(attempt(fails)).toBeUndefined();
   });
 });

@@ -4,11 +4,11 @@ import { tryParseJson, tryReadJson } from './json.js';
 
 describe('tryParseJson', () => {
   it('parses valid JSON', () => {
-    expect(tryParseJson('{"a":[1]}')).toEqual({ a: [1] });
+    expect(tryParseJson('{"ids":[1]}')).toEqual({ ids: [1] });
   });
 
   it('is undefined for invalid JSON', () => {
-    expect(tryParseJson('{"a":')).toBeUndefined();
+    expect(tryParseJson('{"ids":')).toBeUndefined();
   });
 });
 
