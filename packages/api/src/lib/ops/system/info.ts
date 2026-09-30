@@ -7,6 +7,7 @@ import {
   type ZamfonoVersion
 } from '@zamfono/shared';
 
+import { isProfilePending } from '../../provisioning/profilePending.js';
 import { defineOperation } from '../types.js';
 import { updaterClient, type UpdaterStatus } from './_updater.js';
 
@@ -30,6 +31,11 @@ type Output = {
    * the stack there, and how the last update went; `unavailable` says why there is none.
    */
   update: UpdaterStatus | { unavailable: string };
+  /**
+   * `profilePending`: a tenant profile change, the emergency numbers among them, is stored and
+   * in force on the PBX but has not reached Ringotel yet (§10.4 "Tenant profile push").
+   */
+  ringotel: { profilePending: boolean };
 };
 
 async function updateStatus(): Promise<Output['update']> {
@@ -63,27 +69,29 @@ export function setCoreVersionLookup(
 
 /**
  * `GET /system/info` (§7 "Version", §10.3): the version and commit `api` and `core` each run and
- * since when, when Asterisk started, and the latest release with how the last update went (§6.3 "Updates"), for anyone signed in. The MCP `serverInfo.version` carries `api`'s too, but only in the connection
+ * since when, when Asterisk started, the latest release with how the last update went (§6.3 "Updates"), and whether a tenant profile change still waits for Ringotel (§10.4), for anyone signed in. The MCP `serverInfo.version` carries `api`'s too, but only in the connection
  * handshake, which no tool can read; `/healthz` answers without a login and never shows it.
  */
 export const info = defineOperation<Record<string, never>, Output>({
   name: 'system.info',
   description:
-    'Reads the version, commit and start time of api and core separately, when Asterisk started, and the latest release and last update.',
+    'Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update, and whether a tenant profile change still waits for Ringotel.',
   input: z.object({}).strict(),
   minRole: 'user',
   readOnly: true,
-  run: async () => {
-    const [core, update] = await Promise.all([
+  run: async ctx => {
+    const [core, update, profilePending] = await Promise.all([
       lookupHolder.current
         ? lookupHolder.current().catch(() => null)
         : Promise.resolve(null),
-      updateStatus()
+      updateStatus(),
+      isProfilePending(ctx.db)
     ]);
     return {
       api: { ...resolveVersion(process.env), startedAt: apiStartedAt },
       core,
-      update
+      update,
+      ringotel: { profilePending }
     };
   }
 });

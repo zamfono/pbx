@@ -1,6 +1,5 @@
-import { activeRingotelProvider } from '../../provisioning/index.js';
 import type { Context } from '../types.js';
-import { loadSettings } from './_shared.js';
+import { pushProfileAfterCommit } from './profilePush.js';
 
 /** The reload kinds a changed set of columns requires (§3.1): `pjsip` and/or `moh`. The hold
  * music is each device endpoint's `moh_suggest` (§10.2 "Hold music"), so it moves PJSIP too. */
@@ -22,7 +21,8 @@ export function reloadKindsFor(
 }
 
 // §10.4 onTenantProfileChanged: codecs and ringotelMaxRegs move the branch's provision object,
-// language moves the organization's; any of them re-pushes the active Ringotel provider. The
+// language moves the organization's; any of them re-pushes the active Ringotel provider, once the
+// write has committed and reached Asterisk ("Tenant profile push", `profilePush.ts`). The
 // provision object also carries the DND, voicemail and park feature codes ("Branch provision
 // profile"), so a feature-code change moves it too, or the app would dial retired codes.
 // The connection's `country`, the default the app reads phone numbers against to match callers to
@@ -36,7 +36,11 @@ const TENANT_PROFILE_COLUMNS = new Set([
   'country'
 ]);
 
-/** Pushes the tenant's Ringotel profile (codecs, `ringotelMaxRegs`, feature codes, emergency numbers, language, country) when it changed. */
+/**
+ * Pushes the tenant's Ringotel profile (codecs, `ringotelMaxRegs`, feature codes, emergency
+ * numbers, language, country) after the commit when it changed; the write never waits on
+ * Ringotel, so its outage cannot fail it (§10.1 "Emergency calls", §10.4).
+ */
 export async function maybePushTenantProfile(
   ctx: Context,
   columns: Record<string, unknown>
@@ -47,6 +51,5 @@ export async function maybePushTenantProfile(
   if (!changed) {
     return;
   }
-  const provider = await activeRingotelProvider(ctx.db);
-  await provider?.onTenantProfileChanged?.(await loadSettings(ctx.db));
+  await pushProfileAfterCommit(ctx);
 }

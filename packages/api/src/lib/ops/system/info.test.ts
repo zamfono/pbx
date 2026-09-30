@@ -1,4 +1,5 @@
 import process from 'node:process';
+import { sql } from 'kysely';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { makeTestDb } from '../../testDb.js';
@@ -52,7 +53,8 @@ describe('system.info', () => {
         startedAt: STARTED_AT
       },
       core: CORE,
-      update: NO_UPDATER
+      update: NO_UPDATER,
+      ringotel: { profilePending: false }
     });
   });
 
@@ -86,7 +88,8 @@ describe('system.info', () => {
         startedAt: STARTED_AT
       },
       core: null,
-      update: NO_UPDATER
+      update: NO_UPDATER,
+      ringotel: { profilePending: false }
     });
   });
 
@@ -115,6 +118,26 @@ describe('system.info', () => {
       update: {
         unavailable: 'the updater did not answer: connect ECONNREFUSED'
       }
+    });
+  });
+
+  it('reports a tenant profile change that has not reached Ringotel yet (§10.4)', async () => {
+    const db = await makeTestDb();
+    await sql`PRAGMA foreign_keys = OFF`.execute(db);
+    await db
+      .insertInto('settings')
+      .values({
+        id: 1,
+        companyName: 'Test Co',
+        country: 'DE',
+        emergencyNumbersJson: '["112"]',
+        mainDidId: 'did-1',
+        ringotelProfilePending: 1
+      })
+      .execute();
+
+    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+      ringotel: { profilePending: true }
     });
   });
 });

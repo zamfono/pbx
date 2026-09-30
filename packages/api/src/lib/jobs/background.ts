@@ -23,6 +23,7 @@ import { coreUrlFromEnv, fetchCoreVersion } from '../coreClient.js';
 import { connectCoreEvents } from '../coreEvents.js';
 import { publishEvent } from '../eventSink.js';
 import { mediaDirFromEnv } from '../mediaDir.js';
+import { retryPendingProfile } from '../ops/settings/profilePush.js';
 import { propagateAtBoot } from '../propagation.js';
 import type { Keyring } from '../secretbox.js';
 import { seedIfEmpty } from '../seed.js';
@@ -88,14 +89,20 @@ export async function runBootSteps(
 
 /**
  * `core`'s event stream, relayed to the `/events` sockets and to webhooks; its `asterisk.started`
- * frames and every (re)connection drive the Ringotel re-registration (§10.4 "After a restart").
+ * frames and every (re)connection drive the Ringotel re-registration (§10.4 "After a restart"),
+ * and `api`'s start and each `asterisk.started` retry a pending tenant profile push once (§10.4
+ * "Tenant profile push").
  */
 function relayCoreEvents(
   db: Db,
   dispatcher: WebhookDispatcher,
   log: Logger
 ): { close: () => void } {
-  const rereg = watchAsteriskRestarts({ db, lookup: () => fetchCoreVersion() });
+  const rereg = watchAsteriskRestarts({
+    db,
+    lookup: () => fetchCoreVersion(),
+    retryProfile: trigger => retryPendingProfile(db, trigger)
+  });
   return connectCoreEvents({
     url: coreEventsUrl(coreUrlFromEnv()),
     onOpen: () => {

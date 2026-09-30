@@ -4,6 +4,7 @@ import { pendingMigrations, type Db } from '@zamfono/shared';
 
 import { ENC_COLUMNS } from './jobs/keyRotation.js';
 import { hasEmergencyTrunk } from './ops/trunks/_shared.js';
+import { isProfilePending } from './provisioning/profilePending.js';
 import type { Keyring } from './secretbox.js';
 
 const HTTP_OK = 200;
@@ -26,6 +27,11 @@ export type ApiHealth = {
   certificateSync: 'ok' | 'missing' | 'unknown';
   /** Whether a live trunk carries emergency calls (§9.4 "Emergency trunks"). */
   emergencyTrunk: boolean;
+  /**
+   * Whether a tenant profile change, the emergency numbers among them, has not reached Ringotel
+   * yet (§10.4 "Tenant profile push").
+   */
+  ringotelProfilePending: boolean;
 };
 
 /** What `apiHealth` needs to compute a body; a caller resolves each check its own way. */
@@ -134,6 +140,15 @@ async function emergencyTrunkPresent(db: Db): Promise<boolean> {
   }
 }
 
+/** `isProfilePending`, or `false` for a database without the column or row yet. */
+async function profilePending(db: Db): Promise<boolean> {
+  try {
+    return await isProfilePending(db);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * `api`'s own liveness plus the fields a client cannot otherwise observe (§6.3 "Health"):
  * `ok` is true only while the database is open and holds no pending migration, since `api`
@@ -145,6 +160,7 @@ export async function apiHealth(deps: ApiHealthDeps): Promise<ApiHealth> {
   const migrated = dbOpen && pending !== null && pending.length === 0;
   const mail = dbOpen ? await mailConfigured(deps.db) : 'notConfigured';
   const emergencyTrunk = dbOpen && (await emergencyTrunkPresent(deps.db));
+  const ringotelProfilePending = dbOpen && (await profilePending(deps.db));
   const core = await deps.checkCore();
   return {
     ok: dbOpen && migrated,
@@ -154,7 +170,8 @@ export async function apiHealth(deps: ApiHealthDeps): Promise<ApiHealth> {
     mail,
     keyRotationRemaining: deps.keyRotationRemaining,
     certificateSync: deps.certificateSync,
-    emergencyTrunk
+    emergencyTrunk,
+    ringotelProfilePending
   };
 }
 

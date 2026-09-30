@@ -625,7 +625,8 @@ describe('apiHealth', () => {
       mail: 'notConfigured',
       keyRotationRemaining: 0,
       certificateSync: 'unknown',
-      emergencyTrunk: false
+      emergencyTrunk: false,
+      ringotelProfilePending: false
     });
     expect(healthStatus(health)).toBe(HTTP_SERVICE_UNAVAILABLE);
   });

@@ -37,6 +37,11 @@ export type ReregDeps = {
   lookup: () => Promise<CoreVersionResponse>;
   /** The tenant's Ringotel provider, `null` while Ringotel is not set up. */
   provider?: (db: Db) => Promise<ProvisioningProvider | null>;
+  /**
+   * One more try for a tenant profile push Ringotel refused before (§10.4 "Tenant profile
+   * push"), at `api`'s start and at each Asterisk start, ahead of that start's re-registration.
+   */
+  retryProfile?: (trigger: 'api.start' | 'asterisk.started') => Promise<void>;
 };
 
 /** What one check saw: the Asterisk start it handled last, so each start is handled once. */
@@ -146,7 +151,11 @@ export type ReregWatcher = {
 
 /**
  * Runs a check for each thing the stream tells, one at a time and in order, for the process's
- * life; a failed check is logged, and the next event runs the next one.
+ * life; a failed check is logged, and the next event runs the next one. The pending tenant
+ * profile's retries share that queue: the first runs as the watcher starts, with `api`, and one
+ * runs before each announced Asterisk start's check, so the profile push, which also carries the
+ * organization's language, goes first, and the re-registration's own `updateBranch` never
+ * clears the marker ahead of it.
  */
 export function watchAsteriskRestarts(deps: ReregDeps): ReregWatcher {
   const state: ReregState = { lastSeen: null };
@@ -156,11 +165,18 @@ export function watchAsteriskRestarts(deps: ReregDeps): ReregWatcher {
       logger.error({ error }, 'ringotel: re-registration check failed');
     });
   };
+  const { retryProfile } = deps;
+  if (retryProfile !== undefined) {
+    enqueue(() => retryProfile('api.start'));
+  }
   return {
     streamConnected: () => {
       enqueue(() => checkAsteriskRestart(deps, state));
     },
     asteriskStarted: asteriskStartedAt => {
+      if (retryProfile !== undefined) {
+        enqueue(() => retryProfile('asterisk.started'));
+      }
       enqueue(() => handleAsteriskStart(deps, state, asteriskStartedAt));
     },
     idle: () => queue

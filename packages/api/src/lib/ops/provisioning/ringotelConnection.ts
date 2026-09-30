@@ -143,7 +143,13 @@ export async function storeRingotelIds(
   const { orgId, branchId } = ids;
   await ctx.db
     .updateTable('settings')
-    .set({ ringotelOrgId: orgId, ringotelBranchId: branchId })
+    // The connection was just written with the whole profile (`connectionFields`), so no
+    // profile change waits for Ringotel any more (§10.4 "Tenant profile push").
+    .set({
+      ringotelOrgId: orgId,
+      ringotelBranchId: branchId,
+      ringotelProfilePending: 0
+    })
     .where('id', '=', 1)
     .execute();
   const outcomes = await provisionExistingDevices({ client, db: ctx.db });
