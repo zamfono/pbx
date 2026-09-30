@@ -1,4 +1,5 @@
 import process from 'node:process';
+import { setTimeout as sleep } from 'node:timers/promises';
 import type { Transporter } from 'nodemailer';
 import pino from 'pino';
 
@@ -37,12 +38,6 @@ function fqdnFromOrigin(): string {
   } catch {
     return '';
   }
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
 }
 
 type Attachment = { filename: string; content: Buffer; contentType: string };
@@ -163,7 +158,7 @@ export async function sendMail(
         return 'failed';
       }
       // eslint-disable-next-line no-await-in-loop -- the backoff before the next attempt is the point of the loop
-      await delay(RETRY_BACKOFF_MS[attempt - 1] ?? THIRD_RETRY_DELAY_MS);
+      await sleep(RETRY_BACKOFF_MS[attempt - 1] ?? THIRD_RETRY_DELAY_MS);
     }
   }
   return 'failed';

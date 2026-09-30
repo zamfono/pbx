@@ -1,11 +1,11 @@
 import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
-import process from 'node:process';
 import type { Selectable, Transaction } from 'kysely';
 
 import type { DB } from '@zamfono/shared';
 
 import { transcodeForDownload } from '../../audio/transcode.js';
+import { mediaDirFromEnv } from '../../mediaDir.js';
 import { OpError } from '../types.js';
 
 const STATUS_NOT_FOUND = 404;
@@ -52,11 +52,6 @@ export async function loadRecording(
 const RECORDINGS_SUBDIR = 'recordings';
 // The raw pair's names beside `<id>.wav`: Asterisk's 8 kHz `.wav` or 16 kHz `.wav16`.
 const RAW_SUFFIXES = ['-l.wav', '-r.wav', '-l.wav16', '-r.wav16'];
-
-/** The shared media volume root (`MEDIA_DIR`), read at call time so tests can override it. */
-function mediaDirFromEnv(): string {
-  return process.env.MEDIA_DIR ?? '/media';
-}
 
 /**
  * Removes a recording's mixed audio file from the media volume, with the raw per-leg pair

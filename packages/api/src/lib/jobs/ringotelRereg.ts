@@ -2,6 +2,8 @@
  * Re-registers the Ringotel apps after an Asterisk restart (§10.4 "After a restart"): a new
  * Asterisk holds none of the contacts the one before held, a restart of the stack or an update
  * included, and an app would otherwise stay unreachable until its own registration expires.
+ * `core` announces each ARI connection's Asterisk start on its internal event stream, and is asked
+ * for the running one each time that stream (re)connects: no timer asks in between.
  */
 import pino from 'pino';
 
@@ -18,10 +20,6 @@ import {
 } from '../provisioning/index.js';
 
 const logger = pino({ name: 'ringotel' });
-
-// How often `core` is asked when its Asterisk started: a restart is noticed this long after
-// Asterisk accepts registrations again, at most.
-const DEFAULT_INTERVAL_MS = 15_000;
 
 /**
  * The entries after which the Ringotel apps registered against the running Asterisk anyway: the
@@ -96,17 +94,16 @@ async function reregister(
 }
 
 /**
- * One check: asks `core` when its Asterisk started and, for a start it has not handled and that
- * is newer than the last registration the audit log knows of, re-registers the apps once, while
- * Ringotel is set up. At most one attempt per Asterisk start, whatever Ringotel answers, so a
- * refusal never turns into a loop; a refusal is logged and audited, never thrown.
+ * One check, for the Asterisk that started at `asteriskStartedAt`: for a start it has not handled
+ * and that is newer than the last registration the audit log knows of, re-registers the apps
+ * once, while Ringotel is set up. At most one attempt per Asterisk start, whatever Ringotel
+ * answers, so a refusal never turns into a loop; a refusal is logged and audited, never thrown.
  */
-export async function checkAsteriskRestart(
+export async function handleAsteriskStart(
   deps: ReregDeps,
-  state: ReregState
+  state: ReregState,
+  asteriskStartedAt: string | null
 ): Promise<void> {
-  const version = await deps.lookup().catch(() => null);
-  const asteriskStartedAt = version?.asteriskStartedAt ?? null;
   if (asteriskStartedAt === null || asteriskStartedAt === state.lastSeen) {
     return;
   }
@@ -117,7 +114,7 @@ export async function checkAsteriskRestart(
     (await restartIsNew(deps.db, asteriskStartedAt));
   // Only now: a check that failed before this point is retried by the next one, and one that got
   // here never sends a second re-registration for the same start.
-  // eslint-disable-next-line require-atomic-updates -- one check runs at a time (`scheduleRingotelRereg`)
+  // eslint-disable-next-line require-atomic-updates -- one check runs at a time (`watchAsteriskRestarts`)
   state.lastSeen = asteriskStartedAt;
   if (onPbxRestarted === undefined || !isNew) {
     return;
@@ -125,38 +122,47 @@ export async function checkAsteriskRestart(
   await reregister(deps.db, onPbxRestarted, asteriskStartedAt);
 }
 
-export type ReregScheduler = { stop(): void };
+/** `handleAsteriskStart` for the Asterisk `core` reports running now; nothing while it cannot say. */
+export async function checkAsteriskRestart(
+  deps: ReregDeps,
+  state: ReregState
+): Promise<void> {
+  const version = await deps.lookup().catch(() => null);
+  await handleAsteriskStart(deps, state, version?.asteriskStartedAt ?? null);
+}
+
+/** What `core`'s internal event stream tells the re-registration (`background.ts`). */
+export type ReregWatcher = {
+  /**
+   * The stream (re)connected: an Asterisk start announced while it was down went unheard, so
+   * `core` is asked which Asterisk runs.
+   */
+  streamConnected(): void;
+  /** `core` announced an ARI connection to the Asterisk that started then (`asterisk.started`). */
+  asteriskStarted(asteriskStartedAt: string): void;
+  /** Resolves once every check asked for so far has run. */
+  idle(): Promise<void>;
+};
 
 /**
- * Runs `checkAsteriskRestart` now and then every `intervalMs`, one check at a time, for the
- * process's life; a failed check is logged and the next one runs as planned.
+ * Runs a check for each thing the stream tells, one at a time and in order, for the process's
+ * life; a failed check is logged, and the next event runs the next one.
  */
-export function scheduleRingotelRereg(
-  deps: ReregDeps,
-  intervalMs: number = DEFAULT_INTERVAL_MS
-): ReregScheduler {
+export function watchAsteriskRestarts(deps: ReregDeps): ReregWatcher {
   const state: ReregState = { lastSeen: null };
-  const timer: { current?: NodeJS.Timeout; stopped: boolean } = {
-    stopped: false
+  let queue = Promise.resolve();
+  const enqueue = (check: () => Promise<void>): void => {
+    queue = queue.then(check).catch((error: unknown) => {
+      logger.error({ error }, 'ringotel: re-registration check failed');
+    });
   };
-  const tick = (): void => {
-    checkAsteriskRestart(deps, state)
-      .catch((error: unknown) => {
-        logger.error({ error }, 'ringotel: re-registration check failed');
-      })
-      .finally(() => {
-        if (!timer.stopped) {
-          timer.current = setTimeout(tick, intervalMs);
-        }
-      });
-  };
-  tick();
   return {
-    stop: () => {
-      timer.stopped = true;
-      if (timer.current !== undefined) {
-        clearTimeout(timer.current);
-      }
-    }
+    streamConnected: () => {
+      enqueue(() => checkAsteriskRestart(deps, state));
+    },
+    asteriskStarted: asteriskStartedAt => {
+      enqueue(() => handleAsteriskStart(deps, state, asteriskStartedAt));
+    },
+    idle: () => queue
   };
 }

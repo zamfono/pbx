@@ -1,11 +1,11 @@
 /**
  * Subscribes to `core`'s internal `/internal/events` WebSocket (§3, §3.1 "Events"): the socket
- * carries unauthenticated `Envelope` JSON frames, since the internal Docker network is the trust
- * boundary, and a dropped connection reconnects.
+ * carries unauthenticated `CoreStreamFrame` JSON frames, since the internal Docker network is the
+ * trust boundary, and a dropped connection reconnects.
  */
 import { WebSocket } from 'ws';
 
-import type { Envelope } from '@zamfono/shared';
+import type { CoreStreamFrame, Envelope } from '@zamfono/shared';
 
 import { rawDataToString } from './events.js';
 
@@ -13,9 +13,9 @@ import { rawDataToString } from './events.js';
 // worth damping.
 const DEFAULT_RECONNECT_DELAY_MS = 1000;
 
-function tryParseEnvelope(raw: string): Envelope | null {
+function tryParseFrame(raw: string): CoreStreamFrame | null {
   try {
-    return JSON.parse(raw) as Envelope;
+    return JSON.parse(raw) as CoreStreamFrame;
   } catch {
     return null;
   }
@@ -23,15 +23,20 @@ function tryParseEnvelope(raw: string): Envelope | null {
 
 export type CoreEventsDeps = {
   url: string;
+  /** Every event `core` emits, for `/events` subscribers and webhooks. */
   onEvent: (envelope: Envelope) => void;
+  /** `core`'s `asterisk.started` frame, `api`'s alone and never relayed (§10.4 "After a restart"). */
+  onAsteriskStarted?: (asteriskStartedAt: string) => void;
+  /** Each time the connection opens, the first time and after every reconnect. */
+  onOpen?: () => void;
   /** Overridable in tests; the real subscriber reconnects at `DEFAULT_RECONNECT_DELAY_MS`. */
   reconnectDelayMs?: number;
 };
 
 /**
- * Connects to `deps.url` and calls `deps.onEvent` for every `Envelope` frame received,
- * reconnecting after a fixed delay whenever the connection drops or errors. `close()` stops it
- * for good, without a further reconnect.
+ * Connects to `deps.url` and hands every frame received to its callback, reconnecting after a
+ * fixed delay whenever the connection drops or errors. `close()` stops it for good, without a
+ * further reconnect.
  */
 export function connectCoreEvents(deps: CoreEventsDeps): { close: () => void } {
   let closed = false;
@@ -51,11 +56,19 @@ export function connectCoreEvents(deps: CoreEventsDeps): { close: () => void } {
     }
     const ws = new WebSocket(deps.url);
     socket = ws;
+    ws.on('open', () => {
+      deps.onOpen?.();
+    });
     ws.on('message', raw => {
-      const envelope = tryParseEnvelope(rawDataToString(raw));
-      if (envelope) {
-        deps.onEvent(envelope);
+      const frame = tryParseFrame(rawDataToString(raw));
+      if (frame === null) {
+        return;
       }
+      if (frame.type === 'asterisk.started') {
+        deps.onAsteriskStarted?.(frame.asteriskStartedAt);
+        return;
+      }
+      deps.onEvent(frame);
     });
     ws.on('close', scheduleReconnect);
     ws.on('error', () => {

@@ -5,7 +5,11 @@ import { newId, type CoreVersionResponse, type Db } from '@zamfono/shared';
 import type { ProvisioningProvider } from '../provisioning/index.js';
 import { noopProvider } from '../provisioning/types.js';
 import { makeTestDb } from '../testDb.js';
-import { checkAsteriskRestart, type ReregState } from './ringotelRereg.js';
+import {
+  checkAsteriskRestart,
+  watchAsteriskRestarts,
+  type ReregState
+} from './ringotelRereg.js';
 
 const MINUTE_MS = 60_000;
 
@@ -187,5 +191,73 @@ describe('checkAsteriskRestart (§10.4 "After a restart")', () => {
       { field: 'reason', from: null, to: 'ringotel: down' },
       { field: 'asteriskStartedAt', from: null, to: STARTED }
     ]);
+  });
+});
+
+describe('watchAsteriskRestarts (§10.4 "After a restart")', () => {
+  it('asks core once per stream connection, and never on its own', async () => {
+    const db = await makeTestDb();
+    vi.useFakeTimers();
+    try {
+      const lookup = vi.fn(core(STARTED));
+      const rereg = vi.fn(() => Promise.resolve());
+      const watcher = watchAsteriskRestarts({ db, lookup, ...ringotel(rereg) });
+
+      watcher.streamConnected();
+      await watcher.idle();
+      // No timer asks in between: an hour passes without a lookup.
+      await vi.advanceTimersByTimeAsync(MINUTE_MS * 60);
+      expect(lookup).toHaveBeenCalledOnce();
+
+      watcher.streamConnected();
+      await watcher.idle();
+      expect(lookup).toHaveBeenCalledTimes(2);
+      expect(rereg).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('re-registers on an announced start without asking core, once per start', async () => {
+    const db = await makeTestDb();
+    const lookup = vi.fn(core(STARTED));
+    const rereg = vi.fn(() => Promise.resolve());
+    const watcher = watchAsteriskRestarts({ db, lookup, ...ringotel(rereg) });
+    watcher.streamConnected();
+    await watcher.idle();
+    expect(rereg).toHaveBeenCalledOnce();
+
+    // Announced twice back to back, as the stream reconnect after it would repeat it.
+    const later = at(1);
+    watcher.asteriskStarted(later);
+    watcher.asteriskStarted(later);
+    await watcher.idle();
+
+    expect(lookup).toHaveBeenCalledOnce();
+    expect(rereg).toHaveBeenCalledTimes(2);
+    const rows = await reregRows(db);
+    expect(rows).toHaveLength(2);
+  });
+
+  it('keeps running after a failed check', async () => {
+    const db = await makeTestDb();
+    const rereg = vi.fn(() => Promise.resolve());
+    let calls = 0;
+    const watcher = watchAsteriskRestarts({
+      db,
+      lookup: core(STARTED),
+      provider: () => {
+        calls += 1;
+        return calls === 1
+          ? Promise.reject(new Error('database is locked'))
+          : ringotel(rereg).provider();
+      }
+    });
+
+    watcher.asteriskStarted(STARTED);
+    watcher.asteriskStarted(STARTED);
+    await watcher.idle();
+
+    expect(rereg).toHaveBeenCalledOnce();
   });
 });

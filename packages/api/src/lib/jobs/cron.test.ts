@@ -6,11 +6,11 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { encrypt, keyringFromEnv, type Keyring } from '../secretbox.js';
 import { type Bus, type ExecFn } from './backup.js';
-import { scheduleBackups } from './cron.js';
+import { queueRun, scheduleBackups } from './cron.js';
 
 const KEY_BYTE_LENGTH = 32;
 const SNAPSHOT_BYTES = 4321;
-const POLL_INTERVAL_MS = 5;
+const READ_INTERVAL_MS = 5;
 const WAIT_MS = 200;
 
 function testKeyring(): Keyring {
@@ -72,29 +72,30 @@ async function insertTarget(db: Db, kr: Keyring): Promise<string> {
 }
 
 /**
- * A manual run exactly as `backups.runs.start` leaves it: a committed `running` row and no
- * in-process notification, since the operation runs in the SvelteKit bundle.
+ * A manual run as `backups.runs.start` commits it, a `running` row; `handOver` also hands it to
+ * the scheduler, as the operation does once the row has committed.
  */
-async function queueRun(
+async function insertRun(
   db: Db,
   targetId: string,
-  startedAt: string
+  startedAt: string,
+  handOver = true
 ): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('backupRuns')
-    .values({
-      id,
-      targetId,
-      status: 'running',
-      snapshotId: null,
-      bytes: null,
-      error: null,
-      startedAt,
-      finishedAt: null
-    })
-    .execute();
-  return id;
+  const run = {
+    id: newId(),
+    targetId,
+    status: 'running',
+    snapshotId: null,
+    bytes: null,
+    error: null,
+    startedAt,
+    finishedAt: null
+  };
+  await db.insertInto('backupRuns').values(run).execute();
+  if (handOver) {
+    expect(queueRun(run)).toBe(true);
+  }
+  return run.id;
 }
 
 function resticBackupOutput(snapshotId: string): string {
@@ -147,25 +148,24 @@ async function waitForRun(db: Db, runId: string): Promise<string> {
     if (row.status !== 'running' || Date.now() > deadline) {
       return row.status;
     }
-    // eslint-disable-next-line no-await-in-loop -- one poll interval between reads
-    await wait(POLL_INTERVAL_MS);
+    // eslint-disable-next-line no-await-in-loop -- one interval between reads
+    await wait(READ_INTERVAL_MS);
   }
 }
 
-describe('scheduleBackups: the queued-run poll', () => {
-  it('executes a run queued into backup_runs by another bundle', async () => {
+describe('scheduleBackups: the manual runs handed over', () => {
+  it('executes a run backups.runs.start hands over', async () => {
     const db = await migratedDb();
     await seedTenant(db);
     const kr = testKeyring();
     const targetId = await insertTarget(db, kr);
     const { bus, published } = fakeBus();
-    const scheduler = scheduleBackups(
-      db,
-      kr,
-      { exec: fakeExec('snap-queued'), mediaDir: '/media', bus },
-      POLL_INTERVAL_MS
-    );
-    const runId = await queueRun(db, targetId, nowIso());
+    const scheduler = scheduleBackups(db, kr, {
+      exec: fakeExec('snap-queued'),
+      mediaDir: '/media',
+      bus
+    });
+    const runId = await insertRun(db, targetId, nowIso());
 
     const status = await waitForRun(db, runId);
     scheduler.stop();
@@ -195,13 +195,12 @@ describe('scheduleBackups: the queued-run poll', () => {
       .where('id', '=', targetId)
       .execute();
     const { bus } = fakeBus();
-    const scheduler = scheduleBackups(
-      db,
-      kr,
-      { exec: fakeExec('snap-gone'), mediaDir: '/media', bus },
-      POLL_INTERVAL_MS
-    );
-    const runId = await queueRun(db, targetId, nowIso());
+    const scheduler = scheduleBackups(db, kr, {
+      exec: fakeExec('snap-gone'),
+      mediaDir: '/media',
+      bus
+    });
+    const runId = await insertRun(db, targetId, nowIso());
 
     const status = await waitForRun(db, runId);
     scheduler.stop();
@@ -215,19 +214,18 @@ describe('scheduleBackups: the queued-run poll', () => {
     expect(row.error).toContain('not found');
   });
 
-  it('runs a queued run once, not once per poll cycle', async () => {
+  it('runs a handed-over run once', async () => {
     const db = await migratedDb();
     await seedTenant(db);
     const kr = testKeyring();
     const targetId = await insertTarget(db, kr);
     const { bus, published } = fakeBus();
-    const scheduler = scheduleBackups(
-      db,
-      kr,
-      { exec: fakeExec('snap-once'), mediaDir: '/media', bus },
-      POLL_INTERVAL_MS
-    );
-    const runId = await queueRun(db, targetId, nowIso());
+    const scheduler = scheduleBackups(db, kr, {
+      exec: fakeExec('snap-once'),
+      mediaDir: '/media',
+      bus
+    });
+    const runId = await insertRun(db, targetId, nowIso());
     await waitForRun(db, runId);
 
     await wait(WAIT_MS);
@@ -242,18 +240,18 @@ describe('scheduleBackups: the queued-run poll', () => {
     await seedTenant(db);
     const kr = testKeyring();
     const targetId = await insertTarget(db, kr);
-    const staleRunId = await queueRun(
+    const staleRunId = await insertRun(
       db,
       targetId,
-      new Date(Date.now() - WAIT_MS).toISOString()
+      new Date(Date.now() - WAIT_MS).toISOString(),
+      false
     );
     const { bus, published } = fakeBus();
-    const scheduler = scheduleBackups(
-      db,
-      kr,
-      { exec: fakeExec('snap-stale'), mediaDir: '/media', bus },
-      POLL_INTERVAL_MS
-    );
+    const scheduler = scheduleBackups(db, kr, {
+      exec: fakeExec('snap-stale'),
+      mediaDir: '/media',
+      bus
+    });
 
     const status = await waitForRun(db, staleRunId);
     scheduler.stop();
@@ -266,5 +264,33 @@ describe('scheduleBackups: the queued-run poll', () => {
       .executeTakeFirstOrThrow();
     expect(row.error).toBe('interrupted');
     expect(published).toHaveLength(0);
+  });
+
+  it('takes no run once stopped, and none without a scheduler', async () => {
+    const db = await migratedDb();
+    await seedTenant(db);
+    const kr = testKeyring();
+    const targetId = await insertTarget(db, kr);
+    const { bus } = fakeBus();
+    const scheduler = scheduleBackups(db, kr, {
+      exec: fakeExec('snap-stopped'),
+      mediaDir: '/media',
+      bus
+    });
+    scheduler.stop();
+    const runId = await insertRun(db, targetId, nowIso(), false);
+
+    expect(
+      queueRun({
+        id: runId,
+        targetId,
+        status: 'running',
+        snapshotId: null,
+        bytes: null,
+        error: null,
+        startedAt: nowIso(),
+        finishedAt: null
+      })
+    ).toBe(false);
   });
 });

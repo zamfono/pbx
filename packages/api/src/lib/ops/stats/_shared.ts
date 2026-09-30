@@ -1,3 +1,5 @@
+import { MS_PER_DAY } from '../../jobs/scheduleMath.js';
+
 export const METRICS = [
   'answerRate',
   'ringToAnswer',
@@ -12,11 +14,9 @@ export type BucketUnit = (typeof BUCKET_UNITS)[number];
 const MS_PER_SECOND = 1000;
 const SECONDS_PER_MINUTE = 60;
 const MINUTES_PER_HOUR = 60;
-const HOURS_PER_DAY = 24;
 const DAYS_PER_WEEK = 7;
 const MS_PER_MINUTE = SECONDS_PER_MINUTE * MS_PER_SECOND;
 const MS_PER_HOUR = MINUTES_PER_HOUR * MS_PER_MINUTE;
-const MS_PER_DAY = HOURS_PER_DAY * MS_PER_HOUR;
 const MS_PER_WEEK = DAYS_PER_WEEK * MS_PER_DAY;
 
 const STEP_MS_BY_UNIT: Record<BucketUnit, number> = {

@@ -1,7 +1,6 @@
 import process from 'node:process';
 
-import type { CoreHealth } from '@zamfono/shared';
-
+import { fetchCoreHealth } from '../../lib/coreClient.js';
 import { getDb } from '../../lib/db.js';
 import {
   apiHealth,
@@ -14,9 +13,6 @@ import {
   type CertSyncStatus
 } from '../../lib/jobs/certSync.js';
 import { keyringFromEnv, type Keyring } from '../../lib/secretbox.js';
-
-const CORE_HEALTH_TIMEOUT_MS = 3000;
-const DEFAULT_CORE_INTERNAL_URL = 'http://core:3000';
 
 const keyringCache: { resolved: boolean; keyring: Keyring | null } = {
   resolved: false,
@@ -42,7 +38,8 @@ function resolveKeyring(): Keyring | null {
 }
 
 /**
- * The certificate-sync scheduler's status (§6.4), read the same instance `server.ts` started.
+ * The certificate-sync scheduler's status (§6.4), read the same instance the boot started
+ * (`jobs/background.ts`).
  * `ORIGIN` absent or malformed must not turn the public `/healthz` into a 500, so a scheduler
  * that fails to construct reports `'unknown'`, the same as one that has not polled yet.
  */
@@ -61,12 +58,8 @@ function resolveCertificateSync(): CertSyncStatus {
  * together (§6.3 "Health") and this pair keeps the two visible separately here.
  */
 async function checkCore(): Promise<CoreReachability> {
-  const baseUrl = process.env.CORE_INTERNAL_URL ?? DEFAULT_CORE_INTERNAL_URL;
   try {
-    const response = await fetch(`${baseUrl}/healthz`, {
-      signal: AbortSignal.timeout(CORE_HEALTH_TIMEOUT_MS)
-    });
-    const body = (await response.json()) as CoreHealth;
+    const body = await fetchCoreHealth();
     return { reachable: true, ari: body.ari };
   } catch {
     return { reachable: false, ari: false };

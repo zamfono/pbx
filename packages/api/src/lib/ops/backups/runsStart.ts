@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
-import { setUndoable } from '../runner.js';
+import { queueRun } from '../../jobs/cron.js';
+import { afterPropagation, setUndoable } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import { loadLiveTarget, runToWire, type BackupRunWire } from './_shared.js';
 
@@ -14,9 +15,8 @@ type Input = z.infer<typeof inputSchema>;
 
 /**
  * `POST /backups/runs` (§6.5 "Backups"): queues a manual run of `targetId`, immediately visible
- * as a `running` row. The backup scheduler (`jobs/cron.ts`) finds it by polling `backup_runs` for
- * `running` rows, since it and the operations layer are separate bundles with separate module
- * state, and updates that same row by id as the run proceeds.
+ * as a `running` row. Once the row has committed, it is handed to the backup scheduler
+ * (`jobs/cron.ts` `queueRun`), which updates that same row by id as the run proceeds.
  */
 export const runsStart = defineOperation<Input, BackupRunWire>({
   name: 'backups.runs.start',
@@ -54,6 +54,14 @@ export const runsStart = defineOperation<Input, BackupRunWire>({
       .selectAll()
       .where('id', '=', id)
       .executeTakeFirstOrThrow();
+    // After the commit: the scheduler reads the row outside this transaction.
+    afterPropagation(ctx, () =>
+      Promise.resolve(
+        queueRun(row)
+          ? null
+          : 'backups: no backup scheduler runs in this process; the run does not start'
+      )
+    );
     return runToWire(row);
   }
 });

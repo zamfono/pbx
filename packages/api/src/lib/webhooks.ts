@@ -3,6 +3,7 @@
  * at-least-once HTTP POST, from an in-memory queue that is lost on restart.
  */
 import { createHmac } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 import { publicEnvelope, type Db, type Envelope } from '@zamfono/shared';
 
@@ -17,12 +18,6 @@ const FIRST_RETRY_DELAY_MS = 1000;
 const SECOND_RETRY_DELAY_MS = 4000;
 const RETRY_BACKOFF_MS = [FIRST_RETRY_DELAY_MS, SECOND_RETRY_DELAY_MS];
 const SIGNATURE_HEADER = 'X-Zamfono-Signature';
-
-function delayMs(ms: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
-}
 
 type WebhookRow = {
   id: string;
@@ -72,7 +67,7 @@ export class WebhookDispatcher {
       db: deps.db,
       kr: deps.kr,
       fetchImpl: deps.fetchImpl ?? fetch,
-      delay: deps.delay ?? delayMs,
+      delay: deps.delay ?? (ms => sleep(ms)),
       now: deps.now ?? (() => new Date().toISOString())
     };
   }

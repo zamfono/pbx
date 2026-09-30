@@ -6,6 +6,7 @@
 import process from 'node:process';
 
 import type {
+  CoreHealth,
   CoreVersionResponse,
   HangupRequest,
   MwiMailbox,
@@ -19,6 +20,8 @@ import type {
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
 const DEFAULT_CORE_URL = 'http://core:3000';
+// `/healthz` and `/metrics` answer within this even while `core` hangs (§6.3 "Health", §7).
+const CORE_HEALTH_TIMEOUT_MS = 3000;
 
 export type OriginateOutcome =
   { callId: string } | { error: 'noRegisteredDevice' };
@@ -142,6 +145,21 @@ export async function fetchCoreVersion(
   const response = await fetchFn(url);
   await throwIfNotOk(response, url);
   return (await response.json()) as CoreVersionResponse;
+}
+
+/**
+ * `core`'s own `GET /healthz` (`CoreHealth`), for `api`'s `/healthz` and `/metrics`: its body
+ * whatever the status, since a 503 still says which of the database and ARI is down. Rejects
+ * when `core` does not answer within `CORE_HEALTH_TIMEOUT_MS` or answers no such body.
+ */
+export async function fetchCoreHealth(
+  baseUrl: string = coreUrlFromEnv(),
+  fetchFn: typeof fetch = fetch
+): Promise<CoreHealth> {
+  const response = await fetchFn(`${baseUrl}/healthz`, {
+    signal: AbortSignal.timeout(CORE_HEALTH_TIMEOUT_MS)
+  });
+  return (await response.json()) as CoreHealth;
 }
 
 /** `core`'s internal API at `baseUrl` (default `coreUrlFromEnv()`). */

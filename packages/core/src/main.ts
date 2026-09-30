@@ -11,6 +11,7 @@ import { nowIso, openDb, resolveVersion } from '@zamfono/shared';
 import { AmiClient } from './ami/client.js';
 import { AriClient } from './ari/client.js';
 import type { Logger } from './ari/types.js';
+import { announceAsteriskStartOnConnect } from './asteriskStarted.js';
 import {
   buildPipeline,
   startBackgroundJobs,
@@ -29,8 +30,6 @@ import { resyncOnBoot } from './calls/resync.js';
 import { TrunkState } from './calls/trunkState.js';
 // --- boot environment ---
 import { readEnv, type CoreEnv } from './env.js';
-// --- end Task 31 ---
-// --- end Task 31 ---
 import { reloadHepOnConnect } from './hepReload.js';
 import { reloadAllModules } from './internal/configChanged.js';
 import {
@@ -102,6 +101,8 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
     const cache = new ConfigCache(db);
     const state = new StateStore();
     const bus = new EventBus();
+    // Every ARI connection after this first one: `api` reads the first from `/internal/version`.
+    announceAsteriskStartOnConnect(ari, bus, log);
     // --- Task 31 ---
     // `Presence` (§10.2 "Presence and BLF") wires itself to ARI `ContactStatusChange` in its own
     // constructor and seeds registration state from the boot `endpoints.list` in `resyncOnBoot`;

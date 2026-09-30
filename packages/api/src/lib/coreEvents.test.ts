@@ -91,4 +91,47 @@ describe('connectCoreEvents', () => {
 
     connection.close();
   });
+
+  it('hands asterisk.started to its own callback, never as an event, and reports every open', async () => {
+    wss = await listeningServer();
+    wss.on('connection', socket => {
+      socket.send(
+        JSON.stringify({
+          type: 'asterisk.started',
+          asteriskStartedAt: '2026-09-29T08:00:00.000Z'
+        })
+      );
+      socket.send(JSON.stringify(envelope('e1')));
+    });
+
+    const received: Envelope[] = [];
+    const started: string[] = [];
+    let opens = 0;
+    const connection = connectCoreEvents({
+      url: serverUrl(wss),
+      onEvent: ev => {
+        received.push(ev);
+      },
+      onAsteriskStarted: at => {
+        started.push(at);
+      },
+      onOpen: () => {
+        opens += 1;
+      },
+      reconnectDelayMs: RECONNECT_DELAY_MS
+    });
+
+    await wait(WAIT_MS);
+    expect(opens).toBe(1);
+    expect(started).toEqual(['2026-09-29T08:00:00.000Z']);
+    expect(received.map(ev => ev.id)).toEqual(['e1']);
+
+    for (const client of wss.clients) {
+      client.terminate();
+    }
+    await wait(WAIT_MS);
+    expect(opens).toBe(2);
+
+    connection.close();
+  });
 });

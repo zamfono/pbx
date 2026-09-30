@@ -2,6 +2,7 @@
  * The core↔api internal API (§3, §3.1). `core` serves these on its internal HTTP+WS port; `api`
  * serves `/internal/mail`.
  */
+import type { Envelope } from './events.js';
 import type { ZamfonoVersion } from './version.js';
 
 export type ReloadKind = 'pjsip' | 'dialplan' | 'moh';
@@ -81,7 +82,18 @@ export type CoreVersionResponse = ZamfonoVersion & {
 /** `GET /healthz` (200 iff `ok`). */
 export type CoreHealth = { ok: boolean; ari: boolean; db: boolean };
 
-// WS /internal/events: server sends Envelope JSON frames, no auth (internal network).
+/**
+ * A frame for `api` alone on `core`'s internal stream, never relayed to `/events` or webhooks:
+ * the ARI connection opened to the Asterisk that started at `asteriskStartedAt`, a new one after
+ * an Asterisk restart (§10.4 "After a restart").
+ */
+export type AsteriskStartedFrame = {
+  type: 'asterisk.started';
+  asteriskStartedAt: string;
+};
+
+/** WS /internal/events: every JSON frame `core` sends, no auth (internal network). */
+export type CoreStreamFrame = Envelope | AsteriskStartedFrame;
 
 export type MailKind = 'voicemail' | 'missedCall' | 'setup' | 'reset';
 

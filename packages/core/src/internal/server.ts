@@ -8,14 +8,10 @@ import { sql } from 'kysely';
 import { WebSocket, WebSocketServer } from 'ws';
 
 import {
-  newId,
-  nowIso,
   resolveVersion,
   type CoreHealth,
   type CoreVersionResponse,
   type Db,
-  type Envelope,
-  type Event,
   type HangupRequest,
   type OriginateRequest,
   type PickupRequest,
@@ -30,10 +26,11 @@ import {
   respondJson,
   type PresenceRefresh
 } from './configChanged.js';
+import { EventBus } from './eventBus.js';
 import { ConfigCache, type Snapshot } from './snapshot.js';
 import { StateStore } from './stateStore.js';
 
-export { ConfigCache, StateStore };
+export { ConfigCache, EventBus, StateStore };
 export type { Snapshot };
 
 const HTTP_OK = 200;
@@ -68,26 +65,6 @@ type InternalDeps = {
   presence: PresenceRefresh | null;
 };
 
-/** Wraps every core-produced `Event` into an `Envelope` and fans it out to subscribers. */
-export class EventBus {
-  private readonly subscribers = new Set<(envelope: Envelope) => void>();
-
-  emit(event: Event): Envelope {
-    const envelope: Envelope = { ...event, id: newId(), at: nowIso() };
-    for (const subscriber of this.subscribers) {
-      subscriber(envelope);
-    }
-    return envelope;
-  }
-
-  subscribe(fn: (envelope: Envelope) => void): () => void {
-    this.subscribers.add(fn);
-    return () => {
-      this.subscribers.delete(fn);
-    };
-  }
-}
-
 async function isDbHealthy(db: Db): Promise<boolean> {
   try {
     await sql`select 1`.execute(db);
@@ -113,8 +90,9 @@ async function handleHealthz(
 
 /**
  * `GET /internal/version` (§7 "Version"): what this `core` runs and since when, and when the
- * Asterisk it is connected to started, `null` while ARI is down or does not say; `api` watches the
- * latter to re-register the Ringotel apps after an Asterisk restart (§10.4 "After a restart").
+ * Asterisk it is connected to started, `null` while ARI is down or does not say; `api` reads the
+ * latter each time its event stream (re)connects, to re-register the Ringotel apps after an
+ * Asterisk restart it did not hear of (§10.4 "After a restart", `asteriskStarted.ts`).
  */
 async function handleVersion(
   deps: InternalDeps,
@@ -188,12 +166,12 @@ function attachEventStream(
   // ponytail: no logger is wired into this module; add one if these need investigating.
   wss.on('error', () => undefined);
   wss.on('connection', (socket: WebSocket) => {
-    const unsubscribe = bus.subscribe(envelope => {
+    const unsubscribe = bus.subscribeStream(frame => {
       if (socket.readyState !== WebSocket.OPEN) {
         return;
       }
       // The send callback receives the failure, keeping it off the socket's `'error'` channel.
-      socket.send(JSON.stringify(envelope), error => {
+      socket.send(JSON.stringify(frame), error => {
         if (error) {
           unsubscribe();
         }

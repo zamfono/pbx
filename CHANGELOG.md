@@ -23,7 +23,7 @@ why the specified behaviour changed; the commit history, how.
   the caller name the PBX sends wins over the app's contacts.
 - After an Asterisk restart, a stack restart or an update, the Ringotel apps stayed unreachable
   until their next registration, up to an hour. The stack now has Ringotel re-register every app
-  once Asterisk is back, and the apps re-register every two minutes anyway.
+  the moment Asterisk is back, and the apps re-register every two minutes anyway.
 - What Ringotel answered to a device's push, and the re-registration after a restart, was only in
   the call's result and the container log, which an update discards. Each is now an audit entry
   (`ringotel.push` on the device, `ringotel.rereg`), and a `ringotel` device created or rotated
@@ -57,6 +57,8 @@ why the specified behaviour changed; the commit history, how.
   configuration; raising a group to `qos` or `sip` had no effect on its calls.
 - `lastRegisteredAt` on a device is documented as what it is: when the device last became
   reachable, not its latest registration refresh, which Asterisk reports no event for.
+- `/metrics` waited for as long as `core` took to answer its health check, so a hung `core` hung
+  the scrape too. It now gives up after three seconds, as `/healthz` does.
 
 ### Added
 
@@ -78,6 +80,9 @@ why the specified behaviour changed; the commit history, how.
 - Asterisk keeps its astdb, which holds the device registrations, on a new `astdb` volume.
 - `deploy/README.md` says where container logs survive an upgrade (Podman's journal) and how to
   keep them on Docker ("Logs").
+- A backup started by hand (`POST /backups/runs`) begins at once, instead of up to five seconds
+  later, and `api` stops as soon as the stack is stopped or updated, instead of after Docker's
+  ten-second grace period.
 - `update.sh` reports an update done once every service is healthy, `core` included, not only
   `api`; it waits up to three minutes, as before. With `podman-compose` as the provider of
   `podman compose`, which cannot wait on healthchecks, it checks `api` and `core` itself.

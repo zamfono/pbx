@@ -1,11 +1,11 @@
 import { execFile } from 'node:child_process';
 import { copyFile, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import process from 'node:process';
 import { promisify } from 'node:util';
 
 import { newId } from '@zamfono/shared';
 
+import { mediaDirFromEnv } from '../mediaDir.js';
 import { mohClassDir } from './mohLayout.js';
 import type { AudioKind, AudioUpload, StoredAudio } from './types.js';
 import { masterExtensionFor } from './uploadTypes.js';
@@ -18,11 +18,6 @@ const execFileAsync = promisify(execFile);
 const PLAYBACK_SAMPLE_RATE_HZ = 16_000;
 const PLAYBACK_CHANNELS = 1;
 const PLAYBACK_EXTENSION = '.wav16';
-
-/** The shared media volume root (`MEDIA_DIR`, `images/api/Dockerfile`), read at call time so tests can override it. */
-function mediaDirFromEnv(): string {
-  return process.env.MEDIA_DIR ?? '/media';
-}
 
 /** The master file's extension, or a rejection for a type §10.2 does not accept. */
 function masterExtension(upload: AudioUpload): string {

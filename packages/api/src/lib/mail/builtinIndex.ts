@@ -1,8 +1,7 @@
 /**
- * The shipped templates, imported by name (§10.2 "Templates"). A glob would be shorter, but
- * `templates.ts` is reached from both bundles this package produces — the SvelteKit one through
- * the routes and the esbuild one through `server.ts`'s first-boot seed — and only the first
- * understands Vite's. Static imports survive either.
+ * The shipped templates, imported by name (§10.2 "Templates"). A glob would be shorter, but only
+ * Vite understands one, and this package also bundles through esbuild (`server.ts`); static
+ * imports survive either.
  */
 import missedCallDe from './builtin/missedCall.de.json' with { type: 'json' };
 import missedCallEn from './builtin/missedCall.en.json' with { type: 'json' };

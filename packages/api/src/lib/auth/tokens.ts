@@ -2,15 +2,16 @@ import { createHash, randomBytes } from 'node:crypto';
 
 import type { Db } from '@zamfono/shared';
 
+import { MS_PER_DAY } from '../jobs/scheduleMath.js';
+
 // §11.2 `tokens`: refresh tokens rotate every 30 days, a setup link is valid 7 days, a
 // self-requested reset link 1 hour.
 const RAW_TOKEN_BYTES = 32;
-const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
 const REFRESH_TOKEN_TTL_DAYS = 30;
 const SETUP_TOKEN_TTL_DAYS = 7;
-const REFRESH_TOKEN_TTL_MS = REFRESH_TOKEN_TTL_DAYS * DAY_MS;
-const SETUP_TOKEN_TTL_MS = SETUP_TOKEN_TTL_DAYS * DAY_MS;
+const REFRESH_TOKEN_TTL_MS = REFRESH_TOKEN_TTL_DAYS * MS_PER_DAY;
+const SETUP_TOKEN_TTL_MS = SETUP_TOKEN_TTL_DAYS * MS_PER_DAY;
 const RESET_TOKEN_TTL_MS = HOUR_MS;
 
 /** SHA-256 hex of `raw`; the only form a refresh or reset token is ever stored in (§5.2, §11.2). */
