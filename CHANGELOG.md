@@ -11,6 +11,8 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-30
+
 ### Added
 
 - Users set their own call forwarding: `users.setForwarding` (`PUT /users/{id}/forwarding`) is
@@ -422,7 +424,8 @@ why the specified behaviour changed; the commit history, how.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.0.7...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/zamfono/pbx/compare/v0.0.7...v0.1.0
 [0.0.7]: https://github.com/zamfono/pbx/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/zamfono/pbx/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/zamfono/pbx/compare/v0.0.4...v0.0.5
