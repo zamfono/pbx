@@ -242,14 +242,29 @@ describe('calls', () => {
       .execute();
     await db
       .insertInto('callQos')
-      .values({
-        callId,
-        channelId: 'PJSIP/trunk-1',
-        role: 'caller',
-        jitterMs: 4,
-        lossPct: 0.5,
-        rttMs: 21
-      })
+      .values([
+        {
+          callId,
+          channelId: 'PJSIP/trunk-1',
+          role: 'caller',
+          jitterMs: 4,
+          lossPct: 0.5,
+          rttMs: 21,
+          rxPackets: 1500,
+          txPackets: 1490
+        },
+        // A device whose audio never reached the stack: nothing measured, no packet received.
+        {
+          callId,
+          channelId: 'PJSIP/u1-dev',
+          role: 'callee',
+          jitterMs: null,
+          lossPct: null,
+          rttMs: null,
+          rxPackets: 0,
+          txPackets: 1480
+        }
+      ])
       .execute();
 
     const call = await runOperation<
@@ -263,6 +278,8 @@ describe('calls', () => {
           jitterMs: number | null;
           lossPct: number | null;
           rttMs: number | null;
+          rxPackets: number | null;
+          txPackets: number | null;
         }[];
       }
     >(db, 'calls.get', { id: callId }, asRun());
@@ -275,7 +292,18 @@ describe('calls', () => {
         role: 'caller',
         jitterMs: 4,
         lossPct: 0.5,
-        rttMs: 21
+        rttMs: 21,
+        rxPackets: 1500,
+        txPackets: 1490
+      },
+      {
+        channelId: 'PJSIP/u1-dev',
+        role: 'callee',
+        jitterMs: null,
+        lossPct: null,
+        rttMs: null,
+        rxPackets: 0,
+        txPackets: 1480
       }
     ]);
   });

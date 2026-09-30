@@ -41,13 +41,17 @@ export type CallOut = {
   endedAt: string | null;
 };
 
-/** One `call_qos` row, the per-leg RTCP summary of a call at diagnostics level `qos` (§7, §11.2). */
+/** One `call_qos` row, the per-leg RTCP summary of a call at diagnostics level `qos` (§7, §11.2).
+ * `rxPackets` and `txPackets` are the packets the leg's RTP instance received from the peer and
+ * sent to it: 0 received on an answered leg means no audio arrived from that side. */
 export type CallQosOut = {
   channelId: string;
   role: string;
   jitterMs: number | null;
   lossPct: number | null;
   rttMs: number | null;
+  rxPackets: number | null;
+  txPackets: number | null;
 };
 
 /** A call with the §7 diagnostics it recorded: its `calls.log` and its per-leg `call_qos` rows. */
@@ -86,7 +90,15 @@ export async function toCallDetailOut(
 ): Promise<CallDetailOut> {
   const qos = await db
     .selectFrom('callQos')
-    .select(['channelId', 'role', 'jitterMs', 'lossPct', 'rttMs'])
+    .select([
+      'channelId',
+      'role',
+      'jitterMs',
+      'lossPct',
+      'rttMs',
+      'rxPackets',
+      'txPackets'
+    ])
     .where('callId', '=', row.id)
     .orderBy('channelId')
     .execute();

@@ -14,7 +14,8 @@ const STATUS_NOT_FOUND = 404;
  */
 export const get = defineOperation<{ id: string }, CallDetailOut>({
   name: 'calls.get',
-  description: 'Reads one call of the history with its log and QoS summary.',
+  description:
+    'Reads one call of the history with its log and QoS summary: per leg jitter, loss, round trip and the packets received and sent.',
   input: z.object({ id: z.string() }).strict(),
   minRole: 'user',
   readOnly: true,
