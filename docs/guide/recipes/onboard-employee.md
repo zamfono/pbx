@@ -30,9 +30,10 @@ arguments:
      `ringotel.push` entry on the device with the outcome.
 3. Set forwarding, if the role needs it, with `users.setForwarding` (`PUT /users/{id}/forwarding`) —
    the classic unconditional/busy/no-answer/DND/offline rules, each a forward target
-   (`mental-model`). The employee can set their own later with the same call, any target but a
-   `sip` one; an external forward is dialled as their own call, so it reaches only numbers their
-   outbound routes carry.
+   (`mental-model`). The employee can read theirs with `users.getForwarding`
+   (`GET /users/{id}/forwarding`) and set their own later with the same `PUT`, any target but a
+   new `sip` one (`guardrails`); an external forward is dialled as their own call, so it reaches
+   only numbers their outbound routes carry.
 4. Add the employee to any ring group they belong to via `ringGroups.update`
    (`PATCH /ringGroups/{id}`) with the group's updated `members` list.
 

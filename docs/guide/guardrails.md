@@ -44,9 +44,12 @@ scope — their voicemails, their history, their devices, a handful of self-serv
 (`clir`, `rejectAnonymous`, `ringTimeoutS`, `notifyMissedCalls`, `findMe`, their own OOO and
 hours, their own call forwarding). Recordings are `admin`/`owner` only, including of a user's own
 calls. A `sip` target is admin-only everywhere: a user's own forwarding, OOO rule or hours that
-names one is refused with 403, so a user whose forwarding an admin pointed at one can remove that
-rule through `users.setForwarding` (`PUT /users/{id}/forwarding`), which replaces the rules as a
-whole, but not send it back.
+names a new one is refused with 403. A user whose forwarding an admin pointed at one reads their
+rules with `users.getForwarding` (`GET /users/{id}/forwarding`), in the shape
+`users.setForwarding` (`PUT /users/{id}/forwarding`) takes, and sends them back edited: the `PUT`
+replaces the rules as a whole, keeps the admin's `sip` rule when it comes back unchanged under
+the same condition, refuses it changed in any field or under another condition, and removes it
+when left out.
 
 ## Rate limits protect logins, not the API
 

@@ -52,8 +52,9 @@ outside the stack; this recipe gets the call to OpenAI. OpenAI's guide:
      (`PUT /users/{id}/forwarding`) with a `noAnswer` rule to it;
    - an out-of-office rule, closed opening hours, a menu option or a ring group's fallback.
 
-   Only an admin or owner sets one; a user editing their own out-of-office rule or opening hours is
-   refused with 403 for it. The trunk cannot be deleted while a target dials over it.
+   Only an admin or owner sets one; a user editing their own forwarding, out-of-office rule or
+   opening hours is refused with 403 for it, except that their own forwarding may send an
+   admin-set `sip` rule back unchanged, which keeps it (`guardrails`). The trunk cannot be deleted while a target dials over it.
 
 3. Choose what the call tells your webhook. The target's `headers` lists the SIP headers the
    INVITE carries, each a `name` and a `value`:
