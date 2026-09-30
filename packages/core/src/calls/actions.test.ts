@@ -461,6 +461,87 @@ describe('CallActions', () => {
     ]);
   });
 
+  // §10.1 step 4: a ring settles only itself. The ring on the user's own phones hands its answer
+  // over while another of their phones is still being placed; that placement ending (here refused)
+  // must not conclude the call's next ring, the target's, as unanswered before its phone rang.
+  it("a device still being placed once another answered never concludes the target's ring", async () => {
+    await setUp();
+    fakeAri.answerAfterMs = 60_000;
+    const callerId = await seedUser(db, '101');
+    await seedDevice(db, fakeAri, callerId, 'e101-a');
+    await seedDevice(db, fakeAri, callerId, 'e101-b');
+    await devicesUp();
+    const calleeId = await seedUser(db, '102');
+    await seedDevice(db, fakeAri, calleeId, 'e102-a');
+    await devicesUp();
+    const endpointOf = (channelId: string): string | undefined =>
+      (
+        fakeAri.calls.find(
+          entry =>
+            entry.path === 'channels/create' &&
+            (entry.body as { channelId?: string }).channelId === channelId
+        )?.body as { endpoint?: string } | undefined
+      )?.endpoint;
+    fakeAri.requestDelayMs = request => {
+      const dial = /^channels\/(?<id>[^/]+)\/dial$/u.exec(request.path);
+      const channelId = dial?.groups?.id ?? '';
+      const endpoint = endpointOf(channelId);
+      if (endpoint === 'PJSIP/e101-a') {
+        // Answered while its dial's response is still on the way.
+        fakeAri.emit({
+          type: 'ChannelStateChange',
+          timestamp: nowIso(),
+          application: 'zamfono',
+          channel: defaultChannel({ id: channelId, state: 'Up' })
+        });
+        return 50;
+      }
+      if (endpoint === 'PJSIP/e101-b') {
+        // Refused once the target's ring has begun, its phone still being placed.
+        setTimeout(() => {
+          fakeAri.failDial = { status: 409, count: 1 };
+        }, 250);
+        return 300;
+      }
+      return endpoint === 'PJSIP/e102-a' ? 600 : 0;
+    };
+
+    const result = await actions.originate({
+      userId: callerId,
+      target: '102',
+      actorUserId: newId(),
+      requestId: 'req-1'
+    });
+    const callId = 'callId' in result ? result.callId : '';
+    // Read from the create itself: the dials complete out of order here.
+    const targetId = (): string =>
+      (
+        fakeAri.calls.find(
+          entry =>
+            entry.path === 'channels/create' &&
+            (entry.body as { endpoint?: string }).endpoint === 'PJSIP/e102-a'
+        )?.body as { channelId?: string } | undefined
+      )?.channelId ?? '';
+    await eventually(() => {
+      expect(
+        fakeAri.calls.some(
+          entry => entry.path === `channels/${targetId()}/dial`
+        )
+      ).toBe(true);
+    });
+    // Past the dial's response, where a ring already over hangs the target's phone up.
+    await new Promise(resolve => {
+      setTimeout(resolve, 200);
+    });
+
+    const live = [...pipeline.callByChannel.values()].find(
+      call => call.id === callId
+    );
+    expect(live?.log.finish().log ?? '').not.toContain('ringOutcome');
+    expect(hungUp(targetId())).toBe(false);
+    await actions.hangup(callId, { actorUserId: newId() });
+  });
+
   it('dials an external target through the user routes and trunks after the device answers', async () => {
     await setUp();
     pipeline.deps.trunkState = trunkStateForTests();
