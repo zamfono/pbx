@@ -30,5 +30,8 @@ arguments:
      settings are masked, so there is no `from` to restore), a one-shot action (a manual backup
      run, a sent e-mail), or a hard delete of a voicemail or recording whose file is gone.
 
+`ringotel.push` and `ringotel.rereg` entries record what Ringotel answered: they are never
+undoable, and never count as a later change that blocks undoing an entity's earlier entries.
+
 Several consecutive changes to one entity are peeled back by repeated calls to `audit.undo`
 (`POST /audit/{id}/undo`), oldest surviving change last.

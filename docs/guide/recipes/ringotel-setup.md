@@ -45,9 +45,10 @@ again with a new password. Nothing is ever pushed to Ringotel before the setup o
 `ringotel` device created earlier gets a warning saying so, and the setup or adoption provisions
 it when it runs.
 
-The stack owns the connection's settings and rewrites them at every push, so a change made in the
-Ringotel Shell does not last: every call, internal ones included, goes through the PBX, the caller
-name the PBX sends wins over the app's contacts, apps stay registered while closed, and they
-re-register every two minutes. When Asterisk restarts, an update included, the stack tells
+The stack owns the connection settings it sends and rewrites them at every push to the
+connection, so a change made to one of them in the Ringotel Shell does not last; the Shell's other
+settings are left alone. With the ones it owns, every call, internal ones included, goes through
+the PBX, the caller name the PBX sends wins over the app's contacts, apps stay registered while
+closed, and they re-register every two minutes. When Asterisk restarts, an update included, the stack tells
 Ringotel to re-register every app once Asterisk is back (a `ringotel.rereg` entry in
 `audit.list`), so the apps are reachable again without waiting for their next registration.

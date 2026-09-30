@@ -24,7 +24,8 @@ the work; it takes only a published release that is newer than the running one a
 3. Update: `system.update` (`POST /system/update`), optionally with `version`. It asks for
    confirmation and answers as soon as the updater has begun.
 4. Follow it with `system.info`: `update.last.state` goes from `running` to `succeeded` or `failed`,
-   with the end of the updater's log in `error`. While the stack restarts, calls drop and the API
+   with the end of the updater's log in `error`. `succeeded` means every recreated service
+   reported healthy, `core` included. While the stack restarts, calls drop and the API
    does not answer for a minute or two; `system.info` answering again with the new `api.version`
    is the sign it is done. Its `api.startedAt` and `core.startedAt` show the restart, and
    `core.asteriskStartedAt` when Asterisk came back; with Ringotel connected, the stack then tells

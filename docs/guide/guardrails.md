@@ -16,8 +16,9 @@ time range. Secret values (passwords, API tokens, `*_enc` settings) are masked i
 refused, naming the conflicting row, when a later live change to the same entity exists, when the
 change would recreate a duplicate (a reused extension, e-mail or DID number), or when the entry
 itself is not undoable — a secret-bearing change, a one-shot action such as a manual backup run or a
-sent e-mail, or a hard delete whose file is already gone. See the `undo` recipe for the full
-walk-through.
+sent e-mail, or a hard delete whose file is already gone. The `ringotel.push` and
+`ringotel.rereg` entries, which record what Ringotel answered, are never undoable and never block
+an undo. See the `undo` recipe for the full walk-through.
 
 ## Deletes are soft, then confirmed, then purged
 

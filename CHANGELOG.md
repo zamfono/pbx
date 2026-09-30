@@ -106,9 +106,9 @@ why the specified behaviour changed; the commit history, how.
 
 ### Upgrade notes
 
-- **Ringotel connections change at their next push**: the first device, user, extension or
-  profile change after the upgrade, or the upgrade's own restart, rewrites the connection's
-  settings. Internal calls then always go through the PBX, the PBX's caller name wins over the
+- **Ringotel connections change at their next push**: the first user, extension, ring-group,
+  parking or profile change after the upgrade, or the upgrade's own restart (which re-registers
+  the apps), rewrites the connection's settings; a device change does not. Internal calls then always go through the PBX, the PBX's caller name wins over the
   app's contacts, apps stay registered while closed and re-register every two minutes, and the
   mobile apps dial emergency numbers over the cellular network. Settings
   changed by hand in the Ringotel Shell for these are overwritten.

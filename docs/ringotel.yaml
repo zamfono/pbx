@@ -2972,7 +2972,7 @@ components:
 
         **Codecs**
 
-        - `app` **object**. `g711` **boolean**, default `false`. Not directly editable: it is derived from a UI-only "Use OPUS audio codec" checkbox (hint "Enabling the OPUS audio codec between the softphone apps and a softphone server improves call quality on low bandwidth/congested networks, but may cause small audio delays."); on save the Shell sets `app.g711 = !opusCheckboxChecked`. *(Shell UI bundle; matches the codec handling already in `packages/api`'s `buildBranchProvision`.)*
+        - `app` **object**. `g711` **boolean**, default `false`. Not directly editable: it is derived from a UI-only "Use OPUS audio codec" checkbox (hint "Enabling the OPUS audio codec between the softphone apps and a softphone server improves call quality on low bandwidth/congested networks, but may cause small audio delays."); on save the Shell sets `app.g711 = !opusCheckboxChecked`. *(Shell UI bundle. `packages/api`'s `buildBranchProvision` sends no `app`: it states the codecs through `codecs`, so `app` keeps whatever the Shell stored.)*
 
         - `tones` **object**. `Progress` **string**, `Ringback` **string**, `Ringback2` **string** — names of the standard telephony tone sets returned by `getBranchOptions` (below), keyed by the connection's `country`. Only `Ringback` has a dedicated Shell control ("Ringback tone", hint "Choose the country that you would like to use when creating the standard telephony tones."); `Progress`/`Ringback2` follow the selected country. Default `{}`.
 
@@ -2998,7 +2998,7 @@ components:
 
         - `speeddial` **array**. Each entry: `number` **string**, `title` **string**, `gsm` **boolean** ("Dial this number using the native cellular dialer (mobiles only)."). *(Shell UI bundle: an entry titled `"Voicemail"` with `gsm: false` has its `gsm` key removed entirely before saving.)*
 
-        - `emergency` **array**. Emergency numbers list, edited alongside `speeddial`/`blfs`. Each entry: `title` **string**, `number` **string**.
+        - `emergency` **array**. Emergency numbers list, edited alongside `speeddial`/`blfs`. Each entry: `title` **string**, `number` **string**. Zamfono sends `settings.emergency_numbers_json` here, each number as its own title (`docs/spec.md` §10.4); the mobile apps dial these through the phone's cellular dialer, bypassing the PBX (§10.1 "Emergency calls").
 
         - `custompages` **array**. "Custom Web Pages": opens a web page or third-party app on an incoming/answered call. Each entry: `title` **string**, `url` **string**. On save, `url` is prefixed with `http://` unless it already starts with `http://` or `https://`. Supports the placeholders `$userid$`, `$domain$`, `$number$`, `$username$`, `$email$`, `$mobile$` in the URL.
 
@@ -3205,7 +3205,7 @@ components:
 
         ###### **Partial updates**
 
-        `updateBranch` **merges** the `provision` object you send into the branch's stored one rather than replacing it whole: a key you omit keeps its previously stored value. *(Verified live 2026-09-29: a push whose `provision` omitted `keepreg` was followed by a `getBranches` that still showed `keepreg: true` from before the push.)* `docs/spec.md` §10.4 notes that Zamfono relies on the opposite assumption — that the provider writes the whole object on every push so the two sides cannot drift — which only holds if Zamfono's own `buildBranchProvision` always includes every key it cares about; a key Zamfono never sends (and never clears) stays whatever the Shell last set it to.
+        `updateBranch` **merges** the `provision` object you send into the branch's stored one rather than replacing it whole: a key you omit keeps its previously stored value. *(Verified live 2026-09-29: a push whose `provision` omitted `keepreg` was followed by a `getBranches` that still showed `keepreg: true` from before the push.)* `docs/spec.md` §10.4 relies on this: Zamfono owns only the keys `buildBranchProvision` sends, overwriting them at every push; a key it never sends or stopped sending (such as `internal`) keeps whatever is stored.
 
         `rereg` **boolean**, top-level (sibling of `provision`, not inside it). Sent as `true` only when the Shell's "Reset registrations" button (next to "Save changes" on the connection Settings tab) triggers the save; forces the connection's registrations to be reset. Omitted (not `false`) on an ordinary save. *(Shell UI bundle aa7d197e, 2026-09-29; not exercised live by this task.)*
 

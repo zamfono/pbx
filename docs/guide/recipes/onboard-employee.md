@@ -24,8 +24,10 @@ arguments:
      `tested-softphones`) or desk phone.
    - With `ringotel`, the credentials are pushed to Ringotel instead of returned, and the device
      onboards through Ringotel's own activation e-mail and QR code; no credentials need to be
-     typed in by hand. The stack must be connected to Ringotel first (`ringotel-setup`), and a
-     `warnings` entry in the response means Ringotel refused the device; it says why.
+     typed in by hand. The stack must be connected to Ringotel first (`ringotel-setup`). A
+     `warnings` entry in the response means the device did not reach Ringotel: Ringotel refused
+     it, or Ringotel is not set up yet; it says which. Either way `audit.list` holds a
+     `ringotel.push` entry on the device with the outcome.
 3. Set forwarding, if the role needs it, with `users.setForwarding` (`PUT /users/{id}/forwarding`) —
    the classic unconditional/busy/no-answer/DND/offline rules, each a forward target
    (`mental-model`).
