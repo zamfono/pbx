@@ -3,6 +3,7 @@ import { create } from './create.js';
 import { deleteUser } from './delete.js';
 import { erase } from './erase.js';
 import { get } from './get.js';
+import { getForwarding } from './getForwarding.js';
 import { list } from './list.js';
 import { resetPassword } from './resetPassword.js';
 import { setForwarding } from './setForwarding.js';
@@ -16,6 +17,7 @@ register(update);
 register(deleteUser);
 register(resetPassword);
 register(erase);
+register(getForwarding);
 register(setForwarding);
 register(setPresence);
 

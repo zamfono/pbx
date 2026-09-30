@@ -92,6 +92,7 @@ const STATIC_ROUTES: RouteTuple[] = [
   ...crud('users', '/users', ALL_CRUD),
   ['POST', '/users/{id}/resetPassword', 'users.resetPassword'],
   ['POST', '/users/{id}/erase', 'users.erase'],
+  ['GET', '/users/{id}/forwarding', 'users.getForwarding'],
   ['PUT', '/users/{id}/forwarding', 'users.setForwarding'],
   ['PUT', '/users/{id}/presence', 'users.setPresence'],
   ['GET', '/users/{id}/devices', 'devices.list', WITH_USER_ID],

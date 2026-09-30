@@ -15,9 +15,13 @@ why the specified behaviour changed; the commit history, how.
 
 - Users set their own call forwarding: `users.setForwarding` (`PUT /users/{id}/forwarding`) is
   self-service on a user's own account, refused with 403 for anyone else's, and audited under the
-  user's name; admins still set anyone's. A user may forward to anything they can already use
-  elsewhere, but not to a `sip` target: a rule an admin set to one is refused if the user sends it
-  back, and removed if they leave it out, since the call replaces the rules as a whole. An
+  user's name; admins still set anyone's. They read them with the new `users.getForwarding`
+  (`GET /users/{id}/forwarding`), on the same terms, in the shape the `PUT` takes, so a client
+  reads, edits and sends them back. A user may forward to anything they can already use
+  elsewhere, but not to a new `sip` target: a rule an admin set to one is kept as it is if the
+  user sends it back unchanged under the same condition, refused if they change it or move it to
+  another condition, and removed if they leave it out, since the call replaces the rules as a
+  whole. An
   external forward is dialled as the user's own call, so a number their outbound routes do not
   carry is stored but refused when a call is forwarded.
 - A trunk setting `diversion` (`trunks.create`, `trunks.update`, `POST /trunks`,

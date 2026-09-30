@@ -18,8 +18,10 @@ export type TargetInput = TargetSpec;
  * §10.3 "Forward targets": a `sip` target is set or kept by an `admin` or `owner` alone, since it
  * sends calls to whatever host its trunk names (§9.4 "SIP targets"). The one check for every
  * operation a `user` may call, their own forwarding, OOO rules and opening hours: each writes its
- * targets through `createTarget`, and `ooo.update` calls this for the target it keeps. The
- * admin-only operations need it only through `createTarget`, where it always passes.
+ * targets through `createTarget`, and `ooo.update` calls this for the target it keeps, while
+ * `users.setForwarding` keeps, without writing it, only the very `sip` target a rule's condition
+ * already holds. The admin-only operations need it only through `createTarget`, where it always
+ * passes.
  */
 export function assertMayHoldTarget(ctx: Context, target: TargetInput): void {
   if (target.kind === 'sip' && ctx.actor.role === 'user') {
