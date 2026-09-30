@@ -48,7 +48,8 @@ through the MCP `zamfono.help` tool:
 - `mental-model.md` — how a call actually flows, and the vocabulary the API uses
 - `routing-order.md` — the order every inbound call is decided in
 - `guardrails.md` — what the system refuses to do, and why
-- `recipes/` — onboarding an employee, a vacation rule, diagnosing a bad call, undoing a change
+- `recipes/` — onboarding an employee, a vacation rule, forwarding calls to an AI agent, diagnosing
+  a bad call, undoing a change
 - `restore.md` — restoring from a backup
 - `emergency-calls.md`, `recording-consent.md`, `music-licensing.md` — the obligations that come
   with running a phone system

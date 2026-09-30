@@ -30,13 +30,14 @@ that single tenant; there is no cross-tenant sharing.
 
 Every place that routes a call somewhere else — a DID, a menu option, a forward rule, an
 out-of-office rule, a group fallback, an opening-hours closed target — points at one of the same
-seven target kinds:
+eight target kinds:
 
 | Kind               | Meaning                                                            |
 | ------------------ | ------------------------------------------------------------------ |
 | `user`             | rings that user, entering the routing pipeline                     |
 | `ringGroup`        | rings that group, entering the routing pipeline                    |
 | `external`         | dials an external number through the outbound routes               |
+| `sip`              | dials a SIP address over one trunk, no outbound route (admin-only) |
 | `mailboxUser`      | deposits the caller directly in a user's mailbox, no ringing       |
 | `mailboxRingGroup` | deposits the caller directly in a ring group's mailbox, no ringing |
 | `announcement`     | plays an audio asset and ends the call                             |
@@ -45,7 +46,9 @@ seven target kinds:
 A `user` or `ringGroup` target re-enters the routing pipeline and counts a hop toward the
 three-hop forwarding limit (`routing-order`); a `menu` target re-enters without counting a hop.
 `mailboxUser`, `mailboxRingGroup` and `announcement` end the pipeline; `external` dials out
-through the outbound routes.
+through the outbound routes, and `sip`, `{ "kind": "sip", "trunkId": "…", "user": "…" }`, dials
+`sip:<user>@<host>` at the trunk's own hosts, such as an AI agent's endpoint
+(`forward-to-ai-agent`). Either leg tells the far end who called and who forwarded.
 
 ## Where to look next
 

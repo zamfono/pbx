@@ -13,6 +13,16 @@ why the specified behaviour changed; the commit history, how.
 
 ### Added
 
+- A forward target of a new kind, `sip`, `{ "kind": "sip", "trunkId": "…", "user": "proj_…" }`,
+  sends a call to a SIP address rather than a phone number: the stack dials `user` at the trunk's
+  own hosts, such as OpenAI's Realtime SIP endpoint at `sip.api.openai.com`, with no outbound
+  route involved. It works wherever a target does (DIDs, forwarding and out-of-office rules,
+  opening hours, ring-group fallbacks, menus, the tenant fallback), and a ring-group member's
+  unconditional forward to one rings as the member's leg. Only admins and owners set one; a user
+  editing their own out-of-office rule or opening hours is refused for it. A trunk a `sip` target
+  dials over cannot be deleted until the target is changed: `trunks.delete`
+  (`DELETE /trunks/{id}`) answers 409 listing where it is used. The recipe
+  `forward-to-ai-agent` walks through the OpenAI setup.
 - The stack serves the Zamfono logo as its favicon (`/favicon.ico`, `/favicon.svg`) and in a
   light and a dark variant (`/logo.svg`, `/logo.png`, `/logoDark.svg`, `/logoDark.png`), and the
   MCP server names itself with it: MCP clients that show a server's icon, title or website now show
@@ -32,6 +42,13 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
+- A call the stack forwards out over a trunk, to an external number or a `sip` target, now tells
+  the far end who called and who forwarded: the INVITE carries `X-Zamfono-Caller` with the
+  original caller's number (left out when the caller withheld it), `X-Zamfono-Did` with the
+  company number an outside caller dialled, and a `Diversion` header naming the user or ring group
+  whose rule forwarded it last, with the reason (`unconditional`, `user-busy`, `no-answer`,
+  `unavailable`, `do-not-disturb`, `away` for out-of-office, `time-of-day` for closed hours).
+  A carrier sees them on every external forward, which carried none of them before.
 - A backup run shows two sizes instead of one: `bytesTotal`, the full size of its snapshot, and
   `bytesAdded`, what it uploaded after restic's deduplication. The run's `bytes` field is gone
   from `backups.runs.list` and `backups.runs.get` (`GET /backups/runs`, `GET /backups/runs/{id}`)

@@ -5,8 +5,9 @@ parking slot each own one extension.
 
 **DID** — a phone number the tenant owns, routed on arrival to a forward target.
 
-**Forward target** — the seven-kind vocabulary (`user`, `ringGroup`, `external`, `mailboxUser`,
-`mailboxRingGroup`, `announcement`, `menu`) every routing rule points at. See `mental-model`.
+**Forward target** — the eight-kind vocabulary (`user`, `ringGroup`, `external`, `sip`,
+`mailboxUser`, `mailboxRingGroup`, `announcement`, `menu`) every routing rule points at. See
+`mental-model`.
 
 **Hop** — one re-entry of the routing pipeline through a `user` or `ringGroup` forward target. A
 call is released to a mailbox after the third hop.
