@@ -14,6 +14,8 @@
  * request made while the module's reload is already running queues a fresh one, since the running
  * one may have read the files before the write that request reports.
  */
+import { setTimeout as sleep } from 'node:timers/promises';
+
 import { AriError, type AsteriskModule } from './types.js';
 
 const HTTP_CONFLICT = 409;
@@ -45,12 +47,6 @@ export function isReloadInProgress(error: unknown): boolean {
   }
   const { message } = (error.body ?? {}) as { message?: unknown };
   return typeof message === 'string' && /in progress/iu.test(message);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
 }
 
 export class ModuleReloader {

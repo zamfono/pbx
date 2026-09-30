@@ -8,11 +8,10 @@
 import { readdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { Db } from '@zamfono/shared';
+import { MS_PER_DAY, repeat, type Db } from '@zamfono/shared';
 
 import type { Logger } from './ari/types.js';
 
-const MS_PER_DAY = 86_400_000;
 const RECORDINGS_DIR_NAME = 'recordings';
 // A participation's raw pair, `<id>-l.wav` and `<id>-r.wav` (§11.6 "raw per-leg call recordings"),
 // or `.wav16` for a 16 kHz recording (§10.2 "Sample rate").
@@ -139,21 +138,16 @@ export function startRetention(
   deps: RetentionDeps,
   intervalMs: number = MS_PER_DAY
 ): { stop: () => void } {
-  const run = (): void => {
-    runRetention(deps)
-      .then(result => {
-        deps.log.info(result, 'retention sweep');
-      })
-      .catch((error: unknown) => {
-        deps.log.error({ error }, 'retention sweep failed');
-      });
-  };
-  run();
-  const timer = setInterval(run, intervalMs);
-  timer.unref();
-  return {
-    stop: () => {
-      clearInterval(timer);
-    }
-  };
+  return repeat(
+    () =>
+      runRetention(deps)
+        .then(result => {
+          deps.log.info(result, 'retention sweep');
+        })
+        .catch((error: unknown) => {
+          deps.log.error({ error }, 'retention sweep failed');
+        }),
+    intervalMs,
+    { unref: true }
+  );
 }

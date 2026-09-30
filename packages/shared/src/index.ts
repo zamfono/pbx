@@ -11,4 +11,5 @@ export * from './trunks.js';
 export * from './events.js';
 export * from './internalApi.js';
 export * from './mwiMailbox.js';
+export * from './repeat.js';
 export * from './version.js';
