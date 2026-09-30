@@ -17,6 +17,7 @@ import {
   StateStore,
   type PipelineDeps
 } from './pipeline.js';
+import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';
 import { routeToTarget } from './routeToTarget.js';
 import { TrunkState } from './trunkState.js';
@@ -337,6 +338,35 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
         `PJSIP/${FORWARD_NUMBER}@trunk-${forwarderTrunk}`
       ]);
       expect(legs.at(0)?.callerId).toBe('+491110202');
+    });
+
+    // §10.3 "Users": a user writes their own external rule, which nothing checks against their
+    // routes on write; the forward is refused at call time as their own dial would be, with 503
+    // and a `noRoute` trace line (§9.4 "Outbound routing"), even where the caller has a route.
+    it("refuses a forward to a number the forwarder's routes do not carry, though the caller's do", async () => {
+      const forwarder = await seedUser(db, { number: '+491110202' });
+      await seedUserRule(db, forwarder, 'unconditional');
+      await seedTrunkRoute(db, 1, caller);
+
+      await pipeline.enterTarget(
+        call,
+        { id: '', kind: 'user', userId: forwarder },
+        null
+      );
+
+      expect(trunkOriginates(fakeAri)).toEqual([]);
+      expect(call.status).toBe('failed');
+      const release = fakeAri.calls.find(
+        entry =>
+          entry.method === 'DELETE' &&
+          entry.path === `channels/${callerChannel.id}`
+      );
+      expect(release?.qs).toBe(`reason_code=${sipToHangupCause(503)}`);
+      const events = (call.log.finish().log ?? '')
+        .split('\n')
+        .filter(Boolean)
+        .map(line => String((JSON.parse(line) as { event?: string }).event));
+      expect(events).toContain('noRoute');
     });
 
     it("withholds the number under the forwarder's CLIR though the caller shows theirs", async () => {
