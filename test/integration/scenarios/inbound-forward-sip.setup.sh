@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # §9.4 "SIP targets" and "Forwarded calls": a DID reaches user 177, whose out-of-office rule
 # forwards to user 178, whose unconditional rule forwards to a `sip` target, `proj_ci123` over a
-# TLS trunk. The trunk's host is the `sip-tls` container on 5061, a TLS front with a self-signed
-# certificate (`tlsVerify` off) relaying to the `sipp` container's TCP port 5063, where
-# `uas/answer-sip-target.xml` answers with plain RTP (`srtp` off: sipp does no SRTP), tracing what
-# it received for the check. Leaves the ids the teardown removes in the scenario's state.
+# TLS trunk, with templated headers. The trunk's host is the `sip-tls` container on 5061, a TLS
+# front with a self-signed certificate (`tlsVerify` off) relaying to the `sipp` container's TCP
+# port 5063, where `uas/answer-sip-target.xml` answers with plain RTP (`srtp` off: sipp does no
+# SRTP), tracing what it received for the check. Leaves the ids the teardown removes in the scenario's state.
 set -euo pipefail
 
 api_base=$1
@@ -71,8 +71,16 @@ did_id=$(api POST /dids \
   | jsonfield id)
 api POST "/users/$forwarder/ooo" \
   "{\"active\":true,\"target\":{\"kind\":\"user\",\"userId\":\"$agent\"}}" >/dev/null
+# The target's headers (§9.4 "Header templates"): the two defaults, the extension the call was
+# placed to, and the last hop's reason beside a `${…}` that Asterisk must send as written.
+# shellcheck disable=SC2016 -- the `${EXTEN}` is the literal text under test
+headers='[{"name":"X-Zamfono-Caller","value":"{{callerNumber}}"},
+  {"name":"X-Zamfono-Did","value":"{{did}}"},
+  {"name":"X-Called","value":"{{calledExtension}}"},
+  {"name":"X-Forward","value":"{{forwardReason}} ${EXTEN}"}]'
 api PUT "/users/$agent/forwarding" "{\"rules\":[{\"condition\":\"unconditional\",\
-\"target\":{\"kind\":\"sip\",\"trunkId\":\"$trunk_id\",\"user\":\"proj_ci123\"}}]}" >/dev/null
+\"target\":{\"kind\":\"sip\",\"trunkId\":\"$trunk_id\",\"user\":\"proj_ci123\",\
+\"headers\":$headers}}]}" >/dev/null
 printf '%s %s %s %s\n' "$trunk_id" "$forwarder" "$agent" "$did_id" \
   > "$(state_file inbound-forward-sip)"
 

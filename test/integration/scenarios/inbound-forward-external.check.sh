@@ -3,8 +3,8 @@
 # an external number (inbound-forward-external.setup.sh), so the call still reaches the group but
 # is answered over the trunk rather than by any user — the call history still carries the group
 # that routed it, but no answering user (§10.2 "Call history"). The leg carries the forwarding
-# context (§9.4 "Forwarded calls"): the caller, the dialled main number and a `Diversion` naming
-# the member, extension 101, forwarding unconditionally.
+# context (§9.4 "Forwarded calls"): a `Diversion` naming the member, extension 101, forwarding
+# unconditionally, and no custom header, which an external forward's carrier has no use for.
 set -euo pipefail
 
 api_base=$1
@@ -16,7 +16,7 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 await_trace sipp /tmp/trunk-messages.log 1 \
   | python3 "$here/_forward-context-check.py" "sip:+15557777@$(container_ip sipp)" \
-    '+15559999' '+15551000' '^"CI Phone" <sip:101@[^>]+>;reason=unconditional$'
+    '^"CI Phone" <sip:101@[^>]+>;reason=unconditional$'
 
 group_id=$(ci_group)
 newest_call | python3 -c '
