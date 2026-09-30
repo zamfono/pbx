@@ -113,7 +113,9 @@ why the specified behaviour changed; the commit history, how.
   or just before its own ringing was confirmed on a busy host. The phone that answers first now
   always gets the call, and a phone answering after the ring has already moved on is hung up. A
   click-to-dial could also send its target straight to voicemail, without ringing it, when one of
-  the user's own phones was slow to be reached after another had answered.
+  the user's own phones was slow to be reached after another had answered. A ring group's batch
+  timing out as a member answered had the same fault, the caller moving on to the next members or
+  the fallback, and a member answering after its batch had timed out could still take the call.
 
 ### Upgrade notes
 
