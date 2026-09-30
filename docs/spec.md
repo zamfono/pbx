@@ -4,6 +4,12 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-09-30 · §9.4 Forwarded calls, §10.1 steps 2-5 and 7.** A trunk leg the core dials for a forward target, `external` or `sip`, carries the forwarding context: each forward hop (an OOO rule, a closed schedule, a user's `unconditional`, `busy`, `noAnswer`, `dnd` or `offline` rule, a group's `unanswered` or `unavailable` rule, a member's followed `unconditional` forward) is recorded with the diverting user's or group's number and name and a reason, and the leg's `REDIRECTING` data carries the first hop as the original and the last as the redirecting party with their count, from which chan_pjsip sends one `Diversion` (RFC 5806), the last hop's; `X-Zamfono-Caller` carries the original caller's number unless it is withheld, `X-Zamfono-Did` the called company number of an inbound call. Before, a forwarded leg carried neither, and a carrier or an AI agent answering it could not tell who called or who forwarded.
+*Why:* requested by the product owner: an AI agent reached through a `sip` target, and a carrier on an `external` forward, needs the original caller and the forwarding party; this is a visible change to what an `external` forward sends its carrier.
+
+**2026-09-30 · §5.9, §9.4 SIP targets, §10.1 steps 1, 5 and 7, §10.2 Call forwarding, §10.3 Trunks and Forward targets, §11.2 `forward_targets`.** A new forward target kind `sip`, `{ kind: 'sip', trunkId, user }`, dials `user` at a trunk's own hosts, bypassing `outbound_routes`: `forward_targets` gains `sip_trunk_id` (`RESTRICT` on `trunks`) and `sip_user`, set together, and its exactly-one CHECK counts eight kinds, for which SQLite rebuilds the table. Only an `admin` or `owner` sets or keeps one, a `user`'s own forwarding, OOO rule and opening hours included; a trunk that a live `sip` target references cannot be deleted, its `DELETE` answering 409 with the rules and numbers that hold one and the purge keeping it while a soft-deleted entity's target does, and a trunk that is missing or has no outbound host at call time releases the call with 503, as an external forward that matches no route.
+*Why:* requested by the product owner: forwarding a call to a SIP endpoint such as OpenAI's Realtime SIP endpoint, `sip:proj_…@sip.api.openai.com` over TLS, which has no telephone number an outbound route could match.
+
 **2026-09-30 · §9.1, §9.3 Transport policy, §9.4 Signaling, §11.2 `trunks`.** A TLS trunk checks its provider's certificate while the new `trunks.tls_verify` is set, and `trunks.srtp` encrypts its media with SDES-SRTP, refused on a trunk whose transport is not `tls`. PJSIP checks certificates per transport, so `transport-tls` gets `verify_server=yes` against the system CA bundle, which Asterisk applies to outgoing connections alone, and a second transport, `transport-tls-noverify` on 5062, unpublished in the ports mode, where its Contact names 5061, carries the trunks that check nothing. A new trunk has `tls_verify` set; an existing TLS trunk gets it cleared, since nothing was checked before, so the upgrade changes no trunk's behaviour.
 *Why:* requested by the product owner: groundwork for forwarding calls to SIP endpoints that require TLS and SRTP, such as OpenAI's Realtime SIP endpoint, with certificate checking as an option per trunk, like Ringotel's "ignore certificate errors" inverted; before, no trunk could use SRTP and no provider certificate was checked.
 
@@ -423,7 +429,7 @@ Config tables carry a `deleted_at` column. `DELETE` sets it; reads, config rende
 A soft delete is refused with a conflict while routing still depends on the row:
 
 - forward targets pointing at it or its mailbox from rules owned by other entities: DIDs, other users' forward rules, other groups' fallbacks, menu options and menu fallbacks, OOO rules and opening-hours schedules of other scopes, block fallbacks and the tenant fallback;
-- for a trunk: the outbound routes using it;
+- for a trunk: the outbound routes using it, and the rules, numbers and fallbacks whose `sip` forward target dials over it;
 - for a DID: the users and outbound routes presenting it as caller-ID and the tenant main number (`settings.main_did_id`, §9.4), since a number the tenant no longer holds must not be presented;
 - for a block: live DIDs whose number lies within it, that is, begins with its base (and, for a digits block, has the block's digit count); membership is derived from the number, never stored;
 - for a menu: the DIDs and forward targets pointing at it from other menus, rules and schedules;
@@ -438,7 +444,7 @@ Soft-deleting a user also soft-deletes their devices, so the rendered configurat
 
 Soft-deleting a user or ring group also deletes its `extensions` row and, through the FK, the BLF keys of other devices watching it, both recorded in the audit diff, so the extension is free for a new owner at once. Endpoint names carry a random per-device slug (§9.3), so a new owner's devices never collide with the old ones. Undo re-inserts the row, or is refused if the extension has been taken (§5.8).
 
-A daily job in `api`, the primary writer of config tables, hard-deletes rows and their audio files once `settings.soft_delete_retention_days` has passed, and deletes `forward_targets` rows that no owner column references any more (§11.2), the backstop for their ownership by construction. It purges in dependency order: an entity's soft-deleted rules and schedules before the entity, and orphaned `forward_targets` before the users, ring groups, menus and audio assets those targets reference, so no `RESTRICT` fires (§11.1).
+A daily job in `api`, the primary writer of config tables, hard-deletes rows and their audio files once `settings.soft_delete_retention_days` has passed, and deletes `forward_targets` rows that no owner column references any more (§11.2), the backstop for their ownership by construction. It purges in dependency order: an entity's soft-deleted rules and schedules before the entity, and orphaned `forward_targets` before the users, ring groups, menus and audio assets those targets reference, so no `RESTRICT` fires (§11.1); a trunk that a soft-deleted entity's `sip` target still dials over stays until that target is purged.
 
 ### 5.10 GDPR
 
@@ -1051,6 +1057,8 @@ Creating the first trunk inserts the catch-all route, a row with no callers and 
 
 An attempt is final, and the call ends with that outcome, once the far end alerted (a 180 or 183) or answered, whatever follows, since the callee's phone already rang; and on the responses that state the callee's own condition: 480, 486, 600 and 603. Caller-ID and CLIR are resolved per attempt, since each route may carry its own override. Every attempt writes one line to the routing trace at level `events` naming route, trunk and cause; `calls.status` reflects the last attempt.
 
+**SIP targets.** A forward target of kind `sip` (§10.1 step 7, §11.2 `forward_targets`) names a trunk and the user part of a request URI, such as an AI agent's `proj_…` at `sip.api.openai.com`, which has no number a route could match. It bypasses `outbound_routes`: the core dials `PJSIP/<user>@trunk-<id>/sip:<host>[:<port>]` for each `outbound` or `both` host of an `ip` trunk in priority order, failing over as Hosts describes, and `PJSIP/<user>@trunk-<id>` to a `registration` trunk's registrar, so the INVITE's request URI is `sip:<user>@<host>[:<port>]` and its `To` `<sip:<user>@<host>>`, Asterisk adding no `transport` parameter to either. Everything else is a trunk leg's: the `unreachable`, channel-cap and CLIR pre-checks, whose failure ends the call as the last route's does (Outbound routing), Caller-ID and CLIR as for an external forward with no route override, the attempt's trace line with a `null` route, the channel count, the call history and QoS. A trunk that is soft-deleted, or has no outbound host, releases the call with 503 and a `sipTarget` line at level `events` naming the cause, `trunkMissing` or `noOutboundHost`, as an external forward that matches no route is refused. The user part is 1 to 64 characters of `A-Z a-z 0-9 . _ ~ + -`, a subset of RFC 3261's `user` that needs no escaping and cannot reach into the dial string. Only an `admin` or `owner` sets or keeps one (§10.3 Forward targets), since it sends calls to whatever host a trunk names.
+
 **Caller-ID** is decided separately from the trunk. The presented number is the first of:
 
 1. the matching route's `callerid_did_id`, when the route sets one;
@@ -1067,6 +1075,14 @@ A leg the system dials without a user (Outbound routing) presents the main numbe
 4. `settings.clir`, the tenant default.
 
 The user and trunk levels are tri-state, NULL meaning inherit. A withheld call is sent per RFC 3325: the real number travels in `P-Asserted-Identity` and `Privacy: id` asks the provider to strip it before the callee, while `From` is `"Anonymous" <sip:anonymous@anonymous.invalid>` on a `both` trunk and stays the account identity on a `pai` trunk. That needs a trunk that carries PAI, `callerid_header` `pai` or `both`, since a `from`-only trunk has nowhere to carry the identity. The API refuses `clir = 1` on a `from` trunk, and the core skips a route whose trunk is `from`-only for a call that resolves to "withhold" (Route fallthrough), refusing the call with 403 and a line at level `events` only when no matching route remains. Emergency numbers are never anonymous, whatever any level says.
+
+**Forwarded calls.** A trunk leg the core dials for a forward target, of kind `external` or `sip`, a ring-group member's followed forward included, carries the call's forwarding context; a user's own dial, a find-me leg, a transfer and a click-to-dial carry none.
+
+- `Diversion` (RFC 5806): each forward hop of the call (§10.1 step 7) records the diverting party, a user's primary number (`users.callerid_did_id`) or else their extension, a ring group's extension, a menu's called number, with the party's name, and a reason, as Asterisk's `REDIRECTING` reason and the `Diversion` `reason` chan_pjsip sends for it: an OOO rule `away` (`away`), a closed schedule `time_of_day` (`time-of-day`), a user's `unconditional` rule and a member's followed forward `cfu` (`unconditional`), `busy` `cfb` (`user-busy`), `noAnswer` and a group's `unanswered` `cfnr` (`no-answer`), `offline` and a group's `unavailable` `unavailable` (`unavailable`), `dnd` `dnd` (`do-not-disturb`). The leg's `REDIRECTING` data holds the first hop as the original party (`orig-*`), the last as the redirecting party (`from-*`, `reason`) and the number of hops (`count`), set without an indication (`,i`) before the INVITE. chan_pjsip's `send_diversion`, on by default and left on for the trunk endpoints, turns it into one `Diversion`, the last hop's: its number as the user part at the host of the leg's own `From`, its name, `;reason=`. An earlier hop is not sent, since `res_pjsip_diversion` builds the header from the redirecting party alone and replaces any other; `send_history_info` stays off, since Asterisk builds `History-Info` from the same party.
+- `X-Zamfono-Caller`: the original caller's number, an inbound caller's in the international form (Inbound number normalization) and an internal caller's extension; omitted for an `anonymous` caller (Withheld caller).
+- `X-Zamfono-Did`: the called number of an inbound call, a company DID or block number in the international form; omitted for an internal call and a verbatim called string.
+
+No other header is added.
 
 **Provisioning and status.** Trunk changes regenerate `pjsip_trunks.conf` through the same mechanism as the endpoint generation (§9.1, §9.3) and trigger a PJSIP reload. Trunk status, `registered`, `unreachable` or `unknown`, is live state the core holds in memory and resyncs at boot. For `ip` trunks it is the `qualify` reachability of the first host, carried by the ARI `ContactStatusChange` events. For `registration` trunks it is the registration outcome, which ARI does not carry: the core reads it at boot with the AMI action `PJSIPShowRegistrationsOutbound` and follows it through AMI `Registry` events, whose `Username` and `Domain` are the registration's client URI, `sip:<username>@<registrar host>`, and server URI, `sip:<registrar host>[:<port>]`, as `pjsip_trunks.conf` carries them; `Registered` maps to `registered`, and `Rejected`, `Failed` and `Unregistered` to `unreachable`. `api` merges `status` and `statusChangedAt` into `GET /trunks` responses at read time from the core's internal API, answering `unknown` while the core is unreachable, and relays the core's `trunk.status` event on `/events`; the `/metrics` gauge comes from the same source. Nothing about it is stored (§10.1). Per-host reachability is post-MVP.
 
@@ -1136,12 +1152,12 @@ Two processes run for the life of the stack; `migrate` is a third container that
 
 1. **Entry.** Resolve the target and screen the caller:
    - a caller on the tenant blocklist (`blocked_numbers`, a number or every number under a prefix, §11.2) is released with 603 and recorded as `blocked` in the history;
-   - for an inbound call, the DID resolves to its forward target (`dids.target_id`), or a number without a `dids` row to the block or tenant fallback (§11.3), which Forward targets applies: a user or ring group enters the pipeline without counting a hop, a menu plays, a mailbox or announcement ends the pipeline, an external number dials out;
+   - for an inbound call, the DID resolves to its forward target (`dids.target_id`), or a number without a `dids` row to the block or tenant fallback (§11.3), which Forward targets applies: a user or ring group enters the pipeline without counting a hop, a menu plays, a mailbox or announcement ends the pipeline, an external number or a SIP target dials out;
    - for an internal call, the dialed extension is the target;
    - a withheld caller number is then checked against the target user's `reject_anonymous` (NULL = `settings.reject_anonymous`), or against the tenant default for a ring group or menu target; a rejected caller goes to the target's mailbox when it has one enabled, else 603;
    - a forward to a user or ring group re-enters here with the hop counter increased (Forward targets).
-2. **Out of office.** Take the in-effect `ooo_rules` row for the target (user, ring-group or menu scope), else the tenant-wide one. If one exists, apply its forward target (§11, `forward_targets`) and end. This step runs for internal calls too: an OOO rule states that the person or group is absent, and a colleague reaches their mailbox like any other caller. Each scope's OOO rule and opening hours are evaluated at most once per call, so a rule whose target leads back into its own scope is not applied twice.
-3. **Opening hours.** Inbound and forwarded calls only; internal calls skip this step, since hours describe when the company is reachable from outside. Take the target's `opening_hours` schedule, else the tenant-wide one. If the tenant clock (`settings.timezone`) falls outside every open interval, apply the schedule's closed target and end.
+2. **Out of office.** Take the in-effect `ooo_rules` row for the target (user, ring-group or menu scope), else the tenant-wide one. If one exists, apply its forward target (§11, `forward_targets`), a forward hop of reason `away` (§9.4 Forwarded calls), and end. This step runs for internal calls too: an OOO rule states that the person or group is absent, and a colleague reaches their mailbox like any other caller. Each scope's OOO rule and opening hours are evaluated at most once per call, so a rule whose target leads back into its own scope is not applied twice.
+3. **Opening hours.** Inbound and forwarded calls only; internal calls skip this step, since hours describe when the company is reachable from outside. Take the target's `opening_hours` schedule, else the tenant-wide one. If the tenant clock (`settings.timezone`) falls outside every open interval, apply the schedule's closed target, a forward hop of reason `time_of_day`, and end.
 4. **Target user.** Conditions in this order:
    - an `unconditional` rule: apply its target, end;
    - DND: apply the `dnd` rule;
@@ -1150,17 +1166,17 @@ Two processes run for the life of the stack; `migrate` is a third container that
    - find-me legs (`users.find_me_json`) ring alongside: each entry is an outbound leg to an external number through the normal outbound resolution, started `delayS` seconds after ringing begins, so delay 0 rings with the devices and later delays stage the search. The external party who answers hears a short prompt and presses `1` to accept; a leg not accepted within 5 s is dropped, which keeps a mobile carrier's mailbox from taking the call. Find-me applies to direct calls only; a ring group rings a member's devices;
    - the first accepted answer wins and every other leg is hung up. If every device answers 486 or 600, apply the `busy` rule. If nobody answers within `users.ring_timeout_s`, counted from the start, or every leg has ended without an answer before that, apply the `noAnswer` rule.
 
-   An absent rule resolves to an implicit default: the user's own mailbox when `mailbox_enabled`, otherwise a rejection — 486 busy for `dnd` and `busy`, 480 temporarily unavailable for `noAnswer` and `offline`. An absent `offline` rule falls to the `noAnswer` rule before the default.
+   Every rule applied is a forward hop of its condition (§9.4 Forwarded calls). An absent rule resolves to an implicit default: the user's own mailbox when `mailbox_enabled`, otherwise a rejection — 486 busy for `dnd` and `busy`, 480 temporarily unavailable for `noAnswer` and `offline`. An absent `offline` rule falls to the `noAnswer` rule before the default.
 5. **Target ring group.** Expand the members: users and user groups, nested user groups flattened and deduplicated. Then decide who is ringable:
    - members who are DND, offline or under an in-effect OOO rule are skipped;
    - members already in a call are skipped while the group's `skip_busy` is set (the default); with it cleared they are rung on their other devices as call waiting;
-   - a member's `unconditional` forward to a user or an external number is followed, and that target is rung as the member's leg; a forward to a mailbox, an announcement or a ring group skips the member, so a group never drops its caller into one member's voicemail.
+   - a member's `unconditional` forward to a user, an external number or a SIP target is followed, and that target is rung as the member's leg, a SIP target over its trunk as step 7 dials it, with the member's forward as its last hop (§9.4 Forwarded calls); a forward to a mailbox, an announcement or a ring group skips the member, so a group never drops its caller into one member's voicemail.
 
    If no member is ringable, the `unavailable` rule fires immediately without ringing (absent that rule, the `unanswered` rule). Otherwise the group greeting plays to the caller, if configured, and the strategy runs:
    - `simultaneous` rings everyone for `ring_timeout_s`;
    - `sequential` and `random` (sequential over a shuffled order) ring one member at a time for `ring_timeout_s` each, capped by `ring_total_s`;
    - with `allow_reject` (the default), a member's SIP decline stops ringing all their devices; sequential moves on, and if everyone declined the fallback fires early. With it cleared, a decline is ignored and the member keeps ringing until the timeout, for groups where nobody may opt out of a call;
-   - the fallback is the group's `unanswered` forward rule, of any target kind. Absent that rule, the implicit default mirrors the user's: the group's own mailbox when `mailbox_enabled`, otherwise 480 temporarily unavailable.
+   - the fallback is the group's `unanswered` forward rule, of any target kind, a forward hop like a user's rule. Absent that rule, the implicit default mirrors the user's: the group's own mailbox when `mailbox_enabled`, otherwise 480 temporarily unavailable.
 6. **Target menu.** Play the menu's greeting and collect DTMF:
    - keys are collected while the string typed so far is a prefix of a longer mapped string; the string resolves as soon as it matches a mapping that no longer string extends, or when 2 s pass without a further key, so a single-digit menu never waits;
    - a matched string applies its forward target (Forward targets, without counting a hop); an unmatched string that is a live user or ring-group extension routes to it when the menu's `allow_extension_dialing` is set, parking slots excluded;
@@ -1168,7 +1184,7 @@ Two processes run for the life of the stack; `migrate` is a third container that
    - menus reached without a key in between, through fallbacks or OOO and closed targets that are menus, count toward the same attempts limit, so two menus falling back to each other end in a hangup with a trace line.
 
    Nothing about a menu is recorded; the routing trace lists the path pressed.
-7. **Forward targets.** A target of kind user, ring group or menu re-enters at Entry; a user or group target increases the hop counter, a menu does not, and neither does a DID's own target, since that is the call's first hop. An external number is dialed through `outbound_routes` (§9.4), as the forwarding user's call, or without a caller when a DID, menu, ring group or tenant rule forwards. Mailbox and announcement targets end the pipeline. After the third hop the call goes to the last target's mailbox, or is released with 480 if it has none.
+7. **Forward targets.** A target of kind user, ring group or menu re-enters at Entry; a user or group target increases the hop counter, a menu does not, and neither does a DID's own target, since that is the call's first hop. An external number is dialed through `outbound_routes` (§9.4), as the forwarding user's call, or without a caller when a DID, menu, ring group or tenant rule forwards. A SIP target is dialed over its own trunk, bypassing `outbound_routes` (§9.4 SIP targets), under the same caller rule, and like an external number neither counts a hop nor re-enters. An OOO rule, a closed schedule, a user's rule and a group's rule are forward hops, recorded for the forwarded leg's `Diversion` (§9.4 Forwarded calls); a DID's, block's or tenant fallback's own target and a menu's option or fallback are not. Mailbox and announcement targets end the pipeline. After the third hop the call goes to the last target's mailbox, or is released with 480 if it has none.
 
 **Outbound.** The dialed string is resolved in this order:
 
@@ -1212,7 +1228,7 @@ Timers, the hop counter and busy handling live entirely in the core.
 - seeded at first boot (§6.3) as five `audio_assets` rows, so a ring group or the hold default can name one track like any upload; the built-in `default` class plays all five in a shuffle and is what a NULL `hold_moh_audio_id` falls back to;
 - CC BY-SA 3.0, attributed in the admin guide. The artists are not registered with a collecting society, which is what makes the bundled music free of GEMA and AKM fees; music a tenant uploads is the tenant's own licensing matter, and the admin guide says so next to the upload.
 
-**Call forwarding.** Per-user rules, one per condition, in `user_forward_rules`: `unconditional`, `busy`, `noAnswer`, `dnd`, `offline` — the classic CFU, CFB and CFNR plus presence-aware conditions. All draw on the shared target vocabulary `forward_targets`: user, ring group, external number, mailbox, announcement, menu. Ring-group fallbacks and OOO actions use the same targets (§11).
+**Call forwarding.** Per-user rules, one per condition, in `user_forward_rules`: `unconditional`, `busy`, `noAnswer`, `dnd`, `offline` — the classic CFU, CFB and CFNR plus presence-aware conditions. All draw on the shared target vocabulary `forward_targets`: user, ring group, external number, SIP target (§9.4 SIP targets), mailbox, announcement, menu. Ring-group fallbacks and OOO actions use the same targets (§11).
 
 **Presence and BLF.** Device registration events (ARI `ContactStatusChange`) and the core's call state combine into per-user presence: available, busy, offline, dnd. It is published two ways: SIP-native for softphones (`Stasis:` device state and hints, §9.3) and on `/events` for admins and integrations. Transfer and pickup for softphones use native SIP transfer and the `*8` feature code, and are also available as REST actions (`POST /calls/{id}/transfer`, `/pickup`) proxied to the core. Every presence transition is appended to `presence_log` with the call counterpart and group context while busy, so past status can be reconstructed per timestamp.
 
@@ -1349,9 +1365,11 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Provisioning** (min. role: owner) — `POST /provisioning/ringotel/setup` (input: Ringotel `domain`, `region`, `packageid`) — runs `createOrganization` + `createBranch` (§10.4) and stores the ids in `settings`; a `region` or `packageid` the account does not offer is refused before anything is created, naming the ones it does, and a domain the account already has with 409, naming its organization and the adoption call that takes it over. `GET /provisioning/ringotel/options` lists those choices live (`getRegions`, `getPackages`, each package with the registrations per user it allows), since Ringotel adds regions and the packages are the account's own. Setup and adoption set `ringotel_max_regs` to the package's while it is still at its default (§11.4). `POST /provisioning/ringotel/adopt` (input: `orgId`, `domain`, optional `branchId`; confirmed) takes over an organization that already exists instead (§10.4)
 
-**Trunks** (min. role: admin) — `GET/POST /trunks`, `GET/PATCH/DELETE /trunks/{id}` (auth mode, inbound auth, transport — refused for a disabled transport, §9.4 —, emergency — required on create, §9.4 "Emergency trunks" —, codecs, clir, max channels, hosts, status), `PUT /trunks/order` (the ordered trunk ids, §9.4 "Trunk order"), `GET/PUT /outboundRoutes` (the ordered routes, each with its users, user groups and numbers, replaced as a whole)
+**Trunks** (min. role: admin) — `GET/POST /trunks`, `GET/PATCH/DELETE /trunks/{id}` (auth mode, inbound auth, transport — refused for a disabled transport, §9.4 —, emergency — required on create, §9.4 "Emergency trunks" —, codecs, clir, max channels, hosts, status; `DELETE` answers 409 with the outbound routes and the owners of the live `sip` forward targets using the trunk, §5.9), `PUT /trunks/order` (the ordered trunk ids, §9.4 "Trunk order"), `GET/PUT /outboundRoutes` (the ordered routes, each with its users, user groups and numbers, replaced as a whole)
 
 **Extensions & DIDs** (min. role: admin) — `GET/POST /dids`, `PATCH/DELETE /dids/{id}` (`target`, a forward target of any kind, §11.2), `GET/POST /didBlocks`, `PATCH/DELETE /didBlocks/{id}` (`PATCH` edits label, digits and fallback target; `base` is immutable, since the DIDs inside are matched by it); a number is the normalized international form or a provider's verbatim called-party string (§11.3)
+
+**Forward targets** — not a resource of their own: every `target`, `fallbackTarget` and `closedTarget` a DID, block, forwarding rule, OOO rule, schedule, menu or the tenant fallback carries is one of `{ kind: 'user', userId }`, `{ kind: 'ringGroup', ringGroupId }`, `{ kind: 'external', external }` (E.164), `{ kind: 'sip', trunkId, user }` (§9.4 SIP targets), `{ kind: 'mailboxUser', userId }`, `{ kind: 'mailboxRingGroup', ringGroupId }`, `{ kind: 'announcement', audioId }` or `{ kind: 'menu', menuId }`, each naming a live row (404 otherwise). A `sip` target is admin-only wherever it is set: a `user` writing their own forwarding, OOO rule or opening hours is refused with 403 for one in the input, and for an OOO rule update that keeps one; the check is the shared target writer's (`ops/forwardTargets.ts`), which every operation a `user` may call writes its targets through.
 
 **Ring groups** (min. role: admin) — `GET/POST /ringGroups`, `GET/PATCH/DELETE /ringGroups/{id}` (members, replaced as a whole when present, strategy, timeouts, greeting/MoH, skip-busy and reject flags, recording flag, mailbox), `PUT /ringGroups/{id}/forwarding` (the `unanswered` and `unavailable` rules, §11.2)
 
@@ -1885,7 +1903,8 @@ CREATE TABLE extensions (
   CHECK (ext NOT GLOB '*[^0-9]*' AND length(ext) >= 1)
 );
 
--- forward_targets — one shared target vocabulary; exactly one target column is set per row (CHECK).
+-- forward_targets — one shared target vocabulary; exactly one target is set per row (CHECK), the
+-- sip pair counting as one.
 -- A row is a value owned by the single column that points at it, one of nine: dids.target_id,
 -- user_forward_rules.target_id, ring_group_forward_rules.target_id, ooo_rules.target_id,
 -- opening_hours.closed_target_id, menus.fallback_target_id, menu_targets.target_id,
@@ -1898,6 +1917,8 @@ CREATE TABLE extensions (
 --   user_id:               ring the user
 --   ring_group_id:         run the group
 --   external:              dial out (E.164, CHECK)
+--   sip_trunk_id / sip_user: dial sip:<sip_user>@<host> over that trunk, bypassing outbound_routes
+--                          (§9.4 SIP targets); set together; the trunk purges once no row names it
 --   mailbox_user_id / mailbox_ring_group_id: deposit in that mailbox
 --   announcement_audio_id: play the announcement, then hang up
 --   menu_id:               play the menu (§10.1, Target menu)
@@ -1906,13 +1927,17 @@ CREATE TABLE forward_targets (
   user_id               TEXT REFERENCES users(id)        ON DELETE RESTRICT,
   ring_group_id         TEXT REFERENCES ring_groups(id)  ON DELETE RESTRICT,
   external              TEXT CHECK (external IS NULL OR (external GLOB '+[0-9]*' AND substr(external, 2) NOT GLOB '*[^0-9]*')),
+  sip_trunk_id          TEXT REFERENCES trunks(id)       ON DELETE RESTRICT,
+  sip_user              TEXT CHECK (sip_user IS NULL OR (length(sip_user) BETWEEN 1 AND 64 AND sip_user NOT GLOB '*[^A-Za-z0-9._~+-]*')),
   mailbox_user_id       TEXT REFERENCES users(id)        ON DELETE RESTRICT,
   mailbox_ring_group_id TEXT REFERENCES ring_groups(id)  ON DELETE RESTRICT,
   announcement_audio_id TEXT REFERENCES audio_assets(id) ON DELETE RESTRICT,
   menu_id               TEXT REFERENCES menus(id)        ON DELETE RESTRICT,
   CHECK ((user_id IS NOT NULL) + (ring_group_id IS NOT NULL) + (external IS NOT NULL) +
-         (mailbox_user_id IS NOT NULL) + (mailbox_ring_group_id IS NOT NULL) +
-         (announcement_audio_id IS NOT NULL) + (menu_id IS NOT NULL) = 1)
+         (sip_trunk_id IS NOT NULL) + (mailbox_user_id IS NOT NULL) +
+         (mailbox_ring_group_id IS NOT NULL) + (announcement_audio_id IS NOT NULL) +
+         (menu_id IS NOT NULL) = 1),
+  CHECK ((sip_trunk_id IS NULL) = (sip_user IS NULL))
 );
 
 -- menus — auto-attendant menus (§10.1, Target menu; §10.2). A menu's OOO rules and opening hours
