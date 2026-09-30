@@ -107,6 +107,13 @@ why the specified behaviour changed; the commit history, how.
 - A call's `sip`-level log listed Asterisk's RTCP reports, JSON lines such as
   `{"ssrc":…,"type":200,…}`, as if they were SIP messages, close to half the lines of a call
   with audio. The log now holds the call's SIP messages only.
+- A call answered at the very moment its ring time ran out could go to voicemail (or the
+  `noAnswer` forward) while the answering phone stayed connected to nothing, until the caller hung
+  up. The same could happen when a phone answered just as another of the user's phones declined,
+  or just before its own ringing was confirmed on a busy host. The phone that answers first now
+  always gets the call, and a phone answering after the ring has already moved on is hung up. A
+  click-to-dial could also send its target straight to voicemail, without ringing it, when one of
+  the user's own phones was slow to be reached after another had answered.
 
 ### Upgrade notes
 

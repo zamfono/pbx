@@ -5,7 +5,12 @@
  */
 import type { Call, Leg } from './call.js';
 import { findMeLegsPending } from './findMe.js';
-import { clearFindMeTimers, endLeg, hangupLeg } from './legs.js';
+import {
+  clearFindMeTimers,
+  endLeg,
+  hangupLeg,
+  type RingResolver
+} from './legs.js';
 import type { Pipeline } from './pipeline.js';
 
 // `ChannelDestroyed.cause` is Asterisk's Q.850 hangup cause: AST_CAUSE_USER_BUSY for SIP 486/600
@@ -25,10 +30,24 @@ function ringOutcome(call: Call): 'busy' | 'noAnswer' {
   return everyDeviceBusy ? 'busy' : 'noAnswer';
 }
 
-/** Settles `call`'s ring race without an answer: the timeout, or the last leg ending (§10.1 step 4). */
-export function concludeRing(pipeline: Pipeline, call: Call): void {
+/**
+ * Settles `call`'s ring race without an answer: the timeout, or the last leg ending (§10.1 step 4).
+ * A race whose answer is claimed and still being bridged is won already (`winLeg`), though no leg
+ * of it rings any more: nothing settles it but that win. With `ring`, only that race is settled:
+ * a ring on a user's own phones that already handed its answer over (`ownDevices.ts`) may still
+ * be placing its last device while the call's next ring, the click-to-dial's target, has begun.
+ */
+export function concludeRing(
+  pipeline: Pipeline,
+  call: Call,
+  ring?: RingResolver
+): void {
   const pending = pipeline.pendingRing.get(call.id);
-  if (pending === undefined) {
+  if (
+    pending === undefined ||
+    pending.won === true ||
+    (ring !== undefined && pending !== ring)
+  ) {
     return;
   }
   pipeline.pendingRing.delete(call.id);

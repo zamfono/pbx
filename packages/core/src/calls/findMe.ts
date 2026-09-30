@@ -7,7 +7,13 @@ import { MS_PER_SECOND } from '@zamfono/shared';
 import { defaultPrompt } from '../prompts.js';
 import type { Call, Leg } from './call.js';
 import { ringExternalLeg, type ExternalLegOwner } from './externalLeg.js';
-import { endLeg, hangupLeg, trackLeg, type FindMeAcceptWait } from './legs.js';
+import {
+  endLeg,
+  hangupLeg,
+  trackLeg,
+  type FindMeAcceptWait,
+  type RingResolver
+} from './legs.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
 import { concludeRing, endRingingLeg } from './ringConclusion.js';
@@ -31,12 +37,14 @@ export function clearFindMeTimers(pipeline: Pipeline, callId: string): void {
   pipeline.findMeTimers.delete(callId);
 }
 
-/** The single-user ring race as an external leg's owner (`externalLeg.ts`): each attempt's channel
- * is a `findMe` leg of `call`, and a superseded attempt leaves the race without counting as ended. */
+/** The single-user ring race `ring` as an external leg's owner (`externalLeg.ts`): each attempt's
+ * channel is a `findMe` leg of `call`, and a superseded attempt leaves the race without counting
+ * as ended. */
 function findMeOwner(
   pipeline: Pipeline,
   call: Call,
-  userId: string
+  userId: string,
+  ring: RingResolver
 ): ExternalLegOwner {
   const ringingLeg = (channelId: string): Leg | null => {
     const leg = call.legs.get(channelId);
@@ -53,8 +61,9 @@ function findMeOwner(
       };
       trackLeg(pipeline, call, leg);
       call.log.event({ event: 'rungFindMe', channelId, userId });
-      // The race may have settled while this attempt was being originated.
-      if (!pipeline.pendingRing.has(call.id)) {
+      // The race may have settled while this attempt was being originated, the call ringing on
+      // for its next target by now (a `noAnswer` forward to another user): never a leg of that.
+      if (pipeline.pendingRing.get(call.id) !== ring) {
         hangupLeg(pipeline, leg).catch(() => undefined);
       }
     },
@@ -83,14 +92,15 @@ async function originateFindMeLeg(
   userId: string,
   entry: FindMeEntry
 ): Promise<void> {
-  if (!pipeline.pendingRing.has(call.id)) {
+  const ring = pipeline.pendingRing.get(call.id);
+  if (ring === undefined) {
     return;
   }
   await ringExternalLeg(
     pipeline,
     call,
     { number: entry.number, asUser: userId },
-    findMeOwner(pipeline, call, userId)
+    findMeOwner(pipeline, call, userId, ring)
   );
 }
 

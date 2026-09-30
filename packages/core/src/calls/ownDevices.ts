@@ -16,7 +16,13 @@ import { channelLanguageVariable } from '../prompts.js';
 import type { Call, Leg } from './call.js';
 import { recordEvents, redeliverEarlyEvents } from './earlyEvents.js';
 import { originateLeg } from './legOriginate.js';
-import { concludeRing, hangupLeg, trackLeg, type RingOutcome } from './legs.js';
+import {
+  concludeRing,
+  hangupLeg,
+  trackLeg,
+  type RingOutcome,
+  type RingResolver
+} from './legs.js';
 import type { Pipeline } from './pipeline.js';
 import { placeAll } from './ringConclusion.js';
 
@@ -53,14 +59,20 @@ export type OwnRing = {
   outcome: Promise<OwnRingOutcome>;
 };
 
+/** This ring's own state: the channels it placed, and its race on the host call's
+ * `pendingRing`, which the call's next ring replaces once this one has handed its answer over. */
+type OwnRingState = { placed: Map<string, Channel>; ring: RingResolver };
+
 /** Places one leg for `device` on `host`, tracked as a ringing device leg. A placement that
- * fails leaves the ring; one placed after the race settled is hung up. */
+ * fails leaves the ring; one placed after the race settled is hung up, even once the host call
+ * rings on for its next party. */
 async function placeDevice(
   pipeline: Pipeline,
   params: OwnRingParams,
-  placed: Map<string, Channel>,
+  own: OwnRingState,
   device: Device
 ): Promise<void> {
+  const { placed } = own;
   const { host, sipCall, userId, callerId, language } = params;
   const early = recordEvents(pipeline.deps.ari);
   const channel = await originateLeg(pipeline, sipCall, {
@@ -94,7 +106,10 @@ async function placeDevice(
   // A phone that declined or answered at once did so before it was tracked.
   redeliverEarlyEvents(pipeline.deps.ari, early, channel.id);
   const leg = host.legs.get(channel.id);
-  if (!pipeline.pendingRing.has(host.id) && leg?.state === 'ringing') {
+  if (
+    pipeline.pendingRing.get(host.id) !== own.ring &&
+    leg?.state === 'ringing'
+  ) {
     await hangupLeg(pipeline, leg);
   }
 }
@@ -104,17 +119,18 @@ async function placeDevice(
 async function placeDevices(
   pipeline: Pipeline,
   params: OwnRingParams,
-  placed: Map<string, Channel>
+  own: OwnRingState
 ): Promise<void> {
   await placeAll(pipeline, params.host, params.devices, device =>
-    placeDevice(pipeline, params, placed, device)
+    placeDevice(pipeline, params, own, device)
   );
-  // Nothing rings: no device could be placed, or each ended before the last was.
+  // Nothing rings: no device could be placed, or each ended before the last was. Only this ring
+  // is concluded, never the call's next one begun meanwhile.
   const ringing = [...params.host.legs.values()].some(
     leg => leg.state === 'ringing'
   );
   if (!ringing) {
-    concludeRing(pipeline, params.host);
+    concludeRing(pipeline, params.host, own.ring);
   }
 }
 
@@ -131,16 +147,18 @@ export function ringOwnDevices(
     concludeRing(pipeline, host);
   }, params.timeoutS * MS_PER_SECOND);
   timer.unref();
-  pipeline.pendingRing.set(host.id, {
+  const ring: RingResolver = {
     resolve,
     timer,
     existingBridgeId: null,
     handOver: leg => {
       answered = leg;
     }
-  });
+  };
+  pipeline.pendingRing.set(host.id, ring);
   presence?.setCallState(userId, 'ringing', peer, null, presenceKey);
-  const placed = new Map<string, Channel>();
+  const own: OwnRingState = { placed: new Map<string, Channel>(), ring };
+  const { placed } = own;
   const outcome = promise.then((result): OwnRingOutcome => {
     presence?.setCallState(userId, 'idle', null, null, presenceKey);
     const leg = answered;
@@ -152,7 +170,7 @@ export function ringOwnDevices(
       ? { kind: 'abandoned' }
       : { kind: 'unanswered' };
   });
-  return { placed: placeDevices(pipeline, params, placed), outcome };
+  return { placed: placeDevices(pipeline, params, own), outcome };
 }
 
 /** Stops `host`'s ring outright (a REST hangup): its outcome is `abandoned`, and the call's own

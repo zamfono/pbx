@@ -32,6 +32,10 @@ export type RingResolver = {
   /** Device legs still being placed, all at once (`ringUser.ts`, `ownDevices.ts`): the race does
    * not end on its last ringing leg while one is still to ring. */
   placing?: number;
+  /** Set once a leg's answer is claimed (`winLeg`), from before its bridging awaits on: the race is
+   * won, so neither its timeout nor its last other leg ending may settle it unanswered meanwhile
+   * (§10.1 step 4, "first answer wins"). */
+  won?: boolean;
 };
 
 /** A find-me leg awaiting its accept key; `timer`, the accept window, starts once the prompt
@@ -81,6 +85,7 @@ async function winLeg(
   clearFindMeTimers(pipeline, call.id);
   const pending = pipeline.pendingRing.get(call.id);
   if (pending) {
+    pending.won = true;
     clearTimeout(pending.timer);
   }
   const joined = await bridgeAnswered(pipeline, call, leg, existingBridgeId);
