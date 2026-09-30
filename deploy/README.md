@@ -74,7 +74,8 @@ systemctl enable --now podman.socket
 `aardvark-dns` is what lets the services find each other by name. Without it `core` fails to
 reach `asterisk`. `docker-compose` is the Compose provider `podman compose` hands the files to,
 the same one CI uses; it talks to the root socket enabled above and needs no Docker daemon.
-`update.sh` needs it rather than `podman-compose`, which cannot wait for the services' health.
+It is the recommended provider. `podman-compose` also works: it has no `up --wait`, so
+`update.sh` checks the services' health itself instead.
 
 Podman does **not** restart the stack after a reboot on its own: its `podman-restart.service`
 only covers `restart: always`, and the stack uses `unless-stopped`. Step 7 adds a unit for that.

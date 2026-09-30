@@ -40,10 +40,15 @@ for _ in $(seq 1 50); do
   sleep 0.1
 done
 
-# The stub runtime: `docker compose version` answers, everything else is recorded and succeeds.
+# The stub runtime: `docker compose version` answers, `up --help` names --wait unless
+# STUB_NO_WAIT (podman-compose's has none), everything else is recorded and succeeds.
 mkdir -p "$work/bin"
 cat >"$work/bin/docker" <<'STUB'
 #!/usr/bin/env bash
+if [[ $* == 'compose up --help' ]]; then
+  [[ -n ${STUB_NO_WAIT:-} ]] || echo '      --wait    Wait for services to be running|healthy.'
+  exit 0
+fi
 echo "$*" >>"$STUB_LOG"
 [[ -z ${STUB_FAIL_PULL:-} || $* != *' pull'* ]]
 STUB
@@ -94,6 +99,20 @@ grep -qx "CONTAINER_SOCKET='/run/podman/podman.sock'" "$work/stack/.env" ||
 # Podman will not replace asterisk while proxy shares its network namespace (§6.3).
 grep -qx 'compose -f compose.yaml -f compose.ports.yaml rm -sf proxy' "$work/runtime.log" ||
   fail "proxy was not removed before up -d on Podman"
+
+echo "  - on podman-compose, which has no up --wait: api's and core's /healthz polled instead"
+fresh_stack
+(cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_RUNTIME=podman \
+  STUB_NO_WAIT=1 ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh 1.2.4 </dev/null >"$work/out" 2>&1) ||
+  { cat "$work/out"; fail "the update on podman-compose failed"; }
+grep -q 'no up --wait' "$work/out" || fail "no word of the polling path: $(cat "$work/out")"
+grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d' "$work/runtime.log" ||
+  fail "no plain up -d on podman-compose: $(cat "$work/runtime.log")"
+for service in api core; do
+  grep -q "^compose -f compose.yaml -f compose.ports.yaml exec -T $service node -e fetch(" \
+    "$work/runtime.log" || fail "$service's /healthz was not polled"
+done
+grep -q 'Updated 1.2.3 -> 1.2.4' "$work/out" || fail "no report of the update on podman-compose"
 
 fresh_stack
 update 1.2.4 >/dev/null 2>&1 || fail "the update to 1.2.4 failed"
