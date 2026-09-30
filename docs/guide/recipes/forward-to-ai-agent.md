@@ -25,6 +25,8 @@ outside the stack; this recipe gets the call to OpenAI. OpenAI's guide:
      turn it off only for a test endpoint with a self-signed one) and `"srtp": true`, which OpenAI
      requires;
    - `"codecs": ["opus", "alaw", "ulaw"]`, Opus first;
+   - `"diversion": "all"` (or `"last"`), for the `Diversion` header that tells your webhook who
+     forwarded the call (step 5); a new trunk's `off` sends none;
    - `"hosts": [{ "host": "sip.api.openai.com", "port": 5061, "direction": "outbound" }]`:
      `outbound`, since OpenAI never calls the stack, and the port given, since the endpoint is
      reached on 5061 directly.
@@ -112,12 +114,18 @@ outside the stack; this recipe gets the call to OpenAI. OpenAI's guide:
    and its `From` the number the stack presents, as for any call over
    the trunk: the forwarding user's own number, else the company's main number. It adds
    - the target's headers, as step 3 sets them;
-   - `Diversion`: the user or ring group whose rule forwarded the call last, with their number
-     (their own number, else their extension), name and reason: `unconditional`, `user-busy`,
-     `no-answer`, `unavailable`, `do-not-disturb`, `away` (out of office) or `time-of-day` (closed
-     hours). Only the last forward is named: a call that user A's out-of-office rule sent to user
-     B, whose rule sent it on to the agent, names B, for example
-     `Diversion: "B Name" <sip:178@203.0.113.10>;reason=unconditional`.
+   - `Diversion`, as the trunk's `diversion` says: none for `off`; for `last` the user or ring
+     group whose rule forwarded the call last; for `all` every forward, newest first, in one
+     header, separated by commas. Each names the forwarder by their own number (a user's own
+     number, a ring group's DID), else the company's main number, never an extension, with their
+     name and the reason: `unconditional`, `user-busy`, `no-answer`, `unavailable`,
+     `do-not-disturb`, `away` (out of office) or `time-of-day` (closed hours). A call that user
+     A's out-of-office rule sent to user B, who has no number of their own and whose rule sent it
+     on to the agent, carries with `all`, for a company whose main number is +4312345600 and A's
+     own +4312345677,
+     `Diversion: "B Name" <sip:+4312345600@203.0.113.10>;reason=unconditional, "A Name" <sip:+4312345677@203.0.113.10>;reason=away`,
+     and with `last` only the first entry, B's. The host is the stack's own address. To tell B's extension to your webhook, which
+     `Diversion` never names, put `{{forwardedByExtension}}` in a header (step 3).
 
    A call from a DID straight to the agent carries no `Diversion`, since nobody forwarded it.
 

@@ -15,7 +15,10 @@ that single tenant; there is no cross-tenant sharing.
   can encrypt its media too (`srtp`, for a provider that requires SRTP; `tls` trunks only). An
   `ip` trunk's `status` comes from an OPTIONS probe every 60 seconds (`qualify`, on for a new
   trunk); a trunk with it off, for an endpoint that never answers one, reads `unmonitored` and is
-  always tried.
+  always tried. A trunk's `diversion` says what a call forwarded out over it tells the far end
+  about who forwarded it: `off` (the default) nothing, `last` the last forward, `all` every
+  forward, each by the forwarder's own number or the company's main number, never an extension.
+  Some carriers show the original caller's number on a forwarded call only when it carries one.
 - **DID** — a phone number the tenant owns, routed on arrival to a forward target. A **DID
   block** groups a contiguous range of numbers under one fallback target, for a provider that
   hands over a whole range instead of individual DIDs.
@@ -51,7 +54,8 @@ three-hop forwarding limit (`routing-order`); a `menu` target re-enters without 
 `mailboxUser`, `mailboxRingGroup` and `announcement` end the pipeline; `external` dials out
 through the outbound routes, and `sip`, `{ "kind": "sip", "trunkId": "…", "user": "…" }`, dials
 `sip:<user>@<host>` at the trunk's own hosts, such as an AI agent's endpoint
-(`forward-to-ai-agent`). Either leg tells the far end who called and who forwarded.
+(`forward-to-ai-agent`). A `sip` leg tells the far end who called through the target's
+headers; either leg tells it who forwarded only as far as the trunk's `diversion` allows.
 
 ## Where to look next
 
