@@ -5,3 +5,8 @@ export const MS_PER_DAY = 86_400_000;
 export function nowIso(): string {
   return new Date().toISOString();
 }
+
+/** `now`, `days` earlier, as the ISO instant every retention window compares its `_at` column against. */
+export function cutoffIso(now: string, days: number): string {
+  return new Date(Date.parse(now) - days * MS_PER_DAY).toISOString();
+}

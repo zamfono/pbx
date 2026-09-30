@@ -27,6 +27,16 @@ describe('repeat', () => {
     expect(fn).toHaveBeenCalledTimes(3);
   });
 
+  it('starts the first run before it returns, which a stop() right after lets finish', async () => {
+    const fn = vi.fn();
+    const job = repeat(fn, PERIOD_MS);
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    job.stop();
+    await vi.advanceTimersByTimeAsync(2 * PERIOD_MS);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
   it('waits a period before the first run with runNow false', async () => {
     const fn = vi.fn();
     const job = repeat(fn, PERIOD_MS, { runNow: false });

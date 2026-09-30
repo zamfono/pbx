@@ -1,6 +1,6 @@
 /**
  * The "run now, then every period, until stopped" schedule of the background jobs no request
- * drives: `core`'s retention sweep (§11.6) and, as they adopt it, `api`'s own (§5.9, §6.4).
+ * drives: `core`'s retention sweep (§11.6) and `api`'s daily purge (§5.9).
  */
 
 export type RepeatOptions = {
@@ -36,9 +36,12 @@ export function repeat(
       state.timer.unref();
     }
   };
+  // `fn` is called in `run` itself, not a microtask later, so the run `repeat` starts "now" is
+  // already in flight when it returns: a `stop()` right after cancels only the runs after it.
   const run = (): void => {
-    Promise.resolve()
-      .then(fn)
+    new Promise(resolve => {
+      resolve(fn());
+    })
       .catch(() => undefined)
       .finally(() => {
         if (!state.stopped) {
