@@ -120,8 +120,10 @@ grep -q 'does not match' "$work/out" || fail "no word of the mismatch: $(cat "$w
 
 echo "  - the policy of update-policy.tsv, which the updater's judgeUpdate is tested against too"
 fresh_stack
+rows=0
 while IFS=$'\t' read -r from to verdict; do
   [[ -z $from || $from == '#'* ]] && continue
+  rows=$((rows + 1))
   sed -i '/^ZAMFONO_VERSION=/d' "$work/stack/.env"
   echo "ZAMFONO_VERSION=$from" >>"$work/stack/.env"
   case $verdict in
@@ -141,6 +143,7 @@ while IFS=$'\t' read -r from to verdict; do
     [[ $verdict == older || $verdict == breaking ]] || fail "$from to $to: the updater's run refused it"
   fi
 done <"$repo_root/deploy/update-policy.tsv"
+((rows > 0)) || fail "update-policy.tsv holds no case"
 fresh_stack
 
 echo "  - a breaking release needs --yes without a terminal"
