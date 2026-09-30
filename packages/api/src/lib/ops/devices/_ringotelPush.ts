@@ -18,17 +18,20 @@ import type { Context } from '../types.js';
 
 const log = pino({ name: 'ringotel' });
 
-type PushOutcome =
+export type PushOutcome =
   | { outcome: 'pushed'; receipt: PushReceipt }
   | { outcome: 'refused' | 'skipped'; reason: string };
 
-type Push = {
+type PushTarget = {
   /** The operation whose write this push follows, e.g. `devices.create`. */
   trigger: string;
   deviceId: string;
-  push: (provider: ProvisioningProvider) => Promise<PushReceipt>;
   /** What stands whatever Ringotel answers, and how to push again. */
   failure: { what: string; retry: string };
+};
+
+type Push = PushTarget & {
+  push: (provider: ProvisioningProvider) => Promise<PushReceipt>;
 };
 
 /**
@@ -39,7 +42,7 @@ type Push = {
 async function auditPush(
   db: Db,
   caller: OutcomeCaller,
-  push: Push,
+  push: PushTarget,
   result: PushOutcome
 ): Promise<void> {
   const changes = outcomeChanges({
@@ -78,6 +81,17 @@ async function attempt(db: Db, push: Push): Promise<PushOutcome> {
   }
 }
 
+/** The result's warning for `result`, or `null` where Ringotel took the push. */
+function pushWarning(push: PushTarget, result: PushOutcome): string | null {
+  if (result.outcome === 'pushed') {
+    return null;
+  }
+  if (result.outcome === 'skipped') {
+    return `${push.failure.what}: Ringotel is not set up, so nothing reached it; provisioning.ringotelSetup or provisioning.ringotelAdopt pushes the device when it runs`;
+  }
+  return `${push.failure.what}, but Ringotel refused it (${result.reason}); ${push.failure.retry}`;
+}
+
 /**
  * Pushes a `ringotel` device's change to Ringotel once its write has committed and Asterisk holds
  * it (§10.4): an activated Ringotel user registers against the PBX with its SIP credentials
@@ -93,12 +107,23 @@ export function pushToRingotel(ctx: Context, push: Push): void {
   afterPropagation(ctx, async db => {
     const result = await attempt(db, push);
     await auditPush(db, caller, push, result);
-    if (result.outcome === 'pushed') {
-      return null;
-    }
-    if (result.outcome === 'skipped') {
-      return `${push.failure.what}: Ringotel is not set up, so nothing reached it; provisioning.ringotelSetup or provisioning.ringotelAdopt pushes the device when it runs`;
-    }
-    return `${push.failure.what}, but Ringotel refused it (${result.reason}); ${push.failure.retry}`;
+    return pushWarning(push, result);
+  });
+}
+
+/**
+ * Records a push that ran inside `ctx`'s operation, as setup and adoption provision the devices
+ * created before them (§10.4): the `ringotel.push` row is written, and a refusal becomes the
+ * result's warning, once the operation has committed, like every other push's.
+ */
+export function reportPush(
+  ctx: Context,
+  push: PushTarget,
+  result: PushOutcome
+): void {
+  const caller = callerOf(ctx);
+  afterPropagation(ctx, async db => {
+    await auditPush(db, caller, push, result);
+    return pushWarning(push, result);
   });
 }

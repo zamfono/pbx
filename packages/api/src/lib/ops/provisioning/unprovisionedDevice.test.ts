@@ -85,6 +85,19 @@ async function setup(db: Db): Promise<void> {
   );
 }
 
+/** The device's `ringotel.push` rows' changes, oldest first. */
+async function pushTrail(db: Db, deviceId: string): Promise<unknown[]> {
+  const rows = await db
+    .selectFrom('auditLog')
+    .select('changesJson')
+    .where('operation', '=', 'ringotel.push')
+    .where('entityId', '=', deviceId)
+    .orderBy('createdAt')
+    .orderBy('id')
+    .execute();
+  return rows.map(row => JSON.parse(row.changesJson) as unknown);
+}
+
 describe('a ringotel device created before provisioning.ringotelSetup (§10.4)', () => {
   it('is provisioned by the setup, with its stored credentials', async () => {
     const db = await makeTestDb();
@@ -132,6 +145,52 @@ describe('a ringotel device created before provisioning.ringotelSetup (§10.4)',
     expect(blfPush?.params.options).toEqual({
       blfs: [{ number: '101', title: 'Anna' }]
     });
+  });
+  it('ends its ringotel.push trail with what the setup pushed (§5.7)', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    const ringotel = installRingotelFake([]);
+    const { device } = await deviceBeforeSetup(db);
+
+    await setup(db);
+
+    const rows = await pushTrail(db, device.device.id);
+    expect(rows.at(-1)).toEqual([
+      { field: 'outcome', from: null, to: 'pushed' },
+      { field: 'trigger', from: null, to: 'provisioning.ringotelSetup' },
+      { field: 'ringotelUserId', from: null, to: ringotel.users[0]?.id }
+    ]);
+  });
+
+  it('stands when Ringotel refuses the device, with a warning and a refused row', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    const ringotel = installRingotelFake([]);
+    const { device } = await deviceBeforeSetup(db);
+    ringotel.failing.add('createUser');
+
+    const output = await runOperation<
+      unknown,
+      { ringotelOrgId: string; warnings?: string[] }
+    >(
+      db,
+      'provisioning.ringotelSetup',
+      { domain: 'testco', region: '3', packageid: 1 },
+      asRun()
+    );
+
+    expect(output.ringotelOrgId).toBeTruthy();
+    expect(output.warnings).toEqual([
+      expect.stringMatching(
+        /has no Ringotel user yet, but Ringotel refused it .*devices[.]rotate/u
+      )
+    ]);
+    const rows = await pushTrail(db, device.device.id);
+    expect(rows.at(-1)).toEqual([
+      { field: 'outcome', from: null, to: 'refused' },
+      { field: 'trigger', from: null, to: 'provisioning.ringotelSetup' },
+      { field: 'reason', from: null, to: expect.any(String) as unknown }
+    ]);
   });
 });
 

@@ -89,33 +89,39 @@ async function provisionDevice(
   deps: RingotelProviderDeps,
   orgId: string,
   device: DeviceRow
-): Promise<void> {
+): Promise<string> {
   const remoteId = await createRemoteUser(
     deps,
     device,
     storedCredentials(device)
   );
   const keys = await deviceBlfKeys(deps.db, device.id);
-  if (keys.length === 0) {
-    return;
+  if (keys.length > 0) {
+    await deps.client.call('updateUser', {
+      orgid: orgId,
+      id: remoteId,
+      options: { blfs: await blfEntries(deps.db, keys) }
+    });
   }
-  await deps.client.call('updateUser', {
-    orgid: orgId,
-    id: remoteId,
-    options: { blfs: await blfEntries(deps.db, keys) }
-  });
+  return remoteId;
 }
+
+/** What Ringotel answered for one existing device: its new user's id, or why it refused. */
+export type ExistingDeviceOutcome = { deviceId: string } & (
+  { remoteId: string } | { reason: string }
+);
 
 /**
  * Provisions every live `ringotel` device that exists when `provisioning.ringotelSetup` creates
  * the organization and connection: while none existed, no provider could run `onDeviceCreated`
  * (§10.4), so each gets its `createUser` now, with its stored credentials, and its stored panel.
  * `createUser` rather than `onDeviceCreated`, since a Ringotel user never existed for any of
- * them, so there is no deleted user to recover.
+ * them, so there is no deleted user to recover. A device Ringotel refuses leaves the others and
+ * the setup standing, as a device's push does after its own operation; its outcome says why.
  */
 export async function provisionExistingDevices(
   deps: RingotelProviderDeps
-): Promise<void> {
+): Promise<ExistingDeviceOutcome[]> {
   const { orgId } = await resolveIds(deps.db);
   const devices = await deps.db
     .selectFrom('devices')
@@ -124,8 +130,16 @@ export async function provisionExistingDevices(
     .where('deletedAt', 'is', null)
     .orderBy('createdAt')
     .execute();
+  const outcomes: ExistingDeviceOutcome[] = [];
   for (const device of devices) {
-    // eslint-disable-next-line no-await-in-loop -- the Ringotel RPC has no batch create; sequential pushes are the plain reading of the API
-    await provisionDevice(deps, orgId, device);
+    try {
+      // eslint-disable-next-line no-await-in-loop -- the Ringotel RPC has no batch create; sequential pushes are the plain reading of the API
+      const remoteId = await provisionDevice(deps, orgId, device);
+      outcomes.push({ deviceId: device.id, remoteId });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      outcomes.push({ deviceId: device.id, reason });
+    }
   }
+  return outcomes;
 }

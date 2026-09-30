@@ -146,7 +146,12 @@ export const ringotelAdopt = defineOperation<Input, Output>({
       id: input.orgId,
       params: organizationParams(settings)
     });
-    await storeRingotelIds(ctx, client, input.orgId, branchId);
+    await storeRingotelIds(
+      ctx,
+      client,
+      { orgId: input.orgId, branchId },
+      'provisioning.ringotelAdopt'
+    );
     return { ringotelOrgId: input.orgId, ringotelBranchId: branchId };
   }
 });

@@ -27,7 +27,9 @@ why the specified behaviour changed; the commit history, how.
 - What Ringotel answered to a device's push, and the re-registration after a restart, was only in
   the call's result and the container log, which an update discards. Each is now an audit entry
   (`ringotel.push` on the device, `ringotel.rereg`), and a `ringotel` device created or rotated
-  before Ringotel is set up now says so in a `warnings` entry instead of nothing.
+  before Ringotel is set up now says so in a `warnings` entry instead of nothing. Setup and
+  adoption, which provision such a device, add its `ringotel.push` entry too; a device Ringotel
+  refuses there is a `warnings` entry of theirs rather than failing the whole setup.
 - The call log's `sip` level recorded no SIP message at all: Asterisk refused its collector
   address `core:9060`, since it takes a numeric address only, and mirrored nothing. It now sends
   to the address `core` has, and follows it when `core` is recreated.

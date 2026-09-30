@@ -2,6 +2,7 @@ import { buildBranchProvision } from '../../provisioning/ringotel.js';
 import type { RingotelClient } from '../../provisioning/ringotelClient.js';
 import { branchBlfEntries } from '../../provisioning/ringotelRoster.js';
 import { provisionExistingDevices } from '../../provisioning/ringotelUser.js';
+import { reportPush } from '../devices/_ringotelPush.js';
 import { loadParkingSlots } from '../parking/_shared.js';
 import { propagate, recordChange, setUndoable } from '../runner.js';
 import { loadSettings, type SettingsRow } from '../settings/_shared.js';
@@ -127,22 +128,41 @@ export async function createConnection(
 
 /**
  * Stores the two ids and provisions the `ringotel` devices created before any provider existed
- * (§10.4), inside the caller's rollback. Not undoable (§5.8, "where reversal is impossible"): the
- * ids are "written by the setup operation, read-only through `PATCH`" (§11.4), so no normal
- * operation takes the `from` values back, and the objects at Ringotel lie beyond a diff.
+ * (§10.4), inside the caller's rollback; each device's outcome is a `ringotel.push` row with the
+ * operation, `trigger`, as its trigger, and a refusal a warning. Not undoable (§5.8, "where
+ * reversal is impossible"): the ids are "written by the setup operation, read-only through
+ * `PATCH`" (§11.4), so no normal operation takes the `from` values back, and the objects at
+ * Ringotel lie beyond a diff.
  */
 export async function storeRingotelIds(
   ctx: Context,
   client: RingotelClient,
-  orgId: string,
-  branchId: string
+  ids: { orgId: string; branchId: string },
+  trigger: 'provisioning.ringotelSetup' | 'provisioning.ringotelAdopt'
 ): Promise<void> {
+  const { orgId, branchId } = ids;
   await ctx.db
     .updateTable('settings')
     .set({ ringotelOrgId: orgId, ringotelBranchId: branchId })
     .where('id', '=', 1)
     .execute();
-  await provisionExistingDevices({ client, db: ctx.db });
+  const outcomes = await provisionExistingDevices({ client, db: ctx.db });
+  for (const outcome of outcomes) {
+    reportPush(
+      ctx,
+      {
+        trigger,
+        deviceId: outcome.deviceId,
+        failure: {
+          what: `device ${outcome.deviceId} has no Ringotel user yet`,
+          retry: 'devices.rotate on the device creates it'
+        }
+      },
+      'remoteId' in outcome
+        ? { outcome: 'pushed', receipt: { remoteId: outcome.remoteId } }
+        : { outcome: 'refused', reason: outcome.reason }
+    );
+  }
   recordChange(ctx, { field: 'ringotelOrgId', from: null, to: orgId });
   recordChange(ctx, { field: 'ringotelBranchId', from: null, to: branchId });
   setUndoable(ctx, false);

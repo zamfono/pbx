@@ -120,7 +120,12 @@ export const ringotelSetup = defineOperation<Input, Output>({
     onRollback(ctx, cause => discardOrganization(client, org.id, cause));
     await followPackageMaxRegs(ctx, chosen.maxregs);
     const branchId = await createConnection(ctx, client, org.id, address);
-    await storeRingotelIds(ctx, client, org.id, branchId);
+    await storeRingotelIds(
+      ctx,
+      client,
+      { orgId: org.id, branchId },
+      'provisioning.ringotelSetup'
+    );
     return { ringotelOrgId: org.id, ringotelBranchId: branchId };
   }
 });
