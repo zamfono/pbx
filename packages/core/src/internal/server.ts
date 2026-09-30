@@ -4,10 +4,10 @@
  * the internal network is the trust boundary.
  */
 import http from 'node:http';
-import { sql } from 'kysely';
 import { WebSocket, WebSocketServer } from 'ws';
 
 import {
+  isDbOpen,
   MS_PER_SECOND,
   resolveVersion,
   type CoreHealth,
@@ -65,21 +65,12 @@ type InternalDeps = {
   presence: PresenceRefresh | null;
 };
 
-async function isDbHealthy(db: Db): Promise<boolean> {
-  try {
-    await sql`select 1`.execute(db);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function handleHealthz(
   deps: InternalDeps,
   ariConnected: boolean,
   response: http.ServerResponse
 ): Promise<void> {
-  const dbOk = await isDbHealthy(deps.db);
+  const dbOk = await isDbOpen(deps.db);
   const body: CoreHealth = {
     ok: dbOk && ariConnected,
     ari: ariConnected,

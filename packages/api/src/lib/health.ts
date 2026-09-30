@@ -1,6 +1,6 @@
 import { sql } from 'kysely';
 
-import { pendingMigrations, type Db } from '@zamfono/shared';
+import { isDbOpen, pendingMigrations, type Db } from '@zamfono/shared';
 
 import { ENC_COLUMNS } from './jobs/keyRotation.js';
 import { hasEmergencyTrunk } from './ops/trunks/_shared.js';
@@ -41,15 +41,6 @@ export type ApiHealthDeps = {
   keyRotationRemaining: number;
   certificateSync: 'ok' | 'missing' | 'unknown';
 };
-
-async function isDbOpen(db: Db): Promise<boolean> {
-  try {
-    await sql`select 1`.execute(db);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Rows in `table.column` whose blob is not on the keyring's current key generation. Selects

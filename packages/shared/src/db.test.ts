@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { openDb, pendingMigrations } from './db.js';
+import { isDbOpen, openDb, pendingMigrations } from './db.js';
 import { migrateForTest } from './testDb.js';
 
 test('migrates and enforces the schema', async () => {
@@ -89,4 +89,11 @@ test('migrates and enforces the schema', async () => {
       })
       .execute()
   ).rejects.toThrow(/FOREIGN KEY/u);
+});
+
+test('isDbOpen answers until the database is closed', async () => {
+  const db = openDb(':memory:');
+  expect(await isDbOpen(db)).toBe(true);
+  await db.destroy();
+  expect(await isDbOpen(db)).toBe(false);
 });

@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import Database from 'better-sqlite3';
-import { CamelCasePlugin, Kysely, SqliteDialect } from 'kysely';
+import { CamelCasePlugin, Kysely, sql, SqliteDialect } from 'kysely';
 import { FileMigrationProvider, Migrator } from 'kysely/migration';
 
 import type { DB } from './generated/db.js';
@@ -26,6 +26,16 @@ export function openDb(file: string): Db {
     dialect: new SqliteDialect({ database }),
     plugins: [new CamelCasePlugin({ maintainNestedObjectKeys: true })]
   });
+}
+
+/** Whether `db` answers a trivial query, the database check of `api`'s and core's `/healthz` (§7). */
+export async function isDbOpen(db: Db): Promise<boolean> {
+  try {
+    await sql`select 1`.execute(db);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function pendingMigrations(
