@@ -11,6 +11,13 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Added
+
+- The stack serves the Zamfono logo as its favicon (`/favicon.ico`, `/favicon.svg`) and in a
+  light and a dark variant (`/logo.svg`, `/logo.png`, `/logoDark.svg`, `/logoDark.png`), and the
+  MCP server names itself with it: MCP clients that show a server's icon, title or website now show
+  Zamfono's.
+
 ## [0.0.7] - 2026-09-30
 
 ### Fixed

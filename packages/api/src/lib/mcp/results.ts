@@ -13,13 +13,6 @@ import type { PromptContent } from './prompts.js';
 // `resultType` ("complete", or "input_required" for a pending elicitation) and identifies the
 // server in `_meta`; a cacheable one (discovery and every list) adds `ttlMs` and `cacheScope`. A
 // legacy 2025-11-25 result has none of these: the session's `initialize` identified the server.
-//
-// `version` is the stack's own (§7 "Version"), read once: neither environment variable changes
-// for the life of the process.
-const SERVER_INFO = {
-  name: 'zamfono',
-  version: resolveVersion(process.env).display
-};
 const SERVER_INFO_META_KEY = 'io.modelcontextprotocol/serverInfo';
 const TTL_MS = 300_000;
 // `private`: the lists are the same for every caller today, but the endpoint serves one tenant's
@@ -29,6 +22,64 @@ const CAPABILITIES = { tools: {}, prompts: {} };
 
 type TextContent = { type: 'text'; text: string };
 type Result = Record<string, unknown>;
+
+const WEBSITE_URL = 'https://github.com/zamfono/pbx';
+// The logo in `static/`, served by the stack itself and public (§10.3 "Icons"). `theme` is the
+// background an icon is drawn for: the black one for a light client, the white one for a dark.
+const ICONS = [
+  {
+    path: '/logo.svg',
+    mimeType: 'image/svg+xml',
+    sizes: ['any'],
+    theme: 'light'
+  },
+  {
+    path: '/logoDark.svg',
+    mimeType: 'image/svg+xml',
+    sizes: ['any'],
+    theme: 'dark'
+  },
+  {
+    path: '/logo.png',
+    mimeType: 'image/png',
+    sizes: ['192x192'],
+    theme: 'light'
+  },
+  {
+    path: '/logoDark.png',
+    mimeType: 'image/png',
+    sizes: ['192x192'],
+    theme: 'dark'
+  }
+];
+
+/**
+ * The `serverInfo` (`Implementation`) both eras send (§10.5). An icon's `src` must be an absolute
+ * URI, so the icons are left out while `ORIGIN` is unset, as it is outside a stack (`vite dev`).
+ */
+export function serverInfo(env: NodeJS.ProcessEnv): Result {
+  const info: Result = {
+    name: 'zamfono',
+    title: 'Zamfono',
+    version: resolveVersion(env).display,
+    websiteUrl: WEBSITE_URL
+  };
+  if (!env.ORIGIN) {
+    return info;
+  }
+  const origin = new URL(env.ORIGIN).origin;
+  return {
+    ...info,
+    icons: ICONS.map(({ path, ...icon }) => ({
+      src: `${origin}${path}`,
+      ...icon
+    }))
+  };
+}
+
+// `version` is the stack's own (§7 "Version") and the icons follow `ORIGIN`, read once: none of
+// these environment variables changes for the life of the process.
+const SERVER_INFO = serverInfo(process.env);
 
 /** A 2026-07-28 `complete` result, identifying the server as the schema says it SHOULD. */
 function complete(fields: Result): Result {
