@@ -41,6 +41,23 @@ assert_shared_namespace() {
 # file itself is exercised unchanged; only the network's driver differs, a bridge standing in for
 # the macvlan/ipvlan the host would otherwise provide, which is exactly what `external: true`
 # leaves to the host to decide. Brings up `asterisk` alone, the only service the overlay touches.
+# §9.1 "Binding": in the macvlan mode both TLS transports bind the stack address, the trunks'
+# transport-tls-noverify included, since an outgoing connection leaves from its transport's
+# address. Polled for up to 30 s, as PJSIP loads a few seconds after the container starts.
+public_tls_transports_bound() {
+  local stack_ip=$1 transports _
+  for _ in $(seq 1 30); do
+    transports=$(STACK_IPV4=$stack_ip $COMPOSE "${macvlan_files[@]}" exec -T asterisk \
+      asterisk -rx 'pjsip show transports' 2>/dev/null || true)
+    if echo "$transports" | grep -q "transport-tls .*$stack_ip:5061" \
+      && echo "$transports" | grep -q "transport-tls-noverify .*$stack_ip:5062"; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
 assert_public_network_address() {
   echo '== §6.3 Runtimes: asterisk holds STACK_IPV4 on the public network (compose.macvlan.yaml) =='
   local macvlan_files=(-f compose.yaml -f compose.macvlan.yaml -f "$here/compose.test.yaml")
@@ -64,6 +81,9 @@ assert_public_network_address() {
     if [ "$addr" != "$stack_ip" ]; then
       ok=false
       reason="asterisk's address on 'public' was '${addr:-none}', not $stack_ip"
+    elif ! public_tls_transports_bound "$stack_ip"; then
+      ok=false
+      reason="transport-tls and transport-tls-noverify are not bound to $stack_ip:5061/5062 (§9.1)"
     fi
   else
     ok=false

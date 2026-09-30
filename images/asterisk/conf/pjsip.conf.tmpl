@@ -16,7 +16,35 @@ allow_reload = yes
 ; handshakes complete and TLSv1/TLSv1.1 are refused with "tlsv1 alert protocol version" (the
 ; OpenSSL 3 default security level excludes them from that method's range).
 method = sslv23
+; A trunk's `tls_verify` (spec §9.4 "Signaling"): the provider's certificate is checked against
+; the system CA bundle (ca-certificates) and its name against the host dialled. Asterisk applies
+; `verify_server` to outgoing connections alone (res/res_pjsip/pjsip_transport_events.c,
+; transport_tls_verify: an incoming connection returns before the check), so devices connecting
+; here are not affected. `ca_list_path` rather than `ca_list_file`: pjproject turns a CA file
+; into the list of client-certificate authorities the server side names to every device
+; (ssl_sock_ossl.c, SSL_CTX_set_client_CA_list), a directory into nothing. RFC 5922 forbids
+; wildcard certificates, which pjproject enforces and many providers present, so they are allowed.
+verify_server = yes
+ca_list_path = /etc/ssl/certs
+allow_wildcard_certs = yes
 ${EXTERNAL_ADDRESS_LINES}
+
+; The same TLS server for the trunks whose `tls_verify` is off (spec §9.1, §9.4 "Signaling"):
+; PJSIP checks certificates per transport, not per endpoint. It binds the address transport-tls
+; binds, since an outgoing connection leaves from its transport's address, and the provider's
+; in-dialog requests come back over that connection. Its port is not published in the ports mode,
+; where Contact and Via name 5061 instead (entrypoint.sh, TLS_NOVERIFY_EXTERNAL_PORT_LINE).
+[transport-tls-noverify]
+type = transport
+protocol = tls
+bind = ${TLS_BIND_ADDR}:5062
+cert_file = /etc/asterisk/gen/tls/cert.pem
+priv_key_file = /etc/asterisk/gen/tls/privkey.pem
+allow_reload = yes
+method = sslv23
+verify_server = no
+${EXTERNAL_ADDRESS_LINES}
+${TLS_NOVERIFY_EXTERNAL_PORT_LINE}
 
 [transport-udp]
 type = transport

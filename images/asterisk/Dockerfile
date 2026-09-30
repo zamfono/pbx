@@ -7,7 +7,8 @@ LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
 
 # Zamfono APT repository (built by the sibling asterisk-builder repo for Debian 13, spec §4):
 # fetch its archive keyring package, register the source, install Asterisk 22 plus the module
-# and sound packages the stack needs (spec §9.1, §9.3, §9.4).
+# and sound packages the stack needs (spec §9.1, §9.3, §9.4). ca-certificates stays installed:
+# transport-tls checks a trunk provider's certificate against its bundle (§9.4 "Signaling").
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl \
     && curl -fsSL -o /tmp/zamfono-archive-keyring.deb \

@@ -27,9 +27,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# EXTERNAL_IPV4 as in the ports mode (§6.1), for the TLS transports' Contact and Via below.
 docker run -d --name "$CONTAINER" --platform linux/amd64 \
   -e HEP_ENABLED=false \
   -e SIP_UDP_ENABLED=false \
+  -e EXTERNAL_IPV4=192.0.2.10 \
   -e ARI_PASSWORD=x \
   -e AMI_PASSWORD=y \
   "$IMAGE_TAG" > /dev/null
@@ -83,6 +85,61 @@ docker exec "$CONTAINER" openssl s_client -connect 127.0.0.1:5061 -tls1 \
 docker exec "$CONTAINER" openssl s_client -connect 127.0.0.1:5061 -tls1_1 \
     -cipher 'DEFAULT@SECLEVEL=0' > /dev/null 2>&1 \
   && fail "transport-tls accepted a TLSv1.1 handshake"
+
+# §9.1, §9.4 "Signaling": transport-tls-noverify, the TLS transport of the trunks that do not
+# check their provider's certificate, listens on 5062 with the same TLS 1.2+ server.
+echo "$TRANSPORTS" | grep -q 'transport-tls-noverify.*:5062' \
+  || fail "transport-tls-noverify is not listening on :5062"
+docker exec "$CONTAINER" openssl s_client -connect 127.0.0.1:5062 -tls1_2 > /dev/null 2>&1 \
+  || fail "transport-tls-noverify refused a TLSv1.2 handshake"
+
+# An outgoing connection over transport-tls checks the server's certificate and one over
+# transport-tls-noverify does not: two TLS servers presenting a self-signed certificate each, one
+# probe endpoint per transport OPTIONS-probing its own server. Only the noverify connection
+# carries the OPTIONS; the other is closed after the handshake, with the failure in the log.
+docker exec "$CONTAINER" openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+  -keyout /tmp/probe.key -out /tmp/probe.pem -subj /CN=probe.invalid > /dev/null 2>&1
+# `sleep` holds each server's stdin open: s_server closes a connection once stdin ends.
+for port in 5071 5072; do
+  docker exec -d "$CONTAINER" sh -c "sleep 120 | openssl s_server -accept $port \
+    -cert /tmp/probe.pem -key /tmp/probe.key -quiet > /tmp/s_server-$port.log 2>&1"
+done
+docker exec -i "$CONTAINER" sh -c 'cat > /etc/asterisk/gen/pjsip_trunks.conf' <<'CONF'
+[probe-verify]
+type = aor
+contact = sip:127.0.0.1:5071
+
+[probe-verify]
+type = endpoint
+aors = probe-verify
+transport = transport-tls
+
+[probe-noverify]
+type = aor
+contact = sip:127.0.0.1:5072
+
+[probe-noverify]
+type = endpoint
+aors = probe-noverify
+transport = transport-tls-noverify
+CONF
+docker exec "$CONTAINER" asterisk -rx 'module reload res_pjsip.so' > /dev/null
+docker exec "$CONTAINER" asterisk -rx 'pjsip qualify probe-verify' > /dev/null
+docker exec "$CONTAINER" asterisk -rx 'pjsip qualify probe-noverify' > /dev/null
+sleep 3
+docker exec "$CONTAINER" grep -q '^OPTIONS sip:' /tmp/s_server-5072.log \
+  || fail "transport-tls-noverify did not send OPTIONS to a server with a self-signed certificate"
+# In the ports mode 5062 is not published, so the noverify transport names the published 5061
+# for the provider to connect back to (entrypoint.sh, spec §9.4 "Flows").
+docker exec "$CONTAINER" grep -q '^Via: SIP/2.0/TLS 192.0.2.10:5061;' /tmp/s_server-5072.log \
+  || fail "transport-tls-noverify's Via does not name the external address with port 5061"
+docker exec "$CONTAINER" grep -q '^OPTIONS sip:' /tmp/s_server-5071.log \
+  && fail "transport-tls sent OPTIONS to a server whose certificate it cannot verify"
+docker logs "$CONTAINER" 2>&1 | grep "ERROR.*Transport 'transport-tls' to remote '127.0.0.1'" \
+  > /dev/null \
+  || fail "no certificate-verification error for transport-tls's connection to 127.0.0.1:5071"
+docker exec "$CONTAINER" sh -c ': > /etc/asterisk/gen/pjsip_trunks.conf'
+docker exec "$CONTAINER" asterisk -rx 'module reload res_pjsip.so' > /dev/null
 
 HEP_MODULES=$(docker exec "$CONTAINER" asterisk -rx 'module show like res_hep')
 echo "$HEP_MODULES" | grep -q '^0 modules loaded' \

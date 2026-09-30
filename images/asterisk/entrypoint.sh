@@ -41,11 +41,17 @@ TLS_BIND_ADDR=$BIND_ADDR
 # In ports mode (EXTERNAL_IPV4 set) every transport names the host's public address in SIP
 # and SDP; in macvlan mode (STACK_IPV4 set, EXTERNAL_IPV4 unset) it is left out and the
 # transport's own bind address applies.
+# transport-tls-noverify's own port, 5062, is not published in the ports mode, so there it names
+# 5061 in Contact and Via instead: a provider that opens its own connection back reaches
+# transport-tls, which accepts it like any other (spec §9.4 "Flows"). In macvlan mode 5062 is the
+# stack address's own port and reachable as it is.
 if [ -n "${EXTERNAL_IPV4:-}" ]; then
   EXTERNAL_ADDRESS_LINES="external_media_address=${EXTERNAL_IPV4}
 external_signaling_address=${EXTERNAL_IPV4}"
+  TLS_NOVERIFY_EXTERNAL_PORT_LINE="external_signaling_port=5061"
 else
   EXTERNAL_ADDRESS_LINES=""
+  TLS_NOVERIFY_EXTERNAL_PORT_LINE=""
 fi
 
 # hep.conf's enabled=no stops the HEP modules from mirroring; noload keeps them out of the
@@ -86,7 +92,7 @@ reject_unsafe_secret ARI_PASSWORD "$ARI_PASSWORD"
 reject_unsafe_secret AMI_PASSWORD "$AMI_PASSWORD"
 
 export INTERNAL_ADDR UDP_BIND_ADDR TCP_BIND_ADDR TLS_BIND_ADDR EXTERNAL_ADDRESS_LINES \
-       HEP_ENABLED_YN HEP_NOLOAD_LINES ARI_PASSWORD AMI_PASSWORD \
+       TLS_NOVERIFY_EXTERNAL_PORT_LINE HEP_ENABLED_YN HEP_NOLOAD_LINES ARI_PASSWORD AMI_PASSWORD \
        RTP_PORT_START="${RTP_PORT_START:-10000}" RTP_PORT_END="${RTP_PORT_END:-10200}"
 
 for tmpl in "$TEMPLATE_DIR"/*.tmpl; do
