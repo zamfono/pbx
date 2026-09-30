@@ -188,7 +188,8 @@ describe('QosSnapshots (§7 level qos)', () => {
     ]);
   });
 
-  it('writes no row for a leg that never carried media', async () => {
+  it('writes a row of nothing measured for a leg that carried no media, not zeros', async () => {
+    // What Asterisk 22 answers for a bridged leg no RTP packet reached: every figure 0.
     const answers = new Map<string, Answer>([
       [
         'caller',
@@ -197,6 +198,8 @@ describe('QosSnapshots (§7 level qos)', () => {
           txcount: 0,
           rxploss: 0,
           txploss: 0,
+          rxjitter: 0,
+          txjitter: 0,
           rtt: 0
         })
       ]
@@ -207,7 +210,15 @@ describe('QosSnapshots (§7 level qos)', () => {
 
     await qos.write(call);
 
-    expect(await rowsOf(call)).toEqual([]);
+    expect(await rowsOf(call)).toEqual([
+      {
+        channelId: 'caller',
+        role: 'caller',
+        jitterMs: null,
+        lossPct: null,
+        rttMs: null
+      }
+    ]);
   });
 
   it('samples nothing below level qos, and stops sampling once written', async () => {

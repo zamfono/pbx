@@ -23,9 +23,10 @@ why the specified behaviour changed; the commit history, how.
 
 - The `qos` level's `call_qos` rows had no jitter or loss and a round trip of 0, and only the
   caller's leg had one: the core read fields Asterisk does not send, and read the leg that hung up
-  after its channel had gone. Each leg that carried media now has a row with jitter and round trip
-  in milliseconds and loss in percent, read every few seconds while the call runs, a
-  mailbox-answered caller's included; a round trip not yet measured is empty rather than 0.
+  after its channel had gone. Each bridged leg now has a row with jitter and round trip in
+  milliseconds and loss in percent, read every few seconds while the call runs, a
+  mailbox-answered caller's included; what was not measured (a round trip without RTCP, a leg no
+  audio reached) is empty rather than 0.
 - A ring group change that left its members alone (its strategy, ring timeout, mailbox or
   diagnostics level) did not reach call routing until some other change reloaded the
   configuration; raising a group to `qos` or `sip` had no effect on its calls.

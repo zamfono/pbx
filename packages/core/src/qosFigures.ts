@@ -27,12 +27,6 @@ function count(value: unknown): number {
     : 0;
 }
 
-/** Whether `stat` saw any media at all: a leg that never sent or received a packet (a call
- * released before its media flowed) has nothing to summarise. */
-export function carriedMedia(stat: RtpStatistics): boolean {
-  return count(stat.rxcount) > 0 || count(stat.txcount) > 0;
-}
-
 /**
  * The worse direction's jitter: this side's own measurement of what it received (`txjitter`) or
  * the peer's of what it received, from its receiver report (`rxjitter`). Null when neither side

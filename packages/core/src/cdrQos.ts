@@ -14,7 +14,7 @@ import type { Db } from '@zamfono/shared';
 import type { AriClient } from './ari/client.js';
 import type { LogLevel } from './callLog.js';
 import type { Call } from './calls/call.js';
-import { carriedMedia, qosFigures, type QosFigures } from './qosFigures.js';
+import { qosFigures, type QosFigures } from './qosFigures.js';
 
 // §7: `call_qos` is written at diagnostics level `qos` and `sip`, never at `none`/`events`.
 const QOS_ELIGIBLE_LEVELS: ReadonlySet<LogLevel> = new Set(['qos', 'sip']);
@@ -105,8 +105,10 @@ export class QosSnapshots {
     return held;
   }
 
-  /** One reading per channel that answers with media; a channel that answers nothing, or fails,
-   * keeps what it had, without costing the other channels theirs. */
+  /** One reading per channel that answers; a channel that answers nothing, or fails, keeps what
+   * it had, without costing the other channels theirs. A leg whose RTP instance saw no packet
+   * still reads, as nothing measured: a bridged leg without media is a finding of its own (no
+   * audio), and its counters only grow, so a later reading never replaces a better one. */
   private async read(call: Call): Promise<QosRow[]> {
     const targets = qosTargets(call);
     const stats = await Promise.allSettled(
@@ -116,9 +118,6 @@ export class QosSnapshots {
     targets.forEach((target, index) => {
       const result = stats[index];
       if (result?.status !== 'fulfilled' || result.value === null) {
-        return;
-      }
-      if (!carriedMedia(result.value)) {
         return;
       }
       rows.push({ callId: call.id, ...target, ...qosFigures(result.value) });
