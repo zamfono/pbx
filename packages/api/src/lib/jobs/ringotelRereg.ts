@@ -131,7 +131,7 @@ export async function checkAsteriskRestart(
   await handleAsteriskStart(deps, state, version?.asteriskStartedAt ?? null);
 }
 
-/** What `core`'s internal event stream tells the re-registration (`server.ts`). */
+/** What `core`'s internal event stream tells the re-registration (`background.ts`). */
 export type ReregWatcher = {
   /**
    * The stream (re)connected: an Asterisk start announced while it was down went unheard, so
