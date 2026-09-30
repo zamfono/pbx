@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { targetToWire } from '../forwardTargets.js';
+import { rowToTarget } from '../forwardTargetSpec.js';
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import {
@@ -58,7 +58,7 @@ export const setForwarding = defineOperation({
     const existingRules = await Promise.all(
       existing.map(async rule => ({
         condition: rule.condition,
-        target: targetToWire(
+        target: rowToTarget(
           await ctx.db
             .selectFrom('forwardTargets')
             .selectAll()
