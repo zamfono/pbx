@@ -194,6 +194,7 @@ describe('render', () => {
         'transport = transport-tcp',
         'direct_media = no',
         'send_connected_line = no',
+        'send_diversion = no',
         'auth = trunk-t2',
         'identify_by = auth_username'
       ].join('\n')

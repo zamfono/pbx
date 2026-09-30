@@ -1,3 +1,5 @@
+import type { DiversionPolicy } from '@zamfono/shared';
+
 import { encrypt, keyringFromEnv } from '../../secretbox.js';
 import type {
   AuthMode,
@@ -66,6 +68,7 @@ export function mergeScalars(row: TrunkRow, input: MergeInput): Merged {
     srtp: input.srtp ?? row.srtp === 1,
     tlsVerify: input.tlsVerify ?? row.tlsVerify === 1,
     qualify: input.qualify ?? row.qualify === 1,
+    diversion: input.diversion ?? (row.diversion as DiversionPolicy),
     outboundProxy: orRow(input.outboundProxy, row.outboundProxy),
     registerExpiryS:
       authMode === 'registration'

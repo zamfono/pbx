@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { DIVERSION_POLICIES } from '@zamfono/shared';
+
 import { propagate, recordChange } from '../runner.js';
 import {
   logLevelInputFields,
@@ -62,6 +64,7 @@ const inputSchema = z
     srtp: z.boolean().optional(),
     tlsVerify: z.boolean().optional(),
     qualify: z.boolean().optional(),
+    diversion: z.enum(DIVERSION_POLICIES).optional(),
     outboundProxy: z.string().min(1).nullable().optional(),
     registerExpiryS: z.number().int().positive().nullable().optional(),
     registerRetryS: z.number().int().positive().nullable().optional(),
@@ -142,6 +145,7 @@ function trunkColumns(
     srtp: merged.srtp ? 1 : 0,
     tlsVerify: merged.tlsVerify ? 1 : 0,
     qualify: merged.qualify ? 1 : 0,
+    diversion: merged.diversion,
     outboundProxy: merged.outboundProxy,
     registerExpiryS: merged.registerExpiryS,
     registerRetryS: merged.registerRetryS,

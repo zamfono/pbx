@@ -145,6 +145,12 @@ function callerIdLines(trunk: Trunk): string[] {
 // where the number is withheld. Both endpoints of a trunk leave it off.
 const TRUNK_CONNECTED_LINE = 'send_connected_line = no';
 
+// A forwarded leg's `Diversion` is the core's to write, under `trunks.diversion` (§9.4 "Forwarded
+// calls"): chan_pjsip's own, on by default, would name the leg's `REDIRECTING` party, an internal
+// extension among them, on every trunk. Both endpoints of a trunk leave it off; `send_history_info`,
+// which builds `History-Info` from the same party, is off by default and stays so.
+const TRUNK_DIVERSION = 'send_diversion = no';
+
 // SDES-SRTP media for an `srtp` trunk, as on a `tls` device (§9.3 "Transport policy"): the keys
 // travel in the SDP, which only TLS keeps private, hence `tls` trunks alone carry it (§9.4
 // "Signaling"). Both endpoints of the trunk carry it, since either may answer the provider.
@@ -171,6 +177,7 @@ function renderTrunkEndpoint(trunk: Trunk, tenantCodecs: string[]): string {
     `transport = ${trunkTransport(trunk)}`,
     'direct_media = no',
     TRUNK_CONNECTED_LINE,
+    TRUNK_DIVERSION,
     ...mediaEncryptionLines(trunk)
   ];
   if (trunk.outboundProxy !== null) {
@@ -212,6 +219,7 @@ function renderTrunkAuthEndpoint(
     `transport = ${trunkTransport(trunk)}`,
     'direct_media = no',
     TRUNK_CONNECTED_LINE,
+    TRUNK_DIVERSION,
     ...mediaEncryptionLines(trunk),
     `auth = ${trunkSectionName(trunk.id)}`,
     'identify_by = auth_username'

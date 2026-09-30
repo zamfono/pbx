@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { newId, type Db } from '@zamfono/shared';
+import { DIVERSION_POLICIES, newId, type Db } from '@zamfono/shared';
 
 import { encrypt, keyringFromEnv } from '../../secretbox.js';
 import { propagate, recordChange } from '../runner.js';
@@ -55,6 +55,9 @@ const inputSchema = z
     // Default true: a new `ip` trunk's contact is probed for its status (§9.4 "Provisioning and
     // status"); false for an endpoint that answers no OPTIONS.
     qualify: z.boolean().optional(),
+    // Default 'off': a new trunk's forwarded legs carry no `Diversion` until the admin opts in
+    // (§9.4 "Forwarded calls").
+    diversion: z.enum(DIVERSION_POLICIES).optional(),
     outboundProxy: z.string().min(1).optional(),
     registerExpiryS: z.number().int().positive().optional(),
     registerRetryS: z.number().int().positive().optional(),
@@ -122,6 +125,7 @@ async function insertTrunkRow(
       passwordEnc,
       ...switchColumns(input),
       transport: resolved.transport,
+      diversion: input.diversion ?? 'off',
       outboundProxy: input.outboundProxy ?? null,
       registerExpiryS:
         input.authMode === 'registration'

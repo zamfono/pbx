@@ -137,10 +137,11 @@ describe('renderTrunksConf registration retries', () => {
   });
 });
 
-describe('renderTrunksConf connected line', () => {
+describe('renderTrunksConf connected line and redirecting', () => {
   // §9.4 "Caller-ID", "Anonymous calls (CLIR)": the provider is told the presented number by the
-  // call's own INVITE, never the bridged party's identity by a later connected-line update.
-  test('neither endpoint of a trunk sends connected-line updates, whatever its header layout', () => {
+  // call's own INVITE, never the bridged party's identity by a later connected-line update; and
+  // "Forwarded calls": no `Diversion` or `History-Info` of chan_pjsip's, the core writes its own.
+  test('neither endpoint of a trunk sends connected-line updates or Diversion, whatever its header layout', () => {
     for (const callerIdHeader of ['from', 'pai', 'both'] as const) {
       const conf = renderTrunk({
         ...registrationTrunk,
@@ -157,6 +158,8 @@ describe('renderTrunksConf connected line', () => {
       ]);
       for (const endpoint of endpoints) {
         expect(parsedValues(endpoint, 'send_connected_line')).toEqual(['no']);
+        expect(parsedValues(endpoint, 'send_diversion')).toEqual(['no']);
+        expect(parsedValues(endpoint, 'send_history_info')).toEqual([]);
       }
     }
   });

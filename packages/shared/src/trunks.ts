@@ -31,3 +31,8 @@ export function registrationUris(trunk: {
     serverUri: sipHostUri(registrar)
   };
 }
+
+/** `trunks.diversion` (§9.4 "Forwarded calls", §11.2): the `Diversion` a forwarded leg over the
+ * trunk carries, none, the newest forward hop's or every hop's; `off` for a new trunk. */
+export const DIVERSION_POLICIES = ['off', 'last', 'all'] as const;
+export type DiversionPolicy = (typeof DIVERSION_POLICIES)[number];

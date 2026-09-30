@@ -1,7 +1,7 @@
 import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
-import type { Db, DB, TrunkStatus } from '@zamfono/shared';
+import type { Db, DB, DiversionPolicy, TrunkStatus } from '@zamfono/shared';
 
 import { logLevelWire, type LogLevelColumns } from '../settings/logLevel.js';
 
@@ -70,6 +70,9 @@ export type TrunkScalars = {
   /** `trunks.qualify`: an `ip` trunk's contact is OPTIONS-probed for its status; ignored for
    * `registration` (§9.4 "Provisioning and status"). */
   qualify: boolean;
+  /** `trunks.diversion`: the `Diversion` a forwarded leg over the trunk carries, none, the newest
+   * hop's or every hop's (§9.4 "Forwarded calls"). */
+  diversion: DiversionPolicy;
   outboundProxy: string | null;
   registerExpiryS: number | null;
   registerRetryS: number | null;
@@ -160,6 +163,7 @@ export function scalarsFromRow(row: TrunkRow): TrunkScalars {
     srtp: row.srtp === 1,
     tlsVerify: row.tlsVerify === 1,
     qualify: row.qualify === 1,
+    diversion: row.diversion as DiversionPolicy,
     outboundProxy: row.outboundProxy,
     registerExpiryS: row.registerExpiryS,
     registerRetryS: row.registerRetryS,
