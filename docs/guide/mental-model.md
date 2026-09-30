@@ -12,7 +12,10 @@ that single tenant; there is no cross-tenant sharing.
   outbound calls and are tried in a configured order; only those flagged `emergency` carry
   emergency calls. A trunk with `transport` `tls` checks its provider's certificate
   (`tlsVerify`, on for a new trunk; off only for a provider with a self-signed certificate) and
-  can encrypt its media too (`srtp`, for a provider that requires SRTP; `tls` trunks only).
+  can encrypt its media too (`srtp`, for a provider that requires SRTP; `tls` trunks only). An
+  `ip` trunk's `status` comes from an OPTIONS probe every 60 seconds (`qualify`, on for a new
+  trunk); a trunk with it off, for an endpoint that never answers one, reads `unmonitored` and is
+  always tried.
 - **DID** — a phone number the tenant owns, routed on arrival to a forward target. A **DID
   block** groups a contiguous range of numbers under one fallback target, for a provider that
   hands over a whole range instead of individual DIDs.

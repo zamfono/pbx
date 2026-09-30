@@ -33,8 +33,14 @@ outside the stack; this recipe gets the call to OpenAI. OpenAI's guide:
    a route would let ordinary outbound calls leave over it. If it is the tenant's first trunk, the
    catch-all route created with it points at it; move that route to the carrier's trunk with
    `outboundRoutes.replace` (`PUT /outboundRoutes`). Check the trunk's `status` with `trunks.get`
-   (`GET /trunks/{id}`): an `ip` trunk whose host stops answering the stack's OPTIONS probe turns
-   `unreachable`, and calls are then not sent to it.
+   (`GET /trunks/{id}`) a minute after creating it: an `ip` trunk whose host does not answer the
+   stack's OPTIONS probe, sent every 60 seconds, turns `unreachable`, and calls are then not sent
+   to it. If it stays `unreachable` although OpenAI takes calls, the endpoint ignores OPTIONS:
+   a test call (step 6) then shows an `attempt` line with the cause `unreachable` and no SIP
+   code, since no INVITE was sent. Switch the probe off with `trunks.update`
+   (`PATCH /trunks/{id}`) and `"qualify": false`; the trunk then reads `unmonitored`, every call
+   is sent to it, and a call OpenAI refuses fails with OpenAI's own answer. Leave `qualify` on
+   while the trunk reads `registered`: it is what tells you the endpoint is down.
 
 2. Point a forward target at the agent: `{ "kind": "sip", "trunkId": "<the trunk's id>", "user":
 "<project id>" }`. The `user` is the part before the `@`, 1 to 64 letters, digits and
