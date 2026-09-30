@@ -1,4 +1,5 @@
 # shellcheck shell=bash
+# shellcheck disable=SC2154 # runtime, compose, files, services, unit and updater are update.sh's
 # How update.sh recreates the stack on its new images and waits for it to report healthy (§6.3
 # "Updates"). Uses update.sh's runtime, compose, files, services, unit and WAIT_SECONDS.
 
