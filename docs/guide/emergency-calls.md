@@ -38,8 +38,8 @@ A change to the emergency numbers is stored and in force on the PBX as soon as `
 returns, even while Ringotel is unreachable; the mobile apps get it afterwards. If Ringotel
 refuses it, the response carries a `warnings` entry, `system.info` shows
 `ringotel.profilePending: true` (and `/healthz` `ringotelProfilePending: true`), and the stack
-sends it again with the next change that reaches Ringotel, when `api` starts or when Asterisk
-restarts, until Ringotel takes it. Until then the apps dial the old numbers through the cellular
+sends it again with the next change to the apps' profile, when `api` starts or when Asterisk
+restarts, until Ringotel takes all of it. Until then the apps dial the old numbers through the cellular
 network, and every other device already dials the new ones through the PBX.
 
 Tell every remote worker this before they rely on a Zamfono extension for emergencies from

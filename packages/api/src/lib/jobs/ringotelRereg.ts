@@ -154,8 +154,8 @@ export type ReregWatcher = {
  * life; a failed check is logged, and the next event runs the next one. The pending tenant
  * profile's retries share that queue: the first runs as the watcher starts, with `api`, and one
  * runs before each announced Asterisk start's check, so the profile push, which also carries the
- * organization's language, goes first, and the re-registration's own `updateBranch` never
- * clears the marker ahead of it.
+ * organization's language, goes first; the re-registration's own `updateBranch` leaves the
+ * marker alone.
  */
 export function watchAsteriskRestarts(deps: ReregDeps): ReregWatcher {
   const state: ReregState = { lastSeen: null };

@@ -27,6 +27,15 @@ why the specified behaviour changed; the commit history, how.
   `bytesAdded`, which is why a run far smaller than the one before it looked incomplete. Runs from
   before the upgrade keep that value as `bytesAdded`, with no `bytesTotal`.
 
+### Fixed
+
+- A change to the apps' language that Ringotel refused was dropped once any later Ringotel change
+  (a user or extension change, or the re-registration after a restart) went through: those carry
+  the connection's profile but not the organization's language, and still marked the profile as
+  delivered, so `system.info` and `/healthz` no longer showed it pending and it was never sent
+  again. The profile now stays pending until Ringotel has taken all of it, and the stack sends it
+  again when `api` starts, when Asterisk restarts or with the next change to the apps' profile.
+
 ### Upgrade notes
 
 - **Anything that reads a backup run's `bytes`**, such as a monitoring script, an MCP client's

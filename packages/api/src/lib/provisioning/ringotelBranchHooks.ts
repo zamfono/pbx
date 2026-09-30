@@ -8,7 +8,6 @@ import pino from 'pino';
 import { loadParkingSlots } from '../ops/parking/_shared.js';
 import { loadSettings } from '../ops/settings/_shared.js';
 import { buildBranchProvision } from './branchProvision.js';
-import { setProfilePending } from './profilePending.js';
 import type { RingotelProviderDeps } from './ringotelClient.js';
 import {
   blfEntries,
@@ -153,8 +152,9 @@ async function pushDevicePanels(
 /**
  * The branch fields Zamfono owns, as every `updateBranch` push carries them, the roster's
  * included: the default country the app matches phone numbers against (the Shell's "Country")
- * and every key of the provision profile (§10.4). So any push Ringotel takes delivers the whole
- * tenant profile, and clears a profile change still waiting (`profilePending.ts`).
+ * and every key of the provision profile (§10.4). The organization's language is not among them,
+ * so only the profile push, which also writes the organization, clears a profile change still
+ * waiting (`profilePending.ts`).
  */
 async function branchUpdate(
   deps: RingotelProviderDeps,
@@ -187,8 +187,6 @@ export async function ringotelRosterChanged(
     'updateBranch',
     await branchUpdate(deps, settings, branchId, orgId)
   );
-  // The push carried the whole profile, so a profile change still waiting has reached Ringotel.
-  await setProfilePending(deps.db, false);
   const remoteUsers = await deps.client.call<RemoteUser[]>('getUsers', {
     orgid: orgId,
     branchid: branchId
@@ -237,6 +235,4 @@ export async function ringotelPbxRestarted(
     ...(await branchUpdate(deps, settings, branchId, orgId)),
     rereg: true
   });
-  // As the roster push: the whole profile went with it.
-  await setProfilePending(deps.db, false);
 }

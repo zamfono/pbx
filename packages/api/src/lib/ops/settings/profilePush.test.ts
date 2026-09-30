@@ -8,7 +8,6 @@ import {
 } from '@zamfono/shared';
 
 import { watchAsteriskRestarts } from '../../jobs/ringotelRereg.js';
-import { activeRingotelProvider } from '../../provisioning/index.js';
 import { isProfilePending } from '../../provisioning/profilePending.js';
 import { encrypt, keyringFromEnv } from '../../secretbox.js';
 import { makeTestDb } from '../../testDb.js';
@@ -196,28 +195,6 @@ describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile 
     expect(await profileRows(db)).toMatchObject([
       { outcome: 'pushed', trigger: 'settings.update' }
     ]);
-  });
-
-  it('clears the marker with the next branch push of any kind: roster or re-registration', async () => {
-    for (const push of ['onRosterChanged', 'onPbxRestarted'] as const) {
-      // eslint-disable-next-line no-await-in-loop -- one fresh database per kind of push
-      const db = await makeTestDb();
-      // eslint-disable-next-line no-await-in-loop -- as above
-      await seedTenant(db);
-      // eslint-disable-next-line no-await-in-loop -- as above
-      await changeDuringOutage(db);
-      stubRingotel(true);
-
-      // eslint-disable-next-line no-await-in-loop -- as above
-      const provider = await activeRingotelProvider(db);
-      // eslint-disable-next-line no-await-in-loop -- as above
-      await (push === 'onRosterChanged'
-        ? provider?.onRosterChanged?.([])
-        : provider?.onPbxRestarted?.());
-
-      // eslint-disable-next-line no-await-in-loop -- as above
-      expect(await isProfilePending(db)).toBe(false);
-    }
   });
 
   it('retries once at api start and clears the marker when Ringotel takes it', async () => {

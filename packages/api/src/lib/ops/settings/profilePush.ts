@@ -3,8 +3,9 @@
  * branch and organization, the emergency numbers among them, are stored and reach Asterisk first,
  * and reach Ringotel after the write committed, so a Ringotel outage never loses the change nor
  * fails the operation (§10.1 "Emergency calls"). A push Ringotel refuses leaves
- * `settings.ringotel_profile_pending` set; the next `updateBranch` push Ringotel takes clears it,
- * and `api` tries once more at its start and at each Asterisk start. No timer retries it.
+ * `settings.ringotel_profile_pending` set; only a push Ringotel took in full, branch and
+ * organization, clears it, and `api` tries once more at its start and at each Asterisk start. No
+ * timer retries it.
  */
 import pino from 'pino';
 
@@ -97,7 +98,7 @@ export async function pushProfileAfterCommit(ctx: Context): Promise<void> {
       { reason: result.reason },
       'ringotel: the tenant profile push was refused'
     );
-    return `the settings are stored and in force on the PBX, but Ringotel refused the tenant profile (${result.reason}); api pushes it again at its next start, when Asterisk next starts, or with the next change that reaches Ringotel`;
+    return `the settings are stored and in force on the PBX, but Ringotel refused the tenant profile (${result.reason}); api pushes it again at its next start, when Asterisk next starts, or with the next change to the tenant profile`;
   });
 }
 
