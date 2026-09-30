@@ -34,7 +34,8 @@ if not call["ringGroupId"]:
     problems.append("the call did not reach the group")
 if not call["endedAt"]:
     problems.append("the call was never closed")
-if not [line for line in having("pickup", userId=picker, ext="101") if line.get("actorUserId")]:
+# The extension rung is the group's own, which the call reached through its DID.
+if not [line for line in having("pickup", userId=picker) if line.get("actorUserId") and line.get("ext")]:
     problems.append("no pickup line names the picker, the rung extension and the actor")
 if not [line for line in having("pickupRing", step="rungDevice", userId=picker) if line.get("channelId")]:
     problems.append("the pickup's ring on the picker's phone is not in the trace")

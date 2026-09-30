@@ -174,7 +174,7 @@ serve_colleague() {
   local uas=$1 user_id sip_username sip_password
   read -r user_id sip_username sip_password < "$(state_file "$2")"
   PHONE_PORT=$COLLEAGUE_PORT bash "$(dirname "${BASH_SOURCE[0]}")/../phone.sh" "$compose" \
-    answer "$uas" "$sip_username" >&2
+    answer "$uas" "$sip_username" "" "" >&2
 }
 
 # The user id of the colleague of scenario state `$1`.
