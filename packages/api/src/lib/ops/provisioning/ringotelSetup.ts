@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { errorMessage } from '../../errorMessage.js';
+import { errorMessage } from '../../errors.js';
 import {
   createRingotelClient,
   RingotelError,

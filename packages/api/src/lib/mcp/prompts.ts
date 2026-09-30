@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { attempt, bundledEntries, MD_EXT } from './guide.js';
+import { attempt } from '../errors.js';
+import { bundledEntries, MD_EXT } from './guide.js';
 
 // §10.5 "Prompts": every `docs/guide/recipes/*.md` file is published as an MCP prompt, its
 // parameters from the recipe's front matter, listed by `prompts/list` and fetched, filled in with

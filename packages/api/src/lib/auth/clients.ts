@@ -1,5 +1,6 @@
 import { MS_PER_SECOND, type Db } from '@zamfono/shared';
 
+import { attempt } from '../errors.js';
 import { decrypt, encrypt, type Keyring } from '../secretbox.js';
 
 // §5.2 "Client registration": the client-id-metadata-document fetch is cached in memory per the
@@ -25,15 +26,6 @@ export type ClientMeta = {
 type CacheEntry = { meta: ClientMeta; expiresAtMs: number };
 
 const cimdCache = new Map<string, CacheEntry>();
-
-/** `fn()`, or `undefined` when it throws. */
-function attempt<T>(fn: () => T): T | undefined {
-  try {
-    return fn();
-  } catch {
-    return undefined;
-  }
-}
 
 /** Encodes `meta` as a `client_id`: the JSON metadata, secretbox-encrypted and base64url'd. */
 export function encodeMetadataClientId(

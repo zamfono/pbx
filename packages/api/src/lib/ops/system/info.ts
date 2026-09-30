@@ -8,7 +8,7 @@ import {
   type ZamfonoVersion
 } from '@zamfono/shared';
 
-import { errorMessage } from '../../errorMessage.js';
+import { errorMessage } from '../../errors.js';
 import { isProfilePending } from '../../provisioning/profilePending.js';
 import { defineOperation } from '../types.js';
 import { updaterClient, type UpdaterStatus } from './_updater.js';

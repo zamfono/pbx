@@ -18,7 +18,7 @@ import {
   type Event
 } from '@zamfono/shared';
 
-import { errorMessage } from '../errorMessage.js';
+import { errorMessage } from '../errors.js';
 import {
   loadLiveTarget,
   type BackupRunRow,

@@ -2,3 +2,12 @@
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
+
+/** `fn()`, or `undefined` when it throws. */
+export function attempt<T>(fn: () => T): T | undefined {
+  try {
+    return fn();
+  } catch {
+    return undefined;
+  }
+}

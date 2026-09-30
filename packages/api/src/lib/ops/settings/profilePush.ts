@@ -11,7 +11,7 @@ import pino from 'pino';
 
 import type { Db } from '@zamfono/shared';
 
-import { errorMessage } from '../../errorMessage.js';
+import { errorMessage } from '../../errors.js';
 import { activeRingotelProvider } from '../../provisioning/index.js';
 import { setProfilePending } from '../../provisioning/profilePending.js';
 import { afterPropagation } from '../afterPropagationHooks.js';

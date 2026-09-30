@@ -9,7 +9,7 @@ import pino from 'pino';
 
 import type { CoreVersionResponse, Db } from '@zamfono/shared';
 
-import { errorMessage } from '../errorMessage.js';
+import { errorMessage } from '../errors.js';
 import {
   JOB_CALLER,
   outcomeChanges,

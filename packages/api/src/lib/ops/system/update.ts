@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { errorMessage } from '../../errorMessage.js';
+import { errorMessage } from '../../errors.js';
 import { setUndoable } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import { updaterClient, UpdaterRefusal, type UpdateState } from './_updater.js';

@@ -2,7 +2,7 @@ import pino from 'pino';
 
 import type { Db } from '@zamfono/shared';
 
-import { errorMessage } from '../../errorMessage.js';
+import { errorMessage } from '../../errors.js';
 import {
   activeRingotelProvider,
   type ProvisioningProvider,

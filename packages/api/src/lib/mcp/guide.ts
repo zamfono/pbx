@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { attempt } from '../errors.js';
 import { OpError } from '../ops/types.js';
 
 // The guide ships as `docs/guide/{*.md,recipes/*.md}` (§10.5). `import.meta.glob` bundles the
@@ -23,15 +24,6 @@ export const HELP_TOOL = {
 };
 type HelpOutput = { topics: string[] } | { topic: string; content: string };
 export type BundledEntry = { name: string; content: string; isRecipe: boolean };
-
-/** `fn()`, or `undefined` when it throws (a missing directory, most often). */
-export function attempt<T>(fn: () => T): T | undefined {
-  try {
-    return fn();
-  } catch {
-    return undefined;
-  }
-}
 
 /** Every bundled guide/recipe file, named by its topic. */
 export function bundledEntries(): BundledEntry[] {

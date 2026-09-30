@@ -1,6 +1,6 @@
 import type { Db } from '@zamfono/shared';
 
-import { errorMessage } from '../errorMessage.js';
+import { errorMessage } from '../errors.js';
 import type { Context } from './types.js';
 
 /**
