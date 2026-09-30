@@ -49,6 +49,9 @@ export type PipelineDeps = {
   // The stack's `TZ` (§11.4 `timezone`: "NULL = stack `TZ`, else UTC"), `CoreEnv.tz`; optional so
   // a test Pipeline that never evaluates opening hours need not supply it (absent = UTC).
   stackTz?: string;
+  /** How long a created leg may take to enter the app before it counts as not placed
+   * (`legOriginate.ts`); tests shorten it. Default `STASIS_WAIT_MS`. */
+  legStasisWaitMs?: number;
   // Voicemail deposit's own collaborators (§3.1): optional so a test Pipeline that never deposits
   // a call need not supply them; `main.ts`'s real Pipeline always does.
   db?: Db;

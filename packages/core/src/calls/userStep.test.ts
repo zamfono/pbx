@@ -263,6 +263,43 @@ describe('user step against registration', () => {
     ]);
   });
 
+  // A phone Asterisk will not place leaves the race as a phone that declined at once would: with
+  // none left, the noAnswer rule applies at once, not after the ring timeout.
+  it.each([
+    'its create is refused',
+    'its dial is refused',
+    'it never enters the app'
+  ] as const)(
+    'applies the noAnswer rule at once when the only phone cannot be placed: %s',
+    async refusal => {
+      const userId = await seedUser(db, ['e101-da']);
+      await seedAnnouncementRule(db, userId, 'noAnswer', 'noanswer.wav');
+      await register('e101-da');
+      if (refusal === 'its create is refused') {
+        fakeAri.failOriginate = { status: 500 };
+      } else if (refusal === 'its dial is refused') {
+        fakeAri.failDial = { status: 409 };
+      } else {
+        fakeAri.createdEntersStasis = false;
+        pipeline.deps.legStasisWaitMs = 20;
+      }
+
+      const started = Date.now();
+      await runUserStep(
+        pipeline,
+        call,
+        await pipeline.deps.cache.get(),
+        userId
+      );
+
+      expect(playedMedia(fakeAri, callerChannel.id)).toEqual([
+        'sound:/media/prompts/noanswer'
+      ]);
+      expect(Date.now() - started).toBeLessThan(900);
+      expect(call.log.finish().log).toContain('"cause":"placementFailed"');
+    }
+  );
+
   it('rings a user already in a call on their other devices only', async () => {
     const userId = await seedUser(db, ['e101-da', 'e101-db']);
     await register('e101-da');

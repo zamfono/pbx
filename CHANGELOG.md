@@ -41,6 +41,11 @@ why the specified behaviour changed; the commit history, how.
   milliseconds) recorded none of its SIP messages. Each leg the PBX places now joins the call's
   capture before its INVITE leaves, the user's own phones a click-to-dial or an API pickup rings
   included.
+- A call could hang, ringing on for its caller until they gave up, when Asterisk refused to place
+  one of its legs, as a loaded host did by answering a leg's dial before the leg was ready. A leg
+  that cannot be placed now counts as one that ended at once: the ring goes on with the other
+  phones or reaches its fallback, an outbound call tries its next route, and the trace says
+  `placementFailed`.
 - A ring group change that left its members alone (its strategy, ring timeout, mailbox or
   diagnostics level) did not reach call routing until some other change reloaded the
   configuration; raising a group to `qos` or `sip` had no effect on its calls.

@@ -645,6 +645,76 @@ describe('outbound dialing', () => {
     expect(lines).toHaveLength(2);
   });
 
+  /** The `cause` of each `attempt` trace line, in order. */
+  function attemptCauses(call: Call): unknown[] {
+    return (call.log.finish().log ?? '')
+      .split('\n')
+      .filter(Boolean)
+      .map(line => JSON.parse(line) as { event?: string; cause?: unknown })
+      .filter(line => line.event === 'attempt')
+      .map(line => line.cause);
+  }
+
+  // A leg Asterisk will not place fails its attempt before alerting, as a 500 would: the next
+  // route is tried, and a call none of whose legs could be placed ends released.
+  it('falls through to the next route when a trunk leg’s dial is refused, tracing placementFailed', async () => {
+    const mainDidId = await seedDid(db, '+491110000');
+    await seedSettings(db, mainDidId);
+    const trunk1 = await seedTrunk(db, 1);
+    const trunk2 = await seedTrunk(db, 2);
+    await seedRoute(db, 1, trunk1);
+    await seedRoute(db, 2, trunk2);
+    fakeAri.failDial = { status: 409, count: 1 };
+
+    const call = await dial('+498912345');
+
+    expect(call.status).toBe('answered');
+    expect(attemptEndpoints(fakeAri)).toEqual([
+      `PJSIP/+498912345@trunk-${trunk1}`,
+      `PJSIP/+498912345@trunk-${trunk2}`
+    ]);
+    expect(attemptCauses(call)).toEqual(['placementFailed', 'answered']);
+  });
+
+  it('releases the call when no trunk leg can be created, tracing each attempt', async () => {
+    const mainDidId = await seedDid(db, '+491110000');
+    await seedSettings(db, mainDidId);
+    const trunk1 = await seedTrunk(db, 1);
+    const trunk2 = await seedTrunk(db, 2);
+    await seedRoute(db, 1, trunk1);
+    await seedRoute(db, 2, trunk2);
+    fakeAri.failOriginate = { status: 500 };
+
+    const call = await dial('+498912345');
+
+    expect(call.status).toBe('failed');
+    expect(attemptCauses(call)).toEqual(['placementFailed', 'placementFailed']);
+    expect(
+      fakeAri.calls.some(
+        entry =>
+          entry.method === 'DELETE' &&
+          entry.path === `channels/${call.callerChannelId}`
+      )
+    ).toBe(true);
+  });
+
+  it('releases the call when no created trunk leg ever enters the app, dialling none', async () => {
+    const mainDidId = await seedDid(db, '+491110000');
+    await seedSettings(db, mainDidId);
+    const trunkId = await seedTrunk(db, 1);
+    await seedRoute(db, 1, trunkId);
+    fakeAri.createdEntersStasis = false;
+    pipeline.deps.legStasisWaitMs = SETTLE_DELAY_MS;
+
+    const call = await dial('+498912345');
+
+    expect(call.status).toBe('failed');
+    expect(attemptCauses(call)).toEqual(['placementFailed']);
+    expect(fakeAri.calls.some(entry => entry.path.endsWith('/dial'))).toBe(
+      false
+    );
+  });
+
   it('ends busy on a 486 with no second attempt', async () => {
     const mainDidId = await seedDid(db, '+491110000');
     await seedSettings(db, mainDidId);

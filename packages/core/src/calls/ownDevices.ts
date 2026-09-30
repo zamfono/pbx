@@ -74,6 +74,12 @@ async function placeDevices(
       .catch(() => null)
       .finally(early.stop);
     if (channel === null) {
+      host.log.event({
+        event: 'rungDevice',
+        deviceId: device.id,
+        userId,
+        cause: 'placementFailed'
+      });
       continue;
     }
     placed.set(channel.id, channel);

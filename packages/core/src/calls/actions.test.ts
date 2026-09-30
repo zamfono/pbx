@@ -729,6 +729,35 @@ describe('CallActions', () => {
     expect(row.log).toContain('"event":"originate","result":"unanswered"');
   });
 
+  it('ends a click-to-dial unanswered at once when its phone cannot be placed', async () => {
+    await setUp();
+    fakeAri.failDial = { status: 409 };
+    const callerId = await seedUser(db, '101');
+    await seedDevice(db, fakeAri, callerId, 'e101-a');
+    await devicesUp();
+
+    const result = await actions.originate({
+      userId: callerId,
+      target: '102',
+      actorUserId: callerId,
+      requestId: 'req-unplaced'
+    });
+
+    const callId = 'callId' in result ? result.callId : '';
+    const row = await eventually(async () => {
+      const written = await db
+        .selectFrom('calls')
+        .select(['status', 'log', 'endedAt'])
+        .where('id', '=', callId)
+        .executeTakeFirstOrThrow();
+      expect(written.endedAt).not.toBeNull();
+      return written;
+    });
+    expect(row.status).toBe('failed');
+    expect(row.log).toContain('"cause":"placementFailed"');
+    expect(row.log).toContain('"event":"originate","result":"unanswered"');
+  });
+
   it('answers 409 noRegisteredDevice when the user has devices but none is registered', async () => {
     await setUp();
     const userId = await seedUser(db, '101');

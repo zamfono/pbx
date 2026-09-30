@@ -6,12 +6,20 @@ import { newId, nowIso } from '@zamfono/shared';
 import { AriError, defaultChannel, type CreateParams } from '../ari/types.js';
 import type { LogLevel } from '../callLog.js';
 import { newCall } from './call.js';
-import { originateLeg } from './legOriginate.js';
+import {
+  originateLeg,
+  PlacementError,
+  STASIS_WAIT_MS
+} from './legOriginate.js';
 import type { Pipeline } from './pipeline.js';
 
 /** A stand-in pipeline whose ARI and CDR record, in order, what the leg's originate did. */
 function stubPipeline(
-  options: { dialFails?: boolean; enterStasis?: boolean } = {}
+  options: {
+    dialFails?: boolean;
+    enterStasis?: boolean;
+    createFails?: boolean;
+  } = {}
 ): {
   pipeline: Pipeline;
   steps: string[];
@@ -31,6 +39,9 @@ function stubPipeline(
           create: (params: CreateParams) => {
             steps.push('create');
             created.push(params);
+            if (options.createFails === true) {
+              return Promise.reject(new AriError(400, 'Allocation failed'));
+            }
             const channel = defaultChannel({ id: 'leg-1', state: 'Down' });
             // Asterisk puts the created channel in the app once it has answered the create.
             setTimeout(() => {
@@ -132,21 +143,34 @@ describe('originateLeg (§7 level sip)', () => {
 
   // Asterisk answers the create before its own thread puts the channel in the app; a dial ahead
   // of that is refused with 409 "Channel not in Stasis application".
-  it('dials the created channel only once it has entered the app', async () => {
+  it('dials the created channel only once it has entered the app, and never one that did not', async () => {
     vi.useFakeTimers();
     try {
       const { pipeline, steps } = stubPipeline({ enterStasis: false });
       const placing = originateLeg(pipeline, callAt('events'), PARAMS);
-      await vi.advanceTimersByTimeAsync(4000);
+      const failed = expect(placing).rejects.toMatchObject({
+        name: 'PlacementError',
+        step: 'stasis'
+      });
+      await vi.advanceTimersByTimeAsync(STASIS_WAIT_MS - 1);
       expect(steps).toEqual(['create', 'join leg-1']);
 
-      // Never entered: dialled after all once the wait is up.
-      await vi.advanceTimersByTimeAsync(1000);
-      await placing;
-      expect(steps).toEqual(['create', 'join leg-1', 'dial leg-1 30']);
+      // Never entered: not placed, the created channel hung up.
+      await vi.advanceTimersByTimeAsync(1);
+      await failed;
+      expect(steps).toEqual(['create', 'join leg-1', 'hangup leg-1']);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('throws a placement error, dialling nothing, when the create is refused', async () => {
+    const { pipeline, steps } = stubPipeline({ createFails: true });
+
+    await expect(
+      originateLeg(pipeline, callAt('events'), PARAMS)
+    ).rejects.toMatchObject({ name: 'PlacementError', step: 'create' });
+    expect(steps).toEqual(['create']);
   });
 
   it('sets the caller ID as the originate would, the leg’s own variables after it', async () => {
@@ -172,9 +196,12 @@ describe('originateLeg (§7 level sip)', () => {
   it('hangs the created channel up and throws when the dial is refused', async () => {
     const { pipeline, steps } = stubPipeline({ dialFails: true });
 
-    await expect(
-      originateLeg(pipeline, callAt('events'), PARAMS)
-    ).rejects.toBeInstanceOf(AriError);
+    const placing = originateLeg(pipeline, callAt('events'), PARAMS);
+    await expect(placing).rejects.toBeInstanceOf(PlacementError);
+    await expect(placing).rejects.toMatchObject({
+      step: 'dial',
+      cause: expect.any(AriError) as unknown
+    });
     expect(steps.at(-1)).toBe('hangup leg-1');
   });
 });

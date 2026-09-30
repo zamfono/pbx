@@ -76,6 +76,8 @@ export class FakeAri {
     this.emit(contactReachable(sipUsername));
   }
   failOriginate: null | { status: number } = null;
+  failDial: null | { status: number; count?: number } = null;
+  createdEntersStasis = true;
   /**
    * Runs as an originate is handled, before its response is sent: Asterisk dials the channel
    * while it answers the request, so its events can reach the client ahead of the response.
