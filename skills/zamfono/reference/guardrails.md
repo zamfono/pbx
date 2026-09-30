@@ -42,7 +42,11 @@ Every operation enforces its own `minRole` (`owner` > `admin` > `user`) once, so
 and the tenant UI share one answer for who may do what. A `user` reads and edits only their own
 scope — their voicemails, their history, their devices, a handful of self-service settings
 (`clir`, `rejectAnonymous`, `ringTimeoutS`, `notifyMissedCalls`, `findMe`, their own OOO and
-hours). Recordings are `admin`/`owner` only, including of a user's own calls.
+hours, their own call forwarding). Recordings are `admin`/`owner` only, including of a user's own
+calls. A `sip` target is admin-only everywhere: a user's own forwarding, OOO rule or hours that
+names one is refused with 403, so a user whose forwarding an admin pointed at one can remove that
+rule through `users.setForwarding` (`PUT /users/{id}/forwarding`), which replaces the rules as a
+whole, but not send it back.
 
 ## Rate limits protect logins, not the API
 
