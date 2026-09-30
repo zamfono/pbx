@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+  §7 level `sip`, an outbound call: the tenant's level is `sip` (`_sip-log-setup.sh`), and 101's
+  device dials `+15557401`, which only the catch-all route carries, over `ci-trunk`, whose side
+  answers it (`uas/answer-outbound.xml`); the device hangs up. Its log must hold both legs, the
+  device's and the trunk's, in both directions. The device's SIP username arrives as `-key user`,
+  its credentials through `-au`/`-ap`.
+-->
+<scenario name="outbound-sip-log-answered">
+  <send retrans="500">
+    <![CDATA[
+      INVITE sip:+15557401@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:+15557401@[remote_ip]>
+      Call-ID: [call_id]
+      CSeq: 1 INVITE
+      Contact: <sip:[user]@[local_ip]:[local_port];transport=[transport]>
+      Max-Forwards: 70
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=phone 53655768 2353687640 IN IP[local_ip_type] [local_ip]
+      s=-
+      c=IN IP[media_ip_type] [media_ip]
+      t=0 0
+      m=audio [media_port] RTP/AVP 8
+      a=rtpmap:8 PCMA/8000
+    ]]>
+  </send>
+
+  <recv response="100" optional="true" />
+  <recv response="401" auth="true" />
+
+  <send>
+    <![CDATA[
+      ACK sip:+15557401@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch-3]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:+15557401@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 1 ACK
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <send retrans="500">
+    <![CDATA[
+      INVITE sip:+15557401@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:+15557401@[remote_ip]>
+      Call-ID: [call_id]
+      CSeq: 2 INVITE
+      Contact: <sip:[user]@[local_ip]:[local_port];transport=[transport]>
+      [authentication]
+      Max-Forwards: 70
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=phone 53655768 2353687640 IN IP[local_ip_type] [local_ip]
+      s=-
+      c=IN IP[media_ip_type] [media_ip]
+      t=0 0
+      m=audio [media_port] RTP/AVP 8
+      a=rtpmap:8 PCMA/8000
+    ]]>
+  </send>
+
+  <recv response="100" optional="true" />
+  <recv response="180" optional="true" />
+  <recv response="183" optional="true" />
+  <recv response="200" rtd="true" timeout="15000" />
+
+  <send>
+    <![CDATA[
+      ACK sip:+15557401@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:+15557401@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 2 ACK
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <pause milliseconds="1000" />
+
+  <send retrans="500">
+    <![CDATA[
+      BYE sip:+15557401@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:[user]@[remote_ip]>;tag=[call_number]
+      To: <sip:+15557401@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 3 BYE
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <recv response="200" crlf="true" />
+</scenario>

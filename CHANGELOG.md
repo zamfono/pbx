@@ -25,6 +25,11 @@ why the specified behaviour changed; the commit history, how.
   the call's result and the container log, which an update discards. Each is now an audit entry
   (`ringotel.push` on the device, `ringotel.rereg`), and a `ringotel` device created or rotated
   before Ringotel is set up now says so in a `warnings` entry instead of nothing.
+- The call log's `sip` level recorded no SIP message at all: Asterisk refused its collector
+  address `core:9060`, since it takes a numeric address only, and mirrored nothing. It now sends
+  to the address `core` has, and follows it when `core` is recreated.
+- Every device registration was lost whenever the containers were recreated, as an update does,
+  and a phone stayed unreachable until it registered again.
 
 ### Added
 
@@ -36,6 +41,12 @@ why the specified behaviour changed; the commit history, how.
 - `system.info` shows when `api` and `core` started (`startedAt`) and when Asterisk did
   (`core.asteriskStartedAt`), so a restart is visible.
 
+### Changed
+
+- Asterisk keeps its astdb, which holds the device registrations, on a new `astdb` volume.
+- `deploy/README.md` says where container logs survive an upgrade (Podman's journal) and how to
+  keep them on Docker ("Logs").
+
 ### Upgrade notes
 
 - **Ringotel connections change at their next push**: the first device, user, extension or
@@ -44,6 +55,8 @@ why the specified behaviour changed; the commit history, how.
   app's contacts, apps stay registered while closed and re-register every two minutes, and the
   mobile apps dial emergency numbers over the cellular network. Settings
   changed by hand in the Ringotel Shell for these are overwritten.
+- The `astdb` volume is created by the upgrade's own `up -d`; nothing to do. It starts empty, so
+  the registrations of this one upgrade are still lost: devices come back as they re-register.
 
 ## [0.0.6] - 2026-09-29
 

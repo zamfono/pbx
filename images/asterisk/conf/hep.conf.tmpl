@@ -1,5 +1,6 @@
-; SIP mirroring to the core's HEP collector on the internal network (spec §7).
+; SIP mirroring to the core's HEP collector on the internal network (spec §7). res_hep parses a
+; numeric address only; the entrypoint renders the one `core` resolves to, and follows it.
 [general]
 enabled = ${HEP_ENABLED_YN}
-capture_address = core:9060
+capture_address = ${HEP_CAPTURE_ADDRESS}
 capture_id = 1
