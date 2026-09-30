@@ -21,9 +21,8 @@ why the specified behaviour changed; the commit history, how.
   elsewhere, but not to a new `sip` target: a rule an admin set to one is kept as it is if the
   user sends it back unchanged under the same condition, refused if they change it or move it to
   another condition, and removed if they leave it out, since the call replaces the rules as a
-  whole. An
-  external forward is dialled as the user's own call, so a number their outbound routes do not
-  carry is stored but refused when a call is forwarded.
+  whole. An external forward is dialled as the user's own call, so a number their outbound routes
+  do not carry is stored but refused when a call is forwarded.
 - A trunk setting `diversion` (`trunks.create`, `trunks.update`, `POST /trunks`,
   `PATCH /trunks/{id}`) decides whether a call the stack forwards out over the trunk, to an
   external number or a `sip` target, tells the far end who forwarded it: `off`, the default and
@@ -52,23 +51,22 @@ why the specified behaviour changed; the commit history, how.
   to check. Calls recorded before the upgrade have no counts (`null`).
 - A forward target of a new kind, `sip`, `{ "kind": "sip", "trunkId": "…", "user": "proj_…" }`,
   sends a call to a SIP address rather than a phone number: the stack dials `user` at the trunk's
-  own hosts, such as OpenAI's Realtime SIP endpoint at `sip.api.openai.com`, with no outbound
-  route involved. It works wherever a target does (DIDs, forwarding and out-of-office rules,
-  opening hours, ring-group fallbacks, menus, the tenant fallback), and a ring-group member's
-  unconditional forward to one rings as the member's leg. Only admins and owners set one; a user
-  editing their own out-of-office rule or opening hours is refused for it. A trunk a `sip` target
-  dials over cannot be deleted until the target is changed: `trunks.delete`
-  (`DELETE /trunks/{id}`) answers 409 listing where it is used. A `sip` target also names the
-  SIP headers its call carries, `"headers": [{ "name": "X-Called", "value":
-"{{calledExtension}}" }]`: each name starts with `X-`, and each value is text with
-  `{{placeholder}}`s for the original caller and their name, the company number dialled, the user
-  or ring group the call was for, who forwarded it last and why, the number of forwards, the
-  call's id, direction, language and start time. A header whose value comes out empty, such as
-  the caller's number when they withheld it, is left out. Without `headers` a target sends
-  `X-Zamfono-Caller: {{callerNumber}}` and `X-Zamfono-Did: {{did}}`; `[]` sends none. A value
-  with an unknown placeholder, a name given twice or headers larger than 2048 bytes are refused,
-  and headers that could make the call's INVITE too large for a UDP trunk are accepted with a
-  warning. The recipe `forward-to-ai-agent` walks through the OpenAI setup.
+  own hosts, such as OpenAI's Realtime SIP endpoint at `sip.api.openai.com`, with no outbound route
+  involved. It works wherever a target does (DIDs, forwarding and out-of-office rules, opening
+  hours, ring-group fallbacks, menus, the tenant fallback), and a ring-group member's unconditional
+  forward to one rings as the member's leg. Only admins and owners set one; a user editing their own
+  out-of-office rule or opening hours is refused for it. A trunk a `sip` target dials over cannot be
+  deleted until the target is changed: `trunks.delete` (`DELETE /trunks/{id}`) answers 409 listing
+  where it is used. A `sip` target also names the SIP headers its call carries,
+  `"headers": [{ "name": "X-Called", "value": "{{calledExtension}}" }]`: each name starts with `X-`,
+  and each value is text with `{{placeholder}}`s for the original caller and their name, the company
+  number dialled, the user or ring group the call was for, who forwarded it last and why, the number
+  of forwards, the call's id, direction, language and start time. A header whose value comes out
+  empty, such as the caller's number when they withheld it, is left out. Without `headers` a target
+  sends `X-Zamfono-Caller: {{callerNumber}}` and `X-Zamfono-Did: {{did}}`; `[]` sends none. A value
+  with an unknown placeholder, a name given twice or headers larger than 2048 bytes are refused, and
+  headers that could make the call's INVITE too large for a UDP trunk are accepted with a warning.
+  The recipe `forward-to-ai-agent` walks through the OpenAI setup.
 - The stack serves the Zamfono logo as its favicon (`/favicon.ico`, `/favicon.svg`) and in a
   light and a dark variant (`/logo.svg`, `/logo.png`, `/logoDark.svg`, `/logoDark.png`), and the
   MCP server names itself with it: MCP clients that show a server's icon, title or website now show
@@ -84,7 +82,10 @@ why the specified behaviour changed; the commit history, how.
   providers require. Both apply to a trunk whose `transport` is `tls`; `srtp` is refused on any
   other. A new trunk has `tlsVerify` on and `srtp` off. Existing TLS trunks keep working
   unchanged: they get `tlsVerify` off, as nothing checked their certificate before, and can be
-  switched on once the provider presents a publicly trusted one.
+  switched on once the provider presents a publicly trusted one. Trunks with `tlsVerify` off
+  connect from a second TLS listener on port 5062, which only makes outgoing connections: in the
+  ports mode it is not published, and in the macvlan mode, where Asterisk has an address of its
+  own, a host firewall need not open it.
 
 ### Changed
 
