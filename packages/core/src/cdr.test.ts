@@ -280,7 +280,9 @@ describe('CdrWriter', () => {
         role: 'caller',
         jitterMs: 1.5,
         lossPct: 0.2,
-        rttMs: 42
+        rttMs: 42,
+        rxPackets: 998,
+        txPackets: 1000
       })
     ]);
   });

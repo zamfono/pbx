@@ -128,8 +128,8 @@ export class QosRows {
    * A channel's `ChannelDestroyed`: its row, from the `RTPAUDIOQOS` the event carries and the
    * channel's RTCP reports, for every call it was noted for, held for a call not written yet and
    * written now for one that was. A channel without an RTP instance (a Local channel) has no row.
-   * A leg whose instance saw no packet still has one, of nothing measured: a bridged leg without
-   * media is a finding of its own (no audio).
+   * A leg whose instance saw no packet still has one, of nothing measured but a received count of
+   * 0: a bridged leg without media is a finding of its own (no audio).
    */
   async channelEnded(channel: Channel): Promise<void> {
     const stat = parseRtpAudioQos(

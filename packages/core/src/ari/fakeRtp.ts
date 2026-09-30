@@ -27,7 +27,8 @@ function seconds(value: number): string {
   return value.toFixed(DECIMALS);
 }
 
-/** An `RTPAUDIOQOS` value: the default above with `overrides` applied. */
+/** An `RTPAUDIOQOS` value: the default above with `overrides` applied; a count overridden with
+ * null is left out, as a variable that names none. */
 export function fakeRtpAudioQos(overrides: Partial<RtpQos> = {}): string {
   const stat = { ...DEFAULT_RTP_QOS, ...overrides };
   return [
@@ -35,14 +36,16 @@ export function fakeRtpAudioQos(overrides: Partial<RtpQos> = {}): string {
     `themssrc=${REMOTE_SSRC}`,
     `lp=${stat.rxploss}`,
     `rxjitter=${seconds(stat.rxjitter)}`,
-    `rxcount=${stat.rxcount}`,
+    stat.rxcount === null ? null : `rxcount=${stat.rxcount}`,
     `txjitter=${seconds(stat.txjitter)}`,
-    `txcount=${stat.txcount}`,
+    stat.txcount === null ? null : `txcount=${stat.txcount}`,
     `rlp=${stat.txploss}`,
     `rtt=${seconds(stat.rtt)}`,
     `rxmes=${seconds(MES)}`,
     `txmes=${seconds(MES)}`
-  ].join(';');
+  ]
+    .filter(pair => pair !== null)
+    .join(';');
 }
 
 // The events Asterisk publishes after it set the variable: chan_pjsip sets it as the session

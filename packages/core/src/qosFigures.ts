@@ -18,10 +18,13 @@ export const RTP_AUDIO_QOS_VARIABLE = 'RTPAUDIOQOS';
  * `rlp`, those the peer reported missing. `txjitter` is this side's own interarrival jitter of the
  * packets it received, `rxjitter` the peer's of the packets it received, from its RTCP receiver
  * report; `rtt` the last round trip measured from a receiver report, 0 while none arrived.
+ * `rxcount` and `txcount` are the packets this side received from the peer and sent to it, null
+ * where the variable names no count: a count of 0 is a finding (no audio reached this side), an
+ * absent one is not.
  */
 export type RtpQos = {
-  txcount: number;
-  rxcount: number;
+  txcount: number | null;
+  rxcount: number | null;
   txjitter: number;
   rxjitter: number;
   txploss: number;
@@ -40,11 +43,12 @@ const FIELD_NAMES: Readonly<Record<string, keyof RtpQos>> = {
 };
 
 /** The figures of an `RTPAUDIOQOS` value, `null` for an unset one or one that names none of them
- * (a channel without an RTP instance). A field absent or malformed reads as 0. */
+ * (a channel without an RTP instance). A field absent or malformed reads as 0, a packet count as
+ * null. */
 export function parseRtpAudioQos(value: string | undefined): RtpQos | null {
   const stat: RtpQos = {
-    txcount: 0,
-    rxcount: 0,
+    txcount: null,
+    rxcount: null,
     txjitter: 0,
     rxjitter: 0,
     txploss: 0,
@@ -68,6 +72,8 @@ export type QosFigures = {
   jitterMs: number | null;
   lossPct: number | null;
   rttMs: number | null;
+  rxPackets: number | null;
+  txPackets: number | null;
 };
 
 const PERCENT = 100;
@@ -80,8 +86,13 @@ export function roundFigure(value: number): number {
 }
 
 /** A finite, non-negative figure, else 0. */
-function count(value: number): number {
-  return Number.isFinite(value) && value > 0 ? value : 0;
+function count(value: number | null): number {
+  return value !== null && Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+/** A packet count as the row holds it: a whole count, 0 included, or null where none was named. */
+function packets(value: number | null): number | null {
+  return value === null ? null : Math.trunc(count(value));
 }
 
 /**
@@ -142,6 +153,8 @@ export function qosFigures(stat: RtpQos): QosFigures {
   return {
     jitterMs: jitterMs(stat),
     lossPct: lossPct(stat),
-    rttMs: rttMs(stat)
+    rttMs: rttMs(stat),
+    rxPackets: packets(stat.rxcount),
+    txPackets: packets(stat.txcount)
   };
 }

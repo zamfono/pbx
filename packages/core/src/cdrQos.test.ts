@@ -111,7 +111,15 @@ describe('QosRows (§7 level qos)', () => {
   async function rowsOf(call: Call): Promise<Record<string, unknown>[]> {
     return db
       .selectFrom('callQos')
-      .select(['channelId', 'role', 'jitterMs', 'lossPct', 'rttMs'])
+      .select([
+        'channelId',
+        'role',
+        'jitterMs',
+        'lossPct',
+        'rttMs',
+        'rxPackets',
+        'txPackets'
+      ])
       .where('callId', '=', call.id)
       .orderBy('channelId')
       .execute();
@@ -137,7 +145,9 @@ describe('QosRows (§7 level qos)', () => {
         role: 'caller',
         jitterMs: 3.4,
         lossPct: 1,
-        rttMs: 42
+        rttMs: 42,
+        rxPackets: 990,
+        txPackets: 1000
       },
       // No receiver report yet: an unmeasured round trip, not 0 ms.
       {
@@ -145,7 +155,9 @@ describe('QosRows (§7 level qos)', () => {
         role: 'callee',
         jitterMs: 10.5,
         lossPct: 1,
-        rttMs: null
+        rttMs: null,
+        rxPackets: 990,
+        txPackets: 1000
       }
     ]);
   });
@@ -171,7 +183,9 @@ describe('QosRows (§7 level qos)', () => {
         role: 'caller',
         jitterMs: 0.25,
         lossPct: 0,
-        rttMs: null
+        rttMs: null,
+        rxPackets: 351,
+        txPackets: 351
       }
     ]);
   });
@@ -232,7 +246,7 @@ describe('QosRows (§7 level qos)', () => {
     ]);
   });
 
-  it('writes a row of nothing measured for a leg that carried no media, not zeros', async () => {
+  it('writes a row of nothing measured but its packet counts of 0 for a leg that carried no media', async () => {
     const qos = new QosRows(db, holding([]));
     const call = await openCall(db);
     qos.note(call);
@@ -255,13 +269,16 @@ describe('QosRows (§7 level qos)', () => {
     );
     await qos.write(call);
 
+    // Figures of 0 would read as a perfect line; the counts of 0 are the finding: no audio.
     expect(await rowsOf(call)).toEqual([
       {
         channelId: 'caller',
         role: 'caller',
         jitterMs: null,
         lossPct: null,
-        rttMs: null
+        rttMs: null,
+        rxPackets: 0,
+        txPackets: 0
       }
     ]);
   });
@@ -281,14 +298,32 @@ describe('QosRows (§7 level qos)', () => {
     );
     await qos.write(call);
 
+    // Nothing reached this side of the leg: no packet received, 1500 sent.
     expect(await rowsOf(call)).toEqual([
       {
         channelId: 'caller',
         role: 'caller',
         jitterMs: null,
         lossPct: null,
-        rttMs: null
+        rttMs: null,
+        rxPackets: 0,
+        txPackets: 1500
       }
+    ]);
+  });
+
+  it('writes no packet count RTPAUDIOQOS does not name, rather than 0', async () => {
+    const qos = new QosRows(db, holding([]));
+    const call = await openCall(db);
+    qos.note(call);
+
+    await qos.channelEnded(
+      ended('caller', 'lp=0;rxjitter=0.001;txjitter=0.001;rlp=0;rtt=0.02')
+    );
+    await qos.write(call);
+
+    expect(await rowsOf(call)).toEqual([
+      expect.objectContaining({ rxPackets: null, txPackets: null })
     ]);
   });
 
@@ -364,13 +399,40 @@ describe('QosRows (§7 level qos)', () => {
       rtcp.report(report);
     }
 
-    // Asterisk measured jitter and loss but no round trip (0).
-    await qos.channelEnded(ended('caller', fakeRtpAudioQos({ rtt: 0 })));
+    // Asterisk measured jitter and loss but no round trip (0), and counted 1200 packets sent to
+    // the reports' 1000, which were as of its last sender report.
+    await qos.channelEnded(
+      ended('caller', fakeRtpAudioQos({ rtt: 0, txcount: 1200 }))
+    );
     await qos.write(call);
 
     const [row] = await rowsOf(call);
-    expect(row).toMatchObject({ jitterMs: 3.4, lossPct: 1 });
+    expect(row).toMatchObject({
+      jitterMs: 3.4,
+      lossPct: 1,
+      rxPackets: 990,
+      txPackets: 1200
+    });
     expect(row?.rttMs).toBeCloseTo(80, 1);
+  });
+
+  it('keeps a packet count of 0 RTPAUDIOQOS measured over the RTCP reports’ count', async () => {
+    const rtcp = new RtcpQos();
+    const qos = new QosRows(db, holding([]), undefined, rtcp);
+    const call = await openCall(db);
+    qos.note(call);
+    rtcp.join('caller', 'caller-call-id');
+    for (const report of rtcpOfLeg('caller-call-id')) {
+      rtcp.report(report);
+    }
+
+    await qos.channelEnded(
+      ended('caller', fakeRtpAudioQos({ rxcount: 0, txcount: 0 }))
+    );
+    await qos.write(call);
+
+    const [row] = await rowsOf(call);
+    expect(row).toMatchObject({ rxPackets: 0, txPackets: 0 });
   });
 
   it('writes the row of a leg whose ChannelDestroyed was lost from its RTCP reports', async () => {
@@ -387,10 +449,13 @@ describe('QosRows (§7 level qos)', () => {
     await qos.resync();
 
     const [row] = await rowsOf(call);
+    // The sent count is Asterisk's own sender report's; what reached Asterisk no report counts.
     expect(row).toMatchObject({
       channelId: 'caller',
       jitterMs: null,
-      lossPct: 3
+      lossPct: 3,
+      rxPackets: null,
+      txPackets: 1000
     });
     expect(row?.rttMs).toBeCloseTo(80, 1);
     expect(rtcp.joined()).toEqual([]);

@@ -127,11 +127,13 @@ describe('RtcpQos (§7 level qos)', () => {
     expect(rtcp.take('leg')).toEqual({
       jitterMs: null,
       lossPct: 2,
-      rttMs: null
+      rttMs: null,
+      rxPackets: null,
+      txPackets: 1000
     });
   });
 
-  it('measures nothing of Asterisk’s own reports alone, a peer that sends no RTCP', () => {
+  it('measures only the packets sent of Asterisk’s own reports alone, a peer that sends no RTCP', () => {
     const rtcp = new RtcpQos();
     rtcp.join('leg', CALL_ID);
     rtcp.report(
@@ -149,7 +151,25 @@ describe('RtcpQos (§7 level qos)', () => {
     expect(rtcp.take('leg')).toEqual({
       jitterMs: null,
       lossPct: null,
-      rttMs: null
+      rttMs: null,
+      rxPackets: null,
+      txPackets: 300
+    });
+  });
+
+  it('counts no packets received from the peer’s sender report, which counts what it sent', () => {
+    const rtcp = new RtcpQos();
+    rtcp.join('leg', CALL_ID);
+    // The phone reports 500 packets sent, which need not have reached Asterisk (NAT, a blocked
+    // RTP port); and Asterisk, having sent nothing, sends receiver reports only.
+    rtcp.report(
+      mirrored('peer', T0, rtcpPayload({ ssrc: PHONE_SSRC, sent: 500 }))
+    );
+    rtcp.report(mirrored('asterisk', T0, rtcpPayload({ ssrc: ASTERISK_SSRC })));
+
+    expect(rtcp.take('leg')).toMatchObject({
+      rxPackets: null,
+      txPackets: null
     });
   });
 
@@ -191,22 +211,54 @@ describe('RtcpQos (§7 level qos)', () => {
 
 describe('withRtcp', () => {
   it('keeps every figure the summary measured and fills the ones it left null', () => {
+    const unmeasured = { rxPackets: null, txPackets: null };
     expect(
       withRtcp(
-        { jitterMs: 3.4, lossPct: null, rttMs: null },
-        { jitterMs: null, lossPct: 0, rttMs: 81.2 }
+        { jitterMs: 3.4, lossPct: null, rttMs: null, ...unmeasured },
+        {
+          jitterMs: null,
+          lossPct: 0,
+          rttMs: 81.2,
+          rxPackets: null,
+          txPackets: 900
+        }
       )
-    ).toEqual({ jitterMs: 3.4, lossPct: 0, rttMs: 81.2 });
+    ).toEqual({
+      jitterMs: 3.4,
+      lossPct: 0,
+      rttMs: 81.2,
+      rxPackets: null,
+      txPackets: 900
+    });
+    // A count of 0 is a measurement and wins as any other.
     expect(
       withRtcp(
-        { jitterMs: 3.4, lossPct: 1, rttMs: 42 },
-        { jitterMs: null, lossPct: 2, rttMs: 81.2 }
+        { jitterMs: 3.4, lossPct: 1, rttMs: 42, rxPackets: 0, txPackets: 0 },
+        {
+          jitterMs: null,
+          lossPct: 2,
+          rttMs: 81.2,
+          ...unmeasured,
+          txPackets: 900
+        }
       )
-    ).toEqual({ jitterMs: 3.4, lossPct: 1, rttMs: 42 });
+    ).toEqual({
+      jitterMs: 3.4,
+      lossPct: 1,
+      rttMs: 42,
+      rxPackets: 0,
+      txPackets: 0
+    });
   });
 
   it('takes either alone, and gives no figures when neither is there', () => {
-    const figures = { jitterMs: null, lossPct: 0, rttMs: 12 };
+    const figures = {
+      jitterMs: null,
+      lossPct: 0,
+      rttMs: 12,
+      rxPackets: null,
+      txPackets: 40
+    };
 
     expect(withRtcp(null, figures)).toEqual(figures);
     expect(withRtcp(figures, null)).toEqual(figures);

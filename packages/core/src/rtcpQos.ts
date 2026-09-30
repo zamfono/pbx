@@ -80,7 +80,10 @@ function lossShare(lost: number | null, sent: number | null): number | null {
  * The figures of one leg's reports: the worse direction's loss, the packets one side reported
  * missed against those the other side's latest sender report counted as sent, and the last round
  * trip. Jitter is not among them: a report block gives it in RTP timestamp units, whose clock rate
- * (the codec's) the report does not carry.
+ * (the codec's) the report does not carry. The packets sent are those of Asterisk's latest sender
+ * report, the same count `RTPAUDIOQOS`'s `txcount` gives, as of that report. The packets received
+ * are not: the peer's sender report counts what the peer sent, not what reached Asterisk, and
+ * taking it would hide exactly the leg whose audio never arrived (§7 level `qos`).
  */
 function figures(leg: RtcpLeg): QosFigures {
   const shares = [
@@ -94,7 +97,9 @@ function figures(leg: RtcpLeg): QosFigures {
     rttMs:
       leg.rtt === null || leg.rtt <= 0
         ? null
-        : roundFigure(leg.rtt * MS_PER_SECOND)
+        : roundFigure(leg.rtt * MS_PER_SECOND),
+    rxPackets: null,
+    txPackets: leg.sent
   };
 }
 
@@ -109,7 +114,9 @@ export function withRtcp(
   return {
     jitterMs: summary.jitterMs ?? rtcp.jitterMs,
     lossPct: summary.lossPct ?? rtcp.lossPct,
-    rttMs: summary.rttMs ?? rtcp.rttMs
+    rttMs: summary.rttMs ?? rtcp.rttMs,
+    rxPackets: summary.rxPackets ?? rtcp.rxPackets,
+    txPackets: summary.txPackets ?? rtcp.txPackets
   };
 }
 
