@@ -113,7 +113,13 @@ async function trunkMetricLines(
     .execute();
   const lines = ['# TYPE zamfono_trunk_registered gauge'];
   for (const trunk of trunks) {
-    const registered = state?.trunks[trunk.id]?.status === 'registered';
+    const status = state?.trunks[trunk.id]?.status;
+    // An `unmonitored` trunk is never probed, so there is nothing to report for it: a 0 would read
+    // as a trunk that is down (§9.4 "Provisioning and status").
+    if (status === 'unmonitored') {
+      continue;
+    }
+    const registered = status === 'registered';
     lines.push(
       `zamfono_trunk_registered{trunk="${escapeLabel(trunk.name)}"} ${registered ? 1 : 0}`
     );

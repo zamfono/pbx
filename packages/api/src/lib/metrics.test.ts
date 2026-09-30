@@ -177,6 +177,27 @@ describe('renderMetrics', () => {
     expect(text).toContain('zamfono_trunk_max_channels{trunk="main"} 10');
   });
 
+  it('leaves an unmonitored trunk out of zamfono_trunk_registered (§9.4 "Provisioning and status")', async () => {
+    const db = await makeTestDb();
+    const upId = await insertTrunk(db, { name: 'up' });
+    const unprobedId = await insertTrunk(db, { name: 'unprobed', priority: 2 });
+    const state: StateResponse = {
+      ...EMPTY_STATE,
+      trunks: {
+        [upId]: { status: 'registered', statusChangedAt: null },
+        [unprobedId]: { status: 'unmonitored', statusChangedAt: null }
+      }
+    };
+
+    const text = await renderMetrics(
+      stubDeps({ db, coreState: () => Promise.resolve(state) })
+    );
+
+    expect(text).toContain('zamfono_trunk_registered{trunk="up"} 1');
+    expect(text).not.toContain('zamfono_trunk_registered{trunk="unprobed"}');
+    expect(text).toContain('zamfono_trunk_channels{trunk="unprobed"} 0');
+  });
+
   it("renders each live trunk's channels in use from the core's count, 0 for one carrying none", async () => {
     const db = await makeTestDb();
     const busyId = await insertTrunk(db, { name: 'busy', maxChannels: 4 });
