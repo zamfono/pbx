@@ -395,6 +395,7 @@ export interface Trunks {
   outboundProxy: string | null;
   passwordEnc: Buffer | null;
   priority: number;
+  qualify: Generated<number>;
   registerExpiryS: number | null;
   registerRetryS: number | null;
   srtp: Generated<number>;
