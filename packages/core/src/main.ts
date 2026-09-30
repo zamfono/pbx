@@ -138,7 +138,8 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
       mediaDir: env.mediaDir,
       trunkState,
       presence,
-      stackTz: env.tz
+      stackTz: env.tz,
+      stackSipHost: env.sipHost
     });
     pipeline.setOutboundHandler(ev => handleOutbound(pipeline, trunkState, ev));
     // --- end Task 31 ---

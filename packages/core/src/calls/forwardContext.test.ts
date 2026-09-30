@@ -5,25 +5,28 @@ import {
   redirectingVariables,
   type Diversion
 } from './forwardContext.js';
+import type { DiversionTrunk } from './forwardDiversion.js';
 
 // §9.4 "Forwarded calls": what a forwarded trunk leg carries of its call's forwarding context.
 
-describe('redirectingVariables', () => {
-  const bea: Diversion = {
-    number: '177',
-    name: 'Bea',
-    reason: 'away',
-    party: 'user',
-    extension: '177'
-  };
-  const agent: Diversion = {
-    number: '178',
-    name: null,
-    reason: 'cfu',
-    party: 'user',
-    extension: '178'
-  };
+const bea: Diversion = {
+  number: '177',
+  diversionNumber: '+15551177',
+  name: 'Bea',
+  reason: 'away',
+  party: 'user',
+  extension: '177'
+};
+const agent: Diversion = {
+  number: '178',
+  diversionNumber: '+15551000',
+  name: null,
+  reason: 'cfu',
+  party: 'user',
+  extension: '178'
+};
 
+describe('redirectingVariables', () => {
   it('sets nothing for a leg no hop led to', () => {
     expect(redirectingVariables([])).toEqual({});
   });
@@ -41,12 +44,32 @@ describe('redirectingVariables', () => {
 });
 
 describe('forwardVariables', () => {
+  const trunk: DiversionTrunk = {
+    policy: 'last',
+    host: 'pbx.example',
+    format: 'e164',
+    country: 'US'
+  };
+
   it("adds a leg's rendered headers with PJSIP_HEADER beside its REDIRECTING data", () => {
     expect(
-      forwardVariables({
-        diversions: [],
-        headers: [{ name: 'X-Zamfono-Caller', value: '+15559999' }]
-      })
+      forwardVariables(
+        {
+          diversions: [],
+          headers: [{ name: 'X-Zamfono-Caller', value: '+15559999' }]
+        },
+        trunk
+      )
     ).toEqual({ 'PJSIP_HEADER(add,X-Zamfono-Caller)': '+15559999' });
+  });
+
+  it("adds the trunk's Diversion with PJSIP_HEADER, and none with the policy off", () => {
+    const forward = { diversions: [bea, agent], headers: [] };
+    expect(
+      forwardVariables(forward, trunk)['PJSIP_HEADER(add,Diversion)']
+    ).toBe('<sip:+15551000@pbx.example>;reason=unconditional');
+    expect(
+      Object.keys(forwardVariables(forward, { ...trunk, policy: 'off' }))
+    ).not.toContain('PJSIP_HEADER(add,Diversion)');
   });
 });

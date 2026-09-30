@@ -1,27 +1,35 @@
 /**
  * A call's forwarding context (§9.4 "Forwarded calls"): the forward hops it took, each with the
  * diverting party and a reason, and what a trunk leg dialled for a forward target carries of
- * them, the `REDIRECTING` data chan_pjsip builds `Diversion` from and a `sip` target's headers,
- * rendered by `forwardHeaders.ts`.
+ * them: the `REDIRECTING` data, the `Diversion` its trunk's policy sends, written by
+ * `forwardDiversion.ts`, and a `sip` target's headers, rendered by `forwardHeaders.ts`.
  */
 import type { Snapshot } from '../internal/server.js';
 import type { Call } from './call.js';
+import {
+  diversionHeader,
+  diversionNumber,
+  type DiversionTrunk
+} from './forwardDiversion.js';
 import { headerVariables, type SipHeader } from './forwardHeaders.js';
 
 /**
  * Asterisk's `REDIRECTING` reasons a forward hop maps to (§9.4 "Forwarded calls"), and the
- * `Diversion` `reason` chan_pjsip sends for each: `away` away, `time_of_day` time-of-day, `cfu`
- * unconditional, `cfb` user-busy, `cfnr` no-answer, `unavailable` unavailable, `dnd`
- * do-not-disturb.
+ * `Diversion` `reason` sent for each (`forwardDiversion.ts`): `away` away, `time_of_day`
+ * time-of-day, `cfu` unconditional, `cfb` user-busy, `cfnr` no-answer, `unavailable` unavailable,
+ * `dnd` do-not-disturb.
  */
 export type RedirectingReason =
   'away' | 'time_of_day' | 'cfu' | 'cfb' | 'cfnr' | 'unavailable' | 'dnd';
 
-/** One forward hop: who diverted the call, and why. `party` and `extension` are the diverting
- * party's kind and extension, a menu's `null`, which a `sip` target's headers name (§9.4 "Header
- * templates"). */
+/** One forward hop: who diverted the call, and why. `number` is the `REDIRECTING` number, an
+ * extension where the party has no number of its own; `diversionNumber` the one its `Diversion`
+ * entry names, never an extension, `null` for none (§9.4 "Forwarded calls"). `party` and
+ * `extension` are the diverting party's kind and extension, a menu's `null`, which a `sip`
+ * target's headers name (§9.4 "Header templates"). */
 export type Diversion = {
   number: string;
+  diversionNumber: string | null;
   name: string | null;
   reason: RedirectingReason;
   party: 'user' | 'ringGroup' | 'menu';
@@ -43,7 +51,7 @@ export const CONDITION_REASONS = {
   unavailable: 'unavailable'
 } as const satisfies Record<string, RedirectingReason>;
 
-/** A user's number as a `Diversion` names it: their primary number, else their extension. */
+/** A user's number as `REDIRECTING` names it: their primary number, else their extension. */
 function userNumber(snapshot: Snapshot, userId: string): string | null {
   const user = snapshot.users.find(row => row.id === userId);
   const did =
@@ -57,7 +65,10 @@ function userNumber(snapshot: Snapshot, userId: string): string | null {
   );
 }
 
-type PartyIdentity = Omit<Diversion, 'number' | 'reason'> & {
+type PartyIdentity = Omit<
+  Diversion,
+  'number' | 'diversionNumber' | 'reason'
+> & {
   number: string | null;
 };
 
@@ -100,8 +111,8 @@ function partyIdentity(
 }
 
 /**
- * The hop `party` makes for `reason`, with the party's number and name; `null` where it has no
- * number to name, a menu of an internal call, since a `Diversion` without one is not sent.
+ * The hop `party` makes for `reason`, with the party's numbers and name; `null` where it has no
+ * `REDIRECTING` number to name, a menu of an internal call.
  */
 export function diversionFor(
   snapshot: Snapshot,
@@ -110,7 +121,14 @@ export function diversionFor(
   reason: RedirectingReason
 ): Diversion | null {
   const { number, ...identity } = partyIdentity(snapshot, call, party);
-  return number === null ? null : { number, reason, ...identity };
+  return number === null
+    ? null
+    : {
+        number,
+        diversionNumber: diversionNumber(snapshot, call, party),
+        reason,
+        ...identity
+      };
 }
 
 /** Records `diversion`, the hop a forward is taking, in the call's context (§10.1 step 7). */
@@ -136,8 +154,8 @@ function partyVariables(
 /**
  * The `REDIRECTING` data of a leg that took `diversions`, first hop first: the first hop as the
  * original party, the last as the redirecting one, and the count, each set with `i` so nothing is
- * signalled before the INVITE; chan_pjsip sends a `Diversion` from the redirecting party (§9.4
- * "Forwarded calls"). None for a leg no hop led to.
+ * signalled before the INVITE; nothing is sent from it, since every trunk endpoint has
+ * `send_diversion = no` (§9.4 "Forwarded calls"). None for a leg no hop led to.
  */
 export function redirectingVariables(
   diversions: Diversion[]
@@ -161,11 +179,19 @@ export function redirectingVariables(
  * `sip` target's rendered for it and none for an `external` one (§9.4 "Forwarded calls"). */
 export type ForwardLeg = { diversions: Diversion[]; headers: SipHeader[] };
 
-/** The forwarding context `forward`'s leg carries (§9.4 "Forwarded calls"): its `REDIRECTING`
- * data and its headers, every header the leg adds, so any other joins them here. */
-export function forwardVariables(forward: ForwardLeg): Record<string, string> {
+/** The forwarding context `forward`'s leg carries over `trunk` (§9.4 "Forwarded calls"): its
+ * `REDIRECTING` data, the `Diversion` the trunk's policy sends and its headers, every header the
+ * leg adds, so any other joins them here. */
+export function forwardVariables(
+  forward: ForwardLeg,
+  trunk: DiversionTrunk
+): Record<string, string> {
+  const diversion = diversionHeader(forward.diversions, trunk);
   return {
     ...redirectingVariables(forward.diversions),
+    ...(diversion === null
+      ? {}
+      : headerVariables([{ name: 'Diversion', value: diversion }])),
     ...headerVariables(forward.headers)
   };
 }

@@ -168,7 +168,7 @@ export function channelCapAllows(
 const CLIR_UNSUPPORTED_STATUS = 403;
 
 /** Renders `number` (E.164) per `format` (§9.4 "Caller-ID"): `national` drops the country's calling code for a leading `0`. */
-function formatCallerId(
+export function formatCallerId(
   number: string,
   format: 'e164' | 'national',
   country: string

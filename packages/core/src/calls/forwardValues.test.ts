@@ -15,6 +15,7 @@ import type { Pipeline } from './pipeline.js';
 
 const BEA: Diversion = {
   number: '+15551077',
+  diversionNumber: '+15551077',
   name: 'Bea',
   reason: 'away',
   party: 'user',
@@ -22,6 +23,7 @@ const BEA: Diversion = {
 };
 const AI: Diversion = {
   number: '178',
+  diversionNumber: '+15551000',
   name: 'AI Agent',
   reason: 'cfu',
   party: 'user',
@@ -29,6 +31,7 @@ const AI: Diversion = {
 };
 const MENU: Diversion = {
   number: '+15551077',
+  diversionNumber: '+15551077',
   name: 'Main menu',
   reason: 'time_of_day',
   party: 'menu',

@@ -370,6 +370,65 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     expect(legs.at(0)?.variables?.['CALLERID(num)']).toBe('+15551000');
   });
 
+  it("sends each hop's Diversion by its own number or the main number under the trunk's policy", async () => {
+    const trunkId = await seedSipTrunk(db);
+    const bea = await seedUser(db, 'Bea', '177');
+    const ai = await seedUser(db, 'AI Agent', '178');
+    const beaDid = newId();
+    await db
+      .insertInto('dids')
+      .values({
+        id: beaDid,
+        number: '+15551177',
+        targetId: await seedTarget(db, { userId: bea }),
+        createdAt: nowIso()
+      })
+      .execute();
+    await db
+      .updateTable('users')
+      .set({ calleridDidId: beaDid })
+      .where('id', '=', bea)
+      .execute();
+    await db
+      .insertInto('oooRules')
+      .values({
+        id: newId(),
+        scopeUserId: bea,
+        active: 1,
+        targetId: await seedTarget(db, { userId: ai }),
+        createdAt: nowIso()
+      })
+      .execute();
+    await seedRule(db, ai, 'unconditional', await sipTargetId(db, trunkId, []));
+    const sent = async (policy: 'off' | 'last' | 'all'): Promise<unknown> => {
+      await db
+        .updateTable('trunks')
+        .set({ diversion: policy })
+        .where('id', '=', trunkId)
+        .execute();
+      pipeline.deps.cache.invalidate();
+      const before = trunkOriginates(fakeAri).length;
+      const started = pipeline.enterTarget(
+        inboundCall(),
+        { id: '', kind: 'user', userId: bea },
+        null
+      );
+      const legs = await dialled(started, before + 1);
+      return legs.at(-1)?.variables?.['PJSIP_HEADER(add,Diversion)'];
+    };
+
+    // §9.4 "Forwarded calls": AI has no number of their own, so their hop names the main number,
+    // Bea's hers, never an extension; newest first, at the trunk's first outbound host.
+    expect(await sent('all')).toBe(
+      '"AI Agent" <sip:+15551000@sip.api.openai.com>;reason=unconditional, ' +
+        '"Bea" <sip:+15551177@sip.api.openai.com>;reason=away'
+    );
+    expect(await sent('last')).toBe(
+      '"AI Agent" <sip:+15551000@sip.api.openai.com>;reason=unconditional'
+    );
+    expect(await sent('off')).toBeUndefined();
+  });
+
   it("renders a target's templated headers: the called user, the last forwarder and its reason", async () => {
     const trunkId = await seedSipTrunk(db);
     const bea = await seedUser(db, 'Bea', '177');

@@ -56,7 +56,8 @@ describe('buildPipeline', () => {
       mediaDir: '/media',
       trunkState: new TrunkState({ ...deps, ami }),
       presence: new Presence({ ...deps, db }),
-      stackTz
+      stackTz,
+      stackSipHost: null
     });
     return { ...built, state };
   }

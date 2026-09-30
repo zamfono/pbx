@@ -20,6 +20,17 @@ why the specified behaviour changed; the commit history, how.
   back, and removed if they leave it out, since the call replaces the rules as a whole. An
   external forward is dialled as the user's own call, so a number their outbound routes do not
   carry is stored but refused when a call is forwarded.
+- A trunk setting `diversion` (`trunks.create`, `trunks.update`, `POST /trunks`,
+  `PATCH /trunks/{id}`) decides whether a call the stack forwards out over the trunk, to an
+  external number or a `sip` target, tells the far end who forwarded it: `off`, the default and
+  what every existing trunk gets, sends nothing, as before; `last` sends one `Diversion` entry,
+  the user or ring group whose rule forwarded the call last; `all` one entry per forward, newest
+  first. Each entry names the forwarding user's own number, a ring group's own DID, or else the
+  company's main number, never an internal extension, with the reason (`unconditional`,
+  `user-busy`, `no-answer`, `unavailable`, `do-not-disturb`, `away` for out-of-office,
+  `time-of-day` for closed hours). Some carriers show the original caller's number on a
+  forwarded call only when a `Diversion` names one of the company's numbers; an AI agent behind
+  a `sip` target learns from it who forwarded the call and why.
 - A trunk setting `qualify` (`trunks.create`, `trunks.update`, `POST /trunks`,
   `PATCH /trunks/{id}`), on unless given: with it off, the stack stops sending an `ip` trunk's
   provider the OPTIONS request it checks reachability with every 60 seconds, for an endpoint that
@@ -73,12 +84,6 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
-- A call the stack forwards out over a trunk, to an external number or a `sip` target, now tells
-  the far end who forwarded it: the INVITE carries a `Diversion` header naming the user or ring
-  group whose rule forwarded it last, with the reason (`unconditional`, `user-busy`, `no-answer`,
-  `unavailable`, `do-not-disturb`, `away` for out-of-office, `time-of-day` for closed hours).
-  A carrier sees it on every external forward, which carried none before; a `sip` target's call
-  carries its own headers besides (see Added).
 - A backup run shows two sizes instead of one: `bytesTotal`, the full size of its snapshot, and
   `bytesAdded`, what it uploaded after restic's deduplication. The run's `bytes` field is gone
   from `backups.runs.list` and `backups.runs.get` (`GET /backups/runs`, `GET /backups/runs/{id}`)

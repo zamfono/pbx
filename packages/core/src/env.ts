@@ -26,6 +26,9 @@ export type CoreEnv = {
   hepEnabled: boolean;
   callLogMaxBytes: number;
   tz: string;
+  /** The address the stack writes into SIP (§6.1, §9.1): `EXTERNAL_IPV4` in the ports mode, else
+   * `STACK_IPV4`, which the transports bind in the macvlan mode; `null` while neither is set. */
+  sipHost: string | null;
 };
 
 function requireEnv(env: NodeJS.ProcessEnv, name: string): string {
@@ -78,6 +81,17 @@ function parseTz(raw: string | undefined): string {
   return raw ?? DEFAULT_TZ;
 }
 
+/** `EXTERNAL_IPV4`, else `STACK_IPV4`, the Asterisk entrypoint's order; `null` for neither. */
+function parseSipHost(env: NodeJS.ProcessEnv): string | null {
+  // An empty value is unset: compose.yaml hands both to `core` as `${…:-}`.
+  for (const value of [env.EXTERNAL_IPV4, env.STACK_IPV4]) {
+    if (value !== undefined && value !== '') {
+      return value;
+    }
+  }
+  return null;
+}
+
 // amiHost's port, callLogMaxBytes and tz are validated here and carried on `CoreEnv` for the
 // call pipeline, the OOO/hours sweep and the HEP listener; tz is the tenant clock while
 // `settings.timezone` is NULL (§11.4). hepEnabled accepts any value other than the literal
@@ -94,6 +108,7 @@ export function readEnv(env: NodeJS.ProcessEnv): CoreEnv {
     mediaDir: env.MEDIA_DIR ?? DEFAULT_MEDIA_DIR,
     hepEnabled: env.HEP_ENABLED !== 'false',
     callLogMaxBytes: parseCallLogMaxBytes(env.CALL_LOG_MAX_BYTES),
-    tz: parseTz(env.TZ)
+    tz: parseTz(env.TZ),
+    sipHost: parseSipHost(env)
   };
 }

@@ -106,7 +106,12 @@ describe('renderForwardHeaders', () => {
       ],
       { ...VALUES, callerNumber: '${SHELL(id)}' }
     );
-    expect(forwardVariables({ diversions: [], headers })).toEqual({
+    expect(
+      forwardVariables(
+        { diversions: [], headers },
+        { policy: 'all', host: 'pbx.example', format: 'e164', country: 'US' }
+      )
+    ).toEqual({
       'PJSIP_HEADER(add,X-Literal)': '${CALLERID(num)} $[1+1] ${SHELL(id)}'
     });
   });

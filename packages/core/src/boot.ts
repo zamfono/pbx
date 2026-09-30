@@ -39,6 +39,7 @@ export function buildPipeline(deps: {
   trunkState: TrunkState;
   presence: Presence;
   stackTz: string;
+  stackSipHost: string | null;
 }): { pipeline: Pipeline; cdr: CdrWriter } {
   const { db, ari, cache, state, bus, log } = deps;
   const cdr = new CdrWriter({ db, ari, cache, bus, state, now: nowIso });
@@ -62,6 +63,7 @@ export function buildPipeline(deps: {
     recorder,
     now: nowIso,
     stackTz: deps.stackTz,
+    stackSipHost: deps.stackSipHost,
     db,
     apiClient: new ApiClient(),
     logger: log,

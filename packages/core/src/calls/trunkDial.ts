@@ -13,6 +13,7 @@ import type { AttemptFailure } from '../routing/trunk.js';
 import { raiseLogLevel, type Call } from './call.js';
 import type { AttemptIdentity, TrunkRow } from './callerIdentity.js';
 import { forwardVariables, type ForwardLeg } from './forwardContext.js';
+import { diversionTrunk } from './forwardDiversion.js';
 import { originateLeg } from './legOriginate.js';
 import type { Pipeline } from './pipeline.js';
 import type { TrunkLeg } from './provisional.js';
@@ -157,23 +158,31 @@ export async function originateTrunkLeg(
     // (CLIR)", RFC 3325).
     variables['CONNECTEDLINE(pres)'] = 'prohib';
   }
-  if (ctx.forward !== undefined) {
-    // The one place a forwarded leg's `REDIRECTING` data and custom headers are applied.
-    Object.assign(variables, forwardVariables(ctx.forward));
-  }
   // §7: the trunk carrying the call's leg counts toward its diagnostics level.
   raiseLogLevel(call.log, trunk, pipeline.deps.now());
   trunkState.noteAttemptStarted(trunk.id);
   try {
     // Read after the attempt is counted, so the language adds no wait ahead of the channel count.
-    const { settings } = await pipeline.deps.cache.get();
+    const snapshot = await pipeline.deps.cache.get();
+    if (ctx.forward !== undefined) {
+      // The one place a forwarded leg's `REDIRECTING` data, `Diversion` and custom headers are
+      // applied, the `Diversion` under this attempt's trunk's policy (§9.4 "Forwarded calls").
+      const stackSipHost = pipeline.deps.stackSipHost ?? null;
+      Object.assign(
+        variables,
+        forwardVariables(
+          ctx.forward,
+          diversionTrunk(trunk, snapshot, stackSipHost)
+        )
+      );
+    }
     const channel = await originateLeg(pipeline, call, {
       endpoint: `PJSIP/${number}@${endpoint}`,
       app: 'zamfono',
       appArgs: `leg,${call.id}`,
       callerId: identity.number,
       variables: {
-        ...channelLanguageVariable(settings.language),
+        ...channelLanguageVariable(snapshot.settings.language),
         ...variables
       }
     });

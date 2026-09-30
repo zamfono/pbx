@@ -51,6 +51,9 @@ export type PipelineDeps = {
   // The stack's `TZ` (§11.4 `timezone`: "NULL = stack `TZ`, else UTC"), `CoreEnv.tz`; optional so
   // a test Pipeline that never evaluates opening hours need not supply it (absent = UTC).
   stackTz?: string;
+  // The address the stack writes into SIP (`CoreEnv.sipHost`), the host a forwarded leg's
+  // `Diversion` entries name (§9.4 "Forwarded calls"); optional, absent = the trunk's own host.
+  stackSipHost?: string | null;
   /** How long a created leg may take to enter the app before it counts as not placed
    * (`legOriginate.ts`); tests shorten it. Default `STASIS_WAIT_MS`. */
   legStasisWaitMs?: number;
