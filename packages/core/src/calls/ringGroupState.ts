@@ -6,8 +6,9 @@
 import type { Snapshot } from '../internal/server.js';
 import { expandMembers, type MemberState } from '../routing/ringGroup.js';
 import { ownInEffectOoo } from '../routing/schedule.js';
+import { buildOooRules } from '../routing/scheduleRows.js';
 import type { ForwardTarget } from '../routing/targets.js';
-import { buildOooRules, buildUserRules, findForwardTarget } from './call.js';
+import { buildUserRules, findForwardTarget } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { isUserInCall, registeredDevices } from './userDevices.js';
 

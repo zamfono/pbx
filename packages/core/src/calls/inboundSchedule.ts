@@ -5,42 +5,10 @@
 import { resolveTenantTimeZone, type Scope } from '@zamfono/shared';
 
 import type { Snapshot } from '../internal/server.js';
-import {
-  inEffectOoo,
-  isOpen,
-  scheduleFor,
-  type Schedule
-} from '../routing/schedule.js';
-import {
-  buildOooRules,
-  findForwardTarget,
-  scopeFromRow,
-  type Call,
-  type Owner
-} from './call.js';
+import { inEffectOoo, isOpen, scheduleFor } from '../routing/schedule.js';
+import { buildOooRules, buildSchedules } from '../routing/scheduleRows.js';
+import { findForwardTarget, type Call, type Owner } from './call.js';
 import type { Pipeline } from './pipeline.js';
-
-/** `opening_hours`/`opening_hours_intervals` rows as the `Schedule[]` `scheduleFor` (§10.1 step 3) expects. */
-function buildSchedules(
-  rows: Snapshot['openingHours'],
-  intervalRows: Snapshot['openingHoursIntervals']
-): Schedule[] {
-  return rows
-    .filter(row => row.deletedAt === null)
-    .map(row => ({
-      id: row.id,
-      scope: scopeFromRow(row),
-      active: row.active === 1,
-      closedTargetId: row.closedTargetId,
-      intervals: intervalRows
-        .filter(interval => interval.openingHoursId === row.id)
-        .map(interval => ({
-          weekday: interval.weekday as Schedule['intervals'][number]['weekday'],
-          opens: interval.opens,
-          closes: interval.closes
-        }))
-    }));
-}
 
 type ScopedTarget =
   | { kind: 'user'; userId: string }

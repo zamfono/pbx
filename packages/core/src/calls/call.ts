@@ -6,7 +6,6 @@ import type { DB, Scope } from '@zamfono/shared';
 
 import { CallLog, type LogLevel } from '../callLog.js';
 import type { Snapshot } from '../internal/server.js';
-import type { OooRule } from '../routing/schedule.js';
 import { targetFromRow, type ForwardTarget } from '../routing/targets.js';
 import { notifyMissedCall } from './missedCall.js';
 import type { Pipeline } from './pipeline.js';
@@ -192,37 +191,6 @@ export async function endTargetOwner(
     return;
   }
   await release(pipeline, call, fallback.code, fallback.status);
-}
-/** The `Scope` a row's `scopeUserId`/`scopeRingGroupId`/`scopeMenuId` exclusive arc encodes. */
-export function scopeFromRow(row: {
-  scopeUserId: string | null;
-  scopeRingGroupId: string | null;
-  scopeMenuId: string | null;
-}): Scope {
-  if (row.scopeUserId !== null) {
-    return `user:${row.scopeUserId}`;
-  }
-  if (row.scopeRingGroupId !== null) {
-    return `ringGroup:${row.scopeRingGroupId}`;
-  }
-  if (row.scopeMenuId !== null) {
-    return `menu:${row.scopeMenuId}`;
-  }
-  return 'tenant';
-}
-
-/** `ooo_rules` rows as the `OooRule[]` `inEffectOoo` (§10.1 step 2) expects. */
-export function buildOooRules(rows: Snapshot['oooRules']): OooRule[] {
-  return rows
-    .filter(row => row.deletedAt === null)
-    .map(row => ({
-      id: row.id,
-      scope: scopeFromRow(row),
-      active: row.active === 1,
-      startsAt: row.startsAt,
-      expiresAt: row.expiresAt,
-      targetId: row.targetId
-    }));
 }
 
 export {

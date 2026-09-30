@@ -186,6 +186,7 @@ async function loadSnapshot(trx: Transaction<DB>): Promise<Snapshot> {
 export class ConfigCache {
   private readonly db: Db;
   private snapshot: Promise<Snapshot> | null = null;
+  private readonly invalidateListeners = new Set<() => void>();
 
   constructor(db: Db) {
     this.db = db;
@@ -204,5 +205,16 @@ export class ConfigCache {
 
   invalidate(): void {
     this.snapshot = null;
+    for (const listener of this.invalidateListeners) {
+      listener();
+    }
+  }
+
+  /** Calls `listener` after every `invalidate()`, until the returned function unsubscribes it. */
+  onInvalidate(listener: () => void): () => void {
+    this.invalidateListeners.add(listener);
+    return () => {
+      this.invalidateListeners.delete(listener);
+    };
   }
 }

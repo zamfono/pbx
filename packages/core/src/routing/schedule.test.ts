@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   inEffectOoo,
   isOpen,
+  nextTransition,
   scheduleFor,
   type OooRule,
   type Schedule
@@ -109,5 +110,45 @@ describe('scheduleFor', () => {
     ];
 
     expect(scheduleFor(schedules, 'user:u1')?.id).toBe('tenant-schedule');
+  });
+});
+
+describe('nextTransition', () => {
+  it("is the nearest future bound of an active rule, ignoring an inactive one's", () => {
+    const rules = [
+      rule({ startsAt: '2026-01-01T12:00:00.000Z' }),
+      rule({ active: false, startsAt: '2026-01-01T10:30:00.000Z' }),
+      rule({
+        startsAt: '2026-01-01T09:00:00.000Z',
+        expiresAt: '2026-01-01T11:00:00.000Z'
+      })
+    ];
+
+    expect(nextTransition(rules, [], '2026-01-01T10:00:00.000Z', 'UTC')).toBe(
+      Date.parse('2026-01-01T11:00:00.000Z')
+    );
+  });
+
+  it("is a schedule's next open or close edge in its zone", () => {
+    // Wednesday 2026-03-18 18:00 CET: closed, next opening Thursday 09:00 CET (08:00Z).
+    expect(
+      nextTransition(
+        [],
+        [weekdayHoursSchedule()],
+        '2026-03-18T17:00:00.000Z',
+        'Europe/Berlin'
+      )
+    ).toBe(Date.parse('2026-03-19T08:00:00.000Z'));
+  });
+
+  it('is null with nothing that can change: no rules, an always-closed schedule', () => {
+    expect(
+      nextTransition(
+        [rule({})],
+        [weekdayHoursSchedule({ intervals: [] })],
+        '2026-01-01T10:00:00.000Z',
+        'UTC'
+      )
+    ).toBeNull();
   });
 });

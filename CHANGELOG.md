@@ -13,6 +13,9 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- The `ooo` and `hours` events, and the live OOO and opening-hours status they drive, came up to
+  a minute after a rule started or expired or the opening hours opened or closed, and after the
+  rules were changed. They now go out at the moment itself, and at once after a change.
 - Internal calls between Ringotel apps did not always pass through the PBX, so they could be
   missing from the call history, recordings and presence: the connection kept Ringotel's default,
   "through PBX if possible", since the setting Zamfono sent has no effect. The connection now
