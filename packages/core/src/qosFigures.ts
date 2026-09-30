@@ -97,11 +97,21 @@ function jitterMs(stat: RtpQos): number | null {
   return round(worst * MS_PER_SECOND);
 }
 
+/** Whether a receiver report from the peer arrived: it carries the round trip, the peer's jitter
+ * and its missed packets, and Asterisk leaves all three 0 until the first one. */
+function peerReported(stat: RtpQos): boolean {
+  return (
+    count(stat.rtt) > 0 || count(stat.rxjitter) > 0 || count(stat.txploss) > 0
+  );
+}
+
 /**
  * The worse direction's packet loss in percent: the packets this side missed (`lp`) against those
  * it expected (received plus missed), once it received any, or those the peer reported missing
- * (`rlp`) against those sent, once it sent any. Null when no packet went either way. A side that
- * received nothing measured no loss: Asterisk then reports one packet missed out of none.
+ * (`rlp`) against those sent, once the peer sent a receiver report. Null when neither direction
+ * was measured. A side that received nothing measured no loss: Asterisk then reports one packet
+ * missed out of none. Nor did one whose peer never reported: `rlp` then stays 0 however many
+ * packets went out, and a one-way-audio leg would read as a perfect line.
  */
 function lossPct(stat: RtpQos): number | null {
   const shares: number[] = [];
@@ -111,7 +121,7 @@ function lossPct(stat: RtpQos): number | null {
     shares.push(rxLost / (received + rxLost));
   }
   const sent = count(stat.txcount);
-  if (sent > 0) {
+  if (sent > 0 && peerReported(stat)) {
     shares.push(Math.min(count(stat.txploss), sent) / sent);
   }
   return shares.length === 0 ? null : round(Math.max(...shares) * PERCENT);

@@ -2249,7 +2249,8 @@ CREATE TABLE calls (
 --   jitter_ms:  interarrival jitter, the worse of the leg's own measurement and the peer's
 --               receiver report; NULL when neither measured any
 --   loss_pct:   lost packets in percent, the worse direction: missed on receive against expected,
---               once any packet was received, or reported missing by the peer against sent
+--               once any packet was received, or reported missing by the peer against sent,
+--               once the peer sent a receiver report; NULL when neither direction was measured
 --   rtt_ms:     the last round trip measured from an RTCP receiver report; NULL while none arrived
 CREATE TABLE call_qos (
   call_id    TEXT    NOT NULL REFERENCES calls(id) ON DELETE CASCADE,

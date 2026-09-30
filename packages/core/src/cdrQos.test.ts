@@ -231,6 +231,32 @@ describe('QosRows (§7 level qos)', () => {
     ]);
   });
 
+  it('writes no loss for a one-way-audio leg whose peer never sent a receiver report', async () => {
+    const qos = new QosRows(db, holding([]));
+    const call = await openCall(db);
+    qos.note(call);
+
+    // Packets went out but none came back, RTCP included: Asterisk leaves `rlp` at 0, which is
+    // no measurement of the sent direction, not a lossless one.
+    await qos.channelEnded(
+      ended(
+        'caller',
+        'lp=1;rxjitter=0;rxcount=0;txjitter=0;txcount=1500;rlp=0;rtt=0'
+      )
+    );
+    await qos.write(call);
+
+    expect(await rowsOf(call)).toEqual([
+      {
+        channelId: 'caller',
+        role: 'caller',
+        jitterMs: null,
+        lossPct: null,
+        rttMs: null
+      }
+    ]);
+  });
+
   it('writes nothing below level qos, before or after the write, unless routing raised it', async () => {
     const qos = new QosRows(db, holding([]));
     const low = await openCall(db, 'events');
