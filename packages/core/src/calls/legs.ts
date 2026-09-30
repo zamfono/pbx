@@ -26,6 +26,9 @@ export type RingResolver = {
   // --- Task 31 --- The bridge the win joins in place of its own (`winLeg`), `null` for a fresh one.
   existingBridgeId: string | null;
   // --- end Task 31 ---
+  /** Set for a ring on a user's own phones that an action started (`ownDevices.ts`): the leg that
+   * answers is handed to it instead of being bridged with a caller the call does not have yet. */
+  handOver?: (leg: Leg) => void;
 };
 
 /** A find-me leg awaiting its accept key; `timer`, the accept window, starts once the prompt
@@ -99,6 +102,31 @@ async function winLeg(
   pending?.resolve('answered');
 }
 
+/**
+ * The first answer of a ring on a user's own phones (`ownDevices.ts`): the race ends as any does,
+ * every other ringing leg hung up, and the answered channel leaves the call's legs for whoever
+ * started the ring, which makes it the caller of a call (click-to-dial) or dials with it (pickup).
+ */
+async function handOverLeg(
+  pipeline: Pipeline,
+  call: Call,
+  leg: Leg,
+  pending: RingResolver
+): Promise<void> {
+  clearTimeout(pending.timer);
+  pipeline.pendingRing.delete(call.id);
+  call.legs.delete(leg.channelId);
+  pipeline.callByChannel.delete(leg.channelId);
+  for (const other of call.legs.values()) {
+    if (other.state === 'ringing') {
+      // eslint-disable-next-line no-await-in-loop -- a user has at most a handful of devices
+      await hangupLeg(pipeline, other);
+    }
+  }
+  pending.handOver?.(leg);
+  pending.resolve('answered');
+}
+
 /** `ChannelStateChange` Up for a ringing leg: the find-me accept prompt, or straight to `winLeg`. */
 export async function legWentUp(
   pipeline: Pipeline,
@@ -112,6 +140,10 @@ export async function legWentUp(
   const pending = pipeline.pendingRing.get(call.id);
   if (call.answeredAt !== null || pending === undefined) {
     await hangupLeg(pipeline, leg);
+    return;
+  }
+  if (pending.handOver !== undefined) {
+    await handOverLeg(pipeline, call, leg, pending);
     return;
   }
   if (leg.kind === 'findMe') {

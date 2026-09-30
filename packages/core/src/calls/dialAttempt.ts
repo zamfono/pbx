@@ -28,6 +28,14 @@ export type AttemptOutcome =
   | { kind: 'answered'; channelId: string }
   | { kind: 'failure'; failure: AttemptFailure };
 
+// A leg Asterisk would not place (its create or dial refused, `legOriginate.ts`) fails as a 500
+// before alerting would: the next host, then the next route, is tried (§9.4 "Route fallthrough").
+const PLACEMENT_FAILED: AttemptFailure = {
+  kind: 'final',
+  code: 500,
+  alerted: false
+};
+
 /**
  * Resolves once `leg` alerts and later ends, answers, or times out (§9.4 "Route fallthrough"),
  * `early` holding the events that arrived while the leg was being originated.
@@ -146,12 +154,18 @@ async function attemptOnce(
 ): Promise<AttemptOutcome> {
   const { pipeline, call, trunkState, route, trunk } = ctx;
   const early = recordEvents(pipeline.deps.ari);
-  const trunkLeg = await originateTrunkLeg(ctx, endpoint).catch(
-    (error: unknown) => {
-      early.stop();
-      throw error;
-    }
-  );
+  const trunkLeg = await originateTrunkLeg(ctx, endpoint).catch(() => null);
+  if (trunkLeg === null) {
+    early.stop();
+    call.log.event({
+      event: 'attempt',
+      routeId: route?.id ?? null,
+      trunkId: trunk.id,
+      endpoint,
+      cause: 'placementFailed'
+    });
+    return { kind: 'failure', failure: PLACEMENT_FAILED };
+  }
   const channelId = trunkLeg.id;
   call.legs.set(channelId, {
     channelId,

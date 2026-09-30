@@ -9,9 +9,10 @@
 import type { Db } from '@zamfono/shared';
 
 import type { AriClient } from './ari/client.js';
+import type { Channel } from './ari/types.js';
 import type { Call } from './calls/call.js';
 import { callEnded } from './calls/callState.js';
-import { QosSnapshots } from './cdrQos.js';
+import { QosRows } from './cdrQos.js';
 import type { ConfigCache, EventBus, StateStore } from './internal/server.js';
 import { SipCapture, type SipMessage } from './sipCapture.js';
 
@@ -24,9 +25,6 @@ export type CdrWriterDeps = {
   now: () => string;
   /** How long a `sip`-level call keeps collecting mirrored messages after it ends; tests pass 0. */
   sipTailMs?: number;
-  /** How often an open call's legs are read for `call_qos` (§7 level `qos`); 0 samples only at the
-   * call-ending paths. Default `QOS_SAMPLE_MS`. */
-  qosSampleMs?: number;
 };
 
 // §7 level `sip`: the messages that end a dialog leave after its call does. Asterisk sends a
@@ -63,20 +61,20 @@ function withTruncationMarker(
  * Writes the `calls` row, `call_qos` rows and `history.appended` event at call end (§10.2, §7,
  * §10.6).
  *
- * §7 reads `rtp_statistics` "before the leg is hung up", and a destroyed channel answers nothing,
- * so an open call's legs are read every few seconds while it runs (`QosSnapshots.watch`), every
- * path that ends a call calls `captureQos` while its channels still exist, and `finish` writes the
- * last reading of each. A remote hangup reaches `captureQos` through `ChannelHangupRequest`, but
- * the channel that hung up may answer nothing by then, which is what the periodic reading covers.
+ * §7's per-leg summary is what Asterisk sets on each leg's channel as it hangs up, pushed with the
+ * channel's `ChannelDestroyed` (`channelEnded`, `QosRows`): the pipeline notes a call's channels
+ * (`noteQosLegs`) on every event of the call and before any path ends it, while the legs still
+ * count as its own, and each leg's row is written from its own final event, before `finish` or
+ * after it.
  */
 export class CdrWriter {
   private readonly deps: CdrWriterDeps;
 
-  private readonly qos: QosSnapshots;
+  private readonly qos: QosRows;
 
   constructor(deps: CdrWriterDeps) {
     this.deps = deps;
-    this.qos = new QosSnapshots(deps.ari, deps.db, deps.qosSampleMs);
+    this.qos = new QosRows(deps.db);
     this.sip = new SipCapture(deps.ari);
   }
 
@@ -118,9 +116,13 @@ export class CdrWriter {
   async open(call: Call): Promise<void> {
     // At level `sip` the join is in place before routing starts: a call released at once would
     // otherwise be gone before its Call-ID is read, and its dialog would reach no call at all.
-    const joined = this.sip.register(call, call.callerChannelId);
-    // §7 level `qos`: a leg's statistics go with its channel, so they are read while it runs.
-    this.qos.watch(call);
+    // A click-to-dial call has no caller channel yet; its devices join as they are placed.
+    const joined =
+      call.callerChannelId === ''
+        ? Promise.resolve()
+        : this.sip.register(call, call.callerChannelId);
+    // §7 level `qos`: the caller's channel has a `call_qos` row from the start.
+    this.qos.note(call);
     if (call.log.level === 'sip') {
       await joined;
     }
@@ -189,12 +191,19 @@ export class CdrWriter {
     this.deps.bus.emit({ type: 'history.appended', callId: call.id });
   }
 
-  /** Holds `call`'s `call_qos` rows, read while its channels still exist, until `finish`. */
-  async captureQos(call: Call): Promise<void> {
-    // A hangup request reaching a call already closed out has nothing left to add to it.
+  /** Notes `call`'s channels as they are now, the caller's and each leg that is up, as the ones
+   * its `call_qos` rows come from (§7 level `qos`). */
+  noteQosLegs(call: Call): void {
+    // An event reaching a call already closed out has nothing left to add to it.
     if (this.finished.has(call.id)) {
       return;
     }
-    await this.qos.capture(call);
+    this.qos.note(call);
+  }
+
+  /** A channel's `ChannelDestroyed`: the `call_qos` row its `RTPAUDIOQOS` gives, for each call it
+   * was noted for (§7 level `qos`). The notes are taken synchronously; the write settles later. */
+  channelEnded(channel: Channel): Promise<void> {
+    return this.qos.channelEnded(channel);
   }
 }

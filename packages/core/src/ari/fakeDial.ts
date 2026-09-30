@@ -13,6 +13,12 @@ const HTTP_OK = 200;
 /** The slice of `FakeAri` placing a channel reads and drives. */
 export type DialHost = {
   failOriginate: null | { status: number };
+  /** A status `POST /channels/{id}/dial` answers with instead of dialling, for the next `count`
+   * dials (every one while `count` is absent), or `null`. */
+  failDial: null | { status: number; count?: number };
+  /** Whether a created channel enters the app (its `StasisStart`); `false` for one that never
+   * does, as a channel Asterisk lost between the create and its Stasis thread. */
+  createdEntersStasis: boolean;
   onOriginate: ((channel: Channel) => void) | null;
   answerAfterMs: number;
   emit: (event: AriEvent) => void;
@@ -103,13 +109,15 @@ export function fakeCreate(
     caller: callerOf(params.variables?.['CALLERID(all)'])
   });
   channels.set(channel.id, channel);
-  host.emit({
-    type: 'StasisStart',
-    timestamp: new Date().toISOString(),
-    application: 'zamfono',
-    args: (params.appArgs ?? '').split(','),
-    channel: { ...channel }
-  });
+  if (host.createdEntersStasis) {
+    host.emit({
+      type: 'StasisStart',
+      timestamp: new Date().toISOString(),
+      application: 'zamfono',
+      args: (params.appArgs ?? '').split(','),
+      channel: { ...channel }
+    });
+  }
   return { status: HTTP_OK, body: channel };
 }
 
@@ -133,6 +141,17 @@ export function placedCallerId(request: { body: unknown }): string | undefined {
 
 /** `POST /channels/{id}/dial` for a created channel. */
 export function fakeDial(host: DialHost, channel: Channel): RouteResult {
+  const failure = host.failDial;
+  if (failure !== null) {
+    if (failure.count !== undefined) {
+      failure.count -= 1;
+      host.failDial = failure.count > 0 ? failure : null;
+    }
+    return {
+      status: failure.status,
+      body: { message: 'Channel not in Stasis application' }
+    };
+  }
   dialNow(host, channel);
   return { status: HTTP_OK, body: {} };
 }

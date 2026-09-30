@@ -1,38 +1,47 @@
 /**
- * A call's `call_qos` rows (§7 level `qos`): each leg's RTCP summary, read through ARI before the
- * leg is hung up and held until `CdrWriter.finish` writes them. Its own module so `cdr.ts` stays
- * under the repository's `max-lines` lint rule.
+ * A call's `call_qos` rows (§7 level `qos`): each leg's RTCP summary, as Asterisk leaves it on the
+ * leg's channel when it hangs up. Its own module so `cdr.ts` stays under the repository's
+ * `max-lines` lint rule.
  *
- * A leg's statistics die with its channel, and the party who hangs up takes theirs first: by the
- * time the core hears of a remote hangup, the channel may already answer 404. So every open call
- * is sampled while it runs, and each of its channels keeps its last reading: a leg that ends
- * without warning keeps the row read a few seconds before, and the reads at the call-ending
- * paths (`captureQos`) only freshen it.
+ * Asterisk sets `RTPAUDIOQOS` on a channel with an RTP instance as it hangs up, whichever side
+ * ends it (`ast_rtp_instance_set_stats_vars`: chan_pjsip as a BYE ends the session and as the
+ * channel is hung up, ARI's `DELETE /channels/{id}` before its hangup request), and publishes
+ * the channel's `ChannelDestroyed` only after that; ari.conf's `channelvars` makes every event
+ * carry the variable in `channel.channelvars`. So each leg's row comes from its own
+ * `ChannelDestroyed`, pushed to the core, and nothing reads a channel's statistics while it runs.
+ *
+ * Which calls a channel's row belongs to is noted while the channel is part of them (`note`):
+ * the caller's own channel from the start, a leg once it is up. A channel may end before its call
+ * is written (the party who hangs up first), whose row is held until `write`, or after (a leg
+ * the core hangs up as the call ends), whose row is written as its channel goes.
  */
 import type { Db } from '@zamfono/shared';
 
-import type { AriClient } from './ari/client.js';
+import type { Channel } from './ari/types.js';
 import type { LogLevel } from './callLog.js';
 import type { Call } from './calls/call.js';
-import { qosFigures, type QosFigures } from './qosFigures.js';
+import {
+  parseRtpAudioQos,
+  qosFigures,
+  RTP_AUDIO_QOS_VARIABLE,
+  type QosFigures
+} from './qosFigures.js';
 
 // §7: `call_qos` is written at diagnostics level `qos` and `sip`, never at `none`/`events`.
 const QOS_ELIGIBLE_LEVELS: ReadonlySet<LogLevel> = new Set(['qos', 'sip']);
 
-/** How often a call's legs are read while it runs. The packet counts and this side's jitter move
- * with every packet, the peer's figures with its RTCP reports (every 5 s by default); a short call
- * that ends by a hangup keeps only what the samples before it read, so they come well inside
- * that. One GET per leg, and only for a call at level `qos` or above. */
-export const QOS_SAMPLE_MS = 2000;
+type Role = 'caller' | 'callee';
 
-type QosTarget = { channelId: string; role: 'caller' | 'callee' };
+type QosTarget = { channelId: string; role: Role };
 
 // The caller's own channel, plus every leg bridged in (`up`) right now; a leg still ringing, or one
 // that ended unanswered, never carried the call's own media.
 function qosTargets(call: Call): QosTarget[] {
-  const targets: QosTarget[] = [
-    { channelId: call.callerChannelId, role: 'caller' }
-  ];
+  // A click-to-dial call has no caller channel ("") until the user's device answers.
+  const targets: QosTarget[] =
+    call.callerChannelId === ''
+      ? []
+      : [{ channelId: call.callerChannelId, role: 'caller' }];
   for (const leg of call.legs.values()) {
     if (leg.state === 'up') {
       targets.push({ channelId: leg.channelId, role: 'callee' });
@@ -41,105 +50,147 @@ function qosTargets(call: Call): QosTarget[] {
   return targets;
 }
 
-/** One `call_qos` row, held between the reads and `write`. */
+/** One `call_qos` row. */
 type QosRow = QosTarget & QosFigures & { callId: string };
+
+/** One call's channels whose rows are still to come, those that have ended, the rows that came
+ * before the call was written, and whether it was. */
+type Tracked = {
+  call: Call;
+  roles: Map<string, Role>;
+  ended: Set<string>;
+  held: QosRow[];
+  written: boolean;
+};
 
 function eligible(call: Call): boolean {
   return QOS_ELIGIBLE_LEVELS.has(call.log.level);
 }
 
-/** The readings `CdrWriter` takes while a call's channels still exist, and their write. */
-export class QosSnapshots {
-  private readonly ari: AriClient;
+/** The rows `CdrWriter` collects from its calls' channels as they end, and their write. */
+export class QosRows {
   private readonly db: Db;
-  private readonly sampleMs: number;
-  private readonly snapshots = new Map<string, Map<string, QosRow>>();
-  private readonly samplers = new Map<string, ReturnType<typeof setInterval>>();
-  // A read still in flight when its call is written must not hold a row nobody writes.
-  private readonly written = new Set<string>();
+  private readonly calls = new Map<string, Tracked>();
+  // Every tracked call a channel's row belongs to: a transfer makes one channel part of two.
+  private readonly callsByChannel = new Map<string, Set<string>>();
 
-  constructor(ari: AriClient, db: Db, sampleMs: number = QOS_SAMPLE_MS) {
-    this.ari = ari;
+  constructor(db: Db) {
     this.db = db;
-    this.sampleMs = sampleMs;
   }
 
   /**
-   * Samples `call`'s channels every `sampleMs` until `write`, whatever answers them (a bridged
-   * leg, a mailbox, a menu). The level is checked per sample, since routing can still raise it
-   * (§7); a sample at a lower level reads nothing.
+   * Notes `call`'s channels as they are now, each under its role: the caller's own and every leg
+   * that is up. Safe to call any number of times for a call; a channel keeps the role it was last
+   * noted with, and a leg noted once keeps its row when it leaves the call before it ends (a
+   * transferrer, §10.1). Called whatever the level, since routing can still raise it (§7); the
+   * level decides only at the write.
    */
-  watch(call: Call): void {
-    if (this.sampleMs <= 0 || this.samplers.has(call.id)) {
-      return;
-    }
-    const timer = setInterval(() => {
-      this.capture(call).catch(() => undefined);
-    }, this.sampleMs);
-    timer.unref();
-    this.samplers.set(call.id, timer);
-  }
-
-  /**
-   * Reads every live channel's RTP statistics and holds them until `write`. Safe to call any
-   * number of times for a call: each channel keeps its latest reading, and one that has gone since
-   * keeps the reading taken before it went, so a leg that left the call early (a transferrer,
-   * §10.1) and the legs still in it at the end each count once, as of their own last reading (§7).
-   */
-  async capture(call: Call): Promise<void> {
-    if (!eligible(call)) {
-      return;
-    }
-    const rows = await this.read(call);
-    if (!this.written.has(call.id)) {
-      this.hold(call.id, rows);
-    }
-  }
-
-  private hold(callId: string, rows: QosRow[]): Map<string, QosRow> {
-    const held = this.snapshots.get(callId) ?? new Map<string, QosRow>();
-    for (const row of rows) {
-      held.set(row.channelId, row);
-    }
-    this.snapshots.set(callId, held);
-    return held;
-  }
-
-  /** One reading per channel that answers; a channel that answers nothing, or fails, keeps what
-   * it had, without costing the other channels theirs. A leg whose RTP instance saw no packet
-   * still reads, as nothing measured: a bridged leg without media is a finding of its own (no
-   * audio), and its counters only grow, so a later reading never replaces a better one. */
-  private async read(call: Call): Promise<QosRow[]> {
+  note(call: Call): void {
     const targets = qosTargets(call);
-    const stats = await Promise.allSettled(
-      targets.map(target => this.ari.channels.rtpStatistics(target.channelId))
-    );
-    const rows: QosRow[] = [];
-    targets.forEach((target, index) => {
-      const result = stats[index];
-      if (result?.status !== 'fulfilled' || result.value === null) {
-        return;
-      }
-      rows.push({ callId: call.id, ...target, ...qosFigures(result.value) });
-    });
-    return rows;
-  }
-
-  /** Writes `call`'s held readings, updated by what its channels still answer now, as `call_qos`
-   * rows, and stops sampling it. */
-  async write(call: Call): Promise<void> {
-    const sampler = this.samplers.get(call.id);
-    if (sampler !== undefined) {
-      clearInterval(sampler);
-      this.samplers.delete(call.id);
-    }
-    if (!eligible(call)) {
-      this.snapshots.delete(call.id);
+    if (targets.length === 0 && !this.calls.has(call.id)) {
       return;
     }
-    const rows = [...this.hold(call.id, await this.read(call)).values()];
-    this.written.add(call.id);
-    this.snapshots.delete(call.id);
+    const tracked = this.calls.get(call.id) ?? {
+      call,
+      roles: new Map<string, Role>(),
+      ended: new Set<string>(),
+      held: [],
+      written: false
+    };
+    this.calls.set(call.id, tracked);
+    for (const target of targets) {
+      // A channel that has ended keeps the row it had; the caller's stays the call's caller.
+      if (tracked.ended.has(target.channelId)) {
+        continue;
+      }
+      tracked.roles.set(target.channelId, target.role);
+      const calls = this.callsByChannel.get(target.channelId) ?? new Set();
+      calls.add(call.id);
+      this.callsByChannel.set(target.channelId, calls);
+    }
+  }
+
+  /**
+   * A channel's `ChannelDestroyed`: its row, from the `RTPAUDIOQOS` the event carries, for every
+   * call it was noted for, held for a call not written yet and written now for one that was. A
+   * channel without an RTP instance (a Local channel) has no row. A leg whose instance saw no
+   * packet still has one, of nothing measured: a bridged leg without media is a finding of its
+   * own (no audio).
+   */
+  async channelEnded(channel: Channel): Promise<void> {
+    const callIds = this.callsByChannel.get(channel.id);
+    if (callIds === undefined) {
+      return;
+    }
+    this.callsByChannel.delete(channel.id);
+    const stat = parseRtpAudioQos(
+      channel.channelvars?.[RTP_AUDIO_QOS_VARIABLE]
+    );
+    const now: QosRow[] = [];
+    for (const callId of callIds) {
+      const tracked = this.calls.get(callId);
+      const role = tracked?.roles.get(channel.id);
+      if (tracked === undefined || role === undefined) {
+        continue;
+      }
+      tracked.roles.delete(channel.id);
+      tracked.ended.add(channel.id);
+      if (stat !== null) {
+        const row = {
+          callId,
+          channelId: channel.id,
+          role,
+          ...qosFigures(stat)
+        };
+        if (!tracked.written) {
+          tracked.held.push(row);
+        } else if (eligible(tracked.call)) {
+          now.push(row);
+        }
+      }
+      this.forgetIfDone(tracked);
+    }
+    await this.insert(now);
+  }
+
+  /** Writes `call`'s rows whose channels have ended, and has every row still to come written as
+   * its channel ends; below level `qos`, none. */
+  async write(call: Call): Promise<void> {
+    this.note(call);
+    const tracked = this.calls.get(call.id);
+    if (tracked === undefined) {
+      return;
+    }
+    tracked.written = true;
+    const rows = tracked.held;
+    tracked.held = [];
+    if (!eligible(call)) {
+      this.forget(tracked);
+      return;
+    }
+    this.forgetIfDone(tracked);
+    await this.insert(rows);
+  }
+
+  /** Stops waiting for `tracked`'s channels: below level `qos` nothing of it is written. */
+  private forget(tracked: Tracked): void {
+    for (const channelId of tracked.roles.keys()) {
+      const calls = this.callsByChannel.get(channelId);
+      calls?.delete(tracked.call.id);
+      if (calls?.size === 0) {
+        this.callsByChannel.delete(channelId);
+      }
+    }
+    this.calls.delete(tracked.call.id);
+  }
+
+  private forgetIfDone(tracked: Tracked): void {
+    if (tracked.written && tracked.roles.size === 0) {
+      this.calls.delete(tracked.call.id);
+    }
+  }
+
+  private async insert(rows: QosRow[]): Promise<void> {
     if (rows.length === 0) {
       return;
     }

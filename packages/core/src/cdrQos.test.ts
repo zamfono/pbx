@@ -3,43 +3,26 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { newId, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import type { AriClient } from './ari/client.js';
-import { fakeRtpStatistics } from './ari/fakeRtp.js';
-import { AriError, type RtpStatistics } from './ari/types.js';
+import { fakeRtpAudioQos } from './ari/fakeRtp.js';
+import { defaultChannel, type Channel } from './ari/types.js';
 import type { LogLevel } from './callLog.js';
 import { newCall, type Call } from './calls/call.js';
-import { QosSnapshots } from './cdrQos.js';
-import { eventually } from './testing/eventually.js';
+import { QosRows } from './cdrQos.js';
 
-const SAMPLE_MS = 10;
-
-/** What each channel answers to `rtp_statistics`: a body, 404 (`null`), or another failure. */
-type Answer = RtpStatistics | null | Error;
-
-function stubAri(answers: Map<string, Answer>): {
-  ari: AriClient;
-  reads: string[];
-} {
-  const reads: string[] = [];
-  const ari = {
-    channels: {
-      rtpStatistics: (id: string): Promise<RtpStatistics | null> => {
-        reads.push(id);
-        const answer = answers.get(id) ?? null;
-        return answer instanceof Error
-          ? Promise.reject(answer)
-          : Promise.resolve(answer);
-      }
-    }
-  } as unknown as AriClient;
-  return { ari, reads };
+/** `id`'s `ChannelDestroyed` channel, carrying `rtpAudioQos` as its `RTPAUDIOQOS`. */
+function ended(id: string, rtpAudioQos = fakeRtpAudioQos()): Channel {
+  return defaultChannel({ id, channelvars: { RTPAUDIOQOS: rtpAudioQos } });
 }
 
-async function openCall(db: Db, level: LogLevel = 'qos'): Promise<Call> {
+async function openCall(
+  db: Db,
+  level: LogLevel = 'qos',
+  callerChannelId = 'caller'
+): Promise<Call> {
   const call = newCall({
     id: newId(),
     direction: 'inbound',
-    callerChannelId: 'caller',
+    callerChannelId,
     from: '+4930123456',
     to: '+498912345',
     startedAt: '2026-09-29T10:00:00.000Z',
@@ -70,7 +53,7 @@ function answerWith(call: Call, channelId: string): void {
   });
 }
 
-describe('QosSnapshots (§7 level qos)', () => {
+describe('QosRows (§7 level qos)', () => {
   // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
 
@@ -92,16 +75,17 @@ describe('QosSnapshots (§7 level qos)', () => {
       .execute();
   }
 
-  it('writes one row per up leg, in milliseconds and percent, from real RTPstat fields', async () => {
-    const answers = new Map<string, Answer>([
-      ['caller', fakeRtpStatistics()],
-      ['leg', fakeRtpStatistics({ rtt: 0, rxjitter: 0.0105 })]
-    ]);
-    const { ari } = stubAri(answers);
-    const qos = new QosSnapshots(ari, db, 0);
+  it('writes one row per up leg, in milliseconds and percent, from what each hangup left', async () => {
+    const qos = new QosRows(db);
     const call = await openCall(db);
+    qos.note(call);
     answerWith(call, 'leg');
+    qos.note(call);
 
+    await qos.channelEnded(ended('caller'));
+    await qos.channelEnded(
+      ended('leg', fakeRtpAudioQos({ rtt: 0, rxjitter: 0.0105 }))
+    );
     await qos.write(call);
 
     expect(await rowsOf(call)).toEqual([
@@ -124,23 +108,43 @@ describe('QosSnapshots (§7 level qos)', () => {
     ]);
   });
 
-  it('keeps the row of a leg that hung up before the call ended, from its last sample', async () => {
-    const answers = new Map<string, Answer>([
-      ['caller', fakeRtpStatistics()],
-      ['leg', fakeRtpStatistics({ txjitter: 0.02 })]
+  it('reads the exact variable Asterisk 22 sets, fields it does not read included', async () => {
+    const qos = new QosRows(db);
+    const call = await openCall(db);
+    qos.note(call);
+
+    // As `ast_rtp_instance_get_quality` wrote it for a leg on a test stack, 351 packets each way.
+    await qos.channelEnded(
+      ended(
+        'caller',
+        'ssrc=784882500;themssrc=1867692567;lp=0;rxjitter=0.000250;rxcount=351;' +
+          'txjitter=0.000250;txcount=351;rlp=0;rtt=0.000000;rxmes=88.087887;txmes=88.087887'
+      )
+    );
+    await qos.write(call);
+
+    expect(await rowsOf(call)).toEqual([
+      {
+        channelId: 'caller',
+        role: 'caller',
+        jitterMs: 0.25,
+        lossPct: 0,
+        rttMs: null
+      }
     ]);
-    const { ari, reads } = stubAri(answers);
-    const qos = new QosSnapshots(ari, db, SAMPLE_MS);
+  });
+
+  it('keeps the row of a leg that hung up and left the call before it ended', async () => {
+    const qos = new QosRows(db);
     const call = await openCall(db);
     answerWith(call, 'leg');
-    qos.watch(call);
-    await eventually(() => {
-      expect(reads).toContain('leg');
-    });
-    // The callee hangs up: its channel is gone by the time the call's end reads it.
-    answers.set('leg', null);
+    qos.note(call);
+    // The callee hangs up first; its leg is no longer up when the call ends.
+    await qos.channelEnded(ended('leg', fakeRtpAudioQos({ txjitter: 0.02 })));
+    call.legs.delete('leg');
 
     await qos.write(call);
+    await qos.channelEnded(ended('caller'));
 
     expect(await rowsOf(call)).toEqual([
       expect.objectContaining({ channelId: 'caller', role: 'caller' }),
@@ -152,62 +156,61 @@ describe('QosSnapshots (§7 level qos)', () => {
     ]);
   });
 
-  it('keeps the caller row of a call that only a mailbox answered once the caller has gone', async () => {
-    const answers = new Map<string, Answer>([['caller', fakeRtpStatistics()]]);
-    const { ari, reads } = stubAri(answers);
-    const qos = new QosSnapshots(ari, db, SAMPLE_MS);
+  it('writes the row of a leg hung up after the call was written, as it goes', async () => {
+    const qos = new QosRows(db);
     const call = await openCall(db);
-    qos.watch(call);
-    await eventually(() => {
-      expect(reads).toContain('caller');
-    });
-    answers.set('caller', null);
-
-    await qos.write(call);
-
-    expect(await rowsOf(call)).toEqual([
-      expect.objectContaining({ channelId: 'caller', role: 'caller' })
-    ]);
-  });
-
-  it('loses no leg to another leg failing to answer', async () => {
-    const answers = new Map<string, Answer>([
-      ['caller', new AriError(500, 'Internal Server Error')],
-      ['leg', fakeRtpStatistics()]
-    ]);
-    const { ari } = stubAri(answers);
-    const qos = new QosSnapshots(ari, db, 0);
-    const call = await openCall(db);
+    qos.note(call);
     answerWith(call, 'leg');
 
-    await qos.capture(call);
     await qos.write(call);
+    expect(await rowsOf(call)).toEqual([]);
+    await qos.channelEnded(ended('leg'));
 
     expect(await rowsOf(call)).toEqual([
       expect.objectContaining({ channelId: 'leg', role: 'callee' })
     ]);
   });
 
+  it('writes no row for a channel without an RTP instance, nor twice for one', async () => {
+    const qos = new QosRows(db);
+    const call = await openCall(db);
+    answerWith(call, 'local');
+    qos.note(call);
+
+    // A Local channel: Asterisk leaves the variable unset, which ARI reports as "".
+    await qos.channelEnded(ended('local', ''));
+    await qos.channelEnded(ended('caller'));
+    // Noted again after its channel went (the call's last events), the caller keeps one row.
+    qos.note(call);
+    await qos.write(call);
+    await qos.channelEnded(ended('caller'));
+
+    expect(await rowsOf(call)).toEqual([
+      expect.objectContaining({ channelId: 'caller', role: 'caller' })
+    ]);
+  });
+
   it('writes a row of nothing measured for a leg that carried no media, not zeros', async () => {
-    // What Asterisk 22 answers for a bridged leg no RTP packet reached: every figure 0.
-    const answers = new Map<string, Answer>([
-      [
+    const qos = new QosRows(db);
+    const call = await openCall(db);
+    qos.note(call);
+
+    // What Asterisk 22 sets on a leg no RTP packet reached: every count 0, and one packet
+    // "missed" out of none received.
+    await qos.channelEnded(
+      ended(
         'caller',
-        fakeRtpStatistics({
+        fakeRtpAudioQos({
           rxcount: 0,
           txcount: 0,
-          rxploss: 0,
+          rxploss: 1,
           txploss: 0,
           rxjitter: 0,
           txjitter: 0,
           rtt: 0
         })
-      ]
-    ]);
-    const { ari } = stubAri(answers);
-    const qos = new QosSnapshots(ari, db, 0);
-    const call = await openCall(db);
-
+      )
+    );
     await qos.write(call);
 
     expect(await rowsOf(call)).toEqual([
@@ -221,26 +224,23 @@ describe('QosSnapshots (§7 level qos)', () => {
     ]);
   });
 
-  it('samples nothing below level qos, and stops sampling once written', async () => {
-    const answers = new Map<string, Answer>([['caller', fakeRtpStatistics()]]);
-    const { ari, reads } = stubAri(answers);
-    const qos = new QosSnapshots(ari, db, SAMPLE_MS);
-    const call = await openCall(db, 'events');
-    qos.watch(call);
-    await new Promise(resolve => {
-      setTimeout(resolve, SAMPLE_MS * 5);
-    });
-    expect(reads).toEqual([]);
+  it('writes nothing below level qos, before or after the write, unless routing raised it', async () => {
+    const qos = new QosRows(db);
+    const low = await openCall(db, 'events');
+    qos.note(low);
+    answerWith(low, 'leg');
+    await qos.channelEnded(ended('caller'));
+    await qos.write(low);
+    await qos.channelEnded(ended('leg'));
+    expect(await rowsOf(low)).toEqual([]);
 
-    call.log.raise('qos');
-    await eventually(() => {
-      expect(reads.length).toBeGreaterThan(0);
-    });
-    await qos.write(call);
-    const readsAtWrite = reads.length;
-    await new Promise(resolve => {
-      setTimeout(resolve, SAMPLE_MS * 5);
-    });
-    expect(reads).toHaveLength(readsAtWrite);
+    const raised = await openCall(db, 'events', 'caller-2');
+    qos.note(raised);
+    await qos.channelEnded(ended('caller-2'));
+    raised.log.raise('qos');
+    await qos.write(raised);
+    expect(await rowsOf(raised)).toEqual([
+      expect.objectContaining({ channelId: 'caller-2', role: 'caller' })
+    ]);
   });
 });

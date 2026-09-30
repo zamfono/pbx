@@ -1,6 +1,10 @@
 [general]
 enabled = yes
 pretty = yes
+; §7 level `qos`: every event's channel carries RTPAUDIOQOS in `channelvars`. Asterisk sets it on
+; a channel with an RTP instance as it hangs up, before the channel's ChannelDestroyed, which is
+; where `core` takes each leg's `call_qos` row from.
+channelvars = RTPAUDIOQOS
 
 [zamfono]
 type = user

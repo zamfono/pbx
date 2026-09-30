@@ -87,24 +87,6 @@ export type SnoopParams = {
   snoopId: string;
 };
 
-/**
- * The fields of ARI's `RTPstat` (`GET /channels/{id}/rtp_statistics`) the `call_qos` summary reads
- * (§7 level `qos`), as `res_rtp_asterisk` fills them: packet counts as integers, jitter and round
- * trip in seconds. `txjitter` is this side's own interarrival jitter of the packets it received,
- * `rxjitter` the peer's of the packets it received, from its RTCP receiver report; `rxploss` the
- * packets this side missed as of its last RTCP report, `txploss` those the peer reported missing;
- * `rtt` the last round trip measured from a receiver report, 0 while none arrived. ARI sends more
- * (per-side minimum, maximum and mean figures, SSRCs, octets), which nothing here reads.
- */
-export type RtpStatistics = {
-  txcount: number;
-  rxcount: number;
-  txjitter: number;
-  rxjitter: number;
-  txploss: number;
-  rxploss: number;
-  rtt: number;
-};
 export type DeviceState =
   'NOT_INUSE' | 'INUSE' | 'BUSY' | 'UNAVAILABLE' | 'RINGING';
 export type AsteriskModule =
@@ -140,7 +122,6 @@ export type ChannelsApi = {
   ) => Promise<{ id: string }>;
   record: (id: string, params: RecordParams) => Promise<void>;
   snoop: (id: string, params: SnoopParams) => Promise<Channel>;
-  rtpStatistics: (id: string) => Promise<RtpStatistics | null>;
   setVar: (id: string, name: string, value: string) => Promise<void>;
   /** `GET /channels/{id}/variable`, `null` when the channel or the variable is absent. Reading
    * `CHANNEL(pjsip,call-id)` is how a call is matched to its HEP stream (§7 level `sip`). */

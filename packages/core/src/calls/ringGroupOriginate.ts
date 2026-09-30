@@ -102,7 +102,19 @@ async function originateDevices(
       callerId,
       // §9.1 "every channel's language": a member's leg has been through no entry of its own.
       variables: channelLanguageVariable(snapshot.settings.language)
-    }).finally(early.stop);
+    })
+      .catch(() => null)
+      .finally(early.stop);
+    if (channel === null) {
+      // Refused before it rang (`legOriginate.ts`): the member's device leaves the batch.
+      call.log.event({
+        event: 'ringGroupMember',
+        deviceId: device.id,
+        userId: owner.userId,
+        cause: 'placementFailed'
+      });
+      continue;
+    }
     const leg: GroupLeg = {
       channelId: channel.id,
       userId: owner.userId,

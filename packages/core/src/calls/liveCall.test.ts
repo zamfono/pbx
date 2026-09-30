@@ -68,9 +68,8 @@ describe('closeCall', () => {
     await ari.connect();
     const cdr: PipelineDeps['cdr'] = {
       open: () => Promise.resolve(),
-      captureQos: () => {
+      noteQosLegs: () => {
         trail.push(`qos after ${hangupsSoFar()} hangups`);
-        return Promise.resolve();
       },
       finish: () => {
         trail.push('finish');
@@ -133,7 +132,7 @@ describe('closeCall', () => {
     await db.destroy();
   });
 
-  it('reads the QoS and ends each recorded participation of a call hung up over the API (§7, §10.2)', async () => {
+  it('notes the QoS legs and ends each recorded participation of a call hung up over the API (§7, §10.2)', async () => {
     const [legId] = [...call.legs.keys()];
 
     await closeCall(pipeline, call, 'answered', true);

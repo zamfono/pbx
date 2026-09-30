@@ -33,7 +33,10 @@ export type PipelineDeps = {
   cdr: {
     open(call: Call): Promise<void>;
     finish(call: Call): Promise<void>;
-    captureQos?(call: Call): Promise<void>;
+    /** §7 level `qos`: notes the call's channels as the ones its `call_qos` rows come from. */
+    noteQosLegs?(call: Call): void;
+    /** §7 level `qos`: a channel's `ChannelDestroyed`, carrying its `RTPAUDIOQOS`. */
+    channelEnded?(channel: Channel): Promise<void>;
     registerLeg?(call: Call, channelId: string): void;
     /** `registerLeg`, resolving once the join is in place (`legOriginate.ts`). */
     joinLeg?(call: Call, channelId: string): Promise<void>;
@@ -46,6 +49,9 @@ export type PipelineDeps = {
   // The stack's `TZ` (§11.4 `timezone`: "NULL = stack `TZ`, else UTC"), `CoreEnv.tz`; optional so
   // a test Pipeline that never evaluates opening hours need not supply it (absent = UTC).
   stackTz?: string;
+  /** How long a created leg may take to enter the app before it counts as not placed
+   * (`legOriginate.ts`); tests shorten it. Default `STASIS_WAIT_MS`. */
+  legStasisWaitMs?: number;
   // Voicemail deposit's own collaborators (§3.1): optional so a test Pipeline that never deposits
   // a call need not supply them; `main.ts`'s real Pipeline always does.
   db?: Db;
@@ -93,7 +99,7 @@ export class Pipeline {
     });
   }
 
-  /** The call `ev` belongs to, by its channel or, for a leg or click-to-dial channel that has not
+  /** The call `ev` belongs to, by its channel or, for a leg channel that has not
    * been tracked yet, by the call id its Stasis arguments carry; `null` before any call exists. */
   private callIdOf(ev: AriEvent): string | null {
     const channel = ev.channel as Channel | undefined;
@@ -104,12 +110,37 @@ export class Pipeline {
     }
     const [kind, callId] =
       (ev.args as (string | undefined)[] | undefined) ?? [];
-    return (kind === 'leg' || kind === 'click') && callId !== undefined
-      ? callId
-      : null;
+    return kind === 'leg' && callId !== undefined ? callId : null;
   }
 
+  /**
+   * §7 level `qos`: a call's channels are noted before and after each of its events is handled,
+   * since handling one may take a leg out of the call (a leg the caller's hangup ends) and put
+   * one in (a leg answering), and a channel's own `ChannelDestroyed` is handed on with the
+   * `RTPAUDIOQOS` it carries once that note is taken.
+   */
   private async routeEvent(ev: AriEvent): Promise<void> {
+    const channel = ev.channel as Channel | undefined;
+    const before =
+      channel === undefined ? undefined : this.callByChannel.get(channel.id);
+    if (before !== undefined) {
+      this.deps.cdr.noteQosLegs?.(before);
+    }
+    const qosWritten =
+      ev.type === 'ChannelDestroyed' && channel !== undefined
+        ? this.deps.cdr.channelEnded?.(channel)
+        : undefined;
+    await Promise.all([this.dispatch(ev), qosWritten]);
+    const after =
+      channel === undefined ? undefined : this.callByChannel.get(channel.id);
+    for (const call of new Set([before, after])) {
+      if (call !== undefined) {
+        this.deps.cdr.noteQosLegs?.(call);
+      }
+    }
+  }
+
+  private async dispatch(ev: AriEvent): Promise<void> {
     if (ev.type === 'StasisStart') {
       await this.handleStasisStart(ev);
       return;
@@ -129,7 +160,6 @@ export class Pipeline {
       const call = this.callByChannel.get((ev.channel as Channel).id);
       if (call !== undefined) {
         noteHangupRequest(call, ev);
-        await this.deps.cdr.captureQos?.(call);
       }
       return;
     }
@@ -157,6 +187,18 @@ export class Pipeline {
     }
     // A `snoop,<channelId>` entry is the recorder's own spy channel (§10.2): `Recorder` holds its
     // id from the originate and drives its recording directly, so the pipeline leaves it alone.
+  }
+
+  /** Routes `exten` as dialled from `channel`, a device channel already in the app and answered
+   * (an API pickup's, `actions.ts`), exactly as its own `outbound,<exten>` entry would be. */
+  async dialFrom(channel: Channel, exten: string): Promise<void> {
+    await this.outboundHandler?.({
+      type: 'StasisStart',
+      timestamp: new Date().toISOString(),
+      application: 'zamfono',
+      args: ['outbound', exten],
+      channel
+    });
   }
 
   /** Wires Task 30's `handleOutbound` for `outbound,<exten>` Stasis entries (§9.2). */

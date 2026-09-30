@@ -1,10 +1,11 @@
 /**
  * `api`'s live-call actions over the internal API (§3 "core"; §10.2 "Click-to-dial"; §10.1
  * "Transfers and pickup"). Originate rings the user's devices first and, once one answers, dials
- * the target as that device would have; pickup rings the picker's devices with `*8<ext>` as their
- * dial string, so the answer lands in `features.ts`'s own pickup exactly as a dialled `*8` would;
- * hangup and transfer act on a live `Call`. Every action leaves its actor in the call's trace.
- * The originated call itself is built and dialled by `clickToDial.ts`.
+ * the target as that device would have; pickup rings the picker's devices and dials `*8<ext>` with
+ * the one that answers, so the answer lands in `features.ts`'s own pickup exactly as a dialled
+ * `*8` would; both ring as any user's ring does (`ownDevices.ts`). Hangup and transfer act on a
+ * live `Call`. Every action leaves its actor in the call's trace. The originated call itself is
+ * built and dialled by `clickToDial.ts`.
  */
 /* eslint-disable max-classes-per-file -- ActionError is the one refusal these actions raise */
 import {
@@ -16,11 +17,11 @@ import {
 } from '@zamfono/shared';
 
 import type { Snapshot } from '../internal/server.js';
-import type { Call } from './call.js';
+import { callLogMaxBytesFromEnv, newCall, type Call } from './call.js';
 import { findLiveCall } from './callLookup.js';
 import { beginOriginatedCall, newOriginatedCall } from './clickToDial.js';
-import { DeviceRinger, showRinging, type DeviceRing } from './deviceRing.js';
 import { closeCall } from './liveCall.js';
+import { abandonOwnRing, ringOwnDevices } from './ownDevices.js';
 import type { Pipeline } from './pipeline.js';
 import { followTransfers } from './referTransfers.js';
 import { activeBatchHasRingingLeg } from './ringGroupDial.js';
@@ -79,36 +80,25 @@ function ringingExtension(
 /** The live-call actions of the internal API (§3), over one `Pipeline`. */
 export class CallActions {
   private readonly pipeline: Pipeline;
-  private readonly ringer: DeviceRinger;
   // Calls whose devices still ring for an originate: reachable by id before any channel of theirs
   // is registered with the pipeline.
-  private readonly originating = new Map<
-    string,
-    { call: Call; ring: DeviceRing }
-  >();
+  private readonly originating = new Map<string, Call>();
 
   constructor(pipeline: Pipeline) {
     this.pipeline = pipeline;
-    this.ringer = new DeviceRinger(pipeline.deps.ari);
     followTransfers(pipeline);
   }
 
   /** `POST /internal/calls` (§10.2 "Click-to-dial"): the call's row exists from here on, its trace
-   * naming the actor, whether the user's devices answer, never do, or do not exist. */
+   * naming the actor, whether the user's devices answer, never do, or do not exist. The call has
+   * no caller channel until one of them answers. */
   async originate(
     req: OriginateRequest
   ): Promise<{ callId: string } | { error: 'noRegisteredDevice' }> {
     const snapshot = await this.pipeline.deps.cache.get();
     const resolved = resolveTarget(snapshot, req.target);
     const devices = registeredDevices(this.pipeline, snapshot, req.userId);
-    const channelIds = devices.map(() => newId());
-    const call = newOriginatedCall(
-      this.pipeline,
-      snapshot,
-      req,
-      resolved,
-      channelIds.at(0) ?? ''
-    );
+    const call = newOriginatedCall(this.pipeline, snapshot, req, resolved);
     if (devices.length === 0) {
       call.log.event({ event: 'originate', result: 'noRegisteredDevice' });
       call.status = 'failed';
@@ -116,45 +106,42 @@ export class CallActions {
       return { error: 'noRegisteredDevice' };
     }
     await this.pipeline.deps.cdr.open(call);
-    // Keyed by the call, so a REST hangup's `closeCall` clears it with the rest of the call.
-    const ringing = { userId: req.userId, peer: resolved.to, key: call.id };
-    const ring: DeviceRing = {
-      channelIds: new Set(channelIds),
-      ...showRinging(this.pipeline.deps.presence, ringing, {
-        onAnswer: channel => {
-          this.originating.delete(call.id);
-          return beginOriginatedCall(
-            this.pipeline,
-            call,
-            channel,
-            resolved.action
-          );
-        },
-        onUnanswered: () => {
-          this.originating.delete(call.id);
-          call.log.event({ event: 'originate', result: 'unanswered' });
-          return closeCall(this.pipeline, call, 'failed', false);
-        }
-      })
-    };
-    this.originating.set(call.id, { call, ring });
-    await this.ringer.ring(devices, ring, {
-      appArgs: `click,${call.id}`,
+    this.originating.set(call.id, call);
+    const ring = ringOwnDevices(this.pipeline, {
+      host: call,
+      sipCall: call,
+      userId: req.userId,
+      devices,
       callerId: resolved.to,
       timeoutS: ringTimeoutOf(snapshot, req.userId),
-      language: snapshot.settings.language
+      language: snapshot.settings.language,
+      peer: resolved.to,
+      // Keyed by the call, so a REST hangup's `closeCall` clears it with the rest of the call.
+      presenceKey: call.id
     });
-    // §7 level `sip`: every device's dialog is part of the call's SIP log, the one that answers
-    // becoming its caller's; `open` could not join them, since none existed yet.
-    for (const channelId of channelIds) {
-      this.pipeline.deps.cdr.registerLeg?.(call, channelId);
-    }
+    ring.outcome
+      .then(async outcome => {
+        this.originating.delete(call.id);
+        if (outcome.kind === 'answered') {
+          await beginOriginatedCall(
+            this.pipeline,
+            call,
+            outcome.channel,
+            resolved.action
+          );
+        } else if (outcome.kind === 'unanswered') {
+          call.log.event({ event: 'originate', result: 'unanswered' });
+          await closeCall(this.pipeline, call, 'failed', false);
+        }
+      })
+      .catch(() => undefined);
+    await ring.placed;
     return { callId: call.id };
   }
 
-  /** `POST /internal/calls/{id}/pickup` (§10.1 "Pickup"): rings `userId`'s devices with `*8<ext>`
-   * of the ringing extension as their dial string, so the answer takes the call the way the
-   * feature code does; `pickup`'s own trace line on the target names the actor. */
+  /** `POST /internal/calls/{id}/pickup` (§10.1 "Pickup"): rings `userId`'s devices and dials
+   * `*8<ext>` of the ringing extension with the one that answers, so the answer takes the call the
+   * way the feature code does; `pickup`'s own trace line on the target names the actor. */
   async pickup(callId: string, req: PickupRequest): Promise<void> {
     const target = this.findCall(callId);
     const snapshot = await this.pipeline.deps.cache.get();
@@ -176,48 +163,54 @@ export class CallActions {
       actorUserId: req.actorUserId,
       ext
     });
-    const channelIds = devices.map(() => newId());
-    // A key of its own: the answered device's `*8` dial sets the picker in `target`'s call itself.
-    const ringing = {
+    // The ring's own race, on a call of its own that is never written: the answered device's `*8`
+    // dial is the call the picker takes part in, and sets the picker in `target`'s call itself.
+    const host = newCall({
+      id: newId(),
+      direction: 'internal',
+      callerChannelId: '',
+      from: target.from,
+      to: `${snapshot.settings.featureCodes.pickup}${ext}`,
+      startedAt: this.pipeline.deps.now(),
+      logLevel: target.log.level,
+      callLogMaxBytes: callLogMaxBytesFromEnv()
+    });
+    const ring = ringOwnDevices(this.pipeline, {
+      host,
+      // §7 level `sip`: each device's dialog rings for the picked-up call and, answered, becomes
+      // its leg, so it is joined to that call's SIP log as a ring race's legs are.
+      sipCall: target,
       userId: req.userId,
+      devices,
+      callerId: target.from,
+      timeoutS: ringTimeoutOf(snapshot, req.userId),
+      language: snapshot.settings.language,
       peer: target.from,
-      key: `pickup:${target.id}`
-    };
-    const ring: DeviceRing = {
-      channelIds: new Set(channelIds),
-      ...showRinging(this.pipeline.deps.presence, ringing, {
-        onAnswer: () => Promise.resolve(),
-        onUnanswered: () => {
+      // A key of its own: the answered device's `*8` dial sets the picker in `target`'s call itself.
+      presenceKey: `pickup:${target.id}`
+    });
+    ring.outcome
+      .then(async outcome => {
+        if (outcome.kind === 'answered') {
+          await this.pipeline.dialFrom(outcome.channel, host.to);
+        } else if (outcome.kind === 'unanswered') {
           target.log.event({
             event: 'pickup',
             userId: req.userId,
             result: 'unanswered'
           });
-          return Promise.resolve();
         }
       })
-    };
-    await this.ringer.ring(devices, ring, {
-      appArgs: `outbound,${snapshot.settings.featureCodes.pickup}${ext}`,
-      callerId: target.from,
-      timeoutS: ringTimeoutOf(snapshot, req.userId),
-      language: snapshot.settings.language
-    });
-    // §7 level `sip`: each device's dialog rings for the picked-up call and, answered, becomes its
-    // leg, so it is joined to that call's SIP log as a ring race's legs are.
-    for (const channelId of channelIds) {
-      this.pipeline.deps.cdr.registerLeg?.(target, channelId);
-    }
+      .catch(() => undefined);
+    await ring.placed;
   }
 
   /** `POST /internal/calls/{id}/hangup`: ends every channel of the call and writes its history entry. */
   async hangup(callId: string, req: HangupRequest): Promise<void> {
     const call = this.findCall(callId);
     call.log.event({ event: 'hangup', actorUserId: req.actorUserId });
-    const originating = this.originating.get(callId);
-    if (originating !== undefined) {
-      this.originating.delete(callId);
-      await this.ringer.stop(originating.ring, null);
+    if (this.originating.delete(callId)) {
+      abandonOwnRing(this.pipeline, call);
     }
     await closeCall(this.pipeline, call, 'missed', true);
   }
@@ -234,7 +227,7 @@ export class CallActions {
   private findCall(callId: string): Call {
     const call =
       findLiveCall(this.pipeline, candidate => candidate.id === callId) ??
-      this.originating.get(callId)?.call ??
+      this.originating.get(callId) ??
       null;
     if (call === null) {
       throw new ActionError(HTTP_NOT_FOUND, 'notFound', 'call not found');

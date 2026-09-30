@@ -30,8 +30,8 @@ export async function announce(
   call.answeredAt = pipeline.deps.now();
   // eslint-disable-next-line require-atomic-updates -- this call's only writer is this function
   call.status = 'answered';
-  // §7: the RTP statistics are read while the channel still exists.
-  await pipeline.deps.cdr.captureQos?.(call);
+  // §7: the channel whose `call_qos` row this call has is noted before it goes.
+  pipeline.deps.cdr.noteQosLegs?.(call);
   await pipeline.deps.ari.channels
     .hangup(call.callerChannelId)
     .catch(() => undefined);

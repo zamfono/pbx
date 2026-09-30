@@ -3,7 +3,7 @@
  * exposes (§3, §9.2). Each wrapper maps one call onto its ARI method and path; the HTTP itself is
  * `restTransport.ts`'s.
  */
-import { channelRtpStatistics, channelVariable } from './channelReads.js';
+import { channelVariable } from './channelReads.js';
 import { ModuleReloader } from './moduleReloader.js';
 import type { AriRequests } from './restTransport.js';
 import type {
@@ -59,7 +59,6 @@ function buildChannelsApi(rest: AriRequests): ChannelsApi {
       rest.json('POST', `channels/${id}/play`, { media, playbackId }),
     record: (id, params) => rest.void('POST', `channels/${id}/record`, params),
     snoop: (id, params) => rest.json('POST', `channels/${id}/snoop`, params),
-    rtpStatistics: id => channelRtpStatistics(rest.json, id),
     setVar: (id, name, value) =>
       rest.void('POST', `channels/${id}/variable`, {
         variable: name,

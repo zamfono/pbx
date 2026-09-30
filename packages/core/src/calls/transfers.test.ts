@@ -6,7 +6,6 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri, isPlacement } from '../ari/fake.js';
-import { fakeRtpStatistics } from '../ari/fakeRtp.js';
 import type { Logger } from '../ari/types.js';
 import type { LogLevel } from '../callLog.js';
 import { CdrWriter } from '../cdr.js';
@@ -975,7 +974,7 @@ describe('transfers', () => {
     });
   });
 
-  it("writes the consultation's call_qos for every leg it had, each as of its own hangup (§7)", async () => {
+  it("writes the consultation's call_qos for every leg it had, each from its own hangup (§7)", async () => {
     await setUp();
     const transferrerId = await seedUser(db, '101');
     const targetId = await seedUser(db, '102');
@@ -985,40 +984,23 @@ describe('transfers', () => {
       targetId,
       'qos'
     );
-    // Each read answers a fresh jitter; a channel that is gone answers nothing.
-    const gone = new Set<string>();
-    let reads = 0;
-    const readChannels: string[] = [];
-    ari.channels.rtpStatistics = channelId => {
-      reads += 1;
-      readChannels.push(channelId);
-      return Promise.resolve(
-        gone.has(channelId)
-          ? null
-          : fakeRtpStatistics({ txjitter: reads / 1000, rxjitter: 0 })
-      );
-    };
-    /** `channelId`'s hangup request, resolving once the core has read its QoS for it. */
-    const hangupRequest = async (channelId: string): Promise<void> => {
-      const readsBefore = readChannels.filter(id => id === channelId).length;
+    // Each channel's hangup leaves its own jitter on it: 1, 2 and 3 ms.
+    fakeAri.rtpQos.set(secondId, { txjitter: 0.001, rxjitter: 0 });
+    fakeAri.rtpQos.set(original.callerId, { txjitter: 0.002, rxjitter: 0 });
+    fakeAri.rtpQos.set(targetLegId, { txjitter: 0.003, rxjitter: 0 });
+    const hangupRequest = (channelId: string): void => {
       fakeAri.emit({
         type: 'ChannelHangupRequest',
         timestamp: nowIso(),
         application: 'zamfono',
         channel: { id: channelId, name: '' }
       });
-      await eventually(() => {
-        expect(
-          readChannels.filter(id => id === channelId).length
-        ).toBeGreaterThan(readsBefore);
-      });
     };
     const bridge2 = consultation.bridgeId ?? '';
     await ari.bridges.removeChannel(bridge2, secondId);
     await ari.bridges.addChannel(bridge2, original.callerId);
     // Asterisk hangs the transferrer's second channel up as it reports the transfer.
-    await hangupRequest(secondId);
-    gone.add(secondId);
+    hangupRequest(secondId);
     fakeAri.emit({
       type: 'BridgeAttendedTransfer',
       timestamp: nowIso(),
@@ -1036,14 +1018,14 @@ describe('transfers', () => {
     });
     await transferFollowed(original.legId);
     destroyed(secondId);
-    // Any read the second channel's end still makes counts as the transfer's, not the end's.
-    await sleep(SETTLE_MS);
-    const readsAtTransfer = reads;
 
-    // The transferee hangs up, which ends the consultation.
-    await hangupRequest(original.callerId);
-    gone.add(original.callerId);
+    // The transferee hangs up, which ends the consultation, and the core hangs up the target.
+    hangupRequest(original.callerId);
     destroyed(original.callerId);
+    await eventually(async () => {
+      expect(await endedAt(consultation.id)).not.toBeNull();
+    });
+    destroyed(targetLegId);
 
     const byChannel = await eventually(async () => {
       const rows = await db
@@ -1057,16 +1039,10 @@ describe('transfers', () => {
       );
       return written;
     });
-    // The transferee and the target are read as the conversation ends, not as the transferrer left.
-    expect(byChannel.get(original.callerId)?.jitterMs).toBeGreaterThan(
-      readsAtTransfer
-    );
-    expect(byChannel.get(targetLegId)?.jitterMs).toBeGreaterThan(
-      readsAtTransfer
-    );
-    expect(byChannel.get(secondId)?.jitterMs).toBeLessThanOrEqual(
-      readsAtTransfer
-    );
+    // Each channel's row is what its own hangup left, whenever it left the conversation.
+    expect(byChannel.get(secondId)?.jitterMs).toBe(1);
+    expect(byChannel.get(original.callerId)?.jitterMs).toBe(2);
+    expect(byChannel.get(targetLegId)?.jitterMs).toBe(3);
   });
 
   it('collapses the Local link of an attended transfer between two Stasis bridges into one bridge', async () => {

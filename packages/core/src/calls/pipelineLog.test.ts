@@ -52,7 +52,9 @@ describe('pipeline routing-failure log line', () => {
       cdr: {
         open: () => Promise.resolve(),
         finish: () => Promise.resolve(),
-        captureQos: () => Promise.reject(new Error('rtp_statistics failed'))
+        noteQosLegs: () => {
+          throw new Error('noting the QoS legs failed');
+        }
       },
       now: nowIso,
       logger: {

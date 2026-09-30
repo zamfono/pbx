@@ -100,7 +100,7 @@ async function dialFrom(
       routeId: candidate.route.id,
       trunkId: trunk.id,
       endpoint,
-      cause: SIP_SERVER_ERROR
+      cause: 'placementFailed'
     });
   }
   if (previous !== null) {

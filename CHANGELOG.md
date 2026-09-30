@@ -33,12 +33,19 @@ why the specified behaviour changed; the commit history, how.
 - The `qos` level's `call_qos` rows had no jitter or loss and a round trip of 0, and only the
   caller's leg had one: the core read fields Asterisk does not send, and read the leg that hung up
   after its channel had gone. Each bridged leg now has a row with jitter and round trip in
-  milliseconds and loss in percent, read every few seconds while the call runs, a
-  mailbox-answered caller's included; what was not measured (a round trip without RTCP, a leg no
-  audio reached) is empty rather than 0.
+  milliseconds and loss in percent, a mailbox-answered caller's included, taken from the summary
+  Asterisk records on the leg as it hangs up, whichever side hangs up first, so nothing is polled
+  while the call runs; what was not measured (a round trip without RTCP, a leg no audio reached)
+  is empty rather than 0.
 - At the call log's `sip` level, a leg refused at once (a trunk answering 403 within
   milliseconds) recorded none of its SIP messages. Each leg the PBX places now joins the call's
-  capture before its INVITE leaves.
+  capture before its INVITE leaves, the user's own phones a click-to-dial or an API pickup rings
+  included.
+- A call could hang, ringing on for its caller until they gave up, when Asterisk refused to place
+  one of its legs, as a loaded host did by answering a leg's dial before the leg was ready. A leg
+  that cannot be placed now counts as one that ended at once: the ring goes on with the other
+  phones or reaches its fallback, an outbound call tries its next route, and the trace says
+  `placementFailed`.
 - A ring group change that left its members alone (its strategy, ring timeout, mailbox or
   diagnostics level) did not reach call routing until some other change reloaded the
   configuration; raising a group to `qos` or `sip` had no effect on its calls.

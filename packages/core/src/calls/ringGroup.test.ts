@@ -548,6 +548,40 @@ describe('ringGroup', () => {
     expect(released).toBe(true);
   }, 10_000);
 
+  // A member's phone Asterisk will not place leaves the batch; with none ringing, the group falls
+  // back at once rather than after its timeout, and the trace says why.
+  it('falls back at once when no member phone can be placed, tracing placementFailed', async () => {
+    const groupId = await seedRingGroup(db, {
+      strategy: 'simultaneous',
+      ringTimeoutS: 20
+    });
+    const userA = await seedUser(db);
+    const userB = await seedUser(db);
+    await seedDevice(db, userA, 'pf-a');
+    await seedDevice(db, userB, 'pf-b');
+    await seedMember(db, groupId, 0, userA);
+    await seedMember(db, groupId, 1, userB);
+    fakeAri.failDial = { status: 409 };
+
+    const started = Date.now();
+    await ringGroup(pipeline, call, groupId);
+
+    expect(Date.now() - started).toBeLessThan(5000);
+    expect(call.status).toBe('missed');
+    expect(
+      fakeAri.calls.some(
+        entry =>
+          entry.method === 'DELETE' &&
+          entry.path === `channels/${callerChannel.id}` &&
+          entry.qs === `reason_code=${sipToHangupCause(480)}`
+      )
+    ).toBe(true);
+    const failed = (call.log.finish().log ?? '')
+      .split('\n')
+      .filter(line => line.includes('"cause":"placementFailed"'));
+    expect(failed).toHaveLength(2);
+  });
+
   it('a member declining with allow_reject is skipped without waiting for the timeout', async () => {
     const groupId = await seedRingGroup(db, {
       strategy: 'sequential',

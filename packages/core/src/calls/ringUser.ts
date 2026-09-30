@@ -8,7 +8,7 @@ import { release, type Call } from './call.js';
 import { callRinging } from './callState.js';
 import { softphoneCallerId } from './contactName.js';
 import { recordEvents, redeliverEarlyEvents } from './earlyEvents.js';
-import { scheduleFindMeLegs } from './findMe.js';
+import { findMeLegsPending, scheduleFindMeLegs } from './findMe.js';
 import { originateLeg } from './legOriginate.js';
 import { hangupLeg, trackLeg, type RingOutcome } from './legs.js';
 import type { Pipeline } from './pipeline.js';
@@ -39,7 +39,19 @@ async function ringDevices(
       callerId,
       // §9.1 "every channel's language": a device leg has been through no entry of its own.
       variables: channelLanguageVariable(language)
-    }).finally(early.stop);
+    })
+      .catch(() => null)
+      .finally(early.stop);
+    if (channel === null) {
+      // Refused before it rang (`legOriginate.ts`): the device leaves the race as if it declined.
+      call.log.event({
+        event: 'rungDevice',
+        deviceId: device.id,
+        userId,
+        cause: 'placementFailed'
+      });
+      continue;
+    }
     trackLeg(pipeline, call, {
       channelId: channel.id,
       kind: 'device',
@@ -127,6 +139,12 @@ export async function ringUser(
   );
   callRinging(pipeline.deps, call);
   scheduleFindMeLegs(pipeline, call, userId, user.findMe ?? []);
+  // Nothing rings nor is still to come (every device refused before it rang, `legOriginate.ts`):
+  // the race is over at once, as when the last leg declines.
+  const ringing = [...call.legs.values()].some(leg => leg.state === 'ringing');
+  if (!ringing && !findMeLegsPending(pipeline, call.id)) {
+    concludeRing(pipeline, call);
+  }
   await pipeline.deps.ari.channels
     .ring(call.callerChannelId)
     .catch(() => undefined);

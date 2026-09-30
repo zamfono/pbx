@@ -99,6 +99,8 @@ ARI_STATUS=$(docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' \
 
 docker exec "$CONTAINER" grep -q '^\[zamfono\]' /etc/asterisk/ari.conf \
   || fail "ari.conf has no [zamfono] user"
+docker exec "$CONTAINER" grep -q '^channelvars = RTPAUDIOQOS$' /etc/asterisk/ari.conf \
+  || fail "ari.conf does not send RTPAUDIOQOS with ARI's events (§7 level qos)"
 
 for lang in es fr it ru; do
   docker exec "$CONTAINER" test -f "/usr/share/asterisk/sounds/$lang/vm-goodbye.wav" \
