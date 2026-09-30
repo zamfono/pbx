@@ -13,6 +13,18 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- A phone rang for at most 30 seconds, however long the user's ring timeout or the ring group's
+  timeouts were set, and an outbound call the far end had not answered within 30 seconds was cut
+  off. Rings now last as long as they are set to, and an outbound call rings until it is answered
+  or refused.
+- A user's second and further phones, and a ring group's members, started ringing one after the
+  other, each up to a few seconds after the one before. They now all ring at once.
+- A leg with one-way audio, whose far end sent nothing back, read a packet loss of 0 % in
+  `call_qos`, a perfect line. Its loss now reads as not measured.
+- When the core could not read the Asterisk start time after Asterisk restarted, the Ringotel apps
+  were not re-registered. The core now reads it again until it can.
+- Editing a running out-of-office rule's end or start, or a rule that follows another back to
+  back, sent no `ooo` event, so the live status kept the old end time. It now updates at once.
 - The `ooo` and `hours` events, and the live OOO and opening-hours status they drive, came up to
   a minute after a rule started or expired or the opening hours opened or closed, and after the
   rules were changed. They now go out at the moment itself, and at once after a change.
