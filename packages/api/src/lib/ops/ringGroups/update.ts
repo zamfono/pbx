@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { DB } from '@zamfono/shared';
 
 import { pushRoster } from '../roster.js';
-import { propagate, recordChange } from '../runner.js';
+import { propagate, recordChange, recordFieldChanges } from '../runner.js';
 import {
   logLevelInputFields,
   recordLogLevelChanges,
@@ -91,19 +91,6 @@ function resolvedFields(
         ? before.mailboxAudioId
         : input.mailboxAudioId
   };
-}
-
-/** Records one `audit_log` diff entry per field whose resolved value differs from `before`'s. */
-function recordFieldChanges(
-  ctx: Context,
-  before: RingGroupRow,
-  after: ReturnType<typeof resolvedFields>
-): void {
-  for (const field of Object.keys(after) as (keyof typeof after)[]) {
-    if (after[field] !== before[field]) {
-      recordChange(ctx, { field, from: before[field], to: after[field] });
-    }
-  }
 }
 
 export const updateRingGroup = defineOperation({

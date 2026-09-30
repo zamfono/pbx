@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { encrypt, keyringFromEnv } from '../../secretbox.js';
+import { orBefore } from '../patch.js';
 import { recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import {
@@ -25,12 +26,6 @@ const inputSchema = z
   .strict();
 
 type Input = z.infer<typeof inputSchema>;
-
-/** `value` where given, `before` otherwise, distinguishing an absent key from an explicit `null`. */
-function orBefore<T>(value: T | undefined, before: T): T {
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- `??` would also replace an explicit `null` (a meaningful patch value), not just an absent key
-  return value === undefined ? before : value;
-}
 
 /** `PATCH /backups/targets/{id}` (§6.5 "Backups"): kind, params, secret and the enabled flag. */
 export const targetsUpdate = defineOperation<Input, BackupTargetWire>({

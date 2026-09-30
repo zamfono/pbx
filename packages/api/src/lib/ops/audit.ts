@@ -77,6 +77,19 @@ export function recordChange(ctx: Context, change: ChangeEntry): void {
   state.changes.push(change);
 }
 
+/** Records one field change per field of `after` whose resolved value differs from `before`'s. */
+export function recordFieldChanges<Fields extends object>(
+  ctx: Context,
+  before: Fields,
+  after: Fields
+): void {
+  for (const field of Object.keys(after) as (keyof Fields & string)[]) {
+    if (after[field] !== before[field]) {
+      recordChange(ctx, { field, from: before[field], to: after[field] });
+    }
+  }
+}
+
 /**
  * Masks every value of `ctx`'s audit entry, those recorded so far and any recorded later, keeping
  * only the field names, and marks it non-undoable: the GDPR erase call's own entry is

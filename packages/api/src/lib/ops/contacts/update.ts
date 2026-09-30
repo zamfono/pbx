@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import type { DB } from '@zamfono/shared';
 
-import { recordChange } from '../runner.js';
+import { recordChange, recordFieldChanges } from '../runner.js';
 import { defineOperation, OpError, type Context } from '../types.js';
 import {
   contactPhones,
@@ -49,18 +49,6 @@ function resolvedFields(
     company: input.company === undefined ? before.company : input.company,
     email: input.email === undefined ? before.email : input.email
   };
-}
-
-function recordFieldChanges(
-  ctx: Context,
-  before: ContactRow,
-  after: ReturnType<typeof resolvedFields>
-): void {
-  for (const field of Object.keys(after) as (keyof typeof after)[]) {
-    if (after[field] !== before[field]) {
-      recordChange(ctx, { field, from: before[field], to: after[field] });
-    }
-  }
 }
 
 export const updateContact = defineOperation({

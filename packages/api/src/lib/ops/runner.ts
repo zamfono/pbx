@@ -24,7 +24,12 @@ import {
   type Role
 } from './types.js';
 
-export { maskContent, recordChange, setUndoable } from './audit.js';
+export {
+  maskContent,
+  recordChange,
+  recordFieldChanges,
+  setUndoable
+} from './audit.js';
 export { onPropagate, propagate } from './propagationHooks.js';
 export { afterPropagation } from './afterPropagationHooks.js';
 export { onRollback } from './rollbackHooks.js';

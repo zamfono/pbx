@@ -6,6 +6,7 @@ import {
   targetInputSchema,
   type TargetInput
 } from '../dids/_shared.js';
+import { orBefore } from '../patch.js';
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError, type Context } from '../types.js';
 import { loadLiveDidBlock } from './_shared.js';
@@ -31,12 +32,6 @@ type UpdateOutput = {
   fallbackTarget: TargetInput | null;
   createdAt: string;
 };
-
-/** `value` where given, `before` otherwise: the resolved next value of an optional patch field. */
-function orBefore<T>(value: T | undefined, before: T): T {
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- `??` would also replace an explicit `null` (a meaningful patch value), not just an absent key
-  return value === undefined ? before : value;
-}
 
 /**
  * The block's next `fallback_target_id`: unchanged while `fallbackTarget` is absent, cleared on
