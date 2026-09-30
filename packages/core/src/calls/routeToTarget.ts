@@ -8,21 +8,13 @@
 import type { LogLevel } from '../callLog.js';
 import type { Snapshot } from '../internal/server.js';
 import { defaultPrompt } from '../prompts.js';
-import {
-  resolveDialed,
-  type DialAction,
-  type ResolveDialedContext
-} from '../routing/outbound.js';
+import { resolveDialed, type DialAction } from '../routing/outbound.js';
 import { findForwardTarget, release, toLogLevel, type Call } from './call.js';
 import { SIP_SERVICE_UNAVAILABLE } from './conclude.js';
 import { dialEmergency, emergencyLogLevel } from './emergency.js';
 import { handleFeature } from './features.js';
 import { dialExternal } from './outboundExternal.js';
-import {
-  buildExtensionsMap,
-  didTargetsByNumber,
-  toFor
-} from './outboundLookup.js';
+import { resolveDialedContext, toFor } from './outboundLookup.js';
 import { retrieveParkedCall } from './parkingRetrieval.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
@@ -36,24 +28,12 @@ export type ResolvedTarget = {
   to: string;
 };
 
-/** `resolveDialed`'s context over `snapshot`, the one a device's own dial resolves against. */
-function dialContext(snapshot: Snapshot): ResolveDialedContext {
-  return {
-    featureCodes: snapshot.settings.featureCodes,
-    emergencyNumbers: snapshot.settings.emergencyNumbers,
-    country: snapshot.settings.country,
-    extLength: snapshot.settings.extLength,
-    extensions: buildExtensionsMap(snapshot),
-    dids: didTargetsByNumber(snapshot)
-  };
-}
-
 /** What `target` resolves to when dialled (§10.1 "Outbound" steps 1-5) and the `Call` fields it fixes. */
 export function resolveTarget(
   snapshot: Snapshot,
   target: string
 ): ResolvedTarget {
-  const action = resolveDialed(target, dialContext(snapshot));
+  const action = resolveDialed(target, resolveDialedContext(snapshot));
   const direction =
     action.kind === 'external' || action.kind === 'emergency'
       ? 'outbound'
