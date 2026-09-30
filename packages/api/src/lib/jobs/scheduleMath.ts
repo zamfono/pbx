@@ -10,9 +10,10 @@
  * (`packages/api/package.json`), so `longestClosedGap` here implements the same calendar
  * arithmetic independently rather than importing it.
  */
-import { MS_PER_DAY } from '@zamfono/shared';
-
 export const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+const MS_PER_MINUTE = 60_000;
+export const MS_PER_DAY = HOURS_PER_DAY * MINUTES_PER_HOUR * MS_PER_MINUTE;
 export const DAYS_TO_SCAN = 7;
 const ISO_WEEK_DAYS = 7;
 // Two passes resolve the DST-transition case (the first guess lands on the wrong side of the

@@ -3,12 +3,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { MS_PER_DAY, newId, nowIso, openDb, type Db } from '@zamfono/shared';
+import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { runOperation, type RunInput } from '../ops/runner.js';
 import { type Actor } from '../ops/types.js';
 import { runPurge } from './purge.js';
+import { MS_PER_DAY } from './scheduleMath.js';
 
 import '../ops/ooo/index.js';
 import '../ops/users/index.js';
