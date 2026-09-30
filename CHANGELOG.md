@@ -13,6 +13,12 @@ why the specified behaviour changed; the commit history, how.
 
 ### Added
 
+- A call's QoS rows (`calls.get`, `GET /calls/{id}`, at diagnostics level `qos`) count each
+  leg's RTP packets, `rxPackets` received from its far end and `txPackets` sent to it. An answered
+  leg with `rxPackets: 0` received no audio at all from that side, typically a phone behind NAT
+  or a firewall, or one announcing a wrong address in its SDP; before, it read as "nothing
+  measured", the same as a phone that sends no RTCP. The recipe `diagnose-bad-call` explains what
+  to check. Calls recorded before the upgrade have no counts (`null`).
 - A forward target of a new kind, `sip`, `{ "kind": "sip", "trunkId": "…", "user": "proj_…" }`,
   sends a call to a SIP address rather than a phone number: the stack dials `user` at the trunk's
   own hosts, such as OpenAI's Realtime SIP endpoint at `sip.api.openai.com`, with no outbound

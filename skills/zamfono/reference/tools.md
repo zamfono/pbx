@@ -16,7 +16,7 @@
 | `blockedNumbers.create` | `POST /blockedNumbers` | Adds a number or number prefix to the tenant blocklist | admin | no |
 | `blockedNumbers.delete` | `DELETE /blockedNumbers/{id}` | Removes a number from the tenant blocklist | admin | yes |
 | `blockedNumbers.list` | `GET /blockedNumbers` | Lists the tenant's inbound blocklist | admin | no |
-| `calls.get` | `GET /calls/{id}` | Reads one call of the history with its log and QoS summary. | user | no |
+| `calls.get` | `GET /calls/{id}` | Reads one call of the history with its log and QoS summary: per leg jitter, loss, round trip and the packets received and sent. | user | no |
 | `calls.hangup` | `POST /calls/{id}/hangup` | Hangs up a live call. | user | no |
 | `calls.list` | `GET /calls` | Lists call history, or the calls currently in progress. | user | no |
 | `calls.originate` | `POST /calls` | Click-to-dial: rings a user's devices, then dials the target on answer. | user | no |

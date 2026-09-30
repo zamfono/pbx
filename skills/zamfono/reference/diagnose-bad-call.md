@@ -56,9 +56,21 @@ arguments:
    group under suspicion to `qos` (adds a per-leg RTCP summary: `jitterMs`, `lossPct` and `rttMs`
    per leg, the worse of both directions, `rttMs` null until the far end sent an RTCP report,
    `jitterMs` and `lossPct` null for a leg that received nothing and whose far end never
-   reported, as one-way audio can leave it) or
+   reported, as one-way audio can leave it, and the packets the leg received from its far end and
+   sent to it, `rxPackets` and `txPackets`) or
    `sip` (adds the SIP messages themselves, HEP-mirrored from Asterisk) rather than raising it
    tenant-wide. An override without an explicit expiry lapses automatically after 7 days.
+   - `rxPackets: 0` on a leg of an answered call means no audio ever arrived from that side: its
+     RTP was dropped on the way, usually by NAT or a firewall on the device's side, or it was sent
+     to a wrong address. At level `sip`, check the `c=` line of the SDP that side sent: a private
+     address (`10.…`, `172.16–31.…`, `192.168.…`) behind NAT is the classic cause. A leg whose
+     figures are all null but whose `rxPackets` is above 0 received audio; only its far end sends
+     no RTCP. `rxPackets` null means the count is unknown (a row from RTCP reports alone, or one
+     written before the counts existed), not 0.
+   - The opposite case, Asterisk's audio not reaching the device, is not visible in these counts:
+     `txPackets` counts what Asterisk sent, not what arrived. The far end hears nothing while its
+     own leg reads a healthy `txPackets`; ask the person on that side, or read the other leg's
+     `rxPackets`, which shows whether audio reached Asterisk to be relayed at all.
 4. For a trunk suspected of failing calls outbound, check `trunks.get` (`GET /trunks/{id}`) for its
    registration and reachability status before reading its call log; an `unreachable` trunk is
    skipped in trunk-order failover and in emergency-call dialling alike, and a trunk without
