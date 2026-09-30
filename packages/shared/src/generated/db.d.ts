@@ -392,6 +392,8 @@ export interface Trunks {
   priority: number;
   registerExpiryS: number | null;
   registerRetryS: number | null;
+  srtp: Generated<number>;
+  tlsVerify: Generated<number>;
   transport: Generated<string>;
   username: string | null;
 }
