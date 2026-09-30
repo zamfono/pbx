@@ -26,6 +26,9 @@ why the specified behaviour changed; the commit history, how.
   after its channel had gone. Each leg that carried media now has a row with jitter and round trip
   in milliseconds and loss in percent, read every few seconds while the call runs, a
   mailbox-answered caller's included; a round trip not yet measured is empty rather than 0.
+- A ring group change that left its members alone (its strategy, ring timeout, mailbox or
+  diagnostics level) did not reach call routing until some other change reloaded the
+  configuration; raising a group to `qos` or `sip` had no effect on its calls.
 - `lastRegisteredAt` on a device is documented as what it is: when the device last became
   reachable, not its latest registration refresh, which Asterisk reports no event for.
 

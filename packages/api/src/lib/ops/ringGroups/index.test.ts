@@ -160,6 +160,33 @@ describe('ringGroups', () => {
     ]);
   });
 
+  it('update of a routing field alone tells core, without an Asterisk reload (§3.1, §7)', async () => {
+    const db = await makeTestDb();
+    await seedTenant(db);
+    const group = await runOperation<unknown, { id: string }>(
+      db,
+      'ringGroups.create',
+      {
+        name: 'Sales',
+        strategy: 'sequential',
+        members: [{ kind: 'user', id: 'owner' }]
+      },
+      asRun()
+    );
+    const propagated: { operation: string; kind: ReloadKind[] }[] = [];
+    onPropagate(change => {
+      propagated.push(change);
+      return Promise.resolve();
+    });
+    await runOperation(
+      db,
+      'ringGroups.update',
+      { id: group.id, logLevel: 'qos' },
+      asRun()
+    );
+    expect(propagated).toEqual([{ operation: 'ringGroups.update', kind: [] }]);
+  });
+
   it('reads without a since-soft-deleted member and updates unchanged without a 404', async () => {
     const db = await makeTestDb();
     await seedTenant(db);

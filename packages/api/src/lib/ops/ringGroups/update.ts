@@ -144,6 +144,9 @@ export const updateRingGroup = defineOperation({
       });
       propagate(ctx, ['pjsip']);
     }
+    // Every field `core` routes on (strategy, timeouts, mailbox, the diagnostics override, §7)
+    // reaches it only once its config cache drops, which an Asterisk reload is not needed for.
+    propagate(ctx, []);
     // The group's name titles its extension's roster entry (§10.4 "Colleague presence").
     if (after.name !== before.name) {
       await pushRoster(ctx);
