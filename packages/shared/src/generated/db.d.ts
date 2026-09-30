@@ -167,6 +167,7 @@ export interface ForwardTargets {
   mailboxUserId: string | null;
   menuId: string | null;
   ringGroupId: string | null;
+  sipHeadersJson: string | null;
   sipTrunkId: string | null;
   sipUser: string | null;
   userId: string | null;

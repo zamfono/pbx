@@ -70,7 +70,7 @@ test('every earlier target kind survives the rebuild, its owners still pointing 
     Record<string, unknown>
   >`SELECT * FROM forward_targets ORDER BY id`.execute(db);
 
-  await migrateForTest(db);
+  await migrateForTest(db, '1790770935482_forward_target_sip');
 
   const after = await sql<
     Record<string, unknown>

@@ -5,7 +5,7 @@ import { migrateForTest } from './testDb.js';
 
 test('migrates and enforces the schema', async () => {
   const db = openDb(':memory:');
-  expect(await pendingMigrations(db)).toHaveLength(7);
+  expect(await pendingMigrations(db)).toHaveLength(8);
   await migrateForTest(db);
   expect(await pendingMigrations(db)).toEqual([]);
 
