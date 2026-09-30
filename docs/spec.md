@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-09-30 · §10 layout.** The `shared/` line also names the Asterisk object names `api` renders into the generated config and `core` addresses at runtime, such as a trunk's `trunk-<id>` section and an extension's `Stasis:presence-<ext>` hint.
+*Why:* found in a refactor: each process kept its own copy of these names, which the two must spell alike.
+
 **2026-09-30 · §7 Levels, §10 layout, §11 `call_qos`.** Only a HEP datagram of protocol type SIP reaches the `sip` log, or one without a type whose payload opens with a SIP start line. The RTCP reports Asterisk mirrors over HEP as well (`res_hep_rtcp`) go to `call_qos` instead, at any level while `HEP_ENABLED` is on: they fill a loss or round trip the leg's `RTPAUDIOQOS` left unmeasured, the summary keeping every figure it measured, and give a row to a leg whose `ChannelDestroyed` never arrived; jitter stays the summary's alone. Before, every datagram with a payload was logged as a SIP message.
 *Why:* requested by the product owner: RTCP reports were logged at level `sip` as if they were SIP messages, about 20 of a test call's 45 lines, and the rule is to use them for the QoS figures and keep them out of the SIP log.
 
@@ -1105,7 +1108,7 @@ packages/
 │           ├── oauth/, .well-known/          # authorization server + login/consent page (§5)
 │           ├── mcp/+server.ts                # Streamable HTTP endpoint (§10.5)
 │           └── internal/mail, healthz, metrics
-└── shared/              # db access (Kysely + better-sqlite3), generated row types, wire contracts, time and opening-hours math, the background jobs' repeat schedule, MWI mailbox keys
+└── shared/              # db access (Kysely + better-sqlite3), generated row types, wire contracts, time and opening-hours math, the background jobs' repeat schedule, MWI mailbox keys, the Asterisk object names `api` renders and `core` addresses
 db/                      # container 3, one-shot: kysely-ctl configuration and migrations (§6.3 "Migrations")
 ├── Dockerfile
 ├── config.ts            # the file path comes from DB_FILE
