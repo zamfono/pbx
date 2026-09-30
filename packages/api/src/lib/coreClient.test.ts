@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { CoreRequestError, createCoreClient } from './coreClient.js';
+import {
+  CoreRequestError,
+  createCoreClient,
+  fetchCoreHealth
+} from './coreClient.js';
 
 const HTTP_INTERNAL_SERVER_ERROR = 500;
+const HTTP_SERVICE_UNAVAILABLE = 503;
+const HANG_TIMEOUT_MS = 10;
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -152,6 +158,44 @@ describe('createCoreClient', () => {
       3,
       'http://core:3000/internal/calls/c1/hangup',
       expect.objectContaining({ method: 'POST' })
+    );
+  });
+});
+
+describe('fetchCoreHealth', () => {
+  it("returns core's body on a 503 too, since it says which check is down", async () => {
+    const fetchFn = vi.fn(() =>
+      Promise.resolve(
+        jsonResponse(HTTP_SERVICE_UNAVAILABLE, {
+          ok: false,
+          ari: false,
+          db: true
+        })
+      )
+    );
+
+    const health = await fetchCoreHealth('http://core:3000', fetchFn);
+
+    expect(health).toEqual({ ok: false, ari: false, db: true });
+    expect(fetchFn).toHaveBeenCalledWith('http://core:3000/healthz', {
+      signal: expect.any(AbortSignal) as unknown
+    });
+  });
+
+  it('rejects once its timeout aborts a request core never answers', async () => {
+    // A core that hangs: the request ends only when its own signal gives up on it.
+    const fetchFn = (_url: string | URL | Request, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new Error('aborted'));
+        });
+      });
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValueOnce(
+      AbortSignal.timeout(HANG_TIMEOUT_MS)
+    );
+
+    await expect(fetchCoreHealth('http://core:3000', fetchFn)).rejects.toThrow(
+      'aborted'
     );
   });
 });

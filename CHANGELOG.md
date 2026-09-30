@@ -51,6 +51,8 @@ why the specified behaviour changed; the commit history, how.
   configuration; raising a group to `qos` or `sip` had no effect on its calls.
 - `lastRegisteredAt` on a device is documented as what it is: when the device last became
   reachable, not its latest registration refresh, which Asterisk reports no event for.
+- `/metrics` waited for as long as `core` took to answer its health check, so a hung `core` hung
+  the scrape too. It now gives up after three seconds, as `/healthz` does.
 
 ### Added
 

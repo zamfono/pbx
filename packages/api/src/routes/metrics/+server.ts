@@ -2,9 +2,9 @@ import { timingSafeEqual } from 'node:crypto';
 import process from 'node:process';
 import type { RequestEvent } from '@sveltejs/kit';
 
-import { resolveVersion, type CoreHealth } from '@zamfono/shared';
+import { resolveVersion } from '@zamfono/shared';
 
-import { coreUrlFromEnv, createCoreClient } from '../../lib/coreClient.js';
+import { createCoreClient, fetchCoreHealth } from '../../lib/coreClient.js';
 import { getDb } from '../../lib/db.js';
 import {
   getCertSyncScheduler,
@@ -20,14 +20,13 @@ const PROMETHEUS_CONTENT_TYPE = 'text/plain; version=0.0.4';
 
 /** `core`'s own ARI connection state (§7), read the same way `/healthz` reads it (Task 25). */
 async function checkAri(): Promise<boolean> {
-  const response = await fetch(`${coreUrlFromEnv()}/healthz`);
-  const body = (await response.json()) as CoreHealth;
+  const body = await fetchCoreHealth();
   return body.ari;
 }
 
 /**
- * The certificate-sync scheduler's status (§6.4, §7), read the same instance `server.ts`
- * started. `ORIGIN` absent or malformed must not turn `/metrics` into a 500, so a scheduler
+ * The certificate-sync scheduler's status (§6.4, §7), read the same instance the boot
+ * started (`jobs/background.ts`). `ORIGIN` absent or malformed must not turn `/metrics` into a 500, so a scheduler
  * that fails to construct reports `'unknown'`, the same as one that has not polled yet.
  */
 function resolveCertificateSync(): CertSyncStatus {
