@@ -21,7 +21,7 @@ import { authenticateEventsSocket } from './lib/eventsAuth.js';
 import type { Bus, ExecFn } from './lib/jobs/backup.js';
 import { scheduleBackups } from './lib/jobs/cron.js';
 import { scheduleRetention } from './lib/jobs/retention.js';
-import { scheduleRingotelRereg } from './lib/jobs/ringotelRereg.js';
+import { watchAsteriskRestarts } from './lib/jobs/ringotelRereg.js';
 import { propagateAtBoot } from './lib/propagation.js';
 import { keyringFromEnv, type Keyring } from './lib/secretbox.js';
 import { seedIfEmpty } from './lib/seed.js';
@@ -142,8 +142,17 @@ export async function main(): Promise<void> {
     enqueue: envelope => dispatcher.enqueue(envelope)
   };
   await startBootJobs(db, kr, bus);
+  // §10.4 "After a restart": a new Asterisk holds no registration, so the Ringotel apps are told
+  // to register again once `core` announces it, or reports it when its stream (re)connects.
+  const rereg = watchAsteriskRestarts({ db, lookup: () => fetchCoreVersion() });
   connectCoreEvents({
     url: coreEventsUrl(requireEnv('CORE_URL')),
+    onOpen: () => {
+      rereg.streamConnected();
+    },
+    onAsteriskStarted: asteriskStartedAt => {
+      rereg.asteriskStarted(asteriskStartedAt);
+    },
     onEvent: envelope => {
       hub.publish(envelope);
       dispatcher.enqueue(envelope).catch((error: unknown) => {
@@ -154,9 +163,6 @@ export async function main(): Promise<void> {
       });
     }
   });
-  // §10.4 "After a restart": a new Asterisk holds no registration, so the Ringotel apps are told
-  // to register again once `core` reports it.
-  scheduleRingotelRereg({ db, lookup: () => fetchCoreVersion() });
   const handler = await loadHandler();
   const server = http.createServer(handler);
   const wss = new WebSocketServer({ noServer: true });

@@ -20,7 +20,7 @@ why the specified behaviour changed; the commit history, how.
   the caller name the PBX sends wins over the app's contacts.
 - After an Asterisk restart, a stack restart or an update, the Ringotel apps stayed unreachable
   until their next registration, up to an hour. The stack now has Ringotel re-register every app
-  once Asterisk is back, and the apps re-register every two minutes anyway.
+  the moment Asterisk is back, and the apps re-register every two minutes anyway.
 - What Ringotel answered to a device's push, and the re-registration after a restart, was only in
   the call's result and the container log, which an update discards. Each is now an audit entry
   (`ringotel.push` on the device, `ringotel.rereg`), and a `ringotel` device created or rotated
