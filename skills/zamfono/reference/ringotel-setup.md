@@ -52,3 +52,11 @@ the PBX, the caller name the PBX sends wins over the app's contacts, apps stay r
 closed, and they re-register every two minutes. When Asterisk restarts, an update included, the stack tells
 Ringotel to re-register every app once Asterisk is back (a `ringotel.rereg` entry in
 `audit.list`), so the apps are reachable again without waiting for their next registration.
+
+A settings change the apps' profile carries (codecs, feature codes, `ringotelMaxRegs`,
+emergency numbers, country, language) is stored and in force on the PBX first, and reaches
+Ringotel afterwards; a Ringotel outage never fails `settings.update`. Each attempt leaves a
+`ringotel.profile` entry on the settings in `audit.list` (`outcome` `pushed`, `refused` with
+Ringotel's reason, or `skipped`). After a refusal the response carries a `warnings` entry and
+`system.info` shows `ringotel.profilePending: true`: the stack sends the profile again with the
+next push that reaches Ringotel, when `api` starts, and when Asterisk restarts, never on a timer.

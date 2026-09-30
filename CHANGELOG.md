@@ -13,6 +13,12 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- Changing the emergency numbers, or any setting the Ringotel apps' profile carries (codecs,
+  feature codes, registrations per user, country, language), failed while Ringotel was
+  unreachable, and the PBX did not get the new numbers either. The change is now stored and in
+  force on the PBX at once; Ringotel gets it afterwards, and if Ringotel refuses, the result warns,
+  the audit log records it, `system.info` and `/healthz` show the profile as pending, and the stack
+  sends it again with the next Ringotel change, when `api` starts or when Asterisk restarts.
 - A phone rang for at most 30 seconds, however long the user's ring timeout or the ring group's
   timeouts were set, and an outbound call the far end had not answered within 30 seconds was cut
   off. Rings now last as long as they are set to, and an outbound call rings until it is answered

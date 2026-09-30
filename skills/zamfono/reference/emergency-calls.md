@@ -34,5 +34,13 @@ network: the call reaches the emergency centre where the person is, with the pho
 works without mobile data or a reachable PBX. Such a call never passes through Zamfono, so it has
 no call-history entry, uses no emergency trunk and leaves no trace.
 
+A change to the emergency numbers is stored and in force on the PBX as soon as `settings.update`
+returns, even while Ringotel is unreachable; the mobile apps get it afterwards. If Ringotel
+refuses it, the response carries a `warnings` entry, `system.info` shows
+`ringotel.profilePending: true` (and `/healthz` `ringotelProfilePending: true`), and the stack
+sends it again with the next change that reaches Ringotel, when `api` starts or when Asterisk
+restarts, until Ringotel takes it. Until then the apps dial the old numbers through the cellular
+network, and every other device already dials the new ones through the PBX.
+
 Tell every remote worker this before they rely on a Zamfono extension for emergencies from
 somewhere other than the office (see `remote-workers`).
