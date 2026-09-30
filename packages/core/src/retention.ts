@@ -8,7 +8,7 @@
 import { readdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 
-import { MS_PER_DAY, repeat, type Db } from '@zamfono/shared';
+import { cutoffIso, MS_PER_DAY, repeat, type Db } from '@zamfono/shared';
 
 import type { Logger } from './ari/types.js';
 
@@ -32,11 +32,6 @@ export type RetentionResult = {
   callQos: number;
   callLogs: number;
 };
-
-/** The ISO instant `days` before `now`; everything older than it is out of retention. */
-function cutoff(now: string, days: number): string {
-  return new Date(new Date(now).getTime() - days * MS_PER_DAY).toISOString();
-}
 
 /** A recording's mixed file and the raw pair it was mixed from, whichever still exist. */
 async function removeRecordingFiles(
@@ -85,7 +80,7 @@ export async function runRetention(
     .selectFrom('settings')
     .select('recordingRetentionDays')
     .executeTakeFirstOrThrow();
-  const before = cutoff(now(), settings.recordingRetentionDays);
+  const before = cutoffIso(now(), settings.recordingRetentionDays);
 
   const stale = await db
     .selectFrom('recordings')
