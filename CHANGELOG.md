@@ -116,6 +116,9 @@ why the specified behaviour changed; the commit history, how.
   the user's own phones was slow to be reached after another had answered. A ring group's batch
   timing out as a member answered had the same fault, the caller moving on to the next members or
   the fallback, and a member answering after its batch had timed out could still take the call.
+- An external leg (a find-me number, or a ring group member forwarded to an external number) that
+  answered at the moment its 8-second wait for a first response from the provider ran out could
+  be hung up although it had answered.
 
 ### Upgrade notes
 

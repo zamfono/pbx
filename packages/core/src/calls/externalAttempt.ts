@@ -126,10 +126,15 @@ export function watchAttempt(
   };
   attempt.timer = setTimeout(() => {
     attempt.timer = null;
-    // A `100 Trying` ends the budget too, though no event says so; only its absence hangs up.
+    // A `100 Trying` ends the budget too, though no event says so; only its absence hangs up. An
+    // answer landing while the read is under way ends it as well: the answered leg is the race's.
     provisionalArrived(ari, trunkLeg)
       .then(arrived => {
-        if (!arrived && attemptsOf(leg.pipeline).get(channelId) === attempt) {
+        if (
+          !arrived &&
+          !attempt.alerted &&
+          attemptsOf(leg.pipeline).get(channelId) === attempt
+        ) {
           attempt.noResponse = true;
           ari.channels.hangup(channelId).catch(() => undefined);
         }
