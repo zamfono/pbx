@@ -31,6 +31,7 @@ import { TrunkState } from './calls/trunkState.js';
 import { readEnv, type CoreEnv } from './env.js';
 // --- end Task 31 ---
 // --- end Task 31 ---
+import { reloadHepOnConnect } from './hepReload.js';
 import { reloadAllModules } from './internal/configChanged.js';
 import {
   ConfigCache,
@@ -94,6 +95,7 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
   const db = openDb(env.dbFile);
   const ari = createAriClient(env, log);
   const ami = createAmiClient(env, log);
+  reloadHepOnConnect(ari, env.hepEnabled, log);
   try {
     await ari.connect();
     await ami.connect();

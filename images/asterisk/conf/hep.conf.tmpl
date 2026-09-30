@@ -1,6 +1,10 @@
 ; SIP mirroring to the core's HEP collector on the internal network (spec §7). res_hep parses a
-; numeric address only; the entrypoint renders the one `core` resolves to, and follows it.
+; numeric address only, so capture_address comes from hep-capture-address, which Asterisk runs
+; each time it loads this file (asterisk.conf `execincludes`) and which prints the address `core`
+; resolves to at that moment. An `#exec` also makes Asterisk re-read the file on every reload,
+; changed or not. `3>&2` hands the script Asterisk's stderr for its warning, before Asterisk's own
+; redirection sends the script's output into the file it parses.
 [general]
 enabled = ${HEP_ENABLED_YN}
-capture_address = ${HEP_CAPTURE_ADDRESS}
+#exec "/usr/local/bin/hep-capture-address 3>&2"
 capture_id = 1

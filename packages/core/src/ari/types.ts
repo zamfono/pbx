@@ -107,7 +107,8 @@ export type RtpStatistics = {
 };
 export type DeviceState =
   'NOT_INUSE' | 'INUSE' | 'BUSY' | 'UNAVAILABLE' | 'RINGING';
-export type AsteriskModule = 'res_pjsip' | 'pbx_config' | 'res_musiconhold';
+export type AsteriskModule =
+  'res_pjsip' | 'pbx_config' | 'res_musiconhold' | 'res_hep';
 
 export type Endpoint = {
   technology: 'PJSIP';

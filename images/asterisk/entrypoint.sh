@@ -85,87 +85,22 @@ reject_unsafe_secret() {
 reject_unsafe_secret ARI_PASSWORD "$ARI_PASSWORD"
 reject_unsafe_secret AMI_PASSWORD "$AMI_PASSWORD"
 
-# res_hep takes its collector as a numeric address only: a hostname such as `core:9060` fails
-# to parse ("Failed to create address"), and Asterisk then runs with HEP enabled and sends
-# nothing. `core` starts after Asterisk (it depends on it) and gets a new address whenever it is
-# recreated, so no address is known here for good: hep.conf names what `core` resolves to now, or
-# the loopback placeholder until it resolves, and `follow_core` below re-renders it and reloads
-# res_hep whenever that address changes (spec §7, §9.1).
-HEP_PORT=9060
-HEP_PLACEHOLDER_ADDR=127.0.0.1
-FOLLOW_INTERVAL_S=2
-# How long `core` may stay unresolvable before that is logged, a minute of ticks: long enough
-# for a first boot's migrations, which `core` waits for.
-FOLLOW_WARN_TICKS=30
-
-is_ipv4() {
-  case "$1" in
-    ''|*[!0-9.]*|*..*|.*|*.) return 1 ;;
-  esac
-  [ "$(printf '%s' "$1" | tr -cd . | wc -c)" -eq 3 ]
-}
-
-core_ipv4() {
-  getent ahostsv4 core 2>/dev/null | awk 'NR == 1 { print $1 }'
-}
-
-# Renders hep.conf for collector address $1, refusing anything res_hep would not parse; the
-# check reads the rendered file, so a template naming a hostname again fails here too.
-render_hep_conf() {
-  if ! is_ipv4 "$1"; then
-    echo "entrypoint: HEP collector address '$1' is not numeric IPv4" >&2
-    return 1
-  fi
-  HEP_CAPTURE_ADDRESS="$1:$HEP_PORT" envsubst < "$TEMPLATE_DIR/hep.conf.tmpl" \
-    > /etc/asterisk/hep.conf.new
-  mv /etc/asterisk/hep.conf.new /etc/asterisk/hep.conf
-  if ! grep -Eq "^capture_address = ([0-9]{1,3}\.){3}[0-9]{1,3}:$HEP_PORT\$" /etc/asterisk/hep.conf; then
-    echo "entrypoint: hep.conf's capture_address is not a numeric address; res_hep would send nothing" >&2
-    return 1
-  fi
-}
-
-# Runs beside Asterisk for its lifetime: every FOLLOW_INTERVAL_S it resolves `core` and, once
-# that address differs from the one hep.conf names, renders the new one and reloads res_hep; a
-# reload Asterisk does not accept yet (still booting) is retried on the next tick.
-follow_core() {
-  current=$1
-  unresolved=0
-  while sleep "$FOLLOW_INTERVAL_S"; do
-    addr=$(core_ipv4)
-    if [ -z "$addr" ]; then
-      unresolved=$((unresolved + 1))
-      if [ "$unresolved" -eq "$FOLLOW_WARN_TICKS" ]; then
-        echo "entrypoint: WARNING: 'core' has not resolved for a minute; no SIP message reaches the HEP collector" >&2
-      fi
-      continue
-    fi
-    unresolved=0
-    [ "$addr" != "$current" ] || continue
-    render_hep_conf "$addr" || continue
-    if asterisk -rx 'module reload res_hep' 2>/dev/null | grep -q 'reloaded successfully'; then
-      echo "entrypoint: HEP collector is now $addr:$HEP_PORT"
-      current=$addr
-    fi
-  done
-}
-
 export INTERNAL_ADDR UDP_BIND_ADDR TCP_BIND_ADDR TLS_BIND_ADDR EXTERNAL_ADDRESS_LINES \
        HEP_ENABLED_YN HEP_NOLOAD_LINES ARI_PASSWORD AMI_PASSWORD \
        RTP_PORT_START="${RTP_PORT_START:-10000}" RTP_PORT_END="${RTP_PORT_END:-10200}"
 
 for tmpl in "$TEMPLATE_DIR"/*.tmpl; do
   name=$(basename "$tmpl" .tmpl)
-  [ "$name" != hep.conf ] || continue
   envsubst < "$tmpl" > "/etc/asterisk/$name"
 done
 
-HEP_ADDR=$HEP_PLACEHOLDER_ADDR
-if [ "$HEP_ENABLED_YN" = yes ]; then
-  HEP_ADDR=$(core_ipv4)
-  HEP_ADDR=${HEP_ADDR:-$HEP_PLACEHOLDER_ADDR}
+# res_hep takes a numeric collector address only, so hep.conf names none itself: its `#exec`
+# has Asterisk run hep-capture-address, which resolves `core` each time the file is loaded
+# (spec §7, §9.1). A template naming an address again would bypass that.
+if grep -q '^capture_address' /etc/asterisk/hep.conf; then
+  echo "entrypoint: hep.conf names a capture_address itself; it must come from its #exec" >&2
+  exit 1
 fi
-render_hep_conf "$HEP_ADDR" || exit 1
 
 # Self-signed placeholder certificate so transport-tls loads before Caddy has obtained a real
 # one; api replaces both files in place once it has synced the real certificate (spec §6.4).
@@ -190,9 +125,5 @@ chown -R asterisk:asterisk "$GEN_DIR"
 # volume the runtime created root-owned, or a bind mount, is handed to the user Asterisk runs as.
 mkdir -p "$ASTDB_DIR"
 chown asterisk:asterisk "$ASTDB_DIR"
-
-if [ "$HEP_ENABLED_YN" = yes ]; then
-  follow_core "$HEP_ADDR" &
-fi
 
 exec asterisk -f -U asterisk
