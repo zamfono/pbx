@@ -6,7 +6,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { handle } from './hooks.server.js';
+import { handle, init as initHooks } from './hooks.server.js';
 import { signAccessToken } from './lib/auth/jwt.js';
 import { getDb } from './lib/db.js';
 
@@ -14,21 +14,23 @@ const MS_PER_SECOND = 1000;
 const JWT_SECRET = 'test-secret';
 const KEY_BYTE_LENGTH = 32;
 
-// A sweep this test releases by hand, so a request can be issued while it is still running.
-const sweep = vi.hoisted(() => {
+// Background jobs this test releases by hand, so `init` can be observed while they still start.
+const jobs = vi.hoisted(() => {
   let release = (): void => undefined;
-  const finished = new Promise<void>(resolve => {
+  const started = new Promise<void>(resolve => {
     release = resolve;
   });
+  const stop = vi.fn();
   return {
-    finished,
+    stop,
+    start: vi.fn(() => started.then(() => ({ stop }))),
     release: (): void => {
       release();
     }
   };
 });
-vi.mock('./lib/jobs/keyRotation.js', () => ({
-  reencryptSweep: () => sweep.finished
+vi.mock('./lib/jobs/background.js', () => ({
+  startBackgroundJobs: jobs.start
 }));
 
 process.env.DB_FILE = ':memory:';
@@ -145,28 +147,21 @@ describe('hooks handle', () => {
 
   // §5.4: "At boot, before it serves a request, `api` sweeps every `*_enc` column". A fresh
   // module instance, with the environment the sweep needs, starts its own boot sweep.
-  it('serves no request before the boot key-rotation sweep has finished', async () => {
+  it('resolves init once the background jobs have started, and stops them on shutdown', async () => {
     process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
-    vi.resetModules();
-    const fresh = await import('./hooks.server.js');
-    let served = false;
-    // SvelteKit types `handle` as returning `MaybePromise<Response>`; awaiting it through
-    // `Promise.resolve` gives the settled-ness this test observes without asserting it is async.
-    const response = Promise.resolve(
-      fresh.handle({
-        event: eventFor('http://internal/internal/mail'),
-        resolve: resolvePassThrough
-      })
-    ).then(result => {
-      served = true;
-      return result;
+    let initialized = false;
+    const initializing = Promise.resolve(initHooks()).then(() => {
+      initialized = true;
     });
-    await new Promise(resolve => {
-      setTimeout(resolve, 0);
+    await vi.waitFor(() => {
+      expect(jobs.start).toHaveBeenCalledOnce();
     });
-    expect(served).toBe(false);
-    sweep.release();
-    expect(await (await response).text()).toBe('ok');
+    expect(initialized).toBe(false);
+    jobs.release();
+    await initializing;
+
+    process.emit('sveltekit:shutdown', 'SIGTERM');
+    expect(jobs.stop).toHaveBeenCalledOnce();
   });
 
   it('sets locals.actor and locals.clientId from a valid bearer token', async () => {

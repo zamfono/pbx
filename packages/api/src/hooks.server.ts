@@ -1,5 +1,5 @@
 import process from 'node:process';
-import type { Handle, RequestEvent } from '@sveltejs/kit';
+import type { Handle, RequestEvent, ServerInit } from '@sveltejs/kit';
 import pino from 'pino';
 
 import { addressKey } from './lib/addressKey.js';
@@ -7,8 +7,7 @@ import { crossSiteFormRejection } from './lib/auth/crossSiteForms.js';
 import { isRole, verifyAccessToken } from './lib/auth/jwt.js';
 import { createCoreClient, fetchCoreVersion } from './lib/coreClient.js';
 import { getDb } from './lib/db.js';
-import { getCertSyncScheduler } from './lib/jobs/certSync.js';
-import { reencryptSweep } from './lib/jobs/keyRotation.js';
+import { startBackgroundJobs } from './lib/jobs/background.js';
 import { Limiter, type LimitKind } from './lib/limiter.js';
 import { recordApiRequestSeconds } from './lib/metrics.js';
 import { onPropagate } from './lib/ops/runner.js';
@@ -32,13 +31,11 @@ const INTERNAL_PREFIX = '/internal';
 const jobsLogger = pino({ name: 'hooks' });
 
 /**
- * Boot-time background jobs (§3.1 config propagation, §6.4 certificate sync, §5.4 key rotation),
- * wired from this module's own load: this file is part of the SvelteKit build that also builds
- * `runOperation` and every route, so a hook registered here shares their module instance of
- * `./lib/ops/runner.js` — `server.ts` is a separate esbuild bundle with its own copy of every
- * relative import. This file loads before the process serves a first request (§6.4 "The same
- * sync runs at `api` start"). Each piece degrades independently: a missing env var (`DB_FILE`,
- * `ORIGIN`, `SECRETBOX_KEY`) disables only that piece, never the module.
+ * Every background job is started from `init` below: this file is part of the SvelteKit build
+ * that also builds `runOperation` and every route, so a job started here shares their module
+ * instance of every import, and an operation reaches it by a call — `server.ts` is a separate
+ * esbuild bundle with its own copy of every relative import. Outside a stack (`vite dev`), a
+ * missing `DB_FILE` or `SECRETBOX_KEY` disables the jobs that need it, never the module.
  */
 /** `getDb()`, or `null` with a boot-time log line for a missing `DB_FILE`. */
 function tryGetDb(): ReturnType<typeof getDb> | null {
@@ -47,7 +44,7 @@ function tryGetDb(): ReturnType<typeof getDb> | null {
   } catch (error) {
     jobsLogger.error(
       { error },
-      'boot: DB_FILE missing, config propagation and key rotation disabled'
+      'boot: DB_FILE missing, config propagation and the background jobs disabled'
     );
     return null;
   }
@@ -60,31 +57,23 @@ function tryKeyring(): Keyring | null {
   } catch (error) {
     jobsLogger.error(
       { error },
-      'boot: SECRETBOX_KEY missing, key-rotation sweep disabled'
+      'boot: SECRETBOX_KEY missing, the background jobs disabled'
     );
     return null;
   }
 }
 
 /**
- * Starts the boot jobs and resolves once the §5.4 key-rotation sweep has finished, which
- * `handle` waits on before it serves anything: a request answered mid-sweep could read a
- * secret the sweep is re-encrypting. A sweep that throws is logged and lets requests through,
- * since the failure is already reported by `/healthz`'s remaining count.
+ * Wires the operations to `core` and starts the background jobs (`jobs/background.ts`). SvelteKit
+ * runs it once, and serves no request before it resolves; a failure of the first-boot seed
+ * rejects it, which fails loading the handler and so `api`'s boot. The jobs stop on
+ * `sveltekit:shutdown`, which `server.ts` emits on SIGTERM and SIGINT.
  */
-async function startBackgroundJobs(): Promise<void> {
+export const init: ServerInit = async () => {
   // §9.4 "Provisioning and status": trunk status is the core's live state, read per request.
   setTrunkStatusLookup(coreTrunkStatusLookup(createCoreClient()));
   // §7 "Version": `system.info` asks `core` what it runs, per request.
   setCoreVersionLookup(() => fetchCoreVersion());
-  try {
-    getCertSyncScheduler();
-  } catch (error) {
-    jobsLogger.error(
-      { error },
-      'boot: certificate-sync scheduler failed to start'
-    );
-  }
   const db = tryGetDb();
   if (!db) {
     return;
@@ -94,14 +83,11 @@ async function startBackgroundJobs(): Promise<void> {
   if (!kr) {
     return;
   }
-  try {
-    await reencryptSweep(db, kr, jobsLogger);
-  } catch (error) {
-    jobsLogger.error({ error }, 'boot: key-rotation sweep failed');
-  }
-}
-
-const bootJobs = startBackgroundJobs();
+  const jobs = await startBackgroundJobs(db, kr, jobsLogger);
+  process.once('sveltekit:shutdown', () => {
+    jobs.stop();
+  });
+};
 
 type AuthResult = { actor: Actor | null; clientId: string | null };
 
@@ -222,13 +208,10 @@ const handleRequest: Handle = async ({ event, resolve }) => {
 };
 
 /**
- * Waits for the boot jobs (§5.4: the key-rotation sweep finishes before the first request is
- * served), then runs `handleRequest`, timing it for `zamfono_api_request_seconds` (§7 "API
- * latency") regardless of which branch it returns from or whether it throws. The wait falls
- * outside that timing, so a boot-time queue does not read as request latency.
+ * Runs `handleRequest`, timing it for `zamfono_api_request_seconds` (§7 "API latency")
+ * regardless of which branch it returns from or whether it throws.
  */
 export const handle: Handle = async input => {
-  await bootJobs;
   const startedAtMs = Date.now();
   try {
     return await handleRequest(input);

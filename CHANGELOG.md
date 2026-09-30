@@ -72,6 +72,9 @@ why the specified behaviour changed; the commit history, how.
 - Asterisk keeps its astdb, which holds the device registrations, on a new `astdb` volume.
 - `deploy/README.md` says where container logs survive an upgrade (Podman's journal) and how to
   keep them on Docker ("Logs").
+- A backup started by hand (`POST /backups/runs`) begins at once, instead of up to five seconds
+  later, and `api` stops as soon as the stack is stopped or updated, instead of after Docker's
+  ten-second grace period.
 
 ### Upgrade notes
 
