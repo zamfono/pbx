@@ -35,6 +35,8 @@ export type PipelineDeps = {
     finish(call: Call): Promise<void>;
     captureQos?(call: Call): Promise<void>;
     registerLeg?(call: Call, channelId: string): void;
+    /** `registerLeg`, resolving once the join is in place (`legOriginate.ts`). */
+    joinLeg?(call: Call, channelId: string): Promise<void>;
   };
   // §10.2 "Call recording": the answer and end points below hand every participation to the
   // recorder, which decides per participation whether the effective flag is set. Structural so a
@@ -147,8 +149,11 @@ export class Pipeline {
       await this.outboundHandler?.(ev);
       return;
     }
-    if (kind === 'leg') {
-      await legWentUp(this, (ev.channel as Channel).id);
+    // An originated leg enters the app as it answers; a created one (`legOriginate.ts`) as it is
+    // created, before it is dialled, and its answer is the `ChannelStateChange` to `Up`.
+    const channel = ev.channel as Channel;
+    if (kind === 'leg' && channel.state === 'Up') {
+      await legWentUp(this, channel.id);
     }
     // A `snoop,<channelId>` entry is the recorder's own spy channel (§10.2): `Recorder` holds its
     // id from the originate and drives its recording directly, so the pipeline leaves it alone.

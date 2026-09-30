@@ -5,7 +5,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
+import { FakeAri, isPlacement, placedCallerId } from '../ari/fake.js';
 import {
   defaultChannel,
   type AriEvent,
@@ -194,7 +194,7 @@ function outboundEvent(channel: Channel, dialed: string): AriEvent {
 
 function attemptEndpoints(fakeAri: FakeAri): string[] {
   return fakeAri.calls
-    .filter(call => call.method === 'POST' && call.path === 'channels')
+    .filter(call => isPlacement(call))
     .map(call => (call.body as { endpoint: string }).endpoint);
 }
 
@@ -428,12 +428,8 @@ describe('outbound dialing', () => {
     const call = await dial('+498912345');
 
     expect(call.status).toBe('answered');
-    const originate = fakeAri.calls.find(
-      entry => entry.method === 'POST' && entry.path === 'channels'
-    );
-    expect((originate?.body as { callerId: string }).callerId).toBe(
-      '+491230000'
-    );
+    const originate = fakeAri.calls.find(entry => isPlacement(entry));
+    expect(placedCallerId(originate ?? { body: undefined })).toBe('+491230000');
     expect((originate?.body as { endpoint: string }).endpoint).toBe(
       `PJSIP/+498912345@trunk-${trunkId}`
     );
@@ -477,9 +473,17 @@ describe('outbound dialing', () => {
     await seedSettings(db, mainDidId);
     const trunkId = await seedTrunk(db, 1);
     await seedRoute(db, 1, trunkId);
-    const joined: { callId: string; channelId: string }[] = [];
-    pipeline.deps.cdr.registerLeg = (joinedCall, channelId) => {
-      joined.push({ callId: joinedCall.id, channelId });
+    const joined: { callId: string; channelId: string; dialled: boolean }[] =
+      [];
+    pipeline.deps.cdr.joinLeg = (joinedCall, channelId) => {
+      joined.push({
+        callId: joinedCall.id,
+        channelId,
+        dialled: fakeAri.calls.some(
+          entry => entry.path === `channels/${channelId}/dial`
+        )
+      });
+      return Promise.resolve();
     };
 
     const call = await dial('+498912345');
@@ -487,6 +491,8 @@ describe('outbound dialing', () => {
     expect(joined).toHaveLength(1);
     expect(joined[0]?.callId).toBe(call.id);
     expect(joined[0]?.channelId).not.toBe(call.callerChannelId);
+    // §7 level `sip`: joined before its INVITE leaves, so a leg refused at once is still the call's.
+    expect(joined[0]?.dialled).toBe(false);
   });
 
   // §10.2 / §9.1: "The core sets every channel's language from `settings.language`", a
@@ -538,16 +544,14 @@ describe('outbound dialing', () => {
 
     await dial('#31#+498912345');
 
-    const originate = fakeAri.calls.find(
-      entry => entry.method === 'POST' && entry.path === 'channels'
-    );
+    const originate = fakeAri.calls.find(entry => isPlacement(entry));
     const body = originate?.body as {
       callerId: string;
       variables: Record<string, string>;
     };
     // chan_pjsip anonymises `From` and adds `Privacy: id` for a restricted connected line, and
     // `trust_id_outbound` keeps the real number in its `P-Asserted-Identity`.
-    expect(body.callerId).toBe('+491110000');
+    expect(placedCallerId(originate ?? { body: undefined })).toBe('+491110000');
     expect(body.variables['CONNECTEDLINE(pres)']).toBe('prohib');
     expect(
       Object.keys(body.variables).filter(name =>
@@ -564,16 +568,14 @@ describe('outbound dialing', () => {
 
     await dial('+498912345');
 
-    const originate = fakeAri.calls.find(
-      entry => entry.method === 'POST' && entry.path === 'channels'
-    );
+    const originate = fakeAri.calls.find(entry => isPlacement(entry));
     const body = originate?.body as {
       callerId: string;
       variables: Record<string, string>;
     };
     // chan_pjsip asserts the caller ID's number itself (`send_pai`), well-formed and once; the
     // endpoint's `from_user` puts the account identity in `From`.
-    expect(body.callerId).toBe('+491110000');
+    expect(placedCallerId(originate ?? { body: undefined })).toBe('+491110000');
     expect(body.variables['CALLERID(num)']).toBe('+491110000');
     expect(Object.keys(body.variables)).not.toContain(
       'PJSIP_HEADER(add,P-Asserted-Identity)'

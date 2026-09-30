@@ -5,7 +5,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
+import { FakeAri, isPlacement } from '../ari/fake.js';
 import {
   defaultChannel,
   type AriEvent,
@@ -903,7 +903,7 @@ describe('features', () => {
 
     // The external leg went out `PJSIP/<number>@trunk-<id>` — the trunk, not any local extension.
     const dialedTrunk = fakeAri.calls.some(entry => {
-      if (entry.method !== 'POST' || entry.path !== 'channels') {
+      if (!isPlacement(entry)) {
         return false;
       }
       const endpoint = (entry.body as { endpoint?: string }).endpoint;
@@ -1081,8 +1081,7 @@ describe('features', () => {
   }> {
     const originate = fakeAri.calls.find(
       entry =>
-        entry.method === 'POST' &&
-        entry.path === 'channels' &&
+        isPlacement(entry) &&
         ((entry.body as { endpoint?: string }).endpoint ?? '').includes(
           '@trunk-'
         )
@@ -1164,7 +1163,7 @@ describe('features', () => {
 
     expect(addPartyCall.bridgeId).toBe(bridgeId);
     const endpoints = fakeAri.calls
-      .filter(entry => entry.method === 'POST' && entry.path === 'channels')
+      .filter(entry => isPlacement(entry))
       .map(entry => (entry.body as { endpoint?: string }).endpoint);
     expect(endpoints).toEqual(['PJSIP/e300-dabc']);
     await addedPartyLeaves(addPartyCall);
@@ -1217,8 +1216,7 @@ describe('features', () => {
     expect(
       fakeAri.calls.some(
         entry =>
-          entry.method === 'POST' &&
-          entry.path === 'channels' &&
+          isPlacement(entry) &&
           (entry.body as { endpoint?: string }).endpoint ===
             `PJSIP/${memberDeviceUsername}`
       )
@@ -1764,7 +1762,7 @@ describe('features', () => {
       );
       // The running call ends while the added party's device still rings: originated, and
       // answering only `answerAfterMs` later.
-      await requestTo(fakeAri, 'POST', 'channels');
+      await requestTo(fakeAri, 'POST', 'channels/create');
       await ari.bridges.destroy(bridge.id);
       await adding;
 
@@ -2426,8 +2424,7 @@ describe('features', () => {
     await eventually(() => {
       const rangParker = fakeAri.calls.some(
         entry =>
-          entry.method === 'POST' &&
-          entry.path === 'channels' &&
+          isPlacement(entry) &&
           (entry.body as { endpoint?: string }).endpoint ===
             `PJSIP/${parkerDeviceUsername}`
       );
@@ -2601,9 +2598,7 @@ describe('features', () => {
       `channels/${channel.id}/record`
     );
 
-    const originated = fakeAri.calls.some(
-      entry => entry.method === 'POST' && entry.path === 'channels'
-    );
+    const originated = fakeAri.calls.some(entry => isPlacement(entry));
     expect(originated).toBe(false);
 
     fakeAri.emit({

@@ -5,7 +5,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
+import { FakeAri, isPlacement, placedCallerId } from '../ari/fake.js';
 import { defaultChannel, type Channel, type Logger } from '../ari/types.js';
 import { ATTEMPT_NO_RESPONSE_MS } from '../routing/trunk.js';
 import { eventually } from '../testing/eventually.js';
@@ -212,8 +212,11 @@ type Originate = {
 
 function originates(fakeAri: FakeAri): Originate[] {
   return fakeAri.calls
-    .filter(entry => entry.method === 'POST' && entry.path === 'channels')
-    .map(entry => entry.body as Originate);
+    .filter(entry => isPlacement(entry))
+    .map(entry => ({
+      ...(entry.body as Originate),
+      callerId: placedCallerId(entry)
+    }));
 }
 
 function hangups(fakeAri: FakeAri, channelId: string): number {

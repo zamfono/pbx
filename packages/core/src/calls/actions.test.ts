@@ -5,7 +5,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
+import { FakeAri, isPlacement, placedCallerId } from '../ari/fake.js';
 import { defaultChannel, type Logger } from '../ari/types.js';
 import { CdrWriter } from '../cdr.js';
 import {
@@ -284,8 +284,11 @@ describe('CallActions', () => {
 
   function originates(): OriginateRecord[] {
     return fakeAri.calls
-      .filter(entry => entry.method === 'POST' && entry.path === 'channels')
-      .map(entry => entry.body as OriginateRecord);
+      .filter(entry => isPlacement(entry))
+      .map(entry => ({
+        ...(entry.body as OriginateRecord),
+        callerId: placedCallerId(entry)
+      }));
   }
 
   function hungUp(channelId: string): boolean {

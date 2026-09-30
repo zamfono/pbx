@@ -9,6 +9,7 @@ import { callRinging } from './callState.js';
 import { softphoneCallerId } from './contactName.js';
 import { recordEvents, redeliverEarlyEvents } from './earlyEvents.js';
 import { scheduleFindMeLegs } from './findMe.js';
+import { originateLeg } from './legOriginate.js';
 import { hangupLeg, trackLeg, type RingOutcome } from './legs.js';
 import type { Pipeline } from './pipeline.js';
 import { concludeRing } from './ringConclusion.js';
@@ -31,17 +32,14 @@ async function ringDevices(
   for (const device of devices) {
     const early = recordEvents(pipeline.deps.ari);
     // eslint-disable-next-line no-await-in-loop -- devices are originated one at a time; a user has at most a handful
-    const channel = await pipeline.deps.ari.channels
-      .originate({
-        endpoint: `PJSIP/${device.sipUsername}`,
-        app: 'zamfono',
-        appArgs: `leg,${call.id}`,
-        callerId,
-        // §9.1 "every channel's language": a device leg has been through no entry of its own.
-        variables: channelLanguageVariable(language)
-      })
-      .finally(early.stop);
-    pipeline.deps.cdr.registerLeg?.(call, channel.id);
+    const channel = await originateLeg(pipeline, call, {
+      endpoint: `PJSIP/${device.sipUsername}`,
+      app: 'zamfono',
+      appArgs: `leg,${call.id}`,
+      callerId,
+      // §9.1 "every channel's language": a device leg has been through no entry of its own.
+      variables: channelLanguageVariable(language)
+    }).finally(early.stop);
     trackLeg(pipeline, call, {
       channelId: channel.id,
       kind: 'device',

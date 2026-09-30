@@ -10,6 +10,7 @@ import { channelLanguageVariable } from '../prompts.js';
 import type { AttemptFailure } from '../routing/trunk.js';
 import { raiseLogLevel, type Call } from './call.js';
 import type { AttemptIdentity, TrunkRow } from './callerIdentity.js';
+import { originateLeg } from './legOriginate.js';
 import type { Pipeline } from './pipeline.js';
 import type { TrunkLeg } from './provisional.js';
 import { outboundHosts, type TrunkState } from './trunkState.js';
@@ -162,7 +163,7 @@ export async function originateTrunkLeg(
   try {
     // Read after the attempt is counted, so the language adds no wait ahead of the channel count.
     const { settings } = await pipeline.deps.cache.get();
-    const channel = await pipeline.deps.ari.channels.originate({
+    const channel = await originateLeg(pipeline, call, {
       endpoint: `PJSIP/${number}@${endpoint}`,
       app: 'zamfono',
       appArgs: `leg,${call.id}`,
@@ -172,8 +173,6 @@ export async function originateTrunkLeg(
         ...variables
       }
     });
-    // §7 level `sip`: the trunk leg's own dialog is part of the call's SIP log.
-    pipeline.deps.cdr.registerLeg?.(call, channel.id);
     return { id: channel.id, name: channel.name };
   } catch (error: unknown) {
     trunkState.noteAttemptEnded(trunk.id);

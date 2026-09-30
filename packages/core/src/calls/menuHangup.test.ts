@@ -4,7 +4,7 @@ import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
+import { FakeAri, isPlacement } from '../ari/fake.js';
 import { AriError, defaultChannel, type Logger } from '../ari/types.js';
 import { eventually, requestTo } from '../testing/eventually.js';
 import { newCall, type Call } from './call.js';
@@ -204,9 +204,7 @@ describe('menu hangup and a refused greeting', () => {
   }
 
   function originates(): number {
-    return fakeAri.calls.filter(
-      entry => entry.method === 'POST' && entry.path === 'channels'
-    ).length;
+    return fakeAri.calls.filter(entry => isPlacement(entry)).length;
   }
 
   it('runs no fallback for a caller who hung up during the last attempt', async () => {

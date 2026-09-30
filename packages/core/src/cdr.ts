@@ -103,6 +103,12 @@ export class CdrWriter {
     this.sip.register(call, channelId).catch(() => undefined);
   }
 
+  /** `registerLeg`, resolving once the join is in place or has failed: a leg created but not yet
+   * dialled (`legOriginate.ts`) joins before its INVITE leaves. */
+  joinLeg(call: Call, channelId: string): Promise<void> {
+    return this.sip.register(call, channelId);
+  }
+
   /** Inserts `call`'s `calls` row now, under the placeholder status, so anything that references
    * `call.id` (a `recordings` or `call_qos` row, a child call's `parent_call_id`) satisfies the FK
    * while the call is still in progress. Kysely runs even a better-sqlite3 statement several

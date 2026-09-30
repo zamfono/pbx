@@ -65,6 +65,10 @@ export type OriginateParams = {
   channelId?: string;
 };
 
+/** `POST /channels/create`'s parameters: an originate's, less the caller ID, which a created
+ * channel takes as variables (`CALLERID`, `CONNECTEDLINE`), and the timeout, which is the dial's. */
+export type CreateParams = Omit<OriginateParams, 'callerId' | 'timeout'>;
+
 export type RecordParams = {
   name: string;
   format: 'wav' | 'wav16';
@@ -116,6 +120,11 @@ export type HangupOptions = { reason?: string; reasonCode?: number };
 
 export type ChannelsApi = {
   originate: (params: OriginateParams) => Promise<Channel>;
+  /** `POST /channels/create`: the channel, in the app from the start but not dialled yet, so its
+   * SIP dialog (and Call-ID) exists before its INVITE leaves; `dial` sends it. */
+  create: (params: CreateParams) => Promise<Channel>;
+  /** `POST /channels/{id}/dial`, `timeout` in seconds. */
+  dial: (id: string, timeout: number) => Promise<void>;
   answer: (id: string) => Promise<void>;
   // `reason` is ARI's named enum (normal, busy, congestion, …); `reasonCode` is a Q.850 cause sent
   // as the `reason_code` query parameter, which chan_pjsip turns into the SIP final response

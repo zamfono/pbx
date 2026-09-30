@@ -12,7 +12,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AmiClient } from '../ami/client.js';
 import { FakeAmi } from '../ami/fake.js';
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
+import { FakeAri, isPlacement, placedCallerId } from '../ari/fake.js';
 import {
   defaultChannel,
   type AriEvent,
@@ -430,9 +430,7 @@ describe('Pipeline', () => {
 
     // §10.1 step 7 with §9.4: the target is dialled over the matching route's trunk, not released.
     await eventually(() => {
-      const dialled = fakeAri.calls.filter(
-        entry => entry.method === 'POST' && entry.path === 'channels'
-      );
+      const dialled = fakeAri.calls.filter(entry => isPlacement(entry));
       expect(
         dialled.some(entry =>
           (entry.body as { endpoint?: string }).endpoint?.includes(
@@ -621,9 +619,7 @@ describe('Pipeline', () => {
     });
     await pipeline.handleStasisStart(inboundEvent(callerChannel, '+15551000'));
 
-    const originates = fakeAri.calls.filter(
-      entry => entry.method === 'POST' && entry.path === 'channels'
-    );
+    const originates = fakeAri.calls.filter(entry => isPlacement(entry));
     expect(originates).toHaveLength(2);
 
     const call = pipeline.callByChannel.get(callerChannel.id);
@@ -703,8 +699,8 @@ describe('Pipeline', () => {
     await pipeline.handleStasisStart(inboundEvent(known, '+15551000'));
 
     const callerIds = fakeAri.calls
-      .filter(entry => entry.method === 'POST' && entry.path === 'channels')
-      .map(entry => (entry.body as { callerId?: string }).callerId);
+      .filter(entry => isPlacement(entry))
+      .map(entry => placedCallerId(entry));
     // The quote would end the quoted name early, so it is dropped.
     expect(callerIds).toEqual(['"Huber GmbH" <+15559999>']);
   });
@@ -733,9 +729,7 @@ describe('Pipeline', () => {
     );
     expect(hungUp?.qs).toBe(`reason_code=${sipToHangupCause(603)}`);
     expect(cdr.finished).toContain(call);
-    const originated = fakeAri.calls.some(
-      entry => entry.method === 'POST' && entry.path === 'channels'
-    );
+    const originated = fakeAri.calls.some(entry => isPlacement(entry));
     expect(originated).toBe(false);
   });
 
@@ -767,9 +761,7 @@ describe('Pipeline', () => {
     const call = pipeline.callByChannel.get(callerChannel.id);
     expect(call?.status).toBe('missed');
     expect(call?.calleeUserId).toBe(offlineUserId);
-    const originated = fakeAri.calls.some(
-      entry => entry.method === 'POST' && entry.path === 'channels'
-    );
+    const originated = fakeAri.calls.some(entry => isPlacement(entry));
     expect(originated).toBe(false);
   });
 
@@ -792,9 +784,7 @@ describe('Pipeline', () => {
     const call = pipeline.callByChannel.get(callerChannel.id);
     expect(call?.status).toBe('missed');
     expect(call?.calleeUserId).toBe(closedUserId);
-    const originated = fakeAri.calls.some(
-      entry => entry.method === 'POST' && entry.path === 'channels'
-    );
+    const originated = fakeAri.calls.some(entry => isPlacement(entry));
     expect(originated).toBe(false);
   });
 

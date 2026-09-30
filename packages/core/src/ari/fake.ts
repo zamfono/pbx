@@ -8,6 +8,7 @@ import {
   scheduleRecordingFinished,
   type FakeEndpoint
 } from './fakeChannel.js';
+import { fakeCreate, fakeDial, fakeOriginate } from './fakeDial.js';
 import { splitResource, type RouteResult } from './fakeHttp.js';
 import { FakePlaybacks } from './fakePlayback.js';
 import { readRtpStatistics } from './fakeRtp.js';
@@ -18,6 +19,8 @@ import {
   type Channel,
   type RtpStatistics
 } from './types.js';
+
+export { isPlacement, placedCallerId } from './fakeDial.js';
 
 const DEFAULT_ANSWER_AFTER_MS = 10;
 // A real playback takes some time to reach the end; a fixed short delay lets code that awaits
@@ -161,7 +164,10 @@ export class FakeAri {
     qs: string
   ): RouteResult {
     if (path === 'channels' && method === 'POST') {
-      return this.originate(body);
+      return fakeOriginate(this, this.channels, body);
+    }
+    if (path === 'channels/create' && method === 'POST') {
+      return fakeCreate(this, this.channels, body);
     }
     if (path === 'channels' && method === 'GET') {
       return { status: HTTP_OK, body: [...this.channels.values()] };
@@ -179,37 +185,6 @@ export class FakeAri {
     return routeMisc(method, path, this.endpoints);
   }
 
-  private originate(body: unknown): RouteResult {
-    if (this.failOriginate) {
-      return {
-        status: this.failOriginate.status,
-        body: { message: 'Failed to originate channel' }
-      };
-    }
-    const params = body as {
-      channelId?: string;
-      endpoint?: string;
-      callerId?: string;
-    };
-    const channel = defaultChannel({
-      id: params.channelId,
-      name: params.endpoint,
-      caller: { number: params.callerId ?? '', name: '' }
-    });
-    this.channels.set(channel.id, channel);
-    this.onOriginate?.(channel);
-    setTimeout(() => {
-      channel.state = 'Up';
-      this.emit({
-        type: 'ChannelStateChange',
-        timestamp: new Date().toISOString(),
-        application: 'zamfono',
-        channel
-      });
-    }, this.answerAfterMs);
-    return { status: HTTP_OK, body: channel };
-  }
-
   private routeChannel(
     method: string,
     id: string,
@@ -224,6 +199,9 @@ export class FakeAri {
     if (action === '' && method === 'DELETE') {
       this.channels.delete(id);
       return { status: HTTP_OK, body: {} };
+    }
+    if (action === 'dial' && method === 'POST') {
+      return fakeDial(this, channel);
     }
     if (action === 'play' && method === 'POST') {
       return this.playbacks.start(body);

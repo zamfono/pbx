@@ -50,6 +50,9 @@ function hangup(
 function buildChannelsApi(rest: AriRequests): ChannelsApi {
   return {
     originate: params => rest.json('POST', 'channels', params),
+    create: params => rest.json('POST', 'channels/create', params),
+    dial: (id, timeout) =>
+      rest.void('POST', `channels/${id}/dial`, { timeout }),
     answer: id => rest.void('POST', `channels/${id}/answer`),
     hangup: (id, opts) => hangup(rest, id, opts),
     play: (id, media, playbackId) =>

@@ -5,7 +5,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
+import { FakeAri, isPlacement } from '../ari/fake.js';
 import { fakeRtpStatistics } from '../ari/fakeRtp.js';
 import type { Logger } from '../ari/types.js';
 import type { LogLevel } from '../callLog.js';
@@ -275,7 +275,7 @@ describe('transfers', () => {
 
   function originatedEndpoints(): { endpoint?: string; appArgs?: string }[] {
     return fakeAri.calls
-      .filter(entry => entry.method === 'POST' && entry.path === 'channels')
+      .filter(entry => isPlacement(entry))
       .map(entry => entry.body as { endpoint?: string; appArgs?: string });
   }
 
@@ -419,9 +419,7 @@ describe('transfers', () => {
     // §9.4 picks the route from the caller's identity. The transferee matches no route of their
     // own, so a dial over the transferrer's trunk is the only outcome that can be theirs.
     await eventually(() => {
-      const dialled = fakeAri.calls.filter(
-        entry => entry.method === 'POST' && entry.path === 'channels'
-      );
+      const dialled = fakeAri.calls.filter(entry => isPlacement(entry));
       expect(
         dialled.some(entry =>
           (entry.body as { endpoint?: string }).endpoint?.includes(

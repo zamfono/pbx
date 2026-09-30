@@ -4,7 +4,7 @@ import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
+import { FakeAri, isPlacement } from '../ari/fake.js';
 import type { Channel, Logger } from '../ari/types.js';
 import { Presence } from '../presence.js';
 import { eventually } from '../testing/eventually.js';
@@ -170,7 +170,7 @@ async function seedUserForward(
 
 function originatedEndpoints(fakeAri: FakeAri): string[] {
   return fakeAri.calls
-    .filter(entry => entry.method === 'POST' && entry.path === 'channels')
+    .filter(entry => isPlacement(entry))
     .map(entry => (entry.body as { endpoint?: string }).endpoint ?? '');
 }
 
@@ -451,9 +451,14 @@ describe('ring-group ringability and fallback rules', () => {
     await register('e101-da');
     await register('e102-db');
     const joined: string[] = [];
-    pipeline.deps.cdr.registerLeg = (joinedCall, channelId) => {
+    pipeline.deps.cdr.joinLeg = (joinedCall, channelId) => {
       expect(joinedCall).toBe(call);
+      // Joined before its INVITE leaves (§7 level `sip`): created, not dialled yet.
+      expect(
+        fakeAri.calls.some(entry => entry.path === `channels/${channelId}/dial`)
+      ).toBe(false);
       joined.push(channelId);
+      return Promise.resolve();
     };
 
     await ringGroup(pipeline, call, groupId);

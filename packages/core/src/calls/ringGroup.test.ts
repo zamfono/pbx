@@ -4,7 +4,7 @@ import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
+import { FakeAri, isPlacement, placedCallerId } from '../ari/fake.js';
 import { defaultChannel, type Channel, type Logger } from '../ari/types.js';
 import { eventually, requestTo } from '../testing/eventually.js';
 import { newCall, type Call, type Leg } from './call.js';
@@ -202,9 +202,7 @@ function membersRinging(call: Call, count: number): Promise<void> {
 }
 
 function originates(fakeAri: FakeAri): { path: string }[] {
-  return fakeAri.calls.filter(
-    entry => entry.method === 'POST' && entry.path === 'channels'
-  );
+  return fakeAri.calls.filter(entry => isPlacement(entry));
 }
 
 function hangups(fakeAri: FakeAri, channelId: string): number {
@@ -393,8 +391,8 @@ describe('ringGroup', () => {
     const finished = ringGroup(pipeline, call, groupId);
     await membersRinging(call, 2);
     const callerIds = fakeAri.calls
-      .filter(entry => entry.method === 'POST' && entry.path === 'channels')
-      .map(entry => (entry.body as { callerId?: string }).callerId);
+      .filter(entry => isPlacement(entry))
+      .map(entry => placedCallerId(entry));
     expect(callerIds).toEqual([
       '"Huber GmbH" <+15559999>',
       '"Huber GmbH" <+15559999>'
@@ -712,9 +710,7 @@ describe('ringGroup', () => {
 
     await ringGroup(pipeline, call, groupId, () => 0);
 
-    const firstOriginate = fakeAri.calls.find(
-      entry => entry.method === 'POST' && entry.path === 'channels'
-    );
+    const firstOriginate = fakeAri.calls.find(entry => isPlacement(entry));
     expect(
       (firstOriginate?.body as { endpoint?: string } | undefined)?.endpoint
     ).toBe('PJSIP/rand-b');
