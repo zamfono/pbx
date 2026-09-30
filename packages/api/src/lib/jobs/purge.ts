@@ -6,7 +6,7 @@
  */
 import { sql, type Transaction } from 'kysely';
 
-import { type DB, type Db } from '@zamfono/shared';
+import { cutoffIso, type DB, type Db } from '@zamfono/shared';
 
 import { deleteAudioFile } from '../audio/store.js';
 import { loadSettings } from '../ops/settings/_shared.js';
@@ -16,7 +16,6 @@ import {
   purgeOwnRuleRows
 } from './purgeForwardTargets.js';
 import { purgeExpiredTokens, purgeOauthClients } from './purgeOauthTokens.js';
-import { cutoffIso } from './scheduleMath.js';
 
 /** Every table with both an `id` and a `deleted_at` column, the shape the purge sweeps by age. */
 type SoftDeleteTable = {

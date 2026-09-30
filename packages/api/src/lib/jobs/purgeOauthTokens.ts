@@ -4,10 +4,9 @@
  */
 import type { Transaction } from 'kysely';
 
-import type { DB } from '@zamfono/shared';
+import { cutoffIso, type DB } from '@zamfono/shared';
 
 import { CODE_TTL_MS } from '../auth/codes.js';
-import { cutoffIso } from './scheduleMath.js';
 
 // §5.2 "Client rows": a client row is hard-deleted 30 days after its last token expired. An
 // expired refresh row is kept that long, so "no `tokens` row references it" is the whole test.

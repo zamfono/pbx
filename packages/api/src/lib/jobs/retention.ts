@@ -1,7 +1,7 @@
 /** Schedules the daily retention purge (§5.9 last paragraph): `runPurge` once at boot, then on a fixed interval for the process's life. */
 import pino from 'pino';
 
-import { MS_PER_DAY, nowIso, type Db } from '@zamfono/shared';
+import { MS_PER_DAY, nowIso, repeat, type Db } from '@zamfono/shared';
 
 import { runPurge } from './purge.js';
 
@@ -19,29 +19,11 @@ export function scheduleRetention(
   now: () => string = nowIso,
   intervalMs: number = MS_PER_DAY
 ): RetentionScheduler {
-  const state: { timer?: NodeJS.Timeout; stopped: boolean } = {
-    stopped: false
-  };
-
-  const tick = (): void => {
-    runPurge(db, now())
-      .catch((error: unknown) => {
+  return repeat(
+    () =>
+      runPurge(db, now()).catch((error: unknown) => {
         logger.error({ error }, 'retention purge failed');
-      })
-      .finally(() => {
-        if (!state.stopped) {
-          state.timer = setTimeout(tick, intervalMs);
-        }
-      });
-  };
-  tick();
-
-  return {
-    stop: () => {
-      state.stopped = true;
-      if (state.timer !== undefined) {
-        clearTimeout(state.timer);
-      }
-    }
-  };
+      }),
+    intervalMs
+  );
 }

@@ -12,7 +12,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import pino from 'pino';
 
-import type { Db } from '@zamfono/shared';
+import { MINUTES_PER_HOUR, type Db } from '@zamfono/shared';
 
 import { createCoreClient, type CoreClient } from '../coreClient.js';
 import { getDb } from '../db.js';
@@ -169,7 +169,6 @@ export type CertSyncScheduler = {
   stop(): void;
 };
 
-const MINUTES_PER_HOUR = 60;
 const SECONDS_PER_MINUTE = 60;
 const MS_PER_SECOND = 1000;
 // Coarser than the day-scale timing this job targets is enough (§6.4): the resolved moment is
