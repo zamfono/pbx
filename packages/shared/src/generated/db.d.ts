@@ -333,6 +333,7 @@ export interface Settings {
   ringotelBranchId: string | null;
   ringotelMaxRegs: Generated<number>;
   ringotelOrgId: string | null;
+  ringotelProfilePending: Generated<number>;
   smtpHost: string | null;
   smtpPasswordEnc: Buffer | null;
   smtpPort: Generated<number>;
