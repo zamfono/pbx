@@ -125,9 +125,10 @@ bash "$here/run-load-step.sh" "$compose_cmd" "$OUT_DIR" idle 0 0 load-provider.x
 # ---------------------------------------------------------------------------
 # 5. Concurrent-call load steps. rate is kept modest (5/s) so the ramp itself does not distort
 #    the plateau sample. Hold is 30s (not the task's ~60s): load-caller.xml's calls last ~42s
-#    (gen_scenarios.py CALLER_REPS), leaving roughly 30-35s of full-concurrency plateau once the
-#    ramp completes, and the whole flock-held session has to fit a single 10-minute Bash-tool
-#    call; see gen_scenarios.py for the trade-off this and the call length above are both making.
+#    (its 6 plays of the ~7s pcap), leaving roughly 30-35s of full-concurrency plateau once the
+#    ramp completes, and the whole flock-held session (stack bring-up, the load steps' ramp, hold
+#    and drain, the 200-endpoint bulk create, teardown) has to fit a single 10-minute Bash-tool
+#    call; raise both where that budget is no constraint.
 # ---------------------------------------------------------------------------
 for n in 10 25 50; do
   bash "$here/run-load-step.sh" "$compose_cmd" "$OUT_DIR" "calls-$n" "$n" 5 load-provider.xml 30 \

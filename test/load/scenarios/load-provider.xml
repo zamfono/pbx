@@ -3,9 +3,11 @@
   test/load: the trunk-side answering leg for the forwarded call (played in the sipp-provider
   container, one process per load step serving every concurrent forwarded INVITE Asterisk sends
   it). Modelled on test/integration/scenarios/uas/answer-outbound.xml, but plays real RTP audio
-  back (5 plays of sipp's own g711a.pcap (alaw, matching the caller leg, no transcoding), ~35s) instead of silence, and never sends its own BYE:
-  the caller leg (load-caller.xml) ends the call after its own hold, and this side just waits for
-  it.
+  back (5 plays of sipp's own g711a.pcap, alaw, matching the caller leg, no
+  transcoding, ~35s) instead of silence, and never sends its own BYE: the
+  caller leg (load-caller.xml) ends the call after its own hold, and this side just waits for it.
+  The two provider scenarios differ only in that codec: the pcap a play sends is read when sipp
+  loads the scenario, so no `-key` can choose it.
 -->
 <scenario name="load provider">
   <recv request="INVITE" rrs="true" />
@@ -47,41 +49,25 @@
 
   <recv request="ACK" rtd="true" crlf="true" />
 
-
+  <!-- play_pcap_audio is asynchronous: it schedules the pcap's packets onto the RTP socket and
+       returns at once, and a new play interrupts one still in flight. So each play is followed
+       by a pause as long as the pcap itself (236 packets, ~7.05 s by its own timestamps), and
+       the 5 plays make a sustained hold with continuous RTP. -->
+  <nop>
+    <action>
+      <assign assign_to="plays" value="0"/>
+    </action>
+  </nop>
+  <label id="play"/>
   <nop>
     <action>
       <exec play_pcap_audio="/sipp/g711a.pcap"/>
+      <add assign_to="plays" value="1"/>
+      <test assign_to="more" variable="plays" compare="less_than" value="5"/>
     </action>
   </nop>
   <pause milliseconds="7050"/>
-
-  <nop>
-    <action>
-      <exec play_pcap_audio="/sipp/g711a.pcap"/>
-    </action>
-  </nop>
-  <pause milliseconds="7050"/>
-
-  <nop>
-    <action>
-      <exec play_pcap_audio="/sipp/g711a.pcap"/>
-    </action>
-  </nop>
-  <pause milliseconds="7050"/>
-
-  <nop>
-    <action>
-      <exec play_pcap_audio="/sipp/g711a.pcap"/>
-    </action>
-  </nop>
-  <pause milliseconds="7050"/>
-
-  <nop>
-    <action>
-      <exec play_pcap_audio="/sipp/g711a.pcap"/>
-    </action>
-  </nop>
-  <pause milliseconds="7050"/>
+  <nop next="play" test="more"/>
 
   <recv request="BYE" timeout="40000" />
 

@@ -52,49 +52,27 @@
 
   <!-- Real bidirectional RTP for the plateau hold, once the forwarded leg has had time to answer
        (the group's own answer above is immediate MOH; the bridge to the forwarded party follows
-       a moment later). 6 plays of the ~7s pcap hold this leg up for roughly 42s. -->
-
+       a moment later). 6 plays of the ~7s pcap hold this leg up for roughly 42s, the length
+       session.sh's load steps are sized for.
+       play_pcap_audio is asynchronous: it schedules the pcap's packets onto the RTP socket and
+       returns at once, and a new play interrupts one still in flight. So each play is followed
+       by a pause as long as the pcap itself (236 packets, ~7.05 s by its own timestamps), and
+       the 6 plays make a sustained hold with continuous RTP. -->
+  <nop>
+    <action>
+      <assign assign_to="plays" value="0"/>
+    </action>
+  </nop>
+  <label id="play"/>
   <nop>
     <action>
       <exec play_pcap_audio="/sipp/g711a.pcap"/>
+      <add assign_to="plays" value="1"/>
+      <test assign_to="more" variable="plays" compare="less_than" value="6"/>
     </action>
   </nop>
   <pause milliseconds="7050"/>
-
-  <nop>
-    <action>
-      <exec play_pcap_audio="/sipp/g711a.pcap"/>
-    </action>
-  </nop>
-  <pause milliseconds="7050"/>
-
-  <nop>
-    <action>
-      <exec play_pcap_audio="/sipp/g711a.pcap"/>
-    </action>
-  </nop>
-  <pause milliseconds="7050"/>
-
-  <nop>
-    <action>
-      <exec play_pcap_audio="/sipp/g711a.pcap"/>
-    </action>
-  </nop>
-  <pause milliseconds="7050"/>
-
-  <nop>
-    <action>
-      <exec play_pcap_audio="/sipp/g711a.pcap"/>
-    </action>
-  </nop>
-  <pause milliseconds="7050"/>
-
-  <nop>
-    <action>
-      <exec play_pcap_audio="/sipp/g711a.pcap"/>
-    </action>
-  </nop>
-  <pause milliseconds="7050"/>
+  <nop next="play" test="more"/>
 
   <send retrans="500">
     <![CDATA[

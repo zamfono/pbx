@@ -31,6 +31,10 @@ for spec in "${container_specs[@]}"; do
 done
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# The contact waits the integration harness's scenarios use, on this step's stack.
+compose=$compose_cmd
+# shellcheck source=../integration/scenarios/_lib.sh
+. "$here/../integration/scenarios/_lib.sh"
 mkdir -p "$out_dir"
 stats_csv="$out_dir/stats.csv"
 net_csv="$out_dir/net.csv"
@@ -68,17 +72,13 @@ if [ "$concurrency" -gt 0 ]; then
       -trace_msg -message_file /tmp/provider-$step-messages.log \
       asterisk:5060 > /tmp/provider-$step.stdout 2>&1; echo \$? > /tmp/provider-$step.exit"
 
-  # Reachable before the caller starts dialling (the trunk's own qualify, same wait
-  # run-scenarios.sh's start_trunk_side does).
-  for _ in $(seq 1 20); do
-    contact=$(asterisk_cli 'pjsip show contacts' 2>/dev/null | awk '$1 == "Contact:" && $2 ~ /^trunk-/ { print $2 }')
-    for ep in $contact; do
-      asterisk_cli "pjsip qualify ${ep%%/*}" >/dev/null 2>&1 || true
-    done
-    sleep 1
-    if asterisk_cli 'pjsip show contacts' 2>/dev/null | grep -q 'trunk-.*Avail'; then
-      break
-    fi
+  # Reachable before the caller starts dialling (the trunk's own qualify, the wait
+  # run-scenarios.sh's start_trunk_side makes), once the provider answers its probe.
+  await_bound sipp-provider 5060
+  contacts=$(asterisk_cli 'pjsip show contacts')
+  for aor in $(printf '%s\n' "$contacts" \
+    | awk '$1 == "Contact:" && $2 ~ /^trunk-/ { split($2, aor, "/"); print aor[1] }'); do
+    await_contact_avail "$aor" 'Avail|NonQual'
   done
 
 
