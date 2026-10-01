@@ -54,6 +54,7 @@ updates:
     directories:
       - /images/api
       - /images/core
+      - /images/runtime-base
       - /images/asterisk
       - /images/proxy
       - /images/migrate

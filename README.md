@@ -104,7 +104,7 @@ scripts and need a container runtime:
 bash images/asterisk/test.sh   # builds the image and exercises it end to end
 bash images/proxy/test.sh      # builds the proxy image: uid 1000, the caddy-events-exec plugin, the hook
 bash db/test.sh                # the migrate image, including its retry behaviour
-bash deploy/test.sh            # compose config and Caddyfile validation, both node images
+bash deploy/test.sh            # compose config, the release bundle, setup.sh, update.sh, the Caddyfile
 bash test/integration/run.sh   # the full sipp-driven stack test (§8); needs the five images built
 ```
 

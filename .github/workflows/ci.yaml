@@ -161,18 +161,15 @@ jobs:
           path: /tmp
       - run: docker load -i /tmp/images.tar
       - name: Exercise each image's own checks
-        # db/test.sh, deploy/test.sh and the three images/*/test.sh each default to their own
+        # db/test.sh, deploy/test.sh and the four images/*/test.sh each default to their own
         # :test tag and build it themselves when run standalone; here they're pointed at the
-        # images the `images` job built, via IMAGE/IMAGE_TAG and via API_IMAGE/CORE_IMAGE/
-        # PROXY_IMAGE from the env block above, so nothing is built twice and what is checked is
-        # the archive main.yaml publishes, asterisk with its label. `publish` there needs this
-        # whole workflow, this job included, so a failed check stops the push as a failed build
-        # does.
+        # images the `images` job built, via IMAGE/IMAGE_TAG and via PROXY_IMAGE from the env
+        # block above, so nothing is built twice and what is checked is the archive main.yaml
+        # publishes, asterisk with its label. `publish` there needs this whole workflow, this job
+        # included, so a failed check stops the push as a failed build does.
         run: |
           IMAGE="$MIGRATE_IMAGE" bash db/test.sh
           bash deploy/test.sh
-          # One bake run built api and core, so their identical ffmpeg step is one shared layer.
-          python3 images/shared-layer.py "$API_IMAGE" "$CORE_IMAGE" 'install -y --no-install-recommends ffmpeg '
           IMAGE_TAG="$API_IMAGE" bash images/api/test.sh
           IMAGE_TAG="$ASTERISK_IMAGE" bash images/asterisk/test.sh
           IMAGE_TAG="$PROXY_IMAGE" bash images/proxy/test.sh

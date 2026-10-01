@@ -68,9 +68,20 @@ target "migrate" {
   no-cache   = FRESH
 }
 
+# api's and core's common runtime stage, built once and handed to both as the `runtime-base`
+# context, so the two images share its layer by construction. It has no tag: nothing publishes it.
+target "runtime-base" {
+  context    = "images/runtime-base"
+  dockerfile = "Dockerfile"
+  cache-from = cache_from("runtime-base")
+  cache-to   = cache_to("runtime-base")
+  no-cache   = FRESH
+}
+
 target "core" {
   context    = "."
   dockerfile = "images/core/Dockerfile"
+  contexts   = { runtime-base = "target:runtime-base" }
   tags       = [CORE_IMAGE]
   args       = { ZAMFONO_REVISION = REVISION }
   cache-from = cache_from("core")
@@ -81,6 +92,7 @@ target "core" {
 target "api" {
   context    = "."
   dockerfile = "images/api/Dockerfile"
+  contexts   = { runtime-base = "target:runtime-base" }
   tags       = [API_IMAGE]
   args       = { ZAMFONO_REVISION = REVISION }
   cache-from = cache_from("api")

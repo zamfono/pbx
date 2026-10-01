@@ -5,7 +5,7 @@
 # spawns (§6.5), and the Argon2id generator for BOOTSTRAP_OWNER_PASSWORD_HASH (§6.3 "First boot"). Run from the repository root's build
 # context, which is what the Dockerfile expects.
 set -euo pipefail
-repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+repo_root=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
 cd "$repo_root"
 
 MOH_SOURCE_DIR=/usr/share/asterisk/moh
@@ -13,10 +13,11 @@ MOH_TRACK_COUNT=5
 TEST_PASSWORD='a test password'
 
 # CI passes the image it built as IMAGE_TAG, and nothing is built here, so the image checked is
-# the one published. Standalone, the image is built fresh under :test.
+# the one published. Standalone, the image is built fresh under :test, through bake, which
+# supplies the runtime-base stage it starts from.
 if [ -z "${IMAGE_TAG:-}" ]; then
   IMAGE_TAG=zamfono/api:test
-  docker build -f images/api/Dockerfile -t "$IMAGE_TAG" .
+  API_IMAGE=$IMAGE_TAG docker buildx bake --load api
 fi
 
 fail() {

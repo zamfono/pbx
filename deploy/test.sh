@@ -1,24 +1,17 @@
 #!/bin/sh
-# Verifies the compose stack, the Caddyfile and the api/core images (docs/spec.md §6.3). Run from
-# anywhere; it resolves its own paths from its own location.
+# Verifies the compose stack, the release bundle, setup.sh, update.sh and the Caddyfile
+# (docs/spec.md §6.3). Run from anywhere; it resolves its own paths from its own location.
 #
 # Caddy isn't assumed to be installed on the host (it isn't, on the CI runner): the Caddyfile is
-# validated inside the `proxy` image instead, built fresh here unless PROXY_IMAGE is already set
-# (e.g. by the CI job that builds all six images before running this script), the same pattern
-# API_IMAGE and CORE_IMAGE follow below.
-#
-# API_IMAGE and CORE_IMAGE name the images to check; if one is already built (e.g. by the CI
-# job that builds all six images before running this script), the build here is skipped so the
-# check doesn't redo work the caller already did. Left unset, all three default to a local :test
-# tag and get built fresh, as a standalone run has nothing to reuse.
+# validated inside the `proxy` image instead, built fresh here under a local :test tag unless
+# PROXY_IMAGE names one already built (e.g. by the CI job that builds all six images before
+# running this script).
 set -eu
 
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-repo_root=$(CDPATH= cd -- "$script_dir/.." && pwd)
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
 
 PROXY_IMAGE=${PROXY_IMAGE:-zamfono/proxy:test}
-API_IMAGE=${API_IMAGE:-zamfono/api:test}
-CORE_IMAGE=${CORE_IMAGE:-zamfono/core:test}
 
 if ! docker image inspect "$PROXY_IMAGE" >/dev/null 2>&1; then
   docker build -f "$repo_root/images/proxy/Dockerfile" -t "$PROXY_IMAGE" "$repo_root" >/dev/null
@@ -46,7 +39,7 @@ bash "$repo_root/.github/scripts/deploy-bundle.sh" 1.2.3 "$bundle_dir"
 mkdir "$bundle_dir/x"
 tar -xzf "$bundle_dir/zamfono-deploy.tar.gz" -C "$bundle_dir/x" --strip-components=1
 # ZAMFONO_VERSION empty, as .env.example leaves it: every image is the bundle's own release.
-bundle_images=$(cd "$bundle_dir/x" && ZAMFONO_VERSION= docker compose --env-file "$env_file" \
+bundle_images=$(cd "$bundle_dir/x" && ZAMFONO_VERSION='' docker compose --env-file "$env_file" \
   -f compose.yaml -f compose.ports.yaml config --images)
 [ "$(echo "$bundle_images" | grep -c ':1\.2\.3$')" -eq 6 ]
 
@@ -80,20 +73,5 @@ bash "$script_dir/update-test.sh" "$bundle_dir/x"
 echo "==> Caddyfile"
 docker run --rm -e FQDN=x -v "$script_dir/Caddyfile:/etc/caddy/Caddyfile:ro" "$PROXY_IMAGE" \
   caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 | grep -q "Valid configuration"
-
-echo "==> api image"
-if docker image inspect "$API_IMAGE" >/dev/null 2>&1; then
-  echo "$API_IMAGE already built; reusing it"
-else
-  docker build -f "$repo_root/images/api/Dockerfile" -t "$API_IMAGE" "$repo_root" >/dev/null
-fi
-
-echo "==> core image"
-if docker image inspect "$CORE_IMAGE" >/dev/null 2>&1; then
-  echo "$CORE_IMAGE already built; reusing it"
-else
-  docker build -f "$repo_root/images/core/Dockerfile" -t "$CORE_IMAGE" "$repo_root" >/dev/null
-fi
-
 
 echo "OK"

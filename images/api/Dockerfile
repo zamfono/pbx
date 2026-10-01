@@ -1,8 +1,8 @@
 # Multi-stage build (docs/spec.md §6.3, §4). The build stage installs the whole npm workspace and
 # produces the SvelteKit adapter-node output; the runtime stage ships only that output, its
 # dependencies and the tools the api process shells out to (ffmpeg for recording mixdown,
-# restic/rclone for backups, §6.5). Build from the repository root: `docker build -f
-# images/api/Dockerfile .`.
+# restic/rclone for backups, §6.5). Build from the repository root through bake, which supplies
+# the runtime-base stage: `docker buildx bake --load api`.
 FROM node:26-slim AS build
 WORKDIR /app
 # better-sqlite3 (via @zamfono/shared) falls back to compiling from source when no prebuild
@@ -28,18 +28,11 @@ RUN npm run build -w packages/api
 # removed, and the native modules were built by `npm ci` already.
 RUN npm prune --omit=dev --ignore-scripts
 
-FROM node:26-slim
+# images/runtime-base/Dockerfile, which docker-bake.hcl builds once for api and core alike.
+FROM runtime-base
 # Links the published package to its repository (§6.3 "Images").
 LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
 WORKDIR /app
-# Byte for byte the same as images/core/Dockerfile's first runtime step: bake builds the two images
-# in one run, builds an identical step once, and both images then share its ~460 MB layer, in CI's
-# archive and in an operator's pull (deploy/test.sh checks that they do).
-RUN apt-get update \
-	&& apt-get install -y --no-install-recommends ffmpeg \
-	&& rm -rf /var/lib/apt/lists/* \
-	&& mkdir -p /data /media \
-	&& chown node:node /data /media
 # The opsound packages carry the five bundled hold-music tracks (§10.2 "Hold music") as plain
 # data under /usr/share/asterisk/moh, in the 8 kHz wav and 16 kHz g722 variants. `api` is the
 # process that seeds them into the media volume and the `audio_assets` table on first boot

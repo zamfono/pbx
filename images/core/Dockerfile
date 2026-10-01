@@ -1,7 +1,7 @@
 # Multi-stage build (docs/spec.md §6.3, §4). The build stage installs the whole npm workspace and
 # compiles @zamfono/core to plain JavaScript; the runtime stage ships only that output, its
-# dependencies and ffmpeg (recording mixdown, §10.2). Build from the repository root: `docker
-# build -f images/core/Dockerfile .`.
+# dependencies and ffmpeg (recording mixdown, §10.2). Build from the repository root through
+# bake, which supplies the runtime-base stage: `docker buildx bake --load core`.
 FROM node:26-slim AS build
 WORKDIR /app
 # better-sqlite3 (via @zamfono/shared) falls back to compiling from source when no prebuild
@@ -22,18 +22,11 @@ RUN npx tsc -b packages/core
 # removed, and the native modules were built by `npm ci` already.
 RUN npm prune --omit=dev --ignore-scripts
 
-FROM node:26-slim
+# images/runtime-base/Dockerfile, which docker-bake.hcl builds once for api and core alike.
+FROM runtime-base
 # Links the published package to its repository (§6.3 "Images").
 LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
 WORKDIR /app
-# Byte for byte the same as images/api/Dockerfile's first runtime step: bake builds the two images
-# in one run, builds an identical step once, and both images then share its ~460 MB layer, in CI's
-# archive and in an operator's pull (deploy/test.sh checks that they do).
-RUN apt-get update \
-	&& apt-get install -y --no-install-recommends ffmpeg \
-	&& rm -rf /var/lib/apt/lists/* \
-	&& mkdir -p /data /media \
-	&& chown node:node /data /media
 COPY --from=build /app/node_modules node_modules
 COPY --from=build /app/packages/shared/dist packages/shared/dist
 COPY --from=build /app/packages/shared/package.json packages/shared/package.json
