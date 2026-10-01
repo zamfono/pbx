@@ -56,7 +56,7 @@ const inputSchema = z
       .boolean()
       .optional()
       .describe(
-        'true returns the calls in progress now, unpaginated, instead of the history of ended calls.'
+        'true returns the calls in progress now, unpaginated, each with userIds, the users it concerns now, instead of the history of ended calls.'
       ),
     limit: z.number().int().positive().optional(),
     cursor: z.string().optional()

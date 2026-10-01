@@ -104,6 +104,9 @@ why the specified behaviour changed; the commit history, how.
   secret cannot be decrypted, after `SECRETBOX_KEY` was replaced without keeping the previous key
   or the database was restored under another `.env`, is dropped at once instead of being retried
   at every restart, and the hook reads `failing` with `secret unreadable — set a new secret`.
+- The specification and the `call-control` help topic now name what `calls.list` returns for a
+  call in progress, `userIds` among it: the users the call concerns now, its caller, callee and
+  answerer and everyone whose phone rings or is connected in it. The response is unchanged.
 - A time typed without an offset into the `from` and `to` of `calls.list` and `audit.list`, or
   the `at` of `presenceLog.snapshot`, such as `2026-10-01T09:00`, is now the tenant's local time
   (`settings.timezone`), and a date alone, `2026-10-01`, its local midnight, where both were read

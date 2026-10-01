@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-01 · §10.3 Live calls.** `GET /calls?live=true` names what each call in progress carries, among it `userIds`, the users the call concerns now: its caller, callee and answerer and every user with a leg ringing or up in it. The `call.state` events, which §10.6 lists field by field, carry no such list.
+*Why:* requested by the product owner: the field was returned but undocumented, and a CRM can use it to know whose call it is.
+
 **2026-10-01 · §10.3 Webhooks, §10.6 Webhooks, §11.2 `webhooks`.** A failing webhook is logged: a warning with its URL, the reason and the event type when it turns `failing`, whenever the reason changes while it stays failing, the HTTP status or the class of error (`timeout`, `DNS lookup failed`, `TLS error <code>`, `connection refused`, …), and once a day while it keeps failing for the same reason; its recovery is logged too. `webhooks` gains `last_error`, `last_error_at`, `failing_since`, `failed_deliveries` and `last_logged_at`, so the deduplication holds across restarts, and `GET /webhooks` returns the hook's last error and its time, since when it is failing and the deliveries failed since. A delivery whose hook secret cannot be decrypted fails at once, without a retry, and marks the hook `failing` with the reason `secret unreadable — set a new secret`.
 *Why:* requested by the product owner: failing deliveries left no trace, and a delivery whose secret could not be read was retried at every boot, so it could arrive days after its event.
 

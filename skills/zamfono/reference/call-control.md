@@ -15,6 +15,11 @@ the history still names them as its caller. `admin` and `owner` control every ca
 else is refused with 403 (`guardrails`). Declining is different: it acts only on the requesting
 user's own ringing phones.
 
+Each call in progress that `calls.list` (`GET /calls?live=true`) returns carries `callId`,
+`direction`, `from`, `to`, `state` (`ringing` or `up`), `startedAt`, `ringGroupId` and `userIds`:
+the users the call concerns now, its caller, callee and answerer and everyone whose phone rings
+or is connected in it, so a CRM can tell whose call it is.
+
 A refused action names its reason in the problem's `detail`: 404 `notFound` for a call no longer
 in progress, 409 for a call in the wrong state (`notBridged`, not answered yet; `held`;
 `notHeld`; `consulting`; `notConsultation`; `notAnswered`; `notRinging`), 422 `invalidTarget` for
