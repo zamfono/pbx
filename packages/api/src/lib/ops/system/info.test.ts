@@ -59,6 +59,7 @@ describe('system.info', () => {
       core: CORE,
       update: NO_UPDATER,
       autoUpdate: { enabled: false, failed: null },
+      maintenanceGate: { certSync: null, autoUpdate: null },
       ringotel: { profilePending: false },
       stack: { domain: null, ipv4: null }
     });
@@ -96,6 +97,7 @@ describe('system.info', () => {
       core: null,
       update: NO_UPDATER,
       autoUpdate: { enabled: false, failed: null },
+      maintenanceGate: { certSync: null, autoUpdate: null },
       ringotel: { profilePending: false },
       stack: { domain: null, ipv4: null }
     });
@@ -209,6 +211,29 @@ describe('system.info', () => {
     }));
     expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
       autoUpdate: { enabled: true, failed }
+    });
+  });
+
+  it('reports when and why the maintenance gate last gave up on each work (§6.4)', async () => {
+    const db = await makeTestDb();
+    await db
+      .insertInto('maintenanceGate')
+      .values({
+        work: 'certSync',
+        gaveUpAt: '2026-10-01T05:00:00.000Z',
+        reason: 'live calls 1, Asterisk channels 2, recordings in progress 0',
+        consecutiveGiveUps: 1
+      })
+      .execute();
+
+    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+      maintenanceGate: {
+        certSync: {
+          at: '2026-10-01T05:00:00.000Z',
+          reason: 'live calls 1, Asterisk channels 2, recordings in progress 0'
+        },
+        autoUpdate: null
+      }
     });
   });
 

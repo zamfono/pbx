@@ -24,8 +24,8 @@ import {
   isMatchingPair,
   TLS_CERT_FILENAME
 } from './certSyncFiles.js';
+import { coreBusy } from './maintenanceGiveUp.js';
 import {
-  coreIsIdle,
   createMaintenanceGate,
   type MaintenanceGate
 } from './maintenanceWindow.js';
@@ -90,7 +90,8 @@ async function dueNow(
           sourceHash,
           gate: createMaintenanceGate({
             db: deps.db,
-            isIdle: async () => coreIsIdle(deps.coreClient)
+            work: 'certSync',
+            busy: async () => coreBusy(deps.coreClient)
           }),
           nextCheckMs: now.getTime()
         };

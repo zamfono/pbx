@@ -41,12 +41,17 @@ same quiet time a renewed TLS certificate is swapped in at: the middle of a tena
 out-of-office period, else of the longest closed period of the opening hours, else
 `settings.tlsReloadHour`, else 03:00. Then it waits until nothing is in progress (no call, no
 parked call, no voicemail being left, no recording), looking again every 5 minutes for up to two
-hours, after which it waits for the next maintenance moment. Once the moment comes and the stack
-is idle, it backs up every enabled backup target and then updates exactly as `system.update`
-does; without an enabled target there is no backup, and the update fails.
+hours, after which it gives up and waits for the next maintenance moment: it logs a warning and
+writes a `system.maintenanceGate` entry to the audit log with what kept the stack busy (the live
+calls, Asterisk channels and recordings in progress), and `system.info` shows the last such give-up
+in `maintenanceGate.autoUpdate` (`maintenanceGate.certSync` for the certificate). Once the moment
+comes and the stack is idle, it backs up every enabled backup target and then updates exactly as
+`system.update` does; without an enabled target there is no backup, and the update fails with
+`no enabled backup target`.
 
-A failed automatic update is tried again at a later maintenance moment, at least 20 hours after
-the failed attempt, so about once a day, up to 3 attempts per release; after the third failed
+A stack still busy when the gate gives up at 3 maintenance moments in a row counts that as a
+failed attempt. A failed automatic update is tried again at a later maintenance moment, at least
+20 hours after the failed attempt, so about once a day, up to 3 attempts per release; after the third failed
 attempt the stack leaves that release alone until a newer one appears or an update succeeds. An
 update that is already running when the stack asks, one started with `system.update` or
 `update.sh`, counts as no failed attempt: the stack tries again once it ended. From the first
@@ -54,11 +59,13 @@ failure until an update succeeds:
 
 - `/healthz` has `autoUpdateFailed: true`;
 - `system.info` shows the release in `autoUpdate.failed`, with the reason of the last attempt,
-  such as a failed backup, the updater's refusal or the end of the updater's log, and the failed
-  `attempts` on that release;
+  such as `no enabled backup target`, the target and error of a failed backup, the updater's
+  refusal, the end of the updater's log or what kept the stack busy, and the failed `attempts` on
+  that release;
 - every owner gets one `updateFailed` mail once the last attempt failed (see `mail-templates`);
 - `audit.list` has a `system.autoUpdate` entry on channel `job` for every attempt and outcome:
-  `started`, `backupFailed`, `refused`, `succeeded` or `failed`.
+  `started`, `noBackupTarget`, `backupFailed`, `busy`, `refused`, `succeeded` or `failed`, a
+  failure with the same `reason`.
 
 Fix the cause, then update with `system.update` as above, or wait for the next release or the
 next attempt.

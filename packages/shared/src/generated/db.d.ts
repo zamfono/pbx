@@ -182,6 +182,13 @@ export interface MailTemplates {
   updatedAt: string;
 }
 
+export interface MaintenanceGate {
+  consecutiveGiveUps: Generated<number>;
+  gaveUpAt: string;
+  reason: string;
+  work: string;
+}
+
 export interface Menus {
   allowExtensionDialing: Generated<number>;
   audioId: string;
@@ -515,6 +522,7 @@ export interface DB {
   extensions: Extensions;
   forwardTargets: ForwardTargets;
   mailTemplates: MailTemplates;
+  maintenanceGate: MaintenanceGate;
   menus: Menus;
   menuTargets: MenuTargets;
   oauthClients: OauthClients;

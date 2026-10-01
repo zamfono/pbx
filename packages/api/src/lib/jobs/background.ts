@@ -41,7 +41,8 @@ import { backupEnabledTargets } from './backupTurns.js';
 import { getCertSyncScheduler, type CertSyncScheduler } from './certSync.js';
 import { scheduleBackups } from './cron.js';
 import { reencryptSweep } from './keyRotation.js';
-import { coreIsIdle, createMaintenanceGate } from './maintenanceWindow.js';
+import { coreBusy } from './maintenanceGiveUp.js';
+import { createMaintenanceGate } from './maintenanceWindow.js';
 import { scheduleRetention } from './retention.js';
 import { watchAsteriskRestarts } from './ringotelRereg.js';
 
@@ -93,7 +94,8 @@ function startAutoUpdate(
       backUp: async () => backupEnabledTargets(db, kr, backup),
       gate: createMaintenanceGate({
         db,
-        isIdle: async () => coreIsIdle(core)
+        work: 'autoUpdate',
+        busy: async () => coreBusy(core)
       }),
       updater: updaterClient,
       send: updateMailSender(db, kr)

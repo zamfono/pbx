@@ -5,13 +5,16 @@
  * (`requestUpdate`). Its outcome is followed up once the updater reports the run ended, which is
  * after `api` itself restarted. A failure, of the backup, of the request or of the run, is
  * reported (`autoUpdateReport.ts`), and the release is tried again at a later maintenance moment
- * (`retryHeldOff`) until `MAX_AUTO_UPDATE_ATTEMPTS` attempts on it failed; a refusal because an
- * update is already running is no failed attempt. Whatever the setting, a breaking release, which
+ * (`retryHeldOff`) until `MAX_AUTO_UPDATE_ATTEMPTS` attempts on it failed; a gate that gave up
+ * `GIVE_UPS_PER_ATTEMPT` maintenance moments in a row is a failed attempt too, and a refusal
+ * because an update is already running is none. Whatever the setting, a breaking release, which
  * only `update.sh` on the host installs, is reported too.
  */
 import pino from 'pino';
 
 import { MINUTES_PER_HOUR, nowIso, type Db } from '@zamfono/shared';
+
+import { errorMessage } from '#lib/errors.js';
 
 import type { SendUpdateMail } from '../mail/owners.js';
 import type { BackupRunRow } from '../ops/backups/_shared.js';
@@ -33,13 +36,19 @@ import {
   reportFailure,
   type Attempt
 } from './autoUpdateReport.js';
-import { IDLE_RECHECK_MS, type MaintenanceGate } from './maintenanceWindow.js';
+import {
+  IDLE_RECHECK_MS,
+  type GateCheck,
+  type MaintenanceGate
+} from './maintenanceWindow.js';
 
 const logger = pino({ name: 'autoUpdate' });
 
 const MS_PER_MINUTE = 60_000;
 /** How often the job asks the updater, whose own lookup of the latest release is cached an hour. */
 const POLL_INTERVAL_MS = MINUTES_PER_HOUR * MS_PER_MINUTE;
+/** How many maintenance moments in a row the gate may give up before that is a failed attempt. */
+export const GIVE_UPS_PER_ATTEMPT = 3;
 
 export type AutoUpdateDeps = {
   db: Db;
@@ -79,18 +88,40 @@ async function updaterBusy(deps: AutoUpdateDeps): Promise<boolean> {
   return status?.last.state === 'running';
 }
 
+/** The runs of a backup of every enabled target, or why it could not run at all. */
+async function backUp(
+  deps: AutoUpdateDeps
+): Promise<BackupRunRow[] | { error: string }> {
+  try {
+    return await deps.backUp();
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
+}
+
 /**
  * Backs up every enabled target, then asks the updater for `attempt.to`; a failure is reported.
  * A refusal while another update runs is only audited: the release is wanted again once it ended.
  */
 async function install(deps: AutoUpdateDeps, attempt: Attempt): Promise<void> {
-  const runs = await deps.backUp();
+  const runs = await backUp(deps);
+  if (!Array.isArray(runs)) {
+    const reason = `the backup failed: ${runs.error}`;
+    await reportFailure(deps, { ...attempt, outcome: 'backupFailed', reason });
+    return;
+  }
+  if (runs.length === 0) {
+    const reason = 'no enabled backup target';
+    await reportFailure(deps, {
+      ...attempt,
+      outcome: 'noBackupTarget',
+      reason
+    });
+    return;
+  }
   const failed = runs.find(run => run.status !== 'ok');
-  if (runs.length === 0 || failed !== undefined) {
-    const reason =
-      failed === undefined
-        ? 'no backup target is enabled'
-        : `the backup to target ${failed.targetId} failed: ${failed.error ?? 'unknown error'}`;
+  if (failed !== undefined) {
+    const reason = `the backup to target ${failed.targetId} failed: ${failed.error ?? 'without an error message'}`;
     await reportFailure(deps, { ...attempt, outcome: 'backupFailed', reason });
     return;
   }
@@ -112,6 +143,24 @@ async function install(deps: AutoUpdateDeps, attempt: Attempt): Promise<void> {
     return;
   }
   await audit(deps.db, { ...attempt, outcome: 'started' });
+}
+
+/**
+ * A failed attempt once the gate gave up `GIVE_UPS_PER_ATTEMPT` maintenance moments in a row,
+ * which then starts its count afresh; `true` when it was one.
+ */
+async function reportGiveUps(
+  deps: AutoUpdateDeps,
+  attempt: Attempt,
+  verdict: GateCheck
+): Promise<boolean> {
+  if (verdict.open || (verdict.gaveUp?.inARow ?? 0) < GIVE_UPS_PER_ATTEMPT) {
+    return false;
+  }
+  const reason = `the system was busy at ${String(GIVE_UPS_PER_ATTEMPT)} maintenance moments in a row, at the last ${verdict.gaveUp?.reason ?? ''}`;
+  await reportFailure(deps, { ...attempt, outcome: 'busy', reason });
+  await deps.gate.reset();
+  return true;
 }
 
 /**
@@ -138,14 +187,18 @@ export async function runAutoUpdatePass(
   const fresh = (await loadUpdateState(deps.db)) ?? row;
   const to = await wantedRelease(deps.db, fresh, status, now);
   if (to === null) {
-    deps.gate.reset();
+    await deps.gate.reset();
     return null;
   }
+  const attempt = { from: status.current ?? '', to };
   const verdict = await deps.gate.check(now);
+  if (await reportGiveUps(deps, attempt, verdict)) {
+    return null;
+  }
   if (!verdict.open) {
     return verdict.nextCheckAt;
   }
-  await install(deps, { from: status.current ?? '', to });
+  await install(deps, attempt);
   return soon;
 }
 

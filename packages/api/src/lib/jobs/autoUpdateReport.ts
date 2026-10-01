@@ -24,7 +24,13 @@ import type { UpdaterStatus } from '../ops/system/_updater.js';
 export type ReportDeps = { db: Db; send: SendUpdateMail; now?: () => Date };
 
 export type Outcome =
-  'started' | 'backupFailed' | 'refused' | 'succeeded' | 'failed';
+  | 'started'
+  | 'noBackupTarget'
+  | 'backupFailed'
+  | 'busy'
+  | 'refused'
+  | 'succeeded'
+  | 'failed';
 
 /** One attempt or outcome, as its audit entry carries it. */
 export type Attempt = { from: string; to: string };
@@ -108,7 +114,8 @@ export async function followUpRun(
   await reportFailure(deps, {
     ...attempt,
     outcome: 'failed',
-    reason: last.error ?? 'the update failed'
+    reason:
+      last.error ?? 'the updater reported the run failed without naming why'
   });
   return false;
 }

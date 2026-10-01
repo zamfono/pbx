@@ -38,13 +38,16 @@ why the specified behaviour changed; the commit history, how.
   `{ "autoUpdate": true }`, and the stack then installs a newer non-breaking release on its own, as
   `system.update` would (so it needs `UPDATER_TOKEN`), after backing up every enabled backup target,
   at the next maintenance moment once nothing is in progress, the same moment and check a renewed
-  TLS certificate waits for. A failed attempt is tried again at a later maintenance moment, at least
+  TLS certificate waits for; a stack still busy when that wait gives up at 3 maintenance moments in
+  a row counts it as a failed attempt. A failed attempt is tried again at a later maintenance moment, at least
   20 hours on, up to 3 attempts per release, and then left until a newer release appears or an
   update succeeds; a refusal because another update is already running counts as no attempt. From
   the first failure until an update succeeds, `/healthz` has `autoUpdateFailed: true` and
   `system.info` shows the release, the reason and the attempts in `autoUpdate.failed`; every owner
   gets one mail once the last attempt failed (new template kind `updateFailed`), and the audit log
-  has a `system.autoUpdate` entry for every attempt and outcome. Whether automatic updates are on or
+  has a `system.autoUpdate` entry for every attempt and outcome. Each failure names its concrete
+  cause in all three places, such as `no enabled backup target`, the target and error of a failed
+  backup, or what kept the stack busy. Whether automatic updates are on or
   not, a breaking release, which only `update.sh` on the host installs, is announced: `/healthz` has
   `breakingUpdateAvailable: true`, `system.info` shows the release in `update.latest`, and every
   owner gets one mail per release (new template kind `breakingUpdate`). `/healthz` names no release,
@@ -73,7 +76,10 @@ why the specified behaviour changed; the commit history, how.
 - A renewed TLS certificate is swapped in at the maintenance moment only once nothing is in
   progress: no call, no parked call, no voicemail being left and no recording being made or
   mixed. While something is, the stack looks again every 5 minutes for up to two hours, then
-  waits for the next maintenance moment. The first certificate replacing a fresh stack's
+  gives up until the next maintenance moment, which it logs as a warning and enters in the audit
+  log (`system.maintenanceGate`, channel `job`) with what kept it busy: the live calls, Asterisk
+  channels and recordings in progress. `system.info` shows when and why it last gave up, for the
+  certificate and the automatic update each, in `maintenanceGate`. The first certificate replacing a fresh stack's
   placeholder, and a renewal the current certificate would expire before, still apply at once.
 - MCP clients and the OpenAPI document now describe what an operation's input fields mean, not
   just their names and types: every tool's input schema carries a one-sentence `description` per

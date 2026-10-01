@@ -1,26 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
 import { makeTestDb } from '../testDb.js';
+import type { Busy } from './maintenanceGiveUp.js';
 import {
-  coreIsIdle,
   createMaintenanceGate,
   IDLE_RECHECK_MS,
-  IDLE_WAIT_MS,
-  isIdleState
+  IDLE_WAIT_MS
 } from './maintenanceWindow.js';
 
-const IDLE: StateResponse = {
-  calls: [],
-  trunks: {},
-  trunkChannels: {},
-  presence: {},
-  registeredDevices: 4,
-  recordingMixFailures: 0,
-  asteriskChannels: 0,
-  recordingsInProgress: 0
+const BUSY: Busy = {
+  liveCalls: 2,
+  asteriskChannels: 3,
+  recordingsInProgress: 1
 };
+const BUSY_REASON =
+  'live calls 2, Asterisk channels 3, recordings in progress 1';
 
 /** The settings row with the 03:00 quiet hour, the only moment these tests need. */
 async function seedSettings(db: Db): Promise<void> {
@@ -63,44 +59,6 @@ async function seedSettings(db: Db): Promise<void> {
     .execute();
 }
 
-describe('isIdleState', () => {
-  it('is idle with no call, no channel and no recording; registered devices do not count', () => {
-    expect(isIdleState(IDLE)).toBe(true);
-  });
-
-  it.each([
-    ['a live call', { calls: [{} as StateResponse['calls'][number]] }],
-    [
-      'a channel only Asterisk holds, such as a parked party',
-      { asteriskChannels: 1 }
-    ],
-    ['a recording still being mixed', { recordingsInProgress: 1 }],
-    ['ARI not answering', { asteriskChannels: null }]
-  ])('is busy with %s', (_label, overrides) => {
-    expect(isIdleState({ ...IDLE, ...overrides })).toBe(false);
-  });
-
-  it('is busy for a core that does not report its channels', () => {
-    const older: Partial<StateResponse> = { ...IDLE };
-    delete older.asteriskChannels;
-    expect(isIdleState(older as StateResponse)).toBe(false);
-  });
-});
-
-describe('coreIsIdle', () => {
-  it('is busy while core does not answer', async () => {
-    await expect(
-      coreIsIdle({ state: () => Promise.reject(new Error('down')) })
-    ).resolves.toBe(false);
-  });
-
-  it('reads the live state', async () => {
-    await expect(
-      coreIsIdle({ state: () => Promise.resolve(IDLE) })
-    ).resolves.toBe(true);
-  });
-});
-
 describe('createMaintenanceGate', () => {
   const saved = { reloadHour: process.env.TLS_RELOAD_HOUR };
   const state: { db?: Db; idle: boolean; asked: number } = {
@@ -123,15 +81,20 @@ describe('createMaintenanceGate', () => {
     }
   });
 
-  function gate(): ReturnType<typeof createMaintenanceGate> {
+  function database(): Db {
     if (state.db === undefined) {
       throw new Error('no database');
     }
+    return state.db;
+  }
+
+  function gate(): ReturnType<typeof createMaintenanceGate> {
     return createMaintenanceGate({
-      db: state.db,
-      isIdle: () => {
+      db: database(),
+      work: 'certSync',
+      busy: () => {
         state.asked += 1;
-        return Promise.resolve(state.idle);
+        return Promise.resolve(state.idle ? null : BUSY);
       }
     });
   }
@@ -194,11 +157,98 @@ describe('createMaintenanceGate', () => {
       shared.check(new Date(Date.parse('2026-01-01T03:00:00Z') + IDLE_WAIT_MS))
     ).resolves.toEqual({
       open: false,
-      nextCheckAt: new Date('2026-01-02T03:00:00Z')
+      nextCheckAt: new Date('2026-01-02T03:00:00Z'),
+      gaveUp: { inARow: 1, reason: BUSY_REASON }
     });
     await expect(
       shared.check(new Date('2026-01-02T03:00:00Z'))
     ).resolves.toEqual({ open: true });
+  });
+
+  it('records each give-up with what its last look found busy, counts them in a row, and ends the run when it opens', async () => {
+    const db = database();
+    const shared = gate();
+    state.idle = false;
+    const giveUpOn = async (day: string): Promise<unknown> => {
+      await shared.check(new Date(`${day}T03:00:00Z`));
+      return shared.check(
+        new Date(Date.parse(`${day}T03:00:00Z`) + IDLE_WAIT_MS)
+      );
+    };
+
+    await shared.check(new Date('2026-01-01T01:00:00Z'));
+    await giveUpOn('2026-01-01');
+    await expect(giveUpOn('2026-01-02')).resolves.toMatchObject({
+      gaveUp: { inARow: 2, reason: BUSY_REASON }
+    });
+
+    expect(
+      await db.selectFrom('maintenanceGate').selectAll().execute()
+    ).toEqual([
+      {
+        work: 'certSync',
+        gaveUpAt: '2026-01-02T05:00:00.000Z',
+        reason: BUSY_REASON,
+        consecutiveGiveUps: 2
+      }
+    ]);
+    const entries = await db
+      .selectFrom('auditLog')
+      .select(['operation', 'channel', 'actorUserId', 'changesJson'])
+      .orderBy('id')
+      .execute();
+    expect(entries).toHaveLength(2);
+    expect(entries[1]).toMatchObject({
+      operation: 'system.maintenanceGate',
+      channel: 'job',
+      actorUserId: 'system'
+    });
+    expect(
+      Object.fromEntries(
+        (
+          JSON.parse(entries[1]?.changesJson ?? '[]') as {
+            field: string;
+            to: unknown;
+          }[]
+        ).map(change => [change.field, change.to])
+      )
+    ).toEqual({
+      work: 'certSync',
+      outcome: 'gaveUp',
+      moment: '2026-01-02T03:00:00.000Z',
+      reason: BUSY_REASON,
+      inARow: 2,
+      liveCalls: 2,
+      asteriskChannels: 3,
+      recordingsInProgress: 1
+    });
+
+    state.idle = true;
+    await expect(
+      shared.check(new Date('2026-01-03T03:00:00Z'))
+    ).resolves.toEqual({ open: true });
+    expect(
+      await db.selectFrom('maintenanceGate').selectAll().execute()
+    ).toMatchObject([
+      { gaveUpAt: '2026-01-02T05:00:00.000Z', consecutiveGiveUps: 0 }
+    ]);
+  });
+
+  it('records no give-up for a wait in which it never found the system busy', async () => {
+    const db = database();
+    const shared = gate();
+    await shared.check(new Date('2026-01-01T01:00:00Z'));
+
+    await expect(
+      shared.check(new Date(Date.parse('2026-01-01T03:00:00Z') + IDLE_WAIT_MS))
+    ).resolves.toEqual({
+      open: false,
+      nextCheckAt: new Date('2026-01-02T03:00:00Z')
+    });
+    expect(
+      await db.selectFrom('maintenanceGate').selectAll().execute()
+    ).toEqual([]);
+    expect(state.asked).toBe(0);
   });
 
   it('resolves a fresh moment after opening and after reset', async () => {
@@ -209,7 +259,7 @@ describe('createMaintenanceGate', () => {
       open: false,
       nextCheckAt: new Date('2026-01-02T03:00:00Z')
     });
-    shared.reset();
+    await shared.reset();
     await shared.check(new Date('2026-01-01T02:00:00Z'));
     await expect(
       shared.check(new Date('2026-01-01T03:00:00Z'))

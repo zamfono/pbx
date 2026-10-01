@@ -19,7 +19,11 @@ import {
   type UpdateState
 } from '../ops/system/_updater.js';
 import { makeTestDb } from '../testDb.js';
-import { runAutoUpdatePass, type AutoUpdateDeps } from './autoUpdate.js';
+import {
+  GIVE_UPS_PER_ATTEMPT,
+  runAutoUpdatePass,
+  type AutoUpdateDeps
+} from './autoUpdate.js';
 import {
   createMaintenanceGate,
   IDLE_RECHECK_MS,
@@ -87,7 +91,12 @@ type Harness = {
   asked: { version: string | undefined; requester?: RunRequester }[];
   backups: { count: number };
   gateChecks: { count: number };
-  current: { status: UpdaterStatus; gate: GateCheck; backupOk: boolean };
+  current: {
+    status: UpdaterStatus;
+    gate: GateCheck;
+    backupOk: boolean;
+    backup?: () => Promise<BackupRunRow[]>;
+  };
   updaterAnswer: { next: () => Promise<UpdateState> };
 };
 
@@ -123,10 +132,13 @@ function harness(db: Db): Harness {
       gateChecks.count += 1;
       return Promise.resolve(current.gate);
     },
-    reset: () => undefined
+    reset: () => Promise.resolve()
   };
   const backUp = async (): Promise<BackupRunRow[]> => {
     backups.count += 1;
+    if (current.backup !== undefined) {
+      return current.backup();
+    }
     const run: BackupRunRow = {
       id: newId(),
       targetId: 't1',
@@ -309,6 +321,112 @@ describe('runAutoUpdatePass', () => {
     ]);
   });
 
+  it('reports no enabled backup target as such, in the audit entry, system.info and the mail', async () => {
+    const db = await makeTestDb();
+    await seed(db, true);
+    const job = harness(db);
+    job.current.backup = () => Promise.resolve([]);
+    const clock = { now: NOW };
+    job.deps.now = () => clock.now;
+
+    for (let attempt = 0; attempt < MAX_AUTO_UPDATE_ATTEMPTS; attempt += 1) {
+      // eslint-disable-next-line no-await-in-loop -- one pass after another, a day apart
+      await runAutoUpdatePass(job.deps);
+      clock.now = new Date(clock.now.getTime() + MS_PER_DAY);
+    }
+
+    expect(job.asked).toEqual([]);
+    expect(await loadUpdateState(db)).toMatchObject({
+      autoFailure: 'no enabled backup target',
+      autoFailedAttempts: MAX_AUTO_UPDATE_ATTEMPTS
+    });
+    expect(await auditOutcomes(db)).toMatchObject(
+      Array.from({ length: MAX_AUTO_UPDATE_ATTEMPTS }, () => ({
+        outcome: 'noBackupTarget',
+        reason: 'no enabled backup target'
+      }))
+    );
+    expect(job.mails).toMatchObject([
+      { kind: 'updateFailed', values: { reason: 'no enabled backup target' } },
+      { kind: 'updateFailed', values: { reason: 'no enabled backup target' } }
+    ]);
+  });
+
+  it('reports a backup that could not run at all with its error', async () => {
+    const db = await makeTestDb();
+    await seed(db, true);
+    const job = harness(db);
+    job.current.backup = () =>
+      Promise.reject(new Error("backup: target 't9' not found"));
+
+    await runAutoUpdatePass(job.deps);
+
+    expect(job.asked).toEqual([]);
+    expect((await loadUpdateState(db))?.autoFailure).toBe(
+      "the backup failed: backup: target 't9' not found"
+    );
+    expect(await auditOutcomes(db)).toMatchObject([
+      {
+        outcome: 'backupFailed',
+        reason: "the backup failed: backup: target 't9' not found"
+      }
+    ]);
+  });
+
+  it(`counts ${String(GIVE_UPS_PER_ATTEMPT)} maintenance moments given up in a row as a failed attempt`, async () => {
+    const db = await makeTestDb();
+    await seed(db, true);
+    await db
+      .updateTable('settings')
+      .set({ timezone: 'UTC', tlsReloadHour: 3 })
+      .execute();
+    const job = harness(db);
+    const clock = { now: new Date('2026-10-01T02:00:00.000Z') };
+    job.deps.now = () => clock.now;
+    job.deps.gate = createMaintenanceGate({
+      db,
+      work: 'autoUpdate',
+      busy: () =>
+        Promise.resolve({
+          liveCalls: 1,
+          asteriskChannels: 2,
+          recordingsInProgress: 0
+        })
+    });
+    const busyDay = async (day: string): Promise<void> => {
+      clock.now = new Date(`${day}T03:00:00.000Z`);
+      await runAutoUpdatePass(job.deps);
+      clock.now = new Date(`${day}T05:00:00.000Z`);
+      await runAutoUpdatePass(job.deps);
+    };
+
+    await runAutoUpdatePass(job.deps);
+    await busyDay('2026-10-01');
+    await busyDay('2026-10-02');
+    expect((await loadUpdateState(db))?.autoFailedAttempts).toBe(0);
+    await busyDay('2026-10-03');
+
+    expect(job.backups.count).toBe(0);
+    const reason =
+      'the system was busy at 3 maintenance moments in a row, at the last live calls 1, Asterisk channels 2, recordings in progress 0';
+    expect(await loadUpdateState(db)).toMatchObject({
+      autoFailure: reason,
+      autoFailedAttempts: 1
+    });
+    expect(await auditOutcomes(db)).toMatchObject([
+      { outcome: 'busy', to: '0.1.2', reason }
+    ]);
+    const gate = await db
+      .selectFrom('maintenanceGate')
+      .selectAll()
+      .executeTakeFirstOrThrow();
+    expect(gate).toMatchObject({
+      work: 'autoUpdate',
+      gaveUpAt: '2026-10-03T05:00:00.000Z',
+      consecutiveGiveUps: 0
+    });
+  });
+
   it("reports the updater's refusal as a failed attempt", async () => {
     const db = await makeTestDb();
     await seed(db, true);
@@ -390,7 +508,8 @@ describe('runAutoUpdatePass', () => {
     job.deps.now = () => clock.now;
     job.deps.gate = createMaintenanceGate({
       db,
-      isIdle: () => Promise.resolve(true)
+      work: 'autoUpdate',
+      busy: () => Promise.resolve(null)
     });
     job.current.backupOk = false;
 

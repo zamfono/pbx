@@ -10,6 +10,11 @@ import {
 } from '@zamfono/shared';
 
 import { errorMessage } from '#lib/errors.js';
+import {
+  lastGiveUps,
+  type LastGiveUp,
+  type MaintenanceWork
+} from '#lib/jobs/maintenanceGiveUp.js';
 import { isProfilePending } from '#lib/provisioning/profilePending.js';
 import { stackDomain, stackIpv4 } from '#lib/stackAddress.js';
 
@@ -47,6 +52,12 @@ type Output = {
    * on its release, until an update succeeds (§6.3 "Automatic updates").
    */
   autoUpdate: { enabled: boolean; failed: AutoUpdateFailure | null };
+  /**
+   * When the maintenance gate last gave up on each work it holds back, the certificate swap and
+   * the automatic update, and what kept the system busy; `null` for one it never gave up on
+   * (§6.4 "Maintenance gate").
+   */
+  maintenanceGate: Record<MaintenanceWork, LastGiveUp | null>;
   /**
    * `profilePending`: a tenant profile change, the emergency numbers among them, is stored and
    * in force on the PBX but has not reached Ringotel yet (§10.4 "Tenant profile push").
@@ -108,30 +119,33 @@ export function setCoreVersionLookup(
 
 /**
  * `GET /system/info` (§7 "Version", §10.3): the version and commit `api` and `core` each run and
- * since when, when Asterisk started, the latest release with how the last update went and who asked for it, whether automatic updates are on and why the last one failed, after how many attempts (§6.3 "Automatic updates"), whether a tenant profile change still waits for Ringotel (§10.4), and the stack's domain and public IPv4 address (§6.1), for anyone signed in. The MCP `serverInfo.version` carries `api`'s too, but only in the connection
+ * since when, when Asterisk started, the latest release with how the last update went and who asked for it, whether automatic updates are on and why the last one failed, after how many attempts (§6.3 "Automatic updates"), when and why the maintenance gate last gave up (§6.4), whether a tenant profile change still waits for Ringotel (§10.4), and the stack's domain and public IPv4 address (§6.1), for anyone signed in. The MCP `serverInfo.version` carries `api`'s too, but only in the connection
  * handshake, which no tool can read; `/healthz` answers without a login and never shows it.
  */
 export const info = defineOperation<Record<string, never>, Output>({
   name: 'system.info',
   description:
-    'Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update with who asked for it, whether automatic updates are on and why and how often the last one failed, whether a tenant profile change still waits for Ringotel, and the domain of the stack and the public IPv4 address its SIP and media use.',
+    'Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update with who asked for it, whether automatic updates are on and why and how often the last one failed, when and why the maintenance gate last gave up, whether a tenant profile change still waits for Ringotel, and the domain of the stack and the public IPv4 address its SIP and media use.',
   input: z.object({}).strict(),
   minRole: 'user',
   readOnly: true,
   run: async ctx => {
-    const [core, update, autoUpdate, profilePending] = await Promise.all([
-      lookupHolder.current
-        ? lookupHolder.current().catch(() => null)
-        : Promise.resolve(null),
-      updateStatus(ctx.db),
-      autoUpdateStatus(ctx.db),
-      isProfilePending(ctx.db)
-    ]);
+    const [core, update, autoUpdate, maintenanceGate, profilePending] =
+      await Promise.all([
+        lookupHolder.current
+          ? lookupHolder.current().catch(() => null)
+          : Promise.resolve(null),
+        updateStatus(ctx.db),
+        autoUpdateStatus(ctx.db),
+        lastGiveUps(ctx.db),
+        isProfilePending(ctx.db)
+      ]);
     return {
       api: { ...resolveVersion(process.env), startedAt: apiStartedAt },
       core,
       update,
       autoUpdate,
+      maintenanceGate,
       ringotel: { profilePending },
       stack: { domain: stackDomain(process.env), ipv4: stackIpv4(process.env) }
     };

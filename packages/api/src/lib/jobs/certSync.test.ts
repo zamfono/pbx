@@ -477,7 +477,7 @@ describe('runCertSync', () => {
     delete process.env.TLS_RELOAD_HOUR;
     const coreClient = stubCoreClient();
     coreClient.liveCalls = [LIVE_CALL];
-    let now = new Date('2026-01-01T03:00:00Z');
+    let now = new Date('2026-01-01T02:00:00Z');
     const deps: CertSyncDeps = {
       db,
       coreClient,
@@ -487,11 +487,23 @@ describe('runCertSync', () => {
     };
 
     await expect(runCertSync(deps)).resolves.toBe('ok');
+    now = new Date('2026-01-01T03:00:00Z');
+    await expect(runCertSync(deps)).resolves.toBe('ok');
     coreClient.liveCalls = [];
     // Past the two-hour wait: the next chance is tomorrow's 03:00, idle or not.
     now = new Date('2026-01-01T05:30:00Z');
     await expect(runCertSync(deps)).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([]);
+    expect(
+      await db.selectFrom('maintenanceGate').selectAll().execute()
+    ).toEqual([
+      {
+        work: 'certSync',
+        gaveUpAt: '2026-01-01T05:30:00.000Z',
+        reason: 'live calls 1, Asterisk channels 1, recordings in progress 0',
+        consecutiveGiveUps: 1
+      }
+    ]);
 
     now = new Date('2026-01-02T03:00:00Z');
     await expect(runCertSync(deps)).resolves.toBe('ok');
