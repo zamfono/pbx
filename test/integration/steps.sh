@@ -9,7 +9,8 @@
 # SIP_PASSWORD and GROUP_EXT for `run-scenarios.sh` to read.
 
 # The stack's `.env`, then the stack itself, started fresh or, with UPGRADE_FROM, upgraded from
-# a release (upgrade.sh), and `assert_migrated`. Skipped entirely under REUSE.
+# a release (upgrade.sh), `assert_migrated`, and the TLS transport on its certificate
+# (cert-sync.sh's `await_certificate_synced`). Skipped entirely under REUSE.
 bring_up_stack() {
   # Checked before anything binds: a pre-existing listener would answer every probe below, and
   # Docker reports the port as published either way, so the run would silently test another
@@ -42,6 +43,7 @@ bring_up_stack() {
     stack_recreate
   fi
   assert_migrated
+  await_certificate_synced
 }
 
 # The runtime-ordering prerequisite §6.3 names inline: migrate ran to completion, so api started

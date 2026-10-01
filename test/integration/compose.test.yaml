@@ -27,11 +27,9 @@ services:
     # `zamfono` alias is the CN of the placeholder TLS certificate the entrypoint generates
     # (images/asterisk/entrypoint.sh), the way test/load/stress's own baresip devices still dial
     # it (compose.stress.yaml, no §6.4 sync in that harness). `${FQDN}` is the second alias
-    # `device-tls-srtp.setup.sh`'s baresip device dials instead: local_certs' near-instant
-    # issuance (test/integration/Caddyfile.local-ca) means the stack FQDN's real, CA-issued
-    # certificate has reliably already replaced the placeholder by the time any scenario runs
-    # (§6.4 "the first real certificate replaces the placeholder immediately"), and that
-    # certificate's only name is the FQDN, not `zamfono`.
+    # `device-tls-srtp.setup.sh`'s baresip device dials instead: bring-up waits until the stack
+    # FQDN's CA-issued certificate has replaced the placeholder (cert-sync.sh's
+    # `await_certificate_synced`), and that certificate's only name is the FQDN, not `zamfono`.
     environment:
       SIP_UDP_ENABLED: 'true'
       SIP_TCP_ENABLED: 'true'

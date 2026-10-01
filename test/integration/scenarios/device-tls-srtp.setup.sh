@@ -5,10 +5,9 @@
 # (gen_baresip.py), here with a single account instead of many: SIP over TLS to `$FQDN:5061` —
 # the stack FQDN (compose.test.yaml's second `asterisk` network alias), a real client's own dial
 # target, and the one name the certificate §6.4's sync installs actually carries (a
-# `local_certs`-issued certificate for `$FQDN`, since local_certs' near-instant issuance means
-# it has reliably already replaced the placeholder — whose CN was the OTHER alias, `zamfono` —
-# by the time any scenario runs) — so baresip's server verification, against a copy of whichever
-# certificate Asterisk currently presents, passes the way a real client's would either way,
+# `local_certs`-issued certificate for `$FQDN`, which bring-up waited to replace the placeholder,
+# whose CN is the other alias, `zamfono`) — so baresip verifies the server against Caddy's local
+# CA, the way a real client verifies a CA-issued certificate,
 # `mediaenc=srtp-mand` (SDES-SRTP, RTP/SAVP) and only the `opus` codec module loaded, so whatever
 # Asterisk offers, the device can answer with nothing else — no `settings.codecs_json` change
 # needed, and none made, since the shared `ci-trunk` other scenarios still use depends on the
@@ -57,25 +56,15 @@ print(items[0]["id"] if items else "")
 printf '%s %s %s %s\n' "$user_id" "$did_id" "$sip_username" "$sip_password" \
   > "$(state_file tls-srtp)"
 
-# Whatever certificate Asterisk currently presents, copied out and back in so baresip can verify
-# the server it dials, the way test/load/stress's session.sh already does for its own devices.
-# On a stack this young that is still the self-signed placeholder (images/asterisk/entrypoint.sh)
-# most of the time, which verifies against itself; but §6.4's sync applies "the first real
-# certificate" the moment it is available, and in this harness that is near-instant (Caddyfile's
-# global `local_certs`, test/integration/Caddyfile.local-ca, needs no ACME round trip), so by the
-# time any scenario runs the placeholder may already be gone. A CA-issued leaf is not itself a
-# trust anchor, so when the copy does not verify against itself, the actual issuer — Caddy's own
-# local CA root, read from its storage on the `proxy` container — is used instead.
+# The issuer of the certificate Asterisk presents (cert-sync.sh's `await_certificate_synced`):
+# Caddy's own local CA root, read from its storage on the `proxy` container, copied in for
+# baresip to verify the server it dials.
 capem=$(mktemp)
 baresip_config=$(mktemp)
 baresip_accounts=$(mktemp)
 trap 'rm -f "$capem" "$baresip_config" "$baresip_accounts"' EXIT
 # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-$compose exec -T asterisk cat /etc/asterisk/gen/tls/cert.pem > "$capem"
-if ! openssl verify -CAfile "$capem" "$capem" >/dev/null 2>&1; then
-  # shellcheck disable=SC2086
-  $compose exec -T proxy cat /data/caddy/pki/authorities/local/root.crt > "$capem"
-fi
+$compose exec -T proxy cat /data/caddy/pki/authorities/local/root.crt > "$capem"
 # shellcheck disable=SC2086
 $compose exec -T devices mkdir -p /root/.baresip
 # shellcheck disable=SC2086
