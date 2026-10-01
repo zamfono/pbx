@@ -18,6 +18,9 @@ const inputSchema = z
       .string()
       .regex(/^\d+\.\d+\.\d+$/u)
       .optional()
+      .describe(
+        'The release to update to, such as 0.2.0; left out, the latest (see zamfono.help update-stack).'
+      )
   })
   .strict();
 

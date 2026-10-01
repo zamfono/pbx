@@ -19,11 +19,26 @@ const MAX_BUCKETS = 10_080;
 
 const inputSchema = z
   .object({
-    metric: z.enum(METRICS),
-    from: z.iso.datetime({ offset: true }),
-    to: z.iso.datetime({ offset: true }),
-    bucket: z.enum(BUCKET_UNITS),
-    ringGroupId: z.string().optional()
+    metric: z
+      .enum(METRICS)
+      .describe(
+        'answerRate: answered of answered, missed and busy calls (0 to 1); ringToAnswer and avgCallLength: mean seconds; callVolume: the call count.'
+      ),
+    from: z.iso
+      .datetime({ offset: true })
+      .describe('Start of the range, inclusive, ISO 8601 with offset.'),
+    to: z.iso
+      .datetime({ offset: true })
+      .describe('End of the range, exclusive, ISO 8601 with offset.'),
+    bucket: z
+      .enum(BUCKET_UNITS)
+      .describe(
+        'Bucket width, aligned in UTC (a week starts on Monday); at most 10080 buckets per request.'
+      ),
+    ringGroupId: z
+      .string()
+      .optional()
+      .describe("Only this ring group's calls; left out, every call.")
   })
   .strict();
 

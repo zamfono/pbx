@@ -208,8 +208,17 @@ export const searchQuery = defineOperation({
   name: 'search.query',
   description:
     'The type-ahead behind the search bar: users, ring groups and contacts.',
-  // eslint-disable-next-line id-length -- 'q' is the wire query-parameter name fixed by §10.3's `GET /search?q=`
-  input: z.object({ q: z.string().min(1) }).strict(),
+  input: z
+    .object({
+      // eslint-disable-next-line id-length -- 'q' is the wire query-parameter name fixed by §10.3's `GET /search?q=`
+      q: z
+        .string()
+        .min(1)
+        .describe(
+          "Text matched case-insensitively against users' names, extensions and (for admins) e-mails, ring groups' names and extensions, and contacts' names, companies and numbers."
+        )
+    })
+    .strict(),
   minRole: 'user',
   readOnly: true,
   run: async (ctx, input) => {

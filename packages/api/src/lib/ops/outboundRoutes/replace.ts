@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { isE164, newId, type Db } from '@zamfono/shared';
+import { newId, type Db } from '@zamfono/shared';
 
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
@@ -10,6 +10,7 @@ import {
   assertRouteIdsLive,
   assertTrunksLive
 } from './_replaceChecks.js';
+import { replaceInputSchema } from './_replaceInput.js';
 import {
   loadRouteChildren,
   routeToWire,
@@ -17,39 +18,7 @@ import {
   type RouteWire
 } from './_shared.js';
 
-const numberInputSchema = z
-  .object({
-    number: z.string().refine(isE164, 'number must be E.164'),
-    isPrefix: z.boolean().optional()
-  })
-  .strict();
-
-const routeInputSchema = z
-  .object({
-    id: z.string().min(1).optional(),
-    trunkId: z.string().min(1),
-    calleridDidId: z.string().min(1).nullable().optional(),
-    users: z
-      .array(z.string().min(1))
-      .refine(users => new Set(users).size === users.length, {
-        message: 'duplicate user in route'
-      }),
-    userGroups: z
-      .array(z.string().min(1))
-      .refine(userGroups => new Set(userGroups).size === userGroups.length, {
-        message: 'duplicate user group in route'
-      }),
-    numbers: z
-      .array(numberInputSchema)
-      .refine(
-        numbers =>
-          new Set(numbers.map(number => number.number)).size === numbers.length,
-        { message: 'duplicate number in route' }
-      )
-  })
-  .strict();
-
-const inputSchema = z.object({ routes: z.array(routeInputSchema) }).strict();
+const inputSchema = replaceInputSchema;
 
 type Input = z.infer<typeof inputSchema>;
 type RouteInput = Input['routes'][number];
@@ -188,7 +157,7 @@ async function writeRoute(
 export const replace = defineOperation<Input, Output>({
   name: 'outboundRoutes.replace',
   description:
-    'Replaces the outbound route list as a whole, in evaluation order.',
+    'Replaces the outbound route list as a whole, in evaluation order: a call takes the first route whose callers and numbers both match, falling through to the next when its trunk fails.',
   input: inputSchema,
   minRole: 'admin',
   entity: () => ({ kind: 'outboundRoute', id: null }),

@@ -5,6 +5,18 @@ parking slot each own one extension.
 
 **DID** — a phone number the tenant owns, routed on arrival to a forward target.
 
+**Number block** — a base and the numbers that begin with it (`didBlocks`): a fixed count of
+digits after the base, or, with `digits` `null`, any number of digits, none included. It groups
+the DIDs within it and gives its numbers that no DID holds a fallback; it routes nothing itself.
+See `numbers`.
+
+**Main number** — the DID referenced by `settings.mainDidId`, presented as caller ID when neither
+the outbound route nor the caller sets one. See `numbers`.
+
+**Fallback** (inbound) — the forward target for a number no DID holds: the covering number
+block's `fallbackTarget`, else the tenant-wide `settings.fallbackTarget`, else a 404 release. See
+`numbers`.
+
 **Forward target** — the eight-kind vocabulary (`user`, `ringGroup`, `external`, `sip`,
 `mailboxUser`, `mailboxRingGroup`, `announcement`, `menu`) every routing rule points at. See
 `mental-model`.

@@ -6,7 +6,13 @@ import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import { STATUS_UNPROCESSABLE_ENTITY } from './_shared.js';
 
-const inputSchema = z.object({ trunkIds: z.array(z.string().min(1)) }).strict();
+const inputSchema = z
+  .object({
+    trunkIds: z
+      .array(z.string().min(1))
+      .describe('Every live trunk id exactly once, in the new order.')
+  })
+  .strict();
 type Input = z.infer<typeof inputSchema>;
 type Output = { trunkIds: string[] };
 
@@ -47,7 +53,8 @@ async function reorderTrunks(db: Db, orderedIds: string[]): Promise<void> {
 
 export const setOrder = defineOperation<Input, Output>({
   name: 'trunks.setOrder',
-  description: 'Rewrites the tenant trunk order (§9.4 "Trunk order").',
+  description:
+    'Rewrites the tenant trunk order, the order emergency calls try emergency trunks in (§9.4 "Trunk order").',
   input: inputSchema,
   minRole: 'admin',
   entity: () => ({ kind: 'trunk', id: null }),

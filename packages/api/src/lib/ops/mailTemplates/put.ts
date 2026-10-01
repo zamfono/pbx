@@ -16,9 +16,23 @@ const inputSchema = z
   .object({
     kind: kindSchema,
     language: languageSchema,
-    subject: z.string().min(1),
-    bodyText: z.string().min(1),
-    bodyHtml: z.string().nullable().optional()
+    subject: z
+      .string()
+      .min(1)
+      .describe('The subject line, a Handlebars template like the bodies.'),
+    bodyText: z
+      .string()
+      .min(1)
+      .describe(
+        'The plain-text body: Handlebars {{placeholder}}, if/unless/each/with and {{date value}}; every kind offers companyName, recipientName and fqdn, voicemail adds callerNumber, callerName, mailboxName, receivedAt, durationS, missedCall callerNumber, callerName, receivedAt, didLabel, and setup and reset require link (with linkExpiresAt, setup also invitedBy).'
+      ),
+    bodyHtml: z
+      .string()
+      .nullable()
+      .optional()
+      .describe(
+        'An optional HTML body with the same placeholders, their values HTML-escaped; null sends text only.'
+      )
   })
   .strict();
 
@@ -30,7 +44,8 @@ type Input = z.infer<typeof inputSchema>;
  */
 export const put = defineOperation<Input, MailTemplateWire>({
   name: 'mailTemplates.put',
-  description: "Sets a tenant's mail template override",
+  description:
+    "Overrides the shipped mail template of a kind and language, checked against the kind's placeholders",
   input: inputSchema,
   minRole: 'admin',
   entity: input => ({

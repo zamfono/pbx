@@ -6,7 +6,20 @@ import { getCoreClient, resolveActingUserId } from './_shared.js';
 const STATUS_CONFLICT = 409;
 
 const inputSchema = z
-  .object({ target: z.string().min(1), userId: z.string().optional() })
+  .object({
+    target: z
+      .string()
+      .min(1)
+      .describe(
+        'What to dial once a device answers, as that device would: an extension or a number, E.164 or national.'
+      ),
+    userId: z
+      .string()
+      .optional()
+      .describe(
+        'The user whose devices ring first; left out, the caller themselves (admins only for another user).'
+      )
+  })
   .strict();
 
 /**

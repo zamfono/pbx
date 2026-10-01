@@ -22,13 +22,42 @@ const STATUSES = [
 
 const inputSchema = z
   .object({
-    direction: z.enum(DIRECTIONS).optional(),
-    from: z.string().optional(),
-    to: z.string().optional(),
-    userId: z.string().optional(),
-    ringGroupId: z.string().optional(),
-    status: z.enum(STATUSES).optional(),
-    live: z.boolean().optional(),
+    direction: z
+      .enum(DIRECTIONS)
+      .optional()
+      .describe('Only calls in this direction.'),
+    from: z
+      .string()
+      .optional()
+      .describe(
+        'History only: calls started at or after this ISO 8601 time (a time, not a number).'
+      ),
+    to: z
+      .string()
+      .optional()
+      .describe(
+        'History only: calls started at or before this ISO 8601 time (a time, not a number).'
+      ),
+    userId: z
+      .string()
+      .optional()
+      .describe('Only calls this user placed, was called on or answered.'),
+    ringGroupId: z
+      .string()
+      .optional()
+      .describe('Only calls that rang this ring group.'),
+    status: z
+      .enum(STATUSES)
+      .optional()
+      .describe(
+        "History only: the call's outcome; blocked means released at entry by the blocklist or anonymous-call rejection."
+      ),
+    live: z
+      .boolean()
+      .optional()
+      .describe(
+        'true returns the calls in progress now, unpaginated, instead of the history of ended calls.'
+      ),
     limit: z.number().int().positive().optional(),
     cursor: z.string().optional()
   })

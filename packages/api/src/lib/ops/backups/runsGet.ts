@@ -10,7 +10,7 @@ const inputSchema = z.object({ id: z.string() }).strict();
 /** `GET /backups/runs/{id}` (§6.5 "Backups"): one run's status and result. */
 export const runsGet = defineOperation({
   name: 'backups.runs.get',
-  description: 'Reads one backup run',
+  description: "Reads one backup run's status, snapshot id and sizes",
   input: inputSchema,
   minRole: 'admin',
   readOnly: true,

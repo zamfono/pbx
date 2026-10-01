@@ -42,9 +42,28 @@ export type HostInput = {
 /** A trunk host as create or update accepts it; `port` null or omitted means SRV resolution. */
 export const hostInputSchema = z
   .object({
-    host: z.string().min(1),
-    port: z.number().int().min(1).max(MAX_PORT).nullable().optional(),
-    direction: z.enum(HOST_DIRECTIONS).optional()
+    host: z
+      .string()
+      .min(1)
+      .describe(
+        'An FQDN or IP address, or a CIDR range for an inbound host; resolved through NAPTR and SRV unless a port is given.'
+      ),
+    port: z
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_PORT)
+      .nullable()
+      .optional()
+      .describe(
+        'An explicit port, only where the provider requires one: it turns resolution into a plain A lookup.'
+      ),
+    direction: z
+      .enum(HOST_DIRECTIONS)
+      .optional()
+      .describe(
+        'both (default); outbound, dialled and registered to only; inbound, a source address the provider sends from, never dialled.'
+      )
   })
   .strict();
 

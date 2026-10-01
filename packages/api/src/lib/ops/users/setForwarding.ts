@@ -21,9 +21,20 @@ const STATUS_UNPROCESSABLE_ENTITY = 422;
 const inputSchema = z
   .object({
     id: z.string(),
-    rules: z.array(
-      z.object({ condition: z.enum(CONDITIONS), target: targetInputSchema })
-    )
+    rules: z
+      .array(
+        z.object({
+          condition: z
+            .enum(CONDITIONS)
+            .describe(
+              'unconditional: every call; busy: every device busy; noAnswer: nobody answers within ringTimeoutS; dnd: DND on; offline: no registered device, falling to noAnswer without this rule.'
+            ),
+          target: targetInputSchema
+        })
+      )
+      .describe(
+        "The user's rules, one per condition; a condition left out sends the call to the user's mailbox, else rejects it (see zamfono.help routing-order)."
+      )
   })
   .strict();
 type Rule = z.infer<typeof inputSchema>['rules'][number];

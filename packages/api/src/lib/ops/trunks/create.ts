@@ -1,22 +1,17 @@
 import { z } from 'zod';
 
-import { DIVERSION_POLICIES, newId, type Db } from '@zamfono/shared';
+import { newId, type Db } from '@zamfono/shared';
 
 import { encrypt, keyringFromEnv } from '../../secretbox.js';
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError, type Context } from '../types.js';
+import { createInputSchema } from './_inputs.js';
 import {
-  AUTH_MODES,
-  CALLERID_HEADERS,
-  CODECS,
-  hostInputSchema,
   loadTrunkHosts,
   loadTrunkRow,
   mapTrunkRow,
-  NUMBER_FORMATS,
   replaceTrunkHosts,
   STATUS_UNPROCESSABLE_ENTITY,
-  TRANSPORTS,
   type CallerIdHeader,
   type Transport,
   type TrunkWire
@@ -39,37 +34,7 @@ import {
   assertValidUsername
 } from './hostValidation.js';
 
-const inputSchema = z
-  .object({
-    name: z.string().min(1),
-    // Required, so every trunk carries the admin's explicit choice (§9.4 "Emergency trunks").
-    emergency: z.boolean(),
-    authMode: z.enum(AUTH_MODES),
-    username: z.string().min(1).optional(),
-    password: z.string().min(1).optional(),
-    inboundAuth: z.boolean().optional(),
-    transport: z.enum(TRANSPORTS).optional(),
-    srtp: z.boolean().optional(),
-    // Default true: a new TLS trunk checks the provider's certificate (§9.4 "Signaling").
-    tlsVerify: z.boolean().optional(),
-    // Default true: a new `ip` trunk's contact is probed for its status (§9.4 "Provisioning and
-    // status"); false for an endpoint that answers no OPTIONS.
-    qualify: z.boolean().optional(),
-    // Default 'off': a new trunk's forwarded legs carry no `Diversion` until the admin opts in
-    // (§9.4 "Forwarded calls").
-    diversion: z.enum(DIVERSION_POLICIES).optional(),
-    outboundProxy: z.string().min(1).optional(),
-    registerExpiryS: z.number().int().positive().optional(),
-    registerRetryS: z.number().int().positive().optional(),
-    inboundNumberFormat: z.enum(NUMBER_FORMATS).optional(),
-    callerIdFormat: z.enum(NUMBER_FORMATS).optional(),
-    callerIdHeader: z.enum(CALLERID_HEADERS).optional(),
-    clir: z.boolean().nullable().optional(),
-    codecs: z.array(z.enum(CODECS)).min(1).optional(),
-    maxChannels: z.number().int().positive().optional(),
-    hosts: z.array(hostInputSchema).min(1)
-  })
-  .strict();
+const inputSchema = createInputSchema;
 
 type Input = z.infer<typeof inputSchema>;
 type Output = { trunk: TrunkWire; warnings: string[] };
@@ -195,7 +160,8 @@ function recordCreateChanges(ctx: Context, input: Input): void {
 
 export const create = defineOperation<Input, Output>({
   name: 'trunks.create',
-  description: 'Creates a SIP trunk and its ordered host list.',
+  description:
+    'Creates a SIP trunk to a PSTN or SIP provider with its ordered host list; the first trunk also gets the catch-all outbound route.',
   input: inputSchema,
   minRole: 'admin',
   entity: (_input, out) => ({ kind: 'trunk', id: out.trunk.id }),

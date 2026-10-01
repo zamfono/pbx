@@ -77,9 +77,23 @@ async function createOrganization(
 
 const inputSchema = z
   .object({
-    domain: z.string().min(1),
-    region: z.string().min(1),
-    packageid: z.number().int().positive()
+    domain: z
+      .string()
+      .min(1)
+      .describe(
+        "The organization's Ringotel domain, as in <domain>.ringotel.co; unique across Ringotel (see zamfono.help ringotel-setup)."
+      ),
+    region: z
+      .string()
+      .min(1)
+      .describe(
+        'A region id from provisioning.ringotelOptions, such as 3 for Europe (Frankfurt); fixed once created.'
+      ),
+    packageid: z
+      .number()
+      .int()
+      .positive()
+      .describe('A package id from provisioning.ringotelOptions.')
   })
   .strict();
 

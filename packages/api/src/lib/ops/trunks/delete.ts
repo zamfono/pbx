@@ -47,7 +47,8 @@ async function trunkReferences(ctx: Context, id: string): Promise<Reference[]> {
 
 export const deleteTrunk = defineOperation<Input, Output>({
   name: 'trunks.delete',
-  description: 'Soft-deletes a SIP trunk.',
+  description:
+    'Soft-deletes a SIP trunk once no outbound route or sip forward target uses it (409 names them).',
   input: inputSchema,
   minRole: 'admin',
   confirm: () => 'Delete this trunk? The deletion can be undone for 30 days.',

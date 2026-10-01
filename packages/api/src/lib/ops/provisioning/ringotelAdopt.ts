@@ -23,9 +23,21 @@ import { ringotelOffer } from './ringotelOptions.js';
 
 const inputSchema = z
   .object({
-    orgId: z.string().min(1),
-    domain: z.string().min(1),
-    branchId: z.string().min(1).optional()
+    orgId: z
+      .string()
+      .min(1)
+      .describe('The id of an existing Ringotel organization without users.'),
+    domain: z
+      .string()
+      .min(1)
+      .describe("That organization's domain, which must match its id."),
+    branchId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        'A connection of the organization to reuse; left out, a new one is created.'
+      )
   })
   .strict();
 

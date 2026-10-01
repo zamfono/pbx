@@ -28,8 +28,14 @@ export const LANGUAGES = [
   'ru'
 ] as const satisfies readonly Language[];
 
-export const kindSchema = z.enum(TEMPLATE_KINDS);
-export const languageSchema = z.enum(LANGUAGES);
+export const kindSchema = z
+  .enum(TEMPLATE_KINDS)
+  .describe(
+    'The mail: voicemail (a new voicemail), missedCall, setup (the set-password link of a new account) or reset (a password reset link).'
+  );
+export const languageSchema = z
+  .enum(LANGUAGES)
+  .describe("The template's language; mails use the one in settings.language.");
 
 /** A `GET /mailTemplates` / `GET /mailTemplates/{kind}/{language}` row (§10.3 "Mail templates"). */
 export type MailTemplateWire = {

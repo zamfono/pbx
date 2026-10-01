@@ -28,8 +28,18 @@ export type LogLevelColumns = {
 
 /** The two override fields `users.update`, `trunks.update` and `ringGroups.update` accept (§7). */
 export const logLevelInputFields = {
-  logLevel: z.enum(LOG_LEVEL_OVERRIDES).nullish(),
-  logLevelExpiresAt: z.iso.datetime({ offset: true }).nullish()
+  logLevel: z
+    .enum(LOG_LEVEL_OVERRIDES)
+    .nullish()
+    .describe(
+      "Raises this entity's calls to diagnostics level events, qos or sip, above settings.callLogLevel; null: no override (see zamfono.help diagnose-bad-call)."
+    ),
+  logLevelExpiresAt: z.iso
+    .datetime({ offset: true })
+    .nullish()
+    .describe(
+      'When the override ends, ISO 8601 with offset; a logLevel set without one ends 7 days later.'
+    )
 };
 
 export type LogLevelInput = {

@@ -3,13 +3,16 @@ import { z } from 'zod';
 import {
   createTarget,
   resolveOptionalTarget,
-  targetInputSchema,
   type TargetInput
 } from '../dids/_shared.js';
 import { orBefore } from '../patch.js';
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError, type Context } from '../types.js';
-import { loadLiveDidBlock } from './_shared.js';
+import {
+  DIGITS_SCHEMA,
+  FALLBACK_TARGET_SCHEMA,
+  loadLiveDidBlock
+} from './_shared.js';
 
 const STATUS_NOT_FOUND = 404;
 
@@ -17,8 +20,8 @@ const inputSchema = z
   .object({
     id: z.string(),
     label: z.string().nullable().optional(),
-    digits: z.number().int().positive().nullable().optional(),
-    fallbackTarget: targetInputSchema.nullable().optional()
+    digits: DIGITS_SCHEMA,
+    fallbackTarget: FALLBACK_TARGET_SCHEMA
   })
   .strict();
 
@@ -57,7 +60,8 @@ async function resolveFallbackTargetId(
  */
 export const update = defineOperation<Input, UpdateOutput>({
   name: 'didBlocks.update',
-  description: "Changes a number block's label, digit count or fallback target",
+  description:
+    "Changes a number block's label, digit count or fallback target; the base is immutable",
   input: inputSchema,
   minRole: 'admin',
   entity: input => ({ kind: 'didBlock', id: input.id }),

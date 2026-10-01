@@ -8,6 +8,7 @@ import {
   loadLiveTarget,
   paramsSchema,
   targetKindSchema,
+  targetSecretSchema,
   targetToWire,
   withDefaultForgetPolicy,
   type BackupTargetWire
@@ -20,8 +21,13 @@ const inputSchema = z
     id: z.string(),
     kind: targetKindSchema.optional(),
     params: paramsSchema.optional(),
-    secret: z.string().min(1).optional(),
-    enabled: z.boolean().optional()
+    secret: targetSecretSchema.optional(),
+    enabled: z
+      .boolean()
+      .optional()
+      .describe(
+        'Whether scheduled runs back up to this target; on for a new one.'
+      )
   })
   .strict();
 
@@ -30,7 +36,8 @@ type Input = z.infer<typeof inputSchema>;
 /** `PATCH /backups/targets/{id}` (§6.5 "Backups"): kind, params, secret and the enabled flag. */
 export const targetsUpdate = defineOperation<Input, BackupTargetWire>({
   name: 'backups.targets.update',
-  description: 'Changes a backup target',
+  description:
+    "Changes a backup target's kind, location, secret or enabled flag",
   input: inputSchema,
   minRole: 'admin',
   entity: input => ({ kind: 'backupTarget', id: input.id }),

@@ -17,6 +17,9 @@ const inputSchema = z
       .refine(slots => new Set(slots).size === slots.length, {
         message: 'parking: duplicate slot'
       })
+      .describe(
+        "Every parking-slot extension, of the tenant's extension length; *70 parks a call on the lowest free slot, dialling a slot retrieves it, and settings.parkingTimeoutS rings the parker back."
+      )
   })
   .strict();
 
@@ -94,7 +97,8 @@ async function loadDroppedBlfKeys(
 /** `PUT /parking/slots` (§10.3 "Parking"): replaces the set of parking-slot extensions as a whole. */
 export const set = defineOperation<Input, Output>({
   name: 'parking.set',
-  description: 'Replaces the set of parking-slot extensions',
+  description:
+    'Replaces the set of parking-slot extensions as a whole; an extension a user or ring group owns is refused',
   input: inputSchema,
   minRole: 'admin',
   entity: () => ({ kind: 'parking', id: 'parking' }),

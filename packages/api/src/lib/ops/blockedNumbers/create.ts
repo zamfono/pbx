@@ -8,8 +8,16 @@ import { E164_PATTERN } from './_shared.js';
 
 const inputSchema = z
   .object({
-    number: z.string().regex(E164_PATTERN),
-    isPrefix: z.boolean().optional(),
+    number: z
+      .string()
+      .regex(E164_PATTERN)
+      .describe('The caller number to block, E.164 such as +4930123456.'),
+    isPrefix: z
+      .boolean()
+      .optional()
+      .describe(
+        'Whether every caller whose number begins with `number` is blocked, not only that number; off by default.'
+      ),
     label: z.string().nullable().optional()
   })
   .strict();
@@ -27,7 +35,8 @@ type CreateOutput = {
 /** `POST /blockedNumbers` (§10.1 "Entry", §10.3 "Blocklist"): a caller number or prefix to reject. */
 export const create = defineOperation<Input, CreateOutput>({
   name: 'blockedNumbers.create',
-  description: 'Adds a number or number prefix to the tenant blocklist',
+  description:
+    'Adds a number or number prefix to the tenant blocklist; a matching inbound caller is rejected with 603',
   input: inputSchema,
   minRole: 'admin',
   entity: (_input, output: CreateOutput) => ({

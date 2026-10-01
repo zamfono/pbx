@@ -19,9 +19,11 @@ that single tenant; there is no cross-tenant sharing.
   about who forwarded it: `off` (the default) nothing, `last` the last forward, `all` every
   forward, each by the forwarder's own number or the company's main number, never an extension.
   Some carriers show the original caller's number on a forwarded call only when it carries one.
-- **DID** — a phone number the tenant owns, routed on arrival to a forward target. A **DID
-  block** groups a contiguous range of numbers under one fallback target, for a provider that
-  hands over a whole range instead of individual DIDs.
+- **DID** — a phone number the tenant owns, routed on arrival to a forward target. A **number
+  block** (`didBlocks`) covers the numbers that begin with a base, either a fixed count of digits
+  after it or any number of them, and gives the ones no DID holds a fallback target, for a
+  provider that hands over a whole range instead of individual DIDs. The company's **main
+  number** is one of the DIDs, `settings.mainDidId`. See `numbers`.
 - **Ring group** — an ordered or unordered set of users (and nested user groups) rung together
   under one strategy (`simultaneous`, `sequential` or `random`).
 - **Menu** — a greeting plus a map of DTMF digits to forward targets, usable anywhere a target is
@@ -60,5 +62,6 @@ headers; either leg tells it who forwarded only as far as the trunk's `diversion
 ## Where to look next
 
 - `routing-order` — the order every call is decided in, inbound and outbound.
+- `numbers` — DIDs, number blocks, the main number and the fallbacks, with a worked example.
 - `glossary` — short definitions of the terms used across the guide and the REST/MCP surface.
 - `guardrails` — what the API refuses, confirms or lets you undo.

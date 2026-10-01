@@ -10,6 +10,7 @@ import {
   assertNameAvailable,
   deleteForwardTarget,
   insertForwardTarget,
+  MENU_FIELD_DESCRIPTIONS,
   rowToTarget,
   targetSpecSchema,
   toMenuOut,
@@ -22,11 +23,26 @@ export const updateMenuInput = z
   .object({
     id: z.string(),
     name: z.string().min(1).optional(),
-    audioId: z.string().optional(),
-    timeoutS: z.number().int().positive().optional(),
-    maxAttempts: z.number().int().positive().optional(),
-    allowExtensionDialing: z.boolean().optional(),
-    fallbackTarget: targetSpecSchema.optional()
+    audioId: z.string().optional().describe(MENU_FIELD_DESCRIPTIONS.audioId),
+    timeoutS: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(MENU_FIELD_DESCRIPTIONS.timeoutS),
+    maxAttempts: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(MENU_FIELD_DESCRIPTIONS.maxAttempts),
+    allowExtensionDialing: z
+      .boolean()
+      .optional()
+      .describe(MENU_FIELD_DESCRIPTIONS.allowExtensionDialing),
+    fallbackTarget: targetSpecSchema
+      .optional()
+      .describe(MENU_FIELD_DESCRIPTIONS.fallbackTarget)
   })
   .strict();
 

@@ -16,7 +16,8 @@ const inputSchema = z
 /** `GET /recordings` (§5.3): every call recording, newest first; `admin`/`owner` only. */
 export const list = defineOperation({
   name: 'recordings.list',
-  description: 'Lists call recordings.',
+  description:
+    'Lists call recordings, newest first: one per recorded user and call (see zamfono.help recording-consent).',
   input: inputSchema,
   minRole: 'admin',
   readOnly: true,

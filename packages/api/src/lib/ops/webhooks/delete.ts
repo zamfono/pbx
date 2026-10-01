@@ -11,7 +11,7 @@ const inputSchema = z.object({ id: z.string() }).strict();
 /** `DELETE /webhooks/{id}` (§10.6, §5.9): soft-deletes a webhook. */
 export const del = defineOperation({
   name: 'webhooks.delete',
-  description: 'Removes a webhook',
+  description: 'Soft-deletes a webhook; its events are no longer delivered',
   input: inputSchema,
   minRole: 'admin',
   confirm: input => `Delete webhook ${input.id}?`,

@@ -16,7 +16,8 @@ const inputSchema = z
 /** `GET /didBlocks` (§10.3 "Extensions & DIDs", §11.3): live number blocks, keyset-paginated. */
 export const list = defineOperation({
   name: 'didBlocks.list',
-  description: "Lists the tenant's number blocks",
+  description:
+    "Lists the tenant's number blocks with their digit counts and fallback targets",
   input: inputSchema,
   minRole: 'admin',
   readOnly: true,

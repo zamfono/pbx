@@ -23,8 +23,27 @@ export type EventType = (typeof EVENT_TYPES)[number];
 
 export const eventTypeSchema = z.enum(EVENT_TYPES);
 
+/** A webhook's `secret`, the same field on create and update (§10.6). */
+export const webhookSecretSchema = z
+  .string()
+  .min(1)
+  .describe(
+    'Shared secret: each POST carries X-Zamfono-Signature, the HMAC-SHA256 of the body under it; write-only.'
+  );
+
+/** A webhook's event-type filter, the same field on create and update (§10.6). */
+export const eventTypesSchema = z
+  .array(eventTypeSchema)
+  .nullable()
+  .optional()
+  .describe(
+    'The event types to deliver, such as ["call.state", "voicemail.new"]; null delivers every event.'
+  );
+
 /** A webhook's `url`: `http(s)` only, since it names an HTTP POST endpoint (§10.6). */
-export const httpUrlSchema = z.url({ protocol: /^https?$/u });
+export const httpUrlSchema = z
+  .url({ protocol: /^https?$/u })
+  .describe('The http(s) endpoint every event is POSTed to as JSON.');
 
 /** `event_types_json` parsed back to the wire shape: `null` unfiltered, an array of `EventType`. */
 export function parseEventTypesJson(json: string | null): EventType[] | null {

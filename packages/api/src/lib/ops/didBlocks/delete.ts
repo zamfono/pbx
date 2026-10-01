@@ -11,7 +11,7 @@ const inputSchema = z.object({ id: z.string() }).strict();
 /** `DELETE /didBlocks/{id}` (§5.9, §11.3): soft-deletes a block once no live DID falls within it. */
 export const del = defineOperation({
   name: 'didBlocks.delete',
-  description: 'Soft-deletes a number block',
+  description: 'Soft-deletes a number block once no live DID falls within it',
   input: inputSchema,
   minRole: 'admin',
   confirm: input => `Delete number block ${input.id}?`,

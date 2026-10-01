@@ -21,6 +21,7 @@ import {
   assertGroupAudioFieldsAvailable,
   assertNameAvailable,
   optionalFlag,
+  RING_GROUP_FIELD_DESCRIPTIONS,
   toRingGroupOut,
   type RingGroupRow
 } from './_shared.js';
@@ -31,17 +32,54 @@ export const updateRingGroupInput = z
   .object({
     id: z.string(),
     name: z.string().min(1).optional(),
-    strategy: z.enum(['simultaneous', 'sequential', 'random']).optional(),
-    ringTimeoutS: z.number().int().positive().optional(),
-    ringTotalS: z.number().int().positive().nullish(),
-    skipBusy: z.boolean().optional(),
-    allowReject: z.boolean().optional(),
-    greetingAudioId: z.string().nullish(),
-    mohAudioId: z.string().nullish(),
-    recordCalls: z.boolean().optional(),
-    mailboxEnabled: z.boolean().optional(),
-    mailboxAudioId: z.string().nullish(),
-    members: z.array(memberSchema).optional(),
+    strategy: z
+      .enum(['simultaneous', 'sequential', 'random'])
+      .optional()
+      .describe(RING_GROUP_FIELD_DESCRIPTIONS.strategy),
+    ringTimeoutS: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(RING_GROUP_FIELD_DESCRIPTIONS.ringTimeoutS),
+    ringTotalS: z
+      .number()
+      .int()
+      .positive()
+      .nullish()
+      .describe(RING_GROUP_FIELD_DESCRIPTIONS.ringTotalS),
+    skipBusy: z
+      .boolean()
+      .optional()
+      .describe(RING_GROUP_FIELD_DESCRIPTIONS.skipBusy),
+    allowReject: z
+      .boolean()
+      .optional()
+      .describe(RING_GROUP_FIELD_DESCRIPTIONS.allowReject),
+    greetingAudioId: z
+      .string()
+      .nullish()
+      .describe(RING_GROUP_FIELD_DESCRIPTIONS.greetingAudioId),
+    mohAudioId: z
+      .string()
+      .nullish()
+      .describe(RING_GROUP_FIELD_DESCRIPTIONS.mohAudioId),
+    recordCalls: z
+      .boolean()
+      .optional()
+      .describe(RING_GROUP_FIELD_DESCRIPTIONS.recordCalls),
+    mailboxEnabled: z
+      .boolean()
+      .optional()
+      .describe(RING_GROUP_FIELD_DESCRIPTIONS.mailboxEnabled),
+    mailboxAudioId: z
+      .string()
+      .nullish()
+      .describe(RING_GROUP_FIELD_DESCRIPTIONS.mailboxAudioId),
+    members: z
+      .array(memberSchema)
+      .optional()
+      .describe(RING_GROUP_FIELD_DESCRIPTIONS.members),
     ...logLevelInputFields
   })
   .strict();

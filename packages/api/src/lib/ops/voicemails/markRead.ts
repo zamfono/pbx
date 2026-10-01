@@ -9,7 +9,16 @@ import {
   ringGroupIdsForUser
 } from './_shared.js';
 
-const inputSchema = z.object({ id: z.string(), read: z.boolean() }).strict();
+const inputSchema = z
+  .object({
+    id: z.string(),
+    read: z
+      .boolean()
+      .describe(
+        'true marks it read, false unread again; the message-waiting light counts the unread ones.'
+      )
+  })
+  .strict();
 
 /**
  * `PATCH /voicemails/{id}` (§5.7): marks a voicemail read or unread, outside the audit log like

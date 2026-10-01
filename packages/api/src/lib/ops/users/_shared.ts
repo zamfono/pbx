@@ -24,12 +24,71 @@ export const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 export type FindMeLeg = { number: string; delayS: number };
 /** Shared by `users.create` and `users.update`: each leg dials out (§10.1), so its number is E.164. */
-export const findMeSchema = z.array(
-  z.object({
-    number: z.string().refine(isE164, 'number must be E.164'),
-    delayS: z.number().int().min(0)
-  })
-);
+export const findMeSchema = z
+  .array(
+    z.object({
+      number: z
+        .string()
+        .refine(isE164, 'number must be E.164')
+        .describe('The external number this leg rings, E.164.'),
+      delayS: z
+        .number()
+        .int()
+        .min(0)
+        .describe(
+          'Seconds after ringing begins before this leg starts; 0 rings with the devices.'
+        )
+    })
+  )
+  .describe(
+    "External numbers rung alongside the user's devices on direct calls, never through a ring group; the answerer presses 1 to accept; self-service."
+  );
+
+/** The user extension's meaning (§11.2 `users`), required on create and optional on update. */
+export const EXTENSION_DESCRIPTION =
+  "The internal number colleagues dial, digits of the tenant's fixed extension length.";
+
+/** The call-handling fields `users.create` and `users.update` share, each optional (§11.2 `users`). */
+export const userCallFields = {
+  ringTimeoutS: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      "Seconds the user's devices ring before the noAnswer rule applies; 25 by default; self-service."
+    ),
+  clir: z
+    .boolean()
+    .nullish()
+    .describe(
+      'Withholds the number on outbound calls; null inherits from the trunk, then settings.clir; self-service.'
+    ),
+  rejectAnonymous: z
+    .boolean()
+    .nullish()
+    .describe(
+      'Refuses callers who withhold their number; null follows settings.rejectAnonymous; self-service.'
+    ),
+  recordCalls: z
+    .boolean()
+    .optional()
+    .describe(
+      "Records this user's calls; admin-set (see zamfono.help recording-consent)."
+    ),
+  notifyMissedCalls: z
+    .boolean()
+    .optional()
+    .describe(
+      'Sends an e-mail per missed inbound call; on by default; self-service.'
+    ),
+  mailboxEnabled: z
+    .boolean()
+    .optional()
+    .describe(
+      'Gives the user a voicemail box, where an absent forward rule sends the call; on by default.'
+    )
+};
 
 export type UserOut = LogLevelColumns & {
   id: string;

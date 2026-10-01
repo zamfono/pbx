@@ -17,13 +17,19 @@ export const contactInputSchema = z
     displayName: z.string().min(1),
     company: z.string().nullish(),
     email: z.email().nullish(),
-    phones: z.array(phoneSchema).optional()
+    phones: z
+      .array(phoneSchema)
+      .optional()
+      .describe(
+        'The contact numbers; on update, the set is replaced as a whole.'
+      )
   })
   .strict();
 
 export const createContact = defineOperation({
   name: 'contacts.create',
-  description: 'Adds a phone-book contact.',
+  description:
+    'Adds a contact to the tenant-wide phone book; its numbers name inbound callers.',
   input: contactInputSchema,
   minRole: 'admin',
   entity: (_input, out: ContactOut) => ({ kind: 'contact', id: out.id }),

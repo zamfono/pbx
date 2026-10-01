@@ -14,6 +14,7 @@ import {
   isoDatetimeInput,
   liveOooRulesInScope,
   normalizeIsoOrNull,
+  OOO_FIELD_DESCRIPTIONS,
   rangesOverlap,
   scopeColumns,
   scopeInputSchema,
@@ -25,10 +26,16 @@ const STATUS_UNPROCESSABLE_ENTITY = 422;
 const inputSchema = z
   .object({
     scope: scopeInputSchema,
-    active: z.boolean().optional(),
-    startsAt: isoDatetimeInput.nullable().optional(),
-    expiresAt: isoDatetimeInput.nullable().optional(),
-    target: targetInputSchema
+    active: z.boolean().optional().describe(OOO_FIELD_DESCRIPTIONS.active),
+    startsAt: isoDatetimeInput
+      .nullable()
+      .optional()
+      .describe(OOO_FIELD_DESCRIPTIONS.startsAt),
+    expiresAt: isoDatetimeInput
+      .nullable()
+      .optional()
+      .describe(OOO_FIELD_DESCRIPTIONS.expiresAt),
+    target: targetInputSchema.describe(OOO_FIELD_DESCRIPTIONS.target)
   })
   .strict();
 
@@ -84,7 +91,8 @@ async function assertNoOverlap(
  */
 export const create = defineOperation<Input, Output>({
   name: 'ooo.create',
-  description: 'Adds an out-of-office rule to a scope',
+  description:
+    "Adds an out-of-office rule to a scope: while in effect, its calls go to the rule's target, ahead of opening hours",
   input: inputSchema,
   minRole: 'user',
   entity: (_input, output: Output) => ({ kind: 'oooRule', id: output.id }),

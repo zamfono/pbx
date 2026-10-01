@@ -15,7 +15,16 @@ const STATUS_FORBIDDEN = 403;
 export const setPresence = defineOperation({
   name: 'users.setPresence',
   description: "Sets a user's do-not-disturb state.",
-  input: z.object({ id: z.string(), dnd: z.boolean() }).strict(),
+  input: z
+    .object({
+      id: z.string(),
+      dnd: z
+        .boolean()
+        .describe(
+          "Do not disturb: while on, calls follow the user's dnd forward rule, else their mailbox, else busy."
+        )
+    })
+    .strict(),
   minRole: 'user',
   audit: false,
   run: async (ctx, input) => {

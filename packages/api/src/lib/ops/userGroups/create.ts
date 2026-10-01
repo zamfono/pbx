@@ -15,13 +15,19 @@ import {
 export const userGroupInputSchema = z
   .object({
     name: z.string().min(1),
-    members: z.array(memberSchema).optional()
+    members: z
+      .array(memberSchema)
+      .optional()
+      .describe(
+        'Users and nested user groups in the group; replaces the list as a whole.'
+      )
   })
   .strict();
 
 export const createUserGroup = defineOperation({
   name: 'userGroups.create',
-  description: 'Creates a user group.',
+  description:
+    'Creates a user group, a nestable set of users for ring-group membership and outbound-route caller lists.',
   input: userGroupInputSchema,
   minRole: 'admin',
   entity: (_input, out: UserGroupOut) => ({ kind: 'userGroup', id: out.id }),

@@ -9,7 +9,13 @@ import { loadLiveTarget, runToWire, type BackupRunWire } from './_shared.js';
 
 const STATUS_NOT_FOUND = 404;
 
-const inputSchema = z.object({ targetId: z.string() }).strict();
+const inputSchema = z
+  .object({
+    targetId: z
+      .string()
+      .describe('The backup target to run, from backups.targets.list.')
+  })
+  .strict();
 
 type Input = z.infer<typeof inputSchema>;
 
@@ -20,7 +26,7 @@ type Input = z.infer<typeof inputSchema>;
  */
 export const runsStart = defineOperation<Input, BackupRunWire>({
   name: 'backups.runs.start',
-  description: 'Starts a backup run',
+  description: 'Starts a backup run to one target now, outside the schedule',
   input: inputSchema,
   minRole: 'admin',
   pureAction: true,

@@ -13,7 +13,14 @@ import {
 } from './_shared.js';
 
 const inputSchema = z
-  .object({ id: z.string(), keys: z.array(z.string()) })
+  .object({
+    id: z.string(),
+    keys: z
+      .array(z.string())
+      .describe(
+        "Extensions (users, ring groups, parking slots) whose state the panel's lamps show, in panel order; empty: every user and group extension."
+      )
+  })
   .strict();
 
 /** Throws 422 for any `keys` entry that is not a live extension or parking slot (§11.2 `extensions`). */

@@ -6,17 +6,18 @@ import { encrypt, keyringFromEnv } from '../../secretbox.js';
 import { recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
 import {
-  eventTypeSchema,
+  eventTypesSchema,
   httpUrlSchema,
   toWire,
+  webhookSecretSchema,
   type WebhookWire
 } from './_shared.js';
 
 const inputSchema = z
   .object({
     url: httpUrlSchema,
-    secret: z.string().min(1),
-    eventTypes: z.array(eventTypeSchema).nullable().optional()
+    secret: webhookSecretSchema,
+    eventTypes: eventTypesSchema
   })
   .strict();
 
@@ -28,7 +29,8 @@ type Input = z.infer<typeof inputSchema>;
  */
 export const create = defineOperation<Input, WebhookWire>({
   name: 'webhooks.create',
-  description: 'Adds a webhook, created inactive',
+  description:
+    'Adds a webhook, an endpoint every event (or the filtered types) is POSTed to; created inactive until switched on with webhooks.update',
   input: inputSchema,
   minRole: 'admin',
   entity: (_input, output: WebhookWire) => ({ kind: 'webhook', id: output.id }),

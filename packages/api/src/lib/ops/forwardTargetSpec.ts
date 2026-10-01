@@ -1,56 +1,17 @@
 import type { Transaction } from 'kysely';
-import { z } from 'zod';
 
-import {
-  DEFAULT_SIP_HEADERS,
-  isE164,
-  newId,
-  type DB,
-  type SipHeaderTemplate
-} from '@zamfono/shared';
+import { newId, type DB, type SipHeaderTemplate } from '@zamfono/shared';
 
 import { noteWarning } from './afterPropagationHooks.js';
-import { sipHeadersSchema, udpHeadersWarning } from './sipHeaders.js';
+import { targetSpecSchema, type TargetSpec } from './forwardTargetSchema.js';
+import { udpHeadersWarning } from './sipHeaders.js';
 import { OpError, type Context } from './types.js';
 
 const STATUS_NOT_FOUND = 404;
 
-/**
- * A `sip` target's request-URI user part (§9.4 "SIP targets"): RFC 3261's unreserved `.`, `_`,
- * `~`, `-` and the user-unreserved `+` beside letters and digits, a subset that needs no escaping
- * and cannot reach into the `PJSIP/<user>@<endpoint>` dial string; `forward_targets`' CHECK holds
- * the same.
- */
-const SIP_USER_PATTERN = /^[A-Za-z0-9._~+-]{1,64}$/u;
-
-/**
- * The shared target vocabulary a ring group's forwarding rule or a menu's fallback/DTMF option
- * points at (§11.2 `forward_targets`). One of the union's variants maps to exactly one of the
- * table's eight exclusive targets, `sip`'s being its column pair.
- */
-export const targetSpecSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('user'), userId: z.string() }),
-  z.object({ kind: z.literal('ringGroup'), ringGroupId: z.string() }),
-  z.object({
-    kind: z.literal('external'),
-    external: z.string().refine(isE164, 'external must be E.164')
-  }),
-  z.object({
-    kind: z.literal('sip'),
-    trunkId: z.string(),
-    user: z
-      .string()
-      .regex(SIP_USER_PATTERN, 'user must be 1-64 of A-Z a-z 0-9 . _ ~ + -'),
-    // §9.4 "Header templates": left out on a write, the defaults, which the write returns as
-    // every read does.
-    headers: sipHeadersSchema.default(() => [...DEFAULT_SIP_HEADERS])
-  }),
-  z.object({ kind: z.literal('mailboxUser'), userId: z.string() }),
-  z.object({ kind: z.literal('mailboxRingGroup'), ringGroupId: z.string() }),
-  z.object({ kind: z.literal('announcement'), audioId: z.string() }),
-  z.object({ kind: z.literal('menu'), menuId: z.string() })
-]);
-export type TargetSpec = z.infer<typeof targetSpecSchema>;
+// The wire union and its type live beside this module, which maps them onto `forward_targets`;
+// every area keeps importing both from here.
+export { targetSpecSchema, type TargetSpec };
 
 /** The one column `spec` sets on its `forward_targets` row; every other column stays `null`. */
 function forwardTargetColumns(spec: TargetSpec): Record<string, string> {

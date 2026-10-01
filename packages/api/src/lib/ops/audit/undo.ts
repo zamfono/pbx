@@ -180,8 +180,12 @@ async function appendUndoEntry(
 export const undo = defineOperation({
   name: 'audit.undo',
   description:
-    "Reverts one audit entry by replaying its recorded 'from' values.",
-  input: z.object({ id: z.string() }).strict(),
+    "Reverts one audit entry by replaying its recorded 'from' values; refused with 409 while a later live change to the same entity exists (zamfono.help undo).",
+  input: z
+    .object({
+      id: z.string().describe('The audit entry to revert, from audit.list.')
+    })
+    .strict(),
   minRole: 'admin',
   audit: false,
   run: async (ctx, input) => {

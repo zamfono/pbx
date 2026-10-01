@@ -16,7 +16,12 @@ export const updateUserGroupInput = z
   .object({
     id: z.string(),
     name: z.string().min(1).optional(),
-    members: z.array(memberSchema).optional()
+    members: z
+      .array(memberSchema)
+      .optional()
+      .describe(
+        'Users and nested user groups in the group; replaces the list as a whole.'
+      )
   })
   .strict();
 

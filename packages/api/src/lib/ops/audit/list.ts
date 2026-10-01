@@ -12,15 +12,48 @@ const STATES = ['live', 'undone', 'all'] as const;
 
 const inputSchema = z
   .object({
-    entityKind: z.string().optional(),
-    entityId: z.string().optional(),
-    actorUserId: z.string().optional(),
-    channel: z.enum(CHANNELS).optional(),
-    clientId: z.string().optional(),
-    operation: z.string().optional(),
-    from: z.string().optional(),
-    to: z.string().optional(),
-    state: z.enum(STATES).optional(),
+    entityKind: z
+      .string()
+      .optional()
+      .describe(
+        "Only entries about this kind of entity, such as 'user' or 'did'."
+      ),
+    entityId: z
+      .string()
+      .optional()
+      .describe('Only entries about the entity with this id.'),
+    actorUserId: z
+      .string()
+      .optional()
+      .describe('Only entries made by this user.'),
+    channel: z
+      .enum(CHANNELS)
+      .optional()
+      .describe(
+        'Only entries that arrived over this channel; undo marks an audit.undo, job a scheduled job.'
+      ),
+    clientId: z
+      .string()
+      .optional()
+      .describe("Only entries made through this MCP client's OAuth client id."),
+    operation: z
+      .string()
+      .optional()
+      .describe("Only entries of this operation, such as 'users.create'."),
+    from: z
+      .string()
+      .optional()
+      .describe('Only entries written at or after this ISO 8601 time.'),
+    to: z
+      .string()
+      .optional()
+      .describe('Only entries written at or before this ISO 8601 time.'),
+    state: z
+      .enum(STATES)
+      .optional()
+      .describe(
+        'live (the default) hides undone entries, undone shows only them, all shows both.'
+      ),
     limit: z.number().int().positive().max(MAX_LIMIT).optional(),
     cursor: z.string().optional()
   })

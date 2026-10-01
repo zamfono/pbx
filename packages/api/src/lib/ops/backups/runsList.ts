@@ -8,7 +8,7 @@ const MAX_LIMIT = 200;
 
 const inputSchema = z
   .object({
-    targetId: z.string().optional(),
+    targetId: z.string().optional().describe("Only this target's runs."),
     limit: z.number().int().positive().max(MAX_LIMIT).optional(),
     cursor: z.string().optional()
   })

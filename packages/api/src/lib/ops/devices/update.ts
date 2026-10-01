@@ -14,7 +14,12 @@ const inputSchema = z
   .object({
     id: z.string(),
     label: z.string().min(1).optional(),
-    allowedIps: z.array(z.string()).optional()
+    allowedIps: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'IPs or CIDR ranges, IPv4 or IPv6, the only sources a plain device may register and call from; required for plain, refused for tls.'
+      )
   })
   .strict();
 

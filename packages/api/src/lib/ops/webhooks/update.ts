@@ -5,11 +5,12 @@ import { orBefore } from '../patch.js';
 import { recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import {
-  eventTypeSchema,
+  eventTypesSchema,
   httpUrlSchema,
   loadLiveWebhook,
   parseEventTypesJson,
   toWire,
+  webhookSecretSchema,
   type WebhookWire
 } from './_shared.js';
 
@@ -19,9 +20,14 @@ const inputSchema = z
   .object({
     id: z.string(),
     url: httpUrlSchema.optional(),
-    secret: z.string().min(1).optional(),
-    eventTypes: z.array(eventTypeSchema).nullable().optional(),
-    active: z.boolean().optional()
+    secret: webhookSecretSchema.optional(),
+    eventTypes: eventTypesSchema,
+    active: z
+      .boolean()
+      .optional()
+      .describe(
+        'Whether events are delivered; off on creation, switched on once the receiver is ready.'
+      )
   })
   .strict();
 
@@ -44,7 +50,8 @@ function nextEventTypesJson(
 /** `PATCH /webhooks/{id}` (§10.6): URL, secret, event-type filter and the `active` switch. */
 export const update = defineOperation<Input, WebhookWire>({
   name: 'webhooks.update',
-  description: 'Changes a webhook',
+  description:
+    "Changes a webhook's URL, secret or event-type filter, or switches it on or off",
   input: inputSchema,
   minRole: 'admin',
   entity: input => ({ kind: 'webhook', id: input.id }),

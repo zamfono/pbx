@@ -9,7 +9,7 @@ const STATUS_NOT_FOUND = 404;
 const inputSchema = z
   .object({
     id: z.string(),
-    target: targetInputSchema
+    target: targetInputSchema.describe('Where a call to this number goes.')
   })
   .strict();
 
@@ -19,7 +19,8 @@ const inputSchema = z
  */
 export const update = defineOperation({
   name: 'dids.update',
-  description: "Changes a DID's forward target",
+  description:
+    "Changes a DID's forward target; number and label are fixed at creation",
   input: inputSchema,
   minRole: 'admin',
   entity: input => ({ kind: 'did', id: input.id }),

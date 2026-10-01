@@ -2,13 +2,10 @@ import { z } from 'zod';
 
 import { newId, normalizeInbound } from '@zamfono/shared';
 
-import {
-  createTarget,
-  targetInputSchema,
-  type TargetInput
-} from '../dids/_shared.js';
+import { createTarget, type TargetInput } from '../dids/_shared.js';
 import { propagate, recordChange } from '../runner.js';
 import { Conflict, defineOperation } from '../types.js';
+import { DIGITS_SCHEMA, FALLBACK_TARGET_SCHEMA } from './_shared.js';
 
 /**
  * The characters SQLite's `GLOB` reads as wildcards. The `did_blocks` soft-delete guard matches a
@@ -28,10 +25,13 @@ const inputSchema = z
       .string()
       .min(1)
       .regex(/^\S+$/u, 'base: no whitespace')
-      .refine(isGlobLiteral, 'base: no GLOB metacharacter'),
+      .refine(isGlobLiteral, 'base: no GLOB metacharacter')
+      .describe(
+        'What every number in the block begins with: E.164 such as +4989123470, or national such as 089123470, normalized with settings.country; immutable.'
+      ),
     label: z.string().nullable().optional(),
-    digits: z.number().int().positive().nullable().optional(),
-    fallbackTarget: targetInputSchema.nullable().optional()
+    digits: DIGITS_SCHEMA,
+    fallbackTarget: FALLBACK_TARGET_SCHEMA
   })
   .strict();
 
@@ -49,7 +49,8 @@ type CreateOutput = {
 /** `POST /didBlocks` (§10.3 "Extensions & DIDs", §11.3): a number block and its fallback target. */
 export const create = defineOperation<Input, CreateOutput>({
   name: 'didBlocks.create',
-  description: 'Adds a number block',
+  description:
+    'Adds a number block: a base and a fixed digit count, or open-ended; groups DIDs and gives unassigned numbers in it a fallback (zamfono.help numbers)',
   input: inputSchema,
   minRole: 'admin',
   entity: (_input, output: CreateOutput) => ({

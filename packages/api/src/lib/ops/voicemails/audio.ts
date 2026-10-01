@@ -9,7 +9,15 @@ import {
 } from './_shared.js';
 
 const inputSchema = z
-  .object({ id: z.string(), format: z.enum(['opus', 'mp3']).optional() })
+  .object({
+    id: z.string(),
+    format: z
+      .enum(['opus', 'mp3'])
+      .optional()
+      .describe(
+        'A compressed transcode for download; left out, the stored WAV.'
+      )
+  })
   .strict();
 
 /**

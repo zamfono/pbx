@@ -1,29 +1,21 @@
 import { z } from 'zod';
 
-import { DIVERSION_POLICIES } from '@zamfono/shared';
-
 import { propagate, recordChange } from '../runner.js';
 import {
-  logLevelInputFields,
   recordLogLevelChanges,
   resolveLogLevel,
   type LogLevelColumns
 } from '../settings/logLevel.js';
 import { defineOperation, OpError, type Context } from '../types.js';
+import { updateInputSchema } from './_inputs.js';
 import {
-  AUTH_MODES,
-  CALLERID_HEADERS,
-  CODECS,
-  hostInputSchema,
   hostsToWire,
   loadTrunkHosts,
   loadTrunkRow,
   mapTrunkRow,
-  NUMBER_FORMATS,
   replaceTrunkHosts,
   scalarsFromRow,
   STATUS_NOT_FOUND,
-  TRANSPORTS,
   type HostWire,
   type TrunkRow,
   type TrunkScalars,
@@ -51,33 +43,7 @@ import {
   assertValidOutboundProxy
 } from './hostValidation.js';
 
-const inputSchema = z
-  .object({
-    id: z.string().min(1),
-    name: z.string().min(1).optional(),
-    emergency: z.boolean().optional(),
-    authMode: z.enum(AUTH_MODES).optional(),
-    username: z.string().min(1).nullable().optional(),
-    password: z.string().min(1).optional(),
-    inboundAuth: z.boolean().optional(),
-    transport: z.enum(TRANSPORTS).optional(),
-    srtp: z.boolean().optional(),
-    tlsVerify: z.boolean().optional(),
-    qualify: z.boolean().optional(),
-    diversion: z.enum(DIVERSION_POLICIES).optional(),
-    outboundProxy: z.string().min(1).nullable().optional(),
-    registerExpiryS: z.number().int().positive().nullable().optional(),
-    registerRetryS: z.number().int().positive().nullable().optional(),
-    inboundNumberFormat: z.enum(NUMBER_FORMATS).optional(),
-    callerIdFormat: z.enum(NUMBER_FORMATS).optional(),
-    callerIdHeader: z.enum(CALLERID_HEADERS).optional(),
-    clir: z.boolean().nullable().optional(),
-    codecs: z.array(z.enum(CODECS)).min(1).nullable().optional(),
-    maxChannels: z.number().int().positive().nullable().optional(),
-    hosts: z.array(hostInputSchema).min(1).optional(),
-    ...logLevelInputFields
-  })
-  .strict();
+const inputSchema = updateInputSchema;
 
 type Input = z.infer<typeof inputSchema>;
 
@@ -184,7 +150,8 @@ type Output = { trunk: TrunkWire; warnings: string[] };
 
 export const update = defineOperation<Input, Output>({
   name: 'trunks.update',
-  description: 'Updates a SIP trunk; password is write-only.',
+  description:
+    'Updates a SIP trunk; hosts replace the list as a whole, password is write-only.',
   input: inputSchema,
   minRole: 'admin',
   entity: input => ({ kind: 'trunk', id: input.id }),

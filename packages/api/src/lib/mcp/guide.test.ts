@@ -103,9 +103,20 @@ describe('callHelp', () => {
     });
   });
 
-  it('throws on an unknown topic', () => {
+  it('throws on an unknown topic, naming how to list the topics and the topics themselves', () => {
     expect(() =>
       callHelp({ topic: 'no-such-topic' }, guideDir, recipesDir)
     ).toThrow(OpError);
+    expect(() =>
+      callHelp({ topic: 'no-such-topic' }, guideDir, recipesDir)
+    ).toThrow(
+      "unknown help topic 'no-such-topic'; call zamfono.help without a topic for the list: mental-model, onboard-employee"
+    );
+  });
+
+  it('reads `index` as the topic list', () => {
+    expect(callHelp({ topic: 'index' }, guideDir, recipesDir)).toEqual({
+      topics: ['mental-model', 'onboard-employee']
+    });
   });
 });

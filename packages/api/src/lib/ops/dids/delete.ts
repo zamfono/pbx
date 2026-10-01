@@ -54,7 +54,8 @@ async function guardDeletable(ctx: Context, didId: string): Promise<void> {
 /** `DELETE /dids/{id}` (§5.9): soft-deletes a DID once nothing still presents it. */
 export const del = defineOperation({
   name: 'dids.delete',
-  description: 'Soft-deletes a DID',
+  description:
+    'Soft-deletes a DID unless it is the main number or presented as caller ID',
   input: inputSchema,
   minRole: 'admin',
   confirm: input => `Delete DID ${input.id}?`,

@@ -16,7 +16,8 @@ const inputSchema = z
 /** `GET /webhooks` (§10.6): the tenant's configured event receivers, keyset-paginated. */
 export const list = defineOperation({
   name: 'webhooks.list',
-  description: "Lists the tenant's webhooks",
+  description:
+    "Lists the tenant's webhooks with their delivery status, ok or failing",
   input: inputSchema,
   minRole: 'admin',
   readOnly: true,

@@ -15,6 +15,7 @@ import {
   isoDatetimeInput,
   liveOooRulesInScope,
   normalizeIsoOrNull,
+  OOO_FIELD_DESCRIPTIONS,
   rangesOverlap,
   scopeFromColumns,
   type ScopeInput
@@ -26,10 +27,16 @@ const STATUS_UNPROCESSABLE_ENTITY = 422;
 const inputSchema = z
   .object({
     id: z.string(),
-    active: z.boolean().optional(),
-    startsAt: isoDatetimeInput.nullable().optional(),
-    expiresAt: isoDatetimeInput.nullable().optional(),
-    target: targetInputSchema.optional()
+    active: z.boolean().optional().describe(OOO_FIELD_DESCRIPTIONS.active),
+    startsAt: isoDatetimeInput
+      .nullable()
+      .optional()
+      .describe(OOO_FIELD_DESCRIPTIONS.startsAt),
+    expiresAt: isoDatetimeInput
+      .nullable()
+      .optional()
+      .describe(OOO_FIELD_DESCRIPTIONS.expiresAt),
+    target: targetInputSchema.optional().describe(OOO_FIELD_DESCRIPTIONS.target)
   })
   .strict();
 
@@ -96,7 +103,8 @@ async function assertNoOverlap(
 /** `PATCH /ooo/{id}` (§10.2 "Out of office"): active flag, schedule and target are editable. */
 export const update = defineOperation<Input, Output>({
   name: 'ooo.update',
-  description: 'Changes an out-of-office rule',
+  description:
+    "Changes an out-of-office rule's activity, start, expiry or target",
   input: inputSchema,
   minRole: 'user',
   entity: input => ({ kind: 'oooRule', id: input.id }),

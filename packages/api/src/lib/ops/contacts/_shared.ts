@@ -11,8 +11,18 @@ const STATUS_UNPROCESSABLE_ENTITY = 422;
 export type ContactRow = Selectable<DB['contacts']>;
 
 export const phoneSchema = z.object({
-  label: z.string().min(1),
-  number: z.string().min(1)
+  label: z
+    .string()
+    .min(1)
+    .describe(
+      "The number's label, such as 'Mobile'; unique within the contact."
+    ),
+  number: z
+    .string()
+    .min(1)
+    .describe(
+      'The number, E.164 or national, normalized to E.164 with settings.country; incoming calls from it show the contact name.'
+    )
 });
 export type PhoneInput = z.infer<typeof phoneSchema>;
 

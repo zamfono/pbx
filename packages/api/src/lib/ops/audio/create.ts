@@ -18,9 +18,15 @@ const uploadSchema = z.object({
 
 export const createAudioAssetInput = z
   .object({
-    kind: z.enum(['greeting', 'moh', 'vmGreeting', 'announcement']),
+    kind: z
+      .enum(['greeting', 'moh', 'vmGreeting', 'announcement'])
+      .describe(
+        "What the asset is for: a menu greeting, hold or ringing music (moh, see zamfono.help music-licensing), a mailbox greeting, or an announcement target's audio."
+      ),
     label: z.string().min(1),
-    upload: uploadSchema
+    upload: uploadSchema.describe(
+      'The file, WAV or MP3, sent as multipart form data; it is transcoded for playback.'
+    )
   })
   .strict();
 

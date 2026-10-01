@@ -15,9 +15,17 @@ const NUMERIC_NUMBER = /^\+[0-9]+$/u;
 
 const inputSchema = z
   .object({
-    number: z.string().min(1).regex(/^\S+$/u, 'number: no whitespace'),
+    number: z
+      .string()
+      .min(1)
+      .regex(/^\S+$/u, 'number: no whitespace')
+      .describe(
+        "The called number: E.164 such as +4989123456, or national such as 089123456, normalized with settings.country; anything else, such as a provider's account name, is matched verbatim."
+      ),
     label: z.string().nullable().optional(),
-    target: targetInputSchema
+    target: targetInputSchema.describe(
+      'Where a call to this number goes; a numeric DID for a user with no caller ID of their own becomes it.'
+    )
   })
   .strict();
 
@@ -58,7 +66,8 @@ async function setCallerIdIfUnset(
 /** `POST /dids` (§10.3 "Extensions & DIDs", §11.3): a DID and the forward target it dials to. */
 export const create = defineOperation({
   name: 'dids.create',
-  description: 'Adds a DID and its forward target',
+  description:
+    'Adds a DID, a phone number the tenant owns, and the forward target its calls go to (zamfono.help numbers)',
   input: inputSchema,
   minRole: 'admin',
   entity: (_input, output: CreateOutput) => ({ kind: 'did', id: output.id }),

@@ -12,12 +12,27 @@ export type OooRuleRow = Selectable<DB['oooRules']>;
  * /users/{id}/ooo`-style route resolves to before calling the operation. `tenant` carries no id,
  * since all three scope columns are NULL for it.
  */
-export const scopeInputSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('tenant') }),
-  z.object({ kind: z.literal('user'), id: z.string() }),
-  z.object({ kind: z.literal('ringGroup'), id: z.string() }),
-  z.object({ kind: z.literal('menu'), id: z.string() })
-]);
+export const scopeInputSchema = z
+  .discriminatedUnion('kind', [
+    z.object({ kind: z.literal('tenant') }),
+    z.object({ kind: z.literal('user'), id: z.string() }),
+    z.object({ kind: z.literal('ringGroup'), id: z.string() }),
+    z.object({ kind: z.literal('menu'), id: z.string() })
+  ])
+  .describe(
+    "Whose it is: the tenant, or a user, ring group or menu by id; a call's target uses its own, else the tenant's."
+  );
+
+/** The meaning of each `ooo.create`/`ooo.update` field (§10.2 "Out of office", §11.2 `ooo_rules`). */
+export const OOO_FIELD_DESCRIPTIONS = {
+  active: 'Whether the rule applies at all; on by default.',
+  startsAt:
+    'When the rule takes effect, ISO 8601 with an offset; null: immediately.',
+  expiresAt:
+    'When the rule ends, after startsAt; null: until deactivated. Active periods within a scope must not overlap.',
+  target:
+    "Where the scope's calls go while the rule is in effect, ahead of opening hours (see zamfono.help vacation-rule)."
+} as const;
 
 export type ScopeInput = z.infer<typeof scopeInputSchema>;
 

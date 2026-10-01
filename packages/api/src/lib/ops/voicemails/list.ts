@@ -19,7 +19,8 @@ const inputSchema = z
  */
 export const list = defineOperation({
   name: 'voicemails.list',
-  description: "Lists voicemails in the caller's own mailbox scope.",
+  description:
+    "Lists voicemails newest first: a user's own mailbox and their ring groups', every mailbox for an admin.",
   input: inputSchema,
   minRole: 'user',
   readOnly: true,

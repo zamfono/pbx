@@ -15,9 +15,11 @@ import {
   assertCallerIdDidValid,
   assertEmailAvailable,
   assertNotLastOwner,
+  EXTENSION_DESCRIPTION,
   findMeSchema,
   liveUser,
   toUserOut,
+  userCallFields,
   type UserOut,
   type UserRow
 } from './_shared.js';
@@ -39,16 +41,26 @@ const inputSchema = z
     id: z.string(),
     name: z.string().min(1).optional(),
     email: z.email().optional(),
-    role: z.enum(['owner', 'admin', 'user']).optional(),
-    extension: z.string().min(1).optional(),
-    ringTimeoutS: z.number().int().positive().optional(),
-    clir: z.boolean().nullable().optional(),
-    rejectAnonymous: z.boolean().nullable().optional(),
-    recordCalls: z.boolean().optional(),
-    notifyMissedCalls: z.boolean().optional(),
-    mailboxEnabled: z.boolean().optional(),
-    mailboxAudioId: z.string().nullable().optional(),
-    calleridDidId: z.string().nullable().optional(),
+    role: z
+      .enum(['owner', 'admin', 'user'])
+      .optional()
+      .describe(
+        'owner and admin configure the stack (only an owner writes owner-only settings), user only their own self-service fields; the last owner cannot be demoted.'
+      ),
+    extension: z.string().min(1).optional().describe(EXTENSION_DESCRIPTION),
+    ...userCallFields,
+    mailboxAudioId: z
+      .string()
+      .nullable()
+      .optional()
+      .describe('The personal voicemail greeting, an audio asset id.'),
+    calleridDidId: z
+      .string()
+      .nullable()
+      .optional()
+      .describe(
+        "The DID presented on the user's outbound calls; null presents the main number, settings.mainDidId (see zamfono.help numbers)."
+      ),
     findMe: findMeSchema.optional(),
     ...logLevelInputFields
   })

@@ -35,7 +35,9 @@ export async function assertNameAvailable(
 }
 
 export const memberSchema = z.object({
-  kind: z.enum(['user', 'userGroup']),
+  kind: z
+    .enum(['user', 'userGroup'])
+    .describe('Whether id names a user or a user group.'),
   id: z.string()
 });
 export type MemberSpec = z.infer<typeof memberSchema>;

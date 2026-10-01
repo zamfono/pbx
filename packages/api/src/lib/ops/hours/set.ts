@@ -25,15 +25,39 @@ const MAX_WEEKDAY = 7;
 const inputSchema = z
   .object({
     scope: scopeInputSchema,
-    active: z.boolean().optional(),
-    closedTarget: targetInputSchema,
-    intervals: z.array(
-      z.object({
-        weekday: z.number().int().min(1).max(MAX_WEEKDAY),
-        opens: z.string(),
-        closes: z.string()
-      })
-    )
+    active: z
+      .boolean()
+      .optional()
+      .describe(
+        "Whether the schedule applies (on by default); off, it is kept and the scope follows the tenant's."
+      ),
+    closedTarget: targetInputSchema.describe(
+      'Where inbound and forwarded calls go outside every open interval; internal calls ignore opening hours.'
+    ),
+    intervals: z
+      .array(
+        z.object({
+          weekday: z
+            .number()
+            .int()
+            .min(1)
+            .max(MAX_WEEKDAY)
+            .describe('ISO 8601 weekday: 1 is Monday, 7 Sunday.'),
+          opens: z
+            .string()
+            .describe(
+              'HH:MM, inclusive, in the tenant time zone (settings.timezone).'
+            ),
+          closes: z
+            .string()
+            .describe(
+              'HH:MM, exclusive, after opens; 24:00 is the end of the day.'
+            )
+        })
+      )
+      .describe(
+        'The weekly open intervals; none may cross midnight, so split one that does in two.'
+      )
   })
   .strict();
 
@@ -85,7 +109,8 @@ async function replaceIntervals(
  */
 export const set = defineOperation<Input, HoursWire>({
   name: 'hours.set',
-  description: "Replaces a scope's opening-hours schedule",
+  description:
+    "Replaces a scope's weekly opening-hours schedule and the target its calls go to while closed",
   input: inputSchema,
   minRole: 'user',
   entity: (_input, output: HoursWire) => ({

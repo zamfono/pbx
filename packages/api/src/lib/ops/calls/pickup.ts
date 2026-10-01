@@ -8,7 +8,15 @@ import {
 } from './_shared.js';
 
 const inputSchema = z
-  .object({ id: z.string(), userId: z.string().optional() })
+  .object({
+    id: z.string(),
+    userId: z
+      .string()
+      .optional()
+      .describe(
+        'The user whose devices take the call; left out, the caller themselves.'
+      )
+  })
   .strict();
 
 /**
@@ -18,7 +26,8 @@ const inputSchema = z
  */
 export const pickup = defineOperation({
   name: 'calls.pickup',
-  description: 'Picks up a call ringing for another party.',
+  description:
+    "Picks up a call ringing for another party, on the picking user's devices.",
   input: inputSchema,
   minRole: 'user',
   audit: false,

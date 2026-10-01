@@ -9,7 +9,9 @@ const STATUS_NOT_FOUND = 404;
 const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 export const memberSchema = z.object({
-  kind: z.enum(['user', 'userGroup']),
+  kind: z
+    .enum(['user', 'userGroup'])
+    .describe('Whether id names a user or a user group.'),
   id: z.string()
 });
 export type MemberSpec = z.infer<typeof memberSchema>;

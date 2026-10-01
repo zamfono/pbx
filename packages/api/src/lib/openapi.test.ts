@@ -51,7 +51,12 @@ describe('the OpenAPI request bodies describe the REST contract (§10.3)', () =>
 
   it('keeps a plain write free of `confirm` and still forbids a strict schema’s unknown keys', () => {
     const presence = bodySchema('/users/{id}/presence', 'put');
-    expect(presence.properties).toEqual({ dnd: { type: 'boolean' } });
+    expect(presence.properties).toEqual({
+      dnd: {
+        type: 'boolean',
+        description: expect.stringContaining('Do not disturb') as unknown
+      }
+    });
     expect(presence.required).toEqual(['dnd']);
     expect(accepts(presence, { dnd: true })).toBe(true);
     expect(accepts(presence, { dnd: true, colour: 'red' })).toBe(false);

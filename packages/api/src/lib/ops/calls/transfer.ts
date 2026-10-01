@@ -8,7 +8,15 @@ import {
 } from './_shared.js';
 
 const inputSchema = z
-  .object({ id: z.string(), target: z.string().min(1) })
+  .object({
+    id: z.string(),
+    target: z
+      .string()
+      .min(1)
+      .describe(
+        'What to dial, as a phone would: an extension, or an external number E.164 or national.'
+      )
+  })
   .strict();
 
 /**
@@ -18,7 +26,8 @@ const inputSchema = z
  */
 export const transfer = defineOperation({
   name: 'calls.transfer',
-  description: 'Blind-transfers a live call to another target.',
+  description:
+    'Blind-transfers a live call to an extension or number; the transferee is routed there as a new call.',
   input: inputSchema,
   minRole: 'user',
   audit: false,

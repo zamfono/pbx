@@ -16,9 +16,11 @@ const STATUS_UNPROCESSABLE_ENTITY = 422;
 export const setMenuTargetsInput = z
   .object({
     id: z.string(),
-    targets: z.array(
-      z.object({ digits: digitsSchema, target: targetSpecSchema })
-    )
+    targets: z
+      .array(z.object({ digits: digitsSchema, target: targetSpecSchema }))
+      .describe(
+        'Each key string and the forward target it routes to; a matched target re-enters routing without counting a hop.'
+      )
   })
   .strict();
 

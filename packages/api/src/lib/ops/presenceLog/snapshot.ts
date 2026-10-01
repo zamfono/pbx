@@ -4,8 +4,15 @@ import { defineOperation } from '../types.js';
 
 const inputSchema = z
   .object({
-    at: z.string(),
-    userId: z.string().optional()
+    at: z
+      .string()
+      .describe(
+        'The past instant, ISO 8601, whose presence states are returned.'
+      ),
+    userId: z
+      .string()
+      .optional()
+      .describe('Only this user; left out, every user.')
   })
   .strict();
 

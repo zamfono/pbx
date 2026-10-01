@@ -11,6 +11,22 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Added
+
+- A help topic `numbers` (`zamfono.help`, and `reference/numbers.md` in the Claude Code skill):
+  DIDs, number blocks of both kinds, a fixed digit count after the base or open-ended, the main
+  number, the block and tenant-wide fallbacks and the most precise match, with a worked example
+  of a German PBX line (Anlagenanschluss). The glossary, `mental-model` and `routing-order` point
+  to it.
+
+### Changed
+
+- MCP clients and the OpenAPI document now describe what an operation's input fields mean, not
+  just their names and types: every tool's input schema carries a one-sentence `description` per
+  field whose meaning is not obvious, and terse tool descriptions say what the operation does.
+- `zamfono.help` with an unknown topic still fails with 404, but its message now lists every
+  topic; `index` lists them like a call without a topic, and the server instructions say so.
+
 ## [0.1.0] - 2026-09-30
 
 ### Added

@@ -10,7 +10,8 @@ const inputSchema = z
 /** `GET /mailTemplates/{kind}/{language}` (§10.3 "Mail templates"): the effective template. */
 export const get = defineOperation({
   name: 'mailTemplates.get',
-  description: 'Reads one mail template',
+  description:
+    'Reads the effective mail template of a kind and language: the tenant override, else the shipped one',
   input: inputSchema,
   minRole: 'admin',
   readOnly: true,

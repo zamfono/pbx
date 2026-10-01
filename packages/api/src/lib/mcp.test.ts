@@ -149,7 +149,13 @@ describe('handleMcpRequest, 2026-07-28', () => {
     );
     expect(body.result).toMatchObject({
       isError: true,
-      structuredContent: { status: 404 }
+      structuredContent: {
+        status: 404,
+        // The client learns from the error itself how to find the topics, and which there are.
+        title: expect.stringMatching(
+          /call zamfono\.help without a topic for the list: .*\bnumbers\b/u
+        ) as string
+      }
     });
   });
 

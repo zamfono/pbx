@@ -16,8 +16,10 @@ import {
 import { mailDb, setupLinkFor } from './_setupMail.js';
 import {
   assertEmailAvailable,
+  EXTENSION_DESCRIPTION,
   findMeSchema,
   toUserOut,
+  userCallFields,
   type UserOut
 } from './_shared.js';
 
@@ -31,14 +33,14 @@ const inputSchema = z
   .object({
     name: z.string().min(1),
     email: z.email(),
-    role: z.enum(CREATABLE_ROLES).optional(),
-    extension: z.string().min(1),
-    ringTimeoutS: z.number().int().positive().optional(),
-    clir: z.boolean().nullish(),
-    rejectAnonymous: z.boolean().nullish(),
-    recordCalls: z.boolean().optional(),
-    notifyMissedCalls: z.boolean().optional(),
-    mailboxEnabled: z.boolean().optional(),
+    role: z
+      .enum(CREATABLE_ROLES)
+      .optional()
+      .describe(
+        "admin configures the stack, user only their own self-service fields; 'user' by default, owner only by promotion through users.update."
+      ),
+    extension: z.string().min(1).describe(EXTENSION_DESCRIPTION),
+    ...userCallFields,
     findMe: findMeSchema.optional()
   })
   .strict();

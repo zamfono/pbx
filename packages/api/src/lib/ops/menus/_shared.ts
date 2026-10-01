@@ -71,7 +71,22 @@ export async function assertNameAvailable(
 }
 
 /** The digit strings `menu_targets.digits` accepts: one or more of `0-9 * #` (§11.2). */
-export const digitsSchema = z.string().regex(/^[0-9*#]+$/u);
+export const digitsSchema = z
+  .string()
+  .regex(/^[0-9*#]+$/u)
+  .describe('The keys the caller presses, one or more of 0-9 * #.');
+
+/** The meaning of each `menus.create`/`menus.update` field (§10.1 step 6, §11.2 `menus`). */
+export const MENU_FIELD_DESCRIPTIONS = {
+  audioId: 'The greeting, an audio asset of kind announcement.',
+  timeoutS:
+    'Seconds to wait for the first key after the greeting; 5 by default.',
+  maxAttempts:
+    'Greeting replays on silence or an unmapped string before fallbackTarget applies; 3 by default.',
+  allowExtensionDialing:
+    'Lets an unmapped string that is a live user or ring-group extension route to it; off by default.',
+  fallbackTarget: 'Where the call goes after the last attempt.'
+} as const;
 
 export type MenuTargetOut = { digits: string; target: TargetSpec };
 

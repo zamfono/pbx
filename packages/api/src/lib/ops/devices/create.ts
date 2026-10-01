@@ -30,9 +30,23 @@ const inputSchema = z
   .object({
     userId: z.string(),
     label: z.string().min(1),
-    kind: z.enum(DEVICE_KINDS),
-    transport: z.enum(TRANSPORTS).optional(),
-    allowedIps: z.array(z.string()).optional()
+    kind: z
+      .enum(DEVICE_KINDS)
+      .describe(
+        "manual: a softphone or desk phone configured by hand with the returned credentials; ringotel: the user's Ringotel app account, at most one per user (see zamfono.help ringotel-setup)."
+      ),
+    transport: z
+      .enum(TRANSPORTS)
+      .optional()
+      .describe(
+        'tls (the default): SIP over TLS from anywhere; plain: UDP or TCP from allowedIps only, manual devices alone (see zamfono.help remote-workers).'
+      ),
+    allowedIps: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'IPs or CIDR ranges, IPv4 or IPv6, the only sources a plain device may register and call from; required for plain, refused for tls.'
+      )
   })
   .strict();
 /**

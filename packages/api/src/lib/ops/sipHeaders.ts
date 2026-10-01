@@ -27,16 +27,19 @@ export const UDP_HEADERS_ROOM_BYTES =
 const headerSchema = z.object({
   name: z
     .string()
-    .regex(
-      SIP_HEADER_NAME_PATTERN,
-      'name must be X- and 1-64 of A-Z a-z 0-9 -'
-    ),
-  value: z.string().superRefine((value, ctx) => {
-    const parsed = parseSipHeaderValue(value);
-    if (!parsed.ok) {
-      ctx.addIssue({ code: 'custom', message: `value has ${parsed.reason}` });
-    }
-  })
+    .regex(SIP_HEADER_NAME_PATTERN, 'name must be X- and 1-64 of A-Z a-z 0-9 -')
+    .describe('The header name: X- and 1 to 64 of A-Z a-z 0-9 -.'),
+  value: z
+    .string()
+    .superRefine((value, ctx) => {
+      const parsed = parseSipHeaderValue(value);
+      if (!parsed.ok) {
+        ctx.addIssue({ code: 'custom', message: `value has ${parsed.reason}` });
+      }
+    })
+    .describe(
+      'Literal text with {{placeholder}} substitutions such as {{callerNumber}}, {{did}} or {{calledExtension}}.'
+    )
 });
 
 /** A `sip` target's `headers`: no count limit, but names unique without case and at most

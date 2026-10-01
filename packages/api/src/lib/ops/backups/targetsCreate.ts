@@ -8,6 +8,7 @@ import { defineOperation } from '../types.js';
 import {
   paramsSchema,
   targetKindSchema,
+  targetSecretSchema,
   targetToWire,
   withDefaultForgetPolicy,
   type BackupTargetWire
@@ -17,8 +18,13 @@ const inputSchema = z
   .object({
     kind: targetKindSchema,
     params: paramsSchema,
-    secret: z.string().min(1),
-    enabled: z.boolean().optional()
+    secret: targetSecretSchema,
+    enabled: z
+      .boolean()
+      .optional()
+      .describe(
+        'Whether scheduled runs back up to this target; on for a new one.'
+      )
   })
   .strict();
 
@@ -27,7 +33,8 @@ type Input = z.infer<typeof inputSchema>;
 /** `POST /backups/targets` (§6.5 "Backups"): a restic destination for the nightly backup job. */
 export const targetsCreate = defineOperation<Input, BackupTargetWire>({
   name: 'backups.targets.create',
-  description: 'Adds a backup target',
+  description:
+    'Adds a backup target, a restic repository every scheduled run (settings.backupCron) backs up to while enabled',
   input: inputSchema,
   minRole: 'admin',
   entity: (_input, output: BackupTargetWire) => ({

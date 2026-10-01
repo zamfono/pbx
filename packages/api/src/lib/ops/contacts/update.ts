@@ -22,7 +22,12 @@ export const updateContactInput = z
     displayName: z.string().min(1).optional(),
     company: z.string().nullish(),
     email: z.email().nullish(),
-    phones: z.array(phoneSchema).optional()
+    phones: z
+      .array(phoneSchema)
+      .optional()
+      .describe(
+        'The contact numbers; on update, the set is replaced as a whole.'
+      )
   })
   .strict();
 

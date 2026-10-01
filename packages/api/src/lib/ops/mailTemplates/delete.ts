@@ -16,7 +16,8 @@ const inputSchema = z
  */
 export const del = defineOperation({
   name: 'mailTemplates.delete',
-  description: "Removes a tenant's mail template override",
+  description:
+    "Removes a tenant's mail template override, so the shipped template applies again",
   input: inputSchema,
   minRole: 'admin',
   confirm: input => `Remove the ${input.language} override for ${input.kind}?`,
