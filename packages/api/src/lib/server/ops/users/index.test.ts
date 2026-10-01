@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
+import { loginLimiter } from '$lib/server/limiter.js';
 import { installRingotelFake } from '$lib/server/provisioning/ringotelFake.js';
 import { encrypt, keyringFromEnv } from '$lib/server/secretbox.js';
 import { makeTestDb } from '$lib/server/testDb.js';
@@ -10,8 +11,7 @@ import { onPropagate, runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';
 
 import '../devices/index.js';
-
-import { setAccountLockLookup } from './index.js';
+import './index.js';
 
 process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
 process.env.ORIGIN ??= 'https://pbx.example.test';
@@ -1060,9 +1060,11 @@ describe('users', () => {
     const db = await makeTestDb();
     await seedTenant(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
-    setAccountLockLookup(email =>
-      email === 'anna@x.test' ? { until: '2026-09-22T12:15:00.000Z' } : null
-    );
+    const lockThreshold = 5;
+    for (let attempt = 0; attempt < lockThreshold; attempt += 1) {
+      loginLimiter.loginFailed('anna@x.test');
+    }
+    const locked = loginLimiter.isLocked('anna@x.test');
 
     try {
       const read = await runOperation<unknown, { lockedUntil: string | null }>(
@@ -1071,9 +1073,12 @@ describe('users', () => {
         { id: user.user.id },
         asRun()
       );
-      expect(read.lockedUntil).toBe('2026-09-22T12:15:00.000Z');
+      expect(locked.locked).toBe(true);
+      expect(read.lockedUntil).toBe(
+        locked.locked ? new Date(locked.until).toISOString() : null
+      );
     } finally {
-      setAccountLockLookup(undefined);
+      loginLimiter.loginSucceeded('anna@x.test');
     }
   });
 

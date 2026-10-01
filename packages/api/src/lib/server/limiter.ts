@@ -166,3 +166,8 @@ export class Limiter {
     return win.count <= RESET_ACCOUNT_LIMIT;
   }
 }
+
+/** The login's limiter (§5.5), one for the process's lifetime: counters reset on an `api`
+ *  restart. It holds both of the login's counters, the per-address volume limit and the
+ *  per-account lock, which the login form counts and the user record reports. */
+export const loginLimiter = new Limiter();

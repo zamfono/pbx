@@ -1,12 +1,8 @@
 /**
- * The §5.5 account lock, as the user record reports it. The lock itself lives in `api`'s memory
- * alongside the login limiter's counters, so the operations layer reads it through a lookup the
- * process installs at startup rather than from a column. Without an installed lookup — a job, a
- * test, an `api` that has served no login yet — no account is locked.
+ * The §5.5 account lock, as the user record reports it ("an active lock is visible to admins on
+ * the user record"). The lock lives in the login limiter's memory, not in a column.
  */
-export type AccountLockLookup = (
-  account: string
-) => { until: string } | null | undefined;
+import { loginLimiter } from '$lib/server/limiter.js';
 
 /**
  * The key the §5.5 account lock is counted and looked up under: the e-mail, lower-cased.
@@ -18,22 +14,8 @@ export function accountLockKey(email: string): string {
   return email.toLowerCase();
 }
 
-// One mutable module slot, held in an object rather than a `let`: ESLint's `init-declarations`
-// and `no-undef-init` leave no way to declare an optional `let` binding directly.
-const lookupHolder: { current: AccountLockLookup | undefined } = {
-  current: undefined
-};
-
-/** Installs the lookup that answers from the login limiter's lock table (§5.5), keyed by
- *  `accountLockKey`. */
-export function setAccountLockLookup(
-  lookup: AccountLockLookup | undefined
-): void {
-  lookupHolder.current = lookup;
-}
-
-/** The ISO instant `email`'s lock expires at, or `null` while the account is not locked (§5.5).
- *  The lookup is asked under `accountLockKey(email)`, the key the login locked it under. */
+/** The ISO instant `email`'s lock expires at, or `null` while the account is not locked (§5.5). */
 export function accountLockedUntil(email: string): string | null {
-  return lookupHolder.current?.(accountLockKey(email))?.until ?? null;
+  const lock = loginLimiter.isLocked(accountLockKey(email));
+  return lock.locked ? new Date(lock.until).toISOString() : null;
 }

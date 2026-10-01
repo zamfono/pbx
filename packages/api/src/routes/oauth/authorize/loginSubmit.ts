@@ -17,10 +17,9 @@ import { loginRedirect } from '$lib/server/auth/loginRedirect.js';
 import { verifyPassword } from '$lib/server/auth/password.js';
 import { setSealedCookie } from '$lib/server/auth/sealedCookie.js';
 import { getDb } from '$lib/server/db.js';
+import { loginLimiter } from '$lib/server/limiter.js';
 import { accountLockKey } from '$lib/server/ops/users/_accountLock.js';
 import { keyringFromEnv } from '$lib/server/secretbox.js';
-
-import { loginLimiter } from './loginLimiter.js';
 
 const STATUS_FOUND = 302;
 

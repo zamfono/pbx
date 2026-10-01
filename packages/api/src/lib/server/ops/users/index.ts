@@ -24,8 +24,3 @@ register(setForwarding);
 register(setPresence);
 register(setVoicemailGreeting);
 register(clearVoicemailGreeting);
-
-export {
-  setAccountLockLookup,
-  type AccountLockLookup
-} from './_accountLock.js';

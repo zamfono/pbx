@@ -1,23 +1,9 @@
 import { error, type RequestEvent } from '@sveltejs/kit';
 
 import { addressKey } from '$lib/server/addressKey.js';
-import { Limiter } from '$lib/server/limiter.js';
-import { setAccountLockLookup } from '$lib/server/ops/users/_accountLock.js';
+import { loginLimiter } from '$lib/server/limiter.js';
 
 const STATUS_TOO_MANY_REQUESTS = 429;
-
-/** The login's limiter (§5.5), one for the process's lifetime: counters reset on an `api`
- *  restart. It holds both of the login's counters, the per-address volume limit and the
- *  per-account lock. */
-export const loginLimiter = new Limiter();
-
-// §5.5 "an active lock is visible to admins on the user record": the lock lives in this limiter's
-// memory, so this module is the only one that can answer for it, and the operations layer reads it
-// through the lookup installed here.
-setAccountLockLookup(account => {
-  const lock = loginLimiter.isLocked(account);
-  return lock.locked ? { until: new Date(lock.until).toISOString() } : null;
-});
 
 /**
  * Counts one login submission against the client address (§5.5 "Login | client address | 60
