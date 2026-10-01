@@ -4,10 +4,8 @@
 // SQLITE_LOCKED, is retried five times at 5 s intervals; a migration that fails on its own merits
 // exits 1 at once, so a broken release stops the deployment without running its failing migration
 // again. Node runs this file directly (type stripping).
-import console from 'node:console';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import Database from 'better-sqlite3';
 import { Kysely, SqliteDialect } from 'kysely';

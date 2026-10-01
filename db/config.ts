@@ -1,6 +1,5 @@
 import { existsSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
-import process from 'node:process';
 import Database from 'better-sqlite3';
 import { defineConfig } from 'kysely-ctl';
 

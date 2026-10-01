@@ -114,6 +114,10 @@ export default tseslint.config(
       ],
       ...[
         'capitalized-comments',
+        // TypeScript's definite-assignment analysis already refuses a read before the first
+        // write, and with `no-undef-init` this rule would leave `let x: T | undefined;` no legal
+        // spelling at all.
+        'init-declarations',
         'sort-keys',
         'max-statements',
         'no-continue',
@@ -126,6 +130,25 @@ export default tseslint.config(
         rules[name] = 'off';
         return rules;
       }, {})
+    }
+  },
+  {
+    // The plain JavaScript files are Node scripts and configs, run by Node.
+    files: ['**/*.js', '**/*.mjs'],
+    languageOptions: {
+      globals: globals.node
+    }
+  },
+  {
+    // Command-line scripts, whose output is what they print.
+    files: [
+      'scripts/**',
+      '.github/scripts/**',
+      'packages/api/scripts/**',
+      'db/migrate.ts'
+    ],
+    rules: {
+      'no-console': 'off'
     }
   },
   {

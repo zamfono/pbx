@@ -14,7 +14,6 @@
 //
 //   node scripts/check-spec-compose-listings.mjs
 import { execFileSync } from 'node:child_process';
-import console from 'node:console';
 import {
   existsSync,
   mkdtempSync,
@@ -24,7 +23,6 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const EXIT_FAILURE = 1;
