@@ -23,7 +23,7 @@ FROM caddy:2.11.4 AS runtime
 # Links the published package to its repository (§6.3 "Images").
 LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
 
-# The defect this image exists to fix (§6.4's change-log entry): upstream Caddy runs as root and
+# Why this image runs Caddy as uid 1000 (§6.3 "Images"): upstream Caddy runs as root and
 # certmagic writes its certificate store 0700 root:root, so `api` (uid 1000, as §6.3 "Migrations"
 # requires of every container sharing a volume) could never read it. This image runs Caddy as
 # uid 1000 instead — the same id `node` and the remapped `asterisk` user already use — and owns

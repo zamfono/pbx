@@ -7,7 +7,7 @@ Closes #
 **Specification:**
 
 - [ ] No behaviour described in `docs/spec.md` changes, or
-- [ ] `docs/spec.md` is updated in this pull request, with a paragraph in its change log
+- [ ] `docs/spec.md` is updated in this pull request, with a paragraph in `docs/spec-changes.md`
 
 **Operators:**
 

@@ -6,7 +6,7 @@ What changes for the people who run a Zamfono stack, release by release. The for
 description, and ships in its bundle next to `compose.yaml`.
 
 **Upgrade notes** say what to do beyond deploy/README.md step 8's usual upgrade; a release
-without them needs nothing else. The specification's own change log (`docs/spec.md`) records
+without them needs nothing else. The specification's own change log (`docs/spec-changes.md`) records
 why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]

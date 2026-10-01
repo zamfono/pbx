@@ -14,7 +14,7 @@
 // be edited by a bot), so a version-only bump there must pass with no spec change; the image name
 // itself, and everything else in the listing, still has to match byte-for-byte. On a mismatch this
 // prints a unified diff and says where to fix it: the listing in docs/spec.md §6.3, with the change
-// logged at the top of the spec.
+// logged in docs/spec-changes.md.
 //
 //   node scripts/check-spec-compose-listings.mjs
 import { execFileSync } from 'node:child_process';
@@ -196,7 +196,7 @@ function main() {
     console.error(`\n--- deploy/${failure.file} ---`);
     console.error(failure.diff);
     console.error(
-      `update the listing in docs/spec.md §6.3 and log the change at the top of the spec`
+      `update the listing in docs/spec.md §6.3 and log the change in docs/spec-changes.md`
     );
   }
   if (failures.length > 0) process.exit(EXIT_FAILURE);

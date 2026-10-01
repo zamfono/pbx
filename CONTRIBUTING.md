@@ -14,8 +14,8 @@ Bugs in Asterisk itself belong upstream — see the note in `SECURITY.md`.
 
 `docs/spec.md` is the contract the code is built against. A change that alters behaviour it
 describes changes the specification too, in the same pull request, as the smallest edit that
-does it, and adds a paragraph to the change log at its top (`**<date> · <section>.** <change>`,
-then `*Why:* <reason>`, newest first).
+does it, and adds a paragraph at the top of its change log, `docs/spec-changes.md`
+(`**<date> · <section>.** <change>`, then `*Why:* <reason>`, newest first).
 
 ## Pull requests
 
