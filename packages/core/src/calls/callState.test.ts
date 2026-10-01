@@ -10,6 +10,7 @@ import {
   callPartiesChanged,
   callRinging,
   callUp,
+  liveView,
   type CallStateDeps
 } from './callState.js';
 import type { GroupLeg } from './groupLegs.js';
@@ -72,10 +73,12 @@ describe('a live call’s users (§10.3 "Live calls", §10.6)', () => {
   });
 
   function live(): { userIds: string[]; connectedUserIds: string[] } {
-    const entry = deps.state.calls.get(call.id);
+    const view = liveView(
+      deps.state.calls.get(call.id) ?? expect.unreachable()
+    );
     return {
-      userIds: [...(entry?.userIds ?? [])].sort(),
-      connectedUserIds: [...(entry?.connectedUserIds ?? [])].sort()
+      userIds: [...view.userIds].sort(),
+      connectedUserIds: [...view.connectedUserIds].sort()
     };
   }
 

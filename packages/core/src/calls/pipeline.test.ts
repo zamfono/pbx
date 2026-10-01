@@ -21,6 +21,7 @@ import {
 } from '../ari/types.js';
 import { eventually } from '../testing/eventually.js';
 import { newCall, type Call } from './call.js';
+import { liveView } from './callState.js';
 import {
   ConfigCache,
   EventBus,
@@ -580,7 +581,7 @@ describe('Pipeline', () => {
     // While up, the call is in the live view `GET /internal/state` serves.
     const live = pipeline.deps.state.calls.get(call?.id ?? '');
     expect(live?.state).toBe('up');
-    expect(live?.userIds).toContain(userId);
+    expect(liveView(live ?? expect.unreachable()).userIds).toContain(userId);
   });
 
   it('hands the answered participation to the recorder (§10.2 "Call recording")', async () => {

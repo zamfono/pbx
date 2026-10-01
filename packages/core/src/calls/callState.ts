@@ -2,7 +2,7 @@
  * The live view of a call: `StateStore.calls`, which `GET /internal/state` serves (§3.1), and the
  * `call.state` events `/events` subscribers and webhooks receive (§10.6). Both track the same
  * three moments, so both are written here and cannot drift apart. Whose call it is changes in
- * between, as legs start and stop ringing: the live view reads its users from the `Call` each time
+ * between, as legs start and stop ringing: `liveView` reads its users from the `Call` each time
  * it is served, and `callPartiesChanged` tells the users the call starts or stops being theirs.
  */
 import type { LiveCall } from '@zamfono/shared';
@@ -14,9 +14,14 @@ import { presentCallerUserId } from './callLookup.js';
 /** The two collaborators the live view needs, so `CdrWriter` can publish the end as well. */
 export type CallStateDeps = { state: StateStore; bus: EventBus };
 
-/** The users each call's last `call.state` event reached, so the ones it no longer reaches get
- * their `ended`. */
-const notified = new WeakMap<Call, ReadonlySet<string>>();
+/** A call in the live view (`StateStore.calls`): the call itself, the state it is in, and the
+ * users its last `call.state` event reached, so the ones it no longer reaches get their
+ * `ended`. */
+export type LiveEntry = {
+  call: Call;
+  state: 'ringing' | 'up';
+  notified: ReadonlySet<string>;
+};
 
 /**
  * Every user whose call this is to see (§10.3 "Live calls", §10.6 "own calls"): the caller, the
@@ -74,22 +79,20 @@ function peerOf(call: Call): string {
   return call.direction === 'inbound' ? call.from : call.to;
 }
 
-function liveCall(call: Call, state: LiveCall['state']): LiveCall {
+/** What `GET /internal/state` serves of `entry` (§3.1), read from the call when served, so a leg
+ * that starts or stops ringing counts from that moment. */
+export function liveView(entry: LiveEntry): LiveCall {
+  const { call } = entry;
   return {
     callId: call.id,
     direction: call.direction,
     from: call.from,
     to: call.to,
-    state,
+    state: entry.state,
     startedAt: call.startedAt,
     ringGroupId: call.ringGroupId,
-    // Read when served, so a leg that starts or stops ringing counts from that moment.
-    get userIds() {
-      return participants(call);
-    },
-    get connectedUserIds() {
-      return connected(call);
-    }
+    userIds: participants(call),
+    connectedUserIds: connected(call)
   };
 }
 
@@ -114,27 +117,27 @@ function emit(
   });
 }
 
-/** The users `call`'s last event reached that are not among `current`. */
-function leftSince(call: Call, current: string[]): string[] {
-  return [...(notified.get(call) ?? [])].filter(id => !current.includes(id));
+/** The users `entry`'s last event reached that are not among `current`. */
+function leftSince(
+  entry: LiveEntry | undefined,
+  current: readonly string[]
+): string[] {
+  return [...(entry?.notified ?? [])].filter(id => !current.includes(id));
 }
 
+/** `call` is in `state` now: a user it is no longer the call of receives `ended`, as a
+ * `usersOnly` event, and every one it is the call of its state. */
 function publish(
   deps: CallStateDeps,
   call: Call,
-  state: 'ringing' | 'up' | 'ended'
+  state: 'ringing' | 'up'
 ): void {
   const current = participants(call);
-  const left = leftSince(call, current);
-  if (state === 'ended') {
-    notified.delete(call);
-    emit(deps, call, state, [...current, ...left], false);
-    return;
-  }
+  const left = leftSince(deps.state.calls.get(call.id), current);
+  deps.state.calls.set(call.id, { call, state, notified: new Set(current) });
   if (left.length > 0) {
     emit(deps, call, 'ended', left, true);
   }
-  notified.set(call, new Set(current));
   emit(deps, call, state, current, false);
 }
 
@@ -144,37 +147,37 @@ function publish(
  * as a `usersOnly` event; nothing for a call not in the live view.
  */
 export function callPartiesChanged(deps: CallStateDeps, call: Call): void {
-  const live = deps.state.calls.get(call.id);
-  if (live === undefined) {
+  const entry = deps.state.calls.get(call.id);
+  if (entry === undefined) {
     return;
   }
-  const before = notified.get(call) ?? new Set<string>();
   const current = participants(call);
-  const left = leftSince(call, current);
-  const joined = current.filter(id => !before.has(id));
-  notified.set(call, new Set(current));
+  const left = leftSince(entry, current);
+  const joined = current.filter(id => !entry.notified.has(id));
+  deps.state.calls.set(call.id, { ...entry, notified: new Set(current) });
   if (left.length > 0) {
     emit(deps, call, 'ended', left, true);
   }
   if (joined.length > 0) {
-    emit(deps, call, live.state, joined, true);
+    emit(deps, call, entry.state, joined, true);
   }
 }
 
 /** The call has started ringing a target; repeated as the target changes down a forward chain. */
 export function callRinging(deps: CallStateDeps, call: Call): void {
-  deps.state.calls.set(call.id, liveCall(call, 'ringing'));
   publish(deps, call, 'ringing');
 }
 
 /** The call is answered and bridged. */
 export function callUp(deps: CallStateDeps, call: Call): void {
-  deps.state.calls.set(call.id, liveCall(call, 'up'));
   publish(deps, call, 'up');
 }
 
-/** The call is over, however it ended; the live view drops it. */
+/** The call is over, however it ended; the live view drops it, and every user its last event
+ * reached receives `ended` with those it is the call of now. */
 export function callEnded(deps: CallStateDeps, call: Call): void {
+  const entry = deps.state.calls.get(call.id);
   deps.state.calls.delete(call.id);
-  publish(deps, call, 'ended');
+  const current = participants(call);
+  emit(deps, call, 'ended', [...current, ...leftSince(entry, current)], false);
 }

@@ -8,7 +8,6 @@ import {
   openDb,
   rawDataToString,
   type Db,
-  type LiveCall,
   type Presence,
   type TrunkStatus
 } from '@zamfono/shared';
@@ -17,6 +16,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import type { Logger } from '../ari/types.js';
+import { newCall } from '../calls/call.js';
 import {
   ConfigCache,
   EventBus,
@@ -158,17 +158,16 @@ describe('startInternalServer', () => {
   });
 
   it('answers /internal/state with the StateStore snapshot', async () => {
-    const call: LiveCall = {
-      callId: newId(),
+    const call = newCall({
+      id: newId(),
       direction: 'inbound',
+      callerChannelId: newId(),
       from: '+15550002',
       to: '+15550001',
-      state: 'ringing',
       startedAt: nowIso(),
-      ringGroupId: null,
-      userIds: [],
-      connectedUserIds: []
-    };
+      logLevel: 'events',
+      callLogMaxBytes: 1_048_576
+    });
     const trunk: TrunkStatus = {
       status: 'registered',
       statusChangedAt: nowIso()
@@ -179,7 +178,7 @@ describe('startInternalServer', () => {
       ringGroupId: null,
       since: nowIso()
     };
-    state.calls.set(call.callId, call);
+    state.calls.set(call.id, { call, state: 'ringing', notified: new Set() });
     state.trunks.set('mainTrunk', trunk);
     state.presence.set('user1', presence);
     state.trunkChannels.set('mainTrunk', 2);
@@ -191,7 +190,19 @@ describe('startInternalServer', () => {
     const response = await fetch(`http://127.0.0.1:${port}/internal/state`);
     expect(response.status).toBe(HTTP_OK);
     await expect(response.json()).resolves.toEqual({
-      calls: [call],
+      calls: [
+        {
+          callId: call.id,
+          direction: 'inbound',
+          from: '+15550002',
+          to: '+15550001',
+          state: 'ringing',
+          startedAt: call.startedAt,
+          ringGroupId: null,
+          userIds: [],
+          connectedUserIds: []
+        }
+      ],
       trunks: { mainTrunk: trunk },
       trunkChannels: { mainTrunk: 2 },
       presence: { user1: presence },

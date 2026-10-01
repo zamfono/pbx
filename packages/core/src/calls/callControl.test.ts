@@ -17,6 +17,7 @@ import { Presence } from '../presence.js';
 import { eventually } from '../testing/eventually.js';
 import { CallActions } from './actions.js';
 import { newCall, type Call } from './call.js';
+import { liveView } from './callState.js';
 import type { GroupLeg } from './groupLegs.js';
 import { registerActiveBatch } from './groupPickup.js';
 import { Pipeline } from './pipeline.js';
@@ -417,9 +418,10 @@ describe('call control', () => {
     expect(pipeline.callByChannel.get(call.callerChannelId)).toBe(consultation);
     // The history's caller stays the member; the live control is the parties' still in it.
     expect(consultation.callerUserId).toBe(memberId);
-    expect(state.calls.get(consultation.id)?.connectedUserIds).toEqual([
-      targetId
-    ]);
+    expect(
+      liveView(state.calls.get(consultation.id) ?? expect.unreachable())
+        .connectedUserIds
+    ).toEqual([targetId]);
     const original = await eventually(async () => {
       const row = await rowOf(call.id);
       expect(row?.endedAt).not.toBeNull();

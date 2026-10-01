@@ -4,18 +4,16 @@
  * that has to be derived at the moment it is served, wire in the function that derives it.
  * `server.ts` re-exports `StateStore` as part of its public API.
  */
-import type {
-  LiveCall,
-  Presence,
-  StateResponse,
-  TrunkStatus
-} from '@zamfono/shared';
+import type { Presence, StateResponse, TrunkStatus } from '@zamfono/shared';
+
+import { liveView, type LiveEntry } from '../calls/callState.js';
 
 /** In-memory live state (§3, `GET /internal/state`): calls, trunk registration and channels in
  * use, presence, registered devices, recording-mix failures, and what the maintenance gate asks
  * (§6.4): Asterisk's open channels and the recordings in progress. */
 export class StateStore {
-  readonly calls = new Map<string, LiveCall>();
+  /** The calls in progress, served through `liveView` (`callState.ts`). */
+  readonly calls = new Map<string, LiveEntry>();
   readonly trunks = new Map<string, TrunkStatus>();
   /** Active legs per trunk id (§9.4 "Channels"), which `TrunkState` counts. */
   readonly trunkChannels = new Map<string, number>();
@@ -61,7 +59,7 @@ export class StateStore {
 
   async snapshot(): Promise<StateResponse> {
     return {
-      calls: [...this.calls.values()],
+      calls: [...this.calls.values()].map(liveView),
       trunks: Object.fromEntries(this.trunks),
       trunkChannels: Object.fromEntries(this.trunkChannels),
       presence: Object.fromEntries(this.presence),

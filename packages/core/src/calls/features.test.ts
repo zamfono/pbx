@@ -23,7 +23,7 @@ import {
 } from '../testing/eventually.js';
 import { newCall, type Call, type Leg } from './call.js';
 import { channelOf, otherChannelIn } from './callLookup.js';
-import { callUp } from './callState.js';
+import { callUp, liveView } from './callState.js';
 import { handleFeature, retrieveParkedCall } from './features.js';
 import { handleOutbound } from './outbound.js';
 import { Pipeline, type PipelineDeps } from './pipeline.js';
@@ -2464,7 +2464,9 @@ describe('features', () => {
       activeCall
     );
     expect(
-      pipeline.deps.state.calls.get(activeCall.id)?.connectedUserIds
+      liveView(
+        pipeline.deps.state.calls.get(activeCall.id) ?? expect.unreachable()
+      ).connectedUserIds
     ).toEqual([parkerUserId]);
   }, 10_000);
 

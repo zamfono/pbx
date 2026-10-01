@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db, type Envelope } from '@zamfono/shared';
+import {
+  newId,
+  nowIso,
+  openDb,
+  type Db,
+  type Envelope,
+  type LiveCall
+} from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
@@ -8,6 +15,7 @@ import { FakeAri, isPlacement, placedCallerId } from '../ari/fake.js';
 import { defaultChannel, type Channel, type Logger } from '../ari/types.js';
 import { eventually, requestTo } from '../testing/eventually.js';
 import { newCall, type Call, type Leg } from './call.js';
+import { liveView } from './callState.js';
 import {
   ConfigCache,
   EventBus,
@@ -387,16 +395,15 @@ describe('ringGroup', () => {
       events
         .filter(event => event.userIds.includes(userId))
         .map(event => `${event.state}${event.usersOnly ? '*' : ''}`);
-    const liveUsers = (): string[] =>
-      [...(pipeline.deps.state.calls.get(call.id)?.userIds ?? [])].sort();
+    const live = (): LiveCall =>
+      liveView(pipeline.deps.state.calls.get(call.id) ?? expect.unreachable());
+    const liveUsers = (): string[] => [...live().userIds].sort();
     fakeAri.answerAfterMs = 60_000;
 
     const finished = ringGroup(pipeline, call, groupId);
     await membersRinging(call, 3);
     expect(liveUsers()).toEqual([...members].sort());
-    expect(pipeline.deps.state.calls.get(call.id)?.connectedUserIds).toEqual(
-      []
-    );
+    expect(live().connectedUserIds).toEqual([]);
     const listed = await ari.channels.list();
     const channelOf = (index: number): string =>
       listed.find(entry => entry.name === `PJSIP/seen-${index}`)?.id ?? '';
@@ -420,9 +427,7 @@ describe('ringGroup', () => {
     await finished;
 
     expect(liveUsers()).toEqual([winning]);
-    expect(pipeline.deps.state.calls.get(call.id)?.connectedUserIds).toEqual([
-      winning
-    ]);
+    expect(live().connectedUserIds).toEqual([winning]);
     // `*` marks an event for these users alone: the call is new to them, or no longer theirs.
     expect(eventsFor(declining)).toEqual(['ringing*', 'ended*']);
     expect(eventsFor(losing)).toEqual(['ringing*', 'up', 'ended*']);
