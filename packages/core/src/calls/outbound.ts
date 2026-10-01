@@ -96,6 +96,12 @@ export async function handleOutbound(
     channel.id,
     snapshot.settings.language
   );
+  if (transfer !== null) {
+    call.log.event({
+      event: 'transferredFrom',
+      parentCallId: transfer.parentCallId
+    });
+  }
   call.log.event({ event: 'entry', dialAction: action.kind, dialed });
   markCallerInCall(pipeline, call, action);
 

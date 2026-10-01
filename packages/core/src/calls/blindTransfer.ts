@@ -20,45 +20,11 @@ import {
 import type { Pipeline } from './pipeline.js';
 import { fromOf, transfereeEntry, userOfChannel } from './transfers.js';
 
-// `handleOutbound` registers the transferee's new call after its own config-snapshot read, a few
-// event-loop turns after the `StasisStart` both it and `followBlindTransfers` receive.
-const REGISTER_POLL_ATTEMPTS = 50;
-
 /** The transferee's channel and the Local half bridged with it, and the bridge they share. */
 type LocalLine = { transfereeId: string; localId: string; bridgeId: string };
 
-type BlindState = {
-  /** Transferees expected to re-enter as themselves, by channel id, with their parent call id. */
-  reentering: Map<string, string>;
-  /** Each Local line, under both of its channel ids. */
-  lines: Map<string, LocalLine>;
-};
-
-function nextMacrotask(): Promise<void> {
-  return new Promise(resolve => {
-    setImmediate(() => {
-      resolve();
-    });
-  });
-}
-
-/** Links the transferee's new call to its parent once `handleOutbound` has registered it. */
-async function attachParent(
-  pipeline: Pipeline,
-  channelId: string,
-  parentCallId: string
-): Promise<void> {
-  for (let attempt = 0; attempt < REGISTER_POLL_ATTEMPTS; attempt += 1) {
-    const call = pipeline.callByChannel.get(channelId);
-    if (call !== undefined) {
-      call.parentCallId = parentCallId;
-      call.log.event({ event: 'transferredFrom', parentCallId });
-      return;
-    }
-    // eslint-disable-next-line no-await-in-loop -- each turn gives the pipeline's own StasisStart handler time to register the call
-    await nextMacrotask();
-  }
-}
+/** Each Local line, under both of its channel ids. */
+type BlindState = { lines: Map<string, LocalLine> };
 
 /**
  * `BridgeBlindTransfer`: the transferrer leaves `call`, which closes, and their channel, left
@@ -92,9 +58,11 @@ async function onBlindTransfer(
     const snapshot = await pipeline.deps.cache.get();
     const diallingHalf =
       replacement === undefined ? null : localDiallingHalf(replacement.name);
-    if (diallingHalf === null || replacement === undefined) {
-      state.reentering.set(transferee.id, call.id);
-    } else if (bridgeId !== null) {
+    if (
+      diallingHalf !== null &&
+      replacement !== undefined &&
+      bridgeId !== null
+    ) {
       const line = {
         transfereeId: transferee.id,
         localId: replacement.id,
@@ -104,7 +72,8 @@ async function onBlindTransfer(
       state.lines.set(replacement.id, line);
     }
     // §10.1: the onward call is routed as the transferrer's, so it carries their identity into
-    // `handleOutbound` rather than the transferee's own (§9.4 route and caller-ID selection).
+    // `handleOutbound` rather than the transferee's own (§9.4 route and caller-ID selection), and
+    // its parent.
     setPendingTransfer(pipeline, diallingHalf ?? transferee.id, {
       parentCallId: call.id,
       transferrerUserId: userOfChannel(call, transferrer.id),
@@ -142,7 +111,7 @@ async function endLocalLine(
 
 /** Subscribes to `pipeline`'s ARI stream for the blind transfers Asterisk executes on `REFER`. */
 export function followBlindTransfers(pipeline: Pipeline): void {
-  const state: BlindState = { reentering: new Map(), lines: new Map() };
+  const state: BlindState = { lines: new Map() };
   pipeline.deps.ari.on('event', (ev: AriEvent) => {
     if (ev.type === 'BridgeBlindTransfer') {
       onBlindTransfer(pipeline, state, ev).catch(() => undefined);
@@ -154,16 +123,7 @@ export function followBlindTransfers(pipeline: Pipeline): void {
     }
     if (ev.type === 'ChannelDestroyed') {
       endLocalLine(pipeline, state, channel.id).catch(() => undefined);
-    }
-    const parentCallId = state.reentering.get(channel.id);
-    if (parentCallId === undefined) {
-      return;
-    }
-    if (ev.type === 'StasisStart') {
-      state.reentering.delete(channel.id);
-      attachParent(pipeline, channel.id, parentCallId).catch(() => undefined);
-    } else if (ev.type === 'ChannelDestroyed') {
-      state.reentering.delete(channel.id);
+      // A transferee whose channel ended before it re-entered takes no onward call.
       dropPendingTransfer(pipeline, channel.id);
     }
   });

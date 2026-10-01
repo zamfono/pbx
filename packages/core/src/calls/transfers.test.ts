@@ -363,13 +363,16 @@ describe('transfers', () => {
     }
     const childRow = await db
       .selectFrom('calls')
-      .select(['parentCallId', 'status', 'direction', 'didId'])
+      .select(['parentCallId', 'status', 'direction', 'didId', 'log'])
       .where('id', '=', child?.id ?? '')
       .executeTakeFirstOrThrow();
     expect(childRow.parentCallId).toBe(call.id);
     expect(childRow.status).toBe('answered');
     expect(childRow.direction).toBe('inbound');
     expect(childRow.didId).toBe(call.didId);
+    expect(childRow.log).toContain(
+      `"event":"transferredFrom","parentCallId":"${call.id}"`
+    );
   });
 
   it("routes a blind transfer to an external number as the transferrer's call (§10.1)", async () => {
