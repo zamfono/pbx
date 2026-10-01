@@ -29,11 +29,11 @@ env:
   # test/integration/scenarios/device-tls-srtp's baresip device (test/load/stress's own image,
   # test/load/stress/devices/Dockerfile), which compose.test.yaml's `devices` service names.
   DEVICES_IMAGE: zamfono/test-devices:ci
-  # The upstream sipp image compose.test.yaml runs, by the exact name it asks the runtime for.
-  # `images` pulls it into the archive, so no later job pulls from Docker Hub and both runtimes
-  # bring up the same bytes. main.yaml pushes only the six zamfono/ images, so this stays
-  # unpublished.
-  SIPP_IMAGE: ctaloi/sipp:latest
+  # The upstream sipp image compose.test.yaml runs, by the exact name it asks the runtime for: its
+  # pinned SIPp 3.5.1 (`x-sipp-image`). `images` pulls it into the archive, so no later job pulls
+  # from Docker Hub and both runtimes bring up the same bytes. main.yaml pushes only the six
+  # zamfono/ images, so this stays unpublished.
+  SIPP_IMAGE: ctaloi/sipp:latest@sha256:c459f2340443ddcc159227efc798217dbdaad0dbe88b76b78b1a876aa271986a
 
 jobs:
   unit:
@@ -127,7 +127,11 @@ jobs:
           echo "FROM $ASTERISK_IMAGE" \
             | docker build --label "org.zamfono.asterisk.version=$version" -t "$ASTERISK_IMAGE" -
       - name: Pull the upstream image the harness runs
-        run: docker pull "$SIPP_IMAGE"
+        # Tagged, since an archive keeps an image's tag but not the digest it was pulled by, and
+        # Podman finds the digest only on a named image.
+        run: |
+          docker pull "$SIPP_IMAGE"
+          docker tag "$SIPP_IMAGE" "${SIPP_IMAGE%@*}"
       - name: Remove the bake builder
         # Its layer store holds a second copy of every image and their build stages, and the
         # runner's disk cannot fit that, the loaded images and the archive below at once. Bake has
@@ -139,7 +143,7 @@ jobs:
         run: |
           docker save -o /tmp/images.tar \
             "$MIGRATE_IMAGE" "$CORE_IMAGE" "$API_IMAGE" "$ASTERISK_IMAGE" "$PROXY_IMAGE" \
-            "$UPDATER_IMAGE" "$DEVICES_IMAGE" "$SIPP_IMAGE"
+            "$UPDATER_IMAGE" "$DEVICES_IMAGE" "${SIPP_IMAGE%@*}"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: images
@@ -250,8 +254,9 @@ jobs:
         run: |
           sudo apt-get update
           # aardvark-dns is only a Recommends of netavark, and without it no service resolves another
-          # by name: core's first ARI connect to `asterisk` fails with EAI_AGAIN.
-          sudo apt-get install -y --no-install-recommends podman aardvark-dns
+          # by name: core's first ARI connect to `asterisk` fails with EAI_AGAIN. catatonit, a
+          # Recommends of podman, is the init the harness's idle tool services run (`init: true`).
+          sudo apt-get install -y --no-install-recommends podman aardvark-dns catatonit
           version=$(sudo podman version --format '{{.Client.Version}}')
           echo "podman $version"
           if [ "${version%%.*}" -lt 5 ]; then

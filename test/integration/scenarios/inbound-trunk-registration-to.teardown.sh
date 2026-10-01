@@ -28,21 +28,12 @@ api_delete "/dids/$did_id"
 api_delete "/trunks/$trunk_id"
 rm -f "$(state_file registration-to)"
 
-# `-m 1`: the run answers that one REGISTER and ends by itself, so nothing is left on the port and
-# no process has to be killed (a killed sipp can linger as a zombie the next setup's `pgrep` sees).
-ended=false
-for _ in $(seq 1 $ATTEMPTS); do
-  # shellcheck disable=SC2086
-  if ! $compose exec -T sipp-provider pgrep -f 'provider-unregister' >/dev/null 2>&1; then
-    ended=true
-    break
-  fi
-  sleep 1
-done
+# `-m 1`: the run answers that one REGISTER and ends by itself, so nothing is left on the port.
 # shellcheck disable=SC2086
-$compose exec -T sipp-provider grep -qiE '^Expires: *0' "$TRACE" 2>/dev/null && [ "$ended" = true ] || {
+if ! await_sipp_run sipp-provider provider-unregister $ATTEMPTS \
+  || ! $compose exec -T sipp-provider grep -qiE '^Expires: *0' "$TRACE"; then
   # shellcheck disable=SC2086
   $compose exec -T sipp-provider sh /scenarios/_sipp-finish.sh 5 >/dev/null 2>&1 || true
   echo "the deleted trunk's de-registration never reached the provider" >&2
   exit 1
-}
+fi

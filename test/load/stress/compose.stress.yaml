@@ -26,6 +26,7 @@ services:
     volumes:
       - ${LOAD_GEN_DIR:?set by the stress session}:/load-gen
     entrypoint: ['sleep', 'infinity']
+    init: true
     depends_on:
       api:
         condition: service_healthy

@@ -28,6 +28,10 @@
 #     sipp/sipp-provider correctly, from their own SDP) but near-zero inbound.
 # Asterisk's actual local RTP port range still comes from RTP_PORT_START/END in .env regardless of
 # this address -- unrelated to which address gets advertised in SDP.
+
+# The same pinned sipp as compose.test.yaml's `x-sipp-image`.
+x-sipp-image: &sipp-image ${SIPP_IMAGE:-ctaloi/sipp:latest@sha256:c459f2340443ddcc159227efc798217dbdaad0dbe88b76b78b1a876aa271986a}
+
 networks:
   internal:
     ipam:
@@ -61,13 +65,14 @@ services:
     image: ${PROXY_IMAGE:?set by session.sh}
 
   sipp:
-    image: ${SIPP_IMAGE:-ctaloi/sipp:latest}
+    image: *sipp-image
     networks:
       - internal
     volumes:
       - ${SCENARIOS_DIR:?set by session.sh}:/scenarios:ro
       - ${LOAD_SCENARIOS_DIR:?set by session.sh}:/load-scenarios:ro
     entrypoint: ['sleep', 'infinity']
+    init: true
     cap_add:
       - NET_RAW
     depends_on:
@@ -75,19 +80,20 @@ services:
         condition: service_healthy
 
   sipp-phone:
-    image: ${SIPP_IMAGE:-ctaloi/sipp:latest}
+    image: *sipp-image
     networks:
       - internal
     volumes:
       - ${SCENARIOS_DIR:?set by session.sh}:/scenarios:ro
       - ${LOAD_SCENARIOS_DIR:?set by session.sh}:/load-scenarios:ro
     entrypoint: ['sleep', 'infinity']
+    init: true
     depends_on:
       api:
         condition: service_healthy
 
   sipp-provider:
-    image: ${SIPP_IMAGE:-ctaloi/sipp:latest}
+    image: *sipp-image
     networks:
       - internal
     volumes:
@@ -95,6 +101,7 @@ services:
       - ${LOAD_SCENARIOS_DIR:?set by session.sh}:/load-scenarios:ro
       - ${LOAD_GEN_DIR:?set by session.sh}:/load-gen
     entrypoint: ['sleep', 'infinity']
+    init: true
     cap_add:
       - NET_RAW
     depends_on:

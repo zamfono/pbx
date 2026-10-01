@@ -100,7 +100,8 @@ dc exec -T asterisk asterisk -rx "pjsip qualify $SIP_USERNAME" >/dev/null 2>&1 |
 sleep 1
 
 log "generating the ulaw transcoding pcap"
-python3 "$here/make_ulaw_pcap.py" "${SIPP_IMAGE:-ctaloi/sipp:latest}" "$LOAD_GEN_DIR/g711u.pcap" \
+# From the image the `sipp` service runs (compose.load.yaml's `x-sipp-image`).
+python3 "$here/make_ulaw_pcap.py" "$(dc ps --format '{{.Image}}' sipp)" "$LOAD_GEN_DIR/g711u.pcap" \
   || fail "could not build the ulaw pcap"
 
 # ---------------------------------------------------------------------------

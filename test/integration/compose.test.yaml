@@ -3,6 +3,11 @@
 # registers and answers it. Layered over compose.yaml and compose.ports.yaml, so what CI exercises
 # is the file an operator runs, not a copy of it.
 #
+# The harness's sipp: SIPp 3.5.1, the build `ctaloi/sipp` has published since 2017, pinned by
+# digest, since the harness depends on what that release does (no TLS Asterisk's transports
+# accept, `-aa` probes counted against `-m`, `play_pcap_audio` played asynchronously).
+x-sipp-image: &sipp-image ${SIPP_IMAGE:-ctaloi/sipp:latest@sha256:c459f2340443ddcc159227efc798217dbdaad0dbe88b76b78b1a876aa271986a}
+
 # `internal` has a fixed subnet and `asterisk` a fixed address on it, which `.env` names as
 # `EXTERNAL_IPV4` (steps.sh): the ports mode writes that address into SIP and SDP (§9.1), and the
 # sipp containers are peers on `internal`, not clients on the host's network, so it has to be the
@@ -72,16 +77,18 @@ services:
   # address plays the trunk, the other the phone. Sharing one would make every REGISTER from the
   # phone resolve to the trunk endpoint instead.
   sipp:
-    image: ${SIPP_IMAGE:-ctaloi/sipp:latest}
+    image: *sipp-image
     networks:
       - internal
     # An absolute path from `run.sh`: a relative one resolves against the project directory,
-    # which is `deploy/`, and Docker creates whatever it does not find, so the container would
-    # mount an empty directory and every scenario would fail to load.
+    # which is the run's stack directory, and Docker creates whatever it does not find, so the
+    # container would mount an empty directory and every scenario would fail to load.
     volumes:
       - ${SCENARIOS_DIR:?set by run.sh}:/scenarios:ro
-    # Driven by `run.sh` through `exec`; the container itself just stays up.
+    # Driven by `run.sh` through `exec`; the container itself just stays up. Its init reaps what
+    # the runs leave, such as the process sipp's `exec` action starts (`uas/pickup.xml`).
     entrypoint: ['sleep', 'infinity']
+    init: true
     # sipp's `play_pcap_audio` sends its RTP through a raw socket. Docker grants NET_RAW by
     # default, Podman does not, so the capability is asked for explicitly.
     cap_add:
@@ -91,12 +98,13 @@ services:
         condition: service_healthy
 
   sipp-phone:
-    image: ${SIPP_IMAGE:-ctaloi/sipp:latest}
+    image: *sipp-image
     networks:
       - internal
     volumes:
       - ${SCENARIOS_DIR:?set by run.sh}:/scenarios:ro
     entrypoint: ['sleep', 'infinity']
+    init: true
     # The phone speaks too where a recording needs its own voice (`uas/answer-speak.xml`).
     cap_add:
       - NET_RAW
@@ -108,19 +116,20 @@ services:
   # by the registered contact's `line` tag or by digest authentication alone (§9.4 "Inbound
   # identification"), never by where they come from.
   sipp-provider:
-    image: ${SIPP_IMAGE:-ctaloi/sipp:latest}
+    image: *sipp-image
     networks:
       - internal
     volumes:
       - ${SCENARIOS_DIR:?set by run.sh}:/scenarios:ro
     entrypoint: ['sleep', 'infinity']
+    init: true
     depends_on:
       api:
         condition: service_healthy
 
   # `inbound-forward-sip`'s trunk host (§9.4 "SIP targets"): a TLS front, a few lines of Node the
-  # scenario's setup runs, relaying to the `sipp` container over TCP, since the harness's sipp (3.5.1) offers no TLS
-  # version Asterisk's transports accept. The scenario's setup copies its self-signed certificate
+  # scenario's setup runs, relaying to the `sipp` container over TCP, since the harness's sipp
+  # (3.5.1) offers no TLS version Asterisk's transports accept. The scenario's setup copies its self-signed certificate
   # in and starts it; idle otherwise, like the sipp containers. The image is the one api and core
   # are built from.
   sip-tls:
@@ -130,6 +139,7 @@ services:
     volumes:
       - ${SCENARIOS_DIR:?set by run.sh}:/scenarios:ro
     entrypoint: ['sleep', 'infinity']
+    init: true
     depends_on:
       api:
         condition: service_healthy
@@ -146,6 +156,7 @@ services:
     networks:
       - internal
     entrypoint: ['sleep', 'infinity']
+    init: true
     depends_on:
       api:
         condition: service_healthy

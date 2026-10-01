@@ -19,6 +19,21 @@ container_ip() {
   $compose exec -T "$1" hostname -i | tr -d '\r' | awk '{print $1}'
 }
 
+# Waits up to `$3` seconds for the sipp run tagged `$2` in container `$1` (`_sipp-run.sh`) to
+# end, which it says by writing its exit status.
+await_sipp_run() {
+  local attempt
+  for attempt in $(seq 1 "$3"); do
+    # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
+    if $compose exec -T "$1" test -f "/tmp/sipp-runs/$2.exit"; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "the sipp run $2 in $1 did not end within $attempt s" >&2
+  return 1
+}
+
 # The ring group every trunk scenario's DID points at: the one `configure.sh` created.
 ci_group() {
   api GET /ringGroups | python3 -c "
