@@ -52,16 +52,26 @@ echo "==> setup.sh (non-interactive, in the unpacked bundle)"
 [ -f "$bundle_dir/x/CHANGELOG.md" ]
 # The password hasher defaults to the bundle's own api image.
 (cd "$bundle_dir/x" && bash -c '. setup/checks.sh && api_image') | grep -qx 'ghcr.io/zamfono/api:1.2.3'
-(cd "$bundle_dir/x" && SETUP_NONINTERACTIVE=1 ZAMFONO_MODE=ports EXTERNAL_IPV4=198.51.100.7 \
-  FQDN=pbx.example.com COMPANY_NAME="O'Brien & \$ons" MAIN_DID=+4930123456 COUNTRY=de \
-  BOOTSTRAP_OWNER_NAME=Owner BOOTSTRAP_OWNER_EMAIL=owner@example.com \
-  BOOTSTRAP_OWNER_PASSWORD_HASH='$argon2id$v=19$m=65536,p=4,t=3$c2FsdA$aGFzaA' \
-  ./setup.sh </dev/null >/dev/null 2>&1)
+# run_setup [NAME=VALUE...] — setup.sh with every answer from the environment, plus these.
+run_setup() {
+  (cd "$bundle_dir/x" && env SETUP_NONINTERACTIVE=1 ZAMFONO_MODE=ports EXTERNAL_IPV4=198.51.100.7 \
+    FQDN=pbx.example.com COMPANY_NAME="O'Brien & \$ons" MAIN_DID=+4930123456 COUNTRY=de \
+    BOOTSTRAP_OWNER_NAME=Owner BOOTSTRAP_OWNER_EMAIL=owner@example.com \
+    BOOTSTRAP_OWNER_PASSWORD_HASH='$argon2id$v=19$m=65536,p=4,t=3$c2FsdA$aGFzaA' \
+    "$@" ./setup.sh </dev/null >/dev/null 2>&1)
+}
+# A TZ that names no time zone is refused before anything is written.
+if run_setup TZ=Europe/Viena || [ -e "$bundle_dir/x/.env" ]; then
+  echo "setup.sh took TZ=Europe/Viena" >&2
+  exit 1
+fi
+run_setup TZ=Europe/Vienna
 [ "$(stat -c %a "$bundle_dir/x/.env")" = 600 ]
 setup_config=$(cd "$bundle_dir/x" && docker compose -f compose.yaml -f compose.ports.yaml config)
 echo "$setup_config" | grep -qF "COMPANY_NAME: O'Brien & \$\$ons"
 echo "$setup_config" | grep -qF 'BOOTSTRAP_OWNER_PASSWORD_HASH: $$argon2id$$v=19$$m=65536,p=4,t=3$$c2FsdA$$aGFzaA'
 echo "$setup_config" | grep -qF 'COUNTRY: DE'
+echo "$setup_config" | grep -qF 'TZ: Europe/Vienna'
 echo "$setup_config" | grep -qE 'SECRETBOX_KEY: "?1:'
 echo "$setup_config" | grep -qE 'BACKUP_PASSWORD: "?[0-9a-f]{48}'
 echo "$setup_config" | grep -qF 'source: backups'

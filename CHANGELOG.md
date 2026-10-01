@@ -131,6 +131,10 @@ why the specified behaviour changed; the commit history, how.
 - REST and `/events` accepted the access token of a user whose stored role is none of `owner`,
   `admin` and `user`, acting with the role the token was issued with, while MCP refused it. Such a
   token is now refused everywhere, with 401 on REST and MCP and a closed socket on `/events`.
+- A `TZ` in `.env` that names no time zone, such as a misspelt `Europe/Viena`, made every
+  opening-hours, backup and maintenance decision of a tenant without its own time zone run in UTC,
+  without a word. `setup.sh` now accepts only a time zone the host's time zone database holds,
+  and `api` and `core` log an error at start when `TZ` names none.
 - A permission fix: a user could hang up or transfer a call in progress they no longer took part
   in, as an earlier target of a forwarded call or after parking or transferring it, and kept
   seeing it in `calls.list` (`live: true`) and on `/events` until it ended; the user who

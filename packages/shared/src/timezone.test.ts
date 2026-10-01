@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { isIanaTimeZone, resolveTenantTimeZone } from './timezone.js';
+import {
+  isIanaTimeZone,
+  resolveTenantTimeZone,
+  stackTimeZoneError
+} from './timezone.js';
 
 describe('isIanaTimeZone', () => {
   it.each(['Europe/Berlin', 'America/New_York', 'UTC', 'Etc/UTC'])(
@@ -40,5 +44,16 @@ describe('resolveTenantTimeZone', () => {
       'Europe/Vienna'
     );
     expect(resolveTenantTimeZone('Mars/Olympus', 'CET-1CEST')).toBe('UTC');
+  });
+});
+
+describe('stackTimeZoneError', () => {
+  it('says nothing about a usable or unset TZ', () => {
+    expect(stackTimeZoneError('Europe/Vienna')).toBeUndefined();
+    expect(stackTimeZoneError(undefined)).toBeUndefined();
+  });
+
+  it('names a TZ that is no IANA zone', () => {
+    expect(stackTimeZoneError('Europe/Viena')).toMatch(/^TZ=Europe\/Viena /u);
   });
 });

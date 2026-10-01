@@ -40,6 +40,12 @@ v_extlen() { [[ $1 =~ ^[0-9]+$ ]] && (($1 >= 2)); }
 v_port() { [[ $1 =~ ^[0-9]+$ ]] && (($1 >= 1 && $1 <= 65535)); }
 v_mode() { [[ $1 == ports || $1 == macvlan ]]; }
 v_security() { [[ $1 == tls || $1 == starttls ]]; }
+# An IANA name, such as Europe/Berlin, that the host's time zone database holds, where it has one;
+# api and core take any other TZ for UTC.
+v_tz() {
+  [[ $1 =~ ^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*$ ]] &&
+    [[ ! -d /usr/share/zoneinfo || -f /usr/share/zoneinfo/$1 ]]
+}
 
 # ask VAR VALIDATOR TITLE TEXT [DEFAULT] — sets VAR, from the environment when it holds a valid
 # value, else by asking until the answer is valid or the user aborts.
@@ -156,7 +162,7 @@ main() {
   ask COUNTRY v_country "Country" "The ISO 3166-1 country code, e.g. DE."
   COUNTRY=${COUNTRY^^}
   ask EXT_LENGTH v_extlen "Extension length" "Digits per internal extension (at least 2)." 3
-  ask TZ v_nonempty "Time zone" "The stack's time zone." "$(detect_tz)"
+  ask TZ v_tz "Time zone" "The stack's IANA time zone, e.g. Europe/Berlin." "$(detect_tz)"
   ask BOOTSTRAP_OWNER_NAME v_nonempty "Owner name" "The first owner's full name."
   ask BOOTSTRAP_OWNER_EMAIL v_email "Owner email" "The first owner's email address, also the login."
   ask_mail

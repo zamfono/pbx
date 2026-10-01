@@ -6,7 +6,13 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import pino from 'pino';
 
-import { nowIso, openDb, resolveVersion, type Db } from '@zamfono/shared';
+import {
+  nowIso,
+  openDb,
+  resolveVersion,
+  stackTimeZoneError,
+  type Db
+} from '@zamfono/shared';
 
 import { AmiClient } from './ami/client.js';
 import { AriClient } from './ari/client.js';
@@ -47,6 +53,10 @@ function createLogger(): Logger {
 /** §7 "Version": the first line `core` logs, before anything that can fail boots. */
 function logStartup(log: Logger): void {
   log.info({ version: resolveVersion(process.env).display }, 'core starting');
+  const timeZoneError = stackTimeZoneError(process.env.TZ);
+  if (timeZoneError !== undefined) {
+    log.error(timeZoneError);
+  }
 }
 
 function createAriClient(env: CoreEnv, log: Logger): AriClient {

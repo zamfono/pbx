@@ -13,7 +13,12 @@ import { fileURLToPath } from 'node:url';
 import pino from 'pino';
 import { WebSocketServer, type WebSocket } from 'ws';
 
-import { openDb, resolveVersion, type Db } from '@zamfono/shared';
+import {
+  openDb,
+  resolveVersion,
+  stackTimeZoneError,
+  type Db
+} from '@zamfono/shared';
 
 import { EventHub } from '$lib/server/events.js';
 import { authenticateEventsSocket } from '$lib/server/eventsAuth.js';
@@ -86,6 +91,10 @@ function exitOnSignal(server: http.Server): void {
 export async function main(): Promise<void> {
   // §7 "Version": the first line api logs, before anything that can fail boots.
   logger.info({ version: zamfonoVersion.display }, 'api starting');
+  const timeZoneError = stackTimeZoneError(process.env.TZ);
+  if (timeZoneError !== undefined) {
+    logger.error(timeZoneError);
+  }
   const db = openDb(requireEnv('DB_FILE'));
   const jwtSecret = requireEnv('JWT_SECRET');
   // Fails the boot here, since the SvelteKit bundle only skips its jobs without a keyring.

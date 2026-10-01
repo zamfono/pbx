@@ -28,9 +28,9 @@ export function isIanaTimeZone(name: string): boolean {
 
 /**
  * The zone every hour-based feature evaluates in (§11.4, §6.4 "All hours resolve in the tenant's
- * time zone"): `settings.timezone`, else the stack's `TZ`, else UTC. A value `Intl` cannot use —
- * a row written before `settings.update` validated the field, or a POSIX-style `TZ` — counts as
- * absent, so a bad zone falls through the chain instead of throwing inside a call or a job.
+ * time zone"): `settings.timezone`, else the stack's `TZ`, else UTC. A value `Intl` cannot use,
+ * such as a POSIX-style `TZ`, counts as absent, so a bad zone falls through the chain instead of
+ * throwing inside a call or a job; `stackTimeZoneError` is what api and core log about it.
  */
 export function resolveTenantTimeZone(
   settingsTimezone: string | null,
@@ -43,4 +43,17 @@ export function resolveTenantTimeZone(
     return stackTz;
   }
   return FALLBACK_TIMEZONE;
+}
+
+/**
+ * The error api and core log once at start when the stack's `TZ` names no IANA time zone, which
+ * `resolveTenantTimeZone` passes over for UTC; `undefined` for a usable or unset `TZ`.
+ */
+export function stackTimeZoneError(
+  stackTz: string | undefined
+): string | undefined {
+  if (stackTz === undefined || isIanaTimeZone(stackTz)) {
+    return undefined;
+  }
+  return `TZ=${stackTz} names no IANA time zone; a tenant without settings.timezone runs on UTC`;
 }
