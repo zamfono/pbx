@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { MS_PER_SECOND, nowIso, resolveVersion } from '@zamfono/shared';
 
 import { signAccessToken } from '../auth/jwtSigning.js';
-import { mcpResourceUri } from '../auth/resource.js';
 import { handleMcpRequest, type McpDeps } from '../mcp.js';
 import { register } from '../ops/registry.js';
 import { defineOperation } from '../ops/types.js';
@@ -66,20 +65,18 @@ register(
   })
 );
 
-export function bearer(sub = 'owner'): string {
-  const nowS = Math.floor(Date.now() / MS_PER_SECOND);
-  return signAccessToken(
-    JWT_SECRET,
-    { sub, role: 'owner', cid: CLIENT_ID },
-    nowS,
-    mcpResourceUri(ORIGIN)
-  );
-}
+/** The owner's access token, signed once per test file, which ends well within its 15 minutes. */
+export const OWNER_TOKEN = await signAccessToken(
+  JWT_SECRET,
+  { sub: 'owner', role: 'owner', cid: CLIENT_ID },
+  Math.floor(Date.now() / MS_PER_SECOND),
+  ORIGIN
+);
 
 export function mcpRequest(
   body: unknown,
   headers: Record<string, string> = {},
-  token = bearer()
+  token = OWNER_TOKEN
 ): Request {
   return new Request(`${ORIGIN}/mcp`, {
     method: 'POST',

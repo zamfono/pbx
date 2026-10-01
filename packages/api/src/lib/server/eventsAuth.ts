@@ -40,7 +40,7 @@ async function actorForToken(
   token: string
 ): Promise<Actor | null> {
   const nowS = Math.floor((deps.now?.() ?? Date.now()) / MS_PER_SECOND);
-  const claims = verifyAccessToken(deps.jwtSecret, token, nowS);
+  const claims = await verifyAccessToken(deps.jwtSecret, token, nowS);
   if (!claims) {
     return null;
   }

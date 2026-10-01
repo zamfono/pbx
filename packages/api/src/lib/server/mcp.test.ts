@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { nowIso } from '@zamfono/shared';
 
 import { signAccessToken } from './auth/jwtSigning.js';
-import { mcpResourceUri } from './auth/resource.js';
 import { handleMcpRequest } from './mcp.js';
 import { protectedResourceMetadata } from './mcp/auth.js';
 import { callHelp } from './mcp/guide.js';
@@ -465,11 +464,11 @@ describe('handleMcpRequest, legacy 2025-11-25', () => {
     const events = readSseEvents(response);
     const elicit = (await events.next()).value as { id: string };
 
-    const otherActorToken = signAccessToken(
+    const otherActorToken = await signAccessToken(
       JWT_SECRET,
       { sub: 'someone-else', role: 'owner', cid: CLIENT_ID },
       Math.floor(Date.now() / 1000),
-      mcpResourceUri(ORIGIN)
+      ORIGIN
     );
     await deps.db
       .insertInto('users')

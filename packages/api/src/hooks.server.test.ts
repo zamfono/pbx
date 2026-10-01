@@ -166,11 +166,11 @@ describe('hooks handle', () => {
 
   it('sets locals.actor and locals.clientId from a valid bearer token', async () => {
     const nowS = Math.floor(Date.now() / MS_PER_SECOND);
-    const token = signAccessToken(
+    const token = await signAccessToken(
       JWT_SECRET,
       { sub: 'admin1', role: 'admin', cid: 'client1' },
       nowS,
-      'https://pbx.example.com/mcp'
+      'https://pbx.example.com'
     );
     const event = eventFor('http://internal/api/v1/users', {
       headers: { authorization: `Bearer ${token}` }

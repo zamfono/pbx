@@ -139,7 +139,7 @@ async function resolveActor(request: Request): Promise<AuthResult> {
     return ANONYMOUS;
   }
   const nowS = Math.floor(Date.now() / MS_PER_SECOND);
-  const claims = verifyAccessToken(
+  const claims = await verifyAccessToken(
     requiredJwtSecret(),
     header.slice(BEARER_PREFIX.length),
     nowS

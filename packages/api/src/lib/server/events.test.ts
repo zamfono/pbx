@@ -245,11 +245,11 @@ describe('authenticateEventsSocket', () => {
         resolve();
       });
     });
-    const token = signAccessToken(
+    const token = await signAccessToken(
       JWT_SECRET,
       { sub: 'u1', role: 'user', cid: null },
       NOW_S,
-      'https://pbx.example.com/mcp'
+      'https://pbx.example.com'
     );
     client.send(JSON.stringify({ type: 'auth', token }));
     expect(await serverResult).toEqual({

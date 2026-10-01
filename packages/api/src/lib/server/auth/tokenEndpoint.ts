@@ -12,7 +12,7 @@ import {
   STATUS_OK,
   type BaseDeps
 } from './oauthHttp.js';
-import { mcpResourceUri, requestedResourceAcceptable } from './resource.js';
+import { requestedResourceAcceptable } from './resource.js';
 import { issueRefresh, rotateRefresh } from './tokens.js';
 
 const BEARER_TOKEN_TYPE = 'Bearer';
@@ -73,11 +73,11 @@ async function handleAuthorizationCode(
   }
   const nowIso = deps.now();
   const nowS = Math.floor(Date.parse(nowIso) / MS_PER_SECOND);
-  const accessToken = signAccessToken(
+  const accessToken = await signAccessToken(
     deps.jwtSecret,
     { sub: user.id, role: user.role, cid: clientId },
     nowS,
-    mcpResourceUri(deps.origin)
+    deps.origin
   );
   const refresh = await issueRefresh(deps.db, user.id, clientId, nowIso);
   return tokenResponse(accessToken, refresh.raw);
@@ -106,11 +106,11 @@ async function handleRefreshToken(
     return oauthError(STATUS_BAD_REQUEST, 'invalid_grant');
   }
   const nowS = Math.floor(Date.parse(nowIso) / MS_PER_SECOND);
-  const accessToken = signAccessToken(
+  const accessToken = await signAccessToken(
     deps.jwtSecret,
     { sub: user.id, role: user.role, cid: rotated.clientId },
     nowS,
-    mcpResourceUri(deps.origin)
+    deps.origin
   );
   return tokenResponse(accessToken, rotated.next.raw);
 }

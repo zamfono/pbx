@@ -87,11 +87,11 @@ function audioUpload(): FormData {
 describe('form submissions without an Origin header', () => {
   it('lets a bearer multipart POST /api/v1/audio through to the route', async () => {
     expect(svelteKitChecksOrigin).toBe(false);
-    const token = signAccessToken(
+    const token = await signAccessToken(
       JWT_SECRET,
       { sub: 'admin1', role: 'admin', cid: null },
       Math.floor(Date.now() / MS_PER_SECOND),
-      `${ORIGIN}/mcp`
+      ORIGIN
     );
     const { resolved } = await serve(`${ORIGIN}/api/v1/audio`, {
       method: 'POST',

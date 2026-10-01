@@ -29,7 +29,7 @@ export async function authenticate(
   const nowS = Math.floor(Date.now() / MS_PER_SECOND);
   const token = header.slice(BEARER_PREFIX.length);
   // MCP authorization "Token Handling": only a token issued for this MCP server is accepted.
-  const claims = verifyAccessToken(
+  const claims = await verifyAccessToken(
     deps.jwtSecret,
     token,
     nowS,

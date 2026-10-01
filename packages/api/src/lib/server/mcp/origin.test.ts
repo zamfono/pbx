@@ -2,20 +2,20 @@ import { describe, expect, it } from 'vitest';
 
 import { handleMcpRequest } from '../mcp.js';
 import {
-  bearer,
   currentHeaders,
   currentMeta,
   legacyRequest,
   legacySession,
   mcpRequest,
   ORIGIN,
+  OWNER_TOKEN,
   seededDeps
 } from './testKit.js';
 
 // The Streamable HTTP transport's DNS-rebinding check, the same in both revisions
 // (https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http#security-%26-endpoint,
 // https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#security-warning).
-function discoverFrom(origin: string | null, token = bearer()): Request {
+function discoverFrom(origin: string | null, token = OWNER_TOKEN): Request {
   return mcpRequest(
     {
       jsonrpc: '2.0',

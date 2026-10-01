@@ -6,7 +6,6 @@ import { MS_PER_SECOND, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { signAccessToken } from '$lib/server/auth/jwtSigning.js';
-import { mcpResourceUri } from '$lib/server/auth/resource.js';
 import { getDb } from '$lib/server/db.js';
 
 import { POST } from './+server.js';
@@ -36,16 +35,16 @@ beforeAll(async () => {
 });
 
 /** A 2026-07-28 `POST /mcp`: `_meta` and the standard headers as a conforming client sends them. */
-function eventFor(
+async function eventFor(
   id: number,
   method: string,
   params: Record<string, unknown> = {}
-): RequestEvent {
-  const token = signAccessToken(
+): Promise<RequestEvent> {
+  const token = await signAccessToken(
     JWT_SECRET,
     { sub: 'admin1', role: 'admin', cid: null },
     Math.floor(Date.now() / MS_PER_SECOND),
-    mcpResourceUri(ORIGIN)
+    ORIGIN
   );
   const name: Record<string, string> =
     typeof params.name === 'string' ? { 'mcp-name': params.name } : {};
@@ -78,7 +77,7 @@ function eventFor(
 describe('POST /mcp', () => {
   it('lists the registered operations as tools, proving the registry is filled', async () => {
     // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
-    const response = await POST(eventFor(1, 'tools/list'));
+    const response = await POST(await eventFor(1, 'tools/list'));
     const body = (await response.json()) as {
       result: { tools: { name: string }[] };
     };
@@ -90,7 +89,10 @@ describe('POST /mcp', () => {
   it('dispatches a tool call to a real operation instead of answering "unknown operation"', async () => {
     // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
     const response = await POST(
-      eventFor(2, 'tools/call', { name: 'blockedNumbers.list', arguments: {} })
+      await eventFor(2, 'tools/call', {
+        name: 'blockedNumbers.list',
+        arguments: {}
+      })
     );
     const body = (await response.json()) as {
       result?: { isError: boolean; structuredContent: { items: unknown[] } };

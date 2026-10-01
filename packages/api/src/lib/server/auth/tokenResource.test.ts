@@ -81,7 +81,7 @@ describe('tokenEndpoint (resource, RFC 8707)', () => {
       await tokenEndpoint(deps, codeRequest(code, [MCP_RESOURCE]))
     );
     expect(
-      verifyAccessToken(SECRET, token, NOW_S, MCP_RESOURCE)
+      await verifyAccessToken(SECRET, token, NOW_S, MCP_RESOURCE)
     ).not.toBeNull();
   });
 
@@ -91,9 +91,9 @@ describe('tokenEndpoint (resource, RFC 8707)', () => {
       await tokenEndpoint(deps, codeRequest(code, []))
     );
     expect(
-      verifyAccessToken(SECRET, token, NOW_S, MCP_RESOURCE)
+      await verifyAccessToken(SECRET, token, NOW_S, MCP_RESOURCE)
     ).not.toBeNull();
-    expect(verifyAccessToken(SECRET, token, NOW_S)).not.toBeNull();
+    expect(await verifyAccessToken(SECRET, token, NOW_S)).not.toBeNull();
   });
 
   it('accepts an uppercase scheme and host (MCP authorization, "Canonical Server URI")', async () => {

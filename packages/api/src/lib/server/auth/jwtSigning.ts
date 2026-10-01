@@ -1,7 +1,7 @@
 /**
- * Issues access tokens (§5.2) with the stack's `JWT_SECRET` and `ORIGIN`. Kept apart from
- * `jwt.ts`, the token format and its verification, which `server.ts` also runs, for the `/events`
- * handshake, outside the SvelteKit bundle, where `$env` does not exist.
+ * Issues access tokens (§5.2) with the stack's `JWT_SECRET`. Kept apart from `jwt.ts`, the token
+ * format and its verification, which `server.ts` also runs, for the `/events` handshake, outside
+ * the SvelteKit bundle, where `$env` does not exist.
  */
 import { env } from '$env/dynamic/private';
 
@@ -10,6 +10,7 @@ import {
   encodeAccessToken,
   type AccessClaims
 } from './jwt.js';
+import { mcpResourceUri } from './resource.js';
 
 /** The secret every access token is signed and verified with (§5.2 `JWT_SECRET`). */
 export function requiredJwtSecret(): string {
@@ -21,19 +22,19 @@ export function requiredJwtSecret(): string {
 }
 
 /**
- * Signs an HS256 access token for `audience`: `exp` is `nowS + 900`, `iss` is the stack's `ORIGIN`
- * (§5.2, §6.3).
+ * Signs an HS256 access token issued by `origin`, the stack's `ORIGIN`, for its MCP server, the
+ * one resource it issues tokens for (`resource.ts`): `exp` is `nowS + 900` (§5.2, §6.3).
  */
 export function signAccessToken(
   secret: string,
   claims: AccessClaims,
   nowS: number,
-  audience: string
-): string {
+  origin: string
+): Promise<string> {
   return encodeAccessToken(secret, {
     ...claims,
-    iss: env.ORIGIN ?? '',
-    aud: audience,
+    iss: origin,
+    aud: mcpResourceUri(origin),
     iat: nowS,
     exp: nowS + ACCESS_TOKEN_TTL_S
   });
