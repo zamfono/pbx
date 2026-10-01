@@ -73,28 +73,23 @@ api PUT "/users/$agent/forwarding" "{\"rules\":[{\"condition\":\"unconditional\"
 printf '%s %s %s %s\n' "$trunk_id" "$forwarder" "$agent" "$did_id" \
   > "$(state_file inbound-forward-sip)"
 
-# The trunk's status as `api` serves it from the core (§9.4 "Provisioning and status"), and its
-# contact's as `pjsip show contacts` gives it.
+# The trunk's status as `api` serves it from the core (§9.4 "Provisioning and status").
 trunk_status() {
   api GET "/trunks/$trunk_id" | jsonfield status
-}
-contact_status() {
-  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-  $compose exec -T asterisk asterisk -rx 'pjsip show contacts' \
-    | awk -v t="trunk-$trunk_id/" '$1 == "Contact:" && index($2, t) == 1 { print $4 }'
 }
 
 # Nothing listens on the front's port yet, so the trunk's probe fails: the core skips the trunk
 # without an INVITE (§9.4 "Route fallthrough"), as it would skip one whose endpoint ignores OPTIONS.
+# The probe's result lands once it times out.
+# shellcheck disable=SC2086
+$compose exec -T asterisk asterisk -rx "pjsip qualify trunk-$trunk_id" >/dev/null
 unreachable=
 for _ in $(seq 1 30); do
-  # shellcheck disable=SC2086
-  $compose exec -T asterisk asterisk -rx "pjsip qualify trunk-$trunk_id" >/dev/null 2>&1 || true
-  sleep 1
   if [ "$(trunk_status)" = unreachable ]; then
     unreachable=1
     break
   fi
+  sleep 1
 done
 if [ -z "$unreachable" ]; then
   echo "the TLS trunk trunk-$trunk_id never turned unreachable with its front down" >&2
@@ -110,7 +105,8 @@ if [ "$status" != unmonitored ]; then
   echo "trunk-$trunk_id with qualify off reads status '$status', not unmonitored" >&2
   exit 1
 fi
-echo "trunk-$trunk_id with qualify off: contact '$(contact_status)', status unmonitored" >&2
+echo "trunk-$trunk_id with qualify off: contact '$(contact_status "trunk-$trunk_id")'," \
+  "status unmonitored" >&2
 
 # The TLS front: every TLS connection Asterisk opens to 5061 is relayed byte for byte to the UAS
 # over TCP, with the pid written where the teardown stops it.

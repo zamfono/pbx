@@ -1,23 +1,25 @@
 #!/usr/bin/env bash
 # The phone side of one scenario, in the `sipp-phone` container.
 #
-#   phone.sh <compose> register <sip-username> <sip-password>  — bind the contact, once per run
-#   phone.sh <compose> unregister <sip-username> <sip-password>
-#                                                              — remove the contact again
-#   phone.sh <compose> answer <uas-scenario> <sip-username> <caller-username> <caller-password>
-#                                                              — serve exactly one call
-#   phone.sh <compose> listen <uas-scenario>                   — the same, for a device that is
-#                                                                not registered
+#   phone.sh <compose> answer <uas-scenario> <sip-username> <sip-password>
+#            [<caller-username> <caller-password>]       — register the device and serve its calls
 #   phone.sh <compose> call <uac-scenario> <sip-username> <sip-password>
-#                                                              — place one call of its own
-#   phone.sh <compose> wait-call                               — wait for that call to end
-#   phone.sh <compose> invites                                 — INVITEs this run received
+#                                                        — register the device and place one call
+#   phone.sh <compose> unregister <sip-username> <sip-password>
+#                                                        — remove the device's contact again
+#   phone.sh <compose> listen <uas-scenario>             — serve calls on a device that is not
+#                                                          registered
+#   phone.sh <compose> wait-call                         — wait for that call to end
+#   phone.sh <compose> invites                           — INVITEs this run received
 #
-# Separate sipp runs, because one process cannot hold the port twice: `register` binds the
-# contact to the port and exits, and each later run takes that port over for one call. `-aa`
-# answers the OPTIONS probes that keep the contact qualified while that run is up, and the
-# explicit `pjsip qualify` spares the harness the AOR's own probe interval. Every run traces the
-# messages it exchanges, so a scenario can assert that nothing rang the phone.
+# A device is registered only while a sipp run answers on its port: `answer` and `call` register
+# it, start the run that serves the scenario, and wait until Asterisk holds the contact reachable;
+# the scenario's end unregisters it while that run still answers (`run-scenarios.sh`). So no
+# OPTIONS probe ever goes to a contact nothing answers, and none is left to time out after a
+# newer one was answered: Asterisk applies each probe's result as it completes, and a stale
+# timeout would mark the contact unreachable after all (§9.3). `-aa` answers the probes while the
+# run is up. Every run traces the messages it exchanges, so a scenario can assert that nothing
+# rang the phone.
 #
 # `PHONE_PORT` plays a second device beside the first, on a port of its own in the same container
 # (a colleague's phone a scenario rings or picks up with); its trace, its runs' tags and their
@@ -26,16 +28,13 @@ set -euo pipefail
 
 compose=$1
 action=$2
+# shellcheck source=scenarios/_lib.sh
+. "$(dirname "$0")/scenarios/_lib.sh"
 PORT=${PHONE_PORT:-5070}
 # The first device's names stay what they always were; a second one's carry its port, and its
 # media ports are its own, clear of the 6000 onwards sipp takes by default.
 SUFFIX=${PHONE_PORT:+-$PHONE_PORT}
 MEDIA_ARGS=${PHONE_PORT:+-mp $((PHONE_PORT + 2000))}
-QUALIFY_ATTEMPTS=20
-# Asterisk's default `qualify_timeout`, which the rendered AORs keep
-# (packages/api/src/lib/server/pjsip), plus a second for the result to reach the contact's status;
-# in microseconds.
-STALE_PROBE_WINDOW_US=4000000
 CALL_ATTEMPTS=90
 MESSAGES=/tmp/phone$SUFFIX-messages.log
 CALL_EXIT=/tmp/phone$SUFFIX-call.exit
@@ -51,68 +50,29 @@ clear_phone_trace() {
   dc exec -T sipp-phone rm -f "$MESSAGES" "$CALL_EXIT"
 }
 
-# One REGISTER exchange, `register.xml` binding the contact or `unregister.xml` removing it. The
-# API answers a device's write once Asterisk holds its endpoint (§10.4), so the exchange is made
-# once: a refusal is the stack's failure, not a moment to wait out.
+# One REGISTER exchange, `register.xml` binding the contact to this device's port or
+# `unregister.xml` removing every contact of the device, from a port of its own, so the run
+# serving the device's port still answers meanwhile. The API answers a device's write once
+# Asterisk holds its endpoint (§10.4), so the exchange is made once: a refusal is the stack's
+# failure, not a moment to wait out.
 registration() {
-  local scenario=$1 sip_username=$2 sip_password=$3
-  clear_phone_trace
+  local scenario=$1 sip_username=$2 sip_password=$3 port=()
+  [ "$scenario" = unregister ] || port=(-p "$PORT")
   dc exec -T sipp-phone sipp -sf "/scenarios/uas/$scenario.xml" \
     -key user "$sip_username" -au "$sip_username" -ap "$sip_password" \
-    -m 1 -p "$PORT" -timeout 15s -nostdin asterisk:5060 >/dev/null 2>&1 \
+    -m 1 "${port[@]}" -timeout 15s -nostdin asterisk:5060 >/dev/null 2>&1 \
     || { echo "the device's $scenario did not complete" >&2; return 1; }
 }
 
-# The status `pjsip show contacts` gives the device's contact: `NonQual` until its first qualify
-# result lands, then `Avail` or `Unavail`; nothing while it has no contact.
-contact_status() {
-  local sip_username=$1
-  dc exec -T asterisk asterisk -rx 'pjsip show contacts' 2>/dev/null \
-    | awk -v aor="$sip_username/" '$1 == "Contact:" && index($2, aor) == 1 { print $4 }'
-}
-
-# Asterisk qualifies a new contact at once, and by then `register` has exited, so nothing answers
-# that probe. It applies each probe's result as the probe completes, not in the order the probes
-# were sent: that probe's timeout, `qualify_timeout` after it, would mark the contact unreachable
-# even after the next run answered a newer probe, and the core would skip the device (§9.3). So a
-# registration ends only once that first result has landed.
-await_first_qualify() {
-  local sip_username=$1 status=''
-  for _ in $(seq 1 $QUALIFY_ATTEMPTS); do
-    status=$(contact_status "$sip_username")
-    case $status in
-      Avail | Unavail) return 0 ;;
-    esac
-    sleep 1
-  done
-  echo "the device's new contact never got its first qualify result (status '${status:-none}')" >&2
-  return 1
-}
-
-# The time in microseconds, whatever the locale's decimal separator.
-now_us() {
-  echo "${EPOCHREALTIME//[.,]/}"
-}
-
-# The contact is only reachable once something answers the probe, and the core reads a device
-# as registered from that reachability (§9.3), so the call waits for it. Between two runs nothing
-# answers the AOR's own periodic probe, and a probe sent then times out `qualify_timeout` later,
-# possibly after this run's explicit one was answered: Asterisk applies each result as its probe
-# completes (see `await_first_qualify`), so that stale timeout would mark the contact unreachable
-# after all, and the call would find the phone offline. So `Avail` counts only once every probe
-# sent before this run started (`$2`, from `now_us`) has had its result.
+# Asterisk probes a new contact at once, possibly before the run serving it has bound the port,
+# so that first probe's result is waited for whatever it is, leaving no probe outstanding; a
+# contact it found unreachable is probed again now that the run answers. The core reads a device
+# as registered from that reachability (§9.3), so the scenario's call waits for it.
 await_reachable() {
-  local sip_username=$1 started=$2 status=''
-  for _ in $(seq 1 $QUALIFY_ATTEMPTS); do
-    dc exec -T asterisk asterisk -rx "pjsip qualify $sip_username" >/dev/null 2>&1 || true
-    sleep 1
-    status=$(contact_status "$sip_username")
-    if [ "$status" = Avail ] && (($(now_us) - started >= STALE_PROBE_WINDOW_US)); then
-      return 0
-    fi
-  done
-  echo "the device never reached the reachable state (status '${status:-none}')" >&2
-  return 1
+  local first
+  await_bound sipp-phone "$PORT"
+  first=$(await_contact_status "$1" 'Avail|Unavail')
+  [ "$first" = Avail ] || await_contact_avail "$1"
 }
 
 # No call limit: `-aa` answers the OPTIONS probes that keep the contact qualified, and sipp counts
@@ -137,21 +97,17 @@ serve() {
 }
 
 case $action in
-  register)
-    registration register "$3" "$4"
-    await_first_qualify "$3"
+  answer)
+    registration register "$4" "$5"
+    serve "$3" "${6:-}" "${7:-}"
+    await_reachable "$4"
     ;;
   unregister) registration unregister "$3" "$4" ;;
-  answer)
-    started=$(now_us)
-    serve "$3" "$5" "$6"
-    await_reachable "$4" "$started"
-    ;;
   listen) serve "$3" ;;
   call)
     # A call the phone places itself is one call, so `-m 1` ends the run with it; `-aa` still
     # answers the probes meanwhile, so the device stays registered while it is on the call.
-    started=$(now_us)
+    registration register "$4" "$5"
     clear_phone_trace
     dc exec -T -d sipp-phone sh -c \
       "sh /scenarios/_sipp-run.sh phone-$3 \
@@ -159,7 +115,7 @@ case $action in
         -trace_msg -message_file $MESSAGES \
         -key user '$4' -au '$4' -ap '$5' asterisk:5060 > /tmp/$3.log 2>&1; \
         echo \$? > $CALL_EXIT"
-    await_reachable "$4" "$started"
+    await_reachable "$4"
     ;;
   wait-call)
     for _ in $(seq 1 $CALL_ATTEMPTS); do

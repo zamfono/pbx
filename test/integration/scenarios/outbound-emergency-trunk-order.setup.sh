@@ -29,6 +29,7 @@ for side in 1:5061:refuse-503 2:5062:answer-outbound 3:5063:answer-outbound; do
     "sh /scenarios/_sipp-run.sh provider-emergency-$n -sf /scenarios/uas/$uas.xml -p $port -aa \
       -nostdin -trace_msg -message_file /tmp/emergency-$n-messages.log asterisk:5060 \
       > /tmp/emergency-$n.log 2>&1"
+  await_bound sipp-provider "$port"
 done
 
 # The one catch-all route the harness configured must be `ci-trunk`'s, or the control call
@@ -69,14 +70,13 @@ print(json.dumps({"trunkIds": sys.argv[1:4] + json.loads(sys.argv[4])}))
 ' "$refuse_id" "$plain_id" "$answer_id" "$saved_order")" >/dev/null
 
 # The core skips an `unreachable` trunk and tries an `unknown` one, so each of the three is
-# qualified until the core itself reports it reachable (§9.4 "Provisioning and status"): the
-# assertion that trunk 2 was passed by is then about its flag, not its status.
+# probed, by the runs above, which answer, and the call waits until the core itself reports
+# each reachable (§9.4 "Provisioning and status"): the assertion that trunk 2 was passed by is
+# then about its flag, not its status.
+for id in "$refuse_id" "$plain_id" "$answer_id"; do
+  await_contact_avail "trunk-$id"
+done
 for attempt in $(seq 1 $STATUS_ATTEMPTS); do
-  for id in "$refuse_id" "$plain_id" "$answer_id"; do
-    # shellcheck disable=SC2086
-    $compose exec -T asterisk asterisk -rx "pjsip qualify trunk-$id" >/dev/null 2>&1 || true
-  done
-  sleep 1
   if api GET /trunks | python3 -c '
 import json, sys
 status = {t["id"]: t["status"] for t in json.load(sys.stdin)["items"]}
@@ -84,6 +84,7 @@ sys.exit(0 if all(status.get(id) == "registered" for id in sys.argv[1:]) else 1)
 ' "$refuse_id" "$plain_id" "$answer_id"; then
     exit 0
   fi
+  sleep 1
 done
 echo "the emergency scenario's trunks never read registered after $attempt attempts" >&2
 exit 1

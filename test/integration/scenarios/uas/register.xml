@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <!--
-  §8: the phone side registering. Run before the answering scenario on the same local port, so
-  Asterisk's contact for the device names the port that scenario then listens on.
+  §8: the phone side registering. Run just before the answering scenario on the same local port,
+  so Asterisk's contact for the device names the port that scenario then listens on (`phone.sh`).
 
   The device's SIP username arrives as `-key user`, its password through `-au`/`-ap`, which is
   what `[authentication]` reads: sipp does not substitute a keyword nested inside that construct.

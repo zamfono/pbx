@@ -79,25 +79,13 @@ read -r SIP_USERNAME SIP_PASSWORD < <(
 ) || fail "tenant configuration failed"
 [ -n "${SIP_USERNAME:-}" ] || fail "no device credentials came back from configure-load.sh"
 
-log "registering the one answering device"
-bash "$repo/test/integration/phone.sh" "$compose_cmd" register "$SIP_USERNAME" "$SIP_PASSWORD" \
-  >/dev/null || fail "the device never registered"
-
-# phone.sh register binds the contact and its own sipp process exits immediately (its own
-# comment: "each later run takes that port over"); nothing is left to answer Asterisk's ongoing
-# qualify OPTIONS pings, so the contact decays to NonQual within seconds and
-# packages/core/src/calls/ringGroupState.ts's registeredDevices() (fed by Presence's own
-# ContactStatusChange tracking) then sees the member as unregistered -- ringGroup.ts's
-# ringable() drops it before ever looking at its forwarding rule, and the whole call falls
-# straight through to voicemail, logging {"event":"ringGroup","result":"unavailable"} despite a
-# completed registration. The CI harness avoids this because it starts a `phone.sh answer` (also
-# -aa) right before every scenario that needs the device seen as available. A persistent
-# `listen` (-aa, never actually expected to be dialled since the one user's forwarding rule is
-# unconditional) keeps answering those probes for the rest of this session.
-bash "$repo/test/integration/phone.sh" "$compose_cmd" listen answer >/dev/null 2>&1 &
-sleep 2
-dc exec -T asterisk asterisk -rx "pjsip qualify $SIP_USERNAME" >/dev/null 2>&1 || true
-sleep 1
+# The one answering device registered and served for the whole session, as the integration
+# harness's phone is for a scenario (`phone.sh answer`): its run answers Asterisk's qualify
+# probes, so core's Presence keeps the member registered and the ring group rings it, though its
+# unconditional forwarding rule means it is never dialled itself.
+log "registering and serving the one answering device"
+bash "$repo/test/integration/phone.sh" "$compose_cmd" answer answer "$SIP_USERNAME" \
+  "$SIP_PASSWORD" >/dev/null || fail "the device never became reachable"
 
 log "generating the ulaw transcoding pcap"
 # From the image the `sipp` service runs (compose.load.yaml's `x-sipp-image`).

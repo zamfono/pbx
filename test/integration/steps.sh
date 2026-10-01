@@ -1,5 +1,5 @@
-# Sourced by `run.sh`: the stack's own prerequisites (bring-up, tenant configuration, device
-# registration — REUSE skips all three, run.sh's own usage block) as functions, plus the two
+# Sourced by `run.sh`: the stack's own prerequisites (bring-up and tenant configuration — REUSE
+# skips both, run.sh's own usage block) as functions, plus the two
 # selectable named steps that sit either side of the scenario loop in a full run (`runtime-asserts`
 # and `prompts`; `trunk-status` and `cert-sync` wrap their own files' bodies as
 # `run_trunk_status_step`/`run_cert_sync_step`, called directly by run.sh).
@@ -87,15 +87,6 @@ configure_tenant() {
   ) || fail "the tenant could not be configured over REST"
   [ -n "${SIP_USERNAME:-}" ] || fail "no device credentials came back from the configuration step"
   echo "   device $SIP_USERNAME, ring group extension $GROUP_EXT"
-}
-
-# Registers the answering device's own AOR contact, once per stack; every scenario's own call
-# handling (`run-scenarios.sh`'s `start_phone_side`) reuses it. Skipped under REUSE: nothing
-# unregisters it between runs, so a stack `KEEP=1` left up still holds it.
-register_device() {
-  echo '== registering the answering device =='
-  bash "$here/phone.sh" "$compose_cmd" register "$SIP_USERNAME" "$SIP_PASSWORD" >/dev/null \
-    || fail "the answering device never registered"
 }
 
 # §6.5 "Default target": the stack's start created a `local` target from BACKUP_PASSWORD (on the

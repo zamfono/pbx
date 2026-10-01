@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <!--
-  §8: the phone side removing its registration again, `Expires: 0` on the contact `register`
-  bound, so the device is offline (§9.3) until it registers anew. Credentials arrive as in
-  `register.xml`.
+  §8: the phone side removing its registration again, `Expires: 0` on every contact of the device
+  (`Contact: *`, RFC 3261 §10.2.2), so the device is offline (§9.3) until it registers anew. Sent
+  from a port of its own, while the run serving the contact `register` bound still answers its
+  probes (`phone.sh`). Credentials arrive as in `register.xml`.
 -->
 <scenario name="unregister">
   <send retrans="500">
@@ -13,7 +14,7 @@
       To: <sip:[user]@[remote_ip]>
       Call-ID: [call_id]
       CSeq: 1 REGISTER
-      Contact: <sip:[user]@[local_ip]:[local_port];transport=[transport]>
+      Contact: *
       Max-Forwards: 70
       Expires: 0
       Content-Length: 0
@@ -30,7 +31,7 @@
       To: <sip:[user]@[remote_ip]>
       Call-ID: [call_id]
       CSeq: 2 REGISTER
-      Contact: <sip:[user]@[local_ip]:[local_port];transport=[transport]>
+      Contact: *
       [authentication]
       Max-Forwards: 70
       Expires: 0

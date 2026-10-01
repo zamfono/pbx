@@ -8,7 +8,7 @@
 #
 # Usage:
 #   bash test/integration/run.sh
-#     A full run: every prerequisite (bring-up, tenant configuration, device registration), every
+#     A full run: every prerequisite (bring-up, tenant configuration), every
 #     named step (steps.sh, trunk-status.sh, cert-sync.sh) and every scenario under scenarios/, in
 #     the same order this file always ran them in. cert-sync always runs last.
 #
@@ -22,10 +22,10 @@
 #     reproduced by hand, or a later REUSE=<dir> run can reuse it; the run prints the directory.
 #
 #   REUSE=<dir> bash test/integration/run.sh
-#     Skips bring-up, tenant configuration and device registration against the stack a previous
-#     KEEP=1 run left up in <dir>, recovering the tenant state that run's configure.sh produced
-#     (reuse.sh), then runs straight into the selected steps and scenarios. Falls back to a fresh
-#     bring-up, with a message, when no such stack is up.
+#     Skips bring-up and tenant configuration against the stack a previous KEEP=1 run left up in
+#     <dir>, recovering the tenant state that run's configure.sh produced (reuse.sh), then runs
+#     straight into the selected steps and scenarios. Falls back to a fresh bring-up, with a
+#     message, when no such stack is up.
 #     API_PORT and the other env vars compose.test.yaml reads must be the same as the run that
 #     left the stack up, since REUSE never re-runs `compose up`. A run that actually reused a
 #     stack leaves it up on exit too (as if KEEP=1), so further REUSE runs can chase it; tear it
@@ -66,15 +66,19 @@ MAIN_DID=+15551000
 . "$here/../api.sh"
 # shellcheck source=../stack.sh
 . "$here/../stack.sh"
+# shellcheck source=scenarios/_lib.sh
+. "$here/scenarios/_lib.sh"
 
-# The stack runs from directory `$1` (test/stack.sh), as the Compose project of its name. The
-# run's state lives there too: REUSE's (reuse.sh's `save_state`) and the scenarios' (`STATE_DIR`,
+# The stack runs from directory `$1` (test/stack.sh), as the Compose project of its name, which
+# `compose_cmd` (and `compose`, for scenarios/_lib.sh's helpers) drives as one string. The run's
+# state lives there too: REUSE's (reuse.sh's `save_state`) and the scenarios' (`STATE_DIR`,
 # scenarios/_lib.sh's `state_file`).
 use_run_dir() {
   run_dir=$1
   compose_args=(-p "$(stack_project "$run_dir")" -f "$run_dir/compose.yaml"
     -f "$run_dir/compose.ports.yaml" -f "$here/compose.test.yaml")
   compose_cmd="$COMPOSE ${compose_args[*]}"
+  compose=$compose_cmd
   STATE_FILE=$run_dir/integration-state
   STATE_DIR=$run_dir/state
   export STATE_DIR
@@ -165,7 +169,6 @@ if [ "$reused" = true ]; then
   load_state
 else
   configure_tenant
-  register_device
   save_state
 fi
 

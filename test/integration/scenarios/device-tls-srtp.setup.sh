@@ -122,21 +122,9 @@ $compose exec -T devices sh -c ': > /root/.baresip/contacts'
 $compose exec -T -d devices sh -c \
   'baresip -f /root/.baresip -s > /root/.baresip/baresip.log 2>&1'
 
-# The contact is reachable only once baresip has registered and answered a qualify, the way
-# `phone.sh`'s `await_reachable` waits for the sipp phone's own contact.
-reachable=false
-for _ in $(seq 1 30); do
-  # shellcheck disable=SC2086
-  $compose exec -T asterisk asterisk -rx "pjsip qualify $sip_username" >/dev/null 2>&1 || true
-  sleep 1
-  # shellcheck disable=SC2086
-  if $compose exec -T asterisk asterisk -rx 'pjsip show contacts' 2>/dev/null \
-    | grep "$sip_username.*Avail" >/dev/null; then
-    reachable=true
-    break
-  fi
-done
-[ "$reachable" = true ] || {
+# The contact is reachable once baresip has registered and answered the probe Asterisk sends a
+# new contact, which baresip, already up when it registers, always does.
+await_contact_status "$sip_username" Avail >/dev/null || {
   echo "the TLS/SRTP device never reached the reachable state" >&2
   exit 1
 }

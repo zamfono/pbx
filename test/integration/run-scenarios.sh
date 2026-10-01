@@ -22,7 +22,6 @@
 
 CALLER_PORT=5080
 IDLE_ATTEMPTS=10
-QUALIFY_ATTEMPTS=20
 # How long a scenario's sipp runs get to end once its calls are over; a run still in a call by
 # then never ends on its own (`_sipp-finish.sh`).
 FINISH_SECONDS=5
@@ -32,36 +31,31 @@ asterisk_cli() {
   $COMPOSE "${compose_args[@]}" exec -T asterisk asterisk -rx "$1"
 }
 
-# Every trunk's own contact, `<endpoint>/sip…` as `pjsip show contacts` truncates it, and its
-# status: the `ip` trunks' are qualified (`Avail` once answered), a registration trunk's is not.
-trunk_contacts() {
-  asterisk_cli 'pjsip show contacts' | awk '$1 == "Contact:" && $2 ~ /^trunk-/ { print $2, $4 }'
+# Every trunk's own AOR, `trunk-<id>`, as `pjsip show contacts` lists their contacts.
+trunk_aors() {
+  local listing
+  listing=$(asterisk_cli 'pjsip show contacts')
+  printf '%s\n' "$listing" \
+    | awk '$1 == "Contact:" && $2 ~ /^trunk-/ { split($2, aor, "/"); print aor[1] }'
 }
 
 # Starts the trunk side answering on the port the trunk endpoint dials, tracing every message to
 # `/tmp/trunk-messages.log` for a check to read the INVITEs it received. An `ip` trunk is reachable
-# only once its qualify is answered, and the core skips an unreachable trunk without sending an
-# INVITE (§9.4 "Route fallthrough", "Provisioning and status"); until this run, nothing answered
-# that probe, so the call waits for every trunk a scenario set up to be reachable, as `phone.sh`
-# waits for the device.
+# only once its qualify is answered, and the core skips a trunk it holds unreachable without
+# sending an INVITE (§9.4 "Route fallthrough", "Provisioning and status"); until this run, nothing
+# answered that probe, so every trunk is probed now, and the call waits until the core itself
+# reports every `ip` trunk reachable, or unmonitored where its qualify is off.
 start_trunk_side() {
   $COMPOSE "${compose_args[@]}" exec -T sipp rm -f /tmp/trunk-messages.log
   $COMPOSE "${compose_args[@]}" exec -T -d sipp sh -c \
     "sh /scenarios/_sipp-run.sh trunk-$1 -sf /scenarios/uas/$1.xml -p 5060 -aa -nostdin \
       -trace_msg -message_file /tmp/trunk-messages.log asterisk:5060 > /tmp/$1.log 2>&1"
-  local contacts endpoint
-  for _ in $(seq 1 $QUALIFY_ATTEMPTS); do
-    for endpoint in $(trunk_contacts | awk '{ print $1 }'); do
-      asterisk_cli "pjsip qualify ${endpoint%%/*}" >/dev/null 2>&1 || true
-    done
-    sleep 1
-    contacts=$(trunk_contacts)
-    if [ -n "$contacts" ] && ! printf '%s\n' "$contacts" | awk '$2 != "Avail" && $2 != "NonQual"' \
-      | grep -q .; then
-      return 0
-    fi
+  await_bound sipp 5060 || fail "the trunk side did not start"
+  local aor
+  for aor in $(trunk_aors); do
+    await_contact_avail "$aor" 'Avail|NonQual' || fail "trunk $aor never reached the reachable state"
   done
-  fail "the trunks never reached the reachable state: ${contacts:-no contact}"
+  await_ip_trunks_reachable || fail "the core never reported every ip trunk reachable"
 }
 
 # The caller hanging up ends the call for everyone in it: a leg still up afterwards is a party the
@@ -102,10 +96,12 @@ await_phone_call() {
   fail "the phone's own call never came up in $1: $(asterisk_cli 'core show channels concise')"
 }
 
-# Starts the phone side the way `phone_mode_for` says, from the account `phone_account` names.
+# Starts the phone side the way `phone_mode_for` says, from the account `phone_account` names, and
+# leaves the device it registered in `registered`, for the scenario's end to unregister.
 start_phone_side() {
   local name=$1 account_user account_password
   read -r account_user account_password <<<"$phone_account"
+  registered=''
   case $(phone_mode_for "$name") in
     listen)
       bash "$here/phone.sh" "$compose_cmd" listen "$(uas_for "$name")" \
@@ -115,6 +111,7 @@ start_phone_side() {
       bash "$here/phone.sh" "$compose_cmd" call "$(uas_for "$name")" \
         "$account_user" "$account_password" \
         || fail "the phone could not place its own call for $name"
+      registered="$account_user $account_password"
       await_phone_call "$name"
       ;;
     baresip)
@@ -123,8 +120,9 @@ start_phone_side() {
       ;;
     *)
       bash "$here/phone.sh" "$compose_cmd" answer "$(uas_for "$name")" "$SIP_USERNAME" \
-        "$account_user" "$account_password" \
+        "$SIP_PASSWORD" "$account_user" "$account_password" \
         || fail "the answering device was not reachable for $name"
+      registered="$SIP_USERNAME $SIP_PASSWORD"
       ;;
   esac
 }
@@ -178,6 +176,12 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
         -p "$caller_port" -timeout 90s \
         $(caller_args_for "$name") -nostdin asterisk:5060 \
       || fail "sipp scenario $name did not complete"
+  fi
+  # The device's contact goes while its run still answers, so no probe is ever left to it.
+  if [ -n "$registered" ]; then
+    # shellcheck disable=SC2086 # the username and password, two words by design
+    bash "$here/phone.sh" "$compose_cmd" unregister $registered \
+      || fail "the device could not unregister after $name"
   fi
   if [ "$(phone_mode_for "$name")" = call ]; then
     bash "$here/phone.sh" "$compose_cmd" wait-call || fail "the phone's own call failed in $name"

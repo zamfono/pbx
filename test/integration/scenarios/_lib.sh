@@ -19,6 +19,81 @@ container_ip() {
   $compose exec -T "$1" hostname -i | tr -d '\r' | awk '{print $1}'
 }
 
+# Waits up to 10 s for UDP port `$2` in container `$1` to be bound: the sipp run started there
+# detached is up and answers on it.
+await_bound() {
+  local port
+  port=$(printf ':%04X' "$2")
+  for _ in $(seq 1 20); do
+    # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
+    if $compose exec -T "$1" awk -v port="$port" \
+      'substr($2, length($2) - 4) == port { found = 1 } END { exit !found }' /proc/net/udp; then
+      return 0
+    fi
+    sleep 0.5
+  done
+  echo "nothing bound UDP port $2 in $1 within 10 s" >&2
+  return 1
+}
+
+# The status `pjsip show contacts` gives the contact of AOR `$1`, a device's SIP username or a
+# trunk's `trunk-<id>`: `NonQual` until its first qualify result lands, then `Avail` or `Unavail`;
+# nothing while it has none. The listing truncates a contact to `<aor>/<uri>`; the AOR is matched
+# whole, so `101` is not `1011`.
+contact_status() {
+  local listing
+  # Read whole before awk sees it: under pipefail, Podman's compose provider reports the CLI's
+  # SIGPIPE as a failure.
+  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
+  listing=$($compose exec -T asterisk asterisk -rx 'pjsip show contacts')
+  printf '%s\n' "$listing" \
+    | awk -v aor="$1/" '$1 == "Contact:" && index($2, aor) == 1 { print $4 }'
+}
+
+# Waits up to 20 s for the contact of AOR `$1` to read a status matching the extended regex `$2`,
+# and prints it.
+await_contact_status() {
+  local status=''
+  for _ in $(seq 1 40); do
+    status=$(contact_status "$1")
+    if [[ $status =~ ^($2)$ ]]; then
+      printf '%s\n' "$status"
+      return 0
+    fi
+    sleep 0.5
+  done
+  echo "the contact of $1 reads '${status:-none}', not $2, after 20 s" >&2
+  return 1
+}
+
+# Probes the contact of AOR `$1` once and waits for it to read reachable, `Avail`, or a status
+# matching `$2` (`Avail|NonQual` for a trunk whose qualify may be off). Whatever answers the probe
+# must be up already (`await_bound`): a probe it does not answer times out, and that result,
+# applied whenever it lands, would mark the contact unreachable after a later probe's answer.
+await_contact_avail() {
+  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
+  $compose exec -T asterisk asterisk -rx "pjsip qualify $1" >/dev/null
+  await_contact_status "$1" "${2:-Avail}" >/dev/null
+}
+
+# Waits up to 20 s for the core to report every `ip` trunk `registered`, its qualify answered, or
+# `unmonitored`, its qualify off (§9.4 "Provisioning and status"): the status a call's route
+# fallthrough reads, which follows Asterisk's contact status by an event.
+await_ip_trunks_reachable() {
+  local unready
+  for _ in $(seq 1 40); do
+    unready=$(api GET /trunks | python3 -c '
+import json, sys
+print(" ".join("%s:%s" % (t["name"], t["status"]) for t in json.load(sys.stdin)["items"]
+               if t["authMode"] == "ip" and t["status"] not in ("registered", "unmonitored")))
+')
+    [ -n "$unready" ] || return 0
+    sleep 0.5
+  done
+  echo "ip trunks the core does not report reachable after 20 s: $unready" >&2
+  return 1
+}
+
 # Waits up to `$3` seconds for the sipp run tagged `$2` in container `$1` (`_sipp-run.sh`) to
 # end, which it says by writing its exit status.
 await_sipp_run() {
@@ -119,8 +194,8 @@ put_routes() {
 COLLEAGUE_PORT=5072
 
 # Creates user `$1` (email `$2`, extension `$3`) with a device on the phone container's subnet,
-# the answering device's own allowlist, and registers it from the colleague's port. Leaves
-# `<user-id> <sip-username> <sip-password>` in the scenario state `$4`.
+# the answering device's own allowlist. Leaves `<user-id> <sip-username> <sip-password>` in the
+# scenario state `$4`.
 add_colleague() {
   local name=$1 email=$2 ext=$3 state=$4 member_id allowed user_id sip_username sip_password
   member_id=$(user_with_ext 101)
@@ -138,17 +213,17 @@ device = json.load(sys.stdin)
 print(device['sipUsername'], device['sipPassword'])
 ")
   printf '%s %s %s\n' "$user_id" "$sip_username" "$sip_password" > "$(state_file "$state")"
-  PHONE_PORT=$COLLEAGUE_PORT bash "$(dirname "${BASH_SOURCE[0]}")/../phone.sh" "$compose" \
-    register "$sip_username" "$sip_password" >&2
 }
 
-# Serves the colleague of scenario state `$2` with phone scenario `$1` (`uas/<name>.xml`) and
-# waits until their device is reachable, as `phone.sh answer` serves 101's.
+# Registers the colleague of scenario state `$2` from the colleague's port, serves them with
+# phone scenario `$1` (`uas/<name>.xml`) and waits until their device is reachable, as
+# `phone.sh answer` serves 101's. Their device's contact goes with the device, which the
+# teardown deletes.
 serve_colleague() {
   local uas=$1 user_id sip_username sip_password
   read -r user_id sip_username sip_password < "$(state_file "$2")"
   PHONE_PORT=$COLLEAGUE_PORT bash "$(dirname "${BASH_SOURCE[0]}")/../phone.sh" "$compose" \
-    answer "$uas" "$sip_username" "" "" >&2
+    answer "$uas" "$sip_username" "$sip_password" >&2
 }
 
 # The user id of the colleague of scenario state `$1`.
