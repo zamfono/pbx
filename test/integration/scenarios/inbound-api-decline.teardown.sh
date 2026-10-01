@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Undoes `inbound-api-decline.setup.sh`: the ring group's strategy, turn and members are what they
-# were, and the owner's phone is deleted; the owner keeps extension 109.
+# were, and the decliner and their phone are deleted.
 set -euo pipefail
 
 api_base=$1
@@ -17,7 +17,6 @@ print(json.dumps({
     "members": [{"kind": m["kind"], "id": m["id"]} for m in group["members"]],
 }))
 ' "$(state_file api-decline-group)")" >/dev/null
-api_delete "/devices/$(cat "$(state_file api-decline-device)")"
-rm -f "$(state_file api-decline-group)" "$(state_file api-decline-device)" \
-  "$(state_file decliner)"
-bash "$(dirname "$0")/_api-control-teardown.sh" "$1" "$2"
+remove_colleague decliner
+rm -f "$(state_file api-decline-group)"
+bash "$(dirname "$0")/_api-control-teardown.sh" "$api_base" "$token"

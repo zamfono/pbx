@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# §10.1 step 5 with a decline over the API: the owner's decline was accepted, their leg ended as
-# a 603 would end it, and the group moved on to 101, who answered well within the owner's own
-# 20 s turn (`_api-control-check.py decline`).
+# §10.1 step 5 with a decline over the API: the decliner's decline was accepted, their leg
+# ended as a 603 would end it, and the group moved on to 101, who answered well within the
+# decliner's own 20 s turn (`_api-control-check.py decline`).
 set -euo pipefail
 
 api_base=$1

@@ -13,9 +13,9 @@ given, and asserts what the call control over the API leaves behind, by mode:
   hold       <member-id> <call.json>
              the call stayed the member's answered call, its trace naming the hold and the
              resume, each with its actor (the harness's own owner).
-  decline    <owner-id> <member-id> <call.json> <ring-timeout-s>
-             the owner's decline is in the trace, their leg ended with Q.850 21 (SIP 603), and the
-             member answered well before the owner's own ring would have timed out.
+  decline    <decliner-id> <member-id> <call.json> <ring-timeout-s>
+             the decliner's decline is in the trace, their leg ended with Q.850 21 (SIP 603), and
+             the member answered well before the decliner's own ring would have timed out.
 
 Usage: _api-control-check.py <mode> <argument>...
 """
@@ -110,10 +110,11 @@ elif mode == "hold":
         )
     calls = {"call": call}
 elif mode == "decline":
-    owner, member, call_file, ring_timeout_s = args
+    decliner, member, call_file, ring_timeout_s = args
     call = load(call_file)
     closed_answered(call, member, "declined call")
-    expect(having(call, "decline", actorUserId=owner), "the owner's decline is not in the trace")
+    expect(having(call, "decline", actorUserId=decliner),
+           "the decliner's decline is not in the trace")
     expect(having(call, "declined", cause=21), "no leg ended declined (Q.850 21)")
     expect(
         call["answeredAt"] and seconds(call["startedAt"], call["answeredAt"]) < float(ring_timeout_s),
