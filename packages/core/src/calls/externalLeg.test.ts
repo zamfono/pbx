@@ -7,16 +7,13 @@ import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri, isPlacement, placedCallerId } from '../ari/fake.js';
 import { defaultChannel, type Channel, type Logger } from '../ari/types.js';
+import { EventBus } from '../internal/eventBus.js';
+import { ConfigCache } from '../internal/snapshot.js';
+import { StateStore } from '../internal/stateStore.js';
 import { ATTEMPT_NO_RESPONSE_MS } from '../routing/trunk.js';
 import { eventually } from '../testing/eventually.js';
 import { newCall, type Call } from './call.js';
-import {
-  ConfigCache,
-  EventBus,
-  Pipeline,
-  StateStore,
-  type PipelineDeps
-} from './pipeline.js';
+import { Pipeline, type PipelineDeps } from './pipeline.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';
 import { ringUser } from './ringUser.js';

@@ -7,7 +7,8 @@
  */
 import type { LiveCall } from '@zamfono/shared';
 
-import type { EventBus, StateStore } from '../internal/server.js';
+import type { EventBus } from '../internal/eventBus.js';
+import type { StateStore } from '../internal/stateStore.js';
 import type { Call } from './call.js';
 import { presentCallerUserId } from './callLookup.js';
 

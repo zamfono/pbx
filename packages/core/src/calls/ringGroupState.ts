@@ -3,7 +3,7 @@
  * flattened into the `MemberState`s `ringable` expects — DND, registration, in a call, OOO and
  * an unconditional forward — and its `ring_group_forward_rules`, for `ringGroup.ts`.
  */
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import type { MemberState } from '../routing/ringGroup.js';
 import { ownInEffectOoo } from '../routing/schedule.js';
 import { buildOooRules } from '../routing/scheduleRows.js';

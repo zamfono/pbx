@@ -7,7 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newId, nowIso, openDb, type Db, type Envelope } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { ConfigCache, EventBus } from './internal/server.js';
+import { EventBus } from './internal/eventBus.js';
+import { ConfigCache } from './internal/snapshot.js';
 import { startSweep } from './sweep.js';
 
 const MS_PER_MINUTE = 60_000;

@@ -8,7 +8,7 @@ import { newId, type Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import type { Logger } from '../ari/types.js';
-import type { ConfigCache, Snapshot } from '../internal/server.js';
+import type { ConfigCache, Snapshot } from '../internal/snapshot.js';
 import type { Call, Leg } from './call.js';
 import {
   startSnoopPair,

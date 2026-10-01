@@ -7,7 +7,7 @@
 import { sipHostUri, trunkSectionName } from '@zamfono/shared';
 
 import type { AriEvent } from '../ari/types.js';
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import { channelLanguageVariable } from '../prompts.js';
 import type { AttemptFailure } from '../routing/trunk.js';
 import { raiseLogLevel, type Call } from './call.js';
@@ -17,7 +17,8 @@ import { diversionTrunk } from './forwardDiversion.js';
 import { originateLeg } from './legOriginate.js';
 import type { Pipeline } from './pipeline.js';
 import type { TrunkLeg } from './provisional.js';
-import { outboundHosts, type TrunkState } from './trunkState.js';
+import type { TrunkState } from './trunkState.js';
+import { outboundHosts } from './trunkStatus.js';
 
 const SIP_SERVER_ERROR = 500;
 const HTTP_5XX_LOW = 500;

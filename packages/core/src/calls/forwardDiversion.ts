@@ -7,7 +7,7 @@
  */
 import { isE164, type DiversionPolicy } from '@zamfono/shared';
 
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import { formatCallerId } from '../routing/trunk.js';
 import type { Call } from './call.js';
 import type {
@@ -16,7 +16,7 @@ import type {
   RedirectingReason
 } from './forwardContext.js';
 import { cutUtf8 } from './forwardHeaders.js';
-import { outboundHosts } from './trunkState.js';
+import { outboundHosts } from './trunkStatus.js';
 
 /** The `reason` RFC 5806 §4 names for each hop's `REDIRECTING` reason. */
 const DIVERSION_REASONS = {

@@ -7,12 +7,10 @@ import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel, type Logger } from '../ari/types.js';
 import { CdrWriter } from '../cdr.js';
-import {
-  ConfigCache,
-  EventBus,
-  startInternalServer,
-  StateStore
-} from '../internal/server.js';
+import { EventBus } from '../internal/eventBus.js';
+import { startInternalServer } from '../internal/server.js';
+import { ConfigCache } from '../internal/snapshot.js';
+import { StateStore } from '../internal/stateStore.js';
 import { Presence } from '../presence.js';
 import { eventually } from '../testing/eventually.js';
 import { CallActions } from './actions.js';

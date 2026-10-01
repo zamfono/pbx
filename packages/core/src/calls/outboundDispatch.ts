@@ -7,7 +7,7 @@
  * parking slot retrieves the call parked there.
  */
 import type { LogLevel } from '../callLog.js';
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import { defaultPrompt } from '../prompts.js';
 import { resolveDialed, type DialAction } from '../routing/outbound.js';
 import { findForwardTarget, release, toLogLevel, type Call } from './call.js';

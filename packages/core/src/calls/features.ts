@@ -14,14 +14,9 @@ import {
 } from './featureCall.js';
 import { mailboxAccess, ownVoicemail } from './mailbox.js';
 import { park } from './parking.js';
-import { retrieveParkedCall } from './parkingRetrieval.js';
 import { pickupByExtension } from './pickup.js';
 import type { Pipeline } from './pipeline.js';
 import { deposit } from './voicemail.js';
-
-// Re-exported at `features.js` alongside the feature codes, though its own body lives in
-// `parkingRetrieval.ts`.
-export { retrieveParkedCall };
 
 /** `*90`/`*91`: writes `users.dnd` and refreshes the caller's own hint (§9.3, §3.1 cross-write). */
 async function setDnd(

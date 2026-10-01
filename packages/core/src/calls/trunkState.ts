@@ -10,7 +10,9 @@
 import type { AmiClient, AmiEvent } from '../ami/client.js';
 import type { AriClient } from '../ari/client.js';
 import type { AriEvent } from '../ari/types.js';
-import type { ConfigCache, EventBus, StateStore } from '../internal/server.js';
+import type { EventBus } from '../internal/eventBus.js';
+import type { ConfigCache } from '../internal/snapshot.js';
+import type { StateStore } from '../internal/stateStore.js';
 import {
   contactEventStatus,
   endpointStatuses,
@@ -21,8 +23,6 @@ import {
   type StatusChange,
   type TrunkStatus
 } from './trunkStatus.js';
-
-export { outboundHosts } from './trunkStatus.js';
 
 type TrunkStateDeps = {
   ari: AriClient;

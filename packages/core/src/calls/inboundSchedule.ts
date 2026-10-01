@@ -4,7 +4,7 @@
  */
 import { resolveTenantTimeZone, type Scope } from '@zamfono/shared';
 
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import { inEffectOoo, isOpen, scheduleFor } from '../routing/schedule.js';
 import { buildOooRules, buildSchedules } from '../routing/scheduleRows.js';
 import { findForwardTarget, type Call, type Owner } from './call.js';

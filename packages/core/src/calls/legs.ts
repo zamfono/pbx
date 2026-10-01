@@ -14,10 +14,6 @@ import {
 } from './findMe.js';
 import type { Pipeline } from './pipeline.js';
 
-export { clearFindMeTimers } from './findMe.js';
-export { handleChannelEnded } from './legsEnded.js';
-export { concludeRing } from './ringConclusion.js';
-
 export type RingOutcome = 'answered' | 'abandoned' | 'busy' | 'noAnswer';
 
 export type RingResolver = {

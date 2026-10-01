@@ -4,7 +4,7 @@
  * a live extension, or, after `menus.max_attempts`, the menu's fallback. The DTMF collection
  * itself is `menuInput.ts`'s.
  */
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import { assetMedia, defaultPrompt } from '../prompts.js';
 import type { MenuMap } from '../routing/menu.js';
 import type { ForwardTarget } from '../routing/targets.js';

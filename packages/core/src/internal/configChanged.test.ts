@@ -8,12 +8,10 @@ import { FakeAri } from '../ari/fake.js';
 import type { Logger } from '../ari/types.js';
 import { Presence } from '../presence.js';
 import { eventually } from '../testing/eventually.js';
-import {
-  ConfigCache,
-  EventBus,
-  startInternalServer,
-  StateStore
-} from './server.js';
+import { EventBus } from './eventBus.js';
+import { startInternalServer } from './server.js';
+import { ConfigCache } from './snapshot.js';
+import { StateStore } from './stateStore.js';
 
 const ANY_FREE_PORT = 0;
 const HTTP_NO_CONTENT = 204;

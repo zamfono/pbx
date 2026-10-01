@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { newId, nowIso, openDb, type Db, type Envelope } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { ConfigCache, EventBus } from './internal/server.js';
+import { EventBus } from './internal/eventBus.js';
+import { ConfigCache } from './internal/snapshot.js';
 import { startSweep } from './sweep.js';
 
 const SWEEP_INTERVAL_MS = 5;

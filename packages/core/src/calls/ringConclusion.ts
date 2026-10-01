@@ -4,13 +4,8 @@
  * of a call's answered legs and caller, stays under the repository's `max-lines` lint rule.
  */
 import type { Call, Leg } from './call.js';
-import { findMeLegsPending } from './findMe.js';
-import {
-  clearFindMeTimers,
-  endLeg,
-  hangupLeg,
-  type RingResolver
-} from './legs.js';
+import { clearFindMeTimers, findMeLegsPending } from './findMe.js';
+import { endLeg, hangupLeg, type RingResolver } from './legs.js';
 import type { Pipeline } from './pipeline.js';
 
 // `ChannelDestroyed.cause` is Asterisk's Q.850 hangup cause: AST_CAUSE_USER_BUSY for SIP 486/600

@@ -16,7 +16,7 @@ import {
 
 import type { AmiEvent } from '../ami/client.js';
 import type { AriEvent, Endpoint } from '../ari/types.js';
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 
 export type TrunkStatus = TrunkStatusWire['status'];
 export type StatusChange = [trunkId: string, status: TrunkStatus];

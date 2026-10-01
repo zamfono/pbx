@@ -4,7 +4,7 @@
  * them: the `REDIRECTING` data, the `Diversion` its trunk's policy sends, written by
  * `forwardDiversion.ts`, and a `sip` target's headers, rendered by `forwardHeaders.ts`.
  */
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import type { Call } from './call.js';
 import { extensionOf } from './extensionOwner.js';
 import {

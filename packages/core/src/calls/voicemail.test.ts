@@ -13,15 +13,12 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel, type Logger } from '../ari/types.js';
+import { EventBus } from '../internal/eventBus.js';
+import { ConfigCache } from '../internal/snapshot.js';
+import { StateStore } from '../internal/stateStore.js';
 import { eventually, requestTo } from '../testing/eventually.js';
 import { newCall, type Call } from './call.js';
-import {
-  ConfigCache,
-  EventBus,
-  Pipeline,
-  StateStore,
-  type PipelineDeps
-} from './pipeline.js';
+import { Pipeline, type PipelineDeps } from './pipeline.js';
 import { deposit, type MailSender } from './voicemail.js';
 
 const noopLogger: Logger = {

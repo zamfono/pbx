@@ -3,7 +3,7 @@
  * ring group's members, for `*95`'s permission check (§10.2 "Mailbox access") and the group's
  * ring plan (§10.1 step 5). Its coverage lives in `features.test.ts` and
  * `ringGroupState.test.ts`. */
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import { expandMembers } from '../routing/ringGroup.js';
 import type { Owner } from './call.js';
 

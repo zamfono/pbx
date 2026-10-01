@@ -6,9 +6,12 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import type { Logger } from '../ari/types.js';
+import { EventBus } from '../internal/eventBus.js';
+import { ConfigCache } from '../internal/snapshot.js';
+import { StateStore } from '../internal/stateStore.js';
 import { eventually } from '../testing/eventually.js';
 import { newCall } from './call.js';
-import { ConfigCache, EventBus, Pipeline, StateStore } from './pipeline.js';
+import { Pipeline } from './pipeline.js';
 
 /** §7: "Every call-related line carries the per-call correlation id", the pipeline's own account
  * of a routing failure included. */

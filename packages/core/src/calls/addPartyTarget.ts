@@ -5,7 +5,7 @@
  * extensions, E.164 normalization and the tenant's own DIDs all apply. `addParty.ts` dials the
  * result.
  */
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import { resolveDialed } from '../routing/outbound.js';
 import { findForwardTarget } from './call.js';
 import { extensionOf } from './extensionOwner.js';

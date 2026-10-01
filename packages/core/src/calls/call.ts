@@ -5,7 +5,7 @@ import type { Selectable } from 'kysely';
 import type { DB, Scope } from '@zamfono/shared';
 
 import { CallLog, type LogLevel } from '../callLog.js';
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import { targetFromRow, type ForwardTarget } from '../routing/targets.js';
 import type { Diversion } from './forwardContext.js';
 import type { GroupLeg } from './groupLegs.js';

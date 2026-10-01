@@ -1,6 +1,6 @@
 /** `*5<ext or number>` (§10.2 "Three-way calls"), its own module so `features.ts`'s feature-code
  * dispatch stays under the repository's `max-lines` lint rule. */
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import { resolveAddedTarget, type AddedTarget } from './addPartyTarget.js';
 import { settleAnswered } from './answer.js';
 import { release, type Call } from './call.js';

@@ -7,16 +7,13 @@ import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import type { Logger } from '../ari/types.js';
 import { SIT_DURATION_MS } from '../indications.js';
+import { EventBus } from '../internal/eventBus.js';
+import { ConfigCache } from '../internal/snapshot.js';
+import { StateStore } from '../internal/stateStore.js';
 import { PROMPTS } from '../prompts.js';
 import { newCall, type Call } from './call.js';
 import { concludeExhausted } from './conclude.js';
-import {
-  ConfigCache,
-  EventBus,
-  Pipeline,
-  StateStore,
-  type PipelineDeps
-} from './pipeline.js';
+import { Pipeline, type PipelineDeps } from './pipeline.js';
 
 const noopLogger: Logger = {
   info: () => undefined,

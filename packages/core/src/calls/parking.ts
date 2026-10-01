@@ -5,7 +5,7 @@
  * rather than one `*.test.ts` each. */
 import { MS_PER_SECOND } from '@zamfono/shared';
 
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import type { Presence } from '../presence.js';
 import { release, type Call } from './call.js';
 import { activeCallOf, bridgedParty, channelOf } from './callLookup.js';

@@ -12,12 +12,15 @@ import {
   type Channel,
   type Logger
 } from '../ari/types.js';
+import { EventBus } from '../internal/eventBus.js';
+import { ConfigCache } from '../internal/snapshot.js';
+import { StateStore } from '../internal/stateStore.js';
 import { PROMPTS } from '../prompts.js';
 import { ATTEMPT_NO_RESPONSE_MS } from '../routing/trunk.js';
 import { eventually } from '../testing/eventually.js';
 import type { Call, Leg } from './call.js';
 import { handleOutbound } from './outbound.js';
-import { ConfigCache, EventBus, Pipeline, StateStore } from './pipeline.js';
+import { Pipeline } from './pipeline.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { TrunkState } from './trunkState.js';

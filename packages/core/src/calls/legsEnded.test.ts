@@ -6,19 +6,16 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import type { AriEvent, Logger } from '../ari/types.js';
+import { EventBus } from '../internal/eventBus.js';
+import { ConfigCache } from '../internal/snapshot.js';
+import { StateStore } from '../internal/stateStore.js';
 import { eventually } from '../testing/eventually.js';
 import { settleAnswered } from './answer.js';
 import { newCall, type Call, type Leg } from './call.js';
 import { noteHangupRequest } from './callEnd.js';
 import { trackLeg, type RingOutcome } from './legs.js';
 import { handleChannelEnded } from './legsEnded.js';
-import {
-  ConfigCache,
-  EventBus,
-  Pipeline,
-  StateStore,
-  type PipelineDeps
-} from './pipeline.js';
+import { Pipeline, type PipelineDeps } from './pipeline.js';
 import { endRingingLeg } from './ringConclusion.js';
 
 const noopLogger: Logger = {

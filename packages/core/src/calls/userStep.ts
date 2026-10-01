@@ -4,7 +4,7 @@
  * busy or noAnswer outcome. A forward is the user's own rule, so an external target is dialled as
  * their call (§10.1 step 7).
  */
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import {
   userEntryCondition,
   userEntryDecision,

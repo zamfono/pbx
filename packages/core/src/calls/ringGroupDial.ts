@@ -6,7 +6,7 @@
  */
 import { MS_PER_SECOND } from '@zamfono/shared';
 
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import type { MemberLeg } from '../routing/ringGroup.js';
 import type { Call } from './call.js';
 import { callPartiesChanged, callRinging } from './callState.js';

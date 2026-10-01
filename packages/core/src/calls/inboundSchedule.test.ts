@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { ConfigCache } from '../internal/server.js';
+import { ConfigCache } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import { newCall } from './call.js';
 import { applyOooAndHours } from './inboundSchedule.js';

@@ -17,8 +17,10 @@ import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import type { FakeEndpoint } from '../ari/fakeChannel.js';
 import type { Logger } from '../ari/types.js';
+import { EventBus } from '../internal/eventBus.js';
+import { ConfigCache } from '../internal/snapshot.js';
+import { StateStore } from '../internal/stateStore.js';
 import { eventually } from '../testing/eventually.js';
-import { ConfigCache, EventBus, StateStore } from './pipeline.js';
 import { TrunkState } from './trunkState.js';
 
 const noopLogger: Logger = {

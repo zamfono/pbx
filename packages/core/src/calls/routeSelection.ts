@@ -4,7 +4,7 @@
  * decide whether it is attempted at all. Shared by `outboundExternal.ts`, whose attempts wait for
  * their outcome, and `externalLegRoutes.ts`, whose ring-race legs do not.
  */
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import {
   channelCapAllows,
   matchingRoutes,

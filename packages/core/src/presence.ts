@@ -16,12 +16,9 @@ import {
 import type { AriClient } from './ari/client.js';
 import type { AriEvent, DeviceState } from './ari/types.js';
 import { extensionOf } from './calls/extensionOwner.js';
-import type {
-  ConfigCache,
-  EventBus,
-  Snapshot,
-  StateStore
-} from './internal/server.js';
+import type { EventBus } from './internal/eventBus.js';
+import type { ConfigCache, Snapshot } from './internal/snapshot.js';
+import type { StateStore } from './internal/stateStore.js';
 import { HintPusher } from './presenceHints.js';
 import {
   IDLE,

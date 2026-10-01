@@ -6,9 +6,9 @@
  */
 import type { Call, CallsRow } from './call.js';
 import { traceSystemEnd } from './callEnd.js';
+import { clearFindMeTimers } from './findMe.js';
 import { stopGroupRinging } from './groupPickup.js';
 import { endHold, holdIn, holdOf } from './hold.js';
-import { clearFindMeTimers } from './legs.js';
 import { notifyMissedCall } from './missedCall.js';
 import type { Pipeline } from './pipeline.js';
 

@@ -17,12 +17,10 @@ import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import type { Logger } from '../ari/types.js';
 import { newCall } from '../calls/call.js';
-import {
-  ConfigCache,
-  EventBus,
-  startInternalServer,
-  StateStore
-} from './server.js';
+import { EventBus } from './eventBus.js';
+import { startInternalServer } from './server.js';
+import { ConfigCache } from './snapshot.js';
+import { StateStore } from './stateStore.js';
 
 // Every server binds whatever port is free (`0`), never a fixed one another suite running on the
 // same host at the same time may already hold.

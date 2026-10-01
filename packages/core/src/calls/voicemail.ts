@@ -7,7 +7,7 @@
 import { newId, type Db } from '@zamfono/shared';
 
 import type { ApiClient } from '../apiClient.js';
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import { assetMedia, defaultPrompt } from '../prompts.js';
 import { release, type Call, type Owner } from './call.js';
 import { finishAbandoned } from './missedCall.js';
@@ -15,8 +15,6 @@ import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
 import { recordCaller } from './voicemailRecording.js';
 import { persistVoicemail } from './voicemailStore.js';
-
-export { mwiCounts } from './voicemailStore.js';
 
 const RELEASE_CODE_UNAVAILABLE = 480;
 const RELEASE_CODE_SERVER_ERROR = 500;

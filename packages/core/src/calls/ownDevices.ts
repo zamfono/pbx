@@ -11,20 +11,19 @@
 import { MS_PER_SECOND } from '@zamfono/shared';
 
 import type { Channel } from '../ari/types.js';
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import { channelLanguageVariable } from '../prompts.js';
 import type { Call, Leg } from './call.js';
 import { recordEvents, redeliverEarlyEvents } from './earlyEvents.js';
 import { originateLeg } from './legOriginate.js';
 import {
-  concludeRing,
   hangupLeg,
   trackLeg,
   type RingOutcome,
   type RingResolver
 } from './legs.js';
 import type { Pipeline } from './pipeline.js';
-import { placeAll } from './ringConclusion.js';
+import { concludeRing, placeAll } from './ringConclusion.js';
 
 export type Device = Snapshot['devices'][number];
 

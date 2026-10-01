@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import { newCall, type Call } from './call.js';
 import type { Diversion } from './forwardContext.js';
 import {

@@ -4,7 +4,7 @@
  * batch's own ring race) and applies the group's fallback once ringing ends without an answer.
  * The members' state and the group's rules it decides on are `ringGroupState.ts`'s.
  */
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import { assetMedia } from '../prompts.js';
 import {
   groupFallback,

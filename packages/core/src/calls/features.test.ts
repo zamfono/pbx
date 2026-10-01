@@ -13,7 +13,9 @@ import {
   type Logger
 } from '../ari/types.js';
 import { CdrWriter } from '../cdr.js';
-import { ConfigCache, EventBus, StateStore } from '../internal/server.js';
+import { EventBus } from '../internal/eventBus.js';
+import { ConfigCache } from '../internal/snapshot.js';
+import { StateStore } from '../internal/stateStore.js';
 import { Presence } from '../presence.js';
 import { defaultPrompt } from '../prompts.js';
 import {
@@ -24,8 +26,9 @@ import {
 import { newCall, type Call, type Leg } from './call.js';
 import { channelOf, otherChannelIn } from './callLookup.js';
 import { callUp, liveView } from './callState.js';
-import { handleFeature, retrieveParkedCall } from './features.js';
+import { handleFeature } from './features.js';
 import { handleOutbound } from './outbound.js';
+import { retrieveParkedCall } from './parkingRetrieval.js';
 import { Pipeline, type PipelineDeps } from './pipeline.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 import { sipToHangupCause } from './releaseCause.js';

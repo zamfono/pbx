@@ -24,12 +24,10 @@ import { TrunkState } from './calls/trunkState.js';
 import { readEnv, type CoreEnv } from './env.js';
 import { reloadHepOnConnect } from './hepReload.js';
 import { reloadAllModules } from './internal/configChanged.js';
-import {
-  ConfigCache,
-  EventBus,
-  startInternalServer,
-  StateStore
-} from './internal/server.js';
+import { EventBus } from './internal/eventBus.js';
+import { startInternalServer } from './internal/server.js';
+import { ConfigCache } from './internal/snapshot.js';
+import { StateStore } from './internal/stateStore.js';
 import { Presence } from './presence.js';
 
 const CORE_INTERNAL_PORT = 3000;

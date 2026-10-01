@@ -5,7 +5,7 @@
  */
 import { ANONYMOUS, isE164 } from '@zamfono/shared';
 
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import type { Call } from './call.js';
 import { contactName } from './contactName.js';

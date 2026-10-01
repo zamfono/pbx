@@ -7,7 +7,7 @@ import { AriClient } from './ari/client.js';
 import { FakeAri } from './ari/fake.js';
 import type { Logger } from './ari/types.js';
 import { announceAsteriskStartOnConnect } from './asteriskStarted.js';
-import { EventBus } from './internal/server.js';
+import { EventBus } from './internal/eventBus.js';
 
 type LogFn = Logger['info'];
 

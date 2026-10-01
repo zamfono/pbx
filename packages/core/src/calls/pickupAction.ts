@@ -6,7 +6,7 @@
  */
 import { newId, type PickupRequest } from '@zamfono/shared';
 
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import { RelayedCallLog } from '../relayedCallLog.js';
 import { ActionError, HTTP_CONFLICT } from './actionError.js';
 import { callLogMaxBytesFromEnv, newCall, type Call } from './call.js';

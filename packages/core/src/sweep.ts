@@ -9,8 +9,8 @@
  */
 import { resolveTenantTimeZone, type Scope } from '@zamfono/shared';
 
-import type { ConfigCache, EventBus } from './internal/server.js';
-import type { Snapshot } from './internal/snapshot.js';
+import type { EventBus } from './internal/eventBus.js';
+import type { ConfigCache, Snapshot } from './internal/snapshot.js';
 import {
   inEffectOoo,
   isOpen,

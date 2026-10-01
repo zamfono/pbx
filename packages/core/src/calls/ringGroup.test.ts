@@ -13,16 +13,13 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri, isPlacement, placedCallerId } from '../ari/fake.js';
 import { defaultChannel, type Channel, type Logger } from '../ari/types.js';
+import { EventBus } from '../internal/eventBus.js';
+import { ConfigCache } from '../internal/snapshot.js';
+import { StateStore } from '../internal/stateStore.js';
 import { eventually, requestTo } from '../testing/eventually.js';
 import { newCall, type Call, type Leg } from './call.js';
 import { liveView } from './callState.js';
-import {
-  ConfigCache,
-  EventBus,
-  Pipeline,
-  StateStore,
-  type PipelineDeps
-} from './pipeline.js';
+import { Pipeline, type PipelineDeps } from './pipeline.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';

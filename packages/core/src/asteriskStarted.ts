@@ -7,7 +7,7 @@
  */
 import type { AriClient } from './ari/client.js';
 import type { Logger } from './ari/types.js';
-import type { EventBus } from './internal/server.js';
+import type { EventBus } from './internal/eventBus.js';
 import { reconnectBackoff, type ReconnectBackoff } from './reconnectBackoff.js';
 
 /** Registers the announcement on every ARI connection from now on. A start time that cannot be

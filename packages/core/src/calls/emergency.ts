@@ -1,7 +1,7 @@
 /** Emergency calls (§10.1 "Emergency calls"): the tenant's emergency trunks in priority order,
  * bypassing outbound routing entirely. */
 import { effectiveLevel, type LogLevel } from '../callLog.js';
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import { emergencyTrunks } from '../routing/trunk.js';
 import { settleAnswered } from './answer.js';
 import { release, takeJoinBridge, type Call } from './call.js';

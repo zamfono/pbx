@@ -6,7 +6,7 @@
 import type { Presence as PresenceState } from '@zamfono/shared';
 
 import type { DeviceState } from './ari/types.js';
-import type { Snapshot } from './internal/server.js';
+import type { Snapshot } from './internal/snapshot.js';
 
 export type CallFlags = {
   state: 'idle' | 'ringing' | 'inCall';

@@ -8,7 +8,9 @@ import type { Logger } from './ari/types.js';
 import { buildPipeline } from './boot.js';
 import { Recorder } from './calls/recording.js';
 import { TrunkState } from './calls/trunkState.js';
-import { ConfigCache, EventBus, StateStore } from './internal/server.js';
+import { EventBus } from './internal/eventBus.js';
+import { ConfigCache } from './internal/snapshot.js';
+import { StateStore } from './internal/stateStore.js';
 import { Presence } from './presence.js';
 
 const noopLogger: Logger = {

@@ -2,7 +2,6 @@
  * `core`'s in-memory live state (§3, §3.1): what `GET /internal/state` serves to `api`. Live state
  * never lands in a table (§10.1); the modules that observe it write it here, or, for a reading
  * that has to be derived at the moment it is served, wire in the function that derives it.
- * `server.ts` re-exports `StateStore` as part of its public API.
  */
 import type { Presence, StateResponse, TrunkStatus } from '@zamfono/shared';
 

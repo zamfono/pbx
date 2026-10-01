@@ -4,7 +4,7 @@
  * no route to match (§9.4 "SIP targets"). Either leg carries the call's forwarding context (§9.4
  * "Forwarded calls").
  */
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import { shouldFallThrough } from '../routing/trunk.js';
 import { settleAnswered } from './answer.js';

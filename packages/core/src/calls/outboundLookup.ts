@@ -1,7 +1,7 @@
 /** Snapshot lookups `outbound.ts` needs to resolve a dialled string and its routes: route caller
  * lists, own DIDs, extensions, and the caller's own device (§9.2, §9.3, §9.4). */
 import type { Channel } from '../ari/types.js';
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import type {
   DialAction,
   ExtensionRow,

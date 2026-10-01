@@ -10,7 +10,9 @@ import { defaultChannel, type Channel, type Logger } from './ari/types.js';
 import type { LogLevel } from './callLog.js';
 import { newCall, type Call } from './calls/call.js';
 import { CdrWriter } from './cdr.js';
-import { ConfigCache, EventBus, StateStore } from './internal/server.js';
+import { EventBus } from './internal/eventBus.js';
+import { ConfigCache } from './internal/snapshot.js';
+import { StateStore } from './internal/stateStore.js';
 import { parseRtcpReport } from './rtcpReport.js';
 import { fixedPoint, ntpMiddle, rtcpPayload } from './testing/rtcpPayload.js';
 

@@ -5,7 +5,7 @@
  */
 import { newId } from '@zamfono/shared';
 
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import {
   callLogMaxBytesFromEnv,

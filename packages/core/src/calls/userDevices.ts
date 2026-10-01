@@ -3,7 +3,7 @@
  * registered, and whether the user is already in a call. Shared by the user step, its ring race
  * and the ring group's member states and originate step.
  */
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import type { Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 

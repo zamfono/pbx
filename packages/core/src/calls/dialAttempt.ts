@@ -6,7 +6,7 @@
  */
 import type { AriClient } from '../ari/client.js';
 import type { AriEvent, Channel } from '../ari/types.js';
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import {
   ATTEMPT_NO_RESPONSE_MS,
   type AttemptFailure,

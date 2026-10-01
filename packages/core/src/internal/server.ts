@@ -27,11 +27,8 @@ import {
 } from './configChanged.js';
 import { EventBus } from './eventBus.js';
 import { handleMwiRoute } from './mwiRoute.js';
-import { ConfigCache, type Snapshot } from './snapshot.js';
+import { ConfigCache } from './snapshot.js';
 import { StateStore } from './stateStore.js';
-
-export { ConfigCache, EventBus, StateStore };
-export type { Snapshot };
 
 const HTTP_OK = 200;
 const HTTP_NOT_FOUND = 404;

@@ -6,7 +6,7 @@
  * `addParty` for `*5` to an external number (§10.2 "Three-way calls"). The route match and each
  * route's pre-checks are `routeSelection.ts`'s.
  */
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import {
   shouldFallThrough,
   type AttemptFailure,

@@ -3,7 +3,7 @@
  * the batch's own `tracked` map. Owned and raced by `ringGroupDial.ts`; kept in its own module so
  * both stay under the size limits (§ Global Constraints).
  */
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import { channelLanguageVariable } from '../prompts.js';
 import type { MemberLeg } from '../routing/ringGroup.js';
 import type { ForwardTarget } from '../routing/targets.js';

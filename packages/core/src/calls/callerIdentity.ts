@@ -1,7 +1,7 @@
 /** Caller-ID and CLIR resolution for one outbound attempt (§9.4 "Caller-ID", "Anonymous calls
  * (CLIR)"): resolved per attempt, since each route (or the trunk, for an emergency call) may
  * carry its own override. */
-import type { Snapshot } from '../internal/server.js';
+import type { Snapshot } from '../internal/snapshot.js';
 import {
   callerIdHeaders,
   presentedNumber,

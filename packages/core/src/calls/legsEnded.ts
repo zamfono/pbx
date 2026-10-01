@@ -6,8 +6,9 @@
 import type { AriEvent, Channel } from '../ari/types.js';
 import type { Call } from './call.js';
 import { traceChannelEnded } from './callEnd.js';
+import { clearFindMeTimers } from './findMe.js';
 import { endHold, holdIn } from './hold.js';
-import { clearFindMeTimers, endLeg, hangupLeg } from './legs.js';
+import { endLeg, hangupLeg } from './legs.js';
 import { finishAbandoned } from './missedCall.js';
 import { releaseParkedChannel } from './parking.js';
 import type { Pipeline } from './pipeline.js';

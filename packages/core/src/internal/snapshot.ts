@@ -1,7 +1,6 @@
 /**
  * The config snapshot the ARI routing pipeline reads, and the cache that loads it (§3.1
- * "Config propagation"). `server.ts` re-exports `ConfigCache` and `Snapshot` as part of its
- * public API.
+ * "Config propagation").
  */
 import type { Selectable, Transaction } from 'kysely';
 

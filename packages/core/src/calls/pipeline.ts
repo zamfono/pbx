@@ -5,7 +5,9 @@ import type { Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import type { AriEvent, Channel, Logger } from '../ari/types.js';
-import { ConfigCache, EventBus, StateStore } from '../internal/server.js';
+import { EventBus } from '../internal/eventBus.js';
+import { ConfigCache } from '../internal/snapshot.js';
+import { StateStore } from '../internal/stateStore.js';
 import type { Presence } from '../presence.js';
 import type { Call } from './call.js';
 import { noteHangupRequest } from './callEnd.js';
@@ -13,12 +15,12 @@ import type { ActiveBatch } from './groupPickup.js';
 import type { Hold } from './hold.js';
 import { handleInboundStart } from './inbound.js';
 import {
-  handleChannelEnded,
   handleDtmf,
   legWentUp,
   type FindMeAcceptWait,
   type RingResolver
 } from './legs.js';
+import { handleChannelEnded } from './legsEnded.js';
 import { handleOutbound } from './outbound.js';
 import type { ParkedEntry } from './parking.js';
 import type { PendingTransfers } from './pendingTransfer.js';
@@ -26,8 +28,6 @@ import type { ParticipationRecorder } from './recordParticipation.js';
 import { followTransfers } from './referTransfers.js';
 import type { TrunkState } from './trunkState.js';
 import type { MailSender } from './voicemail.js';
-
-export { ConfigCache, EventBus, StateStore };
 
 export type PipelineDeps = {
   ari: AriClient;

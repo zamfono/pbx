@@ -19,16 +19,13 @@ import {
   type Channel,
   type Logger
 } from '../ari/types.js';
+import { EventBus } from '../internal/eventBus.js';
+import { ConfigCache } from '../internal/snapshot.js';
+import { StateStore } from '../internal/stateStore.js';
 import { eventually } from '../testing/eventually.js';
 import { newCall, type Call } from './call.js';
 import { liveView } from './callState.js';
-import {
-  ConfigCache,
-  EventBus,
-  Pipeline,
-  StateStore,
-  type PipelineDeps
-} from './pipeline.js';
+import { Pipeline, type PipelineDeps } from './pipeline.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { TrunkState } from './trunkState.js';
 import { runUserStep } from './userStep.js';
