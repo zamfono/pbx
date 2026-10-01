@@ -16,6 +16,7 @@ import {
   raiseLogLevel,
   type Call
 } from './call.js';
+import { extensionOf } from './extensionOwner.js';
 import {
   dispatchAction,
   logLevelFor,
@@ -23,10 +24,6 @@ import {
   type ResolvedTarget
 } from './outboundDispatch.js';
 import type { Pipeline } from './pipeline.js';
-
-function extensionOf(snapshot: Snapshot, userId: string): string {
-  return snapshot.extensions.find(row => row.userId === userId)?.ext ?? '';
-}
 
 /** What `req.target` resolves to when dialled, under the call's own CLIR where `req.clir` gives
  * one, as `#31#`/`*31#` before the target would (§9.4 "Anonymous calls (CLIR)"); an emergency
@@ -54,7 +51,7 @@ export function newOriginatedCall(
     id: newId(),
     direction: resolved.direction,
     callerChannelId: '',
-    from: extensionOf(snapshot, req.userId),
+    from: extensionOf(snapshot, { userId: req.userId }) ?? '',
     to: resolved.to,
     startedAt,
     logLevel: logLevelFor(snapshot, resolved.action, startedAt),

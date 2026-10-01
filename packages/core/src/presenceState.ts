@@ -28,13 +28,6 @@ export function registeredDeviceCount(
   ).length;
 }
 
-export function extensionForUser(
-  snapshot: Snapshot,
-  userId: string
-): string | null {
-  return snapshot.extensions.find(row => row.userId === userId)?.ext ?? null;
-}
-
 /** §9.3 "a user: RINGING while ... INUSE ... BUSY on DND ... UNAVAILABLE with no registered device". */
 export function userHint(
   flags: CallFlags,

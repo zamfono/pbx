@@ -16,6 +16,7 @@ import {
   toLogLevel,
   type Call
 } from './call.js';
+import { extensionOf } from './extensionOwner.js';
 import { RELEASE_CODE_NOT_FOUND } from './featureCall.js';
 import { endHold } from './hold.js';
 import { trackLeg } from './legs.js';
@@ -143,10 +144,8 @@ export async function ringParkerBack(
     partyChannelId,
     snapshot.settings.language
   );
-  const parkerExt = snapshot.extensions.find(
-    row => row.userId === parkerUserId
-  )?.ext;
-  if (parkerExt === undefined || parked.bridgeId === null) {
+  const parkerExt = extensionOf(snapshot, { userId: parkerUserId });
+  if (parkerExt === null || parked.bridgeId === null) {
     await routeParkedPartyToFallback(
       pipeline,
       snapshot,

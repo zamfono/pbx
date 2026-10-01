@@ -15,6 +15,7 @@ import {
 
 import type { AriClient } from './ari/client.js';
 import type { AriEvent, DeviceState } from './ari/types.js';
+import { extensionOf } from './calls/extensionOwner.js';
 import type {
   ConfigCache,
   EventBus,
@@ -23,7 +24,6 @@ import type {
 } from './internal/server.js';
 import { HintPusher } from './presenceHints.js';
 import {
-  extensionForUser,
   IDLE,
   registeredDeviceCount,
   userHint,
@@ -196,7 +196,7 @@ export class Presence {
     const flags = this.effectiveFlags(userId);
     const registered = registeredDeviceCount(snapshot, this.online, userId);
     const dnd = user.dnd === 1;
-    const ext = extensionForUser(snapshot, userId);
+    const ext = extensionOf(snapshot, { userId });
     if (ext !== null) {
       await this.hints.push(ext, userHint(flags, dnd, registered));
     }

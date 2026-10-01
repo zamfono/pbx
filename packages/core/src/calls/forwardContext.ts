@@ -6,6 +6,7 @@
  */
 import type { Snapshot } from '../internal/server.js';
 import type { Call } from './call.js';
+import { extensionOf } from './extensionOwner.js';
 import {
   diversionHeader,
   diversionNumber,
@@ -58,11 +59,7 @@ function userNumber(snapshot: Snapshot, userId: string): string | null {
     user?.calleridDidId === null || user === undefined
       ? undefined
       : snapshot.dids.find(row => row.id === user.calleridDidId);
-  return (
-    did?.number ??
-    snapshot.extensions.find(row => row.userId === userId)?.ext ??
-    null
-  );
+  return did?.number ?? extensionOf(snapshot, { userId });
 }
 
 type PartyIdentity = Omit<
@@ -84,15 +81,13 @@ function partyIdentity(
       number: userNumber(snapshot, party.userId),
       name: snapshot.users.find(row => row.id === party.userId)?.name ?? null,
       party: 'user',
-      extension:
-        snapshot.extensions.find(row => row.userId === party.userId)?.ext ??
-        null
+      extension: extensionOf(snapshot, { userId: party.userId })
     };
   }
   if ('ringGroupId' in party) {
-    const extension =
-      snapshot.extensions.find(row => row.ringGroupId === party.ringGroupId)
-        ?.ext ?? null;
+    const extension = extensionOf(snapshot, {
+      ringGroupId: party.ringGroupId
+    });
     return {
       number: extension,
       name:

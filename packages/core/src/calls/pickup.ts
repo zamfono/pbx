@@ -5,7 +5,7 @@
  * pickup (`pickupAction.ts`), which names the call.
  */
 import { bridgeAnswered, claimAnswer } from './answer.js';
-import { release, type Call, type Leg } from './call.js';
+import { release, type Call, type Leg, type Owner } from './call.js';
 import { findLiveCall } from './callLookup.js';
 import { ownerForExt } from './extensionOwner.js';
 import { closeFeatureCall, RELEASE_CODE_NOT_FOUND } from './featureCall.js';
@@ -114,20 +114,24 @@ export async function pickUp(
   return true;
 }
 
-/** How `call` rings for a pickup right now: its ring group's batch, any member's leg, or its
- * callee's own ring race; `null` once it stopped ringing. */
+/** How `call` rings for a pickup right now, and whom it rings: its ring group's batch, any
+ * member's leg, or its callee's own ring race; `null` once it stopped ringing. */
 export function pickupRingOf(
   pipeline: Pipeline,
   call: Call
-): PickupRing | null {
+): { ring: PickupRing; rings: Owner } | null {
+  const { ringGroupId, calleeUserId } = call;
   if (
-    call.ringGroupId !== null &&
+    ringGroupId !== null &&
     activeBatchHasRingingLeg(pipeline, call.id, null)
   ) {
-    return { kind: 'group', memberUserId: null };
+    return {
+      ring: { kind: 'group', memberUserId: null },
+      rings: { ringGroupId }
+    };
   }
-  if (call.calleeUserId !== null && pipeline.pendingRing.has(call.id)) {
-    return { kind: 'direct' };
+  if (calleeUserId !== null && pipeline.pendingRing.has(call.id)) {
+    return { ring: { kind: 'direct' }, rings: { userId: calleeUserId } };
   }
   return null;
 }

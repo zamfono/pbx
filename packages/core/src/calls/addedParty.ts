@@ -9,24 +9,17 @@
  */
 import { newId, type AddPartyRequest } from '@zamfono/shared';
 
-import type { Snapshot } from '../internal/server.js';
 import { ActionError, HTTP_UNPROCESSABLE, notBridged } from './actionError.js';
 import { dialAddPartyTarget } from './addParty.js';
 import { resolveAddedTarget } from './addPartyTarget.js';
 import { callLogMaxBytesFromEnv, newCall, type Call } from './call.js';
 import { ownBridge, transferrerChannel } from './callLookup.js';
+import { extensionOf } from './extensionOwner.js';
 import type { Pipeline } from './pipeline.js';
 import { userOfChannel } from './transfers.js';
 
 /** Which action the leg is for, as its trace and the running call's name it. */
 export type AddedLegKind = 'addParty' | 'consult';
-
-function extensionOf(snapshot: Snapshot, userId: string | null): string | null {
-  if (userId === null) {
-    return null;
-  }
-  return snapshot.extensions.find(row => row.userId === userId)?.ext ?? null;
-}
 
 /**
  * The added leg's own row, from the user whose channel `byChannelId` is in `running`, its trace
@@ -60,7 +53,10 @@ export async function newAddedLeg(
     id,
     direction: 'internal',
     callerChannelId: `${kind}:${id}`,
-    from: extensionOf(snapshot, callerUserId) ?? running.from,
+    from:
+      (callerUserId === null
+        ? null
+        : extensionOf(snapshot, { userId: callerUserId })) ?? running.from,
     to: req.target,
     startedAt: pipeline.deps.now(),
     logLevel: running.log.level,

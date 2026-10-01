@@ -8,6 +8,7 @@
 import type { Snapshot } from '../internal/server.js';
 import { resolveDialed } from '../routing/outbound.js';
 import { findForwardTarget } from './call.js';
+import { extensionOf } from './extensionOwner.js';
 import { RELEASE_CODE_NOT_FOUND } from './featureCall.js';
 import { resolveDialedContext } from './outboundLookup.js';
 
@@ -28,19 +29,6 @@ export type AddedTarget =
     }
   | { kind: 'emergency'; number: string }
   | { kind: 'refuse'; code: number };
-
-/** The live extension owned by `owner`, which `*5`'s `to_uri` names for an internal target. */
-function extensionOf(
-  snapshot: Snapshot,
-  owner: { userId: string } | { ringGroupId: string }
-): string | null {
-  const row = snapshot.extensions.find(candidate =>
-    'userId' in owner
-      ? candidate.userId === owner.userId
-      : candidate.ringGroupId === owner.ringGroupId
-  );
-  return row?.ext ?? null;
-}
 
 /** An own DID's E.164 number (§10.1 Outbound step 4: history sees only that form). */
 function didNumber(snapshot: Snapshot, didId: string): string {

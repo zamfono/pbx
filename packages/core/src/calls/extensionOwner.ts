@@ -1,7 +1,8 @@
 /** Who owns a dialled extension, for the feature codes that take one (§9.3 "Feature codes":
- * `*5<ext>`, `*8<ext>`, `*95<ext>`, `*97<ext>`), and a ring group's members, for `*95`'s
- * permission check (§10.2 "Mailbox access") and the group's ring plan (§10.1 step 5). Its
- * coverage lives in `features.test.ts` and `ringGroupState.test.ts`. */
+ * `*5<ext>`, `*8<ext>`, `*95<ext>`, `*97<ext>`), the extension a user or ring group owns, and a
+ * ring group's members, for `*95`'s permission check (§10.2 "Mailbox access") and the group's
+ * ring plan (§10.1 step 5). Its coverage lives in `features.test.ts` and
+ * `ringGroupState.test.ts`. */
 import type { Snapshot } from '../internal/server.js';
 import { expandMembers } from '../routing/ringGroup.js';
 import type { Owner } from './call.js';
@@ -19,6 +20,16 @@ export function ownerForExt(snapshot: Snapshot, ext: string): Owner | null {
     return { ringGroupId: row.ringGroupId };
   }
   return null;
+}
+
+/** The extension `owner` owns, `null` for one that owns none. */
+export function extensionOf(snapshot: Snapshot, owner: Owner): string | null {
+  const row = snapshot.extensions.find(candidate =>
+    'userId' in owner
+      ? candidate.userId === owner.userId
+      : candidate.ringGroupId === owner.ringGroupId
+  );
+  return row?.ext ?? null;
 }
 
 /** `groupId`'s member user ids in ring order: `ring_group_members` rows taken directly, and each

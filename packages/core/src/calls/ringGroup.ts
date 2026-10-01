@@ -13,6 +13,7 @@ import {
   type Strategy
 } from '../routing/ringGroup.js';
 import { raiseLogLevel, release, type Call } from './call.js';
+import { extensionOf } from './extensionOwner.js';
 import { CONDITION_REASONS, diversionFor } from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
@@ -210,8 +211,7 @@ export async function ringGroup(
   );
 
   // §9.3 "a ring group: RINGING while the group rings, else NOT_INUSE".
-  const groupExt =
-    snapshot.extensions.find(row => row.ringGroupId === groupId)?.ext ?? null;
+  const groupExt = extensionOf(snapshot, { ringGroupId: groupId });
   if (groupExt !== null) {
     await pipeline.deps.presence?.setHint(groupExt, 'RINGING');
   }

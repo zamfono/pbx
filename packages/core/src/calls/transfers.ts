@@ -23,7 +23,7 @@ import {
   presentCallerUserId,
   transferrerChannel
 } from './callLookup.js';
-import { ownerForExt } from './extensionOwner.js';
+import { extensionOf, ownerForExt } from './extensionOwner.js';
 import { endHold } from './hold.js';
 import { closeCall } from './liveCall.js';
 import {
@@ -55,10 +55,7 @@ export function fromOf(
     return parent.from;
   }
   const userId = userOfChannel(parent, transferee);
-  const ext =
-    userId === null
-      ? undefined
-      : snapshot.extensions.find(row => row.userId === userId)?.ext;
+  const ext = userId === null ? null : extensionOf(snapshot, { userId });
   return ext ?? parent.to;
 }
 

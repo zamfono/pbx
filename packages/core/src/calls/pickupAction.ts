@@ -10,6 +10,7 @@ import type { Snapshot } from '../internal/server.js';
 import { RelayedCallLog } from '../relayedCallLog.js';
 import { ActionError, HTTP_CONFLICT } from './actionError.js';
 import { callLogMaxBytesFromEnv, newCall, type Call } from './call.js';
+import { extensionOf } from './extensionOwner.js';
 import { ringOwnDevices, ringTimeoutOf } from './ownDevices.js';
 import { pickUp, pickupRingOf } from './pickup.js';
 import type { Pipeline } from './pipeline.js';
@@ -21,19 +22,8 @@ function ringingExtension(
   snapshot: Snapshot,
   call: Call
 ): string | null {
-  const ring = pickupRingOf(pipeline, call);
-  if (ring === null) {
-    return null;
-  }
-  const row =
-    ring.kind === 'group'
-      ? snapshot.extensions.find(
-          candidate => candidate.ringGroupId === call.ringGroupId
-        )
-      : snapshot.extensions.find(
-          candidate => candidate.userId === call.calleeUserId
-        );
-  return row?.ext ?? null;
+  const ringing = pickupRingOf(pipeline, call);
+  return ringing === null ? null : extensionOf(snapshot, ringing.rings);
 }
 
 /** The answered phone takes `target`, if it still rings; else the phone is hung up, and
@@ -44,10 +34,10 @@ async function takeOnAnswer(
   userId: string,
   channelId: string
 ): Promise<void> {
-  const ring = pickupRingOf(pipeline, target);
+  const ringing = pickupRingOf(pipeline, target);
   if (
-    ring !== null &&
-    (await pickUp(pipeline, target, ring, { channelId, userId }))
+    ringing !== null &&
+    (await pickUp(pipeline, target, ringing.ring, { channelId, userId }))
   ) {
     return;
   }
