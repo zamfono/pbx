@@ -184,6 +184,8 @@ describe('startInternalServer', () => {
     state.trunkChannels.set('mainTrunk', 2);
     state.readRegisteredDevicesFrom(() => Promise.resolve(3));
     state.readRecordingMixFailuresFrom(() => 1);
+    state.readAsteriskChannelsFrom(() => Promise.resolve(4));
+    state.readRecordingsInProgressFrom(() => 2);
 
     const response = await fetch(`http://127.0.0.1:${port}/internal/state`);
     expect(response.status).toBe(HTTP_OK);
@@ -193,7 +195,9 @@ describe('startInternalServer', () => {
       trunkChannels: { mainTrunk: 2 },
       presence: { user1: presence },
       registeredDevices: 3,
-      recordingMixFailures: 1
+      recordingMixFailures: 1,
+      asteriskChannels: 4,
+      recordingsInProgress: 2
     });
   });
 

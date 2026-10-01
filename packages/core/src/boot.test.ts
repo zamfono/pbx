@@ -71,6 +71,17 @@ describe('buildPipeline', () => {
     expect((await state.snapshot()).recordingMixFailures).toBe(2);
   });
 
+  it("serves the recordings in progress and Asterisk's channels, null while ARI does not answer (§6.4)", async () => {
+    vi.spyOn(Recorder.prototype, 'inProgressCount', 'get').mockReturnValue(1);
+
+    const { state } = build('UTC');
+    const snapshot = await state.snapshot();
+
+    expect(snapshot.recordingsInProgress).toBe(1);
+    // The client in `build` points at a port nothing listens on.
+    expect(snapshot.asteriskChannels).toBeNull();
+  });
+
   it("hands the stack's TZ to the pipeline, the tenant clock while settings.timezone is NULL (§11.4)", () => {
     const { pipeline } = build('Europe/Vienna');
 

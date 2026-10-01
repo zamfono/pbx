@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-01 · §6.4 Reload timing, Maintenance gate.** A scheduled certificate swap waits at its maintenance moment until the system is idle: no call, no channel open in Asterisk, a parked call, a voicemail deposit or a menu included, and no recording being made or mixed, as `core`'s `GET /internal/state` now reports with `asteriskChannels` and `recordingsInProgress`. While busy it looks again every 5 minutes, and two hours past the moment it gives up until the next one. The safety valve compares the certificate's expiry with the gate's next look rather than with the moment alone; the placeholder's replacement still applies at once.
+*Why:* requested by the product owner: stacks should take non-breaking releases on their own, at a moment no call is disturbed, and owners learn of breaking releases they must install by hand; the certificate swap reloads the TLS transport too, so it uses the same gate.
+
 **2026-10-01 · §3.1 Write ownership, §10.6 Webhooks, §11.1 Soft delete, §11.2 `webhook_deliveries`.** Webhook delivery runs from a persistent outbox, the new `webhook_deliveries` table, in place of an in-memory queue: one row per hook and event holds the body, the attempt count and when the next attempt is due, and is deleted once the delivery succeeds or its third attempt fails, so no retention rule is needed; deleting a hook deletes its rows, and its hard purge takes any left through the FK. A delivery still pending when `api` restarts resumes from its row after what remains of its backoff, with the attempts it has left. Each attempt is signed with the hook's secret at the time of the attempt.
 *Why:* requested by the product owner: events queued when api restarted were lost.
 

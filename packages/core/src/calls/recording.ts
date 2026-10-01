@@ -71,6 +71,9 @@ export class Recorder {
   private readonly mix: Mixer;
   private readonly participations = new Map<string, Participation>();
   private mixFailures = 0;
+  // Participations already out of `participations` whose raw files are still being finished or
+  // mixed: a recording in progress all the same, until its row is stored.
+  private finishing = 0;
 
   constructor(deps: RecorderDeps) {
     this.deps = deps;
@@ -80,6 +83,11 @@ export class Recorder {
   /** Mixes failed since construction (§7 "Metrics" `zamfono_recording_mix_failures_total`). */
   get mixFailureCount(): number {
     return this.mixFailures;
+  }
+
+  /** Participations being recorded or still being mixed (§6.4 "Maintenance gate"). */
+  get inProgressCount(): number {
+    return this.participations.size + this.finishing;
   }
 
   /** Starts recording `leg`'s participation when the effective flag (§10.2) is set, at answer;
@@ -190,6 +198,15 @@ export class Recorder {
       return;
     }
     this.participations.delete(key);
+    this.finishing += 1;
+    try {
+      await this.finish(participation);
+    } finally {
+      this.finishing -= 1;
+    }
+  }
+
+  private async finish(participation: Participation): Promise<void> {
     // Registered before the hangup that stops the recordings, so neither `RecordingFinished`
     // event can fire (and be missed) before this module is listening for it.
     const leftFinished = waitForRecordingFinished(

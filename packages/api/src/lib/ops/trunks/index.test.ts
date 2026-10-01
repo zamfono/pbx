@@ -416,7 +416,9 @@ describe('trunks operations', () => {
             trunkChannels: {},
             presence: {},
             registeredDevices: 0,
-            recordingMixFailures: 0
+            recordingMixFailures: 0,
+            asteriskChannels: 0,
+            recordingsInProgress: 0
           })
       })
     );

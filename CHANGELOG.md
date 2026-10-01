@@ -29,6 +29,11 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
+- A renewed TLS certificate is swapped in at the maintenance moment only once nothing is in
+  progress: no call, no parked call, no voicemail being left and no recording being made or
+  mixed. While something is, the stack looks again every 5 minutes for up to two hours, then
+  waits for the next maintenance moment. The first certificate replacing a fresh stack's
+  placeholder, and a renewal the current certificate would expire before, still apply at once.
 - MCP clients and the OpenAPI document now describe what an operation's input fields mean, not
   just their names and types: every tool's input schema carries a one-sentence `description` per
   field whose meaning is not obvious, and terse tool descriptions say what the operation does.

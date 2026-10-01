@@ -702,7 +702,7 @@ A transport reload can briefly drop TLS registrations. Clients re-register withi
 
 **Fresh stack.** The Asterisk entrypoint generates a self-signed placeholder certificate when the volume holds none, so `transport-tls` loads before Caddy has obtained anything. The first real certificate replaces the placeholder immediately. The reload-timing rule governs only replacements of a working certificate.
 
-**Reload timing.** A detected change is applied at the next maintenance moment, resolved in this priority:
+**Reload timing.** A detected change is applied at the next maintenance moment once the system is idle (Maintenance gate), the moment resolved in this priority:
 
 1. the midpoint of the current or next scheduled tenant-wide OOO period (an `ooo_rules` row with all scope columns NULL and both `starts_at` and `expires_at` set, starting within 7 days), if that midpoint lies in the future;
 2. the midpoint of the longest closed period of the tenant-wide opening hours (§10.2) within the coming 7 days, if such a schedule exists and has a closed period; a schedule without open intervals is closed throughout, and the change is applied at once. The longest period, typically the weekend or the night, keeps a lunch break from being chosen;
@@ -710,7 +710,9 @@ A transport reload can briefly drop TLS registrations. Clients re-register withi
 4. the next occurrence of the hour in the `TLS_RELOAD_HOUR` environment variable;
 5. the next 03:00.
 
-All hours resolve in the tenant's time zone: `settings.timezone` (an IANA name), else the stack's `TZ`, else UTC. Safety valve: if the certificate currently on the `asterisk-config` volume expires before the chosen moment, the change is applied immediately.
+All hours resolve in the tenant's time zone: `settings.timezone` (an IANA name), else the stack's `TZ`, else UTC. Safety valve: if the certificate currently on the `asterisk-config` volume expires before the gate would next open or look again, the change is applied immediately.
+
+**Maintenance gate.** `api` touches the running system on its own only through one gate: it opens at the next maintenance moment once the system is idle, which `core`'s live state tells: no call, no channel open in Asterisk (a parked call, a voicemail deposit and a menu each hold one), and no recording being made or still being mixed; a `core` or ARI that does not answer is not idle. While the system is busy the gate looks again every 5 minutes, and two hours past the moment it gives up until the next moment, resolved from then on. The fresh-stack placeholder's replacement and the safety valve do not wait for it.
 
 `api` reads only the hook's copy, never Caddy's own certificate store, whose layout is internal to Caddy. It alerts through `/healthz` and metrics when the copy is missing.
 

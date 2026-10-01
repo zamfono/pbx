@@ -12,7 +12,8 @@ import type {
 } from '@zamfono/shared';
 
 /** In-memory live state (§3, `GET /internal/state`): calls, trunk registration and channels in
- * use, presence, registered devices, recording-mix failures. */
+ * use, presence, registered devices, recording-mix failures, and what the maintenance gate asks
+ * (§6.4): Asterisk's open channels and the recordings in progress. */
 export class StateStore {
   readonly calls = new Map<string, LiveCall>();
   readonly trunks = new Map<string, TrunkStatus>();
@@ -21,6 +22,8 @@ export class StateStore {
   readonly presence = new Map<string, Presence>();
   private registeredDevicesReading: (() => Promise<number>) | null = null;
   private recordingMixFailuresReading: (() => number) | null = null;
+  private asteriskChannelsReading: (() => Promise<number>) | null = null;
+  private recordingsInProgressReading: (() => number) | null = null;
 
   /**
    * Wires the count of live devices registered right now, `Presence.registeredDevices`: counted
@@ -37,6 +40,25 @@ export class StateStore {
     this.recordingMixFailuresReading = reading;
   }
 
+  /** Wires the count of channels Asterisk holds, read when served; the snapshot reports `null`
+   * until it is wired and whenever the reading fails, as it does while ARI is down. */
+  readAsteriskChannelsFrom(reading: () => Promise<number>): void {
+    this.asteriskChannelsReading = reading;
+  }
+
+  /** Wires the recorder's count of participations recording or mixing; the snapshot reports
+   * zero until it is wired. */
+  readRecordingsInProgressFrom(reading: () => number): void {
+    this.recordingsInProgressReading = reading;
+  }
+
+  private async asteriskChannels(): Promise<number | null> {
+    if (this.asteriskChannelsReading === null) {
+      return null;
+    }
+    return this.asteriskChannelsReading().catch(() => null);
+  }
+
   async snapshot(): Promise<StateResponse> {
     return {
       calls: [...this.calls.values()],
@@ -44,7 +66,9 @@ export class StateStore {
       trunkChannels: Object.fromEntries(this.trunkChannels),
       presence: Object.fromEntries(this.presence),
       registeredDevices: (await this.registeredDevicesReading?.()) ?? 0,
-      recordingMixFailures: this.recordingMixFailuresReading?.() ?? 0
+      recordingMixFailures: this.recordingMixFailuresReading?.() ?? 0,
+      asteriskChannels: await this.asteriskChannels(),
+      recordingsInProgress: this.recordingsInProgressReading?.() ?? 0
     };
   }
 }

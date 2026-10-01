@@ -3,8 +3,8 @@
  * hook's copy on `caddy-data` (`zamfono/cert.pem`/`privkey.pem`, images/proxy/zamfono-cert-hook)
  * with the copy on the `asterisk-config` volume, and on a change copies chain and key across —
  * at once for a fresh stack's self-signed placeholder or an expiring current certificate,
- * otherwise at the next maintenance moment `nextMaintenanceMoment` resolves — then triggers the
- * PJSIP reload through `core`. Runs on a poll, and can be run early by `notify()` when the hook's
+ * otherwise once the maintenance gate opens (`maintenanceWindow.ts`) — then triggers the PJSIP
+ * reload through `core`. Runs on a poll, and can be run early by `notify()` when the hook's
  * own `POST /internal/certificate` reaches `api` (routes/internal/certificate/+server.ts).
  */
 import { createHash, X509Certificate } from 'node:crypto';
@@ -24,7 +24,11 @@ import {
   isMatchingPair,
   TLS_CERT_FILENAME
 } from './certSyncFiles.js';
-import { nextMaintenanceMoment } from './reloadTiming.js';
+import {
+  coreIsIdle,
+  createMaintenanceGate,
+  type MaintenanceGate
+} from './maintenanceWindow.js';
 
 const logger = pino({ name: 'certSync' });
 
@@ -52,29 +56,56 @@ function isSelfSigned(certPem: Buffer): boolean {
   }
 }
 
-/** The moment to apply the change at: at once for a placeholder or an expiring current certificate. */
-async function dueAt(
-  db: Db,
-  now: Date,
-  currentCrt: Buffer | null
-): Promise<Date> {
-  if (currentCrt === null || isSelfSigned(currentCrt)) {
-    return now;
-  }
-  const scheduled = await nextMaintenanceMoment(db, now);
-  const currentExpiresAt = new Date(new X509Certificate(currentCrt).validTo);
-  return currentExpiresAt.getTime() < scheduled.getTime() ? now : scheduled;
-}
-
-type PendingChange = { sourceHash: string; applyAtMs: number };
+/** A change waiting for its gate, and when that gate is next worth asking. */
+type PendingChange = {
+  sourceHash: string;
+  gate: MaintenanceGate;
+  nextCheckMs: number;
+};
 
 // Keyed by the `CertSyncDeps` object a caller keeps passing across polls (the scheduler below
-// reuses one instance): once a target moment is resolved for a given source certificate it is
-// held here and compared against `now` on every later poll, instead of being resolved afresh
-// each time. Resolving afresh against the current `now` would keep landing on a moment still
-// ahead of it (e.g. "the next 3am" recomputed just after 3am is tomorrow's 3am), so the change
-// would never come due.
+// reuses one instance): a source certificate's gate, which holds its resolved maintenance moment
+// across polls, lives here until the change is applied or superseded.
 const pendingChangeByDeps = new WeakMap<CertSyncDeps, PendingChange>();
+
+/**
+ * Whether to apply the change to `sourceHash` now: at once over no certificate or the
+ * placeholder; otherwise once the gate opens, or at once when the current certificate expires
+ * before the gate is next worth asking (the safety valve).
+ */
+async function dueNow(
+  deps: CertSyncDeps,
+  now: Date,
+  sourceHash: string,
+  currentCrt: Buffer | null
+): Promise<boolean> {
+  if (currentCrt === null || isSelfSigned(currentCrt)) {
+    return true;
+  }
+  const held = pendingChangeByDeps.get(deps);
+  const pending =
+    held?.sourceHash === sourceHash
+      ? held
+      : {
+          sourceHash,
+          gate: createMaintenanceGate({
+            db: deps.db,
+            isIdle: async () => coreIsIdle(deps.coreClient)
+          }),
+          nextCheckMs: now.getTime()
+        };
+  pendingChangeByDeps.set(deps, pending);
+  const verdict = await pending.gate.check(now);
+  if (verdict.open) {
+    return true;
+  }
+  const expiresAtMs = Date.parse(new X509Certificate(currentCrt).validTo);
+  if (expiresAtMs < verdict.nextCheckAt.getTime()) {
+    return true;
+  }
+  pending.nextCheckMs = verdict.nextCheckAt.getTime();
+  return false;
+}
 
 // Keyed the same way as `pendingChangeByDeps`, but tracks the far side of a copy: once
 // `copyCertificate` has written a source certificate's hash to the volume, that hash stays here
@@ -119,16 +150,7 @@ export async function runCertSync(deps: CertSyncDeps): Promise<CertSyncStatus> {
   }
   if (!upToDate) {
     const now = (deps.now ?? (() => new Date()))();
-    const pending = pendingChangeByDeps.get(deps);
-    const applyAt =
-      pending?.sourceHash === sourceHash
-        ? new Date(pending.applyAtMs)
-        : await dueAt(deps.db, now, currentCrt);
-    if (applyAt.getTime() > now.getTime()) {
-      pendingChangeByDeps.set(deps, {
-        sourceHash,
-        applyAtMs: applyAt.getTime()
-      });
+    if (!(await dueNow(deps, now, sourceHash, currentCrt))) {
       return 'ok';
     }
     pendingChangeByDeps.delete(deps);
@@ -147,7 +169,7 @@ export async function runCertSync(deps: CertSyncDeps): Promise<CertSyncStatus> {
   return 'ok';
 }
 
-/** The delay, in ms, before the next poll should run: the resolved moment when one is pending and closer than the regular poll interval, else `pollIntervalMs`. */
+/** The delay, in ms, before the next poll should run: the pending change's next gate check when that is closer than the regular poll interval, else `pollIntervalMs`. */
 function nextPollDelayMs(
   deps: CertSyncDeps,
   now: () => Date,
@@ -157,7 +179,7 @@ function nextPollDelayMs(
   if (!pending) {
     return pollIntervalMs;
   }
-  const untilDueMs = pending.applyAtMs - now().getTime();
+  const untilDueMs = pending.nextCheckMs - now().getTime();
   return Math.min(pollIntervalMs, Math.max(0, untilDueMs));
 }
 
@@ -170,15 +192,14 @@ export type CertSyncScheduler = {
 };
 
 const SECONDS_PER_MINUTE = 60;
-// Coarser than the day-scale timing this job targets is enough (§6.4): the resolved moment is
-// held across polls (`pendingChangeByDeps`), so a poll every hour still applies a scheduled
-// change within the hour it comes due.
+// Coarser than the day-scale timing this job targets is enough (§6.4): the gate's next check is
+// held across polls (`pendingChangeByDeps`), and the poll is drawn in to land on it.
 const POLL_INTERVAL_MS = MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND;
 
 /**
  * Runs `runCertSync` once immediately (§6.4 "The same sync runs at `api` start") and then on a
- * poll no coarser than an hour, drawn in to land exactly on a pending change's resolved moment
- * (`nextMaintenanceMoment`) whenever that falls sooner, exposing its last-known status for
+ * poll no coarser than an hour, drawn in to land exactly on a pending change's next gate check
+ * (`maintenanceWindow.ts`) whenever that falls sooner, exposing its last-known status for
  * `/healthz` and `/metrics` to read.
  */
 export function scheduleCertSync(deps: CertSyncDeps): CertSyncScheduler {

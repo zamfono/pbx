@@ -556,6 +556,46 @@ describe('Recorder', () => {
     expect(recorder.mixFailureCount).toBe(1);
   });
 
+  it('counts a participation in progress from its start until its mix is stored (§6.4)', async () => {
+    const userId = await seedUser(db, true);
+    const targetId = await seedForwardTargetUser(db, userId);
+    const didId = await seedDid(db, targetId);
+    await seedSettings(db, didId);
+    const mixing = Promise.withResolvers<number>();
+    const mixStarted = Promise.withResolvers<undefined>();
+    const recorder = new Recorder({
+      ari,
+      cache,
+      db,
+      mediaDir: MEDIA_DIR,
+      mix: async () => {
+        mixStarted.resolve(undefined);
+        return mixing.promise;
+      },
+      log: fakeLogger(),
+      now: () => NOW
+    });
+    const call = buildCall(null);
+    await cdr.open(call);
+    fakeAri.addChannel({ id: 'leg-channel' });
+    const leg = buildLeg({ channelId: 'leg-channel', userId });
+    expect(recorder.inProgressCount).toBe(0);
+
+    await recorder.onLegUp(call, leg);
+    expect(recorder.inProgressCount).toBe(1);
+    const [leftName, rightName] = recordCalls().map(body => body.name);
+    const ended = recorder.onLegEnded(call, leg);
+    emitRecordingFinished(leftName, 5);
+    emitRecordingFinished(rightName, 5);
+    await mixStarted.promise;
+    // Out of the bridge but not yet mixed: still a recording in progress.
+    expect(recorder.inProgressCount).toBe(1);
+
+    mixing.resolve(0);
+    await ended;
+    expect(recorder.inProgressCount).toBe(0);
+  });
+
   it('records both participations of an internal call between two flagged users', async () => {
     const calleeId = await seedUser(db, true);
     const callerId = await seedUser(db, true);

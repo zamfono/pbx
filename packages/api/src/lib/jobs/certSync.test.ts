@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
 
 import type { CoreClient } from '../coreClient.js';
 import { makeTestDb } from '../testDb.js';
@@ -24,23 +24,50 @@ import {
 const FQDN = 'pbx.example.com';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-type StubCoreClient = CoreClient & { configChangedCalls: unknown[][] };
+type StubCoreClient = CoreClient & {
+  configChangedCalls: unknown[][];
+  /** Live calls `state()` reports; an empty list is an idle system (§6.4 "Maintenance gate"). */
+  liveCalls: StateResponse['calls'];
+};
+
+const LIVE_CALL: StateResponse['calls'][number] = {
+  callId: 'call-1',
+  direction: 'inbound',
+  from: '+491701234567',
+  to: '+490000000',
+  state: 'up',
+  startedAt: '2026-01-01T00:00:00.000Z',
+  ringGroupId: null,
+  userIds: []
+};
 
 function stubCoreClient(): StubCoreClient {
   const configChangedCalls: unknown[][] = [];
-  return {
+  const client: StubCoreClient = {
     configChangedCalls,
+    liveCalls: [],
     configChanged: kinds => {
       configChangedCalls.push(kinds);
       return Promise.resolve();
     },
-    state: () => Promise.reject(new Error('not used')),
+    state: () =>
+      Promise.resolve({
+        calls: client.liveCalls,
+        trunks: {},
+        trunkChannels: {},
+        presence: {},
+        registeredDevices: 0,
+        recordingMixFailures: 0,
+        asteriskChannels: client.liveCalls.length,
+        recordingsInProgress: 0
+      }),
     originate: () => Promise.reject(new Error('not used')),
     transfer: () => Promise.reject(new Error('not used')),
     pickup: () => Promise.reject(new Error('not used')),
     hangup: () => Promise.reject(new Error('not used')),
     mwi: () => Promise.reject(new Error('not used'))
   };
+  return client;
 }
 
 /** Places `crt`/`key` bytes where the `proxy` image's `cert_obtained` hook writes them
@@ -403,6 +430,85 @@ describe('runCertSync', () => {
     expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
     const installed = await readFile(path.join(genDir, 'tls', 'cert.pem'));
     expect(installed.equals(nextCert.crt)).toBe(true);
+  });
+
+  it('waits at the maintenance moment while a call is live, then applies once the system is idle', async () => {
+    const { genDir, caddyDataDir, workDir } = await makeDirs();
+    const current = caIssuedCert(workDir, 3650);
+    await seedCurrentCert(genDir, current.crt, current.key);
+    const nextCert = caIssuedCert(workDir, 3650);
+    await seedCaddyCert(caddyDataDir, nextCert.crt, nextCert.key);
+    const db = await makeTestDb();
+    await seedSettings(db);
+    delete process.env.TLS_RELOAD_HOUR;
+    const coreClient = stubCoreClient();
+    coreClient.liveCalls = [LIVE_CALL];
+    let now = new Date('2026-01-01T01:00:00Z');
+    const deps: CertSyncDeps = {
+      db,
+      coreClient,
+      genDir,
+      caddyDataDir,
+      now: () => now
+    };
+
+    await expect(runCertSync(deps)).resolves.toBe('ok');
+    now = new Date('2026-01-01T03:00:00Z');
+    await expect(runCertSync(deps)).resolves.toBe('ok');
+    expect(coreClient.configChangedCalls).toEqual([]);
+
+    coreClient.liveCalls = [];
+    now = new Date('2026-01-01T03:10:00Z');
+    await expect(runCertSync(deps)).resolves.toBe('ok');
+    expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
+  });
+
+  it('gives up two hours past the moment while the system stays busy, until the next moment', async () => {
+    const { genDir, caddyDataDir, workDir } = await makeDirs();
+    const current = caIssuedCert(workDir, 3650);
+    await seedCurrentCert(genDir, current.crt, current.key);
+    const nextCert = caIssuedCert(workDir, 3650);
+    await seedCaddyCert(caddyDataDir, nextCert.crt, nextCert.key);
+    const db = await makeTestDb();
+    await seedSettings(db);
+    delete process.env.TLS_RELOAD_HOUR;
+    const coreClient = stubCoreClient();
+    coreClient.liveCalls = [LIVE_CALL];
+    let now = new Date('2026-01-01T03:00:00Z');
+    const deps: CertSyncDeps = {
+      db,
+      coreClient,
+      genDir,
+      caddyDataDir,
+      now: () => now
+    };
+
+    await expect(runCertSync(deps)).resolves.toBe('ok');
+    coreClient.liveCalls = [];
+    // Past the two-hour wait: the next chance is tomorrow's 03:00, idle or not.
+    now = new Date('2026-01-01T05:30:00Z');
+    await expect(runCertSync(deps)).resolves.toBe('ok');
+    expect(coreClient.configChangedCalls).toEqual([]);
+
+    now = new Date('2026-01-02T03:00:00Z');
+    await expect(runCertSync(deps)).resolves.toBe('ok');
+    expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
+  });
+
+  it('applies the placeholder replacement at once even while a call is live', async () => {
+    const { genDir, caddyDataDir, workDir } = await makeDirs();
+    const placeholder = selfSignedCert(workDir);
+    await seedCurrentCert(genDir, placeholder.crt, placeholder.key);
+    const source = caIssuedCert(workDir, 3650);
+    await seedCaddyCert(caddyDataDir, source.crt, source.key);
+    const db = await makeTestDb();
+    const coreClient = stubCoreClient();
+    coreClient.liveCalls = [LIVE_CALL];
+
+    await expect(
+      runCertSync({ db, coreClient, genDir, caddyDataDir })
+    ).resolves.toBe('ok');
+    expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
   });
 
   it('applies immediately when the installed certificate expires before the scheduled moment (safety valve)', async () => {

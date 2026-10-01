@@ -45,6 +45,14 @@ export type StateResponse = {
   registeredDevices: number;
   /** Recording mixes failed since `core` started (§10.2 "Best effort", §7). */
   recordingMixFailures: number;
+  /**
+   * Channels Asterisk holds right now, read from ARI when served: every leg, a parked party, a
+   * voicemail deposit, a menu and a recording's snoop channels alike; `null` while ARI does not
+   * answer (§6.4 "Maintenance gate").
+   */
+  asteriskChannels: number | null;
+  /** Participations being recorded or still being mixed into their file (§10.2, §6.4). */
+  recordingsInProgress: number;
 };
 
 /** `POST /internal/calls` → 201 `{ callId }` | 409 RFC 9457 problem whose `detail` is `'noRegisteredDevice'` (§10.2).
