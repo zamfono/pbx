@@ -5,7 +5,7 @@
  */
 import { unlink } from 'node:fs/promises';
 
-import { mwiMailboxOf, type Db } from '@zamfono/shared';
+import type { Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import type { Owner } from './call.js';
@@ -59,7 +59,7 @@ export async function markRead(
     .where('read', '=', 0)
     .executeTakeFirst();
   if (Number(result.numUpdatedRows) > 0) {
-    await refreshMwi(deps, mwiMailboxOf(owner));
+    await refreshMwi(deps, owner);
   }
 }
 
@@ -71,5 +71,5 @@ export async function deleteMessage(
 ): Promise<void> {
   await deps.db.deleteFrom('voicemails').where('id', '=', message.id).execute();
   await unlink(`${VOICEMAIL_DIR}/${message.filename}`).catch(() => undefined);
-  await refreshMwi(deps, mwiMailboxOf(owner));
+  await refreshMwi(deps, owner);
 }

@@ -5,7 +5,7 @@
  */
 import type http from 'node:http';
 
-import type { Db, MwiMailbox } from '@zamfono/shared';
+import { parseMwiMailbox, type Db, type MwiMailbox } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import { refreshMwi } from '../calls/voicemailStore.js';
@@ -43,7 +43,7 @@ export async function handleMwiRoute(
   if (mailbox === null) {
     return false;
   }
-  await refreshMwi(deps, mailbox);
+  await refreshMwi(deps, parseMwiMailbox(mailbox));
   response.writeHead(HTTP_NO_CONTENT);
   response.end();
   return true;

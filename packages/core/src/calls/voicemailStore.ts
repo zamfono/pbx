@@ -4,13 +4,7 @@
  * behalf (§3.1 "Mail"). Separate from the deposit flow itself, which is about the call. The MWI
  * push after any later mailbox change (§9.3 "MWI", `refreshMwi`) reads the same counts.
  */
-import {
-  mwiMailboxOf,
-  parseMwiMailbox,
-  type Db,
-  type MailRequest,
-  type MwiMailbox
-} from '@zamfono/shared';
+import { mwiMailboxOf, type Db, type MailRequest } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import type { Call, Owner } from './call.js';
@@ -42,14 +36,11 @@ export async function mwiCounts(
  * after doing the same. */
 export async function refreshMwi(
   deps: { ari: AriClient; db: Db },
-  mailbox: MwiMailbox
+  mailbox: Owner
 ): Promise<void> {
-  const { oldMessages, newMessages } = await mwiCounts(
-    deps.db,
-    parseMwiMailbox(mailbox)
-  );
+  const { oldMessages, newMessages } = await mwiCounts(deps.db, mailbox);
   await deps.ari.mailboxes
-    .put(mailbox, oldMessages, newMessages)
+    .put(mwiMailboxOf(mailbox), oldMessages, newMessages)
     .catch(() => undefined);
 }
 
