@@ -4,8 +4,10 @@
  * a backup of every enabled target first, then the request `system.update` makes
  * (`requestUpdate`). Its outcome is followed up once the updater reports the run ended, which is
  * after `api` itself restarted. A failure, of the backup, of the request or of the run, is
- * reported (`autoUpdateReport.ts`) and not retried for that release. Whatever the setting, a
- * breaking release, which only `update.sh` on the host installs, is reported too.
+ * reported (`autoUpdateReport.ts`), and the release is tried again at a later maintenance moment
+ * (`retryHeldOff`) until `MAX_AUTO_UPDATE_ATTEMPTS` attempts on it failed; a refusal because an
+ * update is already running is no failed attempt. Whatever the setting, a breaking release, which
+ * only `update.sh` on the host installs, is reported too.
  */
 import pino from 'pino';
 
@@ -17,8 +19,8 @@ import { JOB_CALLER } from '../ops/outcomeLog.js';
 import { requestUpdate } from '../ops/system/_request.js';
 import {
   autoUpdateEnabled,
-  autoUpdateFailure,
   loadUpdateState,
+  retryHeldOff,
   type UpdateStateRow
 } from '../ops/system/_state.js';
 import type { UpdaterClient, UpdaterStatus } from '../ops/system/_updater.js';
@@ -49,25 +51,38 @@ export type AutoUpdateDeps = {
   now?: () => Date;
 };
 
-/** The release to install now, when the setting, the updater and the last failure allow one. */
+/** The release to install now, when the setting, the updater and the failed attempts allow one. */
 async function wantedRelease(
   db: Db,
   row: UpdateStateRow,
-  status: UpdaterStatus
+  status: UpdaterStatus,
+  now: Date
 ): Promise<string | null> {
   const version = status.latest?.version;
   if (
     version === undefined ||
     !status.updatable ||
     status.last.state === 'running' ||
-    autoUpdateFailure(row)?.version === version
+    retryHeldOff(row, version, now)
   ) {
     return null;
   }
   return (await autoUpdateEnabled(db)) ? version : null;
 }
 
-/** Backs up every enabled target, then asks the updater for `attempt.to`; a failure is reported. */
+/** Whether the updater runs an update now, one started by hand or on the host meanwhile. */
+async function updaterBusy(deps: AutoUpdateDeps): Promise<boolean> {
+  const status = await deps
+    .updater()
+    ?.status()
+    .catch(() => undefined);
+  return status?.last.state === 'running';
+}
+
+/**
+ * Backs up every enabled target, then asks the updater for `attempt.to`; a failure is reported.
+ * A refusal while another update runs is only audited: the release is wanted again once it ended.
+ */
 async function install(deps: AutoUpdateDeps, attempt: Attempt): Promise<void> {
   const runs = await deps.backUp();
   const failed = runs.find(run => run.status !== 'ok');
@@ -89,6 +104,10 @@ async function install(deps: AutoUpdateDeps, attempt: Attempt): Promise<void> {
       throw error;
     }
     const reason = error.message;
+    if (await updaterBusy(deps)) {
+      await audit(deps.db, { ...attempt, outcome: 'refused', reason });
+      return;
+    }
     await reportFailure(deps, { ...attempt, outcome: 'refused', reason });
     return;
   }
@@ -117,7 +136,7 @@ export async function runAutoUpdatePass(
   await clearFailureAfterSuccess(deps.db, row, status);
   await announceBreaking(deps, row, status);
   const fresh = (await loadUpdateState(deps.db)) ?? row;
-  const to = await wantedRelease(deps.db, fresh, status);
+  const to = await wantedRelease(deps.db, fresh, status, now);
   if (to === null) {
     deps.gate.reset();
     return null;

@@ -45,23 +45,34 @@ hours, after which it waits for the next maintenance moment. Once the moment com
 is idle, it backs up every enabled backup target and then updates exactly as `system.update`
 does; without an enabled target there is no backup, and the update fails.
 
-A failed automatic update is reported and not retried for that release:
+A failed automatic update is tried again at a later maintenance moment, at least 20 hours after
+the failed attempt, so about once a day, up to 3 attempts per release; after the third failed
+attempt the stack leaves that release alone until a newer one appears or an update succeeds. An
+update that is already running when the stack asks, one started with `system.update` or
+`update.sh`, counts as no failed attempt: the stack tries again once it ended. From the first
+failure until an update succeeds:
 
-- `/healthz` carries the release in `autoUpdateFailed` until an update succeeds;
-- `system.info` shows it in `autoUpdate.failed`, with the reason, such as a failed backup, the
-  updater's refusal or the end of the updater's log;
-- every owner gets one `updateFailed` mail (see `mail-templates`);
+- `/healthz` has `autoUpdateFailed: true`;
+- `system.info` shows the release in `autoUpdate.failed`, with the reason of the last attempt,
+  such as a failed backup, the updater's refusal or the end of the updater's log, and the failed
+  `attempts` on that release;
+- every owner gets one `updateFailed` mail once the last attempt failed (see `mail-templates`);
 - `audit.list` has a `system.autoUpdate` entry on channel `job` for every attempt and outcome:
   `started`, `backupFailed`, `refused`, `succeeded` or `failed`.
 
-Fix the cause, then update with `system.update` as above, or wait for the next release.
+Fix the cause, then update with `system.update` as above, or wait for the next release or the
+next attempt.
 
 ## Breaking releases
 
 A breaking release (a new major from 1.0.0 on, a new minor before) is never installed by
 `system.update` or automatically, whether `autoUpdate` is on or not. The stack announces it:
-`/healthz` carries its version in `breakingUpdateAvailable`, and every owner gets one
-`breakingUpdate` mail per such release. Read its upgrade notes, then install it on the host with
+`/healthz` has `breakingUpdateAvailable: true`, `system.info` shows the release in `update.latest`
+with `update.breaking: true`, and every owner gets one `breakingUpdate` mail per such release.
+`/healthz` names no release, since anyone can read it. Without `UPDATER_TOKEN` the stack asks no
+updater, updates nothing on its own and announces nothing: `/healthz` shows neither
+`breakingUpdateAvailable` nor `autoUpdateFailed` as `true`, and `system.info` no
+`autoUpdate.failed`. Read its upgrade notes, then install it on the host with
 `update.sh`.
 
 ## Undoing an update

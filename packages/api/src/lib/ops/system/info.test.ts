@@ -168,7 +168,7 @@ describe('system.info', () => {
     });
   });
 
-  it('reports whether automatic updates are on and why the last one failed (§6.3)', async () => {
+  it('reports whether automatic updates are on, why the last one failed and how often (§6.3)', async () => {
     const db = await makeTestDb();
     await sql`PRAGMA foreign_keys = OFF`.execute(db);
     await db
@@ -185,17 +185,27 @@ describe('system.info', () => {
     const failed = {
       version: '0.1.2',
       reason: 'the backup to target t1 failed: no space left',
-      at: '2026-10-01T03:01:00.000Z'
+      at: '2026-10-01T03:01:00.000Z',
+      attempts: 2
     };
     await db
       .updateTable('updateState')
       .set({
         autoFailedVersion: failed.version,
         autoFailure: failed.reason,
-        autoFailedAt: failed.at
+        autoFailedAt: failed.at,
+        autoFailedAttempts: failed.attempts
       })
       .execute();
 
+    // Without an updater there are no automatic updates, so no failure to show; the record stays.
+    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+      autoUpdate: { enabled: true, failed: null }
+    });
+    setUpdaterClient(() => ({
+      status: () => Promise.reject(new Error('not answering')),
+      update: () => Promise.reject(new Error('not asked'))
+    }));
     expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
       autoUpdate: { enabled: true, failed }
     });

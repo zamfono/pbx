@@ -408,6 +408,7 @@ export interface Trunks {
 
 export interface UpdateState {
   autoFailedAt: string | null;
+  autoFailedAttempts: Generated<number>;
   autoFailedVersion: string | null;
   autoFailure: string | null;
   breakingAnnounced: string | null;

@@ -1,10 +1,10 @@
 /**
  * What the automatic update (`autoUpdate.ts`) reports (§6.3 "Updates"): every attempt and
  * outcome as an audit entry `system.autoUpdate` on channel `job` (§5.7), a failure for `/healthz`
- * and `system.info` and in a mail to the owners, and a breaking release for `/healthz` and in one
- * mail to the owners per release.
+ * and `system.info`, the last attempt a release gets in a mail to the owners, and a breaking
+ * release for `/healthz` and in one mail to the owners per release.
  */
-import { nowIso, type Db } from '@zamfono/shared';
+import type { Db } from '@zamfono/shared';
 
 import { mailOwners, type SendUpdateMail } from '../mail/owners.js';
 import {
@@ -14,12 +14,14 @@ import {
 } from '../ops/outcomeLog.js';
 import {
   autoUpdateFailure,
+  loadUpdateState,
+  MAX_AUTO_UPDATE_ATTEMPTS,
   setAutoUpdateFailure,
   type UpdateStateRow
 } from '../ops/system/_state.js';
 import type { UpdaterStatus } from '../ops/system/_updater.js';
 
-export type ReportDeps = { db: Db; send: SendUpdateMail };
+export type ReportDeps = { db: Db; send: SendUpdateMail; now?: () => Date };
 
 export type Outcome =
   'started' | 'backupFailed' | 'refused' | 'succeeded' | 'failed';
@@ -39,18 +41,28 @@ export async function audit(
   });
 }
 
-/** Records a failed attempt on `to`, audits it and mails the owners. */
+/**
+ * Records a failed attempt on `to`, counted with the earlier ones on that release, and audits it.
+ * The owners are mailed once per release, when its last attempt failed: the failures before it are
+ * on `/healthz` and in `system.info` already, and mailing each would repeat the same news daily.
+ */
 export async function reportFailure(
   deps: ReportDeps,
   attempt: Attempt & { outcome: Outcome; reason: string }
 ): Promise<void> {
-  const at = nowIso();
+  const at = (deps.now?.() ?? new Date()).toISOString();
+  const previous = autoUpdateFailure(await loadUpdateState(deps.db));
+  const attempts = previous?.version === attempt.to ? previous.attempts + 1 : 1;
   await setAutoUpdateFailure(deps.db, {
     version: attempt.to,
     reason: attempt.reason,
-    at
+    at,
+    attempts
   });
   await audit(deps.db, attempt);
+  if (attempts < MAX_AUTO_UPDATE_ATTEMPTS) {
+    return;
+  }
   await mailOwners(deps.db, deps.send, userId => ({
     kind: 'updateFailed',
     to: { userId },

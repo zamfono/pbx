@@ -1,9 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { nowIso, openDb, type Db } from '@zamfono/shared';
 
 import { apiHealth, type ApiHealth } from './health.js';
+import { setUpdaterClient, type UpdaterClient } from './ops/system/_updater.js';
 import { makeTestDb } from './testDb.js';
+
+/** An updater `apiHealth` only needs to be configured: it never asks it anything. */
+const UNUSED_UPDATER: UpdaterClient = {
+  status: () => Promise.reject(new Error('not asked')),
+  update: () => Promise.reject(new Error('not asked'))
+};
 
 /** `apiHealth` over `db`, with core reachable and the job-fed fields fixed. */
 async function healthOf(db: Db): Promise<ApiHealth> {
@@ -36,12 +43,17 @@ async function seedTrunk(
     .execute();
 }
 
-describe('apiHealth update fields (§6.3 "Updates", §10.3 Health row)', () => {
-  it('carries the breaking release and the failed automatic update from update_state', async () => {
+describe('apiHealth update fields (§6.3 "Automatic updates", §10.3 Health row)', () => {
+  afterEach(() => {
+    setUpdaterClient(undefined);
+  });
+
+  it('says whether a breaking release waits and an automatic update failed, naming neither', async () => {
+    setUpdaterClient(() => UNUSED_UPDATER);
     const db = await makeTestDb();
     await expect(healthOf(db)).resolves.toMatchObject({
-      breakingUpdateAvailable: null,
-      autoUpdateFailed: null
+      breakingUpdateAvailable: false,
+      autoUpdateFailed: false
     });
 
     await db
@@ -50,19 +62,47 @@ describe('apiHealth update fields (§6.3 "Updates", §10.3 Health row)', () => {
         breakingVersion: '0.2.0',
         autoFailedVersion: '0.1.2',
         autoFailure: 'the backup failed',
-        autoFailedAt: nowIso()
+        autoFailedAt: nowIso(),
+        autoFailedAttempts: 1
       })
       .execute();
     await expect(healthOf(db)).resolves.toMatchObject({
-      breakingUpdateAvailable: '0.2.0',
-      autoUpdateFailed: '0.1.2'
+      breakingUpdateAvailable: true,
+      autoUpdateFailed: true
+    });
+  });
+
+  it('reports neither without an updater, whatever update_state stores, and keeps the record', async () => {
+    setUpdaterClient(() => undefined);
+    const db = await makeTestDb();
+    await db
+      .updateTable('updateState')
+      .set({
+        breakingVersion: '0.2.0',
+        breakingAnnounced: '0.2.0',
+        autoFailedVersion: '0.1.2',
+        autoFailure: 'the backup failed',
+        autoFailedAt: nowIso(),
+        autoFailedAttempts: 1
+      })
+      .execute();
+    await expect(healthOf(db)).resolves.toMatchObject({
+      breakingUpdateAvailable: false,
+      autoUpdateFailed: false
+    });
+
+    // The token back, and nothing succeeded since: both reappear.
+    setUpdaterClient(() => UNUSED_UPDATER);
+    await expect(healthOf(db)).resolves.toMatchObject({
+      breakingUpdateAvailable: true,
+      autoUpdateFailed: true
     });
   });
 
   it('reports neither on an unmigrated database instead of throwing', async () => {
     await expect(healthOf(openDb(':memory:'))).resolves.toMatchObject({
-      breakingUpdateAvailable: null,
-      autoUpdateFailed: null
+      breakingUpdateAvailable: false,
+      autoUpdateFailed: false
     });
   });
 });

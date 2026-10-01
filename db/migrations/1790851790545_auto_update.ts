@@ -7,8 +7,9 @@ type Db = Kysely<any>;
 // - settings.auto_update, the owner's opt-in, added at 0 so no stack updates itself unasked;
 //   SQLite's `ADD COLUMN` takes a NOT NULL column with a default and a CHECK.
 // - update_state, the one row of what `api` knows about updates beyond the updater's own record:
-//   who asked for the last run it started, the last automatic attempt's failure, and the breaking
-//   release last seen and announced. Created with its row, all NULL, so readers need no seed.
+//   who asked for the last run it started, the last automatic attempt's failure with the count of
+//   failed attempts on that release, and the breaking release last seen and announced. Created
+//   with its row, all NULL and 0, so readers need no seed.
 // - mail_templates.kind admits the two new mails, updateFailed and breakingUpdate. SQLite cannot
 //   alter a CHECK, so the table is rebuilt: created under a new name, filled, the old one dropped
 //   and the new one renamed. Nothing references mail_templates, so no foreign key is touched.
@@ -84,11 +85,14 @@ async function addAutoUpdate(db: Db): Promise<void> {
     .addColumn('auto_failed_version', 'text')
     .addColumn('auto_failure', 'text')
     .addColumn('auto_failed_at', 'text')
+    .addColumn('auto_failed_attempts', 'integer', col =>
+      col.notNull().defaultTo(0)
+    )
     .addColumn('breaking_version', 'text')
     .addColumn('breaking_announced', 'text')
     .addCheckConstraint(
       'update_state_auto_failure',
-      sql`(auto_failed_version IS NULL) = (auto_failure IS NULL) AND (auto_failure IS NULL) = (auto_failed_at IS NULL)`
+      sql`(auto_failed_version IS NULL) = (auto_failure IS NULL) AND (auto_failure IS NULL) = (auto_failed_at IS NULL) AND (auto_failed_at IS NULL) = (auto_failed_attempts = 0)`
     )
     .execute();
   await db.insertInto('update_state').values({ id: 1 }).execute();

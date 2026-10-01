@@ -27,19 +27,24 @@ why the specified behaviour changed; the commit history, how.
   voicemails and MWI, the presence history and its snapshot, and the call statistics. The
   glossary, `mental-model` and `routing-order` point to them.
 - Automatic updates, off by default: an owner switches them on with `settings.update`
-  `{ "autoUpdate": true }`, and the stack then installs a newer non-breaking release on its own,
-  as `system.update` would (so it needs `UPDATER_TOKEN`), after backing up every enabled backup
-  target, at the next maintenance moment once nothing is in progress, the same moment and check a
-  renewed TLS certificate waits for. A failed attempt is not retried for that release: `/healthz`
-  shows the release in `autoUpdateFailed`, `system.info` in `autoUpdate.failed` with the reason,
-  every owner gets a mail (new template kind `updateFailed`), and the audit log has a
-  `system.autoUpdate` entry for every attempt and outcome. Whether automatic updates are on or
-  not, a breaking release, which only `update.sh` on the host installs, is announced:
-  `/healthz` carries its version in `breakingUpdateAvailable`, and every owner gets one mail per
-  release (new template kind `breakingUpdate`). `system.info` names who asked for the last update
-  in `update.last.trigger`: `manual` (with the owner in `by`), `automatic`, or `host` for
-  `update.sh` on the host. Backup runs now take turns: a manual run started during a scheduled one
-  waits for it, as the automatic update's backup does.
+  `{ "autoUpdate": true }`, and the stack then installs a newer non-breaking release on its own, as
+  `system.update` would (so it needs `UPDATER_TOKEN`), after backing up every enabled backup target,
+  at the next maintenance moment once nothing is in progress, the same moment and check a renewed
+  TLS certificate waits for. A failed attempt is tried again at a later maintenance moment, at least
+  20 hours on, up to 3 attempts per release, and then left until a newer release appears or an
+  update succeeds; a refusal because another update is already running counts as no attempt. From
+  the first failure until an update succeeds, `/healthz` has `autoUpdateFailed: true` and
+  `system.info` shows the release, the reason and the attempts in `autoUpdate.failed`; every owner
+  gets one mail once the last attempt failed (new template kind `updateFailed`), and the audit log
+  has a `system.autoUpdate` entry for every attempt and outcome. Whether automatic updates are on or
+  not, a breaking release, which only `update.sh` on the host installs, is announced: `/healthz` has
+  `breakingUpdateAvailable: true`, `system.info` shows the release in `update.latest`, and every
+  owner gets one mail per release (new template kind `breakingUpdate`). `/healthz` names no release,
+  since anyone can read it, and without `UPDATER_TOKEN` it reports neither field as `true` and
+  `system.info` no failure. `system.info` names who asked for the last update in
+  `update.last.trigger`: `manual` (with the owner in `by`), `automatic`, or `host` for `update.sh`
+  on the host. Backup runs now take turns: a manual run started during a scheduled one waits for it,
+  as the automatic update's backup does.
 
 ### Changed
 

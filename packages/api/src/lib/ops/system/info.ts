@@ -42,8 +42,8 @@ type Output = {
    */
   update: UpdaterStatus | { unavailable: string };
   /**
-   * `settings.auto_update`, and why the last automatic update failed, until an update succeeds
-   * (§6.3 "Updates").
+   * `settings.auto_update`, and why the last automatic update failed and after how many attempts
+   * on its release, until an update succeeds (§6.3 "Automatic updates").
    */
   autoUpdate: { enabled: boolean; failed: AutoUpdateFailure | null };
   /**
@@ -79,12 +79,14 @@ async function updateStatus(db: Db): Promise<Output['update']> {
   }
 }
 
+/** `failed` stays `null` without an updater, which automatic updates need; the record is kept. */
 async function autoUpdateStatus(db: Db): Promise<Output['autoUpdate']> {
   const [enabled, row] = await Promise.all([
     autoUpdateEnabled(db),
     loadUpdateState(db)
   ]);
-  return { enabled, failed: autoUpdateFailure(row) };
+  const failed = updaterClient() === undefined ? null : autoUpdateFailure(row);
+  return { enabled, failed };
 }
 
 /** Reads `core`'s version; installed at boot by `hooks.server.ts`, unset in tests. */
@@ -105,13 +107,13 @@ export function setCoreVersionLookup(
 
 /**
  * `GET /system/info` (§7 "Version", §10.3): the version and commit `api` and `core` each run and
- * since when, when Asterisk started, the latest release with how the last update went and who asked for it, whether automatic updates are on and why the last one failed (§6.3 "Updates"), whether a tenant profile change still waits for Ringotel (§10.4), and the stack's domain and public IPv4 address (§6.1), for anyone signed in. The MCP `serverInfo.version` carries `api`'s too, but only in the connection
+ * since when, when Asterisk started, the latest release with how the last update went and who asked for it, whether automatic updates are on and why the last one failed, after how many attempts (§6.3 "Automatic updates"), whether a tenant profile change still waits for Ringotel (§10.4), and the stack's domain and public IPv4 address (§6.1), for anyone signed in. The MCP `serverInfo.version` carries `api`'s too, but only in the connection
  * handshake, which no tool can read; `/healthz` answers without a login and never shows it.
  */
 export const info = defineOperation<Record<string, never>, Output>({
   name: 'system.info',
   description:
-    'Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update with who asked for it, whether automatic updates are on and why the last one failed, whether a tenant profile change still waits for Ringotel, and the domain of the stack and the public IPv4 address its SIP and media use.',
+    'Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update with who asked for it, whether automatic updates are on and why and how often the last one failed, whether a tenant profile change still waits for Ringotel, and the domain of the stack and the public IPv4 address its SIP and media use.',
   input: z.object({}).strict(),
   minRole: 'user',
   readOnly: true,

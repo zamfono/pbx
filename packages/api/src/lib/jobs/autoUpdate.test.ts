@@ -1,11 +1,15 @@
 import { sql } from 'kysely';
 import { describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { MS_PER_DAY, newId, nowIso, type Db } from '@zamfono/shared';
 
 import type { UpdateMailRequest } from '../mail/send.js';
 import type { BackupRunRow } from '../ops/backups/_shared.js';
-import { loadUpdateState } from '../ops/system/_state.js';
+import {
+  AUTO_UPDATE_RETRY_GAP_MS,
+  loadUpdateState,
+  MAX_AUTO_UPDATE_ATTEMPTS
+} from '../ops/system/_state.js';
 import {
   setUpdaterClient,
   UpdaterRefusal,
@@ -16,11 +20,17 @@ import {
 } from '../ops/system/_updater.js';
 import { makeTestDb } from '../testDb.js';
 import { runAutoUpdatePass, type AutoUpdateDeps } from './autoUpdate.js';
-import type { GateCheck, MaintenanceGate } from './maintenanceWindow.js';
+import {
+  createMaintenanceGate,
+  IDLE_RECHECK_MS,
+  type GateCheck,
+  type MaintenanceGate
+} from './maintenanceWindow.js';
 
 const STATUS_CONFLICT = 409;
 const STARTED_AT = '2026-10-01T03:00:00.000Z';
 const NOW = new Date('2026-10-01T03:00:00.000Z');
+const TOMORROW = new Date('2026-10-02T03:00:00.000Z');
 
 /** The settings row with `auto_update` as given, and a second owner and an admin beside the
  * test database's own owner `owner`. */
@@ -188,7 +198,7 @@ describe('runAutoUpdatePass', () => {
     const db = await makeTestDb();
     await seed(db, true);
     const job = harness(db);
-    const nextCheckAt = new Date('2026-10-02T03:00:00.000Z');
+    const nextCheckAt = TOMORROW;
     job.current.gate = { open: false, nextCheckAt };
 
     await expect(runAutoUpdatePass(job.deps)).resolves.toEqual(nextCheckAt);
@@ -216,7 +226,7 @@ describe('runAutoUpdatePass', () => {
     ]);
   });
 
-  it('follows the run up after the restart: running, then failed, reported once', async () => {
+  it('follows the run up after the restart: running, then failed, entered once', async () => {
     const db = await makeTestDb();
     await seed(db, true);
     const job = harness(db);
@@ -236,23 +246,18 @@ describe('runAutoUpdatePass', () => {
         error: 'the recreated services did not report healthy'
       }
     });
+    job.current.gate = { open: false, nextCheckAt: TOMORROW };
     await runAutoUpdatePass(job.deps);
     await runAutoUpdatePass(job.deps);
 
-    expect(job.mails.map(mail => [mail.kind, mail.to.userId])).toEqual([
-      ['updateFailed', 'owner'],
-      ['updateFailed', 'o2']
-    ]);
-    expect(job.mails[0]?.values).toMatchObject({
-      fromVersion: '0.1.1',
-      toVersion: '0.1.2',
-      reason: 'the recreated services did not report healthy'
-    });
+    // The first of the release's attempts: no mail yet, and the retry waits for the gate.
+    expect(job.mails).toEqual([]);
     expect(await loadUpdateState(db)).toMatchObject({
       runOutcomePending: 0,
-      autoFailedVersion: '0.1.2'
+      autoFailedVersion: '0.1.2',
+      autoFailure: 'the recreated services did not report healthy',
+      autoFailedAttempts: 1
     });
-    // Not retried for the release it failed on.
     expect(job.asked).toHaveLength(1);
     expect((await auditOutcomes(db)).map(entry => entry)).toMatchObject([
       { outcome: 'started' },
@@ -295,32 +300,200 @@ describe('runAutoUpdatePass', () => {
     await runAutoUpdatePass(job.deps);
 
     expect(job.asked).toEqual([]);
-    expect(job.mails.map(mail => mail.kind)).toEqual([
-      'updateFailed',
-      'updateFailed'
-    ]);
+    expect(job.mails).toEqual([]);
     const row = await loadUpdateState(db);
     expect(row?.autoFailure).toContain('no space left on device');
+    expect(row?.autoFailedAttempts).toBe(1);
     expect(await auditOutcomes(db)).toMatchObject([
       { outcome: 'backupFailed', to: '0.1.2' }
     ]);
   });
 
-  it("reports the updater's refusal", async () => {
+  it("reports the updater's refusal as a failed attempt", async () => {
     const db = await makeTestDb();
     await seed(db, true);
     const job = harness(db);
     job.updaterAnswer.next = () =>
       Promise.reject(
-        new UpdaterRefusal(STATUS_CONFLICT, 'an update is already running')
+        new UpdaterRefusal(
+          STATUS_CONFLICT,
+          'the stack directory pins no release; update it once with update.sh on the host'
+        )
       );
 
     await runAutoUpdatePass(job.deps);
 
-    expect((await loadUpdateState(db))?.autoFailure).toContain(
-      'an update is already running'
-    );
+    expect(await loadUpdateState(db)).toMatchObject({
+      autoFailure: expect.stringContaining('pins no release') as unknown,
+      autoFailedAttempts: 1
+    });
     expect(await auditOutcomes(db)).toMatchObject([{ outcome: 'refused' }]);
+  });
+
+  it('counts no attempt when refused because another update runs, and tries again after it', async () => {
+    const db = await makeTestDb();
+    await seed(db, true);
+    const job = harness(db);
+    const byHand: UpdateState = {
+      state: 'running',
+      from: '0.1.1',
+      to: '0.1.2',
+      trigger: 'host',
+      startedAt: STARTED_AT
+    };
+    job.updaterAnswer.next = () => {
+      // update.sh on the host began between the job's look and its request.
+      job.current.status = status({ last: byHand });
+      return Promise.reject(
+        new UpdaterRefusal(STATUS_CONFLICT, 'an update is already running')
+      );
+    };
+
+    await runAutoUpdatePass(job.deps);
+    expect(await loadUpdateState(db)).toMatchObject({
+      autoFailedVersion: null,
+      autoFailedAttempts: 0
+    });
+    expect(job.mails).toEqual([]);
+    expect(await auditOutcomes(db)).toMatchObject([
+      {
+        outcome: 'refused',
+        reason: 'system.update: an update is already running'
+      }
+    ]);
+
+    // While it runs nothing is asked; once it ended without reaching 0.1.2, the job asks again.
+    await runAutoUpdatePass(job.deps);
+    expect(job.asked).toHaveLength(1);
+    job.current.status = status({
+      last: {
+        ...byHand,
+        state: 'failed',
+        finishedAt: '2026-10-01T03:04:00.000Z'
+      }
+    });
+    job.updaterAnswer.next = () =>
+      Promise.resolve({ ...byHand, trigger: 'automatic' });
+    await runAutoUpdatePass(job.deps);
+    expect(job.asked).toHaveLength(2);
+  });
+
+  it('tries a failed release again at the next maintenance moment, not before', async () => {
+    const db = await makeTestDb();
+    await seed(db, true);
+    await db
+      .updateTable('settings')
+      .set({ timezone: 'UTC', tlsReloadHour: 3 })
+      .execute();
+    const job = harness(db);
+    const clock = { now: new Date('2026-10-01T02:59:00.000Z') };
+    job.deps.now = () => clock.now;
+    job.deps.gate = createMaintenanceGate({
+      db,
+      isIdle: () => Promise.resolve(true)
+    });
+    job.current.backupOk = false;
+
+    await expect(runAutoUpdatePass(job.deps)).resolves.toEqual(NOW);
+    clock.now = NOW;
+    await runAutoUpdatePass(job.deps);
+    expect(job.backups.count).toBe(1);
+
+    // Held off for the gap; the hourly poll past it finds the next moment.
+    clock.now = new Date('2026-10-01T03:05:00.000Z');
+    await expect(runAutoUpdatePass(job.deps)).resolves.toBeNull();
+    clock.now = new Date('2026-10-01T23:30:00.000Z');
+    await expect(runAutoUpdatePass(job.deps)).resolves.toEqual(TOMORROW);
+    expect(job.backups.count).toBe(1);
+
+    clock.now = TOMORROW;
+    await runAutoUpdatePass(job.deps);
+    expect(job.backups.count).toBe(2);
+    expect((await loadUpdateState(db))?.autoFailedAttempts).toBe(2);
+  });
+
+  it('waits the retry gap after a failed attempt even where the gate is always open', async () => {
+    const db = await makeTestDb();
+    await seed(db, true);
+    const job = harness(db);
+    const clock = { now: NOW };
+    job.deps.now = () => clock.now;
+    job.current.backupOk = false;
+
+    await runAutoUpdatePass(job.deps);
+    const justShort = AUTO_UPDATE_RETRY_GAP_MS - 1;
+    for (const afterMs of [IDLE_RECHECK_MS, justShort]) {
+      clock.now = new Date(NOW.getTime() + afterMs);
+      // eslint-disable-next-line no-await-in-loop -- passes run one after the other, as the job's do
+      await runAutoUpdatePass(job.deps);
+    }
+    expect(job.backups.count).toBe(1);
+
+    clock.now = new Date(NOW.getTime() + AUTO_UPDATE_RETRY_GAP_MS);
+    await runAutoUpdatePass(job.deps);
+    expect(job.backups.count).toBe(2);
+  });
+
+  it(`gives a release ${MAX_AUTO_UPDATE_ATTEMPTS} attempts, mails once the last failed, then tries a newer one`, async () => {
+    const db = await makeTestDb();
+    await seed(db, true);
+    const job = harness(db);
+    const clock = { now: NOW };
+    job.deps.now = () => clock.now;
+    const nextDay = (): void => {
+      clock.now = new Date(clock.now.getTime() + MS_PER_DAY);
+    };
+    job.current.backupOk = false;
+
+    for (let pass = 1; pass < MAX_AUTO_UPDATE_ATTEMPTS; pass += 1) {
+      // eslint-disable-next-line no-await-in-loop -- passes run one after the other, as the job's do
+      await runAutoUpdatePass(job.deps);
+      nextDay();
+    }
+    expect(job.mails).toEqual([]);
+    expect(await loadUpdateState(db)).toMatchObject({
+      autoFailedVersion: '0.1.2',
+      autoFailedAttempts: MAX_AUTO_UPDATE_ATTEMPTS - 1
+    });
+
+    await runAutoUpdatePass(job.deps);
+    nextDay();
+    expect(job.mails.map(mail => [mail.kind, mail.to.userId])).toEqual([
+      ['updateFailed', 'owner'],
+      ['updateFailed', 'o2']
+    ]);
+    expect(job.mails[0]?.values).toMatchObject({
+      fromVersion: '0.1.1',
+      toVersion: '0.1.2',
+      reason: 'the backup to target t1 failed: no space left on device'
+    });
+
+    // Given up on 0.1.2: the gate is not even asked.
+    const checks = job.gateChecks.count;
+    await runAutoUpdatePass(job.deps);
+    expect(job.backups.count).toBe(MAX_AUTO_UPDATE_ATTEMPTS);
+    expect(job.gateChecks.count).toBe(checks);
+    expect(job.mails).toHaveLength(2);
+
+    // A newer release starts its own count; the failure stays reported meanwhile.
+    job.current.status = status({
+      latest: {
+        version: '0.1.3',
+        url: 'https://example/releases/v0.1.3',
+        publishedAt: '2026-10-01T12:00:00Z'
+      }
+    });
+    await runAutoUpdatePass(job.deps);
+    expect(job.backups.count).toBe(MAX_AUTO_UPDATE_ATTEMPTS + 1);
+    expect(await loadUpdateState(db)).toMatchObject({
+      autoFailedVersion: '0.1.3',
+      autoFailedAttempts: 1
+    });
+    expect(
+      (await auditOutcomes(db)).filter(
+        entry => (entry as { outcome: string }).outcome === 'backupFailed'
+      )
+    ).toHaveLength(MAX_AUTO_UPDATE_ATTEMPTS + 1);
   });
 
   it('announces a breaking release once, whether or not auto_update is on', async () => {
