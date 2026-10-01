@@ -45,9 +45,10 @@ time it began and, while busy, the other party (`peer`) and the ring group that 
 
 `presenceLog.snapshot` (`GET /presence/log?at=&userId=`, `admin`) answers what everyone's status
 was at instant `at`: for each user, the last logged state at or before it, with its `since`.
-`userId` narrows it to one user. Give `at` in UTC (`2026-10-01T09:00:00Z`), the form the log is
-stored in. The log is purged after `settings.recordingRetentionDays` (default 90), so a user
-whose last change is older than that is missing from a snapshot.
+`userId` narrows it to one user. `at` is an ISO 8601 time with any offset
+(`2026-10-01T11:00:00+02:00`, `2026-10-01T09:00:00Z`), read as UTC without one; in a query
+string, write the `+` as `%2B`. The log is purged after `settings.recordingRetentionDays`
+(default 90), so a user whose last change is older than that is missing from a snapshot.
 
 ## Statistics
 

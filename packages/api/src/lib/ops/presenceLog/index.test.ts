@@ -116,4 +116,64 @@ describe('presenceLog.snapshot', () => {
 
     expect(result.items.map(item => item.userId)).toEqual(['other']);
   });
+
+  it.each([
+    ['an offset', '2026-01-01T02:15:00+02:00'],
+    ['no milliseconds', '2026-01-01T00:15:00Z'],
+    ['no offset, read as UTC', '2026-01-01T00:15:00'],
+    ['Z with milliseconds', '2026-01-01T00:15:00.000Z']
+  ])('compares an `at` with %s as the instant it names', async (_form, at) => {
+    const db = await makeTestDb();
+    await db
+      .insertInto('presenceLog')
+      .values([
+        {
+          id: newId(),
+          userId: 'owner',
+          status: 'available',
+          peer: null,
+          ringGroupId: null,
+          since: '2026-01-01T00:00:00.000Z'
+        },
+        {
+          id: newId(),
+          userId: 'owner',
+          status: 'busy',
+          peer: null,
+          ringGroupId: null,
+          since: '2026-01-01T00:15:00.000Z'
+        },
+        {
+          id: newId(),
+          userId: 'owner',
+          status: 'offline',
+          peer: null,
+          ringGroupId: null,
+          since: '2026-01-01T00:15:00.001Z'
+        }
+      ])
+      .execute();
+
+    const result = await runOperation<unknown, { items: SnapshotItem[] }>(
+      db,
+      'presenceLog.snapshot',
+      { at },
+      asRun()
+    );
+
+    expect(result.items.map(item => item.status)).toEqual(['busy']);
+  });
+
+  it('refuses an `at` that is not an ISO 8601 instant with 422', async () => {
+    const db = await makeTestDb();
+
+    const attempt = runOperation(
+      db,
+      'presenceLog.snapshot',
+      { at: 'yesterday' },
+      asRun()
+    );
+
+    await expect(attempt).rejects.toMatchObject({ status: 422 });
+  });
 });

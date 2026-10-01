@@ -46,6 +46,11 @@ why the specified behaviour changed; the commit history, how.
   `native` and only on `127.0.0.1`. A redirect to `localhost`, `127.0.0.1` or `[::1]` over
   `http` is now accepted on any port, for every client, when the client registered that host
   and path; any other redirect URI must still match exactly.
+- The time filters of `presenceLog.snapshot` (`at`), `calls.list` and `audit.list` (`from`,
+  `to`) compared the text they were given with the stored UTC times, so a time with an offset
+  (`2026-10-01T12:00:00+02:00`) or without milliseconds picked the wrong entries. They now
+  compare the instant it names, in any offset, with a time without one read as UTC; a value
+  that is not an ISO 8601 time or date is refused with 422.
 
 ## [0.1.0] - 2026-09-30
 

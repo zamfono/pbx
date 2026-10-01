@@ -396,6 +396,50 @@ describe('audit.list', () => {
   });
 });
 
+describe('audit.list time range', () => {
+  it('compares `from` and `to` with an offset as the instants they name, and refuses a non-instant', async () => {
+    const db = await makeTestDb();
+    const createdAts = [
+      '2026-10-01T09:59:59.999Z',
+      '2026-10-01T10:00:00.000Z',
+      '2026-10-01T11:00:00.000Z'
+    ];
+    await db
+      .insertInto('auditLog')
+      .values(
+        createdAts.map((createdAt, index) => ({
+          id: newId(),
+          actorUserId: 'owner',
+          actorUserName: 'Owner',
+          channel: 'rest',
+          clientId: null,
+          clientName: null,
+          operation: `op.${String(index)}`,
+          entityKind: 'user',
+          entityId: null,
+          changesJson: '[]',
+          revertsId: null,
+          createdAt
+        }))
+      )
+      .execute();
+
+    const result = await runOperation<
+      unknown,
+      { items: { operation: string }[] }
+    >(
+      db,
+      'audit.list',
+      { from: '2026-10-01T12:00:00+02:00', to: '2026-10-01T10:00:00Z' },
+      asRun()
+    );
+    const attempt = runOperation(db, 'audit.list', { from: '1 Oct' }, asRun());
+
+    expect(result.items.map(item => item.operation)).toEqual(['op.1']);
+    await expect(attempt).rejects.toMatchObject({ status: 422 });
+  });
+});
+
 /** Inserts one live `audio_assets` row of kind `announcement`, a menu's required greeting. */
 async function seedAnnouncement(db: Db): Promise<string> {
   const id = newId();

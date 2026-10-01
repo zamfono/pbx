@@ -121,6 +121,41 @@ describe('calls', () => {
     await expect(attempt).rejects.toMatchObject({ status: 404 });
   });
 
+  it('calls.list compares `from` and `to` with an offset as the instants they name', async () => {
+    const db = await makeTestDb();
+    const ids = [newId(), newId(), newId()];
+    const starts = [
+      '2026-10-01T09:59:59.999Z',
+      '2026-10-01T10:00:00.000Z',
+      '2026-10-01T10:30:00.000Z'
+    ];
+    await db
+      .insertInto('calls')
+      .values(
+        ids.map((id, index) => ({
+          id,
+          direction: 'internal',
+          fromUri: '101',
+          toUri: '102',
+          status: 'answered',
+          startedAt: starts[index] ?? '',
+          endedAt: '2026-10-01T11:00:00.000Z'
+        }))
+      )
+      .execute();
+
+    const result = await runOperation<unknown, { items: { id: string }[] }>(
+      db,
+      'calls.list',
+      { from: '2026-10-01T12:00:00+02:00', to: '2026-10-01T10:30:00' },
+      asRun()
+    );
+
+    expect(result.items.map(item => item.id).sort()).toEqual(
+      [ids[1], ids[2]].sort()
+    );
+  });
+
   it('live: true returns the core snapshot, filtered to own calls for a user', async () => {
     const db = await makeTestDb();
     const ownCall: LiveCall = {

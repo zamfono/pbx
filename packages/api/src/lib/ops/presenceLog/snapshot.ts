@@ -1,14 +1,13 @@
 import { z } from 'zod';
 
+import { instantInput, toStoredInstant } from '../instantInput.js';
 import { defineOperation } from '../types.js';
 
 const inputSchema = z
   .object({
-    at: z
-      .string()
-      .describe(
-        'The past instant, ISO 8601, whose presence states are returned.'
-      ),
+    at: instantInput.describe(
+      'The past instant, ISO 8601 with any offset (none: UTC), whose presence states are returned.'
+    ),
     userId: z
       .string()
       .optional()
@@ -39,7 +38,7 @@ export const snapshot = defineOperation({
     const rows = await ctx.db
       .selectFrom('presenceLog')
       .selectAll()
-      .where('since', '<=', input.at)
+      .where('since', '<=', toStoredInstant(input.at))
       .$if(input.userId !== undefined, qb =>
         qb.where('userId', '=', input.userId ?? '')
       )

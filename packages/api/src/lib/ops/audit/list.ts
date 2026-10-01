@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { decodeCursor, encodeCursor } from '../../pagination.js';
+import { instantInput, toStoredInstant } from '../instantInput.js';
 import { defineOperation } from '../types.js';
 import { toAuditEntryOut } from './_shared.js';
 
@@ -40,14 +41,16 @@ const inputSchema = z
       .string()
       .optional()
       .describe("Only entries of this operation, such as 'users.create'."),
-    from: z
-      .string()
+    from: instantInput
       .optional()
-      .describe('Only entries written at or after this ISO 8601 time.'),
-    to: z
-      .string()
+      .describe(
+        'Only entries written at or after this ISO 8601 time, any offset (none: UTC).'
+      ),
+    to: instantInput
       .optional()
-      .describe('Only entries written at or before this ISO 8601 time.'),
+      .describe(
+        'Only entries written at or before this ISO 8601 time, any offset (none: UTC).'
+      ),
     state: z
       .enum(STATES)
       .optional()
@@ -79,6 +82,9 @@ export const list = defineOperation({
       input.cursor === undefined
         ? undefined
         : (decodeCursor(input.cursor) as { id: string }).id;
+    const from =
+      input.from === undefined ? undefined : toStoredInstant(input.from);
+    const to = input.to === undefined ? undefined : toStoredInstant(input.to);
     const rows = await ctx.db
       .selectFrom('auditLog')
       .selectAll()
@@ -100,12 +106,8 @@ export const list = defineOperation({
       .$if(input.operation !== undefined, qb =>
         qb.where('operation', '=', input.operation ?? '')
       )
-      .$if(input.from !== undefined, qb =>
-        qb.where('createdAt', '>=', input.from ?? '')
-      )
-      .$if(input.to !== undefined, qb =>
-        qb.where('createdAt', '<=', input.to ?? '')
-      )
+      .$if(from !== undefined, qb => qb.where('createdAt', '>=', from ?? ''))
+      .$if(to !== undefined, qb => qb.where('createdAt', '<=', to ?? ''))
       .$if(state === 'live', qb => qb.where('undoneAt', 'is', null))
       .$if(state === 'undone', qb => qb.where('undoneAt', 'is not', null))
       .$if(cursor !== undefined, qb => qb.where('id', '<', cursor ?? ''))

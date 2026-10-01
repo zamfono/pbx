@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { LiveCall } from '@zamfono/shared';
 
 import { decodeCursor, encodeCursor } from '../../pagination.js';
+import { instantInput, toStoredInstant } from '../instantInput.js';
 import { defineOperation, OpError } from '../types.js';
 import { getCoreClient, toCallOut } from './_shared.js';
 
@@ -26,17 +27,15 @@ const inputSchema = z
       .enum(DIRECTIONS)
       .optional()
       .describe('Only calls in this direction.'),
-    from: z
-      .string()
+    from: instantInput
       .optional()
       .describe(
-        'History only: calls started at or after this ISO 8601 time (a time, not a number).'
+        'History only: calls started at or after this ISO 8601 time, any offset (none: UTC); a time, not a number.'
       ),
-    to: z
-      .string()
+    to: instantInput
       .optional()
       .describe(
-        'History only: calls started at or before this ISO 8601 time (a time, not a number).'
+        'History only: calls started at or before this ISO 8601 time, any offset (none: UTC); a time, not a number.'
       ),
     userId: z
       .string()
@@ -123,6 +122,9 @@ export const list = defineOperation({
       input.cursor === undefined
         ? undefined
         : (decodeCursor(input.cursor) as { id: string }).id;
+    const from =
+      input.from === undefined ? undefined : toStoredInstant(input.from);
+    const to = input.to === undefined ? undefined : toStoredInstant(input.to);
     const rows = await ctx.db
       .selectFrom('calls')
       .selectAll()
@@ -136,12 +138,8 @@ export const list = defineOperation({
       .$if(input.ringGroupId !== undefined, qb =>
         qb.where('ringGroupId', '=', input.ringGroupId ?? '')
       )
-      .$if(input.from !== undefined, qb =>
-        qb.where('startedAt', '>=', input.from ?? '')
-      )
-      .$if(input.to !== undefined, qb =>
-        qb.where('startedAt', '<=', input.to ?? '')
-      )
+      .$if(from !== undefined, qb => qb.where('startedAt', '>=', from ?? ''))
+      .$if(to !== undefined, qb => qb.where('startedAt', '<=', to ?? ''))
       .$if(input.userId !== undefined, qb =>
         qb.where(eb =>
           eb.or([
