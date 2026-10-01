@@ -62,26 +62,39 @@ describe('createReleases', () => {
   });
 
   it('gives up on a GitHub that does not answer, and keeps that for ten minutes', async () => {
-    vi.useFakeTimers();
+    const timeout = new AbortController();
+    const timeoutSpy = vi
+      .spyOn(AbortSignal, 'timeout')
+      .mockReturnValue(timeout.signal);
     try {
       const urls: string[] = [];
-      const hanging: typeof fetch = async input => {
+      // A connect that hangs until the request's signal aborts it, as fetch's does.
+      const hanging: typeof fetch = async (input, init) => {
         urls.push(typeof input === 'string' ? input : urlOf(input));
-        return new Promise<Response>(() => {
-          // Never settles: a connect that hangs.
+        return new Promise<Response>((_resolve, reject) => {
+          const abort = (): void => {
+            reject(init?.signal?.reason as Error);
+          };
+          if (init?.signal?.aborted === true) {
+            abort();
+          }
+          init?.signal?.addEventListener('abort', abort);
         });
       };
-      const clock = { now: 0 };
-      const releases = createReleases(hanging, () => clock.now);
+      let clock = 0;
+      const releases = createReleases(hanging, () => clock);
       const first = releases.latest();
-      const settled = expect(first).rejects.toThrow('did not answer');
-      await vi.advanceTimersByTimeAsync(5000);
-      await settled;
-      clock.now = 9 * 60_000;
+      expect(timeoutSpy).toHaveBeenCalledWith(5000);
+      timeout.abort(new DOMException('timed out', 'TimeoutError'));
+      await expect(first).rejects.toThrow('did not answer within 5000 ms');
+      clock = 9 * 60_000;
       await expect(releases.latest()).rejects.toThrow('did not answer');
       expect(urls).toHaveLength(1);
+      clock = 10 * 60_000;
+      await expect(releases.latest()).rejects.toThrow('did not answer');
+      expect(urls).toHaveLength(2);
     } finally {
-      vi.useRealTimers();
+      timeoutSpy.mockRestore();
     }
   });
 

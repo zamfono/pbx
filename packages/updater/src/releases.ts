@@ -15,23 +15,6 @@ const GITHUB_TIMEOUT_MS = 5000;
 // status request.
 const FAILURE_CACHE_MS = 600_000;
 
-/** `promise`, or a rejection after `ms`: fetch's abort signal does not cut a hanging connect. */
-async function within<T>(
-  promise: Promise<T>,
-  ms: number,
-  what: string
-): Promise<T> {
-  const timer = Promise.withResolvers<never>();
-  const handle = setTimeout(() => {
-    timer.reject(new Error(`${what} did not answer within ${ms} ms`));
-  }, ms);
-  try {
-    return await Promise.race([promise, timer.promise]);
-  } finally {
-    clearTimeout(handle);
-  }
-}
-
 export type Release = { version: Version; url: string; publishedAt: string };
 
 type GitHubRelease = {
@@ -70,20 +53,18 @@ export function createReleases(
   now: () => number = Date.now
 ): Releases {
   // The pending lookup itself is cached, so requests arriving together ask GitHub once.
-  const cache: { at: number; pending: Promise<Release | undefined> } = {
-    at: Number.NEGATIVE_INFINITY,
-    pending: Promise.resolve(undefined)
-  };
+  let pending: Promise<Release | undefined> = Promise.resolve(undefined);
+  let expiresAt = Number.NEGATIVE_INFINITY;
 
   async function get(url: string): Promise<Release | undefined> {
-    const response = await within(
-      fetchFn(url, {
-        headers: { accept: 'application/vnd.github+json' },
-        signal: AbortSignal.timeout(GITHUB_TIMEOUT_MS)
-      }),
-      GITHUB_TIMEOUT_MS,
-      'GitHub'
-    );
+    const response = await fetchFn(url, {
+      headers: { accept: 'application/vnd.github+json' },
+      signal: AbortSignal.timeout(GITHUB_TIMEOUT_MS)
+    }).catch((error: unknown) => {
+      throw error instanceof DOMException && error.name === 'TimeoutError'
+        ? new Error(`GitHub did not answer within ${GITHUB_TIMEOUT_MS} ms`)
+        : error;
+    });
     if (response.status === STATUS_NOT_FOUND) {
       return undefined;
     }
@@ -95,15 +76,14 @@ export function createReleases(
 
   return {
     async latest() {
-      if (now() - cache.at >= CACHE_MS) {
-        cache.at = now();
-        cache.pending = get(`${API}/latest`);
-        // A failed lookup is kept for FAILURE_CACHE_MS rather than the full hour.
-        cache.pending.catch(() => {
-          cache.at = now() - CACHE_MS + FAILURE_CACHE_MS;
+      if (now() >= expiresAt) {
+        expiresAt = now() + CACHE_MS;
+        pending = get(`${API}/latest`);
+        pending.catch(() => {
+          expiresAt = now() + FAILURE_CACHE_MS;
         });
       }
-      return cache.pending;
+      return pending;
     },
     async byVersion(version) {
       return get(`${API}/tags/v${version}`);
