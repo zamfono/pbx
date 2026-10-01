@@ -43,7 +43,9 @@ export function userOfChannel(call: Call, channelId: string): string | null {
   return call.legs.get(channelId)?.userId ?? null;
 }
 
-/** The number the transferee's new call is from: the original caller's, or a colleague's extension. */
+/** The number the transferee's new call is from: the original caller's, a colleague's extension,
+ * else, for a party with no user of its own (an external number dialled), the number the call
+ * went to. */
 export function fromOf(
   parent: Call,
   transferee: string,
@@ -53,7 +55,10 @@ export function fromOf(
     return parent.from;
   }
   const userId = userOfChannel(parent, transferee);
-  const ext = snapshot.extensions.find(row => row.userId === userId)?.ext;
+  const ext =
+    userId === null
+      ? undefined
+      : snapshot.extensions.find(row => row.userId === userId)?.ext;
   return ext ?? parent.to;
 }
 

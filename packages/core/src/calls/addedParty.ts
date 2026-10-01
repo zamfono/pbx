@@ -22,6 +22,9 @@ import { userOfChannel } from './transfers.js';
 export type AddedLegKind = 'addParty' | 'consult';
 
 function extensionOf(snapshot: Snapshot, userId: string | null): string | null {
+  if (userId === null) {
+    return null;
+  }
   return snapshot.extensions.find(row => row.userId === userId)?.ext ?? null;
 }
 

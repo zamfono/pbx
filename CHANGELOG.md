@@ -152,6 +152,11 @@ why the specified behaviour changed; the commit history, how.
   the first. It now takes the call it names. A phone answered once that call has stopped ringing
   is hung up, with a line in the call's trace, and a pickup no longer leaves a `*8` call of the
   picker's in the call history.
+- A party with no user of its own, such as the external number an outbound call reached, could
+  be shown with a parking slot's or ring group's extension as its number: as the caller of the
+  onward call when it was transferred, in `GET /parking/calls` when it was parked, and as the
+  caller of a party added from its side. The first two now show the number the call went to,
+  the last the call's own caller.
 
 ## [0.1.0] - 2026-09-30
 

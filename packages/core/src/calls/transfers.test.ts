@@ -11,12 +11,13 @@ import type { LogLevel } from '../callLog.js';
 import { CdrWriter } from '../cdr.js';
 import { ConfigCache, EventBus, StateStore } from '../internal/server.js';
 import { eventually } from '../testing/eventually.js';
+import { newAddedLeg } from './addedParty.js';
 import { newCall, type Call } from './call.js';
 import { channelOf } from './callLookup.js';
 import { closeCall } from './liveCall.js';
 import { Pipeline } from './pipeline.js';
 import { Recorder } from './recording.js';
-import { transferCall, userOfChannel } from './transfers.js';
+import { fromOf, transferCall, userOfChannel } from './transfers.js';
 import { TrunkState } from './trunkState.js';
 
 const noopLogger: Logger = {
@@ -706,6 +707,47 @@ describe('transfers', () => {
         .executeTakeFirstOrThrow();
       expect(row.log).toContain('"dialAction":"emergency"');
     });
+  });
+
+  // A party with no user of its own, the external number an outbound call reached, owns no
+  // extension: the extensions with no user, a ring group's or a parking slot's, are not theirs.
+  it('names a party with no user of its own by the number the call went to, never by an extension of nobody', async () => {
+    await setUp();
+    await db
+      .insertInto('extensions')
+      .values({ ext: '701', userId: null, ringGroupId: null, isParkingSlot: 1 })
+      .execute();
+    const userId = await seedUser(db, '101');
+    const call = newCall({
+      id: newId(),
+      direction: 'outbound',
+      callerChannelId: newId(),
+      from: '101',
+      to: '+4930123456',
+      startedAt: nowIso(),
+      logLevel: 'events',
+      callLogMaxBytes: 1_048_576
+    });
+    call.legs.set('trunk-leg', {
+      channelId: 'trunk-leg',
+      kind: 'trunk',
+      userId: null,
+      state: 'up',
+      endCause: null
+    });
+    const snapshot = await pipeline.deps.cache.get();
+
+    expect(fromOf(call, 'trunk-leg', snapshot)).toBe('+4930123456');
+
+    // An external caller adding a party, the call's only channel with no user behind it.
+    const added = await newAddedLeg(
+      pipeline,
+      call,
+      'trunk-leg',
+      { target: '101', actorUserId: userId },
+      'addParty'
+    );
+    expect(added.from).toBe('101');
   });
 
   it('refuses a transfer of a call that is not bridged with 409 notBridged', async () => {
