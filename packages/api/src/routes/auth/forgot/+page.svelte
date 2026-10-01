@@ -1,6 +1,4 @@
 <script lang="ts">
-  import '#app.css';
-
   import { resolve } from '$app/paths';
 
   import type { PageData } from './$types.js';

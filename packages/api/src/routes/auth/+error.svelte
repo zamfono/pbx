@@ -1,6 +1,4 @@
 <script lang="ts">
-  import '#app.css';
-
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
 

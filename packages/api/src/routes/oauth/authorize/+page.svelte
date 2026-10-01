@@ -1,6 +1,4 @@
 <script lang="ts">
-  import '#app.css';
-
   import { resolve } from '$app/paths';
 
   import { format } from '$lib/i18n/index.js';

@@ -1,6 +1,4 @@
 <script lang="ts">
-  import '#app.css';
-
   import { page } from '$app/state';
 
   import { format } from '$lib/i18n/index.js';
