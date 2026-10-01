@@ -8,7 +8,8 @@ enforces that.
 Every operation that changes configuration, destroys data or reveals a secret writes an `audit_log`
 entry: who did it, on which channel (`rest`, `mcp`, `ui`, `undo`, `job`), what changed, field by
 field. `audit.list` (`GET /audit`) lists it, filterable by entity, actor, channel, operation and
-time range. Secret values (passwords, API tokens, `*_enc` settings) are masked in the diff.
+time range (`from`, `to`; a time without an offset is the tenant's local time). Secret values
+(passwords, API tokens, `*_enc` settings) are masked in the diff.
 
 ## Most changes are undoable
 

@@ -8,10 +8,10 @@ arguments:
     description: The user or ring group the call went to, to narrow the search
     required: false
   - name: from
-    description: Start of the time range to search, ISO 8601
+    description: Start of the time range to search, ISO 8601; without an offset, the tenant's local time
     required: false
   - name: to
-    description: End of the time range to search, ISO 8601
+    description: End of the time range to search, ISO 8601; without an offset, the tenant's local time
     required: false
 ---
 

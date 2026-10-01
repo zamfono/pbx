@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
-import { instantInput, toStoredInstant } from '../instantInput.js';
+import { instantInput, tenantInstantReader } from '../instantInput.js';
 import { defineOperation } from '../types.js';
 
 const inputSchema = z
   .object({
     at: instantInput.describe(
-      'The past instant, ISO 8601 with any offset (none: UTC), whose presence states are returned.'
+      "The past instant, ISO 8601 with any offset (none: the tenant's time zone), whose presence states are returned."
     ),
     userId: z
       .string()
@@ -35,6 +35,7 @@ export const snapshot = defineOperation({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
+    const toStoredInstant = await tenantInstantReader(ctx.db);
     const rows = await ctx.db
       .selectFrom('presenceLog')
       .selectAll()

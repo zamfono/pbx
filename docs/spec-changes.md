@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-01 · §10.3 Audit, Call history, Presence log.** The time filters `from` and `to` of `GET /audit` and `GET /calls` and `at` of `GET /presence/log` read a date-time without an offset, and a date alone, as a local time in the tenant's time zone, a date alone as its midnight, rather than as UTC; a local time that a DST change skips or repeats is the earlier of its two possible instants. A value with an offset or `Z` is taken as given.
+*Why:* requested by the product owner: a person or the MCP assistant typing a time means local time.
+
 **2026-10-01 · §10.1 Transfers and pickup and step 5, §10.2 Hold music and Three-way calls, §10.3 Live calls.** The API does what a phone does during a call: `calls.consult` holds the other party and dials a target from the actor, and `calls.transfer` with `toCallId` completes the attended transfer to that consultation as a phone's own does; `calls.addParty` adds a third party as `*5` does, ringing the target only; `calls.hold` and `calls.resume` hold the other party in the core with the tenant's hold music, which the phone does not show; `calls.decline` declines the actor's own ringing legs as their phones' 603 would. A caller controls a call only while their own channel is in it, not after parking it or after an attended transfer handed their place over; the history still names them as its caller.
 *Why:* requested by the product owner: integrations and the MCP assistant should be able to do what a user can do from a phone.
 

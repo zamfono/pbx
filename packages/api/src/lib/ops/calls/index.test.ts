@@ -10,7 +10,7 @@ import {
 
 import type { CoreClient } from '#lib/coreClient.js';
 import { handleRest } from '#lib/rest.js';
-import { makeTestDb } from '#lib/testDb.js';
+import { makeTestDb, seedTenantTimeZone } from '#lib/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';
@@ -124,8 +124,9 @@ describe('calls', () => {
     await expect(attempt).rejects.toMatchObject({ status: 404 });
   });
 
-  it('calls.list compares `from` and `to` with an offset as the instants they name', async () => {
+  it('calls.list compares `from` with an offset as the instant it names, and `to` without one in the tenant zone', async () => {
     const db = await makeTestDb();
+    await seedTenantTimeZone(db, 'Europe/Berlin');
     const ids = [newId(), newId(), newId()];
     const starts = [
       '2026-10-01T09:59:59.999Z',
@@ -150,7 +151,7 @@ describe('calls', () => {
     const result = await runOperation<unknown, { items: { id: string }[] }>(
       db,
       'calls.list',
-      { from: '2026-10-01T12:00:00+02:00', to: '2026-10-01T10:30:00' },
+      { from: '2026-10-01T12:00:00+02:00', to: '2026-10-01T12:30:00' },
       asRun()
     );
 

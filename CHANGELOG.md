@@ -87,6 +87,11 @@ why the specified behaviour changed; the commit history, how.
 - The specification now says exactly when a webhook's `lastStatus` turns `failing`: as soon as
   one delivery has failed all three attempts; the next delivery that succeeds turns it back to
   `ok`. Delivery itself is unchanged.
+- A time typed without an offset into the `from` and `to` of `calls.list` and `audit.list`, or
+  the `at` of `presenceLog.snapshot`, such as `2026-10-01T09:00`, is now the tenant's local time
+  (`settings.timezone`), and a date alone, `2026-10-01`, its local midnight, where both were read
+  as UTC. A time with an offset or `Z` means what it did. A local time that a daylight-saving
+  change skips or repeats is read as the earlier of its two possible instants.
 
 ### Fixed
 

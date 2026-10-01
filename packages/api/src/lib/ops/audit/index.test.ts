@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db, type ReloadKind } from '@zamfono/shared';
 
-import { makeTestDb } from '#lib/testDb.js';
+import { makeTestDb, seedTenantTimeZone } from '#lib/testDb.js';
 
 import type { HoursWire } from '../hours/get.js';
 import { onPropagate, runOperation, type RunInput } from '../runner.js';
@@ -438,6 +438,51 @@ describe('audit.list time range', () => {
 
     expect(result.items.map(item => item.operation)).toEqual(['op.1']);
     await expect(attempt).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('reads a `from` and `to` without an offset, and a date alone, in the tenant zone', async () => {
+    const db = await makeTestDb();
+    await seedTenantTimeZone(db, 'Europe/Berlin');
+    const createdAts = [
+      '2026-09-30T21:59:59.999Z',
+      '2026-09-30T22:00:00.000Z',
+      '2026-10-01T10:00:00.000Z',
+      '2026-10-01T10:00:00.001Z'
+    ];
+    await db
+      .insertInto('auditLog')
+      .values(
+        createdAts.map((createdAt, index) => ({
+          id: newId(),
+          actorUserId: 'owner',
+          actorUserName: 'Owner',
+          channel: 'rest',
+          clientId: null,
+          clientName: null,
+          operation: `op.${String(index)}`,
+          entityKind: 'user',
+          entityId: null,
+          changesJson: '[]',
+          revertsId: null,
+          createdAt
+        }))
+      )
+      .execute();
+
+    const result = await runOperation<
+      unknown,
+      { items: { operation: string }[] }
+    >(
+      db,
+      'audit.list',
+      { from: '2026-10-01', to: '2026-10-01T12:00:00' },
+      asRun()
+    );
+
+    expect(result.items.map(item => item.operation).sort()).toEqual([
+      'op.1',
+      'op.2'
+    ]);
   });
 });
 

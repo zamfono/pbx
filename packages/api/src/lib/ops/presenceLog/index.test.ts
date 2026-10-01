@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { newId } from '@zamfono/shared';
 
-import { makeTestDb } from '#lib/testDb.js';
+import { makeTestDb, seedTenantTimeZone } from '#lib/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';
@@ -121,10 +121,11 @@ describe('presenceLog.snapshot', () => {
   it.each([
     ['an offset', '2026-01-01T02:15:00+02:00'],
     ['no milliseconds', '2026-01-01T00:15:00Z'],
-    ['no offset, read as UTC', '2026-01-01T00:15:00'],
+    ['no offset, read in the tenant zone', '2026-01-01T01:15:00'],
     ['Z with milliseconds', '2026-01-01T00:15:00.000Z']
   ])('compares an `at` with %s as the instant it names', async (_form, at) => {
     const db = await makeTestDb();
+    await seedTenantTimeZone(db, 'Europe/Berlin');
     await db
       .insertInto('presenceLog')
       .values([

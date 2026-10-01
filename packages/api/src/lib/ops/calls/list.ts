@@ -4,7 +4,7 @@ import type { LiveCall } from '@zamfono/shared';
 
 import { decodeCursor, encodeCursor } from '#lib/pagination.js';
 
-import { instantInput, toStoredInstant } from '../instantInput.js';
+import { instantInput, tenantInstantReader } from '../instantInput.js';
 import { defineOperation, OpError } from '../types.js';
 import { getCoreClient, toCallOut } from './_shared.js';
 
@@ -31,12 +31,12 @@ const inputSchema = z
     from: instantInput
       .optional()
       .describe(
-        'History only: calls started at or after this ISO 8601 time, any offset (none: UTC); a time, not a number.'
+        "History only: calls started at or after this ISO 8601 time, any offset (none: the tenant's time zone); a time, not a number."
       ),
     to: instantInput
       .optional()
       .describe(
-        'History only: calls started at or before this ISO 8601 time, any offset (none: UTC); a time, not a number.'
+        "History only: calls started at or before this ISO 8601 time, any offset (none: the tenant's time zone); a time, not a number."
       ),
     userId: z
       .string()
@@ -150,6 +150,7 @@ export const list = defineOperation({
       input.cursor === undefined
         ? undefined
         : (decodeCursor(input.cursor) as { id: string }).id;
+    const toStoredInstant = await tenantInstantReader(ctx.db);
     const from =
       input.from === undefined ? undefined : toStoredInstant(input.from);
     const to = input.to === undefined ? undefined : toStoredInstant(input.to);

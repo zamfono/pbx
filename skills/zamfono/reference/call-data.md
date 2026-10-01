@@ -57,8 +57,11 @@ time it began and, while busy, the other party (`peer`) and the ring group that 
 `presenceLog.snapshot` (`GET /presence/log?at=&userId=`, `admin`) answers what everyone's status
 was at instant `at`: for each user, the last logged state at or before it, with its `since`.
 `userId` narrows it to one user. `at` is an ISO 8601 time with any offset
-(`2026-10-01T11:00:00+02:00`, `2026-10-01T09:00:00Z`), read as UTC without one; in a query
-string, write the `+` as `%2B`. The log is purged after `settings.recordingRetentionDays`
+(`2026-10-01T11:00:00+02:00`, `2026-10-01T09:00:00Z`; in a query string, write the `+` as `%2B`),
+or without one, `2026-10-01T11:00`, a local time in the tenant's time zone (`settings.timezone`);
+a date alone is its local midnight, and a local time that a daylight-saving change skips or
+repeats is the earlier of its two possible instants. The `from` and `to` of `calls.list` and
+`audit.list` read the same way. The log is purged after `settings.recordingRetentionDays`
 (default 90), so a user whose last change is older than that is missing from a snapshot.
 
 ## Statistics
