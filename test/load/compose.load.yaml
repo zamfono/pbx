@@ -21,12 +21,11 @@
 #     external_signaling_address) is meant for the host's real public/LAN address, reachable by a
 #     genuine external SIP client through the published RTP port range; sipp/sipp-provider here
 #     are containers on this same `internal` bridge, not on the host's network namespace at all,
-#     so the harness's original 127.0.0.1 (test/integration/run.sh's own value, copied verbatim
-#     into session.sh at first) told every peer to send RTP into its own container-local loopback
-#     -- signalling still worked (it goes over the `internal` network by container name and never
-#     touches this address), but audio never reached asterisk. Confirmed by hand: `asterisk`'s own
-#     veth showed real outbound RTP under load (it can address sipp/sipp-provider correctly, from
-#     their own SDP) but near-zero inbound (sipp/sipp-provider could not address asterisk).
+#     so 127.0.0.1 (test/integration/run.sh's own value) would tell every peer to send RTP into
+#     its own container-local loopback -- signalling would still work (it goes over the
+#     `internal` network by container name and never touches this address), but audio would
+#     never reach asterisk: its own veth would show real outbound RTP under load (it can address
+#     sipp/sipp-provider correctly, from their own SDP) but near-zero inbound.
 # Asterisk's actual local RTP port range still comes from RTP_PORT_START/END in .env regardless of
 # this address -- unrelated to which address gets advertised in SDP.
 networks:

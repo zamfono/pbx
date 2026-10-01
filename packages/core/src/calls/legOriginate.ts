@@ -18,7 +18,7 @@
  *
  * Asterisk answers the create before the channel is in the app: it hands the channel to Stasis
  * on a thread of its own (`ari_channel_thread`, res/ari/resource_channels.c), and a dial reaching
- * it first is refused with 409 "Channel not in Stasis application", as a loaded host showed. So
+ * it first is refused with 409 "Channel not in Stasis application", as happens on a loaded host. So
  * the leg is dialled once its `StasisStart` has arrived.
  *
  * A leg that cannot be placed (the create or the dial refused, the channel gone or never in the

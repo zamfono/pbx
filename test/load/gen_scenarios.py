@@ -9,15 +9,15 @@ from pathlib import Path
 
 REPO = str(Path(__file__).resolve().parent.parent.parent)
 
-# play_pcap_audio is asynchronous (RFC of sipp's own docs: it schedules the pcap's packets onto
-# the RTP socket in the background and returns immediately; it does NOT block the scenario for
-# the pcap's duration). A first attempt without the trailing <pause> raced through all repeats in
-# a couple of milliseconds -- one real debug call showed "8 Total RTP pckts sent" for an 8x loop
-# of a 236-packet pcap and a 28ms call length, instead of ~56s -- because each new
-# play_pcap_audio call interrupts the previous one's still-in-flight send. Following each one with
-# a <pause> at least as long as the pcap's own real duration (g711a.pcap: 236 packets, ~7.05s,
-# measured from its own timestamps) lets it fully play out before the next call retriggers it,
-# and is what actually produces a real, sustained ~N*7s hold with continuous RTP.
+# play_pcap_audio is asynchronous (sipp's own docs: it schedules the pcap's packets onto the RTP
+# socket in the background and returns immediately; it does NOT block the scenario for the
+# pcap's duration), and each new play_pcap_audio call interrupts the previous one's
+# still-in-flight send: without the trailing <pause>, an 8x loop of a 236-packet pcap races
+# through all repeats in a couple of milliseconds and sends a handful of RTP packets instead of
+# holding for ~56s. Following each one with a <pause> at least as long as the pcap's own real
+# duration (g711a.pcap: 236 packets, ~7.05s, measured from its own timestamps) lets it fully
+# play out before the next call retriggers it, and is what produces a real, sustained ~N*7s
+# hold with continuous RTP.
 PCAP_DURATION_MS = 7050
 
 BLOCK = '''
@@ -175,24 +175,22 @@ PROVIDER_TMPL = '''<?xml version="1.0" encoding="ISO-8859-1"?>
 </scenario>
 '''
 
-# ~42s/~35s holds (not the task text's ~90s): the whole flock-wrapped session -- stack bring-up,
-# 4 load steps' ramp+hold+drain, the 200-endpoint bulk create, teardown -- has to fit one
-# Bash-tool call's 10-minute ceiling, confirmed tight even after fixing the two bugs below (a
-# 12-13 minute run at 8/6 reps and a 40s hold, measured before the fixes, barely dropped under budget
-# after them since most of that time is ramp_timeout/hold/drain polling that runs regardless of
-# whether calls succeed). Raise these if that budget is not a constraint for a given run.
+# ~42s/~35s holds: the whole flock-wrapped session -- stack bring-up, 4 load steps'
+# ramp+hold+drain, the 200-endpoint bulk create, teardown -- has to fit one Bash-tool call's
+# 10-minute ceiling, and most of that time is ramp_timeout/hold/drain polling that runs
+# regardless of whether calls succeed. Raise these if that budget is not a constraint for a
+# given run.
 #
-# Two bugs this repeat-with-pause design and the session.sh listener fix (see
-# test/load/session.sh, "registering the one answering device") work around, found by hand with
-# test/load/session.sh's single-call debug driver (not committed -- see git history/session notes
-# if reproducing): (1) play_pcap_audio is asynchronous in sipp 3.5.1 and returns immediately, so a
-# run of bare <exec> actions with no <pause> between them raced through in milliseconds instead of
-# holding for real time; (2) phone.sh's own `register` action binds the contact and exits, leaving
-# nothing to answer Asterisk's ongoing qualify OPTIONS probes, so core's Presence-based
-# registeredDevices() (packages/core/src/calls/ringGroupState.ts) sees the member as unregistered
-# within seconds and ringGroup.ts's ringable() drops it before ever looking at its forwarding
-# rule -- every call fell straight through to voicemail until a persistent `phone.sh listen`
-# process was added alongside the one-shot register.
+# Two behaviours this repeat-with-pause design and the session.sh listener (see
+# test/load/session.sh, "registering the one answering device") work around: (1)
+# play_pcap_audio is asynchronous in sipp 3.5.1 and returns immediately, so a run of bare <exec>
+# actions with no <pause> between them races through in milliseconds instead of holding for real
+# time; (2) phone.sh's own `register` action binds the contact and exits, leaving nothing to
+# answer Asterisk's ongoing qualify OPTIONS probes, so core's Presence-based registeredDevices()
+# (packages/core/src/calls/ringGroupState.ts) sees the member as unregistered within seconds and
+# ringGroup.ts's ringable() drops it before ever looking at its forwarding rule -- every call
+# falls straight through to voicemail unless a persistent `phone.sh listen` process runs
+# alongside the one-shot register.
 CALLER_REPS = 6
 PROVIDER_REPS = 5
 

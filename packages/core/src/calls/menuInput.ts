@@ -1,6 +1,6 @@
 /**
  * The Target-menu step's DTMF collection (§10.1 step 6) for `menu.ts`: the greeting with barge-in,
- * the first-digit and inter-digit timers, and Task 16's `menuStep` deciding when a typed string
+ * the first-digit and inter-digit timers, and `menuStep` deciding when a typed string
  * resolves.
  */
 import { MS_PER_SECOND } from '@zamfono/shared';

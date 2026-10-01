@@ -46,7 +46,7 @@ async function tokenDeps(): Promise<{
 }
 
 /**
- * Inserts the `oauth_clients` row that `/oauth/authorize` (Task 9) upserts on first
+ * Inserts the `oauth_clients` row that `/oauth/authorize` upserts on first
  * authorization: `tokens.client_id` is a foreign key, so a refresh token cannot be issued
  * for a client the authorize step never recorded (§5.2 "Client rows").
  */

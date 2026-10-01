@@ -1,6 +1,6 @@
 /**
  * The Target-menu step (§10.1 step 6; §10.2 "Auto-attendant menus"): plays the greeting, collects
- * DTMF against the menu's map with Task 16's `menuStep`, and applies the resolved forward target,
+ * DTMF against the menu's map with `menuStep`, and applies the resolved forward target,
  * a live extension, or, after `menus.max_attempts`, the menu's fallback. The DTMF collection
  * itself is `menuInput.ts`'s.
  */

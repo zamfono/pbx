@@ -178,7 +178,7 @@ describe('seedIfEmpty', () => {
     expect(moh.every(asset => asset.uploadedBy === null)).toBe(true);
   });
 
-  it('lays out each MoH asset the PJSIP renderer and storeAudio read (§10.2, Task 38)', async () => {
+  it('lays out each MoH asset the PJSIP renderer and storeAudio read (§10.2)', async () => {
     const db = await migratedDb();
     const mediaDir = await tempMediaDir();
     await seedIfEmpty(db, baseEnv(), testKeyring(), mediaDir, silentLogger);
@@ -234,7 +234,7 @@ describe('seedIfEmpty', () => {
     ).rejects.toThrow(/hold-music source directory/u);
   });
 
-  it('seeds the settings row from the SMTP_* env (Task 25 Step 1)', async () => {
+  it('seeds the settings row from the SMTP_* env', async () => {
     const db = await migratedDb();
     const mediaDir = await tempMediaDir();
     const kr = testKeyring();

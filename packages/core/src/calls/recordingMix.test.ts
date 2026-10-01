@@ -196,8 +196,8 @@ describe.skipIf(!ffmpegAvailable)('ffmpegMix', () => {
 
     await ffmpegMix(leftPath, headerOnlyPath, outPath);
 
-    // Before the fix, `amerge` alone stops at the shorter (header-only, 0 s) input, so the output
-    // is itself header-only rather than spanning the left channel's 3 s.
+    // `amerge` alone would stop at the shorter (header-only, 0 s) input, leaving the output
+    // header-only itself; padded, it spans the left channel's 3 s.
     expect(probeDurationS(outPath)).toBeCloseTo(3, DURATION_PRECISION_S);
     expect(
       channelMeanVolumeDb(outPath, LEFT_CHANNEL, 1.2, 2.8)
@@ -210,8 +210,8 @@ describe.skipIf(!ffmpegAvailable)('ffmpegMix', () => {
   it('rejects rather than writing an unplayable mix when both raw channels are header-only', async () => {
     const outPath = path.join(dir, 'out-both-header-only.wav');
 
-    // Before the fix this resolves, having written a ~78-byte header-only `outPath`: exactly the
-    // file §10.2 "A `recordings` row asserts that a playable file exists" forbids a row for.
+    // Resolving here would leave a ~78-byte header-only `outPath`: exactly the file §10.2
+    // "A `recordings` row asserts that a playable file exists" forbids a row for.
     await expect(
       ffmpegMix(headerOnlyPath, headerOnlyPath, outPath)
     ).rejects.toThrow();

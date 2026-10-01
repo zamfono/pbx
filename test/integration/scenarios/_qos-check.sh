@@ -4,7 +4,7 @@
 # statistics while a call runs; each row is what Asterisk set on its leg as it hung up, pushed
 # with the leg's ChannelDestroyed, so the trunk side hanging up first still has its row.
 # sipp sends no RTCP, so a round trip is never measured here: it is held to be null or a real
-# one, never the 0 an unmeasured one used to read as. Jitter and loss are measured on a leg that
+# one, never a 0 standing in for an unmeasured one. Jitter and loss are measured on a leg that
 # received RTP; with `measured`, the scenario's sides both played audio (sipp's pcap), so every
 # leg's jitter and loss must be numbers, and every leg must have received and sent packets
 # (`rxPackets`, `txPackets` above 0: a leg whose peer's audio never arrived reads 0 received);

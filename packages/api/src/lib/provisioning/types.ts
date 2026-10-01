@@ -17,8 +17,8 @@ export type SipCredentials = { username: string; password: string };
 export type PushReceipt = { remoteId: string } | null;
 
 /**
- * A device provisioning provider (§10.4): `manual` (no-op, entered by hand) and `ringotel` (Task
- * 39) are the MVP implementations. Every method but the first three is optional, since `manual`
+ * A device provisioning provider (§10.4): `manual` (no-op, entered by hand) and `ringotel`
+ * are the MVP implementations. Every method but the first three is optional, since `manual`
  * has nothing to push for them.
  */
 export type ProvisioningProvider = {

@@ -173,7 +173,7 @@ function holdMohClass(
     : DEFAULT_MOH_CLASS;
 }
 
-/** The full `RenderInput` (Task 4) assembled from the live database. */
+/** The full `RenderInput` assembled from the live database. */
 export async function loadRenderInput(
   db: Db,
   kr: Keyring

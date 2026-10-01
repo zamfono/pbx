@@ -16,7 +16,6 @@ import { endRingingLeg } from './ringConclusion.js';
 // The fewest parties a bridge still carries a conversation between.
 const CONVERSATION_PARTIES = 2;
 
-// --- Task 31 ---
 /** Every user who took part in `call` (§9.3, §10.2 "Presence and BLF"): its legs' own owners plus
  * whoever answered it, deduplicated — a direct ring, a ring-group win or a pickup's target all
  * resolve through this the same way. */
@@ -45,7 +44,6 @@ function clearParticipantPresence(pipeline: Pipeline, call: Call): void {
     pipeline.deps.presence?.setCallState(userId, 'idle', null, null, call.id);
   }
 }
-// --- end Task 31 ---
 
 /**
  * A party left `call`'s bridge (§10.1 "Call aggregate"). A bridge the core created outlives its
@@ -129,12 +127,10 @@ async function endCallerCall(pipeline: Pipeline, call: Call): Promise<void> {
   if (call.depositing !== true) {
     await finishAbandoned(pipeline, call);
   }
-  // --- Task 31 ---
   // The caller's own channel ending closes out the call either way: still ringing (abandoned) or
   // already answered, in which case `winLeg` set this call's participants `inCall` and nothing
   // else has cleared it since.
   clearParticipantPresence(pipeline, call);
-  // --- end Task 31 ---
   pending?.resolve('abandoned');
 }
 
@@ -144,14 +140,12 @@ export async function handleChannelEnded(
   ev: AriEvent
 ): Promise<void> {
   const channelId = (ev.channel as Channel).id;
-  // --- Task 31 ---
   // The parked party's own channel ending while waiting releases its slot and hint (§9.3 "a
   // parking slot: INUSE while a call is parked there"); this call aggregate's own cleanup below
   // still runs exactly as it would for any other ended channel.
   if (ev.type === 'ChannelDestroyed') {
     releaseParkedChannel(pipeline, channelId, pipeline.deps.presence);
   }
-  // --- end Task 31 ---
   const call = pipeline.callByChannel.get(channelId);
   if (call === undefined) {
     return;
@@ -173,13 +167,11 @@ export async function handleChannelEnded(
     return;
   }
   const leg = call.legs.get(channelId);
-  // --- Task 31 ---
   // An answered leg's own channel ending closes out the call from that side (§9.3, §10.2
   // "Presence and BLF") the same way the caller's own channel ending does above; a `StasisEnd`
   // for it carries no new information over the `ChannelDestroyed` that always follows.
   if (leg?.state === 'up' && ev.type === 'ChannelDestroyed') {
     clearParticipantPresence(pipeline, call);
-    // --- end Task 31 ---
     // §10.2: an answered leg leaving the bridge ends its participation's recording and mixes it.
     await pipeline.deps.recorder?.onLegEnded(call, leg);
     endLeg(pipeline, channelId, leg);
@@ -193,9 +185,7 @@ export async function handleChannelEnded(
       await pipeline.deps.cdr.finish(call);
     }
     return;
-    // --- Task 31 ---
   }
-  // --- end Task 31 ---
   // StasisEnd precedes ChannelDestroyed for a Stasis channel and carries no cause, so only ChannelDestroyed ends a ringing leg (its Q.850 cause is what ringOutcome() needs).
   if (leg?.state !== 'ringing' || ev.type === 'StasisEnd') {
     return;

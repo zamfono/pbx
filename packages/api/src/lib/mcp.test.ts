@@ -535,7 +535,7 @@ describe('protectedResourceMetadata', () => {
 });
 
 /** The literal topic names instructions.txt lists in its "topic (…)" parenthetical, dropping the
- * trailing "or a recipe name" placeholder, which names no single file (Task 42). */
+ * trailing "or a recipe name" placeholder, which names no single file. */
 function namedHelpTopics(instructions: string): string[] {
   const parenthetical = /topic \((?<list>[^)]+)\)/u.exec(instructions);
   const list = parenthetical?.groups?.list;

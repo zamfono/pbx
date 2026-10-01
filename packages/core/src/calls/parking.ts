@@ -15,9 +15,7 @@ import {
   RELEASE_CODE_FORBIDDEN,
   RELEASE_CODE_UNAVAILABLE
 } from './featureCall.js';
-// --- Task 31 ---
 import { moveParkedParty, ringParkerBack } from './parkingRingback.js';
-// --- end Task 31 ---
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
 
@@ -28,9 +26,7 @@ export type ParkedEntry = {
   partyChannelId: string;
   timer: ReturnType<typeof setTimeout>;
 };
-// One registry per `Pipeline` (one per process); `Pipeline` is Task 27's own file. Exported so
-// Task 33's boot resync can hang up a parked call whose parker it no longer knows (§10.1 "Boot
-// and restart"); this task's own callers reach it through `parkingSlots(pipeline)` below.
+// One registry per `Pipeline` (one per process), reached through `parkingSlots(pipeline)` below.
 const parkingByPipeline = new WeakMap<Pipeline, Map<string, ParkedEntry>>();
 export function parkingSlots(pipeline: Pipeline): Map<string, ParkedEntry> {
   let slots = parkingByPipeline.get(pipeline);
@@ -41,7 +37,6 @@ export function parkingSlots(pipeline: Pipeline): Map<string, ParkedEntry> {
   return slots;
 }
 
-// --- Task 31 ---
 // The reverse of `parkingSlots`: which slot a parked party's own channel occupies, so
 // `legsEnded.ts`'s `handleChannelEnded` can free the slot when that channel ends on its own (the
 // parked party hanging up while waiting).
@@ -79,8 +74,6 @@ export function releaseParkedChannel(
   presence?.setHint(ext, 'NOT_INUSE').catch(() => undefined);
   return true;
 }
-
-// --- end Task 31 ---
 
 /** The lowest parking slot no call occupies (§10.2 "Call parking"), `null` when every slot is taken. */
 function lowestFreeSlot(

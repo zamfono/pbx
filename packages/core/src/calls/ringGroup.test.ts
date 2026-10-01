@@ -247,10 +247,8 @@ describe('ringGroup', () => {
       bus: new EventBus(),
       cdr: fakeCdr(),
       now: nowIso,
-      // --- Task 31 ---
       trunkState: null,
       presence: null
-      // --- end Task 31 ---
     });
     callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }

@@ -32,7 +32,7 @@ export const createAudioAssetInput = z
 
 /**
  * `POST /audio` (§10.2 "Greetings and audio"): transcodes and stores the upload through
- * `storeAudio` (Task 38), then rows it as an `audio_assets` asset under the id it returns.
+ * `storeAudio`, then rows it as an `audio_assets` asset under the id it returns.
  */
 export const createAudioAsset = defineOperation({
   name: 'audio.create',

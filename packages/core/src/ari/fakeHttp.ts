@@ -1,4 +1,4 @@
-// Pure HTTP helpers for FakeAri, split out to keep fake.ts under the file size limit.
+// Pure HTTP helpers for FakeAri, a module of their own to keep fake.ts under the file size limit.
 import type http from 'node:http';
 
 export type RouteResult = { status: number; body: unknown };

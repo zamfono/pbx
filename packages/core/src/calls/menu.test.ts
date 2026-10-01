@@ -117,7 +117,7 @@ async function seedForwardTargetUser(db: Db, userId: string): Promise<string> {
   return id;
 }
 
-/** A `forward_targets` row of kind `ring_group`, the plan's own "12: group" menu example. */
+/** A `forward_targets` row of kind `ring_group`, for a menu's "12: group" entry. */
 async function seedForwardTargetRingGroup(
   db: Db,
   ringGroupId: string
@@ -243,10 +243,8 @@ describe('playMenu', () => {
       now: nowIso,
       db,
       apiClient: stubApiClient(),
-      // --- Task 31 ---
       trunkState: null,
       presence: null
-      // --- end Task 31 ---
     });
   });
 
@@ -289,9 +287,9 @@ describe('playMenu', () => {
     const userOne = await seedUser(db);
     const ringGroupTwelve = await seedRingGroup(db);
     // A real `user` target (§10.1 step 6's "Forward targets"), not a mailbox one: `nextHop` counts
-    // a hop for it, so re-entering through the pipeline's own `runTarget` (the bug) is observable,
-    // unlike through a mailbox target, which `nextHop` never counts either way. `12` is a
-    // ring-group target, the plan's own `{1: user, 12: group}` example.
+    // a hop for it, so re-entering through the pipeline's own `runTarget`, which the menu must not
+    // do, is observable, unlike through a mailbox target, which `nextHop` never counts either way.
+    // `12` is a ring-group target, as in a `{1: user, 12: group}` map.
     const targetOne = await seedForwardTargetUser(db, userOne);
     const targetTwelve = await seedForwardTargetRingGroup(db, ringGroupTwelve);
     const audioId = await seedAudioAsset(db);
@@ -379,8 +377,8 @@ describe('playMenu', () => {
       maxAttempts: 1,
       timeoutS: 1
     });
-    // A "long greeting": if the timeout started when it began (the bug), the menu would give up
-    // around 1 s in, well before the greeting itself finishes.
+    // A "long greeting": were the timeout started when it began, the menu would give up around
+    // 1 s in, well before the greeting itself finishes.
     const GREETING_MS = 500;
     fakeAri.playbackFinishedAfterMs = GREETING_MS;
 

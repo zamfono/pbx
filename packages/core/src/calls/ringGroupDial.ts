@@ -1,7 +1,7 @@
 /**
  * One `ringPlan` batch's own ring race (§10.1 step 5): originates its legs (`ringGroupOriginate.ts`),
  * races them (`ringGroupRace.ts`: first `Up` wins, a declined member's siblings drop when `allow_reject`), and resolves
- * once answered or the batch's timeout elapses. Kept off `pipeline.pendingRing`, which Task 27's
+ * once answered or the batch's timeout elapses. Kept off `pipeline.pendingRing`, which the
  * single-user ring race owns; `ringGroup.ts` is the only caller.
  */
 import { MS_PER_SECOND } from '@zamfono/shared';
@@ -11,7 +11,6 @@ import type { MemberLeg } from '../routing/ringGroup.js';
 import type { Call } from './call.js';
 import { callPartiesChanged, callRinging } from './callState.js';
 import { hangupAllRinging } from './groupLegs.js';
-// --- Task 31 ---
 import { registerActiveBatch, unregisterActiveBatch } from './groupPickup.js';
 import type { Pipeline } from './pipeline.js';
 import { originateBatch } from './ringGroupOriginate.js';
@@ -34,12 +33,11 @@ export async function ringBatch(
   const race = createBatchRace(pipeline, call, allowReject);
   call.batchLegs = race.tracked;
   pipeline.deps.ari.on('event', race.onEvent);
-  // --- Task 31 --- (`stopGroupRinging`'s own registry, `groupPickup.ts`)
+  // `stopGroupRinging`'s own registry (`groupPickup.ts`).
   registerActiveBatch(pipeline, call.id, {
     tracked: race.tracked,
     settle: race.settle
   });
-  // --- end Task 31 ---
   const timer = setTimeout(race.timeOut, batch.timeoutS * MS_PER_SECOND);
   timer.unref();
 
@@ -49,7 +47,7 @@ export async function ringBatch(
   });
   // The members it now rings see the call (§10.6), which rang before their legs existed.
   callPartiesChanged(pipeline.deps, call);
-  // --- Task 31 --- (§9.3 "a user: RINGING while any of their devices rings")
+  // §9.3 "a user: RINGING while any of their devices rings".
   const ringingUserIds = new Set(
     [...race.tracked.values()]
       .map(leg => leg.userId)
@@ -64,20 +62,16 @@ export async function ringBatch(
       call.id
     );
   }
-  // --- end Task 31 ---
   race.finishOriginating();
   const outcome = await race.promise;
   pipeline.deps.ari.off('event', race.onEvent);
   clearTimeout(timer);
-  // --- Task 31 ---
   unregisterActiveBatch(pipeline, call.id);
-  // --- end Task 31 ---
   if (outcome !== 'answered') {
     await hangupAllRinging(pipeline, race.tracked);
   }
   delete call.batchLegs;
   callPartiesChanged(pipeline.deps, call);
-  // --- Task 31 ---
   // The winner (if any) is already `inCall` via `winBatch`; every other member who was ringing in
   // this batch goes back to idle (§9.3, §10.2 "Presence and BLF").
   for (const userId of ringingUserIds) {
@@ -85,6 +79,5 @@ export async function ringBatch(
       pipeline.deps.presence?.setCallState(userId, 'idle', null, null, call.id);
     }
   }
-  // --- end Task 31 ---
   return outcome;
 }

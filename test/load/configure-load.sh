@@ -46,8 +46,8 @@ print(value)
 # codecs explicitly includes ulaw: the tenant default (db/migrations' DEFAULT_CODECS_JSON) is
 # ["opus","g722","alaw"] -- no ulaw -- and the transcoding load step's provider leg offers ulaw
 # only (load-provider-ulaw.xml). Without this override Asterisk has nothing to negotiate that SDP
-# against and rejects it outright, which was confirmed by hand: the transcode step's ramp never
-# reached any channels and its caller sipp exited 1 until this was added.
+# against and rejects it outright: the transcode step's ramp reaches no channels and its caller
+# sipp exits 1.
 api POST /trunks \
   "{\"name\":\"load-trunk\",\"emergency\":true,\"authMode\":\"ip\",\"codecs\":[\"alaw\",\"ulaw\"],\"hosts\":[
      {\"host\":\"$sipp_ip\",\"direction\":\"inbound\"},

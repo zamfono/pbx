@@ -145,7 +145,6 @@ function stubMailSender(): MailSender {
   return { mail: () => Promise.resolve() };
 }
 
-// --- Task 31 ---
 /** One `ip`-mode trunk with a single host and a catch-all route, for `*5<number>`'s external
  * target (§10.1 Outbound step 6). */
 async function seedExternalRoute(db: Db): Promise<string> {
@@ -218,7 +217,6 @@ async function seedMember(
     .values({ groupId, position, userId, userGroupId: null })
     .execute();
 }
-// --- end Task 31 ---
 
 async function seedVoicemail(
   db: Db,
@@ -723,7 +721,6 @@ describe('features', () => {
     expect(hint?.body).toEqual({ deviceState: 'BUSY' });
   });
 
-  // --- Task 31 ---
   it('*90 dialled from a registered device sets dnd, hint BUSY and presence dnd', async () => {
     await setUp();
     const trunkState = trunkStateForTests();
@@ -768,7 +765,6 @@ describe('features', () => {
       'dnd'
     ]);
   });
-  // --- end Task 31 ---
 
   it('add-party creates a child calls row', async () => {
     await setUp();
@@ -812,7 +808,7 @@ describe('features', () => {
     addPartyCall.callerUserId = userA;
     pipeline.registerCall(addPartyCall);
 
-    // addParty now waits for the originated leg to answer before bridging it (§10.2), so the
+    // addParty waits for the originated leg to answer before bridging it (§10.2), so the
     // default 60 s `answerAfterMs` (set for tests that must never auto-answer) would time this
     // race out; this test wants userC's device to answer promptly instead.
     fakeAri.answerAfterMs = 10;
@@ -848,7 +844,6 @@ describe('features', () => {
     expect(joinedNewParty).toBe(true);
   });
 
-  // --- Task 31 ---
   it('*5 to an external number dials it through the normal outbound resolution', async () => {
     await setUp();
     await seedExternalRoute(db);
@@ -1852,7 +1847,6 @@ describe('features', () => {
       expect(row.endedAt).not.toBeNull();
     });
   });
-  // --- end Task 31 ---
 
   /** A bridged call between a customer and the parker, which the parker then parks with `*70`:
    * an inbound call the parker answered, or with `parkerIsCaller` one the parker dialled out. */
@@ -2014,7 +2008,6 @@ describe('features', () => {
     expect(mohStopped).toBe(true);
   });
 
-  // --- Task 31 ---
   /** The retriever's own user, extension and device, added after `setUpParkedCall` warmed the
    * config snapshot; the invalidation stands in for the api's `/internal/configChanged`. */
   async function seedRetriever(): Promise<{
@@ -2139,7 +2132,6 @@ describe('features', () => {
     );
     expect(outcome).toBe('empty');
   });
-  // --- end Task 31 ---
 
   it("parking hangs up the parker's own channel, not just removes it from the bridge", async () => {
     const { parkerChannelId } = await setUpParkedCall();
@@ -2152,7 +2144,6 @@ describe('features', () => {
     expect(parkerHangup).toBe(true);
   });
 
-  // --- Task 31 ---
   it("parking returns the parker's own hint from INUSE and their presence from busy", async () => {
     const { parkerUserId } = await setUpParkedCall();
 
@@ -2167,7 +2158,6 @@ describe('features', () => {
       expect(rows.map(row => row.status)).toEqual(['busy', 'offline']);
     });
   });
-  // --- end Task 31 ---
 
   /** A stub recorder noting each participation it is told has started or ended. */
   function endingRecorder(ended: string[]): ParticipationRecorder {
@@ -2373,7 +2363,7 @@ describe('features', () => {
 
   it('parking timeout rings the parker back through the pipeline and joins the parked bridge on answer', async () => {
     await setUp(PARKING_TIMEOUT_S);
-    // The ring-back is a real internal call through `runUserStep`/`ringUser` (Task 31, item 2);
+    // The ring-back is a real internal call through `runUserStep`/`ringUser`;
     // this test wants the parker's device to answer promptly once dialled.
     fakeAri.answerAfterMs = 10;
     const parkerDeviceUsername = 'e100-dabc';
@@ -2431,7 +2421,7 @@ describe('features', () => {
       expect(rangParker).toBe(true);
       // §10.2 "Call parking": "whose answer lands in the parked bridge" — the bridge the customer
       // is waiting in, not a bridge of the ring-back's own (legs.ts's `winLeg` with
-      // `existingBridgeId`, Task 31 item 2).
+      // `existingBridgeId`).
       const customerJoins = fakeAri.calls.filter(
         entry =>
           entry.method === 'POST' &&
@@ -2619,7 +2609,6 @@ describe('features', () => {
     expect(row.mailboxUserId).toBe(ownerId);
   });
 
-  // --- Task 31 ---
   it('a greeting recorded over *95<ext> digit 0 is what the next deposit plays', async () => {
     await setUp();
     const ownerId = await seedUser(db);
@@ -2708,5 +2697,4 @@ describe('features', () => {
     });
     await done;
   });
-  // --- end Task 31 ---
 });

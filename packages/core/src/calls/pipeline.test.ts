@@ -42,7 +42,7 @@ const noopLogger: Logger = {
   error: () => undefined
 };
 
-/** Records every `open`/`finish` call; Task 32's real `CdrWriter` replaces this stand-in. */
+/** Records every `open`/`finish` call, standing in for the real `CdrWriter`. */
 function fakeCdr(): PipelineDeps['cdr'] & { opened: Call[]; finished: Call[] } {
   const opened: Call[] = [];
   const finished: Call[] = [];
@@ -352,10 +352,8 @@ describe('Pipeline', () => {
         }
       },
       now: nowIso,
-      // --- Task 31 ---
       trunkState,
       presence: null
-      // --- end Task 31 ---
     });
   });
 

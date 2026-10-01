@@ -10,7 +10,7 @@ export const ENC_COLUMNS: Record<string, readonly string[]> = {
   devices: ['sip_password_enc'],
   trunks: ['password_enc'],
   webhooks: ['secret_enc'],
-  // eslint-disable-next-line camelcase -- the plan's contract keys ENC_COLUMNS by table name
+  // eslint-disable-next-line camelcase -- ENC_COLUMNS is keyed by table name
   backup_targets: ['secret_enc'],
   settings: [
     'smtp_password_enc',

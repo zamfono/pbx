@@ -31,7 +31,7 @@ export type PipelineDeps = {
   cache: ConfigCache;
   state: StateStore;
   bus: EventBus;
-  // A minimal, structural stand-in for Task 32's `CdrWriter`, ahead of that task's own file.
+  // The part of `CdrWriter` the pipeline uses, typed structurally so a test can stand in for it.
   cdr: {
     open(call: Call): Promise<void>;
     finish(call: Call): Promise<void>;
@@ -64,7 +64,6 @@ export type PipelineDeps = {
   // Process-level logging (§10.1 "Emergency calls": an ERROR line while no live emergency trunk
   // exists); optional so a test Pipeline that never needs it can omit it.
   logger?: Logger;
-  // --- Task 31 ---
   // Required, `null` until `main.ts` constructs them (§10.2 "Presence and BLF", "Three-way
   // calls"), so a `Pipeline` states at construction whether it carries them: `addParty.ts`'s
   // `addParty` reaches `outboundExternal.ts`'s `originateExternalLeg` through `trunkState` for an
@@ -72,7 +71,6 @@ export type PipelineDeps = {
   // `legsEnded.ts`, `ringGroup.ts` and `ringGroupDial.ts` call `presence.setCallState`.
   trunkState: TrunkState | null;
   presence: Presence | null;
-  // --- end Task 31 ---
 };
 
 // One Pipeline per `core` process, wired directly to its `AriClient`'s event stream so
@@ -84,7 +82,7 @@ export class Pipeline {
   readonly pendingRing = new Map<string, RingResolver>();
   readonly findMeTimers = new Map<string, ReturnType<typeof setTimeout>[]>();
   readonly pendingFindMeAccept = new Map<string, FindMeAcceptWait>();
-  // Set by Task 30's wiring (`setOutboundHandler`); `null` until then, so an `outbound,<exten>`
+  // Set by `main.ts`'s wiring (`setOutboundHandler`); `null` until then, so an `outbound,<exten>`
   // Stasis entry is a no-op rather than a crash.
   private outboundHandler: ((ev: AriEvent) => Promise<void>) | null = null;
 
@@ -206,7 +204,7 @@ export class Pipeline {
     });
   }
 
-  /** Wires Task 30's `handleOutbound` for `outbound,<exten>` Stasis entries (§9.2). */
+  /** Wires `handleOutbound` for `outbound,<exten>` Stasis entries (§9.2). */
   setOutboundHandler(handler: (ev: AriEvent) => Promise<void>): void {
     this.outboundHandler = handler;
   }

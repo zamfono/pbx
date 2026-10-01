@@ -1,5 +1,5 @@
-// FakeAri's bridge model: create/list/destroy and channel membership, split out of fake.ts to keep
-// it under the file size limit.
+// FakeAri's bridge model: create/list/destroy and channel membership, a module of its own to keep
+// fake.ts under the file size limit.
 import { randomUUID } from 'node:crypto';
 
 import { splitResource, type RouteResult } from './fakeHttp.js';

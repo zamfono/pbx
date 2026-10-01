@@ -10,7 +10,7 @@
 
   const dict = $derived(data.dictionary.error);
 
-  // §5.2 "Authentication pages": the SSO callback (Task 10) and this page's own `redirect_uri`
+  // §5.2 "Authentication pages": the SSO callback and this page's own `redirect_uri`
   // rejection report a `reason` this dictionary has an entry for; any other value falls back to
   // the generic message rather than showing a raw code.
   const message = $derived.by(() => {

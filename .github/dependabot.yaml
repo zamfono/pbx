@@ -1,7 +1,7 @@
 # Keeps every dependency the repository pins current: the workflows' action SHAs, npm (the root
 # workspace, whose one lockfile covers packages/* and db/) and the Dockerfiles' base
-# images. No `docker-compose` ecosystem entry remains for /deploy: every image deploy/compose.yaml
-# runs is now one of the stack's own (§6.3 "Images"), named through `${ZAMFONO_VERSION}`, which
+# images. There is no `docker-compose` ecosystem entry for /deploy: every image deploy/compose.yaml
+# runs is one of the stack's own (§6.3 "Images"), named through `${ZAMFONO_VERSION}`, which
 # this ecosystem cannot parse a version out of to bump; the `docker` ecosystem below bumps the
 # base images each Dockerfile pins instead, images/proxy/Dockerfile's Caddy tags included.
 #

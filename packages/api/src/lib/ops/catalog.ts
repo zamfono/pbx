@@ -17,7 +17,7 @@ function restColumn(op: string): string {
  * A Markdown table of every registered operation, one row per name, sorted the same way
  * `listTools` orders `tools/list` (§10.5): code-point order, not `localeCompare`, so the table is
  * stable across regenerations regardless of the container's ICU locale. Backs
- * `skills/zamfono/reference/tools.md` (§12 "Admin skill", Task 46), generated instead of
+ * `skills/zamfono/reference/tools.md` (§12 "Admin skill"), generated instead of
  * hand-written so it cannot drift from `registry` or the REST route table. The operation name is
  * the MCP tool's name (§10.5).
  */

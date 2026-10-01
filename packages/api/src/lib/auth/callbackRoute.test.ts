@@ -174,7 +174,7 @@ describe('GET /oauth/callback', () => {
       throw new Error('expected a redirect');
     }
     // Not a direct redirect to the client with a code: the code is minted only once the person
-    // approves the consent step (`consentAction`, Task 9's `/oauth/authorize`), the same as a
+    // approves the consent step (`consentAction`, `/oauth/authorize`'s), the same as a
     // password login.
     const location = new URL(err.location, 'https://pbx.example.com');
     expect(location.origin).toBe('https://pbx.example.com');

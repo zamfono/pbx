@@ -24,9 +24,8 @@ export type RingOutcome = 'answered' | 'abandoned' | 'busy' | 'noAnswer';
 export type RingResolver = {
   resolve: (outcome: RingOutcome) => void;
   timer: ReturnType<typeof setTimeout>;
-  // --- Task 31 --- The bridge the win joins in place of its own (`winLeg`), `null` for a fresh one.
+  // The bridge the win joins in place of its own (`winLeg`), `null` for a fresh one.
   existingBridgeId: string | null;
-  // --- end Task 31 ---
   /** Set for a ring on a user's own phones that an action started (`ownDevices.ts`): the leg that
    * answers is handed to it instead of being bridged with a caller the call does not have yet. */
   handOver?: (leg: Leg) => void;
@@ -73,7 +72,7 @@ export function hangupLeg(pipeline: Pipeline, leg: Leg): Promise<void> {
 
 /**
  * The first accepted answer: bridges it with the caller and ends every other leg. With
- * `existingBridgeId` (Task 31: §10.2 "Call parking"'s ring-back, "Three-way calls"'s `*5`) the
+ * `existingBridgeId` (§10.2 "Call parking"'s ring-back, "Three-way calls"'s `*5`) the
  * winning leg joins that bridge in place of one of its own, and `call.callerChannelId` — a
  * placeholder channel for parking's synthetic ring-back call, or `*5`'s own disposable
  * feature-code channel — is left untouched.
@@ -102,7 +101,7 @@ async function winLeg(
     }
   }
   pipeline.pendingRing.delete(call.id);
-  // --- Task 31 --- (§9.3 "a user: ... INUSE in a call"; a leg whose join failed is hung up)
+  // §9.3 "a user: ... INUSE in a call"; a leg whose join failed is hung up.
   if (leg.userId !== null && joined) {
     pipeline.deps.presence?.setCallState(
       leg.userId,
@@ -112,7 +111,6 @@ async function winLeg(
       call.id
     );
   }
-  // --- end Task 31 ---
   pending?.resolve('answered');
 }
 

@@ -91,12 +91,11 @@ bash "$repo/test/integration/phone.sh" "$compose_cmd" register "$SIP_USERNAME" "
 # packages/core/src/calls/ringGroupState.ts's registeredDevices() (fed by Presence's own
 # ContactStatusChange tracking) then sees the member as unregistered -- ringGroup.ts's
 # ringable() drops it before ever looking at its forwarding rule, and the whole call falls
-# straight through to voicemail. Confirmed by hand: a debug call without this step logged
-# {"event":"ringGroup","result":"unavailable"} despite a completed registration; the CI harness
-# avoids this because it starts a `phone.sh answer` (also -aa) right before every scenario that
-# needs the device seen as available. A persistent `listen` (-aa, never actually expected to be
-# dialled since the one user's forwarding rule is unconditional) keeps answering those probes for
-# the rest of this session.
+# straight through to voicemail, logging {"event":"ringGroup","result":"unavailable"} despite a
+# completed registration. The CI harness avoids this because it starts a `phone.sh answer` (also
+# -aa) right before every scenario that needs the device seen as available. A persistent
+# `listen` (-aa, never actually expected to be dialled since the one user's forwarding rule is
+# unconditional) keeps answering those probes for the rest of this session.
 bash "$repo/test/integration/phone.sh" "$compose_cmd" listen answer >/dev/null 2>&1 &
 sleep 2
 dc exec -T asterisk asterisk -rx "pjsip qualify $SIP_USERNAME" >/dev/null 2>&1 || true

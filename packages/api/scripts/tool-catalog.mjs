@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Prints the tool catalog for `skills/zamfono/reference/tools.md` (§12 "Admin skill", Task 46):
+// Prints the tool catalog for `skills/zamfono/reference/tools.md` (§12 "Admin skill"):
 // one Markdown table row per operation in the registry, generated instead of hand-written so the
 // reference cannot drift from it. Plain `node` cannot resolve the ops modules' NodeNext ".js"
 // import specifiers to their ".ts" sources, so this bundles the catalog module with esbuild

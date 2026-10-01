@@ -4,11 +4,9 @@
  * `max-lines` lint rule.
  */
 import { bridgeAnswered, claimAnswer } from './answer.js';
-// Task 31's own import: the join-bridge registry `winBatch` below also reads.
 import { takeJoinBridge } from './bridgeJoin.js';
 import type { Call, Leg } from './call.js';
 import { hangupAllRinging, type GroupLeg } from './groupLegs.js';
-// --- end Task 31 ---
 import type { Pipeline } from './pipeline.js';
 
 /**
@@ -57,16 +55,15 @@ export async function winBatch(
   await pipeline.deps.ari.channels
     .stopMoh(call.callerChannelId)
     .catch(() => undefined);
-  // --- Task 31 --- (a registered bridge to join, `addParty.ts`'s `*5`, in place of a bridge of its own)
+  // A registered bridge to join (`addParty.ts`'s `*5`) in place of a bridge of its own.
   const joined = await bridgeAnswered(
     pipeline,
     call,
     winningLeg,
     takeJoinBridge(pipeline, call.id)
   );
-  // --- end Task 31 ---
   await hangupAllRinging(pipeline, tracked);
-  // --- Task 31 --- (§9.3 "a user: ... INUSE in a call"; a leg whose join failed is hung up)
+  // §9.3 "a user: ... INUSE in a call"; a leg whose join failed is hung up.
   if (winningLeg.userId !== null && joined) {
     pipeline.deps.presence?.setCallState(
       winningLeg.userId,
@@ -76,6 +73,5 @@ export async function winBatch(
       call.id
     );
   }
-  // --- end Task 31 ---
   return true;
 }

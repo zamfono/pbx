@@ -14,7 +14,6 @@ export type GroupLeg = {
   deviceId?: string;
 };
 
-// --- Task 31 ---
 /** Ends every one of `memberKey`'s still-ringing legs (§10.1 step 5: `allow_reject` stops ringing all of a declining member's devices). */
 export function hangupMemberSiblings(
   pipeline: Pipeline,
@@ -43,4 +42,3 @@ export async function hangupAllRinging(
     await pipeline.deps.ari.channels.hangup(channelId).catch(() => undefined);
   }
 }
-// --- end Task 31 ---

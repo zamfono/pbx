@@ -3,8 +3,8 @@
  * `call_qos` rows at diagnostics level `qos` and above (§7), and the `history.appended` realtime
  * event (§10.6). `open()` inserts the `calls` row immediately, under the placeholder status
  * `interrupted`, so a `recordings` row can reference it (§11.2 FK) before the call itself ends; a
- * row left at `interrupted` by an unclean process exit is exactly the case `resyncOnBoot` (Task
- * 33) already reconciles. `finish()` upserts the same row with the call's real outcome.
+ * row left at `interrupted` by an unclean process exit is exactly the case `resyncOnBoot`
+ * reconciles. `finish()` upserts the same row with the call's real outcome.
  */
 import type { Db } from '@zamfono/shared';
 

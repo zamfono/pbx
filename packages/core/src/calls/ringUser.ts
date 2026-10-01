@@ -66,15 +66,14 @@ async function ringDevice(
   call.log.event({ event: 'rungDevice', channelId: channel.id, userId });
   // A phone that declined at once (486, 603) ended before it was tracked (§10.1 step 4).
   redeliverEarlyEvents(pipeline.deps.ari, early, channel.id);
-  // --- Task 31 --- (§10.1 step 4: a win landing during this originate must not leave its leg ringing,
-  // nor must the race ending unanswered meanwhile, its timeout or its last other leg ending)
+  // §10.1 step 4: a win landing during this originate must not leave its leg ringing,
+  // nor must the race ending unanswered meanwhile, its timeout or its last other leg ending.
   const leg = call.legs.get(channel.id);
   const raceOver =
     call.answeredAt !== null || !pipeline.pendingRing.has(call.id);
   if (raceOver && leg?.state === 'ringing') {
     await hangupLeg(pipeline, leg);
   }
-  // --- end Task 31 ---
 }
 
 /** Originates one leg per device of `userId`'s, all at once (`placeAll`), each placed in its own
@@ -137,11 +136,9 @@ export async function ringUser(
   pipeline.pendingRing.set(call.id, {
     resolve: resolveOutcome,
     timer,
-    // --- Task 31 ---
     existingBridgeId: existingBridgeId ?? takeJoinBridge(pipeline, call.id)
-    // --- end Task 31 ---
   });
-  // --- Task 31 --- (§9.3 "a user: RINGING while any of their devices rings")
+  // §9.3 "a user: RINGING while any of their devices rings".
   pipeline.deps.presence?.setCallState(
     userId,
     'ringing',
@@ -149,7 +146,6 @@ export async function ringUser(
     null,
     call.id
   );
-  // --- end Task 31 ---
 
   await ringDevices(
     pipeline,
@@ -174,11 +170,9 @@ export async function ringUser(
   if (outcome === 'answered') {
     return;
   }
-  // --- Task 31 ---
   // Ringing stopped for `userId` either way (abandoned, busy or no answer); `winLeg` sets
   // `inCall` on the answered path instead (§9.3, §10.2 "Presence and BLF").
   pipeline.deps.presence?.setCallState(userId, 'idle', null, null, call.id);
-  // --- end Task 31 ---
   if (outcome === 'abandoned') {
     return;
   }

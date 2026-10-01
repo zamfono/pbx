@@ -392,7 +392,7 @@ describe('GET /oauth/authorize (load)', () => {
     expect(data.companyName).toBe('Acme');
   });
 
-  it('renders the consent step for a pending `zamfono_consent` cookie, the same one the SSO callback (Task 10) sets', async () => {
+  it('renders the consent step for a pending `zamfono_consent` cookie, the same one the SSO callback sets', async () => {
     const cookies = cookieJar();
     const kr = keyringFromEnv(process.env);
     setConsentCookie(

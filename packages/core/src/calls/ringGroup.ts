@@ -85,7 +85,7 @@ async function applyGroupFallback(
   await release(pipeline, call, action.code, 'missed');
 }
 
-/** `ringGroup`'s batch-plan loop and fallback, split out for `max-lines-per-function`. */
+/** `ringGroup`'s batch-plan loop and fallback, its own function for `max-lines-per-function`. */
 type BatchPlanCtx = {
   groupId: string;
   snapshot: Snapshot;
@@ -205,13 +205,12 @@ export async function ringGroup(
     rng
   );
 
-  // --- Task 31 --- (§9.3 "a ring group: RINGING while the group rings, else NOT_INUSE")
+  // §9.3 "a ring group: RINGING while the group rings, else NOT_INUSE".
   const groupExt =
     snapshot.extensions.find(row => row.ringGroupId === groupId)?.ext ?? null;
   if (groupExt !== null) {
     await pipeline.deps.presence?.setHint(groupExt, 'RINGING');
   }
-  // --- end Task 31 ---
   try {
     await runBatchPlan(pipeline, call, plan, {
       groupId,
@@ -220,11 +219,9 @@ export async function ringGroup(
       groupInfo,
       rules
     });
-    // --- Task 31 ---
   } finally {
     if (groupExt !== null) {
       await pipeline.deps.presence?.setHint(groupExt, 'NOT_INUSE');
     }
   }
-  // --- end Task 31 ---
 }

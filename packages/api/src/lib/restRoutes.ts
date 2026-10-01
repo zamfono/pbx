@@ -87,7 +87,7 @@ function scopeRoutes(suffix: string, entries: ScopeEntry[]): RouteTuple[] {
 }
 
 // §10.3's REST surface table, one row per endpoint. A name absent from the registry answers 501
-// (checked in `handleRest`), so this table stands complete ahead of the areas it names.
+// (checked in `handleRest`), so the table may name an endpoint no operation backs.
 const STATIC_ROUTES: RouteTuple[] = [
   ...crud('users', '/users', ALL_CRUD),
   ['POST', '/users/{id}/resetPassword', 'users.resetPassword'],

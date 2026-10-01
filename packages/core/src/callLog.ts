@@ -78,7 +78,7 @@ export class CallLog {
     this.#maxBytes = maxBytes;
   }
 
-  /** The level this call has resolved to so far (§7); read back by `CdrWriter` (Task 32) to
+  /** The level this call has resolved to so far (§7); read back by `CdrWriter` to
    * gate `call_qos` on the call's own level rather than the tenant default alone. */
   get level(): LogLevel {
     return this.#level;

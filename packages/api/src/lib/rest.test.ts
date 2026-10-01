@@ -15,9 +15,9 @@ const ITEMS = Array.from({ length: PAGE_ITEM_COUNT }, (_unused, index) => ({
   id: `user-${index}`
 }));
 
-// Stubs standing in for the not-yet-built `users.list`/`users.delete` and `trunks.delete`
-// (Tasks 20-21): this task tests the REST catch-all's own plumbing — pagination, confirmation,
-// error shapes — against real route-table entries, without depending on those tasks.
+// Stubs standing in for `users.list`/`users.delete` and `trunks.delete`: these tests cover the
+// REST catch-all's own plumbing — pagination, confirmation, error shapes — against real
+// route-table entries, without depending on those operations' own behaviour.
 register(
   defineOperation({
     name: 'users.list',

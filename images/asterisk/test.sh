@@ -68,9 +68,9 @@ echo "$TRANSPORTS" | grep -q 'transport-udp.*127.0.0.1:5060' \
 echo "$TRANSPORTS" | grep -q 'transport-tls.*:5061' \
   || fail "transport-tls is not listening on :5061"
 
-# transport-tls must speak TLS 1.2 and 1.3 and refuse TLS 1.0/1.1 (a stress-test finding: with
-# `method` unset, pjproject pins TLSv1.0 only, and a modern client - OpenSSL 3, iOS, Android -
-# refuses that handshake). images/asterisk/conf/pjsip.conf.tmpl now sets `method = sslv23`,
+# transport-tls must speak TLS 1.2 and 1.3 and refuse TLS 1.0/1.1 (with `method` unset,
+# pjproject pins TLSv1.0 only, and a modern client - OpenSSL 3, iOS, Android - refuses that
+# handshake). images/asterisk/conf/pjsip.conf.tmpl sets `method = sslv23`,
 # pjproject's negotiate-highest method; OpenSSL 3's own default security level keeps that at
 # TLSv1.2+, which these four handshakes prove directly against the running transport. Cert
 # verification is expected to fail (self-signed placeholder cert) - only protocol negotiation

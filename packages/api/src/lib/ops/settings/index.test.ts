@@ -121,9 +121,9 @@ describe('settings', () => {
   });
 
   // §3.1 "Config propagation": `core` reads `language` (§9.1, §9.4 "Cross-trunk failover") from
-  // a cache it only drops once told to, whether or not Asterisk needs a reload alongside it — the
-  // bug an `outbound-routes-exhausted` integration run surfaced: `core` kept the tenant's
-  // previous language until an unrelated PJSIP-reloading write happened to refresh it too.
+  // a cache it only drops once told to, whether or not Asterisk needs a reload alongside it;
+  // untold, `core` keeps the tenant's previous language until an unrelated PJSIP-reloading write
+  // happens to refresh it too.
   it('propagates a column change that names no reload kind, language among them', async () => {
     const db = await makeTestDb();
     await seedSettings(db);

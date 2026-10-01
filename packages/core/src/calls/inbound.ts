@@ -1,5 +1,5 @@
 /** Inbound call entry (§10.1 step 1; §9.2 `inbound,<exten>`) and pipeline steps 2-4, 6 and 7
- * (ring groups are Task 29): OOO, opening hours, the target-user and target-menu steps,
+ * (ring groups are `ringGroup.ts`'s): OOO, opening hours, the target-user and target-menu steps,
  * reject-anonymous, and each target kind's dispatch; hop counting is `runTarget.ts`'s. */
 import { newId } from '@zamfono/shared';
 
@@ -35,11 +35,11 @@ const RELEASE_CODE_REJECTED = 603;
 const RELEASE_CODE_SERVER_ERROR = 500;
 
 /** Step 1 "Entry" for an already-resolved target (§10.1): reject-anonymous, OOO/hours, then the
- * target's own step. Exported for Task 30's internal extension and own-DID dialling, which enter
- * here directly, without `runTarget`'s hop counting (§10.1 Outbound steps 3 and 5). `asUser` is
- * the user whose own rule forwarded here, whose call an external target is dialled as (§10.1
- * step 7), or `null` when a DID, menu, ring group or tenant rule forwards; no other target kind
- * reads it. */
+ * target's own step. Exported for outbound dialling of an internal extension or own DID, which
+ * enters here directly, without `runTarget`'s hop counting (§10.1 Outbound steps 3 and 5).
+ * `asUser` is the user whose own rule forwarded here, whose call an external target is dialled as
+ * (§10.1 step 7), or `null` when a DID, menu, ring group or tenant rule forwards; no other target
+ * kind reads it. */
 export async function enterTarget(
   pipeline: Pipeline,
   call: Call,

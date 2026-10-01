@@ -1,5 +1,5 @@
 #!/bin/sh
-# Rebuilds skills/zamfono/reference/ (§12 "Admin skill", Task 46): the admin guide sections that
+# Rebuilds skills/zamfono/reference/ (§12 "Admin skill"): the admin guide sections that
 # zamfono.help also serves, plus a tool catalog generated from the operations registry, so the
 # skill's reference cannot drift from either source. SKILL.md itself is hand-written and untouched.
 set -e

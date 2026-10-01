@@ -364,10 +364,8 @@ describe('outbound dialing', () => {
       bus: new EventBus(),
       cdr: fakeCdr(),
       now: nowIso,
-      // --- Task 31 ---
       trunkState: null,
       presence: null
-      // --- end Task 31 ---
     });
     trunkState = new TrunkState({
       ari,

@@ -20,14 +20,11 @@ import { mailboxAccess, ownVoicemail } from './mailbox.js';
 import { park, parkingSlots, type ParkedEntry } from './parking.js';
 import { retrieveParkedCall } from './parkingRetrieval.js';
 import type { Pipeline } from './pipeline.js';
-// --- Task 31 ---
 import { activeBatchHasRingingLeg, stopGroupRinging } from './ringGroupDial.js';
-// --- end Task 31 ---
 import { deposit } from './voicemail.js';
 
-// Re-exported at `features.js`, this task's own declared file, for `outbound.ts`'s parking-slot
-// dispatch and Task 33's boot resync, even though their own bodies live in `parking.ts` and
-// `parkingRetrieval.ts`.
+// Re-exported at `features.js` alongside the feature codes, though their own bodies live in
+// `parking.ts` and `parkingRetrieval.ts`.
 export { parkingSlots, retrieveParkedCall, type ParkedEntry };
 
 /** The picker's own channel as `target`'s answering leg (§10.1 "Pickup"): it stays up as the
@@ -47,7 +44,7 @@ function claimPickup(pipeline: Pipeline, call: Call, target: Call): Leg | null {
 
 /** The picked-up call's own bridging: the picker's channel joins `target`'s in a fresh bridge,
  * every other still-ringing leg of `target` ends, and `target`'s own ringing user (a direct
- * pickup) or ring-group member (`stopGroupRinging`'s own hangups, item 4) returns to idle. */
+ * pickup) or ring-group member (`stopGroupRinging`'s own hangups) returns to idle. */
 async function bridgePickup(
   pipeline: Pipeline,
   call: Call,
@@ -65,7 +62,7 @@ async function bridgePickup(
       await ari.channels.hangup(other.channelId).catch(() => undefined);
     }
   }
-  // --- Task 31 --- (§9.3, §10.2 "Presence and BLF")
+  // Presence (§9.3, §10.2 "Presence and BLF"): the ringing callee idle, the picker in the call.
   if (target.calleeUserId !== null) {
     pipeline.deps.presence?.setCallState(
       target.calleeUserId,
@@ -84,14 +81,13 @@ async function bridgePickup(
       target.id
     );
   }
-  // --- end Task 31 ---
   // §7 level `sip`: the picker's dialog is `target`'s answered leg now, not the closing `*8` dial's.
   pipeline.deps.cdr.registerLeg?.(target, call.callerChannelId);
   await closeFeatureCall(pipeline, call, 'answered');
 }
 
 /** `*8<ext>`: wins the target's ring race for the picker's own channel (§10.1 "Pickup"): a
- * single user's own ring race (`pendingRing`), or — Task 31, item 4 — a ring group's own tracked
+ * single user's own ring race (`pendingRing`), or a ring group's own tracked
  * batch (`ringGroupDial.ts`'s `stopGroupRinging`) when `ext` is a member's extension or the
  * group's own (§9.3 table). */
 async function pickup(
@@ -101,7 +97,6 @@ async function pickup(
 ): Promise<void> {
   const snapshot = await pipeline.deps.cache.get();
   const owner = ownerForExt(snapshot, ext);
-  // --- Task 31 ---
   // An extension nobody owns — unknown, or a parking slot — names no ringing call to pick up
   // (§9.3 table: `*8<ext>` is directed pickup); falling through to the group search below with
   // both `userId` and `groupId` null would otherwise match any live ring-group call at all.
@@ -109,7 +104,6 @@ async function pickup(
     await release(pipeline, call, RELEASE_CODE_NOT_FOUND, 'failed');
     return;
   }
-  // --- end Task 31 ---
   const userId = 'userId' in owner ? owner.userId : null;
   const groupId = 'ringGroupId' in owner ? owner.ringGroupId : null;
 
@@ -134,7 +128,6 @@ async function pickup(
     }
   }
 
-  // --- Task 31 ---
   // Constrained to a call whose tracked batch actually has a leg ringing for `userId` (any member
   // when `ext` is the group's own extension, `userId === null`), not merely any live ring-group
   // call, so a member ringing in one group is never picked up out of another's.
@@ -153,7 +146,6 @@ async function pickup(
     await bridgePickup(pipeline, call, groupTarget, groupLeg);
     return;
   }
-  // --- end Task 31 ---
 
   await release(pipeline, call, RELEASE_CODE_NOT_FOUND, 'failed');
 }
@@ -182,8 +174,8 @@ async function setDnd(
   await concludeFeature(pipeline, call, 'answered');
 }
 
-/** `*97<ext>`: deposits the caller in `ext`'s mailbox without ringing (§9.3), through Task 28's
- * real `deposit()`. */
+/** `*97<ext>`: deposits the caller in `ext`'s mailbox without ringing (§9.3), through
+ * `deposit()`. */
 async function depositFeature(
   pipeline: Pipeline,
   call: Call,

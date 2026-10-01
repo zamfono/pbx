@@ -15,7 +15,7 @@ const STATUS_OK = 200;
 const BEARER_PREFIX = 'Bearer ';
 const PROMETHEUS_CONTENT_TYPE = 'text/plain; version=0.0.4';
 
-/** `core`'s own ARI connection state (§7), read the same way `/healthz` reads it (Task 25). */
+/** `core`'s own ARI connection state (§7), read the same way `/healthz` reads it. */
 async function checkAri(): Promise<boolean> {
   const body = await fetchCoreHealth();
   return body.ari;

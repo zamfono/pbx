@@ -44,7 +44,7 @@ function frontMatterEnd(lines: string[]): number {
   return lines.indexOf(FRONT_MATTER_DELIM, 1);
 }
 
-// ponytail: parses only the flat shape Task 42's recipes use (a `title` line and a flat
+// ponytail: parses only the flat shape the guide's recipes use (a `title` line and a flat
 // `arguments` list of `{name, description, required}`); a maintained YAML parser replaces this if
 // the front matter grows nested or multi-line values.
 export function parseRecipeFrontMatter(content: string): {

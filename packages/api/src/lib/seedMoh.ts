@@ -61,11 +61,11 @@ function labelFromBasename(basename: string): string {
 }
 
 /**
- * One track's files, laid out the way the PJSIP renderer and Task 38's `storeAudio` read them:
+ * One track's files, laid out the way the PJSIP renderer and `storeAudio` read them:
  * the wav and g722 variants under the class's own `prompts/moh/<id>/` directory (`render.ts`'s
  * `directory = /media/prompts/moh/<id>/`, one MoH class per asset, so a wideband call gets the
  * g722 file without transcoding), plus the narrowband copy again as the flat `prompts/<id>.wav`
- * playback file (Task 38's `storeAudio` layout). Both stay under `media/prompts/`, where §6.3
+ * playback file (`storeAudio`'s layout). Both stay under `media/prompts/`, where §6.3
  * copies the bundled hold music and §11.6 keeps it.
  */
 async function seedMohTrack(
@@ -97,7 +97,7 @@ async function seedMohTrack(
     id,
     label: labelFromBasename(basename),
     kind: 'moh',
-    // Matches the file this function just wrote to `prompts/` (Task 38's `storeAudio` layout),
+    // Matches the file this function just wrote to `prompts/` (`storeAudio`'s layout),
     // so `deleteAudioFile` and prompt playback resolve the same file the row names.
     filename: promptFilename,
     uploadedBy: null,

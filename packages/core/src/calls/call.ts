@@ -1,5 +1,5 @@
 /** The Call aggregate (spec §10.1): tracked in memory only — caller channel, legs, bridge, timers,
- * routing cursor; SQLite holds durable outcomes alone, via the CDR writer (Task 32). */
+ * routing cursor; SQLite holds durable outcomes alone, via the CDR writer. */
 import type { Selectable } from 'kysely';
 
 import type { DB, Scope } from '@zamfono/shared';

@@ -34,7 +34,6 @@ function directionFor(action: DialAction): Call['direction'] {
     : 'internal';
 }
 
-// --- Task 31 ---
 /** §9.3 "a user: ... INUSE in a call": the dialling user's own device is in a call from the
  * moment it dials a colleague, a group, a number or a parking slot, whatever the far end does
  * next. Keyed by `call.id`, so `legsEnded.ts`'s `clearParticipantPresence` releases it when this
@@ -59,7 +58,6 @@ function markCallerInCall(
     call.id
   );
 }
-// --- end Task 31 ---
 
 /** `outbound,<exten>` Stasis entry (§9.2): resolves the dialled string and dispatches it. */
 export async function handleOutbound(
@@ -115,9 +113,7 @@ export async function handleOutbound(
     snapshot.settings.language
   );
   call.log.event({ event: 'entry', dialAction: action.kind, dialed });
-  // --- Task 31 ---
   markCallerInCall(pipeline, call, action);
-  // --- end Task 31 ---
 
   await dispatchAction(pipeline, trunkState, call, action, {
     snapshot,

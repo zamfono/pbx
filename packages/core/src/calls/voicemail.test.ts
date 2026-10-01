@@ -174,10 +174,8 @@ describe('deposit', () => {
       now: nowIso,
       db,
       apiClient,
-      // --- Task 31 ---
       trunkState: null,
       presence: null
-      // --- end Task 31 ---
     });
   });
 

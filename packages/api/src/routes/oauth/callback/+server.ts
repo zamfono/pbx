@@ -83,7 +83,7 @@ async function finishLoginOrErrorPage(
 
 /**
  * `GET /oauth/callback`: the OIDC return handler for every configured SSO provider (§5.2 "Login
- * and SSO"). The browser presents the `zamfono_sso` cookie `/oauth/authorize` (Task 9) set when it
+ * and SSO"). The browser presents the `zamfono_sso` cookie `/oauth/authorize` set when it
  * called `startLogin`, sealing the nonce and PKCE verifier `startLogin` generated and never put on
  * the wire, and the outer authorize request, if any, alongside them; its `state` must equal the
  * query's, so a `code`/`state` pair copied off the browser that started the login is refused on

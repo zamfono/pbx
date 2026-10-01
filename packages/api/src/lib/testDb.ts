@@ -1,7 +1,7 @@
 import { nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-/** An in-memory, migrated database seeded with one `owner` user, for operation tests (Task 5). */
+/** An in-memory, migrated database seeded with one `owner` user, for operation tests. */
 export async function makeTestDb(): Promise<Db> {
   const db = openDb(':memory:');
   await migrateForTest(db);

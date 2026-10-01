@@ -8,7 +8,7 @@ const STATUS_NOT_FOUND = 404;
 
 /**
  * `DELETE /audio/{id}` (§5.9): soft-deletes an audio asset; the file stays on the media volume
- * during the undo window and is removed only by the daily purge job (Task 26/40/41).
+ * during the undo window and is removed only by the daily purge job.
  */
 export const deleteAudioAsset = defineOperation({
   name: 'audio.delete',

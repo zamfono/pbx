@@ -73,7 +73,7 @@ function parseInput(op: ErasedOperation, input: unknown): unknown {
 
 // Only `minRole` is enforced here. §5.3's own-scope rules (e.g. a `user` reading only their own
 // voicemails) have no field on `Operation` to declare them and are each operation's own concern,
-// inside its `run` (Tasks 20-26).
+// inside its `run`.
 function checkRole(op: ErasedOperation, actor: Actor): void {
   if (ROLE_RANK[actor.role] > ROLE_RANK[op.minRole]) {
     throw new OpError(STATUS_FORBIDDEN, 'forbidden');

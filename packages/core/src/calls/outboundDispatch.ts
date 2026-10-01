@@ -10,8 +10,6 @@ import type { DialAction } from '../routing/outbound.js';
 import { findForwardTarget, release, type Call } from './call.js';
 import { SIP_SERVICE_UNAVAILABLE } from './conclude.js';
 import { dialEmergency } from './emergency.js';
-// Task 31's own additions: dispatching to `features.ts`'s feature codes and `parking.ts`'s slot
-// retrieval.
 import { handleFeature } from './features.js';
 import { dialExternal } from './outboundExternal.js';
 import { retrieveParkedCall } from './parkingRetrieval.js';
@@ -21,7 +19,6 @@ import type { TrunkState } from './trunkState.js';
 
 const SIP_EXTENSION_NOT_FOUND = 404;
 
-// --- Task 31 ---
 /** Asterisk's generic "not a valid option" prompt, then a release (§9.3 table: an empty parking
  * slot's short error tone; feature-code entry outside a menu shares the same fixed prompt as
  * `menu.ts`'s own `defaultPrompt('invalid')`). */
@@ -39,7 +36,6 @@ async function playInvalidAndRelease(
   );
   await release(pipeline, call, SIP_EXTENSION_NOT_FOUND, 'failed');
 }
-// --- end Task 31 ---
 
 async function dispatchExtension(
   pipeline: Pipeline,
@@ -71,7 +67,6 @@ async function dispatchExtension(
     );
     return;
   }
-  // --- Task 31 ---
   // §10.1 step 3: a parking slot retrieves the call parked there, or plays the short error tone
   // when the slot is empty (§9.3 table).
   const presence = pipeline.deps.presence;
@@ -93,7 +88,6 @@ async function dispatchExtension(
     });
     await playInvalidAndRelease(pipeline, call);
   }
-  // --- end Task 31 ---
 }
 
 /** Dispatches a resolved dialled string (§10.1 "Outbound" steps 1-6) from `handleOutbound`. An
@@ -139,7 +133,7 @@ export async function dispatchAction(
     await dispatchExtension(pipeline, call, action);
     return;
   }
-  // --- Task 31 --- (action.kind === 'feature': §9.3 "Feature codes")
+  // `action.kind === 'feature'`: §9.3 "Feature codes".
   const presence = pipeline.deps.presence;
   if (presence === null) {
     call.log.event({
@@ -151,5 +145,4 @@ export async function dispatchAction(
     return;
   }
   await handleFeature(pipeline, presence, call, action.key, action.rest);
-  // --- end Task 31 ---
 }

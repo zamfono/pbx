@@ -1,7 +1,7 @@
 /**
  * The voicemail deposit's recording (§10.2 "Voicemail"): `POST /channels/{id}/record` on the
- * caller and the wait for Asterisk's outcome of it, split out of `voicemail.ts`, which owns the
- * deposit's flow, so both stay under the repository's `max-lines` lint rule.
+ * caller and the wait for Asterisk's outcome of it, its own module beside `voicemail.ts`, which
+ * owns the deposit's flow, so both stay under the repository's `max-lines` lint rule.
  */
 import { MS_PER_SECOND } from '@zamfono/shared';
 

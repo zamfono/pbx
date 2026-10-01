@@ -44,7 +44,7 @@ export type PropagationDeps = {
 
 const defaultDepsCache: { deps?: PropagationDeps } = {};
 
-/** `PropagationDeps` resolved from the environment, cached like `getDb()`, for the plan's `propagateConfig(db, kinds)` two-argument call sites. */
+/** `PropagationDeps` resolved from the environment, cached like `getDb()`, for the `propagateConfig(db, kinds)` two-argument call sites. */
 function defaultPropagationDeps(): PropagationDeps {
   defaultDepsCache.deps ??= {
     kr: keyringFromEnv(process.env),

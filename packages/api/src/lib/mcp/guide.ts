@@ -7,7 +7,7 @@ import { OpError } from '../ops/types.js';
 // The guide ships as `docs/guide/{*.md,recipes/*.md}` (§10.5). `import.meta.glob` bundles the
 // text into the server chunk at build time, so it ships inside the deployed tree regardless of
 // where the bundle ends up; an absent `docs/guide` at build time yields an empty topic and prompt
-// list (Task 42 adds the files).
+// list.
 const GUIDE_MODULES = import.meta.glob<string>(
   '../../../../../docs/guide/**/*.md',
   { query: '?raw', import: 'default', eager: true }

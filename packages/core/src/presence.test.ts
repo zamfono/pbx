@@ -170,7 +170,6 @@ describe('Presence', () => {
     });
   });
 
-  // --- Task 31 ---
   it('setCallState drives RINGING/INUSE hints and appends busy presence_log rows with the call counterpart', async () => {
     const userId = await seedUser(db);
     await seedDevice(db, userId, 'e102-dabc');
@@ -278,7 +277,6 @@ describe('Presence', () => {
       expect(state.presence.get(userId)?.status).toBe('available');
     });
   });
-  // --- end Task 31 ---
 
   it('the last computed hint wins even when an earlier PUT reaches Asterisk late (§9.3)', async () => {
     const userId = await seedUser(db);

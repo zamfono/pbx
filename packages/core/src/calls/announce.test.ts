@@ -107,10 +107,8 @@ describe('announce', () => {
       bus: new EventBus(),
       cdr,
       now: nowIso,
-      // --- Task 31 ---
       trunkState: null,
       presence: null
-      // --- end Task 31 ---
     });
   });
 
