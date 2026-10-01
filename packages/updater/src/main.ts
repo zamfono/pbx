@@ -6,7 +6,7 @@ import { inspectProject, type ComposeProject } from './docker.js';
 import { createReleases } from './releases.js';
 import { createRunner, type Runner } from './runner.js';
 import { createServer } from './server.js';
-import { stackVersion } from './stack.js';
+import { checkUpdate, stackVersion } from './stack.js';
 
 /**
  * The updater service (§6.3 "Updates"): the stack directory is mounted at `/stack`, the
@@ -85,6 +85,7 @@ createServer({
   token,
   releases: createReleases(),
   currentVersion: async () => stackVersion(STACK_DIR),
+  checkUpdate: async version => checkUpdate(STACK_DIR, version),
   runner,
   ...(unavailable === undefined ? {} : { unavailable })
 }).listen(Number(process.env.PORT ?? DEFAULT_PORT));

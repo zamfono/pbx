@@ -3,16 +3,10 @@ import http from 'node:http';
 
 import type { RunRequester, UpdaterStatus, UpdateState } from '@zamfono/shared';
 
-import {
-  compareVersions,
-  formatVersion,
-  isBreaking,
-  judgeUpdate,
-  parseVersion,
-  type Version
-} from './policy.js';
-import type { Releases } from './releases.js';
+import type { Release, Releases } from './releases.js';
 import type { Runner } from './runner.js';
+import type { UpdateVerdict } from './stack.js';
+import { formatVersion, parseVersion, type Version } from './version.js';
 
 /**
  * The updater's HTTP API on the stack's internal network (§6.3 "Updates"), no port published:
@@ -27,12 +21,16 @@ const STATUS_CONFLICT = 409;
 const STATUS_UNAVAILABLE = 503;
 const MAX_BODY_BYTES = 4096;
 const MAX_BY_LENGTH = 200;
+const PINS_NO_RELEASE =
+  'the stack directory pins no release; update it once with update.sh on the host';
 
 export type ServerDeps = {
   token: string;
   releases: Releases;
   /** The version the stack directory runs, read afresh on every request. */
   currentVersion: () => Promise<Version | undefined>;
+  /** `update.sh --check`'s verdict on an update to a release (stack.ts), the one judge of it. */
+  checkUpdate: (version: string) => Promise<UpdateVerdict>;
   /** `undefined` when the updater could not learn its Compose project, with `unavailable` why. */
   runner: Runner | undefined;
   unavailable?: string;
@@ -82,22 +80,9 @@ async function describeStatus(deps: ServerDeps): Promise<UpdaterStatus> {
     last: deps.runner?.current() ?? { state: 'idle' as const },
     ...(deps.unavailable === undefined ? {} : { unavailable: deps.unavailable })
   };
+  let latest: Release | undefined;
   try {
-    const latest = await deps.releases.latest();
-    const newer =
-      latest !== undefined &&
-      current !== undefined &&
-      compareVersions(latest.version, current) > 0;
-    const breaking = newer && isBreaking(current, latest.version);
-    return {
-      ...base,
-      latest:
-        latest === undefined
-          ? null
-          : { ...latest, version: formatVersion(latest.version) },
-      updatable: newer && !breaking && deps.runner !== undefined,
-      breaking
-    };
+    latest = await deps.releases.latest();
   } catch (error) {
     return {
       ...base,
@@ -107,6 +92,32 @@ async function describeStatus(deps: ServerDeps): Promise<UpdaterStatus> {
       breaking: false
     };
   }
+  const verdict =
+    latest === undefined || current === undefined
+      ? undefined
+      : await deps.checkUpdate(formatVersion(latest.version));
+  return {
+    ...base,
+    latest:
+      latest === undefined
+        ? null
+        : { ...latest, version: formatVersion(latest.version) },
+    updatable: verdict === 'update' && deps.runner !== undefined,
+    breaking: verdict === 'breaking'
+  };
+}
+
+/** Why the updater does not take the stack from `current` to `to`, by `update.sh --check`'s verdict. */
+function refusal(
+  verdict: Exclude<UpdateVerdict, 'update'>,
+  current: string,
+  to: string
+): string {
+  return {
+    breaking: `${current} to ${to} is a breaking update: read its upgrade notes and run update.sh on the host`,
+    notNewer: `${to} is not newer than ${current}, which the stack runs`,
+    noRelease: PINS_NO_RELEASE
+  }[verdict];
 }
 
 /** Who `body` says asks for the run, recorded with it; `undefined` when it says nothing. */
@@ -142,10 +153,7 @@ async function update(deps: ServerDeps, body: unknown): Promise<UpdateState> {
   }
   const current = await deps.currentVersion();
   if (current === undefined) {
-    throw new HttpError(
-      STATUS_CONFLICT,
-      'the stack directory pins no release; update it once with update.sh on the host'
-    );
+    throw new HttpError(STATUS_CONFLICT, PINS_NO_RELEASE);
   }
   const requester = requesterOf(body);
   const asked = (body as { version?: unknown }).version;
@@ -166,15 +174,15 @@ async function update(deps: ServerDeps, body: unknown): Promise<UpdateState> {
         : `there is no published release ${formatVersion(askedVersion)}`
     );
   }
-  const verdict = judgeUpdate(current, release.version);
-  if (!verdict.ok) {
-    throw new HttpError(STATUS_CONFLICT, verdict.message);
+  const to = formatVersion(release.version);
+  const verdict = await deps.checkUpdate(to);
+  if (verdict !== 'update') {
+    throw new HttpError(
+      STATUS_CONFLICT,
+      refusal(verdict, formatVersion(current), to)
+    );
   }
-  await deps.runner.start(
-    formatVersion(current),
-    formatVersion(release.version),
-    requester
-  );
+  await deps.runner.start(formatVersion(current), to, requester);
   return deps.runner.current();
 }
 

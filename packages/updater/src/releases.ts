@@ -1,4 +1,4 @@
-import { parseVersion, type Version } from './policy.js';
+import { parseVersion, type Version } from './version.js';
 
 /**
  * The project's GitHub releases, the only versions the updater installs (§6.3 "Updates"). The

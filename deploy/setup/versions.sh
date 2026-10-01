@@ -17,8 +17,7 @@ version_cmp() {
 }
 
 # breaking FROM TO — RELEASING.md's policy: a new major from 1.0.0 on, a new minor while 0.x.
-# With version_cmp, what the updater's judgeUpdate also decides; update-policy.tsv holds the cases
-# both are tested against, and the updater's run is refused here whatever it judged.
+# With version_cmp, the one implementation of it: the updater asks `update.sh --check`.
 # shellcheck disable=SC2206 # the split on IFS=. is the point
 breaking() {
   local IFS=.

@@ -8,9 +8,12 @@
 #
 #   ./update.sh [--yes] [--check] [VERSION]
 #
-# VERSION is X.Y.Z; without it, the latest release. --check only says what an update would do.
-# A release that is breaking by RELEASING.md's policy (a new major, or a new minor while 0.x)
-# shows its upgrade notes and asks first; --yes answers for a run without a terminal.
+# VERSION is X.Y.Z; without it, the latest release. A release that is breaking by RELEASING.md's
+# policy (a new major, or a new minor while 0.x) shows its upgrade notes and asks first; --yes
+# answers for a run without a terminal. --check only says what an update would do, and exits
+# with its verdict, which the updater reads: 0 the update is allowed, 10 it is breaking, 11
+# VERSION is not newer than the release this directory runs, 12 the directory names no release;
+# any other status is a failure.
 #
 # Beyond the flags, from the environment:
 #   ZAMFONO_RUNTIME         docker | podman, when both are installed
@@ -41,6 +44,11 @@ WAIT_SECONDS=180
 # Names the release an update installed until its stack reports healthy, so that a rerun after a
 # failure there finishes that update rather than saying it is already on it.
 PENDING=.update-pending
+# --check's verdicts, its exit status.
+CHECK_UPDATE=0
+CHECK_BREAKING=10
+CHECK_NOT_NEWER=11
+CHECK_NO_RELEASE=12
 
 assume_yes=
 check_only=
@@ -50,7 +58,7 @@ for arg in "$@"; do
     --yes) assume_yes=1 ;;
     --check) check_only=1 ;;
     -h | --help)
-      sed -n '2,19p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
+      sed -n '2,22p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     -*) fail "unknown option $arg" ;;
@@ -195,30 +203,46 @@ main() {
   services=()
   [[ -z $updater ]] || services=("${STACK_SERVICES[@]}")
   local from
-  from=$(current_version)
+  if ! from=$(current_version); then
+    [[ -z $check_only ]] || exit "$CHECK_NO_RELEASE"
+    exit 1
+  fi
   [[ -n $target ]] || target=$(latest_version)
   v_version "$target" || fail "$target is not a release version (X.Y.Z)"
 
   case $(version_cmp "$target" "$from") in
     0)
-      [[ $(cat "$PENDING" 2>/dev/null) == "$from" ]] || { echo "Already on $from." && exit 0; }
+      if [[ $(cat "$PENDING" 2>/dev/null) != "$from" ]]; then
+        echo "Already on $from."
+        [[ -z $check_only ]] || exit "$CHECK_NOT_NEWER"
+        exit 0
+      fi
       echo "The update to $from stopped before its stack reported healthy; finishing it."
-      [[ -z $check_only ]] || exit 0
+      [[ -z $check_only ]] || exit "$CHECK_NOT_NEWER"
       outcome_start '' "$from"
       recreate_stack
       rm -f "$PENDING"
       echo "Updated to $from. What changed: CHANGELOG.md, or $REPO/releases/tag/v$from"
       exit 0
       ;;
-    -1) fail "$target is older than $from: migrations only go forward (README.md, step 8)" ;;
+    -1)
+      if [[ -n $check_only ]]; then
+        echo "$target is older than $from"
+        exit "$CHECK_NOT_NEWER"
+      fi
+      fail "$target is older than $from: migrations only go forward (README.md, step 8)"
+      ;;
   esac
   local kind=update
+  local verdict=$CHECK_UPDATE
   if breaking "$from" "$target"; then
     kind='breaking update'
-    [[ -z $updater ]] || fail "$from to $target is a breaking update; run update.sh on the host"
+    verdict=$CHECK_BREAKING
   fi
   echo "$from -> $target ($kind)"
-  [[ -z $check_only ]] || exit 0
+  [[ -z $check_only ]] || exit "$verdict"
+  [[ $kind == update || -z $updater ]] ||
+    fail "$from to $target is a breaking update; run update.sh on the host"
   outcome_start "$from" "$target"
 
   work=$(mktemp -d)

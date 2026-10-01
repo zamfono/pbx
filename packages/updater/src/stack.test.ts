@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { stackVersion } from './stack.js';
+import { checkUpdate, stackVersion } from './stack.js';
 
 async function stackDir(files: Record<string, string>): Promise<string> {
   const dir = await mkdtemp(path.join(tmpdir(), 'zamfono-stack-'));
@@ -38,5 +38,29 @@ describe('stackVersion', () => {
     const dir = await stackDir({ VERSION: '0.0.6\n' });
     await mkdir(path.join(dir, '.env'));
     await expect(stackVersion(dir)).rejects.toThrow(/EISDIR/u);
+  });
+});
+
+/** A stand-in for update.sh that exits with `code`, after a word on stderr, when asked as --check by the updater. */
+async function scriptExiting(code: number): Promise<string> {
+  return stackDir({
+    'update.sh': `[ "$1 $ZAMFONO_UPDATER" = '--check 1' ] || exit 99\necho 'said so' >&2\nexit ${String(code)}\n`
+  });
+}
+
+describe('checkUpdate', () => {
+  it.each([
+    [0, 'update'],
+    [10, 'breaking'],
+    [11, 'notNewer'],
+    [12, 'noRelease']
+  ])('reads exit status %i as %s', async (code, verdict) => {
+    expect(await checkUpdate(await scriptExiting(code), '0.0.7')).toBe(verdict);
+  });
+
+  it('fails on any other status, with the script’s message', async () => {
+    await expect(checkUpdate(await scriptExiting(1), '0.0.7')).rejects.toThrow(
+      'update.sh --check 0.0.7 exited 1: said so'
+    );
   });
 });

@@ -131,6 +131,11 @@ why the specified behaviour changed; the commit history, how.
   without `-f`. The Podman boot unit `setup.sh` installs runs `podman compose up -d`; a unit
   installed earlier keeps working as it is. `update.sh` makes the link for a stack that has none,
   from the overlay its boot unit names, else from whether `.env` sets `STACK_IPV4`.
+- `update.sh --check` says what an update would do as before, and its exit status now carries
+  the verdict: 0 for an update it would install, 10 for a breaking one, 11 for a release that is
+  not newer than the stack's, 12 when the stack directory names no release, anything else for an
+  error. `system.update` and `system.info` take their verdict from it, so the two can no longer
+  disagree on which releases are breaking.
 
 ### Fixed
 

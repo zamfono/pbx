@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-01 · §6.3 Updates.** `update.sh --check <version>` answers by its exit status, 0 for an update the updater may install, 10 for a breaking one, 11 for a release not newer than the stack's and 12 for a directory that names no release, and the updater asks it instead of judging the release itself.
+*Why:* found in the design review: the update policy was implemented twice, in `update.sh` and in the updater, and held together by a shared test table.
+
 **2026-10-01 · §6.2.1, §6.2.2, §6.3 Compose stack, Updates, Continuous replication.** `setup.sh` links the mode's attachment overlay as `compose.override.yaml`, which Compose reads beside `compose.yaml` on its own, so the boot unit, `update.sh`, the updater and every printed command run a plain `compose up -d`; `update.sh` makes the link for a stack that has none, from the overlay its boot unit names, else from whether `.env` sets `STACK_IPV4`. The updater learns only its Compose project and directory from its labels.
 *Why:* found in the design review: the overlay choice was stored only in a unit file's command line and parsed back.
 

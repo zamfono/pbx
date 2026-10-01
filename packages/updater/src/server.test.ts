@@ -3,10 +3,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import type { UpdateState } from '@zamfono/shared';
 
-import type { Version } from './policy.js';
 import type { Release, Releases } from './releases.js';
 import type { Runner } from './runner.js';
 import { createServer, type ServerDeps } from './server.js';
+import type { UpdateVerdict } from './stack.js';
+import type { Version } from './version.js';
 
 const TOKEN = 'secret-token';
 const STATUS_OK = 200;
@@ -85,11 +86,20 @@ async function call(
   };
 }
 
+/** update.sh --check's verdicts on the stack at 0.0.6, which the tests stub. */
+const VERDICTS: Record<string, UpdateVerdict> = {
+  '0.0.5': 'notNewer',
+  '0.0.6': 'notNewer',
+  '0.0.7': 'update',
+  '0.1.0': 'breaking'
+};
+
 function deps(overrides: Partial<ServerDeps> = {}): ServerDeps {
   return {
     token: TOKEN,
     releases: fakeReleases([0, 0, 7]),
     currentVersion: () => Promise.resolve([0, 0, 6]),
+    checkUpdate: version => Promise.resolve(VERDICTS[version] ?? 'update'),
     runner: fakeRunner(),
     ...overrides
   };
