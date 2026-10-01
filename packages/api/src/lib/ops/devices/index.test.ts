@@ -2,8 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { encrypt, keyringFromEnv } from '../../secretbox.js';
-import { makeTestDb } from '../../testDb.js';
+import { encrypt, keyringFromEnv } from '#lib/secretbox.js';
+import { makeTestDb } from '#lib/testDb.js';
+
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';
 

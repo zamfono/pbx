@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { activeRingotelProvider } from '../../provisioning/index.js';
+import { activeRingotelProvider } from '#lib/provisioning/index.js';
+
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
 import { assertDeviceScope, liveDevice } from './_shared.js';

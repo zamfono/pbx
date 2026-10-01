@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db, type ReloadKind } from '@zamfono/shared';
 
-import { makeTestDb } from '../../testDb.js';
+import { makeTestDb } from '#lib/testDb.js';
+
 import type { HoursWire } from '../hours/get.js';
 import { onPropagate, runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';

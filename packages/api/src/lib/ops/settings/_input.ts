@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 import { isIanaTimeZone } from '@zamfono/shared';
 
-import { isCronExpression } from '../../jobs/cronExpression.js';
+import { isCronExpression } from '#lib/jobs/cronExpression.js';
+
 import { targetInputSchema } from '../dids/_shared.js';
 import { CODECS } from '../trunks/_shared.js';
 import {

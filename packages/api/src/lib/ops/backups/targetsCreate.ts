@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
-import { encrypt, keyringFromEnv } from '../../secretbox.js';
+import { encrypt, keyringFromEnv } from '#lib/secretbox.js';
+
 import { recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
 import {

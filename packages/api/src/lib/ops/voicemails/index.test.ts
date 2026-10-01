@@ -6,8 +6,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import type { CoreClient } from '../../coreClient.js';
-import { makeTestDb } from '../../testDb.js';
+import type { CoreClient } from '#lib/coreClient.js';
+import { makeTestDb } from '#lib/testDb.js';
+
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';
 import { setCoreClientForTest } from './_shared.js';

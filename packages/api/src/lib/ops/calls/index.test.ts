@@ -8,9 +8,10 @@ import {
   type StateResponse
 } from '@zamfono/shared';
 
-import type { CoreClient } from '../../coreClient.js';
-import { handleRest } from '../../rest.js';
-import { makeTestDb } from '../../testDb.js';
+import type { CoreClient } from '#lib/coreClient.js';
+import { handleRest } from '#lib/rest.js';
+import { makeTestDb } from '#lib/testDb.js';
+
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';
 import { setCoreClientForTest } from './_shared.js';

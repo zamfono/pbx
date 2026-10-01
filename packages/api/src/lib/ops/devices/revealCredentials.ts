@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { decrypt, keyringFromEnv } from '../../secretbox.js';
+import { decrypt, keyringFromEnv } from '#lib/secretbox.js';
+
 import { setUndoable } from '../runner.js';
 import { defineOperation } from '../types.js';
 import { liveDevice } from './_shared.js';

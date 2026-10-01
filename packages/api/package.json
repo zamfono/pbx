@@ -3,6 +3,9 @@
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
+  "imports": {
+    "#*": "./src/*"
+  },
   "scripts": {
     "dev": "vite dev",
     "build": "vite build && esbuild src/server.ts --bundle --platform=node --format=esm --packages=external --outfile=build/server.js",

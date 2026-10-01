@@ -1,7 +1,8 @@
-import { buildBranchProvision } from '../../provisioning/ringotel.js';
-import type { RingotelClient } from '../../provisioning/ringotelClient.js';
-import { branchBlfEntries } from '../../provisioning/ringotelRoster.js';
-import { provisionExistingDevices } from '../../provisioning/ringotelUser.js';
+import { buildBranchProvision } from '#lib/provisioning/ringotel.js';
+import type { RingotelClient } from '#lib/provisioning/ringotelClient.js';
+import { branchBlfEntries } from '#lib/provisioning/ringotelRoster.js';
+import { provisionExistingDevices } from '#lib/provisioning/ringotelUser.js';
+
 import { reportPush } from '../devices/_ringotelPush.js';
 import { loadParkingSlots } from '../parking/_shared.js';
 import { propagate, recordChange, setUndoable } from '../runner.js';

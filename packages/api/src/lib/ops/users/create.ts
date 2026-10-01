@@ -3,9 +3,10 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
-import { issueResetToken } from '../../auth/tokens.js';
-import { sendMail } from '../../mail/index.js';
-import { keyringFromEnv } from '../../secretbox.js';
+import { issueResetToken } from '#lib/auth/tokens.js';
+import { sendMail } from '#lib/mail/index.js';
+import { keyringFromEnv } from '#lib/secretbox.js';
+
 import { pushRoster } from '../roster.js';
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, type Context } from '../types.js';

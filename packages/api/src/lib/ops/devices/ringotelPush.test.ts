@@ -5,9 +5,10 @@ import { newId, nowIso, type Db } from '@zamfono/shared';
 import {
   installRingotelFake,
   type RingotelFake
-} from '../../provisioning/ringotelFake.js';
-import { encrypt, keyringFromEnv } from '../../secretbox.js';
-import { makeTestDb } from '../../testDb.js';
+} from '#lib/provisioning/ringotelFake.js';
+import { encrypt, keyringFromEnv } from '#lib/secretbox.js';
+import { makeTestDb } from '#lib/testDb.js';
+
 import { onPropagate } from '../propagationHooks.js';
 import { runOperation, type RunInput } from '../runner.js';
 

@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '../../testDb.js';
+import { makeTestDb } from '#lib/testDb.js';
+
 import type { HoursWire } from '../hours/get.js';
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';

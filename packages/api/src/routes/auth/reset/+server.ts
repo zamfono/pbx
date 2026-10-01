@@ -1,8 +1,8 @@
 import type { RequestEvent } from '@sveltejs/kit';
 
-import { redeemPasswordReset } from '../../../lib/auth/passwordReset.js';
-import { getDb } from '../../../lib/db.js';
-import { problem } from '../../../lib/problem.js';
+import { redeemPasswordReset } from '#lib/auth/passwordReset.js';
+import { getDb } from '#lib/db.js';
+import { problem } from '#lib/problem.js';
 
 const STATUS_OK = 200;
 const STATUS_BAD_REQUEST = 400;

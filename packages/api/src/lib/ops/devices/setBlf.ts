@@ -3,7 +3,8 @@ import { z } from 'zod';
 
 import type { DB } from '@zamfono/shared';
 
-import { activeRingotelProvider } from '../../provisioning/index.js';
+import { activeRingotelProvider } from '#lib/provisioning/index.js';
+
 import { recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import {

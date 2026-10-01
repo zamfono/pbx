@@ -1,7 +1,8 @@
 import { error } from '@sveltejs/kit';
 
-import { getDb } from '../../../lib/db.js';
-import { dictionaryFor } from '../../../lib/i18n/index.js';
+import { getDb } from '#lib/db.js';
+import { dictionaryFor } from '#lib/i18n/index.js';
+
 import type { PageServerLoad } from './$types.js';
 
 const SETTINGS_ROW_ID = 1;

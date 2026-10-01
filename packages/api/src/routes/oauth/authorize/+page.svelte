@@ -1,9 +1,10 @@
 <script lang="ts">
-  import '../../../app.css';
+  import '#app.css';
 
   import { resolve } from '$app/paths';
 
-  import { format } from '../../../lib/i18n/index.js';
+  import { format } from '#lib/i18n/index.js';
+
   import type { PageData } from './$types.js';
   import { consent as consentForm, login } from './authorize.remote.js';
 

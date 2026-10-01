@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { encrypt, keyringFromEnv } from '../../secretbox.js';
+import { encrypt, keyringFromEnv } from '#lib/secretbox.js';
+
 import { orBefore } from '../patch.js';
 import { recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';

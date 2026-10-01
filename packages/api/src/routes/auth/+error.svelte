@@ -1,10 +1,10 @@
 <script lang="ts">
-  import '../../app.css';
+  import '#app.css';
 
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
 
-  import { dictionaryFor } from '../../lib/i18n/index.js';
+  import { dictionaryFor } from '#lib/i18n/index.js';
 
   // The error boundary of the `/auth/*` pages (§5.2 "Authentication pages"): the forgot-password
   // form's 404 without a relay and 429 past the §5.5 address limit, among others, render here in

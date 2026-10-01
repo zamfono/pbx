@@ -2,13 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '../../testDb.js';
+import { makeTestDb } from '#lib/testDb.js';
+
 import { sipUsernameOrFresh, uniqueSipUsername } from './_sipUsername.js';
 
 // The slugs the generator draws, in order, so a collision is reproducible.
 const slugs = vi.hoisted(() => ({ next: [] as string[] }));
-vi.mock('../../sip.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../../sip.js')>()),
+vi.mock('#lib/sip.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('#lib/sip.js')>()),
   newSlug: () => slugs.next.shift() ?? 'zzzzz'
 }));
 

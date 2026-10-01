@@ -1,9 +1,10 @@
 import pino from 'pino';
 import { z } from 'zod';
 
-import { issueResetToken } from '../../auth/tokens.js';
-import { sendMail } from '../../mail/index.js';
-import { keyringFromEnv } from '../../secretbox.js';
+import { issueResetToken } from '#lib/auth/tokens.js';
+import { sendMail } from '#lib/mail/index.js';
+import { keyringFromEnv } from '#lib/secretbox.js';
+
 import { setUndoable } from '../runner.js';
 import { defineOperation } from '../types.js';
 import { mailDb, setupLinkFor } from './_setupMail.js';

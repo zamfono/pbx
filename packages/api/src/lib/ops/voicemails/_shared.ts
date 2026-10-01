@@ -4,9 +4,10 @@ import { sql, type Selectable, type Transaction } from 'kysely';
 
 import { mwiMailboxOf, type DB, type MwiMailbox } from '@zamfono/shared';
 
-import { transcodeForDownload } from '../../audio/transcode.js';
-import { createCoreClient, type CoreClient } from '../../coreClient.js';
-import { mediaDirFromEnv } from '../../mediaDir.js';
+import { transcodeForDownload } from '#lib/audio/transcode.js';
+import { createCoreClient, type CoreClient } from '#lib/coreClient.js';
+import { mediaDirFromEnv } from '#lib/mediaDir.js';
+
 import { OpError, type Role } from '../types.js';
 
 const STATUS_NOT_FOUND = 404;

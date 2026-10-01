@@ -1,15 +1,15 @@
 import process from 'node:process';
 
-import { fetchCoreHealth } from '../../lib/coreClient.js';
-import { getDb } from '../../lib/db.js';
+import { fetchCoreHealth } from '#lib/coreClient.js';
+import { getDb } from '#lib/db.js';
 import {
   apiHealth,
   countKeyRotationRemaining,
   healthStatus,
   type CoreReachability
-} from '../../lib/health.js';
-import { certSyncStatus } from '../../lib/jobs/certSync.js';
-import { keyringFromEnv, type Keyring } from '../../lib/secretbox.js';
+} from '#lib/health.js';
+import { certSyncStatus } from '#lib/jobs/certSync.js';
+import { keyringFromEnv, type Keyring } from '#lib/secretbox.js';
 
 const keyringCache: { resolved: boolean; keyring: Keyring | null } = {
   resolved: false,

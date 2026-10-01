@@ -5,10 +5,11 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { newId, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { verifyPassword } from '../../../lib/auth/password.js';
-import { MIN_PASSWORD_LENGTH } from '../../../lib/auth/passwordPolicy.js';
-import { hashToken, issueResetToken } from '../../../lib/auth/tokens.js';
-import { getDb } from '../../../lib/db.js';
+import { verifyPassword } from '#lib/auth/password.js';
+import { MIN_PASSWORD_LENGTH } from '#lib/auth/passwordPolicy.js';
+import { hashToken, issueResetToken } from '#lib/auth/tokens.js';
+import { getDb } from '#lib/db.js';
+
 import { POST } from '../reset/+server.js';
 import { load } from './+page.server.js';
 import { setPassword } from './setPassword.remote.js';

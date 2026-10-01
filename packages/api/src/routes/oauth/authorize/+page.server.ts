@@ -4,14 +4,12 @@ import {
   resolveClient,
   settingsInfo,
   ssoInfo
-} from '../../../lib/auth/authorizeRequest.js';
-import {
-  CONSENT_COOKIE_NAME,
-  unsealConsent
-} from '../../../lib/auth/consent.js';
-import { getDb } from '../../../lib/db.js';
-import { dictionaryFor } from '../../../lib/i18n/index.js';
-import { keyringFromEnv } from '../../../lib/secretbox.js';
+} from '#lib/auth/authorizeRequest.js';
+import { CONSENT_COOKIE_NAME, unsealConsent } from '#lib/auth/consent.js';
+import { getDb } from '#lib/db.js';
+import { dictionaryFor } from '#lib/i18n/index.js';
+import { keyringFromEnv } from '#lib/secretbox.js';
+
 import type { PageServerLoad } from './$types.js';
 import { consentForRequest } from './consentSubmit.js';
 

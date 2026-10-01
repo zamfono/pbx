@@ -1,4 +1,5 @@
-import { encrypt, keyringFromEnv } from '../../secretbox.js';
+import { encrypt, keyringFromEnv } from '#lib/secretbox.js';
+
 import { recordChange } from '../runner.js';
 import type { Context } from '../types.js';
 

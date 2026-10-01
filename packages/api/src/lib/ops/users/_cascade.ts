@@ -1,6 +1,7 @@
-import { revokeUserTokens } from '../../auth/tokens.js';
-import { activeRingotelProvider } from '../../provisioning/index.js';
-import type { DeviceRow } from '../../provisioning/types.js';
+import { revokeUserTokens } from '#lib/auth/tokens.js';
+import { activeRingotelProvider } from '#lib/provisioning/index.js';
+import type { DeviceRow } from '#lib/provisioning/types.js';
+
 import { loadDroppedBlfKeys } from '../devices/_shared.js';
 import { pushRoster } from '../roster.js';
 import { propagate, recordChange } from '../runner.js';

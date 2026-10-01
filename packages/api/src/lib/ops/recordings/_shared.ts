@@ -4,8 +4,9 @@ import type { Selectable, Transaction } from 'kysely';
 
 import type { DB } from '@zamfono/shared';
 
-import { transcodeForDownload } from '../../audio/transcode.js';
-import { mediaDirFromEnv } from '../../mediaDir.js';
+import { transcodeForDownload } from '#lib/audio/transcode.js';
+import { mediaDirFromEnv } from '#lib/mediaDir.js';
+
 import { OpError } from '../types.js';
 
 const STATUS_NOT_FOUND = 404;

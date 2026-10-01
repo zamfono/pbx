@@ -2,8 +2,9 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
-import { encrypt, keyringFromEnv } from '../../secretbox.js';
-import { newSipPassword } from '../../sip.js';
+import { encrypt, keyringFromEnv } from '#lib/secretbox.js';
+import { newSipPassword } from '#lib/sip.js';
+
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import { userExtension } from '../users/_extensions.js';

@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 import type { LiveCall } from '@zamfono/shared';
 
-import { decodeCursor, encodeCursor } from '../../pagination.js';
+import { decodeCursor, encodeCursor } from '#lib/pagination.js';
+
 import { instantInput, toStoredInstant } from '../instantInput.js';
 import { defineOperation, OpError } from '../types.js';
 import { getCoreClient, toCallOut } from './_shared.js';

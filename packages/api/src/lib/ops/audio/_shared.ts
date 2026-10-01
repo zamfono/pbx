@@ -2,7 +2,8 @@ import type { Selectable, Transaction } from 'kysely';
 
 import type { DB } from '@zamfono/shared';
 
-import type { AudioKind } from '../../audio/types.js';
+import type { AudioKind } from '#lib/audio/types.js';
+
 import { findForwardTargetOwners } from '../forwardTargetOwners.js';
 import { OpError } from '../types.js';
 

@@ -5,8 +5,9 @@
  * that, because it already chooses between recovering a user deleted within Ringotel's own 24-hour
  * window and creating a fresh one after it.
  */
-import type { DeviceRow } from '../../provisioning/types.js';
-import { decrypt, keyringFromEnv } from '../../secretbox.js';
+import type { DeviceRow } from '#lib/provisioning/types.js';
+import { decrypt, keyringFromEnv } from '#lib/secretbox.js';
+
 import { pushToRingotel } from '../devices/_ringotelPush.js';
 import type { Context } from '../types.js';
 

@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { newId, type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '../../testDb.js';
+import { makeTestDb } from '#lib/testDb.js';
+
 import { runOperation, type RunInput } from '../runner.js';
 import { OpError } from '../types.js';
 

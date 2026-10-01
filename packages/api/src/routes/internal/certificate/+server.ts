@@ -1,6 +1,6 @@
 import type { RequestEvent } from '@sveltejs/kit';
 
-import { getCertSyncScheduler } from '../../../lib/jobs/certSync.js';
+import { getCertSyncScheduler } from '#lib/jobs/certSync.js';
 
 const STATUS_NOT_FOUND = 404;
 const STATUS_ACCEPTED = 202;

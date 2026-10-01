@@ -1,6 +1,7 @@
 import type { Db } from '@zamfono/shared';
 
-import { errorMessage } from '../../errors.js';
+import { errorMessage } from '#lib/errors.js';
+
 import { OpError } from '../types.js';
 import {
   updaterClient,

@@ -5,7 +5,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { newId, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { POST } from '../../routes/auth/reset/+server.js';
+import { POST } from '#routes/auth/reset/+server.js';
+
 import { getDb } from '../db.js';
 import { hashToken, issueRefresh, issueResetToken } from './tokens.js';
 

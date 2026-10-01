@@ -5,7 +5,7 @@ const STATUS_NOT_FOUND = 404;
 const STATUS_ACCEPTED = 202;
 
 const notify = vi.fn();
-vi.mock('../../../lib/jobs/certSync.js', () => ({
+vi.mock('#lib/jobs/certSync.js', () => ({
   getCertSyncScheduler: () => ({
     status: () => 'ok',
     notify,

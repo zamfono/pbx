@@ -5,7 +5,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { newId, nowIso, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { load } from '../../routes/auth/forgot/+page.server.js';
+import { load } from '#routes/auth/forgot/+page.server.js';
+
 import { getDb } from '../db.js';
 
 process.env.DB_FILE = ':memory:';

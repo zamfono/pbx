@@ -6,12 +6,13 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { newId, nowIso, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { load } from '../../routes/oauth/authorize/+page.server.js';
+import { load } from '#routes/oauth/authorize/+page.server.js';
 import {
   approveConsentSubmit,
   denyConsentSubmit
-} from '../../routes/oauth/authorize/consentSubmit.js';
-import { loginSubmit } from '../../routes/oauth/authorize/loginSubmit.js';
+} from '#routes/oauth/authorize/consentSubmit.js';
+import { loginSubmit } from '#routes/oauth/authorize/loginSubmit.js';
+
 import { getDb } from '../db.js';
 import { accountLockedUntil } from '../ops/users/_accountLock.js';
 import { keyringFromEnv } from '../secretbox.js';

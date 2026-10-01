@@ -2,22 +2,23 @@ import process from 'node:process';
 import { redirect, type RequestEvent } from '@sveltejs/kit';
 import { z } from 'zod';
 
-import { requiredOrigin } from '../../../lib/auth/authorizationResponse.js';
+import { requiredOrigin } from '#lib/auth/authorizationResponse.js';
 import {
   AuthorizePayloadSchema,
   lookupUser,
   paramsFromPayload,
   resolveClient,
   settingsInfo
-} from '../../../lib/auth/authorizeRequest.js';
-import { authCodeStore } from '../../../lib/auth/codes.js';
-import { setConsentCookie } from '../../../lib/auth/consent.js';
-import { loginRedirect } from '../../../lib/auth/loginRedirect.js';
-import { verifyPassword } from '../../../lib/auth/password.js';
-import { getDb } from '../../../lib/db.js';
-import { dictionaryFor } from '../../../lib/i18n/index.js';
-import { accountLockKey } from '../../../lib/ops/users/_accountLock.js';
-import { keyringFromEnv } from '../../../lib/secretbox.js';
+} from '#lib/auth/authorizeRequest.js';
+import { authCodeStore } from '#lib/auth/codes.js';
+import { setConsentCookie } from '#lib/auth/consent.js';
+import { loginRedirect } from '#lib/auth/loginRedirect.js';
+import { verifyPassword } from '#lib/auth/password.js';
+import { getDb } from '#lib/db.js';
+import { dictionaryFor } from '#lib/i18n/index.js';
+import { accountLockKey } from '#lib/ops/users/_accountLock.js';
+import { keyringFromEnv } from '#lib/secretbox.js';
+
 import { loginLimiter } from './loginLimiter.js';
 
 const STATUS_FOUND = 302;

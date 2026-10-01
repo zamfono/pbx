@@ -7,8 +7,9 @@ import {
   sendMail,
   type AnyMailRequest,
   type Language
-} from '../../mail/index.js';
-import { keyringFromEnv } from '../../secretbox.js';
+} from '#lib/mail/index.js';
+import { keyringFromEnv } from '#lib/secretbox.js';
+
 import { setUndoable } from '../runner.js';
 import { defineOperation } from '../types.js';
 import { kindSchema, tenantLanguage } from './_shared.js';

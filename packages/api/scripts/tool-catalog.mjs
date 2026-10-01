@@ -35,16 +35,17 @@ const outfile = path.join(here, '.tool-catalog.generated.mjs');
 const globShim = path.join(here, 'viteGlobShim.mjs');
 const WORKSPACE_PREFIX = '@zamfono/';
 
-// Bundles this monorepo's own `.ts` sources (ops/* and @zamfono/shared, both on the ".js"
-// specifier / ".ts" file NodeNext convention `node` cannot resolve on its own) while leaving
-// every real npm package a bare import, so the result stays small and native modules such as
-// `sodium-native` are loaded normally instead of esbuild trying to inline their bindings.
+// Bundles this monorepo's own `.ts` sources (ops/* through relative and `#…` subpath imports,
+// and @zamfono/shared, all on the ".js" specifier / ".ts" file NodeNext convention `node` cannot
+// resolve on its own) while leaving every real npm package a bare import, so the result stays
+// small and native modules such as `sodium-native` are loaded normally instead of esbuild trying
+// to inline their bindings.
 /** @type {import('esbuild').Plugin} */
 const externalizeNpmPackages = {
   name: 'externalize-npm-packages',
   setup(pluginBuild) {
     // eslint-disable-next-line require-unicode-regexp -- esbuild compiles this filter as a Go regexp, which rejects the JS u-flag prefix
-    pluginBuild.onResolve({ filter: /^[^./]/ }, args =>
+    pluginBuild.onResolve({ filter: /^[^./#]/ }, args =>
       args.path.startsWith(WORKSPACE_PREFIX)
         ? undefined
         : { path: args.path, external: true }

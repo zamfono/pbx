@@ -1,6 +1,7 @@
 import type { Db } from '@zamfono/shared';
 
-import { getDb } from '../../db.js';
+import { getDb } from '#lib/db.js';
+
 import { OpError, type Context } from '../types.js';
 
 const STATUS_SERVICE_UNAVAILABLE = 503;

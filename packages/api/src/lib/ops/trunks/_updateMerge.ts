@@ -1,6 +1,7 @@
 import type { DiversionPolicy } from '@zamfono/shared';
 
-import { encrypt, keyringFromEnv } from '../../secretbox.js';
+import { encrypt, keyringFromEnv } from '#lib/secretbox.js';
+
 import type {
   AuthMode,
   CallerIdHeader,

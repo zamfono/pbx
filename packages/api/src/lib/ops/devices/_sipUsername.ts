@@ -2,7 +2,7 @@ import type { Transaction } from 'kysely';
 
 import type { DB } from '@zamfono/shared';
 
-import { newSlug, sipUsername } from '../../sip.js';
+import { newSlug, sipUsername } from '#lib/sip.js';
 
 // §11.2 `devices_sip_username` (unique among live devices): a 5-character slug drawn from 36
 // characters gives ~60M combinations per extension, so a handful of retries clears the rare

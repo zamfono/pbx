@@ -9,9 +9,10 @@ import {
   type ZamfonoVersion
 } from '@zamfono/shared';
 
-import { errorMessage } from '../../errors.js';
-import { isProfilePending } from '../../provisioning/profilePending.js';
-import { stackDomain, stackIpv4 } from '../../stackAddress.js';
+import { errorMessage } from '#lib/errors.js';
+import { isProfilePending } from '#lib/provisioning/profilePending.js';
+import { stackDomain, stackIpv4 } from '#lib/stackAddress.js';
+
 import { defineOperation } from '../types.js';
 import {
   attributeStatus,

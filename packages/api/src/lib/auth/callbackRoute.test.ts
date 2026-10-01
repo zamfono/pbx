@@ -5,7 +5,8 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { GET } from '../../routes/oauth/callback/+server.js';
+import { GET } from '#routes/oauth/callback/+server.js';
+
 import { getDb } from '../db.js';
 import { keyringFromEnv } from '../secretbox.js';
 import { encodeMetadataClientId } from './clients.js';

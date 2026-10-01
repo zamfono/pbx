@@ -5,9 +5,10 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { MS_PER_SECOND, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { signAccessToken } from '../../lib/auth/jwt.js';
-import { mcpResourceUri } from '../../lib/auth/resource.js';
-import { getDb } from '../../lib/db.js';
+import { signAccessToken } from '#lib/auth/jwt.js';
+import { mcpResourceUri } from '#lib/auth/resource.js';
+import { getDb } from '#lib/db.js';
+
 import { POST } from './+server.js';
 
 const ORIGIN = 'https://pbx.example';

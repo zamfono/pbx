@@ -4,10 +4,10 @@ import type { RequestEvent } from '@sveltejs/kit';
 
 import { resolveVersion } from '@zamfono/shared';
 
-import { createCoreClient, fetchCoreHealth } from '../../lib/coreClient.js';
-import { getDb } from '../../lib/db.js';
-import { certSyncStatus } from '../../lib/jobs/certSync.js';
-import { renderMetrics } from '../../lib/metrics.js';
+import { createCoreClient, fetchCoreHealth } from '#lib/coreClient.js';
+import { getDb } from '#lib/db.js';
+import { certSyncStatus } from '#lib/jobs/certSync.js';
+import { renderMetrics } from '#lib/metrics.js';
 
 const STATUS_NOT_FOUND = 404;
 const STATUS_UNAUTHORIZED = 401;

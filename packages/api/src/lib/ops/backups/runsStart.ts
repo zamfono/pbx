@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
-import { queueRun } from '../../jobs/cron.js';
+import { queueRun } from '#lib/jobs/cron.js';
+
 import { afterPropagation, setUndoable } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import { loadLiveTarget, runToWire, type BackupRunWire } from './_shared.js';

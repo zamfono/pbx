@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
-import { encrypt, keyringFromEnv } from '../../secretbox.js';
-import { newSipPassword } from '../../sip.js';
+import { encrypt, keyringFromEnv } from '#lib/secretbox.js';
+import { newSipPassword } from '#lib/sip.js';
+
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
 import { pushToRingotel } from './_ringotelPush.js';

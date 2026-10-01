@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { decodeCursor, encodeCursor } from '../../pagination.js';
+import { decodeCursor, encodeCursor } from '#lib/pagination.js';
+
 import { defineOperation } from '../types.js';
 import { mapTrunkRow, type TrunkHostRow, type TrunkWire } from './_shared.js';
 import { getTrunkStatuses, UNKNOWN_STATUS } from './_status.js';

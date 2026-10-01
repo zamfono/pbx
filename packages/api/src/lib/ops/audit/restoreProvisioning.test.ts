@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { DeviceRow } from '../../provisioning/types.js';
-import { makeTestDb } from '../../testDb.js';
+import type { DeviceRow } from '#lib/provisioning/types.js';
+import { makeTestDb } from '#lib/testDb.js';
+
 import { takeAfterPropagationHooks } from '../afterPropagationHooks.js';
 import type { Context } from '../types.js';
 import { restoreProvisionedDevices } from './restoreProvisioning.js';
 
 const created: DeviceRow[] = [];
 
-vi.mock('../../provisioning/index.js', () => ({
+vi.mock('#lib/provisioning/index.js', () => ({
   activeRingotelProvider: () =>
     Promise.resolve({
       onDeviceCreated: (device: DeviceRow) => {
@@ -20,7 +21,7 @@ vi.mock('../../provisioning/index.js', () => ({
     })
 }));
 
-vi.mock('../../secretbox.js', () => ({
+vi.mock('#lib/secretbox.js', () => ({
   keyringFromEnv: () => ({}),
   decrypt: () => Buffer.from('sip-secret')
 }));

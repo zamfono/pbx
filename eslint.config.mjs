@@ -93,6 +93,18 @@ export default tseslint.config(
           skipComments: true
         }
       ],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(?:\\.\\./){2}',
+              message:
+                "Two or more directories up, import through the package's subpath imports instead (package.json \"imports\"), e.g. '#lib/db.js' in packages/api."
+            }
+          ]
+        }
+      ],
       '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
       '@typescript-eslint/restrict-template-expressions': [
         'error',

@@ -3,8 +3,9 @@ import { z } from 'zod';
 import {
   createRingotelClient,
   type RingotelClient
-} from '../../provisioning/ringotelClient.js';
-import { keyringFromEnv } from '../../secretbox.js';
+} from '#lib/provisioning/ringotelClient.js';
+import { keyringFromEnv } from '#lib/secretbox.js';
+
 import { onRollback } from '../runner.js';
 import { loadSettings } from '../settings/_shared.js';
 import { defineOperation, OpError, type Context } from '../types.js';

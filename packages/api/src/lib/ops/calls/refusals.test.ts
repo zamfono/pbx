@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createCoreClient } from '../../coreClient.js';
-import { handleRest } from '../../rest.js';
-import { makeTestDb } from '../../testDb.js';
+import { createCoreClient } from '#lib/coreClient.js';
+import { handleRest } from '#lib/rest.js';
+import { makeTestDb } from '#lib/testDb.js';
+
 import { type Actor } from '../types.js';
 import { setCoreClientForTest } from './_shared.js';
 

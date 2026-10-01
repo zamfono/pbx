@@ -1,12 +1,13 @@
 import { z } from 'zod';
 
-import { errorMessage } from '../../errors.js';
+import { errorMessage } from '#lib/errors.js';
 import {
   createRingotelClient,
   RingotelError,
   type RingotelClient
-} from '../../provisioning/ringotelClient.js';
-import { keyringFromEnv } from '../../secretbox.js';
+} from '#lib/provisioning/ringotelClient.js';
+import { keyringFromEnv } from '#lib/secretbox.js';
+
 import { onRollback } from '../runner.js';
 import { loadSettings } from '../settings/_shared.js';
 import { defineOperation, OpError } from '../types.js';

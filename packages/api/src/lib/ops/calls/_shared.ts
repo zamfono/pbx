@@ -6,7 +6,8 @@ import {
   coreRefusal,
   createCoreClient,
   type CoreClient
-} from '../../coreClient.js';
+} from '#lib/coreClient.js';
+
 import { OpError, type Context } from '../types.js';
 
 const STATUS_FORBIDDEN = 403;

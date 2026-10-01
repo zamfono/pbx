@@ -2,9 +2,10 @@ import { redirect } from '@sveltejs/kit';
 
 import { nowIso } from '@zamfono/shared';
 
-import { hashToken } from '../../../lib/auth/tokens.js';
-import { getDb } from '../../../lib/db.js';
-import { dictionaryFor } from '../../../lib/i18n/index.js';
+import { hashToken } from '#lib/auth/tokens.js';
+import { getDb } from '#lib/db.js';
+import { dictionaryFor } from '#lib/i18n/index.js';
+
 import type { PageServerLoad } from './$types.js';
 
 const SETTINGS_ROW_ID = 1;

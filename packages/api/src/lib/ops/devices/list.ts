@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { decodeCursor, encodeCursor } from '../../pagination.js';
+import { decodeCursor, encodeCursor } from '#lib/pagination.js';
+
 import { defineOperation, OpError } from '../types.js';
 import { toDeviceOut } from './_shared.js';
 

@@ -5,7 +5,8 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { getDb } from '../../../lib/db.js';
+import { getDb } from '#lib/db.js';
+
 import { login } from './authorize.remote.js';
 
 const KEY_BYTE_LENGTH = 32;

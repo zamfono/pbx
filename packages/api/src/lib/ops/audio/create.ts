@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
-import { deleteAudioFile, storeAudio } from '../../audio/types.js';
-import { isAcceptedUploadType } from '../../audio/uploadTypes.js';
+import { deleteAudioFile, storeAudio } from '#lib/audio/types.js';
+import { isAcceptedUploadType } from '#lib/audio/uploadTypes.js';
+
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
 import { toAudioAssetOut, type AudioAssetOut } from './_shared.js';

@@ -7,7 +7,8 @@ import {
   type Language,
   type TemplateKind,
   type TemplateSource
-} from '../../mail/index.js';
+} from '#lib/mail/index.js';
+
 import { OpError } from '../types.js';
 
 /** The six mail kinds `api` renders a template for (§10.2 "Templates"). */

@@ -2,11 +2,11 @@ import { redirect } from '@sveltejs/kit';
 import { form } from '$app/server';
 import { z } from 'zod';
 
-import { settingsInfo } from '../../../lib/auth/authorizeRequest.js';
-import { MIN_PASSWORD_LENGTH } from '../../../lib/auth/passwordPolicy.js';
-import { redeemPasswordReset } from '../../../lib/auth/passwordReset.js';
-import { getDb } from '../../../lib/db.js';
-import { dictionaryFor, format } from '../../../lib/i18n/index.js';
+import { settingsInfo } from '#lib/auth/authorizeRequest.js';
+import { MIN_PASSWORD_LENGTH } from '#lib/auth/passwordPolicy.js';
+import { redeemPasswordReset } from '#lib/auth/passwordReset.js';
+import { getDb } from '#lib/db.js';
+import { dictionaryFor, format } from '#lib/i18n/index.js';
 
 const STATUS_SEE_OTHER = 303;
 

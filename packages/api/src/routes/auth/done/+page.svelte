@@ -1,9 +1,10 @@
 <script lang="ts">
-  import '../../../app.css';
+  import '#app.css';
 
   import { page } from '$app/state';
 
-  import { format } from '../../../lib/i18n/index.js';
+  import { format } from '#lib/i18n/index.js';
+
   import type { PageData } from './$types.js';
 
   const { data }: { data: PageData } = $props();
