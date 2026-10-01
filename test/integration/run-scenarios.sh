@@ -172,7 +172,7 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
   if [ "$scenario" = "$here/scenarios/$name.call.sh" ]; then
     bash "$scenario" "$API" "$token" "$compose_cmd" || fail "the API call of $name did not complete"
   else
-    # shellcheck disable=SC2046 -- the extra arguments are separate words by design
+    # shellcheck disable=SC2046 # the extra arguments are separate words by design
     $COMPOSE "${compose_files[@]}" exec -T "$caller" \
       sipp -sf "/scenarios/$name.xml" -s "$MAIN_DID" -m "$(calls_for "$name")" -l 1 \
         -p "$caller_port" -timeout 90s \

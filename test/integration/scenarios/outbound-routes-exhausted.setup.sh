@@ -29,7 +29,7 @@ printf '%s\n' "$previous" > "$(state_file routes-exhausted-language)"
 # the logger's own bounded queue (`logger show channels`' "Logger queue limit") faster than the
 # one line this check needs reaches disk — so this scopes the raise to the one module that logs
 # it, `core set debug <level> <module>`, the way `pjsip set debug` scopes SIP tracing.
-# shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
 $compose exec -T asterisk sh -c "
   asterisk -rx 'core set debug 3 res_stasis_playback' >/dev/null
   asterisk -rx 'logger add channel ci-tone debug,verbose' >/dev/null

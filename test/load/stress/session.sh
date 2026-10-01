@@ -161,7 +161,7 @@ done
 
 # Optional diagnostics against the still-running stack (a file sourced here, not committed).
 if [ -n "${POST_STEPS_HOOK:-}" ]; then
-  # shellcheck disable=SC1090 -- caller-supplied
+  # shellcheck disable=SC1090 # caller-supplied
   . "$POST_STEPS_HOOK"
 fi
 for kind in in out; do

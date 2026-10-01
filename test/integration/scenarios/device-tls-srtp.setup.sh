@@ -72,7 +72,7 @@ capem=$(mktemp)
 baresip_config=$(mktemp)
 baresip_accounts=$(mktemp)
 trap 'rm -f "$capem" "$baresip_config" "$baresip_accounts"' EXIT
-# shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
 $compose exec -T asterisk cat /etc/asterisk/gen/tls/cert.pem > "$capem"
 if ! openssl verify -CAfile "$capem" "$capem" >/dev/null 2>&1; then
   # shellcheck disable=SC2086

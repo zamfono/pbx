@@ -15,7 +15,7 @@ compose=$3
 ATTEMPTS=15
 TRACE=/tmp/unregister-messages.log
 
-# shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
 $compose exec -T sipp-provider rm -f "$TRACE"
 # shellcheck disable=SC2086
 $compose exec -T -d sipp-provider sh -c \

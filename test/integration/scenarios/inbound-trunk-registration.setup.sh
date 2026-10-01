@@ -19,7 +19,7 @@ compose=$4
 
 ATTEMPTS=45
 
-# shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
 $compose exec -T sipp-provider rm -f /tmp/registrar-line.csv /tmp/registrar-messages.log
 # shellcheck disable=SC2086
 $compose exec -T -d sipp-provider sh -c \

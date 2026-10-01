@@ -21,7 +21,7 @@ OWNER_PASSWORD='load-secret'
 OWNER_EMAIL='owner@load.test'
 
 dc() {
-  # shellcheck disable=SC2086 -- $COMPOSE carries the runtime's own multi-word command
+  # shellcheck disable=SC2086 # $COMPOSE carries the runtime's own multi-word command
   (cd "$repo/deploy" && $COMPOSE "${compose_files[@]}" "$@")
 }
 

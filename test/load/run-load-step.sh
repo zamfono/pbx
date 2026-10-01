@@ -37,7 +37,7 @@ net_csv="$out_dir/net.csv"
 step_log="$out_dir/$step.log"
 
 dc() {
-  # shellcheck disable=SC2086 -- $compose_cmd carries the runtime's own multi-word command
+  # shellcheck disable=SC2086 # $compose_cmd carries the runtime's own multi-word command
   $compose_cmd "$@"
 }
 

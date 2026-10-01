@@ -19,7 +19,7 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck source=_lib.sh
 . "$here/_lib.sh"
 
-# shellcheck disable=SC2016 -- the `${EXTEN}` is the literal text under test
+# shellcheck disable=SC2016 # the `${EXTEN}` is the literal text under test
 await_trace sipp /tmp/sip-target-messages.log 1 \
   | python3 "$here/_forward-context-check.py" 'sip:proj_ci123@sip-tls:5061' \
     '^"CI Agent" <sip:\+15551000@[^>]+>;reason=unconditional, "CI Away" <sip:\+15551077@[^>]+>;reason=away$' \

@@ -87,7 +87,7 @@ post() {
 # it, whether or not a name column comes between; the listing goes to the log as it was.
 bridge_channels() {
   local listing
-  # shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
   listing=$($compose exec -T asterisk asterisk -rx 'bridge show all' 2>&1 | tr -d '\r')
   printf '%s\n' "$listing" >&2
   printf '%s\n' "$listing" | awk '

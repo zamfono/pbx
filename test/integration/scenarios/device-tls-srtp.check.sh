@@ -28,7 +28,7 @@ fail() {
 # `pjsip show contacts`' own table truncates the contact URI at a fixed column width, cutting off
 # exactly the `;transport=` parameter this checks; the AOR's own `contact` field (`pjsip show
 # aor`) is the same URI in full.
-# shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
 aor=$($compose exec -T asterisk asterisk -rx "pjsip show aor $sip_username")
 contact_line=$(printf '%s' "$aor" | grep '^ contact ' || true)
 [ -n "$contact_line" ] || fail "no contact for AOR $sip_username: $aor"

@@ -22,7 +22,7 @@ member_id=$(user_with_ext 101)
 sip_username=$(api GET "/users/$member_id/devices" | jsonfield items.0.sipUsername)
 suggests=false
 for _ in $(seq 1 30); do
-  # shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
   if $compose exec -T asterisk asterisk -rx "pjsip show endpoint $sip_username" 2>/dev/null \
     | grep -Eq "moh_suggest +: +$moh_id"; then
     suggests=true
@@ -35,7 +35,7 @@ done
   exit 1
 }
 
-# shellcheck disable=SC2086 -- see above
+# shellcheck disable=SC2086 # see above
 $compose exec -T asterisk sh -c \
   "asterisk -rx 'logger add channel ci-hold verbose(3)' >/dev/null"
 printf '%s\n' "$moh_id" > "$(state_file hold)"

@@ -39,7 +39,7 @@ print([u['id'] for u in json.load(sys.stdin)['items'] if u['extension'] == sys.a
 
 # A container's address on the stack's network.
 container_ip() {
-  # shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
   $compose exec -T "$1" hostname -i | tr -d '\r' | awk '{print $1}'
 }
 
@@ -50,7 +50,7 @@ await_endpoint() {
   local attempt
   for attempt in $(seq 1 30); do
     # The listing names the endpoint as `<name>/<caller-ID number>` once it has a `callerid`.
-    # shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+    # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
     if $compose exec -T asterisk asterisk -rx "pjsip show endpoint $1" 2>/dev/null \
       | grep "Endpoint:  *$1[ /]" >/dev/null; then
       return 0
@@ -211,7 +211,7 @@ await_ended_call() {
 await_trace() {
   local attempt content previous='' count
   for attempt in $(seq 1 15); do
-    # shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+    # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
     content=$($compose exec -T "$1" cat "$2" 2>/dev/null || true)
     count=$(printf '%s\n' "$content" | grep -c '^INVITE ' || true)
     if [ "$count" -ge "$3" ] && [ "$content" = "$previous" ]; then

@@ -14,7 +14,7 @@ compose=$1
 LANGUAGES='de en es fr it ru'
 
 dc() {
-  # shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
   $compose "$@"
 }
 
@@ -37,5 +37,5 @@ if [ -n "$missing" ]; then
   echo "prompts the core plays are missing from the image: $missing" >&2
   exit 1
 fi
-# shellcheck disable=SC2086 -- one name per word, split by design
+# shellcheck disable=SC2086 # one name per word, split by design
 echo "   $(printf '%s\n' $names | wc -l | tr -d ' ') prompts ship for every tenant language"

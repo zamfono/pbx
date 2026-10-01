@@ -23,7 +23,7 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 tls_dir=$(mktemp -d)
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=sip-tls' \
   -keyout "$tls_dir/key.pem" -out "$tls_dir/cert.pem" >/dev/null 2>&1
-# shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
 $compose exec -T sip-tls mkdir -p /tmp/sip-target-tls
 # shellcheck disable=SC2086
 $compose cp "$tls_dir/cert.pem" sip-tls:/tmp/sip-target-tls/cert.pem >&2
@@ -62,7 +62,7 @@ api POST "/users/$forwarder/ooo" \
   "{\"active\":true,\"target\":{\"kind\":\"user\",\"userId\":\"$agent\"}}" >/dev/null
 # The target's headers (§9.4 "Header templates"): the two defaults, the extension the call was
 # placed to, and the last hop's reason beside a `${…}` that Asterisk must send as written.
-# shellcheck disable=SC2016 -- the `${EXTEN}` is the literal text under test
+# shellcheck disable=SC2016 # the `${EXTEN}` is the literal text under test
 headers='[{"name":"X-Zamfono-Caller","value":"{{callerNumber}}"},
   {"name":"X-Zamfono-Did","value":"{{did}}"},
   {"name":"X-Called","value":"{{calledExtension}}"},
@@ -79,7 +79,7 @@ trunk_status() {
   api GET "/trunks/$trunk_id" | jsonfield status
 }
 contact_status() {
-  # shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
   $compose exec -T asterisk asterisk -rx 'pjsip show contacts' \
     | awk -v t="trunk-$trunk_id/" '$1 == "Contact:" && index($2, t) == 1 { print $4 }'
 }

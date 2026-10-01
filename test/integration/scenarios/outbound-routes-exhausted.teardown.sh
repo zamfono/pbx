@@ -12,7 +12,7 @@ compose=$3
 previous=$(cat "$(state_file routes-exhausted-language)")
 api PATCH "/settings" "{\"language\":\"$previous\"}" >/dev/null
 
-# shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
 $compose exec -T asterisk sh -c "
   asterisk -rx 'logger remove channel ci-tone' >/dev/null
   rm -f /var/log/asterisk/ci-tone

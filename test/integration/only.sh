@@ -10,7 +10,7 @@ IFS=',' read -ra ONLY_PATTERNS <<<"${ONLY:-*}"
 name_selected() {
   local name=$1 pattern
   for pattern in "${ONLY_PATTERNS[@]}"; do
-    # shellcheck disable=SC2053 -- an intentional glob match against a configured pattern
+    # shellcheck disable=SC2053 # an intentional glob match against a configured pattern
     [[ $name == $pattern ]] && return 0
   done
   return 1

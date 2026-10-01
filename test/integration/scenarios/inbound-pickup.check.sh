@@ -12,7 +12,7 @@ compose=$3
 # before the stack ended the caller's call, so its exit status follows within moments.
 code=''
 for _ in $(seq 1 10); do
-  # shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
   if code=$($compose exec -T sipp-phone cat /tmp/pickup-dial.exit 2>/dev/null); then
     break
   fi

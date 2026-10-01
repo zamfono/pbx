@@ -8,7 +8,7 @@ compose=$3
 . "$(dirname "$0")/_lib.sh"
 
 moh_id=$(cat "$(state_file hold)")
-# shellcheck disable=SC2086 -- `$compose` carries the runtime's own multi-word command
+# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
 started=$($compose exec -T asterisk sh -c 'cat /var/log/asterisk/ci-hold 2>/dev/null || true' \
   | tr -d '\r' | grep 'Started music on hold' || true)
 if ! printf '%s\n' "$started" | grep -q "class '$moh_id', on channel 'PJSIP/trunk-"; then

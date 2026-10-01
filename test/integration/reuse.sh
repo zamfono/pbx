@@ -36,7 +36,7 @@ STATE
 load_state() {
   [ -f "$STATE_FILE" ] \
     || fail "REUSE=1: the stack is up but $STATE_FILE is missing; run once without REUSE first"
-  # shellcheck disable=SC1090 -- a state file this same script wrote, not user input
+  # shellcheck disable=SC1090 # a state file this same script wrote, not user input
   . "$STATE_FILE"
   [ -n "${SIP_USERNAME:-}" ] && [ -n "${SIP_PASSWORD:-}" ] && [ -n "${GROUP_EXT:-}" ] \
     || fail "REUSE=1: $STATE_FILE is incomplete; run once without REUSE first"

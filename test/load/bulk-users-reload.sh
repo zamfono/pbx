@@ -77,7 +77,7 @@ probe_device_s=$(printf '%s\n' "$dout" | tail -1)
 
 echo '== timing a direct `asterisk -rx module reload res_pjsip.so` against the same tenant ==' >&2
 t0=$(date +%s.%N)
-# shellcheck disable=SC2086 -- $compose_cmd carries the runtime's own multi-word command
+# shellcheck disable=SC2086 # $compose_cmd carries the runtime's own multi-word command
 $compose_cmd exec -T asterisk asterisk -rx 'module reload res_pjsip.so' > "$out_dir/pjsip-reload-cli.txt" 2>&1
 t1=$(date +%s.%N)
 cli_reload_s=$(python3 -c "print($t1-$t0)")
