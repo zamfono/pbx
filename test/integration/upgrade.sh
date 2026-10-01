@@ -49,22 +49,17 @@ upgrade_start_previous() {
   echo "== §6.3 Upgrades: starting v$version from its own bundle and images =="
   ASTERISK_IMAGE=$UPGRADE_REGISTRY/asterisk:$version MIGRATE_IMAGE=$UPGRADE_REGISTRY/migrate:$version \
     CORE_IMAGE=$UPGRADE_REGISTRY/core:$version API_IMAGE=$UPGRADE_REGISTRY/api:$version \
-    PROXY_IMAGE=$UPGRADE_REGISTRY/proxy:$version \
-    $COMPOSE "${compose_args[@]}" up -d \
-    || fail "v$version's stack did not come up"
+    PROXY_IMAGE=$UPGRADE_REGISTRY/proxy:$version stack_recreate
 }
 
-# The upgrade itself, as deploy/README.md step 8 gives it: the build under test's files over the
-# stack directory's, as unpacking its bundle puts them, then `up -d`; on Podman `down` first, since Podman will not remove the `asterisk` container
-# `proxy` shares a network namespace with. The images are the build's own, already loaded, so
-# there is nothing to pull.
+# The upgrade itself, as deploy/README.md step 8 gives it, by `update.sh`: the build under test's
+# files over the stack directory's, as unpacking its bundle puts them, then the stack recreated
+# the way update.sh recreates it (`stack_recreate`). The images are the build's own, already
+# loaded, so there is nothing to pull.
 upgrade_to_build() {
   echo "== §6.3 Upgrades: upgrading to the build under test ($RUNTIME) =="
   stack_dir_files "$run_dir"
-  if [ "$RUNTIME" = podman ]; then
-    $COMPOSE "${compose_args[@]}" down || fail "down before the upgrade failed"
-  fi
-  $COMPOSE "${compose_args[@]}" up -d || fail "up -d did not upgrade the stack"
+  stack_recreate
   upgrade_assert_images
 }
 
@@ -124,7 +119,7 @@ PY
 }
 
 # The whole upgrade: the previous release up and ready, its data read, the upgrade, which leaves
-# the stack for `await_stack_ready` to check as it checks a fresh one. Leaves the snapshot's path
+# the stack for `assert_migrated` to check as it checks a fresh one. Leaves the snapshot's path
 # in UPGRADE_BEFORE for `upgrade_verify`, once `run.sh` has its own token.
 upgrade_from_release() {
   local version
@@ -132,7 +127,7 @@ upgrade_from_release() {
   [ -n "$version" ] || fail "UPGRADE_FROM=$UPGRADE_FROM names no release"
   UPGRADE_BEFORE=$run_dir/upgrade-before.tsv
   upgrade_start_previous "$version"
-  await_stack_ready
+  assert_migrated
   upgrade_snapshot "$UPGRADE_BEFORE"
   upgrade_to_build
 }

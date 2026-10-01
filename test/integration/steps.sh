@@ -9,7 +9,7 @@
 # SIP_PASSWORD and GROUP_EXT for `run-scenarios.sh` to read.
 
 # The stack's `.env`, then the stack itself, started fresh or, with UPGRADE_FROM, upgraded from
-# a release (upgrade.sh), and `await_stack_ready`. Skipped entirely under REUSE.
+# a release (upgrade.sh), and `assert_migrated`. Skipped entirely under REUSE.
 bring_up_stack() {
   # Checked before anything binds: a pre-existing listener would answer every probe below, and
   # Docker reports the port as published either way, so the run would silently test another
@@ -39,49 +39,21 @@ bring_up_stack() {
     upgrade_from_release
   else
     echo '== bringing the stack up =='
-    $COMPOSE "${compose_args[@]}" up -d
+    stack_recreate
   fi
-  await_stack_ready
+  assert_migrated
 }
 
-# The two runtime-ordering prerequisites §6.3 names inline (migrate's exit code, the api
-# healthcheck), then `core`: what a stack needs, fresh or just upgraded, before any tenant
-# configuration can be driven over REST.
-await_stack_ready() {
+# The runtime-ordering prerequisite §6.3 names inline: migrate ran to completion, so api started
+# on the migrated database. api's and core's healthchecks, the other prerequisite of a tenant
+# driven over REST, are what `stack_recreate` waited for.
+assert_migrated() {
   echo '== §6.3 Runtimes: migrate ran to completion before api started =='
   local migrate_exit
   migrate_exit=$($COMPOSE "${compose_args[@]}" ps -a --format '{{.Service}} {{.ExitCode}}' \
     | awk '$1 == "migrate" { print $2 }')
   [ "$migrate_exit" = "0" ] \
     || fail "the migrate service exited $migrate_exit; service_completed_successfully did not hold"
-
-  echo '== waiting for the api healthcheck =='
-  local ready=false
-  for _ in $(seq 1 60); do
-    if curl -fsS "${FWD[@]}" "$api_base/healthz" >/dev/null 2>&1; then
-      ready=true
-      break
-    fi
-    sleep 2
-  done
-  [ "$ready" = true ] || fail "api never became healthy"
-
-  echo '== waiting for core =='
-  # Every configuration write asks `core` to reload Asterisk (§3.1); a write made while `core` is
-  # still starting is committed with its propagation refused, so the tenant is built only once
-  # `core` answers.
-  local core_ready=false
-  for _ in $(seq 1 60); do
-    local state
-    state=$($COMPOSE "${compose_args[@]}" ps --format '{{.Service}} {{.Health}}' \
-      | awk '$1 == "core" { print $2 }')
-    if [ "$state" = "healthy" ]; then
-      core_ready=true
-      break
-    fi
-    sleep 2
-  done
-  [ "$core_ready" = true ] || fail "core never became healthy"
 }
 
 # §6.3 Runtimes' own two ordering assertions (runtime-asserts.sh); selectable as `runtime-asserts`.

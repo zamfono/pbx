@@ -83,7 +83,7 @@ use_run_dir() {
 # shellcheck source=diagnostics.sh
 . "$here/diagnostics.sh"
 fail() {
-  echo "FAIL: $1" >&2
+  echo "FAIL: $*" >&2
   dump_diagnostics
   exit 1
 }

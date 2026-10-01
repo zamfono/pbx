@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # test/load: the stack bring-up shared by the load drivers (session.sh, stress/session.sh).
 # Sourced, not run. Mirrors test/integration/run.sh's own bring-up: a stack directory of the
-# session's own with the .env setup.sh writes (test/stack.sh), one `compose up`, the migrate exit
-# code, the api and core healthchecks, a bootstrap owner token.
+# session's own with the .env setup.sh writes (test/stack.sh), brought up the way update.sh brings
+# a stack up, which waits for its healthchecks, the migrate exit code, a bootstrap owner token.
 #
 # The caller sets, before sourcing: repo, OUT_DIR, COMPOSE, compose_args (array, relative to the
 # stack directory), api_base, FQDN, MAIN_DID, API_IMAGE; optionally METRICS_TOKEN (default empty =
@@ -46,7 +46,7 @@ dc() {
 log() { echo "== $* ==" | tee -a "$OUT_DIR/session.log" >&2; }
 
 fail() {
-  echo "FAIL: $1" | tee -a "$OUT_DIR/session.log" >&2
+  echo "FAIL: $*" | tee -a "$OUT_DIR/session.log" >&2
   dc ps >&2 || true
   dc logs --tail 80 >&2 || true
   exit 1
@@ -67,28 +67,11 @@ stack_up() {
   fi
   log "bringing the stack up"
   STACK_UP=true
-  dc up -d || fail "compose up failed"
+  stack_recreate
 
   local migrate_exit
   migrate_exit=$(dc ps -a --format '{{.Service}} {{.ExitCode}}' | awk '$1 == "migrate" { print $2 }')
   [ "$migrate_exit" = "0" ] || fail "migrate exited $migrate_exit"
-
-  log "waiting for api healthcheck"
-  local ready=false
-  for _ in $(seq 1 60); do
-    curl -fsS "${FWD[@]}" "$api_base/healthz" >/dev/null 2>&1 && { ready=true; break; }
-    sleep 2
-  done
-  [ "$ready" = true ] || fail "api never became healthy"
-
-  log "waiting for core healthcheck"
-  ready=false
-  for _ in $(seq 1 60); do
-    [ "$(dc ps --format '{{.Service}} {{.Health}}' | awk '$1 == "core" { print $2 }')" = healthy ] \
-      && { ready=true; break; }
-    sleep 2
-  done
-  [ "$ready" = true ] || fail "core never became healthy"
 }
 
 stack_token() {
