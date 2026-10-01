@@ -67,7 +67,10 @@ if run_setup TZ=Europe/Viena || [ -e "$bundle_dir/x/.env" ]; then
 fi
 run_setup TZ=Europe/Vienna
 [ "$(stat -c %a "$bundle_dir/x/.env")" = 600 ]
-setup_config=$(cd "$bundle_dir/x" && docker compose -f compose.yaml -f compose.ports.yaml config)
+# The mode's overlay is linked as compose.override.yaml, which a plain `compose` reads.
+[ "$(readlink "$bundle_dir/x/compose.override.yaml")" = compose.ports.yaml ]
+setup_config=$(cd "$bundle_dir/x" && docker compose config)
+echo "$setup_config" | grep -qF 'published: "5061"'
 echo "$setup_config" | grep -qF "COMPANY_NAME: O'Brien & \$\$ons"
 echo "$setup_config" | grep -qF 'BOOTSTRAP_OWNER_PASSWORD_HASH: $$argon2id$$v=19$$m=65536,p=4,t=3$$c2FsdA$$aGFzaA'
 echo "$setup_config" | grep -qF 'COUNTRY: DE'

@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-01 · §6.2.1, §6.2.2, §6.3 Compose stack, Updates, Continuous replication.** `setup.sh` links the mode's attachment overlay as `compose.override.yaml`, which Compose reads beside `compose.yaml` on its own, so the boot unit, `update.sh`, the updater and every printed command run a plain `compose up -d`; `update.sh` makes the link for a stack that has none, from the overlay its boot unit names, else from whether `.env` sets `STACK_IPV4`. The updater learns only its Compose project and directory from its labels.
+*Why:* found in the design review: the overlay choice was stored only in a unit file's command line and parsed back.
+
 **2026-10-01 · §4 Database, §6.3 Migrations, §10 layout.** The `migrate` image applies the migrations with Kysely's `Migrator`, run by `db/migrate.ts`, which retries on better-sqlite3's `SQLITE_BUSY`/`SQLITE_LOCKED` error codes; kysely-ctl and `db/config.ts` remain only for creating a migration in a checkout.
 *Why:* found in the design review: the image ran `kysely migrate latest` through npm and decided a retry by matching its printed output.
 

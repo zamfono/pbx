@@ -9,9 +9,11 @@
 # shellcheck source=../deploy/setup/recreate.sh
 . "$repo/deploy/setup/recreate.sh"
 
-# deploy/'s files in directory `$1`, without the .env of a stack in deploy/ itself.
+# deploy/'s files in directory `$1`, without the .env and the compose.override.yaml link of a stack
+# in deploy/ itself: setup.sh makes the link of this stack's own mode.
 stack_dir_files() {
-  tar -C "$repo/deploy" --exclude=./.env -cf - . | tar -C "$1" -xf -
+  tar -C "$repo/deploy" --exclude=./.env --exclude=./compose.override.yaml -cf - . |
+    tar -C "$1" -xf -
 }
 
 # The .env setup.sh writes in stack directory `$1`, its output kept in `$1/setup.log`.
@@ -21,11 +23,13 @@ stack_dir_env() {
 
 # The stack (re)created on the images the environment names and up once healthy, as update.sh
 # recreates an operator's: `up -d --wait` where this Compose has it, on Podman after `down`.
+# recreate.sh's `compose` is the whole command, this stack's project and files included.
 # shellcheck disable=SC2153 # RUNTIME and COMPOSE are the caller's, runtime and compose recreate.sh's
 stack_recreate() {
   local runtime=$RUNTIME unit='' updater='' WAIT_SECONDS=180
-  local -a compose files=("${compose_args[@]}") services=()
+  local -a compose services=()
   read -ra compose <<<"$COMPOSE"
+  compose+=("${compose_args[@]}")
   recreate_stack
 }
 

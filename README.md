@@ -29,14 +29,14 @@ to its public address, the firewall rules and the `.env`. In short:
 | `compose.macvlan.yaml` | several stacks on one host              | the `asterisk` container owns a public address on a `macvlan`/`ipvlan` network named `public`; no NAT anywhere |
 
 Every release carries `deploy/` as one download, pinned to that release's images. Unpack it on
-the host, run `setup.sh` to write `.env`, and bring it up with the overlay you picked:
+the host, run `setup.sh` to write `.env` and link the overlay you picked, and bring it up:
 
 ```bash
 mkdir -p /srv/zamfono && cd /srv/zamfono
 curl -fsSL https://github.com/zamfono/pbx/releases/latest/download/zamfono-deploy.tar.gz \
   | tar xz --strip-components=1
 ./setup.sh              # asks, generates the secrets, writes .env
-docker compose -f compose.yaml -f compose.ports.yaml up -d
+docker compose up -d
 curl -fsS https://<your FQDN>/healthz
 ```
 
@@ -117,7 +117,7 @@ To try a pull request's images without building them, a maintainer labels it `pu
 the diff has been read; its green CI run then publishes them as `ghcr.io/zamfono/<name>-pr:<N>`.
 A later push takes the label off until its new head has been read too, and closing the pull
 request deletes the images. `deploy/compose.pr.yaml` swaps the five images for those, layered last:
-`ZAMFONO_VERSION=<N> docker compose -f compose.yaml -f compose.ports.yaml -f compose.pr.yaml up -d`.
+`ZAMFONO_VERSION=<N> docker compose -f compose.yaml -f compose.override.yaml -f compose.pr.yaml up -d`.
 
 ## Contributing, security and license
 

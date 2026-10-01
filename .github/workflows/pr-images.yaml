@@ -135,7 +135,7 @@ jobs:
           {
             echo "Images of #$PR at \`${SHA::7}\`; review them with deploy/compose.pr.yaml:"
             echo
-            echo "    ZAMFONO_VERSION=$PR docker compose -f compose.yaml -f compose.ports.yaml -f compose.pr.yaml up -d"
+            echo "    ZAMFONO_VERSION=$PR docker compose -f compose.yaml -f compose.override.yaml -f compose.pr.yaml up -d"
           } >>"$GITHUB_STEP_SUMMARY"
 
   unlabel:

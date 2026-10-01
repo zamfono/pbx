@@ -1,9 +1,10 @@
 # shellcheck shell=bash
+# shellcheck disable=SC2154 # compose is setup.sh's
 # The Podman boot unit setup.sh offers (README.md, step 7): Podman restarts nothing after a reboot
 # for a stack on `unless-stopped`, so a systemd unit runs `compose up -d` instead. It stops with
 # `down`, not `stop`: Podman refuses to replace `asterisk` while `proxy` still shares its network
 # namespace, so a restart after a pull must remove both first; the volumes stay. Reads setup.sh's
-# `overlay` and `compose`, and sets `boot_unit` to the unit's name once one exists.
+# `compose`, and sets `boot_unit` to the unit's name once one exists.
 
 # How to run the stack once systemd owns it: independent of the SSH session, and again at boot.
 print_unit_usage() {
@@ -16,7 +17,7 @@ systemd runs the stack from then on, whether or not you stay logged in, and star
   systemctl restart $boot_unit    recreate it, e.g. after an upgrade's pull
   journalctl -u $boot_unit        what the unit's own start and stop printed
 The containers' own logs:
-  cd $PWD && ${compose[*]} -f compose.yaml -f $overlay logs -f
+  cd $PWD && ${compose[*]} logs -f
 EOF
 }
 
@@ -43,8 +44,8 @@ Requires=podman.socket
 Type=oneshot
 RemainAfterExit=true
 WorkingDirectory=$PWD
-ExecStart=$(command -v podman) compose -f compose.yaml -f $overlay up -d
-ExecStop=$(command -v podman) compose -f compose.yaml -f $overlay down
+ExecStart=$(command -v podman) compose up -d
+ExecStop=$(command -v podman) compose down
 
 [Install]
 WantedBy=multi-user.target

@@ -1,9 +1,9 @@
 # A reviewer's override, never an operator's: runs a pull request's images instead of a release.
 # pr-images.yaml publishes them as ghcr.io/zamfono/<name>-pr:<N> and :<N>-<short sha> once a
 # maintainer has read the pull request and labelled it `publish-image`, and deletes them when it
-# closes. Layered last, after compose.yaml and the attachment overlay (§6.1):
+# closes. Layered last, after compose.yaml and the attachment overlay setup.sh linked (§6.1):
 #
-#   ZAMFONO_VERSION=123 docker compose -f compose.yaml -f compose.ports.yaml -f compose.pr.yaml up -d
+#   ZAMFONO_VERSION=123 docker compose -f compose.yaml -f compose.override.yaml -f compose.pr.yaml up -d
 #
 # ZAMFONO_VERSION is the pull request number (123), or <number>-<short sha> for one pushed build of
 # it; it has no default here, so a forgotten value stops Compose instead of running a release.

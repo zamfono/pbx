@@ -52,7 +52,9 @@ export PROXY_IMAGE=${PROXY_IMAGE:-zamfono/proxy:stress}
 METRICS_TOKEN=$(openssl rand -hex 16)
 export METRICS_TOKEN
 
-compose_args=(-f compose.yaml -f compose.ports.yaml -f "$load/compose.load.yaml"
+# compose.override.yaml is the ports overlay setup.sh links; with a `-f` for the load overlays,
+# Compose reads it only when named.
+compose_args=(-f compose.yaml -f compose.override.yaml -f "$load/compose.load.yaml"
   -f "$here/compose.stress.yaml")
 # shellcheck source=test/load/lib-stack.sh
 . "$load/lib-stack.sh"

@@ -3,7 +3,8 @@
 # checks it against the release's SHA256SUMS, unpacks it over this directory (never touching
 # .env), adds the settings a newer .env.example introduced that update.sh can fill in itself,
 # pulls the images and recreates the stack. The `updater` service runs this same script for
-# `system.update` (§6.3 "Updates").
+# `system.update` (§6.3 "Updates"). Compose reads compose.yaml and compose.override.yaml, the link
+# to the mode's overlay setup.sh makes, which update.sh makes too where it is missing.
 #
 #   ./update.sh [--yes] [--check] [VERSION]
 #
@@ -15,8 +16,6 @@
 #   ZAMFONO_RUNTIME         docker | podman, when both are installed
 #   ZAMFONO_REPO_URL        where releases are downloaded from, for a mirror of
 #                           https://github.com/zamfono/pbx
-#   ZAMFONO_COMPOSE_FILES   the compose files, space-separated, instead of the boot unit's or
-#                           compose.yaml plus the overlay .env implies
 #   ZAMFONO_UPDATER=1       the updater service's run: never breaking, never itself, no systemctl
 set -euo pipefail
 
@@ -51,7 +50,7 @@ for arg in "$@"; do
     --yes) assume_yes=1 ;;
     --check) check_only=1 ;;
     -h | --help)
-      sed -n '2,20p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
+      sed -n '2,19p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     -*) fail "unknown option $arg" ;;
@@ -94,24 +93,6 @@ latest_version() {
   url=${url#v}
   v_version "$url" || fail "the latest release is named '$url', not X.Y.Z"
   echo "$url"
-}
-
-# The compose files: ZAMFONO_COMPOSE_FILES, else the boot unit's, else compose.yaml plus the
-# overlay .env's address implies.
-compose_files() {
-  local -a files
-  if [[ -n ${ZAMFONO_COMPOSE_FILES:-} ]]; then
-    read -ra files <<<"$ZAMFONO_COMPOSE_FILES"
-  elif [[ -n $unit ]]; then
-    read -ra files < <(systemctl cat "$unit" | sed -nE 's/^ExecStart=.* compose (.*) up -d$/\1/p' |
-      grep -oE '(-f|--file) [^ ]+' | awk '{print $2}' | tr '\n' ' ')
-  elif grep -qE "^STACK_IPV4=[\"']?[0-9]" .env; then
-    files=(compose.yaml compose.macvlan.yaml)
-  else
-    files=(compose.yaml compose.ports.yaml)
-  fi
-  ((${#files[@]} > 0)) || fail "found no compose files to run the stack with"
-  printf -- '-f %s ' "${files[@]}"
 }
 
 # The boot unit (README.md, step 7) whose WorkingDirectory is this directory, if any.
@@ -181,13 +162,23 @@ release_notes() {
   ' "$1"
 }
 
-# Sets files, the compose files' arguments, and services, the ones `pull` and `up` name.
-stack_args() {
-  local file_args
-  file_args=$(compose_files)
-  read -ra files <<<"$file_args"
-  services=()
-  [[ -z $updater ]] || services=("${STACK_SERVICES[@]}")
+# compose.override.yaml, the link to the mode's overlay that setup.sh makes and Compose reads
+# beside compose.yaml. A stack setup.sh set up before it made one (0.1.0 and older) has none:
+# its overlay is derived here, once, and only here, from the boot unit's ExecStart, else from
+# whether .env holds a STACK_IPV4 (macvlan) or not (ports).
+link_overlay() {
+  local overlay=
+  [[ ! -e compose.override.yaml ]] || return 0
+  [[ -z $unit ]] || overlay=$(systemctl cat "$unit" | grep -oE 'compose\.(ports|macvlan)\.yaml' | head -n1)
+  if [[ -z $overlay ]]; then
+    if grep -qE "^STACK_IPV4=[\"']?[0-9]" .env; then
+      overlay=compose.macvlan.yaml
+    else
+      overlay=compose.ports.yaml
+    fi
+  fi
+  ln -s "$overlay" compose.override.yaml
+  echo "  linked compose.override.yaml to $overlay"
 }
 
 main() {
@@ -199,6 +190,10 @@ main() {
     detect_runtime
   fi
   unit=$(find_unit)
+  [[ -n $check_only ]] || link_overlay
+  # The services `pull` and `up` name: all of them, but for the updater's run.
+  services=()
+  [[ -z $updater ]] || services=("${STACK_SERVICES[@]}")
   local from
   from=$(current_version)
   [[ -n $target ]] || target=$(latest_version)
@@ -210,7 +205,6 @@ main() {
       echo "The update to $from stopped before its stack reported healthy; finishing it."
       [[ -z $check_only ]] || exit 0
       outcome_start '' "$from"
-      stack_args
       recreate_stack
       rm -f "$PENDING"
       echo "Updated to $from. What changed: CHANGELOG.md, or $REPO/releases/tag/v$from"
@@ -249,12 +243,11 @@ main() {
     fi
   fi
 
-  stack_args
   # Pulled before anything here changes, with the running release's files told the new version,
   # so a failed pull leaves the stack as it was and a rerun retries it. A service the new release
   # adds is pulled by `up -d` below.
   echo "Pulling the $target images ..."
-  ZAMFONO_VERSION=$target "${compose[@]}" "${files[@]}" pull "${services[@]}" ||
+  ZAMFONO_VERSION=$target "${compose[@]}" pull "${services[@]}" ||
     fail "pulling the $target images failed; nothing was changed, and a rerun retries"
 
   echo "$target" >"$PENDING"

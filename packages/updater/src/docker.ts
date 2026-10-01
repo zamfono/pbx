@@ -3,12 +3,11 @@ import http from 'node:http';
 /**
  * What the updater learns about the stack from its own container, over the runtime's socket
  * (Docker's API, or Podman's Docker-compatible one): Compose labels every container it creates
- * with the project's name, the host directory it ran in and the files it read, overlay included.
+ * with the project's name and the host directory it ran in.
  */
 export type ComposeProject = {
   name: string;
   workingDir: string;
-  configFiles: string[];
 };
 
 const STATUS_OK = 200;
@@ -45,13 +44,12 @@ export function projectFromLabels(
 ): ComposeProject {
   const name = labels['com.docker.compose.project'];
   const workingDir = labels['com.docker.compose.project.working_dir'];
-  const configFiles = labels['com.docker.compose.project.config_files'];
-  if (!name || !workingDir || !configFiles) {
+  if (!name || !workingDir) {
     throw new Error(
       'the updater container carries no Compose project labels; start the stack with docker compose or podman compose'
     );
   }
-  return { name, workingDir, configFiles: configFiles.split(',') };
+  return { name, workingDir };
 }
 
 /** The Compose project of container `id`, this process's own. */

@@ -1,5 +1,6 @@
 # test/load: the resource-sizing harness's own compose overlay (docs/spec.md §6.6 "Sizing
-# envelope"). Layered over the shipped deploy/compose.yaml + deploy/compose.ports.yaml the same
+# envelope"). Layered over the shipped deploy/compose.yaml + compose.ports.yaml (the
+# compose.override.yaml link setup.sh makes in ports mode) the same
 # way test/integration/compose.test.yaml is, so what this measures is the stack an operator runs
 # in "ports" mode, not a copy of it -- ports mode is what actually publishes the RTP range on the
 # host, which is what §6.6's port-count math is about.

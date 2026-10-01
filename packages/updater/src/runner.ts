@@ -152,7 +152,6 @@ function spawnUpdate(
       PATH: process.env.PATH,
       HOME: process.env.HOME,
       ZAMFONO_UPDATER: '1',
-      ZAMFONO_COMPOSE_FILES: options.project.configFiles.join(' '),
       COMPOSE_PROJECT_NAME: options.project.name,
       DOCKER_HOST: `unix://${options.socketPath}`
     },

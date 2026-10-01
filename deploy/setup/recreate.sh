@@ -1,7 +1,7 @@
 # shellcheck shell=bash
-# shellcheck disable=SC2154 # runtime, compose, files, services, unit and updater are update.sh's
+# shellcheck disable=SC2154 # runtime, compose, services, unit and updater are update.sh's
 # How update.sh recreates the stack on its new images and waits for it to report healthy (§6.3
-# "Updates"). Uses update.sh's runtime, compose, files, services, unit and WAIT_SECONDS.
+# "Updates"). Uses update.sh's runtime, compose, services, unit and WAIT_SECONDS.
 
 # Whether this Compose can `up --wait`: docker-compose can, Docker's own and the one `podman
 # compose` hands the files to as deploy/README.md step 2 installs it; podman-compose cannot.
@@ -13,7 +13,7 @@ compose_waits() {
 
 unhealthy() {
   fail "the stack did not report healthy within $((WAIT_SECONDS / 60)) minutes; see:" \
-    "${compose[*]} ${files[*]} ps, and its logs"
+    "${compose[*]} ps, and its logs"
 }
 
 # Without `up --wait`: api's and core's healthcheck, compose.yaml's x-healthz, run until each
@@ -22,7 +22,7 @@ HEALTHZ="fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1),(
 await_healthz() {
   local service deadline=$((SECONDS + WAIT_SECONDS))
   for service in api core; do
-    until "${compose[@]}" "${files[@]}" exec -T "$service" node -e "$HEALTHZ" >/dev/null 2>&1; do
+    until "${compose[@]}" exec -T "$service" node -e "$HEALTHZ" >/dev/null 2>&1; do
       ((SECONDS < deadline)) || unhealthy
       sleep 2
     done
@@ -47,15 +47,15 @@ recreate_stack() {
     echo "Restarting $unit ..."
     systemctl restart "$unit"
     if ((${#wait_args[@]} > 0)); then
-      "${compose[@]}" "${files[@]}" up -d --no-recreate "${wait_args[@]}" || unhealthy
+      "${compose[@]}" up -d --no-recreate "${wait_args[@]}" || unhealthy
     fi
   else
     if [[ -n $updater ]]; then
-      "${compose[@]}" "${files[@]}" rm -sf proxy
+      "${compose[@]}" rm -sf proxy
     elif [[ $runtime == podman ]]; then
-      "${compose[@]}" "${files[@]}" down
+      "${compose[@]}" down
     fi
-    "${compose[@]}" "${files[@]}" up -d "${wait_args[@]}" "${services[@]}" || unhealthy
+    "${compose[@]}" up -d "${wait_args[@]}" "${services[@]}" || unhealthy
   fi
   ((${#wait_args[@]} > 0)) || await_healthz
 }

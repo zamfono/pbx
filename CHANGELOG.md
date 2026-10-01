@@ -125,6 +125,12 @@ why the specified behaviour changed; the commit history, how.
   `VERSION`, from `compose.yaml`. Where `.env` sets `ZAMFONO_VERSION` more than once, the updater
   now takes the last line, as Compose and `update.sh` do, and answers with an error for an
   `.env` it cannot read instead of taking it for one that sets nothing.
+- The stack directory keeps the mode's overlay as `compose.override.yaml`, a link to
+  `compose.ports.yaml` or `compose.macvlan.yaml` that `setup.sh` makes and Compose reads beside
+  `compose.yaml` by itself, so every command is a plain `docker compose up -d`, `pull` or `logs`
+  without `-f`. The Podman boot unit `setup.sh` installs runs `podman compose up -d`; a unit
+  installed earlier keeps working as it is. `update.sh` makes the link for a stack that has none,
+  from the overlay its boot unit names, else from whether `.env` sets `STACK_IPV4`.
 
 ### Fixed
 
@@ -172,6 +178,13 @@ why the specified behaviour changed; the commit history, how.
   onward call when it was transferred, in `GET /parking/calls` when it was parked, and as the
   caller of a party added from its side. The first two now show the number the call went to,
   the last the call's own caller.
+
+### Upgrade notes
+
+- **After updating from 0.1.0**, run `./update.sh` once more in the stack directory: 0.1.0's own
+  `update.sh` installs this release without the `compose.override.yaml` link, and the second run,
+  which finds the stack already on this release, makes it. Until then, run Compose with
+  `-f compose.yaml -f <overlay>` as before.
 
 ## [0.1.0] - 2026-09-30
 

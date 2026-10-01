@@ -1,7 +1,7 @@
 # The integration overlay (§8): the stack as it ships, plus the `sipp` containers on `internal`
 # that play every side of a call — the trunks that deliver an inbound call, and the phone that
-# registers and answers it. Layered over compose.yaml and compose.ports.yaml, so what CI exercises
-# is the file an operator runs, not a copy of it.
+# registers and answers it. Layered over compose.yaml and compose.override.yaml, the link to
+# compose.ports.yaml setup.sh makes, so what CI exercises is the files an operator runs, not a copy.
 #
 # The harness's sipp: SIPp 3.5.1, the build `ctaloi/sipp` has published since 2017, pinned by
 # digest, since the harness depends on what that release does (no TLS Asterisk's transports

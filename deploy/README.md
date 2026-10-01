@@ -21,8 +21,8 @@ review, the other tests this directory.
 
 ## 1. Pick a mode and a runtime
 
-**Mode.** The one structural decision, and the overlay you name on every `compose` command from
-then on:
+**Mode.** The one structural decision, and the overlay the stack runs with: `setup.sh` links it as
+`compose.override.yaml`, which Compose reads beside `compose.yaml` on every command from then on:
 
 | Mode                     | Use it when                                                  | Overlay                |
 | ------------------------ | ------------------------------------------------------------ | ---------------------- |
@@ -219,6 +219,7 @@ instead of a question. The header of `setup.sh` lists them.
 
 ```bash
 cp .env.example .env
+ln -s compose.ports.yaml compose.override.yaml      # mode A; mode B: compose.macvlan.yaml
 ```
 
 Set the address for your mode — exactly one of the two:
@@ -268,8 +269,7 @@ Leave it empty instead and the owner gets a set-password mail, which needs `SMTP
 ## 6. Start it
 
 ```bash
-docker compose -f compose.yaml -f compose.ports.yaml up -d      # mode A
-docker compose -f compose.yaml -f compose.macvlan.yaml up -d    # mode B
+docker compose up -d
 ```
 
 `migrate` applies the schema and exits; `api` starts on its success, `core` once `api` is healthy.
@@ -280,7 +280,7 @@ music, and never seeds again. Check it, from outside in mode B:
 curl -fsS https://<your FQDN>/healthz
 ```
 
-If it fails, `docker compose -f compose.yaml -f <overlay> logs proxy api` shows whether the
+If it fails, `docker compose logs proxy api` shows whether the
 certificate or the application is the problem; a certificate failure is almost always DNS or
 port 80.
 
@@ -288,7 +288,7 @@ port 80.
 
 `setup.sh` offers to install this unit, named after the stack directory, and then prints the
 `systemctl` commands to start, stop and inspect the stack through it. By hand, one unit per
-stack directory (here `/srv/zamfono`; mode A shown):
+stack directory (here `/srv/zamfono`):
 
 ```ini
 # /etc/systemd/system/zamfono.service
@@ -302,8 +302,8 @@ Requires=podman.socket
 Type=oneshot
 RemainAfterExit=true
 WorkingDirectory=/srv/zamfono
-ExecStart=/usr/bin/podman compose -f compose.yaml -f compose.ports.yaml up -d
-ExecStop=/usr/bin/podman compose -f compose.yaml -f compose.ports.yaml down
+ExecStart=/usr/bin/podman compose up -d
+ExecStop=/usr/bin/podman compose down
 
 [Install]
 WantedBy=multi-user.target
@@ -351,13 +351,13 @@ release on its own, after a backup, at a quiet moment with no call in progress, 
 owners when that fails or when a breaking release needs `update.sh` (`zamfono.help update-stack`).
 
 **By hand**, the steps `update.sh` takes are: unpack the new bundle over the stack directory, then
-pull and recreate with the same overlay as always:
+pull and recreate:
 
 ```bash
 curl -fsSL https://github.com/zamfono/pbx/releases/latest/download/zamfono-deploy.tar.gz \
   | tar xz --strip-components=1
-docker compose -f compose.yaml -f <overlay> pull
-docker compose -f compose.yaml -f <overlay> up -d
+docker compose pull
+docker compose up -d
 ```
 
 **Podman** refuses to replace `asterisk` while `proxy` still shares its network namespace, so
@@ -366,7 +366,7 @@ Remove the containers first — `down` keeps every volume — or, with the boot 
 restart it, which does the same:
 
 ```bash
-podman compose -f compose.yaml -f <overlay> pull
+podman compose pull
 systemctl restart zamfono.service    # or: podman compose ... down && podman compose ... up -d
 ```
 

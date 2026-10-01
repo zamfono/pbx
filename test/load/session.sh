@@ -40,7 +40,9 @@ API_IMAGE=${API_IMAGE:-zamfono/api:load}
 PROXY_IMAGE=${PROXY_IMAGE:-zamfono/proxy:load}
 export ASTERISK_IMAGE MIGRATE_IMAGE CORE_IMAGE API_IMAGE PROXY_IMAGE
 
-compose_args=(-f compose.yaml -f compose.ports.yaml -f "$here/compose.load.yaml")
+# compose.override.yaml is the ports overlay setup.sh links; with a `-f` for the load overlay,
+# Compose reads it only when named.
+compose_args=(-f compose.yaml -f compose.override.yaml -f "$here/compose.load.yaml")
 # shellcheck source=test/load/lib-stack.sh
 . "$here/lib-stack.sh"
 

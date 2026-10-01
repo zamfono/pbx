@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { projectFromLabels } from './docker.js';
 
 describe('projectFromLabels', () => {
-  it('reads the project, its host directory and every file Compose read', () => {
+  it('reads the project and its host directory', () => {
     expect(
       projectFromLabels({
         'com.docker.compose.project': 'zamfono',
@@ -11,14 +11,7 @@ describe('projectFromLabels', () => {
         'com.docker.compose.project.config_files':
           '/srv/zamfono/compose.yaml,/srv/zamfono/compose.ports.yaml'
       })
-    ).toEqual({
-      name: 'zamfono',
-      workingDir: '/srv/zamfono',
-      configFiles: [
-        '/srv/zamfono/compose.yaml',
-        '/srv/zamfono/compose.ports.yaml'
-      ]
-    });
+    ).toEqual({ name: 'zamfono', workingDir: '/srv/zamfono' });
   });
 
   it('refuses a container Compose did not create', () => {

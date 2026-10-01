@@ -16,23 +16,12 @@ async function tempDir(): Promise<string> {
 async function fakeScript(dir: string, code: number): Promise<void> {
   await writeFile(
     path.join(dir, 'update.sh'),
-    `echo "args=$*"\necho "updater=$ZAMFONO_UPDATER files=$ZAMFONO_COMPOSE_FILES project=$COMPOSE_PROJECT_NAME host=$DOCKER_HOST"\nexit ${code}\n`
+    `echo "args=$*"\necho "updater=$ZAMFONO_UPDATER project=$COMPOSE_PROJECT_NAME host=$DOCKER_HOST"\nexit ${code}\n`
   );
 }
 
-function project(workingDir: string): {
-  name: string;
-  workingDir: string;
-  configFiles: string[];
-} {
-  return {
-    name: 'zamfono',
-    workingDir,
-    configFiles: [
-      `${workingDir}/compose.yaml`,
-      `${workingDir}/compose.ports.yaml`
-    ]
-  };
+function project(workingDir: string): { name: string; workingDir: string } {
+  return { name: 'zamfono', workingDir };
 }
 
 describe('createRunner', () => {
@@ -58,7 +47,7 @@ describe('createRunner', () => {
     );
     expect(logText).toContain('args=0.0.7');
     expect(logText).toContain(
-      `updater=1 files=${stackDir}/compose.yaml ${stackDir}/compose.ports.yaml project=zamfono host=unix:///var/run/docker.sock`
+      'updater=1 project=zamfono host=unix:///var/run/docker.sock'
     );
     expect((await loadState(stackDir)).state).toBe('succeeded');
   });

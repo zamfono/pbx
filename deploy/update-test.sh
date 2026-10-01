@@ -143,9 +143,9 @@ grep -qE "^BACKUP_PASSWORD='[0-9a-f]{48}'$" "$work/stack/.env" || fail "no BACKU
 grep -qE "^UPDATER_TOKEN='[0-9a-f]{48}'$" "$work/stack/.env" || fail "no UPDATER_TOKEN added"
 grep -qx "CONTAINER_SOCKET='/var/run/docker.sock'" "$work/stack/.env" || fail "no CONTAINER_SOCKET added"
 [[ $(stat -c %a "$work/stack/.env") == 600 ]] || fail ".env is no longer private"
-grep -qx 'compose -f compose.yaml -f compose.ports.yaml pull' "$work/runtime.log" ||
+grep -qx 'compose pull' "$work/runtime.log" ||
   fail "no pull of the whole stack: $(cat "$work/runtime.log")"
-grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d --wait --wait-timeout 180' \
+grep -qx 'compose up -d --wait --wait-timeout 180' \
   "$work/runtime.log" || fail "no up -d --wait of the whole stack"
 grep -q 'rm -sf proxy' "$work/runtime.log" && fail "Docker needs no removal of proxy"
 grep -q 'Updated 1.2.3 -> 1.2.4' "$work/out" || fail "no report of the update"
@@ -161,14 +161,45 @@ rm "$work/stack/VERSION"
 update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update without VERSION failed"; }
 [[ $(pin) == '1.2.4 ZAMFONO_VERSION:-1.2.4' ]] || fail "the stack pins $(pin), not 1.2.4"
 
+echo "  - a stack set up without compose.override.yaml gets it, its overlay derived once"
+# overlay_after_update [podman] — the overlay the link names after an update of a stack without one.
+overlay_after_update() {
+  rm "$work/stack/compose.override.yaml"
+  update --check 1.2.4 >/dev/null 2>&1
+  [[ ! -e $work/stack/compose.override.yaml ]] || fail "--check linked compose.override.yaml"
+  if [[ ${1:-} == podman ]]; then
+    podman_update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update without a link failed"; }
+  else
+    update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update without a link failed"; }
+  fi
+  readlink "$work/stack/compose.override.yaml"
+}
+fresh_stack
+[[ $(overlay_after_update) == compose.ports.yaml ]] || fail "a ports stack was not linked to compose.ports.yaml"
+fresh_stack
+sed -i "s/^STACK_IPV4=.*/STACK_IPV4='203.0.113.34'/" "$work/stack/.env"
+[[ $(overlay_after_update) == compose.macvlan.yaml ]] ||
+  fail "a stack with a STACK_IPV4 was not linked to compose.macvlan.yaml"
+# A boot unit setup.sh wrote with the overlay in its command line names it, whatever .env says.
+fresh_stack
+cat >"$work/units/zamfono-test.service" <<UNIT
+[Service]
+WorkingDirectory=$work/stack
+ExecStart=/usr/bin/podman compose -f compose.yaml -f compose.macvlan.yaml up -d
+ExecStop=/usr/bin/podman compose -f compose.yaml -f compose.macvlan.yaml down
+UNIT
+[[ $(overlay_after_update podman) == compose.macvlan.yaml ]] ||
+  fail "the boot unit's overlay was not the one linked"
+rm "$work/units/zamfono-test.service"
+
 echo "  - on Podman without a boot unit"
 fresh_stack
 podman_update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update on Podman failed"; }
 grep -qx "CONTAINER_SOCKET='/run/podman/podman.sock'" "$work/stack/.env" ||
   fail "no Podman CONTAINER_SOCKET added"
 # Podman will not replace asterisk while proxy shares its network namespace (§6.3): down, then up.
-[[ $(grep -E ' (down|up -d|rm)' "$work/runtime.log") == "compose -f compose.yaml -f compose.ports.yaml down
-compose -f compose.yaml -f compose.ports.yaml up -d --wait --wait-timeout 180" ]] ||
+[[ $(grep -E ' (down|up -d|rm)' "$work/runtime.log") == "compose down
+compose up -d --wait --wait-timeout 180" ]] ||
   fail "no down before up -d on Podman: $(cat "$work/runtime.log")"
 
 echo "  - on podman-compose, which has no up --wait and no rm: api's and core's /healthz polled"
@@ -176,12 +207,12 @@ fresh_stack
 STUB_PODMAN_COMPOSE=1 podman_update 1.2.4 >"$work/out" 2>&1 ||
   { cat "$work/out"; fail "the update on podman-compose failed"; }
 grep -q 'no up --wait' "$work/out" || fail "no word of the polling path: $(cat "$work/out")"
-grep -qx 'compose -f compose.yaml -f compose.ports.yaml down' "$work/runtime.log" ||
+grep -qx 'compose down' "$work/runtime.log" ||
   fail "no down on podman-compose: $(cat "$work/runtime.log")"
-grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d' "$work/runtime.log" ||
+grep -qx 'compose up -d' "$work/runtime.log" ||
   fail "no plain up -d on podman-compose: $(cat "$work/runtime.log")"
 for service in api core; do
-  grep -q "^compose -f compose.yaml -f compose.ports.yaml exec -T $service node -e fetch(" \
+  grep -q "^compose exec -T $service node -e fetch(" \
     "$work/runtime.log" || fail "$service's /healthz was not polled"
 done
 grep -q 'Updated 1.2.3 -> 1.2.4' "$work/out" || fail "no report of the update on podman-compose"
@@ -191,12 +222,12 @@ fresh_stack
 cat >"$work/units/zamfono-test.service" <<UNIT
 [Service]
 WorkingDirectory=$work/stack
-ExecStart=/usr/bin/podman compose -f compose.yaml -f compose.ports.yaml up -d
-ExecStop=/usr/bin/podman compose -f compose.yaml -f compose.ports.yaml down
+ExecStart=/usr/bin/podman compose up -d
+ExecStop=/usr/bin/podman compose down
 UNIT
 podman_update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update through the unit failed"; }
 [[ $(grep -E '^systemctl| (down|up -d|rm)' "$work/runtime.log") == "systemctl restart zamfono-test.service
-compose -f compose.yaml -f compose.ports.yaml up -d --no-recreate --wait --wait-timeout 180" ]] ||
+compose up -d --no-recreate --wait --wait-timeout 180" ]] ||
   fail "no unit restart and up --no-recreate --wait: $(cat "$work/runtime.log")"
 fresh_stack
 STUB_PODMAN_COMPOSE=1 podman_update 1.2.4 >"$work/out" 2>&1 ||
@@ -213,7 +244,7 @@ grep -q 'did not report healthy' "$work/out" || fail "no word of the failed up: 
 update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the rerun failed"; }
 grep -q 'finishing it' "$work/out" || fail "the rerun did not finish the update: $(cat "$work/out")"
 grep -q ' pull' "$work/runtime.log" && fail "the rerun pulled again"
-grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d --wait --wait-timeout 180' \
+grep -qx 'compose up -d --wait --wait-timeout 180' \
   "$work/runtime.log" || fail "the rerun did not recreate the stack"
 update 1.2.4 | grep -q 'Already on 1.2.4' || fail "the finished update is still pending"
 record_is "$work/stack/.update/state.json" succeeded '' 1.2.4
@@ -281,17 +312,17 @@ update --yes 2.0.0 >/dev/null 2>&1 || fail "the breaking update with --yes faile
 
 echo "  - the updater's run: never breaking, never itself"
 fresh_stack
-(cd "$work/stack" && ZAMFONO_UPDATER=1 ZAMFONO_COMPOSE_FILES='compose.yaml compose.ports.yaml' \
+(cd "$work/stack" && ZAMFONO_UPDATER=1 \
   PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_REPO_URL="http://127.0.0.1:$port" \
   ./update.sh 2.0.0 </dev/null >/dev/null 2>&1) && fail "the updater ran a breaking update"
-(cd "$work/stack" && ZAMFONO_UPDATER=1 ZAMFONO_COMPOSE_FILES='compose.yaml compose.ports.yaml' \
+(cd "$work/stack" && ZAMFONO_UPDATER=1 \
   PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_REPO_URL="http://127.0.0.1:$port" \
   ./update.sh 1.2.4 </dev/null >"$work/out" 2>&1) || { cat "$work/out"; fail "the updater's run failed"; }
-grep -qx 'compose -f compose.yaml -f compose.ports.yaml pull asterisk migrate core api proxy' \
+grep -qx 'compose pull asterisk migrate core api proxy' \
   "$work/runtime.log" || fail "the updater pulled more than the stack: $(cat "$work/runtime.log")"
-grep -qx 'compose -f compose.yaml -f compose.ports.yaml rm -sf proxy' "$work/runtime.log" ||
+grep -qx 'compose rm -sf proxy' "$work/runtime.log" ||
   fail "the updater did not remove proxy first"
-grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d --wait --wait-timeout 180 asterisk'\
+grep -qx 'compose up -d --wait --wait-timeout 180 asterisk'\
 ' migrate core api proxy' "$work/runtime.log" || fail "the updater recreated more than the stack"
 grep -q '^CONTAINER_SOCKET=' "$work/stack/.env" && fail "the updater guessed a CONTAINER_SOCKET"
 [[ ! -e $work/stack/.update ]] || fail "the updater's run wrote the record the updater keeps itself"

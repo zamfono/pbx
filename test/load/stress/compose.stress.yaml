@@ -1,4 +1,5 @@
-# test/load/stress: layered over deploy/compose.yaml + compose.ports.yaml + test/load's own
+# test/load/stress: layered over deploy/compose.yaml + compose.ports.yaml (as the stack's
+# compose.override.yaml link) + test/load's own
 # compose.load.yaml (network, static asterisk address, sipp containers). Adds what the
 # heavy-codec profile needs on top:
 #   - sipp (the trunk side, UDP) also mounts /load-gen, where the session puts the AMR-WB pcap

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Writes this stack's .env (README.md, step 5): asks for what only the operator knows, generates
 # every secret, hashes the owner's password with the api image, and never overwrites an .env
-# that holds anything — a new SECRETBOX_KEY would make the existing database unreadable.
+# that holds anything — a new SECRETBOX_KEY would make the existing database unreadable. It links
+# the mode's overlay as compose.override.yaml, which Compose reads beside compose.yaml on its own.
 #
 # Each answer can come from the environment under its .env name, and is then not asked; with
 # SETUP_NONINTERACTIVE=1, or without a terminal, every answer must. Beyond the .env names:
@@ -191,8 +192,9 @@ main() {
     BACKUP_PASSWORD UPDATER_TOKEN CONTAINER_SOCKET SMTP_HOST SMTP_PORT SMTP_SECURITY SMTP_USER \
     SMTP_PASSWORD MAIL_FROM BOOTSTRAP_OWNER_EMAIL BOOTSTRAP_OWNER_NAME BOOTSTRAP_OWNER_PASSWORD_HASH \
     COMPANY_NAME MAIN_DID COUNTRY EXT_LENGTH TZ
+  ln -sfn "$overlay" compose.override.yaml
 
-  echo "Wrote $PWD/.env (readable by root only)."
+  echo "Wrote $PWD/.env (readable by root only), and linked compose.override.yaml to $overlay."
   echo "Keep a copy of it off this host: SECRETBOX_KEY is the only way to read the encrypted data,"
   echo "and BACKUP_PASSWORD the only way to open the local backups."
   check_dns "$FQDN" "$address"
@@ -209,7 +211,7 @@ main() {
   if [[ -n $boot_unit ]]; then
     print_unit_usage
   else
-    echo "  cd $PWD && ${compose[*]} -f compose.yaml -f $overlay up -d"
+    echo "  cd $PWD && ${compose[*]} up -d"
   fi
 }
 
