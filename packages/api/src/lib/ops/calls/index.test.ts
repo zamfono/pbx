@@ -166,7 +166,8 @@ describe('calls', () => {
       state: 'up',
       startedAt: nowIso(),
       ringGroupId: null,
-      userIds: ['u1']
+      userIds: ['u1'],
+      connectedUserIds: ['u1']
     };
     const otherCall: LiveCall = {
       callId: 'call-2',
@@ -176,7 +177,8 @@ describe('calls', () => {
       state: 'up',
       startedAt: nowIso(),
       ringGroupId: null,
-      userIds: ['u2']
+      userIds: ['u2'],
+      connectedUserIds: ['u2']
     };
     const state: StateResponse = {
       calls: [ownCall, otherCall],

@@ -64,6 +64,30 @@ const inputSchema = z
 
 type Input = z.infer<typeof inputSchema>;
 
+/** A live call as `calls.list` answers it: `connectedUserIds` is `api`'s own to check. */
+function listedLiveCall(call: LiveCall): Omit<LiveCall, 'connectedUserIds'> {
+  const {
+    callId,
+    direction,
+    from,
+    to,
+    state,
+    startedAt,
+    ringGroupId,
+    userIds
+  } = call;
+  return {
+    callId,
+    direction,
+    from,
+    to,
+    state,
+    startedAt,
+    ringGroupId,
+    userIds
+  };
+}
+
 /** Whether live call `call` matches `input`'s filters and, for a `user` actor, `ownUserId`. */
 function matchesLive(
   call: LiveCall,
@@ -87,7 +111,8 @@ function matchesLive(
 
 /**
  * `GET /calls` (§10.2 "Call history", "Live calls", §5.3): a `user` sees only calls where they
- * are the caller, the callee or the answering user; `live: true` returns the calls `core`
+ * are the caller, the callee or the answering user, and of the calls in progress also those a leg
+ * of theirs rings or is up in (§10.3 "Live calls"); `live: true` returns the calls `core`
  * currently has in progress instead of history rows, unpaginated. History holds only ended calls:
  * a call in progress already has its row (core's placeholder, so recordings can reference it), but
  * that row is not a durable outcome until the call ends (§10.1 "Call aggregate").
@@ -113,7 +138,9 @@ export const list = defineOperation({
     if (input.live === true) {
       const state = await getCoreClient().state();
       return {
-        items: state.calls.filter(call => matchesLive(call, input, ownUserId)),
+        items: state.calls
+          .filter(call => matchesLive(call, input, ownUserId))
+          .map(listedLiveCall),
         nextCursor: null
       };
     }

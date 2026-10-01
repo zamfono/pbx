@@ -141,9 +141,10 @@ export function resolveActingUserId(
 }
 
 /**
- * Throws 403 unless `ctx.actor` is a party to the live call `callId` (§10.3 "Live calls"), or is
- * an admin/owner; a call absent from `core`'s live state answers 403 too, since a `user` has no
- * standing over a call that either already ended or never existed.
+ * Throws 403 unless `ctx.actor` may end or transfer the live call `callId` (§10.3 "Live calls"):
+ * an admin/owner any call, a `user` one they placed or have a leg up in, not one they only see
+ * (as its callee, or rung for it). A call absent from `core`'s live state answers 403 too, since a
+ * `user` has no standing over a call that either already ended or never existed.
  */
 export async function assertOwnLiveCall(
   ctx: Context,
@@ -154,7 +155,7 @@ export async function assertOwnLiveCall(
   }
   const state = await coreClient.state();
   const call = state.calls.find(candidate => candidate.callId === callId);
-  if (!call?.userIds.includes(ctx.actor.id)) {
+  if (!call?.connectedUserIds.includes(ctx.actor.id)) {
     throw new OpError(
       STATUS_FORBIDDEN,
       'calls: may act only on your own live call'

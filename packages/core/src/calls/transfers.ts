@@ -117,7 +117,9 @@ async function startTransfereeCall(
   return child;
 }
 
-/** The transferrer's channel in `call`: the actor's own, else the answerer's, else the caller's. */
+/** The transferrer's channel in `call`: the actor's own, else the answerer's, else the caller's.
+ * Only an admin's transfer of someone else's call reaches the fallbacks: `api` lets a `user`
+ * transfer a call only as its caller or with a leg up in it (§10.3 "Live calls"). */
 function transferrerChannel(call: Call, actorUserId: string): string {
   const answerer =
     call.answeredByUserId === null

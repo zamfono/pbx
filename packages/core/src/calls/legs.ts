@@ -5,6 +5,7 @@
 import type { AriEvent, Channel } from '../ari/types.js';
 import { bridgeAnswered, claimAnswer } from './answer.js';
 import type { Call, Leg } from './call.js';
+import { callPartiesChanged } from './callState.js';
 import {
   beginFindMeAccept,
   clearFindMeTimers,
@@ -49,12 +50,17 @@ export type FindMeAcceptWait = {
 export function trackLeg(pipeline: Pipeline, call: Call, leg: Leg): void {
   call.legs.set(leg.channelId, leg);
   pipeline.callByChannel.set(leg.channelId, call);
+  callPartiesChanged(pipeline.deps, call);
 }
 
 export function endLeg(pipeline: Pipeline, channelId: string, leg: Leg): void {
+  const call = pipeline.callByChannel.get(channelId);
   leg.state = 'ended';
   pipeline.callByChannel.delete(channelId);
   pipeline.pendingFindMeAccept.delete(channelId);
+  if (call !== undefined) {
+    callPartiesChanged(pipeline.deps, call);
+  }
 }
 
 /** Ends `leg` and hangs up its still-live channel; never for a channel that already ended itself. */

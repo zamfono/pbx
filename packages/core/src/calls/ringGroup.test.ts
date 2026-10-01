@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
+import { newId, nowIso, openDb, type Db, type Envelope } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
@@ -360,6 +360,75 @@ describe('ringGroup', () => {
       }
       expect(hangups(fakeAri, channel.id)).toBe(1);
     }
+  });
+
+  it('a member sees the call while their leg rings, and is told when it stops (§10.3 "Live calls", §10.6)', async () => {
+    const groupId = await seedRingGroup(db, {
+      strategy: 'simultaneous',
+      ringTimeoutS: 20
+    });
+    const [declining, winning, losing] = await Promise.all([
+      seedUser(db),
+      seedUser(db),
+      seedUser(db)
+    ]);
+    const members = [declining, winning, losing];
+    await Promise.all(
+      members.map((userId, index) => seedDevice(db, userId, `seen-${index}`))
+    );
+    await Promise.all(
+      members.map((userId, index) => seedMember(db, groupId, index, userId))
+    );
+    const events: Extract<Envelope, { type: 'call.state' }>[] = [];
+    pipeline.deps.bus.subscribe(envelope => {
+      if (envelope.type === 'call.state') {
+        events.push(envelope);
+      }
+    });
+    const eventsFor = (userId: string): string[] =>
+      events
+        .filter(event => event.userIds.includes(userId))
+        .map(event => `${event.state}${event.usersOnly ? '*' : ''}`);
+    const liveUsers = (): string[] =>
+      [...(pipeline.deps.state.calls.get(call.id)?.userIds ?? [])].sort();
+    fakeAri.answerAfterMs = 60_000;
+
+    const finished = ringGroup(pipeline, call, groupId);
+    await membersRinging(call, 3);
+    expect(liveUsers()).toEqual([...members].sort());
+    expect(pipeline.deps.state.calls.get(call.id)?.connectedUserIds).toEqual(
+      []
+    );
+    const listed = await ari.channels.list();
+    const channelOf = (index: number): string =>
+      listed.find(entry => entry.name === `PJSIP/seen-${index}`)?.id ?? '';
+
+    fakeAri.emit({
+      type: 'ChannelDestroyed',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: defaultChannel({ id: channelOf(0) }),
+      cause: AST_CAUSE_USER_BUSY
+    });
+    await eventually(() => {
+      expect(liveUsers()).toEqual([winning, losing].sort());
+    });
+    fakeAri.emit({
+      type: 'ChannelStateChange',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: defaultChannel({ id: channelOf(1), state: 'Up' })
+    });
+    await finished;
+
+    expect(liveUsers()).toEqual([winning]);
+    expect(pipeline.deps.state.calls.get(call.id)?.connectedUserIds).toEqual([
+      winning
+    ]);
+    // `*` marks an event for these users alone: the call is new to them, or no longer theirs.
+    expect(eventsFor(declining)).toEqual(['ringing*', 'ended*']);
+    expect(eventsFor(losing)).toEqual(['ringing*', 'up', 'ended*']);
+    expect(eventsFor(winning)).toEqual(['ringing*', 'up']);
   });
 
   it("names a phone-book caller on the member legs: the contact's display name is the caller-ID name (§10.2)", async () => {

@@ -7,6 +7,7 @@
  */
 import type { AriEvent, Channel } from '../ari/types.js';
 import type { Call } from './call.js';
+import { callPartiesChanged } from './callState.js';
 import { externalAttemptDialsOn } from './externalLeg.js';
 import { hangupMemberSiblings, type GroupLeg } from './groupLegs.js';
 import type { Pipeline } from './pipeline.js';
@@ -49,11 +50,13 @@ function handleDecline(
   if (declined && !ctx.allowReject) {
     // §10.1 step 5: with allow_reject cleared, a decline is ignored, so it must not end the
     // batch early — the member's line drops, but the batch still rings on to its own timeout.
+    callPartiesChanged(ctx.pipeline.deps, ctx.call);
     return;
   }
   if (declined) {
     hangupMemberSiblings(ctx.pipeline, ctx.tracked, leg.memberKey);
   }
+  callPartiesChanged(ctx.pipeline.deps, ctx.call);
   ctx.checkStillRinging();
 }
 

@@ -99,7 +99,8 @@ describe('renderMetrics', () => {
           state: 'up',
           startedAt: nowIso(),
           ringGroupId: null,
-          userIds: ['owner']
+          userIds: ['owner'],
+          connectedUserIds: ['owner']
         }
       ],
       trunks: {},

@@ -22,11 +22,18 @@ export type Event =
       userId: string | null;
       /**
        * Every user the call is theirs to see (§10.6 "own calls"): the caller, the callee, the
-       * answerer and every user one of its legs rang or connected. Routing data for `api`'s
+       * answerer and every user with a leg ringing or up right now. Routing data for `api`'s
        * per-subscriber filter on the internal stream only; `publicEnvelope` strips it before a
        * subscriber or a webhook receives the event.
        */
       userIds: string[];
+      /**
+       * Set while the call's own state is unchanged and it starts or stops being the call of the
+       * users `userIds` names (§10.6): `ended` for those it is no longer theirs, its state for those
+       * it now is. Delivered to those users alone, never to an admin or a webhook; internal like
+       * `userIds`.
+       */
+      usersOnly?: true;
     }
   | {
       type: 'voicemail.new';

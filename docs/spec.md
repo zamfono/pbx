@@ -1296,7 +1296,7 @@ A `sip` target's `headers` is a list of `{ name, value }` (§9.4 Header template
 
 **Settings** (min. role: admin; owners for the columns marked 👑 in §11.4) — `GET/PATCH /settings` — the columns of the singleton row (§11.4) under their wire names; unknown fields rejected, secret values masked; a change to the tenant's Ringotel profile reaches Ringotel after the write committed, and a refusal is a `warnings` entry of the result, never a failed write (§10.4 "Tenant profile push")
 
-**Live calls** (min. role: user (own scope) / admin) — `GET /calls?live=true` (the calls in progress, with ring-group context per call), `POST /calls` (click-to-dial: target, optional `userId` for admins, §10.2), `POST /calls/{id}/transfer`, `POST /calls/{id}/pickup`, `POST /calls/{id}/hangup`
+**Live calls** (min. role: user (own scope) / admin) — `GET /calls?live=true` (the calls in progress, with ring-group context per call), `POST /calls` (click-to-dial: target, optional `userId` for admins, §10.2), `POST /calls/{id}/transfer`, `POST /calls/{id}/pickup`, `POST /calls/{id}/hangup`; a `user`'s own scope: the live calls list a call they placed, were called on or answered, or that a leg of theirs rings or is up in right now, and they transfer or hang up only a call they placed or have a leg up in
 
 **Search** (min. role: user) — `GET /search?q=` (users, ring groups, contacts; §10.2 "Search")
 
@@ -1413,7 +1413,7 @@ Consumers are the future admin frontends, the operator's tooling and integration
 
 **Authentication** happens in the first message: the client sends `{ "type": "auth", "token": "<jwt>" }` as its first frame, and the server closes a connection that sends anything else first, or nothing within 5 s. The token never travels in the URL, since Caddy logs every request line and a log shipper forwards it off the host (§7).
 
-Visibility follows roles: `admin` and `owner` receive every event; a `user` receives events about themselves (own presence, own calls, and voicemails for the mailboxes they may read, §5.3) plus the tenant-scope `ooo` and `hours` events.
+Visibility follows roles: `admin` and `owner` receive every event; a `user` receives events about themselves (own presence, own calls, and voicemails for the mailboxes they may read, §5.3) plus the tenant-scope `ooo` and `hours` events. A call is a user's own while the live calls list it for them (§10.3 "Live calls"): a user whose leg starts ringing it receives its current state, one it stops being the call of while it goes on, their leg having stopped ringing or left, receives `ended`, and nothing of it after; neither event goes to an admin or a webhook.
 
 Server-to-client messages:
 

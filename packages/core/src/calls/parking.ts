@@ -9,6 +9,7 @@ import type { Snapshot } from '../internal/server.js';
 import type { Presence } from '../presence.js';
 import { release, type Call } from './call.js';
 import { activeCallOf, channelOf, otherChannelIn } from './callLookup.js';
+import { callPartiesChanged } from './callState.js';
 import {
   concludeFeature,
   RELEASE_CODE_FORBIDDEN,
@@ -120,6 +121,7 @@ async function dropParker(
   } else if (parkerLeg !== undefined) {
     recorder?.onLegEnded(active, parkerLeg).catch(() => undefined);
     parkerLeg.state = 'ended';
+    callPartiesChanged(pipeline.deps, active);
   }
   pipeline.callByChannel.delete(parkerChannelId);
   await pipeline.deps.ari.channels

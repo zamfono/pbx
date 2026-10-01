@@ -23,7 +23,9 @@ All webhook operations are `admin`.
 `eventTypes` is a list of the type names below, such as `["call.state", "voicemail.new"]`; `null`
 or left out delivers every event. On `webhooks.update`, `null` clears the filter and leaving the
 field out keeps it. A hook receives every event its filter admits, whatever role created it: the
-per-role visibility of `/events` does not apply.
+per-role visibility of `/events` does not apply. There a `user` receives a call's `call.state`
+events while it is theirs to see (`guardrails`), and `ended` once it stops being theirs while it
+goes on for others, as when their phone stops ringing; a hook never receives that `ended`.
 
 ## Events and payloads
 

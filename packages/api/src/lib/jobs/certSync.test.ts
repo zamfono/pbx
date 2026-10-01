@@ -38,7 +38,8 @@ const LIVE_CALL: StateResponse['calls'][number] = {
   state: 'up',
   startedAt: '2026-01-01T00:00:00.000Z',
   ringGroupId: null,
-  userIds: []
+  userIds: [],
+  connectedUserIds: []
 };
 
 function stubCoreClient(): StubCoreClient {

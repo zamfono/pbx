@@ -13,6 +13,7 @@
 import type { AriEvent } from '../ari/types.js';
 import type { Call } from './call.js';
 import { otherChannelIn } from './callLookup.js';
+import { callPartiesChanged } from './callState.js';
 import { closeCall } from './liveCall.js';
 import type { Pipeline } from './pipeline.js';
 import { userOfChannel } from './transfers.js';
@@ -62,6 +63,7 @@ function handOver(
     state: 'up',
     endCause: null
   });
+  callPartiesChanged(pipeline.deps, consultation);
 }
 
 /** A `link` join: the transferee moves into the consultation's bridge and the Local pair ends. */

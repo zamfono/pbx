@@ -9,7 +9,7 @@ import { MS_PER_SECOND } from '@zamfono/shared';
 import type { Snapshot } from '../internal/server.js';
 import type { MemberLeg } from '../routing/ringGroup.js';
 import type { Call } from './call.js';
-import { callRinging } from './callState.js';
+import { callPartiesChanged, callRinging } from './callState.js';
 import { hangupAllRinging } from './groupLegs.js';
 // --- Task 31 ---
 import { registerActiveBatch, unregisterActiveBatch } from './groupPickup.js';
@@ -32,6 +32,7 @@ export async function ringBatch(
 ): Promise<BatchOutcome> {
   callRinging(pipeline.deps, call);
   const race = createBatchRace(pipeline, call, allowReject);
+  call.batchLegs = race.tracked;
   pipeline.deps.ari.on('event', race.onEvent);
   // --- Task 31 --- (`stopGroupRinging`'s own registry, `groupPickup.ts`)
   registerActiveBatch(pipeline, call.id, {
@@ -46,6 +47,8 @@ export async function ringBatch(
     tracked: race.tracked,
     end: race.endLeg
   });
+  // The members it now rings see the call (§10.6), which rang before their legs existed.
+  callPartiesChanged(pipeline.deps, call);
   // --- Task 31 --- (§9.3 "a user: RINGING while any of their devices rings")
   const ringingUserIds = new Set(
     [...race.tracked.values()]
@@ -72,6 +75,8 @@ export async function ringBatch(
   if (outcome !== 'answered') {
     await hangupAllRinging(pipeline, race.tracked);
   }
+  delete call.batchLegs;
+  callPartiesChanged(pipeline.deps, call);
   // --- Task 31 ---
   // The winner (if any) is already `inCall` via `winBatch`; every other member who was ringing in
   // this batch goes back to idle (§9.3, §10.2 "Presence and BLF").

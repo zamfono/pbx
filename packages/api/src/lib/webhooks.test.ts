@@ -216,6 +216,31 @@ describe('WebhookDispatcher', () => {
     });
   });
 
+  it('posts nothing for a call.state event meant for the users it names alone (§10.6)', async () => {
+    const db = await migratedDb();
+    const kr = testKeyring();
+    await insertWebhook(db, kr, { url: stub.url, secret: 'top-secret' });
+    const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
+
+    await dispatcher.enqueue({
+      id: 'evt-3',
+      at: nowIso(),
+      type: 'call.state',
+      callId: 'c1',
+      state: 'ended',
+      peer: '+15550100',
+      ringGroupId: 'group-1',
+      userId: null,
+      userIds: ['u1'],
+      usersOnly: true
+    });
+
+    expect(stub.requests).toHaveLength(0);
+    expect(
+      await db.selectFrom('webhookDeliveries').selectAll().execute()
+    ).toEqual([]);
+  });
+
   it('marks the hook failing after three failed attempts, and ok on the next success', async () => {
     const db = await migratedDb();
     const kr = testKeyring();

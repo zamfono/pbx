@@ -8,6 +8,7 @@ import { CallLog, type LogLevel } from '../callLog.js';
 import type { Snapshot } from '../internal/server.js';
 import { targetFromRow, type ForwardTarget } from '../routing/targets.js';
 import type { Diversion } from './forwardContext.js';
+import type { GroupLeg } from './groupLegs.js';
 import { notifyMissedCall } from './missedCall.js';
 import type { Pipeline } from './pipeline.js';
 import { sipToHangupCause } from './releaseCause.js';
@@ -42,6 +43,10 @@ export type Call = {
   answeredByUserId: string | null;
   bridgeId: string | null;
   legs: Map<string, Leg>;
+  /** The legs of the ring-group batch ringing the call right now (`ringGroupDial.ts`), which
+   * `legs` holds only once one is answered; a member's ringing leg makes the call theirs to see
+   * (`callState.ts`). */
+  batchLegs?: ReadonlyMap<string, GroupLeg>;
   hops: number;
   /** The forward hops taken so far, first first (§9.4 "Forwarded calls"). */
   diversions: Diversion[];

@@ -63,6 +63,16 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- A permission fix: a user could hang up or transfer a call in progress they no longer took part
+  in, as an earlier target of a forwarded call or after parking or transferring it, and kept
+  seeing it in `calls.list` (`live: true`) and on `/events` until it ended; the user who
+  forwarded a call could also end or transfer the forwarded call. A user now sees a call in
+  progress they placed, were called on or answered, or that one of their phones rings or is
+  connected in right now, ring-group calls included, and ends or transfers (`calls.hangup`,
+  `calls.transfer`) only one they placed or are connected in; anything else is refused with 403.
+  Once a call stops being theirs while it goes on, they receive its `call.state` `ended`, and
+  nothing of it after. Admins, owners and webhooks see every call as before, and pickup is
+  unchanged.
 - Claude Code could not connect to any Zamfono stack: its sign-in page showed "Something went
   wrong while signing in." Claude Code receives the sign-in result on `localhost` at a port it
   picks anew each time, and the stack accepted such a port only from clients registered as

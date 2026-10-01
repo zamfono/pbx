@@ -166,7 +166,8 @@ describe('startInternalServer', () => {
       state: 'ringing',
       startedAt: nowIso(),
       ringGroupId: null,
-      userIds: []
+      userIds: [],
+      connectedUserIds: []
     };
     const trunk: TrunkStatus = {
       status: 'registered',

@@ -24,6 +24,11 @@ const USER_MAILBOX_PREFIX = 'user:';
  * checks separately since this function takes no database.
  */
 export function visibleTo(actor: Actor, ev: Event): boolean {
+  if (ev.type === 'call.state' && ev.usersOnly === true) {
+    // The call starting or stopping being these users' own while its state is unchanged: news to
+    // them alone, since an admin already has every event of the call.
+    return actor.role === 'user' && ev.userIds.includes(actor.id);
+  }
   if (actor.role !== 'user') {
     return true;
   }

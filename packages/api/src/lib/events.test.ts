@@ -121,6 +121,25 @@ describe('visibleTo', () => {
     expect(visibleTo(user, placedCall)).toBe(true);
   });
 
+  it('shows the users it names alone a call that stopped or started being theirs (§10.6)', () => {
+    // A ring-group member whose leg stopped ringing while the call rings on for the others.
+    const left: Envelope = {
+      id: 'e4',
+      at: nowIso(),
+      type: 'call.state',
+      callId: 'c3',
+      state: 'ended',
+      peer: '+15550100',
+      ringGroupId: 'group-1',
+      userId: null,
+      userIds: [user.id],
+      usersOnly: true
+    };
+    expect(visibleTo(user, left)).toBe(true);
+    expect(visibleTo({ ...user, id: 'user-2' }, left)).toBe(false);
+    expect(visibleTo(admin, left)).toBe(false);
+  });
+
   it('shows a user only the tenant-scope ooo and hours events', () => {
     const tenantOoo: Envelope = {
       id: 'e1',

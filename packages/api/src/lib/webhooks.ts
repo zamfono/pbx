@@ -97,6 +97,10 @@ export class WebhookDispatcher {
    * every hook's attempts (success or exhausted retries) have settled.
    */
   async enqueue(ev: Envelope): Promise<void> {
+    if (ev.type === 'call.state' && ev.usersOnly === true) {
+      // News to the users it names alone (`visibleTo`): the call's own state is unchanged.
+      return;
+    }
     const hooks = await this.deps.db
       .selectFrom('webhooks')
       .select(['id', 'eventTypesJson'])

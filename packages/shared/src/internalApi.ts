@@ -24,7 +24,12 @@ export type LiveCall = {
   state: 'ringing' | 'up';
   startedAt: string;
   ringGroupId: string | null;
+  /** The users whose call this is to see (§10.3 "Live calls"): the caller, the callee, the
+   * answerer and every user with a leg ringing or up right now. */
   userIds: string[];
+  /** The users who may end or transfer it (§10.3 "Live calls"): the caller and every user with a
+   * leg up in it. For `api`'s check alone; `calls.list` leaves it out. */
+  connectedUserIds: string[];
 };
 
 export type Presence = {
