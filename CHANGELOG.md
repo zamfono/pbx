@@ -34,6 +34,9 @@ why the specified behaviour changed; the commit history, how.
   field whose meaning is not obvious, and terse tool descriptions say what the operation does.
 - `zamfono.help` with an unknown topic still fails with 404, but its message now lists every
   topic; `index` lists them like a call without a topic, and the server instructions say so.
+- The specification now says exactly when a webhook's `lastStatus` turns `failing`: as soon as
+  one delivery has failed all three attempts; the next delivery that succeeds turns it back to
+  `ok`. Delivery itself is unchanged.
 
 ### Fixed
 

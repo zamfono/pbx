@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-01 · §10.6 Webhooks.** A hook is marked `failing` as soon as one delivery has failed all three attempts, not after a "persistent" failure the text left undefined, and the next delivery that succeeds marks it `ok` again.
+*Why:* requested by the product owner: the spec follows the code, which marks a hook `failing` on the first delivery it gives up.
+
 **2026-10-01 · §5.2 Client registration.** A redirect URI matches a registered one exactly, except that an `http` URI on a loopback host, `127.0.0.1`, `[::1]` or `localhost`, carries any port at request time when a registered URI names the same host, path and query, as RFC 8252 §7.3 requires, for a `web` client as for a `native` one; a registered `localhost` URI does not admit `127.0.0.1`, nor the reverse. Before, only a `native` client's `127.0.0.1` URIs did, and the code exchange still presents the authorization request's own redirect URI, port included.
 *Why:* found live: Claude Code's client metadata registers http://localhost/callback without a port or application_type, and the stack refused its random-port loopback redirect, so Claude Code could not sign in to any stack.
 
