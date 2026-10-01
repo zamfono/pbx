@@ -58,6 +58,7 @@ updates:
       - /images/asterisk
       - /images/proxy
       - /images/migrate
+      - /images/updater
       - /test/load/stress/devices
     schedule:
       interval: weekly
