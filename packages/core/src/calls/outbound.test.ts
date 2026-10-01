@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
@@ -31,8 +31,6 @@ const noopLogger: Logger = {
   error: () => undefined
 };
 const SETTLE_DELAY_MS = 60;
-// How long past the 8 s no-response budget the next route's attempt is waited for.
-const NEXT_ATTEMPT_WAIT_MS = 3000;
 
 function fakeCdr(): {
   open: (call: Call) => Promise<void>;
@@ -382,6 +380,7 @@ describe('outbound dialing', () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     await ari.close();
     await fakeAri.close();
     await db.destroy();
@@ -845,41 +844,38 @@ describe('outbound dialing', () => {
     expect(attemptEndpoints(fakeAri)).toHaveLength(1);
   });
 
-  it(
-    'hangs up and tries the next route after 8s with no provisional response',
-    async () => {
-      const mainDidId = await seedDid(db, '+491110000');
-      await seedSettings(db, mainDidId);
-      const trunk1 = await seedTrunk(db, 1);
-      const trunk2 = await seedTrunk(db, 2);
-      await seedRoute(db, 1, trunk1);
-      await seedRoute(db, 2, trunk2);
-      fakeAri.answerAfterMs = 60_000;
+  it('hangs up and tries the next route after 8s with no provisional response', async () => {
+    const mainDidId = await seedDid(db, '+491110000');
+    await seedSettings(db, mainDidId);
+    const trunk1 = await seedTrunk(db, 1);
+    const trunk2 = await seedTrunk(db, 2);
+    await seedRoute(db, 1, trunk1);
+    await seedRoute(db, 2, trunk2);
+    fakeAri.answerAfterMs = 60_000;
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout'],
+      shouldAdvanceTime: true
+    });
 
-      const { call, finished } = await startDial('+498912345');
-      const leg1 = await ringingLeg(call);
-      const leg2 = await ringingLeg(
-        call,
-        leg1,
-        ATTEMPT_NO_RESPONSE_MS + NEXT_ATTEMPT_WAIT_MS
-      );
-      emitState(fakeAri, leg2.channelId, 'Up');
-      await finished;
+    const { call, finished } = await startDial('+498912345');
+    const leg1 = await ringingLeg(call);
+    await vi.advanceTimersByTimeAsync(ATTEMPT_NO_RESPONSE_MS);
+    const leg2 = await ringingLeg(call, leg1);
+    emitState(fakeAri, leg2.channelId, 'Up');
+    await finished;
 
-      expect(call.status).toBe('answered');
-      expect(attemptEndpoints(fakeAri)).toEqual([
-        `PJSIP/+498912345@trunk-${trunk1}`,
-        `PJSIP/+498912345@trunk-${trunk2}`
-      ]);
-      const timedOutHangup = fakeAri.calls.some(
-        entry =>
-          entry.method === 'DELETE' &&
-          entry.path.startsWith(`channels/${[...call.legs.keys()][0]}`)
-      );
-      expect(timedOutHangup).toBe(true);
-    },
-    ATTEMPT_NO_RESPONSE_MS + 5000
-  );
+    expect(call.status).toBe('answered');
+    expect(attemptEndpoints(fakeAri)).toEqual([
+      `PJSIP/+498912345@trunk-${trunk1}`,
+      `PJSIP/+498912345@trunk-${trunk2}`
+    ]);
+    const timedOutHangup = fakeAri.calls.some(
+      entry =>
+        entry.method === 'DELETE' &&
+        entry.path.startsWith(`channels/${[...call.legs.keys()][0]}`)
+    );
+    expect(timedOutHangup).toBe(true);
+  });
 
   it('refuses a call that matches no route with 503, unanswered, with no announcement and a trace line (§9.4)', async () => {
     const mainDidId = await seedDid(db, '+491110000');
@@ -1141,90 +1137,90 @@ describe('outbound dialing', () => {
     ]);
   });
 
-  it(
-    'does not re-route at 8s once the far end alerted before that',
-    async () => {
-      const mainDidId = await seedDid(db, '+491110000');
-      await seedSettings(db, mainDidId);
-      const trunk1 = await seedTrunk(db, 1);
-      const trunk2 = await seedTrunk(db, 2);
-      await seedRoute(db, 1, trunk1);
-      await seedRoute(db, 2, trunk2);
-      fakeAri.answerAfterMs = 60_000;
+  it('does not re-route at 8s once the far end alerted before that', async () => {
+    const mainDidId = await seedDid(db, '+491110000');
+    await seedSettings(db, mainDidId);
+    const trunk1 = await seedTrunk(db, 1);
+    const trunk2 = await seedTrunk(db, 2);
+    await seedRoute(db, 1, trunk1);
+    await seedRoute(db, 2, trunk2);
+    fakeAri.answerAfterMs = 60_000;
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout'],
+      shouldAdvanceTime: true
+    });
 
-      const { call, finished } = await startDial('+498912345');
-      const leg = await ringingLeg(call);
-      emitState(fakeAri, leg.channelId, 'Ringing');
-      await sleep(ATTEMPT_NO_RESPONSE_MS + 300);
-      emitState(fakeAri, leg.channelId, 'Up');
-      await finished;
+    const { call, finished } = await startDial('+498912345');
+    const leg = await ringingLeg(call);
+    emitState(fakeAri, leg.channelId, 'Ringing');
+    await vi.advanceTimersByTimeAsync(ATTEMPT_NO_RESPONSE_MS + 300);
+    emitState(fakeAri, leg.channelId, 'Up');
+    await finished;
 
-      expect(call.status).toBe('answered');
-      expect(attemptEndpoints(fakeAri)).toEqual([
-        `PJSIP/+498912345@trunk-${trunk1}`
-      ]);
-    },
-    ATTEMPT_NO_RESPONSE_MS + 5000
-  );
+    expect(call.status).toBe('answered');
+    expect(attemptEndpoints(fakeAri)).toEqual([
+      `PJSIP/+498912345@trunk-${trunk1}`
+    ]);
+  });
 
-  it(
-    'keeps an attempt past 8s whose far end answered 183 Session Progress, which leaves the channel Down',
-    async () => {
-      const mainDidId = await seedDid(db, '+491110000');
-      await seedSettings(db, mainDidId);
-      const trunk1 = await seedTrunk(db, 1);
-      const trunk2 = await seedTrunk(db, 2);
-      await seedRoute(db, 1, trunk1);
-      await seedRoute(db, 2, trunk2);
-      fakeAri.answerAfterMs = 60_000;
+  it('keeps an attempt past 8s whose far end answered 183 Session Progress, which leaves the channel Down', async () => {
+    const mainDidId = await seedDid(db, '+491110000');
+    await seedSettings(db, mainDidId);
+    const trunk1 = await seedTrunk(db, 1);
+    const trunk2 = await seedTrunk(db, 2);
+    await seedRoute(db, 1, trunk1);
+    await seedRoute(db, 2, trunk2);
+    fakeAri.answerAfterMs = 60_000;
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout'],
+      shouldAdvanceTime: true
+    });
 
-      const { call, finished } = await startDial('+498912345');
-      const leg = await ringingLeg(call);
-      // Asterisk 22 reports a 183 only as a `Dial` event on the originated channel.
-      emitDialStatus(fakeAri, leg.channelId, 'PROGRESS');
-      await sleep(ATTEMPT_NO_RESPONSE_MS + 300);
-      emitState(fakeAri, leg.channelId, 'Up');
-      await finished;
+    const { call, finished } = await startDial('+498912345');
+    const leg = await ringingLeg(call);
+    // Asterisk 22 reports a 183 only as a `Dial` event on the originated channel.
+    emitDialStatus(fakeAri, leg.channelId, 'PROGRESS');
+    await vi.advanceTimersByTimeAsync(ATTEMPT_NO_RESPONSE_MS + 300);
+    emitState(fakeAri, leg.channelId, 'Up');
+    await finished;
 
-      expect(call.status).toBe('answered');
-      expect(attemptEndpoints(fakeAri)).toEqual([
-        `PJSIP/+498912345@trunk-${trunk1}`
-      ]);
-    },
-    ATTEMPT_NO_RESPONSE_MS + 5000
-  );
+    expect(call.status).toBe('answered');
+    expect(attemptEndpoints(fakeAri)).toEqual([
+      `PJSIP/+498912345@trunk-${trunk1}`
+    ]);
+  });
 
-  it(
-    'keeps an attempt past 8s whose far end answered only 100 Trying, which no event reports',
-    async () => {
-      const mainDidId = await seedDid(db, '+491110000');
-      await seedSettings(db, mainDidId);
-      const trunk1 = await seedTrunk(db, 1);
-      const trunk2 = await seedTrunk(db, 2);
-      await seedRoute(db, 1, trunk1);
-      await seedRoute(db, 2, trunk2);
-      fakeAri.answerAfterMs = 60_000;
+  it('keeps an attempt past 8s whose far end answered only 100 Trying, which no event reports', async () => {
+    const mainDidId = await seedDid(db, '+491110000');
+    await seedSettings(db, mainDidId);
+    const trunk1 = await seedTrunk(db, 1);
+    const trunk2 = await seedTrunk(db, 2);
+    await seedRoute(db, 1, trunk1);
+    await seedRoute(db, 2, trunk2);
+    fakeAri.answerAfterMs = 60_000;
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout'],
+      shouldAdvanceTime: true
+    });
 
-      const { call, finished } = await startDial('+498912345');
-      const leg = await ringingLeg(call);
-      // chan_pjsip records every response in the channel's hangup-cause hash; the fake names an
-      // originated channel after its endpoint.
-      fakeAri.channelVariables.set(
-        `${leg.channelId}:HANGUPCAUSE(PJSIP/+498912345@trunk-${trunk1},tech)`,
-        'SIP 100 Trying'
-      );
-      await sleep(ATTEMPT_NO_RESPONSE_MS + 300);
-      // A 486 after a bare 100 is the callee's own condition, final on the first route.
-      emitDestroyed(fakeAri, leg.channelId, 17);
-      await finished;
+    const { call, finished } = await startDial('+498912345');
+    const leg = await ringingLeg(call);
+    // chan_pjsip records every response in the channel's hangup-cause hash; the fake names an
+    // originated channel after its endpoint.
+    fakeAri.channelVariables.set(
+      `${leg.channelId}:HANGUPCAUSE(PJSIP/+498912345@trunk-${trunk1},tech)`,
+      'SIP 100 Trying'
+    );
+    await vi.advanceTimersByTimeAsync(ATTEMPT_NO_RESPONSE_MS + 300);
+    // A 486 after a bare 100 is the callee's own condition, final on the first route.
+    emitDestroyed(fakeAri, leg.channelId, 17);
+    await finished;
 
-      expect(call.status).toBe('busy');
-      expect(attemptEndpoints(fakeAri)).toEqual([
-        `PJSIP/+498912345@trunk-${trunk1}`
-      ]);
-    },
-    ATTEMPT_NO_RESPONSE_MS + 5000
-  );
+    expect(call.status).toBe('busy');
+    expect(attemptEndpoints(fakeAri)).toEqual([
+      `PJSIP/+498912345@trunk-${trunk1}`
+    ]);
+  });
 
   it('does not count a hop for an internal-extension or own-DID dispatch', async () => {
     const mainDidId = await seedDid(db, '+491110000');

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
@@ -361,6 +361,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     await ari.close();
     await fakeAri.close();
     await db.destroy();
@@ -468,40 +469,42 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       ]);
     });
 
-    it(
-      'keeps ringing past 8s once the far end sent only 100 Trying, which no event reports',
-      async () => {
-        const forwarding = await seedUser(db);
-        await seedExternalForward(db, forwarding, '+15557777');
-        await seedDevice(db, forwarding, 'member-forwarding');
-        const trunk1 = await seedTrunk(db, 1);
-        const trunk2 = await seedTrunk(db, 2);
-        await seedRoute(db, 1, trunk1);
-        await seedRoute(db, 2, trunk2);
-        const groupId = await seedRingGroup(db, [forwarding]);
+    it('keeps ringing past 8s once the far end sent only 100 Trying, which no event reports', async () => {
+      const forwarding = await seedUser(db);
+      await seedExternalForward(db, forwarding, '+15557777');
+      await seedDevice(db, forwarding, 'member-forwarding');
+      const trunk1 = await seedTrunk(db, 1);
+      const trunk2 = await seedTrunk(db, 2);
+      await seedRoute(db, 1, trunk1);
+      await seedRoute(db, 2, trunk2);
+      const groupId = await seedRingGroup(db, [forwarding]);
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout'],
+        shouldAdvanceTime: true
+      });
 
-        const finished = ringGroup(pipeline, call, groupId);
-        await membersRinging(call, 1);
-        const endpoint = `PJSIP/+15557777@trunk-${trunk1}`;
-        const first = await channelTo(ari, endpoint);
-        // chan_pjsip records every response in the channel's hangup-cause hash.
-        fakeAri.channelVariables.set(
-          `${first.id}:HANGUPCAUSE(${endpoint},tech)`,
-          'SIP 100 Trying'
-        );
-        await sleep(ATTEMPT_NO_RESPONSE_MS + 300);
+      const finished = ringGroup(pipeline, call, groupId);
+      await membersRinging(call, 1);
+      const endpoint = `PJSIP/+15557777@trunk-${trunk1}`;
+      const first = await channelTo(ari, endpoint);
+      // chan_pjsip records every response in the channel's hangup-cause hash.
+      fakeAri.channelVariables.set(
+        `${first.id}:HANGUPCAUSE(${endpoint},tech)`,
+        'SIP 100 Trying'
+      );
+      await vi.advanceTimersByTimeAsync(ATTEMPT_NO_RESPONSE_MS + 300);
 
-        expect(hangups(fakeAri, first.id)).toBe(0);
-        expect(originates(fakeAri)).toHaveLength(1);
-        emit('ChannelStateChange', first.id, { state: 'Up' });
-        await finished;
-        expect(call.status).toBe('answered');
-      },
-      ATTEMPT_NO_RESPONSE_MS + 5000
-    );
+      expect(hangups(fakeAri, first.id)).toBe(0);
+      expect(originates(fakeAri)).toHaveLength(1);
+      emit('ChannelStateChange', first.id, { state: 'Up' });
+      await finished;
+      expect(call.status).toBe('answered');
+    });
 
     // §9.4 "Route fallthrough": the budget covers only the wait for a first response. An answer
     // landing while its end-of-budget read is still under way is the race's, never hung up.
+    // The budget runs out on a real clock here: the slow read is the fake Asterisk's own timer,
+    // which the answer has to land inside.
     it(
       'keeps an attempt answered while its 8 s budget read is still under way',
       async () => {
