@@ -1,5 +1,5 @@
 # Keeps every dependency the repository pins current: the workflows' action SHAs, npm (the root
-# workspace, whose lockfile covers packages/*, and db/ with its own) and the Dockerfiles' base
+# workspace, whose one lockfile covers packages/* and db/) and the Dockerfiles' base
 # images. No `docker-compose` ecosystem entry remains for /deploy: every image deploy/compose.yaml
 # runs is now one of the stack's own (§6.3 "Images"), named through `${ZAMFONO_VERSION}`, which
 # this ecosystem cannot parse a version out of to bump; the `docker` ecosystem below bumps the
@@ -22,7 +22,7 @@ updates:
         patterns: ['*']
 
   - package-ecosystem: npm
-    directories: [/, /db]
+    directory: /
     schedule:
       interval: weekly
     cooldown:
@@ -56,7 +56,7 @@ updates:
       - /images/core
       - /images/asterisk
       - /images/proxy
-      - /db
+      - /images/migrate
       - /test/load/stress/devices
     schedule:
       interval: weekly

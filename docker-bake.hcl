@@ -59,8 +59,8 @@ group "default" {
 }
 
 target "migrate" {
-  context    = "db"
-  dockerfile = "Dockerfile"
+  context    = "."
+  dockerfile = "images/migrate/Dockerfile"
   tags       = [MIGRATE_IMAGE]
   args       = { ZAMFONO_REVISION = REVISION }
   cache-from = cache_from("migrate")

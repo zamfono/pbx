@@ -80,8 +80,8 @@ claude mcp add --transport http zamfono https://<your FQDN>/mcp
 | `docs/guide/`     | the admin guide above                                                                                                                    |
 | `CHANGELOG.md`    | what each release changes for operators, with its upgrade notes; each release's description                                              |
 | `docs/spec.md`    | the full technical specification — the contract the code is built against                                                                |
-| `images/`         | the Dockerfiles for `asterisk`, `api`, `core` and `proxy`                                                                                |
-| `db/`             | the schema migration and the one-shot `migrate` image                                                                                    |
+| `images/`         | the Dockerfiles for `asterisk`, `migrate`, `api`, `core`, `proxy` and `updater`                                                          |
+| `db/`             | the schema migrations and the kysely-ctl configuration the `migrate` image runs                                                          |
 | `packages/shared` | the database schema types, wire contracts and shared helpers                                                                             |
 | `packages/core`   | the ARI client and the call pipeline                                                                                                     |
 | `packages/api`    | the operations layer, REST, MCP, OAuth, events and background jobs                                                                       |
@@ -90,7 +90,7 @@ claude mcp add --transport http zamfono https://<your FQDN>/mcp
 ## Developing
 
 ```bash
-npm ci
+npm ci            # every workspace, db/ included, from the one lockfile
 npm test          # every package
 npm run typecheck
 npm run lint

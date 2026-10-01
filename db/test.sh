@@ -27,7 +27,8 @@ chmod 0777 "$DATA_DIR" "$BROKEN_DIR" "$BROKEN_DATA_DIR" "$LOCKED_DATA_DIR"
 if docker image inspect "$IMAGE" >/dev/null 2>&1; then
   echo "$IMAGE already built; reusing it"
 else
-  docker build -t "$IMAGE" .
+  # images/migrate/Dockerfile builds from the repository root, whose lockfile covers db/.
+  docker build -t "$IMAGE" -f ../images/migrate/Dockerfile ..
 fi
 
 echo '== first run: applies the migration =='
@@ -89,7 +90,7 @@ EOF
 broken_status=0
 broken_output=$(docker run --rm \
   -v "$BROKEN_DATA_DIR:/data" \
-  -v "$BROKEN_DIR:/migrations/migrations" \
+  -v "$BROKEN_DIR:/app/db/migrations" \
   -e DB_FILE=/data/zamfono.sqlite3 \
   "$IMAGE" 2>&1) || broken_status=$?
 echo "$broken_output"

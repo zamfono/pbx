@@ -49,9 +49,6 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - run: npm ci
-      # db/ is a package of its own, outside the workspaces (its image installs only it); lint
-      # type-checks db/config.ts and the migrations, which need its dependencies.
-      - run: npm ci --prefix db
       - name: Unit suites, refusing a run that skipped one
         run: |
           set -o pipefail

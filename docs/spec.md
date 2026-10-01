@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-01 · §6.3 Migrations, §10.** `db/` is an npm workspace of the root, like `packages/*`, so one `npm ci` and the root lockfile cover it and `kysely` and `better-sqlite3` are locked once for the migrations and the app; it no longer has a lockfile of its own. The `migrate` image is built from the repository root by `images/migrate/Dockerfile`, beside the other images, installing only the `db` workspace's production dependencies, so what it holds and runs is unchanged.
+*Why:* requested by the product owner: db/ was an npm project of its own, so every checkout needed two installs and kysely and better-sqlite3 were locked twice, free to drift apart between migrations and the app.
+
 **2026-09-30 · §10.3 Users and Forward targets.** A user's forwarding rules are read with `GET /users/{id}/forwarding`, in the shape `PUT /users/{id}/forwarding` takes, `sip` targets with their `headers`, so a client reads, edits and sends them back; it is self-service on the user's own id, 403 for another's, as the `PUT`. A `user`'s `PUT` that sends back a rule with the very `sip` target its condition already holds, the same trunk, user part and headers, keeps it as it is, where it was refused with 403 before; a `sip` target that is new, differs in any field, or is sent under another condition than the one holding it is still refused, and a rule left out is still removed.
 *Why:* requested by the product owner: users setting their own forwarding need to read it, and an admin-set sip rule a user sends back unchanged should survive the user's change to another condition.
 
@@ -832,7 +835,7 @@ handle /metrics/litestream {
 - the first-boot seed ("First boot");
 - optional `TZ`, `TLS_RELOAD_HOUR` (§6.4), `CALL_LOG_MAX_BYTES` and `HEP_ENABLED` (§7, default `true`), `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED` (§9.1, default `true`), `METRICS_TOKEN` (§7; absent = no metrics endpoint), and `ZAMFONO_VERSION`, the tag of the six `zamfono/` images (default `latest`), which Compose also passes to `api` and `core` as the version they report (§7).
 
-**Migrations.** The `migrate` service is the only thing that changes the schema. Its image holds `db/config.ts` and `db/migrations/` and runs `kysely migrate latest` against the `db` volume, retrying five times at 5 s intervals for a file that is briefly locked, then exits: 0 when every migration is applied, which is also the idle case on every later start, 1 when a migration fails on its own merits. `api` and `core` start only on that exit 0, so a failed migration stops the deployment before any code runs against an older schema. Migrations are forward-only; a bad release is undone by restoring the snapshot the upgrade began with (Upgrades, §6.5) and setting `ZAMFONO_VERSION` to the previous release. Every container that writes a shared volume runs as uid 1000: the three images that open the database as `node`, the `asterisk` image with its `asterisk` user mapped to that uid, and the `proxy` image, so the migration's database file, the rendered configuration and certificate on `asterisk-config`, the voicemail and prompt files on `media` and the certificate copy on `caddy-data` are readable and writable across containers.
+**Migrations.** The `migrate` service is the only thing that changes the schema. Its image, built from the repository root by `images/migrate/Dockerfile` with the `db` workspace's production dependencies alone, holds `db/config.ts` and `db/migrations/` and runs `kysely migrate latest` against the `db` volume, retrying five times at 5 s intervals for a file that is briefly locked, then exits: 0 when every migration is applied, which is also the idle case on every later start, 1 when a migration fails on its own merits. `api` and `core` start only on that exit 0, so a failed migration stops the deployment before any code runs against an older schema. Migrations are forward-only; a bad release is undone by restoring the snapshot the upgrade began with (Upgrades, §6.5) and setting `ZAMFONO_VERSION` to the previous release. Every container that writes a shared volume runs as uid 1000: the three images that open the database as `node`, the `asterisk` image with its `asterisk` user mapped to that uid, and the `proxy` image, so the migration's database file, the rendered configuration and certificate on `asterisk-config`, the voicemail and prompt files on `media` and the certificate copy on `caddy-data` are readable and writable across containers.
 
 **First boot.** On its first start against a freshly migrated, empty database, `api` seeds it from `.env`:
 
@@ -1131,7 +1134,7 @@ A placeholder that names a hop is empty without one, and `hopCount` is `0`. The 
 
 ## 10. Node.js Application
 
-Two long-running processes plus the one-shot migration container — a monorepo with two application packages, a shared library and the `db` package:
+Two long-running processes plus the one-shot migration container — a monorepo with two application packages, a shared library and the `db` package, npm workspaces of the root that one install and one lockfile cover:
 
 ```
 packages/
@@ -1171,8 +1174,7 @@ packages/
 │           ├── mcp/+server.ts                # Streamable HTTP endpoint (§10.5)
 │           └── internal/mail, healthz, metrics
 └── shared/              # db access (Kysely + better-sqlite3), generated row types, wire contracts, time and opening-hours math, the background jobs' repeat schedule, MWI mailbox keys, the Asterisk object names `api` renders and `core` addresses
-db/                      # container 3, one-shot: kysely-ctl configuration and migrations (§6.3 "Migrations")
-├── Dockerfile
+db/                      # container 3, one-shot: kysely-ctl configuration and migrations (§6.3 "Migrations"); its image is images/migrate/Dockerfile
 ├── config.ts            # the file path comes from DB_FILE
 └── migrations/
 ```

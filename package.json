@@ -4,7 +4,8 @@
   "license": "AGPL-3.0-only",
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "db"
   ],
   "scripts": {
     "test": "npm test --workspaces --if-present",
@@ -13,8 +14,8 @@
     "format": "prettier --write . && node scripts/format-md-tables.mjs",
     "format:check": "prettier --check . && node scripts/format-md-tables.mjs --check",
     "db:generate": "npm run db:generate -w packages/shared",
-    "db:migrate:create": "npm run migrate:create --prefix db",
-    "db:deploy": "npm run deploy --prefix db"
+    "db:migrate:create": "npm run migrate:create -w db",
+    "db:deploy": "npm run deploy -w db"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
