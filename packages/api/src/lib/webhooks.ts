@@ -1,7 +1,8 @@
 /**
  * Signed webhook delivery (§10.6): every active hook matching an event's type gets an
  * at-least-once HTTP POST from the `webhook_deliveries` outbox, so a queued or retrying delivery
- * survives an `api` restart and resumes with its attempt count and backoff.
+ * survives an `api` restart and resumes with its attempt count and backoff. A delivery's end moves
+ * its hook's health and logs what changed (`webhookHealth.ts`).
  */
 import { createHmac } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -10,6 +11,12 @@ import { newId, publicEnvelope, type Db, type Envelope } from '@zamfono/shared';
 
 import { tryParseJson } from './json.js';
 import { decrypt, type Keyring } from './secretbox.js';
+import {
+  errorReason,
+  httpReason,
+  SECRET_UNREADABLE
+} from './webhookFailure.js';
+import { settleDelivery } from './webhookHealth.js';
 
 // §10.6: three attempts total per delivery, a 5 s timeout per request, and the two backoff
 // delays between them.
@@ -33,6 +40,21 @@ type DeliveryRow = {
   attempts: number;
   nextAttemptAt: string;
 };
+
+/**
+ * One attempt's outcome: `failure` `null` when it was delivered, else why not, and whether a
+ * failure is worth another attempt.
+ */
+type AttemptOutcome = { failure: string | null; retryable: boolean };
+
+/** `secretEnc` decrypted, `null` when no key of `kr` opens it. */
+function readSecret(kr: Keyring, secretEnc: Buffer): string | null {
+  try {
+    return decrypt(kr, secretEnc).toString('utf8');
+  } catch {
+    return null;
+  }
+}
 
 /**
  * `true` when `hook`'s optional event-type filter admits `eventType`; `null` means every type.
@@ -150,14 +172,23 @@ export class WebhookDispatcher {
         await this.deps.delay(waitMs);
       }
       // eslint-disable-next-line no-await-in-loop -- attempts are sequential by design: a retry only happens after the previous one failed
-      const delivered = await this.attempt(row);
-      if (delivered === null) {
+      const outcome = await this.attempt(row);
+      if (outcome === null) {
         return;
       }
       attempts += 1;
-      if (delivered || attempts >= DELIVERY_ATTEMPTS) {
+      if (
+        outcome.failure === null ||
+        !outcome.retryable ||
+        attempts >= DELIVERY_ATTEMPTS
+      ) {
         // eslint-disable-next-line no-await-in-loop -- the last step of the loop, which ends it
-        await this.settle(row, delivered);
+        await settleDelivery(
+          this.deps.db,
+          row,
+          outcome.failure,
+          this.deps.now()
+        );
         return;
       }
       nextAttemptAt = new Date(
@@ -173,10 +204,12 @@ export class WebhookDispatcher {
   }
 
   /**
-   * One POST of `row`'s body, signed with its hook's current secret: whether it succeeded, or
-   * `null` when the delivery is gone or its hook deleted, which ends it with no status.
+   * One POST of `row`'s body, signed with its hook's current secret, or `null` when the delivery
+   * is gone or its hook deleted, which ends it with no status. A secret that cannot be decrypted
+   * (§5.4: a key replaced without its previous generation, a database restored under another
+   * `.env`) fails the delivery for good: no later attempt could read it either.
    */
-  private async attempt(row: DeliveryRow): Promise<boolean | null> {
+  private async attempt(row: DeliveryRow): Promise<AttemptOutcome | null> {
     const hook = await this.deps.db
       .selectFrom('webhookDeliveries')
       .innerJoin('webhooks', 'webhooks.id', 'webhookDeliveries.webhookId')
@@ -191,34 +224,23 @@ export class WebhookDispatcher {
         .execute();
       return null;
     }
-    const secret = decrypt(this.deps.kr, hook.secretEnc).toString('utf8');
+    const secret = readSecret(this.deps.kr, hook.secretEnc);
+    if (secret === null) {
+      return { failure: SECRET_UNREADABLE, retryable: false };
+    }
     const signature = createHmac('sha256', secret)
       .update(row.bodyJson)
       .digest('hex');
-    return this.post(hook.url, row.bodyJson, signature);
+    const failure = await this.post(hook.url, row.bodyJson, signature);
+    return { failure, retryable: true };
   }
 
-  /** Removes `row` from the outbox and records its outcome as the hook's `last_status`. */
-  private async settle(row: DeliveryRow, delivered: boolean): Promise<void> {
-    const now = this.deps.now();
-    await this.deps.db.transaction().execute(async trx => {
-      await trx
-        .deleteFrom('webhookDeliveries')
-        .where('id', '=', row.id)
-        .execute();
-      await trx
-        .updateTable('webhooks')
-        .set({ lastStatus: delivered ? 'ok' : 'failing', lastDeliveryAt: now })
-        .where('id', '=', row.webhookId)
-        .execute();
-    });
-  }
-
+  /** POSTs `body`: `null` once the receiver answered 2xx, else why not (`webhookHealth.ts`). */
   private async post(
     url: string,
     body: string,
     signature: string
-  ): Promise<boolean> {
+  ): Promise<string | null> {
     try {
       const response = await this.deps.fetchImpl(url, {
         method: 'POST',
@@ -229,9 +251,9 @@ export class WebhookDispatcher {
         body,
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
       });
-      return response.ok;
-    } catch {
-      return false;
+      return response.ok ? null : httpReason(response.status);
+    } catch (error) {
+      return errorReason(error);
     }
   }
 }

@@ -93,6 +93,15 @@ why the specified behaviour changed; the commit history, how.
 - The specification now says exactly when a webhook's `lastStatus` turns `failing`: as soon as
   one delivery has failed all three attempts; the next delivery that succeeds turns it back to
   `ok`. Delivery itself is unchanged.
+- A failing webhook leaves a trace: `api` logs a warning with the hook's URL (without credentials or query), the reason (the
+  HTTP status, such as `HTTP 404`, or `timeout`, `DNS lookup failed`, `TLS error <code>`,
+  `connection refused`) and the event type when the hook turns `failing`, again whenever the
+  reason changes while it stays failing, and once a day while it keeps failing for the same
+  reason, and logs when it delivers again. `webhooks.list` shows `lastError` and `lastErrorAt`,
+  and while the hook is failing `failingSince` and `failedDeliveries`. A delivery whose hook
+  secret cannot be decrypted, after `SECRETBOX_KEY` was replaced without keeping the previous key
+  or the database was restored under another `.env`, is dropped at once instead of being retried
+  at every restart, and the hook reads `failing` with `secret unreadable — set a new secret`.
 - A time typed without an offset into the `from` and `to` of `calls.list` and `audit.list`, or
   the `at` of `presenceLog.snapshot`, such as `2026-10-01T09:00`, is now the tenant's local time
   (`settings.timezone`), and a date alone, `2026-10-01`, its local midnight, where both were read

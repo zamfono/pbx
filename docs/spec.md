@@ -1294,7 +1294,7 @@ The time filters of these reads, `from` and `to` of `GET /audit` and `GET /calls
 
 **Opening hours** (min. role: user (own) / admin) — `GET/PUT /users/{id}/hours`, `GET/PUT /ringGroups/{id}/hours`, `GET/PUT /menus/{id}/hours`, `GET/PUT /tenant/hours`, `DELETE` on each
 
-**Webhooks** (min. role: admin) — `GET/POST /webhooks`, `PATCH/DELETE /webhooks/{id}` (URL, secret, event-type filter, active; delivery status)
+**Webhooks** (min. role: admin) — `GET/POST /webhooks`, `PATCH/DELETE /webhooks/{id}` (URL, secret, event-type filter, active; delivery status: `lastStatus`, `lastDeliveryAt`, `failingSince`, `failedDeliveries`, `lastError`, `lastErrorAt`, §10.6)
 
 **Mail templates** (min. role: admin) — `GET /mailTemplates` (effective templates, each marked `builtin` or `tenant`), `GET/PUT/DELETE /mailTemplates/{kind}/{language}`, `POST /mailTemplates/{kind}/test` (sends to the caller with sample values) — §10.2 "Mail"
 
@@ -1436,7 +1436,7 @@ Server-to-client messages:
 
 Subscribers render presence, live call state and OOO status from this stream, without polling.
 
-**Webhooks.** The same events are delivered as HTTP POSTs to admin-configured endpoints from the `webhooks` table: URL, per-hook secret, optional event-type filter, and an `active` flag that is off on creation and switched on with `PATCH` once the receiver is ready. `api` delivers at least once from the `webhook_deliveries` outbox: three attempts with exponential backoff and a 5 s timeout per request. A delivery's row holds the body, its attempt count and when the next attempt is due, and is deleted once the delivery succeeds or its third attempt fails, or when its hook is deleted; a delivery still pending when `api` restarts resumes from its row, after what remains of its backoff. Each POST carries the JSON event, an event id for consumer-side deduplication, and an `X-Zamfono-Signature` header holding the HMAC-SHA256 of the body with the hook's secret. One delivery whose three attempts all fail marks the hook `failing` in `GET /webhooks`, and the next delivery that succeeds marks it `ok`; a hook is never auto-disabled.
+**Webhooks.** The same events are delivered as HTTP POSTs to admin-configured endpoints from the `webhooks` table: URL, per-hook secret, optional event-type filter, and an `active` flag that is off on creation and switched on with `PATCH` once the receiver is ready. `api` delivers at least once from the `webhook_deliveries` outbox: three attempts with exponential backoff and a 5 s timeout per request. A delivery's row holds the body, its attempt count and when the next attempt is due, and is deleted once the delivery succeeds or its third attempt fails, or when its hook is deleted; a delivery still pending when `api` restarts resumes from its row, after what remains of its backoff. Each POST carries the JSON event, an event id for consumer-side deduplication, and an `X-Zamfono-Signature` header holding the HMAC-SHA256 of the body with the hook's secret. One delivery whose three attempts all fail marks the hook `failing` in `GET /webhooks`, and the next delivery that succeeds marks it `ok`; a hook is never auto-disabled. A delivery whose hook secret cannot be decrypted (§5.4) fails at once, without a retry, for the reason `secret unreadable — set a new secret`. A failed delivery's reason is its last attempt's: the HTTP status (`HTTP 404`) or the class of error (`timeout`, `DNS lookup failed`, `TLS error <code>`, `connection refused`, …), kept as the hook's `lastError` and `lastErrorAt`; while it is failing, `failingSince` and `failedDeliveries` say since when and how many deliveries failed, `null` and 0 again once one succeeds. `api` logs a warning with the URL, without credentials or query, the reason and the event type when a hook turns `failing`, whenever the reason changes while it stays failing, and once a day while it keeps failing for the same reason, and logs its recovery; `webhooks.last_logged_at` keeps the time across restarts.
 
 ## 11. Data Model (SQLite)
 
@@ -2132,16 +2132,25 @@ CREATE TABLE tokens (
 --   active:           a hook is created inactive and switched on with PATCH once the receiver is
 --                     ready; only active hooks receive deliveries
 --   last_status:      NULL until the first delivery
+--   last_error, last_error_at: the reason the last failed delivery failed, and when
+--   failing_since, failed_deliveries: since when the hook is failing and the deliveries failed
+--                     since; NULL and 0 while it is not
+--   last_logged_at:   when its failure was last logged, for the daily reminder (§10.6)
 CREATE TABLE webhooks (
-  id               TEXT    PRIMARY KEY,
-  url              TEXT    NOT NULL,
-  event_types_json TEXT,
-  active           INTEGER NOT NULL DEFAULT 0,
-  secret_enc       BLOB    NOT NULL,
-  last_status      TEXT    CHECK (last_status IN ('ok','failing')),
-  last_delivery_at TEXT,
-  created_at       TEXT    NOT NULL,
-  deleted_at       TEXT
+  id                TEXT    PRIMARY KEY,
+  url               TEXT    NOT NULL,
+  event_types_json  TEXT,
+  active            INTEGER NOT NULL DEFAULT 0,
+  secret_enc        BLOB    NOT NULL,
+  last_status       TEXT    CHECK (last_status IN ('ok','failing')),
+  last_delivery_at  TEXT,
+  last_error        TEXT,
+  last_error_at     TEXT,
+  failing_since     TEXT,
+  failed_deliveries INTEGER NOT NULL DEFAULT 0 CHECK (failed_deliveries >= 0),
+  last_logged_at    TEXT,
+  created_at        TEXT    NOT NULL,
+  deleted_at        TEXT
 );
 
 -- webhook_deliveries — the webhook outbox (§10.6): one row per hook and event, deleted once

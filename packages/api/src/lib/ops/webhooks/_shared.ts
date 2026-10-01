@@ -57,6 +57,12 @@ export type WebhookWire = {
   active: boolean;
   lastStatus: 'failing' | 'ok' | null;
   lastDeliveryAt: string | null;
+  /** When the hook turned `failing`, and the deliveries failed since; `null` and 0 while not. */
+  failingSince: string | null;
+  failedDeliveries: number;
+  /** Why the last delivery that failed did, such as `HTTP 404` or `timeout`, and when. */
+  lastError: string | null;
+  lastErrorAt: string | null;
   createdAt: string;
 };
 
@@ -69,6 +75,10 @@ export function toWire(row: WebhookRow): WebhookWire {
     active: row.active === 1,
     lastStatus: row.lastStatus as 'failing' | 'ok' | null,
     lastDeliveryAt: row.lastDeliveryAt,
+    failingSince: row.failingSince,
+    failedDeliveries: row.failedDeliveries,
+    lastError: row.lastError,
+    lastErrorAt: row.lastErrorAt,
     createdAt: row.createdAt
   };
 }

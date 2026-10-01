@@ -15,8 +15,8 @@ All webhook operations are `admin`.
   **inactive**, so nothing is POSTed to a receiver that is not deployed yet.
 - `webhooks.update` (`PATCH /webhooks/{id}`) changes `url`, `secret` or `eventTypes`, and switches
   delivery on and off with `active`. `{ "active": true }` once the receiver verifies signatures.
-- `webhooks.list` (`GET /webhooks`) lists the hooks with `eventTypes`, `active`, `lastStatus` and
-  `lastDeliveryAt`; the secret never appears in a read.
+- `webhooks.list` (`GET /webhooks`) lists the hooks with `eventTypes`, `active`, `lastStatus`,
+  `lastDeliveryAt` and the failure fields below; the secret never appears in a read.
 - `webhooks.delete` (`DELETE /webhooks/{id}`) soft-deletes a hook (`guardrails`); nothing more is
   delivered to it.
 
@@ -73,6 +73,18 @@ the body and an `X-Zamfono-Signature` header.
 - `lastStatus` in `webhooks.list` is `ok` after a delivery that succeeded and `failing` after one
   that gave up, with `lastDeliveryAt` its time; `null` before the first. A failing hook stays
   active and keeps receiving new events: it is never switched off automatically.
+- `lastError` is why the last delivery that gave up failed, with `lastErrorAt` its time: the
+  status, such as `HTTP 404` or `HTTP 403`, or the kind of error, `timeout`, `DNS lookup failed`,
+  `TLS error <code>`, `connection refused`, `connection reset`. While the hook is failing,
+  `failingSince` is when it turned so and `failedDeliveries` how many deliveries gave up since; a
+  delivery that succeeds sets them back to `null` and 0, and `lastError` stays as a record.
+- `api` logs a warning when a hook turns `failing`, again whenever the reason changes while it
+  stays failing (a `404` fixed by a new `url` that now answers `403` for a wrong `secret`), and
+  once a day while it keeps failing for the same reason; it logs when the hook delivers again.
+- A hook whose secret `api` cannot decrypt (the `SECRETBOX_KEY` was replaced without keeping the
+  previous key, or the database was restored under another `.env`) fails each delivery at once,
+  without a retry: `lastError` reads `secret unreadable — set a new secret`. Set one with
+  `webhooks.update` `{ "secret": "…" }`, and the receiver's check with it.
 - Delivery is **at least once**: a receiver that answers too slowly can get the same event again.
   Deduplicate on `id`. Events are delivered concurrently, so order them by `at`, not by arrival.
 - Pending deliveries are kept in the database: a delivery queued or between retries when the

@@ -111,6 +111,51 @@ describe('webhooks', () => {
     expect(pending).toEqual([]);
   });
 
+  it("lists a failing hook's failures since it turned failing and its last error", async () => {
+    const db = await makeTestDb();
+    const created = await runOperation<unknown, WebhookWire>(
+      db,
+      'webhooks.create',
+      { url: 'https://example.invalid/hook', secret: 'sh-secret' },
+      asRun()
+    );
+    expect(created).toMatchObject({
+      failingSince: null,
+      failedDeliveries: 0,
+      lastError: null,
+      lastErrorAt: null
+    });
+    await db
+      .updateTable('webhooks')
+      .set({
+        lastStatus: 'failing',
+        lastDeliveryAt: '2026-10-01T10:05:00.000Z',
+        failingSince: '2026-10-01T09:00:00.000Z',
+        failedDeliveries: 4,
+        lastError: 'HTTP 403',
+        lastErrorAt: '2026-10-01T10:05:00.000Z'
+      })
+      .execute();
+
+    const listed = await runOperation<unknown, { items: WebhookWire[] }>(
+      db,
+      'webhooks.list',
+      {},
+      asRun()
+    );
+
+    expect(listed.items).toMatchObject([
+      {
+        id: created.id,
+        lastStatus: 'failing',
+        failingSince: '2026-10-01T09:00:00.000Z',
+        failedDeliveries: 4,
+        lastError: 'HTTP 403',
+        lastErrorAt: '2026-10-01T10:05:00.000Z'
+      }
+    ]);
+  });
+
   it('refuses a non-HTTP webhook URL', async () => {
     const db = await makeTestDb();
     await expect(

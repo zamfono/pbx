@@ -498,8 +498,13 @@ export interface Webhooks {
   createdAt: string;
   deletedAt: string | null;
   eventTypesJson: string | null;
+  failedDeliveries: Generated<number>;
+  failingSince: string | null;
   id: string;
   lastDeliveryAt: string | null;
+  lastError: string | null;
+  lastErrorAt: string | null;
+  lastLoggedAt: string | null;
   lastStatus: string | null;
   secretEnc: Buffer;
   url: string;
