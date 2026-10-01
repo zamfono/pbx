@@ -11,8 +11,8 @@
     "test": "npm test --workspaces --if-present",
     "typecheck": "npm run sync -w packages/api && tsc -b",
     "lint": "npm run sync -w packages/api && tsc -b && eslint . --cache --cache-strategy content",
-    "format": "prettier --write . && node scripts/format-md-tables.mjs",
-    "format:check": "prettier --check . && node scripts/format-md-tables.mjs --check",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "db:generate": "npm run db:generate -w packages/shared",
     "db:migrate:create": "npm run migrate:create -w db",
     "db:deploy": "npm run deploy -w db"

@@ -3,7 +3,8 @@
 skills/zamfono/reference/
 
 # The specification is hand-formatted and authoritative: its changes are logged and reviewed line by
-# line, and Prettier's table padding would bury every content change in a whole-table diff.
+# line, and Prettier would rewrite its emphasis and list markers and pad every table, which turns a
+# one-cell change into a whole-table diff.
 docs/spec.md
 docs/spec-changes.md
 
