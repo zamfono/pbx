@@ -13,21 +13,12 @@ import {
   type CoreHealth,
   type CoreVersionResponse,
   type Db,
-  type HangupRequest,
-  type OriginateRequest,
-  type ParkingResponse,
-  type ParkRequest,
-  type PickupRequest,
-  type StateResponse,
-  type TransferRequest
+  type StateResponse
 } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
+import type { CallActions } from '../calls/actions.js';
 import { handleActionRoute, handleParkingRead } from './actionRoutes.js';
-import {
-  handleCallControlRoute,
-  type CallControlActions
-} from './callControlRoutes.js';
 import {
   handleConfigChanged,
   respondJson,
@@ -35,6 +26,7 @@ import {
   type TrunkMonitoringRefresh
 } from './configChanged.js';
 import { EventBus } from './eventBus.js';
+import { handleMwiRoute } from './mwiRoute.js';
 import { ConfigCache, type Snapshot } from './snapshot.js';
 import { StateStore } from './stateStore.js';
 
@@ -51,24 +43,13 @@ const processStartedAt = new Date(
   Date.now() - process.uptime() * MS_PER_SECOND
 ).toISOString();
 
-/** The live-call actions (§3), `calls/actions.ts`'s `CallActions`; `null` leaves their routes 404. */
-export type CallActions = {
-  originate: (
-    req: OriginateRequest
-  ) => Promise<{ callId: string } | { error: 'noRegisteredDevice' }>;
-  transfer: (callId: string, req: TransferRequest) => Promise<void>;
-  pickup: (callId: string, req: PickupRequest) => Promise<void>;
-  hangup: (callId: string, req: HangupRequest) => Promise<void>;
-  park: (callId: string, req: ParkRequest) => Promise<{ slot: string }>;
-  parked: () => Promise<ParkingResponse>;
-} & CallControlActions;
-
 type InternalDeps = {
   db: Db;
   ari: AriClient;
   cache: ConfigCache;
   state: StateStore;
   bus: EventBus;
+  /** The live-call actions (§3); `null` leaves their routes 404. */
   actions: CallActions | null;
   /** Recomputed after every config change (`configChanged.ts`); `null` leaves presence alone. */
   presence: PresenceRefresh | null;
@@ -153,18 +134,8 @@ async function routeRequest(
   }
   if (
     request.method === 'POST' &&
-    (await handleActionRoute(deps, url.pathname, request, response))
-  ) {
-    return;
-  }
-  if (
-    request.method === 'POST' &&
-    (await handleCallControlRoute(
-      deps.actions,
-      url.pathname,
-      request,
-      response
-    ))
+    ((await handleMwiRoute(deps, url.pathname, response)) ||
+      (await handleActionRoute(deps.actions, url.pathname, request, response)))
   ) {
     return;
   }

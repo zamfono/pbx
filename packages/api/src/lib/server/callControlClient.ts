@@ -1,5 +1,5 @@
 /**
- * `core`'s call-control routes (§10.3 "Live calls"; `core`'s `internal/callControlRoutes.ts`):
+ * `core`'s call-control routes (§10.3 "Live calls"; `core`'s `internal/actionTable.ts`):
  * add a party, consult and transfer to the consultation, hold, resume and decline, beside the
  * live-call actions of `coreClient.ts`, whose transport and refusals they share.
  */
