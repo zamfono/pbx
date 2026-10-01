@@ -1,32 +1,28 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { AmiClient } from '../ami/client.js';
-import { AriClient } from '../ari/client.js';
-import { FakeAri, isPlacement } from '../ari/fake.js';
-import type { Logger } from '../ari/types.js';
+import type { AriClient } from '../ari/client.js';
+import { isPlacement, type FakeAri } from '../ari/fake.js';
 import type { LogLevel } from '../callLog.js';
-import { CdrWriter } from '../cdr.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
+import type { CdrWriter } from '../cdr.js';
 import { eventually } from '../testing/eventually.js';
+import {
+  answeredCall,
+  languageSet,
+  legOf,
+  noopLogger,
+  startRig,
+  type Rig
+} from '../testing/pipelineRig.js';
+import { seedDevice, seedUser } from '../testing/seedRows.js';
 import { newAddedLeg } from './addedParty.js';
 import { newCall, type Call } from './call.js';
 import { channelOf } from './callLookup.js';
 import { closeCall } from './liveCall.js';
-import { Pipeline } from './pipeline.js';
+import type { Pipeline } from './pipeline.js';
 import { Recorder } from './recording.js';
 import { fromOf, transferCall, userOfChannel } from './transfers.js';
-import { TrunkState } from './trunkState.js';
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 // How long a check that something does NOT happen gives the flow to do it anyway.
 const SETTLE_MS = 50;
@@ -35,30 +31,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => {
     setTimeout(resolve, ms);
   });
-}
-
-/** A throwaway forward-target/DID chain, just to satisfy `settings.main_did_id`'s FK. */
-async function seedSettings(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+15551234', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
 }
 
 /** A trunk plus an outbound route restricted to `userId`, so only their calls match it (§9.4). */
@@ -101,52 +73,16 @@ async function seedTrunkWithRoute(db: Db, userId: string): Promise<string> {
   return trunkId;
 }
 
-async function seedUser(db: Db, ext: string): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id,
-      name: `User ${ext}`,
-      email: `${id}@example.com`,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('extensions')
-    .values({ ext, userId: id, ringGroupId: null, isParkingSlot: 0 })
-    .execute();
-  await db
-    .insertInto('devices')
-    .values({
-      id: newId(),
-      userId: id,
-      label: `e${ext}-a`,
-      kind: 'manual',
-      sipUsername: `e${ext}-a`,
-      sipPasswordEnc: Buffer.from('secret'),
-      createdAt: nowIso()
-    })
-    .execute();
+/** A user at `ext` with one device, never registered. */
+async function seedUserWithDevice(rig: Rig, ext: string): Promise<string> {
+  const id = await seedUser(rig.db, ext);
+  await seedDevice(rig, id, `e${ext}-a`, false);
   return id;
 }
 
-/** Whether the core set `channelId`'s language to `language` (§9.1). */
-function languageSet(
-  fakeAri: FakeAri,
-  channelId: string,
-  language: string
-): boolean {
-  return fakeAri.calls.some(
-    entry =>
-      entry.method === 'POST' &&
-      entry.path === `channels/${channelId}/variable` &&
-      (entry.body as { variable?: string }).variable === 'CHANNEL(language)' &&
-      (entry.body as { value?: string }).value === language
-  );
-}
-
 describe('transfers', () => {
+  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
+  let rig: Rig;
   // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let db: Db;
   // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
@@ -159,105 +95,23 @@ describe('transfers', () => {
   let cdr: CdrWriter;
 
   async function setUp(): Promise<void> {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    await seedSettings(db);
-    fakeAri = new FakeAri();
-    fakeAri.answerAfterMs = 5;
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
-    const cache = new ConfigCache(db);
-    const state = new StateStore();
-    const bus = new EventBus();
-    cdr = new CdrWriter({
-      db,
-      ari,
-      cache,
-      bus,
-      state: new StateStore(),
-      now: nowIso
-    });
-    const ami = new AmiClient({
-      host: '127.0.0.1',
-      port: 1,
-      username: 'zamfono',
-      password: 'secret',
-      log: noopLogger
-    });
-    const trunkState = new TrunkState({
-      ari,
-      ami,
-      cache,
-      state,
-      bus,
-      now: nowIso
-    });
-    pipeline = new Pipeline({
-      ari,
-      cache,
-      state,
-      bus,
-      cdr,
-      now: nowIso,
-      db,
-      trunkState,
-      presence: null
-    });
+    rig = await startRig({ presence: null });
+    ({ db, fakeAri, ari, pipeline, cdr } = rig);
+    pipeline.deps.trunkState = rig.trunkState();
   }
 
-  /** An answered inbound call from `+15559999`, bridged with `userId`'s device leg. */
-  async function answeredCall(
+  afterEach(async () => {
+    await rig.stop();
+  });
+
+  /** An answered inbound call from `+15559999`, bridged with `userId`'s device leg, on a channel
+   * named `legName`. */
+  async function answered(
     userId: string,
     legName: string
   ): Promise<{ call: Call; callerId: string; legId: string }> {
-    const caller = fakeAri.addChannel({
-      name: 'PJSIP/trunk-1-00000001',
-      caller: { number: '+15559999', name: '' }
-    });
-    const leg = fakeAri.addChannel({ name: legName });
-    const bridge = await ari.bridges.create({ type: 'mixing' });
-    await ari.bridges.addChannel(bridge.id, caller.id);
-    await ari.bridges.addChannel(bridge.id, leg.id);
-    const call = newCall({
-      id: newId(),
-      direction: 'inbound',
-      callerChannelId: caller.id,
-      from: '+15559999',
-      to: '101',
-      startedAt: nowIso(),
-      logLevel: 'events',
-      callLogMaxBytes: 1_048_576
-    });
-    call.calleeUserId = userId;
-    call.answeredByUserId = userId;
-    call.answeredAt = nowIso();
-    call.status = 'answered';
-    call.bridgeId = bridge.id;
-    call.legs.set(leg.id, {
-      channelId: leg.id,
-      kind: 'device',
-      userId,
-      state: 'up',
-      endCause: null
-    });
-    pipeline.registerCall(call);
-    pipeline.callByChannel.set(leg.id, call);
-    await cdr.open(call);
-    return { call, callerId: caller.id, legId: leg.id };
-  }
-
-  function hungUp(channelId: string): boolean {
-    return fakeAri.calls.some(
-      entry =>
-        entry.method === 'DELETE' && entry.path === `channels/${channelId}`
-    );
+    const call = await answeredCall(rig, userId, { legName });
+    return { call, callerId: call.callerChannelId, legId: legOf(call) };
   }
 
   /**
@@ -267,7 +121,7 @@ describe('transfers', () => {
    */
   function transferFollowed(transferrerChannelId: string): Promise<void> {
     return eventually(() => {
-      expect(hungUp(transferrerChannelId)).toBe(true);
+      expect(rig.hungUp(transferrerChannelId)).toBe(true);
     });
   }
 
@@ -277,17 +131,11 @@ describe('transfers', () => {
       .map(entry => entry.body as { endpoint?: string; appArgs?: string });
   }
 
-  afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
-  });
-
   it('follows a blind transfer: the original call closes and the re-entering transferee becomes a child call', async () => {
     await setUp();
-    const transferrerId = await seedUser(db, '101');
-    await seedUser(db, '102');
-    const { call, callerId, legId } = await answeredCall(
+    const transferrerId = await seedUserWithDevice(rig, '101');
+    await seedUserWithDevice(rig, '102');
+    const { call, callerId, legId } = await answered(
       transferrerId,
       'PJSIP/e101-a-00000002'
     );
@@ -313,7 +161,7 @@ describe('transfers', () => {
     // transferrer's participation, whose channel is left with nobody, and leaves the transferee
     // to the onward call.
     await eventually(() => {
-      expect(hungUp(legId)).toBe(true);
+      expect(rig.hungUp(legId)).toBe(true);
     });
     const original = await db
       .selectFrom('calls')
@@ -324,7 +172,7 @@ describe('transfers', () => {
     expect(original.endedAt).not.toBeNull();
     expect(original.log).toContain('"event":"blindTransfer"');
     expect(pipeline.callByChannel.has(callerId)).toBe(false);
-    expect(hungUp(callerId)).toBe(false);
+    expect(rig.hungUp(callerId)).toBe(false);
 
     // The transferee re-enters Stasis through `from-users` (§9.2), dialling the transfer target.
     fakeAri.emit({
@@ -379,11 +227,11 @@ describe('transfers', () => {
 
   it("routes a blind transfer to an external number as the transferrer's call (§10.1)", async () => {
     await setUp();
-    const transferrerId = await seedUser(db, '101');
+    const transferrerId = await seedUserWithDevice(rig, '101');
     // The transferrer's own outbound route and presented number; the transferee is an outside
     // caller with neither.
     const trunkId = await seedTrunkWithRoute(db, transferrerId);
-    const { callerId, legId } = await answeredCall(
+    const { callerId, legId } = await answered(
       transferrerId,
       'PJSIP/e101-a-00000002'
     );
@@ -433,12 +281,12 @@ describe('transfers', () => {
 
   it("names the transferrer by the channel that sent the REFER, not by the call's answerer (§10.1)", async () => {
     await setUp();
-    const answererId = await seedUser(db, '101');
-    const transferrerId = await seedUser(db, '102');
+    const answererId = await seedUserWithDevice(rig, '101');
+    const transferrerId = await seedUserWithDevice(rig, '102');
     // Only the transferrer, the internal caller, has a route; the answerer, whom the old
     // identity named, has none, and neither does the transferee they are.
     const trunkId = await seedTrunkWithRoute(db, transferrerId);
-    const { call, callerId, legId } = await answeredCall(
+    const { call, callerId, legId } = await answered(
       answererId,
       'PJSIP/e101-a-00000002'
     );
@@ -490,9 +338,9 @@ describe('transfers', () => {
 
   it('follows a blind transfer out of a Stasis bridge, where a Local pair dials the target for the transferee', async () => {
     await setUp();
-    const transferrerId = await seedUser(db, '101');
+    const transferrerId = await seedUserWithDevice(rig, '101');
     const trunkId = await seedTrunkWithRoute(db, transferrerId);
-    const { call, callerId, legId } = await answeredCall(
+    const { call, callerId, legId } = await answered(
       transferrerId,
       'PJSIP/e101-a-00000002'
     );
@@ -545,9 +393,9 @@ describe('transfers', () => {
           entry.endpoint?.includes(`trunk-${trunkId}`)
         )
       ).toBe(true);
-      expect(hungUp(legId)).toBe(true);
+      expect(rig.hungUp(legId)).toBe(true);
     });
-    expect(hungUp(callerId)).toBe(false);
+    expect(rig.hungUp(callerId)).toBe(false);
 
     // The transferee hanging up ends their Local line, and with it the onward call.
     fakeAri.emit({
@@ -558,7 +406,7 @@ describe('transfers', () => {
       cause: 16
     });
     await eventually(() => {
-      expect(hungUp(localOne.id)).toBe(true);
+      expect(rig.hungUp(localOne.id)).toBe(true);
       expect(
         fakeAri.calls.some(
           entry =>
@@ -570,8 +418,8 @@ describe('transfers', () => {
 
   it('hangs up the transferee once the onward call through its Local pair ends', async () => {
     await setUp();
-    const transferrerId = await seedUser(db, '101');
-    const { callerId, legId } = await answeredCall(
+    const transferrerId = await seedUserWithDevice(rig, '101');
+    const { callerId, legId } = await answered(
       transferrerId,
       'PJSIP/e101-a-00000002'
     );
@@ -604,15 +452,15 @@ describe('transfers', () => {
     });
 
     await eventually(() => {
-      expect(hungUp(callerId)).toBe(true);
+      expect(rig.hungUp(callerId)).toBe(true);
     });
   });
 
   it('blind-transfers the other party over the API into a child call routed to the target', async () => {
     await setUp();
-    const transferrerId = await seedUser(db, '101');
-    await seedUser(db, '102');
-    const { call, callerId, legId } = await answeredCall(
+    const transferrerId = await seedUserWithDevice(rig, '101');
+    await seedUserWithDevice(rig, '102');
+    const { call, callerId, legId } = await answered(
       transferrerId,
       'PJSIP/e101-a-00000002'
     );
@@ -635,8 +483,8 @@ describe('transfers', () => {
     expect(child.callerChannelId).toBe(callerId);
     expect(child.direction).toBe('inbound');
     expect(child.from).toBe('+15559999');
-    expect(hungUp(legId)).toBe(true);
-    expect(hungUp(callerId)).toBe(false);
+    expect(rig.hungUp(legId)).toBe(true);
+    expect(rig.hungUp(callerId)).toBe(false);
     expect(
       fakeAri.calls.some(
         entry =>
@@ -670,9 +518,9 @@ describe('transfers', () => {
   it('sets the transferee channel’s language from the tenant setting', async () => {
     await setUp();
     await db.updateTable('settings').set({ language: 'de' }).execute();
-    const transferrerId = await seedUser(db, '101');
-    await seedUser(db, '102');
-    const { call, callerId } = await answeredCall(
+    const transferrerId = await seedUserWithDevice(rig, '101');
+    await seedUserWithDevice(rig, '102');
+    const { call, callerId } = await answered(
       transferrerId,
       'PJSIP/e101-a-00000002'
     );
@@ -694,8 +542,8 @@ describe('transfers', () => {
       .set({ callLogLevel: 'none' })
       .where('id', '=', 1)
       .execute();
-    const transferrerId = await seedUser(db, '101');
-    const { call } = await answeredCall(transferrerId, 'PJSIP/e101-a-00000002');
+    const transferrerId = await seedUserWithDevice(rig, '101');
+    const { call } = await answered(transferrerId, 'PJSIP/e101-a-00000002');
 
     const child = await transferCall(pipeline, call, {
       target: '112',
@@ -722,7 +570,7 @@ describe('transfers', () => {
       .insertInto('extensions')
       .values({ ext: '701', userId: null, ringGroupId: null, isParkingSlot: 1 })
       .execute();
-    const userId = await seedUser(db, '101');
+    const userId = await seedUserWithDevice(rig, '101');
     const call = newCall({
       id: newId(),
       direction: 'outbound',
@@ -757,8 +605,8 @@ describe('transfers', () => {
 
   it('refuses a transfer of a call that is not bridged with 409 notBridged', async () => {
     await setUp();
-    const userId = await seedUser(db, '101');
-    const { call } = await answeredCall(userId, 'PJSIP/e101-a-00000002');
+    const userId = await seedUserWithDevice(rig, '101');
+    const { call } = await answered(userId, 'PJSIP/e101-a-00000002');
     call.bridgeId = null;
     await expect(
       transferCall(pipeline, call, { target: '102', actorUserId: userId })
@@ -825,9 +673,9 @@ describe('transfers', () => {
 
   it('follows an attended transfer: the consultation call carries on with the transferee as a child of the original', async () => {
     await setUp();
-    const transferrerId = await seedUser(db, '101');
-    const targetId = await seedUser(db, '102');
-    const original = await answeredCall(transferrerId, 'PJSIP/e101-a-00000002');
+    const transferrerId = await seedUserWithDevice(rig, '101');
+    const targetId = await seedUserWithDevice(rig, '102');
+    const original = await answered(transferrerId, 'PJSIP/e101-a-00000002');
     const { consultation, secondId } = await consultationCall(
       transferrerId,
       targetId
@@ -869,7 +717,7 @@ describe('transfers', () => {
     // The transferee holds the place the transferrer had in the consultation.
     expect(consultation.callerChannelId).toBe(original.callerId);
     // The transferrer's first channel is left with nobody.
-    expect(hungUp(original.legId)).toBe(true);
+    expect(rig.hungUp(original.legId)).toBe(true);
     // The history's caller is still the transferrer, who no longer controls the call: their
     // channel left it (§10.3 "Live calls").
     expect(consultation.callerUserId).toBe(transferrerId);
@@ -879,9 +727,9 @@ describe('transfers', () => {
 
   it('carries the consultation on past the transferrer leaving Stasis, and closes it once the transferee hangs up', async () => {
     await setUp();
-    const transferrerId = await seedUser(db, '101');
-    const targetId = await seedUser(db, '102');
-    const original = await answeredCall(transferrerId, 'PJSIP/e101-a-00000002');
+    const transferrerId = await seedUserWithDevice(rig, '101');
+    const targetId = await seedUserWithDevice(rig, '102');
+    const original = await answered(transferrerId, 'PJSIP/e101-a-00000002');
     const { consultation, secondId, targetLegId } = await consultationCall(
       transferrerId,
       targetId
@@ -921,7 +769,7 @@ describe('transfers', () => {
     destroyed(original.callerId);
 
     await eventually(async () => {
-      expect(hungUp(targetLegId)).toBe(true);
+      expect(rig.hungUp(targetLegId)).toBe(true);
       expect(await endedAt(consultation.id)).not.toBeNull();
       expect(pipeline.callByChannel.has(original.callerId)).toBe(false);
     });
@@ -929,9 +777,9 @@ describe('transfers', () => {
 
   it("records the transferee's own participation in the consultation row once it carries the call on (§10.1, §10.2)", async () => {
     await setUp();
-    const transferrerId = await seedUser(db, '101');
-    const targetId = await seedUser(db, '102');
-    const transfereeId = await seedUser(db, '103');
+    const transferrerId = await seedUserWithDevice(rig, '101');
+    const targetId = await seedUserWithDevice(rig, '102');
+    const transfereeId = await seedUserWithDevice(rig, '103');
     await db
       .updateTable('users')
       .set({ recordCalls: 1 })
@@ -939,7 +787,7 @@ describe('transfers', () => {
       .execute();
     const recorder = new Recorder({
       ari,
-      cache: new ConfigCache(db),
+      cache: rig.cache,
       db,
       mediaDir: '/media',
       mix: () => Promise.resolve(0),
@@ -948,7 +796,7 @@ describe('transfers', () => {
     });
     pipeline.deps.recorder = recorder;
     // 103 called 101, recorded on 103's flag; 101 consults 102 and transfers 103 to them.
-    const original = await answeredCall(transferrerId, 'PJSIP/e101-a-00000002');
+    const original = await answered(transferrerId, 'PJSIP/e101-a-00000002');
     original.call.callerUserId = transfereeId;
     await recorder.onCallerUp(original.call);
     const { consultation, secondId } = await consultationCall(
@@ -981,7 +829,7 @@ describe('transfers', () => {
         entry => entry.method === 'POST' && entry.path.endsWith('/record')
       );
     const snoopHungUp = (entry: (typeof fakeAri.calls)[number]): boolean =>
-      hungUp(entry.path.slice('channels/'.length, -'/record'.length));
+      rig.hungUp(entry.path.slice('channels/'.length, -'/record'.length));
     // The transferee's participation in the consultation has started once the original call,
     // which closes only after it, has ended its own.
     await eventually(() => {
@@ -1023,9 +871,9 @@ describe('transfers', () => {
 
   it("writes the consultation's call_qos for every leg it had, each from its own hangup (§7)", async () => {
     await setUp();
-    const transferrerId = await seedUser(db, '101');
-    const targetId = await seedUser(db, '102');
-    const original = await answeredCall(transferrerId, 'PJSIP/e101-a-00000002');
+    const transferrerId = await seedUserWithDevice(rig, '101');
+    const targetId = await seedUserWithDevice(rig, '102');
+    const original = await answered(transferrerId, 'PJSIP/e101-a-00000002');
     const { consultation, secondId, targetLegId } = await consultationCall(
       transferrerId,
       targetId,
@@ -1094,9 +942,9 @@ describe('transfers', () => {
 
   it('collapses the Local link of an attended transfer between two Stasis bridges into one bridge', async () => {
     await setUp();
-    const transferrerId = await seedUser(db, '101');
-    const targetId = await seedUser(db, '102');
-    const original = await answeredCall(transferrerId, 'PJSIP/e101-a-00000002');
+    const transferrerId = await seedUserWithDevice(rig, '101');
+    const targetId = await seedUserWithDevice(rig, '102');
+    const original = await answered(transferrerId, 'PJSIP/e101-a-00000002');
     const { consultation, secondId, targetLegId } = await consultationCall(
       transferrerId,
       targetId
@@ -1147,8 +995,8 @@ describe('transfers', () => {
     expect(posted(`bridges/${bridge2}/addChannel`)).toContain(
       original.callerId
     );
-    expect(hungUp(localOne.id)).toBe(true);
-    expect(hungUp(localTwo.id)).toBe(true);
+    expect(rig.hungUp(localOne.id)).toBe(true);
+    expect(rig.hungUp(localTwo.id)).toBe(true);
     expect(
       fakeAri.calls.some(
         entry =>
@@ -1159,7 +1007,7 @@ describe('transfers', () => {
     // The target hanging up now ends the conversation for the transferee too.
     destroyed(targetLegId);
     await eventually(() => {
-      expect(hungUp(original.callerId)).toBe(true);
+      expect(rig.hungUp(original.callerId)).toBe(true);
     });
     destroyed(original.callerId);
     await eventually(async () => {
