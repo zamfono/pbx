@@ -10,7 +10,7 @@
 //
 // Everything read from the pull request (logins, commit author names, comment bodies) is data
 // here: it is compared, or quoted inside code spans, and never evaluated.
-import { listAll, personOf, record } from './cla-api.mjs';
+import { personOf, record } from './cla-api.mjs';
 import { readStore, sign } from './cla-signatures.mjs';
 
 export const SIGN_SENTENCE = 'I have read the CLA and I hereby sign it.';
@@ -19,6 +19,7 @@ const COMMENT_MARKER = '<!-- cla -->';
 const STATUS_CONTEXT = 'cla';
 
 /** @typedef {import('./cla-api.mjs').Request} Request */
+/** @typedef {import('./cla-api.mjs').Paginate} Paginate */
 /** @typedef {import('./cla-api.mjs').Repo} Repo */
 /** @typedef {import('./cla-api.mjs').Person} Person */
 /** @typedef {{ people: Person[], unlinked: string[] }} Authors */
@@ -90,15 +91,15 @@ export function commentBody(documentUrl, unsigned, unlinked) {
 /**
  * Creates, updates or leaves alone the check's own comment.
  * @param {Request} request
+ * @param {Paginate} paginate
  * @param {Repo} repo
  * @param {number} number
  * @param {string} body
  * @returns {Promise<void>}
  */
-async function upsertComment(request, { owner, repo }, number, body) {
-  const comments = await listAll(
-    request,
-    `/repos/${owner}/${repo}/issues/${number}/comments`
+async function upsertComment(request, paginate, { owner, repo }, number, body) {
+  const comments = await paginate(
+    `GET /repos/${owner}/${repo}/issues/${number}/comments?per_page=100`
   );
   const own = comments.map(record).find(comment => {
     const author = personOf(comment.user);
@@ -160,11 +161,12 @@ async function documentVersion(request, { owner, repo }, branch) {
 }
 
 /**
- * @param {{ github: { request: Request }, context: { repo: Repo, eventName: string, payload: unknown, serverUrl: string } }} script
+ * @param {{ github: { request: Request, paginate: Paginate }, context: { repo: Repo, eventName: string, payload: unknown, serverUrl: string } }} script
  * @returns {Promise<void>}
  */
 export default async function run({ github, context }) {
   const request = github.request.bind(github);
+  const paginate = github.paginate.bind(github);
   const { repo } = context;
   const { number, signer } = eventOf(context.eventName, context.payload);
   const pull = record(
@@ -175,9 +177,8 @@ export default async function run({ github, context }) {
     return;
   }
   const { people, unlinked } = authorsOf(
-    await listAll(
-      request,
-      `/repos/${repo.owner}/${repo.repo}/pulls/${number}/commits`
+    await paginate(
+      `GET /repos/${repo.owner}/${repo.repo}/pulls/${number}/commits?per_page=100`
     )
   );
   const branch = String(record(record(pull.base).repo).default_branch);
@@ -215,6 +216,7 @@ export default async function run({ github, context }) {
   );
   await upsertComment(
     request,
+    paginate,
     repo,
     number,
     commentBody(documentUrl, unsigned, unlinked)
