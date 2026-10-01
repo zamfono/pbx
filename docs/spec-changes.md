@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-01 · §6.3 Updates.** `update.sh` run on the host records its run in `.update/state.json`, in the updater's own shape: `running` from its start, then `succeeded` or `failed` with the versions and times and, for a failure, its message. `--check` and the updater's run of the script (`ZAMFONO_UPDATER=1`), which the updater records itself, write nothing. The updater reports what the file holds whenever no run of its own is in progress, rather than what it read at start.
+*Why:* found live: a stack updated with update.sh on the host reported the updater's last run in `system.info`, 0.0.6 to 0.0.7, while it ran 0.1.0.
+
 **2026-10-01 · §10.6 Webhooks.** A hook is marked `failing` as soon as one delivery has failed all three attempts, not after a "persistent" failure the text left undefined, and the next delivery that succeeds marks it `ok` again.
 *Why:* requested by the product owner: the spec follows the code, which marks a hook `failing` on the first delivery it gives up.
 

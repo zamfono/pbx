@@ -342,8 +342,8 @@ curl -fsSL https://github.com/zamfono/pbx/releases/latest/download/zamfono-deplo
 ```
 
 **From an MCP client or the API**, the owner updates without a shell: `system.info` shows the
-latest release, whether it can be installed this way, and how the last update went, and
-`system.update` installs it. It runs the same `update.sh` in the `updater` service, only to a newer
+latest release, whether it can be installed this way, and how the last update went, run either
+way, and `system.update` installs it. It runs the same `update.sh` in the `updater` service, only to a newer
 release that is not breaking, and only once a backup run finished `ok` within the last hour. The
 updater needs `UPDATER_TOKEN` and `CONTAINER_SOCKET` in `.env`, which `setup.sh` and `update.sh`
 write.

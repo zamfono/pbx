@@ -42,7 +42,8 @@ done
 
 # The stub runtime: `docker compose version` answers, `up --help` names --wait unless
 # STUB_PODMAN_COMPOSE, which also has no `rm`, as podman-compose has neither; everything else is
-# recorded and succeeds, bar a pull under STUB_FAIL_PULL and an `up` under STUB_FAIL_UP.
+# recorded and succeeds, bar a pull under STUB_FAIL_PULL and an `up` under STUB_FAIL_UP. A pull
+# copies the update's record, .update/state.json, to $STUB_LOG.state, as it stands mid-run.
 mkdir -p "$work/bin"
 cat >"$work/bin/docker" <<'STUB'
 #!/usr/bin/env bash
@@ -51,6 +52,7 @@ if [[ $* == 'compose up --help' ]]; then
   exit 0
 fi
 echo "$*" >>"$STUB_LOG"
+[[ $* != *' pull'* || ! -e .update/state.json ]] || cp .update/state.json "$STUB_LOG.state"
 if [[ -n ${STUB_PODMAN_COMPOSE:-} && $* == *' rm '* ]]; then
   echo "podman-compose: error: argument command: invalid choice: 'rm'" >&2
   exit 2
@@ -78,6 +80,35 @@ fresh_stack() {
   cp -a "$stack_src" "$work/stack"
   sed -i -E '/^(BACKUP_PASSWORD|UPDATER_TOKEN|CONTAINER_SOCKET)=/d' "$work/stack/.env"
   : >"$work/runtime.log"
+  rm -f "$work/runtime.log.state"
+}
+
+# record_is FILE STATE FROM TO [ERROR] — FILE holds the updater's record of a run in STATE from
+# FROM to TO, with exactly the fields runner.ts writes for it, its times ISO 8601 UTC with
+# milliseconds and, for a failed run, an error containing ERROR.
+record_is() {
+  python3 - "$@" <<'PY' || fail "$1 is not the record of a $2 run $3 -> $4: $(cat "$1" 2>&1)"
+import json, re, sys
+path, state, frm, to = sys.argv[1:5]
+error = sys.argv[5] if len(sys.argv) > 5 else None
+with open(path) as f:
+    text = f.read()
+record = json.loads(text)
+keys = ['state', 'from', 'to', 'startedAt']
+if state != 'running':
+    keys.append('finishedAt')
+if state == 'failed':
+    keys.append('error')
+if frm == '':
+    keys.remove('from')
+assert list(record) == keys, list(record)
+assert text == json.dumps(record, indent=2) + '\n', 'not in the updater layout'
+assert record['state'] == state and record.get('from', '') == frm and record['to'] == to
+for key in ('startedAt', 'finishedAt'):
+    if key in record:
+        assert re.fullmatch(r'\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z', record[key]), record[key]
+assert error is None or error in record['error'], record['error']
+PY
 }
 
 update() {
@@ -110,6 +141,9 @@ grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d --wait --wait-time
   "$work/runtime.log" || fail "no up -d --wait of the whole stack"
 grep -q 'rm -sf proxy' "$work/runtime.log" && fail "Docker needs no removal of proxy"
 grep -q 'Updated 1.2.3 -> 1.2.4' "$work/out" || fail "no report of the update"
+echo "  - recorded in .update/state.json: running while it runs, then succeeded"
+record_is "$work/runtime.log.state" running 1.2.3 1.2.4
+record_is "$work/stack/.update/state.json" succeeded 1.2.3 1.2.4
 
 echo "  - on Podman without a boot unit"
 fresh_stack
@@ -166,6 +200,7 @@ grep -q ' pull' "$work/runtime.log" && fail "the rerun pulled again"
 grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d --wait --wait-timeout 180' \
   "$work/runtime.log" || fail "the rerun did not recreate the stack"
 update 1.2.4 | grep -q 'Already on 1.2.4' || fail "the finished update is still pending"
+record_is "$work/stack/.update/state.json" succeeded '' 1.2.4
 
 fresh_stack
 update 1.2.4 >/dev/null 2>&1 || fail "the update to 1.2.4 failed"
@@ -175,11 +210,14 @@ STUB_FAIL_PULL=1 update 1.2.4 >"$work/out" 2>&1 && fail "an update whose pull fa
 grep -q 'nothing was changed' "$work/out" || fail "no word of the failed pull: $(cat "$work/out")"
 [[ $(pin) == 'ZAMFONO_VERSION:-1.2.3' ]] || fail "a failed pull left compose.yaml at $(pin)"
 grep -q 'up -d' "$work/runtime.log" && fail "a failed pull still recreated the stack"
+record_is "$work/stack/.update/state.json" failed 1.2.3 1.2.4 'pulling the 1.2.4 images failed'
 
 fresh_stack
 update 1.2.4 >/dev/null 2>&1 || fail "the update to 1.2.4 failed"
 echo "  - the same release again"
+record=$(cat "$work/stack/.update/state.json")
 update 1.2.4 | grep -q 'Already on 1.2.4' || fail "a second run did not say it is already on 1.2.4"
+[[ $(cat "$work/stack/.update/state.json") == "$record" ]] || fail "a run that did nothing was recorded"
 
 echo "  - an older release"
 update 1.2.3 >/dev/null 2>&1 && fail "an update to an older release ran"
@@ -206,6 +244,7 @@ while IFS=$'\t' read -r from to verdict; do
     *) fail "update-policy.tsv: unknown verdict $verdict" ;;
   esac
   got=$(update --check "$to" 2>/dev/null) || got=
+  [[ ! -e $work/stack/.update ]] || fail "$from to $to: --check wrote $(ls "$work/stack/.update")"
   [[ $got == "$expected" ]] || fail "$from to $to: update.sh said '$got'; the table: $verdict"
   # The updater's run refuses what judgeUpdate refuses, bar the release it is on, which it reports.
   if (cd "$work/stack" && ZAMFONO_UPDATER=1 ZAMFONO_REPO_URL="http://127.0.0.1:$port" \
@@ -239,4 +278,5 @@ grep -qx 'compose -f compose.yaml -f compose.ports.yaml rm -sf proxy' "$work/run
 grep -qx 'compose -f compose.yaml -f compose.ports.yaml up -d --wait --wait-timeout 180 asterisk'\
 ' migrate core api proxy' "$work/runtime.log" || fail "the updater recreated more than the stack"
 grep -q '^CONTAINER_SOCKET=' "$work/stack/.env" && fail "the updater guessed a CONTAINER_SOCKET"
+[[ ! -e $work/stack/.update ]] || fail "the updater's run wrote the record the updater keeps itself"
 echo "  update.sh OK"

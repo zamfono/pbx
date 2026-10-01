@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { mkdir, open, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -7,7 +8,7 @@ import type { ComposeProject } from './docker.js';
 /**
  * One update at a time, run by the stack's own `update.sh` (§6.3 "Updates"), and its outcome
  * kept in the stack directory's `.update/`, so it outlives the updater and `system.info` reports
- * the last one after a restart.
+ * the last one after a restart. `update.sh` run on the host writes the same record of its own run.
  */
 export type UpdateState = {
   state: 'idle' | 'running' | 'succeeded' | 'failed';
@@ -22,6 +23,7 @@ const LOG_TAIL_LINES = 20;
 const JSON_INDENT = 2;
 
 export type Runner = {
+  /** The updater's own run while it runs, else `.update/state.json` as it is now. */
   current: () => UpdateState;
   /** Starts `update.sh <to>`; the caller has checked that no update is running. */
   start: (from: string, to: string) => Promise<void>;
@@ -54,7 +56,9 @@ async function persist(stackDir: string, state: UpdateState): Promise<void> {
 
 /**
  * The state `.update/state.json` holds, with a run still `running` there marked failed: the
- * updater never restarts itself, so such a run was cut off by a stop or a reboot of the host.
+ * updater never restarts itself, so such a run was cut off by a stop or a reboot of the host. A
+ * run of `update.sh` on the host recreates the updater while it runs, and writes its own end over
+ * this mark once it ends.
  */
 export async function loadState(
   stackDir: string,
@@ -78,6 +82,18 @@ export async function loadState(
     await persist(stackDir, state);
   }
   return state;
+}
+
+/**
+ * `.update/state.json` as it is now, which `update.sh` run on the host may have written since the
+ * updater last did, or `fallback` while it cannot be read.
+ */
+function readState(stackDir: string, fallback: UpdateState): UpdateState {
+  try {
+    return JSON.parse(readFileSync(stateFile(stackDir), 'utf8')) as UpdateState;
+  } catch {
+    return fallback;
+  }
 }
 
 async function logTail(logFile: string): Promise<string> {
@@ -146,7 +162,10 @@ export async function createRunner(options: RunnerOptions): Promise<Runner> {
   }
 
   return {
-    current: () => holder.state,
+    current: () =>
+      holder.state.state === 'running'
+        ? holder.state
+        : readState(options.stackDir, holder.state),
     settled: async () => holder.done,
     async start(from, to) {
       // Settled when the run has ended and its outcome is on disk; set before the first await,

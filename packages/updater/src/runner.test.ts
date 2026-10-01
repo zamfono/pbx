@@ -75,6 +75,31 @@ describe('createRunner', () => {
     expect(runner.current().state).toBe('failed');
     expect(runner.current().error).toContain('args=0.0.7');
   });
+
+  it("reports a run update.sh recorded on the host since the updater's own", async () => {
+    const stackDir = await tempDir();
+    const runner = await createRunner({
+      stackDir,
+      project: project(stackDir),
+      socketPath: '/s',
+      script: await fakeScript(stackDir, 0)
+    });
+    await runner.start('0.0.6', '0.0.7');
+    await runner.settled();
+    const hostRun = {
+      state: 'succeeded',
+      from: '0.0.7',
+      to: '0.1.0',
+      startedAt: '2026-10-01T10:00:00.000Z',
+      finishedAt: '2026-10-01T10:02:00.000Z'
+    };
+    await writeFile(
+      path.join(stackDir, '.update', 'state.json'),
+      `${JSON.stringify(hostRun, null, 2)}\n`
+    );
+
+    expect(runner.current()).toEqual(hostRun);
+  });
 });
 
 describe('loadState', () => {

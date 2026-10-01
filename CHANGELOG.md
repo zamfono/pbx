@@ -51,6 +51,10 @@ why the specified behaviour changed; the commit history, how.
   (`2026-10-01T12:00:00+02:00`) or without milliseconds picked the wrong entries. They now
   compare the instant it names, in any offset, with a time without one read as UTC; a value
   that is not an ISO 8601 time or date is refused with 422.
+- `system.info` reported the last update the `updater` service ran, not one run with `update.sh`
+  on the host. `update.sh` now records its run in `.update/state.json` as the updater does,
+  `running` while it runs and then `succeeded` or `failed` with both versions and times, and
+  `system.info` shows it; `update.sh --check` records nothing.
 
 ## [0.1.0] - 2026-09-30
 

@@ -28,6 +28,8 @@ umask 077
 . setup/versions.sh
 # shellcheck source=setup/recreate.sh
 . setup/recreate.sh
+# shellcheck source=setup/outcome.sh
+. setup/outcome.sh
 
 # ZAMFONO_REPO_URL is for deploy/update-test.sh, which serves releases of its own.
 REPO=${ZAMFONO_REPO_URL:-https://github.com/zamfono/pbx}
@@ -58,6 +60,14 @@ for arg in "$@"; do
   esac
 done
 updater=${ZAMFONO_UPDATER:-}
+# The bundle's download directory, once main has made it.
+work=
+on_exit() {
+  local code=$?
+  [[ -z $work ]] || rm -rf "$work"
+  outcome_end "$code" || warn "could not record the outcome in $OUTCOME_FILE"
+}
+trap on_exit EXIT
 
 # The release this directory runs: .env's ZAMFONO_VERSION when set, else the bundle's own pin.
 current_version() {
@@ -197,6 +207,7 @@ main() {
       [[ $(cat "$PENDING" 2>/dev/null) == "$from" ]] || { echo "Already on $from." && exit 0; }
       echo "The update to $from stopped before its stack reported healthy; finishing it."
       [[ -z $check_only ]] || exit 0
+      outcome_start '' "$from"
       stack_args
       recreate_stack
       rm -f "$PENDING"
@@ -212,9 +223,9 @@ main() {
   fi
   echo "$from -> $target ($kind)"
   [[ -z $check_only ]] || exit 0
+  outcome_start "$from" "$target"
 
   work=$(mktemp -d)
-  trap 'rm -rf "$work"' EXIT
   local base="$REPO/releases/download/v$target"
   echo "Downloading the $target bundle ..."
   curl -fsSL -o "$work/zamfono-deploy.tar.gz" "$base/zamfono-deploy.tar.gz" ||

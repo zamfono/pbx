@@ -11,7 +11,10 @@ warn() {
   printf '%swarning:%s %b\n' "$(color setaf 3)" "$(color sgr0)" "$*" >&2
 }
 
+# Keeps the message in `failure` too, which update.sh records as its run's outcome.
 fail() {
+  # shellcheck disable=SC2034 # read by setup/outcome.sh
+  failure="$*"
   printf '%serror:%s %b\n' "$(color setaf 1)" "$(color sgr0)" "$*" >&2
   exit 1
 }
