@@ -1,0 +1,4 @@
+# shellcheck shell=bash disable=SC2034
+# Where the sides of `inbound-attended-transfer` differ from run-scenarios.sh's defaults.
+UAS=attended-transfer
+TRUNK_UAS=answer-outbound

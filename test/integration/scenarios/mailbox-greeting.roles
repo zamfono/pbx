@@ -1,0 +1,4 @@
+# shellcheck shell=bash disable=SC2034
+# Where the sides of `mailbox-greeting` differ from run-scenarios.sh's defaults.
+CALLER=sipp-phone
+CALLER_ARGS="-key user $SIP_USERNAME -au $SIP_USERNAME -ap $SIP_PASSWORD"

@@ -1,0 +1,4 @@
+# shellcheck shell=bash disable=SC2034
+# Where the sides of `inbound-trunk-registration-to` differ from run-scenarios.sh's defaults.
+CALLER=sipp-provider
+CALLER_ARGS="-inf /tmp/registrar-line.csv"

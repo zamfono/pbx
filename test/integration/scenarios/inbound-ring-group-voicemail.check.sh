@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# §8 "no answer → voicemail": the group rings the phone (`uas_for` plays `ring-no-answer`) past
+# §8 "no answer → voicemail": the group rings the phone (its `.roles` plays `ring-no-answer`) past
 # its ring timeout without an answer and falls through to the group's own mailbox (§10.1 step 5,
 # the implicit `unanswered` default), where the caller's silence lets the mailbox's own 5 s
 # silence stop end the recording (§10.2 "Voicemail").

@@ -3,7 +3,7 @@
 # `please-try-call-later` (`prompts.ts`'s `LANGUAGES_WITH_FAILED_CALL_PROMPT`), so a call whose
 # only matching route — the catch-all, over `ci-trunk` — fails hears the special information tone
 # instead of the announcement. `ci-trunk` itself answers every attempt with 403 before any
-# alerting (`uas/refuse-403.xml`, via `scenario-roles.sh`'s `trunk_uas_for`, the same script
+# alerting (`uas/refuse-403.xml`, its `TRUNK_UAS` in `.roles`, the same script
 # `outbound-fallthrough` uses for its own first route), a final response that falls through
 # (§9.4 "Route fallthrough"); with no further matching route, the call ends exhausted, "the last
 # attempt's outcome". A scratch log channel (the technique `inbound-hold` uses, at a debug level

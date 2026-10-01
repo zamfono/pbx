@@ -1,0 +1,4 @@
+# shellcheck shell=bash disable=SC2034
+# Where the sides of `click-to-dial-clir` differ from run-scenarios.sh's defaults.
+UAS=answer-speak-hangup
+TRUNK_UAS=answer-speak

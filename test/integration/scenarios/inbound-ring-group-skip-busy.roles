@@ -1,0 +1,5 @@
+# shellcheck shell=bash disable=SC2034
+# Where the sides of `inbound-ring-group-skip-busy` differ from run-scenarios.sh's defaults.
+UAS=call-out
+PHONE_MODE=call
+TRUNK_UAS=answer-outbound

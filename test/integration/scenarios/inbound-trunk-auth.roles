@@ -1,0 +1,4 @@
+# shellcheck shell=bash disable=SC2034
+# Where the sides of `inbound-trunk-auth` differ from run-scenarios.sh's defaults.
+CALLER=sipp-provider
+CALLER_ARGS="-au ci-auth-acct -ap ci-auth-secret"

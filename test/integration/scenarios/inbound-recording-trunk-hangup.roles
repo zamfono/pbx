@@ -1,0 +1,3 @@
+# shellcheck shell=bash disable=SC2034
+# Where the sides of `inbound-recording-trunk-hangup` differ from run-scenarios.sh's defaults.
+UAS=answer-speak

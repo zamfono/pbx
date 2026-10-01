@@ -1,7 +1,8 @@
 # Sourced by `run.sh`: plays every `scenarios/*.xml` (and `*.call.sh`, below) against the tenant it
 # configured, each paired with the phone-side (and, for a call that leaves again, the trunk-side)
-# scenario it expects (`scenario-roles.sh`), and checks after each one that Asterisk holds no channel any more, that
-# every sipp run the scenario started ended with its calls and, where the scenario has a
+# scenario it expects (`<name>.roles`, below), and checks after each one that Asterisk holds no
+# channel any more, that every sipp run the scenario started ended with its calls and, where the
+# scenario has a
 # `<name>.check.sh`, that the history records what the spec says the call leaves behind. Reads
 # `run.sh`'s own `COMPOSE`, `compose_args`, `compose_cmd`, `here`, `api_base`, `token`, `GROUP_EXT`,
 # `SIP_USERNAME`, `SIP_PASSWORD`, `MAIN_DID` and `fail`, and `only.sh`'s `name_selected`.
@@ -17,8 +18,33 @@
 # scenarios whose name matches one of the globs, for reproducing one or a few by hand; `SHARD=k/n`
 # (`only.sh`'s `shard_selected`) plays every n-th, for CI's parallel runs.
 
-# shellcheck source=scenario-roles.sh
-. "$here/scenario-roles.sh"
+# The part each container plays in scenario `$1`: its `<name>.roles`, sourced, sets those that
+# differ from these defaults.
+#   UAS          the phone-side scenario (`uas/<name>.xml`), so a test of the unanswered path
+#                pairs with a phone that rings on without answering
+#   PHONE_MODE   how the phone side runs: `answer` registers the device and serves the call;
+#                `listen` serves it on a device that is not registered, so nothing may reach it;
+#                `call` places the phone's own call first (`UAS` a caller scenario), which stays
+#                up while the caller's call arrives; `baresip` starts nothing, the scenario's own
+#                setup having registered a real device that answers on its own
+#   TRUNK_UAS    for a call that leaves again over the trunk, the scenario the trunk container
+#                answers that leg with, on the port the trunk endpoint dials; the caller then
+#                places its own call from another
+#   CALLER       the container that delivers the call: `sipp`, the `ip` trunk's own address;
+#                `sipp-provider`, the second provider, whose trunks no source address identifies
+#                (§9.4 "Inbound identification"); or `sipp-phone`, for a call the registered
+#                device places (with its credentials in `CALLER_ARGS`) or one from an address
+#                that is none of a trunk's hosts
+#   CALLER_ARGS  what else the caller's sipp run needs: credentials, keys, an injection file the
+#                container holds
+#   DIALS        an injection file beside the scenario, one call per row after its header: the
+#                numbers the caller dials in turn; without one, the caller places one call
+load_roles() {
+  UAS=answer PHONE_MODE=answer TRUNK_UAS='' CALLER=sipp CALLER_ARGS='' DIALS=''
+  local roles="$here/scenarios/$1.roles"
+  # shellcheck source=/dev/null # one sidecar per scenario
+  [ ! -f "$roles" ] || . "$roles"
+}
 
 CALLER_PORT=5080
 IDLE_ATTEMPTS=10
@@ -96,19 +122,19 @@ await_phone_call() {
   fail "the phone's own call never came up in $1: $(asterisk_cli 'core show channels concise')"
 }
 
-# Starts the phone side the way `phone_mode_for` says, from the account `phone_account` names, and
+# Starts the phone side the way `PHONE_MODE` says, from the account `phone_account` names, and
 # leaves the device it registered in `registered`, for the scenario's end to unregister.
 start_phone_side() {
   local name=$1 account_user account_password
   read -r account_user account_password <<<"$phone_account"
   registered=''
-  case $(phone_mode_for "$name") in
+  case $PHONE_MODE in
     listen)
-      bash "$here/phone.sh" "$compose_cmd" listen "$(uas_for "$name")" \
+      bash "$here/phone.sh" "$compose_cmd" listen "$UAS" \
         || fail "the phone side could not listen for $name"
       ;;
     call)
-      bash "$here/phone.sh" "$compose_cmd" call "$(uas_for "$name")" \
+      bash "$here/phone.sh" "$compose_cmd" call "$UAS" \
         "$account_user" "$account_password" \
         || fail "the phone could not place its own call for $name"
       registered="$account_user $account_password"
@@ -119,7 +145,7 @@ start_phone_side() {
       # its own (a real device, not a sipp UAS), and it stays up until the scenario's teardown.
       ;;
     *)
-      bash "$here/phone.sh" "$compose_cmd" answer "$(uas_for "$name")" "$SIP_USERNAME" \
+      bash "$here/phone.sh" "$compose_cmd" answer "$UAS" "$SIP_USERNAME" \
         "$SIP_PASSWORD" "$account_user" "$account_password" \
         || fail "the answering device was not reachable for $name"
       registered="$SIP_USERNAME $SIP_PASSWORD"
@@ -144,6 +170,7 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
   name=${name%.call.sh}
   name_selected "$name" || continue
   echo "-- $name"
+  load_roles "$name"
   # A scenario that needs tenant state of its own arranges it here and undoes it afterwards, so
   # the scenarios stay independent of the order they run in.
   setup="$here/scenarios/$name.setup.sh"
@@ -157,24 +184,27 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
     phone_account=${account:-$phone_account}
   fi
   # The trunk side answers before the phone starts, since the phone's own call may leave over it.
-  trunk_uas=$(trunk_uas_for "$name")
   caller_port=5060
-  if [ -n "$trunk_uas" ]; then
+  if [ -n "$TRUNK_UAS" ]; then
     caller_port=$CALLER_PORT
-    start_trunk_side "$trunk_uas"
+    start_trunk_side "$TRUNK_UAS"
   fi
   start_phone_side "$name"
-  caller=$(caller_container_for "$name")
   # The second provider's own port 5060 belongs to its registrar, where a scenario runs one.
-  [ "$caller" = sipp ] || caller_port=$CALLER_PORT
+  [ "$CALLER" = sipp ] || caller_port=$CALLER_PORT
+  calls=1 dials=()
+  if [ -n "$DIALS" ]; then
+    calls=$(($(wc -l <"$here/scenarios/$DIALS") - 1))
+    dials=(-inf "/scenarios/$DIALS")
+  fi
   if [ "$scenario" = "$here/scenarios/$name.call.sh" ]; then
     bash "$scenario" "$api_base" "$token" "$compose_cmd" || fail "the API call of $name did not complete"
   else
-    # shellcheck disable=SC2046 # the extra arguments are separate words by design
-    $COMPOSE "${compose_args[@]}" exec -T "$caller" \
-      sipp -sf "/scenarios/$name.xml" -s "$MAIN_DID" -m "$(calls_for "$name")" -l 1 \
+    # shellcheck disable=SC2086 # the extra arguments are separate words by design
+    $COMPOSE "${compose_args[@]}" exec -T "$CALLER" \
+      sipp -sf "/scenarios/$name.xml" -s "$MAIN_DID" -m "$calls" -l 1 \
         -p "$caller_port" -timeout 90s \
-        $(caller_args_for "$name") -nostdin asterisk:5060 \
+        $CALLER_ARGS "${dials[@]}" -nostdin asterisk:5060 \
       || fail "sipp scenario $name did not complete"
   fi
   # The device's contact goes while its run still answers, so no probe is ever left to it.
@@ -183,7 +213,7 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
     bash "$here/phone.sh" "$compose_cmd" unregister $registered \
       || fail "the device could not unregister after $name"
   fi
-  if [ "$(phone_mode_for "$name")" = call ]; then
+  if [ "$PHONE_MODE" = call ]; then
     bash "$here/phone.sh" "$compose_cmd" wait-call || fail "the phone's own call failed in $name"
   fi
   assert_no_channels "$name"

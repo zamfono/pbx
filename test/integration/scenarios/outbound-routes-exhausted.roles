@@ -1,0 +1,5 @@
+# shellcheck shell=bash disable=SC2034
+# Where the sides of `outbound-routes-exhausted` differ from run-scenarios.sh's defaults.
+TRUNK_UAS=refuse-403
+CALLER=sipp-phone
+CALLER_ARGS="-key user $SIP_USERNAME -au $SIP_USERNAME -ap $SIP_PASSWORD"
