@@ -131,6 +131,8 @@ why the specified behaviour changed; the commit history, how.
 - REST and `/events` accepted the access token of a user whose stored role is none of `owner`,
   `admin` and `user`, acting with the role the token was issued with, while MCP refused it. Such a
   token is now refused everywhere, with 401 on REST and MCP and a closed socket on `/events`.
+- `update.sh --help` run from outside the stack directory, as `/srv/zamfono/update.sh --help`,
+  failed with `sed: can't read`; it prints its usage from anywhere.
 - A `TZ` in `.env` that names no time zone, such as a misspelt `Europe/Viena`, made every
   opening-hours, backup and maintenance decision of a tenant without its own time zone run in UTC,
   without a word. `setup.sh` now accepts only a time zone the host's time zone database holds,

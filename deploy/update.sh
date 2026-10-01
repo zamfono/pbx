@@ -51,7 +51,7 @@ for arg in "$@"; do
     --yes) assume_yes=1 ;;
     --check) check_only=1 ;;
     -h | --help)
-      sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,20p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     -*) fail "unknown option $arg" ;;
