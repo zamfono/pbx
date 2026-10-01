@@ -14,6 +14,7 @@ import type { AriEvent } from '../ari/types.js';
 import type { Call } from './call.js';
 import { otherChannelIn } from './callLookup.js';
 import { callPartiesChanged } from './callState.js';
+import { endHold } from './hold.js';
 import { closeCall } from './liveCall.js';
 import type { Pipeline } from './pipeline.js';
 import { userOfChannel } from './transfers.js';
@@ -24,9 +25,10 @@ type Named = { id: string } | undefined;
  * The consultation carries on without the transferrer's `secondLeg` and with the transferee in
  * its place (§10.1): their channel takes the one the transferrer held, as the call's caller or as
  * an answered leg, so the transferee leaving ends the conversation the way that side's leaving
- * always does. Synchronous, so no event for either channel falls between the two.
+ * always does. Synchronous, so no event for either channel falls between the two. Shared with
+ * the attended transfer `api` requests (`consultation.ts`).
  */
-function handOver(
+export function handOver(
   pipeline: Pipeline,
   consultation: Call,
   secondLeg: string,
@@ -49,6 +51,8 @@ function handOver(
   if (secondLeg === consultation.callerChannelId) {
     recorder?.onCallerEnded(consultation).catch(() => undefined);
     consultation.callerChannelId = transferee.channelId;
+    consultation.callerChannelUserId = transferee.userId;
+    callPartiesChanged(pipeline.deps, consultation);
     return;
   }
   const leg = consultation.legs.get(secondLeg);
@@ -154,11 +158,14 @@ export async function onAttendedTransfer(
     second !== undefined &&
     transfereeId !== null
   ) {
+    const heldIn = original.bridgeId;
     await carryOn(pipeline, ev, consultation, {
       call: original,
       secondLeg: second.id,
       transfereeId
     });
+    // A transferee held through the API (`hold.ts`) is in neither bridge Asterisk joined.
+    await endHold(pipeline, heldIn, consultation.bridgeId);
   }
   await closeCall(pipeline, original, 'answered', false);
   // The transferrer's first channel is left with nobody; Asterisk ends the second itself.

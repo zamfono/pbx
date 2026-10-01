@@ -12,12 +12,13 @@ import { CdrWriter } from '../cdr.js';
 import { ConfigCache, EventBus, StateStore } from '../internal/server.js';
 import { eventually } from '../testing/eventually.js';
 import { newCall, type Call } from './call.js';
+import { channelOf } from './callLookup.js';
 import { closeCall } from './liveCall.js';
 import { handleOutbound } from './outbound.js';
 import { Pipeline } from './pipeline.js';
 import { Recorder } from './recording.js';
 import { followTransfers } from './referTransfers.js';
-import { transferCall } from './transfers.js';
+import { transferCall, userOfChannel } from './transfers.js';
 import { TrunkState } from './trunkState.js';
 
 const noopLogger: Logger = {
@@ -828,6 +829,11 @@ describe('transfers', () => {
     expect(consultation.callerChannelId).toBe(original.callerId);
     // The transferrer's first channel is left with nobody.
     expect(hungUp(original.legId)).toBe(true);
+    // The history's caller is still the transferrer, who no longer controls the call: their
+    // channel left it (§10.3 "Live calls").
+    expect(consultation.callerUserId).toBe(transferrerId);
+    expect(userOfChannel(consultation, original.callerId)).toBeNull();
+    expect(channelOf(consultation, transferrerId)).toBeNull();
   });
 
   it('carries the consultation on past the transferrer leaving Stasis, and closes it once the transferee hangs up', async () => {

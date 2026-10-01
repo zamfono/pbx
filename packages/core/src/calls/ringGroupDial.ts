@@ -33,10 +33,11 @@ export async function ringBatch(
   const race = createBatchRace(pipeline, call, allowReject);
   call.batchLegs = race.tracked;
   pipeline.deps.ari.on('event', race.onEvent);
-  // `stopGroupRinging`'s own registry (`groupPickup.ts`).
+  // `stopGroupRinging`'s and `declineInBatch`'s own registry (`groupPickup.ts`).
   registerActiveBatch(pipeline, call.id, {
     tracked: race.tracked,
-    settle: race.settle
+    settle: race.settle,
+    endLeg: race.endLeg
   });
   const timer = setTimeout(race.timeOut, batch.timeoutS * MS_PER_SECOND);
   timer.unref();

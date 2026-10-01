@@ -104,6 +104,25 @@ export type ParkedCall = {
 /** `GET /internal/parking`: the parked calls, by slot. */
 export type ParkingResponse = { parked: ParkedCall[] };
 
+/** `POST /internal/calls/{id}/parties` → 201 `{ callId }`, the added leg's own call (§10.2
+ * "Three-way calls"). A refused action answers its status as a problem whose `detail` is the
+ * reason, a target no party answers on (`invalidTarget`) with 422. */
+export type AddPartyRequest = { target: string; actorUserId: string };
+
+/** `POST /internal/calls/{id}/consult` → 201 `{ callId }`, the consultation call. */
+export type ConsultRequest = { target: string; actorUserId: string };
+
+/** `POST /internal/calls/{id}/attendedTransfer` → 204: the held party joins the consultation
+ * `toCallId` in the actor's place (§10.1 "Transfers and pickup"). */
+export type AttendedTransferRequest = { toCallId: string; actorUserId: string };
+
+/** `POST /internal/calls/{id}/hold` and `POST /internal/calls/{id}/resume` → 204. */
+export type HoldRequest = { actorUserId: string };
+
+/** `POST /internal/calls/{id}/decline` → 204: the actor's own legs ringing for the call end as
+ * declined (§10.1 steps 4 and 5). */
+export type DeclineRequest = { actorUserId: string };
+
 /** `POST /internal/mwi/{mailbox}` → 204: core re-reads the mailbox's counts and pushes MWI (§3.1, §9.3). */
 export type MwiMailbox = `user:${string}` | `ringGroup:${string}`;
 

@@ -6,6 +6,7 @@
  */
 import type { Call, CallsRow } from './call.js';
 import { traceSystemEnd } from './callEnd.js';
+import { endHold, holdIn, holdOf } from './hold.js';
 import { clearFindMeTimers } from './legs.js';
 import { notifyMissedCall } from './missedCall.js';
 import type { Pipeline } from './pipeline.js';
@@ -28,13 +29,57 @@ function participants(call: Call): Set<string> {
 }
 
 /**
+ * Ends the conversation of a call closed with its channels: whoever else is still in its bridge
+ * (a party added to it, §10.2 "Three-way calls") or held out of it (`hold.ts`) is hung up, and the
+ * bridge destroyed. An added leg's own row shares the bridge of the call it joined, which goes on
+ * without it.
+ */
+async function endConversation(
+  pipeline: Pipeline,
+  call: Call,
+  hungUp: readonly string[]
+): Promise<void> {
+  const { bridgeId } = call;
+  if (bridgeId === null || call.addedLeg === true) {
+    return;
+  }
+  const { ari } = pipeline.deps;
+  const held = holdIn(pipeline, bridgeId)?.channelId;
+  await endHold(pipeline, bridgeId, null);
+  const bridges = await ari.bridges.list().catch(() => []);
+  const inBridge = bridges.find(bridge => bridge.id === bridgeId)?.channels;
+  const others = [...(inBridge ?? []), ...(held === undefined ? [] : [held])];
+  await Promise.all(
+    others
+      .filter(channelId => !hungUp.includes(channelId))
+      .map(channelId => ari.channels.hangup(channelId).catch(() => undefined))
+  );
+  await ari.bridges.destroy(bridgeId).catch(() => undefined);
+}
+
+/** A call closed with its channels left to whoever carries them (a transfer) whose party is still
+ * held out of its bridge (`hold.ts`): nothing returns that party to a conversation, so it is hung
+ * up rather than left in Stasis with its hold music. */
+async function dropStrandedHold(pipeline: Pipeline, call: Call): Promise<void> {
+  const hold = holdOf(pipeline, call);
+  if (hold === null) {
+    return;
+  }
+  await endHold(pipeline, call.bridgeId, null);
+  await pipeline.deps.ari.channels
+    .hangup(hold.channelId)
+    .catch(() => undefined);
+}
+
+/**
  * Ends `call`'s bookkeeping (§10.1 "Call aggregate"): stops its ring race and timers, unmaps its
  * channels, returns its participants to idle (§9.3), ends every recorded participation in it
  * (§10.2 "Recording semantics") and writes its history entry (§10.2 "Call history") under the
  * status it already reached, else `status`, sending the missed-call mail for a call it ends as
- * missed. With `hangupChannels` every channel still live is hung up and the bridge destroyed;
- * without, they stay up for whoever now carries them (a transfer's transferee, a bridge Asterisk
- * merged). A caller in a voicemail deposit is only hung up, the deposit closing its row.
+ * missed. With `hangupChannels` every channel still live is hung up, with the rest of its
+ * conversation (`endConversation`); without, they stay up for whoever now carries them (a
+ * transfer's transferee, a bridge Asterisk merged). A caller in a voicemail deposit is only hung
+ * up, the deposit closing its row.
  */
 export async function closeCall(
   pipeline: Pipeline,
@@ -96,9 +141,9 @@ export async function closeCall(
         ari.channels.hangup(channelId).catch(() => undefined)
       )
     );
-    if (call.bridgeId !== null) {
-      await ari.bridges.destroy(call.bridgeId).catch(() => undefined);
-    }
+    await endConversation(pipeline, call, live);
+  } else {
+    await dropStrandedHold(pipeline, call);
   }
   await recordings;
   await pipeline.deps.cdr.finish(call);

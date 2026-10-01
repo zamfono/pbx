@@ -17,6 +17,7 @@ import {
   type Call
 } from './call.js';
 import { RELEASE_CODE_NOT_FOUND } from './featureCall.js';
+import { endHold } from './hold.js';
 import { trackLeg } from './legs.js';
 import type { Pipeline } from './pipeline.js';
 import { runUserStep } from './userStep.js';
@@ -34,6 +35,8 @@ export async function moveParkedParty(
 ): Promise<string> {
   const ari = pipeline.deps.ari;
   const previous = parked.bridgeId;
+  // A party held through the API (`hold.ts`) is parked from the bridge it was held out of.
+  await endHold(pipeline, previous, previous);
   const bridge = await ari.bridges.create({ type });
   if (previous !== null) {
     await ari.bridges

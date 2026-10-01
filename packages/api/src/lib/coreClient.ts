@@ -60,7 +60,7 @@ export function coreUrlFromEnv(): string {
   return process.env.CORE_URL ?? DEFAULT_CORE_URL;
 }
 
-async function postJson(
+export async function postJson(
   fetchFn: typeof fetch,
   url: string,
   body: unknown
@@ -73,7 +73,7 @@ async function postJson(
 }
 
 /** `response`'s body, parsed as JSON, or `undefined` when it is empty or not JSON. */
-async function readJsonBody(response: Response): Promise<unknown> {
+export async function readJsonBody(response: Response): Promise<unknown> {
   return response.json().catch(() => undefined);
 }
 
@@ -89,7 +89,7 @@ async function throwIfNotOk(response: Response, url: string): Promise<void> {
 }
 
 /** POSTs `body` to `url` and throws on a non-2xx response. */
-async function postJsonChecked(
+export async function postJsonChecked(
   fetchFn: typeof fetch,
   url: string,
   body: unknown
@@ -109,7 +109,8 @@ function namesNoRegisteredDevice(body: unknown): boolean {
 
 /** The statuses `core` refuses a call action with (`calls/actionError.ts`'s `ActionError`): 404
  * for a call it holds no live state for, 409 for one in the wrong state or a picker without a
- * device, 422 for a target it cannot act on (a voicemail transfer to no mailbox). */
+ * device, 422 for a target it cannot act on (a voicemail transfer to no mailbox, a party added
+ * or consulted on a target nobody answers on). */
 const REFUSAL_STATUSES = [
   HTTP_NOT_FOUND,
   HTTP_CONFLICT,

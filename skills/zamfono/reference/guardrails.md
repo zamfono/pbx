@@ -44,9 +44,11 @@ scope — their voicemails, their history, their devices, a handful of self-serv
 (`clir`, `rejectAnonymous`, `ringTimeoutS`, `notifyMissedCalls`, `findMe`, their own OOO and
 hours, their own call forwarding, their own voicemail greeting). Of the calls in progress (`calls.list` with `live: true`, the
 `call.state` events) a `user` sees one they placed, were called on or answered, or that one of
-their phones rings or is connected in right now, and ends or transfers (`calls.hangup`,
-`calls.transfer`) only one they placed or are connected in, as they park one (`calls.park`); every
-user sees the parked calls (`parking.list`), which only an admin ends. Recordings are `admin`/`owner` only,
+their phones rings or is connected in right now, and ends, transfers, holds or adds to
+(`calls.hangup`, `calls.transfer`, `calls.consult`, `calls.hold`, `calls.addParty`) only one they
+placed, while their own phone is in it, or are connected in (`call-control`), as they park one
+(`calls.park`); every user sees the parked calls (`parking.list`), which only an admin ends.
+Recordings are `admin`/`owner` only,
 including of a user's own calls. A `sip` target is admin-only everywhere: a user's own forwarding, OOO rule or hours that
 names a new one is refused with 403. A user whose forwarding an admin pointed at one reads their
 rules with `users.getForwarding` (`GET /users/{id}/forwarding`), in the shape

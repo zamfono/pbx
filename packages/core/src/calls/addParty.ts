@@ -103,9 +103,9 @@ async function dialExternalTarget(
  * either answer joins the bridge through `answer.ts`'s `settleAnswered`. `call.to` and
  * `call.direction` become the pipeline's view of the target (§11.2 `calls`). `call`'s own
  * channel, never part of the added leg, is released once the dial settles. Whether the added
- * party joined.
+ * party joined. Shared with the party `api` adds (`addedParty.ts`), whose call has no channel.
  */
-async function dialAddPartyTarget(
+export async function dialAddPartyTarget(
   pipeline: Pipeline,
   call: Call,
   snapshot: Snapshot,

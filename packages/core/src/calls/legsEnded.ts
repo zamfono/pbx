@@ -7,6 +7,7 @@ import type { AriEvent, Channel } from '../ari/types.js';
 import type { Call } from './call.js';
 import { traceChannelEnded } from './callEnd.js';
 import { externalAttemptDialsOn } from './externalLeg.js';
+import { endHold, holdIn } from './hold.js';
 import { clearFindMeTimers, endLeg, hangupLeg } from './legs.js';
 import { finishAbandoned } from './missedCall.js';
 import { releaseParkedChannel } from './parking.js';
@@ -52,8 +53,9 @@ function clearParticipantPresence(pipeline: Pipeline, call: Call): void {
  * the rest are hung up and the bridge destroyed; a bridge still holding two or more — a three-way
  * call's added leg leaving (§10.2 "Three-way calls": "leaves the original two-party call intact")
  * — carries on, unless the party leaving is the three-way call's initiator: "the initiator
- * hanging up ends the bridge for everyone". `leavingChannelId` is filtered out, since its
- * departure may not have reached the bridge's own membership yet.
+ * hanging up ends the bridge for everyone". A party held out of the bridge (`hold.ts`) is
+ * still one of them, and the one who held it leaving ends it like an initiator. `leavingChannelId`
+ * is filtered out, since its departure may not have reached the bridge's own membership yet.
  */
 async function releaseLastParty(
   pipeline: Pipeline,
@@ -69,11 +71,25 @@ async function releaseLastParty(
   if (bridge === undefined) {
     return;
   }
-  const remaining = bridge.channels.filter(id => id !== leavingChannelId);
-  const initiatorLeft = call.threeWayInitiatorChannelId === leavingChannelId;
+  const hold = holdIn(pipeline, bridge.id);
+  if (hold?.channelId === leavingChannelId) {
+    await endHold(pipeline, bridge.id, null);
+  }
+  const held =
+    hold === null || hold.channelId === leavingChannelId
+      ? []
+      : [hold.channelId];
+  const remaining = [
+    ...bridge.channels.filter(id => id !== leavingChannelId),
+    ...held
+  ];
+  const initiatorLeft =
+    call.threeWayInitiatorChannelId === leavingChannelId ||
+    hold?.byChannelId === leavingChannelId;
   if (remaining.length >= CONVERSATION_PARTIES && !initiatorLeft) {
     return;
   }
+  await endHold(pipeline, bridge.id, null);
   await Promise.all(
     remaining.map(channelId =>
       ari.channels.hangup(channelId).catch(() => undefined)

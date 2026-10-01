@@ -4,13 +4,19 @@
  * the target as that device would have; pickup rings the picker's devices and dials `*8<ext>` with
  * the one that answers, so the answer lands in `features.ts`'s own pickup exactly as a dialled
  * `*8` would; both ring as any user's ring does (`ownDevices.ts`). Hangup, transfer and park act
- * on a live `Call` (park through `parkingActions.ts`, §10.2 "Call parking"). Every action leaves
- * its actor in the call's trace. The originated call itself is built and dialled by
+ * on a live `Call` (park through `parkingActions.ts`, §10.2 "Call parking"), and so do the hold,
+ * consultation, added party and decline `callControl.ts` carries out. Every action leaves its
+ * actor in the call's trace. The originated call itself is built and dialled by
  * `clickToDial.ts`.
  */
 import {
   newId,
+  type AddPartyRequest,
+  type AttendedTransferRequest,
+  type ConsultRequest,
+  type DeclineRequest,
   type HangupRequest,
+  type HoldRequest,
   type OriginateRequest,
   type ParkingResponse,
   type ParkRequest,
@@ -22,6 +28,7 @@ import type { Snapshot } from '../internal/server.js';
 import { RelayedCallLog } from '../relayedCallLog.js';
 import { ActionError } from './actionError.js';
 import { callLogMaxBytesFromEnv, newCall, type Call } from './call.js';
+import { CallControl } from './callControl.js';
 import { findLiveCall } from './callLookup.js';
 import {
   beginOriginatedCall,
@@ -79,9 +86,11 @@ export class CallActions {
   // Calls whose devices still ring for an originate: reachable by id before any channel of theirs
   // is registered with the pipeline.
   private readonly originating = new Map<string, Call>();
+  private readonly control: CallControl;
 
   constructor(pipeline: Pipeline) {
     this.pipeline = pipeline;
+    this.control = new CallControl(pipeline);
     followTransfers(pipeline);
   }
 
@@ -243,6 +252,36 @@ export class CallActions {
   /** `GET /internal/parking`: the occupied parking slots (§10.2 "Call parking"). */
   async parked(): Promise<ParkingResponse> {
     return { parked: await parkedCalls(this.pipeline) };
+  }
+
+  // Call control beside hangup and transfer (§10.3 "Live calls"), `callControl.ts`'s.
+  addParty(callId: string, req: AddPartyRequest): Promise<{ callId: string }> {
+    return this.control.addParty(this.findCall(callId), req);
+  }
+
+  consult(callId: string, req: ConsultRequest): Promise<{ callId: string }> {
+    return this.control.consult(this.findCall(callId), req);
+  }
+
+  attendedTransfer(
+    callId: string,
+    req: AttendedTransferRequest
+  ): Promise<void> {
+    const call = this.findCall(callId);
+    const consultation = this.findCall(req.toCallId);
+    return this.control.transferToConsultation(call, consultation, req);
+  }
+
+  hold(callId: string, req: HoldRequest): Promise<void> {
+    return this.control.hold(this.findCall(callId), req);
+  }
+
+  resume(callId: string, req: HoldRequest): Promise<void> {
+    return this.control.resume(this.findCall(callId), req);
+  }
+
+  decline(callId: string, req: DeclineRequest): void {
+    this.control.decline(this.findCall(callId), req);
   }
 
   private findCall(callId: string): Call {

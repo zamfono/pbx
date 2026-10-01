@@ -1,0 +1,119 @@
+/**
+ * A party `api` adds to a live call's conversation (§10.2 "Three-way calls", §10.3 "Live calls"):
+ * `calls.addParty`'s leg, and `calls.consult`'s consultation, the same leg dialled while the other
+ * party is held (`consultation.ts`). It is `*5`'s leg (`addParty.ts`), resolved and dialled the
+ * same way, its answer joining the conversation's bridge and its own row ending when it leaves.
+ * No line of anyone's dials it, so its caller channel is a placeholder and it rings its target
+ * and stops there (`Call.ringOnly`): no forward or mailbox of the target's applies, since nobody
+ * would hear them.
+ */
+import { newId, type AddPartyRequest } from '@zamfono/shared';
+
+import type { Snapshot } from '../internal/server.js';
+import { ActionError } from './actionError.js';
+import { dialAddPartyTarget } from './addParty.js';
+import { resolveAddedTarget } from './addPartyTarget.js';
+import { callLogMaxBytesFromEnv, newCall, type Call } from './call.js';
+import type { Pipeline } from './pipeline.js';
+import { userOfChannel } from './transfers.js';
+
+const HTTP_UNPROCESSABLE = 422;
+
+/** Which action the leg is for, as its trace and the running call's name it. */
+export type AddedLegKind = 'addParty' | 'consult';
+
+function extensionOf(snapshot: Snapshot, userId: string | null): string | null {
+  return snapshot.extensions.find(row => row.userId === userId)?.ext ?? null;
+}
+
+/**
+ * The added leg's own row, from the user whose channel `byChannelId` is in `running`, its trace
+ * and the running call's naming the actor; refused with 422 for a target `*5` refuses (a parking
+ * slot, a feature code, a mailbox, an unknown extension), before anything is dialled or held.
+ */
+export async function newAddedLeg(
+  pipeline: Pipeline,
+  running: Call,
+  byChannelId: string,
+  req: AddPartyRequest,
+  kind: AddedLegKind
+): Promise<Call> {
+  const snapshot = await pipeline.deps.cache.get();
+  if (resolveAddedTarget(snapshot, req.target).kind === 'refuse') {
+    running.log.event({
+      event: kind,
+      actorUserId: req.actorUserId,
+      target: req.target,
+      result: 'invalidTarget'
+    });
+    throw new ActionError(
+      HTTP_UNPROCESSABLE,
+      'invalidTarget',
+      'no party answers on this target'
+    );
+  }
+  const id = newId();
+  const callerUserId = userOfChannel(running, byChannelId);
+  const leg = newCall({
+    id,
+    direction: 'internal',
+    callerChannelId: `${kind}:${id}`,
+    from: extensionOf(snapshot, callerUserId) ?? running.from,
+    to: req.target,
+    startedAt: pipeline.deps.now(),
+    logLevel: running.log.level,
+    callLogMaxBytes: callLogMaxBytesFromEnv()
+  });
+  leg.callerUserId = callerUserId;
+  leg.addedLeg = true;
+  leg.ringOnly = true;
+  leg.log.event({
+    event: kind,
+    actorUserId: req.actorUserId,
+    target: req.target,
+    runningCallId: running.id
+  });
+  running.log.event({
+    event: kind,
+    actorUserId: req.actorUserId,
+    target: req.target,
+    callId: id
+  });
+  await pipeline.deps.cdr.open(leg);
+  // Reachable by its id from here on, as a `*5` dial is through its own channel.
+  pipeline.registerCall(leg);
+  return leg;
+}
+
+/**
+ * Dials the added leg in the background, its answer joining `bridgeId`; `onJoined` runs once it
+ * did. A ring nobody answered leaves the row open (`Call.ringOnly`), so it closes here as missed.
+ */
+export function dialAddedLeg(
+  pipeline: Pipeline,
+  leg: Call,
+  bridgeId: string,
+  target: string,
+  onJoined: () => void
+): void {
+  const dial = async (): Promise<void> => {
+    const snapshot = await pipeline.deps.cache.get();
+    const joined = await dialAddPartyTarget(
+      pipeline,
+      leg,
+      snapshot,
+      bridgeId,
+      target
+    );
+    if (joined) {
+      onJoined();
+      return;
+    }
+    pipeline.callByChannel.delete(leg.callerChannelId);
+    if (leg.status === null) {
+      leg.status = 'missed';
+      await pipeline.deps.cdr.finish(leg);
+    }
+  };
+  dial().catch(() => undefined);
+}

@@ -25,6 +25,10 @@ import {
 import type { AriClient } from '../ari/client.js';
 import { handleActionRoute, handleParkingRead } from './actionRoutes.js';
 import {
+  handleCallControlRoute,
+  type CallControlActions
+} from './callControlRoutes.js';
+import {
   handleConfigChanged,
   respondJson,
   type PresenceRefresh,
@@ -57,7 +61,7 @@ export type CallActions = {
   hangup: (callId: string, req: HangupRequest) => Promise<void>;
   park: (callId: string, req: ParkRequest) => Promise<{ slot: string }>;
   parked: () => Promise<ParkingResponse>;
-};
+} & CallControlActions;
 
 type InternalDeps = {
   db: Db;
@@ -150,6 +154,17 @@ async function routeRequest(
   if (
     request.method === 'POST' &&
     (await handleActionRoute(deps, url.pathname, request, response))
+  ) {
+    return;
+  }
+  if (
+    request.method === 'POST' &&
+    (await handleCallControlRoute(
+      deps.actions,
+      url.pathname,
+      request,
+      response
+    ))
   ) {
     return;
   }

@@ -101,6 +101,25 @@ describe('a live call’s users (§10.3 "Live calls", §10.6)', () => {
     });
   });
 
+  it('no longer counts a caller whose channel left as controlling: parked, or handed over', () => {
+    const answered = leg('callee', 'up');
+    call.legs.set(answered.channelId, answered);
+    callUp(deps, call);
+    // The caller parked the other party: their channel left the call for good.
+    call.callerEnded = true;
+    expect(live().connectedUserIds).toEqual(['callee']);
+    expect(live().userIds).toContain('caller');
+
+    // An attended transfer handed the caller's place to the transferee's channel.
+    delete call.callerEnded;
+    call.callerChannelUserId = 'transferee';
+    expect(live()).toEqual({
+      userIds: ['callee', 'caller', 'transferee'],
+      connectedUserIds: ['callee', 'transferee']
+    });
+    expect(call.callerUserId).toBe('caller');
+  });
+
   it('serves the users as they are now, not as they were at the last transition', async () => {
     const ringing = leg('member', 'ringing');
     call.legs.set(ringing.channelId, ringing);

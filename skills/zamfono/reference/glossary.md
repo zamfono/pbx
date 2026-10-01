@@ -44,6 +44,10 @@ anyone: pickup (`*8<ext>`), DND on/off (`*90`/`*91`), mailbox access (`*95<ext>`
 deposit (`*97<ext>`), add a third party (`*5<target>`), CLIR override (`#31#`/`*31#`), park
 (`*70`). Codes are remapped tenant-wide in `settings.featureCodes`.
 
+**Attended transfer** — a transfer after talking to the target first: the other party waits on
+hold while you consult, then the two are joined and you leave. From the API, `calls.consult`
+then `calls.transfer` with `toCallId`. See `call-control`.
+
 **BLF** (Busy Lamp Field) — a SIP `SUBSCRIBE`/`NOTIFY` indicator a device shows for an extension
 or parking slot's live state (`parking`).
 

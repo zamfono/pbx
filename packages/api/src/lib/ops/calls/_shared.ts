@@ -3,6 +3,10 @@ import type { Selectable, Transaction } from 'kysely';
 import type { DB } from '@zamfono/shared';
 
 import {
+  createCallControlClient,
+  type CallControlClient
+} from '#lib/callControlClient.js';
+import {
   coreRefusal,
   createCoreClient,
   type CoreClient
@@ -126,6 +130,17 @@ export function getCoreClient(): CoreClient {
   return coreClient;
 }
 
+let callControlClient: CallControlClient = createCallControlClient();
+
+/** Test-only: replaces the `CallControlClient` the call-control operations proxy through. */
+export function setCallControlClientForTest(client: CallControlClient): void {
+  callControlClient = client;
+}
+
+export function getCallControlClient(): CallControlClient {
+  return callControlClient;
+}
+
 /**
  * Throws 403 for a `user` actor naming another user in `userId` (§10.3 "Click-to-dial"): a
  * `user` may act only for themselves, an admin for any user. Returns the effective user id.
@@ -168,7 +183,8 @@ export async function assertOwnLiveCall(
  * Runs a live-call action through `core`, turning its refusal into the matching problem (§10.3):
  * a call `core` holds no live state for is a 404, one it cannot act on in its current state a 409,
  * a target it cannot act on a 422, each with `core`'s reason as `detail` (`notFound`,
- * `notBridged`, `notRinging`, `noRegisteredDevice`, `noFreeSlot`, `noMailbox`), as
+ * `notBridged`, `notRinging`, `noRegisteredDevice`, `noFreeSlot`, `noMailbox`, `held`,
+ * `notHeld`, `consulting`, `notConsultation`, `notAnswered`, `invalidTarget`), as
  * `calls.originate` answers its own `noRegisteredDevice` (§10.2). Resolves with what the action
  * answered.
  */

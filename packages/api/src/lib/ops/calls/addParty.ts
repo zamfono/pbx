@@ -1,0 +1,47 @@
+import { z } from 'zod';
+
+import { defineOperation } from '../types.js';
+import {
+  assertOwnLiveCall,
+  getCallControlClient,
+  proxyCallAction
+} from './_shared.js';
+
+const inputSchema = z
+  .object({
+    id: z
+      .string()
+      .describe("The live call's id, as calls.list with live=true lists it."),
+    target: z
+      .string()
+      .min(1)
+      .describe(
+        'Whom to add, dialled from you as your phone would: an extension, or an external number E.164 or national.'
+      )
+  })
+  .strict();
+
+/**
+ * `POST /calls/{id}/parties` (§10.2 "Three-way calls", §10.3 "Live calls"): `*5<target>` over
+ * the API, proxied to `core`: `target` is dialled from the actor and, on answer, joins the live
+ * call `id`'s bridge as its own `calls` row. Recorded with the acting user in the call's own
+ * history entry rather than the audit log.
+ */
+export const addParty = defineOperation({
+  name: 'calls.addParty',
+  description:
+    "Three-way call: dials the target from you and, once answered, adds them to a live call so all three talk; returns the added party's own call id (callId). It only rings the target: no forward or mailbox of theirs applies.",
+  input: inputSchema,
+  minRole: 'user',
+  audit: false,
+  run: async (ctx, input) => {
+    await assertOwnLiveCall(ctx, input.id);
+    const { callId } = await proxyCallAction(() =>
+      getCallControlClient().addParty(input.id, {
+        target: input.target,
+        actorUserId: ctx.actor.id
+      })
+    );
+    return { id: input.id, callId };
+  }
+});

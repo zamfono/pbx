@@ -9,6 +9,7 @@ import type { LiveCall } from '@zamfono/shared';
 
 import type { EventBus, StateStore } from '../internal/server.js';
 import type { Call } from './call.js';
+import { presentCallerUserId } from './callLookup.js';
 
 /** The two collaborators the live view needs, so `CdrWriter` can publish the end as well. */
 export type CallStateDeps = { state: StateStore; bus: EventBus };
@@ -19,14 +20,16 @@ const notified = new WeakMap<Call, ReadonlySet<string>>();
 
 /**
  * Every user whose call this is to see (§10.3 "Live calls", §10.6 "own calls"): the caller, the
- * callee, the answerer, and every user with a leg ringing or up right now, of the call's own legs
- * or of the ring-group batch ringing it. A user whose own leg ended, another member having
- * answered or their ring having stopped, is not one, as in the history.
+ * callee, the answerer, the user whose channel holds the caller's place after an attended
+ * transfer, and every user with a leg ringing or up right now, of the call's own legs or of the
+ * ring-group batch ringing it. A user whose own leg ended, another member having answered or
+ * their ring having stopped, is not one, as in the history.
  */
 function participants(call: Call): string[] {
   const ids = new Set<string>();
   for (const id of [
     call.callerUserId,
+    presentCallerUserId(call),
     call.calleeUserId,
     call.answeredByUserId
   ]) {
@@ -45,12 +48,15 @@ function participants(call: Call): string[] {
   return [...ids];
 }
 
-/** The users who may end or transfer the call (§10.3 "Live calls"): the caller and every user
- * with a leg up in it, whose channel `transfers.ts`'s transferrer then is. */
+/** The users who may end or transfer the call (§10.3 "Live calls"): the caller while their own
+ * channel is in it, and every user with a leg up in it, whose channel `transfers.ts`'s
+ * transferrer then is. A caller who parked the other party, or whose place an attended transfer
+ * handed over, is no longer one; the user whose channel took that place is. */
 function connected(call: Call): string[] {
   const ids = new Set<string>();
-  if (call.callerUserId !== null) {
-    ids.add(call.callerUserId);
+  const caller = presentCallerUserId(call);
+  if (caller !== null) {
+    ids.add(caller);
   }
   for (const leg of call.legs.values()) {
     if (leg.userId !== null && leg.state === 'up') {

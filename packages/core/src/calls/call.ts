@@ -60,7 +60,7 @@ export type Call = {
   /** §10.2 "Call parking": a system-initiated ring-back rings its target and stops there. Its
    * caller is a placeholder channel with nobody behind it, so the target's forward, mailbox and
    * release rules have no caller to act on; the initiator decides what follows an unanswered
-   * ring. */
+   * ring. A party added or consulted through the API (`callControl.ts`) rings the same way. */
   ringOnly?: boolean;
   /** §10.2 "Three-way calls": the channel through which the user who added a party to this
    * call's bridge with `*5` is in it; their hanging up ends the bridge for everyone. */
@@ -72,8 +72,13 @@ export type Call = {
    * up is how a caller ends a message, and the recording's outcome only follows the channel, so
    * the caller's own channel ending leaves the row to the deposit (`legsEnded.ts`). */
   depositing?: boolean;
-  /** The caller's own channel has ended (`legsEnded.ts`'s `endCallerCall`). */
+  /** The caller's own channel has ended (`legsEnded.ts`'s `endCallerCall`), or left the call
+   * for good (`parking.ts`'s park). */
   callerEnded?: boolean;
+  /** The user whose channel `callerChannelId` is once an attended transfer handed the caller's
+   * place to the transferee (§10.1 "Transfers and pickup"); absent while it is `callerUserId`'s
+   * own, who stays the history's caller either way. */
+  callerChannelUserId?: string | null;
   /** Who ended the call (`callEnd.ts`): the first hangup request on the caller or an answered
    * leg, and whether the `ended` trace line is written yet. */
   ending?: CallEnding;

@@ -63,7 +63,7 @@ export type ActionRouteDeps = {
 };
 
 /** The JSON object body of an action request; `null` for a malformed, non-object or oversized one. */
-async function readActionBody(
+export async function readActionBody(
   request: http.IncomingMessage
 ): Promise<Record<string, unknown> | null> {
   const chunks: Buffer[] = [];
@@ -128,7 +128,7 @@ function matchMwiRoute(pathname: string): MwiMailbox | null {
 }
 
 /** An `ActionError` from `calls/actionError.ts`, matched by shape so this module imports no call code. */
-function isActionFailure(
+export function isActionFailure(
   error: unknown
 ): error is Error & { status: number; reason: string } {
   const shape = error as { status?: unknown; reason?: unknown };
@@ -173,7 +173,7 @@ function flagsValid(
 
 /** An RFC 9457 problem, the shape `api` answers its own errors in (§10.3): `detail` names the
  * cause (§10.2 `noRegisteredDevice`). */
-function respondProblem(
+export function respondProblem(
   response: http.ServerResponse,
   status: number,
   title: string,

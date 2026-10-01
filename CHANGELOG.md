@@ -13,6 +13,14 @@ why the specified behaviour changed; the commit history, how.
 
 ### Added
 
+- Call control through the API and the MCP tools, as a phone does it: `calls.consult` puts the
+  other party of a call on hold and dials someone from you, and `calls.transfer` with `toCallId`
+  hands the held party over to them (attended transfer); `calls.addParty` adds a third party to a
+  call, as `*5` does; `calls.hold` and `calls.resume` hold the other party with the hold music,
+  in the PBX, so the phone itself does not show the hold; `calls.decline` declines a call ringing
+  for you, as declining it on your phone does. A user controls only a call they are in, as for
+  hangup and transfer; a caller who parked a call, or handed it on with an attended transfer, no
+  longer controls it. Help topic `call-control` describes each.
 - Help topics `numbers`, `webhooks`, `mail-templates`, `parking`, `user-groups`, `directory` and
   `call-data` (`zamfono.help`, and `reference/<topic>.md` in the Claude Code skill). `numbers`:
   DIDs, number blocks of both kinds, a fixed digit count after the base or open-ended, the main

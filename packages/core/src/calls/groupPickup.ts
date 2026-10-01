@@ -13,6 +13,8 @@ import type { BatchOutcome } from './ringGroupDial.js';
 export type ActiveBatch = {
   tracked: Map<string, GroupLeg>;
   settle: (outcome: BatchOutcome) => void;
+  /** A member leg ended with Q.850 `cause`, as the batch's own race handles it (`ringGroupRace.ts`). */
+  endLeg: (leg: GroupLeg, cause: number | null) => void;
 };
 const activeBatchByPipeline = new WeakMap<Pipeline, Map<string, ActiveBatch>>();
 
@@ -97,4 +99,28 @@ export function stopGroupRinging(
   }
   active.settle('answered');
   return { channelId: stoppedChannelId, userId: stoppedLeg.userId };
+}
+
+/**
+ * Declines `memberUserId`'s legs in `call`'s currently-ringing batch as their phones' own 603
+ * would (§10.1 step 5, `decline.ts`): each ends through the batch's race with `cause`, so the
+ * group's `allow_reject` decides what follows, and its channel is hung up.
+ */
+export function declineInBatch(
+  pipeline: Pipeline,
+  call: Call,
+  memberUserId: string,
+  cause: number
+): void {
+  const active = activeBatchByPipeline.get(pipeline)?.get(call.id);
+  const ringing = [...(active?.tracked.values() ?? [])].filter(
+    leg => leg.state === 'ringing' && leg.userId === memberUserId
+  );
+  for (const leg of ringing) {
+    // With `allow_reject` the first decline already hung up the member's other legs.
+    if (leg.state === 'ringing') {
+      active?.endLeg(leg, cause);
+      pipeline.deps.ari.channels.hangup(leg.channelId).catch(() => undefined);
+    }
+  }
 }

@@ -58,7 +58,8 @@ function callEnded(call: Call): boolean {
   return call.status !== null;
 }
 
-/** Dispatches `groupFallback`'s decision once ringing ends without an answer (§10.1 step 5). */
+/** Dispatches `groupFallback`'s decision once ringing ends without an answer (§10.1 step 5);
+ * a call that only rings (`Call.ringOnly`) stops there, as a user's does (`userStep.ts`). */
 async function applyGroupFallback(
   pipeline: Pipeline,
   call: Call,
@@ -66,6 +67,9 @@ async function applyGroupFallback(
   rules: GroupRules,
   outcome: GroupOutcome
 ): Promise<void> {
+  if (call.ringOnly === true) {
+    return;
+  }
   const action = groupFallback(group, rules, outcome);
   if (action.kind === 'forward') {
     // §10.1 step 7: a ring group's fallback forwards without a caller, a hop of the group's.

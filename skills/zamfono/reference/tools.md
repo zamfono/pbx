@@ -16,13 +16,18 @@
 | `blockedNumbers.create` | `POST /blockedNumbers` | Adds a number or number prefix to the tenant blocklist; a matching inbound caller is rejected with 603 | admin | no |
 | `blockedNumbers.delete` | `DELETE /blockedNumbers/{id}` | Removes a number from the tenant blocklist | admin | yes |
 | `blockedNumbers.list` | `GET /blockedNumbers` | Lists the tenant's inbound blocklist | admin | no |
+| `calls.addParty` | `POST /calls/{id}/parties` | Three-way call: dials the target from you and, once answered, adds them to a live call so all three talk; returns the added party's own call id (callId). It only rings the target: no forward or mailbox of theirs applies. | user | no |
+| `calls.consult` | `POST /calls/{id}/consult` | Starts an attended transfer: puts the other party of a live call on hold with hold music and dials the target from you, returning the consultation call's id (callId) for calls.transfer with toCallId. The hold happens in the PBX, so the phone does not show it. | user | no |
+| `calls.decline` | `POST /calls/{id}/decline` | Declines a call ringing for you, as declining it on your phone would: your phones stop ringing, and the call goes on to your no-answer rule, or a ring group rings its other members. | user | no |
 | `calls.get` | `GET /calls/{id}` | Reads one call of the history with its log and QoS summary: per leg jitter, loss, round trip and the packets received and sent. | user | no |
 | `calls.hangup` | `POST /calls/{id}/hangup` | Hangs up a live call. | user | no |
+| `calls.hold` | `POST /calls/{id}/hold` | Puts the other party of a live call on hold: they hear the hold music, and you and they no longer hear each other; calls.resume ends it. The hold happens in the PBX, so the phone does not show it. Hangup, transfer and park work as usual while held. | user | no |
 | `calls.list` | `GET /calls` | Lists call history, or the calls currently in progress. | user | no |
 | `calls.originate` | `POST /calls` | Click-to-dial: rings a user's devices, then dials the target on answer, as that phone would; a parking slot as target retrieves the call parked there. | user | no |
 | `calls.park` | `POST /calls/{id}/park` | Parks the other party of a live call on the lowest free parking slot, as *70 does, and returns the slot; anyone retrieves it by dialling the slot (calls.originate with the slot as target). | user | no |
 | `calls.pickup` | `POST /calls/{id}/pickup` | Picks up a call ringing for another party, on the picking user's devices. | user | no |
-| `calls.transfer` | `POST /calls/{id}/transfer` | Blind-transfers a live call to an extension or number, or with voicemail into an extension's mailbox; the transferee is routed there as a new call. | user | no |
+| `calls.resume` | `POST /calls/{id}/resume` | Takes a live call off the hold calls.hold or calls.consult put it on: the held party talks with you again, and during a consultation all three talk. The phone does not show it. | user | no |
+| `calls.transfer` | `POST /calls/{id}/transfer` | Transfers a live call: blind to an extension or number (target), or with voicemail into an extension's mailbox, where the transferee is routed as a new call; or attended to the consultation calls.consult started (toCallId), where the held party and the consulted party talk on without you. | user | no |
 | `contacts.create` | `POST /contacts` | Adds a contact to the tenant-wide phone book; its numbers name inbound callers. | admin | no |
 | `contacts.delete` | `DELETE /contacts/{id}` | Soft-deletes a phone-book contact. | admin | yes |
 | `contacts.get` | `GET /contacts/{id}` | Reads one live contact by id. | user | no |

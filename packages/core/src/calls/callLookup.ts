@@ -5,11 +5,27 @@
 import type { Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 
-/** The channel `userId` is present as in `call`: its own caller channel while it is up, or an up
- * leg. A caller who left (one who parked the other party, §10.2 "Call parking") is present only
- * through a leg they joined again by, such as the parking ring-back's. */
+/**
+ * The user whose channel `call.callerChannelId` is right now: the caller until their channel
+ * leaves the call, parking the other party (§10.2 "Call parking"), or until an attended transfer
+ * hands its place to the transferee (§10.1), whose user it then is. The history's caller is
+ * `callerUserId` throughout.
+ */
+export function presentCallerUserId(call: Call): string | null {
+  if (call.callerEnded === true) {
+    return null;
+  }
+  return call.callerChannelUserId === undefined
+    ? call.callerUserId
+    : call.callerChannelUserId;
+}
+
+/** The channel `userId` is present as in `call`: its own caller channel while it is in the call
+ * (`presentCallerUserId`), or an up leg. A caller who left (one who parked the other party, §10.2
+ * "Call parking") is present only through a leg they joined again by, such as the parking
+ * ring-back's. */
 export function channelOf(call: Call, userId: string): string | null {
-  if (call.callerUserId === userId && call.callerEnded !== true) {
+  if (presentCallerUserId(call) === userId) {
     return call.callerChannelId;
   }
   const match = [...call.legs.values()].find(

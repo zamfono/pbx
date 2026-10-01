@@ -16,8 +16,13 @@ import {
   raiseLogLevel,
   type Call
 } from './call.js';
-import { channelOf, otherChannelIn } from './callLookup.js';
+import {
+  channelOf,
+  otherChannelIn,
+  presentCallerUserId
+} from './callLookup.js';
 import { ownerForExt } from './extensionOwner.js';
+import { endHold } from './hold.js';
 import { closeCall } from './liveCall.js';
 import type { Pipeline } from './pipeline.js';
 import { logLevelFor, resolveTarget, routeToTarget } from './routeToTarget.js';
@@ -25,7 +30,7 @@ import { logLevelFor, resolveTarget, routeToTarget } from './routeToTarget.js';
 /** The user present in `call` as `channelId`: its caller, or the leg's owner. */
 export function userOfChannel(call: Call, channelId: string): string | null {
   if (channelId === call.callerChannelId) {
-    return call.callerUserId;
+    return presentCallerUserId(call);
   }
   return call.legs.get(channelId)?.userId ?? null;
 }
@@ -141,8 +146,9 @@ export async function voicemailDial(
 
 /** The transferrer's channel in `call`: the actor's own, else the answerer's, else the caller's.
  * Only an admin's transfer of someone else's call reaches the fallbacks: `api` lets a `user`
- * transfer a call only as its caller or with a leg up in it (§10.3 "Live calls"). */
-function transferrerChannel(call: Call, actorUserId: string): string {
+ * transfer a call only as its caller or with a leg up in it (§10.3 "Live calls"). The same side
+ * holds, consults and adds a party for the actor (`callControl.ts`). */
+export function transferrerChannel(call: Call, actorUserId: string): string {
   const answerer =
     call.answeredByUserId === null
       ? null
@@ -153,7 +159,8 @@ function transferrerChannel(call: Call, actorUserId: string): string {
 /**
  * `POST /internal/calls/{id}/transfer` (§10.1 "Transfers and pickup"): blind-transfers the other
  * party of the bridged `call` to `target` as their own new call, returned; the transferrer's
- * participation, and with it `call`, ends. `null` for a call that is not bridged.
+ * participation, and with it `call`, ends. `null` for a call that is not bridged, or whose
+ * bridge is another call's: a party added to that call (§10.2 "Three-way calls").
  */
 export async function transferCall(
   pipeline: Pipeline,
@@ -163,9 +170,11 @@ export async function transferCall(
   const transferrer = transferrerChannel(call, req.actorUserId);
   const transferee = otherChannelIn(call, transferrer);
   const { bridgeId } = call;
-  if (bridgeId === null || transferee === null) {
+  if (bridgeId === null || transferee === null || call.addedLeg === true) {
     return null;
   }
+  // A transferee held through the API (`hold.ts`) leaves from the bridge it was held out of.
+  await endHold(pipeline, bridgeId, bridgeId);
   call.log.event({
     event: 'transfer',
     actorUserId: req.actorUserId,
