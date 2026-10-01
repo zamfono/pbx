@@ -3,9 +3,11 @@ import process from 'node:process';
 import { isHttpError, type RequestEvent } from '@sveltejs/kit';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { getDb } from '$lib/server/db.js';
+import { seedTenantTimeZone } from '$lib/server/testDb.js';
 
 import { login } from './authorize.remote.js';
 
@@ -53,9 +55,22 @@ async function statusOf(
 }
 
 beforeAll(async () => {
-  // No `settings` row: the SSO button then answers 400 "SSO is not configured", which is
-  // enough to tell a submission the address limit let through from one it refused.
-  await migrateForTest(getDb());
+  // No SSO provider in `settings`: the SSO button then answers 400 "SSO is not configured",
+  // which is enough to tell a submission the address limit let through from one it refused.
+  const db = getDb();
+  await migrateForTest(db);
+  await db
+    .insertInto('users')
+    .values({
+      id: 'owner',
+      name: 'Owner',
+      email: 'owner@example.com',
+      role: 'owner',
+      passwordHash: 'x',
+      createdAt: nowIso()
+    })
+    .execute();
+  await seedTenantTimeZone(db, 'Europe/Berlin');
 });
 
 describe('the login form', () => {

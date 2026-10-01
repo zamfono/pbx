@@ -42,9 +42,6 @@ const discoverMock = vi.mocked(discover);
 const finishLoginMock = vi.mocked(finishLogin);
 
 beforeAll(async () => {
-  // No `settings` row: `ssoConfigFromSettings` then answers `null`, which the handler reports as
-  // the `noUser` error page — enough to prove a request cleared the cookie/query state check
-  // without needing a full SSO provider stubbed in.
   await migrateForTest(getDb());
 });
 

@@ -68,10 +68,7 @@ export async function ssoConfigFromSettings(
       'ssoLabel'
     ])
     .where('id', '=', SETTINGS_ROW_ID)
-    .executeTakeFirst();
-  if (row === undefined) {
-    return null;
-  }
+    .executeTakeFirstOrThrow();
   if (
     row.ssoProvider === null ||
     row.ssoClientId === null ||
