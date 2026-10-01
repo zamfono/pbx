@@ -61,14 +61,20 @@ fi
 STUB
 chmod 755 "$work/bin/docker"
 cp "$work/bin/docker" "$work/bin/podman"
-# The stub systemctl, for the boot unit's path: `cat` shows the unit, the rest is recorded.
+# The stub systemctl, for the boot unit's path, over the units in $STUB_UNIT_DIR: it lists them,
+# shows one's WorkingDirectory and `cat`s one; the rest is recorded.
 cat >"$work/bin/systemctl" <<'STUB'
 #!/usr/bin/env bash
-if [[ $1 == cat ]]; then
-  cat "$ZAMFONO_UNIT_DIR/$2"
-  exit
-fi
-echo "systemctl $*" >>"$STUB_LOG"
+case $1 in
+  list-unit-files)
+    for unit in "$STUB_UNIT_DIR"/*.service; do
+      [[ ! -e $unit ]] || echo "$(basename "$unit") enabled enabled"
+    done
+    ;;
+  show) sed -n 's/^WorkingDirectory=//p' "$STUB_UNIT_DIR/${*: -1}" ;;
+  cat) cat "$STUB_UNIT_DIR/$2" ;;
+  *) echo "systemctl $*" >>"$STUB_LOG" ;;
+esac
 STUB
 chmod 755 "$work/bin/systemctl"
 # No boot unit unless a case installs one.
@@ -114,12 +120,12 @@ PY
 
 update() {
   (cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_RUNTIME=docker \
-    ZAMFONO_UNIT_DIR="$work/units" ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh "$@" </dev/null)
+    STUB_UNIT_DIR="$work/units" ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh "$@" </dev/null)
 }
 
 podman_update() {
   (cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_RUNTIME=podman \
-    ZAMFONO_UNIT_DIR="$work/units" ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh "$@" </dev/null)
+    STUB_UNIT_DIR="$work/units" ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh "$@" </dev/null)
 }
 
 # The release the stack's VERSION names, then the one compose.yaml's defaults pin.

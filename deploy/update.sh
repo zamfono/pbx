@@ -13,6 +13,8 @@
 #
 # Beyond the flags, from the environment:
 #   ZAMFONO_RUNTIME         docker | podman, when both are installed
+#   ZAMFONO_REPO_URL        where releases are downloaded from, for a mirror of
+#                           https://github.com/zamfono/pbx
 #   ZAMFONO_COMPOSE_FILES   the compose files, space-separated, instead of the boot unit's or
 #                           compose.yaml plus the overlay .env implies
 #   ZAMFONO_UPDATER=1       the updater service's run: never breaking, never itself, no systemctl
@@ -31,7 +33,6 @@ umask 077
 # shellcheck source=setup/outcome.sh
 . setup/outcome.sh
 
-# ZAMFONO_REPO_URL is for deploy/update-test.sh, which serves releases of its own.
 REPO=${ZAMFONO_REPO_URL:-https://github.com/zamfono/pbx}
 # The services a release replaces; the updater's run leaves out the updater itself, which the
 # next update from the host, or any `up -d`, brings to its new image.
@@ -41,8 +42,6 @@ WAIT_SECONDS=180
 # Names the release an update installed until its stack reports healthy, so that a rerun after a
 # failure there finishes that update rather than saying it is already on it.
 PENDING=.update-pending
-# ZAMFONO_UNIT_DIR is for deploy/update-test.sh, which installs a boot unit of its own.
-UNIT_DIR=${ZAMFONO_UNIT_DIR:-/etc/systemd/system}
 
 assume_yes=
 check_only=
@@ -52,7 +51,7 @@ for arg in "$@"; do
     --yes) assume_yes=1 ;;
     --check) check_only=1 ;;
     -h | --help)
-      sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     -*) fail "unknown option $arg" ;;
@@ -117,12 +116,11 @@ compose_files() {
 
 # The boot unit (README.md, step 7) whose WorkingDirectory is this directory, if any.
 find_unit() {
-  local candidate
+  local name
   [[ -z $updater ]] && command -v systemctl >/dev/null 2>&1 || return 0
-  for candidate in "$UNIT_DIR"/zamfono*.service; do
-    [[ -e $candidate ]] || continue
-    if grep -qxF "WorkingDirectory=$PWD" "$candidate"; then
-      basename "$candidate"
+  for name in $(systemctl list-unit-files --type=service --no-legend 'zamfono*.service' | awk '{print $1}'); do
+    if [[ $(systemctl show -p WorkingDirectory --value "$name") == "$PWD" ]]; then
+      echo "$name"
       return 0
     fi
   done
