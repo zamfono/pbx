@@ -172,10 +172,6 @@ describe('the set-password form', () => {
 describe('GET /auth/set-password (load)', () => {
   it('renders the confirmation the form redirects to, without a token', async () => {
     const data = await load(pageEvent('?done'));
-    expect(data).toMatchObject({
-      token: null,
-      done: true,
-      companyName: 'Acme'
-    });
+    expect(data).toEqual({ token: null, done: true });
   });
 });

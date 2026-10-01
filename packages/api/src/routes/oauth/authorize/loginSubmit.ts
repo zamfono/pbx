@@ -2,15 +2,14 @@ import { redirect, type RequestEvent } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
-import { dictionaryFor } from '$lib/i18n/index.js';
 import { requiredOrigin } from '$lib/server/auth/authorizationResponse.js';
 import {
   AuthorizePayloadSchema,
   lookupUser,
   paramsFromPayload,
-  resolveClient,
-  settingsInfo
+  resolveClient
 } from '$lib/server/auth/authorizeRequest.js';
+import { loadBranding } from '$lib/server/auth/branding.js';
 import { authCodeStore } from '$lib/server/auth/codes.js';
 import { CONSENT_COOKIE } from '$lib/server/auth/consent.js';
 import { loginRedirect } from '$lib/server/auth/loginRedirect.js';
@@ -63,8 +62,8 @@ export async function loginSubmit(
   const kr = keyringFromEnv(env);
   const origin = requiredOrigin();
   const resolved = await resolveClient(kr, paramsFromPayload(payload));
-  const dict = dictionaryFor((await settingsInfo(db)).language);
-  const refused = { message: dict.login.invalid, email: payload.email };
+  const { dictionary } = await loadBranding(db);
+  const refused = { message: dictionary.login.invalid, email: payload.email };
   const parsed = CredentialsSchema.safeParse(payload);
   if (!parsed.success) {
     return refused;

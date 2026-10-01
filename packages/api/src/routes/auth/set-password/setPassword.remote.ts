@@ -3,8 +3,8 @@ import { form } from '$app/server';
 import { z } from 'zod';
 
 import { MIN_PASSWORD_LENGTH } from '$lib/auth/passwordPolicy.js';
-import { dictionaryFor, format } from '$lib/i18n/index.js';
-import { settingsInfo } from '$lib/server/auth/authorizeRequest.js';
+import { format } from '$lib/i18n/index.js';
+import { loadBranding } from '$lib/server/auth/branding.js';
 import { redeemPasswordReset } from '$lib/server/auth/passwordReset.js';
 import { getDb } from '$lib/server/db.js';
 
@@ -40,7 +40,7 @@ export const setPassword = form(
     if (outcome.kind === 'passwordSet') {
       redirect(STATUS_SEE_OTHER, PASSWORD_SET_LOCATION);
     }
-    const dict = dictionaryFor((await settingsInfo(db)).language).setPassword;
+    const dict = (await loadBranding(db)).dictionary.setPassword;
     const tooShort =
       outcome.kind === 'invalidRequest' &&
       password.length < MIN_PASSWORD_LENGTH;

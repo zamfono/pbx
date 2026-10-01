@@ -2,13 +2,11 @@ import { redirect } from '@sveltejs/kit';
 
 import { nowIso } from '@zamfono/shared';
 
-import { dictionaryFor } from '$lib/i18n/index.js';
 import { hashToken } from '$lib/server/auth/tokens.js';
 import { getDb } from '$lib/server/db.js';
 
 import type { PageServerLoad } from './$types.js';
 
-const SETTINGS_ROW_ID = 1;
 const STATUS_FOUND = 302;
 
 /**
@@ -37,22 +35,12 @@ async function tokenIsLive(token: string): Promise<boolean> {
  * link it came from no longer redeems by then: the page renders its confirmation instead.
  */
 export const load: PageServerLoad = async event => {
-  const db = getDb();
-  const settings = await db
-    .selectFrom('settings')
-    .select(['language', 'companyName'])
-    .where('id', '=', SETTINGS_ROW_ID)
-    .executeTakeFirstOrThrow();
-  const page = {
-    dictionary: dictionaryFor(settings.language),
-    companyName: settings.companyName
-  };
   if (event.url.searchParams.has('done')) {
-    return { ...page, token: null, done: true };
+    return { token: null, done: true };
   }
   const token = event.url.searchParams.get('token');
   if (token === null || !(await tokenIsLive(token))) {
     redirect(STATUS_FOUND, '/auth/error?reason=expired');
   }
-  return { ...page, token, done: false };
+  return { token, done: false };
 };

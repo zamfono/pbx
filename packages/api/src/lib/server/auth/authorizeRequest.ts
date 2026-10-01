@@ -3,8 +3,6 @@ import { z } from 'zod';
 
 import type { Db } from '@zamfono/shared';
 
-import type { Language } from '$lib/i18n/index.js';
-
 import type { Keyring } from '../secretbox.js';
 import {
   authorizationErrorRedirect,
@@ -20,7 +18,6 @@ import { requestedResourceAcceptable } from './resource.js';
 import { ssoConfigFromSettings, type PendingAuthorize } from './sso.js';
 
 const STATUS_BAD_REQUEST = 400;
-const SETTINGS_ROW_ID = 1;
 // §5.2 "Authentication pages": the server "implements the authorization-code grant with PKCE";
 // the discovery document advertises only these as supported (`oauth.ts`), so a request naming
 // anything else is refused before the person ever sees the login form, rather than only failing
@@ -176,25 +173,6 @@ export async function resolveClient(
       scope: params.get('scope') ?? '',
       state
     }
-  };
-}
-
-/** `settings.language`/`settings.company_name`, for the page's rendered strings and title, plus
- *  whether a mail relay is configured (§10.2 "Without a relay": no forgot-password form then). */
-export async function settingsInfo(db: Db): Promise<{
-  language: Language;
-  companyName: string;
-  mailConfigured: boolean;
-}> {
-  const row = await db
-    .selectFrom('settings')
-    .select(['language', 'companyName', 'smtpHost'])
-    .where('id', '=', SETTINGS_ROW_ID)
-    .executeTakeFirstOrThrow();
-  return {
-    language: row.language as Language,
-    companyName: row.companyName,
-    mailConfigured: row.smtpHost !== null
   };
 }
 

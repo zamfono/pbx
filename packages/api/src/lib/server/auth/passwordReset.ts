@@ -38,7 +38,7 @@ const SET_PASSWORD_PATH = '/auth/set-password';
 const limiter = new Limiter();
 
 /** `true` while `settings.smtp_host` is set (§10.2 "Without a relay"). */
-async function relayConfigured(db: Db): Promise<boolean> {
+export async function relayConfigured(db: Db): Promise<boolean> {
   const row = await db
     .selectFrom('settings')
     .select('smtpHost')

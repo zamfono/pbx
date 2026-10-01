@@ -1,12 +1,8 @@
 import { env } from '$env/dynamic/private';
 
-import { dictionaryFor } from '$lib/i18n/index.js';
-import {
-  resolveClient,
-  settingsInfo,
-  ssoInfo
-} from '$lib/server/auth/authorizeRequest.js';
+import { resolveClient, ssoInfo } from '$lib/server/auth/authorizeRequest.js';
 import { CONSENT_COOKIE } from '$lib/server/auth/consent.js';
+import { relayConfigured } from '$lib/server/auth/passwordReset.js';
 import { unsealCookie } from '$lib/server/auth/sealedCookie.js';
 import { getDb } from '$lib/server/db.js';
 import { keyringFromEnv } from '$lib/server/secretbox.js';
@@ -24,8 +20,7 @@ import { consentForRequest } from './consentSubmit.js';
 export const load = (async event => {
   const db = getDb();
   const kr = keyringFromEnv(env);
-  const settings = await settingsInfo(db);
-  const dictionary = dictionaryFor(settings.language);
+  const mailConfigured = await relayConfigured(db);
   const sso = await ssoInfo(db, kr);
   const pendingConsent = consentForRequest(
     unsealCookie(event.cookies, kr, CONSENT_COOKIE),
@@ -33,9 +28,7 @@ export const load = (async event => {
   );
   if (pendingConsent !== null) {
     return {
-      dictionary,
-      companyName: settings.companyName,
-      mailConfigured: settings.mailConfigured,
+      mailConfigured,
       clientName: pendingConsent.clientName,
       sso,
       authorize: null,
@@ -47,9 +40,7 @@ export const load = (async event => {
   }
   const resolved = await resolveClient(kr, event.url.searchParams);
   return {
-    dictionary,
-    companyName: settings.companyName,
-    mailConfigured: settings.mailConfigured,
+    mailConfigured,
     clientName: resolved?.meta.name ?? null,
     sso,
     authorize: resolved?.authorize ?? null,

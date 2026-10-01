@@ -11,9 +11,10 @@ declare global {
     interface Locals {
       auth: Authenticated | null;
     }
-    /** Every authentication page's load returns at least these two (§5.2 "Authentication
-     *  pages"); declaring them here is what types the `$app/state` `page.data` a `+error.svelte`
-     *  reads them from, since an error boundary receives no `data` prop of its own. */
+    /** The root layout's load returns these two for every authentication page (§5.2
+     *  "Authentication pages"); declaring them here is what types the `$app/state` `page.data` a
+     *  `+error.svelte` reads them from, since an error boundary receives no `data` prop of its
+     *  own. */
     // eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- SvelteKit's own generated types extend `App.PageData` by declaration merging, which only an `interface` supports
     interface PageData {
       dictionary?: Dictionary;

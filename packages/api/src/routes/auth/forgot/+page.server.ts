@@ -1,11 +1,10 @@
 import { error } from '@sveltejs/kit';
 
-import { dictionaryFor } from '$lib/i18n/index.js';
+import { relayConfigured } from '$lib/server/auth/passwordReset.js';
 import { getDb } from '$lib/server/db.js';
 
 import type { PageServerLoad } from './$types.js';
 
-const SETTINGS_ROW_ID = 1;
 const STATUS_NOT_FOUND = 404;
 
 /**
@@ -14,20 +13,11 @@ const STATUS_NOT_FOUND = 404;
  * this page 404s the same way `POST /auth/resetRequest` does.
  */
 export const load = (async () => {
-  const db = getDb();
-  const settings = await db
-    .selectFrom('settings')
-    .select(['language', 'companyName', 'smtpHost'])
-    .where('id', '=', SETTINGS_ROW_ID)
-    .executeTakeFirstOrThrow();
-  if (settings.smtpHost === null) {
+  if (!(await relayConfigured(getDb()))) {
     error(
       STATUS_NOT_FOUND,
       'forgot-password is unavailable without a mail relay'
     );
   }
-  return {
-    dictionary: dictionaryFor(settings.language),
-    companyName: settings.companyName
-  };
+  return {};
 }) satisfies PageServerLoad;

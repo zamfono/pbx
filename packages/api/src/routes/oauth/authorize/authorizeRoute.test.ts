@@ -393,7 +393,6 @@ describe('GET /oauth/authorize (load)', () => {
     } as unknown as Parameters<typeof load>[0]);
     expect(data.authorize).toBeNull();
     expect(data.consent).toBeNull();
-    expect(data.companyName).toBe('Acme');
   });
 
   it('renders the consent step for a pending `zamfono_consent` cookie, the same one the SSO callback sets', async () => {
