@@ -56,9 +56,9 @@ type InternalDeps = {
 
 async function handleHealthz(
   deps: InternalDeps,
-  ariConnected: boolean,
   response: http.ServerResponse
 ): Promise<void> {
+  const ariConnected = deps.ari.connected;
   const dbOk = await isDbOpen(deps.db);
   const body: CoreHealth = {
     ok: dbOk && ariConnected,
@@ -76,10 +76,9 @@ async function handleHealthz(
  */
 async function handleVersion(
   deps: InternalDeps,
-  ariConnected: boolean,
   response: http.ServerResponse
 ): Promise<void> {
-  const asteriskStartedAt = ariConnected
+  const asteriskStartedAt = deps.ari.connected
     ? await deps.ari.asterisk.startupTime().catch(() => null)
     : null;
   const body: CoreVersionResponse = {
@@ -100,13 +99,12 @@ async function handleState(
 
 async function routeRequest(
   deps: InternalDeps,
-  isAriConnected: () => boolean,
   request: http.IncomingMessage,
   response: http.ServerResponse
 ): Promise<void> {
   const url = new URL(request.url ?? '/', 'http://internal');
   if (request.method === 'GET' && url.pathname === '/healthz') {
-    await handleHealthz(deps, isAriConnected(), response);
+    await handleHealthz(deps, response);
     return;
   }
   if (request.method === 'POST' && url.pathname === '/internal/configChanged') {
@@ -120,7 +118,7 @@ async function routeRequest(
   // The version this `core` runs (§7 "Version"), for `api`'s `system.info`: during an upgrade, or
   // with one container left on an old image, it can differ from `api`'s own.
   if (request.method === 'GET' && url.pathname === '/internal/version') {
-    await handleVersion(deps, isAriConnected(), response);
+    await handleVersion(deps, response);
     return;
   }
   if (
@@ -192,17 +190,8 @@ export function startInternalServer(
   deps: InternalDeps,
   port: number
 ): Promise<{ port: number; close: () => Promise<void> }> {
-  // ARI exposes no direct connection getter, only `'connected'`/`'disconnected'` events, and by
-  // the boot order (§3.1) it is already connected by the time this server starts.
-  let ariConnected = true;
-  deps.ari.on('connected', () => {
-    ariConnected = true;
-  });
-  deps.ari.on('disconnected', () => {
-    ariConnected = false;
-  });
   const server = http.createServer((request, response) => {
-    routeRequest(deps, () => ariConnected, request, response).catch(() => {
+    routeRequest(deps, request, response).catch(() => {
       respondJson(response, HTTP_SERVICE_UNAVAILABLE, {
         message: 'internal error'
       });

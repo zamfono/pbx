@@ -66,6 +66,11 @@ export class AriClient extends EventEmitter {
     this.asterisk = api.asterisk;
   }
 
+  /** Whether the event stream is open right now. */
+  get connected(): boolean {
+    return this.socket?.readyState === WebSocket.OPEN;
+  }
+
   connect(): Promise<void> {
     this.closing = false;
     return this.connectOnce();
