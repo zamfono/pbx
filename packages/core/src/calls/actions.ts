@@ -1,16 +1,13 @@
 /**
  * `api`'s live-call actions over the internal API (§3 "core"; §10.2 "Click-to-dial"; §10.1
- * "Transfers and pickup"). Originate rings the user's devices first and, once one answers, dials
- * the target as that device would have; pickup rings the picker's devices and dials `*8<ext>` with
- * the one that answers, so the answer lands in `features.ts`'s own pickup exactly as a dialled
- * `*8` would; both ring as any user's ring does (`ownDevices.ts`). Hangup, transfer and park act
- * on a live `Call` (park through `parkingActions.ts`, §10.2 "Call parking"), and so do the hold,
- * consultation, added party and decline `callControl.ts` carries out. Every action leaves its
- * actor in the call's trace. The originated call itself is built and dialled by
- * `clickToDial.ts`.
+ * "Transfers and pickup"). Originate rings the user's devices first, as any user's ring does
+ * (`ownDevices.ts`), and once one answers dials the target as that device would have; the
+ * originated call itself is built and dialled by `clickToDial.ts`. Pickup is `pickupAction.ts`'s.
+ * Hangup, transfer and park act on a live `Call` (park through `parkingActions.ts`, §10.2 "Call
+ * parking"), and so do the hold, consultation, added party and decline `callControl.ts` carries
+ * out. Every action leaves its actor in the call's trace.
  */
 import {
-  newId,
   type AddPartyRequest,
   type AttendedTransferRequest,
   type ConsultRequest,
@@ -24,10 +21,8 @@ import {
   type TransferRequest
 } from '@zamfono/shared';
 
-import type { Snapshot } from '../internal/server.js';
-import { RelayedCallLog } from '../relayedCallLog.js';
 import { ActionError } from './actionError.js';
-import { callLogMaxBytesFromEnv, newCall, type Call } from './call.js';
+import type { Call } from './call.js';
 import { CallControl } from './callControl.js';
 import { findLiveCall } from './callLookup.js';
 import {
@@ -36,49 +31,17 @@ import {
   resolveOriginateTarget
 } from './clickToDial.js';
 import { closeCall } from './liveCall.js';
-import { abandonOwnRing, ringOwnDevices } from './ownDevices.js';
+import { abandonOwnRing, ringOwnDevices, ringTimeoutOf } from './ownDevices.js';
 import { parkOnRequest } from './parkingActions.js';
 import { parkedCalls } from './parkingView.js';
+import { pickupOnRequest } from './pickupAction.js';
 import type { Pipeline } from './pipeline.js';
 import { followTransfers } from './referTransfers.js';
-import { activeBatchHasRingingLeg } from './ringGroupDial.js';
 import { transferCall, voicemailDial } from './transfers.js';
 import { registeredDevices } from './userDevices.js';
 
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
-// `users.ring_timeout_s`'s column default (§11.2).
-const DEFAULT_RING_TIMEOUT_S = 25;
-
-/** `users.ring_timeout_s` (§11.2): the user's own, or the column's default for an unknown user. */
-function ringTimeoutOf(snapshot: Snapshot, userId: string): number {
-  const user = snapshot.users.find(row => row.id === userId);
-  return user?.ringTimeoutS ?? DEFAULT_RING_TIMEOUT_S;
-}
-
-/** The extension `call` is ringing right now, `null` once it stopped (§10.1 "Pickup"). */
-function ringingExtension(
-  pipeline: Pipeline,
-  snapshot: Snapshot,
-  call: Call
-): string | null {
-  const { calleeUserId, ringGroupId } = call;
-  if (
-    ringGroupId !== null &&
-    activeBatchHasRingingLeg(pipeline, call.id, null)
-  ) {
-    return (
-      snapshot.extensions.find(row => row.ringGroupId === ringGroupId)?.ext ??
-      null
-    );
-  }
-  if (calleeUserId !== null && pipeline.pendingRing.has(call.id)) {
-    return (
-      snapshot.extensions.find(row => row.userId === calleeUserId)?.ext ?? null
-    );
-  }
-  return null;
-}
 
 /** The live-call actions of the internal API (§3), over one `Pipeline`. */
 export class CallActions {
@@ -144,79 +107,9 @@ export class CallActions {
     return { callId: call.id };
   }
 
-  /** `POST /internal/calls/{id}/pickup` (§10.1 "Pickup"): rings `userId`'s devices and dials
-   * `*8<ext>` of the ringing extension with the one that answers, so the answer takes the call the
-   * way the feature code does; `pickup`'s own trace line on the target names the actor. */
+  /** `POST /internal/calls/{id}/pickup` (§10.1 "Pickup"): `pickupAction.ts`'s. */
   async pickup(callId: string, req: PickupRequest): Promise<void> {
-    const target = this.findCall(callId);
-    const snapshot = await this.pipeline.deps.cache.get();
-    const ext = ringingExtension(this.pipeline, snapshot, target);
-    if (ext === null) {
-      throw new ActionError(HTTP_CONFLICT, 'notRinging', 'call is not ringing');
-    }
-    const devices = registeredDevices(this.pipeline, snapshot, req.userId);
-    if (devices.length === 0) {
-      throw new ActionError(
-        HTTP_CONFLICT,
-        'noRegisteredDevice',
-        'no registered device'
-      );
-    }
-    target.log.event({
-      event: 'pickup',
-      userId: req.userId,
-      actorUserId: req.actorUserId,
-      ext
-    });
-    // The ring's own race, on a call of its own that is never written: the answered device's `*8`
-    // dial is the call the picker takes part in, and sets the picker in `target`'s call itself.
-    // Its trace (the devices rung, declined or never placed) lands in `target`'s own, so a pickup
-    // that failed is explained in the history of the call it was for (§7 "every REST live-call
-    // action").
-    const host = newCall({
-      id: newId(),
-      direction: 'internal',
-      callerChannelId: '',
-      from: target.from,
-      to: `${snapshot.settings.featureCodes.pickup}${ext}`,
-      startedAt: this.pipeline.deps.now(),
-      logLevel: target.log.level,
-      callLogMaxBytes: callLogMaxBytesFromEnv()
-    });
-    host.log = new RelayedCallLog(
-      host.id,
-      target.log,
-      'pickupRing',
-      callLogMaxBytesFromEnv()
-    );
-    const ring = ringOwnDevices(this.pipeline, {
-      host,
-      // §7 level `sip`: each device's dialog rings for the picked-up call and, answered, becomes
-      // its leg, so it is joined to that call's SIP log as a ring race's legs are.
-      sipCall: target,
-      userId: req.userId,
-      devices,
-      callerId: target.from,
-      timeoutS: ringTimeoutOf(snapshot, req.userId),
-      language: snapshot.settings.language,
-      peer: target.from,
-      // A key of its own: the answered device's `*8` dial sets the picker in `target`'s call itself.
-      presenceKey: `pickup:${target.id}`
-    });
-    ring.outcome
-      .then(async outcome => {
-        if (outcome.kind === 'answered') {
-          await this.pipeline.dialFrom(outcome.channel, host.to);
-        } else if (outcome.kind === 'unanswered') {
-          target.log.event({
-            event: 'pickup',
-            userId: req.userId,
-            result: 'unanswered'
-          });
-        }
-      })
-      .catch(() => undefined);
-    await ring.placed;
+    await pickupOnRequest(this.pipeline, this.findCall(callId), req);
   }
 
   /** `POST /internal/calls/{id}/hangup`: ends every channel of the call and writes its history entry. */

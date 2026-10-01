@@ -192,18 +192,6 @@ export class Pipeline {
     // id from the originate and drives its recording directly, so the pipeline leaves it alone.
   }
 
-  /** Routes `exten` as dialled from `channel`, a device channel already in the app and answered
-   * (an API pickup's, `actions.ts`), exactly as its own `outbound,<exten>` entry would be. */
-  async dialFrom(channel: Channel, exten: string): Promise<void> {
-    await this.outboundHandler?.({
-      type: 'StasisStart',
-      timestamp: new Date().toISOString(),
-      application: 'zamfono',
-      args: ['outbound', exten],
-      channel
-    });
-  }
-
   /** Wires `handleOutbound` for `outbound,<exten>` Stasis entries (§9.2). */
   setOutboundHandler(handler: (ev: AriEvent) => Promise<void>): void {
     this.outboundHandler = handler;

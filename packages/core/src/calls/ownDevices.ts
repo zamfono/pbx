@@ -5,8 +5,8 @@
  * same machinery a user's ring is (`legs.ts`): the first to answer wins, the others are hung up,
  * and a ring whose every device fails, declines or rings out is unanswered. The call hosting the
  * race has no caller channel while it rings; the answered channel is handed back to the action
- * (`RingResolver.handOver`), which makes it the caller of the click-to-dial call, or dials the
- * pickup code with it.
+ * (`RingResolver.handOver`), which makes it the caller of the click-to-dial call, or the
+ * picked-up call's answer.
  */
 import { MS_PER_SECOND } from '@zamfono/shared';
 
@@ -27,6 +27,15 @@ import type { Pipeline } from './pipeline.js';
 import { placeAll } from './ringConclusion.js';
 
 export type Device = Snapshot['devices'][number];
+
+// `users.ring_timeout_s`'s column default (§11.2).
+const DEFAULT_RING_TIMEOUT_S = 25;
+
+/** `users.ring_timeout_s` (§11.2): the user's own, or the column's default for an unknown user. */
+export function ringTimeoutOf(snapshot: Snapshot, userId: string): number {
+  const user = snapshot.users.find(row => row.id === userId);
+  return user?.ringTimeoutS ?? DEFAULT_RING_TIMEOUT_S;
+}
 
 export type OwnRingParams = {
   /** The call whose legs the devices are, and whose ring race they run in. */

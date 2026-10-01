@@ -6,7 +6,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri, isPlacement, placedCallerId } from '../ari/fake.js';
-import { defaultChannel, type Channel, type Logger } from '../ari/types.js';
+import { defaultChannel, type Logger } from '../ari/types.js';
 import { CdrWriter } from '../cdr.js';
 import {
   ConfigCache,
@@ -977,13 +977,8 @@ describe('CallActions', () => {
     });
   });
 
-  it('picks up a ringing call by ringing the picker devices and dialling *8<ext> with the one that answers, and refuses 409 notRinging otherwise', async () => {
+  it('picks up a ringing call by ringing the picker devices, the one that answers taking it, and refuses 409 notRinging otherwise', async () => {
     await setUp();
-    const dials: { args: unknown; channelId: string }[] = [];
-    pipeline.setOutboundHandler(ev => {
-      dials.push({ args: ev.args, channelId: (ev.channel as Channel).id });
-      return Promise.resolve();
-    });
     const calleeId = await seedUser(db, '101');
     const pickerId = await seedUser(db, '102');
     await seedDevice(db, fakeAri, pickerId, 'e102-a');
@@ -998,30 +993,30 @@ describe('CallActions', () => {
       'PJSIP/e102-a',
       'PJSIP/e102-b'
     ]);
-    // Both ring in a race of their own; the first to answer dials `*8101` as the feature code would.
+    // Both ring in a race of their own; the first to answer is the picked-up call's answer.
     const [first, second] = dialled.map(entry => entry.appArgs);
     expect(first).toMatch(/^leg,/u);
     expect(second).toBe(first);
     await eventually(() => {
-      expect(dials).toEqual([
-        { args: ['outbound', '*8101'], channelId: dialled[0]?.channelId }
-      ]);
+      expect(ringing.answeredByUserId).toBe(pickerId);
+      expect(ringing.legs.get(dialled[0]?.channelId ?? '')?.state).toBe('up');
       expect(hungUp(dialled[1]?.channelId ?? '')).toBe(true);
     });
+    expect(pipeline.pendingRing.has(ringing.id)).toBe(false);
 
     const answered = await answeredCall(calleeId);
     await expect(
       actions.pickup(answered.id, { userId: pickerId, actorUserId })
     ).rejects.toMatchObject({ status: HTTP_CONFLICT, reason: 'notRinging' });
     const nobodyId = await seedUser(db, '103');
+    const stillRinging = ringingCall(calleeId);
     await expect(
-      actions.pickup(ringing.id, { userId: nobodyId, actorUserId })
+      actions.pickup(stillRinging.id, { userId: nobodyId, actorUserId })
     ).rejects.toMatchObject({
       status: HTTP_CONFLICT,
       reason: 'noRegisteredDevice'
     });
-    clearTimeout(pipeline.pendingRing.get(ringing.id)?.timer);
-    ringing.status = 'missed';
+    clearTimeout(pipeline.pendingRing.get(stillRinging.id)?.timer);
     await cdr.finish(ringing);
     const row = await db
       .selectFrom('calls')
@@ -1030,6 +1025,68 @@ describe('CallActions', () => {
       .executeTakeFirstOrThrow();
     expect(row.log).toContain(
       `"event":"pickup","userId":"${pickerId}","actorUserId":"${actorUserId}","ext":"101"`
+    );
+  });
+
+  it('picks up the call it names while another call rings the same user (call waiting)', async () => {
+    await setUp();
+    const calleeId = await seedUser(db, '101');
+    const pickerId = await seedUser(db, '102');
+    await seedDevice(db, fakeAri, pickerId, 'e102-a');
+    await devicesUp();
+    const waiting = ringingCall(calleeId);
+    const named = ringingCall(calleeId);
+
+    await actions.pickup(named.id, { userId: pickerId, actorUserId: pickerId });
+
+    const [picker] = originates();
+    await eventually(() => {
+      expect(named.answeredByUserId).toBe(pickerId);
+    });
+    expect(named.legs.get(picker?.channelId ?? '')?.state).toBe('up');
+    expect(pipeline.callByChannel.get(picker?.channelId ?? '')).toBe(named);
+    expect(waiting.answeredAt).toBeNull();
+    expect(pipeline.pendingRing.has(waiting.id)).toBe(true);
+    expect(pipeline.pendingRing.has(named.id)).toBe(false);
+    clearTimeout(pipeline.pendingRing.get(waiting.id)?.timer);
+  });
+
+  it('hangs up the answered phone of a pickup whose call stopped ringing meanwhile, and says so in its trace', async () => {
+    await setUp();
+    fakeAri.answerAfterMs = 60_000;
+    const calleeId = await seedUser(db, '101');
+    const pickerId = await seedUser(db, '102');
+    await seedDevice(db, fakeAri, pickerId, 'e102-a');
+    await devicesUp();
+    const ringing = ringingCall(calleeId);
+
+    await actions.pickup(ringing.id, {
+      userId: pickerId,
+      actorUserId: pickerId
+    });
+    const [picker] = originates();
+    clearTimeout(pipeline.pendingRing.get(ringing.id)?.timer);
+    pipeline.pendingRing.delete(ringing.id);
+    fakeAri.emit({
+      type: 'ChannelStateChange',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: defaultChannel({ id: picker?.channelId ?? '', state: 'Up' })
+    });
+
+    await eventually(() => {
+      expect(hungUp(picker?.channelId ?? '')).toBe(true);
+    });
+    expect(ringing.answeredAt).toBeNull();
+    ringing.status = 'missed';
+    await cdr.finish(ringing);
+    const row = await db
+      .selectFrom('calls')
+      .select('log')
+      .where('id', '=', ringing.id)
+      .executeTakeFirstOrThrow();
+    expect(row.log).toContain(
+      `"event":"pickup","userId":"${pickerId}","result":"notRinging"`
     );
   });
 

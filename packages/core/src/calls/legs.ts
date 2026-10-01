@@ -117,7 +117,8 @@ async function winLeg(
 /**
  * The first answer of a ring on a user's own phones (`ownDevices.ts`): the race ends as any does,
  * every other ringing leg hung up, and the answered channel leaves the call's legs for whoever
- * started the ring, which makes it the caller of a call (click-to-dial) or dials with it (pickup).
+ * started the ring, which makes it the caller of a call (click-to-dial) or the answer of the call
+ * it picks up (pickup).
  */
 async function handOverLeg(
   pipeline: Pipeline,

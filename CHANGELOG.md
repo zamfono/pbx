@@ -143,6 +143,11 @@ why the specified behaviour changed; the commit history, how.
   on the host. `update.sh` now records its run in `.update/state.json` as the updater does,
   `running` while it runs and then `succeeded` or `failed` with both versions and times, and
   `system.info` shows it; `update.sh --check` records nothing.
+- `calls.pickup` could pick up another call than the one it named: the PBX looked the call up
+  again by the extension it rang, so with two calls ringing the same user (call waiting) it took
+  the first. It now takes the call it names. A phone answered once that call has stopped ringing
+  is hung up, with a line in the call's trace, and a pickup no longer leaves a `*8` call of the
+  picker's in the call history.
 
 ## [0.1.0] - 2026-09-30
 

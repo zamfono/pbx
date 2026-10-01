@@ -1,17 +1,13 @@
 /** Feature-code dispatch (§9.3 "Feature codes"; §10.1 "Transfers and pickup"; §10.2
- * "Three-way calls"). Mailbox DTMF access lives in `mailbox.ts`, call parking in `parking.ts` and
- * `*5` in `addParty.ts`, each its own module so this dispatcher stays under the repository's
- * `max-lines` lint rule. */
+ * "Three-way calls"). Mailbox DTMF access lives in `mailbox.ts`, call parking in `parking.ts`,
+ * pickup in `pickup.ts` and `*5` in `addParty.ts`. */
 import type { FeatureCodeKey } from '@zamfono/shared';
 
 import type { Presence } from '../presence.js';
 import { addParty } from './addParty.js';
-import { bridgeAnswered, claimAnswer } from './answer.js';
-import { release, type Call, type Leg } from './call.js';
-import { findLiveCall } from './callLookup.js';
+import { release, type Call } from './call.js';
 import { ownerForExt } from './extensionOwner.js';
 import {
-  closeFeatureCall,
   concludeFeature,
   RELEASE_CODE_FORBIDDEN,
   RELEASE_CODE_NOT_FOUND
@@ -19,136 +15,13 @@ import {
 import { mailboxAccess, ownVoicemail } from './mailbox.js';
 import { park, parkingSlots, type ParkedEntry } from './parking.js';
 import { retrieveParkedCall } from './parkingRetrieval.js';
+import { pickupByExtension } from './pickup.js';
 import type { Pipeline } from './pipeline.js';
-import { activeBatchHasRingingLeg, stopGroupRinging } from './ringGroupDial.js';
 import { deposit } from './voicemail.js';
 
 // Re-exported at `features.js` alongside the feature codes, though their own bodies live in
 // `parking.ts` and `parkingRetrieval.ts`.
 export { parkingSlots, retrieveParkedCall, type ParkedEntry };
-
-/** The picker's own channel as `target`'s answering leg (§10.1 "Pickup"): it stays up as the
- * picked-up call's answered leg, so the picker hanging up ends that call for its caller too.
- * Claimed (`answer.ts`) before anything stops the ring, so an answer already in flight keeps the
- * call, and `null` then. */
-function claimPickup(pipeline: Pipeline, call: Call, target: Call): Leg | null {
-  const leg: Leg = {
-    channelId: call.callerChannelId,
-    kind: 'device',
-    userId: call.callerUserId,
-    state: 'up',
-    endCause: null
-  };
-  return claimAnswer(pipeline, target, leg, { pickup: true }) ? leg : null;
-}
-
-/** The picked-up call's own bridging: the picker's channel joins `target`'s in a fresh bridge,
- * every other still-ringing leg of `target` ends, and `target`'s own ringing user (a direct
- * pickup) or ring-group member (`stopGroupRinging`'s own hangups) returns to idle. */
-async function bridgePickup(
-  pipeline: Pipeline,
-  call: Call,
-  target: Call,
-  leg: Leg
-): Promise<void> {
-  const ari = pipeline.deps.ari;
-  await ari.channels.answer(call.callerChannelId).catch(() => undefined);
-  await bridgeAnswered(pipeline, target, leg);
-  for (const other of target.legs.values()) {
-    if (other.state === 'ringing') {
-      other.state = 'ended';
-      pipeline.callByChannel.delete(other.channelId);
-      // eslint-disable-next-line no-await-in-loop -- a handful of legs at most, hung up one at a time
-      await ari.channels.hangup(other.channelId).catch(() => undefined);
-    }
-  }
-  // Presence (§9.3, §10.2 "Presence and BLF"): the ringing callee idle, the picker in the call.
-  if (target.calleeUserId !== null) {
-    pipeline.deps.presence?.setCallState(
-      target.calleeUserId,
-      'idle',
-      null,
-      null,
-      target.id
-    );
-  }
-  if (call.callerUserId !== null) {
-    pipeline.deps.presence?.setCallState(
-      call.callerUserId,
-      'inCall',
-      target.from,
-      null,
-      target.id
-    );
-  }
-  // §7 level `sip`: the picker's dialog is `target`'s answered leg now, not the closing `*8` dial's.
-  pipeline.deps.cdr.registerLeg?.(target, call.callerChannelId);
-  await closeFeatureCall(pipeline, call, 'answered');
-}
-
-/** `*8<ext>`: wins the target's ring race for the picker's own channel (§10.1 "Pickup"): a
- * single user's own ring race (`pendingRing`), or a ring group's own tracked
- * batch (`ringGroupDial.ts`'s `stopGroupRinging`) when `ext` is a member's extension or the
- * group's own (§9.3 table). */
-async function pickup(
-  pipeline: Pipeline,
-  call: Call,
-  ext: string
-): Promise<void> {
-  const snapshot = await pipeline.deps.cache.get();
-  const owner = ownerForExt(snapshot, ext);
-  // An extension nobody owns — unknown, or a parking slot — names no ringing call to pick up
-  // (§9.3 table: `*8<ext>` is directed pickup); falling through to the group search below with
-  // both `userId` and `groupId` null would otherwise match any live ring-group call at all.
-  if (owner === null) {
-    await release(pipeline, call, RELEASE_CODE_NOT_FOUND, 'failed');
-    return;
-  }
-  const userId = 'userId' in owner ? owner.userId : null;
-  const groupId = 'ringGroupId' in owner ? owner.ringGroupId : null;
-
-  if (userId !== null) {
-    const target = findLiveCall(
-      pipeline,
-      candidate =>
-        pipeline.pendingRing.has(candidate.id) &&
-        candidate.calleeUserId === userId
-    );
-    const leg = target === null ? null : claimPickup(pipeline, call, target);
-    if (target !== null && leg !== null) {
-      const pending = pipeline.pendingRing.get(target.id);
-      if (pending !== undefined) {
-        clearTimeout(pending.timer);
-        pipeline.pendingRing.delete(target.id);
-      }
-      // A find-me leg's own timer, if any, no-ops on firing (guards on `pendingRing`, cleared above).
-      await bridgePickup(pipeline, call, target, leg);
-      pending?.resolve('answered');
-      return;
-    }
-  }
-
-  // Constrained to a call whose tracked batch actually has a leg ringing for `userId` (any member
-  // when `ext` is the group's own extension, `userId === null`), not merely any live ring-group
-  // call, so a member ringing in one group is never picked up out of another's.
-  const groupTarget = findLiveCall(
-    pipeline,
-    candidate =>
-      candidate.ringGroupId !== null &&
-      (groupId === null || candidate.ringGroupId === groupId) &&
-      activeBatchHasRingingLeg(pipeline, candidate.id, userId)
-  );
-  const groupLeg =
-    groupTarget === null ? null : claimPickup(pipeline, call, groupTarget);
-  if (groupTarget !== null && groupLeg !== null) {
-    // Same tick as the search above, so the batch it matched is still ringing to be stopped.
-    stopGroupRinging(pipeline, groupTarget, userId);
-    await bridgePickup(pipeline, call, groupTarget, groupLeg);
-    return;
-  }
-
-  await release(pipeline, call, RELEASE_CODE_NOT_FOUND, 'failed');
-}
 
 /** `*90`/`*91`: writes `users.dnd` and refreshes the caller's own hint (§9.3, §3.1 cross-write). */
 async function setDnd(
@@ -199,7 +72,7 @@ export async function handleFeature(
   rest: string
 ): Promise<void> {
   const actions: Partial<Record<FeatureCodeKey, () => Promise<void>>> = {
-    pickup: () => pickup(pipeline, call, rest),
+    pickup: () => pickupByExtension(pipeline, call, rest),
     dndOn: () => setDnd(pipeline, presence, call, true),
     dndOff: () => setDnd(pipeline, presence, call, false),
     mailbox: () => mailboxAccess(pipeline, call, rest),
