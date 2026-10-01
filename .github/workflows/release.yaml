@@ -55,6 +55,8 @@ jobs:
             exit 1
           fi
           echo "short=${commit::7}" >>"$GITHUB_OUTPUT"
+      - name: The stack's images, from docker-bake.hcl
+        run: echo "IMAGES=$(bash .github/scripts/stack-images.sh)" >>"$GITHUB_ENV"
       # crane, logged in to ghcr.io with this job's token.
       - uses: imjasonh/setup-crane@feee3b6bb0d4c68370f256a4502498c9227e5c6b # v0.7
         with:
@@ -62,7 +64,6 @@ jobs:
       - name: Add the release tags to main's build of that commit
         env:
           REPOSITORY: ghcr.io/zamfono
-          IMAGES: asterisk migrate core api proxy updater
           # A commit pushed together with its tag is still in main's CI when this starts.
           WAIT_TIMEOUT: 2700
           WAIT_INTERVAL: 30
@@ -134,5 +135,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ORG: zamfono
         run: |
+          # The image names are one argument each on purpose.
+          # shellcheck disable=SC2046
           bash .github/scripts/prune-sha-images.sh "$(git rev-parse "$GITHUB_REF^{commit}")" \
-            asterisk migrate core api proxy updater
+            $(bash .github/scripts/stack-images.sh)

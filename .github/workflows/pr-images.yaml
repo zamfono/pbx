@@ -35,7 +35,6 @@ permissions: {}
 env:
   LABEL: publish-image
   REGISTRY: ghcr.io/zamfono
-  IMAGES: asterisk migrate core api proxy updater
 
 jobs:
   resolve:
@@ -107,6 +106,8 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
+      - name: The stack's images, from docker-bake.hcl
+        run: echo "IMAGES=$(bash .github/scripts/stack-images.sh)" >>"$GITHUB_ENV"
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: images
@@ -180,5 +181,5 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
         run: |
           packages=()
-          for name in $IMAGES; do packages+=("$name-pr"); done
+          for name in $(bash .github/scripts/stack-images.sh); do packages+=("$name-pr"); done
           bash .github/scripts/prune-pr-images.sh "$PR" "${packages[@]}"

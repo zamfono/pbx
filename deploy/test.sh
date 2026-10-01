@@ -42,7 +42,10 @@ tar -xzf "$bundle_dir/zamfono-deploy.tar.gz" -C "$bundle_dir/x" --strip-componen
 # ZAMFONO_VERSION empty, as .env.example leaves it: every image is the bundle's own release.
 bundle_images=$(cd "$bundle_dir/x" && ZAMFONO_VERSION='' docker compose --env-file "$env_file" \
   -f compose.yaml -f compose.ports.yaml config --images)
-[ "$(echo "$bundle_images" | grep -c ':1\.2\.3$')" -eq 6 ]
+if [ -z "$bundle_images" ] || echo "$bundle_images" | grep -v ':1\.2\.3$'; then
+  echo "the bundle's compose.yaml runs an image that is not the release's own" >&2
+  exit 1
+fi
 
 echo "==> setup.sh (non-interactive, in the unpacked bundle)"
 [ -x "$bundle_dir/x/setup.sh" ]

@@ -3,7 +3,7 @@
 # the pull request's ci archive (docs/spec.md §6.3 "Images" names the six).
 #
 # Usage: pr-images-tag.sh <pr number> <head sha> <head repository URL>
-# Environment: REGISTRY (ghcr.io/zamfono), IMAGES (asterisk migrate core api proxy updater).
+# Environment: REGISTRY (ghcr.io/zamfono), IMAGES (the image names, from stack-images.sh).
 #
 # The archive is the pull request's own output and may hold anything; only zamfono/<name>:ci for
 # the six names is used, and every other image in it is ignored. Each becomes

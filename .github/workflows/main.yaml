@@ -36,6 +36,13 @@ jobs:
     env:
       REGISTRY: ghcr.io/zamfono
     steps:
+      # docker-bake.hcl names the six images, and the script reads them from it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            docker-bake.hcl
+            .github/scripts
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: images
@@ -52,7 +59,7 @@ jobs:
         # unpublished. The short sha is the name `promote` looks the build up by when this
         # commit is released.
         run: |
-          for name in asterisk migrate core api proxy updater; do
+          for name in $(bash .github/scripts/stack-images.sh); do
             for tag in edge "sha-${GITHUB_SHA::7}"; do
               docker tag "zamfono/$name:ci" "$REGISTRY/$name:$tag"
               docker push "$REGISTRY/$name:$tag"

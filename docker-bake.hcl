@@ -1,8 +1,8 @@
-# The images CI builds (§6.3 "Images", §8): the five the stack ships plus the TLS/SRTP scenario's
-# baresip device, built in parallel by `docker buildx bake` from ci.yaml's `images` job. Each
-# target keeps the Dockerfile and context the separate `docker build`s used before, and its tag
-# comes from the variable of the same name in ci.yaml's env block, so the workflow stays the one
-# place that names them.
+# The images CI builds (§6.3 "Images", §8): the six the stack ships, which the `stack` group below
+# is the one list of, plus the TLS/SRTP scenario's baresip device, built in parallel by `docker
+# buildx bake` from ci.yaml's `images` job. The workflows that publish, promote or prune the
+# stack's images read the names from that group (.github/scripts/stack-images.sh). Each target's
+# tag is the variable of the same name, which ci.yaml's env block sets for its later steps.
 #
 # Local run, no cache and no registry involved:
 #   docker buildx bake --load
@@ -54,8 +54,12 @@ function "cache_to" {
   result = CACHE_TO == "gha" ? ["type=gha,scope=${scope},mode=max"] : []
 }
 
+group "stack" {
+  targets = ["asterisk", "migrate", "core", "api", "proxy", "updater"]
+}
+
 group "default" {
-  targets = ["migrate", "core", "api", "asterisk", "proxy", "updater", "test-devices"]
+  targets = ["stack", "test-devices"]
 }
 
 target "migrate" {
