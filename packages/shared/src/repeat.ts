@@ -4,36 +4,30 @@
  */
 
 export type RepeatOptions = {
-  /** Run `fn` once at once, before the first period has passed (the default), or only after it. */
-  runNow?: boolean;
-  /** Stops the schedule when aborted, like `stop()`. */
-  signal?: AbortSignal;
   /** Keeps the pending timer from holding the process open (`Timeout.unref()`). */
   unref?: boolean;
 };
 
 /**
- * Runs `fn` now (unless `runNow` is false), then again `periodMs` after each run has settled, so
- * a slow run never overlaps the next. `fn` handles and logs its own failures: a rejection is
- * dropped here and the schedule goes on. `stop()` (or aborting `signal`) cancels the next run;
- * one already in flight finishes.
+ * Runs `fn` now, then again `periodMs` after each run has settled, so a slow run never overlaps
+ * the next. `fn` handles and logs its own failures: a rejection is dropped here and the schedule
+ * goes on. `stop()` cancels the next run; one already in flight finishes.
  */
 export function repeat(
   fn: () => unknown,
   periodMs: number,
   options: RepeatOptions = {}
 ): { stop: () => void } {
-  const state: { timer?: NodeJS.Timeout; stopped: boolean } = {
-    stopped: false
-  };
+  let timer: NodeJS.Timeout | undefined;
+  let stopped = false;
   const stop = (): void => {
-    state.stopped = true;
-    clearTimeout(state.timer);
+    stopped = true;
+    clearTimeout(timer);
   };
   const arm = (next: () => void): void => {
-    state.timer = setTimeout(next, periodMs);
+    timer = setTimeout(next, periodMs);
     if (options.unref === true) {
-      state.timer.unref();
+      timer.unref();
     }
   };
   // `fn` is called in `run` itself, not a microtask later, so the run `repeat` starts "now" is
@@ -44,20 +38,11 @@ export function repeat(
     })
       .catch(() => undefined)
       .finally(() => {
-        if (!state.stopped) {
+        if (!stopped) {
           arm(run);
         }
       });
   };
-  if (options.signal?.aborted === true) {
-    stop();
-    return { stop };
-  }
-  options.signal?.addEventListener('abort', stop, { once: true });
-  if (options.runNow ?? true) {
-    run();
-  } else {
-    arm(run);
-  }
+  run();
   return { stop };
 }

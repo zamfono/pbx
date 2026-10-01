@@ -37,17 +37,6 @@ describe('repeat', () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
-  it('waits a period before the first run with runNow false', async () => {
-    const fn = vi.fn();
-    const job = repeat(fn, PERIOD_MS, { runNow: false });
-    await vi.advanceTimersByTimeAsync(PERIOD_MS - 1);
-    expect(fn).not.toHaveBeenCalled();
-
-    await vi.advanceTimersByTimeAsync(1);
-    expect(fn).toHaveBeenCalledTimes(1);
-    job.stop();
-  });
-
   it('keeps going after a rejected run, and never overlaps a slow one', async () => {
     let calls = 0;
     const fn = vi.fn(async () => {
@@ -65,19 +54,5 @@ describe('repeat', () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(fn).toHaveBeenCalledTimes(2);
     job.stop();
-  });
-
-  it('stops when its signal aborts, and never starts on an aborted one', async () => {
-    const fn = vi.fn();
-    const controller = new AbortController();
-    repeat(fn, PERIOD_MS, { signal: controller.signal });
-    await vi.advanceTimersByTimeAsync(0);
-    controller.abort();
-    await vi.advanceTimersByTimeAsync(2 * PERIOD_MS);
-    expect(fn).toHaveBeenCalledTimes(1);
-
-    repeat(fn, PERIOD_MS, { signal: controller.signal });
-    await vi.advanceTimersByTimeAsync(2 * PERIOD_MS);
-    expect(fn).toHaveBeenCalledTimes(1);
   });
 });
