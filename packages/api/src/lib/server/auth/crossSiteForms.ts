@@ -27,7 +27,7 @@ const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 // The client endpoints (§5.2, §10.3, §10.5): none reads a cookie, so a cross-site form gains no
 // ambient authority there. REST authenticates by bearer token, the OAuth endpoints by the grant
-// or token in the body, and `/mcp` validates `Origin` itself (`lib/mcp/origin.ts`).
+// or token in the body, and `/mcp` validates `Origin` itself (`$lib/server/mcp/origin.ts`).
 const CLIENT_PATHS = new Set([
   '/oauth/token',
   '/oauth/revoke',
