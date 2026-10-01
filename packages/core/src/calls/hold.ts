@@ -5,10 +5,19 @@
  * hearing nobody and heard by nobody. Resuming puts the party back. The phone knows nothing of
  * it, so a hold or resume the phone signals (re-INVITE) is a separate matter for Asterisk. One
  * registry per `Pipeline`, keyed by the conversation's bridge, since every row sharing that
- * bridge (a party added to it, a consultation) must count the held party as still in it.
+ * bridge (a party added to it, a consultation) must count the held party as still in it. Also
+ * the `calls.hold` and `calls.resume` actions themselves.
  */
+import type { HoldRequest } from '@zamfono/shared';
+
+import { ActionError } from './actionError.js';
 import type { Call } from './call.js';
+import { findLiveCall, otherChannelIn } from './callLookup.js';
+import { notBridged, ownBridge } from './consultation.js';
 import type { Pipeline } from './pipeline.js';
+import { transferrerChannel } from './transfers.js';
+
+const HTTP_CONFLICT = 409;
 
 export type Hold = {
   /** The call whose party is held. */
@@ -107,4 +116,51 @@ export async function endHold(
     .addChannel(intoBridgeId, hold.channelId)
     .catch(() => undefined);
   return true;
+}
+
+/** Whether `call`'s consultation (`Hold.consultationCallId`) is still live. */
+export function consultationLive(pipeline: Pipeline, call: Call): boolean {
+  const id = holdOf(pipeline, call)?.consultationCallId ?? null;
+  return id !== null && findLiveCall(pipeline, live => live.id === id) !== null;
+}
+
+/** `POST /internal/calls/{id}/hold`: the other party leaves the bridge for the hold music. */
+export async function holdOnRequest(
+  pipeline: Pipeline,
+  call: Call,
+  req: HoldRequest
+): Promise<void> {
+  const bridgeId = ownBridge(call);
+  const byChannelId = transferrerChannel(call, req.actorUserId);
+  const party = otherChannelIn(call, byChannelId);
+  if (bridgeId === null || party === null) {
+    throw notBridged();
+  }
+  if (holdIn(pipeline, bridgeId) !== null) {
+    throw new ActionError(HTTP_CONFLICT, 'held', 'call is on hold');
+  }
+  call.log.event({
+    event: 'hold',
+    actorUserId: req.actorUserId,
+    channelId: party
+  });
+  await holdParty(pipeline, call, byChannelId, party);
+}
+
+/** `POST /internal/calls/{id}/resume`: the held party returns to the bridge. During a
+ * consultation that makes three parties, the one who held it then their initiator. */
+export async function resumeOnRequest(
+  pipeline: Pipeline,
+  call: Call,
+  req: HoldRequest
+): Promise<void> {
+  const hold = holdOf(pipeline, call);
+  if (hold === null) {
+    throw new ActionError(HTTP_CONFLICT, 'notHeld', 'call is not on hold');
+  }
+  call.log.event({ event: 'resume', actorUserId: req.actorUserId });
+  if (consultationLive(pipeline, call)) {
+    call.threeWayInitiatorChannelId = hold.byChannelId;
+  }
+  await endHold(pipeline, call.bridgeId, call.bridgeId);
 }

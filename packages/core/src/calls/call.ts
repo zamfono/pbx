@@ -60,7 +60,7 @@ export type Call = {
   /** §10.2 "Call parking": a system-initiated ring-back rings its target and stops there. Its
    * caller is a placeholder channel with nobody behind it, so the target's forward, mailbox and
    * release rules have no caller to act on; the initiator decides what follows an unanswered
-   * ring. A party added or consulted through the API (`callControl.ts`) rings the same way. */
+   * ring. A party added or consulted through the API (`addedParty.ts`) rings the same way. */
   ringOnly?: boolean;
   /** §10.2 "Three-way calls": the channel through which the user who added a party to this
    * call's bridge with `*5` is in it; their hanging up ends the bridge for everyone. */

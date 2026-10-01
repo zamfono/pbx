@@ -14,8 +14,9 @@ import { ActionError } from './actionError.js';
 import { dialAddPartyTarget } from './addParty.js';
 import { resolveAddedTarget } from './addPartyTarget.js';
 import { callLogMaxBytesFromEnv, newCall, type Call } from './call.js';
+import { notBridged, ownBridge } from './consultation.js';
 import type { Pipeline } from './pipeline.js';
-import { userOfChannel } from './transfers.js';
+import { transferrerChannel, userOfChannel } from './transfers.js';
 
 const HTTP_UNPROCESSABLE = 422;
 
@@ -116,4 +117,25 @@ export function dialAddedLeg(
     }
   };
   dial().catch(() => undefined);
+}
+
+/** `POST /internal/calls/{id}/parties`: dials `req.target` from the actor, its answer joining
+ * the call's bridge as a third party; the actor leaving then ends it for everyone, as `*5`'s
+ * initiator does. The added leg's own call. */
+export async function addPartyOnRequest(
+  pipeline: Pipeline,
+  call: Call,
+  req: AddPartyRequest
+): Promise<{ callId: string }> {
+  const bridgeId = ownBridge(call);
+  if (bridgeId === null) {
+    throw notBridged();
+  }
+  const byChannelId = transferrerChannel(call, req.actorUserId);
+  const leg = await newAddedLeg(pipeline, call, byChannelId, req, 'addParty');
+  leg.parentCallId = call.id;
+  dialAddedLeg(pipeline, leg, bridgeId, req.target, () => {
+    call.threeWayInitiatorChannelId = byChannelId;
+  });
+  return { callId: leg.id };
 }

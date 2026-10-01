@@ -6,11 +6,11 @@
  */
 import type { Call, CallsRow } from './call.js';
 import { traceSystemEnd } from './callEnd.js';
+import { stopGroupRinging } from './groupPickup.js';
 import { endHold, holdIn, holdOf } from './hold.js';
 import { clearFindMeTimers } from './legs.js';
 import { notifyMissedCall } from './missedCall.js';
 import type { Pipeline } from './pipeline.js';
-import { stopGroupRinging } from './ringGroupDial.js';
 
 /** Every user who took part in `call`: its caller, its legs' owners and whoever answered it. */
 function participants(call: Call): Set<string> {

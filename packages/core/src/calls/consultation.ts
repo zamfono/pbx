@@ -14,8 +14,8 @@ import { ActionError } from './actionError.js';
 import { dialAddedLeg, newAddedLeg } from './addedParty.js';
 import { handOver } from './attendedTransfer.js';
 import type { Call } from './call.js';
-import { findLiveCall, otherChannelIn } from './callLookup.js';
-import { endHold, holdOf, holdParty } from './hold.js';
+import { otherChannelIn } from './callLookup.js';
+import { consultationLive, endHold, holdOf, holdParty } from './hold.js';
 import { closeCall } from './liveCall.js';
 import type { Pipeline } from './pipeline.js';
 import { transferrerChannel, userOfChannel } from './transfers.js';
@@ -30,12 +30,6 @@ export function ownBridge(call: Call): string | null {
 
 export function notBridged(): ActionError {
   return new ActionError(HTTP_CONFLICT, 'notBridged', 'call is not bridged');
-}
-
-/** Whether `call`'s consultation (`hold.ts`'s `consultationCallId`) is still live. */
-export function consultationLive(pipeline: Pipeline, call: Call): boolean {
-  const id = holdOf(pipeline, call)?.consultationCallId ?? null;
-  return id !== null && findLiveCall(pipeline, live => live.id === id) !== null;
 }
 
 /** `POST /internal/calls/{id}/consult`: holds the other party and dials `target` from the actor;

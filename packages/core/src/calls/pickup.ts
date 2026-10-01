@@ -9,8 +9,8 @@ import { release, type Call, type Leg } from './call.js';
 import { findLiveCall } from './callLookup.js';
 import { ownerForExt } from './extensionOwner.js';
 import { closeFeatureCall, RELEASE_CODE_NOT_FOUND } from './featureCall.js';
+import { activeBatchHasRingingLeg, stopGroupRinging } from './groupPickup.js';
 import type { Pipeline } from './pipeline.js';
-import { activeBatchHasRingingLeg, stopGroupRinging } from './ringGroupDial.js';
 
 /** How the call to pick up rings: its own ring race (`pendingRing`, a user's ring), or its ring
  * group's tracked batch (`groupPickup.ts`) with a leg ringing for `memberUserId`, any member's
