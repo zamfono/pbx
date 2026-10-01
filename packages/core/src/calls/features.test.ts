@@ -22,6 +22,8 @@ import {
   requestTo
 } from '../testing/eventually.js';
 import { newCall, type Call, type Leg } from './call.js';
+import { channelOf, otherChannelIn } from './callLookup.js';
+import { callUp } from './callState.js';
 import { handleFeature, retrieveParkedCall } from './features.js';
 import { handleOutbound } from './outbound.js';
 import { Pipeline, type PipelineDeps } from './pipeline.js';
@@ -2401,6 +2403,7 @@ describe('features', () => {
     activeCall.bridgeId = bridge.id;
     pipeline.registerCall(activeCall);
     await cdr.open(activeCall);
+    callUp(pipeline.deps, activeCall);
 
     const parkDialChannel = fakeAri.addChannel({});
     const parkDial = newInternalCall(parkDialChannel.id, 'e100', '*70');
@@ -2460,7 +2463,42 @@ describe('features', () => {
       expect(ringbackRow.endedAt).not.toBeNull();
     }, RINGBACK_WAIT_MS);
     expect(activeCall.answeredByUserId).toBe(parkerUserId);
+    // §10.3 "Live calls": the parker who answered is connected in the parked call itself, their
+    // answered leg one of its own, so they may end or transfer it.
+    const parkerLeg = [...activeCall.legs.values()].find(
+      leg => leg.userId === parkerUserId && leg.state === 'up'
+    );
+    expect(parkerLeg?.channelId).not.toBe(parkerChannel.id);
+    expect(pipeline.callByChannel.get(parkerLeg?.channelId ?? '')).toBe(
+      activeCall
+    );
+    expect(
+      pipeline.deps.state.calls.get(activeCall.id)?.connectedUserIds
+    ).toEqual([parkerUserId]);
   }, 10_000);
+
+  it('finds a caller who left only by a leg they joined again by, and the other party among the legs (§10.2 "Call parking")', () => {
+    const call = newInternalCall('caller-gone', '100', '+15559999');
+    call.callerUserId = 'parker';
+    call.callerEnded = true;
+    for (const [channelId, userId] of [
+      ['party', null],
+      ['ringback', 'parker']
+    ] as const) {
+      call.legs.set(channelId, {
+        channelId,
+        kind: userId === null ? 'trunk' : 'device',
+        userId,
+        state: 'up',
+        endCause: null
+      });
+    }
+    call.bridgeId = 'bridge';
+
+    expect(channelOf(call, 'parker')).toBe('ringback');
+    expect(otherChannelIn(call, 'ringback')).toBe('party');
+    expect(otherChannelIn(call, 'party')).toBe('ringback');
+  });
 
   it('*95<ext> admits a caller who is a member of the ring group only through a user group', async () => {
     await setUp();

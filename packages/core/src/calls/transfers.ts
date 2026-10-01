@@ -9,6 +9,7 @@ import { newId, type TransferRequest } from '@zamfono/shared';
 
 import type { Snapshot } from '../internal/server.js';
 import { setChannelLanguage } from '../prompts.js';
+import { ActionError } from './actionError.js';
 import {
   callLogMaxBytesFromEnv,
   newCall,
@@ -16,6 +17,7 @@ import {
   type Call
 } from './call.js';
 import { channelOf, otherChannelIn } from './callLookup.js';
+import { ownerForExt } from './extensionOwner.js';
 import { closeCall } from './liveCall.js';
 import type { Pipeline } from './pipeline.js';
 import { logLevelFor, resolveTarget, routeToTarget } from './routeToTarget.js';
@@ -115,6 +117,26 @@ async function startTransfereeCall(
     () => undefined
   );
   return child;
+}
+
+const HTTP_UNPROCESSABLE = 422;
+
+/** `*97<ext>` (§9.3), what a phone transfers a caller to for `ext`'s mailbox, without ringing:
+ * a transfer with `voicemail` dials it in place of `ext`. 422 for an extension no user or ring
+ * group owns. */
+export async function voicemailDial(
+  pipeline: Pipeline,
+  ext: string
+): Promise<string> {
+  const snapshot = await pipeline.deps.cache.get();
+  if (ownerForExt(snapshot, ext) === null) {
+    throw new ActionError(
+      HTTP_UNPROCESSABLE,
+      'noMailbox',
+      'the target owns no mailbox'
+    );
+  }
+  return `${snapshot.settings.featureCodes.deposit}${ext}`;
 }
 
 /** The transferrer's channel in `call`: the actor's own, else the answerer's, else the caller's.

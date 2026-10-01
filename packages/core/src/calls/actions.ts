@@ -3,50 +3,45 @@
  * "Transfers and pickup"). Originate rings the user's devices first and, once one answers, dials
  * the target as that device would have; pickup rings the picker's devices and dials `*8<ext>` with
  * the one that answers, so the answer lands in `features.ts`'s own pickup exactly as a dialled
- * `*8` would; both ring as any user's ring does (`ownDevices.ts`). Hangup and transfer act on a
- * live `Call`. Every action leaves its actor in the call's trace. The originated call itself is
- * built and dialled by `clickToDial.ts`.
+ * `*8` would; both ring as any user's ring does (`ownDevices.ts`). Hangup, transfer and park act
+ * on a live `Call` (park through `parkingActions.ts`, §10.2 "Call parking"). Every action leaves
+ * its actor in the call's trace. The originated call itself is built and dialled by
+ * `clickToDial.ts`.
  */
-/* eslint-disable max-classes-per-file -- ActionError is the one refusal these actions raise */
 import {
   newId,
   type HangupRequest,
   type OriginateRequest,
+  type ParkingResponse,
+  type ParkRequest,
   type PickupRequest,
   type TransferRequest
 } from '@zamfono/shared';
 
 import type { Snapshot } from '../internal/server.js';
 import { RelayedCallLog } from '../relayedCallLog.js';
+import { ActionError } from './actionError.js';
 import { callLogMaxBytesFromEnv, newCall, type Call } from './call.js';
 import { findLiveCall } from './callLookup.js';
-import { beginOriginatedCall, newOriginatedCall } from './clickToDial.js';
+import {
+  beginOriginatedCall,
+  newOriginatedCall,
+  resolveOriginateTarget
+} from './clickToDial.js';
 import { closeCall } from './liveCall.js';
 import { abandonOwnRing, ringOwnDevices } from './ownDevices.js';
+import { parkOnRequest } from './parkingActions.js';
+import { parkedCalls } from './parkingView.js';
 import type { Pipeline } from './pipeline.js';
 import { followTransfers } from './referTransfers.js';
 import { activeBatchHasRingingLeg } from './ringGroupDial.js';
-import { resolveTarget } from './routeToTarget.js';
-import { transferCall } from './transfers.js';
+import { transferCall, voicemailDial } from './transfers.js';
 import { registeredDevices } from './userDevices.js';
 
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
 // `users.ring_timeout_s`'s column default (§11.2).
 const DEFAULT_RING_TIMEOUT_S = 25;
-
-/** A refused action, carried to the internal API as its HTTP status and problem `cause`. */
-export class ActionError extends Error {
-  readonly status: number;
-  readonly reason: string;
-
-  constructor(status: number, reason: string, message: string) {
-    super(message);
-    this.name = 'ActionError';
-    this.status = status;
-    this.reason = reason;
-  }
-}
 
 /** `users.ring_timeout_s` (§11.2): the user's own, or the column's default for an unknown user. */
 function ringTimeoutOf(snapshot: Snapshot, userId: string): number {
@@ -97,7 +92,7 @@ export class CallActions {
     req: OriginateRequest
   ): Promise<{ callId: string } | { error: 'noRegisteredDevice' }> {
     const snapshot = await this.pipeline.deps.cache.get();
-    const resolved = resolveTarget(snapshot, req.target);
+    const resolved = resolveOriginateTarget(snapshot, req);
     const devices = registeredDevices(this.pipeline, snapshot, req.userId);
     const call = newOriginatedCall(this.pipeline, snapshot, req, resolved);
     if (devices.length === 0) {
@@ -225,13 +220,29 @@ export class CallActions {
     await closeCall(this.pipeline, call, 'missed', true);
   }
 
-  /** `POST /internal/calls/{id}/transfer` (§10.1 "Transfers and pickup"). */
+  /** `POST /internal/calls/{id}/transfer` (§10.1 "Transfers and pickup"): with `voicemail`,
+   * to `*97<target>`, the mailbox of the extension's user or ring group (§9.3). */
   async transfer(callId: string, req: TransferRequest): Promise<void> {
     const call = this.findCall(callId);
-    const child = await transferCall(this.pipeline, call, req);
+    const target =
+      req.voicemail === true
+        ? await voicemailDial(this.pipeline, req.target)
+        : req.target;
+    const child = await transferCall(this.pipeline, call, { ...req, target });
     if (child === null) {
       throw new ActionError(HTTP_CONFLICT, 'notBridged', 'call is not bridged');
     }
+  }
+
+  /** `POST /internal/calls/{id}/park` (§10.2 "Call parking"): `userId` parks the call's other
+   * party as `*70` would, without the slot read out to a feature dial, which there is none of. */
+  async park(callId: string, req: ParkRequest): Promise<{ slot: string }> {
+    return parkOnRequest(this.pipeline, this.findCall(callId), req);
+  }
+
+  /** `GET /internal/parking`: the occupied parking slots (§10.2 "Call parking"). */
+  async parked(): Promise<ParkingResponse> {
+    return { parked: await parkedCalls(this.pipeline) };
   }
 
   private findCall(callId: string): Call {

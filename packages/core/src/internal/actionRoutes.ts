@@ -1,7 +1,8 @@
 /**
  * The live-call routes of the internal API (§3): `POST /internal/calls`,
- * `/internal/calls/{id}/{transfer|pickup|hangup}` and the MWI trigger `/internal/mwi/{mailbox}`
- * (§3.1). `server.ts` mounts `handleActionRoute`; the actions themselves are
+ * `/internal/calls/{id}/{transfer|pickup|hangup|park}`, the parked calls' read
+ * `GET /internal/parking` and the MWI trigger `/internal/mwi/{mailbox}` (§3.1). `server.ts`
+ * mounts `handleActionRoute` and `handleParkingRead`; the actions themselves are
  * `calls/actions.ts`'s `CallActions`.
  */
 import type http from 'node:http';
@@ -11,6 +12,7 @@ import type {
   HangupRequest,
   MwiMailbox,
   OriginateRequest,
+  ParkRequest,
   PickupRequest,
   TransferRequest
 } from '@zamfono/shared';
@@ -20,6 +22,7 @@ import { refreshMwi } from '../calls/voicemailStore.js';
 import { respondJson } from './configChanged.js';
 import type { CallActions } from './server.js';
 
+const HTTP_OK = 200;
 const HTTP_CREATED = 201;
 const HTTP_NO_CONTENT = 204;
 const HTTP_BAD_REQUEST = 400;
@@ -29,7 +32,7 @@ const PROBLEM_CONTENT_TYPE = 'application/problem+json';
 // network's one client (§3.1).
 const MAX_ACTION_BODY_BYTES = 65536;
 const CALL_ACTION_ROUTE =
-  /^\/internal\/calls\/(?<callId>[^/]+)\/(?<action>transfer|pickup|hangup)$/u;
+  /^\/internal\/calls\/(?<callId>[^/]+)\/(?<action>transfer|pickup|hangup|park)$/u;
 // The mailbox arrives as one path segment, percent-encoded or not (`user:<id>` and `user%3A<id>`
 // name the same mailbox), so the segment is decoded before it is matched.
 const MWI_ROUTE = /^\/internal\/mwi\/(?<segment>[^/]+)$/u;
@@ -42,10 +45,16 @@ const ACTION_FIELDS = {
   originate: ['userId', 'target', 'actorUserId', 'requestId'],
   transfer: ['target', 'actorUserId'],
   pickup: ['userId', 'actorUserId'],
-  hangup: ['actorUserId']
+  hangup: ['actorUserId'],
+  park: ['userId', 'actorUserId']
 } as const;
 type ActionName = keyof typeof ACTION_FIELDS;
 type CallActionName = Exclude<ActionName, 'originate'>;
+// The optional boolean fields, absent or a boolean: a call's own CLIR, a transfer to the mailbox.
+const ACTION_FLAGS: Partial<Record<ActionName, readonly string[]>> = {
+  originate: ['clir'],
+  transfer: ['voicemail']
+};
 
 export type ActionRouteDeps = {
   db: Db;
@@ -78,7 +87,12 @@ async function readActionBody(
 }
 
 function isCallAction(action: string): action is CallActionName {
-  return action === 'transfer' || action === 'pickup' || action === 'hangup';
+  return (
+    action === 'transfer' ||
+    action === 'pickup' ||
+    action === 'hangup' ||
+    action === 'park'
+  );
 }
 
 function matchActionRoute(
@@ -113,7 +127,7 @@ function matchMwiRoute(pathname: string): MwiMailbox | null {
   }
 }
 
-/** An `ActionError` from `calls/actions.ts`, matched by shape so this module imports no call code. */
+/** An `ActionError` from `calls/actionError.ts`, matched by shape so this module imports no call code. */
 function isActionFailure(
   error: unknown
 ): error is Error & { status: number; reason: string } {
@@ -125,21 +139,36 @@ function isActionFailure(
   );
 }
 
+/** Runs one call action: what it answers with, `undefined` for an action that answers 204. */
 async function runCallAction(
   actions: CallActions,
   callId: string,
   action: CallActionName,
   body: Record<string, unknown>
-): Promise<void> {
+): Promise<unknown> {
   if (action === 'transfer') {
     await actions.transfer(callId, body as TransferRequest);
-    return;
+    return undefined;
   }
   if (action === 'pickup') {
     await actions.pickup(callId, body as PickupRequest);
-    return;
+    return undefined;
+  }
+  if (action === 'park') {
+    return actions.park(callId, body as ParkRequest);
   }
   await actions.hangup(callId, body as HangupRequest);
+  return undefined;
+}
+
+/** Whether every field `ACTION_FLAGS` names for `action` is absent or a boolean in `body`. */
+function flagsValid(
+  action: ActionName,
+  body: Record<string, unknown>
+): boolean {
+  return (ACTION_FLAGS[action] ?? []).every(
+    field => body[field] === undefined || typeof body[field] === 'boolean'
+  );
 }
 
 /** An RFC 9457 problem, the shape `api` answers its own errors in (§10.3): `detail` names the
@@ -198,7 +227,8 @@ export async function handleActionRoute(
   const fields: readonly string[] = ACTION_FIELDS[route.action];
   if (
     body === null ||
-    !fields.every(field => typeof body[field] === 'string')
+    !fields.every(field => typeof body[field] === 'string') ||
+    !flagsValid(route.action, body)
   ) {
     respondJson(response, HTTP_BAD_REQUEST, { message: 'invalid body' });
     return true;
@@ -208,14 +238,37 @@ export async function handleActionRoute(
       await runOriginate(deps.actions, body, response);
       return true;
     }
-    await runCallAction(deps.actions, route.callId, route.action, body);
-    response.writeHead(HTTP_NO_CONTENT);
-    response.end();
+    const result = await runCallAction(
+      deps.actions,
+      route.callId,
+      route.action,
+      body
+    );
+    if (result === undefined) {
+      response.writeHead(HTTP_NO_CONTENT);
+      response.end();
+    } else {
+      respondJson(response, HTTP_OK, result);
+    }
   } catch (error) {
     if (!isActionFailure(error)) {
       throw error;
     }
     respondProblem(response, error.status, error.message, error.reason);
   }
+  return true;
+}
+
+/** `GET /internal/parking` (§10.2 "Call parking"): the occupied slots; `false` off that path or
+ * while the actions are not mounted. */
+export async function handleParkingRead(
+  actions: CallActions | null,
+  pathname: string,
+  response: http.ServerResponse
+): Promise<boolean> {
+  if (pathname !== '/internal/parking' || actions === null) {
+    return false;
+  }
+  respondJson(response, HTTP_OK, await actions.parked());
   return true;
 }

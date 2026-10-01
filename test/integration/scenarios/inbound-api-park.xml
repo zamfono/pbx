@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+  §10.2 "Call parking" over the API: an inbound call over the trunk reaches the ring group and is
+  answered by its member, 101 (`uas/answer.xml`). The setup's `_api-park.sh` parks it for 101
+  with `POST /calls/{id}/park`, which hangs up 101's leg, and retrieves it on a colleague's phone
+  with a click-to-dial to the slot; the colleague's phone answers and speaks
+  (`uas/answer-speak.xml`). By the time this side speaks, it talks to the colleague, so the audio
+  of the retrieved conversation runs both ways; then it hangs up, which ends the call for the
+  colleague too.
+-->
+<scenario name="inbound api park">
+  <send retrans="500">
+    <![CDATA[
+      INVITE sip:[service]@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:+15559999@[local_ip]>;tag=[call_number]
+      To: <sip:[service]@[remote_ip]>
+      Call-ID: [call_id]
+      CSeq: 1 INVITE
+      Contact: <sip:+15559999@[local_ip]:[local_port];transport=[transport]>
+      Max-Forwards: 70
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=user1 53655765 2353687637 IN IP[local_ip_type] [local_ip]
+      s=-
+      c=IN IP[media_ip_type] [media_ip]
+      t=0 0
+      m=audio [media_port] RTP/AVP 8
+      a=rtpmap:8 PCMA/8000
+    ]]>
+  </send>
+
+  <recv response="100" optional="true" />
+  <recv response="180" optional="true" />
+  <recv response="183" optional="true" />
+  <recv response="200" rtd="true" />
+
+  <send>
+    <![CDATA[
+      ACK sip:[service]@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:+15559999@[local_ip]>;tag=[call_number]
+      To: <sip:[service]@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 1 ACK
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <!-- Parked, then retrieved by the colleague, meanwhile; then this side speaks sipp's own A-law
+       voice sample to them and hangs up. -->
+  <pause milliseconds="6000" />
+  <nop>
+    <action>
+      <exec play_pcap_audio="/sipp/g711a.pcap" />
+    </action>
+  </nop>
+  <pause milliseconds="5000" />
+
+  <send retrans="500">
+    <![CDATA[
+      BYE sip:[service]@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+      From: <sip:+15559999@[local_ip]>;tag=[call_number]
+      To: <sip:[service]@[remote_ip]>[peer_tag_param]
+      Call-ID: [call_id]
+      CSeq: 2 BYE
+      Max-Forwards: 70
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <recv response="200" crlf="true" />
+</scenario>

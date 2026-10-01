@@ -224,3 +224,23 @@ await_trace() {
   echo "$2 in $1 held $count of $3 INVITEs after $attempt s" >&2
   printf '%s\n' "$content"
 }
+
+# Waits up to `$1` seconds for a call in progress that a ring group routed and someone answered,
+# and prints its id: the call a scenario's background API action acts on, as a CRM's button acts
+# on the call it shows (`_api-park.sh`, `_api-deposit.sh`).
+await_answered_group_call() {
+  local call_id
+  for _ in $(seq 1 $(($1 * 5))); do
+    call_id=$(api GET '/calls?live=true' 2>/dev/null | python3 -c '
+import json, sys
+calls = json.load(sys.stdin)["items"]
+print(next((c["callId"] for c in calls if c["state"] == "up" and c["ringGroupId"]), ""))
+' 2>/dev/null)
+    if [ -n "$call_id" ]; then
+      printf '%s\n' "$call_id"
+      return 0
+    fi
+    sleep 0.2
+  done
+  return 1
+}

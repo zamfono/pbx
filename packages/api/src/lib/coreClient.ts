@@ -11,6 +11,8 @@ import type {
   HangupRequest,
   MwiMailbox,
   OriginateRequest,
+  ParkingResponse,
+  ParkRequest,
   PickupRequest,
   ReloadKind,
   StateResponse,
@@ -19,6 +21,7 @@ import type {
 
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
+const HTTP_UNPROCESSABLE = 422;
 const DEFAULT_CORE_URL = 'http://core:3000';
 // `/healthz`, `/metrics` and `system.info` answer within this even while `core` hangs (§6.3
 // "Health", §7, §10.3), and a hung `core` holds up no re-registration check (§10.4).
@@ -47,6 +50,8 @@ export type CoreClient = {
   transfer(callId: string, req: TransferRequest): Promise<void>;
   pickup(callId: string, req: PickupRequest): Promise<void>;
   hangup(callId: string, req: HangupRequest): Promise<void>;
+  park(callId: string, req: ParkRequest): Promise<{ slot: string }>;
+  parked(): Promise<ParkingResponse>;
   mwi(mailbox: MwiMailbox): Promise<void>;
 };
 
@@ -102,9 +107,14 @@ function namesNoRegisteredDevice(body: unknown): boolean {
   return (body as { detail?: unknown }).detail === 'noRegisteredDevice';
 }
 
-/** The statuses `core` refuses a call action with (`calls/actions.ts`'s `ActionError`): 404 for a
- * call it holds no live state for, 409 for one in the wrong state or a picker without a device. */
-const REFUSAL_STATUSES = [HTTP_NOT_FOUND, HTTP_CONFLICT] as const;
+/** The statuses `core` refuses a call action with (`calls/actionError.ts`'s `ActionError`): 404
+ * for a call it holds no live state for, 409 for one in the wrong state or a picker without a
+ * device, 422 for a target it cannot act on (a voicemail transfer to no mailbox). */
+const REFUSAL_STATUSES = [
+  HTTP_NOT_FOUND,
+  HTTP_CONFLICT,
+  HTTP_UNPROCESSABLE
+] as const;
 
 /** A call action `core` refused: its status and the RFC 9457 problem's `title` and `detail`. */
 export type CoreRefusal = {
@@ -215,6 +225,18 @@ export function createCoreClient(
         `${baseUrl}/internal/calls/${encodeURIComponent(callId)}/hangup`,
         req
       );
+    },
+    async park(callId, req) {
+      const url = `${baseUrl}/internal/calls/${encodeURIComponent(callId)}/park`;
+      const response = await postJson(fetchFn, url, req);
+      await throwIfNotOk(response, url);
+      return (await response.json()) as { slot: string };
+    },
+    async parked() {
+      const url = `${baseUrl}/internal/parking`;
+      const response = await fetchFn(url);
+      await throwIfNotOk(response, url);
+      return (await response.json()) as ParkingResponse;
     },
     async mwi(mailbox) {
       // Not `encodeURIComponent`-escaped: `mailbox` is `user:<id>` or `ringGroup:<id>` by

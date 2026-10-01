@@ -9,7 +9,7 @@ import { newId, type OriginateRequest } from '@zamfono/shared';
 import type { Channel } from '../ari/types.js';
 import type { Snapshot } from '../internal/server.js';
 import { setChannelLanguage } from '../prompts.js';
-import type { DialAction } from '../routing/outbound.js';
+import { withClir, type DialAction } from '../routing/outbound.js';
 import {
   callLogMaxBytesFromEnv,
   newCall,
@@ -19,12 +19,26 @@ import {
 import type { Pipeline } from './pipeline.js';
 import {
   logLevelFor,
+  resolveTarget,
   routeToTarget,
   type ResolvedTarget
 } from './routeToTarget.js';
 
 function extensionOf(snapshot: Snapshot, userId: string): string {
   return snapshot.extensions.find(row => row.userId === userId)?.ext ?? '';
+}
+
+/** What `req.target` resolves to when dialled, under the call's own CLIR where `req.clir` gives
+ * one, as `#31#`/`*31#` before the target would (§9.4 "Anonymous calls (CLIR)"); an emergency
+ * number keeps presenting the caller's number. */
+export function resolveOriginateTarget(
+  snapshot: Snapshot,
+  req: OriginateRequest
+): ResolvedTarget {
+  const resolved = resolveTarget(snapshot, req.target);
+  return req.clir === undefined
+    ? resolved
+    : { ...resolved, action: withClir(resolved.action, req.clir) };
 }
 
 /** The originated call, from the user's own extension to `resolved`, with the actor in its trace;
@@ -58,7 +72,8 @@ export function newOriginatedCall(
     actorUserId: req.actorUserId,
     requestId: req.requestId,
     target: req.target,
-    dialAction: resolved.action.kind
+    dialAction: resolved.action.kind,
+    ...(req.clir === undefined ? {} : { clir: req.clir })
   });
   return call;
 }

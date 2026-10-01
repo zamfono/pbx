@@ -106,6 +106,8 @@ function stubCoreClient(): StubCoreClient {
     transfer: () => Promise.reject(new Error('not used')),
     pickup: () => Promise.reject(new Error('not used')),
     hangup: () => Promise.reject(new Error('not used')),
+    park: () => Promise.reject(new Error('not used')),
+    parked: () => Promise.reject(new Error('not used')),
     mwi: () => Promise.reject(new Error('not used'))
   };
 }

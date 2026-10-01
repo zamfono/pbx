@@ -17,6 +17,7 @@ import {
   type Call
 } from './call.js';
 import { RELEASE_CODE_NOT_FOUND } from './featureCall.js';
+import { trackLeg } from './legs.js';
 import type { Pipeline } from './pipeline.js';
 import { runUserStep } from './userStep.js';
 
@@ -46,6 +47,36 @@ export async function moveParkedParty(
   // eslint-disable-next-line require-atomic-updates -- `parked` is this park's own aggregate; nothing else writes `bridgeId` while the party is parked
   parked.bridgeId = bridge.id;
   return bridge.id;
+}
+
+/**
+ * The parker's answered ring-back leg becomes a leg of `parked`, as a retriever's channel does
+ * (`parkingRetrieval.ts`): the parker is connected in the parked call from here on (§10.3 "Live
+ * calls"), so they may end or transfer it, either side hanging up ends it for the other
+ * (`legsEnded.ts`), and their recorded participation carries on in it (§10.2 "Recording
+ * semantics"). The ring-back's own row closes as the parker joins.
+ */
+function takeOverAnsweredLeg(
+  pipeline: Pipeline,
+  ringback: Call,
+  parked: Call
+): void {
+  const leg = [...ringback.legs.values()].find(
+    candidate => candidate.state === 'up'
+  );
+  if (leg === undefined) {
+    return;
+  }
+  ringback.legs.delete(leg.channelId);
+  trackLeg(pipeline, parked, leg);
+  const { cdr, presence, recorder } = pipeline.deps;
+  if (leg.userId !== null) {
+    presence?.setCallState(leg.userId, 'inCall', parked.from, null, parked.id);
+    presence?.setCallState(leg.userId, 'idle', null, null, ringback.id);
+  }
+  // §7 level `sip`: the parker's dialog is the parked call's leg now, not the ring-back's.
+  cdr.registerLeg?.(parked, leg.channelId);
+  recorder?.onLegMoved?.(ringback, parked, leg);
 }
 
 type RingbackContext = {
@@ -155,6 +186,7 @@ export async function ringParkerBack(
       .catch(() => undefined);
     parked.answeredByUserId = parkerUserId;
     parked.log.event({ event: 'parkingRetrieved', by: parkerUserId });
+    takeOverAnsweredLeg(pipeline, ringback, parked);
     await pipeline.deps.cdr.finish(ringback);
     return;
   }

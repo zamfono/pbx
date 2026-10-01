@@ -33,6 +33,8 @@ function stubCoreClient(overrides: Partial<CoreClient>): CoreClient {
     transfer: notImplemented,
     pickup: notImplemented,
     hangup: notImplemented,
+    park: notImplemented,
+    parked: notImplemented,
     mwi: notImplemented,
     ...overrides
   };

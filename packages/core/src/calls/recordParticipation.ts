@@ -14,6 +14,8 @@ export type ParticipationRecorder = {
   ): Promise<void>;
   onCallerEnded(call: Call): Promise<void>;
   onLegEnded(call: Call, leg: Leg): Promise<void>;
+  /** `leg`'s channel goes on in `to` (a parking ring-back's answer, §10.2 "Call parking"). */
+  onLegMoved?(from: Call, to: Call, leg: Leg): void;
 };
 
 /**

@@ -5,9 +5,11 @@
 import type { Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 
-/** The channel `userId` is present as in `call`: its own caller channel, or an up leg. */
+/** The channel `userId` is present as in `call`: its own caller channel while it is up, or an up
+ * leg. A caller who left (one who parked the other party, §10.2 "Call parking") is present only
+ * through a leg they joined again by, such as the parking ring-back's. */
 export function channelOf(call: Call, userId: string): string | null {
-  if (call.callerUserId === userId) {
+  if (call.callerUserId === userId && call.callerEnded !== true) {
     return call.callerChannelId;
   }
   const match = [...call.legs.values()].find(
@@ -17,16 +19,18 @@ export function channelOf(call: Call, userId: string): string | null {
 }
 
 /** The bridged call's other party (§10.2 "Call parking" assumes the usual two-party bridge):
- * `call.callerChannelId` when `excludeChannelId` is a leg, else the one up leg. */
+ * `call.callerChannelId` when `excludeChannelId` is a leg and the caller is still in the call,
+ * else the one other up leg. */
 export function otherChannelIn(
   call: Call,
   excludeChannelId: string
 ): string | null {
-  if (call.callerChannelId !== excludeChannelId) {
+  if (call.callerChannelId !== excludeChannelId && call.callerEnded !== true) {
     return call.callerChannelId;
   }
   const leg = [...call.legs.values()].find(
-    candidate => candidate.state === 'up'
+    candidate =>
+      candidate.state === 'up' && candidate.channelId !== excludeChannelId
   );
   return leg?.channelId ?? null;
 }

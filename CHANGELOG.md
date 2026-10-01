@@ -45,6 +45,20 @@ why the specified behaviour changed; the commit history, how.
   `update.last.trigger`: `manual` (with the owner in `by`), `automatic`, or `host` for `update.sh`
   on the host. Backup runs now take turns: a manual run started during a scheduled one waits for it,
   as the automatic update's backup does.
+- Parking, voicemail deposit, per-call CLIR and the personal greeting over the API and MCP, as a
+  phone does them with feature codes. `calls.park` (`POST /calls/{id}/park`) parks the other party
+  of a call on the lowest free slot as `*70` does, hangs up the parker's leg and returns the slot;
+  `parking.list` (`GET /parking/calls`) shows every user the parked calls, slot, caller (none when
+  withheld), since when and by whom; `calls.originate` with a slot as target retrieves the call
+  parked there, as dialling the slot does. A parked call is ended over the API by an admin only,
+  until the parker answers the ring-back, which now connects them in the parked call itself, so
+  they can hang it up or transfer it. `calls.transfer` takes `voicemail: true` to put the caller
+  straight through to the target extension's mailbox, as `*97<ext>` does, and `calls.originate`
+  takes `clir` to withhold or present the number on that one call, as `#31#` and `*31#` do.
+  `users.setVoicemailGreeting` (`PUT /users/{id}/voicemailGreeting`, a WAV or MP3 upload) and
+  `users.clearVoicemailGreeting` set and remove the personal mailbox greeting `*96` records, for
+  oneself or, as an admin, for anyone; like the phone's recording, they are not in the audit log.
+  Help topic `click-to-dial`.
 
 ### Changed
 

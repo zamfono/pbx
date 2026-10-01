@@ -368,6 +368,45 @@ describe('Recorder', () => {
     expect(rows[0]?.durationS).toBe(7);
   });
 
+  it('carries a participation over to the call its leg moved to, whose row then names it (§10.2 "Call parking")', async () => {
+    const userId = await seedUser(db, true);
+    const targetId = await seedForwardTargetUser(db, userId);
+    const didId = await seedDid(db, targetId);
+    await seedSettings(db, didId);
+    const recorder = new Recorder({
+      ari,
+      cache,
+      db,
+      mediaDir: MEDIA_DIR,
+      mix: () => Promise.resolve(3),
+      log: fakeLogger(),
+      now: () => NOW
+    });
+    const ringback = buildCall(null);
+    const parked = buildCall(null);
+    await cdr.open(ringback);
+    await cdr.open(parked);
+    fakeAri.addChannel({ id: 'ringback-leg' });
+    const leg = buildLeg({ channelId: 'ringback-leg', userId });
+    await recorder.onLegUp(ringback, leg);
+    const [leftName, rightName] = recordCalls().map(body => body.name);
+
+    recorder.onLegMoved(ringback, parked, leg);
+    // The call it left no longer holds it; the one it moved to ends it.
+    await recorder.onLegEnded(ringback, leg);
+    expect(recorder.inProgressCount).toBe(1);
+    const ended = recorder.onLegEnded(parked, leg);
+    emitRecordingFinished(leftName, 3);
+    emitRecordingFinished(rightName, 3);
+    await ended;
+
+    const rows = await db
+      .selectFrom('recordings')
+      .select(['callId', 'userId'])
+      .execute();
+    expect(rows).toEqual([{ callId: parked.id, userId }]);
+  });
+
   it('records a wideband bridge at 16 kHz: both snoops `wav16`, the mix reading `.wav16` (§10.2 "Sample rate")', async () => {
     const userId = await seedUser(db, true);
     const targetId = await seedForwardTargetUser(db, userId);

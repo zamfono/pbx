@@ -69,7 +69,7 @@ function ownerFromRow(ext: string, row: ExtensionRow): ExtensionOwner {
 }
 
 /** Sets `clir` on `action` for the kinds that carry it, unchanged for `emergency` and `refuse` (§10.1 Outbound step 1). */
-function withClir(action: DialAction, clir: boolean): DialAction {
+export function withClir(action: DialAction, clir: boolean): DialAction {
   switch (action.kind) {
     case 'feature':
     case 'extension':

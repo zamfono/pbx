@@ -186,6 +186,22 @@ export class Recorder {
     await this.end(call, leg.channelId);
   }
 
+  /** Carries `leg`'s participation over from `from` to `to`, the call its channel is in from
+   * here on (a parking ring-back's answer, §10.2 "Call parking"): it goes on recording, and its
+   * row names `to`. */
+  onLegMoved(from: Call, to: Call, leg: Leg): void {
+    const key = participationKey(from.id, leg.channelId);
+    const participation = this.participations.get(key);
+    if (participation === undefined) {
+      return;
+    }
+    this.participations.delete(key);
+    this.participations.set(participationKey(to.id, leg.channelId), {
+      ...participation,
+      callId: to.id
+    });
+  }
+
   /** The caller-side counterpart of `onLegEnded`, for a participation started by `onCallerUp`. */
   async onCallerEnded(call: Call): Promise<void> {
     await this.end(call, call.callerChannelId);

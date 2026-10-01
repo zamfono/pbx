@@ -10,9 +10,20 @@ the call statistics. The call history itself is `calls.list` (`GET /calls`) and 
 one, off by default. A caller is left in a mailbox when a forward rule or a ring group's fallback
 ends there, implicitly when no rule is set and the mailbox is enabled (`routing-order`), or
 explicitly through a `mailboxUser` or `mailboxRingGroup` target, which deposits whether or not
-the mailbox is enabled. `*97<ext>` puts a caller straight through to a mailbox. The caller hears
-the mailbox's greeting, or the default prompt in the tenant language, and records up to
+the mailbox is enabled. `*97<ext>` puts a caller straight through to a mailbox, and so does
+`calls.transfer` (`POST /calls/{id}/transfer`) with `{ "target": "102", "voicemail": true }`: the
+other party goes to the mailbox of the user or ring group owning that extension without ringing
+anyone, and an extension nobody owns is refused with 422 `noMailbox`. The caller hears the
+mailbox's greeting, or the default prompt in the tenant language, and records up to
 `settings.voicemailMaxS` seconds (default 180), ended by `#` or 5 s of silence.
+
+**The personal greeting.** `users.setVoicemailGreeting` (`PUT /users/{id}/voicemailGreeting`)
+takes a WAV or MP3 file as multipart form data, field `upload`, transcoded like any audio upload,
+and makes it the user's mailbox greeting, replacing the one before, exactly as recording one on
+`*96` does; `users.clearVoicemailGreeting` (`DELETE /users/{id}/voicemailGreeting`, confirmed)
+goes back to the default prompt. Both are a user's own on their own id, an admin's for anyone,
+and, like the phone's recording, not in the audit log. A ring group's greeting is its
+`mailboxAudioId` (`ringGroups.update`).
 
 **What follows a message.** The mailbox's phones light their message-waiting indicator (MWI),
 which counts the unread messages; a `voicemail.new` event goes out (`webhooks`); and, with a mail

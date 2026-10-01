@@ -72,6 +72,7 @@ headers; either leg tells it who forwarded only as far as the trunk's `diversion
 - `guardrails` — what the API refuses, confirms or lets you undo.
 - `user-groups` — nestable sets of users for ring groups and outbound routes.
 - `parking` — parking slots, park and retrieve, the ring-back to the parker.
+- `click-to-dial` — placing a call on a user's phones from outside, a slot or one call's CLIR.
 - `directory` — the phone book, caller names and the type-ahead search.
 - `call-data` — voicemails, the presence history and the call statistics.
 - `mail-templates` — the mails the stack sends, their languages and placeholders.

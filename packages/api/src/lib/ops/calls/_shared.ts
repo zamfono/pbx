@@ -167,14 +167,14 @@ export async function assertOwnLiveCall(
 /**
  * Runs a live-call action through `core`, turning its refusal into the matching problem (§10.3):
  * a call `core` holds no live state for is a 404, one it cannot act on in its current state a 409,
- * each with `core`'s reason as `detail` (`notFound`, `notBridged`, `notRinging`,
- * `noRegisteredDevice`), as `calls.originate` answers its own `noRegisteredDevice` (§10.2).
+ * a target it cannot act on a 422, each with `core`'s reason as `detail` (`notFound`,
+ * `notBridged`, `notRinging`, `noRegisteredDevice`, `noFreeSlot`, `noMailbox`), as
+ * `calls.originate` answers its own `noRegisteredDevice` (§10.2). Resolves with what the action
+ * answered.
  */
-export async function proxyCallAction(
-  action: () => Promise<void>
-): Promise<void> {
+export async function proxyCallAction<T>(action: () => Promise<T>): Promise<T> {
   try {
-    await action();
+    return await action();
   } catch (error) {
     const refusal = coreRefusal(error);
     if (refusal === null) {

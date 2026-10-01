@@ -19,9 +19,10 @@
 | `calls.get` | `GET /calls/{id}` | Reads one call of the history with its log and QoS summary: per leg jitter, loss, round trip and the packets received and sent. | user | no |
 | `calls.hangup` | `POST /calls/{id}/hangup` | Hangs up a live call. | user | no |
 | `calls.list` | `GET /calls` | Lists call history, or the calls currently in progress. | user | no |
-| `calls.originate` | `POST /calls` | Click-to-dial: rings a user's devices, then dials the target on answer. | user | no |
+| `calls.originate` | `POST /calls` | Click-to-dial: rings a user's devices, then dials the target on answer, as that phone would; a parking slot as target retrieves the call parked there. | user | no |
+| `calls.park` | `POST /calls/{id}/park` | Parks the other party of a live call on the lowest free parking slot, as *70 does, and returns the slot; anyone retrieves it by dialling the slot (calls.originate with the slot as target). | user | no |
 | `calls.pickup` | `POST /calls/{id}/pickup` | Picks up a call ringing for another party, on the picking user's devices. | user | no |
-| `calls.transfer` | `POST /calls/{id}/transfer` | Blind-transfers a live call to an extension or number; the transferee is routed there as a new call. | user | no |
+| `calls.transfer` | `POST /calls/{id}/transfer` | Blind-transfers a live call to an extension or number, or with voicemail into an extension's mailbox; the transferee is routed there as a new call. | user | no |
 | `contacts.create` | `POST /contacts` | Adds a contact to the tenant-wide phone book; its numbers name inbound callers. | admin | no |
 | `contacts.delete` | `DELETE /contacts/{id}` | Soft-deletes a phone-book contact. | admin | yes |
 | `contacts.get` | `GET /contacts/{id}` | Reads one live contact by id. | user | no |
@@ -65,6 +66,7 @@
 | `outboundRoutes.list` | `GET /outboundRoutes` | Lists outbound routes in evaluation order, each with its callers and numbers. | admin | no |
 | `outboundRoutes.replace` | `PUT /outboundRoutes` | Replaces the outbound route list as a whole, in evaluation order: a call takes the first route whose callers and numbers both match, falling through to the next when its trunk fails. | admin | no |
 | `parking.get` | `GET /parking/slots` | Reads the set of parking-slot extensions | admin | no |
+| `parking.list` | `GET /parking/calls` | Lists the calls parked right now: slot, call, caller (null when withheld), parked since and by whom. | user | no |
 | `parking.set` | `PUT /parking/slots` | Replaces the set of parking-slot extensions as a whole; an extension a user or ring group owns is refused | admin | no |
 | `presenceLog.snapshot` | `GET /presence/log` | Snapshots each user's presence state as of a past timestamp. | admin | no |
 | `provisioning.ringotelAdopt` | `POST /provisioning/ringotel/adopt` | Adopts an existing, empty Ringotel organization (by id and domain) and one of its connections, or a new one, instead of creating them. | owner | yes |
@@ -96,6 +98,7 @@
 | `userGroups.get` | `GET /userGroups/{id}` | Reads one live user group by id. | admin | no |
 | `userGroups.list` | `GET /userGroups` | Lists the tenant's live user groups. | admin | no |
 | `userGroups.update` | `PATCH /userGroups/{id}` | Updates a user group's name and nested membership. | admin | no |
+| `users.clearVoicemailGreeting` | `DELETE /users/{id}/voicemailGreeting` | Removes a user's personal voicemail greeting; callers hear the default prompt in the tenant language again. | user | yes |
 | `users.create` | `POST /users` | Creates a user, assigns their extension and returns a setup link. | admin | no |
 | `users.delete` | `DELETE /users/{id}` | Soft-deletes a user, cascading their devices, extension and sessions. | admin | yes |
 | `users.erase` | `POST /users/{id}/erase` | Erases a user's personal data from their audit trail (GDPR, irreversible). | owner | yes |
@@ -105,6 +108,7 @@
 | `users.resetPassword` | `POST /users/{id}/resetPassword` | Issues a new one-time link to set a user's password. | admin | no |
 | `users.setForwarding` | `PUT /users/{id}/forwarding` | Replaces a user's call-forwarding rules as a whole; a user sets their own, without new sip targets, an admin anyone's. | user | no |
 | `users.setPresence` | `PUT /users/{id}/presence` | Sets a user's do-not-disturb state. | user | no |
+| `users.setVoicemailGreeting` | `PUT /users/{id}/voicemailGreeting` | Sets a user's personal voicemail greeting from a WAV or MP3 upload, as recording it on *96 does. | user | no |
 | `users.update` | `PATCH /users/{id}` | Updates a user's profile; admins write every field, a user only their self-service subset. | user | no |
 | `voicemails.audio` | `GET /voicemails/{id}/audio` | Returns a voicemail's recorded audio. | user | no |
 | `voicemails.delete` | `DELETE /voicemails/{id}` | Permanently deletes a voicemail and its audio file. | user | yes |

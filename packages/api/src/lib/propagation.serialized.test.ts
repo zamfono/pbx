@@ -28,6 +28,8 @@ function coreClient(
     transfer: unused,
     pickup: unused,
     hangup: unused,
+    park: unused,
+    parked: unused,
     mwi: unused
   };
 }

@@ -7,7 +7,7 @@ import { propagate, recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
 import { toAudioAssetOut, type AudioAssetOut } from './_shared.js';
 
-const uploadSchema = z.object({
+export const uploadSchema = z.object({
   filename: z.string().min(1),
   // §10.2 "Greetings and audio": WAV or MP3 only; any other type is invalid input (422, §10.3).
   mimeType: z

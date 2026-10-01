@@ -24,6 +24,7 @@ export type ParkedEntry = {
   parkerUserId: string;
   // The counterpart's own channel, alone in the holding bridge for the duration of the park (§10.2).
   partyChannelId: string;
+  parkedAt: string;
   timer: ReturnType<typeof setTimeout>;
 };
 // One registry per `Pipeline` (one per process), reached through `parkingSlots(pipeline)` below.
@@ -123,36 +124,37 @@ async function dropParker(
   presence.setCallState(parkerUserId, 'idle', null, null, active.id);
 }
 
-/** `*70`: parks the other party on the lowest free slot, ringing the parker back on timeout (§10.2). */
-export async function park(
+/** Why `parkParty` left the call where it was: the parker has no channel in it, it has no
+ * two-party bridge to take the other party out of, or every slot is taken. */
+export type ParkRefusal = 'notInCall' | 'notBridged' | 'noFreeSlot';
+
+/**
+ * Parks the other party of `active`, the call `parker.userId` is in, on the lowest free slot
+ * (§10.2 "Call parking"): the party waits in a holding bridge with the hold music, the parker's
+ * own channel in the call is hung up, and the parker is rung back on timeout. Shared by `*70`
+ * and `POST /internal/calls/{id}/park`, whose `actorUserId` the trace line names. Returns the
+ * slot, or why nothing moved.
+ */
+export async function parkParty(
   pipeline: Pipeline,
   presence: Presence,
-  call: Call
-): Promise<void> {
-  if (call.callerUserId === null) {
-    await release(pipeline, call, RELEASE_CODE_FORBIDDEN, 'failed');
-    return;
+  active: Call,
+  parker: { userId: string; actorUserId?: string }
+): Promise<{ ext: string } | { refused: ParkRefusal }> {
+  const parkerUserId = parker.userId;
+  const parkerCh = channelOf(active, parkerUserId);
+  if (parkerCh === null) {
+    return { refused: 'notInCall' };
   }
-  const parkerUserId = call.callerUserId;
-  const active = activeCallOf(pipeline, parkerUserId);
-  if (active === null) {
-    await release(pipeline, call, RELEASE_CODE_UNAVAILABLE, 'failed');
-    return;
+  const partyChannelId = otherChannelIn(active, parkerCh);
+  if (active.bridgeId === null || partyChannelId === null) {
+    return { refused: 'notBridged' };
   }
   const snapshot = await pipeline.deps.cache.get();
   const slots = parkingSlots(pipeline);
   const ext = lowestFreeSlot(snapshot, slots);
-  const parkerCh = channelOf(active, parkerUserId);
-  const partyChannelId =
-    parkerCh === null ? null : otherChannelIn(active, parkerCh);
-  if (
-    active.bridgeId === null ||
-    ext === null ||
-    parkerCh === null ||
-    partyChannelId === null
-  ) {
-    await release(pipeline, call, RELEASE_CODE_UNAVAILABLE, 'failed');
-    return;
+  if (ext === null) {
+    return { refused: 'noFreeSlot' };
   }
   const ari = pipeline.deps.ari;
   await ari.bridges
@@ -165,7 +167,9 @@ export async function park(
   await ari.channels
     .startMoh(partyChannelId, snapshot.settings.holdMohAudioId ?? undefined)
     .catch(() => undefined);
-  active.log.event({ event: 'parked', by: parkerUserId, ext });
+  const actor =
+    parker.actorUserId === undefined ? {} : { actorUserId: parker.actorUserId };
+  active.log.event({ event: 'parked', by: parkerUserId, ext, ...actor });
   const timer = setTimeout(() => {
     slots.delete(ext);
     slotByChannel(pipeline).delete(partyChannelId);
@@ -177,14 +181,47 @@ export async function park(
     }).catch(() => undefined);
   }, snapshot.settings.parkingTimeoutS * MS_PER_SECOND);
   timer.unref();
-  slots.set(ext, { call: active, parkerUserId, partyChannelId, timer });
+  const parkedAt = pipeline.deps.now();
+  slots.set(ext, {
+    call: active,
+    parkerUserId,
+    partyChannelId,
+    parkedAt,
+    timer
+  });
   slotByChannel(pipeline).set(partyChannelId, ext);
   await presence.setHint(ext, 'INUSE');
+  return { ext };
+}
+
+/** `*70`: parks the other party on the lowest free slot and reads its number to the parker
+ * (§10.2). */
+export async function park(
+  pipeline: Pipeline,
+  presence: Presence,
+  call: Call
+): Promise<void> {
+  if (call.callerUserId === null) {
+    await release(pipeline, call, RELEASE_CODE_FORBIDDEN, 'failed');
+    return;
+  }
+  const active = activeCallOf(pipeline, call.callerUserId);
+  const outcome =
+    active === null
+      ? null
+      : await parkParty(pipeline, presence, active, {
+          userId: call.callerUserId
+        });
+  if (outcome === null || 'refused' in outcome) {
+    await release(pipeline, call, RELEASE_CODE_UNAVAILABLE, 'failed');
+    return;
+  }
+  const ari = pipeline.deps.ari;
   await ari.channels.answer(call.callerChannelId).catch(() => undefined);
   await playAndWait(
     ari,
     call.callerChannelId,
-    `digits:${ext}`,
+    `digits:${outcome.ext}`,
     `${call.callerChannelId}:park`
   );
   await concludeFeature(pipeline, call, 'answered');

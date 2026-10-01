@@ -15,13 +15,15 @@ import {
   type Db,
   type HangupRequest,
   type OriginateRequest,
+  type ParkingResponse,
+  type ParkRequest,
   type PickupRequest,
   type StateResponse,
   type TransferRequest
 } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
-import { handleActionRoute } from './actionRoutes.js';
+import { handleActionRoute, handleParkingRead } from './actionRoutes.js';
 import {
   handleConfigChanged,
   respondJson,
@@ -53,6 +55,8 @@ export type CallActions = {
   transfer: (callId: string, req: TransferRequest) => Promise<void>;
   pickup: (callId: string, req: PickupRequest) => Promise<void>;
   hangup: (callId: string, req: HangupRequest) => Promise<void>;
+  park: (callId: string, req: ParkRequest) => Promise<{ slot: string }>;
+  parked: () => Promise<ParkingResponse>;
 };
 
 type InternalDeps = {
@@ -135,6 +139,12 @@ async function routeRequest(
   // with one container left on an old image, it can differ from `api`'s own.
   if (request.method === 'GET' && url.pathname === '/internal/version') {
     await handleVersion(deps, isAriConnected(), response);
+    return;
+  }
+  if (
+    request.method === 'GET' &&
+    (await handleParkingRead(deps.actions, url.pathname, response))
+  ) {
     return;
   }
   if (

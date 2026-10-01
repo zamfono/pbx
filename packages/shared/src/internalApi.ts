@@ -67,16 +67,42 @@ export type OriginateRequest = {
   target: string;
   actorUserId: string;
   requestId: string;
+  /** This call's own CLIR, as `#31#`/`*31#` give it (§9.4 "Anonymous calls (CLIR)"); absent,
+   * the user's, trunk's or tenant's default applies. */
+  clir?: boolean;
 };
 
-/** `POST /internal/calls/{id}/transfer` → 204. */
-export type TransferRequest = { target: string; actorUserId: string };
+/** `POST /internal/calls/{id}/transfer` → 204; with `voicemail`, 422 `noMailbox` for a `target`
+ * no user or ring group owns. */
+export type TransferRequest = {
+  target: string;
+  actorUserId: string;
+  /** Deposits the transferee in `target`'s mailbox without ringing, as `*97<ext>` does (§9.3). */
+  voicemail?: boolean;
+};
 
 /** `POST /internal/calls/{id}/pickup` → 204. */
 export type PickupRequest = { userId: string; actorUserId: string };
 
 /** `POST /internal/calls/{id}/hangup` → 204. */
 export type HangupRequest = { actorUserId: string };
+
+/** `POST /internal/calls/{id}/park` → 200 `{ slot }`: `userId`, who must be in the call, parks
+ * its other party (§10.2 "Call parking"); 409 `notInCall`, `notBridged` or `noFreeSlot`. */
+export type ParkRequest = { userId: string; actorUserId: string };
+
+/** One occupied parking slot (§10.2 "Call parking"), as every user's BLF shows it. */
+export type ParkedCall = {
+  slot: string;
+  callId: string;
+  /** The parked party's number as the phones show it; `null` when the caller withheld it. */
+  caller: string | null;
+  parkedAt: string;
+  parkedByUserId: string;
+};
+
+/** `GET /internal/parking`: the parked calls, by slot. */
+export type ParkingResponse = { parked: ParkedCall[] };
 
 /** `POST /internal/mwi/{mailbox}` → 204: core re-reads the mailbox's counts and pushes MWI (§3.1, §9.3). */
 export type MwiMailbox = `user:${string}` | `ringGroup:${string}`;
