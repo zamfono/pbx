@@ -32,18 +32,16 @@ export function formatCallerId(number: string, name: string): string {
   return safeName === '' ? number : `"${safeName}" <${number}>`;
 }
 
-// One lookup per call: a ring group rings its members batch by batch, a user's devices one by one.
-const callerIdByCall = new WeakMap<Call, Promise<string>>();
-
 /** The caller ID a leg pushed to a softphone presents for `call` (§10.2 "Phone book"): the
- * caller's number with the phone book's name for it, looked up once per call. */
+ * caller's number with the phone book's name for it, looked up once per call
+ * (`Call.softphoneCallerId`), since a ring group rings its members batch by batch, a user's
+ * devices one by one. */
 export function softphoneCallerId(
   pipeline: Pipeline,
   call: Call
 ): Promise<string> {
-  const cached = callerIdByCall.get(call);
-  if (cached !== undefined) {
-    return cached;
+  if (call.softphoneCallerId !== undefined) {
+    return call.softphoneCallerId;
   }
   const { db } = pipeline.deps;
   const lookup =
@@ -52,6 +50,6 @@ export function softphoneCallerId(
       : contactName(db, call.from)
           .then(name => formatCallerId(call.from, name))
           .catch(() => call.from);
-  callerIdByCall.set(call, lookup);
+  call.softphoneCallerId = lookup;
   return lookup;
 }

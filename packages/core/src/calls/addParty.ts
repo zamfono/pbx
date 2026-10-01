@@ -3,7 +3,6 @@
 import type { Snapshot } from '../internal/server.js';
 import { resolveAddedTarget, type AddedTarget } from './addPartyTarget.js';
 import { settleAnswered } from './answer.js';
-import { joinExistingBridgeOnAnswer, takeJoinBridge } from './bridgeJoin.js';
 import { release, type Call } from './call.js';
 import { activeCallOf, channelOf } from './callLookup.js';
 import { concludeExhausted, concludeFinal } from './conclude.js';
@@ -40,7 +39,7 @@ async function releaseFeatureDial(
 }
 
 /** An internal target (§10.1 steps 4-5) rung on a fresh pass over `call`, its win joining
- * `activeBridgeId` through `joinExistingBridgeOnAnswer`. Whether the added party joined. */
+ * `activeBridgeId` (`Call.joinBridgeId`). Whether the added party joined. */
 async function ringInternalTarget(
   pipeline: Pipeline,
   call: Call,
@@ -48,15 +47,15 @@ async function ringInternalTarget(
   activeBridgeId: string,
   target: Extract<AddedTarget, { kind: 'user' | 'ringGroup' }>
 ): Promise<boolean> {
-  joinExistingBridgeOnAnswer(pipeline, call.id, activeBridgeId);
+  call.joinBridgeId = activeBridgeId;
   if (target.kind === 'user') {
     call.calleeUserId = target.userId;
     await runUserStep(pipeline, call, snapshot, target.userId);
   } else {
     await ringGroup(pipeline, call, target.ringGroupId);
   }
-  // A ring that never won leaves the registry entry behind; nothing reads it after this point.
-  takeJoinBridge(pipeline, call.id);
+  // A ring that never won leaves the bridge to join behind; nothing reads it after this point.
+  delete call.joinBridgeId;
   if (call.status === 'answered') {
     await releaseFeatureDial(pipeline, call);
   }
@@ -97,8 +96,8 @@ async function dialExternalTarget(
  * ring-group target re-enters the normal per-user or ring-group routing — `runUserStep`/
  * `ringGroup`, the same functions Entry itself dispatches to (§10.1 steps 4-5) — so its forward
  * rules, find-me legs and the ring group's own strategy all apply exactly as they would for any
- * other call to it; `joinExistingBridgeOnAnswer` (the mechanism `parking.ts`'s ring-back also
- * uses) makes the winning leg join `activeBridgeId` in place of a bridge of its own. An external
+ * other call to it; `Call.joinBridgeId` (as `parking.ts`'s ring-back also sets it) makes the
+ * winning leg join `activeBridgeId` in place of a bridge of its own. An external
  * number goes through §9.4's route selection, an emergency number through `emergency.ts`, and
  * either answer joins the bridge through `answer.ts`'s `settleAnswered`. `call.to` and
  * `call.direction` become the pipeline's view of the target (§11.2 `calls`). `call`'s own
@@ -139,7 +138,7 @@ export async function dialAddPartyTarget(
   }
   // §10.1 "Emergency calls": the routing trace is kept at level `events`.
   call.log.raise('events');
-  joinExistingBridgeOnAnswer(pipeline, call.id, activeBridgeId);
+  call.joinBridgeId = activeBridgeId;
   await dialEmergency(
     pipeline,
     trunkState,
@@ -147,7 +146,7 @@ export async function dialAddPartyTarget(
     target.number,
     call.callerUserId
   );
-  takeJoinBridge(pipeline, call.id);
+  delete call.joinBridgeId;
   if (call.bridgeId !== activeBridgeId) {
     return false;
   }

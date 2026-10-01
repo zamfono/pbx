@@ -1,9 +1,10 @@
 /**
  * `*8<ext>` on a ring group (§10.1 "Pickup"; §9.3 table), its own module so `ringGroupDial.ts`
- * stays under the repository's `max-lines` lint rule. One registry per `Pipeline`: the batch
- * currently ringing for a call, so `features.ts`'s `pickup` can stop a ring group's ring race
- * from outside `ringGroupDial.ts`. Populated for the lifetime of one `ringBatch` call; a call
- * rings at most one batch at a time (`ringGroup.ts`'s own sequential loop).
+ * stays under the repository's `max-lines` lint rule. The `Pipeline`'s `activeBatches` hold the
+ * batch currently ringing for a call, so a pickup (`pickup.ts`) and a decline can reach a ring
+ * group's ring race from outside `ringGroupDial.ts`, which sets the entry for the lifetime of one
+ * `ringBatch` call; a call rings at most one batch at a time (`ringGroup.ts`'s own sequential
+ * loop).
  */
 import type { Call } from './call.js';
 import type { GroupLeg } from './groupLegs.js';
@@ -16,30 +17,6 @@ export type ActiveBatch = {
   /** A member leg ended with Q.850 `cause`, as the batch's own race handles it (`ringGroupRace.ts`). */
   endLeg: (leg: GroupLeg, cause: number | null) => void;
 };
-const activeBatchByPipeline = new WeakMap<Pipeline, Map<string, ActiveBatch>>();
-
-/** `ringBatch`'s own bookkeeping: registers its batch as the one `stopGroupRinging` can reach for `call.id`. */
-export function registerActiveBatch(
-  pipeline: Pipeline,
-  callId: string,
-  active: ActiveBatch
-): void {
-  let batches = activeBatchByPipeline.get(pipeline);
-  if (batches === undefined) {
-    batches = new Map();
-    activeBatchByPipeline.set(pipeline, batches);
-  }
-  batches.set(callId, active);
-}
-
-/** `ringBatch`'s own bookkeeping: clears `call.id`'s entry once its batch settles. */
-export function unregisterActiveBatch(
-  pipeline: Pipeline,
-  callId: string
-): void {
-  activeBatchByPipeline.get(pipeline)?.delete(callId);
-}
-
 /** Whether `call`'s own tracked batch, if any, has a leg still ringing for `memberUserId` — any
  * member when `null` — so `features.ts`'s `pickup` only picks a call that is actually ringing the
  * named extension, rather than any live ring-group call at all (§10.1 "Pickup"). */
@@ -48,7 +25,7 @@ export function activeBatchHasRingingLeg(
   callId: string,
   memberUserId: string | null
 ): boolean {
-  const active = activeBatchByPipeline.get(pipeline)?.get(callId);
+  const active = pipeline.activeBatches.get(callId);
   if (active === undefined) {
     return false;
   }
@@ -72,7 +49,7 @@ export function stopGroupRinging(
   call: Call,
   memberUserId: string | null
 ): { channelId: string; userId: string | null } | null {
-  const active = activeBatchByPipeline.get(pipeline)?.get(call.id);
+  const active = pipeline.activeBatches.get(call.id);
   if (active === undefined) {
     return null;
   }
@@ -112,7 +89,7 @@ export function declineInBatch(
   memberUserId: string,
   cause: number
 ): void {
-  const active = activeBatchByPipeline.get(pipeline)?.get(call.id);
+  const active = pipeline.activeBatches.get(call.id);
   const ringing = [...(active?.tracked.values() ?? [])].filter(
     leg => leg.state === 'ringing' && leg.userId === memberUserId
   );

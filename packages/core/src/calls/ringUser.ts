@@ -5,8 +5,7 @@
 import { MS_PER_SECOND } from '@zamfono/shared';
 
 import { channelLanguageVariable } from '../prompts.js';
-import { takeJoinBridge } from './bridgeJoin.js';
-import { release, type Call } from './call.js';
+import { release, takeJoinBridge, type Call } from './call.js';
 import { callRinging } from './callState.js';
 import { softphoneCallerId } from './contactName.js';
 import { recordEvents, redeliverEarlyEvents } from './earlyEvents.js';
@@ -95,8 +94,8 @@ async function ringDevices(
 
 /**
  * Step 4: originate every registered device (+ find-me legs), first answer wins (§10.1).
- * `existingBridgeId` makes the win join that bridge rather than a fresh one; a caller reaching
- * this ring through `runUserStep` hands the bridge over through `bridgeJoin.ts`'s registry.
+ * `existingBridgeId`, else the call's own `joinBridgeId`, makes the win join that bridge rather
+ * than a fresh one.
  */
 export async function ringUser(
   pipeline: Pipeline,
@@ -136,7 +135,7 @@ export async function ringUser(
   pipeline.pendingRing.set(call.id, {
     resolve: resolveOutcome,
     timer,
-    existingBridgeId: existingBridgeId ?? takeJoinBridge(pipeline, call.id)
+    existingBridgeId: existingBridgeId ?? takeJoinBridge(call)
   });
   // §9.3 "a user: RINGING while any of their devices rings".
   pipeline.deps.presence?.setCallState(

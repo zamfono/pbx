@@ -62,6 +62,13 @@ export type Call = {
    * release rules have no caller to act on; the initiator decides what follows an unanswered
    * ring. A party added or consulted through the API (`addedParty.ts`) rings the same way. */
   ringOnly?: boolean;
+  /** The bridge this call's next answer joins in place of a bridge of its own: the parked
+   * party's for the parking ring-back (§10.2 "Call parking"), the running call's for `*5`
+   * (§10.2 "Three-way calls"). Read once by the answer it is for (`takeJoinBridge`), and
+   * cleared by its writer once the dial settles. */
+  joinBridgeId?: string;
+  /** The caller ID a softphone leg presents for this call, once looked up (`contactName.ts`). */
+  softphoneCallerId?: Promise<string>;
   /** §10.2 "Three-way calls": the channel through which the user who added a party to this
    * call's bridge with `*5` is in it; their hanging up ends the bridge for everyone. */
   threeWayInitiatorChannelId?: string;
@@ -122,6 +129,13 @@ export function newCall(params: NewCallParams): Call {
     evaluated: new Set(),
     menuAttempts: 0
   };
+}
+
+/** Reads and clears `call.joinBridgeId`, so the bridge is joined by one answer only. */
+export function takeJoinBridge(call: Call): string | null {
+  const bridgeId = call.joinBridgeId ?? null;
+  delete call.joinBridgeId;
+  return bridgeId;
 }
 
 /** The `ForwardTarget` a `forward_targets` row represents; throws on a dangling id (FK-guaranteed present). */

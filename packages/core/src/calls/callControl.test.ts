@@ -19,7 +19,6 @@ import { CallActions } from './actions.js';
 import { newCall, type Call } from './call.js';
 import { liveView } from './callState.js';
 import type { GroupLeg } from './groupLegs.js';
-import { registerActiveBatch } from './groupPickup.js';
 import { Pipeline } from './pipeline.js';
 
 const ANY_FREE_PORT = 0;
@@ -638,7 +637,7 @@ describe('call control', () => {
       ]
     ]);
     const ended: [string, number | null][] = [];
-    registerActiveBatch(pipeline, call.id, {
+    pipeline.activeBatches.set(call.id, {
       tracked,
       settle: () => undefined,
       endLeg: (leg, cause) => {

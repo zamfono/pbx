@@ -1,6 +1,6 @@
 /**
- * A one-shot registry carrying what a blind transfer's onward call needs before it routes (§10.1
- * "Transfers and pickup").
+ * What a blind transfer's onward call needs before it routes (§10.1 "Transfers and pickup"), one
+ * entry per transfer, held by the `Pipeline` until the onward call takes it.
  *
  * The onward call re-enters Stasis through `from-users` as an ordinary outbound call. Several
  * things about it come from the transfer rather than from the channel: it is a child of the
@@ -36,21 +36,12 @@ export type PendingTransfer = {
 // leave Asterisk within the same millisecond; the budget only has to cover the core's own turns.
 const LOCAL_TRANSFER_WAIT_MS = 2000;
 
-type Registry = {
+/** The `Pipeline`'s pending transfers: each entry by the key its channel re-enters under, and the
+ * Local channels already waiting for theirs. */
+export type PendingTransfers = {
   entries: Map<string, PendingTransfer>;
   waiters: Map<string, (pending: PendingTransfer) => void>;
 };
-
-const registryByPipeline = new WeakMap<Pipeline, Registry>();
-
-function registryOf(pipeline: Pipeline): Registry {
-  let registry = registryByPipeline.get(pipeline);
-  if (registry === undefined) {
-    registry = { entries: new Map(), waiters: new Map() };
-    registryByPipeline.set(pipeline, registry);
-  }
-  return registry;
-}
 
 /** The dialling half of the Local pair whose first half is named `firstHalf` (`…;1` → `…;2`). */
 export function localDiallingHalf(firstHalf: string): string | null {
@@ -69,7 +60,7 @@ export function setPendingTransfer(
   key: string,
   pending: PendingTransfer
 ): void {
-  const registry = registryOf(pipeline);
+  const registry = pipeline.pendingTransfers;
   const waiter = registry.waiters.get(key);
   if (waiter !== undefined) {
     registry.waiters.delete(key);
@@ -79,7 +70,10 @@ export function setPendingTransfer(
   registry.entries.set(key, pending);
 }
 
-function takeEntry(registry: Registry, key: string): PendingTransfer | null {
+function takeEntry(
+  registry: PendingTransfers,
+  key: string
+): PendingTransfer | null {
   const pending = registry.entries.get(key);
   if (pending === undefined) {
     return null;
@@ -97,7 +91,7 @@ export async function takePendingTransfer(
   pipeline: Pipeline,
   channel: Pick<Channel, 'id' | 'name'>
 ): Promise<PendingTransfer | null> {
-  const registry = registryOf(pipeline);
+  const registry = pipeline.pendingTransfers;
   const byId = takeEntry(registry, channel.id);
   if (byId !== null || !isLocalDiallingHalf(channel.name)) {
     return byId;
@@ -121,5 +115,5 @@ export async function takePendingTransfer(
 
 /** Drops `key`'s entry, for a transferee whose channel ended before it re-entered. */
 export function dropPendingTransfer(pipeline: Pipeline, key: string): void {
-  registryOf(pipeline).entries.delete(key);
+  pipeline.pendingTransfers.entries.delete(key);
 }

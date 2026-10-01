@@ -4,8 +4,7 @@
  * `max-lines` lint rule.
  */
 import { bridgeAnswered, claimAnswer } from './answer.js';
-import { takeJoinBridge } from './bridgeJoin.js';
-import type { Call, Leg } from './call.js';
+import { takeJoinBridge, type Call, type Leg } from './call.js';
 import { hangupAllRinging, type GroupLeg } from './groupLegs.js';
 import type { Pipeline } from './pipeline.js';
 
@@ -60,7 +59,7 @@ export async function winBatch(
     pipeline,
     call,
     winningLeg,
-    takeJoinBridge(pipeline, call.id)
+    takeJoinBridge(call)
   );
   await hangupAllRinging(pipeline, tracked);
   // §9.3 "a user: ... INUSE in a call"; a leg whose join failed is hung up.

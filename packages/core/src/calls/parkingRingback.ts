@@ -7,7 +7,6 @@ import { newId } from '@zamfono/shared';
 
 import type { Snapshot } from '../internal/server.js';
 import { setChannelLanguage } from '../prompts.js';
-import { joinExistingBridgeOnAnswer, takeJoinBridge } from './bridgeJoin.js';
 import {
   callLogMaxBytesFromEnv,
   findForwardTarget,
@@ -134,7 +133,7 @@ async function routeParkedPartyToFallback(
  * — DND, forwards, mailbox — apply exactly as they would for any other call to that extension.
  * The ring-back's own `callerChannelId` is a placeholder, never a real ARI channel: the party
  * waits in a mixing bridge of its own, which whichever device answers joins through `legs.ts`'s
- * `winLeg` (`existingBridgeId`, handed over via `joinExistingBridgeOnAnswer`). Its `calls` row
+ * `winLeg` (`existingBridgeId`, handed over as the ring-back's `joinBridgeId`). Its `calls` row
  * closes here on either outcome. On no answer (a DND skip, an unreachable mailbox decision, no
  * registered device or a ring nobody took), the parked party goes to the tenant fallback target.
  */
@@ -179,7 +178,7 @@ export async function ringParkerBack(
     partyChannelId,
     'mixing'
   );
-  joinExistingBridgeOnAnswer(pipeline, ringback.id, bridgeId);
+  ringback.joinBridgeId = bridgeId;
   try {
     ringback.ringOnly = true;
     await runUserStep(pipeline, ringback, snapshot, parkerUserId);
@@ -188,7 +187,7 @@ export async function ringParkerBack(
     // placeholder channel answers no ARI request); the fallback below still takes them.
     ringback.log.event({ event: 'ringbackFailed' });
   }
-  takeJoinBridge(pipeline, ringback.id);
+  delete ringback.joinBridgeId;
   if (ringback.status === 'answered' && ringback.answeredByUserId !== null) {
     await pipeline.deps.ari.channels
       .stopMoh(partyChannelId)

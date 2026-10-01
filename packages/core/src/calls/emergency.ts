@@ -4,8 +4,7 @@ import { effectiveLevel, type LogLevel } from '../callLog.js';
 import type { Snapshot } from '../internal/server.js';
 import { emergencyTrunks } from '../routing/trunk.js';
 import { settleAnswered } from './answer.js';
-import { takeJoinBridge } from './bridgeJoin.js';
-import { release, type Call } from './call.js';
+import { release, takeJoinBridge, type Call } from './call.js';
 import { resolveAttemptIdentity, type UserRow } from './callerIdentity.js';
 import { SIP_SERVICE_UNAVAILABLE } from './conclude.js';
 import { attemptRoute, type AttemptOutcome } from './dialAttempt.js';
@@ -131,7 +130,7 @@ export async function dialEmergency(
         pipeline,
         call,
         outcome.channelId,
-        takeJoinBridge(pipeline, call.id)
+        takeJoinBridge(call)
       );
       return;
     }

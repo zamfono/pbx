@@ -11,7 +11,6 @@ import type { MemberLeg } from '../routing/ringGroup.js';
 import type { Call } from './call.js';
 import { callPartiesChanged, callRinging } from './callState.js';
 import { hangupAllRinging } from './groupLegs.js';
-import { registerActiveBatch, unregisterActiveBatch } from './groupPickup.js';
 import type { Pipeline } from './pipeline.js';
 import { originateBatch } from './ringGroupOriginate.js';
 import { createBatchRace, type BatchOutcome } from './ringGroupRace.js';
@@ -32,8 +31,8 @@ export async function ringBatch(
   const race = createBatchRace(pipeline, call, allowReject);
   call.batchLegs = race.tracked;
   pipeline.deps.ari.on('event', race.onEvent);
-  // `stopGroupRinging`'s and `declineInBatch`'s own registry (`groupPickup.ts`).
-  registerActiveBatch(pipeline, call.id, {
+  // The batch `stopGroupRinging` and `declineInBatch` reach (`groupPickup.ts`).
+  pipeline.activeBatches.set(call.id, {
     tracked: race.tracked,
     settle: race.settle,
     endLeg: race.endLeg
@@ -66,7 +65,7 @@ export async function ringBatch(
   const outcome = await race.promise;
   pipeline.deps.ari.off('event', race.onEvent);
   clearTimeout(timer);
-  unregisterActiveBatch(pipeline, call.id);
+  pipeline.activeBatches.delete(call.id);
   if (outcome !== 'answered') {
     await hangupAllRinging(pipeline, race.tracked);
   }

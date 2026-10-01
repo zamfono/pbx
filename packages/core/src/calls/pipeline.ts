@@ -9,6 +9,8 @@ import { ConfigCache, EventBus, StateStore } from '../internal/server.js';
 import type { Presence } from '../presence.js';
 import type { Call } from './call.js';
 import { noteHangupRequest } from './callEnd.js';
+import type { ActiveBatch } from './groupPickup.js';
+import type { Hold } from './hold.js';
 import { handleInboundStart } from './inbound.js';
 import {
   handleChannelEnded,
@@ -18,6 +20,8 @@ import {
   type RingResolver
 } from './legs.js';
 import { handleOutbound } from './outbound.js';
+import type { ParkedEntry } from './parking.js';
+import type { PendingTransfers } from './pendingTransfer.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 import { followTransfers } from './referTransfers.js';
 import type { TrunkState } from './trunkState.js';
@@ -74,14 +78,27 @@ export type PipelineDeps = {
 
 // One Pipeline per `core` process, wired directly to its `AriClient`'s event stream so
 // constructing it is the only wiring a caller needs to do, the transfers Asterisk executes on SIP
-// `REFER` included. The ring/leg/bridge state below is
-// public so `legs.ts`'s functions, taking `this` as their first argument, can read and write it.
+// `REFER` included. The live state below is public so the call modules' functions, taking the
+// pipeline as their first argument, can read and write it.
 export class Pipeline {
   readonly deps: PipelineDeps;
   readonly callByChannel = new Map<string, Call>();
   readonly pendingRing = new Map<string, RingResolver>();
   readonly findMeTimers = new Map<string, ReturnType<typeof setTimeout>[]>();
   readonly pendingFindMeAccept = new Map<string, FindMeAcceptWait>();
+  /** The ring-group batch ringing each call right now, by call id (`groupPickup.ts`). */
+  readonly activeBatches = new Map<string, ActiveBatch>();
+  /** The hold on each conversation, by its bridge (`hold.ts`). */
+  readonly holds = new Map<string, Hold>();
+  /** The occupied parking slots, by extension, and the slot each parked party's own channel
+   * occupies, by channel (`parking.ts`, §10.2 "Call parking"). */
+  readonly parkingSlots = new Map<string, ParkedEntry>();
+  readonly parkedSlotByChannel = new Map<string, string>();
+  /** What each blind transfer's onward call carries into its own (`pendingTransfer.ts`). */
+  readonly pendingTransfers: PendingTransfers = {
+    entries: new Map(),
+    waiters: new Map()
+  };
 
   constructor(deps: PipelineDeps) {
     this.deps = deps;

@@ -27,32 +27,9 @@ export type ParkedEntry = {
   parkedAt: string;
   timer: ReturnType<typeof setTimeout>;
 };
-// One registry per `Pipeline` (one per process), reached through `parkingSlots(pipeline)` below.
-const parkingByPipeline = new WeakMap<Pipeline, Map<string, ParkedEntry>>();
-export function parkingSlots(pipeline: Pipeline): Map<string, ParkedEntry> {
-  let slots = parkingByPipeline.get(pipeline);
-  if (slots === undefined) {
-    slots = new Map();
-    parkingByPipeline.set(pipeline, slots);
-  }
-  return slots;
-}
-
-// The reverse of `parkingSlots`: which slot a parked party's own channel occupies, so
-// `legsEnded.ts`'s `handleChannelEnded` can free the slot when that channel ends on its own (the
-// parked party hanging up while waiting).
-const slotByChannelByPipeline = new WeakMap<Pipeline, Map<string, string>>();
-function slotByChannel(pipeline: Pipeline): Map<string, string> {
-  let map = slotByChannelByPipeline.get(pipeline);
-  if (map === undefined) {
-    map = new Map();
-    slotByChannelByPipeline.set(pipeline, map);
-  }
-  return map;
-}
-
-/** Frees the slot `channelId` (a parked party's own channel) occupies, if any: clears its timer,
- * removes it from `parkingSlots` and reverts its BLF hint to `NOT_INUSE` (§9.3 "a parking slot:
+/** Frees the slot `channelId` (a parked party's own channel) occupies, if any, when that channel
+ * ends on its own (the parked party hanging up while waiting): clears its timer, removes it from
+ * the `Pipeline`'s `parkingSlots` and reverts its BLF hint to `NOT_INUSE` (§9.3 "a parking slot:
  * INUSE while a call is parked there"). A no-op, returning `false`, for a channel that is not a
  * parked party's — every other ended channel `legsEnded.ts` calls this for. */
 export function releaseParkedChannel(
@@ -60,13 +37,13 @@ export function releaseParkedChannel(
   channelId: string,
   presence: Presence | null
 ): boolean {
-  const byChannel = slotByChannel(pipeline);
+  const byChannel = pipeline.parkedSlotByChannel;
   const ext = byChannel.get(channelId);
   if (ext === undefined) {
     return false;
   }
   byChannel.delete(channelId);
-  const slots = parkingSlots(pipeline);
+  const slots = pipeline.parkingSlots;
   const entry = slots.get(ext);
   if (entry !== undefined) {
     clearTimeout(entry.timer);
@@ -142,7 +119,7 @@ export async function parkParty(
   const { userId: parkerUserId, channelId: parkerCh } = parker;
   const { bridgeId, party: partyChannelId } = conversation;
   const snapshot = await pipeline.deps.cache.get();
-  const slots = parkingSlots(pipeline);
+  const slots = pipeline.parkingSlots;
   const ext = lowestFreeSlot(snapshot, slots);
   if (ext === null) {
     return null;
@@ -161,7 +138,7 @@ export async function parkParty(
   active.log.event({ event: 'parked', by: parkerUserId, ext, ...actor });
   const timer = setTimeout(() => {
     slots.delete(ext);
-    slotByChannel(pipeline).delete(partyChannelId);
+    pipeline.parkedSlotByChannel.delete(partyChannelId);
     presence.setHint(ext, 'NOT_INUSE').catch(() => undefined);
     ringParkerBack(pipeline, {
       parkerUserId,
@@ -178,7 +155,7 @@ export async function parkParty(
     parkedAt,
     timer
   });
-  slotByChannel(pipeline).set(partyChannelId, ext);
+  pipeline.parkedSlotByChannel.set(partyChannelId, ext);
   await presence.setHint(ext, 'INUSE');
   return ext;
 }
@@ -244,14 +221,14 @@ export async function takeParkedEntry(
   presence: Presence,
   ext: string
 ): Promise<ParkedEntry | null> {
-  const slots = parkingSlots(pipeline);
+  const slots = pipeline.parkingSlots;
   const entry = slots.get(ext);
   if (entry === undefined) {
     return null;
   }
   clearTimeout(entry.timer);
   slots.delete(ext);
-  slotByChannel(pipeline).delete(entry.partyChannelId);
+  pipeline.parkedSlotByChannel.delete(entry.partyChannelId);
   await presence.setHint(ext, 'NOT_INUSE');
   return entry;
 }

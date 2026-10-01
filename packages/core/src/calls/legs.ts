@@ -14,7 +14,6 @@ import {
 } from './findMe.js';
 import type { Pipeline } from './pipeline.js';
 
-export { joinExistingBridgeOnAnswer } from './bridgeJoin.js';
 export { clearFindMeTimers } from './findMe.js';
 export { handleChannelEnded } from './legsEnded.js';
 export { concludeRing } from './ringConclusion.js';

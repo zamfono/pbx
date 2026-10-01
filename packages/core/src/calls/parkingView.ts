@@ -5,7 +5,6 @@
  */
 import { ANONYMOUS, type ParkedCall } from '@zamfono/shared';
 
-import { parkingSlots } from './parking.js';
 import type { Pipeline } from './pipeline.js';
 import { fromOf } from './transfers.js';
 
@@ -13,7 +12,7 @@ import { fromOf } from './transfers.js';
  * caller"). */
 export async function parkedCalls(pipeline: Pipeline): Promise<ParkedCall[]> {
   const snapshot = await pipeline.deps.cache.get();
-  return [...parkingSlots(pipeline)]
+  return [...pipeline.parkingSlots]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([slot, entry]) => {
       const number = fromOf(entry.call, entry.partyChannelId, snapshot);

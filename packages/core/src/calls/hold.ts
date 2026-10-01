@@ -3,8 +3,8 @@
  * the conversation's bridge and hears the tenant's hold music on its own channel, the way a ring
  * group's caller hears its music while members ring, and the one holding stays in the bridge,
  * hearing nobody and heard by nobody. Resuming puts the party back. The phone knows nothing of
- * it, so a hold or resume the phone signals (re-INVITE) is a separate matter for Asterisk. One
- * registry per `Pipeline`, keyed by the conversation's bridge, since every row sharing that
+ * it, so a hold or resume the phone signals (re-INVITE) is a separate matter for Asterisk. The
+ * holds are the `Pipeline`'s, keyed by the conversation's bridge, since every row sharing that
  * bridge (a party added to it, a consultation) must count the held party as still in it. Also
  * the `calls.hold` and `calls.resume` actions themselves.
  */
@@ -32,23 +32,12 @@ export type Hold = {
   consultationJoined: boolean;
 };
 
-const holdsByPipeline = new WeakMap<Pipeline, Map<string, Hold>>();
-
-function holds(pipeline: Pipeline): Map<string, Hold> {
-  let map = holdsByPipeline.get(pipeline);
-  if (map === undefined) {
-    map = new Map();
-    holdsByPipeline.set(pipeline, map);
-  }
-  return map;
-}
-
 /** The hold on the conversation in `bridgeId`, whichever row sharing that bridge asks. */
 export function holdIn(
   pipeline: Pipeline,
   bridgeId: string | null
 ): Hold | null {
-  return bridgeId === null ? null : (holds(pipeline).get(bridgeId) ?? null);
+  return bridgeId === null ? null : (pipeline.holds.get(bridgeId) ?? null);
 }
 
 /** `call`'s own hold: one of its parties held in its bridge. */
@@ -79,7 +68,7 @@ export async function holdParty(
     consultationJoined: false
   };
   // Registered before the bridge is left, so the party's absence is never read as their leaving.
-  holds(pipeline).set(bridgeId, hold);
+  pipeline.holds.set(bridgeId, hold);
   const snapshot = await pipeline.deps.cache.get();
   const { ari } = pipeline.deps;
   await ari.bridges
@@ -106,7 +95,7 @@ export async function endHold(
   if (hold === null || bridgeId === null) {
     return false;
   }
-  holds(pipeline).delete(bridgeId);
+  pipeline.holds.delete(bridgeId);
   if (intoBridgeId === null) {
     return true;
   }
