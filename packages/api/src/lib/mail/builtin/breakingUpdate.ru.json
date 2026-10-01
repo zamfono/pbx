@@ -1,0 +1,5 @@
+{
+  "subject": "Zamfono {{version}} требует ручного обновления",
+  "bodyText": "Здравствуйте, {{recipientName}}!\n\nВышел Zamfono {{version}}{{#if publishedAt}} ({{date publishedAt}}){{/if}}. Это релиз с несовместимыми изменениями, поэтому {{fqdn}} на {{currentVersion}} не устанавливает его сам.\n\nПрочитайте примечания к релизу{{#if releaseUrl}} ({{releaseUrl}}){{/if}}, затем обновите систему через update.sh на хосте.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Здравствуйте, {{recipientName}}!</p><p>Вышел Zamfono {{version}}{{#if publishedAt}} ({{date publishedAt}}){{/if}}. Это релиз с несовместимыми изменениями, поэтому {{fqdn}} на {{currentVersion}} не устанавливает его сам.</p><p>Прочитайте примечания к релизу{{#if releaseUrl}} ({{releaseUrl}}){{/if}}, затем обновите систему через update.sh на хосте.</p><p>{{companyName}} · {{fqdn}}</p>"
+}

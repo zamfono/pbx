@@ -24,7 +24,7 @@ const inputSchema = z
       .string()
       .min(1)
       .describe(
-        'The plain-text body: Handlebars {{placeholder}}, if/unless/each/with and {{date value}}; every kind offers companyName, recipientName and fqdn, voicemail adds callerNumber, callerName, mailboxName, receivedAt, durationS, missedCall callerNumber, callerName, receivedAt, didLabel, and setup and reset require link (with linkExpiresAt, setup also invitedBy).'
+        'The plain-text body: Handlebars {{placeholder}}, if/unless/each/with and {{date value}}; every kind offers companyName, recipientName and fqdn, voicemail adds callerNumber, callerName, mailboxName, receivedAt, durationS, missedCall callerNumber, callerName, receivedAt, didLabel, setup and reset require link (with linkExpiresAt, setup also invitedBy), updateFailed adds fromVersion, toVersion, reason, failedAt, and breakingUpdate currentVersion, version, releaseUrl, publishedAt.'
       ),
     bodyHtml: z
       .string()

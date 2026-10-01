@@ -1,9 +1,9 @@
 /**
  * Every background job `api` runs, started once from `hooks.server.ts`'s `init`: the first-boot
  * seed and the boot render (§6.3 "First boot", §3.1, §9.1), the key-rotation sweep (§5.4), the
- * certificate sync (§6.4), backups (§6.5), the daily purge (§5.9), webhook delivery and the relay
- * of `core`'s event stream (§3.1 "Events", §10.6), and the Ringotel re-registration after an
- * Asterisk restart (§10.4).
+ * certificate sync (§6.4), backups (§6.5), the automatic update (§6.3 "Updates"), the daily purge
+ * (§5.9), webhook delivery and the relay of `core`'s event stream (§3.1 "Events", §10.6), and the
+ * Ringotel re-registration after an Asterisk restart (§10.4).
  *
  * They all live in the SvelteKit bundle, the one that also holds `runOperation` and every
  * operation: an operation hands a job its work by calling it (`backups.runs.start` →
@@ -19,20 +19,29 @@ import type { Logger } from 'pino';
 
 import type { Db, Envelope } from '@zamfono/shared';
 
-import { coreUrlFromEnv, fetchCoreVersion } from '../coreClient.js';
+import {
+  coreUrlFromEnv,
+  createCoreClient,
+  fetchCoreVersion
+} from '../coreClient.js';
 import { connectCoreEvents } from '../coreEvents.js';
 import { publishEvent } from '../eventSink.js';
+import { updateMailSender } from '../mail/owners.js';
 import { mediaDirFromEnv } from '../mediaDir.js';
 import { retryPendingProfile } from '../ops/settings/profilePush.js';
+import { updaterClient } from '../ops/system/_updater.js';
 import { propagateAtBoot } from '../propagation.js';
 import type { Keyring } from '../secretbox.js';
 import { seedIfEmpty } from '../seed.js';
 import { seedBackupTarget } from '../seedBackupTarget.js';
 import { WebhookDispatcher } from '../webhooks.js';
-import type { Bus, ExecFn } from './backup.js';
+import { scheduleAutoUpdate, type AutoUpdateScheduler } from './autoUpdate.js';
+import type { BackupJobDeps, Bus, ExecFn } from './backup.js';
+import { backupEnabledTargets } from './backupTurns.js';
 import { getCertSyncScheduler, type CertSyncScheduler } from './certSync.js';
 import { scheduleBackups } from './cron.js';
 import { reencryptSweep } from './keyRotation.js';
+import { coreIsIdle, createMaintenanceGate } from './maintenanceWindow.js';
 import { scheduleRetention } from './retention.js';
 import { watchAsteriskRestarts } from './ringotelRereg.js';
 
@@ -66,6 +75,31 @@ function startCertSync(log: Logger): CertSyncScheduler | null {
     return getCertSyncScheduler();
   } catch (error) {
     log.error({ error }, 'boot: certificate-sync scheduler failed to start');
+    return null;
+  }
+}
+
+/** The automatic update (§6.3 "Updates"); a failed start costs only it. */
+function startAutoUpdate(
+  db: Db,
+  kr: Keyring,
+  backup: BackupJobDeps,
+  log: Logger
+): AutoUpdateScheduler | null {
+  try {
+    const core = createCoreClient();
+    return scheduleAutoUpdate({
+      db,
+      backUp: async () => backupEnabledTargets(db, kr, backup),
+      gate: createMaintenanceGate({
+        db,
+        isIdle: async () => coreIsIdle(core)
+      }),
+      updater: updaterClient,
+      send: updateMailSender(db, kr)
+    });
+  } catch (error) {
+    log.error({ error }, 'boot: automatic-update scheduler failed to start');
     return null;
   }
 }
@@ -150,17 +184,20 @@ export async function startBackgroundJobs(
     },
     enqueue: envelope => dispatcher.enqueue(envelope)
   };
-  const backups = scheduleBackups(db, kr, {
+  const backupDeps: BackupJobDeps = {
     exec: execCommand,
     mediaDir: mediaDirFromEnv(),
     bus
-  });
+  };
+  const backups = scheduleBackups(db, kr, backupDeps);
+  const autoUpdate = startAutoUpdate(db, kr, backupDeps, log);
   const retention = scheduleRetention(db);
   const coreEvents = relayCoreEvents(db, dispatcher, log);
   return {
     stop: () => {
       coreEvents.close();
       retention.stop();
+      autoUpdate?.stop();
       backups.stop();
       certSync?.stop();
     }

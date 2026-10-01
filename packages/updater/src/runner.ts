@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { mkdir, open, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -14,19 +15,31 @@ export type UpdateState = {
   state: 'idle' | 'running' | 'succeeded' | 'failed';
   from?: string;
   to?: string;
+  /** Who asked: an owner through `system.update` (`by` names them), the automatic update, or
+   * `update.sh` run on the host. Absent from a record written before it was kept. */
+  trigger?: 'manual' | 'automatic' | 'host';
+  by?: string;
   startedAt?: string;
   finishedAt?: string;
   error?: string;
 };
 
+/** Who asks the updater for a run: `api`, for an owner or for its automatic update. */
+export type RunRequester = { trigger: 'manual' | 'automatic'; by?: string };
+
 const LOG_TAIL_LINES = 20;
 const JSON_INDENT = 2;
+/**
+ * How long a run of `update.sh` on the host may stay `running` in the record before it counts as
+ * cut off, its host stopped mid-run: well past its download, pull and three-minute health wait.
+ */
+export const HOST_RUN_STALE_MS = 3_600_000;
 
 export type Runner = {
   /** The updater's own run while it runs, else `.update/state.json` as it is now. */
   current: () => UpdateState;
   /** Starts `update.sh <to>`; the caller has checked that no update is running. */
-  start: (from: string, to: string) => Promise<void>;
+  start: (from: string, to: string, requester?: RunRequester) => Promise<void>;
   /** Resolves once the running update, if any, has ended; for tests. */
   settled: () => Promise<void>;
 };
@@ -44,22 +57,50 @@ function stateFile(stackDir: string): string {
   return path.join(stackDir, '.update', 'state.json');
 }
 
+/**
+ * Writes `state` in one rename, from a temporary file of this write's own: `update.sh` on the
+ * host replaces the record through `state.json.next`, and two writes sharing that name could
+ * rename each other's file away.
+ */
 async function persist(stackDir: string, state: UpdateState): Promise<void> {
   const file = stateFile(stackDir);
+  const next = `${file}.${randomUUID()}.next`;
   await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(
-    `${file}.next`,
-    `${JSON.stringify(state, null, JSON_INDENT)}\n`
-  );
-  await rename(`${file}.next`, file);
+  await writeFile(next, `${JSON.stringify(state, null, JSON_INDENT)}\n`);
+  await rename(next, file);
 }
 
 /**
- * The state `.update/state.json` holds, with a run still `running` there marked failed: the
- * updater never restarts itself, so such a run was cut off by a stop or a reboot of the host. A
- * run of `update.sh` on the host recreates the updater while it runs, and writes its own end over
- * this mark once it ends.
+ * `state`, with a `running` run that cannot still be running marked failed: the updater's own,
+ * since the updater never restarts itself, so a stop or a reboot of the host cut it off; or a run
+ * of `update.sh` on the host started `HOST_RUN_STALE_MS` ago or longer. A younger host run is left
+ * as it is: it recreates the updater while it runs, and writes its own end once it ends.
  */
+function settle(state: UpdateState, now: string): UpdateState {
+  if (state.state !== 'running') {
+    return state;
+  }
+  if (state.trigger === 'host') {
+    const startedMs = Date.parse(state.startedAt ?? '');
+    if (Date.parse(now) - startedMs < HOST_RUN_STALE_MS) {
+      return state;
+    }
+    return {
+      ...state,
+      state: 'failed',
+      finishedAt: now,
+      error: 'interrupted: update.sh on the host did not finish the update'
+    };
+  }
+  return {
+    ...state,
+    state: 'failed',
+    finishedAt: now,
+    error: 'interrupted: the updater stopped while the update ran'
+  };
+}
+
+/** The state `.update/state.json` holds, `settle`d, and written back when that changed it. */
 export async function loadState(
   stackDir: string,
   now: () => string = () => new Date().toISOString()
@@ -72,25 +113,27 @@ export async function loadState(
   } catch {
     return state;
   }
-  if (state.state === 'running') {
-    state = {
-      ...state,
-      state: 'failed',
-      finishedAt: now(),
-      error: 'interrupted: the updater stopped while the update ran'
-    };
-    await persist(stackDir, state);
+  const settled = settle(state, now());
+  if (settled !== state) {
+    await persist(stackDir, settled);
   }
-  return state;
+  return settled;
 }
 
 /**
  * `.update/state.json` as it is now, which `update.sh` run on the host may have written since the
- * updater last did, or `fallback` while it cannot be read.
+ * updater last did, `settle`d without writing it back, or `fallback` while it cannot be read.
  */
-function readState(stackDir: string, fallback: UpdateState): UpdateState {
+function readState(
+  stackDir: string,
+  fallback: UpdateState,
+  now: string
+): UpdateState {
   try {
-    return JSON.parse(readFileSync(stateFile(stackDir), 'utf8')) as UpdateState;
+    return settle(
+      JSON.parse(readFileSync(stateFile(stackDir), 'utf8')) as UpdateState,
+      now
+    );
   } catch {
     return fallback;
   }
@@ -140,15 +183,13 @@ export async function createRunner(options: RunnerOptions): Promise<Runner> {
 
   async function finish(
     code: number | null,
-    from: string,
-    to: string,
+    run: Pick<UpdateState, 'by' | 'from' | 'to' | 'trigger'>,
     startedAt: string
   ): Promise<void> {
     const ok = code === 0;
     holder.state = {
       state: ok ? 'succeeded' : 'failed',
-      from,
-      to,
+      ...run,
       startedAt,
       finishedAt: now(),
       ...(ok
@@ -165,15 +206,16 @@ export async function createRunner(options: RunnerOptions): Promise<Runner> {
     current: () =>
       holder.state.state === 'running'
         ? holder.state
-        : readState(options.stackDir, holder.state),
+        : readState(options.stackDir, holder.state, now()),
     settled: async () => holder.done,
-    async start(from, to) {
+    async start(from, to, requester) {
       // Settled when the run has ended and its outcome is on disk; set before the first await,
       // so `settled()` never returns a previous run's.
       const done = Promise.withResolvers<undefined>();
       holder.done = done.promise;
       const startedAt = now();
-      holder.state = { state: 'running', from, to, startedAt };
+      const run = { from, to, ...requester };
+      holder.state = { state: 'running', ...run, startedAt };
       await persist(options.stackDir, holder.state);
       const log = await open(logFile, 'w');
       const child = spawnUpdate(script, to, options, log.fd);
@@ -186,7 +228,7 @@ export async function createRunner(options: RunnerOptions): Promise<Runner> {
         ended.once = true;
         log
           .close()
-          .then(async () => finish(code, from, to, startedAt))
+          .then(async () => finish(code, run, startedAt))
           .then(
             () => {
               done.resolve(undefined);

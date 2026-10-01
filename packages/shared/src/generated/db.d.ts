@@ -317,6 +317,7 @@ export interface RingGroups {
 
 export interface Settings {
   auditRetentionDays: number | null;
+  autoUpdate: Generated<number>;
   backupCron: Generated<string>;
   callLogLevel: Generated<string>;
   clir: Generated<number>;
@@ -403,6 +404,19 @@ export interface Trunks {
   tlsVerify: Generated<number>;
   transport: Generated<string>;
   username: string | null;
+}
+
+export interface UpdateState {
+  autoFailedAt: string | null;
+  autoFailedVersion: string | null;
+  autoFailure: string | null;
+  breakingAnnounced: string | null;
+  breakingVersion: string | null;
+  id: Generated<number | null>;
+  runActorName: string | null;
+  runOutcomePending: Generated<number>;
+  runStartedAt: string | null;
+  runTrigger: string | null;
 }
 
 export interface UserForwardRules {
@@ -519,6 +533,7 @@ export interface DB {
   tokens: Tokens;
   trunkHosts: TrunkHosts;
   trunks: Trunks;
+  updateState: UpdateState;
   userForwardRules: UserForwardRules;
   userGroupGroups: UserGroupGroups;
   userGroups: UserGroups;

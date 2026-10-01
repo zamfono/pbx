@@ -176,6 +176,30 @@ describe('settings', () => {
     ).resolves.toMatchObject({ smtpHost: 'mail.example.com' });
   });
 
+  it('lets only an owner switch automatic updates on (§6.3 "Updates")', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    await expect(
+      runOperation(
+        db,
+        'settings.update',
+        { autoUpdate: true },
+        asRun({ actor: admin })
+      )
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      runOperation(
+        db,
+        'settings.update',
+        { autoUpdate: true },
+        asRun({ actor: owner })
+      )
+    ).resolves.toMatchObject({ autoUpdate: true });
+    await expect(
+      runOperation(db, 'settings.get', {}, asRun({ actor: owner }))
+    ).resolves.toMatchObject({ autoUpdate: true });
+  });
+
   it('rejects the read-only extLength field', async () => {
     const db = await makeTestDb();
     await seedSettings(db);

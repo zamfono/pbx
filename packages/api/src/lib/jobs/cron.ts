@@ -1,4 +1,7 @@
-/** Cron-expression scheduling for the backup job (§6.5 "Backups"), and the manual runs' queue. */
+/**
+ * Cron-expression scheduling for the backup job (§6.5 "Backups"), and the manual runs' queue;
+ * both wait their turn with the automatic update's backup (`backupTurns.ts`).
+ */
 import { setTimeout as sleep } from 'node:timers/promises';
 import pino from 'pino';
 
@@ -14,6 +17,7 @@ import {
   performBackup,
   type BackupJobDeps
 } from './backup.js';
+import { enabledTargetIds, inTurn } from './backupTurns.js';
 import { nextRun } from './cronExpression.js';
 
 const logger = pino({ name: 'backup-cron' });
@@ -61,20 +65,11 @@ async function runEnabledTargets(
   kr: Keyring,
   deps: BackupJobDeps
 ): Promise<void> {
-  const targets = await db
-    .selectFrom('backupTargets')
-    .select('id')
-    .where('enabled', '=', 1)
-    .where('deletedAt', 'is', null)
-    .execute();
-  for (const target of targets) {
+  for (const targetId of await enabledTargetIds(db)) {
     // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; runs must serialize
-    await runTarget(db, kr, deps, target.id).catch((error: unknown) => {
+    await runTarget(db, kr, deps, targetId).catch((error: unknown) => {
       // The failure already lives in the run row and `backup.failed` event; this is a trace.
-      logger.error(
-        { error, targetId: target.id },
-        'scheduled backup run failed'
-      );
+      logger.error({ error, targetId }, 'scheduled backup run failed');
     });
   }
 }
@@ -137,11 +132,13 @@ function manualRunQueue(
 ): (run: BackupRunRow) => void {
   let tail = Promise.resolve();
   return run => {
-    tail = tail.then(() =>
-      executeRun(db, kr, deps, run).catch((error: unknown) => {
-        // The failure already lives in the run row and `backup.failed` event; this is a trace.
-        logger.error({ error, runId: run.id }, 'queued backup run failed');
-      })
+    tail = tail.then(async () =>
+      inTurn(async () => executeRun(db, kr, deps, run)).catch(
+        (error: unknown) => {
+          // The failure already lives in the run row and `backup.failed` event; this is a trace.
+          logger.error({ error, runId: run.id }, 'queued backup run failed');
+        }
+      )
     );
   };
 }
@@ -179,7 +176,7 @@ export function scheduleBackups(
           return;
         }
         // eslint-disable-next-line no-await-in-loop -- one run cycle finishes before the next is due
-        await runEnabledTargets(db, kr, deps);
+        await inTurn(async () => runEnabledTargets(db, kr, deps));
       } catch (error) {
         // The loop retries after a fixed backoff on any cycle failure, for the process's life.
         logger.error(

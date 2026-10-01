@@ -50,6 +50,7 @@ const FIELD_TRANSFORMS: Partial<Record<keyof SettingsWire, FieldTransform>> = {
     encode: toBit,
     decode: fromBit
   },
+  autoUpdate: { column: 'autoUpdate', encode: toBit, decode: fromBit },
   emergencyNumbers: {
     column: 'emergencyNumbersJson',
     encode: toJson,

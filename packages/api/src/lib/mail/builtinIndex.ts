@@ -3,6 +3,12 @@
  * Vite understands one, and this package also bundles through esbuild (`server.ts`); static
  * imports survive either.
  */
+import breakingUpdateDe from './builtin/breakingUpdate.de.json' with { type: 'json' };
+import breakingUpdateEn from './builtin/breakingUpdate.en.json' with { type: 'json' };
+import breakingUpdateEs from './builtin/breakingUpdate.es.json' with { type: 'json' };
+import breakingUpdateFr from './builtin/breakingUpdate.fr.json' with { type: 'json' };
+import breakingUpdateIt from './builtin/breakingUpdate.it.json' with { type: 'json' };
+import breakingUpdateRu from './builtin/breakingUpdate.ru.json' with { type: 'json' };
 import missedCallDe from './builtin/missedCall.de.json' with { type: 'json' };
 import missedCallEn from './builtin/missedCall.en.json' with { type: 'json' };
 import missedCallEs from './builtin/missedCall.es.json' with { type: 'json' };
@@ -21,6 +27,12 @@ import setupEs from './builtin/setup.es.json' with { type: 'json' };
 import setupFr from './builtin/setup.fr.json' with { type: 'json' };
 import setupIt from './builtin/setup.it.json' with { type: 'json' };
 import setupRu from './builtin/setup.ru.json' with { type: 'json' };
+import updateFailedDe from './builtin/updateFailed.de.json' with { type: 'json' };
+import updateFailedEn from './builtin/updateFailed.en.json' with { type: 'json' };
+import updateFailedEs from './builtin/updateFailed.es.json' with { type: 'json' };
+import updateFailedFr from './builtin/updateFailed.fr.json' with { type: 'json' };
+import updateFailedIt from './builtin/updateFailed.it.json' with { type: 'json' };
+import updateFailedRu from './builtin/updateFailed.ru.json' with { type: 'json' };
 import voicemailDe from './builtin/voicemail.de.json' with { type: 'json' };
 import voicemailEn from './builtin/voicemail.en.json' with { type: 'json' };
 import voicemailEs from './builtin/voicemail.es.json' with { type: 'json' };
@@ -33,6 +45,12 @@ export const BUILTIN_TEMPLATES: Record<
   `${TemplateKind}.${Language}`,
   TemplateSource
 > = {
+  'breakingUpdate.de': breakingUpdateDe,
+  'breakingUpdate.en': breakingUpdateEn,
+  'breakingUpdate.es': breakingUpdateEs,
+  'breakingUpdate.fr': breakingUpdateFr,
+  'breakingUpdate.it': breakingUpdateIt,
+  'breakingUpdate.ru': breakingUpdateRu,
   'missedCall.de': missedCallDe,
   'missedCall.en': missedCallEn,
   'missedCall.es': missedCallEs,
@@ -51,6 +69,12 @@ export const BUILTIN_TEMPLATES: Record<
   'setup.fr': setupFr,
   'setup.it': setupIt,
   'setup.ru': setupRu,
+  'updateFailed.de': updateFailedDe,
+  'updateFailed.en': updateFailedEn,
+  'updateFailed.es': updateFailedEs,
+  'updateFailed.fr': updateFailedFr,
+  'updateFailed.it': updateFailedIt,
+  'updateFailed.ru': updateFailedRu,
   'voicemail.de': voicemailDe,
   'voicemail.en': voicemailEn,
   'voicemail.es': voicemailEs,

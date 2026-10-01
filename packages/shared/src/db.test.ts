@@ -5,14 +5,14 @@ import { migrateForTest } from './testDb.js';
 
 test('migrates and enforces the schema', async () => {
   const db = openDb(':memory:');
-  expect(await pendingMigrations(db)).toHaveLength(11);
+  expect(await pendingMigrations(db)).toHaveLength(12);
   await migrateForTest(db);
   expect(await pendingMigrations(db)).toEqual([]);
 
   const tables = (await db.introspection.getTables())
     .map(table => table.name)
     .sort();
-  expect(tables).toHaveLength(43);
+  expect(tables).toHaveLength(44);
 
   // partial unique: two soft-deleted users may share an e-mail with a live one
   await db

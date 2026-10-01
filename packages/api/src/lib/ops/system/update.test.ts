@@ -90,15 +90,36 @@ describe('system.update', () => {
   it('asks the updater once a backup finished within the hour, and answers at once', async () => {
     const db = await makeTestDb();
     await backupFinished(db, 5 * MINUTE_MS);
-    const updater = recordingUpdater(() =>
-      Promise.resolve({ state: 'running', from: '0.0.6', to: '0.0.7' })
-    );
+    const started = {
+      state: 'running' as const,
+      from: '0.0.6',
+      to: '0.0.7',
+      startedAt: '2026-10-01T03:00:00.000Z'
+    };
+    const updater = recordingUpdater(() => Promise.resolve(started));
     setUpdaterClient(() => updater);
 
     expect(
       await runOperation(db, 'system.update', { version: '0.0.7' }, asOwner)
-    ).toEqual({ state: 'running', from: '0.0.6', to: '0.0.7' });
+    ).toEqual(started);
     expect(updater.asked).toEqual(['0.0.7']);
+    // Who asked, for system.info to report next to the run.
+    await expect(
+      db
+        .selectFrom('updateState')
+        .select([
+          'runTrigger',
+          'runActorName',
+          'runStartedAt',
+          'runOutcomePending'
+        ])
+        .executeTakeFirst()
+    ).resolves.toEqual({
+      runTrigger: 'manual',
+      runActorName: 'Owner',
+      runStartedAt: started.startedAt,
+      runOutcomePending: 0
+    });
   });
 
   it('refuses without a recent backup, and leaves the updater alone', async () => {

@@ -83,7 +83,7 @@ Three long-running application services run per stack, plus the TLS proxy and a 
 
 **Write ownership.** Each SQLite table has a primary writer. Both processes read everything; WAL mode and `busy_timeout` make concurrent writers safe, so a cross-write is allowed where a flow naturally lands in the other process.
 
-- `api` owns the configuration tables: users, devices, trunks, trunk_hosts, outbound_routes, outbound_route_users, outbound_route_user_groups, outbound_route_numbers, dids, did_blocks, ring_groups, ring_group_members, user_groups, user_group_users, user_group_groups, extensions, device_blf_keys, forward_targets, user_forward_rules, ring_group_forward_rules, opening_hours, opening_hours_intervals, audio_assets, contacts, contact_phones, settings, ooo_rules, menus, menu_targets, blocked_numbers, mail_templates, tokens, oauth_clients, webhooks, webhook_deliveries, backup_targets, backup_runs, audit_log.
+- `api` owns the configuration tables: users, devices, trunks, trunk_hosts, outbound_routes, outbound_route_users, outbound_route_user_groups, outbound_route_numbers, dids, did_blocks, ring_groups, ring_group_members, user_groups, user_group_users, user_group_groups, extensions, device_blf_keys, forward_targets, user_forward_rules, ring_group_forward_rules, opening_hours, opening_hours_intervals, audio_assets, contacts, contact_phones, settings, ooo_rules, menus, menu_targets, blocked_numbers, mail_templates, tokens, oauth_clients, webhooks, webhook_deliveries, backup_targets, backup_runs, update_state, audit_log.
 - `core` owns the runtime tables: calls, call_qos, voicemails, recordings, presence_log.
 - Known cross-writes: `api` updates and deletes `voicemails` and `recordings` rows through their REST endpoints and, after a voicemail change, calls `core`'s internal `/internal/mwi/{mailbox}` so the MWI counts follow (§9.3). `core` toggles `users.dnd` through the `*90`/`*91` feature codes and stamps `devices.last_registered_at` when a `ContactStatusChange` event reports the device's contact `Reachable`, a timestamp of an event rather than a state: the last time the device became reachable, not its latest REGISTER, since Asterisk raises no event for a registration refresh; a greeting recorded by phone (§10.2) makes `core` insert the `audio_assets` row, write its file to `media/prompts/` and set the mailbox's `mailbox_audio_id`. Live state such as a trunk's registration status never lands in a table (§10.1); `api` reads it from the core when a request needs it.
 
@@ -253,7 +253,7 @@ Outside the audited scope:
 - DND (`users.dnd`), presence state that a user toggles many times a day, through `PUT /users/{id}/presence` and through the `*90`/`*91` feature codes alike; its transitions are in `presence_log`;
 - live-call actions (originate, transfer, pickup, hangup), which are recorded with the acting user in the call's own history entry (`calls.log`, §7).
 
-Three operations record what an effect outside Zamfono answered rather than a change: `ringotel.push`, a device's Ringotel push that ran after its operation committed, `ringotel.profile`, the tenant profile's push (§10.4 "Tenant profile push"), and `ringotel.rereg`, the re-registration after an Asterisk restart (§10.4). Their entries are written outside any transaction, are never undoable, and, like a pure action's, never block an undo of the entity's earlier entries (§5.8). A job's entries carry the actor id `system`, named `Zamfono`.
+Four operations record what an effect outside Zamfono answered rather than a change: `ringotel.push`, a device's Ringotel push that ran after its operation committed, `ringotel.profile`, the tenant profile's push (§10.4 "Tenant profile push"), `ringotel.rereg`, the re-registration after an Asterisk restart (§10.4), and `system.autoUpdate`, an automatic update's attempt and outcome (§6.3 "Automatic updates"). Their entries are written outside any transaction, are never undoable, and, like a pure action's, never block an undo of the entity's earlier entries (§5.8). A job's entries carry the actor id `system`, named `Zamfono`.
 
 `GET /audit` exposes the log read-only to `admin`, filterable by entity kind and id, actor, channel, client, operation, time range and state (live, undone, all).
 
@@ -688,7 +688,9 @@ Without the hash variable the owner receives the set-password mail instead, so e
 
 **Upgrades** are a backup run (`POST /backups/runs`, §6.5), then unpacking the new release's bundle over the stack's files, which leaves `.env` alone, and `docker compose pull && docker compose up -d`; a deployment pinned through `ZAMFONO_VERSION` edits it to the new release first. On Podman, `down` comes between the two: Podman refuses to remove `asterisk` while `proxy` still shares its network namespace, which Docker allows, so `up -d` cannot replace it; `down` keeps every volume, and the Podman boot unit stops with `down` for the same reason. The `migrate` service applies pending migrations and exits, `api` starts on its success, and `core` starts once `api` reports healthy. Asterisk's static configuration is regenerated from the environment on start.
 
-**Updates.** The bundle's `update.sh` carries out an upgrade: it downloads the named release's bundle, or the latest release's, checks it against the release's `SHA256SUMS`, unpacks it over the stack directory one file at a time, adds the settings a newer `.env.example` introduced that it can generate (`BACKUP_PASSWORD`, `UPDATER_TOKEN`, `CONTAINER_SOCKET`) and lists the others, pulls, and recreates the stack. Podman refuses to replace `asterisk` while `proxy` shares its network namespace, so on Podman it restarts the boot unit where there is one and takes the stack `down` before `up -d` where there is none; the updater's run, on either runtime, removes `proxy` before `up -d` instead, since `down` would stop the updater itself. It then waits up to three minutes for the recreated services to report healthy: `up --wait` waits on their healthchecks where the Compose has it, and without it (`podman-compose`) the script runs `api`'s and `core`'s healthcheck itself until each passes; the update fails otherwise. A rerun finishes an update that stopped before its stack reported healthy. It refuses an older release; a breaking one, a new major from 1.0.0 on and a new minor while 0.x, shows the release notes in between and asks first. The `updater` service runs the same script for `system.update`: an image with the Docker CLI and Compose, on the internal network only, that mounts the stack directory and the runtime's socket (`CONTAINER_SOCKET`, Docker's or rootful Podman's Docker-compatible one) and learns its Compose project, directory and files from its own container's labels. It answers only requests carrying `UPDATER_TOKEN`, which `.env` shares with `api` alone, and takes the stack only to a published, newer, non-breaking GitHub release; it never recreates itself, which the next update from the host does. `system.update` requires a backup run finished `ok` within the last hour and answers once the updater has begun; `system.info` reports the latest release, whether it can be installed this way, and the last update's outcome, which the updater keeps in the stack directory's `.update/`. `update.sh` run on the host writes the same record of its own run, `running` from its start and then `succeeded` or `failed` with both versions and times, and the updater reports it; `--check` and the updater's own run of the script write none.
+**Updates.** The bundle's `update.sh` carries out an upgrade: it downloads the named release's bundle, or the latest release's, checks it against the release's `SHA256SUMS`, unpacks it over the stack directory one file at a time, adds the settings a newer `.env.example` introduced that it can generate (`BACKUP_PASSWORD`, `UPDATER_TOKEN`, `CONTAINER_SOCKET`) and lists the others, pulls, and recreates the stack. Podman refuses to replace `asterisk` while `proxy` shares its network namespace, so on Podman it restarts the boot unit where there is one and takes the stack `down` before `up -d` where there is none; the updater's run, on either runtime, removes `proxy` before `up -d` instead, since `down` would stop the updater itself. It then waits up to three minutes for the recreated services to report healthy: `up --wait` waits on their healthchecks where the Compose has it, and without it (`podman-compose`) the script runs `api`'s and `core`'s healthcheck itself until each passes; the update fails otherwise. A rerun finishes an update that stopped before its stack reported healthy. It refuses an older release; a breaking one, a new major from 1.0.0 on and a new minor while 0.x, shows the release notes in between and asks first. The `updater` service runs the same script for `system.update`: an image with the Docker CLI and Compose, on the internal network only, that mounts the stack directory and the runtime's socket (`CONTAINER_SOCKET`, Docker's or rootful Podman's Docker-compatible one) and learns its Compose project, directory and files from its own container's labels. It answers only requests carrying `UPDATER_TOKEN`, which `.env` shares with `api` alone, and takes the stack only to a published, newer, non-breaking GitHub release; it never recreates itself, which the next update from the host does. `system.update` requires a backup run finished `ok` within the last hour and answers once the updater has begun; `system.info` reports the latest release, whether it can be installed this way, and the last update's outcome, which the updater keeps in the stack directory's `.update/`. `update.sh` run on the host writes the same record of its own run, `running` from its start and then `succeeded` or `failed` with both versions and times, and the updater reports it; `--check` and the updater's own run of the script write none. The record names who asked for the run in `trigger`: `manual`, with `by` naming the owner, for `system.update`; `automatic`; `host` for `update.sh` on the host. A run of its own that a starting updater finds still `running` was cut off, since the updater never restarts itself, and is marked failed; a host run, which recreates the updater while it runs, is left `running` until `update.sh` writes its end, unless it started an hour ago or longer. `api` also keeps who asked for the run it started, in `update_state` (§11.2), for an updater that records no `trigger`.
+
+**Automatic updates.** With `settings.auto_update` on (owner-only, off by default), `api` asks the updater hourly for the latest release and installs a newer non-breaking one on its own through the maintenance gate (§6.4): once the gate opens, a backup run of every enabled target, taking turns with the scheduled and manual runs, then the request `system.update` makes, attributed to `automatic`. A failed or missing backup, a refusal and a failed run are each reported and not retried for that release: `/healthz` carries the release as `autoUpdateFailed` until an update succeeds, `system.info` the release and the reason as `autoUpdate.failed`, and every owner gets one `updateFailed` mail (§10.2). Every attempt and outcome is an audit entry `system.autoUpdate` on channel `job` (§5.7), `outcome` `started`, `backupFailed`, `refused`, `succeeded` or `failed` with both versions and, on a failure, `reason`; a run's own outcome is entered once the updater reports it ended, after the update restarted `api`. Whatever the setting, a newer breaking release, which only `update.sh` on the host installs, is `/healthz`'s `breakingUpdateAvailable` (its version), and every owner gets one `breakingUpdate` mail per such release; `update_state` remembers the release announced, so a restart sends none again.
 
 **Health.** `GET /healthz` is the liveness endpoint. Its HTTP status reflects only the process's own liveness, for `api` the open database with no migration pending, for `core` its database and ARI connection; every other check is a field in the body. Compose health checks run on `core` and `api`, and the `api` check gates `core`'s start, which is why `api`'s status never depends on `core`. Every long-running service has `restart: unless-stopped`; `migrate` has `restart: "no"`.
 
@@ -712,7 +714,7 @@ A transport reload can briefly drop TLS registrations. Clients re-register withi
 
 All hours resolve in the tenant's time zone: `settings.timezone` (an IANA name), else the stack's `TZ`, else UTC. Safety valve: if the certificate currently on the `asterisk-config` volume expires before the gate would next open or look again, the change is applied immediately.
 
-**Maintenance gate.** `api` touches the running system on its own only through one gate: it opens at the next maintenance moment once the system is idle, which `core`'s live state tells: no call, no channel open in Asterisk (a parked call, a voicemail deposit and a menu each hold one), and no recording being made or still being mixed; a `core` or ARI that does not answer is not idle. While the system is busy the gate looks again every 5 minutes, and two hours past the moment it gives up until the next moment, resolved from then on. The fresh-stack placeholder's replacement and the safety valve do not wait for it.
+**Maintenance gate.** `api` touches the running system on its own, a scheduled certificate swap or an automatic update (§6.3), only through one gate: it opens at the next maintenance moment once the system is idle, which `core`'s live state tells: no call, no channel open in Asterisk (a parked call, a voicemail deposit and a menu each hold one), and no recording being made or still being mixed; a `core` or ARI that does not answer is not idle. While the system is busy the gate looks again every 5 minutes, and two hours past the moment it gives up until the next moment, resolved from then on. The fresh-stack placeholder's replacement and the safety valve do not wait for it.
 
 `api` reads only the hook's copy, never Caddy's own certificate store, whose layout is internal to Caddy. It alerts through `/healthz` and metrics when the copy is missing.
 
@@ -1134,7 +1136,8 @@ Mail is optional. The relay is `settings.smtp_host`, `smtp_port`, `smtp_security
 
 - on the core's request: the voicemail notification with the audio attached;
 - on the core's request: the missed-call mail, one per missed inbound call to a user with `notify_missed_calls` set, carrying caller number, the phone-book name where known, time and the targeted DID; a call that reaches the mailbox sends the voicemail mail only;
-- from `api` itself: the setup mail with the set-password link, sent when an admin creates an account and, when no password hash is seeded, to the first owner at first boot (§5.2, §6.3); and the admin-triggered and self-service reset mails.
+- from `api` itself: the setup mail with the set-password link, sent when an admin creates an account and, when no password hash is seeded, to the first owner at first boot (§5.2, §6.3); and the admin-triggered and self-service reset mails;
+- from `api` itself, to every owner: the failed automatic update and the breaking release that needs a manual update (§6.3 "Automatic updates").
 
 **Without a relay**, `POST /users` and `POST /users/{id}/resetPassword` return the one-time set-password link in their response, and the admin passes it on. The login page offers no forgot-password form, voicemail notifications are skipped (MWI and the `voicemail.new` event remain), and `/healthz` reports mail as not configured. The link is returned to the admin in both modes, since a mailed link can land in a spam folder.
 
@@ -1161,6 +1164,10 @@ Per kind, the placeholders a template may use and the ones it must use:
 **`setup`** — placeholders: `link`, `linkExpiresAt`, `invitedBy` (the admin who created the account; empty for the first owner at first boot, so the shipped template branches on it and carries the MCP connect hint in that branch); required: `link`.
 
 **`reset`** — placeholders: `link`, `linkExpiresAt`; required: `link`.
+
+**`updateFailed`** — placeholders: `fromVersion` (empty when unknown), `toVersion`, `reason`, `failedAt`.
+
+**`breakingUpdate`** — placeholders: `currentVersion`, `version`, `releaseUrl`, `publishedAt` (each empty when GitHub names none).
 
 #### Recording semantics
 
@@ -1293,11 +1300,11 @@ A `sip` target's `headers` is a list of `{ name, value }` (§9.4 Header template
 
 **Search** (min. role: user) — `GET /search?q=` (users, ring groups, contacts; §10.2 "Search")
 
-**Health** (min. role: none (public, unauthenticated — served through the proxy so the §7 external uptime check can reach it)) — `GET /healthz` (HTTP status = `api`'s own liveness, the open and migrated database; body fields for core and its ARI connection, mail configured, key rotation remaining (§5.4), certificate sync (§6.4), emergency trunk present (§9.4 "Emergency trunks"), Ringotel profile pending (§10.4 "Tenant profile push"); no version or configuration values)
+**Health** (min. role: none (public, unauthenticated — served through the proxy so the §7 external uptime check can reach it)) — `GET /healthz` (HTTP status = `api`'s own liveness, the open and migrated database; body fields for core and its ARI connection, mail configured, key rotation remaining (§5.4), certificate sync (§6.4), emergency trunk present (§9.4 "Emergency trunks"), Ringotel profile pending (§10.4 "Tenant profile push"), the breaking release only `update.sh` installs (`breakingUpdateAvailable`) and the release a failed automatic update tried (`autoUpdateFailed`), each `null` while there is none (§6.3 "Automatic updates"); no version the stack runs and no configuration values)
 
 **Icons** (min. role: none (public, unauthenticated)) — `GET /favicon.ico`, `GET /favicon.svg` (black, white under a dark color scheme), `GET /logo.svg` and `GET /logo.png` (192 px) for a light background, `GET /logoDark.svg` and `GET /logoDark.png` for a dark one: static files of `packages/api/static/`, named in the MCP `serverInfo` (§10.5) and linked from the authentication pages (§5.2), and at the paths a client that shows a domain's favicon asks for
 
-**System** (min. role: user) — `GET /system/info` — the version and commit `api` runs and the ones `core` reports (§7 "Version"), each with its process's `startedAt`, and `core`'s `asteriskStartedAt` (§10.4 "After a restart"), `core` as `null` while it does not answer within three seconds, with the updater's latest release, whether `system.update` takes it and the last update's outcome (§6.3 "Updates"), `ringotel.profilePending`, whether a tenant profile change has not reached Ringotel yet (§10.4 "Tenant profile push"), and `stack`: `domain`, the `FQDN` read from `ORIGIN`, and `ipv4`, the address SIP and media use (§6.1), `EXTERNAL_IPV4` in the ports mode and `STACK_IPV4` in the macvlan mode, each `null` while unset; owner, with confirmation: `POST /system/update` (`version` optional) — hands the update to the updater once a backup run finished `ok` within the hour, refused otherwise; not undoable
+**System** (min. role: user) — `GET /system/info` — the version and commit `api` runs and the ones `core` reports (§7 "Version"), each with its process's `startedAt`, and `core`'s `asteriskStartedAt` (§10.4 "After a restart"), `core` as `null` while it does not answer within three seconds, with the updater's latest release, whether `system.update` takes it and the last update's outcome with who asked for it (§6.3 "Updates"), `autoUpdate`: `enabled`, `settings.auto_update`, and `failed`, the release, reason and time of the last automatic update's failure until an update succeeds, else `null` (§6.3 "Automatic updates"), `ringotel.profilePending`, whether a tenant profile change has not reached Ringotel yet (§10.4 "Tenant profile push"), and `stack`: `domain`, the `FQDN` read from `ORIGIN`, and `ipv4`, the address SIP and media use (§6.1), `EXTERNAL_IPV4` in the ports mode and `STACK_IPV4` in the macvlan mode, each `null` while unset; owner, with confirmation: `POST /system/update` (`version` optional) — hands the update to the updater once a backup run finished `ok` within the hour, refused otherwise; not undoable
 
 **Metrics** (min. role: bearer `METRICS_TOKEN` from `.env`; 404 while unset) — `GET /metrics` (Prometheus, §7); `GET /metrics/litestream` with the DR overlay
 
@@ -1431,7 +1438,7 @@ WAL mode, `foreign_keys=ON`, write ownership split per §3.1 (`api` = config tab
 
 ### 11.1 Schema conventions
 
-**Ids.** Every entity table has a `TEXT PRIMARY KEY` holding an app-generated UUIDv7 (RFC 9562), produced by a maintained library such as `uuid`, never by a hand-written implementation. UUIDv7 ids are non-enumerable, globally unique (snapshots, stack migrations and a future multi-tenant consolidation, §12, never collide) and time-ordered, so index inserts stay append-ish and ids sort roughly chronologically. The internal SQLite rowid remains, and the TEXT key is a unique index over it. `calls.id` doubles as the per-call log correlation id (§7). Entity tables carry this surrogate key even where a natural key exists, `dids.number`, `did_blocks.base`, `users.email`, because soft delete (§5.9) lets a deleted row and its live successor hold the same natural key for the length of the undo window; tables without soft delete, `extensions`, `trunk_hosts`, `contact_phones`, `mail_templates` and the link tables, use their natural keys, and the `settings` singleton is `id = 1`.
+**Ids.** Every entity table has a `TEXT PRIMARY KEY` holding an app-generated UUIDv7 (RFC 9562), produced by a maintained library such as `uuid`, never by a hand-written implementation. UUIDv7 ids are non-enumerable, globally unique (snapshots, stack migrations and a future multi-tenant consolidation, §12, never collide) and time-ordered, so index inserts stay append-ish and ids sort roughly chronologically. The internal SQLite rowid remains, and the TEXT key is a unique index over it. `calls.id` doubles as the per-call log correlation id (§7). Entity tables carry this surrogate key even where a natural key exists, `dids.number`, `did_blocks.base`, `users.email`, because soft delete (§5.9) lets a deleted row and its live successor hold the same natural key for the length of the undo window; tables without soft delete, `extensions`, `trunk_hosts`, `contact_phones`, `mail_templates` and the link tables, use their natural keys, and the `settings` and `update_state` singletons are `id = 1`.
 
 **Triggers.** A rule that spans tables and that the operations layer enforces with a listed, undoable refusal (§5.9) gets a `RAISE(ABORT)` trigger as its backstop where the rule is a plain predicate. Today that is the block-membership rule of `did_blocks`, on the soft delete (`UPDATE OF deleted_at`) and on the purge (`DELETE`), and the no-cycle rule of `user_group_groups`, a recursive CTE in the trigger's `WHEN` clause. The operation still refuses first, with the dependents listed; the trigger is what holds if a write bypasses it. Triggers carry no business logic beyond such assertions.
 
@@ -1448,6 +1455,7 @@ WAL mode, `foreign_keys=ON`, write ownership split per §3.1 (`api` = config tab
 - `extensions`: the row is deleted with its owner's soft delete, taking the BLF keys that watched it through the FK; both are recorded in the deleting operation's audit diff and re-inserted by undo (§5.9); parking-slot rows are replaced as a set by `PUT /parking/slots` and restored from the audit diff, and removing one drops its BLF keys through the FK;
 - `mail_templates`: a `DELETE` removes the tenant override and the shipped template applies again; undo re-inserts the row from the audit diff;
 - `settings`: a singleton, never deleted;
+- `update_state`: `api`'s own singleton, never deleted, without undo (§6.3 "Automatic updates");
 - `tokens` and `oauth_clients`: security artifacts without undo;
 - `webhook_deliveries`: the webhook outbox, without undo; deleting a hook deletes its pending rows (§10.6);
 - `audit_log`: append-only.
@@ -1934,6 +1942,7 @@ CREATE TABLE settings (
   -- operations
   backup_cron                TEXT    NOT NULL DEFAULT '0 3 * * *',
   tls_reload_hour            INTEGER CHECK (tls_reload_hour BETWEEN 0 AND 23),
+  auto_update                INTEGER NOT NULL DEFAULT 0,
   -- single sign-on
   sso_provider               TEXT    CHECK (sso_provider IN ('microsoft','google','oidc')),
   sso_label                  TEXT,
@@ -2044,7 +2053,7 @@ CREATE TABLE blocked_numbers (
 -- means the shipped template for that kind and language applies.
 --   body_html: NULL = the mail is sent as plain text only
 CREATE TABLE mail_templates (
-  kind       TEXT    NOT NULL CHECK (kind IN ('voicemail','missedCall','setup','reset')),
+  kind       TEXT    NOT NULL CHECK (kind IN ('voicemail','missedCall','setup','reset','updateFailed','breakingUpdate')),
   language   TEXT    NOT NULL CHECK (language IN ('de','en','es','fr','it','ru')),
   subject    TEXT    NOT NULL,
   body_text  TEXT    NOT NULL,
@@ -2172,6 +2181,28 @@ CREATE TABLE backup_runs (
   error       TEXT,
   started_at  TEXT    NOT NULL,
   finished_at TEXT
+);
+
+-- update_state — what api knows about updates beyond the updater's own record (§6.3 "Updates",
+-- "Automatic updates"); one row (id = 1), created by its migration.
+--   run_*:               who asked for the last run api started, and the updater's start time of it
+--   run_outcome_pending: 1 while an automatic run's outcome has not been entered
+--   auto_failed_*, auto_failure: the release, time and reason of the last automatic update's
+--                        failure, until an update succeeds; NULL together
+--   breaking_version:    the newer breaking release the updater last reported, NULL for none
+--   breaking_announced:  the breaking release the owners were last mailed about
+CREATE TABLE update_state (
+  id                  INTEGER PRIMARY KEY CHECK (id = 1),
+  run_trigger         TEXT    CHECK (run_trigger IN ('manual','automatic')),
+  run_actor_name      TEXT,
+  run_started_at      TEXT,
+  run_outcome_pending INTEGER NOT NULL DEFAULT 0,
+  auto_failed_version TEXT,
+  auto_failure        TEXT,
+  auto_failed_at      TEXT,
+  breaking_version    TEXT,
+  breaking_announced  TEXT,
+  CHECK ((auto_failed_version IS NULL) = (auto_failure IS NULL) AND (auto_failure IS NULL) = (auto_failed_at IS NULL))
 );
 
 -- audit_log — append-only (§5) and deliberately FK-less: the log outlives hard-purged rows.
@@ -2426,6 +2457,7 @@ A DID's `number` is what the trunk boundary produces (§9.4): the international 
 | `audit_retention_days` 👑 | purge age for audit entries; NULL = kept forever. The floor of 30 keeps even an owner from erasing the trail of a recent change | NULL | §5 |
 | `backup_cron` | cron expression of the restic backup job | `0 3 * * *` | §6.5 |
 | `tls_reload_hour` | hour `0`–`23` for certificate swaps when the tenant schedule offers no closed period (priority chain in §6.4) | NULL | §6.4 |
+| `auto_update` 👑 | 1 = install newer non-breaking releases on their own, after a backup, through the maintenance gate | `0` | §6.3 |
 | `sso_provider` 👑 | `microsoft` \| `google` \| `oidc`; NULL = local passwords only | NULL | §5 |
 | `sso_label` 👑 | login-button text for `oidc` (required for it, CHECK); the presets bring their own | NULL | §5 |
 | `sso_issuer`, `sso_client_id`, `sso_allowed_domain` 👑 | upstream OIDC configuration; the issuer is preset for `microsoft` and `google` and required for `oidc` (CHECK); the client id is required whenever a provider is set (CHECK) | NULL | §5 |

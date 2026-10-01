@@ -58,7 +58,7 @@ async function seedTenant(db: Db): Promise<void> {
 }
 
 describe('mailTemplates', () => {
-  it('lists the four builtin templates in the tenant language', async () => {
+  it('lists the six builtin templates in the tenant language', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
     const listed = await runOperation<unknown, { items: MailTemplateWire[] }>(
@@ -67,7 +67,7 @@ describe('mailTemplates', () => {
       {},
       asRun()
     );
-    expect(listed.items).toHaveLength(4);
+    expect(listed.items).toHaveLength(6);
     expect(listed.items.every(item => item.source === 'builtin')).toBe(true);
   });
 

@@ -19,13 +19,27 @@ why the specified behaviour changed; the commit history, how.
   number, the block and tenant-wide fallbacks and the most precise match, with a worked example
   of a German PBX line (Anlagenanschluss). `webhooks`: every event and its payload, the event-type
   filter and the `active` switch, retries, timeouts and the delivery status, and how to verify
-  `X-Zamfono-Signature`, with code. `mail-templates`: the four kinds, builtin and tenant templates
+  `X-Zamfono-Signature`, with code. `mail-templates`: the mail kinds, builtin and tenant templates
   per language, the Handlebars subset, the placeholders each kind offers and requires, the test
   send and mail without a relay. `parking`: the slot extensions, park, retrieve, the ring-back to
   the parker and BLF on slots. `user-groups`: where they are used, nesting, flattening and
   deletion. `directory`: the phone book, how it names callers, and the search. `call-data`:
   voicemails and MWI, the presence history and its snapshot, and the call statistics. The
   glossary, `mental-model` and `routing-order` point to them.
+- Automatic updates, off by default: an owner switches them on with `settings.update`
+  `{ "autoUpdate": true }`, and the stack then installs a newer non-breaking release on its own,
+  as `system.update` would (so it needs `UPDATER_TOKEN`), after backing up every enabled backup
+  target, at the next maintenance moment once nothing is in progress, the same moment and check a
+  renewed TLS certificate waits for. A failed attempt is not retried for that release: `/healthz`
+  shows the release in `autoUpdateFailed`, `system.info` in `autoUpdate.failed` with the reason,
+  every owner gets a mail (new template kind `updateFailed`), and the audit log has a
+  `system.autoUpdate` entry for every attempt and outcome. Whether automatic updates are on or
+  not, a breaking release, which only `update.sh` on the host installs, is announced:
+  `/healthz` carries its version in `breakingUpdateAvailable`, and every owner gets one mail per
+  release (new template kind `breakingUpdate`). `system.info` names who asked for the last update
+  in `update.last.trigger`: `manual` (with the owner in `by`), `automatic`, or `host` for
+  `update.sh` on the host. Backup runs now take turns: a manual run started during a scheduled one
+  waits for it, as the automatic update's backup does.
 
 ### Changed
 

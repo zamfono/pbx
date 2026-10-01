@@ -1,14 +1,16 @@
 # Mail templates
 
 Every mail the stack sends is rendered from a template: the voicemail notification, the
-missed-call mail (to users with `notifyMissedCalls` set), the setup mail with a new account's set-password link, and the password-reset
-mail. Each template has a `subject`, a plain-text `bodyText` and an optional `bodyHtml`.
+missed-call mail (to users with `notifyMissedCalls` set), the setup mail with a new account's
+set-password link, the password-reset mail, and the two mails to every owner about updates
+(`update-stack`): a failed automatic update and a breaking release to install by hand. Each
+template has a `subject`, a plain-text `bodyText` and an optional `bodyHtml`.
 
 ## Kinds, languages and which template applies
 
-There are four kinds, `voicemail`, `missedCall`, `setup` and `reset`, and six languages, `de`,
-`en`, `es`, `fr`, `it` and `ru`. The stack ships a **builtin** template for every kind and
-language; a **tenant** template overrides one of them. A mail uses the tenant's template for its
+There are six kinds, `voicemail`, `missedCall`, `setup`, `reset`, `updateFailed` and
+`breakingUpdate`, and six languages, `de`, `en`, `es`, `fr`, `it` and `ru`. The stack ships a
+**builtin** template for every kind and language; a **tenant** template overrides one of them. A mail uses the tenant's template for its
 kind in `settings.language`, else the builtin one for that language. An override in another
 language is kept but used only once `settings.language` is switched to it.
 
@@ -45,12 +47,14 @@ HTML-escaped in `bodyHtml`. The subject and text body are not escaped.
 Every kind offers `companyName` (`settings.companyName`), `recipientName` (the recipient user's
 name, or the ring group's for a group mailbox) and `fqdn` (the stack's domain). In addition:
 
-| Kind         | Also offered                                                             | Required |
-| ------------ | ------------------------------------------------------------------------ | -------- |
-| `voicemail`  | `callerNumber`, `callerName`, `mailboxName`, `receivedAt`, `durationS`   | none     |
-| `missedCall` | `callerNumber`, `callerName`, `receivedAt`, `didLabel`                   | none     |
-| `setup`      | `link`, `linkExpiresAt`, `invitedBy` (empty for the first owner at boot) | `link`   |
-| `reset`      | `link`, `linkExpiresAt`                                                  | `link`   |
+| Kind             | Also offered                                                                            | Required |
+| ---------------- | --------------------------------------------------------------------------------------- | -------- |
+| `voicemail`      | `callerNumber`, `callerName`, `mailboxName`, `receivedAt`, `durationS`                  | none     |
+| `missedCall`     | `callerNumber`, `callerName`, `receivedAt`, `didLabel`                                  | none     |
+| `setup`          | `link`, `linkExpiresAt`, `invitedBy` (empty for the first owner at boot)                | `link`   |
+| `reset`          | `link`, `linkExpiresAt`                                                                 | `link`   |
+| `updateFailed`   | `fromVersion` (empty when unknown), `toVersion`, `reason`, `failedAt`                   | none     |
+| `breakingUpdate` | `currentVersion`, `version`, `releaseUrl`, `publishedAt` (empty when GitHub names none) | none     |
 
 `callerName` is the phone-book name for the caller's number, empty when no contact has it
 (`directory`), so `{{#if callerName}}` chooses the wording. The voicemail audio is attached to the

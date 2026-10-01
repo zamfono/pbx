@@ -94,7 +94,7 @@ error = sys.argv[5] if len(sys.argv) > 5 else None
 with open(path) as f:
     text = f.read()
 record = json.loads(text)
-keys = ['state', 'from', 'to', 'startedAt']
+keys = ['state', 'from', 'to', 'trigger', 'startedAt']
 if state != 'running':
     keys.append('finishedAt')
 if state == 'failed':
@@ -104,6 +104,7 @@ if frm == '':
 assert list(record) == keys, list(record)
 assert text == json.dumps(record, indent=2) + '\n', 'not in the updater layout'
 assert record['state'] == state and record.get('from', '') == frm and record['to'] == to
+assert record['trigger'] == 'host', record['trigger']
 for key in ('startedAt', 'finishedAt'):
     if key in record:
         assert re.fullmatch(r'\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z', record[key]), record[key]

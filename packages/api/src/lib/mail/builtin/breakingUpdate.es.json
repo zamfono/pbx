@@ -1,0 +1,5 @@
+{
+  "subject": "Zamfono {{version}} requiere una actualización manual",
+  "bodyText": "Hola {{recipientName}},\n\nZamfono {{version}} ya está disponible{{#if publishedAt}} desde el {{date publishedAt}}{{/if}}. Es una versión con cambios incompatibles, así que {{fqdn}}, en {{currentVersion}}, no la instala por sí solo.\n\nLea sus notas de la versión{{#if releaseUrl}} ({{releaseUrl}}){{/if}} y actualice después con update.sh en el host.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Hola {{recipientName}},</p><p>Zamfono {{version}} ya está disponible{{#if publishedAt}} desde el {{date publishedAt}}{{/if}}. Es una versión con cambios incompatibles, así que {{fqdn}}, en {{currentVersion}}, no la instala por sí solo.</p><p>Lea sus notas de la versión{{#if releaseUrl}} ({{releaseUrl}}){{/if}} y actualice después con update.sh en el host.</p><p>{{companyName}} · {{fqdn}}</p>"
+}

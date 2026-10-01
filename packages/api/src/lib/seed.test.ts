@@ -626,7 +626,9 @@ describe('apiHealth', () => {
       keyRotationRemaining: 0,
       certificateSync: 'unknown',
       emergencyTrunk: false,
-      ringotelProfilePending: false
+      ringotelProfilePending: false,
+      breakingUpdateAvailable: null,
+      autoUpdateFailed: null
     });
     expect(healthStatus(health)).toBe(HTTP_SERVICE_UNAVAILABLE);
   });

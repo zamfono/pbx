@@ -6,19 +6,20 @@ import type { Actor, Channel, Context } from './types.js';
 /**
  * The `audit_log` operations that record what an effect outside Zamfono answered, rather than a
  * change Zamfono made (§5.7): a device's Ringotel push that ran after its operation committed,
- * the tenant profile's push (§10.4 "Tenant profile push"), and the re-registration a restart
- * triggers (§10.4). They are written outside any operation's
- * transaction, never undoable, and, like a pure action, never block an undo of the entity's
- * earlier entries (§5.8).
+ * the tenant profile's push (§10.4 "Tenant profile push"), the re-registration a restart
+ * triggers (§10.4), and each automatic update attempt (§6.3 "Updates"). They are written outside
+ * any operation's transaction, never undoable, and, like a pure action, never block an undo of
+ * the entity's earlier entries (§5.8).
  */
 export const OUTCOME_OPERATIONS: ReadonlySet<string> = new Set([
   'ringotel.push',
   'ringotel.profile',
-  'ringotel.rereg'
+  'ringotel.rereg',
+  'system.autoUpdate'
 ]);
 
 export type OutcomeOperation =
-  'ringotel.push' | 'ringotel.profile' | 'ringotel.rereg';
+  'ringotel.push' | 'ringotel.profile' | 'ringotel.rereg' | 'system.autoUpdate';
 
 /** Who an outcome row is attributed to: the caller of the operation it follows, or a job. */
 export type OutcomeCaller = {

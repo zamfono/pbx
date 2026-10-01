@@ -10,7 +10,7 @@ import {
   type Version
 } from './policy.js';
 import type { Releases } from './releases.js';
-import type { Runner, UpdateState } from './runner.js';
+import type { Runner, RunRequester, UpdateState } from './runner.js';
 
 /**
  * The updater's HTTP API on the stack's internal network (§6.3 "Updates"), no port published:
@@ -24,6 +24,7 @@ const STATUS_NOT_FOUND = 404;
 const STATUS_CONFLICT = 409;
 const STATUS_UNAVAILABLE = 503;
 const MAX_BODY_BYTES = 4096;
+const MAX_BY_LENGTH = 200;
 
 export type Status = {
   current: string | null;
@@ -120,6 +121,30 @@ async function describeStatus(deps: ServerDeps): Promise<Status> {
   }
 }
 
+/** Who `body` says asks for the run, recorded with it; `undefined` when it says nothing. */
+function requesterOf(body: unknown): RunRequester | undefined {
+  const { trigger, by } = body as { trigger?: unknown; by?: unknown };
+  if (trigger === undefined && by === undefined) {
+    return undefined;
+  }
+  if (trigger !== 'manual' && trigger !== 'automatic') {
+    throw new HttpError(
+      STATUS_BAD_REQUEST,
+      'trigger must be manual or automatic'
+    );
+  }
+  if (
+    by !== undefined &&
+    (typeof by !== 'string' || by.length > MAX_BY_LENGTH)
+  ) {
+    throw new HttpError(
+      STATUS_BAD_REQUEST,
+      `by must be a string of at most ${String(MAX_BY_LENGTH)} characters`
+    );
+  }
+  return by === undefined ? { trigger } : { trigger, by };
+}
+
 async function update(deps: ServerDeps, body: unknown): Promise<UpdateState> {
   if (deps.runner === undefined) {
     throw new HttpError(STATUS_UNAVAILABLE, deps.unavailable ?? 'no runner');
@@ -134,6 +159,7 @@ async function update(deps: ServerDeps, body: unknown): Promise<UpdateState> {
       'the stack directory pins no release; update it once with update.sh on the host'
     );
   }
+  const requester = requesterOf(body);
   const asked = (body as { version?: unknown }).version;
   const askedVersion =
     typeof asked === 'string' ? parseVersion(asked) : undefined;
@@ -158,7 +184,8 @@ async function update(deps: ServerDeps, body: unknown): Promise<UpdateState> {
   }
   await deps.runner.start(
     formatVersion(current),
-    formatVersion(release.version)
+    formatVersion(release.version),
+    requester
   );
   return deps.runner.current();
 }

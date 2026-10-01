@@ -10,12 +10,14 @@ import {
 } from '../../mail/index.js';
 import { OpError } from '../types.js';
 
-/** The four mail kinds `api` renders a template for (§10.2 "Templates"). */
+/** The six mail kinds `api` renders a template for (§10.2 "Templates"). */
 export const TEMPLATE_KINDS = [
   'voicemail',
   'missedCall',
   'setup',
-  'reset'
+  'reset',
+  'updateFailed',
+  'breakingUpdate'
 ] as const satisfies readonly TemplateKind[];
 
 /** The six tenant languages (§9.1, §10.2, §11.2). */
@@ -31,7 +33,7 @@ export const LANGUAGES = [
 export const kindSchema = z
   .enum(TEMPLATE_KINDS)
   .describe(
-    'The mail: voicemail (a new voicemail), missedCall, setup (the set-password link of a new account) or reset (a password reset link).'
+    'The mail: voicemail (a new voicemail), missedCall, setup (the set-password link of a new account), reset (a password reset link), updateFailed (to the owners: an automatic update failed) or breakingUpdate (to the owners: a breaking release needs a manual update).'
   );
 export const languageSchema = z
   .enum(LANGUAGES)

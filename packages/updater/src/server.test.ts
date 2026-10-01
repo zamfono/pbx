@@ -40,9 +40,9 @@ function fakeRunner(): Runner & { started: string[][] } {
     started,
     current: () => holder.state,
     settled: () => Promise.resolve(),
-    start: (from, to) => {
+    start: (from, to, requester) => {
       started.push([from, to]);
-      holder.state = { state: 'running', from, to };
+      holder.state = { state: 'running', from, to, ...requester };
       return Promise.resolve();
     }
   };
@@ -163,6 +163,25 @@ describe('the updater API', () => {
     expect(
       (await call(base, 'POST', '/update', { version: 'latest' })).status
     ).toBe(STATUS_BAD_REQUEST);
+  });
+
+  it('records who asked for the run, and refuses a trigger it does not know', async () => {
+    const runner = fakeRunner();
+    const base = await serve(deps({ runner }));
+    expect(
+      (await call(base, 'POST', '/update', { trigger: 'host' })).status
+    ).toBe(STATUS_BAD_REQUEST);
+    expect(
+      (await call(base, 'POST', '/update', { trigger: 'manual', by: 7 })).status
+    ).toBe(STATUS_BAD_REQUEST);
+    expect(runner.started).toEqual([]);
+
+    const { status, body } = await call(base, 'POST', '/update', {
+      trigger: 'manual',
+      by: 'Olga Owner'
+    });
+    expect(status).toBe(STATUS_ACCEPTED);
+    expect(body).toMatchObject({ trigger: 'manual', by: 'Olga Owner' });
   });
 
   it('refuses updates while it cannot run them, and says why', async () => {

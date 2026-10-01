@@ -57,6 +57,7 @@ describe('system.info', () => {
       },
       core: CORE,
       update: NO_UPDATER,
+      autoUpdate: { enabled: false, failed: null },
       ringotel: { profilePending: false },
       stack: { domain: null, ipv4: null }
     });
@@ -93,6 +94,7 @@ describe('system.info', () => {
       },
       core: null,
       update: NO_UPDATER,
+      autoUpdate: { enabled: false, failed: null },
       ringotel: { profilePending: false },
       stack: { domain: null, ipv4: null }
     });
@@ -123,6 +125,79 @@ describe('system.info', () => {
       update: {
         unavailable: 'the updater did not answer: connect ECONNREFUSED'
       }
+    });
+  });
+
+  it('names who asked for the last run: the record, else the run api started (§6.3)', async () => {
+    const db = await makeTestDb();
+    const last = {
+      state: 'succeeded' as const,
+      from: '0.1.0',
+      to: '0.1.1',
+      startedAt: '2026-10-01T03:00:00.000Z',
+      finishedAt: '2026-10-01T03:04:00.000Z'
+    };
+    const reporting = (state: typeof last & { trigger?: 'host' }) => () => ({
+      status: () =>
+        Promise.resolve({
+          current: '0.1.1',
+          latest: null,
+          updatable: false,
+          breaking: false,
+          last: state
+        }),
+      update: () => Promise.reject(new Error('unused'))
+    });
+    setUpdaterClient(reporting({ ...last, trigger: 'host' }));
+    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+      update: { last: { trigger: 'host' } }
+    });
+
+    // An updater that keeps no trigger: the run api started, as update_state recorded it.
+    await db
+      .updateTable('updateState')
+      .set({
+        runTrigger: 'automatic',
+        runActorName: 'Zamfono',
+        runStartedAt: last.startedAt
+      })
+      .execute();
+    setUpdaterClient(reporting(last));
+    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+      update: { last: { ...last, trigger: 'automatic', by: 'Zamfono' } }
+    });
+  });
+
+  it('reports whether automatic updates are on and why the last one failed (§6.3)', async () => {
+    const db = await makeTestDb();
+    await sql`PRAGMA foreign_keys = OFF`.execute(db);
+    await db
+      .insertInto('settings')
+      .values({
+        id: 1,
+        companyName: 'Test Co',
+        country: 'DE',
+        emergencyNumbersJson: '["112"]',
+        mainDidId: 'did-1',
+        autoUpdate: 1
+      })
+      .execute();
+    const failed = {
+      version: '0.1.2',
+      reason: 'the backup to target t1 failed: no space left',
+      at: '2026-10-01T03:01:00.000Z'
+    };
+    await db
+      .updateTable('updateState')
+      .set({
+        autoFailedVersion: failed.version,
+        autoFailure: failed.reason,
+        autoFailedAt: failed.at
+      })
+      .execute();
+
+    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+      autoUpdate: { enabled: true, failed }
     });
   });
 

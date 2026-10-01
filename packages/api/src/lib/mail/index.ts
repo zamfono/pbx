@@ -11,4 +11,9 @@ export {
   type CompiledTemplate
 } from './render.js';
 export { relayFromSettings, type RelayConfig } from './relay.js';
-export { sendMail, type SetupOrResetRequest } from './send.js';
+export {
+  sendMail,
+  type AnyMailRequest,
+  type SetupOrResetRequest,
+  type UpdateMailRequest
+} from './send.js';

@@ -8,6 +8,9 @@ export type UpdateState = {
   state: 'idle' | 'running' | 'succeeded' | 'failed';
   from?: string;
   to?: string;
+  /** Who asked for the run, `by` naming the owner of a manual one; absent from an older record. */
+  trigger?: 'manual' | 'automatic' | 'host';
+  by?: string;
   startedAt?: string;
   finishedAt?: string;
   error?: string;
@@ -34,10 +37,16 @@ export class UpdaterRefusal extends Error {
   }
 }
 
+/** Who asks the updater for a run, which it records with the run. */
+export type RunRequester = { trigger: 'manual' | 'automatic'; by: string };
+
 export type UpdaterClient = {
   status: () => Promise<UpdaterStatus>;
   /** `POST /update`: the latest release, or `version`; resolves once the updater has begun. */
-  update: (version: string | undefined) => Promise<UpdateState>;
+  update: (
+    version: string | undefined,
+    requester?: RunRequester
+  ) => Promise<UpdateState>;
 };
 
 const DEFAULT_URL = 'http://updater:8080';
@@ -78,11 +87,14 @@ export function updaterFromEnv(): UpdaterClient | undefined {
   }
   return {
     status: async () => call<UpdaterStatus>('/status', { token }),
-    update: async version =>
+    update: async (version, requester) =>
       call<UpdateState>('/update', {
         token,
         method: 'POST',
-        body: JSON.stringify(version === undefined ? {} : { version })
+        body: JSON.stringify({
+          ...(version === undefined ? {} : { version }),
+          ...requester
+        })
       })
   };
 }

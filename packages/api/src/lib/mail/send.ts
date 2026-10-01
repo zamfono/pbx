@@ -60,16 +60,43 @@ async function attachmentsFor(req: {
   }
 }
 
-/** The call a mail is about (§7), `undefined` for an account mail or a template test. */
-function callIdOf(req: MailRequest | SetupOrResetRequest): string | undefined {
-  return 'callId' in req ? req.callId : undefined;
-}
-
 export type SetupOrResetRequest = {
   kind: 'reset' | 'setup';
   to: { userId: string };
   values: { link: string; linkExpiresAt: string; invitedBy?: string };
 };
+
+/** The mails `api` sends each owner about updates (§6.3 "Updates", §10.2 "Mail"). */
+export type UpdateMailRequest =
+  | {
+      kind: 'updateFailed';
+      to: { userId: string };
+      values: {
+        fromVersion: string;
+        toVersion: string;
+        reason: string;
+        failedAt: string;
+      };
+    }
+  | {
+      kind: 'breakingUpdate';
+      to: { userId: string };
+      values: {
+        currentVersion: string;
+        version: string;
+        releaseUrl: string;
+        publishedAt: string;
+      };
+    };
+
+/** Every mail `sendMail` renders: the core's, the account mails and the update mails. */
+export type AnyMailRequest =
+  MailRequest | SetupOrResetRequest | UpdateMailRequest;
+
+/** The call a mail is about (§7), `undefined` for any other mail or a template test. */
+function callIdOf(req: AnyMailRequest): string | undefined {
+  return 'callId' in req ? req.callId : undefined;
+}
 
 /**
  * Renders `req`'s template and sends it over the tenant relay (§3.1 "Mail", §10.2 "Mail"),
@@ -80,7 +107,7 @@ export type SetupOrResetRequest = {
 export async function sendMail(
   db: Db,
   kr: Keyring,
-  req: MailRequest | SetupOrResetRequest,
+  req: AnyMailRequest,
   opts?: { attempts?: number; transport?: Transporter }
 ): Promise<'failed' | 'sent' | 'skipped'> {
   const relay = await relayFromSettings(db, kr);

@@ -3,12 +3,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 
-import type { MailRequest } from '@zamfono/shared';
-
 import {
   sendMail,
-  type Language,
-  type SetupOrResetRequest
+  type AnyMailRequest,
+  type Language
 } from '../../mail/index.js';
 import { keyringFromEnv } from '../../secretbox.js';
 import { setUndoable } from '../runner.js';
@@ -21,6 +19,9 @@ type Input = z.infer<typeof inputSchema>;
 
 const SAMPLE_CALLER_NUMBER = '+491234567890';
 const SAMPLE_DURATION_S = 90;
+const SAMPLE_FROM_VERSION = '1.2.3';
+const SAMPLE_TO_VERSION = '1.2.4';
+const SAMPLE_BREAKING_VERSION = '2.0.0';
 
 // ponytail: a placeholder file stands in for a real recording — `test` renders the template and
 // exercises the relay, not the voicemail pipeline, so the attachment's content is unobserved.
@@ -42,12 +43,9 @@ async function sampleAttachmentPath(): Promise<string> {
 type SampleRequestBuilder = (
   userId: string,
   now: string
-) =>
-  | Promise<MailRequest | SetupOrResetRequest>
-  | MailRequest
-  | SetupOrResetRequest;
+) => Promise<AnyMailRequest> | AnyMailRequest;
 
-/** One sample-valued `MailRequest`/`SetupOrResetRequest` builder per kind (§10.2), keyed so `sampleRequest` needs no switch to stay exhaustive. */
+/** One sample-valued request builder per kind (§10.2), keyed so `sampleRequest` needs no switch to stay exhaustive. */
 const SAMPLE_REQUEST_BUILDERS: Record<Input['kind'], SampleRequestBuilder> = {
   voicemail: async (userId, now) => ({
     kind: 'voicemail',
@@ -87,15 +85,35 @@ const SAMPLE_REQUEST_BUILDERS: Record<Input['kind'], SampleRequestBuilder> = {
       link: 'https://example.invalid/reset/sample-token',
       linkExpiresAt: now
     }
+  }),
+  updateFailed: (userId, now) => ({
+    kind: 'updateFailed',
+    to: { userId },
+    values: {
+      fromVersion: SAMPLE_FROM_VERSION,
+      toVersion: SAMPLE_TO_VERSION,
+      reason: 'Sample reason: the backup to the sample target failed.',
+      failedAt: now
+    }
+  }),
+  breakingUpdate: (userId, now) => ({
+    kind: 'breakingUpdate',
+    to: { userId },
+    values: {
+      currentVersion: SAMPLE_FROM_VERSION,
+      version: SAMPLE_BREAKING_VERSION,
+      releaseUrl: 'https://example.invalid/releases/sample',
+      publishedAt: now
+    }
   })
 };
 
-/** The sample-valued `MailRequest`/`SetupOrResetRequest` `sendMail` renders for `kind` (§10.2). */
+/** The sample-valued request `sendMail` renders for `kind` (§10.2). */
 async function sampleRequest(
   kind: Input['kind'],
   userId: string,
   now: string
-): Promise<MailRequest | SetupOrResetRequest> {
+): Promise<AnyMailRequest> {
   return SAMPLE_REQUEST_BUILDERS[kind](userId, now);
 }
 

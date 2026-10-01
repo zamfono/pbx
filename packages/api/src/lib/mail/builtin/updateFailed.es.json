@@ -1,0 +1,5 @@
+{
+  "subject": "La actualización automática a {{toVersion}} ha fallado",
+  "bodyText": "Hola {{recipientName}},\n\nLa actualización automática de {{fqdn}}{{#if fromVersion}} de {{fromVersion}}{{/if}} a {{toVersion}} ha fallado el {{date failedAt}}:\n\n{{reason}}\n\nZamfono no vuelve a intentar esta versión por sí solo. system.info muestra los detalles; una vez resuelta la causa, actualice con system.update o con update.sh en el host.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Hola {{recipientName}},</p><p>La actualización automática de {{fqdn}}{{#if fromVersion}} de {{fromVersion}}{{/if}} a {{toVersion}} ha fallado el {{date failedAt}}:</p><p>{{reason}}</p><p>Zamfono no vuelve a intentar esta versión por sí solo. system.info muestra los detalles; una vez resuelta la causa, actualice con system.update o con update.sh en el host.</p><p>{{companyName}} · {{fqdn}}</p>"
+}

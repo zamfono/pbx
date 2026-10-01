@@ -1,0 +1,5 @@
+{
+  "subject": "Échec de la mise à jour automatique vers {{toVersion}}",
+  "bodyText": "Bonjour {{recipientName}},\n\nLa mise à jour automatique de {{fqdn}}{{#if fromVersion}} de {{fromVersion}}{{/if}} vers {{toVersion}} a échoué le {{date failedAt}} :\n\n{{reason}}\n\nZamfono ne retente pas cette version de lui-même. system.info en donne le détail ; une fois la cause corrigée, mettez à jour avec system.update ou avec update.sh sur l'hôte.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Bonjour {{recipientName}},</p><p>La mise à jour automatique de {{fqdn}}{{#if fromVersion}} de {{fromVersion}}{{/if}} vers {{toVersion}} a échoué le {{date failedAt}} :</p><p>{{reason}}</p><p>Zamfono ne retente pas cette version de lui-même. system.info en donne le détail ; une fois la cause corrigée, mettez à jour avec system.update ou avec update.sh sur l'hôte.</p><p>{{companyName}} · {{fqdn}}</p>"
+}

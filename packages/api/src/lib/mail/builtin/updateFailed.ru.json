@@ -1,0 +1,5 @@
+{
+  "subject": "Автоматическое обновление до {{toVersion}} не удалось",
+  "bodyText": "Здравствуйте, {{recipientName}}!\n\nАвтоматическое обновление {{fqdn}}{{#if fromVersion}} с {{fromVersion}}{{/if}} до {{toVersion}} не удалось {{date failedAt}}:\n\n{{reason}}\n\nZamfono не повторяет этот релиз сам. Подробности показывает system.info; устранив причину, обновите систему через system.update или update.sh на хосте.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Здравствуйте, {{recipientName}}!</p><p>Автоматическое обновление {{fqdn}}{{#if fromVersion}} с {{fromVersion}}{{/if}} до {{toVersion}} не удалось {{date failedAt}}:</p><p>{{reason}}</p><p>Zamfono не повторяет этот релиз сам. Подробности показывает system.info; устранив причину, обновите систему через system.update или update.sh на хосте.</p><p>{{companyName}} · {{fqdn}}</p>"
+}

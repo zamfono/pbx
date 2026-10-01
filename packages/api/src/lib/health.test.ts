@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { nowIso, openDb, type Db } from '@zamfono/shared';
 
-import { apiHealth } from './health.js';
+import { apiHealth, type ApiHealth } from './health.js';
 import { makeTestDb } from './testDb.js';
 
 /** `apiHealth` over `db`, with core reachable and the job-fed fields fixed. */
-async function healthOf(db: Db): Promise<{ emergencyTrunk: boolean }> {
+async function healthOf(db: Db): Promise<ApiHealth> {
   return apiHealth({
     db,
     checkCore: () => Promise.resolve({ reachable: true, ari: true }),
@@ -35,6 +35,37 @@ async function seedTrunk(
     })
     .execute();
 }
+
+describe('apiHealth update fields (§6.3 "Updates", §10.3 Health row)', () => {
+  it('carries the breaking release and the failed automatic update from update_state', async () => {
+    const db = await makeTestDb();
+    await expect(healthOf(db)).resolves.toMatchObject({
+      breakingUpdateAvailable: null,
+      autoUpdateFailed: null
+    });
+
+    await db
+      .updateTable('updateState')
+      .set({
+        breakingVersion: '0.2.0',
+        autoFailedVersion: '0.1.2',
+        autoFailure: 'the backup failed',
+        autoFailedAt: nowIso()
+      })
+      .execute();
+    await expect(healthOf(db)).resolves.toMatchObject({
+      breakingUpdateAvailable: '0.2.0',
+      autoUpdateFailed: '0.1.2'
+    });
+  });
+
+  it('reports neither on an unmigrated database instead of throwing', async () => {
+    await expect(healthOf(openDb(':memory:'))).resolves.toMatchObject({
+      breakingUpdateAvailable: null,
+      autoUpdateFailed: null
+    });
+  });
+});
 
 describe('apiHealth emergencyTrunk (§9.4 "Emergency trunks", §10.3 Health row)', () => {
   it('is false with no trunk at all', async () => {

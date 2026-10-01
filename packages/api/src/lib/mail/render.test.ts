@@ -14,7 +14,9 @@ const BUILTIN_KINDS: TemplateKind[] = [
   'voicemail',
   'missedCall',
   'setup',
-  'reset'
+  'reset',
+  'updateFailed',
+  'breakingUpdate'
 ];
 const BUILTIN_LANGUAGES: Language[] = ['de', 'en', 'es', 'fr', 'it', 'ru'];
 
@@ -113,6 +115,51 @@ describe('loadBuiltinTemplate', () => {
       });
     }
   }
+});
+
+describe('the update mails', () => {
+  it('render the failed update with its reason, and the breaking release with its notes', () => {
+    const failed = loadBuiltinTemplate('updateFailed', 'en');
+    const failedMail = compileTemplate(
+      'updateFailed',
+      failed.subject,
+      failed.bodyText,
+      failed.bodyHtml
+    ).render(
+      {
+        fqdn: 'pbx.example.com',
+        fromVersion: '0.1.1',
+        toVersion: '0.1.2',
+        reason: 'the backup failed',
+        failedAt: '2026-10-01T03:00:00Z'
+      },
+      { language: 'en', timezone: 'UTC' }
+    );
+    expect(failedMail.subject).toBe('Automatic update to 0.1.2 failed');
+    expect(failedMail.text).toContain('from 0.1.1 to 0.1.2');
+    expect(failedMail.text).toContain('the backup failed');
+
+    const breaking = loadBuiltinTemplate('breakingUpdate', 'de');
+    const breakingMail = compileTemplate(
+      'breakingUpdate',
+      breaking.subject,
+      breaking.bodyText,
+      breaking.bodyHtml
+    ).render(
+      {
+        currentVersion: '0.1.2',
+        version: '0.2.0',
+        releaseUrl: 'https://example/v0.2.0',
+        publishedAt: ''
+      },
+      { language: 'de', timezone: 'UTC' }
+    );
+    expect(breakingMail.subject).toBe(
+      'Zamfono 0.2.0 braucht ein manuelles Update'
+    );
+    expect(breakingMail.text).toContain('https://example/v0.2.0');
+    expect(breakingMail.text).not.toContain(', am ');
+  });
 });
 
 describe('resolveTemplate', () => {

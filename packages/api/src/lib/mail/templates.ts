@@ -53,6 +53,26 @@ export const PLACEHOLDERS: Record<
   reset: {
     offered: [...COMMON_PLACEHOLDERS, 'link', 'linkExpiresAt'],
     required: ['link']
+  },
+  updateFailed: {
+    offered: [
+      ...COMMON_PLACEHOLDERS,
+      'fromVersion',
+      'toVersion',
+      'reason',
+      'failedAt'
+    ],
+    required: []
+  },
+  breakingUpdate: {
+    offered: [
+      ...COMMON_PLACEHOLDERS,
+      'currentVersion',
+      'version',
+      'releaseUrl',
+      'publishedAt'
+    ],
+    required: []
   }
 };
 

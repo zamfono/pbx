@@ -8,6 +8,7 @@ import { connectCoreEvents } from '../coreEvents.js';
 import { propagateAtBoot } from '../propagation.js';
 import type { Keyring } from '../secretbox.js';
 import { seedIfEmpty } from '../seed.js';
+import { scheduleAutoUpdate } from './autoUpdate.js';
 import {
   execCommand,
   runBootSteps,
@@ -35,6 +36,9 @@ vi.mock('./retention.js', () => ({
 }));
 vi.mock('./cron.js', () => ({
   scheduleBackups: vi.fn(() => ({ enqueue: vi.fn(), stop: vi.fn() }))
+}));
+vi.mock('./autoUpdate.js', () => ({
+  scheduleAutoUpdate: vi.fn(() => ({ stop: vi.fn() }))
 }));
 vi.mock('./certSync.js', () => ({
   getCertSyncScheduler: vi.fn(() => ({
@@ -133,6 +137,7 @@ describe('startBackgroundJobs', () => {
     expect(scheduleRetention).toHaveBeenCalledTimes(1);
     expect(vi.mocked(scheduleRetention).mock.calls[0]?.[0]).toBe(FAKE_DB);
     expect(getCertSyncScheduler).toHaveBeenCalledTimes(1);
+    expect(scheduleAutoUpdate).toHaveBeenCalledTimes(1);
     expect(connectCoreEvents).toHaveBeenCalledTimes(1);
   });
 
@@ -145,6 +150,7 @@ describe('startBackgroundJobs', () => {
       vi.mocked(scheduleBackups).mock.results[0]?.value,
       vi.mocked(scheduleRetention).mock.results[0]?.value,
       vi.mocked(getCertSyncScheduler).mock.results[0]?.value,
+      vi.mocked(scheduleAutoUpdate).mock.results[0]?.value,
       vi.mocked(connectCoreEvents).mock.results[0]?.value
     ] as ({ stop?: () => void; close?: () => void } | undefined)[];
     for (const job of stopped) {

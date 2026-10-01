@@ -1,9 +1,9 @@
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { createRunner, loadState } from './runner.js';
+import { createRunner, HOST_RUN_STALE_MS, loadState } from './runner.js';
 
 async function tempDir(): Promise<string> {
   return mkdtemp(path.join(tmpdir(), 'zamfono-updater-'));
@@ -62,6 +62,23 @@ describe('createRunner', () => {
     expect((await loadState(stackDir)).state).toBe('succeeded');
   });
 
+  it('keeps who asked for the run in its record', async () => {
+    const stackDir = await tempDir();
+    const runner = await createRunner({
+      stackDir,
+      project: project(stackDir),
+      socketPath: '/s',
+      script: await fakeScript(stackDir, 0)
+    });
+    await runner.start('0.0.6', '0.0.7', { trigger: 'automatic' });
+    expect(runner.current()).toMatchObject({ trigger: 'automatic' });
+    await runner.settled();
+    expect(await loadState(stackDir)).toMatchObject({
+      state: 'succeeded',
+      trigger: 'automatic'
+    });
+  });
+
   it('records a failure with the end of the log', async () => {
     const stackDir = await tempDir();
     const runner = await createRunner({
@@ -117,6 +134,31 @@ describe('loadState', () => {
     expect(state).toMatchObject({ state: 'failed', to: '0.0.7' });
     expect(state.error).toContain('interrupted');
     await runner.settled();
+  });
+
+  it('leaves a running host run alone, unless it started HOST_RUN_STALE_MS ago', async () => {
+    const stackDir = await tempDir();
+    const hostRun = {
+      state: 'running',
+      from: '0.1.0',
+      to: '0.1.1',
+      trigger: 'host',
+      startedAt: '2026-10-01T03:00:00.000Z'
+    };
+    await mkdir(path.join(stackDir, '.update'));
+    await writeFile(
+      path.join(stackDir, '.update', 'state.json'),
+      `${JSON.stringify(hostRun, null, 2)}\n`
+    );
+    const startedMs = Date.parse(hostRun.startedAt);
+    const at = (ms: number) => () => new Date(startedMs + ms).toISOString();
+
+    expect(await loadState(stackDir, at(HOST_RUN_STALE_MS - 1))).toEqual(
+      hostRun
+    );
+    const stale = await loadState(stackDir, at(HOST_RUN_STALE_MS));
+    expect(stale).toMatchObject({ state: 'failed', trigger: 'host' });
+    expect(stale.error).toContain('update.sh on the host');
   });
 
   it('starts idle in a directory that never ran an update', async () => {

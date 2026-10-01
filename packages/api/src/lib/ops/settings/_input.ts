@@ -185,6 +185,12 @@ export const settingsInputSchema = z
       .describe(
         'Hour 0-23 for swapping in a renewed certificate when no opening-hours schedule offers a closed period.'
       ),
+    autoUpdate: z
+      .boolean()
+      .optional()
+      .describe(
+        'Install newer non-breaking releases automatically, after a backup, at a maintenance moment when no call is in progress; off by default. Owner-only.'
+      ),
     ssoProvider: z
       .enum(SSO_PROVIDERS)
       .nullish()

@@ -1,0 +1,5 @@
+{
+  "subject": "Zamfono {{version}} needs a manual update",
+  "bodyText": "Hi {{recipientName}},\n\nZamfono {{version}} is out{{#if publishedAt}} since {{date publishedAt}}{{/if}}. It is a breaking release, so {{fqdn}}, on {{currentVersion}}, does not install it on its own.\n\nRead its release notes{{#if releaseUrl}} ({{releaseUrl}}){{/if}}, then update with update.sh on the host.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Hi {{recipientName}},</p><p>Zamfono {{version}} is out{{#if publishedAt}} since {{date publishedAt}}{{/if}}. It is a breaking release, so {{fqdn}}, on {{currentVersion}}, does not install it on its own.</p><p>Read its release notes{{#if releaseUrl}} ({{releaseUrl}}){{/if}}, then update with update.sh on the host.</p><p>{{companyName}} · {{fqdn}}</p>"
+}

@@ -346,7 +346,9 @@ latest release, whether it can be installed this way, and how the last update we
 way, and `system.update` installs it. It runs the same `update.sh` in the `updater` service, only to a newer
 release that is not breaking, and only once a backup run finished `ok` within the last hour. The
 updater needs `UPDATER_TOKEN` and `CONTAINER_SOCKET` in `.env`, which `setup.sh` and `update.sh`
-write.
+write. With the owner's setting `autoUpdate` on (off by default), the stack installs such a
+release on its own, after a backup, at a quiet moment with no call in progress, and mails the
+owners when that fails or when a breaking release needs `update.sh` (`zamfono.help update-stack`).
 
 **By hand**, the steps `update.sh` takes are: unpack the new bundle over the stack directory, then
 pull and recreate with the same overlay as always:

@@ -48,6 +48,7 @@ export type SettingsWire = {
   auditRetentionDays: number | null;
   backupCron: string;
   tlsReloadHour: number | null;
+  autoUpdate: boolean;
   ssoProvider: (typeof SSO_PROVIDERS)[number] | null;
   ssoLabel: string | null;
   ssoIssuer: string | null;
@@ -71,6 +72,7 @@ export const OWNER_FIELDS: ReadonlySet<keyof SettingsWire> = new Set([
   'mailFrom',
   'emergencyNumbers',
   'auditRetentionDays',
+  'autoUpdate',
   'ssoProvider',
   'ssoLabel',
   'ssoIssuer',
@@ -135,6 +137,7 @@ export async function rowToWire(
     auditRetentionDays: row.auditRetentionDays,
     backupCron: row.backupCron,
     tlsReloadHour: row.tlsReloadHour,
+    autoUpdate: row.autoUpdate === 1,
     ssoProvider: row.ssoProvider as (typeof SSO_PROVIDERS)[number] | null,
     ssoLabel: row.ssoLabel,
     ssoIssuer: row.ssoIssuer,
