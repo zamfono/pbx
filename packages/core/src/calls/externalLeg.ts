@@ -9,10 +9,9 @@
  */
 import { isE164 } from '@zamfono/shared';
 
-import type { AriEvent } from '../ari/types.js';
 import type { Call } from './call.js';
 import { recordEvents, redeliverEarlyEvents } from './earlyEvents.js';
-import { endAttempt, watchAttempt } from './externalAttempt.js';
+import { watchAttempt, type AttemptFailed } from './externalAttempt.js';
 import {
   nextCandidate,
   nextRoute,
@@ -62,11 +61,12 @@ function takeOver(
   leg: ExternalLeg,
   candidate: Candidate,
   trunkLeg: TrunkLeg,
-  previous: string | null
+  attempt: { previous: string | null; onFailed: AttemptFailed }
 ): void {
   const { pipeline, owner } = leg;
   const channelId = trunkLeg.id;
-  watchAttempt(leg, candidate, trunkLeg);
+  const { previous } = attempt;
+  watchAttempt(leg, candidate, trunkLeg, attempt.onFailed);
   if (previous !== null && !owner.ringing(previous)) {
     pipeline.deps.ari.channels.hangup(channelId).catch(() => undefined);
     return;
@@ -78,7 +78,9 @@ function takeOver(
 }
 
 /** Originates `candidate`'s attempt, or the next ones should originating fail, and hands the
- * channel to the race in place of `previous`, the attempt it replaces (`null` for the first). */
+ * channel to the race in place of `previous`, the attempt it replaces (`null` for the first). An
+ * attempt that fails while the race rings the leg is replaced by the next one, as §9.4 "Route
+ * fallthrough" or "Hosts" retries it, else ends the leg for the race, as a device's end would. */
 async function dialFrom(
   leg: ExternalLeg,
   first: Candidate,
@@ -102,7 +104,18 @@ async function dialFrom(
       endpoint
     ).catch(() => null);
     if (trunkLeg !== null) {
-      takeOver(leg, candidate, trunkLeg, previous);
+      const channelId = trunkLeg.id;
+      takeOver(leg, candidate, trunkLeg, {
+        previous,
+        onFailed: (failure, cause) => {
+          const next = nextCandidate(leg, failure);
+          if (next === null) {
+            owner.end(channelId, cause);
+            return;
+          }
+          dialFrom(leg, next, channelId).catch(() => undefined);
+        }
+      });
       redeliverEarlyEvents(pipeline.deps.ari, early, trunkLeg.id);
       return;
     }
@@ -118,30 +131,6 @@ async function dialFrom(
   if (previous !== null) {
     owner.end(previous, null);
   }
-}
-
-/**
- * For the race's own `ChannelDestroyed` of a leg it still rings: whether the leg dials on, because
- * the attempt failed before alerting in a way §9.4 "Route fallthrough" or "Hosts" retries and a
- * next host or route remains; the race then keeps the leg ringing rather than counting it ended.
- * Any other end — after alerting, on the callee's own condition, the routes exhausted — is the
- * leg's own, for the race to handle as it would a device's.
- */
-export function externalAttemptDialsOn(
-  pipeline: Pipeline,
-  channelId: string,
-  destroyed: AriEvent
-): boolean {
-  const ended = endAttempt(pipeline, channelId, destroyed);
-  if (ended === null) {
-    return false;
-  }
-  const next = nextCandidate(ended.leg, ended.failure);
-  if (next === null) {
-    return false;
-  }
-  dialFrom(ended.leg, next, channelId).catch(() => undefined);
-  return true;
 }
 
 /**

@@ -6,7 +6,6 @@
 import type { AriEvent, Channel } from '../ari/types.js';
 import type { Call } from './call.js';
 import { traceChannelEnded } from './callEnd.js';
-import { externalAttemptDialsOn } from './externalLeg.js';
 import { endHold, holdIn } from './hold.js';
 import { clearFindMeTimers, endLeg, hangupLeg } from './legs.js';
 import { finishAbandoned } from './missedCall.js';
@@ -206,10 +205,11 @@ export async function handleChannelEnded(
   if (leg?.state !== 'ringing' || ev.type === 'StasisEnd') {
     return;
   }
-  const cause = typeof ev.cause === 'number' ? ev.cause : null;
-  // An external leg's attempt that falls through to its next route rings on (§9.4 "Route fallthrough").
-  if (externalAttemptDialsOn(pipeline, channelId, ev)) {
+  // A find-me leg is an external leg, whose attempt's own end falls through to its next route or
+  // ends the leg (`externalAttempt.ts`, §9.4 "Route fallthrough").
+  if (leg.kind === 'findMe') {
     return;
   }
+  const cause = typeof ev.cause === 'number' ? ev.cause : null;
   endRingingLeg(pipeline, call, leg, cause);
 }

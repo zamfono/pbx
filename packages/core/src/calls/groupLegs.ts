@@ -12,6 +12,9 @@ export type GroupLeg = {
   state: 'ringing' | 'ended';
   /** The device a member's own leg rings; absent for an external (forwarded) member leg. */
   deviceId?: string;
+  /** An external (forwarded) member leg, whose channel's end its attempt handles
+   * (`externalAttempt.ts`). */
+  external?: true;
 };
 
 /** Ends every one of `memberKey`'s still-ringing legs (§10.1 step 5: `allow_reject` stops ringing all of a declining member's devices). */

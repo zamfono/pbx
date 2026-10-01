@@ -8,7 +8,6 @@
 import type { AriEvent, Channel } from '../ari/types.js';
 import type { Call } from './call.js';
 import { callPartiesChanged } from './callState.js';
-import { externalAttemptDialsOn } from './externalLeg.js';
 import { hangupMemberSiblings, type GroupLeg } from './groupLegs.js';
 import type { Pipeline } from './pipeline.js';
 import { winBatch } from './ringGroupWin.js';
@@ -97,11 +96,12 @@ function handleBatchEvent(ctx: RaceContext, ev: AriEvent): void {
     }
     return;
   }
-  const cause = typeof ev.cause === 'number' ? ev.cause : null;
-  // An external leg's attempt that falls through to its next route rings on (§9.4 "Route fallthrough").
-  if (externalAttemptDialsOn(ctx.pipeline, channel.id, ev)) {
+  // An external member leg's attempt's own end falls through to its next route or ends the leg
+  // (`externalAttempt.ts`, §9.4 "Route fallthrough").
+  if (leg.external === true) {
     return;
   }
+  const cause = typeof ev.cause === 'number' ? ev.cause : null;
   handleDecline(ctx, leg, cause);
 }
 

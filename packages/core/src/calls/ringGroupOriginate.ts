@@ -167,7 +167,8 @@ async function originateExternalLeg(
           channelId,
           userId: null,
           memberKey,
-          state: 'ringing'
+          state: 'ringing',
+          external: true
         };
         tracked.set(channelId, leg);
         call.log.event({ event: 'ringGroupMember', channelId, userId: null });
