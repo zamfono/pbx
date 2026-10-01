@@ -14,7 +14,9 @@ import {
   callLogMaxBytesFromEnv,
   newCall,
   raiseLogLevel,
-  type Call
+  toLogLevel,
+  type Call,
+  type Owner
 } from './call.js';
 import {
   channelOf,
@@ -25,7 +27,13 @@ import { ownerForExt } from './extensionOwner.js';
 import { endHold } from './hold.js';
 import { closeCall } from './liveCall.js';
 import type { Pipeline } from './pipeline.js';
-import { logLevelFor, resolveTarget, routeToTarget } from './routeToTarget.js';
+import {
+  logLevelFor,
+  resolveTarget,
+  routeToTarget,
+  type ResolvedTarget
+} from './routeToTarget.js';
+import { deposit } from './voicemail.js';
 
 /** The user present in `call` as `channelId`: its caller, or the leg's owner. */
 export function userOfChannel(call: Call, channelId: string): string | null {
@@ -67,31 +75,41 @@ export function transfereeEntry(
   };
 }
 
+/** Where a transfer sends the transferee: `target` dialled as the transferrer's call, or for a
+ * transfer to voicemail straight into the mailbox of `target`'s owner, without ringing, as
+ * `*97<target>` deposits (§9.3). */
+type Onward =
+  | { target: string; resolved: ResolvedTarget }
+  | { target: string; mailbox: Owner };
+
 /**
  * The transferee's own new call (§10.1 "Transfers and pickup"): `parent_call_id` links it to
- * `parent`, its caller channel is the transferee's, and `target` is routed as the transferrer's
- * call (§9.4), so an external number leaves under the transferrer's routes and caller-ID. The
- * routing runs on after this returns, like any other call's.
+ * `parent`, its caller channel is the transferee's, and it goes `onward`: a target is routed as
+ * the transferrer's call (§9.4), so an external number leaves under the transferrer's routes and
+ * caller-ID. The routing runs on after this returns, like any other call's.
  */
 async function startTransfereeCall(
   pipeline: Pipeline,
   parent: Call,
   transferee: string,
-  target: string,
+  onward: Onward,
   transferrerUserId: string | null
 ): Promise<Call> {
   const snapshot = await pipeline.deps.cache.get();
-  const resolved = resolveTarget(snapshot, target);
   const entry = transfereeEntry(parent, transferee);
   const startedAt = pipeline.deps.now();
+  const dial = 'resolved' in onward ? onward.resolved : null;
   const child = newCall({
     id: newId(),
-    direction: entry.inbound ? 'inbound' : resolved.direction,
+    direction: entry.inbound ? 'inbound' : (dial?.direction ?? 'internal'),
     callerChannelId: transferee,
     from: fromOf(parent, transferee, snapshot),
-    to: resolved.to,
+    to: dial?.to ?? onward.target,
     startedAt,
-    logLevel: logLevelFor(snapshot, resolved.action, startedAt),
+    logLevel:
+      dial === null
+        ? toLogLevel(snapshot.settings.callLogLevel)
+        : logLevelFor(snapshot, dial.action, startedAt),
     callLogMaxBytes: callLogMaxBytesFromEnv()
   });
   child.parentCallId = parent.id;
@@ -114,34 +132,42 @@ async function startTransfereeCall(
   );
   child.log.event({
     event: 'entry',
-    dialAction: resolved.action.kind,
-    dialed: target,
+    ...(dial === null
+      ? { mailbox: onward.target }
+      : { dialAction: dial.action.kind, dialed: onward.target }),
     parentCallId: parent.id
   });
-  routeToTarget(pipeline, child, resolved.action, transferrerUserId).catch(
-    () => undefined
-  );
+  const routing =
+    'mailbox' in onward
+      ? deposit(pipeline, child, onward.mailbox, 'transfer')
+      : routeToTarget(
+          pipeline,
+          child,
+          onward.resolved.action,
+          transferrerUserId
+        );
+  routing.catch(() => undefined);
   return child;
 }
 
 const HTTP_UNPROCESSABLE = 422;
 
-/** `*97<ext>` (§9.3), what a phone transfers a caller to for `ext`'s mailbox, without ringing:
- * a transfer with `voicemail` dials it in place of `ext`. 422 for an extension no user or ring
- * group owns. */
-export async function voicemailDial(
-  pipeline: Pipeline,
-  ext: string
-): Promise<string> {
-  const snapshot = await pipeline.deps.cache.get();
-  if (ownerForExt(snapshot, ext) === null) {
+/** Where `req` sends the transferee (`Onward`); 422 for a transfer to voicemail to an extension
+ * no user or ring group owns, so nothing has moved yet. */
+function onwardOf(snapshot: Snapshot, req: TransferRequest): Onward {
+  const { target } = req;
+  if (req.voicemail !== true) {
+    return { target, resolved: resolveTarget(snapshot, target) };
+  }
+  const mailbox = ownerForExt(snapshot, target);
+  if (mailbox === null) {
     throw new ActionError(
       HTTP_UNPROCESSABLE,
       'noMailbox',
       'the target owns no mailbox'
     );
   }
-  return `${snapshot.settings.featureCodes.deposit}${ext}`;
+  return { target, mailbox };
 }
 
 /** The transferrer's channel in `call`: the actor's own, else the answerer's, else the caller's.
@@ -158,15 +184,17 @@ export function transferrerChannel(call: Call, actorUserId: string): string {
 
 /**
  * `POST /internal/calls/{id}/transfer` (§10.1 "Transfers and pickup"): blind-transfers the other
- * party of the bridged `call` to `target` as their own new call, returned; the transferrer's
- * participation, and with it `call`, ends. `null` for a call that is not bridged, or whose
- * bridge is another call's: a party added to that call (§10.2 "Three-way calls").
+ * party of the bridged `call` to `req.target`, with `req.voicemail` into its owner's mailbox, as
+ * their own new call, returned; the transferrer's participation, and with it `call`, ends. `null`
+ * for a call that is not bridged, or whose bridge is another call's: a party added to that call
+ * (§10.2 "Three-way calls").
  */
 export async function transferCall(
   pipeline: Pipeline,
   call: Call,
   req: TransferRequest
 ): Promise<Call | null> {
+  const onward = onwardOf(await pipeline.deps.cache.get(), req);
   const transferrer = transferrerChannel(call, req.actorUserId);
   const transferee = otherChannelIn(call, transferrer);
   const { bridgeId } = call;
@@ -179,6 +207,7 @@ export async function transferCall(
     event: 'transfer',
     actorUserId: req.actorUserId,
     target: req.target,
+    ...('mailbox' in onward ? { voicemail: true } : {}),
     transferee
   });
   const transferrerUserId = userOfChannel(call, transferrer);
@@ -191,7 +220,7 @@ export async function transferCall(
     pipeline,
     call,
     transferee,
-    req.target,
+    onward,
     transferrerUserId
   );
 }

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # §10.1 "Transfers and pickup" over the API, into a mailbox (§9.3 `*97<ext>`): the transfer was
-# accepted, the answered call closed with the transfer to `*97101` in its trace, and the caller's
-# onward call, linked to it through `parent_call_id`, ended in 101's mailbox, which holds a new
-# message from the caller.
+# accepted, the answered call closed with the transfer to 101's mailbox in its trace, and the
+# caller's onward call, linked to it through `parent_call_id`, ended in 101's mailbox, which holds
+# a new message from the caller.
 set -euo pipefail
 
 api_base=$1
@@ -26,9 +26,9 @@ before, mailbox = set(sys.argv[4].split()), sys.argv[5]
 lines = [json.loads(line) for line in (parent.get("log") or "").splitlines() if line.strip()]
 
 problems = []
-if not [l for l in lines if l.get("event") == "transfer" and l.get("target") == "*97101"
-        and l.get("actorUserId")]:
-    problems.append("the call's trace has no transfer to *97101 naming the acting user")
+if not [l for l in lines if l.get("event") == "transfer" and l.get("target") == "101"
+        and l.get("voicemail") is True and l.get("actorUserId")]:
+    problems.append("the call's trace has no transfer to 101's mailbox naming the acting user")
 child = next((c for c in calls["items"] if c["parentCallId"] == parent["id"]), None)
 if child is None:
     problems.append("no onward call carries the transferred call as its parent")

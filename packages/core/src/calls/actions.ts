@@ -37,7 +37,7 @@ import { parkedCalls } from './parkingView.js';
 import { pickupOnRequest } from './pickupAction.js';
 import type { Pipeline } from './pipeline.js';
 import { followTransfers } from './referTransfers.js';
-import { transferCall, voicemailDial } from './transfers.js';
+import { transferCall } from './transfers.js';
 import { registeredDevices } from './userDevices.js';
 
 const HTTP_NOT_FOUND = 404;
@@ -123,14 +123,9 @@ export class CallActions {
   }
 
   /** `POST /internal/calls/{id}/transfer` (§10.1 "Transfers and pickup"): with `voicemail`,
-   * to `*97<target>`, the mailbox of the extension's user or ring group (§9.3). */
+   * into the mailbox of the extension's user or ring group, as `*97<target>` (§9.3). */
   async transfer(callId: string, req: TransferRequest): Promise<void> {
-    const call = this.findCall(callId);
-    const target =
-      req.voicemail === true
-        ? await voicemailDial(this.pipeline, req.target)
-        : req.target;
-    const child = await transferCall(this.pipeline, call, { ...req, target });
+    const child = await transferCall(this.pipeline, this.findCall(callId), req);
     if (child === null) {
       throw new ActionError(HTTP_CONFLICT, 'notBridged', 'call is not bridged');
     }

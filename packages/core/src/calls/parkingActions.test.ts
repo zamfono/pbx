@@ -430,7 +430,7 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
     });
   });
 
-  it('transfers to voicemail through *97<ext>, depositing in that mailbox without ringing it', async () => {
+  it('transfers to voicemail, depositing in that mailbox without ringing it, as *97<ext> does', async () => {
     await setUp();
     const anna = await seedUser(db, '101');
     const ben = await seedUser(db, '102');
@@ -452,7 +452,7 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
         .executeTakeFirstOrThrow();
       expect(child.status).toBe('voicemail');
       expect(child.direction).toBe('inbound');
-      expect(child.log).toContain('"dialed":"*97102"');
+      expect(child.log).toContain('"event":"entry","mailbox":"102"');
       const messages = await db
         .selectFrom('voicemails')
         .select('mailboxUserId')

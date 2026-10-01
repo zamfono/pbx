@@ -29,7 +29,8 @@ export type MailSender = Pick<ApiClient, 'mail'>;
  * Why a call reached a mailbox, for the `voicemail` trace line (§7 "fallback taken"): the user's
  * DND or `offline` at Entry, a ring's `busy` or `noAnswer` outcome, a ring group's `unanswered` or
  * `unavailable` fallback, a mailbox as the forward target itself (`target`), an anonymous caller
- * rejected (`rejectAnonymous`), the hop limit (`hopLimit`) or the `*97` feature code (`feature`).
+ * rejected (`rejectAnonymous`), the hop limit (`hopLimit`), the `*97` feature code (`feature`) or
+ * a transfer to voicemail (`transfer`).
  */
 export type DepositReason =
   | 'dnd'
@@ -41,7 +42,8 @@ export type DepositReason =
   | 'target'
   | 'rejectAnonymous'
   | 'hopLimit'
-  | 'feature';
+  | 'feature'
+  | 'transfer';
 
 /** The mailbox owner's display name and greeting, from the config snapshot (FK-guaranteed present). */
 function findOwner(
