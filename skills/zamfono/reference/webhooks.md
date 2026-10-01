@@ -73,9 +73,12 @@ the body and an `X-Zamfono-Signature` header.
   active and keeps receiving new events: it is never switched off automatically.
 - Delivery is **at least once**: a receiver that answers too slowly can get the same event again.
   Deduplicate on `id`. Events are delivered concurrently, so order them by `at`, not by arrival.
-- Pending deliveries live in memory only: events still queued when the `api` container restarts
-  (an update, a crash) are lost. Treat a webhook as a notification and re-read state through the
-  API (`calls.list`, `voicemails.list`, …) after a gap.
+- Pending deliveries are kept in the database: a delivery queued or between retries when the
+  `api` container restarts (an update, a crash) goes on after it, with the attempts it has left,
+  and one cut off mid-request is sent again. Deleting a hook drops its pending deliveries. An
+  event that happens while `api` is down reaches no webhook, so treat a webhook as a
+  notification and re-read state through the API (`calls.list`, `voicemails.list`, …) after a
+  gap.
 
 ## Verifying the signature
 

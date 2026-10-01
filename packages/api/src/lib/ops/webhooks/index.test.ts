@@ -76,6 +76,40 @@ describe('webhooks', () => {
     expect(afterDelete.items.map(item => item.id)).not.toContain(created.id);
   });
 
+  it("drops a deleted webhook's pending deliveries", async () => {
+    const db = await makeTestDb();
+    const created = await runOperation<unknown, WebhookWire>(
+      db,
+      'webhooks.create',
+      { url: 'https://example.invalid/hook', secret: 'sh-secret' },
+      asRun()
+    );
+    await db
+      .insertInto('webhookDeliveries')
+      .values({
+        id: 'delivery-1',
+        webhookId: created.id,
+        bodyJson: '{}',
+        attempts: 1,
+        nextAttemptAt: '2026-10-01T10:00:01.000Z',
+        createdAt: '2026-10-01T10:00:00.000Z'
+      })
+      .execute();
+
+    await runOperation(
+      db,
+      'webhooks.delete',
+      { id: created.id },
+      asRun({ confirm: true })
+    );
+
+    const pending = await db
+      .selectFrom('webhookDeliveries')
+      .select('id')
+      .execute();
+    expect(pending).toEqual([]);
+  });
+
   it('refuses a non-HTTP webhook URL', async () => {
     const db = await makeTestDb();
     await expect(

@@ -140,6 +140,10 @@ export async function startBackgroundJobs(
   }
   const certSync = startCertSync(log);
   const dispatcher = new WebhookDispatcher({ db, kr });
+  // The deliveries the previous process left pending (§10.6), alongside the new ones.
+  dispatcher.resume().catch((error: unknown) => {
+    log.error({ error }, 'webhook delivery failed');
+  });
   const bus: Bus = {
     publish: (envelope: Envelope) => {
       publishEvent(envelope);

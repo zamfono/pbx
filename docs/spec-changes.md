@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-01 · §3.1 Write ownership, §10.6 Webhooks, §11.1 Soft delete, §11.2 `webhook_deliveries`.** Webhook delivery runs from a persistent outbox, the new `webhook_deliveries` table, in place of an in-memory queue: one row per hook and event holds the body, the attempt count and when the next attempt is due, and is deleted once the delivery succeeds or its third attempt fails, so no retention rule is needed; deleting a hook deletes its rows, and its hard purge takes any left through the FK. A delivery still pending when `api` restarts resumes from its row after what remains of its backoff, with the attempts it has left. Each attempt is signed with the hook's secret at the time of the attempt.
+*Why:* requested by the product owner: events queued when api restarted were lost.
+
 **2026-10-01 · §6.3 Updates.** `update.sh` run on the host records its run in `.update/state.json`, in the updater's own shape: `running` from its start, then `succeeded` or `failed` with the versions and times and, for a failure, its message. `--check` and the updater's run of the script (`ZAMFONO_UPDATER=1`), which the updater records itself, write nothing. The updater reports what the file holds whenever no run of its own is in progress, rather than what it read at start.
 *Why:* found live: a stack updated with update.sh on the host reported the updater's last run in `system.info`, 0.0.6 to 0.0.7, while it ran 0.1.0.
 

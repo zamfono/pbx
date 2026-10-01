@@ -34,6 +34,10 @@ why the specified behaviour changed; the commit history, how.
   field whose meaning is not obvious, and terse tool descriptions say what the operation does.
 - `zamfono.help` with an unknown topic still fails with 404, but its message now lists every
   topic; `index` lists them like a call without a topic, and the server instructions say so.
+- Webhook deliveries survive a restart of `api`: an event still queued, or waiting for its retry,
+  when `api` restarts (an update, a crash) is delivered after it, with the attempts it has left,
+  where it used to be lost. Deleting a webhook drops its pending deliveries. A delivery cut off
+  mid-request is sent again, so receivers keep deduplicating on the event `id`.
 - The specification now says exactly when a webhook's `lastStatus` turns `failing`: as soon as
   one delivery has failed all three attempts; the next delivery that succeeds turns it back to
   `ok`. Delivery itself is unchanged.

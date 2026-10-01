@@ -462,6 +462,15 @@ export interface Voicemails {
   read: Generated<number>;
 }
 
+export interface WebhookDeliveries {
+  attempts: Generated<number>;
+  bodyJson: string;
+  createdAt: string;
+  id: string;
+  nextAttemptAt: string;
+  webhookId: string;
+}
+
 export interface Webhooks {
   active: Generated<number>;
   createdAt: string;
@@ -516,5 +525,6 @@ export interface DB {
   userGroupUsers: UserGroupUsers;
   users: Users;
   voicemails: Voicemails;
+  webhookDeliveries: WebhookDeliveries;
   webhooks: Webhooks;
 }

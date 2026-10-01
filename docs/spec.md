@@ -83,7 +83,7 @@ Three long-running application services run per stack, plus the TLS proxy and a 
 
 **Write ownership.** Each SQLite table has a primary writer. Both processes read everything; WAL mode and `busy_timeout` make concurrent writers safe, so a cross-write is allowed where a flow naturally lands in the other process.
 
-- `api` owns the configuration tables: users, devices, trunks, trunk_hosts, outbound_routes, outbound_route_users, outbound_route_user_groups, outbound_route_numbers, dids, did_blocks, ring_groups, ring_group_members, user_groups, user_group_users, user_group_groups, extensions, device_blf_keys, forward_targets, user_forward_rules, ring_group_forward_rules, opening_hours, opening_hours_intervals, audio_assets, contacts, contact_phones, settings, ooo_rules, menus, menu_targets, blocked_numbers, mail_templates, tokens, oauth_clients, webhooks, backup_targets, backup_runs, audit_log.
+- `api` owns the configuration tables: users, devices, trunks, trunk_hosts, outbound_routes, outbound_route_users, outbound_route_user_groups, outbound_route_numbers, dids, did_blocks, ring_groups, ring_group_members, user_groups, user_group_users, user_group_groups, extensions, device_blf_keys, forward_targets, user_forward_rules, ring_group_forward_rules, opening_hours, opening_hours_intervals, audio_assets, contacts, contact_phones, settings, ooo_rules, menus, menu_targets, blocked_numbers, mail_templates, tokens, oauth_clients, webhooks, webhook_deliveries, backup_targets, backup_runs, audit_log.
 - `core` owns the runtime tables: calls, call_qos, voicemails, recordings, presence_log.
 - Known cross-writes: `api` updates and deletes `voicemails` and `recordings` rows through their REST endpoints and, after a voicemail change, calls `core`'s internal `/internal/mwi/{mailbox}` so the MWI counts follow (§9.3). `core` toggles `users.dnd` through the `*90`/`*91` feature codes and stamps `devices.last_registered_at` when a `ContactStatusChange` event reports the device's contact `Reachable`, a timestamp of an event rather than a state: the last time the device became reachable, not its latest REGISTER, since Asterisk raises no event for a registration refresh; a greeting recorded by phone (§10.2) makes `core` insert the `audio_assets` row, write its file to `media/prompts/` and set the mailbox's `mailbox_audio_id`. Live state such as a trunk's registration status never lands in a table (§10.1); `api` reads it from the core when a request needs it.
 
@@ -1421,7 +1421,7 @@ Server-to-client messages:
 
 Subscribers render presence, live call state and OOO status from this stream, without polling.
 
-**Webhooks.** The same events are delivered as HTTP POSTs to admin-configured endpoints from the `webhooks` table: URL, per-hook secret, optional event-type filter, and an `active` flag that is off on creation and switched on with `PATCH` once the receiver is ready. `api` delivers at least once from an in-memory queue: three attempts with exponential backoff and a 5 s timeout per request. Events still queued when `api` restarts are lost; a persistent outbox is a noted extension. Each POST carries the JSON event, an event id for consumer-side deduplication, and an `X-Zamfono-Signature` header holding the HMAC-SHA256 of the body with the hook's secret. One delivery whose three attempts all fail marks the hook `failing` in `GET /webhooks`, and the next delivery that succeeds marks it `ok`; a hook is never auto-disabled.
+**Webhooks.** The same events are delivered as HTTP POSTs to admin-configured endpoints from the `webhooks` table: URL, per-hook secret, optional event-type filter, and an `active` flag that is off on creation and switched on with `PATCH` once the receiver is ready. `api` delivers at least once from the `webhook_deliveries` outbox: three attempts with exponential backoff and a 5 s timeout per request. A delivery's row holds the body, its attempt count and when the next attempt is due, and is deleted once the delivery succeeds or its third attempt fails, or when its hook is deleted; a delivery still pending when `api` restarts resumes from its row, after what remains of its backoff. Each POST carries the JSON event, an event id for consumer-side deduplication, and an `X-Zamfono-Signature` header holding the HMAC-SHA256 of the body with the hook's secret. One delivery whose three attempts all fail marks the hook `failing` in `GET /webhooks`, and the next delivery that succeeds marks it `ok`; a hook is never auto-disabled.
 
 ## 11. Data Model (SQLite)
 
@@ -1447,6 +1447,7 @@ WAL mode, `foreign_keys=ON`, write ownership split per §3.1 (`api` = config tab
 - `mail_templates`: a `DELETE` removes the tenant override and the shipped template applies again; undo re-inserts the row from the audit diff;
 - `settings`: a singleton, never deleted;
 - `tokens` and `oauth_clients`: security artifacts without undo;
+- `webhook_deliveries`: the webhook outbox, without undo; deleting a hook deletes its pending rows (§10.6);
 - `audit_log`: append-only.
 
 **FK delete behavior.** Config-to-config references that would orphan routing are `RESTRICT`: a trunk with outbound routes cannot be hard-deleted. References from runtime and history tables to config tables are `SET NULL`, or `CASCADE` where the row is meaningless without its parent, so the hard purge of soft-deleted config rows never fails on historical data.
@@ -2125,6 +2126,20 @@ CREATE TABLE webhooks (
   deleted_at       TEXT
 );
 
+-- webhook_deliveries — the webhook outbox (§10.6): one row per hook and event, deleted once
+-- delivered or given up.
+--   body_json:       the event as POSTed, the body the signature is computed over
+--   attempts:        attempts made so far, of three
+--   next_attempt_at: when the next attempt is due, the end of the current backoff
+CREATE TABLE webhook_deliveries (
+  id              TEXT    PRIMARY KEY,
+  webhook_id      TEXT    NOT NULL REFERENCES webhooks(id) ON DELETE CASCADE,
+  body_json       TEXT    NOT NULL,
+  attempts        INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  next_attempt_at TEXT    NOT NULL,
+  created_at      TEXT    NOT NULL
+);
+
 -- backup_targets — restic backup destinations (§6.5); a target's current state is its latest
 -- backup_runs row.
 --   params_json: endpoint/path/bucket + restic forget policy
@@ -2317,6 +2332,7 @@ CREATE INDEX audit_actor           ON audit_log (actor_user_id, created_at);
 CREATE INDEX tokens_expiry         ON tokens (expires_at);
 CREATE INDEX contact_phones_number ON contact_phones (number);
 CREATE INDEX backup_runs_target     ON backup_runs (target_id, started_at);
+CREATE INDEX webhook_deliveries_webhook ON webhook_deliveries (webhook_id);
 
 -- devices_one_ringotel_per_user — a Ringotel device is the user's Ringotel account (§10.4).
 CREATE UNIQUE INDEX devices_one_ringotel_per_user ON devices (user_id)

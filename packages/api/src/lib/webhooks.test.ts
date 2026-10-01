@@ -112,6 +112,37 @@ async function lastStatusOf(db: Db): Promise<string | null> {
   return row.lastStatus;
 }
 
+async function pendingDeliveries(
+  db: Db
+): Promise<{ attempts: number; nextAttemptAt: string }[]> {
+  return db
+    .selectFrom('webhookDeliveries')
+    .select(['attempts', 'nextAttemptAt'])
+    .execute();
+}
+
+/**
+ * A dispatcher at `now` whose first retry never comes, as in an `api` that stops during the
+ * backoff: `retrying` settles once the failed first attempt is on disk and the wait has begun.
+ */
+function stoppedAtFirstRetry(
+  db: Db,
+  kr: Keyring,
+  now: string
+): { dispatcher: WebhookDispatcher; retrying: Promise<undefined> } {
+  const retrying = Promise.withResolvers<undefined>();
+  const dispatcher = new WebhookDispatcher({
+    db,
+    kr,
+    now: () => now,
+    delay: () => {
+      retrying.resolve(undefined);
+      return Promise.withResolvers<undefined>().promise;
+    }
+  });
+  return { dispatcher, retrying: retrying.promise };
+}
+
 function sampleEvent(): Envelope {
   return {
     id: 'evt-1',
@@ -248,5 +279,127 @@ describe('WebhookDispatcher', () => {
       .where('id', '=', 'hook-bad-filter')
       .executeTakeFirstOrThrow();
     expect(badFilterHook.lastStatus).toBeNull();
+  });
+
+  it('leaves nothing in the outbox once a delivery is delivered or given up', async () => {
+    const db = await migratedDb();
+    const kr = testKeyring();
+    await insertWebhook(db, kr, { url: stub.url });
+    const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
+
+    await dispatcher.enqueue(sampleEvent());
+    stub.setStatus(FAILING_STATUS);
+    await dispatcher.enqueue(sampleEvent());
+
+    expect(await pendingDeliveries(db)).toEqual([]);
+  });
+});
+
+describe('WebhookDispatcher across a restart', () => {
+  // eslint-disable-next-line init-declarations -- assigned in beforeEach, closed in afterEach
+  let stub: Awaited<ReturnType<typeof startStub>>;
+
+  beforeEach(async () => {
+    stub = await startStub();
+  });
+
+  afterEach(() => stub.close());
+
+  it('resumes a retrying delivery with its attempt count, waiting out the rest of its backoff', async () => {
+    const db = await migratedDb();
+    const kr = testKeyring();
+    await insertWebhook(db, kr, { url: stub.url, secret: 'top-secret' });
+    stub.setStatus(FAILING_STATUS);
+    const first = stoppedAtFirstRetry(db, kr, '2026-10-01T10:00:00.000Z');
+    // Never settles: this process stops during the backoff.
+    first.dispatcher.enqueue(sampleEvent()).catch(() => undefined);
+    await first.retrying;
+
+    expect(stub.requests).toHaveLength(1);
+    expect(await pendingDeliveries(db)).toEqual([
+      { attempts: 1, nextAttemptAt: '2026-10-01T10:00:01.000Z' }
+    ]);
+
+    stub.setStatus(200);
+    const delays: number[] = [];
+    const second = new WebhookDispatcher({
+      db,
+      kr,
+      now: () => '2026-10-01T10:00:00.400Z',
+      delay: ms => {
+        delays.push(ms);
+        return Promise.resolve();
+      }
+    });
+    await second.resume();
+
+    expect(delays).toEqual([600]);
+    expect(stub.requests).toHaveLength(2);
+    expect(stub.requests[1]?.body).toBe(stub.requests[0]?.body);
+    expect(stub.requests[1]?.headers['x-zamfono-signature']).toBe(
+      createHmac('sha256', 'top-secret')
+        .update(stub.requests[0]?.body ?? '')
+        .digest('hex')
+    );
+    expect(JSON.parse(stub.requests[1]?.body ?? '')).toMatchObject({
+      id: 'evt-1'
+    });
+    expect(await pendingDeliveries(db)).toEqual([]);
+    expect(await lastStatusOf(db)).toBe('ok');
+  });
+
+  it('gives a resumed delivery only the attempts it has left', async () => {
+    const db = await migratedDb();
+    const kr = testKeyring();
+    await insertWebhook(db, kr, { url: stub.url });
+    await db
+      .insertInto('webhookDeliveries')
+      .values({
+        id: 'delivery-1',
+        webhookId: 'hook-1',
+        bodyJson: JSON.stringify(sampleEvent()),
+        attempts: 2,
+        nextAttemptAt: '2026-10-01T10:00:00.000Z',
+        createdAt: '2026-10-01T09:59:55.000Z'
+      })
+      .execute();
+    stub.setStatus(FAILING_STATUS);
+
+    await new WebhookDispatcher({ db, kr, delay: noDelay }).resume();
+
+    expect(stub.requests).toHaveLength(1);
+    expect(await pendingDeliveries(db)).toEqual([]);
+    expect(await lastStatusOf(db)).toBe('failing');
+  });
+
+  it('drops a retrying delivery whose hook is deleted, without a status', async () => {
+    const db = await migratedDb();
+    const kr = testKeyring();
+    await insertWebhook(db, kr, { url: stub.url });
+    stub.setStatus(FAILING_STATUS);
+    const retry = Promise.withResolvers<undefined>();
+    const retrying = Promise.withResolvers<undefined>();
+    const dispatcher = new WebhookDispatcher({
+      db,
+      kr,
+      delay: () => {
+        retrying.resolve(undefined);
+        return retry.promise;
+      }
+    });
+    const delivery = dispatcher.enqueue(sampleEvent());
+    await retrying.promise;
+
+    await db
+      .updateTable('webhooks')
+      .set({ deletedAt: nowIso() })
+      .where('id', '=', 'hook-1')
+      .execute();
+    retry.resolve(undefined);
+    await delivery;
+
+    expect(stub.requests).toHaveLength(1);
+    expect(await pendingDeliveries(db)).toEqual([]);
+    expect(await lastStatusOf(db)).toBeNull();
   });
 });

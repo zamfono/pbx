@@ -8,7 +8,10 @@ const STATUS_NOT_FOUND = 404;
 
 const inputSchema = z.object({ id: z.string() }).strict();
 
-/** `DELETE /webhooks/{id}` (§10.6, §5.9): soft-deletes a webhook. */
+/**
+ * `DELETE /webhooks/{id}` (§10.6, §5.9): soft-deletes a webhook and drops its pending deliveries,
+ * which an undo does not bring back.
+ */
 export const del = defineOperation({
   name: 'webhooks.delete',
   description: 'Soft-deletes a webhook; its events are no longer delivered',
@@ -25,6 +28,10 @@ export const del = defineOperation({
       .updateTable('webhooks')
       .set({ deletedAt: ctx.now })
       .where('id', '=', input.id)
+      .execute();
+    await ctx.db
+      .deleteFrom('webhookDeliveries')
+      .where('webhookId', '=', input.id)
       .execute();
     recordChange(ctx, { field: 'deletedAt', from: null, to: ctx.now });
     return { id: input.id };
