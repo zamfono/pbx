@@ -32,10 +32,8 @@ COPY --from=build /app/packages/shared/dist packages/shared/dist
 COPY --from=build /app/packages/shared/package.json packages/shared/package.json
 COPY --from=build /app/packages/core/package.json packages/core/package.json
 COPY --from=build /app/packages/core/dist packages/core/dist
-COPY db/migrations db/migrations
 ENV DB_FILE=/data/zamfono.sqlite3 \
-	MEDIA_DIR=/media \
-	MIGRATIONS_DIR=/app/db/migrations
+	MEDIA_DIR=/media
 USER node
 
 # The commit this image was built from (§6.3 "Images", §7 "Version"), passed by

@@ -9,10 +9,13 @@ import type { DB } from './generated/db.js';
 
 export type Db = Kysely<DB>;
 
-const DEFAULT_MIGRATIONS_DIR = path.resolve(
-  import.meta.dirname,
-  '../../../db/migrations'
-);
+/**
+ * db/migrations, found from this file in a checkout. The api image sets MIGRATIONS_DIR: its Vite
+ * build bundles this module into a server chunk, away from db/.
+ */
+const MIGRATIONS_DIR =
+  process.env.MIGRATIONS_DIR ??
+  path.resolve(import.meta.dirname, '../../../db/migrations');
 
 // journal_mode/foreign_keys/busy_timeout/synchronous mirror the deployed stack (§3.1, §6.6);
 // setting them on ':memory:' is a harmless no-op, so `openDb(':memory:')` stays test-friendly.
@@ -38,15 +41,20 @@ export async function isDbOpen(db: Db): Promise<boolean> {
   }
 }
 
-export async function pendingMigrations(
-  db: Db,
-  dir: string = process.env.MIGRATIONS_DIR ?? DEFAULT_MIGRATIONS_DIR
-): Promise<string[]> {
-  const migrator = new Migrator({
+/** Kysely's migrator over db/migrations. */
+export function migrator(db: Db): Migrator {
+  return new Migrator({
     db,
-    provider: new FileMigrationProvider({ fs, path, migrationFolder: dir })
+    provider: new FileMigrationProvider({
+      fs,
+      path,
+      migrationFolder: MIGRATIONS_DIR
+    })
   });
-  const migrations = await migrator.getMigrations();
+}
+
+export async function pendingMigrations(db: Db): Promise<string[]> {
+  const migrations = await migrator(db).getMigrations();
   return migrations
     .filter(migration => !migration.executedAt)
     .map(migration => migration.name);
