@@ -126,18 +126,28 @@ CONF
 docker exec "$CONTAINER" asterisk -rx 'module reload res_pjsip.so' > /dev/null
 docker exec "$CONTAINER" asterisk -rx 'pjsip qualify probe-verify' > /dev/null
 docker exec "$CONTAINER" asterisk -rx 'pjsip qualify probe-noverify' > /dev/null
-sleep 3
+# Both probes have played out once the noverify server holds the OPTIONS and the log the verify
+# transport's certificate error; only then does the absence of OPTIONS on 5071 mean anything.
+verify_error="ERROR.*Transport 'transport-tls' to remote '127.0.0.1'"
+probes_done=
+for _ in $(seq 1 40); do
+  if docker exec "$CONTAINER" grep -q '^OPTIONS sip:' /tmp/s_server-5072.log \
+    && docker logs "$CONTAINER" 2>&1 | grep "$verify_error" > /dev/null; then
+    probes_done=1
+    break
+  fi
+  sleep 0.5
+done
 docker exec "$CONTAINER" grep -q '^OPTIONS sip:' /tmp/s_server-5072.log \
   || fail "transport-tls-noverify did not send OPTIONS to a server with a self-signed certificate"
+[ -n "$probes_done" ] \
+  || fail "no certificate-verification error for transport-tls's connection to 127.0.0.1:5071"
 # In the ports mode 5062 is not published, so the noverify transport names the published 5061
 # for the provider to connect back to (entrypoint.sh, spec §9.4 "Flows").
 docker exec "$CONTAINER" grep -q '^Via: SIP/2.0/TLS 192.0.2.10:5061;' /tmp/s_server-5072.log \
   || fail "transport-tls-noverify's Via does not name the external address with port 5061"
 docker exec "$CONTAINER" grep -q '^OPTIONS sip:' /tmp/s_server-5071.log \
   && fail "transport-tls sent OPTIONS to a server whose certificate it cannot verify"
-docker logs "$CONTAINER" 2>&1 | grep "ERROR.*Transport 'transport-tls' to remote '127.0.0.1'" \
-  > /dev/null \
-  || fail "no certificate-verification error for transport-tls's connection to 127.0.0.1:5071"
 docker exec "$CONTAINER" sh -c ': > /etc/asterisk/gen/pjsip_trunks.conf'
 docker exec "$CONTAINER" asterisk -rx 'module reload res_pjsip.so' > /dev/null
 
