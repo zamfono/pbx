@@ -119,7 +119,17 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
       expect(state.presence.get(userId)?.status).toBe('available');
     });
     const started = await startInternalServer(
-      { db, ari, cache, state, bus, actions: null, presence, trunks: null },
+      {
+        db,
+        ari,
+        log: noopLogger,
+        cache,
+        state,
+        bus,
+        actions: null,
+        presence,
+        trunks: null
+      },
       ANY_FREE_PORT
     );
     close = started.close;
@@ -178,6 +188,7 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
       {
         db,
         ari,
+        log: noopLogger,
         cache,
         state: new StateStore(),
         bus: new EventBus(),

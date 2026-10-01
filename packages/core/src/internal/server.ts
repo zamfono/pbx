@@ -17,6 +17,7 @@ import {
 } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
+import type { Logger } from '../ari/types.js';
 import type { CallActions } from '../calls/actions.js';
 import { handleActionRoute, handleParkingRead } from './actionRoutes.js';
 import {
@@ -43,6 +44,7 @@ const processStartedAt = new Date(
 type InternalDeps = {
   db: Db;
   ari: AriClient;
+  log: Logger;
   cache: ConfigCache;
   state: StateStore;
   bus: EventBus;
@@ -145,11 +147,13 @@ async function routeRequest(
  */
 function attachEventStream(
   server: http.Server,
-  bus: EventBus
+  deps: Pick<InternalDeps, 'bus' | 'log'>
 ): WebSocketServer {
+  const { bus, log } = deps;
   const wss = new WebSocketServer({ noServer: true });
-  // ponytail: no logger is wired into this module; add one if these need investigating.
-  wss.on('error', () => undefined);
+  wss.on('error', (error: Error) => {
+    log.warn({ err: error }, 'internal event stream failed');
+  });
   wss.on('connection', (socket: WebSocket) => {
     const unsubscribe = bus.subscribeStream(frame => {
       if (socket.readyState !== WebSocket.OPEN) {
@@ -191,13 +195,17 @@ export function startInternalServer(
   port: number
 ): Promise<{ port: number; close: () => Promise<void> }> {
   const server = http.createServer((request, response) => {
-    routeRequest(deps, request, response).catch(() => {
+    routeRequest(deps, request, response).catch((error: unknown) => {
+      deps.log.error(
+        { err: error, method: request.method, path: request.url },
+        'internal API request failed'
+      );
       respondJson(response, HTTP_SERVICE_UNAVAILABLE, {
         message: 'internal error'
       });
     });
   });
-  const wss = attachEventStream(server, deps.bus);
+  const wss = attachEventStream(server, deps);
   return new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, () => {

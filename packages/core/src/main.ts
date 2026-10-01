@@ -6,7 +6,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import pino from 'pino';
 
-import { nowIso, openDb, resolveVersion } from '@zamfono/shared';
+import { nowIso, openDb, resolveVersion, type Db } from '@zamfono/shared';
 
 import { AmiClient } from './ami/client.js';
 import { AriClient } from './ari/client.js';
@@ -70,6 +70,38 @@ function createAmiClient(env: CoreEnv, log: Logger): AmiClient {
 }
 
 /**
+ * `Presence` (§10.2 "Presence and BLF") wires itself to ARI `ContactStatusChange` in its own
+ * constructor and seeds registration state from the boot `endpoints.list` in `resyncOnBoot`;
+ * `TrunkState` likewise wires itself to ARI/AMI and resyncs registration trunks from AMI at boot.
+ * Both are handed to the `Pipeline` so its dial dispatch (`outboundDispatch.ts`) and feature codes
+ * (`features.ts`) can reach them.
+ */
+async function startLiveState(deps: {
+  db: Db;
+  ari: AriClient;
+  ami: AmiClient;
+  cache: ConfigCache;
+  state: StateStore;
+  bus: EventBus;
+}): Promise<{ presence: Presence; trunkState: TrunkState }> {
+  const { db, ari, ami, cache, state, bus } = deps;
+  const presence = new Presence({ ari, cache, state, bus, db, now: nowIso });
+  await presence.resyncOnBoot();
+  // §7 "registered devices": the live state serves the count `Presence`'s registrations give.
+  state.readRegisteredDevicesFrom(() => presence.registeredDevices());
+  const trunkState = new TrunkState({
+    ari,
+    ami,
+    cache,
+    state,
+    bus,
+    now: nowIso
+  });
+  await trunkState.resyncOnBoot();
+  return { presence, trunkState };
+}
+
+/**
  * Boots `core`: opens the database, connects ARI then AMI, starts the internal server and the
  * OOO/hours sweep. On any failure it closes both clients before rethrowing, so neither leaves a
  * reconnect timer running: an unclosed `AriClient`/`AmiClient` keeps Node's event loop alive on a
@@ -92,28 +124,18 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
     const bus = new EventBus();
     // Every ARI connection after this first one: `api` reads the first from `/internal/version`.
     announceAsteriskStartOnConnect(ari, bus, log);
-    // `Presence` (§10.2 "Presence and BLF") wires itself to ARI `ContactStatusChange` in its own
-    // constructor and seeds registration state from the boot `endpoints.list` in `resyncOnBoot`;
-    // `TrunkState` likewise wires itself to ARI/AMI and resyncs registration trunks from
-    // AMI at boot. Both are handed to the `Pipeline` so its dial dispatch (`outboundDispatch.ts`)
-    // and feature codes (`features.ts`) can reach them.
     // Before anything reads Asterisk's view of the configuration: the rendered files on the
     // volume are the truth, and a fresh Asterisk or a propagation refused while this process was
     // down leaves it holding an older one (§3.1, §9.1).
     await reloadAllModules(ari);
-    const presence = new Presence({ ari, cache, state, bus, db, now: nowIso });
-    await presence.resyncOnBoot();
-    // §7 "registered devices": the live state serves the count `Presence`'s registrations give.
-    state.readRegisteredDevicesFrom(() => presence.registeredDevices());
-    const trunkState = new TrunkState({
+    const { presence, trunkState } = await startLiveState({
+      db,
       ari,
       ami,
       cache,
       state,
-      bus,
-      now: nowIso
+      bus
     });
-    await trunkState.resyncOnBoot();
     const { pipeline, cdr } = buildPipeline({
       db,
       ari,
@@ -133,7 +155,17 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
     const actions = new CallActions(pipeline);
     await resyncOnBoot({ db, ari, now: nowIso, pipeline, log });
     const server = await startInternalServer(
-      { db, ari, cache, state, bus, actions, presence, trunks: trunkState },
+      {
+        db,
+        ari,
+        log,
+        cache,
+        state,
+        bus,
+        actions,
+        presence,
+        trunks: trunkState
+      },
       CORE_INTERNAL_PORT
     );
     // The OOO/hours sweep (§3.1 "Events", §10.2) is the only source of `ooo` and `hours` events: it

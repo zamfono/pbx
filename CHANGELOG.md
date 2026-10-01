@@ -116,6 +116,9 @@ why the specified behaviour changed; the commit history, how.
   parked from its own call: `calls.park` on that call is refused with 409 `notBridged`, as
   `calls.transfer`, `calls.consult` and `calls.hold` on it already were, and `*70` dialled by
   the added party is released, where both took the other party out of the shared conversation.
+- `core` logs an error, with the method and path, when its internal API fails to serve a request
+  `api` made (which `api` sees as a 503), and a warning when its internal event stream fails;
+  neither left a trace before.
 
 ### Fixed
 

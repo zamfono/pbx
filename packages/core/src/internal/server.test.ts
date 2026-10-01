@@ -37,6 +37,14 @@ const noopLogger: Logger = {
   warn: () => undefined,
   error: () => undefined
 };
+// What the server under test logged at error, the message and its fields.
+const errorsLogged: { fields: unknown; msg: unknown }[] = [];
+const serverLogger: Logger = {
+  ...noopLogger,
+  error: (fields, msg) => {
+    errorsLogged.push({ fields, msg });
+  }
+};
 
 /** Seeds the one settings row (and the DID/forward-target/user chain its FK requires). */
 async function seedMinimalConfig(db: Db): Promise<void> {
@@ -109,10 +117,12 @@ describe('startInternalServer', () => {
     await ari.connect();
     cache = new ConfigCache(db);
     state = new StateStore();
+    errorsLogged.length = 0;
     const started = await startInternalServer(
       {
         db,
         ari,
+        log: serverLogger,
         cache,
         state,
         bus: new EventBus(),
@@ -153,6 +163,23 @@ describe('startInternalServer', () => {
     const unhealthy = await fetch(`http://127.0.0.1:${port}/healthz`);
     expect(unhealthy.status).toBe(HTTP_SERVICE_UNAVAILABLE);
     await expect(unhealthy.json()).resolves.toMatchObject({ ari: false });
+  });
+
+  it('answers 503 for a request whose route failed, and logs the failure with the request', async () => {
+    state.readRegisteredDevicesFrom(() => Promise.reject(new Error('boom')));
+
+    const response = await fetch(`http://127.0.0.1:${port}/internal/state`);
+
+    expect(response.status).toBe(HTTP_SERVICE_UNAVAILABLE);
+    expect(errorsLogged).toEqual([
+      {
+        fields: expect.objectContaining({
+          method: 'GET',
+          path: '/internal/state'
+        }) as unknown,
+        msg: 'internal API request failed'
+      }
+    ]);
   });
 
   it('answers /internal/state with the StateStore snapshot', async () => {
@@ -299,6 +326,7 @@ describe('startInternalServer', () => {
       {
         db,
         ari,
+        log: noopLogger,
         cache: new ConfigCache(db),
         state: new StateStore(),
         bus,
@@ -358,6 +386,7 @@ describe('startInternalServer', () => {
       {
         db,
         ari,
+        log: noopLogger,
         cache: new ConfigCache(db),
         state: new StateStore(),
         bus,

@@ -132,6 +132,7 @@ export async function startRig(
         {
           db,
           ari,
+          log: noopLogger,
           cache: new ConfigCache(db),
           state: new StateStore(),
           bus: new EventBus(),
