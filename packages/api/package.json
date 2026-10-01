@@ -4,11 +4,11 @@
   "license": "AGPL-3.0-only",
   "type": "module",
   "imports": {
-    "#*": "./src/*"
+    "#app.css": "./src/app.css"
   },
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build && esbuild src/server.ts --bundle --platform=node --format=esm --packages=external --outfile=build/server.js",
+    "build": "vite build && esbuild src/server.ts --bundle '--alias:$lib=./src/lib' --platform=node --format=esm --packages=external --outfile=build/server.js",
     "preview": "vite preview",
     "postinstall": "svelte-kit sync",
     "test": "vitest run"

@@ -5,9 +5,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { MS_PER_SECOND, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { signAccessToken } from '#lib/auth/jwt.js';
-import { mcpResourceUri } from '#lib/auth/resource.js';
-import { getDb } from '#lib/db.js';
+import { signAccessToken } from '$lib/server/auth/jwt.js';
+import { mcpResourceUri } from '$lib/server/auth/resource.js';
+import { getDb } from '$lib/server/db.js';
 
 import { POST } from './+server.js';
 

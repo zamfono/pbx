@@ -4,28 +4,28 @@ import pino from 'pino';
 
 import { MS_PER_SECOND } from '@zamfono/shared';
 
-import { addressKey } from './lib/addressKey.js';
-import { crossSiteFormRejection } from './lib/auth/crossSiteForms.js';
+import { addressKey } from '$lib/server/addressKey.js';
+import { crossSiteFormRejection } from '$lib/server/auth/crossSiteForms.js';
 import {
   isRole,
   requiredJwtSecret,
   verifyAccessToken
-} from './lib/auth/jwt.js';
-import { createCoreClient, fetchCoreVersion } from './lib/coreClient.js';
-import { getDb } from './lib/db.js';
-import { startBackgroundJobs } from './lib/jobs/background.js';
-import { Limiter, type LimitKind } from './lib/limiter.js';
-import { recordApiRequestSeconds } from './lib/metrics.js';
-import { onPropagate } from './lib/ops/runner.js';
-import { setCoreVersionLookup } from './lib/ops/system/info.js';
+} from '$lib/server/auth/jwt.js';
+import { createCoreClient, fetchCoreVersion } from '$lib/server/coreClient.js';
+import { getDb } from '$lib/server/db.js';
+import { startBackgroundJobs } from '$lib/server/jobs/background.js';
+import { Limiter, type LimitKind } from '$lib/server/limiter.js';
+import { recordApiRequestSeconds } from '$lib/server/metrics.js';
+import { onPropagate } from '$lib/server/ops/runner.js';
+import { setCoreVersionLookup } from '$lib/server/ops/system/info.js';
 import {
   coreTrunkStatusLookup,
   setTrunkStatusLookup
-} from './lib/ops/trunks/index.js';
-import type { Actor } from './lib/ops/types.js';
-import { problem } from './lib/problem.js';
-import { propagateConfig } from './lib/propagation.js';
-import { keyringFromEnv, type Keyring } from './lib/secretbox.js';
+} from '$lib/server/ops/trunks/index.js';
+import type { Actor } from '$lib/server/ops/types.js';
+import { problem } from '$lib/server/problem.js';
+import { propagateConfig } from '$lib/server/propagation.js';
+import { keyringFromEnv, type Keyring } from '$lib/server/secretbox.js';
 
 const BEARER_PREFIX = 'Bearer ';
 const UNAUTHORIZED_STATUS = 401;
@@ -69,10 +69,11 @@ function tryKeyring(): Keyring | null {
 }
 
 /**
- * Wires the operations to `core` and starts the background jobs (`jobs/background.ts`). SvelteKit
- * runs it once, and serves no request before it resolves; a failure of the first-boot seed
- * rejects it, which fails loading the handler and so `api`'s boot. The jobs stop on
- * `sveltekit:shutdown`, which `server.ts` emits on SIGTERM and SIGINT.
+ * Wires the operations to `core` and starts the background jobs
+ * (`lib/server/jobs/background.ts`). SvelteKit runs it once, and serves no request before it
+ * resolves; a failure of the first-boot seed rejects it, which fails loading the handler and so
+ * `api`'s boot. The jobs stop on `sveltekit:shutdown`, which `server.ts` emits on SIGTERM and
+ * SIGINT.
  */
 export const init: ServerInit = async () => {
   // §9.4 "Provisioning and status": trunk status is the core's live state, read per request.

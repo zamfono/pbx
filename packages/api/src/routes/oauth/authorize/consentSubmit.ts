@@ -7,19 +7,22 @@ import { nowIso } from '@zamfono/shared';
 import {
   authorizationErrorRedirect,
   requiredOrigin
-} from '#lib/auth/authorizationResponse.js';
-import { clientMetaFor, requestState } from '#lib/auth/authorizeRequest.js';
-import { upsertClient } from '#lib/auth/clients.js';
-import { authCodeStore } from '#lib/auth/codes.js';
+} from '$lib/server/auth/authorizationResponse.js';
+import {
+  clientMetaFor,
+  requestState
+} from '$lib/server/auth/authorizeRequest.js';
+import { upsertClient } from '$lib/server/auth/clients.js';
+import { authCodeStore } from '$lib/server/auth/codes.js';
 import {
   CONSENT_COOKIE_NAME,
   CONSENT_COOKIE_PATH,
   unsealConsent,
   type PendingConsent
-} from '#lib/auth/consent.js';
-import { loginRedirect } from '#lib/auth/loginRedirect.js';
-import { getDb } from '#lib/db.js';
-import { keyringFromEnv } from '#lib/secretbox.js';
+} from '$lib/server/auth/consent.js';
+import { loginRedirect } from '$lib/server/auth/loginRedirect.js';
+import { getDb } from '$lib/server/db.js';
+import { keyringFromEnv } from '$lib/server/secretbox.js';
 
 const STATUS_BAD_REQUEST = 400;
 const STATUS_FOUND = 302;

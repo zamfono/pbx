@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-01 · §10 layout, §10.3 Operations layer.** `api`'s server-only code, the operations layer, REST, MCP, events, auth, pjsip, audio, mail, provisioning and jobs among it, lives under `src/lib/server/`, SvelteKit's `$lib/server`, and the authentication pages' dictionaries, which their browser code uses, under `src/lib/i18n/`.
+*Why:* requested by the product owner: the SvelteKit app follows SvelteKit's conventions, `$lib`, `$lib/server` and `$env`.
+
 **2026-10-01 · §10.3 Live calls.** `GET /calls?live=true` names what each call in progress carries, among it `userIds`, the users the call concerns now: its caller, callee and answerer and every user with a leg ringing or up in it. The `call.state` events, which §10.6 lists field by field, carry no such list.
 *Why:* requested by the product owner: the field was returned but undocumented, and a CRM can use it to know whose call it is.
 

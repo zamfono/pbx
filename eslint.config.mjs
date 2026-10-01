@@ -100,7 +100,7 @@ export default tseslint.config(
             {
               regex: '^(?:\\.\\./){2}',
               message:
-                "Two or more directories up, import through the package's subpath imports instead (package.json \"imports\"), e.g. '#lib/db.js' in packages/api."
+                "Two or more directories up, import through SvelteKit's `$lib` alias in packages/api instead (e.g. '$lib/server/db.js'), and through the package's subpath imports (package.json \"imports\") in the other packages."
             }
           ]
         }

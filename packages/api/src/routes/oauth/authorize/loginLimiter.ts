@@ -1,8 +1,8 @@
 import { error, type RequestEvent } from '@sveltejs/kit';
 
-import { addressKey } from '#lib/addressKey.js';
-import { Limiter } from '#lib/limiter.js';
-import { setAccountLockLookup } from '#lib/ops/users/_accountLock.js';
+import { addressKey } from '$lib/server/addressKey.js';
+import { Limiter } from '$lib/server/limiter.js';
+import { setAccountLockLookup } from '$lib/server/ops/users/_accountLock.js';
 
 const STATUS_TOO_MANY_REQUESTS = 429;
 

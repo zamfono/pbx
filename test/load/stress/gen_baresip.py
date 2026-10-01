@@ -7,7 +7,7 @@ Every account registers over TLS to zamfono:5061 (compose.stress.yaml maps that 
 CN of the stack's placeholder certificate, to asterisk; the certificate itself is the CA file,
 so baresip verifies the server the way a real softphone would), auto-answers, offers/accepts only Opus and
 requires SDES-SRTP (`mediaenc=srtp-mand`, i.e. RTP/SAVP with a=crypto), which is what the
-rendered endpoint of a `tls` device demands (packages/api/src/lib/pjsip/render.ts:
+rendered endpoint of a `tls` device demands (packages/api/src/lib/server/pjsip/render.ts:
 `media_encryption = sdes`). Audio comes from a WAV file (aufile), so each answered call encodes
 real speech into Opus (complexity 0: the generator shares the host with the stack, so its own
 encoder is kept cheap; Asterisk's Opus encoder settings are untouched); what the device receives

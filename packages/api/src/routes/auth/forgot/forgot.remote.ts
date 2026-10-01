@@ -2,8 +2,8 @@ import { error } from '@sveltejs/kit';
 import { form, getRequestEvent } from '$app/server';
 import { z } from 'zod';
 
-import { requestPasswordReset } from '#lib/auth/passwordReset.js';
-import { getDb } from '#lib/db.js';
+import { requestPasswordReset } from '$lib/server/auth/passwordReset.js';
+import { getDb } from '$lib/server/db.js';
 
 const STATUS_NOT_FOUND = 404;
 const STATUS_TOO_MANY_REQUESTS = 429;

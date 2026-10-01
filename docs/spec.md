@@ -999,21 +999,23 @@ packages/
 │   ├── static/              # the logo and favicons, served as they are (§10.3 "Icons")
 │   └── src/
 │       ├── server.ts            # entry: http server, SvelteKit handler, /events WS; stops on SIGTERM
-│       ├── hooks.server.ts      # init: first-boot seed and every background job (lib/jobs/background.ts); token → actor resolution, rate limits (§5)
-│       ├── lib/ops/             # operations layer (§10.3): registry and runner, then one directory per area
-│       │   ├── users/           #   one module per operation (list.ts, create.ts, update.ts, …); index.ts registers the area
-│       │   └── …/
-│       ├── lib/rest.ts          # REST route table (method + path pattern → operation), OpenAPI generation
-│       ├── lib/mcp.ts           # MCP server (§10.5) — tools derived from operation schemas
-│       ├── lib/events.ts        # /events fan-out (subscribed to core's internal WS)
-│       ├── lib/auth/            # OAuth server, tokens, SSO (§5.2)
-│       ├── lib/pjsip/           # pjsip_users.conf + pjsip_trunks.conf + hints + musiconhold renderer
-│       ├── lib/audio/           # upload, transcode (ffmpeg), prompt management
-│       ├── lib/mail/            # templates, relay, sending (§10.2 "Mail")
-│       ├── lib/provisioning/    # manual and Ringotel providers (§10.4)
-│       ├── lib/jobs/            # purge, retention, backups, certificate sync, key rotation, Ringotel re-registration (§5.9, §6.4, §6.5, §10.4)
+│       ├── hooks.server.ts      # init: first-boot seed and every background job (lib/server/jobs/background.ts); token → actor resolution, rate limits (§5)
+│       ├── lib/server/          # `$lib/server`: everything the browser must never receive, which SvelteKit refuses to bundle for it
+│       │   ├── ops/             # operations layer (§10.3): registry and runner, then one directory per area
+│       │   │   ├── users/       #   one module per operation (list.ts, create.ts, update.ts, …); index.ts registers the area
+│       │   │   └── …/
+│       │   ├── rest.ts          # REST route table (method + path pattern → operation), OpenAPI generation
+│       │   ├── mcp.ts           # MCP server (§10.5) — tools derived from operation schemas
+│       │   ├── events.ts        # /events fan-out (subscribed to core's internal WS)
+│       │   ├── auth/            # OAuth server, tokens, SSO (§5.2)
+│       │   ├── pjsip/           # pjsip_users.conf + pjsip_trunks.conf + hints + musiconhold renderer
+│       │   ├── audio/           # upload, transcode (ffmpeg), prompt management
+│       │   ├── mail/            # templates, relay, sending (§10.2 "Mail")
+│       │   ├── provisioning/    # manual and Ringotel providers (§10.4)
+│       │   └── jobs/            # purge, retention, backups, certificate sync, key rotation, Ringotel re-registration (§5.9, §6.4, §6.5, §10.4)
+│       ├── lib/i18n/            # the authentication pages' dictionaries (§5.2), which their browser code shares
 │       └── routes/
-│           ├── api/v1/[...path]/+server.ts   # REST catch-all → lib/rest.ts
+│           ├── api/v1/[...path]/+server.ts   # REST catch-all → lib/server/rest.ts
 │           ├── oauth/, .well-known/          # authorization server + login/consent page (§5)
 │           ├── mcp/+server.ts                # Streamable HTTP endpoint (§10.5)
 │           └── internal/mail, healthz, metrics
@@ -1197,7 +1199,7 @@ Pause and resume and on-demand recording are call-center features (§12). A reco
 
 #### Operations layer
 
-Every v1 operation is one module, `packages/api/src/lib/ops/<area>/<operation>.ts` (`users/update.ts` for `users.update`), exporting one `Operation` object, a plain record built with a `defineOperation` helper that infers `In` from the schema and `Out` from the body:
+Every v1 operation is one module, `packages/api/src/lib/server/ops/<area>/<operation>.ts` (`users/update.ts` for `users.update`), exporting one `Operation` object, a plain record built with a `defineOperation` helper that infers `In` from the schema and `Out` from the body:
 
 ```ts
 type Operation<In, Out> = {

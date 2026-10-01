@@ -1,14 +1,17 @@
 import process from 'node:process';
 
+import { dictionaryFor } from '$lib/i18n/index.js';
 import {
   resolveClient,
   settingsInfo,
   ssoInfo
-} from '#lib/auth/authorizeRequest.js';
-import { CONSENT_COOKIE_NAME, unsealConsent } from '#lib/auth/consent.js';
-import { getDb } from '#lib/db.js';
-import { dictionaryFor } from '#lib/i18n/index.js';
-import { keyringFromEnv } from '#lib/secretbox.js';
+} from '$lib/server/auth/authorizeRequest.js';
+import {
+  CONSENT_COOKIE_NAME,
+  unsealConsent
+} from '$lib/server/auth/consent.js';
+import { getDb } from '$lib/server/db.js';
+import { keyringFromEnv } from '$lib/server/secretbox.js';
 
 import type { PageServerLoad } from './$types.js';
 import { consentForRequest } from './consentSubmit.js';

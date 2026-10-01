@@ -2,8 +2,8 @@
 # proves the certificate sync of §6.4 end to end against the real `proxy` image the stack ships
 # (built by docker-bake.hcl's `proxy` target, like the other four) — the `cert_obtained` hook's
 # copy onto caddy-data is the only thing that makes a Dependabot PR bumping Caddy
-# (images/proxy/Dockerfile) a real test of `packages/api/src/lib/jobs/certSync*.ts`, the only code
-# that depends on it.
+# (images/proxy/Dockerfile) a real test of `packages/api/src/lib/server/jobs/certSync*.ts`, the
+# only code that depends on it.
 #
 # `compose.test.yaml`'s `proxy` service mounts Caddyfile.local-ca into
 # `/etc/caddy/global.d/`, the directory the shipped deploy/Caddyfile's global options block

@@ -4,11 +4,11 @@ import pino from 'pino';
 
 import { nowIso, type Db } from '@zamfono/shared';
 
-import { requiredOrigin } from '#lib/auth/authorizationResponse.js';
-import { clientMetaFor } from '#lib/auth/authorizeRequest.js';
-import { authCodeStore } from '#lib/auth/codes.js';
-import { setConsentCookie } from '#lib/auth/consent.js';
-import { loginRedirect } from '#lib/auth/loginRedirect.js';
+import { requiredOrigin } from '$lib/server/auth/authorizationResponse.js';
+import { clientMetaFor } from '$lib/server/auth/authorizeRequest.js';
+import { authCodeStore } from '$lib/server/auth/codes.js';
+import { setConsentCookie } from '$lib/server/auth/consent.js';
+import { loginRedirect } from '$lib/server/auth/loginRedirect.js';
 import {
   discover,
   finishLogin,
@@ -18,9 +18,9 @@ import {
   unsealPendingLogin,
   type Discovery,
   type SsoConfig
-} from '#lib/auth/sso.js';
-import { getDb } from '#lib/db.js';
-import { keyringFromEnv } from '#lib/secretbox.js';
+} from '$lib/server/auth/sso.js';
+import { getDb } from '$lib/server/db.js';
+import { keyringFromEnv } from '$lib/server/secretbox.js';
 
 type FinishLoginResult = Awaited<ReturnType<typeof finishLogin>>;
 

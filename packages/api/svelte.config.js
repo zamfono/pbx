@@ -14,8 +14,8 @@ const config = {
     // `'*'` turns off SvelteKit's built-in CSRF origin check, which refuses every origin-less form
     // POST, and with it the clients of `/oauth/token`, `/oauth/revoke` and multipart REST uploads
     // (§5.2, §10.3). `hooks.server.ts` applies the same check to every other route instead
-    // (`lib/auth/crossSiteForms.ts`). Remote functions called from JavaScript keep SvelteKit's
-    // own same-origin check, which this option does not touch.
+    // (`lib/server/auth/crossSiteForms.ts`). Remote functions called from JavaScript keep
+    // SvelteKit's own same-origin check, which this option does not touch.
     csrf: {
       trustedOrigins: ['*']
     },

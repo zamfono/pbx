@@ -2,25 +2,25 @@ import { randomBytes } from 'node:crypto';
 import process from 'node:process';
 import { error, redirect, type RequestEvent } from '@sveltejs/kit';
 
-import { requiredOrigin } from '#lib/auth/authorizationResponse.js';
+import { requiredOrigin } from '$lib/server/auth/authorizationResponse.js';
 import {
   paramsFromPayload,
   resolveClient,
   type AuthorizePayload
-} from '#lib/auth/authorizeRequest.js';
+} from '$lib/server/auth/authorizeRequest.js';
 import {
   discover,
   SSO_COOKIE_NAME,
   SSO_COOKIE_PATH,
   ssoConfigFromSettings,
   startLogin
-} from '#lib/auth/sso.js';
+} from '$lib/server/auth/sso.js';
 import {
   PENDING_LOGIN_TTL_S,
   sealedPendingLoginValue
-} from '#lib/auth/ssoCookie.js';
-import { getDb } from '#lib/db.js';
-import { keyringFromEnv } from '#lib/secretbox.js';
+} from '$lib/server/auth/ssoCookie.js';
+import { getDb } from '$lib/server/db.js';
+import { keyringFromEnv } from '$lib/server/secretbox.js';
 
 const STATUS_BAD_REQUEST = 400;
 const STATUS_FOUND = 302;

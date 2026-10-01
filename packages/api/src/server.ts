@@ -2,7 +2,8 @@
  * `api`'s process entry point (§10, §3.1): wraps the SvelteKit adapter-node build's request
  * handler in a plain HTTP server so a WebSocket can be attached for `/events` (§10.6). Every
  * event reaches those sockets from the SvelteKit bundle, where the background jobs run
- * (`lib/jobs/background.ts`), through the sink this file provides (`lib/eventSink.ts`).
+ * (`lib/server/jobs/background.ts`), through the sink this file provides
+ * (`lib/server/eventSink.ts`).
  */
 import http from 'node:http';
 import process from 'node:process';
@@ -12,11 +13,11 @@ import { WebSocketServer, type WebSocket } from 'ws';
 
 import { resolveVersion, type Db } from '@zamfono/shared';
 
-import { getDb } from './lib/db.js';
-import { EventHub } from './lib/events.js';
-import { authenticateEventsSocket } from './lib/eventsAuth.js';
-import { provideEventSink } from './lib/eventSink.js';
-import { keyringFromEnv } from './lib/secretbox.js';
+import { getDb } from '$lib/server/db.js';
+import { EventHub } from '$lib/server/events.js';
+import { authenticateEventsSocket } from '$lib/server/eventsAuth.js';
+import { provideEventSink } from '$lib/server/eventSink.js';
+import { keyringFromEnv } from '$lib/server/secretbox.js';
 
 // Global Constraints "Fixed internal ports": api's port is never configurable per stack.
 const API_INTERNAL_PORT = 3000;

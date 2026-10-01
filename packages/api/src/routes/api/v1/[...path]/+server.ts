@@ -2,13 +2,13 @@ import type { RequestEvent } from '@sveltejs/kit';
 
 import { newId, type Db } from '@zamfono/shared';
 
-import { getDb } from '#lib/db.js';
+import { getDb } from '$lib/server/db.js';
 
 // Side-effect import: fills the registry (§10.3) every area's own operations register into, so
 // the route table below actually has something to dispatch to instead of 501ing on every call.
-import '#lib/ops/index.js';
+import '$lib/server/ops/index.js';
 
-import { handleRest } from '#lib/rest.js';
+import { handleRest } from '$lib/server/rest.js';
 
 /** The `oauth_clients` name behind `clientId`, for `audit_log.client_name` (§5.7). */
 async function clientNameFor(

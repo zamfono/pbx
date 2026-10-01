@@ -3,7 +3,7 @@
 
   import { resolve } from '$app/paths';
 
-  import { MIN_PASSWORD_LENGTH } from '#lib/auth/passwordPolicy.js';
+  import { MIN_PASSWORD_LENGTH } from '$lib/auth/passwordPolicy.js';
 
   import type { PageData } from './$types.js';
   import { setPassword } from './setPassword.remote.js';

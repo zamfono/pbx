@@ -3,10 +3,10 @@ import type { RequestEvent } from '@sveltejs/kit';
 import pino from 'pino';
 import { z } from 'zod';
 
-import { getDb } from '#lib/db.js';
-import { tryReadJson } from '#lib/json.js';
-import { sendMail } from '#lib/mail/index.js';
-import { keyringFromEnv } from '#lib/secretbox.js';
+import { getDb } from '$lib/server/db.js';
+import { tryReadJson } from '$lib/server/json.js';
+import { sendMail } from '$lib/server/mail/index.js';
+import { keyringFromEnv } from '$lib/server/secretbox.js';
 
 const logger = pino({ name: 'internal-mail' });
 

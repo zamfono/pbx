@@ -1,6 +1,6 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
-import type { Dictionary } from './lib/i18n/index.js';
-import type { Actor } from './lib/ops/types.js';
+import type { Dictionary } from '$lib/i18n/index.js';
+import type { Actor } from '$lib/server/ops/types.js';
 
 declare global {
   namespace App {

@@ -5,9 +5,10 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { MS_PER_SECOND, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
+import { signAccessToken } from '$lib/server/auth/jwt.js';
+import { getDb } from '$lib/server/db.js';
+
 import { handle } from './hooks.server.js';
-import { signAccessToken } from './lib/auth/jwt.js';
-import { getDb } from './lib/db.js';
 
 const JWT_SECRET = 'test-secret';
 const ORIGIN = 'https://pbx.example.com';
@@ -15,7 +16,7 @@ const FORM = { 'content-type': 'application/x-www-form-urlencoded' };
 // A no-JavaScript submission of one of the login page's remote `form`s posts to the page itself.
 const LOGIN_SUBMISSION = `${ORIGIN}/oauth/authorize?/remote=login`;
 
-vi.mock('./lib/jobs/keyRotation.js', () => ({
+vi.mock('$lib/server/jobs/keyRotation.js', () => ({
   reencryptSweep: () => Promise.resolve()
 }));
 

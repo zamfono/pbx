@@ -4,7 +4,7 @@
 # the reload cost is linear in total endpoint count) and times what a further config change costs
 # once that many endpoints exist. Each `POST /users/:id/devices` already calls `propagate(['pjsip'])`
 # and the runner awaits `notifyPropagation` before the HTTP response returns
-# (packages/api/src/lib/ops/runner.ts:229), so a curl round-trip time already includes the
+# (packages/api/src/lib/server/ops/runner.ts:229), so a curl round-trip time already includes the
 # api->core->Asterisk reload; a direct `asterisk -rx 'module reload res_pjsip.so'` is timed
 # alongside it to isolate Asterisk's own reload from that orchestration overhead.
 #
@@ -59,9 +59,10 @@ for ext in $(seq "$start_ext" "$end_ext"); do
   if [ $((n % 25)) -eq 0 ]; then
     echo "   $n/$count users created (last device-create reload round trip: ${device_ms}ms)" >&2
   fi
-  :  # No artificial pacing: admin CRUD carries no rate limit (checked in packages/api/src/lib/ops
-     # and packages/api/src/lib/auth/*, which only rate-limit the auth endpoints), and each
-     # create/device round trip above already serializes on its own propagate()+reload.
+  :  # No artificial pacing: admin CRUD carries no rate limit (checked in
+     # packages/api/src/lib/server/ops and packages/api/src/lib/server/auth/*, which only
+     # rate-limit the auth endpoints), and each create/device round trip above already serializes
+     # on its own propagate()+reload.
 done
 
 echo '== timing one more config change against the ~200-endpoint tenant ==' >&2

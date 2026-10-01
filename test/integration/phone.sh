@@ -32,8 +32,9 @@ PORT=${PHONE_PORT:-5070}
 SUFFIX=${PHONE_PORT:+-$PHONE_PORT}
 MEDIA_ARGS=${PHONE_PORT:+-mp $((PHONE_PORT + 2000))}
 QUALIFY_ATTEMPTS=20
-# Asterisk's default `qualify_timeout`, which the rendered AORs keep (packages/api/src/lib/pjsip),
-# plus a second for the result to reach the contact's status; in microseconds.
+# Asterisk's default `qualify_timeout`, which the rendered AORs keep
+# (packages/api/src/lib/server/pjsip), plus a second for the result to reach the contact's status;
+# in microseconds.
 STALE_PROBE_WINDOW_US=4000000
 REGISTER_ATTEMPTS=10
 CALL_ATTEMPTS=90

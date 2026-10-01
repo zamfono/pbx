@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 
-import { getDb } from '#lib/db.js';
-import { dictionaryFor } from '#lib/i18n/index.js';
+import { dictionaryFor } from '$lib/i18n/index.js';
+import { getDb } from '$lib/server/db.js';
 
 import type { PageServerLoad } from './$types.js';
 

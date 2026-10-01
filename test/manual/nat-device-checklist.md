@@ -5,7 +5,7 @@ under `test/integration/` exercise routing logic against a stack and simulated p
 network, which proves nothing about a real device crossing real NAT. Run this by hand against a
 live stack whenever the SIP transports, NAT settings or endpoint rendering change — §9.1
 (`pjsip.conf`/`rtp.conf` transports), §9.3 (per-device NAT settings), or the renderers at
-`packages/api/src/lib/pjsip/` and the templates at `images/asterisk/conf/*.tmpl`.
+`packages/api/src/lib/server/pjsip/` and the templates at `images/asterisk/conf/*.tmpl`.
 
 ## Setup
 

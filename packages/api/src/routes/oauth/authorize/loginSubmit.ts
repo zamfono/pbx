@@ -2,22 +2,22 @@ import process from 'node:process';
 import { redirect, type RequestEvent } from '@sveltejs/kit';
 import { z } from 'zod';
 
-import { requiredOrigin } from '#lib/auth/authorizationResponse.js';
+import { dictionaryFor } from '$lib/i18n/index.js';
+import { requiredOrigin } from '$lib/server/auth/authorizationResponse.js';
 import {
   AuthorizePayloadSchema,
   lookupUser,
   paramsFromPayload,
   resolveClient,
   settingsInfo
-} from '#lib/auth/authorizeRequest.js';
-import { authCodeStore } from '#lib/auth/codes.js';
-import { setConsentCookie } from '#lib/auth/consent.js';
-import { loginRedirect } from '#lib/auth/loginRedirect.js';
-import { verifyPassword } from '#lib/auth/password.js';
-import { getDb } from '#lib/db.js';
-import { dictionaryFor } from '#lib/i18n/index.js';
-import { accountLockKey } from '#lib/ops/users/_accountLock.js';
-import { keyringFromEnv } from '#lib/secretbox.js';
+} from '$lib/server/auth/authorizeRequest.js';
+import { authCodeStore } from '$lib/server/auth/codes.js';
+import { setConsentCookie } from '$lib/server/auth/consent.js';
+import { loginRedirect } from '$lib/server/auth/loginRedirect.js';
+import { verifyPassword } from '$lib/server/auth/password.js';
+import { getDb } from '$lib/server/db.js';
+import { accountLockKey } from '$lib/server/ops/users/_accountLock.js';
+import { keyringFromEnv } from '$lib/server/secretbox.js';
 
 import { loginLimiter } from './loginLimiter.js';
 

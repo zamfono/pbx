@@ -6,7 +6,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { newId, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { getDb } from '#lib/db.js';
+import { getDb } from '$lib/server/db.js';
 
 import { POST } from '../resetRequest/+server.js';
 import { requestReset } from './forgot.remote.js';
@@ -38,7 +38,7 @@ vi.mock('$app/server', () => ({
 }));
 
 // The relay is never reached: the reset token's row is what tells a sent mail from a dropped one.
-vi.mock('#lib/mail/index.js', () => ({
+vi.mock('$lib/server/mail/index.js', () => ({
   sendMail: () => Promise.resolve()
 }));
 

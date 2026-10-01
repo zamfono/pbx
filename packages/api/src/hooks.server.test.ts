@@ -6,9 +6,10 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { MS_PER_SECOND, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
+import { signAccessToken } from '$lib/server/auth/jwt.js';
+import { getDb } from '$lib/server/db.js';
+
 import { handle, init as initHooks } from './hooks.server.js';
-import { signAccessToken } from './lib/auth/jwt.js';
-import { getDb } from './lib/db.js';
 
 const JWT_SECRET = 'test-secret';
 const KEY_BYTE_LENGTH = 32;
@@ -28,7 +29,7 @@ const jobs = vi.hoisted(() => {
     }
   };
 });
-vi.mock('./lib/jobs/background.js', () => ({
+vi.mock('$lib/server/jobs/background.js', () => ({
   startBackgroundJobs: jobs.start
 }));
 
