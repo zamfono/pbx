@@ -34,7 +34,7 @@ services:
     restart: unless-stopped
 
   migrate:
-    image: ghcr.io/zamfono/migrate:${ZAMFONO_VERSION:-latest}   # node:26-slim + kysely-ctl + db/migrations; applies pending migrations, then exits
+    image: ghcr.io/zamfono/migrate:${ZAMFONO_VERSION:-latest}   # node:26-slim + Kysely + db/migrations; applies pending migrations, then exits
     networks:
       - internal
     environment:

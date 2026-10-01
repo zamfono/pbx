@@ -117,7 +117,7 @@ Three long-running application services run per stack, plus the TLS proxy and a 
 
 **Input schemas:** zod (Standard Schema, JSON Schema export) — one schema per operation drives remote-function validation, REST validation, OpenAPI and MCP tool definitions (§10.3)
 
-**Database:** SQLite3 via `better-sqlite3`, **Kysely** query builder — type-safe queries; kysely-ctl migrations run by the one-shot `migrate` service (§6.3); WAL mode
+**Database:** SQLite3 via `better-sqlite3`, **Kysely** query builder — type-safe queries; migrations applied by Kysely's `Migrator` in the one-shot `migrate` service (§6.3); WAL mode
 
 **Realtime events:** WebSocket `/events` on the `api` service — for admin UIs & integrations; softphones use SIP-native mechanisms instead
 
@@ -448,7 +448,7 @@ services:
     restart: unless-stopped
 
   migrate:
-    image: ghcr.io/zamfono/migrate:${ZAMFONO_VERSION:-latest}   # node:26-slim + kysely-ctl + db/migrations; applies pending migrations, then exits
+    image: ghcr.io/zamfono/migrate:${ZAMFONO_VERSION:-latest}   # node:26-slim + Kysely + db/migrations; applies pending migrations, then exits
     networks:
       - internal
     environment:
@@ -675,7 +675,7 @@ handle /metrics/litestream {
 - the first-boot seed ("First boot");
 - optional `TZ`, `TLS_RELOAD_HOUR` (§6.4), `CALL_LOG_MAX_BYTES` and `HEP_ENABLED` (§7, default `true`), `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED` (§9.1, default `true`), `METRICS_TOKEN` (§7; absent = no metrics endpoint), and `ZAMFONO_VERSION`, the tag of the six `zamfono/` images (default `latest`), which Compose also passes to `api` and `core` as the version they report (§7).
 
-**Migrations.** The `migrate` service is the only thing that changes the schema. Its image, built from the repository root by `images/migrate/Dockerfile` with the `db` workspace's production dependencies alone, holds `db/config.ts` and `db/migrations/` and runs `kysely migrate latest` against the `db` volume, retrying five times at 5 s intervals for a file that is briefly locked, then exits: 0 when every migration is applied, which is also the idle case on every later start, 1 when a migration fails on its own merits. `api` and `core` start only on that exit 0, so a failed migration stops the deployment before any code runs against an older schema. Migrations are forward-only; a bad release is undone by restoring the snapshot the upgrade began with (Upgrades, §6.5) and setting `ZAMFONO_VERSION` to the previous release. Every container that writes a shared volume runs as uid 1000: the three images that open the database as `node`, the `asterisk` image with its `asterisk` user mapped to that uid, and the `proxy` image, so the migration's database file, the rendered configuration and certificate on `asterisk-config`, the voicemail and prompt files on `media` and the certificate copy on `caddy-data` are readable and writable across containers.
+**Migrations.** The `migrate` service is the only thing that changes the schema. Its image, built from the repository root by `images/migrate/Dockerfile` with the `db` workspace's production dependencies alone, holds `db/migrate.ts` and `db/migrations/` and applies them with Kysely's `Migrator` to the `db` volume, retrying five times at 5 s intervals for a file that is briefly locked, then exits: 0 when every migration is applied, which is also the idle case on every later start, 1 when a migration fails on its own merits. `api` and `core` start only on that exit 0, so a failed migration stops the deployment before any code runs against an older schema. Migrations are forward-only; a bad release is undone by restoring the snapshot the upgrade began with (Upgrades, §6.5) and setting `ZAMFONO_VERSION` to the previous release. Every container that writes a shared volume runs as uid 1000: the three images that open the database as `node`, the `asterisk` image with its `asterisk` user mapped to that uid, and the `proxy` image, so the migration's database file, the rendered configuration and certificate on `asterisk-config`, the voicemail and prompt files on `media` and the certificate copy on `caddy-data` are readable and writable across containers.
 
 **First boot.** On its first start against a freshly migrated, empty database, `api` seeds it from `.env`:
 
@@ -1020,8 +1020,9 @@ packages/
 │           ├── mcp/+server.ts                # Streamable HTTP endpoint (§10.5)
 │           └── internal/mail, healthz, metrics
 └── shared/              # db access (Kysely + better-sqlite3), generated row types, wire contracts, time and opening-hours math, the background jobs' repeat schedule, MWI mailbox keys, the Asterisk object names `api` renders and `core` addresses
-db/                      # container 3, one-shot: kysely-ctl configuration and migrations (§6.3 "Migrations"); its image is images/migrate/Dockerfile
-├── config.ts            # the file path comes from DB_FILE
+db/                      # container 3, one-shot: the migrate entry point and migrations (§6.3 "Migrations"); its image is images/migrate/Dockerfile
+├── migrate.ts           # applies migrations/ to the file DB_FILE names
+├── config.ts            # kysely-ctl's, for creating a migration
 └── migrations/
 ```
 

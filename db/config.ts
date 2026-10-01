@@ -1,18 +1,19 @@
+import { existsSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import process from 'node:process';
 import Database from 'better-sqlite3';
-import { config as loadEnv } from 'dotenv';
 import { defineConfig } from 'kysely-ctl';
 
+// kysely-ctl's configuration, for `npm run migrate:create` in a checkout; the migrate image runs
+// migrate.ts instead. kysely-ctl runs with cwd `db/`, so a `.env` at the repository root, where a
+// developer may keep DB_FILE, is found from this file.
 const rootPath = resolve(import.meta.dirname, '..');
+const envFile = resolve(rootPath, '.env');
+if (existsSync(envFile)) {
+  process.loadEnvFile(envFile);
+}
 
-// The stack's only `.env` lives at the repository root; every kysely-ctl script runs with cwd
-// `db/`, so the path is resolved from this file rather than via `dotenv/config`. The `migrate`
-// image carries no `.env` at all: dotenv silently skips a missing file, and Compose injects the
-// environment instead (§6.3).
-loadEnv({ path: resolve(rootPath, '.env') });
-
-export const resolveDbFile = (dbFile: string): string =>
+const resolveDbFile = (dbFile: string): string =>
   dbFile === ':memory:' || isAbsolute(dbFile)
     ? dbFile
     : resolve(rootPath, dbFile);

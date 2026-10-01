@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-01 · §4 Database, §6.3 Migrations, §10 layout.** The `migrate` image applies the migrations with Kysely's `Migrator`, run by `db/migrate.ts`, which retries on better-sqlite3's `SQLITE_BUSY`/`SQLITE_LOCKED` error codes; kysely-ctl and `db/config.ts` remain only for creating a migration in a checkout.
+*Why:* found in the design review: the image ran `kysely migrate latest` through npm and decided a retry by matching its printed output.
+
 **2026-10-01 · §6.3 Images.** The release bundle carries a `VERSION` file naming its release, which `update.sh`, `setup.sh` and the updater read the release a stack directory runs from, unless `.env` sets `ZAMFONO_VERSION`; `compose.yaml`'s pinned defaults stay, since they are what Compose pulls and reports.
 *Why:* requested by the product owner: the release was written into `compose.yaml` and parsed back out of it in three places, which disagreed.
 

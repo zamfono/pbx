@@ -81,7 +81,7 @@ claude mcp add --transport http zamfono https://<your FQDN>/mcp
 | `CHANGELOG.md`    | what each release changes for operators, with its upgrade notes; each release's description                                              |
 | `docs/spec.md`    | the full technical specification — the contract the code is built against                                                                |
 | `images/`         | the Dockerfiles for `asterisk`, `migrate`, `api`, `core`, `proxy` and `updater`                                                          |
-| `db/`             | the schema migrations and the kysely-ctl configuration the `migrate` image runs                                                          |
+| `db/`             | the schema migrations and `migrate.ts`, which the `migrate` image runs                                                                   |
 | `packages/shared` | the database schema types, wire contracts and shared helpers                                                                             |
 | `packages/core`   | the ARI client and the call pipeline                                                                                                     |
 | `packages/api`    | the operations layer, REST, MCP, OAuth, events and background jobs                                                                       |

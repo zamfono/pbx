@@ -3,7 +3,7 @@
 # better-sqlite3 once for the migrations and the app, but only the `db` workspace's production
 # dependencies. The runtime stage keeps the workspace's layout under /app, the root's hoisted
 # node_modules beside db/ with any of db's own that npm nests under db/node_modules, so every
-# module resolves as in a checkout; db/package.json carries the `deploy` script migrate.ts runs.
+# module resolves as in a checkout.
 # Build from the repository root: `docker build -f images/migrate/Dockerfile .`.
 FROM node:26-slim AS build
 
@@ -19,7 +19,8 @@ RUN apt-get update && \
 COPY package.json package-lock.json ./
 COPY db/package.json db/
 # `--workspace db` installs the db workspace's dependencies alone, none of the root's or the other
-# workspaces', and `--omit=dev` leaves out its type packages, which nothing needs at run time.
+# workspaces', and `--omit=dev` leaves out its type packages and kysely-ctl, which only creates
+# migrations in a checkout.
 RUN npm ci --workspace db --omit=dev
 
 FROM node:26-slim
@@ -30,7 +31,7 @@ LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
 WORKDIR /app/db
 
 COPY --from=build /app /app
-COPY db/config.ts db/migrate.ts ./
+COPY db/migrate.ts ./
 COPY db/migrations ./migrations
 
 ENV NODE_ENV=production
