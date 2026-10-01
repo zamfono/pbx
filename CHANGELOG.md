@@ -13,11 +13,19 @@ why the specified behaviour changed; the commit history, how.
 
 ### Added
 
-- A help topic `numbers` (`zamfono.help`, and `reference/numbers.md` in the Claude Code skill):
+- Help topics `numbers`, `webhooks`, `mail-templates`, `parking`, `user-groups`, `directory` and
+  `call-data` (`zamfono.help`, and `reference/<topic>.md` in the Claude Code skill). `numbers`:
   DIDs, number blocks of both kinds, a fixed digit count after the base or open-ended, the main
   number, the block and tenant-wide fallbacks and the most precise match, with a worked example
-  of a German PBX line (Anlagenanschluss). The glossary, `mental-model` and `routing-order` point
-  to it.
+  of a German PBX line (Anlagenanschluss). `webhooks`: every event and its payload, the event-type
+  filter and the `active` switch, retries, timeouts and the delivery status, and how to verify
+  `X-Zamfono-Signature`, with code. `mail-templates`: the four kinds, builtin and tenant templates
+  per language, the Handlebars subset, the placeholders each kind offers and requires, the test
+  send and mail without a relay. `parking`: the slot extensions, park, retrieve, the ring-back to
+  the parker and BLF on slots. `user-groups`: where they are used, nesting, flattening and
+  deletion. `directory`: the phone book, how it names callers, and the search. `call-data`:
+  voicemails and MWI, the presence history and its snapshot, and the call statistics. The
+  glossary, `mental-model` and `routing-order` point to them.
 
 ### Changed
 

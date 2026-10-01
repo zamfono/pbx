@@ -22,9 +22,9 @@ Every call — inbound from a trunk, internal between colleagues, or re-entering
    find-me legs. The first accepted answer wins. `busy` applies when every device is busy;
    `noAnswer` applies when nobody answers within `ringTimeoutS`. An absent rule falls back to the
    user's own mailbox, or a rejection when none is enabled.
-5. **Target ring group.** Members (nested user groups flattened) are filtered to who is
-   ringable — not DND, not offline, not under an OOO rule, and, unless `skipBusy` is cleared, not
-   already in a call. The configured strategy (`simultaneous`, `sequential`, `random`) then rings
+5. **Target ring group.** Members (nested user groups flattened, `user-groups`) are filtered to
+   who is ringable — not DND, not offline, not under an OOO rule, and, unless `skipBusy` is
+   cleared, not already in a call. The configured strategy (`simultaneous`, `sequential`, `random`) then rings
    the ringable members; the group's `unanswered` rule is the fallback, `unavailable` fires at
    once when nobody is ringable.
 6. **Target menu.** The greeting plays and DTMF is collected against the menu's target map;
@@ -38,6 +38,6 @@ Every call — inbound from a trunk, internal between colleagues, or re-entering
 ## Outbound resolution
 
 The dialled string is resolved in order: a feature code, then an emergency number (see
-`emergency-calls`), then an internal extension or parking slot, then, once normalized to E.164, a
-tenant DID (routed internally, never out through a trunk), then an external number dialled out
-through the configured `outboundRoutes`.
+`emergency-calls`), then an internal extension or parking slot (`parking`), then, once normalized
+to E.164, a tenant DID (routed internally, never out through a trunk), then an external number
+dialled out through the configured `outboundRoutes`.

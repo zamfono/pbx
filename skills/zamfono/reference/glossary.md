@@ -3,6 +3,15 @@
 **Extension** — the short internal number dialled between colleagues. A user, a ring group and a
 parking slot each own one extension.
 
+**Parking slot** — an extension that holds a parked call (`*70`) until someone dials it; replaced
+as a set with `parking.set`. See `parking`.
+
+**User group** — a named, nestable set of users, flattened wherever it is used: as ring-group
+members and as an outbound route's callers. See `user-groups`.
+
+**Contact** — a tenant-wide phone-book entry (`contacts`) whose numbers name inbound callers. See
+`directory`.
+
 **DID** — a phone number the tenant owns, routed on arrival to a forward target.
 
 **Number block** — a base and the numbers that begin with it (`didBlocks`): a fixed count of
@@ -36,9 +45,20 @@ deposit (`*97<ext>`), add a third party (`*5<target>`), CLIR override (`#31#`/`*
 (`*70`). Codes are remapped tenant-wide in `settings.featureCodes`.
 
 **BLF** (Busy Lamp Field) — a SIP `SUBSCRIBE`/`NOTIFY` indicator a device shows for an extension
-or parking slot's live state.
+or parking slot's live state (`parking`).
 
 **MWI** (Message Waiting Indicator) — the SIP mechanism that tells a device it has new voicemail.
+See `call-data`.
+
+**Presence** — a user's status, `available`, `busy`, `offline` or `dnd`, from their devices'
+registrations and calls; every change is kept in the presence log (`presenceLog`). See
+`call-data`.
+
+**Webhook** — an endpoint the stack POSTs each realtime event to, with an `X-Zamfono-Signature`
+HMAC of the body. See `webhooks`.
+
+**Mail template** — the subject and bodies one kind of mail is rendered from, builtin or the
+tenant's own (`mailTemplates`). See `mail-templates`.
 
 **CLIR** — withholding the caller's own number on an outbound call.
 

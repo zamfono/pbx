@@ -21,38 +21,7 @@ const GUIDE_DIR = path.resolve(OPS_DIR, '../../../../../docs/guide');
  * area that does need guide text and has none yet; drop it from here with the topic that covers
  * it.
  */
-const UNCOVERED_AREAS = new Map<string, string>([
-  [
-    'contacts',
-    'TODO(guide): the shared phone book, its numbers and the caller-name lookup.'
-  ],
-  [
-    'mailTemplates',
-    'TODO(guide): the mail templates, their names and placeholders.'
-  ],
-  [
-    'parking',
-    'TODO(guide): call parking, its slot extensions and the ring-back to the parker.'
-  ],
-  [
-    'presenceLog',
-    'TODO(guide): the presence history and its point-in-time snapshot.'
-  ],
-  [
-    'search',
-    'TODO(guide): the type-ahead search across users, ring groups and contacts.'
-  ],
-  ['stats', 'TODO(guide): the call metrics, their time ranges and buckets.'],
-  [
-    'userGroups',
-    'TODO(guide): user groups, their nesting and where they are used.'
-  ],
-  ['voicemails', 'TODO(guide): voicemails, their audio and read state.'],
-  [
-    'webhooks',
-    'TODO(guide): webhooks, the events they carry, their filter and their secret.'
-  ]
-]);
+const UNCOVERED_AREAS = new Map<string, string>();
 
 function guideText(dir: string): string {
   return readdirSync(dir, { withFileTypes: true })

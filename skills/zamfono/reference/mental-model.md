@@ -29,8 +29,13 @@ that single tenant; there is no cross-tenant sharing.
 - **Menu** — a greeting plus a map of DTMF digits to forward targets, usable anywhere a target is
   usable, including as one option of another menu.
 - **User group** — a named, nestable set of users, used as ring-group membership and as an
-  outbound-route caller list.
-- **Contact** — a phone-book entry with one or more numbers, shared tenant-wide.
+  outbound-route caller list. See `user-groups`.
+- **Contact** — a phone-book entry with one or more numbers, shared tenant-wide, that names
+  inbound callers. See `directory`.
+- **Parking slot** — an extension of its own kind that holds a parked call until someone dials
+  it. See `parking`.
+- **Webhook** — an HTTP endpoint the stack POSTs its realtime events to, signed with a per-hook
+  secret. See `webhooks`.
 - **Settings** — the one tenant-wide row: time zone, language, feature codes, emergency numbers,
   the mail relay, and every other tenant default.
 
@@ -65,3 +70,9 @@ headers; either leg tells it who forwarded only as far as the trunk's `diversion
 - `numbers` — DIDs, number blocks, the main number and the fallbacks, with a worked example.
 - `glossary` — short definitions of the terms used across the guide and the REST/MCP surface.
 - `guardrails` — what the API refuses, confirms or lets you undo.
+- `user-groups` — nestable sets of users for ring groups and outbound routes.
+- `parking` — parking slots, park and retrieve, the ring-back to the parker.
+- `directory` — the phone book, caller names and the type-ahead search.
+- `call-data` — voicemails, the presence history and the call statistics.
+- `mail-templates` — the mails the stack sends, their languages and placeholders.
+- `webhooks` — the realtime events, their delivery and how to verify the signature.
