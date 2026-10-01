@@ -18,11 +18,12 @@ await_trace sipp /tmp/trunk-messages.log 1 \
   | python3 "$here/_forward-context-check.py" "sip:+15557301@$(container_ip sipp)" \
     '^"CI Agent" <sip:\+15551000@[^>]+>;reason=unconditional$'
 
-newest_call | python3 -c '
+newest_call | PYTHONPATH="$here" python3 -c '
 import json, sys
+from _call_trace import trace
 
 call = json.load(sys.stdin)
-events = [json.loads(line) for line in (call.get("log") or "").splitlines() if line.strip()]
+events = trace(call)
 attempts = [event for event in events if event.get("event") == "attempt"]
 problems = []
 if call["status"] != "answered":

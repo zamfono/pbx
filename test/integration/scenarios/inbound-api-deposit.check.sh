@@ -17,13 +17,14 @@ if [[ ${code:-none} != 2?? ]]; then
   exit 1
 fi
 parent=$(await_ended_call "$call_id" 15)
-python3 - "$parent" "$(api GET /calls)" "$(api GET /voicemails)" \
+PYTHONPATH="$(dirname "$0")" python3 - "$parent" "$(api GET /calls)" "$(api GET /voicemails)" \
   "$(cat "$(state_file api-deposit-before)")" "$(user_with_ext 101)" <<'PY'
 import json, sys
+from _call_trace import trace
 
 parent, calls, voicemails = (json.loads(arg) for arg in sys.argv[1:4])
 before, mailbox = set(sys.argv[4].split()), sys.argv[5]
-lines = [json.loads(line) for line in (parent.get("log") or "").splitlines() if line.strip()]
+lines = trace(parent)
 
 problems = []
 if not [l for l in lines if l.get("event") == "transfer" and l.get("target") == "101"

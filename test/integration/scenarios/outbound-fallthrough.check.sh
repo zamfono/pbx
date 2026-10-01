@@ -12,19 +12,13 @@ token=$2
 
 first_id=$(trunk_named ci-trunk)
 second_id=$(cat "$(state_file fallthrough)")
-newest_call | python3 -c '
+newest_call | PYTHONPATH="$(dirname "$0")" python3 -c '
 import json, sys
+from _call_trace import trace
 
 first, second = sys.argv[1:3]
 call = json.load(sys.stdin)
-attempts = []
-for line in (call.get("log") or "").splitlines():
-    try:
-        entry = json.loads(line)
-    except ValueError:
-        continue
-    if isinstance(entry, dict) and entry.get("event") == "attempt":
-        attempts.append((entry.get("trunkId"), entry.get("cause")))
+attempts = [(e.get("trunkId"), e.get("cause")) for e in trace(call) if e.get("event") == "attempt"]
 
 to, status = call["toUri"], call["status"]
 problems = []

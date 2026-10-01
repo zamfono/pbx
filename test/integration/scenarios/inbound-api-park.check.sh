@@ -19,17 +19,13 @@ if [ -z "${originated:-}" ]; then
 fi
 parked=$(await_ended_call "$call_id" 15)
 retrieval=$(await_ended_call "$originated" 15)
-python3 - "$parked" "$retrieval" "$(cat "$(state_file api-park-list)")" "$slot" \
+PYTHONPATH="$(dirname "$0")" python3 - "$parked" "$retrieval" "$(cat "$(state_file api-park-list)")" "$slot" \
   "$(user_with_ext 101)" "$(colleague_id colleague)" <<'PY'
 import json, sys
+from _call_trace import trace
 
 parked, retrieval, listing = (json.loads(arg) for arg in sys.argv[1:4])
 slot, parker, retriever = sys.argv[4:7]
-
-
-def trace(call):
-    return [json.loads(line) for line in (call.get("log") or "").splitlines() if line.strip()]
-
 
 problems = []
 entries = [e for e in listing["items"] if e["callId"] == parked["id"]]

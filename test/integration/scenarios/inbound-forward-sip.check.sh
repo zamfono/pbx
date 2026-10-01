@@ -26,11 +26,12 @@ await_trace sipp /tmp/sip-target-messages.log 1 \
     'X-Zamfono-Caller=+15559999' 'X-Zamfono-Did=+15551077' 'X-Called=177' \
     'X-Forward=unconditional ${EXTEN}'
 
-newest_call | python3 -c '
+newest_call | PYTHONPATH="$here" python3 -c '
 import json, sys
+from _call_trace import trace
 
 call = json.load(sys.stdin)
-events = [json.loads(line) for line in (call.get("log") or "").splitlines() if line.strip()]
+events = trace(call)
 attempts = [event for event in events if event.get("event") == "attempt"]
 problems = []
 if call["status"] != "answered":

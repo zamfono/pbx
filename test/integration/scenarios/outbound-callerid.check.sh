@@ -26,10 +26,11 @@ trunk_ip=$(container_ip sipp)
 await_trace sipp /tmp/trunk-messages.log 5 \
   | python3 "$(dirname "$0")/_callerid-check.py" "$trunk_ip"
 
-newest_call | python3 -c '
+newest_call | PYTHONPATH="$(dirname "$0")" python3 -c '
 import json, sys
+from _call_trace import trace
 call = json.load(sys.stdin)
-events = [json.loads(line) for line in (call.get("log") or "").splitlines() if line.strip()]
+events = trace(call)
 causes = [event.get("cause") for event in events if event.get("event") == "attempt"]
 releases = [event.get("code") for event in events if event.get("event") == "release"]
 if call["status"] != "failed" or causes != ["clirUnsupported"] or releases != [403]:

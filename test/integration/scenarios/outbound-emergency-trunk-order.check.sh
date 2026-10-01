@@ -32,28 +32,28 @@ read -r refuse_id _ answer_id ci_id < "$(state_file emergency-order)"
 calls=$(api GET /calls)
 emergency=$(api GET "/calls/$(printf '%s' "$calls" | jsonfield items.0.id)")
 control=$(api GET "/calls/$(printf '%s' "$calls" | jsonfield items.1.id)")
-python3 -c '
+PYTHONPATH="$(dirname "$0")" python3 -c '
 import json, sys
+from _call_trace import trace
 
 emergency, control = json.loads(sys.argv[1]), json.loads(sys.argv[2])
 refuse, answer, ci, number = sys.argv[3:7]
 
 
-def trace(call, event):
-    lines = [json.loads(line) for line in (call.get("log") or "").splitlines() if line.strip()]
-    return [(line.get("trunkId"), line.get("cause")) for line in lines
-            if isinstance(line, dict) and line.get("event") == event]
+def trunks(call, event):
+    return [(line.get("trunkId"), line.get("cause")) for line in trace(call)
+            if line.get("event") == event]
 
 
 problems = []
 for call, to, attempts in ((control, number, [(ci, "answered")]),
                            (emergency, "112", [(refuse, 503), (answer, "answered")])):
-    dialled, status, attempted = call["toUri"], call["status"], trace(call, "attempt")
+    dialled, status, attempted = call["toUri"], call["status"], trunks(call, "attempt")
     if dialled != to or status != "answered":
         problems.append(f"the call to {dialled!r} ended {status!r}, not {to} answered")
     if attempted != attempts:
         problems.append(f"the call to {to} attempted {attempted}, not {attempts}")
-tried = [trunk for trunk, _ in trace(emergency, "emergencyAttempt")]
+tried = [trunk for trunk, _ in trunks(emergency, "emergencyAttempt")]
 if tried != [refuse, answer]:
     problems.append(f"the emergency call tried {tried}, not {[refuse, answer]}")
 if problems:

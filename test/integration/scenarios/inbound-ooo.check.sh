@@ -16,18 +16,11 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 group_id=$(ci_group)
 bash "$here/_unavailable-check.sh" "$1" "$2" "$3" "$group_id" 20
 
-newest_call | python3 -c '
+newest_call | PYTHONPATH="$here" python3 -c '
 import json, sys
+from _call_trace import trace
 
 call = json.load(sys.stdin)
-active = False
-for line in (call.get("log") or "").splitlines():
-    try:
-        entry = json.loads(line)
-    except ValueError:
-        continue
-    if isinstance(entry, dict) and entry.get("event") == "ooo" and entry.get("active") is True:
-        active = True
-if not active:
+if not [e for e in trace(call) if e.get("event") == "ooo" and e.get("active") is True]:
     sys.exit("no out-of-office rule recorded as active in the call log: " + json.dumps(call)[:600])
 '

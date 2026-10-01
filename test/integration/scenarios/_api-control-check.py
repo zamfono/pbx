@@ -24,6 +24,8 @@ import json
 import sys
 from datetime import datetime
 
+from _call_trace import trace
+
 mode, *args = sys.argv[1:]
 problems = []
 
@@ -31,7 +33,7 @@ problems = []
 def load(path):
     with open(path, encoding="utf-8") as handle:
         call = json.load(handle)
-    call["lines"] = [json.loads(line) for line in (call.get("log") or "").splitlines()]
+    call["lines"] = trace(call)
     return call
 
 

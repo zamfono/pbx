@@ -16,11 +16,11 @@ here=$(dirname "$0")
 call=$(api GET "/calls/$(cat "$(state_file originated)")")
 printf '%s' "$call" \
   | python3 "$here/_originate-check.py" "$(user_with_ext 101)" +15557102 answered trunk
-printf '%s' "$call" | python3 -c '
+printf '%s' "$call" | PYTHONPATH="$here" python3 -c '
 import json, sys
+from _call_trace import trace
 call = json.load(sys.stdin)
-lines = [json.loads(line) for line in (call.get("log") or "").splitlines() if line.strip()]
-if not [l for l in lines if l.get("event") == "originate" and l.get("clir") is True]:
+if not [l for l in trace(call) if l.get("event") == "originate" and l.get("clir") is True]:
     sys.exit("the originate line does not carry clir: true: " + json.dumps(call)[:800])
 '
 await_trace sipp /tmp/trunk-messages.log 1 | PYTHONPATH="$here" python3 -c '

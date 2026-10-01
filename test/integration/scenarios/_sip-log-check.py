@@ -16,6 +16,8 @@ import json
 import re
 import sys
 
+from _call_trace import trace
+
 SIP_START_LINE = re.compile(r"^(?:[A-Z]+ \S+ SIP/2\.0$|SIP/2\.0 \d{3}\b)")
 
 
@@ -24,12 +26,8 @@ def main() -> None:
     expected = [arg.split(" ", 1) for arg in sys.argv[2:]]
     call = json.load(sys.stdin)
     messages = []
-    for line in (call.get("log") or "").splitlines():
-        try:
-            entry = json.loads(line)
-        except ValueError:
-            continue
-        if isinstance(entry, dict) and isinstance(entry.get("raw"), str):
+    for entry in trace(call):
+        if isinstance(entry.get("raw"), str):
             first = entry["raw"].lstrip().split("\r\n", 1)[0].split("\n", 1)[0]
             messages.append((entry.get("direction"), first))
 

@@ -10,17 +10,12 @@ The call is read from stdin, `calls.get`'s detail with its `log`.
 import json
 import sys
 
+from _call_trace import trace
+
 trunk_id, did_id, expected_to, expected_from = sys.argv[1:5]
 call = json.load(sys.stdin)
 
-trunks = []
-for line in (call.get("log") or "").splitlines():
-    try:
-        entry = json.loads(line)
-    except ValueError:
-        continue
-    if isinstance(entry, dict) and entry.get("event") == "trunk":
-        trunks.append(entry.get("trunkId"))
+trunks = [entry.get("trunkId") for entry in trace(call) if entry.get("event") == "trunk"]
 
 problems = []
 if call["toUri"] != expected_to:

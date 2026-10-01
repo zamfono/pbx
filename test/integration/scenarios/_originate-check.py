@@ -15,10 +15,12 @@ row whose trace says the ring went unanswered.
 import json
 import sys
 
+from _call_trace import trace
+
 user_id, target, outcome = sys.argv[1:4]
 answerer = sys.argv[4] if len(sys.argv) > 4 else ""
 call = json.load(sys.stdin)
-lines = [json.loads(line) for line in (call.get("log") or "").splitlines()]
+lines = trace(call)
 
 
 def having(event, **fields):
