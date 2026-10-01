@@ -1,7 +1,8 @@
 /**
  * `GET /metrics` (§7 "Metrics"): Prometheus text exposition of active calls, registered
  * devices, trunk registration and capacity, ARI connection state, API request latency,
- * database size, backup freshness, recording-mix failures and certificate-sync status.
+ * database size, backup freshness, recording-mix failures, certificate-sync status and what is
+ * known of updates.
  */
 import { stat } from 'node:fs/promises';
 
@@ -13,6 +14,7 @@ import {
 } from '@zamfono/shared';
 
 import type { CertSyncStatus } from './jobs/certSync.js';
+import { updateNews } from './ops/system/_state.js';
 
 /* eslint-disable no-magic-numbers -- Prometheus's suggested latency-histogram bucket bounds, meaningful only as this literal list */
 const API_REQUEST_SECONDS_BUCKETS = [
@@ -191,6 +193,25 @@ async function backupAgeLines(db: Db, now: () => Date): Promise<string[]> {
   return lines;
 }
 
+/**
+ * §6.3 "Automatic updates": whether an automatic update failed and the failed attempts on its
+ * release, and whether a breaking release waits for `update.sh`; all 0 without an updater.
+ */
+async function updateLines(db: Db): Promise<string[]> {
+  const news = await updateNews(db);
+  return [
+    ...gaugeLines('zamfono_auto_update_failed', news.autoUpdateFailed ? 1 : 0),
+    ...gaugeLines(
+      'zamfono_auto_update_failed_attempts',
+      news.autoUpdateFailedAttempts
+    ),
+    ...gaugeLines(
+      'zamfono_breaking_update_available',
+      news.breakingUpdateAvailable ? 1 : 0
+    )
+  ];
+}
+
 /** Renders the full `GET /metrics` body (§7 "Metrics"). */
 export async function renderMetrics(deps: MetricsDeps): Promise<string> {
   const now = deps.now ?? (() => new Date());
@@ -213,6 +234,7 @@ export async function renderMetrics(deps: MetricsDeps): Promise<string> {
       deps.certSyncStatus() === 'ok' ? 1 : 0
     ),
     ...recordingMixFailureLines(state),
+    ...(await updateLines(deps.db)),
     ...buildInfoLines(deps.version)
   ];
   return `${lines.join('\n')}\n`;

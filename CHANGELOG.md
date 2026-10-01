@@ -42,17 +42,19 @@ why the specified behaviour changed; the commit history, how.
   a row counts it as a failed attempt. A failed attempt is tried again at a later maintenance moment, at least
   20 hours on, up to 3 attempts per release, and then left until a newer release appears or an
   update succeeds; a refusal because another update is already running counts as no attempt. From
-  the first failure until an update succeeds, `/healthz` has `autoUpdateFailed: true` and
+  the first failure until an update succeeds, `/healthz` has `autoUpdateFailed: true`, `/metrics`
+  has `zamfono_auto_update_failed 1` with `zamfono_auto_update_failed_attempts`, and
   `system.info` shows the release, the reason and the attempts in `autoUpdate.failed`; every owner
   gets one mail once the last attempt failed (new template kind `updateFailed`), and the audit log
   has a `system.autoUpdate` entry for every attempt and outcome. Each failure names its concrete
   cause in all three places, such as `no enabled backup target`, the target and error of a failed
   backup, or what kept the stack busy. Whether automatic updates are on or
-  not, a breaking release, which only `update.sh` on the host installs, is announced: `/healthz` has
-  `breakingUpdateAvailable: true`, `system.info` shows the release in `update.latest`, and every
-  owner gets one mail per release (new template kind `breakingUpdate`). `/healthz` names no release,
-  since anyone can read it, and without `UPDATER_TOKEN` it reports neither field as `true` and
-  `system.info` no failure. `system.info` names who asked for the last update in
+  not, a breaking release, which only `update.sh` on the host installs, is announced: `/metrics` has
+  `zamfono_breaking_update_available 1`, `system.info` shows the release in `update.latest`, and
+  every owner gets one mail per release (new template kind `breakingUpdate`). `/healthz`, the
+  public uptime check, says nothing of releases, since anyone can read it; without
+  `UPDATER_TOKEN` it reports no failure, the three gauges are 0 and `system.info` shows no
+  failure. `system.info` names who asked for the last update in
   `update.last.trigger`: `manual` (with the owner in `by`), `automatic`, or `host` for `update.sh`
   on the host. Backup runs now take turns: a manual run started during a scheduled one waits for it,
   as the automatic update's backup does.

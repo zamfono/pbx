@@ -2,7 +2,11 @@ import type { Selectable } from 'kysely';
 
 import type { Db, DB } from '@zamfono/shared';
 
-import type { UpdaterStatus, UpdateState } from './_updater.js';
+import {
+  updaterClient,
+  type UpdaterStatus,
+  type UpdateState
+} from './_updater.js';
 
 /**
  * `update_state` (§11.2), the one row of what `api` knows about updates beyond the updater's own
@@ -93,6 +97,45 @@ export async function setAutoUpdateFailure(
     })
     .where('id', '=', 1)
     .execute();
+}
+
+/**
+ * What `update_state` tells `/healthz` and `/metrics` (§6.3 "Automatic updates", §7): whether an
+ * automatic update failed, with the failed attempts on its release, and whether a breaking
+ * release waits for `update.sh`.
+ */
+export type UpdateNews = {
+  autoUpdateFailed: boolean;
+  autoUpdateFailedAttempts: number;
+  breakingUpdateAvailable: boolean;
+};
+
+const NO_UPDATE_NEWS: UpdateNews = {
+  autoUpdateFailed: false,
+  autoUpdateFailedAttempts: 0,
+  breakingUpdateAvailable: false
+};
+
+/**
+ * `UpdateNews` from `update_state`; none for a database without the table yet, and while `.env`
+ * sets no `UPDATER_TOKEN`: without an updater there are no automatic updates and no report of a
+ * breaking release. The record is kept, should the token come back.
+ */
+export async function updateNews(db: Db): Promise<UpdateNews> {
+  if (updaterClient() === undefined) {
+    return NO_UPDATE_NEWS;
+  }
+  try {
+    const row = await loadUpdateState(db);
+    const failure = autoUpdateFailure(row);
+    return {
+      autoUpdateFailed: failure !== null,
+      autoUpdateFailedAttempts: failure?.attempts ?? 0,
+      breakingUpdateAvailable: (row?.breakingVersion ?? null) !== null
+    };
+  } catch {
+    return NO_UPDATE_NEWS;
+  }
 }
 
 /** `settings.auto_update` (§11.4); off for a database without its settings row yet. */

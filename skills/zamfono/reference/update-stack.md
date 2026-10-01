@@ -57,7 +57,9 @@ update that is already running when the stack asks, one started with `system.upd
 `update.sh`, counts as no failed attempt: the stack tries again once it ended. From the first
 failure until an update succeeds:
 
-- `/healthz` has `autoUpdateFailed: true`;
+- `/healthz` has `autoUpdateFailed: true`, and `/metrics` (with `METRICS_TOKEN`)
+  `zamfono_auto_update_failed 1` with the failed attempts in
+  `zamfono_auto_update_failed_attempts`;
 - `system.info` shows the release in `autoUpdate.failed`, with the reason of the last attempt,
   such as `no enabled backup target`, the target and error of a failed backup, the updater's
   refusal, the end of the updater's log or what kept the stack busy, and the failed `attempts` on
@@ -74,12 +76,12 @@ next attempt.
 
 A breaking release (a new major from 1.0.0 on, a new minor before) is never installed by
 `system.update` or automatically, whether `autoUpdate` is on or not. The stack announces it:
-`/healthz` has `breakingUpdateAvailable: true`, `system.info` shows the release in `update.latest`
-with `update.breaking: true`, and every owner gets one `breakingUpdate` mail per such release.
-`/healthz` names no release, since anyone can read it. Without `UPDATER_TOKEN` the stack asks no
-updater, updates nothing on its own and announces nothing: `/healthz` shows neither
-`breakingUpdateAvailable` nor `autoUpdateFailed` as `true`, and `system.info` no
-`autoUpdate.failed`. Read its upgrade notes, then install it on the host with
+`system.info` shows the release in `update.latest` with `update.breaking: true`, `/metrics` has
+`zamfono_breaking_update_available 1`, and every owner gets one `breakingUpdate` mail per such
+release. `/healthz`, the public uptime check, says nothing of releases, since anyone can read it.
+Without `UPDATER_TOKEN` the stack asks no updater, updates nothing on its own and announces
+nothing: `/healthz` does not show `autoUpdateFailed` as `true`, the `/metrics` update gauges are
+0, and `system.info` has no `autoUpdate.failed`. Read its upgrade notes, then install it on the host with
 `update.sh`.
 
 ## Undoing an update

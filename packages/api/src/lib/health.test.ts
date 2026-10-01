@@ -48,11 +48,10 @@ describe('apiHealth update fields (§6.3 "Automatic updates", §10.3 Health row)
     setUpdaterClient(undefined);
   });
 
-  it('says whether a breaking release waits and an automatic update failed, naming neither', async () => {
+  it('says whether an automatic update failed, and nothing of releases', async () => {
     setUpdaterClient(() => UNUSED_UPDATER);
     const db = await makeTestDb();
     await expect(healthOf(db)).resolves.toMatchObject({
-      breakingUpdateAvailable: false,
       autoUpdateFailed: false
     });
 
@@ -66,13 +65,13 @@ describe('apiHealth update fields (§6.3 "Automatic updates", §10.3 Health row)
         autoFailedAttempts: 1
       })
       .execute();
-    await expect(healthOf(db)).resolves.toMatchObject({
-      breakingUpdateAvailable: true,
-      autoUpdateFailed: true
-    });
+    const health = await healthOf(db);
+    expect(health).toMatchObject({ autoUpdateFailed: true });
+    expect(health).not.toHaveProperty('breakingUpdateAvailable');
+    expect(JSON.stringify(health)).not.toMatch(/0\.1\.2|0\.2\.0/u);
   });
 
-  it('reports neither without an updater, whatever update_state stores, and keeps the record', async () => {
+  it('reports no failure without an updater, whatever update_state stores, and keeps the record', async () => {
     setUpdaterClient(() => undefined);
     const db = await makeTestDb();
     await db
@@ -87,21 +86,18 @@ describe('apiHealth update fields (§6.3 "Automatic updates", §10.3 Health row)
       })
       .execute();
     await expect(healthOf(db)).resolves.toMatchObject({
-      breakingUpdateAvailable: false,
       autoUpdateFailed: false
     });
 
-    // The token back, and nothing succeeded since: both reappear.
+    // The token back, and nothing succeeded since: it reappears.
     setUpdaterClient(() => UNUSED_UPDATER);
     await expect(healthOf(db)).resolves.toMatchObject({
-      breakingUpdateAvailable: true,
       autoUpdateFailed: true
     });
   });
 
-  it('reports neither on an unmigrated database instead of throwing', async () => {
+  it('reports no failure on an unmigrated database instead of throwing', async () => {
     await expect(healthOf(openDb(':memory:'))).resolves.toMatchObject({
-      breakingUpdateAvailable: false,
       autoUpdateFailed: false
     });
   });

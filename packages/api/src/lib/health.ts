@@ -3,8 +3,7 @@ import { sql } from 'kysely';
 import { isDbOpen, pendingMigrations, type Db } from '@zamfono/shared';
 
 import { ENC_COLUMNS } from './jobs/keyRotation.js';
-import { loadUpdateState } from './ops/system/_state.js';
-import { updaterClient } from './ops/system/_updater.js';
+import { updateNews } from './ops/system/_state.js';
 import { hasEmergencyTrunk } from './ops/trunks/_shared.js';
 import { isProfilePending } from './provisioning/profilePending.js';
 import type { Keyring } from './secretbox.js';
@@ -35,14 +34,9 @@ export type ApiHealth = {
    */
   ringotelProfilePending: boolean;
   /**
-   * Whether a newer release the stack cannot take on its own because it is breaking waits to be
-   * installed with `update.sh` on the host, as the updater last reported; `false` without an
-   * updater (§6.3 "Automatic updates"). The release itself is `system.info`'s, which needs a login.
-   */
-  breakingUpdateAvailable: boolean;
-  /**
    * Whether an automatic update failed, from its first failed attempt until an update succeeds;
-   * `false` without an updater, which automatic updates need.
+   * `false` without an updater, which automatic updates need (§6.3 "Automatic updates"). What
+   * else is known of releases is `system.info`'s, which needs a login, and `/metrics`'.
    */
   autoUpdateFailed: boolean;
 };
@@ -153,36 +147,6 @@ async function profilePending(db: Db): Promise<boolean> {
   }
 }
 
-type UpdateFields = Pick<
-  ApiHealth,
-  'autoUpdateFailed' | 'breakingUpdateAvailable'
->;
-
-const NO_UPDATE_NEWS: UpdateFields = {
-  breakingUpdateAvailable: false,
-  autoUpdateFailed: false
-};
-
-/**
- * The update fields of `update_state`, both `false` for a database without the table yet, and
- * while `.env` sets no `UPDATER_TOKEN`: without an updater there are no automatic updates and no
- * report of a breaking release. The record is kept, should the token come back.
- */
-async function updateFields(db: Db): Promise<UpdateFields> {
-  if (updaterClient() === undefined) {
-    return NO_UPDATE_NEWS;
-  }
-  try {
-    const row = await loadUpdateState(db);
-    return {
-      breakingUpdateAvailable: (row?.breakingVersion ?? null) !== null,
-      autoUpdateFailed: (row?.autoFailedVersion ?? null) !== null
-    };
-  } catch {
-    return NO_UPDATE_NEWS;
-  }
-}
-
 /**
  * `api`'s own liveness plus the fields a client cannot otherwise observe (§6.3 "Health"):
  * `ok` is true only while the database is open and holds no pending migration, since `api`
@@ -195,7 +159,8 @@ export async function apiHealth(deps: ApiHealthDeps): Promise<ApiHealth> {
   const mail = dbOpen ? await mailConfigured(deps.db) : 'notConfigured';
   const emergencyTrunk = dbOpen && (await emergencyTrunkPresent(deps.db));
   const ringotelProfilePending = dbOpen && (await profilePending(deps.db));
-  const updates = dbOpen ? await updateFields(deps.db) : NO_UPDATE_NEWS;
+  const autoUpdateFailed =
+    dbOpen && (await updateNews(deps.db)).autoUpdateFailed;
   const core = await deps.checkCore();
   return {
     ok: dbOpen && migrated,
@@ -207,7 +172,7 @@ export async function apiHealth(deps: ApiHealthDeps): Promise<ApiHealth> {
     certificateSync: deps.certificateSync,
     emergencyTrunk,
     ringotelProfilePending,
-    ...updates
+    autoUpdateFailed
   };
 }
 

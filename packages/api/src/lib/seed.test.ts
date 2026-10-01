@@ -627,7 +627,6 @@ describe('apiHealth', () => {
       certificateSync: 'unknown',
       emergencyTrunk: false,
       ringotelProfilePending: false,
-      breakingUpdateAvailable: false,
       autoUpdateFailed: false
     });
     expect(healthStatus(health)).toBe(HTTP_SERVICE_UNAVAILABLE);

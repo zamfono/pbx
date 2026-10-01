@@ -7,6 +7,7 @@ import {
   renderMetrics,
   resetMetricsAccumulators
 } from './metrics.js';
+import { setUpdaterClient, type UpdaterClient } from './ops/system/_updater.js';
 import { makeTestDb } from './testDb.js';
 
 const EMPTY_STATE: StateResponse = {
@@ -267,6 +268,53 @@ describe('renderMetrics', () => {
 
     expect(parseMetrics(ok).get('zamfono_certificate_sync_ok')).toBe('1');
     expect(parseMetrics(missing).get('zamfono_certificate_sync_ok')).toBe('0');
+  });
+
+  it('renders the update gauges from update_state, all 0 without an updater (§6.3)', async () => {
+    const updater: UpdaterClient = {
+      status: () => Promise.reject(new Error('not asked')),
+      update: () => Promise.reject(new Error('not asked'))
+    };
+    const db = await makeTestDb();
+    await db
+      .updateTable('updateState')
+      .set({
+        breakingVersion: '0.2.0',
+        autoFailedVersion: '0.1.2',
+        autoFailure: 'no enabled backup target',
+        autoFailedAt: nowIso(),
+        autoFailedAttempts: 2
+      })
+      .execute();
+
+    setUpdaterClient(() => undefined);
+    const without = parseMetrics(await renderMetrics(stubDeps({ db })));
+    setUpdaterClient(() => updater);
+    const withUpdater = await renderMetrics(stubDeps({ db }));
+    await db
+      .updateTable('updateState')
+      .set({
+        breakingVersion: null,
+        autoFailedVersion: null,
+        autoFailure: null,
+        autoFailedAt: null,
+        autoFailedAttempts: 0
+      })
+      .execute();
+    const cleared = parseMetrics(await renderMetrics(stubDeps({ db })));
+    setUpdaterClient(undefined);
+
+    expect(withUpdater).toContain('# TYPE zamfono_auto_update_failed gauge');
+    const parsed = parseMetrics(withUpdater);
+    for (const [metrics, failed, attempts, breaking] of [
+      [without, '0', '0', '0'],
+      [parsed, '1', '2', '1'],
+      [cleared, '0', '0', '0']
+    ] as const) {
+      expect(metrics.get('zamfono_auto_update_failed')).toBe(failed);
+      expect(metrics.get('zamfono_auto_update_failed_attempts')).toBe(attempts);
+      expect(metrics.get('zamfono_breaking_update_available')).toBe(breaking);
+    }
   });
 
   it('accumulates zamfono_api_request_seconds', async () => {
