@@ -1,13 +1,14 @@
 import { randomBytes } from 'node:crypto';
 import process from 'node:process';
-import { isRedirect, type RequestEvent } from '@sveltejs/kit';
+import { isRedirect, type Cookies, type RequestEvent } from '@sveltejs/kit';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { encodeMetadataClientId } from '$lib/server/auth/clients.js';
-import { setConsentCookie } from '$lib/server/auth/consent.js';
+import { CONSENT_COOKIE } from '$lib/server/auth/consent.js';
+import { setSealedCookie } from '$lib/server/auth/sealedCookie.js';
 import { getDb } from '$lib/server/db.js';
 import { keyringFromEnv } from '$lib/server/secretbox.js';
 
@@ -97,9 +98,10 @@ function sealConsent(
   clientName: string,
   state: string | null = 'state-a'
 ): void {
-  setConsentCookie(
-    { cookies: { set: jar.set } } as unknown as RequestEvent,
+  setSealedCookie(
+    jar as unknown as Cookies,
     keyringFromEnv(process.env),
+    CONSENT_COOKIE,
     {
       userId: 'user-1',
       clientName,

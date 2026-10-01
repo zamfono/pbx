@@ -1,18 +1,19 @@
 import { randomBytes } from 'node:crypto';
 import process from 'node:process';
-import { isRedirect, type RequestEvent } from '@sveltejs/kit';
+import { isRedirect, type Cookies, type RequestEvent } from '@sveltejs/kit';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { encodeMetadataClientId } from '$lib/server/auth/clients.js';
-import { CONSENT_COOKIE_NAME } from '$lib/server/auth/consent.js';
+import { CONSENT_COOKIE } from '$lib/server/auth/consent.js';
+import { setSealedCookie } from '$lib/server/auth/sealedCookie.js';
 import {
   discover,
   finishLogin,
-  sealPendingLogin,
-  SSO_COOKIE_NAME,
-  ssoConfigFromSettings
+  SSO_COOKIE,
+  ssoConfigFromSettings,
+  type PendingLogin
 } from '$lib/server/auth/sso.js';
 import { getDb } from '$lib/server/db.js';
 import { keyringFromEnv } from '$lib/server/secretbox.js';
@@ -56,9 +57,25 @@ beforeEach(() => {
   finishLoginMock.mockReset();
 });
 
-/** A `RequestEvent` for `GET /oauth/callback?state=...&code=...` presenting `cookie` (a full
- *  `Set-Cookie` string, or `undefined` for none). `sets` collects every `cookies.set` call, for
- *  tests asserting the handler seals a consent cookie rather than minting a code directly. */
+/** The `zamfono_sso` value the SSO button seals for `pending`. */
+function sealedLogin(pending: PendingLogin): string {
+  let value = '';
+  setSealedCookie(
+    {
+      set: (_name: string, sealed: string) => {
+        value = sealed;
+      }
+    } as unknown as Cookies,
+    keyringFromEnv(process.env),
+    SSO_COOKIE,
+    pending
+  );
+  return value;
+}
+
+/** A `RequestEvent` for `GET /oauth/callback?state=...&code=...` presenting the `zamfono_sso`
+ *  value `cookie` (`undefined` for none). `sets` collects every `cookies.set` call, for tests
+ *  asserting the handler seals a consent cookie rather than minting a code directly. */
 function eventFor(
   query: string,
   cookie: string | undefined,
@@ -68,10 +85,7 @@ function eventFor(
   return {
     url,
     cookies: {
-      get: (name: string) =>
-        name === SSO_COOKIE_NAME && cookie !== undefined
-          ? cookie.slice(cookie.indexOf('=') + 1, cookie.indexOf(';'))
-          : undefined,
+      get: (name: string) => (name === SSO_COOKIE.name ? cookie : undefined),
       set: (name: string, value: string) => {
         sets.push({ name, value });
       },
@@ -93,7 +107,7 @@ function errorReasonOf(err: unknown): string | null {
 
 describe('GET /oauth/callback', () => {
   it('proceeds past the cookie/query state check when the cookie matches the browser', async () => {
-    const cookie = sealPendingLogin({
+    const cookie = sealedLogin({
       state: 'state-1',
       nonce: 'nonce-1',
       codeVerifier: 'verifier-1',
@@ -108,7 +122,7 @@ describe('GET /oauth/callback', () => {
   });
 
   it("refuses a code/state pair presented with another login's cookie", async () => {
-    const cookie = sealPendingLogin({
+    const cookie = sealedLogin({
       state: 'attacker-state',
       nonce: 'nonce-1',
       codeVerifier: 'verifier-1',
@@ -155,7 +169,7 @@ describe('GET /oauth/callback', () => {
       issuer: 'https://idp.example.com'
     });
     finishLoginMock.mockResolvedValue({ ok: true, userId: 'user-1' });
-    const cookie = sealPendingLogin({
+    const cookie = sealedLogin({
       state: 'state-1',
       nonce: 'nonce-1',
       codeVerifier: 'verifier-1',
@@ -182,8 +196,28 @@ describe('GET /oauth/callback', () => {
     expect(location.origin).toBe('https://pbx.example.com');
     expect(location.pathname).toBe('/oauth/authorize');
     expect(location.searchParams.get('code')).toBeNull();
-    expect(sets.some(cookieSet => cookieSet.name === CONSENT_COOKIE_NAME)).toBe(
+    expect(sets.some(cookieSet => cookieSet.name === CONSENT_COOKIE.name)).toBe(
       true
     );
+  });
+
+  it('fails as a server error, not as an expired link, while SECRETBOX_KEY is missing', async () => {
+    const cookie = sealedLogin({
+      state: 'state-1',
+      nonce: 'nonce-1',
+      codeVerifier: 'verifier-1',
+      authorizeParams: null
+    });
+    vi.stubEnv('SECRETBOX_KEY', '');
+    try {
+      // eslint-disable-next-line new-cap -- GET is the fixed SvelteKit route-handler export name
+      const err = await GET(
+        eventFor('state=state-1&code=auth-code', cookie)
+      ).catch((caught: unknown) => caught);
+      expect(isRedirect(err)).toBe(false);
+      expect(err).toBeInstanceOf(Error);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

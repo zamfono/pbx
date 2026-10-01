@@ -7,15 +7,17 @@ import { nowIso, type Db } from '@zamfono/shared';
 import { requiredOrigin } from '$lib/server/auth/authorizationResponse.js';
 import { clientMetaFor } from '$lib/server/auth/authorizeRequest.js';
 import { authCodeStore } from '$lib/server/auth/codes.js';
-import { setConsentCookie } from '$lib/server/auth/consent.js';
+import { CONSENT_COOKIE } from '$lib/server/auth/consent.js';
 import { loginRedirect } from '$lib/server/auth/loginRedirect.js';
+import {
+  setSealedCookie,
+  unsealCookie
+} from '$lib/server/auth/sealedCookie.js';
 import {
   discover,
   finishLogin,
-  SSO_COOKIE_NAME,
-  SSO_COOKIE_PATH,
+  SSO_COOKIE,
   ssoConfigFromSettings,
-  unsealPendingLogin,
   type Discovery,
   type SsoConfig
 } from '$lib/server/auth/sso.js';
@@ -83,9 +85,9 @@ async function finishLoginOrErrorPage(
 
 /**
  * `GET /oauth/callback`: the OIDC return handler for every configured SSO provider (§5.2 "Login
- * and SSO"). The browser presents the `zamfono_sso` cookie `/oauth/authorize` set when it
- * called `startLogin`, sealing the nonce and PKCE verifier `startLogin` generated and never put on
- * the wire, and the outer authorize request, if any, alongside them; its `state` must equal the
+ * and SSO"). The browser presents the `zamfono_sso` cookie the SSO button set on
+ * `/oauth/authorize`, sealing the nonce and PKCE verifier it generated and never put on the wire,
+ * and the outer authorize request, if any, alongside them; its `state` must equal the
  * query's, so a `code`/`state` pair copied off the browser that started the login is refused on
  * any other browser. On success, a sign-in for an outer client seals a consent decision into the
  * `zamfono_consent` cookie and returns to `/oauth/authorize` to render the consent step naming
@@ -94,19 +96,19 @@ async function finishLoginOrErrorPage(
  */
 export async function GET(event: RequestEvent): Promise<Response> {
   const origin = requiredOrigin();
+  const kr = keyringFromEnv(env);
   const state = event.url.searchParams.get('state');
   const code = event.url.searchParams.get('code');
   if (!state || !code) {
     toErrorPage(origin, 'expired');
   }
-  const pending = unsealPendingLogin(event.cookies.get(SSO_COOKIE_NAME));
+  const pending = unsealCookie(event.cookies, kr, SSO_COOKIE);
   if (pending?.state !== state) {
     toErrorPage(origin, 'expired');
   }
-  event.cookies.delete(SSO_COOKIE_NAME, { path: SSO_COOKIE_PATH });
+  event.cookies.delete(SSO_COOKIE.name, { path: SSO_COOKIE.path });
 
   const db = getDb();
-  const kr = keyringFromEnv(env);
   const cfg = await ssoConfigFromSettings(db, kr);
   if (!cfg) {
     toErrorPage(origin, 'noUser');
@@ -140,7 +142,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
   if (meta === null) {
     toErrorPage(origin, 'expired');
   }
-  setConsentCookie(event, kr, {
+  setSealedCookie(event.cookies, kr, CONSENT_COOKIE, {
     userId: result.userId,
     clientName: meta.name,
     authorize: pending.authorizeParams

@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import process from 'node:process';
 import { exportJWK, generateKeyPair, SignJWT, type JWK } from 'jose';
 import { describe, expect, it } from 'vitest';
 
@@ -10,12 +9,9 @@ import { makeTestDb } from '../testDb.js';
 import {
   discover,
   finishLogin,
-  sealPendingLogin,
   ssoConfigFromSettings,
   startLogin,
-  unsealPendingLogin,
   type Discovery,
-  type PendingAuthorize,
   type SsoConfig
 } from './sso.js';
 
@@ -29,27 +25,8 @@ const NONCE = 'test-nonce';
 const KEY_ID = 'kid-1';
 const SECRETBOX_KEY_VALUE = `0:${Buffer.alloc(32, 7).toString('base64')}`;
 
-// `startLogin`/`unsealPendingLogin` read the sealing key from `process.env` themselves, the same
-// way the callback route resolves it (`keyringFromEnv(process.env)`), so it must be set once here.
-process.env.SECRETBOX_KEY = SECRETBOX_KEY_VALUE;
-
 function testKeyring(): Keyring {
   return keyringFromEnv({ SECRETBOX_KEY: SECRETBOX_KEY_VALUE });
-}
-
-/** The value of a `Set-Cookie` string's first `name=value` pair. */
-function cookieValueOf(cookie: string): string {
-  return cookie.slice(cookie.indexOf('=') + 1, cookie.indexOf(';'));
-}
-
-function pendingAuthorize(state: string): PendingAuthorize {
-  return {
-    clientId: 'outer-client',
-    redirectUri: 'https://app.example.com/callback',
-    codeChallenge: 'challenge',
-    scope: 'openid',
-    state
-  };
 }
 
 function jsonResponse(body: unknown): Response {
@@ -450,20 +427,14 @@ describe('finishLogin', () => {
   });
 });
 
-describe('startLogin / unsealPendingLogin', () => {
+describe('startLogin', () => {
   it('builds an authorization URL with PKCE S256 and the OIDC scope', () => {
     const cfg = oidcConfig();
     const disc = discoveryFor(cfg.issuer);
     const codeVerifier = 'verifier-1';
-    const { url: rawUrl, cookie } = startLogin(
-      cfg,
-      disc,
-      ORIGIN,
-      'state-1',
-      NONCE,
-      codeVerifier
+    const url = new URL(
+      startLogin(cfg, disc, ORIGIN, 'state-1', NONCE, codeVerifier)
     );
-    const url = new URL(rawUrl);
     expect(url.origin + url.pathname).toBe(disc.authorizationEndpoint);
     expect(url.searchParams.get('client_id')).toBe(CLIENT_ID);
     expect(url.searchParams.get('redirect_uri')).toBe(
@@ -477,76 +448,14 @@ describe('startLogin / unsealPendingLogin', () => {
     expect(url.searchParams.get('code_challenge')).toBe(
       createHash('sha256').update(codeVerifier).digest('base64url')
     );
-    expect(cookie).toContain('HttpOnly');
-    expect(cookie).toContain('Secure');
-    expect(cookie).toContain('SameSite=Lax');
-    expect(cookie).toContain('Path=/oauth');
-    expect(cookie).toContain('Max-Age=600');
   });
 
   it('never puts the PKCE verifier itself on the authorization URL (RFC 7636)', () => {
     const cfg = oidcConfig();
     const disc = discoveryFor(cfg.issuer);
-    const { url, cookie } = startLogin(
-      cfg,
-      disc,
-      ORIGIN,
-      'state-2',
-      NONCE,
-      'verifier-2'
-    );
-    expect(url).not.toContain('verifier-2');
-    expect(cookie).not.toContain('verifier-2');
-  });
-
-  it('recovers the state, nonce and PKCE verifier startLogin sealed into the cookie', () => {
-    const cfg = oidcConfig();
-    const disc = discoveryFor(cfg.issuer);
-    const { cookie } = startLogin(
-      cfg,
-      disc,
-      ORIGIN,
-      'state-3',
-      NONCE,
-      'verifier-3'
-    );
-    expect(unsealPendingLogin(cookieValueOf(cookie))).toEqual({
-      state: 'state-3',
-      nonce: NONCE,
-      codeVerifier: 'verifier-3',
-      authorizeParams: null
-    });
-  });
-
-  it('returns null while no zamfono_sso cookie was presented', () => {
-    expect(unsealPendingLogin(undefined)).toBeNull();
-  });
-
-  it('returns null for a cookie value that does not unseal under the current keyring', () => {
-    expect(unsealPendingLogin('not-a-sealed-value')).toBeNull();
-  });
-
-  it('carries an outer authorize context sealed in afterwards by sealPendingLogin', () => {
-    const cfg = oidcConfig();
-    const disc = discoveryFor(cfg.issuer);
-    const { cookie } = startLogin(
-      cfg,
-      disc,
-      ORIGIN,
-      'state-4',
-      NONCE,
-      'verifier-4'
-    );
-    const pending = unsealPendingLogin(cookieValueOf(cookie));
-    if (pending === null) {
-      throw new Error('expected a pending login for state-4');
-    }
-    const authorizeParams = pendingAuthorize('outer-state');
-    const resealed = sealPendingLogin({ ...pending, authorizeParams });
-    expect(unsealPendingLogin(cookieValueOf(resealed))).toEqual({
-      ...pending,
-      authorizeParams
-    });
+    expect(
+      startLogin(cfg, disc, ORIGIN, 'state-2', NONCE, 'verifier-2')
+    ).not.toContain('verifier-2');
   });
 });
 

@@ -15,12 +15,11 @@ import {
 import { upsertClient } from '$lib/server/auth/clients.js';
 import { authCodeStore } from '$lib/server/auth/codes.js';
 import {
-  CONSENT_COOKIE_NAME,
-  CONSENT_COOKIE_PATH,
-  unsealConsent,
+  CONSENT_COOKIE,
   type PendingConsent
 } from '$lib/server/auth/consent.js';
 import { loginRedirect } from '$lib/server/auth/loginRedirect.js';
+import { unsealCookie } from '$lib/server/auth/sealedCookie.js';
 import { getDb } from '$lib/server/db.js';
 import { keyringFromEnv } from '$lib/server/secretbox.js';
 
@@ -65,11 +64,12 @@ export function consentForRequest(
  *  a reload cannot approve twice. A cookie that is absent, sealed under a retired key or
  *  malformed reads as an expired session. */
 function takePendingConsent(event: RequestEvent): PendingConsent {
-  const pending = unsealConsent(
+  const pending = unsealCookie(
+    event.cookies,
     keyringFromEnv(env),
-    event.cookies.get(CONSENT_COOKIE_NAME)
+    CONSENT_COOKIE
   );
-  event.cookies.delete(CONSENT_COOKIE_NAME, { path: CONSENT_COOKIE_PATH });
+  event.cookies.delete(CONSENT_COOKIE.name, { path: CONSENT_COOKIE.path });
   if (pending === null) {
     error(STATUS_BAD_REQUEST, 'oauth/authorize: consent session expired');
   }

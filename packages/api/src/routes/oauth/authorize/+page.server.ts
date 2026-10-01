@@ -6,10 +6,8 @@ import {
   settingsInfo,
   ssoInfo
 } from '$lib/server/auth/authorizeRequest.js';
-import {
-  CONSENT_COOKIE_NAME,
-  unsealConsent
-} from '$lib/server/auth/consent.js';
+import { CONSENT_COOKIE } from '$lib/server/auth/consent.js';
+import { unsealCookie } from '$lib/server/auth/sealedCookie.js';
 import { getDb } from '$lib/server/db.js';
 import { keyringFromEnv } from '$lib/server/secretbox.js';
 
@@ -30,7 +28,7 @@ export const load = (async event => {
   const dictionary = dictionaryFor(settings.language);
   const sso = await ssoInfo(db, kr);
   const pendingConsent = consentForRequest(
-    unsealConsent(kr, event.cookies.get(CONSENT_COOKIE_NAME)),
+    unsealCookie(event.cookies, kr, CONSENT_COOKIE),
     event.url.searchParams
   );
   if (pendingConsent !== null) {

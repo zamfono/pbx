@@ -20,16 +20,15 @@ import { matchSsoAccount } from './ssoAccount.js';
 
 export {
   discover,
-  sealPendingLogin,
-  SSO_COOKIE_NAME,
-  SSO_COOKIE_PATH,
   startLogin,
-  unsealPendingLogin,
   type Discovery,
-  type PendingAuthorize,
-  type PendingLogin,
   type SsoConfig
 } from './oidc.js';
+export {
+  SSO_COOKIE,
+  type PendingAuthorize,
+  type PendingLogin
+} from './ssoCookie.js';
 export { ssoConfigFromSettings } from './ssoSettings.js';
 
 type FinishLoginFailure =

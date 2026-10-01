@@ -1,6 +1,6 @@
 import { authorizationResponseUrl } from './authorizationResponse.js';
 import type { AuthCodeStore } from './codes.js';
-import type { PendingAuthorize } from './oidc.js';
+import type { PendingAuthorize } from './ssoCookie.js';
 
 /**
  * Where a completed login sends the browser: a fresh authorization code at the outer OAuth

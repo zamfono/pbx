@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { AuthCodeStore } from './codes.js';
 import { loginRedirect } from './loginRedirect.js';
-import type { PendingAuthorize } from './oidc.js';
+import type { PendingAuthorize } from './ssoCookie.js';
 
 const NOW = '2026-01-01T00:00:00.000Z';
 const ORIGIN = 'https://pbx.example.com';

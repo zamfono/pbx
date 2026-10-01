@@ -12,9 +12,10 @@ import {
   settingsInfo
 } from '$lib/server/auth/authorizeRequest.js';
 import { authCodeStore } from '$lib/server/auth/codes.js';
-import { setConsentCookie } from '$lib/server/auth/consent.js';
+import { CONSENT_COOKIE } from '$lib/server/auth/consent.js';
 import { loginRedirect } from '$lib/server/auth/loginRedirect.js';
 import { verifyPassword } from '$lib/server/auth/password.js';
+import { setSealedCookie } from '$lib/server/auth/sealedCookie.js';
 import { getDb } from '$lib/server/db.js';
 import { accountLockKey } from '$lib/server/ops/users/_accountLock.js';
 import { keyringFromEnv } from '$lib/server/secretbox.js';
@@ -91,7 +92,7 @@ export async function loginSubmit(
   if (!resolved) {
     redirect(STATUS_FOUND, loginRedirect(authCodeStore, user.id, null, origin));
   }
-  setConsentCookie(event, kr, {
+  setSealedCookie(event.cookies, kr, CONSENT_COOKIE, {
     userId: user.id,
     clientName: resolved.meta.name,
     authorize: resolved.authorize

@@ -8,8 +8,6 @@ import {
 } from 'jose';
 import { z } from 'zod';
 
-import { sealPendingLogin } from './ssoCookie.js';
-
 const DISCOVERY_PATH = '/.well-known/openid-configuration';
 // Discovery documents are cached for 1 hour (§5.2 "SSO", `discover`).
 const DISCOVERY_CACHE_TTL_MS = 3_600_000;
@@ -89,17 +87,8 @@ function s256(verifier: string): string {
   return createHash('sha256').update(verifier).digest('base64url');
 }
 
-export {
-  SSO_COOKIE_NAME,
-  SSO_COOKIE_PATH,
-  sealPendingLogin,
-  unsealPendingLogin,
-  type PendingAuthorize,
-  type PendingLogin
-} from './ssoCookie.js';
-
-/** Builds the upstream authorization URL and seals `state`/`nonce`/`codeVerifier` into the
- *  `zamfono_sso` cookie the callback unseals to redeem them. */
+/** The upstream authorization URL for `state`, `nonce` and `codeVerifier`'s S256 challenge; the
+ *  caller seals the three into the `zamfono_sso` cookie the callback redeems them from. */
 // eslint-disable-next-line max-params -- the authorization request's own parameters (§5.2 "Login and SSO")
 export function startLogin(
   cfg: SsoConfig,
@@ -108,7 +97,7 @@ export function startLogin(
   state: string,
   nonce: string,
   codeVerifier: string
-): { url: string; cookie: string } {
+): string {
   const url = new URL(disc.authorizationEndpoint);
   url.searchParams.set('client_id', cfg.clientId);
   url.searchParams.set('redirect_uri', `${origin}${SSO_CALLBACK_PATH}`);
@@ -118,15 +107,7 @@ export function startLogin(
   url.searchParams.set('nonce', nonce);
   url.searchParams.set('code_challenge', s256(codeVerifier));
   url.searchParams.set('code_challenge_method', CODE_CHALLENGE_METHOD);
-  return {
-    url: url.toString(),
-    cookie: sealPendingLogin({
-      state,
-      nonce,
-      codeVerifier,
-      authorizeParams: null
-    })
-  };
+  return url.toString();
 }
 
 /** Redeems `params.code` at the token endpoint and returns the raw `id_token`. */

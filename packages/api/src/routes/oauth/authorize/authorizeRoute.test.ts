@@ -1,6 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto';
 import process from 'node:process';
-import { isHttpError, isRedirect, type RequestEvent } from '@sveltejs/kit';
+import {
+  isHttpError,
+  isRedirect,
+  type Cookies,
+  type RequestEvent
+} from '@sveltejs/kit';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
@@ -8,9 +13,10 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { encodeMetadataClientId } from '$lib/server/auth/clients.js';
 import { authCodeStore } from '$lib/server/auth/codes.js';
-import { setConsentCookie } from '$lib/server/auth/consent.js';
+import { CONSENT_COOKIE } from '$lib/server/auth/consent.js';
 import { tokenEndpoint } from '$lib/server/auth/oauth.js';
 import { hashPassword } from '$lib/server/auth/password.js';
+import { setSealedCookie } from '$lib/server/auth/sealedCookie.js';
 import { getDb } from '$lib/server/db.js';
 import { accountLockedUntil } from '$lib/server/ops/users/_accountLock.js';
 import { keyringFromEnv } from '$lib/server/secretbox.js';
@@ -393,27 +399,17 @@ describe('GET /oauth/authorize (load)', () => {
   it('renders the consent step for a pending `zamfono_consent` cookie, the same one the SSO callback sets', async () => {
     const cookies = cookieJar();
     const kr = keyringFromEnv(process.env);
-    setConsentCookie(
-      {
-        cookies: {
-          set: (name: string, value: string) => {
-            cookies.set(name, value);
-          }
-        }
-      } as unknown as RequestEvent,
-      kr,
-      {
-        userId: 'user-1',
-        clientName: 'Callback Client',
-        authorize: {
-          clientId: 'client-1',
-          redirectUri: 'https://client.example.com/callback',
-          codeChallenge: 'challenge-1',
-          scope: 'openid',
-          state: 'state-1'
-        }
+    setSealedCookie(cookies as unknown as Cookies, kr, CONSENT_COOKIE, {
+      userId: 'user-1',
+      clientName: 'Callback Client',
+      authorize: {
+        clientId: 'client-1',
+        redirectUri: 'https://client.example.com/callback',
+        codeChallenge: 'challenge-1',
+        scope: 'openid',
+        state: 'state-1'
       }
-    );
+    });
     const data = await load({
       url: new URL(`${ORIGIN}/oauth/authorize`),
       cookies

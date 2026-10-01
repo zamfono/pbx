@@ -8,17 +8,13 @@ import {
   resolveClient,
   type AuthorizePayload
 } from '$lib/server/auth/authorizeRequest.js';
+import { setSealedCookie } from '$lib/server/auth/sealedCookie.js';
 import {
   discover,
-  SSO_COOKIE_NAME,
-  SSO_COOKIE_PATH,
+  SSO_COOKIE,
   ssoConfigFromSettings,
   startLogin
 } from '$lib/server/auth/sso.js';
-import {
-  PENDING_LOGIN_TTL_S,
-  sealedPendingLoginValue
-} from '$lib/server/auth/ssoCookie.js';
 import { getDb } from '$lib/server/db.js';
 import { keyringFromEnv } from '$lib/server/secretbox.js';
 
@@ -56,22 +52,14 @@ export async function ssoSubmit(
   const state = randomBytes(RANDOM_TOKEN_BYTES).toString('base64url');
   const nonce = randomBytes(RANDOM_TOKEN_BYTES).toString('base64url');
   const codeVerifier = randomBytes(RANDOM_TOKEN_BYTES).toString('base64url');
-  const { url } = startLogin(cfg, disc, origin, state, nonce, codeVerifier);
-  event.cookies.set(
-    SSO_COOKIE_NAME,
-    sealedPendingLoginValue({
-      state,
-      nonce,
-      codeVerifier,
-      authorizeParams: resolved?.authorize ?? null
-    }),
-    {
-      path: SSO_COOKIE_PATH,
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      maxAge: PENDING_LOGIN_TTL_S
-    }
+  setSealedCookie(event.cookies, kr, SSO_COOKIE, {
+    state,
+    nonce,
+    codeVerifier,
+    authorizeParams: resolved?.authorize ?? null
+  });
+  redirect(
+    STATUS_FOUND,
+    startLogin(cfg, disc, origin, state, nonce, codeVerifier)
   );
-  redirect(STATUS_FOUND, url);
 }
