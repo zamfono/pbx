@@ -620,16 +620,15 @@ describe('transfers', () => {
     await eventually(() => {
       expect(originatedEndpoints().at(-1)).toMatchObject({
         endpoint: 'PJSIP/e102-a',
-        appArgs: `leg,${child?.id ?? ''}`
+        appArgs: `leg,${child.id}`
       });
-      expect(child?.status).toBe('answered');
+      expect(child.status).toBe('answered');
     });
 
-    expect(child).not.toBeNull();
-    expect(child?.parentCallId).toBe(call.id);
-    expect(child?.callerChannelId).toBe(callerId);
-    expect(child?.direction).toBe('inbound');
-    expect(child?.from).toBe('+15559999');
+    expect(child.parentCallId).toBe(call.id);
+    expect(child.callerChannelId).toBe(callerId);
+    expect(child.direction).toBe('inbound');
+    expect(child.from).toBe('+15559999');
     expect(hungUp(legId)).toBe(true);
     expect(hungUp(callerId)).toBe(false);
     expect(
@@ -642,9 +641,9 @@ describe('transfers', () => {
     ).toBe(true);
     expect(originatedEndpoints().at(-1)).toMatchObject({
       endpoint: 'PJSIP/e102-a',
-      appArgs: `leg,${child?.id ?? ''}`
+      appArgs: `leg,${child.id}`
     });
-    expect(child?.status).toBe('answered');
+    expect(child.status).toBe('answered');
     const original = await db
       .selectFrom('calls')
       .select(['status', 'endedAt', 'log'])
@@ -656,7 +655,7 @@ describe('transfers', () => {
     const childRow = await db
       .selectFrom('calls')
       .select(['parentCallId'])
-      .where('id', '=', child?.id ?? '')
+      .where('id', '=', child.id)
       .executeTakeFirstOrThrow();
     expect(childRow.parentCallId).toBe(call.id);
   });
@@ -697,26 +696,26 @@ describe('transfers', () => {
       actorUserId: transferrerId
     });
 
-    expect(child?.log.level).toBe('events');
+    expect(child.log.level).toBe('events');
     // The row carries the trace once the child's dial, in the background, has ended it.
     await eventually(async () => {
       const row = await db
         .selectFrom('calls')
         .select('log')
-        .where('id', '=', child?.id ?? '')
+        .where('id', '=', child.id)
         .executeTakeFirstOrThrow();
       expect(row.log).toContain('"dialAction":"emergency"');
     });
   });
 
-  it('returns null for a transfer of a call that is not bridged', async () => {
+  it('refuses a transfer of a call that is not bridged with 409 notBridged', async () => {
     await setUp();
     const userId = await seedUser(db, '101');
     const { call } = await answeredCall(userId, 'PJSIP/e101-a-00000002');
     call.bridgeId = null;
     await expect(
       transferCall(pipeline, call, { target: '102', actorUserId: userId })
-    ).resolves.toBeNull();
+    ).rejects.toMatchObject({ status: 409, reason: 'notBridged' });
   });
 
   /** 101's consultation call to 102: 101's second channel is its caller, 102's device its leg. */

@@ -112,6 +112,10 @@ why the specified behaviour changed; the commit history, how.
   (`settings.timezone`), and a date alone, `2026-10-01`, its local midnight, where both were read
   as UTC. A time with an offset or `Z` means what it did. A local time that a daylight-saving
   change skips or repeats is read as the earlier of its two possible instants.
+- A party added to a call (`*5`, `calls.addParty`, a consultation's `calls.consult`) is not
+  parked from its own call: `calls.park` on that call is refused with 409 `notBridged`, as
+  `calls.transfer`, `calls.consult` and `calls.hold` on it already were, and `*70` dialled by
+  the added party is released, where both took the other party out of the shared conversation.
 
 ### Fixed
 

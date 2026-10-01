@@ -10,14 +10,14 @@
  */
 import type { HoldRequest } from '@zamfono/shared';
 
-import { ActionError } from './actionError.js';
+import { ActionError, HTTP_CONFLICT, notBridged } from './actionError.js';
 import type { Call } from './call.js';
-import { findLiveCall, otherChannelIn } from './callLookup.js';
-import { notBridged, ownBridge } from './consultation.js';
+import {
+  bridgedParty,
+  findLiveCall,
+  transferrerChannel
+} from './callLookup.js';
 import type { Pipeline } from './pipeline.js';
-import { transferrerChannel } from './transfers.js';
-
-const HTTP_CONFLICT = 409;
 
 export type Hold = {
   /** The call whose party is held. */
@@ -130,12 +130,12 @@ export async function holdOnRequest(
   call: Call,
   req: HoldRequest
 ): Promise<void> {
-  const bridgeId = ownBridge(call);
   const byChannelId = transferrerChannel(call, req.actorUserId);
-  const party = otherChannelIn(call, byChannelId);
-  if (bridgeId === null || party === null) {
+  const conversation = bridgedParty(call, byChannelId);
+  if (conversation === null) {
     throw notBridged();
   }
+  const { bridgeId, party } = conversation;
   if (holdIn(pipeline, bridgeId) !== null) {
     throw new ActionError(HTTP_CONFLICT, 'held', 'call is on hold');
   }

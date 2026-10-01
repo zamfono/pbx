@@ -51,6 +51,35 @@ export function otherChannelIn(
   return leg?.channelId ?? null;
 }
 
+/** The bridge `call` carries its conversation in, `null` while it has none of its own: not
+ * answered yet, or an added leg, whose bridge is the call it joined (§10.2 "Three-way calls"). */
+export function ownBridge(call: Call): string | null {
+  return call.addedLeg === true ? null : call.bridgeId;
+}
+
+/** The channel the actor acts through in `call`: the actor's own, else the answerer's, else the
+ * caller's. Only an admin's action on someone else's call reaches the fallbacks: `api` lets a
+ * `user` act on a call only as its caller or with a leg up in it (§10.3 "Live calls"). */
+export function transferrerChannel(call: Call, actorUserId: string): string {
+  const answerer =
+    call.answeredByUserId === null
+      ? null
+      : channelOf(call, call.answeredByUserId);
+  return channelOf(call, actorUserId) ?? answerer ?? call.callerChannelId;
+}
+
+/** The conversation `call` carries in its own bridge, seen from `byChannelId`: the bridge and the
+ * other party in it. `null` for a call that has no bridge of its own (`ownBridge`) or nobody
+ * else in it, which transfer, consult, hold and park all refuse. */
+export function bridgedParty(
+  call: Call,
+  byChannelId: string
+): { bridgeId: string; party: string } | null {
+  const bridgeId = ownBridge(call);
+  const party = otherChannelIn(call, byChannelId);
+  return bridgeId === null || party === null ? null : { bridgeId, party };
+}
+
 /** The first live call matching `test`, over `callByChannel`'s several entries per call. */
 export function findLiveCall(
   pipeline: Pipeline,

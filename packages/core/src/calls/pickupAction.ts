@@ -8,14 +8,12 @@ import { newId, type PickupRequest } from '@zamfono/shared';
 
 import type { Snapshot } from '../internal/server.js';
 import { RelayedCallLog } from '../relayedCallLog.js';
-import { ActionError } from './actionError.js';
+import { ActionError, HTTP_CONFLICT } from './actionError.js';
 import { callLogMaxBytesFromEnv, newCall, type Call } from './call.js';
 import { ringOwnDevices, ringTimeoutOf } from './ownDevices.js';
 import { pickUp, pickupRingOf } from './pickup.js';
 import type { Pipeline } from './pipeline.js';
 import { registeredDevices } from './userDevices.js';
-
-const HTTP_CONFLICT = 409;
 
 /** The extension `call` is ringing right now, `null` once it stopped (§10.1 "Pickup"). */
 function ringingExtension(

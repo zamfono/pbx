@@ -21,7 +21,7 @@ import {
   type TransferRequest
 } from '@zamfono/shared';
 
-import { ActionError } from './actionError.js';
+import { ActionError, HTTP_NOT_FOUND } from './actionError.js';
 import { addPartyOnRequest } from './addedParty.js';
 import type { Call } from './call.js';
 import { findLiveCall } from './callLookup.js';
@@ -41,9 +41,6 @@ import { pickupOnRequest } from './pickupAction.js';
 import type { Pipeline } from './pipeline.js';
 import { transferCall } from './transfers.js';
 import { registeredDevices } from './userDevices.js';
-
-const HTTP_NOT_FOUND = 404;
-const HTTP_CONFLICT = 409;
 
 /** The live-call actions of the internal API (§3), over one `Pipeline`. */
 export class CallActions {
@@ -124,10 +121,7 @@ export class CallActions {
   /** `POST /internal/calls/{id}/transfer` (§10.1 "Transfers and pickup"): with `voicemail`,
    * into the mailbox of the extension's user or ring group, as `*97<target>` (§9.3). */
   async transfer(callId: string, req: TransferRequest): Promise<void> {
-    const child = await transferCall(this.pipeline, this.findCall(callId), req);
-    if (child === null) {
-      throw new ActionError(HTTP_CONFLICT, 'notBridged', 'call is not bridged');
-    }
+    await transferCall(this.pipeline, this.findCall(callId), req);
   }
 
   /** `POST /internal/calls/{id}/park` (§10.2 "Call parking"): `userId` parks the call's other

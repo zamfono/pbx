@@ -10,15 +10,13 @@
 import { newId, type AddPartyRequest } from '@zamfono/shared';
 
 import type { Snapshot } from '../internal/server.js';
-import { ActionError } from './actionError.js';
+import { ActionError, HTTP_UNPROCESSABLE, notBridged } from './actionError.js';
 import { dialAddPartyTarget } from './addParty.js';
 import { resolveAddedTarget } from './addPartyTarget.js';
 import { callLogMaxBytesFromEnv, newCall, type Call } from './call.js';
-import { notBridged, ownBridge } from './consultation.js';
+import { ownBridge, transferrerChannel } from './callLookup.js';
 import type { Pipeline } from './pipeline.js';
-import { transferrerChannel, userOfChannel } from './transfers.js';
-
-const HTTP_UNPROCESSABLE = 422;
+import { userOfChannel } from './transfers.js';
 
 /** Which action the leg is for, as its trace and the running call's name it. */
 export type AddedLegKind = 'addParty' | 'consult';

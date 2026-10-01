@@ -9,7 +9,7 @@ import { newId, type TransferRequest } from '@zamfono/shared';
 
 import type { Snapshot } from '../internal/server.js';
 import { setChannelLanguage } from '../prompts.js';
-import { ActionError } from './actionError.js';
+import { ActionError, HTTP_UNPROCESSABLE, notBridged } from './actionError.js';
 import {
   callLogMaxBytesFromEnv,
   newCall,
@@ -19,9 +19,9 @@ import {
   type Owner
 } from './call.js';
 import {
-  channelOf,
-  otherChannelIn,
-  presentCallerUserId
+  bridgedParty,
+  presentCallerUserId,
+  transferrerChannel
 } from './callLookup.js';
 import { ownerForExt } from './extensionOwner.js';
 import { endHold } from './hold.js';
@@ -148,8 +148,6 @@ async function startTransfereeCall(
   return child;
 }
 
-const HTTP_UNPROCESSABLE = 422;
-
 /** Where `req` sends the transferee (`Onward`); 422 for a transfer to voicemail to an extension
  * no user or ring group owns, so nothing has moved yet. */
 function onwardOf(snapshot: Snapshot, req: TransferRequest): Onward {
@@ -168,37 +166,24 @@ function onwardOf(snapshot: Snapshot, req: TransferRequest): Onward {
   return { target, mailbox };
 }
 
-/** The transferrer's channel in `call`: the actor's own, else the answerer's, else the caller's.
- * Only an admin's transfer of someone else's call reaches the fallbacks: `api` lets a `user`
- * transfer a call only as its caller or with a leg up in it (§10.3 "Live calls"). The same side
- * holds, consults and adds a party for the actor. */
-export function transferrerChannel(call: Call, actorUserId: string): string {
-  const answerer =
-    call.answeredByUserId === null
-      ? null
-      : channelOf(call, call.answeredByUserId);
-  return channelOf(call, actorUserId) ?? answerer ?? call.callerChannelId;
-}
-
 /**
  * `POST /internal/calls/{id}/transfer` (§10.1 "Transfers and pickup"): blind-transfers the other
  * party of the bridged `call` to `req.target`, with `req.voicemail` into its owner's mailbox, as
- * their own new call, returned; the transferrer's participation, and with it `call`, ends. `null`
- * for a call that is not bridged, or whose bridge is another call's: a party added to that call
- * (§10.2 "Three-way calls").
+ * their own new call, returned; the transferrer's participation, and with it `call`, ends. 409
+ * for a call that is not bridged (`bridgedParty`).
  */
 export async function transferCall(
   pipeline: Pipeline,
   call: Call,
   req: TransferRequest
-): Promise<Call | null> {
+): Promise<Call> {
   const onward = onwardOf(await pipeline.deps.cache.get(), req);
   const transferrer = transferrerChannel(call, req.actorUserId);
-  const transferee = otherChannelIn(call, transferrer);
-  const { bridgeId } = call;
-  if (bridgeId === null || transferee === null || call.addedLeg === true) {
-    return null;
+  const conversation = bridgedParty(call, transferrer);
+  if (conversation === null) {
+    throw notBridged();
   }
+  const { bridgeId, party: transferee } = conversation;
   // A transferee held through the API (`hold.ts`) leaves from the bridge it was held out of.
   await endHold(pipeline, bridgeId, bridgeId);
   call.log.event({

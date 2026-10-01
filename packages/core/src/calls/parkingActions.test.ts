@@ -392,6 +392,15 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
       actions.park(lone.id, { userId: ben, actorUserId: ben })
     ).rejects.toMatchObject({ status: 409, reason: 'notBridged' });
 
+    // A party added to a call (§10.2 "Three-way calls") shares that call's bridge, which is not
+    // its own to park from, as it is not its own to transfer, consult on or hold.
+    const added = await answeredCall(anna);
+    added.addedLeg = true;
+    await expect(
+      actions.park(added.id, { userId: anna, actorUserId: anna })
+    ).rejects.toMatchObject({ status: 409, reason: 'notBridged' });
+    expect((await actions.parked()).parked).toEqual([]);
+
     await actions.park(first.id, { userId: anna, actorUserId: anna });
     const second = await answeredCall(ben);
     await expect(

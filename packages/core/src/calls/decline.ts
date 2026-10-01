@@ -7,13 +7,12 @@
  */
 import type { DeclineRequest } from '@zamfono/shared';
 
-import { ActionError } from './actionError.js';
+import { ActionError, HTTP_CONFLICT } from './actionError.js';
 import type { Call } from './call.js';
 import { activeBatchHasRingingLeg, declineInBatch } from './groupPickup.js';
 import type { Pipeline } from './pipeline.js';
 import { endRingingLeg } from './ringConclusion.js';
 
-const HTTP_CONFLICT = 409;
 // Asterisk's Q.850 mapping of SIP 603 Decline (`ringGroupRace.ts`, `ringConclusion.ts`).
 const AST_CAUSE_CALL_REJECTED = 21;
 

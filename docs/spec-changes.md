@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-01 · §10.2 Call parking, §10.3 Live calls.** The call of a party added to another (§10.2 "Three-way calls") is not parked: `POST /calls/{id}/park` on it answers 409 `notBridged`, as a transfer, consultation or hold of it does, and `*70` from it is released.
+*Why:* requested by the product owner: park was the one action that took the shared bridge's other party out of the call that added a party, while transfer, consult and hold refuse that call as not bridged.
+
 **2026-10-01 · §5.3.** A request acts with the role its user holds in `users` at that moment, and a token whose user is soft-deleted or holds none of the three roles is refused on REST, MCP and `/events` alike; REST and `/events` fell back to the role the token was issued with.
 *Why:* requested by the product owner: the three channels resolved a token's user each in its own way and disagreed on a user whose stored role is not valid; MCP's refusal is now the rule everywhere.
 

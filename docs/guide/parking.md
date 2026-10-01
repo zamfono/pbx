@@ -51,7 +51,8 @@ The same park and retrieve, for an integration or the MCP assistant:
   `user` parks a call they are connected in; an admin names the user in the call who parks it with
   `userId`, since the parker is who the ring-back rings. Refused with 409 `noFreeSlot` when every
   slot is taken, `notInCall` when that user is not in the call, `notBridged` for a call not
-  yet answered.
+  yet answered or for the call of a party added to another, which shares that call's
+  conversation.
 - `parking.list` (`GET /parking/calls`) lists the calls parked right now to every user, as every
   phone's BLF shows every slot: `slot`, `callId`, `caller` (the parked party's number, `null` when
   they withheld it), `parkedAt` and `parkedByUserId`.

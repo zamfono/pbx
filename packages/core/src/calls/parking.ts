@@ -8,7 +8,7 @@ import { MS_PER_SECOND } from '@zamfono/shared';
 import type { Snapshot } from '../internal/server.js';
 import type { Presence } from '../presence.js';
 import { release, type Call } from './call.js';
-import { activeCallOf, channelOf, otherChannelIn } from './callLookup.js';
+import { activeCallOf, bridgedParty, channelOf } from './callLookup.js';
 import { callPartiesChanged } from './callState.js';
 import {
   concludeFeature,
@@ -124,42 +124,31 @@ async function dropParker(
   presence.setCallState(parkerUserId, 'idle', null, null, active.id);
 }
 
-/** Why `parkParty` left the call where it was: the parker has no channel in it, it has no
- * two-party bridge to take the other party out of, or every slot is taken. */
-export type ParkRefusal = 'notInCall' | 'notBridged' | 'noFreeSlot';
-
 /**
- * Parks the other party of `active`, the call `parker.userId` is in, on the lowest free slot
- * (§10.2 "Call parking"): the party waits in a holding bridge with the hold music, the parker's
- * own channel in the call is hung up, and the parker is rung back on timeout. Shared by `*70`
- * and `POST /internal/calls/{id}/park`, whose `actorUserId` the trace line names. Returns the
- * slot, or why nothing moved.
+ * Parks `conversation.party`, the other party of `active`'s own conversation (`bridgedParty`),
+ * for `parker`, whose channel in it is `parker.channelId`, on the lowest free slot (§10.2 "Call
+ * parking"): the party waits in a holding bridge with the hold music, the parker's own channel
+ * in the call is hung up, and the parker is rung back on timeout. Shared by `*70` and
+ * `POST /internal/calls/{id}/park`, whose `actorUserId` the trace line names. Returns the slot,
+ * `null` with every slot taken and nothing moved.
  */
 export async function parkParty(
   pipeline: Pipeline,
   presence: Presence,
   active: Call,
-  parker: { userId: string; actorUserId?: string }
-): Promise<{ ext: string } | { refused: ParkRefusal }> {
-  const parkerUserId = parker.userId;
-  const parkerCh = channelOf(active, parkerUserId);
-  if (parkerCh === null) {
-    return { refused: 'notInCall' };
-  }
-  const partyChannelId = otherChannelIn(active, parkerCh);
-  if (active.bridgeId === null || partyChannelId === null) {
-    return { refused: 'notBridged' };
-  }
+  parker: { userId: string; channelId: string; actorUserId?: string },
+  conversation: { bridgeId: string; party: string }
+): Promise<string | null> {
+  const { userId: parkerUserId, channelId: parkerCh } = parker;
+  const { bridgeId, party: partyChannelId } = conversation;
   const snapshot = await pipeline.deps.cache.get();
   const slots = parkingSlots(pipeline);
   const ext = lowestFreeSlot(snapshot, slots);
   if (ext === null) {
-    return { refused: 'noFreeSlot' };
+    return null;
   }
   const ari = pipeline.deps.ari;
-  await ari.bridges
-    .removeChannel(active.bridgeId, parkerCh)
-    .catch(() => undefined);
+  await ari.bridges.removeChannel(bridgeId, parkerCh).catch(() => undefined);
   await dropParker(pipeline, presence, active, parkerUserId, parkerCh);
   await moveParkedParty(pipeline, active, partyChannelId, 'holding');
   // Tenant's own hold music class, falling back to Asterisk's `default` (§10.2 "Call parking",
@@ -191,7 +180,33 @@ export async function parkParty(
   });
   slotByChannel(pipeline).set(partyChannelId, ext);
   await presence.setHint(ext, 'INUSE');
-  return { ext };
+  return ext;
+}
+
+/** The slot `*70` parks the other party of `userId`'s current call on, `null` when there is
+ * nothing to park (no call, or no two-party conversation of its own) or no slot free. */
+async function parkActiveCall(
+  pipeline: Pipeline,
+  presence: Presence,
+  userId: string
+): Promise<string | null> {
+  const active = activeCallOf(pipeline, userId);
+  if (active === null) {
+    return null;
+  }
+  const channelId = channelOf(active, userId);
+  const conversation =
+    channelId === null ? null : bridgedParty(active, channelId);
+  if (channelId === null || conversation === null) {
+    return null;
+  }
+  return parkParty(
+    pipeline,
+    presence,
+    active,
+    { userId, channelId },
+    conversation
+  );
 }
 
 /** `*70`: parks the other party on the lowest free slot and reads its number to the parker
@@ -205,14 +220,8 @@ export async function park(
     await release(pipeline, call, RELEASE_CODE_FORBIDDEN, 'failed');
     return;
   }
-  const active = activeCallOf(pipeline, call.callerUserId);
-  const outcome =
-    active === null
-      ? null
-      : await parkParty(pipeline, presence, active, {
-          userId: call.callerUserId
-        });
-  if (outcome === null || 'refused' in outcome) {
+  const ext = await parkActiveCall(pipeline, presence, call.callerUserId);
+  if (ext === null) {
     await release(pipeline, call, RELEASE_CODE_UNAVAILABLE, 'failed');
     return;
   }
@@ -221,7 +230,7 @@ export async function park(
   await playAndWait(
     ari,
     call.callerChannelId,
-    `digits:${outcome.ext}`,
+    `digits:${ext}`,
     `${call.callerChannelId}:park`
   );
   await concludeFeature(pipeline, call, 'answered');

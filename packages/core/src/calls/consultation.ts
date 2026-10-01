@@ -10,27 +10,15 @@
  */
 import type { AttendedTransferRequest, ConsultRequest } from '@zamfono/shared';
 
-import { ActionError } from './actionError.js';
+import { ActionError, HTTP_CONFLICT, notBridged } from './actionError.js';
 import { dialAddedLeg, newAddedLeg } from './addedParty.js';
 import { handOver } from './attendedTransfer.js';
 import type { Call } from './call.js';
-import { otherChannelIn } from './callLookup.js';
+import { bridgedParty, ownBridge, transferrerChannel } from './callLookup.js';
 import { consultationLive, endHold, holdOf, holdParty } from './hold.js';
 import { closeCall } from './liveCall.js';
 import type { Pipeline } from './pipeline.js';
-import { transferrerChannel, userOfChannel } from './transfers.js';
-
-const HTTP_CONFLICT = 409;
-
-/** The bridge `call` carries its conversation in, `null` while it has none of its own: not
- * answered yet, or an added leg, whose bridge is the call it joined. */
-export function ownBridge(call: Call): string | null {
-  return call.addedLeg === true ? null : call.bridgeId;
-}
-
-export function notBridged(): ActionError {
-  return new ActionError(HTTP_CONFLICT, 'notBridged', 'call is not bridged');
-}
+import { userOfChannel } from './transfers.js';
 
 /** `POST /internal/calls/{id}/consult`: holds the other party and dials `target` from the actor;
  * the consultation's own call. */
@@ -39,12 +27,12 @@ export async function consult(
   call: Call,
   req: ConsultRequest
 ): Promise<{ callId: string }> {
-  const bridgeId = ownBridge(call);
   const byChannelId = transferrerChannel(call, req.actorUserId);
-  const party = otherChannelIn(call, byChannelId);
-  if (bridgeId === null || party === null) {
+  const conversation = bridgedParty(call, byChannelId);
+  if (conversation === null) {
     throw notBridged();
   }
+  const { bridgeId, party } = conversation;
   if (consultationLive(pipeline, call)) {
     throw new ActionError(
       HTTP_CONFLICT,

@@ -5,22 +5,16 @@
  */
 import type { ParkRequest } from '@zamfono/shared';
 
-import { ActionError } from './actionError.js';
+import { ActionError, HTTP_CONFLICT, notBridged } from './actionError.js';
 import type { Call } from './call.js';
-import { parkParty, type ParkRefusal } from './parking.js';
+import { bridgedParty, channelOf } from './callLookup.js';
+import { parkParty } from './parking.js';
 import type { Pipeline } from './pipeline.js';
-
-const HTTP_CONFLICT = 409;
-// The problem titles of a refused park, each answered as a 409 whose `detail` is the reason.
-const PARK_REFUSALS: Record<ParkRefusal, string> = {
-  notInCall: 'the user is not in the call',
-  notBridged: 'call is not bridged',
-  noFreeSlot: 'no parking slot is free'
-};
 
 /** `req.userId` parks the other party of `call` as `*70` would. No feature dial hears the slot,
  * so it is returned instead; the parker's own channel in the call is hung up as `*70` hangs it
- * up. */
+ * up. 409 when `req.userId` has no channel in the call (`notInCall`), the call is not bridged
+ * (`notBridged`, a party added to a call included) or every slot is taken (`noFreeSlot`). */
 export async function parkOnRequest(
   pipeline: Pipeline,
   call: Call,
@@ -30,10 +24,31 @@ export async function parkOnRequest(
   if (presence === null) {
     throw new Error('park: presence is not wired');
   }
-  const outcome = await parkParty(pipeline, presence, call, req);
-  if ('refused' in outcome) {
-    const reason = outcome.refused;
-    throw new ActionError(HTTP_CONFLICT, reason, PARK_REFUSALS[reason]);
+  const channelId = channelOf(call, req.userId);
+  if (channelId === null) {
+    throw new ActionError(
+      HTTP_CONFLICT,
+      'notInCall',
+      'the user is not in the call'
+    );
   }
-  return { slot: outcome.ext };
+  const conversation = bridgedParty(call, channelId);
+  if (conversation === null) {
+    throw notBridged();
+  }
+  const slot = await parkParty(
+    pipeline,
+    presence,
+    call,
+    { ...req, channelId },
+    conversation
+  );
+  if (slot === null) {
+    throw new ActionError(
+      HTTP_CONFLICT,
+      'noFreeSlot',
+      'no parking slot is free'
+    );
+  }
+  return { slot };
 }
