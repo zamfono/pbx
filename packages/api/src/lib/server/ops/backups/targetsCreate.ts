@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
@@ -46,7 +47,7 @@ export const targetsCreate = defineOperation<Input, BackupTargetWire>({
     const id = newId();
     const enabled = input.enabled ?? true;
     const params = withDefaultForgetPolicy(input.params);
-    const secretEnc = encrypt(keyringFromEnv(process.env), input.secret);
+    const secretEnc = encrypt(keyringFromEnv(env), input.secret);
     await ctx.db
       .insertInto('backupTargets')
       .values({

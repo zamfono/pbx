@@ -4,7 +4,7 @@ import { nowIso } from '@zamfono/shared';
 
 import { requiredOrigin } from '$lib/server/auth/authorizationResponse.js';
 import { authCodeStore } from '$lib/server/auth/codes.js';
-import { requiredJwtSecret } from '$lib/server/auth/jwt.js';
+import { requiredJwtSecret } from '$lib/server/auth/jwtSigning.js';
 import { tokenEndpoint } from '$lib/server/auth/oauth.js';
 import { getDb } from '$lib/server/db.js';
 

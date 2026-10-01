@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 import { encrypt, keyringFromEnv } from '$lib/server/secretbox.js';
@@ -21,7 +22,7 @@ export const rotate = defineOperation({
     const password = newSipPassword();
     await ctx.db
       .updateTable('devices')
-      .set({ sipPasswordEnc: encrypt(keyringFromEnv(process.env), password) })
+      .set({ sipPasswordEnc: encrypt(keyringFromEnv(env), password) })
       .where('id', '=', input.id)
       .execute();
     recordChange(ctx, { field: 'sipPassword', from: null, to: password });

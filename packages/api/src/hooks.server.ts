@@ -1,16 +1,14 @@
 import process from 'node:process';
 import type { Handle, RequestEvent, ServerInit } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import pino from 'pino';
 
 import { MS_PER_SECOND } from '@zamfono/shared';
 
 import { addressKey } from '$lib/server/addressKey.js';
 import { crossSiteFormRejection } from '$lib/server/auth/crossSiteForms.js';
-import {
-  isRole,
-  requiredJwtSecret,
-  verifyAccessToken
-} from '$lib/server/auth/jwt.js';
+import { isRole, verifyAccessToken } from '$lib/server/auth/jwt.js';
+import { requiredJwtSecret } from '$lib/server/auth/jwtSigning.js';
 import { createCoreClient, fetchCoreVersion } from '$lib/server/coreClient.js';
 import { getDb } from '$lib/server/db.js';
 import { startBackgroundJobs } from '$lib/server/jobs/background.js';
@@ -58,7 +56,7 @@ function tryGetDb(): ReturnType<typeof getDb> | null {
 /** The `.env` keyring, or `null` with a boot-time log line for a missing `SECRETBOX_KEY`. */
 function tryKeyring(): Keyring | null {
   try {
-    return keyringFromEnv(process.env);
+    return keyringFromEnv(env);
   } catch (error) {
     jobsLogger.error(
       { error },

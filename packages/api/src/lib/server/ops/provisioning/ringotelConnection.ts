@@ -1,3 +1,5 @@
+import { env } from '$env/dynamic/private';
+
 import { buildBranchProvision } from '$lib/server/provisioning/ringotel.js';
 import type { RingotelClient } from '$lib/server/provisioning/ringotelClient.js';
 import { branchBlfEntries } from '$lib/server/provisioning/ringotelRoster.js';
@@ -25,7 +27,7 @@ const STATUS_SERVICE_UNAVAILABLE = 503;
  * one is this stack's own misconfiguration rather than a bad request.
  */
 export function stackBranchAddress(): string {
-  const origin = process.env.ORIGIN;
+  const origin = env.ORIGIN;
   if (!origin) {
     throw new OpError(
       STATUS_SERVICE_UNAVAILABLE,

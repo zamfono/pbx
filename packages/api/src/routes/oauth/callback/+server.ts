@@ -1,5 +1,5 @@
-import process from 'node:process';
 import { redirect, type RequestEvent } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import pino from 'pino';
 
 import { nowIso, type Db } from '@zamfono/shared';
@@ -106,7 +106,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
   event.cookies.delete(SSO_COOKIE_NAME, { path: SSO_COOKIE_PATH });
 
   const db = getDb();
-  const kr = keyringFromEnv(process.env);
+  const kr = keyringFromEnv(env);
   const cfg = await ssoConfigFromSettings(db, kr);
   if (!cfg) {
     toErrorPage(origin, 'noUser');

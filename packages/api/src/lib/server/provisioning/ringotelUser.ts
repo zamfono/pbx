@@ -5,6 +5,8 @@
  * provider" (§5.2), so a device whose Ringotel user is missing is provisioned when one of its
  * hooks next needs that user, rather than failing the Zamfono operation.
  */
+import { env } from '$env/dynamic/private';
+
 import { errorMessage } from '../errors.js';
 import { decrypt, keyringFromEnv } from '../secretbox.js';
 import { ringotelLog } from './ringotelBranchHooks.js';
@@ -56,10 +58,9 @@ export async function createRemoteUser(
 function storedCredentials(device: DeviceRow): SipCredentials {
   return {
     username: device.sipUsername,
-    password: decrypt(
-      keyringFromEnv(process.env),
-      device.sipPasswordEnc
-    ).toString('utf8')
+    password: decrypt(keyringFromEnv(env), device.sipPasswordEnc).toString(
+      'utf8'
+    )
   };
 }
 

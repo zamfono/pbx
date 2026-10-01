@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { MS_PER_SECOND } from '@zamfono/shared';
 
-import { signAccessToken } from '../auth/jwt.js';
+import { signAccessToken } from '../auth/jwtSigning.js';
 import { authenticate } from './auth.js';
 import { JWT_SECRET, ORIGIN, seededDeps } from './testKit.js';
 

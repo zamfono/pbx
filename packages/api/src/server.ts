@@ -3,7 +3,9 @@
  * handler in a plain HTTP server so a WebSocket can be attached for `/events` (§10.6). Every
  * event reaches those sockets from the SvelteKit bundle, where the background jobs run
  * (`lib/server/jobs/background.ts`), through the sink this file provides
- * (`lib/server/eventSink.ts`).
+ * (`lib/server/eventSink.ts`). It runs outside that bundle, where SvelteKit's `$env` does not
+ * exist, so it reads `process.env` itself and passes what the modules it imports need, the
+ * database file, `JWT_SECRET` and the keyring, into them; none of them reads the environment.
  */
 import http from 'node:http';
 import process from 'node:process';
@@ -11,9 +13,8 @@ import { fileURLToPath } from 'node:url';
 import pino from 'pino';
 import { WebSocketServer, type WebSocket } from 'ws';
 
-import { resolveVersion, type Db } from '@zamfono/shared';
+import { openDb, resolveVersion, type Db } from '@zamfono/shared';
 
-import { getDb } from '$lib/server/db.js';
 import { EventHub } from '$lib/server/events.js';
 import { authenticateEventsSocket } from '$lib/server/eventsAuth.js';
 import { provideEventSink } from '$lib/server/eventSink.js';
@@ -85,7 +86,7 @@ function exitOnSignal(server: http.Server): void {
 export async function main(): Promise<void> {
   // §7 "Version": the first line api logs, before anything that can fail boots.
   logger.info({ version: zamfonoVersion.display }, 'api starting');
-  const db = getDb();
+  const db = openDb(requireEnv('DB_FILE'));
   const jwtSecret = requireEnv('JWT_SECRET');
   // Fails the boot here, since the SvelteKit bundle only skips its jobs without a keyring.
   keyringFromEnv(process.env);

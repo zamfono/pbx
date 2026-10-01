@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { MS_PER_SECOND, nowIso, resolveVersion } from '@zamfono/shared';
 
-import { signAccessToken } from '../auth/jwt.js';
+import { signAccessToken } from '../auth/jwtSigning.js';
 import { mcpResourceUri } from '../auth/resource.js';
 import { handleMcpRequest, type McpDeps } from '../mcp.js';
 import { register } from '../ops/registry.js';

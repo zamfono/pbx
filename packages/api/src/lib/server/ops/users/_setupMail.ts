@@ -1,3 +1,5 @@
+import { env } from '$env/dynamic/private';
+
 import type { Db } from '@zamfono/shared';
 
 import { getDb } from '$lib/server/db.js';
@@ -15,7 +17,7 @@ const SET_PASSWORD_PATH = '/auth/set-password';
  * directly against an isolated `makeTestDb()` instance and never await the mail send anyway.
  */
 export function mailDb(ctx: Context): Db {
-  return process.env.DB_FILE ? getDb() : ctx.db;
+  return env.DB_FILE ? getDb() : ctx.db;
 }
 
 /**
@@ -25,7 +27,7 @@ export function mailDb(ctx: Context): Db {
  * pass on either (§10.2 "Without a relay").
  */
 export function setupLinkFor(token: string): string {
-  const origin = process.env.ORIGIN;
+  const origin = env.ORIGIN;
   if (!origin) {
     throw new OpError(
       STATUS_SERVICE_UNAVAILABLE,

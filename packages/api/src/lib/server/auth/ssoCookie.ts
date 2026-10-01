@@ -4,6 +4,7 @@
  * only the browser it was set on can redeem it — a `code`/`state` pair carries no redeemable login
  * without the cookie.
  */
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 import { MS_PER_SECOND } from '@zamfono/shared';
@@ -64,7 +65,7 @@ export function sealedPendingLoginValue(
   pending: PendingLogin,
   nowMs = Date.now()
 ): string {
-  const kr = keyringFromEnv(process.env);
+  const kr = keyringFromEnv(env);
   const expiresAtS = Math.floor(nowMs / MS_PER_SECOND) + PENDING_LOGIN_TTL_S;
   const sealed = { ...pending, expiresAtS };
   return encrypt(kr, JSON.stringify(sealed)).toString('base64url');
@@ -95,7 +96,7 @@ export function unsealPendingLogin(
     return null;
   }
   try {
-    const kr = keyringFromEnv(process.env);
+    const kr = keyringFromEnv(env);
     const json = decrypt(kr, Buffer.from(cookieValue, 'base64url')).toString(
       'utf8'
     );

@@ -1,4 +1,4 @@
-import process from 'node:process';
+import { env } from '$env/dynamic/private';
 
 import { resolveTenantTimeZone } from '@zamfono/shared';
 
@@ -8,5 +8,5 @@ import { resolveTenantTimeZone } from '@zamfono/shared';
  * schedule, the certificate reload timing and mail dates all read it, so they cannot disagree.
  */
 export function tenantTimeZone(settingsTimezone: string | null): string {
-  return resolveTenantTimeZone(settingsTimezone, process.env.TZ);
+  return resolveTenantTimeZone(settingsTimezone, env.TZ);
 }

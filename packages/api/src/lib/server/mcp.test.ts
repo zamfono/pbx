@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { nowIso } from '@zamfono/shared';
 
-import { signAccessToken } from './auth/jwt.js';
+import { signAccessToken } from './auth/jwtSigning.js';
 import { mcpResourceUri } from './auth/resource.js';
 import { handleMcpRequest } from './mcp.js';
 import { protectedResourceMetadata } from './mcp/auth.js';

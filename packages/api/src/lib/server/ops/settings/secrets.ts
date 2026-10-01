@@ -1,3 +1,5 @@
+import { env } from '$env/dynamic/private';
+
 import { encrypt, keyringFromEnv } from '$lib/server/secretbox.js';
 
 import { recordChange } from '../runner.js';
@@ -24,7 +26,7 @@ export function applySecretFields(
   if (present.length === 0) {
     return;
   }
-  const keyring = keyringFromEnv(process.env);
+  const keyring = keyringFromEnv(env);
   for (const field of present) {
     const value = input[field] as string | null;
     recordChange(ctx, { field, from: null, to: value });

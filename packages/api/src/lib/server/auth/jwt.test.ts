@@ -1,11 +1,8 @@
 import { createHmac } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  requiredJwtSecret,
-  signAccessToken,
-  verifyAccessToken
-} from './jwt.js';
+import { verifyAccessToken } from './jwt.js';
+import { requiredJwtSecret, signAccessToken } from './jwtSigning.js';
 
 const SECRET = 'test-secret';
 const NOW_S = 1_700_000_000;

@@ -1,5 +1,5 @@
-import process from 'node:process';
 import { redirect, type RequestEvent } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 import { dictionaryFor } from '$lib/i18n/index.js';
@@ -60,7 +60,7 @@ export async function loginSubmit(
   payload: LoginPayload
 ): Promise<LoginResult> {
   const db = getDb();
-  const kr = keyringFromEnv(process.env);
+  const kr = keyringFromEnv(env);
   const origin = requiredOrigin();
   const resolved = await resolveClient(kr, paramsFromPayload(payload));
   const dict = dictionaryFor((await settingsInfo(db)).language);

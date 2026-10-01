@@ -1,4 +1,4 @@
-import process from 'node:process';
+import { env as privateEnv } from '$env/dynamic/private';
 
 import { resolveVersion } from '@zamfono/shared';
 
@@ -79,7 +79,7 @@ export function serverInfo(env: NodeJS.ProcessEnv): Result {
 
 // `version` is the stack's own (§7 "Version") and the icons follow `ORIGIN`, read once: none of
 // these environment variables changes for the life of the process.
-const SERVER_INFO = serverInfo(process.env);
+const SERVER_INFO = serverInfo(privateEnv);
 
 /** A 2026-07-28 `complete` result, identifying the server as the schema says it SHOULD. */
 function complete(fields: Result): Result {

@@ -1,7 +1,8 @@
 import { MS_PER_SECOND } from '@zamfono/shared';
 
 import type { AuthCodeStore } from './codes.js';
-import { ACCESS_TOKEN_TTL_S, isRole, signAccessToken } from './jwt.js';
+import { ACCESS_TOKEN_TTL_S, isRole } from './jwt.js';
+import { signAccessToken } from './jwtSigning.js';
 import {
   GRANT_AUTHORIZATION_CODE,
   GRANT_REFRESH_TOKEN,

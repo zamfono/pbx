@@ -3,7 +3,8 @@
  * config-reload triggers, live state, call actions and MWI, reached over the Docker `internal`
  * network with no authentication, since that network is the trust boundary.
  */
-import process from 'node:process';
+
+import { env } from '$env/dynamic/private';
 
 import type {
   CoreHealth,
@@ -57,7 +58,7 @@ export type CoreClient = {
 
 /** `CORE_URL` (§6.3, default `http://core:3000`), read at call time so tests can override it. */
 export function coreUrlFromEnv(): string {
-  return process.env.CORE_URL ?? DEFAULT_CORE_URL;
+  return env.CORE_URL ?? DEFAULT_CORE_URL;
 }
 
 export async function postJson(

@@ -1,3 +1,5 @@
+import { env } from '$env/dynamic/private';
+
 import type { Db } from '@zamfono/shared';
 
 import { loadSettings } from '../ops/settings/_shared.js';
@@ -55,6 +57,6 @@ export async function activeRingotelProvider(
   if (settings.ringotelOrgId === null || settings.ringotelBranchId === null) {
     return null;
   }
-  const client = createRingotelClient(settings, keyringFromEnv(process.env));
+  const client = createRingotelClient(settings, keyringFromEnv(env));
   return providerFor('ringotel', { client, db });
 }

@@ -25,11 +25,15 @@ function trimmedOr(value: string | undefined, fallback: string): string {
   return trimmed === undefined || trimmed === '' ? fallback : trimmed;
 }
 
-/** Reads `ZAMFONO_VERSION`/`ZAMFONO_REVISION` off `env` (normally `process.env`) into the three forms api, core, /metrics and the MCP `serverInfo` each want. */
-export function resolveVersion(env: {
-  ZAMFONO_VERSION?: string | undefined;
-  ZAMFONO_REVISION?: string | undefined;
-}): ZamfonoVersion {
+/**
+ * Reads `ZAMFONO_VERSION`/`ZAMFONO_REVISION` off `env` (`process.env`, or SvelteKit's
+ * `$env/dynamic/private` in api) into the three forms api, core, /metrics and the MCP
+ * `serverInfo` each want. Typed as a whole environment: SvelteKit types its `env` with the
+ * variables set where the types were generated, which need not include either of these two.
+ */
+export function resolveVersion(
+  env: Readonly<Record<string, string | undefined>>
+): ZamfonoVersion {
   const version = trimmedOr(env.ZAMFONO_VERSION, DEV_VERSION);
   const revision = trimmedOr(env.ZAMFONO_REVISION, '');
   const display = revision

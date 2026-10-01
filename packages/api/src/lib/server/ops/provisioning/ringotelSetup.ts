@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 import { errorMessage } from '$lib/server/errors.js';
@@ -119,7 +120,7 @@ export const ringotelSetup = defineOperation<Input, Output>({
     // Resolved before the first RPC, so a stack that cannot name its own branch address creates
     // no Ringotel organization it would then be unable to attach a connection to.
     const address = stackBranchAddress();
-    const client = createRingotelClient(settings, keyringFromEnv(process.env));
+    const client = createRingotelClient(settings, keyringFromEnv(env));
     // The region is immutable once the organization exists (§10.4), so a value the account does
     // not offer is refused here, naming the ones it does, before anything is created.
     const chosen = await assertOffered(client, input.region, input.packageid);

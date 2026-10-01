@@ -4,8 +4,8 @@
  * "Authorization responses carry `iss` (RFC 9207)") and the request's `state` whenever the
  * request had one.
  */
-import process from 'node:process';
 import { redirect } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 
 const STATUS_FOUND = 302;
 
@@ -36,7 +36,7 @@ export function authorizationResponseUrl(
 
 /** The stack's own issuer, which every authorization response carries as `iss` (RFC 9207). */
 export function requiredOrigin(): string {
-  const value = process.env.ORIGIN;
+  const value = env.ORIGIN;
   if (!value) {
     throw new Error('ORIGIN environment variable is required.');
   }

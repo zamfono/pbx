@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 import { decrypt, keyringFromEnv } from '$lib/server/secretbox.js';
@@ -19,10 +20,9 @@ export const revealCredentials = defineOperation({
     setUndoable(ctx, false);
     return {
       sipUsername: row.sipUsername,
-      sipPassword: decrypt(
-        keyringFromEnv(process.env),
-        row.sipPasswordEnc
-      ).toString('utf8')
+      sipPassword: decrypt(keyringFromEnv(env), row.sipPasswordEnc).toString(
+        'utf8'
+      )
     };
   }
 });

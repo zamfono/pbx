@@ -5,6 +5,8 @@
  * that, because it already chooses between recovering a user deleted within Ringotel's own 24-hour
  * window and creating a fresh one after it.
  */
+import { env } from '$env/dynamic/private';
+
 import type { DeviceRow } from '$lib/server/provisioning/types.js';
 import { decrypt, keyringFromEnv } from '$lib/server/secretbox.js';
 
@@ -62,7 +64,7 @@ export async function restoreProvisionedDevices(
         provider.onDeviceCreated(device, {
           username: device.sipUsername,
           password: decrypt(
-            keyringFromEnv(process.env),
+            keyringFromEnv(env),
             device.sipPasswordEnc
           ).toString()
         }),

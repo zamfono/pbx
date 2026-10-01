@@ -1,4 +1,4 @@
-import process from 'node:process';
+import { env } from '$env/dynamic/private';
 
 import { dictionaryFor } from '$lib/i18n/index.js';
 import {
@@ -25,7 +25,7 @@ import { consentForRequest } from './consentSubmit.js';
  */
 export const load = (async event => {
   const db = getDb();
-  const kr = keyringFromEnv(process.env);
+  const kr = keyringFromEnv(env);
   const settings = await settingsInfo(db);
   const dictionary = dictionaryFor(settings.language);
   const sso = await ssoInfo(db, kr);

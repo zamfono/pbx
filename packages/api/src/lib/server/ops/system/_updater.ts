@@ -1,4 +1,4 @@
-import process from 'node:process';
+import { env } from '$env/dynamic/private';
 
 /**
  * `api`'s side of the updater service (§6.3 "Updates"): the one process that holds
@@ -56,7 +56,7 @@ async function call<T>(
   path: string,
   init: RequestInit & { token: string }
 ): Promise<T> {
-  const base = process.env.UPDATER_URL ?? DEFAULT_URL;
+  const base = env.UPDATER_URL ?? DEFAULT_URL;
   const response = await fetch(`${base}${path}`, {
     ...init,
     headers: {
@@ -81,7 +81,7 @@ async function call<T>(
 
 /** The client for `UPDATER_TOKEN`, or `undefined` while `.env` sets none. */
 export function updaterFromEnv(): UpdaterClient | undefined {
-  const token = process.env.UPDATER_TOKEN ?? '';
+  const token = env.UPDATER_TOKEN ?? '';
   if (token === '') {
     return undefined;
   }

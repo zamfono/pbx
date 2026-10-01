@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
@@ -109,7 +110,7 @@ export const create = defineOperation({
         allowedIpsJson:
           transport === 'plain' ? JSON.stringify(input.allowedIps) : null,
         sipUsername: username,
-        sipPasswordEnc: encrypt(keyringFromEnv(process.env), password),
+        sipPasswordEnc: encrypt(keyringFromEnv(env), password),
         createdAt: ctx.now
       })
       .execute();

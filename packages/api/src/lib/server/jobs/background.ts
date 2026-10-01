@@ -13,8 +13,8 @@
  * through `eventSink.ts`.
  */
 import { execFile } from 'node:child_process';
-import process from 'node:process';
 import { promisify } from 'node:util';
+import { env } from '$env/dynamic/private';
 import type { Logger } from 'pino';
 
 import type { Db, Envelope } from '@zamfono/shared';
@@ -117,9 +117,9 @@ export async function runBootSteps(
   kr: Keyring,
   log: Logger
 ): Promise<void> {
-  const seeded = await seedIfEmpty(db, process.env, kr, mediaDirFromEnv(), log);
+  const seeded = await seedIfEmpty(db, env, kr, mediaDirFromEnv(), log);
   log.info({ seeded }, 'boot: first-boot seed');
-  await seedBackupTarget(db, process.env, kr, log);
+  await seedBackupTarget(db, env, kr, log);
   await propagateAtBoot(db, log);
 }
 

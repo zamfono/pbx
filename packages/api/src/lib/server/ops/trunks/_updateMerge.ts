@@ -1,3 +1,5 @@
+import { env } from '$env/dynamic/private';
+
 import type { DiversionPolicy } from '@zamfono/shared';
 
 import { encrypt, keyringFromEnv } from '$lib/server/secretbox.js';
@@ -23,7 +25,7 @@ function mergedPasswordEnc(row: TrunkRow, input: MergeInput): Buffer | null {
   if (input.password === undefined) {
     return row.passwordEnc;
   }
-  return encrypt(keyringFromEnv(process.env), input.password);
+  return encrypt(keyringFromEnv(env), input.password);
 }
 
 /** `row.clir` as the wire's tri-state boolean, unless `input` overrides it. */

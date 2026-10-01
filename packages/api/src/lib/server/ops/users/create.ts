@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import pino from 'pino';
 import { z } from 'zod';
 
@@ -115,7 +116,7 @@ export const create = defineOperation({
     // Not awaited: `sendMail`'s in-process retries (§10.2 "Failure") run over several minutes,
     // and this operation runs inside the write transaction (§10.3) — waiting here would hold it,
     // and every other writer, for as long as the relay is unreachable (§6.6 `busy_timeout`).
-    sendMail(mailDb(ctx), keyringFromEnv(process.env), {
+    sendMail(mailDb(ctx), keyringFromEnv(env), {
       kind: 'setup',
       to: { userId: id },
       values: {

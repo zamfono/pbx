@@ -12,7 +12,7 @@ import {
 } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { signAccessToken } from './auth/jwt.js';
+import { signAccessToken } from './auth/jwtSigning.js';
 import { EventHub, visibleTo } from './events.js';
 import { authenticateEventsSocket } from './eventsAuth.js';
 import type { Actor } from './ops/types.js';

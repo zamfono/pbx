@@ -1,3 +1,5 @@
+import { env } from '$env/dynamic/private';
+
 import { TRUNK_SECTION_PREFIX, type Db } from '@zamfono/shared';
 
 import { OpError } from '../types.js';
@@ -14,8 +16,8 @@ const STATUS_CONFLICT = 409;
 /** Throws 422 when `transport` is switched off by its `.env` flag (§9.1, §9.4 "Signaling"). */
 export function assertTransportEnabled(transport: Transport): void {
   const disabled =
-    (transport === 'udp' && process.env.SIP_UDP_ENABLED === 'false') ||
-    (transport === 'tcp' && process.env.SIP_TCP_ENABLED === 'false');
+    (transport === 'udp' && env.SIP_UDP_ENABLED === 'false') ||
+    (transport === 'tcp' && env.SIP_TCP_ENABLED === 'false');
   if (disabled) {
     throw new OpError(
       STATUS_UNPROCESSABLE_ENTITY,

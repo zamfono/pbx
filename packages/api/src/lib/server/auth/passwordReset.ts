@@ -6,7 +6,7 @@
  * and outcomes are the same whichever path a request takes; each caller only maps the outcome
  * onto its own response (problem+json, or a re-rendered page).
  */
-import process from 'node:process';
+import { env } from '$env/dynamic/private';
 import pino from 'pino';
 import { z } from 'zod';
 
@@ -52,7 +52,7 @@ async function relayConfigured(db: Db): Promise<boolean> {
 function sendResetMail(db: Db, userId: string): void {
   issueResetToken(db, userId, 'reset', nowIso())
     .then(({ raw, expiresAt }) =>
-      sendMail(db, keyringFromEnv(process.env), {
+      sendMail(db, keyringFromEnv(env), {
         kind: 'reset',
         to: { userId },
         values: {

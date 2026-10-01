@@ -1,4 +1,4 @@
-import process from 'node:process';
+import { env } from '$env/dynamic/private';
 
 import { fetchCoreHealth } from '$lib/server/coreClient.js';
 import { getDb } from '$lib/server/db.js';
@@ -25,7 +25,7 @@ const keyringCache: { resolved: boolean; keyring: Keyring | null } = {
 function resolveKeyring(): Keyring | null {
   if (!keyringCache.resolved) {
     try {
-      keyringCache.keyring = keyringFromEnv(process.env);
+      keyringCache.keyring = keyringFromEnv(env);
     } catch {
       keyringCache.keyring = null;
     }

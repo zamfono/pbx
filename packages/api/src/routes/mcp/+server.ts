@@ -1,7 +1,7 @@
 import type { RequestEvent } from '@sveltejs/kit';
 
 import { requiredOrigin } from '$lib/server/auth/authorizationResponse.js';
-import { requiredJwtSecret } from '$lib/server/auth/jwt.js';
+import { requiredJwtSecret } from '$lib/server/auth/jwtSigning.js';
 import { getDb } from '$lib/server/db.js';
 import { handleMcpRequest } from '$lib/server/mcp.js';
 

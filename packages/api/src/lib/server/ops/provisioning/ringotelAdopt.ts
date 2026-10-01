@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 import {
@@ -144,7 +145,7 @@ export const ringotelAdopt = defineOperation<Input, Output>({
     // Resolved before the first RPC, as in setup: a stack that cannot name its own address
     // changes nothing at Ringotel.
     const address = stackBranchAddress();
-    const client = createRingotelClient(settings, keyringFromEnv(process.env));
+    const client = createRingotelClient(settings, keyringFromEnv(env));
     const organization = await findOrganization(client, input);
     await assertEmpty(client, input);
     if (organization.packageid !== undefined) {

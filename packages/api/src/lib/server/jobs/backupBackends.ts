@@ -5,6 +5,7 @@
  * repository string and backend env.
  */
 import path from 'node:path';
+import { env as privateEnv } from '$env/dynamic/private';
 
 import type { BackupTargetRow } from '../ops/backups/_shared.js';
 import { decrypt, type Keyring } from '../secretbox.js';
@@ -93,7 +94,7 @@ async function obscurePassword(
   password: string
 ): Promise<string> {
   const { stdout } = await exec('rclone', ['obscure'], {
-    env: process.env,
+    env: privateEnv,
     input: password
   });
   return stdout.trim();
@@ -133,7 +134,7 @@ async function rcloneRepository(
 // Next to the database on the `db` volume, so a host key accepted on first contact survives
 // restarts and upgrades and a later change is refused (§6.3: `/data` is api's persistent state).
 function sshKnownHostsFile(): string {
-  const dbFile = process.env.DB_FILE;
+  const dbFile = privateEnv.DB_FILE;
   if (!dbFile) {
     throw new Error('backup: DB_FILE is required for an sftp target');
   }

@@ -1,5 +1,5 @@
-import process from 'node:process';
 import { error, redirect, type RequestEvent } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import pino from 'pino';
 
 import { nowIso } from '@zamfono/shared';
@@ -66,7 +66,7 @@ export function consentForRequest(
  *  malformed reads as an expired session. */
 function takePendingConsent(event: RequestEvent): PendingConsent {
   const pending = unsealConsent(
-    keyringFromEnv(process.env),
+    keyringFromEnv(env),
     event.cookies.get(CONSENT_COOKIE_NAME)
   );
   event.cookies.delete(CONSENT_COOKIE_NAME, { path: CONSENT_COOKIE_PATH });
@@ -78,10 +78,7 @@ function takePendingConsent(event: RequestEvent): PendingConsent {
 
 /** Writes the client's `oauth_clients` row, `false` when it cannot be written. */
 async function writeClientRow(authorize: Authorize): Promise<boolean> {
-  const meta = await clientMetaFor(
-    keyringFromEnv(process.env),
-    authorize.clientId
-  );
+  const meta = await clientMetaFor(keyringFromEnv(env), authorize.clientId);
   if (meta === null) {
     logger.warn(
       { clientId: authorize.clientId },

@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
@@ -38,7 +39,7 @@ export const create = defineOperation<Input, WebhookWire>({
   run: async (ctx, input) => {
     const id = newId();
     const eventTypes = input.eventTypes ?? null;
-    const secretEnc = encrypt(keyringFromEnv(process.env), input.secret);
+    const secretEnc = encrypt(keyringFromEnv(env), input.secret);
     await ctx.db
       .insertInto('webhooks')
       .values({

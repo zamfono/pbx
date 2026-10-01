@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 import { MS_PER_DAY } from '@zamfono/shared';
@@ -49,7 +50,7 @@ export type LogLevelInput = {
 
 /** Refuses `sip` while the deployment mirrors no SIP traffic, so the ladder ends at `qos` (§7). */
 function assertLevelAvailable(level: string): void {
-  if (level === 'sip' && process.env.HEP_ENABLED === 'false') {
+  if (level === 'sip' && env.HEP_ENABLED === 'false') {
     throw new OpError(
       STATUS_UNPROCESSABLE_ENTITY,
       "logLevel 'sip' requires HEP_ENABLED"

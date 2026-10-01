@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 import { newId, type Db } from '@zamfono/shared';
@@ -77,7 +78,7 @@ async function insertTrunkRow(
 ): Promise<void> {
   const passwordEnc =
     resolved.credentialsRequired && input.password
-      ? encrypt(keyringFromEnv(process.env), input.password)
+      ? encrypt(keyringFromEnv(env), input.password)
       : null;
   await ctx.db
     .insertInto('trunks')

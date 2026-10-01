@@ -6,7 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import process from 'node:process';
+import { env } from '$env/dynamic/private';
 import type { Logger } from 'pino';
 
 import type { Db, ReloadKind } from '@zamfono/shared';
@@ -22,7 +22,7 @@ const ALL_RELOAD_KINDS: ReloadKind[] = ['pjsip', 'dialplan', 'moh'];
 
 /** `ASTERISK_GEN_DIR` (§6.3, fixed image path `/etc/asterisk/gen`), read at call time for tests. */
 export function asteriskGenDirFromEnv(): string {
-  return process.env.ASTERISK_GEN_DIR ?? DEFAULT_ASTERISK_GEN_DIR;
+  return env.ASTERISK_GEN_DIR ?? DEFAULT_ASTERISK_GEN_DIR;
 }
 
 /** Writes `contents` to `filePath` via a same-directory temp file and `rename`, which POSIX and NTFS both make an atomic replace: a reader of `filePath` never observes a partial write. `mode`, when given, is the temp file's permission bits (e.g. a private key kept unreadable by other users of the shared volume). */
@@ -47,7 +47,7 @@ const defaultDepsCache: { deps?: PropagationDeps } = {};
 /** `PropagationDeps` resolved from the environment, cached like `getDb()`, for the `propagateConfig(db, kinds)` two-argument call sites. */
 function defaultPropagationDeps(): PropagationDeps {
   defaultDepsCache.deps ??= {
-    kr: keyringFromEnv(process.env),
+    kr: keyringFromEnv(env),
     coreClient: createCoreClient()
   };
   return defaultDepsCache.deps;

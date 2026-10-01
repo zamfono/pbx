@@ -34,13 +34,15 @@ const DRIFT_EXIT_CODE = 1;
 // never shows up as an untracked file.
 const outfile = path.join(here, '.tool-catalog.generated.mjs');
 const globShim = path.join(here, 'viteGlobShim.mjs');
+const envShim = path.join(here, 'envShim.mjs');
 const WORKSPACE_PREFIX = '@zamfono/';
 
 // Bundles this monorepo's own `.ts` sources (ops/* through relative and `$lib` imports, the
 // latter resolved by the `alias` below as Vite resolves it, and @zamfono/shared, all on the ".js"
 // specifier / ".ts" file NodeNext convention `node` cannot resolve on its own) while leaving every
 // real npm package a bare import, so the result stays small and native modules such as
-// `sodium-native` are loaded normally instead of esbuild trying to inline their bindings.
+// `sodium-native` are loaded normally instead of esbuild trying to inline their bindings. The
+// same `alias` points `$env/dynamic/private` at `envShim.mjs`.
 /** @type {import('esbuild').Plugin} */
 const externalizeNpmPackages = {
   name: 'externalize-npm-packages',
@@ -112,7 +114,7 @@ await build({
   platform: 'node',
   format: 'esm',
   plugins: [externalizeNpmPackages],
-  alias: { $lib: libDir },
+  alias: { $lib: libDir, '$env/dynamic/private': envShim },
   inject: [globShim],
   define: { 'import.meta.glob': 'viteGlobShim' },
   outfile

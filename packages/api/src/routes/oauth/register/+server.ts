@@ -1,5 +1,5 @@
-import process from 'node:process';
 import type { RequestEvent } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 
 import { nowIso } from '@zamfono/shared';
 
@@ -12,7 +12,7 @@ export function POST(event: RequestEvent): Promise<Response> {
   return registerEndpoint(
     {
       db: getDb(),
-      keyring: keyringFromEnv(process.env),
+      keyring: keyringFromEnv(env),
       now: nowIso
     },
     event.request

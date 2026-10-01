@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import process from 'node:process';
 import { error, redirect, type RequestEvent } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 
 import { requiredOrigin } from '$lib/server/auth/authorizationResponse.js';
 import {
@@ -40,7 +40,7 @@ export async function ssoSubmit(
   payload: AuthorizePayload
 ): Promise<never> {
   const db = getDb();
-  const kr = keyringFromEnv(process.env);
+  const kr = keyringFromEnv(env);
   const origin = requiredOrigin();
   const resolved = await resolveClient(kr, paramsFromPayload(payload));
   const cfg = await ssoConfigFromSettings(db, kr);

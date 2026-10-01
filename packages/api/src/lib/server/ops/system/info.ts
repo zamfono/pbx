@@ -1,4 +1,5 @@
 import process from 'node:process';
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 import {
@@ -141,13 +142,13 @@ export const info = defineOperation<Record<string, never>, Output>({
         isProfilePending(ctx.db)
       ]);
     return {
-      api: { ...resolveVersion(process.env), startedAt: apiStartedAt },
+      api: { ...resolveVersion(env), startedAt: apiStartedAt },
       core,
       update,
       autoUpdate,
       maintenanceGate,
       ringotel: { profilePending },
-      stack: { domain: stackDomain(process.env), ipv4: stackIpv4(process.env) }
+      stack: { domain: stackDomain(env), ipv4: stackIpv4(env) }
     };
   }
 });

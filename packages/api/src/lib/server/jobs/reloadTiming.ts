@@ -2,7 +2,8 @@
  * The maintenance moment a detected TLS certificate change is applied at (§6.4 "Reload timing"):
  * the tenant's own quiet windows first, a configured quiet hour otherwise.
  */
-import process from 'node:process';
+
+import { env } from '$env/dynamic/private';
 
 import {
   addDays,
@@ -152,7 +153,7 @@ export async function nextMaintenanceMoment(db: Db, now: Date): Promise<Date> {
       nextHourOccurrenceMs(fromMs, settings.tlsReloadHour, timezone)
     );
   }
-  const envHour = parseReloadHourEnv(process.env.TLS_RELOAD_HOUR);
+  const envHour = parseReloadHourEnv(env.TLS_RELOAD_HOUR);
   if (envHour !== null) {
     return new Date(nextHourOccurrenceMs(fromMs, envHour, timezone));
   }

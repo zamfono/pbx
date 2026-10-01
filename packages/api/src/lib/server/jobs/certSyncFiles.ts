@@ -7,7 +7,7 @@
 import { createPrivateKey, X509Certificate } from 'node:crypto';
 import { mkdir, stat } from 'node:fs/promises';
 import path from 'node:path';
-import process from 'node:process';
+import { env } from '$env/dynamic/private';
 
 import { writeFileAtomically } from '../propagation.js';
 
@@ -26,7 +26,7 @@ const TLS_KEY_MODE = 0o600;
 
 /** `CADDY_DATA_DIR` (§6.3, the read-only `caddy-data` mount), read at call time for tests. */
 export function caddyDataDirFromEnv(): string {
-  return process.env.CADDY_DATA_DIR ?? DEFAULT_CADDY_DATA_DIR;
+  return env.CADDY_DATA_DIR ?? DEFAULT_CADDY_DATA_DIR;
 }
 
 async function pathExists(filePath: string): Promise<boolean> {

@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 import {
@@ -74,8 +75,6 @@ export const ringotelOptions = defineOperation<Record<string, never>, Output>({
   readOnly: true,
   run: async ctx => {
     const settings = await loadSettings(ctx.db);
-    return ringotelOffer(
-      createRingotelClient(settings, keyringFromEnv(process.env))
-    );
+    return ringotelOffer(createRingotelClient(settings, keyringFromEnv(env)));
   }
 });

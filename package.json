@@ -9,8 +9,8 @@
   ],
   "scripts": {
     "test": "npm test --workspaces --if-present",
-    "typecheck": "tsc -b",
-    "lint": "tsc -b && eslint . --cache --cache-strategy content",
+    "typecheck": "npm run sync -w packages/api && tsc -b",
+    "lint": "npm run sync -w packages/api && tsc -b && eslint . --cache --cache-strategy content",
     "format": "prettier --write . && node scripts/format-md-tables.mjs",
     "format:check": "prettier --check . && node scripts/format-md-tables.mjs --check",
     "db:generate": "npm run db:generate -w packages/shared",

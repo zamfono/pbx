@@ -1,5 +1,5 @@
-import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { env } from '$env/dynamic/private';
 import type { Transporter } from 'nodemailer';
 import pino from 'pino';
 
@@ -129,7 +129,7 @@ export async function sendMail(
     ...req.values,
     companyName: settings.companyName,
     recipientName: recipients.name,
-    fqdn: stackDomain(process.env) ?? ''
+    fqdn: stackDomain(env) ?? ''
   };
   const rendered = template.render(values, {
     language,

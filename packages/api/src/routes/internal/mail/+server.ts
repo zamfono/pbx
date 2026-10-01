@@ -1,5 +1,5 @@
-import process from 'node:process';
 import type { RequestEvent } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import pino from 'pino';
 import { z } from 'zod';
 
@@ -64,7 +64,7 @@ async function handleMailRequest(request: Request): Promise<Response> {
   }
   const req = parsed.data;
   const db = getDb();
-  const kr = keyringFromEnv(process.env);
+  const kr = keyringFromEnv(env);
   // §10.2 "Failure": the retries run in process over some minutes; the caller does not wait
   // for them, only for the request to be accepted.
   sendMail(db, kr, req).catch((error: unknown) => {

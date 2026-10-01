@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 import { encrypt, keyringFromEnv } from '$lib/server/secretbox.js';
@@ -70,7 +71,7 @@ export const update = defineOperation<Input, WebhookWire>({
     const secretEnc =
       input.secret === undefined
         ? before.secretEnc
-        : encrypt(keyringFromEnv(process.env), input.secret);
+        : encrypt(keyringFromEnv(env), input.secret);
     if (url !== before.url) {
       recordChange(ctx, { field: 'url', from: before.url, to: url });
     }

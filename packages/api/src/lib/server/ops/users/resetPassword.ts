@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import pino from 'pino';
 import { z } from 'zod';
 
@@ -31,7 +32,7 @@ export const resetPassword = defineOperation({
     );
     const link = setupLinkFor(raw);
     // Not awaited: see `users.create` — a held write transaction must not wait on the relay.
-    sendMail(mailDb(ctx), keyringFromEnv(process.env), {
+    sendMail(mailDb(ctx), keyringFromEnv(env), {
       kind: 'reset',
       to: { userId: input.id },
       values: { link, linkExpiresAt: expiresAt }

@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
-import process from 'node:process';
 import type { RequestEvent } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 
 import { resolveVersion } from '@zamfono/shared';
 
@@ -34,7 +34,7 @@ function isValidBearer(authorization: string | null, token: string): boolean {
  * missing or wrong bearer token once one is configured.
  */
 export async function GET(event: RequestEvent): Promise<Response> {
-  const token = process.env.METRICS_TOKEN;
+  const token = env.METRICS_TOKEN;
   if (!token) {
     return new Response(null, { status: STATUS_NOT_FOUND });
   }
@@ -45,11 +45,11 @@ export async function GET(event: RequestEvent): Promise<Response> {
   const coreClient = createCoreClient();
   const body = await renderMetrics({
     db: getDb(),
-    dbFile: process.env.DB_FILE ?? '',
+    dbFile: env.DB_FILE ?? '',
     checkAri,
     coreState: () => coreClient.state(),
     certSyncStatus,
-    version: resolveVersion(process.env)
+    version: resolveVersion(env)
   });
   return new Response(body, {
     status: STATUS_OK,

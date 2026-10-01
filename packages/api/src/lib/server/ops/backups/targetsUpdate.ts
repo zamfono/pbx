@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 import { encrypt, keyringFromEnv } from '$lib/server/secretbox.js';
@@ -56,7 +57,7 @@ export const targetsUpdate = defineOperation<Input, BackupTargetWire>({
     const secretEnc =
       input.secret === undefined
         ? before.secretEnc
-        : encrypt(keyringFromEnv(process.env), input.secret);
+        : encrypt(keyringFromEnv(env), input.secret);
     if (kind !== before.kind) {
       recordChange(ctx, { field: 'kind', from: before.kind, to: kind });
     }

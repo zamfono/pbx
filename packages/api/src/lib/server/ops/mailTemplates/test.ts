@@ -1,6 +1,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 import {
@@ -141,7 +142,7 @@ export const test = defineOperation<
     setUndoable(ctx, false);
     const request = await sampleRequest(input.kind, ctx.actor.id, ctx.now);
     try {
-      const keyring = keyringFromEnv(process.env);
+      const keyring = keyringFromEnv(env);
       const status = await sendMail(ctx.db, keyring, request);
       return { status, language };
     } finally {

@@ -10,7 +10,8 @@
     "dev": "vite dev",
     "build": "vite build && esbuild src/server.ts --bundle '--alias:$lib=./src/lib' --platform=node --format=esm --packages=external --outfile=build/server.js",
     "preview": "vite preview",
-    "postinstall": "svelte-kit sync",
+    "postinstall": "npm run sync",
+    "sync": "env -i PATH=\"$PATH\" HOME=\"$HOME\" svelte-kit sync",
     "test": "vitest run"
   },
   "dependencies": {

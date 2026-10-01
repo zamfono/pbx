@@ -1,5 +1,4 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import process from 'node:process';
 
 import { tryParseJson } from '../json.js';
 import type { Role } from '../ops/types.js';
@@ -18,7 +17,7 @@ export type AccessClaims = { sub: string; role: Role; cid: string | null };
  * The claims as signed: `aud` is the RFC 8707 resource the token was issued for (`resource.ts`),
  * absent only from a token signed before audiences were, which the REST API still accepts.
  */
-type AccessPayload = AccessClaims & {
+export type AccessPayload = AccessClaims & {
   iss: string;
   aud?: string;
   iat: number;
@@ -35,15 +34,6 @@ function base64UrlDecode(value: string): string {
 
 function sign(secret: string, signingInput: string): string {
   return createHmac('sha256', secret).update(signingInput).digest('base64url');
-}
-
-/** The secret every access token is signed and verified with (§5.2 `JWT_SECRET`). */
-export function requiredJwtSecret(): string {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error('JWT_SECRET environment variable is required.');
-  }
-  return secret;
 }
 
 /** Type guard for the RBAC roles a JWT `role` claim (or a `users.role` column) may hold. */
@@ -76,25 +66,17 @@ function parsePayload(encoded: string): AccessPayload | null {
 }
 
 /**
- * Signs an HS256 access token for `audience`: `exp` is `nowS + 900`, `iss` is the stack's `ORIGIN`
- * (§5.2, §6.3).
+ * Encodes `payload` as an HS256 access token signed with `secret`. `jwtSigning.ts` builds the
+ * payload from the environment, which this module never reads: `server.ts` verifies tokens
+ * through it outside the SvelteKit bundle, where there is no `$env`.
  */
-export function signAccessToken(
+export function encodeAccessToken(
   secret: string,
-  claims: AccessClaims,
-  nowS: number,
-  audience: string
+  payload: AccessPayload
 ): string {
   const header = base64UrlEncode(
     JSON.stringify({ alg: JWT_ALG, typ: JWT_TYP })
   );
-  const payload: AccessPayload = {
-    ...claims,
-    iss: process.env.ORIGIN ?? '',
-    aud: audience,
-    iat: nowS,
-    exp: nowS + ACCESS_TOKEN_TTL_S
-  };
   const body = base64UrlEncode(JSON.stringify(payload));
   const signingInput = `${header}.${body}`;
   return `${signingInput}.${sign(secret, signingInput)}`;

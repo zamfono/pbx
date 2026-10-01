@@ -1,4 +1,5 @@
 import { isIP } from 'node:net';
+import { env } from '$env/dynamic/private';
 
 import { OpError } from '../types.js';
 import {
@@ -62,8 +63,8 @@ export function assertValidIps(ips: string[]): void {
 
 /** Throws 422 for a `plain` device while both plain transports are disabled (§9.1, §9.3). */
 export function assertPlainTransportEnabled(): void {
-  const udpDisabled = process.env.SIP_UDP_ENABLED === 'false';
-  const tcpDisabled = process.env.SIP_TCP_ENABLED === 'false';
+  const udpDisabled = env.SIP_UDP_ENABLED === 'false';
+  const tcpDisabled = env.SIP_TCP_ENABLED === 'false';
   if (udpDisabled && tcpDisabled) {
     throw new OpError(
       STATUS_UNPROCESSABLE_ENTITY,

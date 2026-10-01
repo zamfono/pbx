@@ -1,3 +1,4 @@
+import { env } from '$env/dynamic/private';
 import { z } from 'zod';
 
 import { propagate } from '../runner.js';
@@ -47,7 +48,7 @@ function assertKnownCountry(country: Input['country']): void {
 
 /** Refuses `callLogLevel: 'sip'` while the deployment mirrors no SIP traffic (§7, §11.4). */
 function assertCallLogLevel(level: Input['callLogLevel']): void {
-  const hepEnabled = process.env.HEP_ENABLED !== 'false';
+  const hepEnabled = env.HEP_ENABLED !== 'false';
   if (level === 'sip' && !hepEnabled) {
     throw new OpError(
       STATUS_UNPROCESSABLE_ENTITY,
