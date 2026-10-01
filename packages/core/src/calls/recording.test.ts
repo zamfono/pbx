@@ -24,23 +24,6 @@ const NOW = '2026-01-01T00:01:00.000Z';
 const MEDIA_DIR = '/media/recordings';
 const MIX_SAMPLE_RATE_HZ = 8000;
 
-function hasFfmpeg(): boolean {
-  try {
-    execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-const ffmpegAvailable = hasFfmpeg();
-if (!ffmpegAvailable) {
-  // eslint-disable-next-line no-console -- the task asks for a clear skip message, not a logger
-  console.warn(
-    'recording.test.ts: ffmpeg is not installed on this machine, skipping ffmpeg-backed tests'
-  );
-}
-
 /** A raw per-leg file that captured no audio at all: the ~78-byte header-only wav Asterisk
  * writes when a snoop channel's recording is stopped before it ever received a sample (a muted
  * phone, Opus DTX, or a one-way leg, §10.2 "Best effort"). */
@@ -904,7 +887,7 @@ describe('Recorder', () => {
     expect(hungUp(leg.channelId)).toBe(true);
   });
 
-  describe.skipIf(!ffmpegAvailable)('with the real ffmpeg mixer', () => {
+  describe('with the real ffmpeg mixer', () => {
     it('two header-only raw files: no row, raw files kept, mix failure counted (§10.2 "Best effort")', async () => {
       const userId = await seedUser(db, true);
       const targetId = await seedForwardTargetUser(db, userId);

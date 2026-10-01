@@ -12,23 +12,6 @@ const WAV_BITS_PER_SAMPLE_OFFSET = 34;
 const EXPECTED_SAMPLE_RATE_HZ = 16_000;
 const EXPECTED_BITS_PER_SAMPLE = 16;
 
-function hasFfmpeg(): boolean {
-  try {
-    execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-const ffmpegAvailable = hasFfmpeg();
-if (!ffmpegAvailable) {
-  // eslint-disable-next-line no-console -- the task asks for a clear skip message, not a logger
-  console.warn(
-    'audio/store.test.ts: ffmpeg is not installed on this machine, skipping ffmpeg-backed tests'
-  );
-}
-
 /** Reads a WAV file's channel count, sample rate and bit depth from its `fmt ` header. */
 async function readWavFormat(
   wavPath: string
@@ -41,7 +24,7 @@ async function readWavFormat(
   };
 }
 
-describe.skipIf(!ffmpegAvailable)('storeAudio', () => {
+describe('storeAudio', () => {
   // eslint-disable-next-line init-declarations -- assigned in beforeAll before each test runs
   let mediaDir: string;
   // eslint-disable-next-line init-declarations -- assigned in beforeAll before each test runs

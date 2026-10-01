@@ -96,9 +96,8 @@ npm run typecheck
 npm run lint
 ```
 
-The audio suites shell out to `ffmpeg` and skip themselves when it is absent, so a green run on a
-machine without it has tested less than it appears to. The image and stack checks are separate
-scripts and need a container runtime:
+The audio suites shell out to `ffmpeg`, so `npm test` needs it installed; without it they fail.
+The image and stack checks are separate scripts and need a container runtime:
 
 ```bash
 bash images/asterisk/test.sh   # builds the image and exercises it end to end

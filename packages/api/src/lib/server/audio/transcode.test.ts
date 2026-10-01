@@ -6,24 +6,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { transcodeForDownload, voicemailAttachment } from './transcode.js';
 
-function hasFfmpeg(): boolean {
-  try {
-    execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-const ffmpegAvailable = hasFfmpeg();
-if (!ffmpegAvailable) {
-  // eslint-disable-next-line no-console -- the task asks for a clear skip message, not a logger
-  console.warn(
-    'audio/transcode.test.ts: ffmpeg is not installed on this machine, skipping ffmpeg-backed tests'
-  );
-}
-
-describe.skipIf(!ffmpegAvailable)('transcodeForDownload', () => {
+describe('transcodeForDownload', () => {
   // eslint-disable-next-line init-declarations -- assigned in beforeAll before each test runs
   let wavPath: string;
 

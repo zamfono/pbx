@@ -44,21 +44,11 @@ jobs:
         with:
           node-version: '26'
           cache: npm
-      # The audio suites skip themselves when ffmpeg is absent, which would make this job green
-      # while testing none of the transcoding paths (§10.2 "Attachments", §11.6).
+      # The audio suites run ffmpeg (§10.2 "Attachments", §11.6).
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - run: npm ci
-      - name: Unit suites, refusing a run that skipped one
-        run: |
-          set -o pipefail
-          npm test 2>&1 | tee /tmp/test.log
-          # A suite that gates itself on an absent tool reports green while testing nothing; in CI
-          # the tool is installed, so a skip means the environment is wrong.
-          if grep -qE '[0-9]+ skipped' /tmp/test.log; then
-            echo "a suite skipped itself; CI must exercise every one" >&2
-            exit 1
-          fi
+      - run: npm test
       - run: npm run typecheck
       - run: npm run lint
       # The git tag is the only version source (§6.3 "Images", §7 "Version"); a package.json

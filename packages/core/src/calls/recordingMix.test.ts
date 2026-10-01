@@ -6,23 +6,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { ffmpegMix } from './recordingMix.js';
 
-function hasFfmpeg(): boolean {
-  try {
-    execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-const ffmpegAvailable = hasFfmpeg();
-if (!ffmpegAvailable) {
-  // eslint-disable-next-line no-console -- the task asks for a clear skip message, not a logger
-  console.warn(
-    'recordingMix.test.ts: ffmpeg is not installed on this machine, skipping ffmpeg-backed tests'
-  );
-}
-
 const SAMPLE_RATE_HZ = 8000;
 const WIDEBAND_RATE_HZ = 16_000;
 const LEFT_CHANNEL = 0;
@@ -150,7 +133,7 @@ function channelMeanVolumeDb(
   return Number.parseFloat(match.groups.db);
 }
 
-describe.skipIf(!ffmpegAvailable)('ffmpegMix', () => {
+describe('ffmpegMix', () => {
   // eslint-disable-next-line init-declarations -- assigned in beforeAll before each test runs
   let dir: string;
   // eslint-disable-next-line init-declarations -- see above
