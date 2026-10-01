@@ -26,13 +26,13 @@ import {
 import { ownerForExt } from './extensionOwner.js';
 import { endHold } from './hold.js';
 import { closeCall } from './liveCall.js';
-import type { Pipeline } from './pipeline.js';
 import {
+  dispatchAction,
   logLevelFor,
   resolveTarget,
-  routeToTarget,
   type ResolvedTarget
-} from './routeToTarget.js';
+} from './outboundDispatch.js';
+import type { Pipeline } from './pipeline.js';
 import { deposit } from './voicemail.js';
 
 /** The user present in `call` as `channelId`: its caller, or the leg's owner. */
@@ -140,12 +140,10 @@ async function startTransfereeCall(
   const routing =
     'mailbox' in onward
       ? deposit(pipeline, child, onward.mailbox, 'transfer')
-      : routeToTarget(
-          pipeline,
-          child,
-          onward.resolved.action,
-          transferrerUserId
-        );
+      : dispatchAction(pipeline, child, onward.resolved.action, {
+          snapshot,
+          asUser: transferrerUserId
+        });
   routing.catch(() => undefined);
   return child;
 }

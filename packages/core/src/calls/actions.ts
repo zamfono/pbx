@@ -36,7 +36,6 @@ import { parkOnRequest } from './parkingActions.js';
 import { parkedCalls } from './parkingView.js';
 import { pickupOnRequest } from './pickupAction.js';
 import type { Pipeline } from './pipeline.js';
-import { followTransfers } from './referTransfers.js';
 import { transferCall } from './transfers.js';
 import { registeredDevices } from './userDevices.js';
 
@@ -54,7 +53,6 @@ export class CallActions {
   constructor(pipeline: Pipeline) {
     this.pipeline = pipeline;
     this.control = new CallControl(pipeline);
-    followTransfers(pipeline);
   }
 
   /** `POST /internal/calls` (§10.2 "Click-to-dial"): the call's row exists from here on, its trace

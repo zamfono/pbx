@@ -14,10 +14,8 @@ import { eventually } from '../testing/eventually.js';
 import { newCall, type Call } from './call.js';
 import { channelOf } from './callLookup.js';
 import { closeCall } from './liveCall.js';
-import { handleOutbound } from './outbound.js';
 import { Pipeline } from './pipeline.js';
 import { Recorder } from './recording.js';
-import { followTransfers } from './referTransfers.js';
 import { transferCall, userOfChannel } from './transfers.js';
 import { TrunkState } from './trunkState.js';
 
@@ -209,9 +207,6 @@ describe('transfers', () => {
       trunkState,
       presence: null
     });
-    // The real `outbound,<exten>` path, the one a transferee re-enters through `from-users`.
-    pipeline.setOutboundHandler(ev => handleOutbound(pipeline, trunkState, ev));
-    followTransfers(pipeline);
   }
 
   /** An answered inbound call from `+15559999`, bridged with `userId`'s device leg. */

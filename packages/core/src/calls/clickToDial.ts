@@ -16,13 +16,13 @@ import {
   raiseLogLevel,
   type Call
 } from './call.js';
-import type { Pipeline } from './pipeline.js';
 import {
+  dispatchAction,
   logLevelFor,
   resolveTarget,
-  routeToTarget,
   type ResolvedTarget
-} from './routeToTarget.js';
+} from './outboundDispatch.js';
+import type { Pipeline } from './pipeline.js';
 
 function extensionOf(snapshot: Snapshot, userId: string): string {
   return snapshot.extensions.find(row => row.userId === userId)?.ext ?? '';
@@ -108,5 +108,8 @@ export async function beginOriginatedCall(
       call.id
     );
   }
-  await routeToTarget(pipeline, call, action, call.callerUserId);
+  await dispatchAction(pipeline, call, action, {
+    snapshot,
+    asUser: call.callerUserId
+  });
 }

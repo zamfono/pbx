@@ -10,6 +10,7 @@ import { defaultChannel, type Channel, type Logger } from '../ari/types.js';
 import { eventually } from '../testing/eventually.js';
 import { newCall, type Call } from './call.js';
 import { playMenu } from './menu.js';
+import { dispatchAction } from './outboundDispatch.js';
 import {
   ConfigCache,
   EventBus,
@@ -19,7 +20,6 @@ import {
 } from './pipeline.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';
-import { routeToTarget } from './routeToTarget.js';
 import { TrunkState } from './trunkState.js';
 
 // §10.1 step 7 with §9.4 "Outbound routing": an external forward target is dialled "as the
@@ -612,7 +612,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       const openTrunk = await seedRoutes();
 
       const legs = await dialled(
-        routeToTarget(
+        dispatchAction(
           pipeline,
           call,
           {
@@ -622,7 +622,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
             targetId,
             clir: null
           },
-          caller
+          { snapshot: await pipeline.deps.cache.get(), asUser: caller }
         )
       );
 
@@ -640,11 +640,11 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
 
     // `call` stands for the transferee's new call: its caller is the transferee, `caller`.
     const legs = await dialled(
-      routeToTarget(
+      dispatchAction(
         pipeline,
         call,
         { kind: 'external', number: FORWARD_NUMBER, clir: null },
-        transferrer
+        { snapshot: await pipeline.deps.cache.get(), asUser: transferrer }
       )
     );
 
@@ -660,11 +660,11 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
     await seedTrunkRoute(db, 2, null);
 
     const legs = await dialled(
-      routeToTarget(
+      dispatchAction(
         pipeline,
         call,
         { kind: 'external', number: FORWARD_NUMBER, clir: null },
-        caller
+        { snapshot: await pipeline.deps.cache.get(), asUser: caller }
       )
     );
 

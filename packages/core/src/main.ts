@@ -18,7 +18,6 @@ import {
   startHepCollector
 } from './boot.js';
 import { CallActions } from './calls/actions.js';
-import { handleOutbound } from './calls/outbound.js';
 import { resyncOnBoot } from './calls/resync.js';
 import { TrunkState } from './calls/trunkState.js';
 // --- boot environment ---
@@ -98,9 +97,8 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
     // `Presence` (§10.2 "Presence and BLF") wires itself to ARI `ContactStatusChange` in its own
     // constructor and seeds registration state from the boot `endpoints.list` in `resyncOnBoot`;
     // `TrunkState` likewise wires itself to ARI/AMI and resyncs registration trunks from
-    // AMI at boot. Both are handed to the `Pipeline` so its feature-code and three-way-call
-    // dispatch (`features.ts`) can reach them, and `handleOutbound` is wired as the
-    // pipeline's `outbound,<exten>` handler, without which outbound dialling would not run.
+    // AMI at boot. Both are handed to the `Pipeline` so its dial dispatch (`outboundDispatch.ts`)
+    // and feature codes (`features.ts`) can reach them.
     // Before anything reads Asterisk's view of the configuration: the rendered files on the
     // volume are the truth, and a fresh Asterisk or a propagation refused while this process was
     // down leaves it holding an older one (§3.1, §9.1).
@@ -131,11 +129,9 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
       stackTz: env.tz,
       stackSipHost: env.sipHost
     });
-    pipeline.setOutboundHandler(ev => handleOutbound(pipeline, trunkState, ev));
     // The boot resync (§10.1 "Boot and restart") runs once the ARI connection is up and the
     // pipeline exists, so a channel the pipeline already handles is left alone, and before the
     // internal server listens, so no action of `api`'s lands on a call the resync then interrupts.
-    // `CallActions` subscribes to the transfer events on construction (`followTransfers`).
     const actions = new CallActions(pipeline);
     await resyncOnBoot({ db, ari, now: nowIso, pipeline, log });
     const server = await startInternalServer(

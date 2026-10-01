@@ -1,5 +1,6 @@
-// Wires Asterisk's ARI events (§9.2 `inbound,<exten>` / `leg,<callId>`) to the Call aggregate's
-// ring/leg/bridge lifecycle (`legs.ts`) and `inbound.ts`'s target-resolution logic.
+// Wires Asterisk's ARI events (§9.2 `inbound,<exten>` / `outbound,<exten>` / `leg,<callId>`) to
+// the Call aggregate's ring/leg/bridge lifecycle (`legs.ts`), `inbound.ts`'s target resolution,
+// `outbound.ts`'s dial resolution and the transfers Asterisk executes (`referTransfers.ts`).
 import type { Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
@@ -18,7 +19,9 @@ import {
   type FindMeAcceptWait,
   type RingResolver
 } from './legs.js';
+import { handleOutbound } from './outbound.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
+import { followTransfers } from './referTransfers.js';
 import { ringUser } from './ringUser.js';
 import { runTarget } from './runTarget.js';
 import type { TrunkState } from './trunkState.js';
@@ -74,7 +77,8 @@ export type PipelineDeps = {
 };
 
 // One Pipeline per `core` process, wired directly to its `AriClient`'s event stream so
-// constructing it is the only wiring a caller needs to do. The ring/leg/bridge state below is
+// constructing it is the only wiring a caller needs to do, the transfers Asterisk executes on SIP
+// `REFER` included. The ring/leg/bridge state below is
 // public so `legs.ts`'s functions, taking `this` as their first argument, can read and write it.
 export class Pipeline {
   readonly deps: PipelineDeps;
@@ -82,9 +86,6 @@ export class Pipeline {
   readonly pendingRing = new Map<string, RingResolver>();
   readonly findMeTimers = new Map<string, ReturnType<typeof setTimeout>[]>();
   readonly pendingFindMeAccept = new Map<string, FindMeAcceptWait>();
-  // Set by `main.ts`'s wiring (`setOutboundHandler`); `null` until then, so an `outbound,<exten>`
-  // Stasis entry is a no-op rather than a crash.
-  private outboundHandler: ((ev: AriEvent) => Promise<void>) | null = null;
 
   constructor(deps: PipelineDeps) {
     this.deps = deps;
@@ -100,6 +101,7 @@ export class Pipeline {
         );
       });
     });
+    followTransfers(this);
   }
 
   /** The call `ev` belongs to, by its channel or, for a leg channel that has not
@@ -179,7 +181,7 @@ export class Pipeline {
       return;
     }
     if (kind === 'outbound') {
-      await this.outboundHandler?.(ev);
+      await handleOutbound(this, ev);
       return;
     }
     // An originated leg enters the app as it answers; a created one (`legOriginate.ts`) as it is
@@ -190,11 +192,6 @@ export class Pipeline {
     }
     // A `snoop,<channelId>` entry is the recorder's own spy channel (§10.2): `Recorder` holds its
     // id from the originate and drives its recording directly, so the pipeline leaves it alone.
-  }
-
-  /** Wires `handleOutbound` for `outbound,<exten>` Stasis entries (§9.2). */
-  setOutboundHandler(handler: (ev: AriEvent) => Promise<void>): void {
-    this.outboundHandler = handler;
   }
 
   registerCall(call: Call): void {

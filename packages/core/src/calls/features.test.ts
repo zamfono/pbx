@@ -725,8 +725,7 @@ describe('features', () => {
 
   it('*90 dialled from a registered device sets dnd, hint BUSY and presence dnd', async () => {
     await setUp();
-    const trunkState = trunkStateForTests();
-    pipeline.deps.trunkState = trunkState;
+    pipeline.deps.trunkState = trunkStateForTests();
     const userId = await seedUser(db);
     await seedExtension(db, '201', { userId });
     await seedDevice(db, userId, 'e201-dabc');
@@ -739,7 +738,7 @@ describe('features', () => {
       name: 'PJSIP/e201-dabc-00000001',
       caller: { number: '201', name: '' }
     });
-    await handleOutbound(pipeline, trunkState, {
+    await handleOutbound(pipeline, {
       type: 'StasisStart',
       timestamp: nowIso(),
       application: 'zamfono',
@@ -1652,7 +1651,7 @@ describe('features', () => {
       name: 'PJSIP/e100-dabc-00000001',
       caller: { number: '100', name: '' }
     });
-    const dialing = handleOutbound(pipeline, pipeline.deps.trunkState, {
+    const dialing = handleOutbound(pipeline, {
       type: 'StasisStart',
       timestamp: nowIso(),
       application: 'zamfono',
@@ -2012,17 +2011,13 @@ describe('features', () => {
 
   /** The retriever's own user, extension and device, added after `setUpParkedCall` warmed the
    * config snapshot; the invalidation stands in for the api's `/internal/configChanged`. */
-  async function seedRetriever(): Promise<{
-    retrieverUserId: string;
-    trunkState: TrunkState;
-  }> {
-    const trunkState = trunkStateForTests();
-    pipeline.deps.trunkState = trunkState;
+  async function seedRetriever(): Promise<string> {
+    pipeline.deps.trunkState = trunkStateForTests();
     const retrieverUserId = await seedUser(db);
     await seedExtension(db, '200', { userId: retrieverUserId });
     await seedDevice(db, retrieverUserId, 'e200-dabc');
     pipeline.deps.cache.invalidate();
-    return { retrieverUserId, trunkState };
+    return retrieverUserId;
   }
 
   function outboundEvent(channel: Channel, dialed: string): AriEvent {
@@ -2037,17 +2032,13 @@ describe('features', () => {
 
   it('dialling 701 from a registered device retrieves the parked call through the outbound entry', async () => {
     const { activeCall, partyChannelId } = await setUpParkedCall();
-    const { retrieverUserId, trunkState } = await seedRetriever();
+    const retrieverUserId = await seedRetriever();
     const retrieverChannel = fakeAri.addChannel({
       name: 'PJSIP/e200-dabc-00000001',
       caller: { number: '200', name: '' }
     });
 
-    await handleOutbound(
-      pipeline,
-      trunkState,
-      outboundEvent(retrieverChannel, '701')
-    );
+    await handleOutbound(pipeline, outboundEvent(retrieverChannel, '701'));
 
     expect(activeCall.answeredByUserId).toBe(retrieverUserId);
     const retrieverJoin = fakeAri.calls.find(
@@ -2078,13 +2069,13 @@ describe('features', () => {
   it('dialling an empty parking slot plays the invalid-option prompt and releases with 404', async () => {
     await setUp();
     await seedExtension(db, '701', { isParkingSlot: true });
-    const { trunkState } = await seedRetriever();
+    await seedRetriever();
     const channel = fakeAri.addChannel({
       name: 'PJSIP/e200-dabc-00000001',
       caller: { number: '200', name: '' }
     });
 
-    await handleOutbound(pipeline, trunkState, outboundEvent(channel, '701'));
+    await handleOutbound(pipeline, outboundEvent(channel, '701'));
 
     // §9.3 table, §10.1 Outbound step 3: the short error tone, then the release.
     const relevant = fakeAri.calls.filter(

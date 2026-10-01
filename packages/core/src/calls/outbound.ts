@@ -8,31 +8,21 @@ import { newId } from '@zamfono/shared';
 
 import type { AriEvent, Channel } from '../ari/types.js';
 import { setChannelLanguage } from '../prompts.js';
-import { resolveDialed, type DialAction } from '../routing/outbound.js';
+import type { DialAction } from '../routing/outbound.js';
 import {
   callLogMaxBytesFromEnv,
   newCall,
   raiseLogLevel,
-  toLogLevel,
   type Call
 } from './call.js';
-import { emergencyLogLevel } from './emergency.js';
-import { dispatchAction } from './outboundDispatch.js';
 import {
-  identifyCallerUserId,
-  resolveDialedContext,
-  toFor
-} from './outboundLookup.js';
+  dispatchAction,
+  logLevelFor,
+  resolveTarget
+} from './outboundDispatch.js';
+import { identifyCallerUserId } from './outboundLookup.js';
 import { takePendingTransfer } from './pendingTransfer.js';
 import type { Pipeline } from './pipeline.js';
-import type { TrunkState } from './trunkState.js';
-
-/** The `Call.direction` a resolved dialled string starts as (§11.2 `calls.direction`). */
-function directionFor(action: DialAction): Call['direction'] {
-  return action.kind === 'external' || action.kind === 'emergency'
-    ? 'outbound'
-    : 'internal';
-}
 
 /** §9.3 "a user: ... INUSE in a call": the dialling user's own device is in a call from the
  * moment it dials a colleague, a group, a number or a parking slot, whatever the far end does
@@ -62,19 +52,13 @@ function markCallerInCall(
 /** `outbound,<exten>` Stasis entry (§9.2): resolves the dialled string and dispatches it. */
 export async function handleOutbound(
   pipeline: Pipeline,
-  trunkState: TrunkState,
   ev: AriEvent
 ): Promise<void> {
   const channel = ev.channel as Channel;
   const args = (ev.args as string[] | undefined) ?? [];
   const dialed = args[1] ?? '';
   const snapshot = await pipeline.deps.cache.get();
-  const action = resolveDialed(dialed, resolveDialedContext(snapshot));
-  const configuredLevel = toLogLevel(snapshot.settings.callLogLevel);
-  const logLevel =
-    action.kind === 'emergency'
-      ? emergencyLogLevel(configuredLevel, pipeline.deps.now())
-      : configuredLevel;
+  const { action, direction, to } = resolveTarget(snapshot, dialed);
   // §10.1 "Transfers and pickup": a blind transfer's onward call is routed as the transferrer's,
   // so the identity it dials as, its caller, its parent and, for an inbound caller, its inbound
   // direction and DID come from the transfer rather than from this channel, which may be the
@@ -82,12 +66,12 @@ export async function handleOutbound(
   const transfer = await takePendingTransfer(pipeline, channel);
   const call = newCall({
     id: newId(),
-    direction: transfer?.inbound === true ? 'inbound' : directionFor(action),
+    direction: transfer?.inbound === true ? 'inbound' : direction,
     callerChannelId: channel.id,
     from: transfer?.from ?? channel.caller.number,
-    to: toFor(action, dialed),
+    to,
     startedAt: pipeline.deps.now(),
-    logLevel,
+    logLevel: logLevelFor(snapshot, action, pipeline.deps.now()),
     callLogMaxBytes: callLogMaxBytesFromEnv()
   });
   call.callerUserId =
@@ -115,8 +99,5 @@ export async function handleOutbound(
   call.log.event({ event: 'entry', dialAction: action.kind, dialed });
   markCallerInCall(pipeline, call, action);
 
-  await dispatchAction(pipeline, trunkState, call, action, {
-    snapshot,
-    asUser
-  });
+  await dispatchAction(pipeline, call, action, { snapshot, asUser });
 }

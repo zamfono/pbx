@@ -375,6 +375,7 @@ describe('outbound dialing', () => {
       bus: new EventBus(),
       now: nowIso
     });
+    pipeline.deps.trunkState = trunkState;
   });
 
   afterEach(async () => {
@@ -392,11 +393,7 @@ describe('outbound dialing', () => {
       name: 'PJSIP/e101-d1',
       caller: { number: '101', name: '' }
     });
-    const finished = handleOutbound(
-      pipeline,
-      trunkState,
-      outboundEvent(channel, dialed)
-    );
+    const finished = handleOutbound(pipeline, outboundEvent(channel, dialed));
     const call = await eventually(() => {
       const registered = pipeline.callByChannel.get(channel.id);
       if (!registered) {

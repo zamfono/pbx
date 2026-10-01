@@ -2,7 +2,7 @@
  * One of the two primitives the live-call actions of §3 are made of, shared by `actions.ts` and
  * `transfers.ts`: `closeCall` ends a `Call`'s bookkeeping and writes its history entry (a hangup
  * over the API, a transferrer leaving). The other, sending a channel through the dial
- * resolution, is `routeToTarget.ts`'s.
+ * resolution, is `outboundDispatch.ts`'s.
  */
 import type { Call, CallsRow } from './call.js';
 import { traceSystemEnd } from './callEnd.js';
