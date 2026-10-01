@@ -189,7 +189,7 @@ The first-boot owner needs none of them when the password hash is seeded (§6.3)
 
 ### 5.3 Authorization
 
-Every operation (§10.3) performs its own RBAC check, so REST, MCP, undo and UI calls share one enforcement point. Roles are ordered `owner` > `admin` > `user`.
+Every operation (§10.3) performs its own RBAC check, so REST, MCP, undo and UI calls share one enforcement point. Roles are ordered `owner` > `admin` > `user`. A request acts with the role its user holds in `users` at that moment, not the one its access token was issued with, and a token whose user is soft-deleted or holds none of the three roles is refused, on REST, MCP and `/events` alike.
 
 - A user reads only their own voicemails (including the mailboxes of ring groups they belong to), their own history and their own devices.
 - Recordings are readable by `admin` and `owner` only, including recordings of a user's own calls.

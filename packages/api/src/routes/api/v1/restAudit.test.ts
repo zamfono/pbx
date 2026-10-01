@@ -43,7 +43,7 @@ beforeAll(async () => {
 function eventFor(
   url: string,
   body: unknown,
-  clientId: string | null
+  client: { clientId: string; clientName: string } | null
 ): RequestEvent {
   return {
     request: new Request(url, {
@@ -53,8 +53,7 @@ function eventFor(
     }),
     url: new URL(url),
     locals: {
-      actor: { id: 'admin1', name: 'Admin', role: 'admin' },
-      clientId
+      auth: { actor: { id: 'admin1', name: 'Admin', role: 'admin' }, ...client }
     },
     getClientAddress: () => '198.51.100.1'
   } as RequestEvent;
@@ -67,7 +66,7 @@ describe('POST /api/v1/[...path]', () => {
       eventFor(
         'http://api/api/v1/blockedNumbers',
         { number: '+4915112345678' },
-        CLIENT_ID
+        { clientId: CLIENT_ID, clientName: CLIENT_NAME }
       )
     );
     expect(response.status).toBe(200);

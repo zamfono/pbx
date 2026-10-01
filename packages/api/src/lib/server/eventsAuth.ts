@@ -5,9 +5,9 @@
  */
 import type { WebSocket } from 'ws';
 
-import { MS_PER_SECOND, rawDataToString, type Db } from '@zamfono/shared';
+import { rawDataToString } from '@zamfono/shared';
 
-import { isRole, verifyAccessToken } from './auth/jwt.js';
+import { authenticateToken, type BearerDeps } from './auth/bearer.js';
 import { tryParseJson } from './json.js';
 import type { Actor } from './ops/types.js';
 
@@ -26,38 +26,10 @@ function parseAuthFrame(raw: string): AuthFrame | null {
   return type === 'auth' && typeof token === 'string' ? { type, token } : null;
 }
 
-export type EventsAuthDeps = {
-  db: Db;
-  jwtSecret: string;
+export type EventsAuthDeps = BearerDeps & {
   /** Overridable in tests; the auth handshake's real timeout is `AUTH_TIMEOUT_MS`. */
   timeoutMs?: number;
-  now?: () => number;
 };
-
-/** The live user behind `token`, or `null` for an expired/invalid token or a deleted account. */
-async function actorForToken(
-  deps: EventsAuthDeps,
-  token: string
-): Promise<Actor | null> {
-  const nowS = Math.floor((deps.now?.() ?? Date.now()) / MS_PER_SECOND);
-  const claims = await verifyAccessToken(deps.jwtSecret, token, nowS);
-  if (!claims) {
-    return null;
-  }
-  const user = await deps.db
-    .selectFrom('users')
-    .select(['id', 'name', 'role', 'deletedAt'])
-    .where('id', '=', claims.sub)
-    .executeTakeFirst();
-  if (user?.deletedAt !== null) {
-    return null;
-  }
-  return {
-    id: user.id,
-    name: user.name,
-    role: isRole(user.role) ? user.role : claims.role
-  };
-}
 
 /**
  * Waits for the socket's first frame, expects `{ type: 'auth', token }`, and resolves the
@@ -92,12 +64,12 @@ export function authenticateEventsSocket(
         finish(null);
         return;
       }
-      actorForToken(deps, frame.token)
-        .then(actor => {
-          if (!actor) {
+      authenticateToken(deps, frame.token)
+        .then(auth => {
+          if (!auth) {
             socket.close();
           }
-          finish(actor);
+          finish(auth?.actor ?? null);
         })
         .catch(() => {
           socket.close();

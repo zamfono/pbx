@@ -31,8 +31,7 @@ function eventFor(url: string): RequestEvent {
     request: new Request(url),
     url: new URL(url),
     locals: {
-      actor: { id: 'admin1', name: 'Admin', role: 'admin' },
-      clientId: null
+      auth: { actor: { id: 'admin1', name: 'Admin', role: 'admin' } }
     },
     getClientAddress: () => '198.51.100.1'
   } as RequestEvent;

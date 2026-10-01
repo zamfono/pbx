@@ -1,10 +1,10 @@
 import pino from 'pino';
 
+import type { Authenticated } from './auth/bearer.js';
 import { tryReadJson } from './json.js';
 import {
   authenticate,
   unauthorizedResponse,
-  type Authenticated,
   type McpDeps
 } from './mcp/auth.js';
 import {

@@ -1,64 +1,22 @@
-import { MS_PER_SECOND, type Db } from '@zamfono/shared';
+import type { Db } from '@zamfono/shared';
 
-import { isRole, verifyAccessToken } from '../auth/jwt.js';
+import { authenticateRequest, type Authenticated } from '../auth/bearer.js';
 import { mcpResourceUri } from '../auth/resource.js';
-import type { Actor } from '../ops/types.js';
 
 // §10.5 "Auth": an MCP request acts as the user its OAuth 2.1 bearer token names, and a mutating
 // tool call is audited under that user plus the MCP client's OAuth client id and name.
 const STATUS_UNAUTHORIZED = 401;
-const BEARER_PREFIX = 'Bearer ';
 
 /** What the MCP endpoint needs beyond the request itself. */
 export type McpDeps = { db: Db; jwtSecret: string; origin: string };
 
-export type Authenticated = {
-  actor: Actor;
-  clientId?: string;
-  clientName?: string;
-};
-
-export async function authenticate(
+/** The request's user and client; MCP authorization "Token Handling": only a token issued for
+ *  this MCP server is accepted. */
+export function authenticate(
   deps: McpDeps,
   request: Request
 ): Promise<Authenticated | null> {
-  const header = request.headers.get('authorization') ?? '';
-  if (!header.startsWith(BEARER_PREFIX)) {
-    return null;
-  }
-  const nowS = Math.floor(Date.now() / MS_PER_SECOND);
-  const token = header.slice(BEARER_PREFIX.length);
-  // MCP authorization "Token Handling": only a token issued for this MCP server is accepted.
-  const claims = await verifyAccessToken(
-    deps.jwtSecret,
-    token,
-    nowS,
-    mcpResourceUri(deps.origin)
-  );
-  if (!claims) {
-    return null;
-  }
-  const user = await deps.db
-    .selectFrom('users')
-    .select(['id', 'name', 'role'])
-    .where('id', '=', claims.sub)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!user || !isRole(user.role)) {
-    return null;
-  }
-  const client = claims.cid
-    ? await deps.db
-        .selectFrom('oauthClients')
-        .select('name')
-        .where('clientId', '=', claims.cid)
-        .executeTakeFirst()
-    : undefined;
-  return {
-    actor: { id: user.id, name: user.name, role: user.role },
-    clientId: claims.cid ?? undefined,
-    clientName: client?.name
-  };
+  return authenticateRequest(deps, request, mcpResourceUri(deps.origin));
 }
 
 /** The 401 an unauthenticated request gets, pointing the client at the resource metadata. */

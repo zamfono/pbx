@@ -1,15 +1,15 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 import type { Dictionary } from '$lib/i18n/index.js';
-import type { Actor } from '$lib/server/ops/types.js';
+import type { Authenticated } from '$lib/server/auth/bearer.js';
 
 declare global {
   namespace App {
     // interface Error {}
-    /** Set by `hooks.server.ts` on every request; non-`null` only inside `/api/v1/*` (§10.3). */
+    /** Set by `hooks.server.ts` on every request: the bearer token's user and client, non-`null`
+     *  only inside `/api/v1/*` (§10.3). */
     // eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- SvelteKit's own generated types extend `App.Locals` by declaration merging, which only an `interface` supports
     interface Locals {
-      actor: Actor | null;
-      clientId: string | null;
+      auth: Authenticated | null;
     }
     /** Every authentication page's load returns at least these two (§5.2 "Authentication
      *  pages"); declaring them here is what types the `$app/state` `page.data` a `+error.svelte`

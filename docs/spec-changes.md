@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-01 · §5.3.** A request acts with the role its user holds in `users` at that moment, and a token whose user is soft-deleted or holds none of the three roles is refused on REST, MCP and `/events` alike; REST and `/events` fell back to the role the token was issued with.
+*Why:* requested by the product owner: the three channels resolved a token's user each in its own way and disagreed on a user whose stored role is not valid; MCP's refusal is now the rule everywhere.
+
 **2026-10-01 · §10 layout, §10.3 Operations layer.** `api`'s server-only code, the operations layer, REST, MCP, events, auth, pjsip, audio, mail, provisioning and jobs among it, lives under `src/lib/server/`, SvelteKit's `$lib/server`, and the authentication pages' dictionaries, which their browser code uses, under `src/lib/i18n/`.
 *Why:* requested by the product owner: the SvelteKit app follows SvelteKit's conventions, `$lib`, `$lib/server` and `$env`.
 

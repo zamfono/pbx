@@ -6,8 +6,8 @@ import pino from 'pino';
 import { MS_PER_SECOND } from '@zamfono/shared';
 
 import { addressKey } from '$lib/server/addressKey.js';
+import { authenticateRequest } from '$lib/server/auth/bearer.js';
 import { crossSiteFormRejection } from '$lib/server/auth/crossSiteForms.js';
-import { isRole, verifyAccessToken } from '$lib/server/auth/jwt.js';
 import { requiredJwtSecret } from '$lib/server/auth/jwtSigning.js';
 import { createCoreClient, fetchCoreVersion } from '$lib/server/coreClient.js';
 import { getDb } from '$lib/server/db.js';
@@ -20,12 +20,10 @@ import {
   coreTrunkStatusLookup,
   setTrunkStatusLookup
 } from '$lib/server/ops/trunks/index.js';
-import type { Actor } from '$lib/server/ops/types.js';
 import { problem } from '$lib/server/problem.js';
 import { propagateConfig } from '$lib/server/propagation.js';
 import { keyringFromEnv, type Keyring } from '$lib/server/secretbox.js';
 
-const BEARER_PREFIX = 'Bearer ';
 const UNAUTHORIZED_STATUS = 401;
 const NOT_FOUND_STATUS = 404;
 const TOO_MANY_REQUESTS_STATUS = 429;
@@ -93,10 +91,6 @@ export const init: ServerInit = async () => {
   });
 };
 
-type AuthResult = { actor: Actor | null; clientId: string | null };
-
-const ANONYMOUS: AuthResult = { actor: null, clientId: null };
-
 // One limiter for the process's lifetime (§5.5): counters reset on an `api` restart.
 const limiter = new Limiter();
 
@@ -129,42 +123,8 @@ function rateLimitResponse(
 }
 
 /**
- * The bearer token's `Actor` and OAuth client id, or both `null` for a missing token, a bad
- * signature, or a deleted account (§5.2, §5.3, §5.9); the role is read fresh from `users` so a
- * role change takes effect before the token's own 15-minute expiry.
- */
-async function resolveActor(request: Request): Promise<AuthResult> {
-  const header = request.headers.get('authorization') ?? '';
-  if (!header.startsWith(BEARER_PREFIX)) {
-    return ANONYMOUS;
-  }
-  const nowS = Math.floor(Date.now() / MS_PER_SECOND);
-  const claims = await verifyAccessToken(
-    requiredJwtSecret(),
-    header.slice(BEARER_PREFIX.length),
-    nowS
-  );
-  if (!claims) {
-    return ANONYMOUS;
-  }
-  const user = await getDb()
-    .selectFrom('users')
-    .select(['id', 'name', 'role', 'deletedAt'])
-    .where('id', '=', claims.sub)
-    .executeTakeFirst();
-  if (user?.deletedAt !== null) {
-    return ANONYMOUS;
-  }
-  const role = isRole(user.role) ? user.role : claims.role;
-  return {
-    actor: { id: user.id, name: user.name, role },
-    clientId: claims.cid
-  };
-}
-
-/**
  * Refuses a cross-site form submission to a browser-served page (`crossSiteFormRejection`);
- * resolves `/api/v1/*`'s bearer token into `event.locals.actor`, 401 problem+json without one;
+ * resolves `/api/v1/*`'s bearer token into `event.locals.auth`, 401 problem+json without one;
  * refuses `/internal/*` when the request carries `X-Forwarded-For`, since only the proxy hop sets
  * it and that path is reachable from the internal network alone (§3.1); answers 429 problem+json
  * once a client address exceeds the §5.5 limit of the auth endpoint it called.
@@ -186,20 +146,20 @@ const handleRequest: Handle = async ({ event, resolve }) => {
     return limited;
   }
   if (!pathname.startsWith(API_PREFIX)) {
-    event.locals.actor = null;
-    event.locals.clientId = null;
+    event.locals.auth = null;
     return resolve(event);
   }
   // `/api/v1/openapi.json` is inside this prefix and so requires a bearer token like every other
   // `/api/v1/*` endpoint; §10.3 lists no separate row for it, so it gets no separate exemption.
-  const { actor, clientId } = await resolveActor(event.request);
-  if (!actor) {
+  const auth = await authenticateRequest(
+    { db: getDb(), jwtSecret: requiredJwtSecret() },
+    event.request
+  );
+  if (!auth) {
     return problem(UNAUTHORIZED_STATUS, 'unauthorized');
   }
   // eslint-disable-next-line require-atomic-updates -- `event` is this call's own local object, never mutated concurrently
-  event.locals.actor = actor;
-  // eslint-disable-next-line require-atomic-updates -- `event` is this call's own local object, never mutated concurrently
-  event.locals.clientId = clientId;
+  event.locals.auth = auth;
   return resolve(event);
 };
 

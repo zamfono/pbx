@@ -164,7 +164,18 @@ describe('hooks handle', () => {
     expect(jobs.stop).toHaveBeenCalledOnce();
   });
 
-  it('sets locals.actor and locals.clientId from a valid bearer token', async () => {
+  it('sets locals.auth from a valid bearer token: the user, the client and its name', async () => {
+    await getDb()
+      .insertInto('oauthClients')
+      .values({
+        clientId: 'client1',
+        name: 'Ops Console',
+        kind: 'cimd',
+        redirectUrisJson: '[]',
+        createdAt: nowIso(),
+        lastLoginAt: nowIso()
+      })
+      .execute();
     const nowS = Math.floor(Date.now() / MS_PER_SECOND);
     const token = await signAccessToken(
       JWT_SECRET,
@@ -176,11 +187,10 @@ describe('hooks handle', () => {
       headers: { authorization: `Bearer ${token}` }
     });
     await handle({ event, resolve: resolvePassThrough });
-    expect(event.locals.actor).toEqual({
-      id: 'admin1',
-      name: 'Admin',
-      role: 'admin'
+    expect(event.locals.auth).toEqual({
+      actor: { id: 'admin1', name: 'Admin', role: 'admin' },
+      clientId: 'client1',
+      clientName: 'Ops Console'
     });
-    expect(event.locals.clientId).toBe('client1');
   });
 });

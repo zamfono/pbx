@@ -1,9 +1,10 @@
 import { newId } from '@zamfono/shared';
 
+import type { Authenticated } from '../auth/bearer.js';
 import { registry } from '../ops/registry.js';
 import { runOperation, type RunInput } from '../ops/runner.js';
 import { ConfirmationRequired, OpError } from '../ops/types.js';
-import type { Authenticated, McpDeps } from './auth.js';
+import type { McpDeps } from './auth.js';
 import { CONFIRM_KEY, confirmElicitation, isAffirmative } from './confirm.js';
 import type { Era } from './era.js';
 import { callHelp, HELP_TOOL_NAME } from './guide.js';
