@@ -64,6 +64,6 @@ recordings_dump() {
 }
 
 mix_failures() {
-  curl -fsS "$API/metrics" "${FWD[@]}" -H "Authorization: Bearer $METRICS_TOKEN" 2>/dev/null \
+  curl -fsS "$api_base/metrics" "${FWD[@]}" -H "Authorization: Bearer $METRICS_TOKEN" 2>/dev/null \
     | awk '$1 == "zamfono_recording_mix_failures_total" { print $2; f=1 } END { if (!f) print "?" }'
 }

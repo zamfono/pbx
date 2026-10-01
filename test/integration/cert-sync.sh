@@ -22,7 +22,7 @@
 # change between runs, so the comparisons below still hold), but the restart itself briefly repeats
 # that outage against a stack other REUSE=1 scenarios may still be relying on staying up.
 #
-# Reads `run.sh`'s own COMPOSE, compose_files, FQDN, API, FWD and fail.
+# Reads `run.sh`'s own COMPOSE, compose_files, FQDN, api_base, FWD and fail.
 
 CERT_SYNC_WAIT_ATTEMPTS=60
 
@@ -68,7 +68,7 @@ cert_sync_dump_extra_diagnostics() {
   echo '-- proxy log lines from the hook --' >&2
   $COMPOSE "${compose_files[@]}" logs --no-color proxy 2>&1 | grep zamfono-cert-hook >&2 || true
   echo '-- api healthz body --' >&2
-  curl -fsS "${FWD[@]}" "$API/healthz" >&2 2>&1 || true
+  curl -fsS "${FWD[@]}" "$api_base/healthz" >&2 2>&1 || true
   echo '-- api log lines mentioning "cert" --' >&2
   $COMPOSE "${compose_files[@]}" logs --no-color api 2>&1 | grep -i cert >&2 || true
   echo '-- asterisk-config tls dir --' >&2
@@ -130,7 +130,7 @@ run_cert_sync_step() {
 
   local cert_sync_api_ready=false
   for _ in $(seq 1 $CERT_SYNC_WAIT_ATTEMPTS); do
-    if curl -fsS "${FWD[@]}" "$API/healthz" >/dev/null 2>&1; then
+    if curl -fsS "${FWD[@]}" "$api_base/healthz" >/dev/null 2>&1; then
       cert_sync_api_ready=true
       break
     fi

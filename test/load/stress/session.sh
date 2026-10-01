@@ -28,7 +28,7 @@ COMPOSE=${COMPOSE:-docker compose}
 FQDN=pbx.load.test
 API_PORT=${API_PORT:-8140}
 export API_PORT
-API="http://127.0.0.1:$API_PORT"
+api_base="http://127.0.0.1:$API_PORT"
 MAIN_DID=+15551000
 OUT_DIR=${OUT_DIR:?set OUT_DIR}
 STEPS=${STEPS:-0 10 25 50}
@@ -113,7 +113,7 @@ trunk_ip=$(dc exec -T sipp hostname -i | tr -d '\r' | awk '{print $1}')
 provider_ip=$(dc exec -T sipp-provider hostname -i | tr -d '\r' | awk '{print $1}')
 devices_ip=$(dc exec -T devices hostname -i | tr -d '\r' | awk '{print $1}')
 log "trunk sipp=$trunk_ip provider=$provider_ip devices=$devices_ip; configuring $DEVICES users"
-bash "$here/configure-stress.sh" "$API" "$TOKEN" "$trunk_ip" "$DEVICES" "$LOAD_GEN_DIR" \
+bash "$here/configure-stress.sh" "$api_base" "$token" "$trunk_ip" "$DEVICES" "$LOAD_GEN_DIR" \
   "$provider_ip" \
   2>> "$OUT_DIR/session.log" || fail "tenant configuration failed"
 cp "$LOAD_GEN_DIR/recorded.txt" "$LOAD_GEN_DIR/users.txt" "$OUT_DIR/"

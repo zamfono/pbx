@@ -18,6 +18,8 @@ compose_cmd=$4
 out_dir=$5
 count=${6:-200}
 start_ext=${7:-200}
+# shellcheck source=../api.sh
+. "$(dirname "$0")/../api.sh"
 
 mkdir -p "$out_dir"
 timings_csv="$out_dir/bulk-user-create-timings.csv"
@@ -26,19 +28,9 @@ echo 'n,extension,create_ms,device_ms' > "$timings_csv"
 api_timed() {
   # $1 method, $2 path, $3 body; prints "<time_total_seconds> <body>" on two lines via a marker
   local method=$1 path=$2 body=$3
-  curl -fsS -X "$method" "$api_base/api/v1$path" -H 'X-Forwarded-For: 127.0.0.1' \
+  curl -fsS -X "$method" "$api_base/api/v1$path" "${FWD[@]}" \
     -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$body" \
     -w '\n%{time_total}\n'
-}
-
-jsonfield() {
-  python3 -c '
-import json, sys
-value = json.load(sys.stdin)
-for step in sys.argv[1].split("."):
-    value = value[int(step)] if step.isdigit() else value[step]
-print(value)
-' "$1"
 }
 
 echo "== creating $count users + devices (extensions $start_ext..$((start_ext + count - 1))) ==" >&2

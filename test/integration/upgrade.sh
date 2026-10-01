@@ -6,7 +6,7 @@
 #   UPGRADE_FROM=latest   the newest vX.Y.Z tag of the repository
 #   UPGRADE_FROM=0.0.4    that release
 #
-# Reads and sets `run.sh`'s own COMPOSE, compose_files, repo, here, API, FWD, RUNTIME, OWNER_EMAIL,
+# Reads and sets `run.sh`'s own COMPOSE, compose_files, repo, here, api_base, FWD, RUNTIME, OWNER_EMAIL,
 # OWNER_PASSWORD, FQDN and fail.
 
 UPGRADE_REPO=https://github.com/zamfono/pbx
@@ -28,12 +28,12 @@ upgrade_version() {
 # The previous release's API, read with a token of its own, into one JSON document per path.
 upgrade_snapshot() {
   local out=$1 token path
-  token=$(bash "$here/bootstrap-token.sh" "$API" "$OWNER_EMAIL" "$OWNER_PASSWORD" "https://$FQDN") \
+  token=$(bash "$here/bootstrap-token.sh" "$api_base" "$OWNER_EMAIL" "$OWNER_PASSWORD" "https://$FQDN") \
     || fail "could not obtain an access token from the release upgraded from"
   : >"$out"
   for path in "${UPGRADE_SNAPSHOT_PATHS[@]}"; do
     printf '%s\t' "$path" >>"$out"
-    curl -fsS "$API/api/v1$path" "${FWD[@]}" -H "Authorization: Bearer $token" >>"$out" \
+    api GET "$path" >>"$out" \
       || fail "GET $path did not answer on the release upgraded from"
     echo >>"$out"
   done

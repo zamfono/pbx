@@ -10,27 +10,8 @@ token=$2
 trunk_ip=$3
 phone_cidr=$4
 
-api() {
-  local method=$1 path=$2 body=${3:-}
-  if [ -n "$body" ]; then
-    curl -fsS -X "$method" "$api_base/api/v1$path" -H 'X-Forwarded-For: 127.0.0.1' \
-      -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$body"
-  else
-    curl -fsS -X "$method" "$api_base/api/v1$path" -H 'X-Forwarded-For: 127.0.0.1' \
-      -H "Authorization: Bearer $token"
-  fi
-}
-
-# One field out of a JSON object on stdin, by a dotted path (`user.id`, `items.0.id`).
-jsonfield() {
-  python3 -c '
-import json, sys
-value = json.load(sys.stdin)
-for step in sys.argv[1].split("."):
-    value = value[int(step)] if step.isdigit() else value[step]
-print(value)
-' "$1"
-}
+# shellcheck source=../api.sh
+. "$(dirname "$0")/../api.sh"
 
 # An `ip` trunk identified by the calling container's address (§9.4 "Inbound identification").
 api POST /trunks \

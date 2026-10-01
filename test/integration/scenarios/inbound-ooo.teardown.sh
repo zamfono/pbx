@@ -4,9 +4,8 @@ set -euo pipefail
 
 api_base=$1
 token=$2
+# shellcheck source=_lib.sh
+. "$(dirname "$0")/_lib.sh"
 
-rule_id=$(cat /tmp/zamfono-ooo-rule)
-curl -fsS -X DELETE "$api_base/api/v1/ooo/$rule_id" -H 'X-Forwarded-For: 127.0.0.1' \
-  -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
-  -d '{"confirm":true}' >/dev/null
+api_delete "/ooo/$(cat /tmp/zamfono-ooo-rule)"
 rm -f /tmp/zamfono-ooo-rule

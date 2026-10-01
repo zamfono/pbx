@@ -6,17 +6,10 @@ set -euo pipefail
 api_base=$1
 token=$2
 
-api() {
-  curl -fsS -X "$1" "$api_base/api/v1$2" -H 'X-Forwarded-For: 127.0.0.1' \
-    -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$3"
-}
+# shellcheck source=_lib.sh
+. "$(dirname "$0")/_lib.sh"
 
-user_id=$(curl -fsS "$api_base/api/v1/users" -H 'X-Forwarded-For: 127.0.0.1' \
-  -H "Authorization: Bearer $token" \
-  | python3 -c "
-import json, sys
-print([u['id'] for u in json.load(sys.stdin)['items'] if u['extension'] == '101'][0])
-")
+user_id=$(user_with_ext 101)
 
 api PUT "/users/$user_id/forwarding" \
   '{"rules":[{"condition":"unconditional","target":{"kind":"external","external":"+15557777"}}]}' \

@@ -36,7 +36,7 @@ with wave.open(path, "wb") as out:
         struct.pack("<h", int(8000 * math.sin(2 * math.pi * 440 * n / 8000)))
         for n in range(8000 * seconds)))
 PY
-  audio_id=$(curl -fsS -X POST "$api_base/api/v1/audio" -H 'X-Forwarded-For: 127.0.0.1' \
+  audio_id=$(curl -fsS -X POST "$api_base/api/v1/audio" "${FWD[@]}" \
     -H "Authorization: Bearer $token" -F kind=announcement -F label=ci-menu-greeting \
     -F "upload=@$wav;type=audio/wav" | jsonfield id)
 fi

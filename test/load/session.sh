@@ -23,7 +23,7 @@ API_PORT=${API_PORT:-8140}
 export API_PORT  # compose.load.yaml interpolates ${API_PORT:-8140} from the environment, not
                   # from this script's own shell variable, so a caller-supplied override must be
                   # exported for the api service's published port to actually follow it.
-API="http://127.0.0.1:$API_PORT"
+api_base="http://127.0.0.1:$API_PORT"
 MAIN_DID=+15551000
 OUT_DIR=${OUT_DIR:-$here/results}
 mkdir -p "$OUT_DIR"
@@ -77,7 +77,7 @@ log "sipp=$sipp_ip sipp-phone=$phone_ip sipp-provider=$provider_ip"
 
 log "configuring the tenant"
 read -r SIP_USERNAME SIP_PASSWORD < <(
-  bash "$here/configure-load.sh" "$API" "$TOKEN" "$sipp_ip" "$provider_ip" "$phone_cidr"
+  bash "$here/configure-load.sh" "$api_base" "$token" "$sipp_ip" "$provider_ip" "$phone_cidr"
 ) || fail "tenant configuration failed"
 [ -n "${SIP_USERNAME:-}" ] || fail "no device credentials came back from configure-load.sh"
 
@@ -160,7 +160,7 @@ bash "$here/run-load-step.sh" "$compose_cmd" "$OUT_DIR" calls-25-transcode 25 5 
 #    idle RAM with that many endpoints configured.
 # ---------------------------------------------------------------------------
 log "creating 200 users/devices and timing the reload"
-bash "$here/bulk-users-reload.sh" "$API" "$TOKEN" "$phone_cidr" "$compose_cmd" "$OUT_DIR" 200 200 \
+bash "$here/bulk-users-reload.sh" "$api_base" "$token" "$phone_cidr" "$compose_cmd" "$OUT_DIR" 200 200 \
   2>&1 | tee -a "$OUT_DIR/session.log"
 
 log "sampling idle RAM with ~200 endpoints configured"

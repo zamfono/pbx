@@ -22,26 +22,8 @@ provider_ip=$4
 phone_cidr=$5
 external_number=${6:-+15557777}
 
-api() {
-  local method=$1 path=$2 body=${3:-}
-  if [ -n "$body" ]; then
-    curl -fsS -X "$method" "$api_base/api/v1$path" -H 'X-Forwarded-For: 127.0.0.1' \
-      -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$body"
-  else
-    curl -fsS -X "$method" "$api_base/api/v1$path" -H 'X-Forwarded-For: 127.0.0.1' \
-      -H "Authorization: Bearer $token"
-  fi
-}
-
-jsonfield() {
-  python3 -c '
-import json, sys
-value = json.load(sys.stdin)
-for step in sys.argv[1].split("."):
-    value = value[int(step)] if step.isdigit() else value[step]
-print(value)
-' "$1"
-}
+# shellcheck source=../api.sh
+. "$(dirname "$0")/../api.sh"
 
 # codecs explicitly includes ulaw: the tenant default (db/migrations' DEFAULT_CODECS_JSON) is
 # ["opus","g722","alaw"] -- no ulaw -- and the transcoding load step's provider leg offers ulaw

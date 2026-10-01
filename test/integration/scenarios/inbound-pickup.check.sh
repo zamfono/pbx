@@ -7,6 +7,8 @@ set -euo pipefail
 api_base=$1
 token=$2
 compose=$3
+# shellcheck source=_lib.sh
+. "$(dirname "$0")/_lib.sh"
 
 # The picker's own call (`uas/pickup-dial.sh`) ran beside the ringing device's; it hung up just
 # before the stack ended the caller's call, so its exit status follows within moments.
@@ -25,8 +27,7 @@ if [ "$code" != 0 ]; then
 fi
 
 picker_id=$(cat /tmp/zamfono-picker-user)
-curl -fsS "$api_base/api/v1/calls" -H 'X-Forwarded-For: 127.0.0.1' \
-  -H "Authorization: Bearer $token" | python3 -c '
+api GET /calls | python3 -c '
 import json, sys
 picker = sys.argv[1]
 calls = json.load(sys.stdin)["items"]

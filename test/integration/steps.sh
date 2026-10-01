@@ -4,7 +4,7 @@
 # and `prompts`; `trunk-status` and `cert-sync` wrap their own files' bodies as
 # `run_trunk_status_step`/`run_cert_sync_step`, called directly by run.sh).
 #
-# Reads and sets `run.sh`'s own COMPOSE, compose_files, repo, here, compose_cmd, API, API_PORT,
+# Reads and sets `run.sh`'s own COMPOSE, compose_files, repo, here, compose_cmd, api_base, API_PORT,
 # FWD, RUNTIME, OWNER_EMAIL, OWNER_PASSWORD, MAIN_DID, FQDN and fail; sets SIP_USERNAME,
 # SIP_PASSWORD and GROUP_EXT for `run-scenarios.sh` to read.
 
@@ -94,7 +94,7 @@ await_stack_ready() {
   echo '== waiting for the api healthcheck =='
   local ready=false
   for _ in $(seq 1 60); do
-    if curl -fsS "${FWD[@]}" "$API/healthz" >/dev/null 2>&1; then
+    if curl -fsS "${FWD[@]}" "$api_base/healthz" >/dev/null 2>&1; then
       ready=true
       break
     fi
@@ -147,7 +147,7 @@ configure_tenant() {
     | awk '{print $1}')
   phone_cidr="${phone_ip%.*}.0/24"
   read -r SIP_USERNAME SIP_PASSWORD GROUP_EXT < <(
-    bash "$here/configure.sh" "$API" "$token" "$trunk_ip" "$phone_cidr"
+    bash "$here/configure.sh" "$api_base" "$token" "$trunk_ip" "$phone_cidr"
   ) || fail "the tenant could not be configured over REST"
   [ -n "${SIP_USERNAME:-}" ] || fail "no device credentials came back from the configuration step"
   echo "   device $SIP_USERNAME, ring group extension $GROUP_EXT"
@@ -166,10 +166,6 @@ register_device() {
 # upgrade shard, the start of the release under test on a database the old one wrote, which had
 # none), and a manual run against it creates the repository and backs up for real, through the
 # image's own restic. Selectable as `backups`; cheap enough to run on every shard.
-json_key() {
-  python3 -c 'import json, sys; print(json.load(sys.stdin)[sys.argv[1]])' "$1"
-}
-
 step_backups() {
   echo '== backing up to the default local target =='
   local target_id run_id status='running' attempt
@@ -180,11 +176,11 @@ local = [t for t in json.load(sys.stdin)["items"]
 print(local[0]["id"] if len(local) == 1 else "")
 ') || fail "GET /backups/targets did not answer"
   [ -n "$target_id" ] || fail "the stack has no default local backup target"
-  run_id=$(api POST /backups/runs "{\"targetId\":\"$target_id\"}" | json_key id) \
+  run_id=$(api POST /backups/runs "{\"targetId\":\"$target_id\"}" | jsonfield id) \
     || fail "POST /backups/runs refused the default target"
   # The scheduler polls for queued runs; a first run also initializes the repository.
   for attempt in $(seq 1 60); do
-    status=$(api GET "/backups/runs/$run_id" | json_key status)
+    status=$(api GET "/backups/runs/$run_id" | jsonfield status)
     [ "$status" = running ] || break
     sleep 1
   done
@@ -212,12 +208,10 @@ core = info["core"] or {}
 if not core.get("startedAt") or not core.get("asteriskStartedAt"):
     sys.exit("system.info carries no core start times: %s" % json.dumps(core))
 ' || fail "system.info reports no usable updater, or no core start times"
-  refusal=$(curl -sS -X POST "$API/api/v1/system/update" "${FWD[@]}" \
-    -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
-    -d '{"confirm":true}' -w '\n%{http_code}')
+  refusal=$(api_status POST /system/update '{"confirm":true}')
   case $refusal in
-    *'pins no release'*$'\n'409 | *'no backup finished ok'*$'\n'409)
-      echo "   refused as expected: ${refusal%$'\n'*}"
+    409$'\n'*'pins no release'* | 409$'\n'*'no backup finished ok'*)
+      echo "   refused as expected: ${refusal#*$'\n'}"
       ;;
     *) fail "system.update did not answer as expected: $refusal" ;;
   esac

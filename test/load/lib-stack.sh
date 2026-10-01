@@ -4,9 +4,10 @@
 # `compose up`, the migrate exit code, the api and core healthchecks, a bootstrap owner token.
 #
 # The caller sets, before sourcing: repo, OUT_DIR, COMPOSE, compose_files (array, relative to
-# deploy/), API, FQDN, MAIN_DID, API_IMAGE; optionally METRICS_TOKEN (default empty = /metrics
-# off). It provides: dc, log, fail, api, stack_write_env, stack_up, stack_token, and sets
-# STACK_UP=true once `compose up` ran (the caller's teardown trap keys `down -v` off it).
+# deploy/), api_base, FQDN, MAIN_DID, API_IMAGE; optionally METRICS_TOKEN (default empty = /metrics
+# off). It provides: dc, log, fail, test/api.sh's helpers, stack_write_env, stack_up,
+# stack_token, and sets STACK_UP=true once `compose up` ran (the caller's teardown trap keys
+# `down -v` off it).
 # RUNTIME (default: the first word of $COMPOSE, i.e. docker or podman) is the CLI used for the
 # plain container/volume commands, so they hit the same image and volume store as the stack
 # (test/integration/run.sh does the same).
@@ -15,7 +16,8 @@
 RUNTIME=${RUNTIME:-${COMPOSE%% *}}
 export RUNTIME
 
-FWD=(-H 'X-Forwarded-For: 127.0.0.1')
+# shellcheck source=../api.sh
+. "$repo/test/api.sh"
 STACK_UP=false
 OWNER_PASSWORD='load-secret'
 OWNER_EMAIL='owner@load.test'
@@ -32,16 +34,6 @@ fail() {
   dc ps >&2 || true
   dc logs --tail 80 >&2 || true
   exit 1
-}
-
-api() {
-  local method=$1 path=$2 body=${3:-}
-  if [ -n "$body" ]; then
-    curl -fsS -X "$method" "$API/api/v1$path" "${FWD[@]}" \
-      -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "$body"
-  else
-    curl -fsS -X "$method" "$API/api/v1$path" "${FWD[@]}" -H "Authorization: Bearer $TOKEN"
-  fi
 }
 
 stack_write_env() {
@@ -83,7 +75,7 @@ ENV
 }
 
 stack_up() {
-  local api_port=${API#*127.0.0.1:}
+  local api_port=${api_base#*127.0.0.1:}
   if lsof -nP -iTCP:"$api_port" -sTCP:LISTEN >/dev/null 2>&1; then
     fail "something already listens on 127.0.0.1:$api_port; set API_PORT to a free port"
   fi
@@ -98,7 +90,7 @@ stack_up() {
   log "waiting for api healthcheck"
   local ready=false
   for _ in $(seq 1 60); do
-    curl -fsS "${FWD[@]}" "$API/healthz" >/dev/null 2>&1 && { ready=true; break; }
+    curl -fsS "${FWD[@]}" "$api_base/healthz" >/dev/null 2>&1 && { ready=true; break; }
     sleep 2
   done
   [ "$ready" = true ] || fail "api never became healthy"
@@ -115,9 +107,9 @@ stack_up() {
 
 stack_token() {
   log "obtaining a bootstrap token"
-  TOKEN=$(bash "$repo/test/integration/bootstrap-token.sh" "$API" "$OWNER_EMAIL" \
+  token=$(bash "$repo/test/integration/bootstrap-token.sh" "$api_base" "$OWNER_EMAIL" \
     "$OWNER_PASSWORD" "https://$FQDN") || fail "could not obtain an access token"
-  [ -n "$TOKEN" ] || fail "the token endpoint returned nothing"
+  [ -n "$token" ] || fail "the token endpoint returned nothing"
 }
 
 # Host facts for the sizing record (docs/spec.md §6.6): nproc, CPU model, free -m, runtimes.

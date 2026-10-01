@@ -59,11 +59,10 @@ PROXY_IMAGE=${PROXY_IMAGE:-zamfono/proxy:ci}
 # cert-sync.sh's own Caddyfile (§6.4): an absolute path, for the same reason SCENARIOS_DIR is one.
 CERT_SYNC_CADDYFILE="$here/Caddyfile.local-ca"
 export API_PORT SCENARIOS_DIR PROXY_IMAGE CERT_SYNC_CADDYFILE FQDN
-API=http://127.0.0.1:$API_PORT
+api_base=http://127.0.0.1:$API_PORT
 MAIN_DID=+15551000
-# The api runs behind Caddy, which sets `X-Forwarded-For`; adapter-node is configured to require
-# it (`ADDRESS_HEADER`). Driving the api directly means supplying it, exactly as the proxy does.
-FWD=(-H 'X-Forwarded-For: 127.0.0.1')
+# shellcheck source=../api.sh
+. "$here/../api.sh"
 
 cd "$repo/deploy"
 compose_files=(-f compose.yaml -f compose.ports.yaml -f "$here/compose.test.yaml")
@@ -116,18 +115,6 @@ OWNER_EMAIL='owner@ci.test'
 # shellcheck source=upgrade.sh
 . "$here/upgrade.sh"
 
-api() {
-  local method=$1 path=$2 body=${3:-}
-  if [ -n "$body" ]; then
-    curl -fsS -X "$method" "$API/api/v1$path" "${FWD[@]}" \
-      -H "Authorization: Bearer $token" \
-      -H 'Content-Type: application/json' \
-      -d "$body"
-  else
-    curl -fsS -X "$method" "$API/api/v1$path" "${FWD[@]}" -H "Authorization: Bearer $token"
-  fi
-}
-
 reused=false
 if [ "${REUSE:-0}" = "1" ]; then
   if stack_is_up; then
@@ -144,7 +131,7 @@ name_selected runtime-asserts && step_runtime_asserts
 name_selected prompts && step_prompts
 
 echo '== obtaining a bootstrap token =='
-token=$(bash "$here/bootstrap-token.sh" "$API" "$OWNER_EMAIL" "$OWNER_PASSWORD" "https://$FQDN") \
+token=$(bash "$here/bootstrap-token.sh" "$api_base" "$OWNER_EMAIL" "$OWNER_PASSWORD" "https://$FQDN") \
   || fail "could not obtain an access token through the authorization-code flow"
 [ -n "$token" ] || fail "the token endpoint returned nothing"
 

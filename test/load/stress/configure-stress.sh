@@ -23,23 +23,8 @@ count=$4
 out_dir=$5
 provider_ip=${6:-}
 
-api() {
-  local method=$1 path=$2 body=${3:-}
-  local args=(-sS --fail-with-body -X "$method" "$api_base/api/v1$path" -H 'X-Forwarded-For: 127.0.0.1'
-    -H "Authorization: Bearer $token")
-  [ -n "$body" ] && args+=(-H 'Content-Type: application/json' -d "$body")
-  curl "${args[@]}" || { echo " <- $method $path failed" >&2; return 1; }
-}
-
-jsonfield() {
-  python3 -c '
-import json, sys
-value = json.load(sys.stdin)
-for step in sys.argv[1].split("."):
-    value = value[int(step)] if step.isdigit() else value[step]
-print(value)
-' "$1"
-}
+# shellcheck source=../../api.sh
+. "$(dirname "$0")/../../api.sh"
 
 api PATCH /settings '{"codecs":["opus"]}' >/dev/null
 

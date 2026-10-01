@@ -3,7 +3,7 @@
 # scenario it expects (`scenario-roles.sh`), and checks after each one that Asterisk holds no channel any more, that
 # every sipp run the scenario started ended with its calls and, where the scenario has a
 # `<name>.check.sh`, that the history records what the spec says the call leaves behind. Reads
-# `run.sh`'s own `COMPOSE`, `compose_files`, `compose_cmd`, `here`, `API`, `token`, `GROUP_EXT`,
+# `run.sh`'s own `COMPOSE`, `compose_files`, `compose_cmd`, `here`, `api_base`, `token`, `GROUP_EXT`,
 # `SIP_USERNAME`, `SIP_PASSWORD`, `MAIN_DID` and `fail`, and `only.sh`'s `name_selected`.
 #
 # A scenario's setup, check and teardown are called with the api base and the token, then (after
@@ -154,7 +154,7 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
   # a colleague's device rather than the answering one.
   phone_account="$SIP_USERNAME $SIP_PASSWORD"
   if [ -f "$setup" ]; then
-    account=$(bash "$setup" "$API" "$token" "$GROUP_EXT" "$compose_cmd") \
+    account=$(bash "$setup" "$api_base" "$token" "$GROUP_EXT" "$compose_cmd") \
       || fail "the setup for $name failed"
     phone_account=${account:-$phone_account}
   fi
@@ -170,7 +170,7 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
   # The second provider's own port 5060 belongs to its registrar, where a scenario runs one.
   [ "$caller" = sipp ] || caller_port=$CALLER_PORT
   if [ "$scenario" = "$here/scenarios/$name.call.sh" ]; then
-    bash "$scenario" "$API" "$token" "$compose_cmd" || fail "the API call of $name did not complete"
+    bash "$scenario" "$api_base" "$token" "$compose_cmd" || fail "the API call of $name did not complete"
   else
     # shellcheck disable=SC2046 # the extra arguments are separate words by design
     $COMPOSE "${compose_files[@]}" exec -T "$caller" \
@@ -186,9 +186,9 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
   finish_sipp_runs "$name"
   check="$here/scenarios/$name.check.sh"
   if [ -f "$check" ]; then
-    bash "$check" "$API" "$token" "$compose_cmd" || fail "the history check for $name failed"
+    bash "$check" "$api_base" "$token" "$compose_cmd" || fail "the history check for $name failed"
   fi
   if [ -f "$teardown" ]; then
-    bash "$teardown" "$API" "$token" "$compose_cmd" || fail "the teardown for $name failed"
+    bash "$teardown" "$api_base" "$token" "$compose_cmd" || fail "the teardown for $name failed"
   fi
 done

@@ -4,9 +4,8 @@ set -euo pipefail
 
 api_base=$1
 token=$2
+# shellcheck source=_lib.sh
+. "$(dirname "$0")/_lib.sh"
 
-user_id=$(cat /tmp/zamfono-forward-user)
-curl -fsS -X PUT "$api_base/api/v1/users/$user_id/forwarding" \
-  -H 'X-Forwarded-For: 127.0.0.1' -H "Authorization: Bearer $token" \
-  -H 'Content-Type: application/json' -d '{"rules":[]}' >/dev/null
+api PUT "/users/$(cat /tmp/zamfono-forward-user)/forwarding" '{"rules":[]}' >/dev/null
 rm -f /tmp/zamfono-forward-user

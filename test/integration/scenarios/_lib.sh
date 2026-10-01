@@ -1,33 +1,9 @@
-# Sourced by the scenarios' setup, check and teardown scripts: the REST calls they make, as the
-# harness's own `configure.sh` makes them. Reads `api_base` and `token`, and `compose` where a
-# script drives a container.
+# Sourced by the scenarios' setup, check and teardown scripts: the REST calls they make
+# (test/api.sh) and the tenant state they share. Reads `api_base` and `token`, and `compose` where
+# a script drives a container.
 
-api() {
-  local method=$1 path=$2 body=${3:-}
-  if [ -n "$body" ]; then
-    curl -fsS -X "$method" "$api_base/api/v1$path" -H 'X-Forwarded-For: 127.0.0.1' \
-      -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$body"
-  else
-    curl -fsS -X "$method" "$api_base/api/v1$path" -H 'X-Forwarded-For: 127.0.0.1' \
-      -H "Authorization: Bearer $token"
-  fi
-}
-
-# A delete asks for confirmation (§10.3), which the REST body gives as `confirm`.
-api_delete() {
-  api DELETE "$1" '{"confirm":true}' >/dev/null
-}
-
-# One field out of a JSON object on stdin, by a dotted path (`user.id`, `items.0.id`).
-jsonfield() {
-  python3 -c '
-import json, sys
-value = json.load(sys.stdin)
-for step in sys.argv[1].split("."):
-    value = value[int(step)] if step.isdigit() else value[step]
-print(value)
-' "$1"
-}
+# shellcheck source=../../api.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../../api.sh"
 
 # The id of the live user holding extension `$1`.
 user_with_ext() {

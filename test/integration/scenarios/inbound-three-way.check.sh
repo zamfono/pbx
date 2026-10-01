@@ -6,9 +6,10 @@ set -euo pipefail
 
 api_base=$1
 token=$2
+# shellcheck source=_lib.sh
+. "$(dirname "$0")/_lib.sh"
 
-curl -fsS "$api_base/api/v1/calls" -H 'X-Forwarded-For: 127.0.0.1' \
-  -H "Authorization: Bearer $token" | python3 -c '
+api GET /calls | python3 -c '
 import json, sys
 calls = json.load(sys.stdin)["items"]
 # Newest first: the most recent child is the one this scenario made.

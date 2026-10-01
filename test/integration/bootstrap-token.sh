@@ -10,9 +10,8 @@ api=$1
 email=$2
 password=$3
 origin=${4:-}
-# The api runs behind Caddy: adapter-node requires the `X-Forwarded-For` the proxy sets
-# (`ADDRESS_HEADER`). Driving the api directly means presenting it, exactly as the proxy does.
-FWD=(-H 'X-Forwarded-For: 127.0.0.1')
+# shellcheck source=../api.sh
+. "$(dirname "$0")/../api.sh"
 
 # SvelteKit negotiates a page POST's response from `Accept`, and answers JSON for a request that
 # accepts anything. The login page's steps are browser-served (§5.2), so these requests ask for
@@ -29,11 +28,6 @@ fi
 jar=$(mktemp)
 trap 'rm -f "$jar"' EXIT
 COOKIES=(-c "$jar" -b "$jar")
-
-jsonf() {
-  # One JSON string field, without assuming `jq` is on the runner.
-  python3 -c "import json,sys; print(json.load(sys.stdin).get('$1',''))"
-}
 
 form_action() {
   # The `action` of the page's own form. Each step of §5.2's login page is a remote `form`, whose
@@ -58,7 +52,7 @@ redirect_uri='http://127.0.0.1:0/callback'
 client_id=$(curl -fsS -X POST "$api/oauth/register" "${FWD[@]}" \
   -H 'Content-Type: application/json' \
   -d "{\"client_name\":\"ci\",\"redirect_uris\":[\"$redirect_uri\"],\"application_type\":\"native\"}" \
-  | jsonf client_id)
+  | jsonfield client_id)
 [ -n "$client_id" ] || { echo 'registration returned no client_id' >&2; exit 1; }
 
 login_action=$(curl -fsS "${FWD[@]}" "${PAGE[@]}" "${COOKIES[@]}" --get \
@@ -106,4 +100,4 @@ curl -fsS -X POST "$api/oauth/token" "${FWD[@]}" \
   --data-urlencode "code_verifier=$verifier" \
   --data-urlencode "client_id=$client_id" \
   --data-urlencode "redirect_uri=$redirect_uri" \
-  | jsonf access_token
+  | jsonfield access_token
