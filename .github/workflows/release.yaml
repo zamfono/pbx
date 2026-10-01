@@ -55,13 +55,14 @@ jobs:
             exit 1
           fi
           echo "short=${commit::7}" >>"$GITHUB_OUTPUT"
+      # crane, logged in to ghcr.io with this job's token.
+      - uses: imjasonh/setup-crane@feee3b6bb0d4c68370f256a4502498c9227e5c6b # v0.7
+        with:
+          version: v0.22.1
       - name: Add the release tags to main's build of that commit
         env:
-          REGISTRY_URL: https://ghcr.io
-          NAMESPACE: zamfono
+          REPOSITORY: ghcr.io/zamfono
           IMAGES: asterisk migrate core api proxy updater
-          REGISTRY_USER: ${{ github.actor }}
-          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
           # A commit pushed together with its tag is still in main's CI when this starts.
           WAIT_TIMEOUT: 2700
           WAIT_INTERVAL: 30
