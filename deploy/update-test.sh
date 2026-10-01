@@ -122,15 +122,16 @@ podman_update() {
     ZAMFONO_UNIT_DIR="$work/units" ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh "$@" </dev/null)
 }
 
+# The release the stack's VERSION names, then the one compose.yaml's defaults pin.
 pin() {
-  grep -oE 'ZAMFONO_VERSION:-[0-9.]+' "$work/stack/compose.yaml" | sort -u
+  echo "$(<"$work/stack/VERSION") $(grep -oE 'ZAMFONO_VERSION:-[0-9.]+' "$work/stack/compose.yaml" | sort -u)"
 }
 
 echo "  - to a newer release"
 fresh_stack
 key=$(grep '^SECRETBOX_KEY=' "$work/stack/.env")
 update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update to 1.2.4 failed"; }
-[[ $(pin) == 'ZAMFONO_VERSION:-1.2.4' ]] || fail "compose.yaml pins $(pin), not 1.2.4"
+[[ $(pin) == '1.2.4 ZAMFONO_VERSION:-1.2.4' ]] || fail "the stack pins $(pin), not 1.2.4"
 [[ $(grep '^SECRETBOX_KEY=' "$work/stack/.env") == "$key" ]] || fail "the update changed SECRETBOX_KEY"
 grep -qE "^BACKUP_PASSWORD='[0-9a-f]{48}'$" "$work/stack/.env" || fail "no BACKUP_PASSWORD added"
 grep -qE "^UPDATER_TOKEN='[0-9a-f]{48}'$" "$work/stack/.env" || fail "no UPDATER_TOKEN added"
@@ -145,6 +146,14 @@ grep -q 'Updated 1.2.3 -> 1.2.4' "$work/out" || fail "no report of the update"
 echo "  - recorded in .update/state.json: running while it runs, then succeeded"
 record_is "$work/runtime.log.state" running 1.2.3 1.2.4
 record_is "$work/stack/.update/state.json" succeeded 1.2.3 1.2.4
+
+echo "  - from a bundle without VERSION: the release compose.yaml pins"
+fresh_stack
+rm "$work/stack/VERSION"
+[[ $(update --check 1.2.4) == '1.2.3 -> 1.2.4 (update)' ]] ||
+  fail "a stack without VERSION was not read as 1.2.3"
+update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update without VERSION failed"; }
+[[ $(pin) == '1.2.4 ZAMFONO_VERSION:-1.2.4' ]] || fail "the stack pins $(pin), not 1.2.4"
 
 echo "  - on Podman without a boot unit"
 fresh_stack
@@ -209,7 +218,7 @@ echo "  - a pull that fails changes nothing"
 fresh_stack
 STUB_FAIL_PULL=1 update 1.2.4 >"$work/out" 2>&1 && fail "an update whose pull failed went on"
 grep -q 'nothing was changed' "$work/out" || fail "no word of the failed pull: $(cat "$work/out")"
-[[ $(pin) == 'ZAMFONO_VERSION:-1.2.3' ]] || fail "a failed pull left compose.yaml at $(pin)"
+[[ $(pin) == '1.2.3 ZAMFONO_VERSION:-1.2.3' ]] || fail "a failed pull left the stack at $(pin)"
 grep -q 'up -d' "$work/runtime.log" && fail "a failed pull still recreated the stack"
 record_is "$work/stack/.update/state.json" failed 1.2.3 1.2.4 'pulling the 1.2.4 images failed'
 
@@ -227,7 +236,7 @@ echo "  - a bundle that does not match SHA256SUMS"
 fresh_stack
 update 1.2.5 >"$work/out" 2>&1 && fail "a mismatching bundle was installed"
 grep -q 'does not match' "$work/out" || fail "no word of the mismatch: $(cat "$work/out")"
-[[ $(pin) == 'ZAMFONO_VERSION:-1.2.3' ]] || fail "a mismatching bundle changed compose.yaml"
+[[ $(pin) == '1.2.3 ZAMFONO_VERSION:-1.2.3' ]] || fail "a mismatching bundle changed the stack's release"
 
 echo "  - the policy of update-policy.tsv, which the updater's judgeUpdate is tested against too"
 fresh_stack
@@ -262,7 +271,7 @@ echo "  - a breaking release needs --yes without a terminal"
 update 2.0.0 >"$work/out" 2>&1 && fail "a breaking update ran without --yes"
 grep -q 'needs --yes' "$work/out" || fail "no word of --yes: $(cat "$work/out")"
 update --yes 2.0.0 >/dev/null 2>&1 || fail "the breaking update with --yes failed"
-[[ $(pin) == 'ZAMFONO_VERSION:-2.0.0' ]] || fail "compose.yaml pins $(pin), not 2.0.0"
+[[ $(pin) == '2.0.0 ZAMFONO_VERSION:-2.0.0' ]] || fail "the stack pins $(pin), not 2.0.0"
 
 echo "  - the updater's run: never breaking, never itself"
 fresh_stack

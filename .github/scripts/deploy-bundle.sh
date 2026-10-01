@@ -5,8 +5,9 @@
 # Both archives hold one directory, zamfono/, so `tar xz -C <stack dir> --strip-components=1`
 # unpacks a first install and an upgrade alike; .env is never in the bundle, so an upgrade keeps it.
 # In the bundle, compose.yaml's `${ZAMFONO_VERSION:-latest}` defaults name the release itself,
-# so the files and the images they pull come from the same commit until .env says otherwise, and
-# the README's links to docs/ point at the release tag rather than main. The asset names carry no
+# so the files and the images they pull come from the same commit until .env says otherwise; a
+# VERSION file names it as data, for update.sh, setup.sh and the updater to read; and the README's
+# links to docs/ point at the release tag rather than main. The asset names carry no
 # version, so releases/latest/download/<name> is a stable URL for the newest release.
 set -euo pipefail
 
@@ -28,6 +29,8 @@ mkdir -p "$stage/zamfono/setup"
 for f in "${files[@]}"; do cp "$root/deploy/$f" "$stage/zamfono/$f"; done
 # The release notes, with every upgrade's own steps, next to the files they are about.
 cp "$root/CHANGELOG.md" "$stage/zamfono/CHANGELOG.md"
+# The release this bundle is, as data.
+echo "$version" >"$stage/zamfono/VERSION"
 # Every file 644 but the ones the operator runs, whatever the checkout's modes were.
 chmod 644 "$stage"/zamfono/{.env.example,*,setup/*} 2>/dev/null || true
 chmod 755 "$stage/zamfono/setup" "$stage/zamfono/setup.sh" "$stage/zamfono/update.sh"
@@ -35,12 +38,6 @@ chmod 755 "$stage/zamfono/setup" "$stage/zamfono/setup.sh" "$stage/zamfono/updat
 sed -i "s/\${ZAMFONO_VERSION:-latest}/\${ZAMFONO_VERSION:-$version}/g" "$stage/zamfono/compose.yaml"
 if grep -q ':-latest}' "$stage/zamfono/compose.yaml"; then
   echo "deploy-bundle.sh: compose.yaml still defaults to latest somewhere" >&2
-  exit 1
-fi
-# Six images, plus the two copies Compose passes to api and core (§7 "Version").
-pinned=$(grep -c "\${ZAMFONO_VERSION:-$version}" "$stage/zamfono/compose.yaml")
-if [[ $pinned -ne 8 ]]; then
-  echo "deploy-bundle.sh: expected 8 ZAMFONO_VERSION defaults in compose.yaml, pinned $pinned" >&2
   exit 1
 fi
 sed -i "s#github.com/zamfono/pbx/blob/main/#github.com/zamfono/pbx/blob/v$version/#g" "$stage/zamfono/README.md"

@@ -119,6 +119,12 @@ why the specified behaviour changed; the commit history, how.
 - `core` logs an error, with the method and path, when its internal API fails to serve a request
   `api` made (which `api` sees as a 503), and a warning when its internal event stream fails;
   neither left a trace before.
+- The release bundle carries a `VERSION` file naming its release. `update.sh`, `setup.sh` and
+  the `updater` service read the release a stack runs from it, unless `.env` sets
+  `ZAMFONO_VERSION`; `update.sh` still reads a stack unpacked from an older bundle, which has no
+  `VERSION`, from `compose.yaml`. Where `.env` sets `ZAMFONO_VERSION` more than once, the updater
+  now takes the last line, as Compose and `update.sh` do, and answers with an error for an
+  `.env` it cannot read instead of taking it for one that sets nothing.
 
 ### Fixed
 

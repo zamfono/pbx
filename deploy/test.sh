@@ -38,6 +38,7 @@ bash "$repo_root/.github/scripts/deploy-bundle.sh" 1.2.3 "$bundle_dir"
 (cd "$bundle_dir" && sha256sum -c --quiet SHA256SUMS)
 mkdir "$bundle_dir/x"
 tar -xzf "$bundle_dir/zamfono-deploy.tar.gz" -C "$bundle_dir/x" --strip-components=1
+[ "$(cat "$bundle_dir/x/VERSION")" = 1.2.3 ]
 # ZAMFONO_VERSION empty, as .env.example leaves it: every image is the bundle's own release.
 bundle_images=$(cd "$bundle_dir/x" && ZAMFONO_VERSION='' docker compose --env-file "$env_file" \
   -f compose.yaml -f compose.ports.yaml config --images)

@@ -26,6 +26,7 @@ detect_runtime() {
   for candidate in ${ZAMFONO_RUNTIME:-docker podman}; do
     if command -v "$candidate" >/dev/null 2>&1 && "$candidate" compose version >/dev/null 2>&1; then
       runtime=$candidate
+      # shellcheck disable=SC2034 # read by setup.sh and update.sh
       compose=("$candidate" compose)
       return 0
     fi
@@ -90,12 +91,12 @@ check_public_network() {
   fi
 }
 
-# The api image's default tag, as this directory's compose.yaml names it: the release itself in
-# a release bundle, `latest` in the repository.
+# The api image's default tag: the release a bundle's VERSION names, `latest` in the repository,
+# which has no VERSION.
 api_image() {
-  local tag
-  tag=$(sed -nE 's#.*image: ghcr\.io/zamfono/api:\$\{ZAMFONO_VERSION:-([^}]+)\}.*#\1#p' compose.yaml)
-  echo "${ZAMFONO_API_IMAGE:-ghcr.io/zamfono/api:${ZAMFONO_VERSION:-${tag:-latest}}}"
+  local tag=latest
+  [[ ! -f VERSION ]] || tag=$(<VERSION)
+  echo "${ZAMFONO_API_IMAGE:-ghcr.io/zamfono/api:${ZAMFONO_VERSION:-$tag}}"
 }
 
 # hash_password PASSWORD — the Argon2id hash from the api image's own generator (§6.3 "First

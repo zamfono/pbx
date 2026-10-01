@@ -69,16 +69,20 @@ on_exit() {
 }
 trap on_exit EXIT
 
-# The release this directory runs: .env's ZAMFONO_VERSION when set, else the bundle's own pin.
+# The release this directory runs: .env's ZAMFONO_VERSION when set, else the bundle's VERSION.
+# A bundle without a VERSION file (0.1.0's and older) names its release only in compose.yaml's
+# `${ZAMFONO_VERSION:-X.Y.Z}` defaults, which are read instead.
 current_version() {
   local pinned
   pinned=$(sed -nE 's/^ZAMFONO_VERSION=["'\'']?([0-9]+\.[0-9]+\.[0-9]+)["'\'']?$/\1/p' .env | tail -n1)
+  [[ -n $pinned || ! -f VERSION ]] || pinned=$(<VERSION)
   if [[ -z $pinned ]]; then
     pinned=$(grep -oE '\$\{ZAMFONO_VERSION:-[0-9]+\.[0-9]+\.[0-9]+\}' compose.yaml | head -n1 |
       sed -E 's/.*:-(.*)\}/\1/')
   fi
-  [[ -n $pinned ]] || fail "cannot tell which release runs here: compose.yaml pins none and .env" \
-    "sets no ZAMFONO_VERSION (a stack from before 0.0.2 upgrades by hand once, README.md step 8)"
+  [[ -n $pinned ]] || fail "cannot tell which release runs here: there is no VERSION, compose.yaml" \
+    "pins none and .env sets no ZAMFONO_VERSION (a stack from before 0.0.2 upgrades by hand once," \
+    "README.md step 8)"
   echo "$pinned"
 }
 

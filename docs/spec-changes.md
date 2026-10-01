@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-01 · §6.3 Images.** The release bundle carries a `VERSION` file naming its release, which `update.sh`, `setup.sh` and the updater read the release a stack directory runs from, unless `.env` sets `ZAMFONO_VERSION`; `compose.yaml`'s pinned defaults stay, since they are what Compose pulls and reports.
+*Why:* requested by the product owner: the release was written into `compose.yaml` and parsed back out of it in three places, which disagreed.
+
 **2026-10-01 · §10.2 Call parking, §10.3 Live calls.** The call of a party added to another (§10.2 "Three-way calls") is not parked: `POST /calls/{id}/park` on it answers 409 `notBridged`, as a transfer, consultation or hold of it does, and `*70` from it is released.
 *Why:* requested by the product owner: park was the one action that took the shared bridge's other party out of the call that added a party, while transfer, consult and hold refuse that call as not bridged.
 
