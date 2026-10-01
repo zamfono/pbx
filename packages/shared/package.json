@@ -8,7 +8,11 @@
     "test": "vitest run"
   },
   "exports": {
-    ".": "./src/index.ts",
+    ".": {
+      "types": "./src/index.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
     "./testDb.js": "./src/testDb.ts"
   },
   "types": "./src/index.ts",

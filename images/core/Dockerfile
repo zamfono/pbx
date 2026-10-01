@@ -14,19 +14,8 @@ COPY packages packages
 RUN npm ci
 # No per-package "build" script exists for @zamfono/shared or @zamfono/core: `tsc -b` on core's
 # project reference also builds shared, emitting packages/core/dist/main.js and
-# packages/shared/dist/*.js.
+# packages/shared/dist/*.js, the output shared's manifest exports by default.
 RUN npx tsc -b packages/core
-# packages/shared's package.json points "exports"/"types" at its TypeScript source for `npm run
-# dev`/`vitest`, which run it through a bundler or loader that rewrites the internal "./db.js"
-# specifiers to "./db.ts"; plain `node` does not, so the runtime image below ships the compiled
-# dist output instead and repoints exports/types at it here, image-local only.
-RUN node -e "\
-	const fs = require('node:fs'); \
-	const file = 'packages/shared/package.json'; \
-	const pkg = JSON.parse(fs.readFileSync(file, 'utf8')); \
-	pkg.exports['.'] = './dist/index.js'; \
-	pkg.types = './dist/index.d.ts'; \
-	fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + '\n');"
 # The compile is done: the development dependencies (the TypeScript and test toolchain, the
 # linters, the SvelteKit build tooling) leave node_modules before the runtime stage copies it.
 # Without its lifecycle scripts: api's `prepare` runs `svelte-kit sync`, which the prune has just

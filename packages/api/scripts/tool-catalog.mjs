@@ -113,6 +113,8 @@ await build({
   bundle: true,
   platform: 'node',
   format: 'esm',
+  // @zamfono/shared's source, as `vite dev` and vitest resolve it, not its build output.
+  conditions: ['development'],
   plugins: [externalizeNpmPackages],
   alias: { $lib: libDir, '$env/dynamic/private': envShim },
   inject: [globShim],

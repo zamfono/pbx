@@ -14,22 +14,10 @@ COPY package.json package-lock.json tsconfig.base.json tsconfig.json ./
 COPY packages packages
 RUN npm ci
 # packages/shared has no build step of its own; its tsconfig still builds standalone via project
-# references, emitting packages/shared/dist/*.js.
+# references, emitting packages/shared/dist/*.js. Its manifest's default export is that output,
+# which plain `node` loads and Vite's production build resolves; the `development` condition that
+# `vite dev` and `vitest` set picks its TypeScript source instead.
 RUN npx tsc -b packages/shared
-# packages/shared's package.json points "exports"/"types" at its TypeScript source for `npm run
-# dev`/`vitest`, which run it through a bundler or loader that rewrites the internal "./db.js"
-# specifiers to "./db.ts"; plain `node` does not, so the runtime image below ships the compiled
-# dist output instead and repoints exports/types at it here, image-local only. Doing this before
-# the SvelteKit build lets Vite's SSR bundle (which externalizes workspace dependencies found in
-# node_modules rather than inlining them) resolve @zamfono/shared the same way at both build and
-# run time.
-RUN node -e "\
-	const fs = require('node:fs'); \
-	const file = 'packages/shared/package.json'; \
-	const pkg = JSON.parse(fs.readFileSync(file, 'utf8')); \
-	pkg.exports['.'] = './dist/index.js'; \
-	pkg.types = './dist/index.d.ts'; \
-	fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + '\n');"
 # The admin guide that `zamfono.help` serves is bundled into the server chunk at build time by an
 # `import.meta.glob` over `docs/guide/**/*.md` (§10.5), so those files are inputs to the build.
 COPY docs/guide docs/guide
