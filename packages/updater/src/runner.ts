@@ -4,28 +4,9 @@ import { readFileSync } from 'node:fs';
 import { mkdir, open, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import type { RunRequester, UpdateState } from '@zamfono/shared';
+
 import type { ComposeProject } from './docker.js';
-
-/**
- * One update at a time, run by the stack's own `update.sh` (§6.3 "Updates"), and its outcome
- * kept in the stack directory's `.update/`, so it outlives the updater and `system.info` reports
- * the last one after a restart. `update.sh` run on the host writes the same record of its own run.
- */
-export type UpdateState = {
-  state: 'idle' | 'running' | 'succeeded' | 'failed';
-  from?: string;
-  to?: string;
-  /** Who asked: an owner through `system.update` (`by` names them), the automatic update, or
-   * `update.sh` run on the host. Absent from a record written before it was kept. */
-  trigger?: 'manual' | 'automatic' | 'host';
-  by?: string;
-  startedAt?: string;
-  finishedAt?: string;
-  error?: string;
-};
-
-/** Who asks the updater for a run: `api`, for an owner or for its automatic update. */
-export type RunRequester = { trigger: 'manual' | 'automatic'; by?: string };
 
 const LOG_TAIL_LINES = 20;
 const JSON_INDENT = 2;
@@ -35,6 +16,11 @@ const JSON_INDENT = 2;
  */
 export const HOST_RUN_STALE_MS = 3_600_000;
 
+/**
+ * One update at a time, run by the stack's own `update.sh` (§6.3 "Updates"), and its outcome
+ * kept in the stack directory's `.update/`, so it outlives the updater and `system.info` reports
+ * the last one after a restart. `update.sh` run on the host writes the same record of its own run.
+ */
 export type Runner = {
   /** The updater's own run while it runs, else `.update/state.json` as it is now. */
   current: () => UpdateState;

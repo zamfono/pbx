@@ -1,6 +1,8 @@
 import { timingSafeEqual } from 'node:crypto';
 import http from 'node:http';
 
+import type { RunRequester, UpdaterStatus, UpdateState } from '@zamfono/shared';
+
 import {
   compareVersions,
   formatVersion,
@@ -10,7 +12,7 @@ import {
   type Version
 } from './policy.js';
 import type { Releases } from './releases.js';
-import type { Runner, RunRequester, UpdateState } from './runner.js';
+import type { Runner } from './runner.js';
 
 /**
  * The updater's HTTP API on the stack's internal network (§6.3 "Updates"), no port published:
@@ -25,20 +27,6 @@ const STATUS_CONFLICT = 409;
 const STATUS_UNAVAILABLE = 503;
 const MAX_BODY_BYTES = 4096;
 const MAX_BY_LENGTH = 200;
-
-export type Status = {
-  current: string | null;
-  latest: { version: string; url: string; publishedAt: string } | null;
-  /** Why `latest` is null when GitHub could not be asked. */
-  latestError?: string;
-  /** Whether `latest` is newer than `current` and non-breaking: what `POST /update` takes. */
-  updatable: boolean;
-  /** Whether `latest` is newer and breaking: `update.sh` on the host takes it. */
-  breaking: boolean;
-  last: UpdateState;
-  /** Why the updater cannot update at all, such as a container without Compose labels. */
-  unavailable?: string;
-};
 
 export type ServerDeps = {
   token: string;
@@ -87,7 +75,7 @@ async function readBody(request: http.IncomingMessage): Promise<unknown> {
   }
 }
 
-async function describeStatus(deps: ServerDeps): Promise<Status> {
+async function describeStatus(deps: ServerDeps): Promise<UpdaterStatus> {
   const current = await deps.currentVersion();
   const base = {
     current: current === undefined ? null : formatVersion(current),

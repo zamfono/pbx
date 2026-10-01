@@ -1,14 +1,9 @@
-import type { Db } from '@zamfono/shared';
+import type { Db, RunRequester, UpdateState } from '@zamfono/shared';
 
 import { errorMessage } from '$lib/server/errors.js';
 
 import { OpError } from '../types.js';
-import {
-  updaterClient,
-  UpdaterRefusal,
-  type RunRequester,
-  type UpdateState
-} from './_updater.js';
+import { updaterClient, UpdaterRefusal } from './_updater.js';
 
 const STATUS_BAD_REQUEST = 400;
 const STATUS_NOT_FOUND = 404;

@@ -4,7 +4,7 @@
  * and `system.info`, the last attempt a release gets in a mail to the owners, and a breaking
  * release for `/healthz` and in one mail to the owners per release.
  */
-import type { Db } from '@zamfono/shared';
+import type { Db, UpdaterStatus } from '@zamfono/shared';
 
 import { mailOwners, type SendUpdateMail } from '../mail/owners.js';
 import {
@@ -19,7 +19,6 @@ import {
   setAutoUpdateFailure,
   type UpdateStateRow
 } from '../ops/system/_state.js';
-import type { UpdaterStatus } from '../ops/system/_updater.js';
 
 export type ReportDeps = { db: Db; send: SendUpdateMail; now?: () => Date };
 

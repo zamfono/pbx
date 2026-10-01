@@ -1,9 +1,10 @@
 import { z } from 'zod';
 
+import type { UpdateState } from '@zamfono/shared';
+
 import { setUndoable } from '../runner.js';
 import { defineOperation } from '../types.js';
 import { requestUpdate } from './_request.js';
-import type { UpdateState } from './_updater.js';
 
 const inputSchema = z
   .object({

@@ -11,6 +11,7 @@ export * from './trunks.js';
 export * from './sipHeaders.js';
 export * from './events.js';
 export * from './internalApi.js';
+export * from './updaterApi.js';
 export * from './mwiMailbox.js';
 export * from './asteriskNames.js';
 export * from './repeat.js';

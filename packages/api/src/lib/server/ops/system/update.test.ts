@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { newId, type Db } from '@zamfono/shared';
+import { newId, type Db, type UpdateState } from '@zamfono/shared';
 
 import { makeTestDb } from '$lib/server/testDb.js';
 
@@ -12,8 +12,7 @@ import '../index.js';
 import {
   setUpdaterClient,
   UpdaterRefusal,
-  type UpdaterClient,
-  type UpdateState
+  type UpdaterClient
 } from './_updater.js';
 
 const asOwner: RunInput = {

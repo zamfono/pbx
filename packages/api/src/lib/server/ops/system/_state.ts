@@ -1,12 +1,8 @@
 import type { Selectable } from 'kysely';
 
-import type { Db, DB } from '@zamfono/shared';
+import type { Db, DB, UpdaterStatus, UpdateState } from '@zamfono/shared';
 
-import {
-  updaterClient,
-  type UpdaterStatus,
-  type UpdateState
-} from './_updater.js';
+import { updaterClient } from './_updater.js';
 
 /**
  * `update_state` (§11.2), the one row of what `api` knows about updates beyond the updater's own

@@ -1,9 +1,11 @@
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import type { UpdateState } from '@zamfono/shared';
+
 import type { Version } from './policy.js';
 import type { Release, Releases } from './releases.js';
-import type { Runner, UpdateState } from './runner.js';
+import type { Runner } from './runner.js';
 import { createServer, type ServerDeps } from './server.js';
 
 const TOKEN = 'secret-token';

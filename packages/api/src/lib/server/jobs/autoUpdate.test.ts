@@ -1,7 +1,15 @@
 import { sql } from 'kysely';
 import { describe, expect, it } from 'vitest';
 
-import { MS_PER_DAY, newId, nowIso, type Db } from '@zamfono/shared';
+import {
+  MS_PER_DAY,
+  newId,
+  nowIso,
+  type Db,
+  type RunRequester,
+  type UpdaterStatus,
+  type UpdateState
+} from '@zamfono/shared';
 
 import type { UpdateMailRequest } from '../mail/send.js';
 import type { BackupRunRow } from '../ops/backups/_shared.js';
@@ -13,10 +21,7 @@ import {
 import {
   setUpdaterClient,
   UpdaterRefusal,
-  type RunRequester,
-  type UpdaterClient,
-  type UpdaterStatus,
-  type UpdateState
+  type UpdaterClient
 } from '../ops/system/_updater.js';
 import { makeTestDb } from '../testDb.js';
 import {

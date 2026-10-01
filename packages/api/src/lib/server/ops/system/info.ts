@@ -7,6 +7,7 @@ import {
   resolveVersion,
   type CoreVersionResponse,
   type Db,
+  type UpdaterStatus,
   type ZamfonoVersion
 } from '@zamfono/shared';
 
@@ -27,7 +28,7 @@ import {
   loadUpdateState,
   type AutoUpdateFailure
 } from './_state.js';
-import { updaterClient, type UpdaterStatus } from './_updater.js';
+import { updaterClient } from './_updater.js';
 
 // When this process started, however late this module loads, so a restart is visible (§10.3).
 const apiStartedAt = new Date(

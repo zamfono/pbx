@@ -12,7 +12,12 @@
  */
 import pino from 'pino';
 
-import { MINUTES_PER_HOUR, nowIso, type Db } from '@zamfono/shared';
+import {
+  MINUTES_PER_HOUR,
+  nowIso,
+  type Db,
+  type UpdaterStatus
+} from '@zamfono/shared';
 
 import { errorMessage } from '$lib/server/errors.js';
 
@@ -26,7 +31,7 @@ import {
   retryHeldOff,
   type UpdateStateRow
 } from '../ops/system/_state.js';
-import type { UpdaterClient, UpdaterStatus } from '../ops/system/_updater.js';
+import type { UpdaterClient } from '../ops/system/_updater.js';
 import { OpError } from '../ops/types.js';
 import {
   announceBreaking,

@@ -1,31 +1,10 @@
-import { env } from '$env/dynamic/private';
-
 /**
  * `api`'s side of the updater service (§6.3 "Updates"): the one process that holds
  * `UPDATER_TOKEN` besides the updater itself, over the stack's internal network.
  */
-export type UpdateState = {
-  state: 'idle' | 'running' | 'succeeded' | 'failed';
-  from?: string;
-  to?: string;
-  /** Who asked for the run, `by` naming the owner of a manual one; absent from an older record. */
-  trigger?: 'manual' | 'automatic' | 'host';
-  by?: string;
-  startedAt?: string;
-  finishedAt?: string;
-  error?: string;
-};
+import { env } from '$env/dynamic/private';
 
-/** The updater's `GET /status`, verbatim. */
-export type UpdaterStatus = {
-  current: string | null;
-  latest: { version: string; url: string; publishedAt: string } | null;
-  latestError?: string;
-  updatable: boolean;
-  breaking: boolean;
-  last: UpdateState;
-  unavailable?: string;
-};
+import type { RunRequester, UpdaterStatus, UpdateState } from '@zamfono/shared';
 
 /** A refusal the updater answered with, its status and message passed on to the caller. */
 export class UpdaterRefusal extends Error {
@@ -36,9 +15,6 @@ export class UpdaterRefusal extends Error {
     super(message);
   }
 }
-
-/** Who asks the updater for a run, which it records with the run. */
-export type RunRequester = { trigger: 'manual' | 'automatic'; by: string };
 
 export type UpdaterClient = {
   status: () => Promise<UpdaterStatus>;
