@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Shared setup of the `inbound-api-*` scenarios (§10.3 "Live calls"): with `<colleague-uas>`, a
 # colleague, 102, with a phone of their own beside 101's (`_lib.sh`'s `add_colleague`) served by
-# that phone scenario; then the call control itself started in the background, waiting for the
-# call (`_api-control.sh <mode>`, given `<user-id>` where the mode takes one).
+# that phone scenario; then the live-call action itself started in the background, waiting for
+# the call (`_api-control.sh <mode>`, given `<user-id>` where the mode takes one).
 #
 # Usage: _api-control-setup.sh <api-base> <token> <compose> <mode> [<colleague-uas> [<user-id>]]
 set -euo pipefail
@@ -18,7 +18,7 @@ here=$(dirname "$0")
 . "$here/_lib.sh"
 
 if [ -n "$uas" ]; then
-  add_colleague 'CI Consulted' api-control@ci.test 102 colleague
+  add_colleague 'CI Colleague' api-control@ci.test 102 colleague
   serve_colleague "$uas" colleague
 fi
 rm -f "$(state_file api-control)"

@@ -7,17 +7,14 @@ set -euo pipefail
 
 api_base=$1
 token=$2
+here=$(dirname "$0")
 # shellcheck source=_lib.sh
-. "$(dirname "$0")/_lib.sh"
+. "$here/_lib.sh"
 
-read -r code call_id < "$(state_file api-deposit)" || true
-if [[ ${code:-none} != 2?? ]]; then
-  echo "the API transfer to voicemail was not accepted (HTTP ${code:-none}):" \
-    "$(cat "$(state_file api-deposit.log)" 2>/dev/null)" >&2
-  exit 1
-fi
+accepted=$(bash "$here/_api-control-check.sh" 1)
+read -r call_id <<<"$accepted"
 parent=$(await_ended_call "$call_id" 15)
-PYTHONPATH="$(dirname "$0")" python3 - "$parent" "$(api GET /calls)" "$(api GET /voicemails)" \
+PYTHONPATH="$here" python3 - "$parent" "$(api GET /calls)" "$(api GET /voicemails)" \
   "$(cat "$(state_file api-deposit-before)")" "$(user_with_ext 101)" <<'PY'
 import json, sys
 from _call_trace import trace

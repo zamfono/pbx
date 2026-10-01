@@ -9,7 +9,8 @@ token=$2
 # shellcheck source=_lib.sh
 . "$(dirname "$0")/_lib.sh"
 
-read -r call_id <<<"$(bash "$(dirname "$0")/_api-control-check.sh" 1)"
+accepted=$(bash "$(dirname "$0")/_api-control-check.sh" 1)
+read -r call_id <<<"$accepted"
 call_file=$(mktemp)
 trap 'rm -f "$call_file"' EXIT
 await_ended_call "$call_id" 15 > "$call_file"

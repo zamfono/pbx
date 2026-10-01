@@ -8,19 +8,16 @@ set -euo pipefail
 
 api_base=$1
 token=$2
+here=$(dirname "$0")
 # shellcheck source=_lib.sh
-. "$(dirname "$0")/_lib.sh"
+. "$here/_lib.sh"
 
-read -r call_id slot originated < "$(state_file api-park)" || true
-if [ -z "${originated:-}" ]; then
-  echo "the API park and retrieval did not complete: $(cat "$(state_file api-park)" 2>/dev/null)" \
-    "$(cat "$(state_file api-park.log)" 2>/dev/null)" >&2
-  exit 1
-fi
+accepted=$(bash "$here/_api-control-check.sh" 2)
+read -r call_id slot originated <<<"$accepted"
 parked=$(await_ended_call "$call_id" 15)
 retrieval=$(await_ended_call "$originated" 15)
-PYTHONPATH="$(dirname "$0")" python3 - "$parked" "$retrieval" "$(cat "$(state_file api-park-list)")" "$slot" \
-  "$(user_with_ext 101)" "$(colleague_id colleague)" <<'PY'
+PYTHONPATH="$here" python3 - "$parked" "$retrieval" "$(cat "$(state_file api-control.parked)")" \
+  "$slot" "$(user_with_ext 101)" "$(colleague_id colleague)" <<'PY'
 import json, sys
 from _call_trace import trace
 

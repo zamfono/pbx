@@ -7,5 +7,5 @@ token=$2
 # shellcheck source=_lib.sh
 . "$(dirname "$0")/_lib.sh"
 
-rm -f "$(state_file api-deposit)" "$(state_file api-deposit-before)" \
-  "$(state_file api-deposit.log)"
+rm -f "$(state_file api-deposit-before)"
+bash "$(dirname "$0")/_api-control-teardown.sh" "$api_base" "$token"

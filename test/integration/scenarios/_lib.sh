@@ -201,22 +201,34 @@ await_trace() {
   printf '%s\n' "$content"
 }
 
-# Waits up to `$1` seconds for a call in progress that a ring group routed and someone answered,
-# and prints its id: the call a scenario's background API action acts on, as a CRM's button acts
-# on the call it shows (`_api-park.sh`, `_api-deposit.sh`).
-await_answered_group_call() {
-  local call_id
-  for _ in $(seq 1 $(($1 * 5))); do
-    call_id=$(api GET '/calls?live=true' 2>/dev/null | python3 -c '
+# Waits up to 30 s for a call in progress in state `$1` (`ringing`, or `up` once answered and
+# bridged) and prints its id: call `$2` itself, else one a ring group routed; with `$3`, only one
+# that user's phone rings or is in. The call a scenario's background API action acts on, as a
+# CRM's button acts on the call it shows (`_api-control.sh`).
+await_live_call() {
+  local id
+  for _ in $(seq 1 150); do
+    id=$(api GET '/calls?live=true' | python3 -c '
 import json, sys
-calls = json.load(sys.stdin)["items"]
-print(next((c["callId"] for c in calls if c["state"] == "up" and c["ringGroupId"]), ""))
-' 2>/dev/null)
-    if [ -n "$call_id" ]; then
-      printf '%s\n' "$call_id"
+state, wanted, user = sys.argv[1:4]
+for call in json.load(sys.stdin)["items"]:
+    if call["state"] != state:
+        continue
+    if wanted and call["callId"] != wanted:
+        continue
+    if not wanted and not call["ringGroupId"]:
+        continue
+    if user and user not in call["userIds"]:
+        continue
+    print(call["callId"])
+    break
+' "$1" "${2:-}" "${3:-}")
+    if [ -n "$id" ]; then
+      printf '%s\n' "$id"
       return 0
     fi
     sleep 0.2
   done
+  echo "no live call in state $1 within 30 s" >&2
   return 1
 }

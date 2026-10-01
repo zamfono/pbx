@@ -9,7 +9,8 @@ token=$2
 # shellcheck source=_lib.sh
 . "$(dirname "$0")/_lib.sh"
 
-read -r call_id added channels <<<"$(bash "$(dirname "$0")/_api-control-check.sh" 1)"
+accepted=$(bash "$(dirname "$0")/_api-control-check.sh" 1)
+read -r call_id added channels <<<"$accepted"
 if [ "${channels:-0}" != 3 ]; then
   echo "the bridge held ${channels:-no} channels once the added party answered, not 3" >&2
   exit 1

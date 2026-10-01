@@ -12,7 +12,8 @@ here=$(dirname "$0")
 # shellcheck source=_lib.sh
 . "$here/_lib.sh"
 
-read -r call_id while_held resumed <<<"$(bash "$here/_api-control-check.sh" 2)"
+accepted=$(bash "$here/_api-control-check.sh" 2)
+read -r call_id while_held resumed <<<"$accepted"
 if [ "${while_held:-}" != 1 ] || [ "${resumed:-}" != 2 ]; then
   echo "the bridge held ${while_held:-?} channels while on hold and ${resumed:-?} once resumed," \
     "not 1 and 2" >&2

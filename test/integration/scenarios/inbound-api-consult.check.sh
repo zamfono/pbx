@@ -10,7 +10,8 @@ token=$2
 # shellcheck source=_lib.sh
 . "$(dirname "$0")/_lib.sh"
 
-read -r call_id consultation <<<"$(bash "$(dirname "$0")/_api-control-check.sh" 2)"
+accepted=$(bash "$(dirname "$0")/_api-control-check.sh" 2)
+read -r call_id consultation <<<"$accepted"
 original_file=$(mktemp)
 consultation_file=$(mktemp)
 trap 'rm -f "$original_file" "$consultation_file"' EXIT

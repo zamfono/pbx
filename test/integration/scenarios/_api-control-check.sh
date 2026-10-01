@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The part of the `inbound-api-*` scenarios' checks they share: the background call control
+# The part of the `inbound-api-*` scenarios' checks they share: the background live-call action
 # (`_api-control.sh`) left its line, whose first `<count>` fields, HTTP statuses, must each be a
 # 2xx. Prints the line's remaining fields for the scenario's own check.
 #
@@ -13,7 +13,7 @@ count=$1
 read -r -a fields < "$(state_file api-control)" || true
 for index in $(seq 0 $((count - 1))); do
   if [[ ${fields[$index]:-none} != 2?? ]]; then
-    echo "the API call control was not accepted (${fields[*]:-nothing}):" \
+    echo "the API live-call action was not accepted (${fields[*]:-nothing}):" \
       "$(cat "$(state_file api-control.log)" 2>/dev/null)" >&2
     exit 1
   fi
