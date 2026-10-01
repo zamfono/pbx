@@ -2,8 +2,8 @@
 # §8 "pickup": a second user, 102, with a device of their own on the phone container's subnet.
 # While the ring group rings 101, 102 dials `*8101` (§9.3) from the phone side. Prints that
 # device's SIP username and password, the account the phone side places the pickup from, and
-# records the user's id for the check and the teardown. The picker's device never registers, so
-# nothing else waits for its endpoint to reach Asterisk before the pickup is dialled from it.
+# records the user's id for the check and the teardown. The picker's device never registers: it
+# dials the pickup with its credentials alone.
 set -euo pipefail
 
 api_base=$1
@@ -30,5 +30,4 @@ import json, sys
 device = json.load(sys.stdin)
 print(device['sipUsername'], device['sipPassword'])
 ")
-await_endpoint "$sip_username"
 printf '%s %s\n' "$sip_username" "$sip_password"

@@ -57,8 +57,6 @@ print(items[0]["id"] if items else "")
 printf '%s %s %s %s\n' "$user_id" "$did_id" "$sip_username" "$sip_password" \
   > "$(state_file tls-srtp)"
 
-await_endpoint "$sip_username"
-
 # Whatever certificate Asterisk currently presents, copied out and back in so baresip can verify
 # the server it dials, the way test/load/stress's session.sh already does for its own devices.
 # On a stack this young that is still the self-signed placeholder (images/asterisk/entrypoint.sh)

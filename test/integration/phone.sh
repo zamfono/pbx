@@ -36,7 +36,6 @@ QUALIFY_ATTEMPTS=20
 # (packages/api/src/lib/server/pjsip), plus a second for the result to reach the contact's status;
 # in microseconds.
 STALE_PROBE_WINDOW_US=4000000
-REGISTER_ATTEMPTS=10
 CALL_ATTEMPTS=90
 MESSAGES=/tmp/phone$SUFFIX-messages.log
 CALL_EXIT=/tmp/phone$SUFFIX-call.exit
@@ -52,24 +51,16 @@ clear_phone_trace() {
   dc exec -T sipp-phone rm -f "$MESSAGES" "$CALL_EXIT"
 }
 
-# One REGISTER exchange, `register.xml` binding the contact or `unregister.xml` removing it.
-# Retried, the way a phone retries: the device's endpoint reaches Asterisk through a config render
-# and a PJSIP reload, and a REGISTER that arrives before that reload lands is answered 401 by the
-# artificial endpoint, with no auth object to match the credentials against.
+# One REGISTER exchange, `register.xml` binding the contact or `unregister.xml` removing it. The
+# API answers a device's write once Asterisk holds its endpoint (§10.4), so the exchange is made
+# once: a refusal is the stack's failure, not a moment to wait out.
 registration() {
   local scenario=$1 sip_username=$2 sip_password=$3
   clear_phone_trace
-  for attempt in $(seq 1 $REGISTER_ATTEMPTS); do
-    if dc exec -T sipp-phone sipp -sf "/scenarios/uas/$scenario.xml" \
-      -key user "$sip_username" -au "$sip_username" -ap "$sip_password" \
-      -m 1 -p "$PORT" -timeout 15s -nostdin asterisk:5060 >/dev/null 2>&1; then
-      return 0
-    fi
-    echo "   $scenario attempt $attempt did not complete, retrying" >&2
-    sleep 2
-  done
-  echo "the device's $scenario never completed" >&2
-  return 1
+  dc exec -T sipp-phone sipp -sf "/scenarios/uas/$scenario.xml" \
+    -key user "$sip_username" -au "$sip_username" -ap "$sip_password" \
+    -m 1 -p "$PORT" -timeout 15s -nostdin asterisk:5060 >/dev/null 2>&1 \
+    || { echo "the device's $scenario did not complete" >&2; return 1; }
 }
 
 # The status `pjsip show contacts` gives the device's contact: `NonQual` until its first qualify

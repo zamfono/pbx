@@ -102,19 +102,12 @@ if [ -z "$unreachable" ]; then
 fi
 
 # `qualify` off renders `qualify_frequency = 0`: Asterisk stops probing, and the core reports the
-# trunk `unmonitored`, which no pre-check skips, whatever the contact still says. The contact's
-# own status, `NonQual` for one never probed, is printed for the run's log.
+# trunk `unmonitored` once the PATCH answered, which no pre-check skips, whatever the contact still
+# says. The contact's own status, `NonQual` for one never probed, is printed for the run's log.
 api PATCH "/trunks/$trunk_id" '{"qualify":false}' >/dev/null
-unmonitored=
-for _ in $(seq 1 30); do
-  if [ "$(trunk_status)" = unmonitored ]; then
-    unmonitored=1
-    break
-  fi
-  sleep 1
-done
-if [ -z "$unmonitored" ]; then
-  echo "trunk-$trunk_id with qualify off reads status '$(trunk_status)', not unmonitored" >&2
+status=$(trunk_status)
+if [ "$status" != unmonitored ]; then
+  echo "trunk-$trunk_id with qualify off reads status '$status', not unmonitored" >&2
   exit 1
 fi
 echo "trunk-$trunk_id with qualify off: contact '$(contact_status)', status unmonitored" >&2

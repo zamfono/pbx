@@ -25,6 +25,3 @@ trunk_id=$(api POST /trunks "{
 }" | jsonfield trunk.id)
 did_id=$(did_to_group +15551002 "$(ci_group)")
 printf '%s %s\n' "$trunk_id" "$did_id" > "$(state_file auth)"
-
-# The endpoint the digest credential identifies is the one named by the trunk's username.
-await_endpoint ci-auth-acct

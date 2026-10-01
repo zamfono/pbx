@@ -39,6 +39,3 @@ api PUT "/users/$agent/forwarding" \
   >/dev/null
 printf '%s %s %s %s\n' "$trunk_id" "$forwarder" "$agent" "$did_id" \
   > "$(state_file inbound-forward-diversion-last)"
-
-# The trunk's contact must exist before the trunk side's qualify waits for it.
-await_endpoint "trunk-$trunk_id"

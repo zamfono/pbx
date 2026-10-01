@@ -35,7 +35,3 @@ saved=$(routes_body)
 put_routes_ahead "$saved" "+15557101=$pai_id" "+15557102=$both_id"
 printf '%s %s\n' "$pai_id" "$both_id" > "$(state_file callerid)"
 printf '%s\n' "$saved" > "$(state_file callerid-routes)"
-
-# Both trunks' contacts must exist before the trunk side's qualify waits for them.
-await_endpoint "trunk-$pai_id"
-await_endpoint "trunk-$both_id"

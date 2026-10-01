@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # §10.2 "Hold music": one of the bundled tracks, seeded at first boot as a `moh` audio asset
-# (§6.3), becomes the tenant's hold music, and the scenario waits until the answering device's
-# endpoint suggests its class, which is what the PATCH re-renders (§9.1). Asterisk's verbose log
-# at level 3, which names the class every music-on-hold start plays, goes to a scratch log channel
-# for the check to read; `core set verbose` would raise only the CLI console's own level.
+# (§6.3), becomes the tenant's hold music, and the answering device's endpoint suggests its class
+# once the PATCH answered, which is what it re-renders and propagates (§9.1). Asterisk's verbose
+# log at level 3, which names the class every music-on-hold start plays, goes to a scratch log
+# channel for the check to read; `core set verbose` would raise only the CLI console's own level.
 set -euo pipefail
 
 api_base=$1
@@ -20,18 +20,12 @@ api PATCH /settings "{\"holdMohAudioId\": \"$moh_id\"}" >/dev/null
 
 member_id=$(user_with_ext 101)
 sip_username=$(api GET "/users/$member_id/devices" | jsonfield items.0.sipUsername)
-suggests=false
-for _ in $(seq 1 30); do
-  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-  if $compose exec -T asterisk asterisk -rx "pjsip show endpoint $sip_username" 2>/dev/null \
-    | grep -Eq "moh_suggest +: +$moh_id"; then
-    suggests=true
-    break
-  fi
-  sleep 1
-done
-[ "$suggests" = true ] || {
-  echo "endpoint $sip_username never suggested hold class $moh_id" >&2
+# Read whole before matching: under pipefail, Podman's compose provider reports the SIGPIPE an
+# early-exiting `grep -q` leaves the CLI as a failure.
+# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
+endpoint=$($compose exec -T asterisk asterisk -rx "pjsip show endpoint $sip_username")
+printf '%s\n' "$endpoint" | grep -Eq "moh_suggest +: +$moh_id" || {
+  echo "endpoint $sip_username does not suggest hold class $moh_id once the PATCH answered" >&2
   exit 1
 }
 

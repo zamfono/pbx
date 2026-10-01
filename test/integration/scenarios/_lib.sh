@@ -19,24 +19,6 @@ container_ip() {
   $compose exec -T "$1" hostname -i | tr -d '\r' | awk '{print $1}'
 }
 
-# Waits until Asterisk's configuration holds PJSIP endpoint `$1`: an endpoint reaches it through
-# a config render and a PJSIP reload after the write that created it, and a request that arrives
-# before that is answered as from no endpoint at all.
-await_endpoint() {
-  local attempt
-  for attempt in $(seq 1 30); do
-    # The listing names the endpoint as `<name>/<caller-ID number>` once it has a `callerid`.
-    # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-    if $compose exec -T asterisk asterisk -rx "pjsip show endpoint $1" 2>/dev/null \
-      | grep "Endpoint:  *$1[ /]" >/dev/null; then
-      return 0
-    fi
-    sleep 1
-  done
-  echo "endpoint $1 never reached Asterisk after $attempt attempts" >&2
-  return 1
-}
-
 # The ring group every trunk scenario's DID points at: the one `configure.sh` created.
 ci_group() {
   api GET /ringGroups | python3 -c "
@@ -141,7 +123,6 @@ device = json.load(sys.stdin)
 print(device['sipUsername'], device['sipPassword'])
 ")
   printf '%s %s %s\n' "$user_id" "$sip_username" "$sip_password" > "$(state_file "$state")"
-  await_endpoint "$sip_username"
   PHONE_PORT=$COLLEAGUE_PORT bash "$(dirname "${BASH_SOURCE[0]}")/../phone.sh" "$compose" \
     register "$sip_username" "$sip_password" >&2
 }

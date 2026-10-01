@@ -71,9 +71,6 @@ print(json.dumps({"trunkIds": sys.argv[1:4] + json.loads(sys.argv[4])}))
 # The core skips an `unreachable` trunk and tries an `unknown` one, so each of the three is
 # qualified until the core itself reports it reachable (§9.4 "Provisioning and status"): the
 # assertion that trunk 2 was passed by is then about its flag, not its status.
-for id in "$refuse_id" "$plain_id" "$answer_id"; do
-  await_endpoint "trunk-$id"
-done
 for attempt in $(seq 1 $STATUS_ATTEMPTS); do
   for id in "$refuse_id" "$plain_id" "$answer_id"; do
     # shellcheck disable=SC2086

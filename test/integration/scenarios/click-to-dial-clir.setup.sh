@@ -23,5 +23,3 @@ saved=$(routes_body)
 put_routes_ahead "$saved" "+15557102=$trunk_id"
 printf '%s\n' "$trunk_id" > "$(state_file clir-trunk)"
 printf '%s\n' "$saved" > "$(state_file clir-routes)"
-# The trunk's contact must exist before the trunk side's qualify waits for it.
-await_endpoint "trunk-$trunk_id"

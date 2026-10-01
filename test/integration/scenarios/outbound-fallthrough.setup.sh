@@ -29,5 +29,3 @@ saved=$(routes_body)
 put_routes_ahead "$saved" "+15557201=$(trunk_named ci-trunk)" "+15557201=$second_id"
 printf '%s\n' "$second_id" > "$(state_file fallthrough)"
 printf '%s\n' "$saved" > "$(state_file fallthrough-routes)"
-
-await_endpoint "trunk-$second_id"
