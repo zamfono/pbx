@@ -23,7 +23,7 @@ compose=$3
 . "$(dirname "$0")/_lib.sh"
 
 trunk_ip=$(container_ip sipp)
-await_trace sipp /tmp/trunk-messages.log 5 \
+sipp_trace sipp /tmp/trunk-messages.log \
   | python3 "$(dirname "$0")/_callerid-check.py" "$trunk_ip"
 
 newest_call | PYTHONPATH="$(dirname "$0")" python3 -c '

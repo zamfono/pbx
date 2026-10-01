@@ -94,7 +94,8 @@ configure_tenant() {
 # §6.5 "Default target": the stack's start created a `local` target from BACKUP_PASSWORD (on the
 # upgrade shard, the start of the release under test on a database the old one wrote, which had
 # none), and a manual run against it creates the repository and backs up for real, through the
-# image's own restic. Selectable as `backups`; cheap enough to run on every shard.
+# image's own restic. Selectable as `backups`; cheap enough to run on every shard. Leaves
+# `backed_up` set for `step_updater`.
 step_backups() {
   echo '== backing up to the default local target =='
   local target_id run_id status='running' attempt
@@ -115,14 +116,17 @@ print(local[0]["id"] if len(local) == 1 else "")
   done
   [ "$status" = ok ] || fail "the backup run ended $status: $(api GET "/backups/runs/$run_id")"
   echo "   run $run_id ok after ${attempt}s"
+  backed_up=true
 }
 
 # §6.3 "Updates": the updater found its own Compose project and the runtime's socket, so
 # system.info carries its status rather than why it has none, and system.update reaches it with
 # the token api holds: from this checkout, which pins no release, the updater refuses with 409 for
-# that reason (or api does first, without a recent backup). Selectable as `updater`; after
-# `backups`, on every shard, since it asks for the runtime of this run.
+# that reason. api asks it only once a backup has finished ok, so the step backs up first where
+# this run has not (`step_backups`). Selectable as `updater`; after `backups`, on every shard,
+# since it asks for the runtime of this run.
 step_updater() {
+  [ "${backed_up:-false}" = true ] || step_backups
   echo '== reaching the updater through system.info and system.update =='
   local info refusal
   info=$(api GET /system/info) || fail "GET /system/info did not answer"
@@ -139,9 +143,7 @@ if not core.get("startedAt") or not core.get("asteriskStartedAt"):
 ' || fail "system.info reports no usable updater, or no core start times"
   refusal=$(api_status POST /system/update '{"confirm":true}')
   case $refusal in
-    409$'\n'*'pins no release'* | 409$'\n'*'no backup finished ok'*)
-      echo "   refused as expected: ${refusal#*$'\n'}"
-      ;;
+    409$'\n'*'pins no release'*) echo "   refused as expected: ${refusal#*$'\n'}" ;;
     *) fail "system.update did not answer as expected: $refusal" ;;
   esac
 }

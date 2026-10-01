@@ -4,14 +4,16 @@
 # row, whose file is playable stereo audio ("a recordings row asserts that a playable file
 # exists") at the sample rate `$4` the call's codecs call for ("Sample rate"), and whose
 # `durationS` is that file's own length (§11.2 `recordings.duration_s`). The mix runs once
-# the participation's snoops have stopped, a moment after the call's channels are gone, so the
-# row is waited for.
+# the participation's snoops have stopped, a moment after the call's channels are gone, and
+# removes the participation's raw pair once it stored the row (§10.2), so the rows are counted
+# once no raw pair is left in `media/recordings`: the scenario's call is the only one there was.
 #
 # Usage: _recording-check.sh <api-base> <token> <compose> <sample-rate-hz> [<member-extension>]
 set -euo pipefail
 
 api_base=$1
 token=$2
+compose=$3
 rate_hz=$4
 member_ext=${5:-101}
 # shellcheck source=_lib.sh
@@ -21,19 +23,7 @@ member_ext=${5:-101}
 # ends at once) is no playable recording of a call the trunk side spoke on for seconds.
 MIN_AUDIO_BYTES=$((rate_hz * 2 * 2 / 2))
 
-# The history lists a call once it has ended, which is once its participations are stored: the
-# channels, which the harness waited out, go first.
-before=$(cat "$(state_file recording-before)")
-call_id=$before
-for _ in $(seq 1 15); do
-  call_id=$(api GET /calls | jsonfield items.0.id)
-  [ "$call_id" != "$before" ] && break
-  sleep 1
-done
-[ "$call_id" != "$before" ] || {
-  echo "the scenario's call never reached the history" >&2
-  exit 1
-}
+call_id=$(await_new_call "$(cat "$(state_file recording-before)")" 15)
 member_id=$(user_with_ext "$member_ext")
 # The call's own recordings, one `<id> <userId> <durationS>` line each.
 call_recordings() {
@@ -44,12 +34,22 @@ for r in json.load(sys.stdin)["items"]:
         print(r["id"], r["userId"] or "-", r["durationS"])
 ' "$call_id"
 }
-for _ in $(seq 1 15); do
-  [ -n "$(call_recordings)" ] && break
+# Asterisk names a raw file `<recording-id>-l.<format>` or `-r.` (packages/core/src/calls).
+mixed=false
+for _ in $(seq 1 30); do
+  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
+  files=$($compose exec -T core ls /media/recordings)
+  if ! printf '%s\n' "$files" | grep -q -- '-[lr]\.'; then
+    mixed=true
+    break
+  fi
   sleep 1
 done
-# A second, later row would be the participation recorded twice.
-sleep 2
+[ "$mixed" = true ] || {
+  echo "call $call_id's recordings were never mixed: raw files are left in media/recordings" >&2
+  exit 1
+}
+# A second row would be the participation recorded twice.
 recordings=$(call_recordings)
 rows=$(printf '%s' "$recordings" | grep -c . || true)
 [ "$rows" -eq 1 ] || {

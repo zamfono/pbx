@@ -23,7 +23,7 @@ call = json.load(sys.stdin)
 if not [l for l in trace(call) if l.get("event") == "originate" and l.get("clir") is True]:
     sys.exit("the originate line does not carry clir: true: " + json.dumps(call)[:800])
 '
-await_trace sipp /tmp/trunk-messages.log 1 | PYTHONPATH="$here" python3 -c '
+sipp_trace sipp /tmp/trunk-messages.log | PYTHONPATH="$here" python3 -c '
 import re, sys
 from _sip_trace import received_invites
 

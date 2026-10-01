@@ -4,7 +4,7 @@
 # the phone's 200 in; the trunk's BYE in and Asterisk's BYE out to the phone.
 set -euo pipefail
 
-bash "$(dirname "$0")/_sip-log-check.sh" "$1" "$2" +15551000 \
+bash "$(dirname "$0")/_sip-log-check.sh" "$1" "$2" inbound-sip-log-answered +15551000 \
   'in ^INVITE ' 'out ^SIP/2\.0 100 ' 'out ^SIP/2\.0 200 ' \
   'out ^INVITE ' 'in ^SIP/2\.0 200 ' \
   'in ^BYE ' 'out ^BYE '

@@ -14,7 +14,7 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck source=_lib.sh
 . "$here/_lib.sh"
 
-await_trace sipp /tmp/trunk-messages.log 1 \
+sipp_trace sipp /tmp/trunk-messages.log \
   | python3 "$here/_forward-context-check.py" "sip:+15557777@$(container_ip sipp)" -
 
 group_id=$(ci_group)

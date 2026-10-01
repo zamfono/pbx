@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Undoes `_sip-log-setup.sh`: the tenant's previous `callLogLevel`.
+# Undoes `_sip-log-setup.sh`: the tenant's previous `callLogLevel`, and its scenario state.
 #   _sip-log-teardown.sh API TOKEN NAME
 set -euo pipefail
 
@@ -11,4 +11,4 @@ name=$3
 
 previous=$(cat "$(state_file "$name-level")")
 api PATCH /settings "{\"callLogLevel\":\"$previous\"}" >/dev/null
-rm -f "$(state_file "$name-level")"
+rm -f "$(state_file "$name-level")" "$(state_file "$name-before")"

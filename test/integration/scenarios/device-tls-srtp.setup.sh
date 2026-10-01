@@ -45,14 +45,8 @@ did_id=$(api POST /dids \
   "{\"number\":\"$DID\",\"target\":{\"kind\":\"user\",\"userId\":\"$user_id\"}}" | jsonfield id)
 
 # The newest call before this scenario's own, the way the other recording scenarios' setups tell
-# their call apart (`_recording-check.sh`) — empty, not `jsonfield items.0.id`'s usual index
-# error, the first time this tenant answers any call at all, which this scenario's early name
-# (before every `inbound-*` recording scenario, alphabetically) can well be.
-api GET /calls | python3 -c '
-import json, sys
-items = json.load(sys.stdin)["items"]
-print(items[0]["id"] if items else "")
-' > "$(state_file recording-before)"
+# their call apart (`_recording-check.sh`).
+newest_call_id > "$(state_file recording-before)"
 printf '%s %s %s %s\n' "$user_id" "$did_id" "$sip_username" "$sip_password" \
   > "$(state_file tls-srtp)"
 

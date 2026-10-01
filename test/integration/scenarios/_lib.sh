@@ -14,9 +14,11 @@ print([u['id'] for u in json.load(sys.stdin)['items'] if u['extension'] == sys.a
 }
 
 # A container's address on the stack's network.
+# `exec` hands the container its standard input, so it reads none here: a caller may expand this
+# in the arguments of a pipeline's reader, whose input it would otherwise take.
 container_ip() {
   # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-  $compose exec -T "$1" hostname -i | tr -d '\r' | awk '{print $1}'
+  $compose exec -T "$1" hostname -i </dev/null | tr -d '\r' | awk '{print $1}'
 }
 
 # Waits up to 10 s for UDP port `$2` in container `$1` to be bound: the sipp run started there
@@ -253,25 +255,38 @@ await_ended_call() {
   return 1
 }
 
-# Prints sipp message trace `$2` in container `$1` once it holds at least `$3` received INVITEs
-# and has stopped growing: sipp writes it as the messages go, and a check that reads it the moment
-# the call ended can find the INVITE not yet written. After 15 s it prints what is there, and the
-# check reports what is missing.
-await_trace() {
-  local attempt content previous='' count
-  for attempt in $(seq 1 15); do
-    # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-    content=$($compose exec -T "$1" cat "$2" 2>/dev/null || true)
-    count=$(printf '%s\n' "$content" | grep -c '^INVITE ' || true)
-    if [ "$count" -ge "$3" ] && [ "$content" = "$previous" ]; then
-      printf '%s\n' "$content"
+# Prints sipp message trace `$2` in container `$1`. The run that wrote it has ended, as every
+# sipp run of a scenario has by the time its check runs (`run-scenarios.sh`'s
+# `finish_sipp_runs`), so the trace is whole.
+sipp_trace() {
+  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
+  $compose exec -T "$1" cat "$2"
+}
+
+# The id of the newest call in the history, empty while it holds none: what a setup notes before
+# its scenario's call, for the check to tell that call by (`await_new_call`).
+newest_call_id() {
+  api GET /calls | python3 -c '
+import json, sys
+items = json.load(sys.stdin)["items"]
+print(items[0]["id"] if items else "")
+'
+}
+
+# Waits up to `$2` seconds for a call newer than call `$1` (`newest_call_id`) to reach the
+# history, which lists a call once it has ended and its trace is written (§7), and prints its id.
+await_new_call() {
+  local attempt id
+  for attempt in $(seq 1 "$2"); do
+    id=$(newest_call_id)
+    if [ "$id" != "$1" ]; then
+      printf '%s\n' "$id"
       return 0
     fi
-    previous=$content
     sleep 1
   done
-  echo "$2 in $1 held $count of $3 INVITEs after $attempt s" >&2
-  printf '%s\n' "$content"
+  echo "no call newer than $1 reached the history within $attempt s" >&2
+  return 1
 }
 
 # Waits up to 30 s for a call in progress in state `$1` (`ringing`, or `up` once answered and

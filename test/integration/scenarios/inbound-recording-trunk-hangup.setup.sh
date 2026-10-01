@@ -14,4 +14,4 @@ api PATCH "/users/$(user_with_ext 101)" '{"recordCalls": true}' >/dev/null
 api PATCH "/ringGroups/$(api GET /ringGroups | jsonfield items.0.id)" '{"logLevel": "qos"}' \
   >/dev/null
 # The newest call in the history before this scenario's own, so the check can tell its call apart.
-api GET /calls | jsonfield items.0.id > "$(state_file recording-before)"
+newest_call_id > "$(state_file recording-before)"
