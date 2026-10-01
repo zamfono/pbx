@@ -18,6 +18,7 @@ import { defaultChannel, type Channel, type Logger } from '../ari/types.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import { eventually } from '../testing/eventually.js';
 import { newCall, type Call } from './call.js';
+import { enterTarget } from './inbound.js';
 import {
   ConfigCache,
   EventBus,
@@ -291,7 +292,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     const call = inboundCall();
 
     const legs = await dialled(
-      pipeline.enterTarget(call, sipTarget(trunkId), null)
+      enterTarget(pipeline, call, sipTarget(trunkId), null)
     );
 
     expect(legs.map(leg => leg.endpoint)).toEqual([
@@ -308,7 +309,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
   it('fails over to the next outbound host on a 503 (§9.4 "Hosts")', async () => {
     const trunkId = await seedSipTrunk(db);
     const call = inboundCall();
-    const started = pipeline.enterTarget(call, sipTarget(trunkId), null);
+    const started = enterTarget(pipeline, call, sipTarget(trunkId), null);
     await dialled(started);
     const first = await eventually(() => {
       const leg = [...call.legs.values()].find(
@@ -352,7 +353,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     const call = inboundCall();
 
     const legs = await dialled(
-      pipeline.enterTarget(call, { id: '', kind: 'user', userId: bea }, null)
+      enterTarget(pipeline, call, { id: '', kind: 'user', userId: bea }, null)
     );
 
     expect(forwardContext(legs.at(0))).toEqual({
@@ -408,7 +409,8 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
         .execute();
       pipeline.deps.cache.invalidate();
       const before = trunkOriginates(fakeAri).length;
-      const started = pipeline.enterTarget(
+      const started = enterTarget(
+        pipeline,
         inboundCall(),
         { id: '', kind: 'user', userId: bea },
         null
@@ -463,7 +465,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     const call = inboundCall();
 
     const legs = await dialled(
-      pipeline.enterTarget(call, { id: '', kind: 'user', userId: bea }, null)
+      enterTarget(pipeline, call, { id: '', kind: 'user', userId: bea }, null)
     );
 
     const variables = legs.at(0)?.variables ?? {};
@@ -503,7 +505,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     const call = inboundCall('anonymous');
 
     const legs = await dialled(
-      pipeline.enterTarget(call, { id: '', kind: 'user', userId: ai }, null)
+      enterTarget(pipeline, call, { id: '', kind: 'user', userId: ai }, null)
     );
 
     expect(forwardContext(legs.at(0))).toEqual({
@@ -556,7 +558,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     const call = inboundCall();
 
     const legs = await dialled(
-      pipeline.enterTarget(call, { id: '', kind: 'user', userId: bea }, null)
+      enterTarget(pipeline, call, { id: '', kind: 'user', userId: bea }, null)
     );
 
     expect(legs.map(leg => leg.endpoint)).toEqual([
@@ -638,7 +640,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     ] as const) {
       const call = inboundCall();
       // eslint-disable-next-line no-await-in-loop -- one call per unusable trunk
-      await pipeline.enterTarget(call, sipTarget(id), null);
+      await enterTarget(pipeline, call, sipTarget(id), null);
       expect(traceEvents(call)).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ event: 'sipTarget', trunkId: id, cause }),
@@ -690,13 +692,15 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     const hops: Record<string, string>[] = [];
     for (const started of [
       () =>
-        pipeline.enterTarget(
+        enterTarget(
+          pipeline,
           inboundCall(),
           { id: '', kind: 'user', userId: offline },
           null
         ),
       () =>
-        pipeline.enterTarget(
+        enterTarget(
+          pipeline,
           inboundCall(),
           { id: '', kind: 'user', userId: closed },
           null

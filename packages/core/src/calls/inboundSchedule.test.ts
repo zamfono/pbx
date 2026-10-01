@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
@@ -8,6 +8,12 @@ import type { ForwardTarget } from '../routing/targets.js';
 import { newCall } from './call.js';
 import { applyOooAndHours } from './inboundSchedule.js';
 import type { Pipeline } from './pipeline.js';
+
+// The targets the schedule sends a call to, recorded instead of run.
+const { runTarget } = vi.hoisted(() => ({
+  runTarget: vi.fn<(...args: unknown[]) => Promise<void>>()
+}));
+vi.mock('./runTarget.js', () => ({ runTarget }));
 
 /**
  * Seeds the settings row with `timezone` and a tenant schedule open Monday 09:00-17:00, returning
@@ -77,12 +83,13 @@ function stubPipeline(
   ran: ForwardTarget[];
 } {
   const ran: ForwardTarget[] = [];
+  runTarget.mockReset();
+  runTarget.mockImplementation((...args) => {
+    ran.push(args[2] as ForwardTarget);
+    return Promise.resolve();
+  });
   const pipeline = {
-    deps: { now: () => now, stackTz },
-    runTarget: (_call: unknown, target: ForwardTarget) => {
-      ran.push(target);
-      return Promise.resolve();
-    }
+    deps: { now: () => now, stackTz }
   } as unknown as Pipeline;
   return { pipeline, ran };
 }

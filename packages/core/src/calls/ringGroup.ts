@@ -24,7 +24,9 @@ import {
   type GroupOutcome,
   type GroupRules
 } from './ringGroupState.js';
+import { runTarget } from './runTarget.js';
 import { busyDevices } from './userDevices.js';
+import { deposit } from './voicemail.js';
 
 const RELEASE_CODE_UNAVAILABLE = 480;
 /** Answers the caller (no early media without it), plays the group's greeting to completion if it
@@ -80,11 +82,11 @@ async function applyGroupFallback(
       { ringGroupId: group.ringGroupId },
       CONDITION_REASONS[outcome]
     );
-    await pipeline.runTarget(call, action.target, null, diversion);
+    await runTarget(pipeline, call, action.target, null, diversion);
     return;
   }
   if (action.kind === 'mailbox') {
-    await pipeline.deposit(call, { ringGroupId: action.ringGroupId }, outcome);
+    await deposit(pipeline, call, { ringGroupId: action.ringGroupId }, outcome);
     return;
   }
   await release(pipeline, call, action.code, 'missed');

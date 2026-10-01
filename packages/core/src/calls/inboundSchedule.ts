@@ -14,6 +14,7 @@ import {
   type RedirectingReason
 } from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';
+import { runTarget } from './runTarget.js';
 
 type ScopedTarget =
   | { kind: 'user'; userId: string }
@@ -75,7 +76,8 @@ export async function applyOooAndHours(
   );
   call.log.event({ event: 'ooo', scope, active: ooo !== null });
   if (ooo) {
-    await pipeline.runTarget(
+    await runTarget(
+      pipeline,
       call,
       findForwardTarget(snapshot, ooo.targetId),
       scopeUser(ooo.scope),
@@ -107,7 +109,8 @@ export async function applyOooAndHours(
   if (open) {
     return false;
   }
-  await pipeline.runTarget(
+  await runTarget(
+    pipeline,
     call,
     findForwardTarget(snapshot, schedule.closedTargetId),
     scopeUser(schedule.scope),

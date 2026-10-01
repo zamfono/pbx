@@ -12,7 +12,7 @@ import type { GroupLeg } from './groupLegs.js';
 import { notifyMissedCall } from './missedCall.js';
 import type { Pipeline } from './pipeline.js';
 import { sipToHangupCause } from './releaseCause.js';
-import type { DepositReason } from './voicemail.js';
+import { deposit, type DepositReason } from './voicemail.js';
 
 export type CallsRow = Selectable<DB['calls']>;
 
@@ -201,7 +201,7 @@ export async function endTargetOwner(
   }
 ): Promise<void> {
   if (owner !== null && ownerMailboxEnabled(owner, snapshot)) {
-    await pipeline.deposit(call, owner, fallback.reason);
+    await deposit(pipeline, call, owner, fallback.reason);
     return;
   }
   await release(pipeline, call, fallback.code, fallback.status);

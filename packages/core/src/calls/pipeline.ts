@@ -7,11 +7,9 @@ import type { AriClient } from '../ari/client.js';
 import type { AriEvent, Channel, Logger } from '../ari/types.js';
 import { ConfigCache, EventBus, StateStore } from '../internal/server.js';
 import type { Presence } from '../presence.js';
-import type { ForwardTarget } from '../routing/targets.js';
-import type { Call, Owner } from './call.js';
+import type { Call } from './call.js';
 import { noteHangupRequest } from './callEnd.js';
-import type { Diversion } from './forwardContext.js';
-import { enterTarget, handleInboundStart } from './inbound.js';
+import { handleInboundStart } from './inbound.js';
 import {
   handleChannelEnded,
   handleDtmf,
@@ -22,10 +20,8 @@ import {
 import { handleOutbound } from './outbound.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 import { followTransfers } from './referTransfers.js';
-import { ringUser } from './ringUser.js';
-import { runTarget } from './runTarget.js';
 import type { TrunkState } from './trunkState.js';
-import { deposit, type DepositReason, type MailSender } from './voicemail.js';
+import type { MailSender } from './voicemail.js';
 
 export { ConfigCache, EventBus, StateStore };
 
@@ -196,40 +192,5 @@ export class Pipeline {
 
   registerCall(call: Call): void {
     this.callByChannel.set(call.callerChannelId, call);
-  }
-
-  /** §10.1 step 7, dialling an external target as `asUser`, the forwarding user, `diversion` the
-   * forward hop it is, `null` for none (`runTarget.ts`). */
-  async runTarget(
-    call: Call,
-    target: ForwardTarget,
-    asUser: string | null,
-    diversion: Diversion | null = null
-  ): Promise<void> {
-    await runTarget(this, call, target, asUser, diversion);
-  }
-
-  /** Entry's hop-free re-entry (§10.1 step 1/6): a matched menu option or a menu's live-extension
-   * match, neither of which counts a hop (§10.1 step 7). */
-  async enterTarget(
-    call: Call,
-    target: ForwardTarget,
-    asUser: string | null
-  ): Promise<void> {
-    await enterTarget(this, call, target, asUser);
-  }
-
-  async ringUser(call: Call, userId: string): Promise<void> {
-    await ringUser(this, call, userId);
-  }
-
-  /** §10.1 steps 4 and 5: the mailbox outcome of a ring that went unanswered. Routed through the
-   * pipeline because `call.ts` holds those outcomes and `voicemail.ts` reads `call.ts`. */
-  async deposit(
-    call: Call,
-    mailbox: Owner,
-    reason: DepositReason | null = null
-  ): Promise<void> {
-    await deposit(this, call, mailbox, reason);
   }
 }

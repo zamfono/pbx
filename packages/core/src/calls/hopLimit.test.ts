@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
@@ -7,7 +7,7 @@ import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import type { Logger } from '../ari/types.js';
 import { MAX_HOPS } from '../routing/targets.js';
-import { newCall, type Call, type Owner } from './call.js';
+import { newCall, type Call } from './call.js';
 import { enterTarget } from './inbound.js';
 import {
   ConfigCache,
@@ -16,6 +16,15 @@ import {
   StateStore,
   type PipelineDeps
 } from './pipeline.js';
+
+// The mailbox a call ends in, recorded instead of deposited: no deposit is made here.
+const { deposit } = vi.hoisted(() => ({
+  deposit: vi.fn<(...args: unknown[]) => Promise<void>>()
+}));
+vi.mock('./voicemail.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('./voicemail.js')>()),
+  deposit
+}));
 
 const noopLogger: Logger = {
   info: () => undefined,
@@ -90,8 +99,6 @@ describe('hop limit (§10.1 step 7)', () => {
   let ari: AriClient;
   // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let pipeline: Pipeline;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
-  let deposited: Owner[];
 
   beforeEach(async () => {
     db = openDb(':memory:');
@@ -117,11 +124,8 @@ describe('hop limit (§10.1 step 7)', () => {
       trunkState: null,
       presence: null
     });
-    deposited = [];
-    pipeline.deposit = (_call, owner) => {
-      deposited.push(owner);
-      return Promise.resolve();
-    };
+    deposit.mockReset();
+    deposit.mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
@@ -175,7 +179,9 @@ describe('hop limit (§10.1 step 7)', () => {
       null
     );
 
-    expect(deposited).toStrictEqual([{ ringGroupId: groupId }]);
+    expect(deposit.mock.calls.map(args => args[2])).toStrictEqual([
+      { ringGroupId: groupId }
+    ]);
     expect(call.calleeUserId).toBeNull();
   });
 });

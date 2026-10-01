@@ -30,6 +30,7 @@ import { Pipeline, type PipelineDeps } from './pipeline.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';
+import { ringUser } from './ringUser.js';
 import { TrunkState } from './trunkState.js';
 import type { MailSender } from './voicemail.js';
 
@@ -1593,7 +1594,7 @@ describe('features', () => {
     fakeAri.answerAfterMs = 10;
     await cdr.open(call);
 
-    await pipeline.ringUser(call, userId);
+    await ringUser(pipeline, call, userId);
 
     function hintPuts(): { deviceState?: string }[] {
       return fakeAri.calls

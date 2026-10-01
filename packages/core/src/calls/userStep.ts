@@ -13,7 +13,10 @@ import {
 import { buildUserRules, raiseLogLevel, release, type Call } from './call.js';
 import { CONDITION_REASONS, diversionFor } from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';
+import { ringUser } from './ringUser.js';
+import { runTarget } from './runTarget.js';
 import { registeredDevices } from './userDevices.js';
+import { deposit } from './voicemail.js';
 
 const RELEASE_CODE_UNAVAILABLE = 480;
 /** After `ringUser`'s race concludes without an answer: forward, mailbox, or release (§10.1 step 4). */
@@ -42,11 +45,11 @@ export async function applyRingOutcome(
       { userId: user.id },
       CONDITION_REASONS[outcome]
     );
-    await pipeline.runTarget(call, decision.target, user.id, diversion);
+    await runTarget(pipeline, call, decision.target, user.id, diversion);
     return;
   }
   if (decision.kind === 'mailbox') {
-    await pipeline.deposit(call, { userId: decision.userId }, outcome);
+    await deposit(pipeline, call, { userId: decision.userId }, outcome);
     return;
   }
   if (decision.kind === 'release') {
@@ -92,7 +95,7 @@ export async function runUserStep(
     registeredDevices: entryUser.registeredDevices
   });
   if (decision.kind === 'ring') {
-    await pipeline.ringUser(call, userId);
+    await ringUser(pipeline, call, userId);
     return;
   }
   if (call.ringOnly === true) {
@@ -105,12 +108,13 @@ export async function runUserStep(
       reason === null
         ? null
         : diversionFor(snapshot, call, { userId }, CONDITION_REASONS[reason]);
-    await pipeline.runTarget(call, decision.target, userId, diversion);
+    await runTarget(pipeline, call, decision.target, userId, diversion);
     return;
   }
   if (decision.kind === 'mailbox') {
     // A mailbox at Entry is DND's or `offline`'s implicit default (§10.1 step 4).
-    await pipeline.deposit(
+    await deposit(
+      pipeline,
       call,
       { userId: decision.userId },
       reason === 'dnd' ? 'dnd' : 'offline'

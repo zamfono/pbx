@@ -9,6 +9,7 @@ import { FakeAri, isPlacement, placedCallerId } from '../ari/fake.js';
 import { defaultChannel, type Channel, type Logger } from '../ari/types.js';
 import { eventually } from '../testing/eventually.js';
 import { newCall, type Call } from './call.js';
+import { enterTarget } from './inbound.js';
 import { playMenu } from './menu.js';
 import { dispatchAction } from './outboundDispatch.js';
 import {
@@ -327,7 +328,8 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       const forwarderTrunk = await seedTrunkRoute(db, 2, forwarder);
 
       const legs = await dialled(
-        pipeline.enterTarget(
+        enterTarget(
+          pipeline,
           call,
           { id: '', kind: 'user', userId: forwarder },
           null
@@ -348,7 +350,8 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       await seedUserRule(db, forwarder, 'unconditional');
       await seedTrunkRoute(db, 1, caller);
 
-      await pipeline.enterTarget(
+      await enterTarget(
+        pipeline,
         call,
         { id: '', kind: 'user', userId: forwarder },
         null
@@ -375,7 +378,8 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       await seedTrunkRoute(db, 1, null, 'both');
 
       const legs = await dialled(
-        pipeline.enterTarget(
+        enterTarget(
+          pipeline,
           call,
           { id: '', kind: 'user', userId: forwarder },
           null
@@ -394,7 +398,8 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       await seedTrunkRoute(db, 1, null, 'both');
 
       const legs = await dialled(
-        pipeline.enterTarget(
+        enterTarget(
+          pipeline,
           newCallFrom(withholding),
           { id: '', kind: 'user', userId: forwarder },
           null
@@ -413,7 +418,8 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       const forwarderTrunk = await seedTrunkRoute(db, 2, forwarder);
 
       const legs = await dialled(
-        pipeline.enterTarget(
+        enterTarget(
+          pipeline,
           call,
           { id: '', kind: 'user', userId: forwarder },
           null
@@ -432,7 +438,8 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       await seedTrunkRoute(db, 1, caller);
       const forwarderTrunk = await seedTrunkRoute(db, 2, forwarder);
 
-      const started = pipeline.enterTarget(
+      const started = enterTarget(
+        pipeline,
         call,
         { id: '', kind: 'user', userId: forwarder },
         null
@@ -468,7 +475,8 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       const forwarderTrunk = await seedTrunkRoute(db, 2, forwarder);
 
       const legs = await dialled(
-        pipeline.enterTarget(
+        enterTarget(
+          pipeline,
           call,
           { id: '', kind: 'user', userId: forwarder },
           null
@@ -498,7 +506,8 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       await seedTrunkRoute(db, 2, null);
 
       const legs = await dialled(
-        pipeline.enterTarget(
+        enterTarget(
+          pipeline,
           newCallFrom(null, 'inbound'),
           { id: '', kind: 'user', userId: forwarder },
           null
@@ -525,7 +534,8 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       const openTrunk = await seedRoutes();
 
       const legs = await dialled(
-        pipeline.enterTarget(
+        enterTarget(
+          pipeline,
           call,
           { id: '', kind: 'user', userId: callee },
           null

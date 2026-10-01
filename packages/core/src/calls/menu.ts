@@ -9,9 +9,11 @@ import { assetMedia, defaultPrompt } from '../prompts.js';
 import type { MenuMap } from '../routing/menu.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import { findForwardTarget, release, type Call } from './call.js';
+import { enterTarget } from './inbound.js';
 import { collectMenuInput } from './menuInput.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
+import { runTarget } from './runTarget.js';
 
 const RELEASE_CODE_UNAVAILABLE = 480;
 const RELEASE_CODE_SERVER_ERROR = 500;
@@ -120,14 +122,16 @@ async function attemptMenuRound(
     // gets its own full `max_attempts` rather than inheriting what this menu had already spent.
     call.menuAttempts = 0;
     // §10.1 step 7: a menu forwards without a caller.
-    await pipeline.enterTarget(call, target, null);
+    await enterTarget(pipeline, call, target, null);
     return;
   }
   if (call.menuAttempts >= menu.maxAttempts) {
     call.log.event({ event: 'menuFallback', menuId: menu.id });
-    await pipeline.runTarget(
+    await runTarget(
+      pipeline,
       call,
       findForwardTarget(snapshot, menu.fallbackTargetId),
+      null,
       null
     );
     return;

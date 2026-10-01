@@ -16,6 +16,7 @@ import {
   StateStore,
   type PipelineDeps
 } from './pipeline.js';
+import { ringUser } from './ringUser.js';
 import { TrunkState } from './trunkState.js';
 
 const noopLogger: Logger = {
@@ -227,7 +228,7 @@ describe('a find-me leg still to come (§10.1 step 4)', () => {
     const userId = await seedUser(db, 1);
     const trunkId = await seedRoute(db);
 
-    const finished = pipeline.ringUser(call, userId);
+    const finished = ringUser(pipeline, call, userId);
     await eventually(() => {
       expect(call.legs.size).toBe(1);
     });
@@ -246,7 +247,7 @@ describe('a find-me leg still to come (§10.1 step 4)', () => {
   it('settles the race once a find-me leg that could not be routed was the last one to come', async () => {
     const userId = await seedUser(db, 1);
 
-    const finished = pipeline.ringUser(call, userId);
+    const finished = ringUser(pipeline, call, userId);
     await eventually(() => {
       expect(call.legs.size).toBe(1);
     });

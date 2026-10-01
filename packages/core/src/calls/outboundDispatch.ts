@@ -14,6 +14,7 @@ import { findForwardTarget, release, toLogLevel, type Call } from './call.js';
 import { SIP_SERVICE_UNAVAILABLE } from './conclude.js';
 import { dialEmergency, emergencyLogLevel } from './emergency.js';
 import { handleFeature } from './features.js';
+import { enterTarget } from './inbound.js';
 import { dialExternal } from './outboundExternal.js';
 import { resolveDialedContext, toFor } from './outboundLookup.js';
 import { retrieveParkedCall } from './parkingRetrieval.js';
@@ -106,7 +107,8 @@ async function dispatchExtension(
 ): Promise<void> {
   // §10.1 step 3/7: an internal extension enters at Entry; it is the call's first hop, so it adds no hop.
   if (action.owner.kind === 'user') {
-    await pipeline.enterTarget(
+    await enterTarget(
+      pipeline,
       call,
       {
         id: '',
@@ -118,7 +120,8 @@ async function dispatchExtension(
     return;
   }
   if (action.owner.kind === 'ringGroup') {
-    await pipeline.enterTarget(
+    await enterTarget(
+      pipeline,
       call,
       {
         id: '',
@@ -177,7 +180,8 @@ export async function dispatchAction(
   if (action.kind === 'ownDid') {
     // §10.1 step 7: a DID's own target is the call's first hop too, so it adds no hop either, and
     // an external one is dialled without a caller, since the DID forwards, not the dialling user.
-    await pipeline.enterTarget(
+    await enterTarget(
+      pipeline,
       call,
       findForwardTarget(snapshot, action.targetId),
       null

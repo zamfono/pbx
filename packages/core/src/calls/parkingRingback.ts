@@ -21,6 +21,7 @@ import { RELEASE_CODE_NOT_FOUND } from './featureCall.js';
 import { endHold } from './hold.js';
 import { trackLeg } from './legs.js';
 import type { Pipeline } from './pipeline.js';
+import { runTarget } from './runTarget.js';
 import { runUserStep } from './userStep.js';
 
 /** Moves the parked party's channel into a fresh bridge of `type` — `holding` for the park itself
@@ -118,7 +119,13 @@ async function routeParkedPartyToFallback(
   }
   parked.log.event({ event: 'parkingTimeout', result: 'fallback' });
   // The tenant fallback forwards without a caller (§10.1 step 7).
-  await pipeline.runTarget(parked, findForwardTarget(snapshot, targetId), null);
+  await runTarget(
+    pipeline,
+    parked,
+    findForwardTarget(snapshot, targetId),
+    null,
+    null
+  );
 }
 
 /**

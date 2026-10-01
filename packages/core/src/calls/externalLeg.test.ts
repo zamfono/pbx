@@ -19,6 +19,7 @@ import {
 } from './pipeline.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';
+import { ringUser } from './ringUser.js';
 import { TrunkState } from './trunkState.js';
 
 const noopLogger: Logger = {
@@ -637,7 +638,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const trunkId = await seedTrunk(db, 1);
       await seedRoute(db, 1, trunkId, userId);
 
-      const finished = pipeline.ringUser(call, userId);
+      const finished = ringUser(pipeline, call, userId);
       // The device leg and the find-me leg, each tracked once its originate returned.
       await eventually(() => {
         expect(call.legs.size).toBe(2);
@@ -669,7 +670,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const trunkId = await seedTrunk(db, 1);
       await seedRoute(db, 1, trunkId);
 
-      const finished = pipeline.ringUser(call, userId);
+      const finished = ringUser(pipeline, call, userId);
       await eventually(() => {
         expect(findMeLegs()).toHaveLength(1);
       });
@@ -693,7 +694,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       });
       const trunkId = await seedTrunk(db, 1);
       await seedRoute(db, 1, trunkId);
-      const finished = pipeline.ringUser(call, userId);
+      const finished = ringUser(pipeline, call, userId);
       const leg = await eventually(() => {
         const found = findMeLegs().at(0);
         if (found === undefined) {
@@ -756,7 +757,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const trunkId = await seedTrunk(db, 1);
       await seedRoute(db, 1, trunkId);
 
-      const finished = pipeline.ringUser(call, userId);
+      const finished = ringUser(pipeline, call, userId);
       // The device leg and the find-me leg, each tracked once its originate returned.
       await eventually(() => {
         expect(call.legs.size).toBe(2);
@@ -778,7 +779,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       await seedRoute(db, 1, trunk1);
       await seedRoute(db, 2, trunk2);
 
-      const finished = pipeline.ringUser(call, userId);
+      const finished = ringUser(pipeline, call, userId);
       const first = await eventually(() => {
         const leg = findMeLegs().at(0);
         if (leg === undefined) {
@@ -826,7 +827,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       await seedRoute(db, 1, trunkId);
       refuseFirstOriginate({ cause: AST_CAUSE_USER_BUSY });
 
-      await pipeline.ringUser(call, userId);
+      await ringUser(pipeline, call, userId);
 
       expect(pipeline.pendingRing.has(call.id)).toBe(false);
       expect(findMeLegs().map(leg => leg.state)).toEqual(['ended']);
@@ -841,7 +842,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const trunkId = await seedTrunk(db, 1);
       await seedRoute(db, 1, trunkId, someoneElse);
 
-      const finished = pipeline.ringUser(call, userId);
+      const finished = ringUser(pipeline, call, userId);
       // The find-me leg is judged unrouted (and traced) once the device leg rings.
       await eventually(() => {
         expect(call.legs.size).toBe(1);
