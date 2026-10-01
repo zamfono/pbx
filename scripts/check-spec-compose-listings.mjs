@@ -8,13 +8,9 @@
 // other way); every other fence is matched by its own first line, "# <name>" or "# <name> — …",
 // when <name> is a file that exists under deploy/.
 //
-// Before comparing, the tag of every image that is not ours (any `image:` value whose repository
-// is not `ghcr.io/zamfono/…` — today just docker.io/library/caddy) is replaced with a placeholder
-// on both sides. Dependabot's only lever on that pin is deploy/compose.yaml (docs/spec.md may not
-// be edited by a bot), so a version-only bump there must pass with no spec change; the image name
-// itself, and everything else in the listing, still has to match byte-for-byte. On a mismatch this
-// prints a unified diff and says where to fix it: the listing in docs/spec.md §6.3, with the change
-// logged in docs/spec-changes.md.
+// Each listing has to match its file byte for byte. On a mismatch this prints a unified diff and
+// says where to fix it: the listing in docs/spec.md §6.3, with the change logged in
+// docs/spec-changes.md.
 //
 //   node scripts/check-spec-compose-listings.mjs
 import { execFileSync } from 'node:child_process';
@@ -32,8 +28,6 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const EXIT_FAILURE = 1;
-const OWN_IMAGE_PREFIX = 'ghcr.io/zamfono/';
-const PINNED_TAG_PLACEHOLDER = '<pinned>';
 const HEADING = '### 6.3 Compose stack';
 const FENCE = /^```(?:\S*)\s*$/u;
 const NAMED_LISTING = /^#\s*(?<name>[A-Za-z0-9._-]+)\b/u;
@@ -82,33 +76,6 @@ function mappedDeployFile(block, isComposeYamlListing) {
   if (candidate !== 'Caddyfile' && !/\.(?:yaml|caddy)$/u.test(candidate))
     return null;
   return existsSync(join(repoRoot, 'deploy', candidate)) ? candidate : null;
-}
-
-/**
- * Replaces the tag of every non-Zamfono `image:` reference with a fixed placeholder, so a bump of
- * an upstream pin (Caddy today) compares equal without a spec edit; the repository portion, and
- * every other line, is untouched.
- * @param {string} text
- * @returns {string}
- */
-function normalizeForeignImageTags(text) {
-  return text
-    .split('\n')
-    .map(line => {
-      // eslint-disable-next-line prefer-named-capture-group -- destructured by position right below; a name would add nothing here
-      const match = /^(\s*image:\s*)(\S+)/u.exec(line);
-      if (match === null) return line;
-      const [, prefix, ref] = match;
-      // Both groups are mandatory (not `?`), so a match always sets them.
-      if (prefix === undefined || ref === undefined) return line;
-      if (ref.startsWith(OWN_IMAGE_PREFIX)) return line;
-      const colonAt = ref.lastIndexOf(':');
-      if (colonAt === -1) return line;
-      const repository = ref.slice(0, colonAt);
-      const rest = line.slice(prefix.length + ref.length);
-      return `${prefix}${repository}:${PINNED_TAG_PLACEHOLDER}${rest}`;
-    })
-    .join('\n');
 }
 
 /**
@@ -165,10 +132,8 @@ function checkListings() {
   for (const block of blocks) {
     const file = mappedDeployFile(block, block === composeYamlBlock);
     if (file === null) continue;
-    const expected = normalizeForeignImageTags(`${block.lines.join('\n')}\n`);
-    const actual = normalizeForeignImageTags(
-      readFileSync(join(repoRoot, 'deploy', file), 'utf8')
-    );
+    const expected = `${block.lines.join('\n')}\n`;
+    const actual = readFileSync(join(repoRoot, 'deploy', file), 'utf8');
     results.push({
       file,
       matches: expected === actual,
