@@ -6,8 +6,8 @@
 #   UPGRADE_FROM=latest   the newest vX.Y.Z tag of the repository
 #   UPGRADE_FROM=0.0.4    that release
 #
-# Reads and sets `run.sh`'s own COMPOSE, compose_files, repo, here, api_base, FWD, RUNTIME, OWNER_EMAIL,
-# OWNER_PASSWORD, FQDN and fail.
+# Reads and sets `run.sh`'s own COMPOSE, compose_args, run_dir, here, api_base, RUNTIME,
+# OWNER_EMAIL, OWNER_PASSWORD, FQDN and fail.
 
 UPGRADE_REPO=https://github.com/zamfono/pbx
 UPGRADE_REGISTRY=ghcr.io/zamfono
@@ -39,34 +39,32 @@ upgrade_snapshot() {
   done
 }
 
-# Starts `$1`'s stack: its compose files from its bundle, its images from the registry, and the
-# overlay and `.env` this run uses for the build under test. `--project-directory` keeps the
-# project `deploy`, the name the build under test's compose files give it, so the upgrade replaces
-# these containers and keeps these volumes, as unpacking a bundle over a stack directory does.
+# Starts `$1`'s stack: its bundle unpacked into the stack directory, its images from the
+# registry, and the overlay and `.env` this run uses for the build under test.
 upgrade_start_previous() {
-  local version=$1 dir=$2
+  local version=$1
   curl -fsSL "$UPGRADE_REPO/releases/download/v$version/zamfono-deploy.tar.gz" \
-    | tar xz -C "$dir" --strip-components=1 \
+    | tar xz -C "$run_dir" --strip-components=1 \
     || fail "could not download the v$version release bundle"
   echo "== §6.3 Upgrades: starting v$version from its own bundle and images =="
   ASTERISK_IMAGE=$UPGRADE_REGISTRY/asterisk:$version MIGRATE_IMAGE=$UPGRADE_REGISTRY/migrate:$version \
     CORE_IMAGE=$UPGRADE_REGISTRY/core:$version API_IMAGE=$UPGRADE_REGISTRY/api:$version \
     PROXY_IMAGE=$UPGRADE_REGISTRY/proxy:$version \
-    $COMPOSE --project-directory "$repo/deploy" -f "$dir/compose.yaml" -f "$dir/compose.ports.yaml" \
-    -f "$here/compose.test.yaml" up -d \
+    $COMPOSE "${compose_args[@]}" up -d \
     || fail "v$version's stack did not come up"
 }
 
-# The upgrade itself, as deploy/README.md step 8 gives it: the build under test's compose files,
-# then `up -d`; on Podman `down` first, since Podman will not remove the `asterisk` container
+# The upgrade itself, as deploy/README.md step 8 gives it: the build under test's files over the
+# stack directory's, as unpacking its bundle puts them, then `up -d`; on Podman `down` first, since Podman will not remove the `asterisk` container
 # `proxy` shares a network namespace with. The images are the build's own, already loaded, so
 # there is nothing to pull.
 upgrade_to_build() {
   echo "== §6.3 Upgrades: upgrading to the build under test ($RUNTIME) =="
+  stack_dir_files "$run_dir"
   if [ "$RUNTIME" = podman ]; then
-    $COMPOSE "${compose_files[@]}" down || fail "down before the upgrade failed"
+    $COMPOSE "${compose_args[@]}" down || fail "down before the upgrade failed"
   fi
-  $COMPOSE "${compose_files[@]}" up -d || fail "up -d did not upgrade the stack"
+  $COMPOSE "${compose_args[@]}" up -d || fail "up -d did not upgrade the stack"
   upgrade_assert_images
 }
 
@@ -82,7 +80,7 @@ upgrade_assert_images() {
       api) expected=${API_IMAGE:-zamfono/api:ci} ;;
       proxy) expected=$PROXY_IMAGE ;;
     esac
-    running=$($COMPOSE "${compose_files[@]}" ps -a --format '{{.Service}} {{.Image}}' \
+    running=$($COMPOSE "${compose_args[@]}" ps -a --format '{{.Service}} {{.Image}}' \
       | awk -v s="$service" '$1 == s { print $2 }' | sed -E 's#^(localhost|docker\.io)/##')
     [ "$running" = "${expected#docker.io/}" ] \
       || fail "after the upgrade $service runs '${running:-nothing}', not the build's $expected"
@@ -129,12 +127,11 @@ PY
 # the stack for `await_stack_ready` to check as it checks a fresh one. Leaves the snapshot's path
 # in UPGRADE_BEFORE for `upgrade_verify`, once `run.sh` has its own token.
 upgrade_from_release() {
-  local version dir
+  local version
   version=$(upgrade_version)
   [ -n "$version" ] || fail "UPGRADE_FROM=$UPGRADE_FROM names no release"
-  dir=$(mktemp -d)
-  UPGRADE_BEFORE=$dir/snapshot.tsv
-  upgrade_start_previous "$version" "$dir"
+  UPGRADE_BEFORE=$run_dir/upgrade-before.tsv
+  upgrade_start_previous "$version"
   await_stack_ready
   upgrade_snapshot "$UPGRADE_BEFORE"
   upgrade_to_build

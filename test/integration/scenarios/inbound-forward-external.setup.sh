@@ -14,4 +14,4 @@ user_id=$(user_with_ext 101)
 api PUT "/users/$user_id/forwarding" \
   '{"rules":[{"condition":"unconditional","target":{"kind":"external","external":"+15557777"}}]}' \
   >/dev/null
-printf '%s\n' "$user_id" > /tmp/zamfono-forward-user
+printf '%s\n' "$user_id" > "$(state_file forward-user)"

@@ -16,4 +16,4 @@ rule_id=$(api POST "/ringGroups/$group_id/ooo" "{
   \"target\": { \"kind\": \"mailboxRingGroup\", \"ringGroupId\": \"$group_id\" }
 }" | jsonfield id)
 
-printf '%s\n' "$rule_id" > /tmp/zamfono-ooo-rule
+printf '%s\n' "$rule_id" > "$(state_file ooo-rule)"

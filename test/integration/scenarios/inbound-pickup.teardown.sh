@@ -7,5 +7,5 @@ token=$2
 # shellcheck source=_lib.sh
 . "$(dirname "$0")/_lib.sh"
 
-api_delete "/users/$(cat /tmp/zamfono-picker-user)"
-rm -f /tmp/zamfono-picker-user
+api_delete "/users/$(cat "$(state_file picker-user)")"
+rm -f "$(state_file picker-user)"

@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # test/load: the stack bring-up shared by the load drivers (session.sh, stress/session.sh).
-# Sourced, not run. Mirrors test/integration/run.sh's own bring-up: a generated deploy/.env, one
-# `compose up`, the migrate exit code, the api and core healthchecks, a bootstrap owner token.
+# Sourced, not run. Mirrors test/integration/run.sh's own bring-up: a stack directory of the
+# session's own with the .env setup.sh writes (test/stack.sh), one `compose up`, the migrate exit
+# code, the api and core healthchecks, a bootstrap owner token.
 #
-# The caller sets, before sourcing: repo, OUT_DIR, COMPOSE, compose_files (array, relative to
-# deploy/), api_base, FQDN, MAIN_DID, API_IMAGE; optionally METRICS_TOKEN (default empty = /metrics
-# off). It provides: dc, log, fail, test/api.sh's helpers, stack_write_env, stack_up,
+# The caller sets, before sourcing: repo, OUT_DIR, COMPOSE, compose_args (array, relative to the
+# stack directory), api_base, FQDN, MAIN_DID, API_IMAGE; optionally METRICS_TOKEN (default empty =
+# /metrics off). Sourcing makes the stack directory, STACK_DIR, and changes into it, and sets
+# compose_cmd; it provides: dc, log, fail, test/api.sh's helpers, stack_write_env, stack_up,
 # stack_token, and sets STACK_UP=true once `compose up` ran (the caller's teardown trap keys
-# `down -v` off it).
+# `down -v` off it, and removes STACK_DIR).
 # RUNTIME (default: the first word of $COMPOSE, i.e. docker or podman) is the CLI used for the
 # plain container/volume commands, so they hit the same image and volume store as the stack
 # (test/integration/run.sh does the same).
@@ -18,13 +20,27 @@ export RUNTIME
 
 # shellcheck source=../api.sh
 . "$repo/test/api.sh"
+# shellcheck source=../stack.sh
+. "$repo/test/stack.sh"
 STACK_UP=false
 OWNER_PASSWORD='load-secret'
 OWNER_EMAIL='owner@load.test'
+# What the load stack runs differently from compose.yaml's defaults, handed to Compose through
+# the environment, which it reads before .env: no HEP mirroring, and /metrics behind the token.
+HEP_ENABLED=false
+METRICS_TOKEN=${METRICS_TOKEN:-}
+export HEP_ENABLED METRICS_TOKEN
+
+STACK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/zamfono-load.XXXXXX")
+stack_dir_files "$STACK_DIR"
+compose_args=(-p "$(stack_project "$STACK_DIR")" "${compose_args[@]}")
+# shellcheck disable=SC2034 # the callers' compose command for the scripts they run
+compose_cmd="$COMPOSE ${compose_args[*]}"
+cd "$STACK_DIR" || exit 1
 
 dc() {
   # shellcheck disable=SC2086 # $COMPOSE carries the runtime's own multi-word command
-  (cd "$repo/deploy" && $COMPOSE "${compose_files[@]}" "$@")
+  $COMPOSE "${compose_args[@]}" "$@"
 }
 
 log() { echo "== $* ==" | tee -a "$OUT_DIR/session.log" >&2; }
@@ -37,41 +53,11 @@ fail() {
 }
 
 stack_write_env() {
-  local owner_hash
-  owner_hash=$(printf '%s' "$OWNER_PASSWORD" \
-    | "$RUNTIME" run --rm -i --entrypoint node "$API_IMAGE" hash-password.mjs) \
-    || fail "could not hash the bootstrap owner password against $API_IMAGE"
-  cat > "$repo/deploy/.env" <<ENV
-FQDN=$FQDN
-EXTERNAL_IPV4=172.28.0.10
-RTP_PORT_START=10000
-RTP_PORT_END=10200
-ARI_PASSWORD=load-ari
-AMI_PASSWORD=load-ami
-JWT_SECRET=$(openssl rand -base64 32)
-SECRETBOX_KEY=1:$(openssl rand -base64 32)
-SECRETBOX_KEY_PREVIOUS=
-SMTP_HOST=
-SMTP_PORT=
-SMTP_SECURITY=
-SMTP_USER=
-SMTP_PASSWORD=
-MAIL_FROM=
-BOOTSTRAP_OWNER_EMAIL=$OWNER_EMAIL
-BOOTSTRAP_OWNER_NAME=Load Owner
-BOOTSTRAP_OWNER_PASSWORD_HASH='$owner_hash'
-COMPANY_NAME=Load
-MAIN_DID=$MAIN_DID
-COUNTRY=DE
-EXT_LENGTH=3
-TZ=UTC
-TLS_RELOAD_HOUR=3
-CALL_LOG_MAX_BYTES=1048576
-HEP_ENABLED=false
-SIP_UDP_ENABLED=true
-SIP_TCP_ENABLED=true
-METRICS_TOKEN=${METRICS_TOKEN:-}
-ENV
+  ZAMFONO_MODE=ports ZAMFONO_RUNTIME=$RUNTIME ZAMFONO_API_IMAGE=$API_IMAGE \
+    EXTERNAL_IPV4=172.28.0.10 FQDN=$FQDN COMPANY_NAME=Load MAIN_DID=$MAIN_DID COUNTRY=DE \
+    EXT_LENGTH=3 TZ=UTC BOOTSTRAP_OWNER_NAME='Load Owner' BOOTSTRAP_OWNER_EMAIL=$OWNER_EMAIL \
+    OWNER_PASSWORD=$OWNER_PASSWORD stack_dir_env "$STACK_DIR" \
+    || fail "setup.sh could not write the stack's .env: $(cat "$STACK_DIR/setup.log")"
 }
 
 stack_up() {
@@ -126,10 +112,12 @@ stack_host_facts() {
   log "host facts written to $OUT_DIR/host-facts.txt"
 }
 
-# One line per named volume of compose project "deploy": name, mountpoint, du -sh.
+# One line per named volume of the stack's Compose project: name, mountpoint, du -sh.
 stack_volume_sizes() {
-  local vol mp
-  for vol in deploy_db deploy_media deploy_caddy-data deploy_asterisk-config; do
+  local vol mp project
+  project=$(stack_project "$STACK_DIR")
+  for vol in "${project}_db" "${project}_media" "${project}_caddy-data" \
+    "${project}_asterisk-config"; do
     mp=$("$RUNTIME" volume inspect "$vol" --format '{{.Mountpoint}}' 2>/dev/null) || continue
     printf '%s\t%s\t%s\n' "$vol" "$mp" "$(du -sh "$mp" 2>/dev/null | cut -f1)"
   done

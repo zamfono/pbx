@@ -3,7 +3,7 @@
 # scenario it expects (`scenario-roles.sh`), and checks after each one that Asterisk holds no channel any more, that
 # every sipp run the scenario started ended with its calls and, where the scenario has a
 # `<name>.check.sh`, that the history records what the spec says the call leaves behind. Reads
-# `run.sh`'s own `COMPOSE`, `compose_files`, `compose_cmd`, `here`, `api_base`, `token`, `GROUP_EXT`,
+# `run.sh`'s own `COMPOSE`, `compose_args`, `compose_cmd`, `here`, `api_base`, `token`, `GROUP_EXT`,
 # `SIP_USERNAME`, `SIP_PASSWORD`, `MAIN_DID` and `fail`, and `only.sh`'s `name_selected`.
 #
 # A scenario's setup, check and teardown are called with the api base and the token, then (after
@@ -29,7 +29,7 @@ FINISH_SECONDS=5
 SIPP_SERVICES=(sipp sipp-phone sipp-provider)
 
 asterisk_cli() {
-  $COMPOSE "${compose_files[@]}" exec -T asterisk asterisk -rx "$1"
+  $COMPOSE "${compose_args[@]}" exec -T asterisk asterisk -rx "$1"
 }
 
 # Every trunk's own contact, `<endpoint>/sip…` as `pjsip show contacts` truncates it, and its
@@ -45,8 +45,8 @@ trunk_contacts() {
 # that probe, so the call waits for every trunk a scenario set up to be reachable, as `phone.sh`
 # waits for the device.
 start_trunk_side() {
-  $COMPOSE "${compose_files[@]}" exec -T sipp rm -f /tmp/trunk-messages.log
-  $COMPOSE "${compose_files[@]}" exec -T -d sipp sh -c \
+  $COMPOSE "${compose_args[@]}" exec -T sipp rm -f /tmp/trunk-messages.log
+  $COMPOSE "${compose_args[@]}" exec -T -d sipp sh -c \
     "sh /scenarios/_sipp-run.sh trunk-$1 -sf /scenarios/uas/$1.xml -p 5060 -aa -nostdin \
       -trace_msg -message_file /tmp/trunk-messages.log asterisk:5060 > /tmp/$1.log 2>&1"
   local contacts endpoint
@@ -84,7 +84,7 @@ assert_no_channels() {
 finish_sipp_runs() {
   local service report leftovers=''
   for service in "${SIPP_SERVICES[@]}"; do
-    report=$($COMPOSE "${compose_files[@]}" exec -T "$service" \
+    report=$($COMPOSE "${compose_args[@]}" exec -T "$service" \
       sh /scenarios/_sipp-finish.sh "$FINISH_SECONDS" 2>&1) \
       || leftovers="$leftovers"$'\n'"$service: $report"
   done
@@ -130,10 +130,10 @@ start_phone_side() {
 }
 
 echo '== running the sipp scenarios =='
-# A stack a `KEEP=1` run left up (run.sh's `REUSE=1`) may still hold the sipp runs of the scenario
+# A stack a `KEEP=1` run left up (run.sh's `REUSE`) may still hold the sipp runs of the scenario
 # that run failed in; from here on, every scenario finds its sides idle (`finish_sipp_runs`).
 for service in "${SIPP_SERVICES[@]}"; do
-  $COMPOSE "${compose_files[@]}" exec -T "$service" \
+  $COMPOSE "${compose_args[@]}" exec -T "$service" \
     sh -c 'pkill -9 -x sipp; rm -rf /tmp/sipp-runs' || true
 done
 position=-1
@@ -173,7 +173,7 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
     bash "$scenario" "$api_base" "$token" "$compose_cmd" || fail "the API call of $name did not complete"
   else
     # shellcheck disable=SC2046 # the extra arguments are separate words by design
-    $COMPOSE "${compose_files[@]}" exec -T "$caller" \
+    $COMPOSE "${compose_args[@]}" exec -T "$caller" \
       sipp -sf "/scenarios/$name.xml" -s "$MAIN_DID" -m "$(calls_for "$name")" -l 1 \
         -p "$caller_port" -timeout 90s \
         $(caller_args_for "$name") -nostdin asterisk:5060 \

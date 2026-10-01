@@ -3,7 +3,7 @@
 # (run-scenarios.sh) and the named steps (steps.sh, trunk-status.sh, cert-sync.sh) alike, by the
 # same mechanism; unset or empty, everything matches, the way a bare `ONLY=*` would. The stack's
 # own prerequisites (bring-up, tenant configuration, device registration) are not names this
-# selects among at all — run.sh runs them unconditionally, REUSE=1 aside.
+# selects among at all — run.sh runs them unconditionally, REUSE aside.
 
 IFS=',' read -ra ONLY_PATTERNS <<<"${ONLY:-*}"
 

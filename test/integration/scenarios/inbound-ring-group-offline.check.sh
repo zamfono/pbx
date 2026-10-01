@@ -3,5 +3,10 @@
 # mailbox at once, without offering it to any phone.
 set -euo pipefail
 
-read -r _ _ group_id _ _ _ < /tmp/zamfono-offline
+api_base=$1
+token=$2
+# shellcheck source=_lib.sh
+. "$(dirname "$0")/_lib.sh"
+
+read -r _ _ group_id _ _ _ < "$(state_file offline)"
 bash "$(dirname "$0")/_unavailable-check.sh" "$1" "$2" "$3" "$group_id" 20

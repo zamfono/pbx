@@ -56,9 +56,11 @@ newest_call() {
   api GET "/calls/$(api GET /calls | jsonfield items.0.id)"
 }
 
-# Scenario state a setup leaves for its check and teardown, under one file per scenario.
+# Scenario state a setup leaves for its check and teardown, under one file per scenario, in the
+# run's own directory (run.sh's `STATE_DIR`).
 state_file() {
-  printf '/tmp/zamfono-%s\n' "$1"
+  mkdir -p "${STATE_DIR:?set by run.sh}"
+  printf '%s/%s\n' "$STATE_DIR" "$1"
 }
 
 # The id of the live trunk named `$1`.

@@ -10,7 +10,7 @@ token=$2
 # shellcheck source=_lib.sh
 . "$(dirname "$0")/_lib.sh"
 
-read -r group_id _ < /tmp/zamfono-skip-busy
+read -r group_id _ < "$(state_file skip-busy)"
 bash "$(dirname "$0")/_unavailable-check.sh" "$1" "$2" "$3" "$group_id" 20
 
 api GET /calls | python3 -c '

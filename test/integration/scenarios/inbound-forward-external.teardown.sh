@@ -7,5 +7,5 @@ token=$2
 # shellcheck source=_lib.sh
 . "$(dirname "$0")/_lib.sh"
 
-api PUT "/users/$(cat /tmp/zamfono-forward-user)/forwarding" '{"rules":[]}' >/dev/null
-rm -f /tmp/zamfono-forward-user
+api PUT "/users/$(cat "$(state_file forward-user)")/forwarding" '{"rules":[]}' >/dev/null
+rm -f "$(state_file forward-user)"

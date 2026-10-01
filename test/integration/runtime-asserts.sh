@@ -1,7 +1,8 @@
 # Sourced by `run.sh`: the two of §6.3 "Runtimes" four guarded features that are not asserted
 # inline there (the namespace share and the migrate exit code are, right where the stack comes
-# up). Reads `run.sh`'s own `COMPOSE`, `compose_files`, `RUNTIME`, `here` and `fail`, and runs
-# with `run.sh`'s own working directory, `deploy/`, so `compose.yaml` resolves as a relative path.
+# up). Reads `run.sh`'s own `COMPOSE`, `compose_args`, `run_dir`, `RUNTIME`, `here` and `fail`,
+# and runs with `run.sh`'s own working directory, the stack directory, so `compose.yaml` resolves
+# as a relative path.
 
 # §6.3 Runtimes: "the health-gated `depends_on`, the `service_completed_successfully` condition
 # on the one-shot `migrate` service ... asserted explicitly rather than inferring them from a
@@ -11,9 +12,9 @@
 assert_runtime_ordering() {
   echo '== §6.3 Runtimes: depends_on ordered api/core after migrate, core after api healthy =='
   local migrate_id api_id core_id
-  migrate_id=$($COMPOSE "${compose_files[@]}" ps -a -q migrate)
-  api_id=$($COMPOSE "${compose_files[@]}" ps -q api)
-  core_id=$($COMPOSE "${compose_files[@]}" ps -q core)
+  migrate_id=$($COMPOSE "${compose_args[@]}" ps -a -q migrate)
+  api_id=$($COMPOSE "${compose_args[@]}" ps -q api)
+  core_id=$($COMPOSE "${compose_args[@]}" ps -q core)
   [ -n "$migrate_id" ] && [ -n "$api_id" ] && [ -n "$core_id" ] \
     || fail "could not resolve the migrate/api/core container ids for the ordering assertion"
 
@@ -29,8 +30,8 @@ assert_runtime_ordering() {
 assert_shared_namespace() {
   echo '== §6.3 Runtimes: proxy shares the asterisk network namespace =='
   local proxy_ns asterisk_ns
-  proxy_ns=$($COMPOSE "${compose_files[@]}" exec -T proxy readlink /proc/self/ns/net)
-  asterisk_ns=$($COMPOSE "${compose_files[@]}" exec -T asterisk readlink /proc/self/ns/net)
+  proxy_ns=$($COMPOSE "${compose_args[@]}" exec -T proxy readlink /proc/self/ns/net)
+  asterisk_ns=$($COMPOSE "${compose_args[@]}" exec -T asterisk readlink /proc/self/ns/net)
   [ -n "$proxy_ns" ] && [ "$proxy_ns" = "$asterisk_ns" ] \
     || fail "proxy and asterisk do not share a network namespace (network_mode: service:)"
 }
@@ -60,7 +61,8 @@ public_tls_transports_bound() {
 
 assert_public_network_address() {
   echo '== §6.3 Runtimes: asterisk holds STACK_IPV4 on the public network (compose.macvlan.yaml) =='
-  local macvlan_files=(-f compose.yaml -f compose.macvlan.yaml -f "$here/compose.test.yaml")
+  local macvlan_files=(-p "$(stack_project "$run_dir")" -f compose.yaml -f compose.macvlan.yaml
+    -f "$here/compose.test.yaml")
   local subnet=198.51.100.0/29 gateway=198.51.100.1 stack_ip=198.51.100.2
   local ok=true reason='' cid addr
 
@@ -70,8 +72,8 @@ assert_public_network_address() {
   "$RUNTIME" network create -d bridge --subnet "$subnet" --gateway "$gateway" public >/dev/null \
     || fail "could not create the bridge-backed 'public' network"
 
-  # This runs before run.sh writes deploy/.env, and asterisk's entrypoint exits without the two
-  # passwords; a restarting container has no address to inspect, so the check would pass only
+  # This runs before setup.sh writes the stack's .env, and asterisk's entrypoint exits without
+  # the two passwords; a restarting container has no address to inspect, so the check would pass only
   # when it caught one of the restarts' brief moments up. Throwaway values keep it running.
   if STACK_IPV4=$stack_ip ARI_PASSWORD=unused AMI_PASSWORD=unused \
     $COMPOSE "${macvlan_files[@]}" up -d asterisk; then

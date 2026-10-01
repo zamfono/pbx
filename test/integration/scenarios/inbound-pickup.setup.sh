@@ -21,7 +21,7 @@ print(json.dumps(json.load(sys.stdin)['items'][0]['allowedIps']))
 
 picker_id=$(api POST /users '{"name":"CI Picker","email":"picker@ci.test","extension":"102"}' \
   | jsonfield user.id)
-printf '%s\n' "$picker_id" > /tmp/zamfono-picker-user
+printf '%s\n' "$picker_id" > "$(state_file picker-user)"
 
 read -r sip_username sip_password < <(api POST "/users/$picker_id/devices" \
   "{\"kind\":\"manual\",\"label\":\"ci-picker\",\"transport\":\"plain\",\"allowedIps\":$allowed}" \

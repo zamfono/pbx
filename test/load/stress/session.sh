@@ -52,7 +52,7 @@ export PROXY_IMAGE=${PROXY_IMAGE:-zamfono/proxy:stress}
 METRICS_TOKEN=$(openssl rand -hex 16)
 export METRICS_TOKEN
 
-compose_files=(-f compose.yaml -f compose.ports.yaml -f "$load/compose.load.yaml"
+compose_args=(-f compose.yaml -f compose.ports.yaml -f "$load/compose.load.yaml"
   -f "$here/compose.stress.yaml")
 # shellcheck source=test/load/lib-stack.sh
 . "$load/lib-stack.sh"
@@ -85,7 +85,7 @@ cleanup() {
     cp -r "$LOAD_GEN_DIR"/bs-* "$OUT_DIR/" 2>/dev/null || true
     dc down -v --remove-orphans >>"$OUT_DIR/session.log" 2>&1 || true
   fi
-  rm -f "$repo/deploy/.env"
+  rm -rf "$STACK_DIR"
   rm -rf "$LOAD_GEN_DIR"
   log "teardown complete"
 }
@@ -118,7 +118,8 @@ bash "$here/configure-stress.sh" "$api_base" "$token" "$trunk_ip" "$DEVICES" "$L
   2>> "$OUT_DIR/session.log" || fail "tenant configuration failed"
 cp "$LOAD_GEN_DIR/recorded.txt" "$LOAD_GEN_DIR/users.txt" "$OUT_DIR/"
 
-MEDIA_REC_DIR="$("$RUNTIME" volume inspect deploy_media --format '{{.Mountpoint}}')/recordings"
+MEDIA_REC_DIR="$("$RUNTIME" volume inspect "$(stack_project "$STACK_DIR")_media" \
+  --format '{{.Mountpoint}}')/recordings"
 containers=()
 for svc in asterisk core api proxy sipp sipp-provider devices; do
   containers+=("$(dc ps -q "$svc")=$svc")

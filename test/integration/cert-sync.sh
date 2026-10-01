@@ -17,12 +17,12 @@
 # call-history assertions that read from `api`. §6.4: a synced certificate change reloads the TLS
 # transport, which "can briefly drop TLS registrations" and restarting `api` (the trigger this
 # step uses) is itself a short outage of the REST surface — harmless once nothing else depends on
-# either. That restart is also why REUSE=1 warns before selecting this step: a certificate an
+# either. That restart is also why REUSE warns before selecting this step: a certificate an
 # earlier run on the same stack already synced stays synced (Caddy's stored certificate does not
 # change between runs, so the comparisons below still hold), but the restart itself briefly repeats
-# that outage against a stack other REUSE=1 scenarios may still be relying on staying up.
+# that outage against a stack other REUSE scenarios may still be relying on staying up.
 #
-# Reads `run.sh`'s own COMPOSE, compose_files, FQDN, api_base, FWD and fail.
+# Reads `run.sh`'s own COMPOSE, compose_args, FQDN, api_base, FWD and fail.
 
 CERT_SYNC_WAIT_ATTEMPTS=60
 
@@ -35,7 +35,7 @@ cert_sync_presented_fingerprint() {
   # Captured before `openssl x509` reads it: x509 stops at the first PEM block, and under
   # pipefail Podman's compose provider reports the unread rest's SIGPIPE as a failure.
   local handshake
-  handshake=$($COMPOSE "${compose_files[@]}" exec -T asterisk sh -c \
+  handshake=$($COMPOSE "${compose_args[@]}" exec -T asterisk sh -c \
     "echo | openssl s_client -connect 127.0.0.1:5061 -servername $FQDN 2>/dev/null" || true)
   printf '%s\n' "$handshake" | openssl x509 -noout -fingerprint -sha256 2>/dev/null | cut -d= -f2
 }
@@ -49,7 +49,7 @@ cert_sync_presented_fingerprint() {
 # this scenario runs, so that "before" snapshot is routinely the real certificate already, not
 # the placeholder — device-tls-srtp.setup.sh hits the same thing and copes the same way.
 cert_sync_presented_is_self_signed() {
-  issuer_subject=$($COMPOSE "${compose_files[@]}" exec -T asterisk sh -c \
+  issuer_subject=$($COMPOSE "${compose_args[@]}" exec -T asterisk sh -c \
     "echo | openssl s_client -connect 127.0.0.1:5061 -servername $FQDN 2>/dev/null" \
     | openssl x509 -noout -issuer -subject 2>/dev/null)
   issuer=$(printf '%s\n' "$issuer_subject" | sed -n 's/^issuer=//p')
@@ -62,17 +62,17 @@ cert_sync_presented_is_self_signed() {
 # pin down.
 cert_sync_dump_extra_diagnostics() {
   echo '-- caddy-data certificates tree --' >&2
-  $COMPOSE "${compose_files[@]}" exec -T proxy find /data/caddy/certificates >&2 2>&1 || true
+  $COMPOSE "${compose_args[@]}" exec -T proxy find /data/caddy/certificates >&2 2>&1 || true
   echo '-- caddy-data zamfono/ (the hook copy, §6.4) --' >&2
-  $COMPOSE "${compose_files[@]}" exec -T proxy ls -la /data/zamfono >&2 2>&1 || true
+  $COMPOSE "${compose_args[@]}" exec -T proxy ls -la /data/zamfono >&2 2>&1 || true
   echo '-- proxy log lines from the hook --' >&2
-  $COMPOSE "${compose_files[@]}" logs --no-color proxy 2>&1 | grep zamfono-cert-hook >&2 || true
+  $COMPOSE "${compose_args[@]}" logs --no-color proxy 2>&1 | grep zamfono-cert-hook >&2 || true
   echo '-- api healthz body --' >&2
   curl -fsS "${FWD[@]}" "$api_base/healthz" >&2 2>&1 || true
   echo '-- api log lines mentioning "cert" --' >&2
-  $COMPOSE "${compose_files[@]}" logs --no-color api 2>&1 | grep -i cert >&2 || true
+  $COMPOSE "${compose_args[@]}" logs --no-color api 2>&1 | grep -i cert >&2 || true
   echo '-- asterisk-config tls dir --' >&2
-  $COMPOSE "${compose_files[@]}" exec -T asterisk ls -la /etc/asterisk/gen/tls >&2 2>&1 || true
+  $COMPOSE "${compose_args[@]}" exec -T asterisk ls -la /etc/asterisk/gen/tls >&2 2>&1 || true
 }
 
 run_cert_sync_step() {
@@ -80,7 +80,7 @@ run_cert_sync_step() {
   local cert_sync_caddy_path=''
   for _ in $(seq 1 $CERT_SYNC_WAIT_ATTEMPTS); do
     local found
-    found=$($COMPOSE "${compose_files[@]}" exec -T proxy sh -c \
+    found=$($COMPOSE "${compose_args[@]}" exec -T proxy sh -c \
       "find /data/caddy/certificates -type f -name '$FQDN.crt' 2>/dev/null | head -1" \
       | tr -d '\r')
     if [ -n "$found" ]; then
@@ -97,7 +97,7 @@ run_cert_sync_step() {
   # Captured first, for the same SIGPIPE reason as cert_sync_presented_fingerprint: Caddy's .crt
   # carries the chain, and x509 reads only the leaf.
   local cert_sync_caddy_fp cert_sync_caddy_pem
-  cert_sync_caddy_pem=$($COMPOSE "${compose_files[@]}" exec -T proxy cat "$cert_sync_caddy_path")
+  cert_sync_caddy_pem=$($COMPOSE "${compose_args[@]}" exec -T proxy cat "$cert_sync_caddy_path")
   cert_sync_caddy_fp=$(printf '%s\n' "$cert_sync_caddy_pem" \
     | openssl x509 -noout -fingerprint -sha256 2>/dev/null | cut -d= -f2)
   if [ -z "$cert_sync_caddy_fp" ]; then
@@ -109,7 +109,7 @@ run_cert_sync_step() {
   # `/internal/certificate` must have been answered 2xx, or a real issuance waits for the hourly
   # sync.
   echo '== §6.4 cert sync: the hook notified api =='
-  if ! $COMPOSE "${compose_files[@]}" logs --no-color proxy 2>&1 \
+  if ! $COMPOSE "${compose_args[@]}" logs --no-color proxy 2>&1 \
     | grep 'zamfono-cert-hook: api notified' >/dev/null; then
     cert_sync_dump_extra_diagnostics
     fail "the cert_obtained hook never notified api (POST /internal/certificate refused or unreachable)"
@@ -126,7 +126,7 @@ run_cert_sync_step() {
   fi
 
   echo '== §6.4 cert sync: restarting api, the same sync that runs at api start =='
-  $COMPOSE "${compose_files[@]}" restart api >/dev/null
+  $COMPOSE "${compose_args[@]}" restart api >/dev/null
 
   local cert_sync_api_ready=false
   for _ in $(seq 1 $CERT_SYNC_WAIT_ATTEMPTS); do

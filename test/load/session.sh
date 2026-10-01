@@ -40,9 +40,7 @@ API_IMAGE=${API_IMAGE:-zamfono/api:load}
 PROXY_IMAGE=${PROXY_IMAGE:-zamfono/proxy:load}
 export ASTERISK_IMAGE MIGRATE_IMAGE CORE_IMAGE API_IMAGE PROXY_IMAGE
 
-cd "$repo/deploy"
-compose_files=(-f compose.yaml -f compose.ports.yaml -f "$here/compose.load.yaml")
-compose_cmd="$COMPOSE ${compose_files[*]}"
+compose_args=(-f compose.yaml -f compose.ports.yaml -f "$here/compose.load.yaml")
 # shellcheck source=test/load/lib-stack.sh
 . "$here/lib-stack.sh"
 
@@ -52,7 +50,7 @@ cleanup() {
   if [ "$STACK_UP" = true ]; then
     dc down -v --remove-orphans >>"$OUT_DIR/session.log" 2>&1 || true
   fi
-  rm -f "$repo/deploy/.env"
+  rm -rf "$STACK_DIR"
   rm -rf "$LOAD_GEN_DIR"
   for img in "$ASTERISK_IMAGE" "$MIGRATE_IMAGE" "$CORE_IMAGE" "$API_IMAGE"; do
     docker rmi "$img" >>"$OUT_DIR/session.log" 2>&1 || true
@@ -125,7 +123,7 @@ containers=(
   docker images --format '{{.Repository}}:{{.Tag}}\t{{.Size}}' \
     | grep -E "zamfono/(asterisk|core|api|migrate):load|caddy:2|ctaloi/sipp"
   echo
-  echo '-- volume sizes (compose project deploy) --'
+  echo '-- volume sizes (the stack Compose project) --'
   stack_volume_sizes
 } > "$OUT_DIR/disk-footprint-before-load.txt"
 
@@ -170,7 +168,7 @@ python3 "$here/aggregate_step.py" "$OUT_DIR/stats.csv" "$OUT_DIR/net.csv" idle-2
   | tee -a "$OUT_DIR/summary.txt"
 
 {
-  echo '-- volume sizes after the run (compose project deploy) --'
+  echo '-- volume sizes after the run (the stack Compose project) --'
   stack_volume_sizes
 } > "$OUT_DIR/disk-footprint-after-load.txt"
 

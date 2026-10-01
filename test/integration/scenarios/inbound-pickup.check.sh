@@ -26,7 +26,7 @@ if [ "$code" != 0 ]; then
   exit 1
 fi
 
-picker_id=$(cat /tmp/zamfono-picker-user)
+picker_id=$(cat "$(state_file picker-user)")
 api GET /calls | python3 -c '
 import json, sys
 picker = sys.argv[1]
