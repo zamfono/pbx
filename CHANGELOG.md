@@ -35,6 +35,15 @@ why the specified behaviour changed; the commit history, how.
 - `zamfono.help` with an unknown topic still fails with 404, but its message now lists every
   topic; `index` lists them like a call without a topic, and the server instructions say so.
 
+### Fixed
+
+- Claude Code could not connect to any Zamfono stack: its sign-in page showed "Something went
+  wrong while signing in." Claude Code receives the sign-in result on `localhost` at a port it
+  picks anew each time, and the stack accepted such a port only from clients registered as
+  `native` and only on `127.0.0.1`. A redirect to `localhost`, `127.0.0.1` or `[::1]` over
+  `http` is now accepted on any port, for every client, when the client registered that host
+  and path; any other redirect URI must still match exactly.
+
 ## [0.1.0] - 2026-09-30
 
 ### Added

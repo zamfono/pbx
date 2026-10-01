@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import process from 'node:process';
 import { isHttpError, isRedirect, type RequestEvent } from '@sveltejs/kit';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
@@ -589,5 +589,119 @@ describe('GET /oauth/authorize (load)', () => {
       throw new Error('expected an HttpError');
     }
     expect(err.status).toBe(400);
+  });
+});
+
+describe("Claude Code's sign-in on a random loopback port (RFC 8252 §7.3)", () => {
+  const CLAUDE_CODE_CLIENT_ID =
+    'https://claude.ai/oauth/claude-code-client-metadata';
+  const REDIRECT_URI = 'http://localhost:49536/callback';
+  const realFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  /** Serves Claude Code's metadata document as it did on 2026-10-01: no `application_type`, and
+   *  redirect URIs without a port. */
+  function serveClaudeCodeDocument(): void {
+    globalThis.fetch = () =>
+      Promise.resolve(
+        new Response(
+          /* eslint-disable camelcase -- RFC 7591 mandates these snake_case wire fields */
+          JSON.stringify({
+            client_id: CLAUDE_CODE_CLIENT_ID,
+            client_name: 'Claude Code',
+            client_uri: 'https://claude.ai',
+            redirect_uris: [
+              'http://localhost/callback',
+              'http://127.0.0.1/callback'
+            ],
+            grant_types: ['authorization_code', 'refresh_token'],
+            response_types: ['code'],
+            token_endpoint_auth_method: 'none'
+          }),
+          /* eslint-enable camelcase -- RFC 7591 mandates these snake_case wire fields */
+          { headers: { 'content-type': 'application/json' } }
+        )
+      );
+  }
+
+  /** Logs in and approves for Claude Code at {@link REDIRECT_URI}; the code it is redirected with. */
+  async function codeFor(email: string, verifier: string): Promise<string> {
+    serveClaudeCodeDocument();
+    await seedUser(getDb(), email);
+    const cookies = cookieJar();
+    /* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
+    const loginResult = await loginSubmit(
+      eventFor(cookies),
+      loginPayload(email, PASSWORD, {
+        client_id: CLAUDE_CODE_CLIENT_ID,
+        redirect_uri: REDIRECT_URI,
+        state: 'state-claude-code',
+        code_challenge: createHash('sha256')
+          .update(verifier)
+          .digest('base64url'),
+        scope: 'openid'
+      })
+    );
+    /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
+    expect(loginResult).toEqual({
+      needsConsent: true,
+      clientName: 'Claude Code',
+      redirectUri: REDIRECT_URI
+    });
+    const err = await approveConsentSubmit(eventFor(cookies)).catch(
+      (caught: unknown) => caught
+    );
+    if (!isRedirect(err)) {
+      throw new Error('expected a redirect');
+    }
+    const location = new URL(err.location);
+    expect(`${location.origin}${location.pathname}`).toBe(REDIRECT_URI);
+    return location.searchParams.get('code') ?? '';
+  }
+
+  function redeem(
+    code: string,
+    verifier: string,
+    redirectUri: string
+  ): Promise<Response> {
+    return tokenEndpoint(
+      {
+        db: getDb(),
+        jwtSecret: 'test-secret',
+        codes: authCodeStore,
+        origin: ORIGIN,
+        now: nowIso
+      },
+      new Request(`${ORIGIN}/oauth/token`, {
+        method: 'POST',
+        /* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: redirectUri,
+          client_id: CLAUDE_CODE_CLIENT_ID,
+          code_verifier: verifier
+        })
+        /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
+      })
+    );
+  }
+
+  it('authorizes the port-bearing redirect and exchanges its code for tokens', async () => {
+    const verifier = 'verifier-claude-code';
+    const code = await codeFor('claude-code@example.com', verifier);
+    const response = await redeem(code, verifier, REDIRECT_URI);
+    expect(response.status).toBe(200);
+  });
+
+  it('refuses the code at the registered port-less URI: the exchange matches the request exactly (OAuth 2.1 §4.1.3)', async () => {
+    const verifier = 'verifier-claude-code-portless';
+    const code = await codeFor('claude-code-portless@example.com', verifier);
+    const response = await redeem(code, verifier, 'http://localhost/callback');
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'invalid_grant' });
   });
 });

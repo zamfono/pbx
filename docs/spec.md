@@ -4,6 +4,9 @@
 
 Every change made to this specification during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-01 · §5.2 Client registration.** A redirect URI matches a registered one exactly, except that an `http` URI on a loopback host, `127.0.0.1`, `[::1]` or `localhost`, carries any port at request time when a registered URI names the same host, path and query, as RFC 8252 §7.3 requires, for a `web` client as for a `native` one; a registered `localhost` URI does not admit `127.0.0.1`, nor the reverse. Before, only a `native` client's `127.0.0.1` URIs did, and the code exchange still presents the authorization request's own redirect URI, port included.
+*Why:* found live: Claude Code's client metadata registers http://localhost/callback without a port or application_type, and the stack refused its random-port loopback redirect, so Claude Code could not sign in to any stack.
+
 **2026-10-01 · §6.3 Migrations, §10.** `db/` is an npm workspace of the root, like `packages/*`, so one `npm ci` and the root lockfile cover it and `kysely` and `better-sqlite3` are locked once for the migrations and the app; it no longer has a lockfile of its own. The `migrate` image is built from the repository root by `images/migrate/Dockerfile`, beside the other images, installing only the `db` workspace's production dependencies, so what it holds and runs is unchanged.
 *Why:* requested by the product owner: db/ was an npm project of its own, so every checkout needed two installs and kysely and better-sqlite3 were locked twice, free to drift apart between migrations and the app.
 
@@ -314,7 +317,7 @@ Three long-running application services run per stack, plus the TLS proxy and a 
 
 1. **Client ID Metadata Documents.** The `client_id` is an HTTPS URL to the client's JSON metadata. The server fetches the document, checks that its `client_id` equals the URL, validates the redirect URI against it, and caches it per its HTTP cache headers. Support is advertised with `client_id_metadata_document_supported: true`.
 2. **Dynamic client registration** (RFC 7591) at `/oauth/register`, for clients without a metadata document. `application_type`, the OpenID Connect registration field, is required: `native` for CLIs and desktop apps, `web` otherwise. Registration is stateless: the endpoint validates the request (`client_name` at most 100 characters, at most 5 redirect URIs of at most 512 characters each) and returns a `client_id` that is the metadata itself, encrypted with the stack's secretbox key (§5.4) and base64url-encoded. Nothing is written, so the anonymous endpoint cannot fill the database.
-Registered clients are public clients: PKCE, no secret.
+Registered clients are public clients: PKCE, no secret. A redirect URI matches a registered one exactly, except that an `http` URI on a loopback host, `127.0.0.1`, `[::1]` or `localhost`, carries any port when a registered URI names the same host, path and query (RFC 8252 §7.3), whatever the client's `application_type`.
 
 **Client rows.** At `/oauth/authorize` the server decrypts a metadata `client_id` or fetches the document behind a URL `client_id`, and validates the redirect URI from that. On the first successful authorization it upserts the client's `oauth_clients` row (id, name, kind), so a row exists exactly for clients a real user has logged in with, and the foreign key from `tokens` holds for every kind. The daily job deletes a row once no `tokens` row references it and its last token expired more than 30 days ago.
 
