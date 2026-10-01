@@ -38,18 +38,21 @@ export const HOST_RUN_STALE_MS = 3_600_000;
 export type Runner = {
   /** The updater's own run while it runs, else `.update/state.json` as it is now. */
   current: () => UpdateState;
-  /** Starts `update.sh <to>`; the caller has checked that no update is running. */
-  start: (from: string, to: string, requester?: RunRequester) => Promise<void>;
-  /** Resolves once the running update, if any, has ended; for tests. */
-  settled: () => Promise<void>;
+  /**
+   * Starts `update.sh <to>`; the caller has checked that no update is running. Resolves once the
+   * run is recorded as `running`, with `finished`, which resolves once its outcome is on disk.
+   */
+  start: (
+    from: string,
+    to: string,
+    requester?: RunRequester
+  ) => Promise<{ finished: Promise<void> }>;
 };
 
 export type RunnerOptions = {
   stackDir: string;
   project: ComposeProject;
   socketPath: string;
-  /** The script to run; `update.sh` in the project's own directory unless a test says otherwise. */
-  script?: string;
   now?: () => string;
 };
 
@@ -173,13 +176,9 @@ function spawnUpdate(
 
 export async function createRunner(options: RunnerOptions): Promise<Runner> {
   const now = options.now ?? (() => new Date().toISOString());
-  const holder: { state: UpdateState; done: Promise<void> } = {
-    state: await loadState(options.stackDir, now),
-    done: Promise.resolve()
-  };
+  let state = await loadState(options.stackDir, now);
   const logFile = path.join(options.stackDir, '.update', 'update.log');
-  const script =
-    options.script ?? path.join(options.project.workingDir, 'update.sh');
+  const script = path.join(options.project.workingDir, 'update.sh');
 
   async function finish(
     code: number | null,
@@ -187,7 +186,7 @@ export async function createRunner(options: RunnerOptions): Promise<Runner> {
     startedAt: string
   ): Promise<void> {
     const ok = code === 0;
-    holder.state = {
+    state = {
       state: ok ? 'succeeded' : 'failed',
       ...run,
       startedAt,
@@ -199,33 +198,29 @@ export async function createRunner(options: RunnerOptions): Promise<Runner> {
               (await logTail(logFile)) || `update.sh exited ${String(code)}`
           })
     };
-    await persist(options.stackDir, holder.state);
+    await persist(options.stackDir, state);
   }
 
   return {
     current: () =>
-      holder.state.state === 'running'
-        ? holder.state
-        : readState(options.stackDir, holder.state, now()),
-    settled: async () => holder.done,
+      state.state === 'running'
+        ? state
+        : readState(options.stackDir, state, now()),
     async start(from, to, requester) {
-      // Settled when the run has ended and its outcome is on disk; set before the first await,
-      // so `settled()` never returns a previous run's.
       const done = Promise.withResolvers<undefined>();
-      holder.done = done.promise;
       const startedAt = now();
       const run = { from, to, ...requester };
-      holder.state = { state: 'running', ...run, startedAt };
-      await persist(options.stackDir, holder.state);
+      state = { state: 'running', ...run, startedAt };
+      await persist(options.stackDir, state);
       const log = await open(logFile, 'w');
       const child = spawnUpdate(script, to, options, log.fd);
-      const ended = { once: false };
+      let ended = false;
       // A child that fails to spawn emits 'error', and may or may not emit 'close' after it.
       const end = (code: number | null): void => {
-        if (ended.once) {
+        if (ended) {
           return;
         }
-        ended.once = true;
+        ended = true;
         log
           .close()
           .then(async () => finish(code, run, startedAt))
@@ -240,6 +235,7 @@ export async function createRunner(options: RunnerOptions): Promise<Runner> {
       };
       child.once('error', end.bind(undefined, null));
       child.once('close', end);
+      return { finished: done.promise };
     }
   };
 }

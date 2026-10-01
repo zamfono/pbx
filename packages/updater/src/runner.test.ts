@@ -9,14 +9,15 @@ async function tempDir(): Promise<string> {
   return mkdtemp(path.join(tmpdir(), 'zamfono-updater-'));
 }
 
-/** A stand-in for update.sh that prints what it was given and exits with `code`. */
-async function fakeScript(dir: string, code: number): Promise<string> {
-  const script = path.join(dir, 'update.sh');
+/**
+ * A stand-in for update.sh, where the runner runs it, in the project's directory: it prints what
+ * it was given and exits with `code`.
+ */
+async function fakeScript(dir: string, code: number): Promise<void> {
   await writeFile(
-    script,
+    path.join(dir, 'update.sh'),
     `echo "args=$*"\necho "updater=$ZAMFONO_UPDATER files=$ZAMFONO_COMPOSE_FILES project=$COMPOSE_PROJECT_NAME host=$DOCKER_HOST"\nexit ${code}\n`
   );
-  return script;
 }
 
 function project(workingDir: string): {
@@ -40,12 +41,12 @@ describe('createRunner', () => {
     const runner = await createRunner({
       stackDir,
       project: project(stackDir),
-      socketPath: '/var/run/docker.sock',
-      script: await fakeScript(stackDir, 0)
+      socketPath: '/var/run/docker.sock'
     });
-    await runner.start('0.0.6', '0.0.7');
+    await fakeScript(stackDir, 0);
+    const { finished } = await runner.start('0.0.6', '0.0.7');
     expect(runner.current()).toMatchObject({ state: 'running', to: '0.0.7' });
-    await runner.settled();
+    await finished;
     expect(runner.current()).toMatchObject({
       state: 'succeeded',
       from: '0.0.6',
@@ -67,12 +68,14 @@ describe('createRunner', () => {
     const runner = await createRunner({
       stackDir,
       project: project(stackDir),
-      socketPath: '/s',
-      script: await fakeScript(stackDir, 0)
+      socketPath: '/s'
     });
-    await runner.start('0.0.6', '0.0.7', { trigger: 'automatic' });
+    await fakeScript(stackDir, 0);
+    const { finished } = await runner.start('0.0.6', '0.0.7', {
+      trigger: 'automatic'
+    });
     expect(runner.current()).toMatchObject({ trigger: 'automatic' });
-    await runner.settled();
+    await finished;
     expect(await loadState(stackDir)).toMatchObject({
       state: 'succeeded',
       trigger: 'automatic'
@@ -84,11 +87,11 @@ describe('createRunner', () => {
     const runner = await createRunner({
       stackDir,
       project: project(stackDir),
-      socketPath: '/s',
-      script: await fakeScript(stackDir, 1)
+      socketPath: '/s'
     });
-    await runner.start('0.0.6', '0.0.7');
-    await runner.settled();
+    await fakeScript(stackDir, 1);
+    const { finished } = await runner.start('0.0.6', '0.0.7');
+    await finished;
     expect(runner.current().state).toBe('failed');
     expect(runner.current().error).toContain('args=0.0.7');
   });
@@ -98,11 +101,11 @@ describe('createRunner', () => {
     const runner = await createRunner({
       stackDir,
       project: project(stackDir),
-      socketPath: '/s',
-      script: await fakeScript(stackDir, 0)
+      socketPath: '/s'
     });
-    await runner.start('0.0.6', '0.0.7');
-    await runner.settled();
+    await fakeScript(stackDir, 0);
+    const { finished } = await runner.start('0.0.6', '0.0.7');
+    await finished;
     const hostRun = {
       state: 'succeeded',
       from: '0.0.7',
@@ -125,15 +128,15 @@ describe('loadState', () => {
     const runner = await createRunner({
       stackDir,
       project: project(stackDir),
-      socketPath: '/s',
-      script: await fakeScript(stackDir, 0)
+      socketPath: '/s'
     });
-    await runner.start('0.0.6', '0.0.7');
+    await fakeScript(stackDir, 0);
+    const { finished } = await runner.start('0.0.6', '0.0.7');
     // Read back before the child ends, as a restarted updater would find it.
     const state = await loadState(stackDir);
     expect(state).toMatchObject({ state: 'failed', to: '0.0.7' });
     expect(state.error).toContain('interrupted');
-    await runner.settled();
+    await finished;
   });
 
   it('leaves a running host run alone, unless it started HOST_RUN_STALE_MS ago', async () => {

@@ -34,16 +34,15 @@ function fakeReleases(latest: Version, known: Version[] = [latest]): Releases {
 }
 
 function fakeRunner(): Runner & { started: string[][] } {
-  const holder: { state: UpdateState } = { state: { state: 'idle' } };
+  let state: UpdateState = { state: 'idle' };
   const started: string[][] = [];
   return {
     started,
-    current: () => holder.state,
-    settled: () => Promise.resolve(),
+    current: () => state,
     start: (from, to, requester) => {
       started.push([from, to]);
-      holder.state = { state: 'running', from, to, ...requester };
-      return Promise.resolve();
+      state = { state: 'running', from, to, ...requester };
+      return Promise.resolve({ finished: Promise.resolve() });
     }
   };
 }
