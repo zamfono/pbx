@@ -1,18 +1,4 @@
-export type FeatureCodeKey =
-  | 'pickup'
-  | 'dndOn'
-  | 'dndOff'
-  | 'mailbox'
-  | 'ownVoicemail'
-  | 'deposit'
-  | 'addParty'
-  | 'clirOn'
-  | 'clirOff'
-  | 'park';
-
-export type FeatureCodes = Record<FeatureCodeKey, string>;
-
-const FEATURE_CODE_KEYS: FeatureCodeKey[] = [
+const FEATURE_CODE_KEYS = [
   'pickup',
   'dndOn',
   'dndOff',
@@ -23,7 +9,10 @@ const FEATURE_CODE_KEYS: FeatureCodeKey[] = [
   'clirOn',
   'clirOff',
   'park'
-];
+] as const;
+export type FeatureCodeKey = (typeof FEATURE_CODE_KEYS)[number];
+
+export type FeatureCodes = Record<FeatureCodeKey, string>;
 
 /** Column default of `settings.feature_codes_json` (§9.3 table). */
 export const DEFAULT_FEATURE_CODES: FeatureCodes = {
