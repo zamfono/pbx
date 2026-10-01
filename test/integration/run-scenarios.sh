@@ -46,6 +46,8 @@ load_roles() {
   [ ! -f "$roles" ] || . "$roles"
 }
 
+# The caller's port in every container: 5060 belongs to the trunk's host in `sipp`, and to the
+# registrar a scenario runs in `sipp-provider`.
 CALLER_PORT=5080
 IDLE_ATTEMPTS=10
 # How long a scenario's sipp runs get to end once its calls are over; a run still in a call by
@@ -65,13 +67,33 @@ trunk_aors() {
     | awk '$1 == "Contact:" && $2 ~ /^trunk-/ { split($2, aor, "/"); print aor[1] }'
 }
 
-# Starts the trunk side answering on the port the trunk endpoint dials, tracing every message to
-# `/tmp/trunk-messages.log` for a check to read the INVITEs it received. An `ip` trunk is reachable
-# only once its qualify is answered, and the core skips a trunk it holds unreachable without
-# sending an INVITE (§9.4 "Route fallthrough", "Provisioning and status"); until this run, nothing
-# answered that probe, so every trunk is probed now, and the call waits until the core itself
-# reports every `ip` trunk reachable, or unmonitored where its qualify is off.
+# The trunk's host answers its qualify between scenarios too, as a provider's does, and refuses
+# any call (`uas/refuse-403.xml`, which no scenario expects): Asterisk probes the `ip` trunks every
+# 60 s and on every PJSIP reload, so a configuration write, and a probe nothing answered times
+# out `qualify_timeout` later and is applied when it lands, after a later probe's answer too,
+# leaving the trunk unreachable for a call (§9.4 "Provisioning and status").
+start_trunk_idle() {
+  $COMPOSE "${compose_args[@]}" exec -T -d sipp sh -c \
+    'sh /scenarios/_sipp-run.sh trunk-idle -sf /scenarios/uas/refuse-403.xml -p 5060 -aa \
+      -nostdin asterisk:5060 > /tmp/trunk-idle.log 2>&1'
+  await_bound sipp 5060 || fail "the trunk's host did not start answering"
+}
+
+# Ends the idle run of `start_trunk_idle` (`_sipp-finish.sh`), for a run of a scenario's own to
+# take the port over; the probe a gap of a moment may miss is answered by its retransmission.
+end_trunk_idle() {
+  $COMPOSE "${compose_args[@]}" exec -T sipp sh /scenarios/_sipp-finish.sh "$FINISH_SECONDS" \
+    || fail "the trunk's idle host did not end"
+}
+
+# Starts the trunk side answering on the port the trunk endpoint dials, in place of the idle
+# host, tracing every message to `/tmp/trunk-messages.log` for a check to read the INVITEs it
+# received. An `ip` trunk is reachable only once its qualify is answered, and the core skips a
+# trunk it holds unreachable without sending an INVITE (§9.4 "Route fallthrough"), so every trunk
+# is probed, the setup's own among them, and the call waits until the core itself reports every
+# `ip` trunk reachable, or unmonitored where its qualify is off.
 start_trunk_side() {
+  end_trunk_idle
   $COMPOSE "${compose_args[@]}" exec -T sipp rm -f /tmp/trunk-messages.log
   $COMPOSE "${compose_args[@]}" exec -T -d sipp sh -c \
     "sh /scenarios/_sipp-run.sh trunk-$1 -sf /scenarios/uas/$1.xml -p 5060 -aa -nostdin \
@@ -160,6 +182,7 @@ for service in "${SIPP_SERVICES[@]}"; do
   $COMPOSE "${compose_args[@]}" exec -T "$service" \
     sh -c 'pkill -9 -x sipp; rm -rf /tmp/sipp-runs' || true
 done
+start_trunk_idle
 position=-1
 for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
   position=$((position + 1))
@@ -184,14 +207,8 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
     phone_account=${account:-$phone_account}
   fi
   # The trunk side answers before the phone starts, since the phone's own call may leave over it.
-  caller_port=5060
-  if [ -n "$TRUNK_UAS" ]; then
-    caller_port=$CALLER_PORT
-    start_trunk_side "$TRUNK_UAS"
-  fi
+  [ -z "$TRUNK_UAS" ] || start_trunk_side "$TRUNK_UAS"
   start_phone_side "$name"
-  # The second provider's own port 5060 belongs to its registrar, where a scenario runs one.
-  [ "$CALLER" = sipp ] || caller_port=$CALLER_PORT
   calls=1 dials=()
   if [ -n "$DIALS" ]; then
     calls=$(($(wc -l <"$here/scenarios/$DIALS") - 1))
@@ -203,7 +220,7 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
     # shellcheck disable=SC2086 # the extra arguments are separate words by design
     $COMPOSE "${compose_args[@]}" exec -T "$CALLER" \
       sipp -sf "/scenarios/$name.xml" -s "$MAIN_DID" -m "$calls" -l 1 \
-        -p "$caller_port" -timeout 90s \
+        -p "$CALLER_PORT" -timeout 90s \
         $CALLER_ARGS "${dials[@]}" -nostdin asterisk:5060 \
       || fail "sipp scenario $name did not complete"
   fi
@@ -218,6 +235,7 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
   fi
   assert_no_channels "$name"
   finish_sipp_runs "$name"
+  start_trunk_idle
   check="$here/scenarios/$name.check.sh"
   if [ -f "$check" ]; then
     bash "$check" "$api_base" "$token" "$compose_cmd" || fail "the history check for $name failed"
