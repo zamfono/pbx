@@ -16,8 +16,6 @@ import { fakeChannelVars } from './fakeRtp.js';
 import { FakeAriTransport, type FakeRequest } from './fakeTransport.js';
 import { defaultChannel, type AriEvent, type Channel } from './types.js';
 
-export { isPlacement, placedCallerId } from './fakeDial.js';
-
 const DEFAULT_ANSWER_AFTER_MS = 10;
 // A real playback takes some time to reach the end; a fixed short delay lets code that awaits
 // `PlaybackFinished` (announce, voicemail's greeting, the menu greeting) be exercised for real

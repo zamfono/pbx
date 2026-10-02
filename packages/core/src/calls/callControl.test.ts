@@ -23,6 +23,8 @@ import type { Pipeline } from './pipeline.js';
 const HTTP_CREATED = 201;
 const HTTP_NO_CONTENT = 204;
 const HTTP_BAD_REQUEST = 400;
+// Over the action routes' 65536-byte body cap (actionRoutes.ts's `MAX_ACTION_BODY_BYTES`).
+const OVERSIZED_BODY_BYTES = 65537;
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
 const HTTP_UNPROCESSABLE = 422;
@@ -581,6 +583,11 @@ describe('call control', () => {
     expect(await held.json()).toMatchObject({ detail: 'held' });
     const missing = await post(`${call.id}/parties`, { actorUserId: memberId });
     expect(missing.status).toBe(HTTP_BAD_REQUEST);
+    const oversized = await post(`${call.id}/hold`, {
+      actorUserId: memberId,
+      pad: 'x'.repeat(OVERSIZED_BODY_BYTES)
+    });
+    expect(oversized.status).toBe(HTTP_BAD_REQUEST);
     await eventually(async () => {
       const resumed = await post(`${call.id}/resume`, {
         actorUserId: memberId

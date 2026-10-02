@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { isPlacement, placedCallerId, type FakeAri } from '../ari/fake.js';
+import { type FakeAri } from '../ari/fake.js';
+import { isPlacement, placedCallerId } from '../ari/fakeDial.js';
 import { eventually } from '../testing/eventually.js';
 import {
   answeredCall,

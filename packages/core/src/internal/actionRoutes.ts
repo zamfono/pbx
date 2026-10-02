@@ -14,7 +14,7 @@ import {
   type ActionRoute,
   type Body
 } from './actionTable.js';
-import { respondJson } from './configChanged.js';
+import { readJsonBody, respondJson } from './configChanged.js';
 
 const HTTP_OK = 200;
 const HTTP_BAD_REQUEST = 400;
@@ -25,28 +25,16 @@ const MAX_ACTION_BODY_BYTES = 65536;
 const CALL_ACTION_ROUTE =
   /^\/internal\/calls\/(?<callId>[^/]+)\/(?<action>[^/]+)$/u;
 
-/** The JSON object body of an action request; `null` for a malformed, non-object or oversized one. */
+/** The JSON object body of an action request, `{}` for an empty one; `null` for a malformed,
+ * non-object or oversized one. */
 async function readActionBody(
   request: http.IncomingMessage
 ): Promise<Body | null> {
-  const chunks: Buffer[] = [];
-  let bytes = 0;
-  for await (const chunk of request as AsyncIterable<Buffer>) {
-    bytes += chunk.length;
-    if (bytes > MAX_ACTION_BODY_BYTES) {
-      return null;
-    }
-    chunks.push(chunk);
-  }
-  const text = Buffer.concat(chunks).toString('utf8');
-  try {
-    const parsed: unknown = text === '' ? {} : JSON.parse(text);
-    return typeof parsed === 'object' && parsed !== null
-      ? (parsed as Body)
-      : null;
-  } catch {
-    return null;
-  }
+  const parsed = await readJsonBody(request, MAX_ACTION_BODY_BYTES).catch(
+    () => null
+  );
+  const body = parsed === undefined ? {} : parsed;
+  return typeof body === 'object' && body !== null ? (body as Body) : null;
 }
 
 /** The route `pathname` names, a call action's run bound to its call; `null` off every action

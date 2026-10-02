@@ -35,10 +35,10 @@ function routeBridgeAction(
   if (action === 'play' && method === 'POST') {
     return { status: HTTP_OK, body: { id: randomUUID() } };
   }
+  // ponytail: bridge moh falls through to this 200 {} ack; add state if a test needs it.
   return { status: HTTP_OK, body: {} };
 }
 
-// ponytail: bridge moh falls through to the 200 {} ack above; add state if a test needs it.
 /** Routes every `bridges`/`bridges/*` request against `bridges`, mutating it in place (a `DELETE`
  * on the bridge itself is applied by the caller, which owns the map). */
 export function routeBridge(

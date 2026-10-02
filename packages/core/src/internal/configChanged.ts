@@ -34,14 +34,27 @@ export function respondJson(
   response.end(JSON.stringify(body));
 }
 
-function readJsonBody(request: http.IncomingMessage): Promise<unknown> {
+/** A request body past its route's size limit. */
+export class BodyTooLarge extends Error {
+  constructor() {
+    super('request body too large');
+    this.name = 'BodyTooLarge';
+  }
+}
+
+/** The request's JSON body, `undefined` for an empty one; rejects with `BodyTooLarge` past
+ * `maxBytes`, or with the parse error of a malformed one. */
+export function readJsonBody(
+  request: http.IncomingMessage,
+  maxBytes: number
+): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let receivedBytes = 0;
     let tooLarge = false;
     request.on('data', (chunk: Buffer) => {
       receivedBytes += chunk.length;
-      if (receivedBytes > MAX_INTERNAL_BODY_BYTES) {
+      if (receivedBytes > maxBytes) {
         // Keep draining so 'end' still fires and a response can be written on this connection,
         // but stop buffering: the request is already rejected once it finishes.
         tooLarge = true;
@@ -51,7 +64,7 @@ function readJsonBody(request: http.IncomingMessage): Promise<unknown> {
     });
     request.on('end', () => {
       if (tooLarge) {
-        reject(new Error('request body too large'));
+        reject(new BodyTooLarge());
         return;
       }
       const text = Buffer.concat(chunks).toString('utf8');
@@ -90,13 +103,15 @@ async function readConfigChangedBody(
   { ok: true; body: unknown } | { ok: false; reason: 'malformed' | 'tooLarge' }
 > {
   try {
-    return { ok: true, body: await readJsonBody(request) };
+    return {
+      ok: true,
+      body: await readJsonBody(request, MAX_INTERNAL_BODY_BYTES)
+    };
   } catch (error) {
-    const reason =
-      error instanceof Error && error.message === 'request body too large'
-        ? 'tooLarge'
-        : 'malformed';
-    return { ok: false, reason };
+    return {
+      ok: false,
+      reason: error instanceof BodyTooLarge ? 'tooLarge' : 'malformed'
+    };
   }
 }
 

@@ -5,7 +5,8 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
-import { FakeAri, isPlacement } from '../ari/fake.js';
+import { FakeAri } from '../ari/fake.js';
+import { isPlacement } from '../ari/fakeDial.js';
 import {
   defaultChannel,
   type AriEvent,
