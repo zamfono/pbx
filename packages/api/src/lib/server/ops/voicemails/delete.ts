@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { afterCommit } from '../afterCommit.js';
 import { setUndoable } from '../runner.js';
 import { defineOperation } from '../types.js';
 import {
@@ -33,8 +34,12 @@ export const deleteVoicemail = defineOperation({
         ? await ringGroupIdsForUser(ctx.db, ctx.actor.id)
         : [];
     assertVoicemailScope(ctx.actor.role, ctx.actor.id, row, ringGroupIds);
-    await deleteVoicemailFile(row.filename);
     await ctx.db.deleteFrom('voicemails').where('id', '=', input.id).execute();
+    // Only once the row's delete has committed: a rolled-back one keeps its audio.
+    afterCommit(ctx, async () => {
+      await deleteVoicemailFile(row.filename);
+      return null;
+    });
     setUndoable(ctx, false);
     notifyMwi(ctx, mailboxKey(row));
     return { id: input.id };

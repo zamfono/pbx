@@ -1,6 +1,7 @@
 import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { sql } from 'kysely';
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
@@ -209,5 +210,40 @@ describe('voicemails', () => {
       .where('operation', '=', 'voicemails.delete')
       .executeTakeFirstOrThrow();
     expect(auditRow.undoable).toBe(0);
+  });
+
+  it('voicemails.delete keeps the file when the delete rolls back', async () => {
+    const db = await makeTestDb();
+    await seedUser(db, 'u1', 'Anna');
+    const filename = 'vm-1.wav';
+    const vmId = await seedVoicemail(db, {
+      id: 'vm-1',
+      mailboxUserId: 'u1',
+      filename
+    });
+    await sql`
+      CREATE TRIGGER voicemails_no_delete BEFORE DELETE ON voicemails
+      BEGIN SELECT RAISE(ABORT, 'refused'); END
+    `.execute(db);
+    const mediaDir = await mkdtemp(path.join(os.tmpdir(), 'zamfono-vm-'));
+    onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));
+    await mkdir(path.join(mediaDir, 'voicemail'), { recursive: true });
+    const filePath = path.join(mediaDir, 'voicemail', filename);
+    await writeFile(filePath, 'audio-bytes');
+    vi.stubEnv('MEDIA_DIR', mediaDir);
+    onTestFinished(() => {
+      vi.unstubAllEnvs();
+    });
+
+    await expect(
+      runOperation(
+        db,
+        'voicemails.delete',
+        { id: vmId },
+        asRun({ actor: anna, confirm: true })
+      )
+    ).rejects.toThrow();
+
+    await expect(access(filePath)).resolves.toBeUndefined();
   });
 });

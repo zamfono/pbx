@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { afterCommit } from '../afterCommit.js';
 import { setUndoable } from '../runner.js';
 import { defineOperation } from '../types.js';
 import { deleteRecordingFile, loadRecording } from './_shared.js';
@@ -20,8 +21,12 @@ export const deleteRecording = defineOperation({
   entity: input => ({ kind: 'recording', id: input.id }),
   run: async (ctx, input) => {
     const row = await loadRecording(ctx.db, input.id);
-    await deleteRecordingFile(row.filename);
     await ctx.db.deleteFrom('recordings').where('id', '=', input.id).execute();
+    // Only once the row's delete has committed: a rolled-back one keeps its audio.
+    afterCommit(ctx, async () => {
+      await deleteRecordingFile(row.filename);
+      return null;
+    });
     setUndoable(ctx, false);
     return { id: input.id };
   }

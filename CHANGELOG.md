@@ -267,6 +267,9 @@ why the specified behaviour changed; the commit history, how.
 - A ring group still rang the members of a soft-deleted user group in it, nested or not, and an
   outbound route naming a soft-deleted user group still let its members call over it, until the
   purge. A soft-deleted user group is now skipped in both until it is restored.
+- `voicemails.delete` and `recordings.delete` removed the audio file before the row's delete was
+  stored, so a delete that failed left a voicemail or recording without its audio. The file is
+  now removed once the delete is stored.
 
 ### Upgrade notes
 
