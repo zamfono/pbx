@@ -10,6 +10,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { EventBus } from './internal/eventBus.js';
 import { ConfigCache } from './internal/snapshot.js';
 import { startSweep } from './sweep.js';
+import { noopLogger } from './testing/pipelineRig.js';
 
 const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 3_600_000;
@@ -116,7 +117,7 @@ describe('startSweep timing', () => {
       seen.push({ event, atMs: Date.now() });
     });
     sweep = startSweep(
-      { cache, bus, now: () => new Date().toISOString() },
+      { cache, bus, log: noopLogger, now: () => new Date().toISOString() },
       backstopMs
     );
     await vi.advanceTimersByTimeAsync(0);
@@ -237,5 +238,34 @@ describe('startSweep timing', () => {
 
     await vi.advanceTimersByTimeAsync(MS_PER_HOUR);
     expect(tenant('hours')[1]).toMatchObject({ event: { open: true } });
+  });
+
+  it('logs a failed sweep and retries it a minute later', async () => {
+    const { forwardTargetId } = await seedTenant(db, 'UTC');
+    await seedMondayHours(db, forwardTargetId);
+    const failure = new Error('database is locked');
+    vi.spyOn(cache, 'get').mockRejectedValueOnce(failure);
+    const error = vi.fn();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    vi.setSystemTime(new Date('2026-01-05T00:00:00.000Z'));
+    const bus = new EventBus();
+    bus.subscribe(event => {
+      seen.push({ event, atMs: Date.now() });
+    });
+    sweep = startSweep({
+      cache,
+      bus,
+      log: { ...noopLogger, error },
+      now: () => new Date().toISOString()
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(error).toHaveBeenCalledWith(
+      { err: failure },
+      'ooo/hours sweep failed; retrying in 60 s'
+    );
+    expect(tenant('hours')).toHaveLength(0);
+
+    await vi.advanceTimersByTimeAsync(MS_PER_MINUTE);
+    expect(tenant('hours')).toHaveLength(1);
   });
 });

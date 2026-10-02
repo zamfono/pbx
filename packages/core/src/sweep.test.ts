@@ -6,6 +6,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { EventBus } from './internal/eventBus.js';
 import { ConfigCache } from './internal/snapshot.js';
 import { startSweep } from './sweep.js';
+import { noopLogger } from './testing/pipelineRig.js';
 
 const SWEEP_INTERVAL_MS = 5;
 // Real-timer waits around a 5 ms sweep interval: generous enough for several ticks to have run
@@ -96,7 +97,12 @@ describe('startSweep', () => {
       events.push(event);
     });
     sweep = startSweep(
-      { cache: new ConfigCache(db), bus, now: () => current.toISOString() },
+      {
+        cache: new ConfigCache(db),
+        bus,
+        log: noopLogger,
+        now: () => current.toISOString()
+      },
       SWEEP_INTERVAL_MS
     );
     await settle();
@@ -146,7 +152,12 @@ describe('startSweep', () => {
       events.push(event);
     });
     sweep = startSweep(
-      { cache: new ConfigCache(db), bus, now: () => current.toISOString() },
+      {
+        cache: new ConfigCache(db),
+        bus,
+        log: noopLogger,
+        now: () => current.toISOString()
+      },
       SWEEP_INTERVAL_MS
     );
     await settle();
@@ -196,6 +207,7 @@ describe('startSweep', () => {
       {
         cache: new ConfigCache(db),
         bus,
+        log: noopLogger,
         now: () => '2026-01-05T16:30:00.000Z'
       },
       SWEEP_INTERVAL_MS
@@ -236,6 +248,7 @@ describe('startSweep', () => {
       {
         cache: new ConfigCache(db),
         bus,
+        log: noopLogger,
         now: () => '2026-01-05T10:00:00.000Z',
         stackTz: 'America/New_York'
       },
@@ -273,7 +286,10 @@ describe('startSweep', () => {
       events.push(event);
     });
     const cache = new ConfigCache(db);
-    sweep = startSweep({ cache, bus, now: () => current }, SWEEP_INTERVAL_MS);
+    sweep = startSweep(
+      { cache, bus, log: noopLogger, now: () => current },
+      SWEEP_INTERVAL_MS
+    );
     await settle();
     const tenantOoo = (): Envelope[] =>
       events.filter(event => event.type === 'ooo' && event.scope === 'tenant');

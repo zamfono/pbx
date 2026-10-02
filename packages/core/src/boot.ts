@@ -94,6 +94,7 @@ export function startBackgroundJobs(deps: {
   const sweep = startSweep({
     cache: deps.cache,
     bus: deps.bus,
+    log: deps.log,
     now: nowIso,
     stackTz: deps.env.tz
   });

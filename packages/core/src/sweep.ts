@@ -9,6 +9,7 @@
  */
 import { resolveTenantTimeZone, type Scope } from '@zamfono/shared';
 
+import type { Logger } from './ari/types.js';
 import type { EventBus } from './internal/eventBus.js';
 import type { ConfigCache, Snapshot } from './internal/snapshot.js';
 import {
@@ -26,6 +27,7 @@ import { buildOooRules, buildSchedules } from './routing/scheduleRows.js';
 export type SweepDeps = {
   cache: ConfigCache;
   bus: EventBus;
+  log: Logger;
   now: () => string;
   // The stack's `TZ` (§11.4 `timezone`: "NULL = stack `TZ`, else UTC"), `CoreEnv.tz`.
   stackTz?: string;
@@ -168,8 +170,11 @@ class Sweep {
           next === null ? this.backstopMs : next - Date.parse(this.deps.now())
         );
       })
-      // ponytail: no logger is wired into this module; add one if a failed sweep needs investigating.
-      .catch(() => {
+      .catch((error: unknown) => {
+        this.deps.log.error(
+          { err: error },
+          'ooo/hours sweep failed; retrying in 60 s'
+        );
         if (own === this.generation) {
           this.arm(RETRY_MS);
         }

@@ -126,6 +126,8 @@ why the specified behaviour changed; the commit history, how.
   trace. An ARI request on a channel or bridge that has already gone is still dropped silently,
   the expected race with a hangup; any other ARI failure, such as refused credentials or an
   Asterisk error, is now logged too.
+- `core` logs an error when the sweep that announces out-of-office and opening-hours changes
+  fails, and retries it a minute later as before; until now it retried without a trace.
 - The release bundle carries a `VERSION` file naming its release. `update.sh`, `setup.sh` and
   the `updater` service read the release a stack runs from it, unless `.env` sets
   `ZAMFONO_VERSION`; `update.sh` still reads a stack unpacked from an older bundle, which has no
