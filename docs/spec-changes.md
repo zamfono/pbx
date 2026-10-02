@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-02 · §10.3 Conventions.** No list takes a bare row id as `cursor` any more; the lists of DIDs, number blocks, blocked numbers, webhooks and backup targets and runs answer one with 422, like any cursor they did not hand out.
+*Why:* product-owner decision: the next release is a breaking 0.2.0, without any backwards compatibility.
+
 **2026-10-02 · §6.4 Reload timing, §10.2 Opening hours.** A local time that a DST change skips or repeats resolves to the earlier of its two possible instants for opening-hours edges and the maintenance moment too, as it does for the time filters of §10.3.
 *Why:* requested by the product owner: one rule for ambiguous local times.
 

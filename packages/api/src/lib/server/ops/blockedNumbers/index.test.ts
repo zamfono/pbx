@@ -44,7 +44,7 @@ describe('blockedNumbers', () => {
     expect(afterDelete.items).toHaveLength(0);
   });
 
-  it('pages with an opaque cursor, and takes a bare row id as one too', async () => {
+  it('pages with an opaque cursor, and refuses a bare row id', async () => {
     const db = await makeTestDb();
     await runOperation(
       db,
@@ -73,15 +73,16 @@ describe('blockedNumbers', () => {
       { limit: 1, cursor: first.nextCursor },
       asRun()
     )) as Page;
-    const fromBareId = (await runOperation(
-      db,
-      'blockedNumbers.list',
-      { limit: 1, cursor: firstId },
-      asRun()
-    )) as Page;
     expect(second.items).toHaveLength(1);
     expect(second.items[0]?.id).not.toBe(firstId);
-    expect(fromBareId.items).toEqual(second.items);
+    await expect(
+      runOperation(
+        db,
+        'blockedNumbers.list',
+        { limit: 1, cursor: firstId },
+        asRun()
+      )
+    ).rejects.toMatchObject({ status: 422 });
     await expect(
       runOperation(
         db,
