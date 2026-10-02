@@ -1,13 +1,11 @@
 import { isIPv4, isIPv6 } from 'node:net';
 
-// IPv6 canonical-form helpers: a /64 key keeps 4 of the address's 8 hextets.
+// A /64 key keeps 4 of an IPv6 address's 8 hextets.
 const IPV6_GROUP_COUNT = 8;
 const IPV6_PREFIX_GROUP_COUNT = 4;
-const IPV6_MAX_COMPRESSION_PARTS = 2;
 const HEX_RADIX = 16;
 const BYTE_MULTIPLIER = 256;
 const IPV4_MAPPED_MARKER = 0xffff;
-const MIN_COMPRESSIBLE_RUN = 2;
 // An embedded IPv4 address occupies the last 2 hextets, after either 5 zero hextets
 // (`::ffff:a.b.c.d` mapped, `::a.b.c.d` compatible) or 4 zero hextets plus the `ffff`
 // marker and one more zero hextet (`::ffff:0:a.b.c.d` translated, RFC 2765).
@@ -16,83 +14,27 @@ const IPV4_TRANSLATED_ZERO_COUNT = 4;
 const IPV4_EMBEDDED_HEXTET_COUNT = 2;
 
 /**
- * Parses one `::`-side of an IPv6 address into hextets, expanding a trailing embedded
- * IPv4 dotted-quad (`x:x:x:x:x:x:d.d.d.d` and its `::`-compressed forms, RFC 4291 §2.2)
- * into its two hextets.
+ * `ip`'s RFC 5952 canonical text, without a zone (`%eth0`): the WHATWG URL parser's IPv6
+ * serialisation, which lowercases, compresses the longest zero run and writes an embedded
+ * dotted quad as its two hextets.
  */
-function parseHextets(side: string): number[] {
-  if (!side) {
-    return [];
-  }
-  return side.split(':').flatMap(group => {
-    if (!isIPv4(group)) {
-      return [parseInt(group, HEX_RADIX)];
-    }
-    const [firstOctet, secondOctet, thirdOctet, fourthOctet] = group
-      .split('.')
-      .map(Number);
-    // `isIPv4(group)` above guarantees exactly 4 dotted octets.
-    if (
-      firstOctet === undefined ||
-      secondOctet === undefined ||
-      thirdOctet === undefined ||
-      fourthOctet === undefined
-    ) {
-      throw new Error(`addressKey: malformed IPv4 octet: ${group}`);
-    }
-    return [
-      firstOctet * BYTE_MULTIPLIER + secondOctet,
-      thirdOctet * BYTE_MULTIPLIER + fourthOctet
-    ];
-  });
+function canonicalIpv6(ip: string): string {
+  const [address = ''] = ip.split('%');
+  return new URL(`http://[${address}]`).hostname.slice(1, -1);
 }
 
-/**
- * Expands a full or `::`-compressed IPv6 address into its 8 hextets as numbers.
- */
-function expandIpv6(address: string): number[] {
-  const halves = address.split('::');
-  if (halves.length > IPV6_MAX_COMPRESSION_PARTS) {
-    throw new Error(`addressKey: malformed IPv6 address: ${address}`);
+/** The 8 hextets of canonical IPv6 text, its one `::` expanded. */
+function hextets(canonical: string): number[] {
+  const parse = (side: string): number[] =>
+    side === '' ? [] : side.split(':').map(group => parseInt(group, HEX_RADIX));
+  const [head = '', tail] = canonical.split('::');
+  if (tail === undefined) {
+    return parse(head);
   }
-  const head = parseHextets(halves[0] ?? '');
-  if (halves.length === 1) {
-    return head;
-  }
-  const tail = parseHextets(halves[1] ?? '');
-  const missing = IPV6_GROUP_COUNT - head.length - tail.length;
-  return [...head, ...new Array<number>(missing).fill(0), ...tail];
-}
-
-/**
- * RFC 5952 canonical text of a full 8-hextet IPv6 address: lowercase hex hextets, with
- * the longest run of zero hextets (leftmost on a tie) compressed to `::`.
- */
-function canonicalIpv6Text(groups: number[]): string {
-  let bestStart = -1;
-  let bestLen = 0;
-  let runStart = -1;
-  let runLen = 0;
-  for (const [index, group] of groups.entries()) {
-    if (group !== 0) {
-      runStart = -1;
-      runLen = 0;
-      continue;
-    }
-    runStart = runStart === -1 ? index : runStart;
-    runLen += 1;
-    if (runLen > bestLen) {
-      bestStart = runStart;
-      bestLen = runLen;
-    }
-  }
-  const hex = groups.map(group => group.toString(HEX_RADIX));
-  if (bestLen < MIN_COMPRESSIBLE_RUN) {
-    return hex.join(':');
-  }
-  const before = hex.slice(0, bestStart).join(':');
-  const after = hex.slice(bestStart + bestLen).join(':');
-  return `${before}::${after}`;
+  const before = parse(head);
+  const after = parse(tail);
+  const missing = IPV6_GROUP_COUNT - before.length - after.length;
+  return [...before, ...new Array<number>(missing).fill(0), ...after];
 }
 
 /**
@@ -146,14 +88,14 @@ export function addressKey(ip: string): string {
     // its own limit.
     return 'unparsable';
   }
-  const groups = expandIpv6(ip);
+  const groups = hextets(canonicalIpv6(ip));
   const embedded = embeddedIpv4(groups, ip);
   if (embedded !== undefined) {
     return embedded;
   }
-  const prefix = [
-    ...groups.slice(0, IPV6_PREFIX_GROUP_COUNT),
-    ...new Array<number>(IPV6_GROUP_COUNT - IPV6_PREFIX_GROUP_COUNT).fill(0)
-  ];
-  return `${canonicalIpv6Text(prefix)}/64`;
+  const prefix = groups
+    .slice(0, IPV6_PREFIX_GROUP_COUNT)
+    .map(group => group.toString(HEX_RADIX))
+    .join(':');
+  return `${canonicalIpv6(`${prefix}::`)}/64`;
 }
