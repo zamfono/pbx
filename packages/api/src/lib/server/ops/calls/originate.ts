@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
+import { getCoreClient } from '#lib/server/coreClient.js';
+
 import { defineOperation, OpError } from '../types.js';
-import { getCoreClient, resolveActingUserId } from './_shared.js';
+import { resolveActingUserId } from './_shared.js';
 
 const STATUS_CONFLICT = 409;
 

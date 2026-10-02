@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, type Db, type ReloadKind } from '@zamfono/shared';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
+import { propagateConfig } from '#lib/server/propagation.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 
-import { onPropagate, runOperation, type RunInput } from '../runner.js';
+import { runOperation, type RunInput } from '../runner.js';
 import { Conflict, type Actor } from '../types.js';
 
 import './index.js';
@@ -58,11 +59,7 @@ describe('ringGroups', () => {
   it('create assigns the lowest free extension and propagates pjsip and dialplan', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const propagated: { operation: string; kind: ReloadKind[] }[] = [];
-    onPropagate(change => {
-      propagated.push(change);
-      return Promise.resolve();
-    });
+    vi.mocked(propagateConfig).mockClear();
     const created = await runOperation<unknown, { id: string; ext: string }>(
       db,
       'ringGroups.create',
@@ -76,8 +73,8 @@ describe('ringGroups', () => {
       .where('ringGroupId', '=', created.id)
       .executeTakeFirstOrThrow();
     expect(row.ext).toBe('001');
-    expect(propagated).toEqual([
-      { operation: 'ringGroups.create', kind: ['pjsip', 'dialplan'] }
+    expect(vi.mocked(propagateConfig).mock.calls).toEqual([
+      [db, ['pjsip', 'dialplan']]
     ]);
   });
 
@@ -139,11 +136,7 @@ describe('ringGroups', () => {
       },
       asRun()
     );
-    const propagated: { operation: string; kind: ReloadKind[] }[] = [];
-    onPropagate(change => {
-      propagated.push(change);
-      return Promise.resolve();
-    });
+    vi.mocked(propagateConfig).mockClear();
     await runOperation(
       db,
       'ringGroups.update',
@@ -156,9 +149,7 @@ describe('ringGroups', () => {
       .where('groupId', '=', group.id)
       .execute();
     expect(members).toHaveLength(0);
-    expect(propagated).toEqual([
-      { operation: 'ringGroups.update', kind: ['pjsip'] }
-    ]);
+    expect(vi.mocked(propagateConfig).mock.calls).toEqual([[db, ['pjsip']]]);
   });
 
   it('update of a routing field alone tells core, without an Asterisk reload (§3.1, §7)', async () => {
@@ -174,18 +165,14 @@ describe('ringGroups', () => {
       },
       asRun()
     );
-    const propagated: { operation: string; kind: ReloadKind[] }[] = [];
-    onPropagate(change => {
-      propagated.push(change);
-      return Promise.resolve();
-    });
+    vi.mocked(propagateConfig).mockClear();
     await runOperation(
       db,
       'ringGroups.update',
       { id: group.id, logLevel: 'qos' },
       asRun()
     );
-    expect(propagated).toEqual([{ operation: 'ringGroups.update', kind: [] }]);
+    expect(vi.mocked(propagateConfig).mock.calls).toEqual([[db, []]]);
   });
 
   it('reads without a since-soft-deleted member and updates unchanged without a 404', async () => {

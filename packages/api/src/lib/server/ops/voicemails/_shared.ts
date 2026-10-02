@@ -6,7 +6,7 @@ import pino from 'pino';
 import { mwiMailboxOf, type DB, type MwiMailbox } from '@zamfono/shared';
 
 import { transcodeForDownload } from '#lib/server/audio/transcode.js';
-import { createCoreClient, type CoreClient } from '#lib/server/coreClient.js';
+import { getCoreClient } from '#lib/server/coreClient.js';
 import { mediaDirFromEnv } from '#lib/server/mediaDir.js';
 
 import { afterCommit } from '../afterCommit.js';
@@ -176,13 +176,6 @@ export async function loadVoicemailAudio(
   };
 }
 
-let coreClient: CoreClient = createCoreClient();
-
-/** Test-only: replaces the `CoreClient` a voicemail write notifies after commit. */
-export function setCoreClientForTest(client: CoreClient): void {
-  coreClient = client;
-}
-
 /**
  * Has `core` refresh `mailbox`'s voicemail count (§3.1, §9.3 MWI) once `ctx`'s write has
  * committed, never after a rollback. Not awaited, so the caller's result never waits on `core`; a
@@ -190,9 +183,11 @@ export function setCoreClientForTest(client: CoreClient): void {
  */
 export function notifyMwi(ctx: Context, mailbox: MwiMailbox): void {
   afterCommit(ctx, () => {
-    coreClient.mwi(mailbox).catch((error: unknown) => {
-      logger.warn({ err: error, mailbox }, 'MWI update failed');
-    });
+    getCoreClient()
+      .mwi(mailbox)
+      .catch((error: unknown) => {
+        logger.warn({ err: error, mailbox }, 'MWI update failed');
+      });
     return Promise.resolve(null);
   });
 }

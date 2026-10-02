@@ -1,15 +1,20 @@
 /**
- * A thin HTTP client for `core`'s internal API (§3, §3.1; `@zamfono/shared`'s `internalApi.ts`):
- * config-reload triggers, live state, call actions and MWI, reached over the Docker `internal`
- * network with no authentication, since that network is the trust boundary.
+ * The HTTP client for `core`'s internal API (§3, §3.1; `@zamfono/shared`'s `internalApi.ts`):
+ * config-reload triggers, live state, health and version, call actions and MWI, reached over the
+ * Docker `internal` network with no authentication, since that network is the trust boundary.
  */
 
 import * as env from '$app/env/private';
 
 import type {
+  AddPartyRequest,
+  AttendedTransferRequest,
+  ConsultRequest,
   CoreHealth,
   CoreVersionResponse,
+  DeclineRequest,
   HangupRequest,
+  HoldRequest,
   MwiMailbox,
   OriginateRequest,
   ParkingResponse,
@@ -20,9 +25,16 @@ import type {
   TransferRequest
 } from '@zamfono/shared';
 
-const HTTP_NOT_FOUND = 404;
+import {
+  CoreRequestError,
+  postJson,
+  postJsonChecked,
+  postJsonForBody,
+  readJsonBody,
+  throwIfNotOk
+} from './coreHttp.js';
+
 const HTTP_CONFLICT = 409;
-const HTTP_UNPROCESSABLE = 422;
 const DEFAULT_CORE_URL = 'http://core:3000';
 // `/healthz`, `/metrics` and `system.info` answer within this even while `core` hangs (§6.3
 // "Health", §7, §10.3), and a hung `core` holds up no re-registration check (§10.4).
@@ -31,22 +43,14 @@ const CORE_HEALTH_TIMEOUT_MS = 3000;
 export type OriginateOutcome =
   { callId: string } | { error: 'noRegisteredDevice' };
 
-/** A non-2xx response from `core`'s internal API, carrying the status and, if parseable, the body. */
-export class CoreRequestError extends Error {
-  readonly status: number;
-  readonly body: unknown;
-
-  constructor(url: string, status: number, body: unknown) {
-    super(`core request to ${url} failed with status ${status}`);
-    this.name = 'CoreRequestError';
-    this.status = status;
-    this.body = body;
-  }
-}
-
 export type CoreClient = {
   configChanged(kinds: ReloadKind[]): Promise<void>;
   state(): Promise<StateResponse>;
+  /** `core`'s own `GET /healthz`, whatever the status, since a 503 still says which of the
+   * database and ARI is down; rejects when `core` does not answer within the health timeout. */
+  health(): Promise<CoreHealth>;
+  /** The version `core` runs, since when, and since when its Asterisk runs (§7 "Version"). */
+  version(): Promise<CoreVersionResponse>;
   originate(req: OriginateRequest): Promise<OriginateOutcome>;
   transfer(callId: string, req: TransferRequest): Promise<void>;
   pickup(callId: string, req: PickupRequest): Promise<void>;
@@ -54,49 +58,17 @@ export type CoreClient = {
   park(callId: string, req: ParkRequest): Promise<{ slot: string }>;
   parked(): Promise<ParkingResponse>;
   mwi(mailbox: MwiMailbox): Promise<void>;
+  addParty(callId: string, req: AddPartyRequest): Promise<{ callId: string }>;
+  consult(callId: string, req: ConsultRequest): Promise<{ callId: string }>;
+  attendedTransfer(callId: string, req: AttendedTransferRequest): Promise<void>;
+  hold(callId: string, req: HoldRequest): Promise<void>;
+  resume(callId: string, req: HoldRequest): Promise<void>;
+  decline(callId: string, req: DeclineRequest): Promise<void>;
 };
 
-/** `CORE_URL` (§6.3, default `http://core:3000`), read at call time so tests can override it. */
+/** `CORE_URL` (§6.3, default `http://core:3000`). */
 export function coreUrlFromEnv(): string {
   return env.CORE_URL ?? DEFAULT_CORE_URL;
-}
-
-export async function postJson(
-  fetchFn: typeof fetch,
-  url: string,
-  body: unknown
-): Promise<Response> {
-  return fetchFn(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body)
-  });
-}
-
-/** `response`'s body, parsed as JSON, or `undefined` when it is empty or not JSON. */
-export async function readJsonBody(response: Response): Promise<unknown> {
-  return response.json().catch(() => undefined);
-}
-
-/** Throws `CoreRequestError` for a non-2xx `response`; callers get a rejected promise instead of silently treating a failed reload or call action as having succeeded. */
-async function throwIfNotOk(response: Response, url: string): Promise<void> {
-  if (!response.ok) {
-    throw new CoreRequestError(
-      url,
-      response.status,
-      await readJsonBody(response)
-    );
-  }
-}
-
-/** POSTs `body` to `url` and throws on a non-2xx response. */
-export async function postJsonChecked(
-  fetchFn: typeof fetch,
-  url: string,
-  body: unknown
-): Promise<void> {
-  const response = await postJson(fetchFn, url, body);
-  await throwIfNotOk(response, url);
 }
 
 /** Whether `body` is the problem whose `detail` names the `noRegisteredDevice` cause of a 409
@@ -108,93 +80,34 @@ function namesNoRegisteredDevice(body: unknown): boolean {
   return (body as { detail?: unknown }).detail === 'noRegisteredDevice';
 }
 
-/** The statuses `core` refuses a call action with (`calls/actionError.ts`'s `ActionError`): 404
- * for a call it holds no live state for, 409 for one in the wrong state or a picker without a
- * device, 422 for a target it cannot act on (a voicemail transfer to no mailbox, a party added
- * or consulted on a target nobody answers on). */
-const REFUSAL_STATUSES = [
-  HTTP_NOT_FOUND,
-  HTTP_CONFLICT,
-  HTTP_UNPROCESSABLE
-] as const;
-
-/** A call action `core` refused: its status and the RFC 9457 problem's `title` and `detail`. */
-export type CoreRefusal = {
-  status: (typeof REFUSAL_STATUSES)[number];
-  title: string;
-  detail: string;
-};
-
-/**
- * The refusal `error` carries, when it is `core` answering a call action with its RFC 9457
- * problem, whose `detail` is the reason (`internal/actionRoutes.ts`); `null` for any other
- * failure, a malformed body or `core` being unreachable included, which stays a 500.
- */
-export function coreRefusal(error: unknown): CoreRefusal | null {
-  if (!(error instanceof CoreRequestError)) {
-    return null;
-  }
-  const status = REFUSAL_STATUSES.find(candidate => candidate === error.status);
-  const body = error.body as { title?: unknown; detail?: unknown } | undefined;
-  if (
-    status === undefined ||
-    typeof body?.title !== 'string' ||
-    typeof body.detail !== 'string'
-  ) {
-    return null;
-  }
-  return { status, title: body.title, detail: body.detail };
-}
-
-/**
- * The version `core` reports it runs (§7 "Version"), since when, and since when its Asterisk
- * runs, from its internal API at `baseUrl`. Rejects when `core` does not answer within
- * `CORE_HEALTH_TIMEOUT_MS`, as `fetchCoreHealth` does.
- */
-export async function fetchCoreVersion(
-  baseUrl: string = coreUrlFromEnv(),
-  fetchFn: typeof fetch = fetch
-): Promise<CoreVersionResponse> {
-  const url = `${baseUrl}/internal/version`;
-  const response = await fetchFn(url, {
-    signal: AbortSignal.timeout(CORE_HEALTH_TIMEOUT_MS)
-  });
-  await throwIfNotOk(response, url);
-  return (await response.json()) as CoreVersionResponse;
-}
-
-/**
- * `core`'s own `GET /healthz` (`CoreHealth`), for `api`'s `/healthz` and `/metrics`: its body
- * whatever the status, since a 503 still says which of the database and ARI is down. Rejects
- * when `core` does not answer within `CORE_HEALTH_TIMEOUT_MS` or answers no such body.
- */
-export async function fetchCoreHealth(
-  baseUrl: string = coreUrlFromEnv(),
-  fetchFn: typeof fetch = fetch
-): Promise<CoreHealth> {
-  const response = await fetchFn(`${baseUrl}/healthz`, {
-    signal: AbortSignal.timeout(CORE_HEALTH_TIMEOUT_MS)
-  });
-  return (await response.json()) as CoreHealth;
-}
-
 /** `core`'s internal API at `baseUrl` (default `coreUrlFromEnv()`). */
 export function createCoreClient(
   baseUrl: string = coreUrlFromEnv(),
   fetchFn: typeof fetch = fetch
 ): CoreClient {
+  const call = (callId: string, action: string): string =>
+    `${baseUrl}/internal/calls/${encodeURIComponent(callId)}/${action}`;
+  const getJson = async <T>(url: string, init?: RequestInit): Promise<T> => {
+    const response = await fetchFn(url, init);
+    await throwIfNotOk(response, url);
+    return (await response.json()) as T;
+  };
   return {
-    async configChanged(kinds) {
-      await postJsonChecked(fetchFn, `${baseUrl}/internal/configChanged`, {
+    configChanged: async kinds =>
+      postJsonChecked(fetchFn, `${baseUrl}/internal/configChanged`, {
         reload: kinds
+      }),
+    state: async () => getJson<StateResponse>(`${baseUrl}/internal/state`),
+    async health() {
+      const response = await fetchFn(`${baseUrl}/healthz`, {
+        signal: AbortSignal.timeout(CORE_HEALTH_TIMEOUT_MS)
       });
+      return (await response.json()) as CoreHealth;
     },
-    async state() {
-      const url = `${baseUrl}/internal/state`;
-      const response = await fetchFn(url);
-      await throwIfNotOk(response, url);
-      return (await response.json()) as StateResponse;
-    },
+    version: async () =>
+      getJson<CoreVersionResponse>(`${baseUrl}/internal/version`, {
+        signal: AbortSignal.timeout(CORE_HEALTH_TIMEOUT_MS)
+      }),
     async originate(req) {
       const url = `${baseUrl}/internal/calls`;
       const response = await postJson(fetchFn, url, req);
@@ -207,48 +120,48 @@ export function createCoreClient(
       }
       return body as { callId: string };
     },
-    async transfer(callId, req) {
-      await postJsonChecked(
-        fetchFn,
-        `${baseUrl}/internal/calls/${encodeURIComponent(callId)}/transfer`,
-        req
-      );
-    },
-    async pickup(callId, req) {
-      await postJsonChecked(
-        fetchFn,
-        `${baseUrl}/internal/calls/${encodeURIComponent(callId)}/pickup`,
-        req
-      );
-    },
-    async hangup(callId, req) {
-      await postJsonChecked(
-        fetchFn,
-        `${baseUrl}/internal/calls/${encodeURIComponent(callId)}/hangup`,
-        req
-      );
-    },
+    transfer: async (callId, req) =>
+      postJsonChecked(fetchFn, call(callId, 'transfer'), req),
+    pickup: async (callId, req) =>
+      postJsonChecked(fetchFn, call(callId, 'pickup'), req),
+    hangup: async (callId, req) =>
+      postJsonChecked(fetchFn, call(callId, 'hangup'), req),
     async park(callId, req) {
-      const url = `${baseUrl}/internal/calls/${encodeURIComponent(callId)}/park`;
+      const url = call(callId, 'park');
       const response = await postJson(fetchFn, url, req);
       await throwIfNotOk(response, url);
       return (await response.json()) as { slot: string };
     },
-    async parked() {
-      const url = `${baseUrl}/internal/parking`;
-      const response = await fetchFn(url);
-      await throwIfNotOk(response, url);
-      return (await response.json()) as ParkingResponse;
-    },
-    async mwi(mailbox) {
-      // Not `encodeURIComponent`-escaped: `mailbox` is `user:<id>` or `ringGroup:<id>` by
-      // construction (`MwiMailbox`), and escaping its routing colon to `%3A` would change the
-      // path segment core matches against.
-      await postJsonChecked(
-        fetchFn,
-        `${baseUrl}/internal/mwi/${mailbox}`,
-        undefined
-      );
-    }
+    parked: async () => getJson<ParkingResponse>(`${baseUrl}/internal/parking`),
+    // Not `encodeURIComponent`-escaped: `mailbox` is `user:<id>` or `ringGroup:<id>` by
+    // construction (`MwiMailbox`), and escaping its routing colon to `%3A` would change the
+    // path segment core matches against.
+    mwi: async mailbox =>
+      postJsonChecked(fetchFn, `${baseUrl}/internal/mwi/${mailbox}`, undefined),
+    // A route that dials a call answers 201 with its id.
+    addParty: async (callId, req) =>
+      postJsonForBody(fetchFn, call(callId, 'parties'), req) as Promise<{
+        callId: string;
+      }>,
+    consult: async (callId, req) =>
+      postJsonForBody(fetchFn, call(callId, 'consult'), req) as Promise<{
+        callId: string;
+      }>,
+    attendedTransfer: async (callId, req) =>
+      postJsonChecked(fetchFn, call(callId, 'attendedTransfer'), req),
+    hold: async (callId, req) =>
+      postJsonChecked(fetchFn, call(callId, 'hold'), req),
+    resume: async (callId, req) =>
+      postJsonChecked(fetchFn, call(callId, 'resume'), req),
+    decline: async (callId, req) =>
+      postJsonChecked(fetchFn, call(callId, 'decline'), req)
   };
+}
+
+let processClient: CoreClient | undefined;
+
+/** The process's client for `core` at `CORE_URL`, created on first use, like `getDb()`. */
+export function getCoreClient(): CoreClient {
+  processClient ??= createCoreClient();
+  return processClient;
 }

@@ -4,11 +4,12 @@ import { newId, nowIso, type Db } from '@zamfono/shared';
 
 import { loginLimiter } from '#lib/server/limiter.js';
 import { sendMail } from '#lib/server/mail/index.js';
+import { propagateConfig } from '#lib/server/propagation.js';
 import { installRingotelFake } from '#lib/server/provisioning/ringotelFake.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 
-import { onPropagate, runOperation, type RunInput } from '../runner.js';
+import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';
 
 import '../devices/index.js';
@@ -868,13 +869,7 @@ describe('users', () => {
     const db = await makeTestDb();
     await seedTenant(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
-    const kinds: string[][] = [];
-    onPropagate(change => {
-      if (change.operation === 'users.update') {
-        kinds.push(change.kind);
-      }
-      return Promise.resolve();
-    });
+    vi.mocked(propagateConfig).mockClear();
     await runOperation(
       db,
       'users.update',
@@ -887,25 +882,24 @@ describe('users', () => {
       { id: user.user.id, ringTimeoutS: 30 },
       asRun()
     );
-    expect(kinds).toEqual([['pjsip'], []]);
+    expect(vi.mocked(propagateConfig).mock.calls).toEqual([
+      [db, ['pjsip']],
+      [db, []]
+    ]);
   });
 
   it("setPresence propagates, so core recomputes the user's presence (§3.1, §10.2)", async () => {
     const db = await makeTestDb();
     await seedTenant(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
-    const propagated: string[] = [];
-    onPropagate(change => {
-      propagated.push(change.operation);
-      return Promise.resolve();
-    });
+    vi.mocked(propagateConfig).mockClear();
     await runOperation(
       db,
       'users.setPresence',
       { id: user.user.id, dnd: true },
       asRun()
     );
-    expect(propagated).toContain('users.setPresence');
+    expect(propagateConfig).toHaveBeenCalledOnce();
   });
   it('delete frees the Ringotel user of a ringotel device (§10.4 lifecycle)', async () => {
     const db = await makeTestDb();

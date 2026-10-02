@@ -1,13 +1,13 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { nowIso, type LiveCall, type StateResponse } from '@zamfono/shared';
 
-import { createCoreClient, type CoreClient } from '#lib/server/coreClient.js';
+import { getCoreClient } from '#lib/server/coreClient.js';
+import { stubCoreClient } from '#lib/server/coreClientStub.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 
 import { runOperation } from '../runner.js';
 import { type Actor } from '../types.js';
-import { setCoreClientForTest } from './_shared.js';
 
 import './index.js';
 
@@ -63,8 +63,7 @@ function coreWith(calls: LiveCall[]): string[] {
     asteriskChannels: 0,
     recordingsInProgress: 0
   };
-  const client: CoreClient = {
-    ...createCoreClient('http://core.test'),
+  const client = stubCoreClient({
     state: () => Promise.resolve(state),
     hangup: callId => {
       actions.push(`hangup ${callId}`);
@@ -74,8 +73,8 @@ function coreWith(calls: LiveCall[]): string[] {
       actions.push(`transfer ${callId}`);
       return Promise.resolve();
     }
-  };
-  setCoreClientForTest(client);
+  });
+  vi.mocked(getCoreClient).mockReturnValue(client);
   return actions;
 }
 
@@ -103,7 +102,7 @@ async function liveIds(actor: Actor): Promise<string[]> {
 }
 
 afterEach(() => {
-  setCoreClientForTest(createCoreClient());
+  vi.mocked(getCoreClient).mockReset();
 });
 
 describe('who may see and control a live call (§10.3 "Live calls")', () => {

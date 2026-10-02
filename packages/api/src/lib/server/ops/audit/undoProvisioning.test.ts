@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MS_PER_DAY, newId, nowIso, type Db } from '@zamfono/shared';
 
+import { propagateConfig } from '#lib/server/propagation.js';
 import { installRingotelFake } from '#lib/server/provisioning/ringotelFake.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 
-import { onPropagate } from '../propagationHooks.js';
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';
 
@@ -90,7 +90,7 @@ async function undoLatest(
 
 // Whether the undo's configuration had reached Asterisk when a Ringotel call went out.
 let propagated = false;
-onPropagate(() => {
+vi.mocked(propagateConfig).mockImplementation(() => {
   propagated = true;
   return Promise.resolve();
 });

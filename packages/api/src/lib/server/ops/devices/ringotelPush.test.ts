@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
+import { propagateConfig } from '#lib/server/propagation.js';
 import {
   installRingotelFake,
   type RingotelFake
@@ -9,7 +10,6 @@ import {
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 
-import { onPropagate } from '../propagationHooks.js';
 import { runOperation, type RunInput } from '../runner.js';
 
 import '../index.js';
@@ -26,7 +26,7 @@ const admin: RunInput = {
 
 // What happened, in order: the configuration reaching Asterisk, and each Ringotel call.
 const events: string[] = [];
-onPropagate(() => {
+vi.mocked(propagateConfig).mockImplementation(() => {
   events.push('propagated');
   return Promise.resolve();
 });

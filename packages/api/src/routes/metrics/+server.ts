@@ -4,7 +4,7 @@ import * as env from '$app/env/private';
 
 import { resolveVersion } from '@zamfono/shared';
 
-import { createCoreClient, fetchCoreHealth } from '#lib/server/coreClient.js';
+import { getCoreClient } from '#lib/server/coreClient.js';
 import { getDb } from '#lib/server/db.js';
 import { certSyncStatus } from '#lib/server/jobs/certSync.js';
 import { renderMetrics } from '#lib/server/metrics.js';
@@ -17,7 +17,7 @@ const PROMETHEUS_CONTENT_TYPE = 'text/plain; version=0.0.4';
 
 /** `core`'s own ARI connection state (§7), read the same way `/healthz` reads it. */
 async function checkAri(): Promise<boolean> {
-  const body = await fetchCoreHealth();
+  const body = await getCoreClient().health();
   return body.ari;
 }
 
@@ -42,12 +42,11 @@ export async function GET(event: RequestEvent): Promise<Response> {
   if (!isValidBearer(authorization, token)) {
     return new Response(null, { status: STATUS_UNAUTHORIZED });
   }
-  const coreClient = createCoreClient();
   const body = await renderMetrics({
     db: getDb(),
     dbFile: env.DB_FILE ?? '',
     checkAri,
-    coreState: () => coreClient.state(),
+    coreState: async () => getCoreClient().state(),
     certSyncStatus,
     version: resolveVersion(env)
   });

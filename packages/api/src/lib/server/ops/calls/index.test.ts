@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   newId,
@@ -8,13 +8,13 @@ import {
   type StateResponse
 } from '@zamfono/shared';
 
-import type { CoreClient } from '#lib/server/coreClient.js';
+import { getCoreClient } from '#lib/server/coreClient.js';
+import { stubCoreClient } from '#lib/server/coreClientStub.js';
 import { handleRest } from '#lib/server/rest.js';
 import { makeTestDb, seedTenantTimeZone } from '#lib/server/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';
-import { setCoreClientForTest } from './_shared.js';
 
 import './index.js';
 
@@ -23,24 +23,6 @@ const anna: Actor = { id: 'u1', name: 'Anna', role: 'user' };
 
 function asRun(overrides: Partial<RunInput> = {}): RunInput {
   return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
-
-/** A `CoreClient` double whose methods reject unless `overrides` supplies one. */
-function stubCoreClient(overrides: Partial<CoreClient>): CoreClient {
-  const notImplemented = (): Promise<never> =>
-    Promise.reject(new Error('not implemented in test stub'));
-  return {
-    configChanged: notImplemented,
-    state: notImplemented,
-    originate: notImplemented,
-    transfer: notImplemented,
-    pickup: notImplemented,
-    hangup: notImplemented,
-    park: notImplemented,
-    parked: notImplemented,
-    mwi: notImplemented,
-    ...overrides
-  };
 }
 
 async function seedUser(db: Db, id: string): Promise<void> {
@@ -194,7 +176,7 @@ describe('calls', () => {
       recordingsInProgress: 0,
       presence: {}
     };
-    setCoreClientForTest(
+    vi.mocked(getCoreClient).mockReturnValue(
       stubCoreClient({ state: () => Promise.resolve(state) })
     );
 
@@ -232,7 +214,7 @@ describe('calls', () => {
 
   it('calls.originate proxies to core and reports a missing device as 409', async () => {
     const db = await makeTestDb();
-    setCoreClientForTest(
+    vi.mocked(getCoreClient).mockReturnValue(
       stubCoreClient({
         originate: () => Promise.resolve({ error: 'noRegisteredDevice' })
       })
@@ -249,7 +231,7 @@ describe('calls', () => {
 
   it('POST /calls answers a missing device as a problem whose detail names the cause (§10.2)', async () => {
     const db = await makeTestDb();
-    setCoreClientForTest(
+    vi.mocked(getCoreClient).mockReturnValue(
       stubCoreClient({
         originate: () => Promise.resolve({ error: 'noRegisteredDevice' })
       })

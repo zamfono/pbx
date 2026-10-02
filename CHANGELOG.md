@@ -141,6 +141,8 @@ why the specified behaviour changed; the commit history, how.
   not newer than the stack's, 12 when the stack directory names no release, anything else for an
   error. `system.update` and `system.info` take their verdict from it, so the two can no longer
   disagree on which releases are breaking.
+- `trunks.list` and `trunks.get` still answer status `unknown` while `core` does not answer, and
+  `api` now logs a warning saying so, where it said nothing.
 
 ### Fixed
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createCallControlClient } from './callControlClient.js';
-import { coreRefusal } from './coreClient.js';
+import { createCoreClient } from './coreClient.js';
+import { coreRefusal } from './coreHttp.js';
 
 const HTTP_CREATED = 201;
 const HTTP_NO_CONTENT = 204;
@@ -14,13 +14,13 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-describe('createCallControlClient', () => {
+describe('createCoreClient call control', () => {
   it('posts each action to its core route and reads the call a dialling one started', async () => {
     const fetchFn = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse(HTTP_CREATED, { callId: 'c2' }))
       .mockResolvedValue(new Response(null, { status: HTTP_NO_CONTENT }));
-    const client = createCallControlClient('http://core:3000', fetchFn);
+    const client = createCoreClient('http://core:3000', fetchFn);
 
     await expect(
       client.consult('c 1', { target: '102', actorUserId: 'u1' })
@@ -54,7 +54,7 @@ describe('createCallControlClient', () => {
         detail: 'invalidTarget'
       })
     );
-    const client = createCallControlClient('http://core:3000', fetchFn);
+    const client = createCoreClient('http://core:3000', fetchFn);
     const error: unknown = await client
       .addParty('c1', { target: '799', actorUserId: 'u1' })
       .catch((caught: unknown) => caught);

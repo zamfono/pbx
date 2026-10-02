@@ -56,7 +56,7 @@ async function call<T>(
 }
 
 /** The client for `UPDATER_TOKEN`, or `undefined` while `.env` sets none. */
-export function updaterFromEnv(): UpdaterClient | undefined {
+export function updaterClient(): UpdaterClient | undefined {
   const token = env.UPDATER_TOKEN ?? '';
   if (token === '') {
     return undefined;
@@ -73,18 +73,4 @@ export function updaterFromEnv(): UpdaterClient | undefined {
         })
       })
   };
-}
-
-// One mutable module slot, as `info.ts` holds its core lookup: a test installs a fake.
-const clientHolder: { current: (() => UpdaterClient | undefined) | undefined } =
-  { current: undefined };
-
-export function setUpdaterClient(
-  factory: (() => UpdaterClient | undefined) | undefined
-): void {
-  clientHolder.current = factory;
-}
-
-export function updaterClient(): UpdaterClient | undefined {
-  return (clientHolder.current ?? updaterFromEnv)();
 }

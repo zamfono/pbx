@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import process from 'node:process';
 import type { RequestEvent } from '@sveltejs/kit';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { CoreHealth, StateResponse } from '@zamfono/shared';
+import type { StateResponse } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
+import { getCoreClient } from '#lib/server/coreClient.js';
+import { stubCoreClient } from '#lib/server/coreClientStub.js';
 import { getDb } from '#lib/server/db.js';
 
 import { GET } from './+server.js';
@@ -26,11 +28,10 @@ const EMPTY_STATE: StateResponse = {
 
 process.env.DB_FILE = ':memory:';
 
-const realFetch = globalThis.fetch;
 const originalToken = process.env.METRICS_TOKEN;
 
 afterEach(() => {
-  globalThis.fetch = realFetch;
+  vi.mocked(getCoreClient).mockReset();
   if (originalToken === undefined) {
     delete process.env.METRICS_TOKEN;
   } else {
@@ -38,34 +39,13 @@ afterEach(() => {
   }
 });
 
-/** `input` as the URL string `fetch` was called with, whichever of its three accepted shapes. */
-function requestUrl(input: string | URL | Request): string {
-  if (typeof input === 'string') {
-    return input;
-  }
-  return input instanceof URL ? input.href : input.url;
-}
-
 function stubCore(): void {
-  globalThis.fetch = (input: string | URL | Request) => {
-    const url = requestUrl(input);
-    if (url.endsWith('/healthz')) {
-      const body: CoreHealth = { ok: true, ari: true, db: true };
-      return Promise.resolve(
-        new Response(JSON.stringify(body), {
-          headers: { 'content-type': 'application/json' }
-        })
-      );
-    }
-    if (url.endsWith('/internal/state')) {
-      return Promise.resolve(
-        new Response(JSON.stringify(EMPTY_STATE), {
-          headers: { 'content-type': 'application/json' }
-        })
-      );
-    }
-    return Promise.reject(new Error(`unexpected fetch: ${url}`));
-  };
+  vi.mocked(getCoreClient).mockReturnValue(
+    stubCoreClient({
+      health: () => Promise.resolve({ ok: true, ari: true, db: true }),
+      state: () => Promise.resolve(EMPTY_STATE)
+    })
+  );
 }
 
 function eventWithAuth(authorization: string | null): RequestEvent {

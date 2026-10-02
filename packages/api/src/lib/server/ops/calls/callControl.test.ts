@@ -1,24 +1,14 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { nowIso, type LiveCall, type StateResponse } from '@zamfono/shared';
 
-import {
-  createCallControlClient,
-  type CallControlClient
-} from '#lib/server/callControlClient.js';
-import {
-  CoreRequestError,
-  createCoreClient,
-  type CoreClient
-} from '#lib/server/coreClient.js';
+import { getCoreClient } from '#lib/server/coreClient.js';
+import { stubCoreClient } from '#lib/server/coreClientStub.js';
+import { CoreRequestError } from '#lib/server/coreHttp.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 
 import { runOperation } from '../runner.js';
 import { type Actor } from '../types.js';
-import {
-  setCallControlClientForTest,
-  setCoreClientForTest
-} from './_shared.js';
 
 import './index.js';
 
@@ -63,14 +53,6 @@ function coreWith(calls: LiveCall[]): string[] {
     asteriskChannels: 0,
     recordingsInProgress: 0
   };
-  const core: CoreClient = {
-    ...createCoreClient('http://core.test'),
-    state: () => Promise.resolve(state),
-    transfer: (callId, req) => {
-      requests.push(`transfer ${callId} ${JSON.stringify(req)}`);
-      return Promise.resolve();
-    }
-  };
   const record =
     (action: string) =>
     (callId: string, req: object): Promise<void> => {
@@ -83,16 +65,18 @@ function coreWith(calls: LiveCall[]): string[] {
       requests.push(`${action} ${callId} ${JSON.stringify(req)}`);
       return Promise.resolve({ callId: `${action}-call` });
     };
-  const control: CallControlClient = {
-    addParty: started('addParty'),
-    consult: started('consult'),
-    attendedTransfer: record('attendedTransfer'),
-    hold: record('hold'),
-    resume: record('resume'),
-    decline: record('decline')
-  };
-  setCoreClientForTest(core);
-  setCallControlClientForTest(control);
+  vi.mocked(getCoreClient).mockReturnValue(
+    stubCoreClient({
+      state: () => Promise.resolve(state),
+      transfer: record('transfer'),
+      addParty: started('addParty'),
+      consult: started('consult'),
+      attendedTransfer: record('attendedTransfer'),
+      hold: record('hold'),
+      resume: record('resume'),
+      decline: record('decline')
+    })
+  );
   return requests;
 }
 
@@ -109,8 +93,7 @@ async function run(
 }
 
 afterEach(() => {
-  setCoreClientForTest(createCoreClient());
-  setCallControlClientForTest(createCallControlClient());
+  vi.mocked(getCoreClient).mockReset();
 });
 
 describe('call control over the API (§10.3 "Live calls")', () => {
@@ -194,8 +177,8 @@ describe('call control over the API (§10.3 "Live calls")', () => {
 
   it('answers core’s refusals as their problems, 422 for a target nobody answers on', async () => {
     coreWith(CALLS);
-    const refusing: CallControlClient = {
-      ...createCallControlClient('http://core.test'),
+    vi.mocked(getCoreClient).mockReturnValue({
+      ...getCoreClient(),
       addParty: () =>
         Promise.reject(
           new CoreRequestError('http://core.test', 422, {
@@ -210,8 +193,7 @@ describe('call control over the API (§10.3 "Live calls")', () => {
             detail: 'notRinging'
           })
         )
-    };
-    setCallControlClientForTest(refusing);
+    });
     await expect(
       run(admin, 'calls.addParty', { id: 'answered', target: '799' })
     ).rejects.toMatchObject({ status: 422, detail: 'invalidTarget' });

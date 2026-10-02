@@ -1,6 +1,6 @@
 import * as env from '$app/env/private';
 
-import { fetchCoreHealth } from '#lib/server/coreClient.js';
+import { getCoreClient } from '#lib/server/coreClient.js';
 import { getDb } from '#lib/server/db.js';
 import {
   apiHealth,
@@ -11,14 +11,14 @@ import { certSyncStatus } from '#lib/server/jobs/certSync.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 /**
- * `core`'s own `/healthz` (Task 19, `CoreHealth`), reached over the internal Docker network
+ * `core`'s own `/healthz` (`CoreHealth`), reached over the internal Docker network
  * (§6.3): `reachable` reports whether a response was received and parsed at all, and `ari`
  * comes from that body, since core's own HTTP status folds its database and ARI checks
  * together (§6.3 "Health") and this pair keeps the two visible separately here.
  */
 async function checkCore(): Promise<CoreReachability> {
   try {
-    const body = await fetchCoreHealth();
+    const body = await getCoreClient().health();
     return { reachable: true, ari: body.ari };
   } catch {
     return { reachable: false, ari: false };

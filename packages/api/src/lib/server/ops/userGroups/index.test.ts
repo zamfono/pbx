@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { nowIso, type ReloadKind } from '@zamfono/shared';
+import { nowIso } from '@zamfono/shared';
 
+import { propagateConfig } from '#lib/server/propagation.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 
-import { onPropagate, runOperation, type RunInput } from '../runner.js';
+import { runOperation, type RunInput } from '../runner.js';
 import { Conflict, OpError, type Actor } from '../types.js';
 
 import './index.js';
@@ -32,20 +33,14 @@ describe('userGroups', () => {
 
   it('create propagates pjsip when members is present', async () => {
     const db = await makeTestDb();
-    const propagated: { operation: string; kind: ReloadKind[] }[] = [];
-    onPropagate(change => {
-      propagated.push(change);
-      return Promise.resolve();
-    });
+    vi.mocked(propagateConfig).mockClear();
     await runOperation(
       db,
       'userGroups.create',
       { name: 'Support', members: [{ kind: 'user', id: 'owner' }] },
       asRun()
     );
-    expect(propagated).toEqual([
-      { operation: 'userGroups.create', kind: ['pjsip'] }
-    ]);
+    expect(vi.mocked(propagateConfig).mock.calls).toEqual([[db, ['pjsip']]]);
   });
 
   it('refuses an unknown member id with a 404, not a raw DB error', async () => {
@@ -86,19 +81,13 @@ describe('userGroups', () => {
       { name: 'Support', members: [{ kind: 'user', id: 'owner' }] },
       asRun()
     );
-    const propagated: { operation: string; kind: ReloadKind[] }[] = [];
-    onPropagate(change => {
-      propagated.push(change);
-      return Promise.resolve();
-    });
+    vi.mocked(propagateConfig).mockClear();
     const updated = await runOperation<
       unknown,
       { id: string; members: unknown[] }
     >(db, 'userGroups.update', { id: group.id, members: [] }, asRun());
     expect(updated.members).toEqual([]);
-    expect(propagated).toEqual([
-      { operation: 'userGroups.update', kind: ['pjsip'] }
-    ]);
+    expect(vi.mocked(propagateConfig).mock.calls).toEqual([[db, ['pjsip']]]);
   });
 
   it('refuses to create a user group whose name is already used by another live group', async () => {

@@ -22,3 +22,22 @@ vi.mock('$app/env/private', async () => {
     )
   );
 });
+
+// No suite reaches a `core` or an Asterisk: the process's core client is one whose every request
+// fails, as an unreachable `core`'s does, and a write's config propagation does nothing. A suite
+// that needs `core` to answer sets `vi.mocked(getCoreClient)` (`stubCoreClient`), one that
+// observes a propagation reads `vi.mocked(propagateConfig)`, and the suites of `propagation.ts`
+// itself unmock it.
+vi.mock('#lib/server/coreClient.js', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('#lib/server/coreClient.js')>();
+  const unreachable = actual.createCoreClient('http://core.test', () =>
+    Promise.reject(new Error('core unreachable'))
+  );
+  return { ...actual, getCoreClient: vi.fn(() => unreachable) };
+});
+
+vi.mock('#lib/server/propagation.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('#lib/server/propagation.js')>()),
+  propagateConfig: vi.fn(() => Promise.resolve())
+}));

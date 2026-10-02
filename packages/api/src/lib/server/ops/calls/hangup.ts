@@ -1,11 +1,9 @@
 import { z } from 'zod';
 
+import { getCoreClient } from '#lib/server/coreClient.js';
+
 import { defineOperation } from '../types.js';
-import {
-  assertOwnLiveCall,
-  getCoreClient,
-  proxyCallAction
-} from './_shared.js';
+import { assertOwnLiveCall, proxyCallAction } from './_shared.js';
 
 const inputSchema = z.object({ id: z.string() }).strict();
 

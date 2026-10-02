@@ -12,9 +12,3 @@ register(list);
 register(update);
 register(deleteTrunk);
 register(setOrder);
-
-export {
-  coreTrunkStatusLookup,
-  setTrunkStatusLookup,
-  type TrunkStatusLookup
-} from './_status.js';

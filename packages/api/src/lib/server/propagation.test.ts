@@ -3,22 +3,38 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import pino from 'pino';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import type { CoreClient } from './coreClient.js';
+import { getCoreClient, type CoreClient } from './coreClient.js';
+import { stubCoreClient } from './coreClientStub.js';
 import { propagateAtBoot, propagateConfig } from './propagation.js';
 import { encrypt, keyringFromEnv, type Keyring } from './secretbox.js';
 import { makeTestDb } from './testDb.js';
 
 const KEY_BYTE_LENGTH = 32;
 
+// The propagation under test, not the setup file's stand-in for it.
+vi.unmock('./propagation.js');
+
+/** A fresh `SECRETBOX_KEY`, the keyring a propagation renders with. */
 function testKeyring(): Keyring {
-  return keyringFromEnv({
-    SECRETBOX_KEY: `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`
-  });
+  process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
+  return keyringFromEnv(process.env);
 }
+
+/** Has the next propagation render into `genDir` and reach `core` through `coreClient`. */
+function propagateInto(genDir: string, coreClient: CoreClient): void {
+  process.env.ASTERISK_GEN_DIR = genDir;
+  vi.mocked(getCoreClient).mockReturnValue(coreClient);
+}
+
+afterEach(() => {
+  delete process.env.SECRETBOX_KEY;
+  delete process.env.ASTERISK_GEN_DIR;
+  vi.mocked(getCoreClient).mockReset();
+});
 
 /** Inserts a live `dids` row targeting an external number, returning its id. */
 async function insertDid(db: Db, number: string): Promise<string> {
@@ -91,24 +107,19 @@ async function seedUserWithDevice(db: Db, kr: Keyring): Promise<void> {
     .execute();
 }
 
-type StubCoreClient = CoreClient & { calls: unknown[][] };
+type RecordingCore = CoreClient & { calls: unknown[][] };
 
-function stubCoreClient(): StubCoreClient {
+/** A `core` that takes every reload, recording each. */
+function recordingCore(): RecordingCore {
   const calls: unknown[][] = [];
   return {
-    calls,
-    configChanged: kinds => {
-      calls.push(['configChanged', kinds]);
-      return Promise.resolve();
-    },
-    state: () => Promise.reject(new Error('not used')),
-    originate: () => Promise.reject(new Error('not used')),
-    transfer: () => Promise.reject(new Error('not used')),
-    pickup: () => Promise.reject(new Error('not used')),
-    hangup: () => Promise.reject(new Error('not used')),
-    park: () => Promise.reject(new Error('not used')),
-    parked: () => Promise.reject(new Error('not used')),
-    mwi: () => Promise.reject(new Error('not used'))
+    ...stubCoreClient({
+      configChanged: kinds => {
+        calls.push(['configChanged', kinds]);
+        return Promise.resolve();
+      }
+    }),
+    calls
   };
 }
 
@@ -130,13 +141,10 @@ describe('propagateConfig', () => {
     await seedUserWithDevice(db, kr);
     const genDir = await mkdtemp(path.join(tmpdir(), 'zamfono-gen-'));
     workDirs.genDir = genDir;
-    const coreClient = stubCoreClient();
+    const coreClient = recordingCore();
 
-    await propagateConfig(db, ['pjsip', 'dialplan'], {
-      kr,
-      coreClient,
-      genDir
-    });
+    propagateInto(genDir, coreClient);
+    await propagateConfig(db, ['pjsip', 'dialplan']);
 
     const filenames = [
       'pjsip_users.conf',
@@ -185,11 +193,8 @@ describe('the hold music class (§10.2 "Hold music")', () => {
     await db.updateTable('settings').set({ holdMohAudioId: 'moh-1' }).execute();
     const genDir = await mkdtemp(path.join(tmpdir(), 'zamfono-gen-'));
     try {
-      await propagateConfig(db, ['pjsip', 'moh'], {
-        kr,
-        coreClient: stubCoreClient(),
-        genDir
-      });
+      propagateInto(genDir, recordingCore());
+      await propagateConfig(db, ['pjsip', 'moh']);
       const usersConf = await readFile(
         path.join(genDir, 'pjsip_users.conf'),
         'utf8'
@@ -224,13 +229,10 @@ describe('propagateAtBoot', () => {
     await seedUserWithDevice(db, kr);
     const genDir = await mkdtemp(path.join(tmpdir(), 'zamfono-gen-'));
     workDirs.genDir = genDir;
-    const coreClient = stubCoreClient();
+    const coreClient = recordingCore();
 
-    await propagateAtBoot(db, pino({ level: 'silent' }), {
-      kr,
-      coreClient,
-      genDir
-    });
+    propagateInto(genDir, coreClient);
+    await propagateAtBoot(db, pino({ level: 'silent' }));
 
     const hints = await readFile(
       path.join(genDir, 'extensions_hints.conf'),
@@ -251,15 +253,12 @@ describe('propagateAtBoot', () => {
     const genDir = await mkdtemp(path.join(tmpdir(), 'zamfono-gen-'));
     workDirs.genDir = genDir;
     const coreClient: CoreClient = {
-      ...stubCoreClient(),
+      ...recordingCore(),
       configChanged: () => Promise.reject(new Error('ECONNREFUSED'))
     };
 
-    await propagateAtBoot(db, pino({ level: 'silent' }), {
-      kr,
-      coreClient,
-      genDir
-    });
+    propagateInto(genDir, coreClient);
+    await propagateAtBoot(db, pino({ level: 'silent' }));
 
     const usersConf = await readFile(
       path.join(genDir, 'pjsip_users.conf'),

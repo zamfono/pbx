@@ -1,9 +1,10 @@
 import { z } from 'zod';
 
+import { getCoreClient } from '#lib/server/coreClient.js';
+
 import { defineOperation } from '../types.js';
 import {
   assertOwnLiveCall,
-  getCoreClient,
   proxyCallAction,
   resolveActingUserId
 } from './_shared.js';

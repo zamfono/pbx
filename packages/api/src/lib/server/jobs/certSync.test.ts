@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
 
 import type { CoreClient } from '../coreClient.js';
+import { stubCoreClient } from '../coreClientStub.js';
 import { makeTestDb } from '../testDb.js';
 import {
   CertSync,
@@ -43,33 +44,28 @@ const LIVE_CALL: StateResponse['calls'][number] = {
   connectedUserIds: []
 };
 
-function stubCoreClient(): StubCoreClient {
+function stubCore(): StubCoreClient {
   const configChangedCalls: unknown[][] = [];
   const client: StubCoreClient = {
+    ...stubCoreClient({
+      configChanged: kinds => {
+        configChangedCalls.push(kinds);
+        return Promise.resolve();
+      },
+      state: () =>
+        Promise.resolve({
+          calls: client.liveCalls,
+          trunks: {},
+          trunkChannels: {},
+          presence: {},
+          registeredDevices: 0,
+          recordingMixFailures: 0,
+          asteriskChannels: client.liveCalls.length,
+          recordingsInProgress: 0
+        })
+    }),
     configChangedCalls,
-    liveCalls: [],
-    configChanged: kinds => {
-      configChangedCalls.push(kinds);
-      return Promise.resolve();
-    },
-    state: () =>
-      Promise.resolve({
-        calls: client.liveCalls,
-        trunks: {},
-        trunkChannels: {},
-        presence: {},
-        registeredDevices: 0,
-        recordingMixFailures: 0,
-        asteriskChannels: client.liveCalls.length,
-        recordingsInProgress: 0
-      }),
-    originate: () => Promise.reject(new Error('not used')),
-    transfer: () => Promise.reject(new Error('not used')),
-    pickup: () => Promise.reject(new Error('not used')),
-    hangup: () => Promise.reject(new Error('not used')),
-    park: () => Promise.reject(new Error('not used')),
-    parked: () => Promise.reject(new Error('not used')),
-    mwi: () => Promise.reject(new Error('not used'))
+    liveCalls: []
   };
   return client;
 }
@@ -277,7 +273,7 @@ describe('CertSync', () => {
   it('reports missing while the hook has not copied a certificate onto caddy-data yet', async () => {
     const { genDir, caddyDataDir } = await makeDirs();
     const db = await makeTestDb();
-    const coreClient = stubCoreClient();
+    const coreClient = stubCore();
     const sync = new CertSync({
       db,
       coreClient,
@@ -295,7 +291,7 @@ describe('CertSync', () => {
     await seedCaddyCert(caddyDataDir, same, Buffer.from('key'));
     await seedCurrentCert(genDir, same, Buffer.from('key'));
     const db = await makeTestDb();
-    const coreClient = stubCoreClient();
+    const coreClient = stubCore();
 
     await expect(
       new CertSync({ db, coreClient, genDir, caddyDataDir }).run()
@@ -308,7 +304,7 @@ describe('CertSync', () => {
     const source = caIssuedCert(workDir, 3650);
     await seedCaddyCert(caddyDataDir, source.crt, source.key);
     const db = await makeTestDb();
-    const coreClient = stubCoreClient();
+    const coreClient = stubCore();
 
     await expect(
       new CertSync({ db, coreClient, genDir, caddyDataDir }).run()
@@ -328,7 +324,7 @@ describe('CertSync', () => {
     // The hook has renamed the new chain into place but not yet the new key.
     await seedCaddyCert(caddyDataDir, renewed.crt, previous.key);
     const db = await makeTestDb();
-    const coreClient = stubCoreClient();
+    const coreClient = stubCore();
     const sync = new CertSync({ db, coreClient, genDir, caddyDataDir });
 
     await expect(sync.run()).resolves.toBe('ok');
@@ -351,7 +347,7 @@ describe('CertSync', () => {
     const source = caIssuedCert(workDir, 3650);
     await seedCaddyCert(caddyDataDir, source.crt, source.key);
     const db = await makeTestDb();
-    const coreClient = stubCoreClient();
+    const coreClient = stubCore();
 
     await expect(
       new CertSync({ db, coreClient, genDir, caddyDataDir }).run()
@@ -364,7 +360,7 @@ describe('CertSync', () => {
     const source = caIssuedCert(workDir, 3650);
     await seedCaddyCert(caddyDataDir, source.crt, source.key);
     const db = await makeTestDb();
-    const coreClient = stubCoreClient();
+    const coreClient = stubCore();
     let shouldFail = true;
     coreClient.configChanged = kinds => {
       coreClient.configChangedCalls.push(kinds);
@@ -397,7 +393,7 @@ describe('CertSync', () => {
     const db = await makeTestDb();
     await seedSettings(db);
     await seedFarOoo(db);
-    const coreClient = stubCoreClient();
+    const coreClient = stubCore();
 
     await expect(
       new CertSync({ db, coreClient, genDir, caddyDataDir }).run()
@@ -414,7 +410,7 @@ describe('CertSync', () => {
     const db = await makeTestDb();
     await seedSettings(db);
     delete process.env.TLS_RELOAD_HOUR;
-    const coreClient = stubCoreClient();
+    const coreClient = stubCore();
     // Before the default 03:00 maintenance hour.
     let now = new Date('2026-01-01T01:00:00Z');
     const sync = new CertSync({
@@ -445,7 +441,7 @@ describe('CertSync', () => {
     const db = await makeTestDb();
     await seedSettings(db);
     delete process.env.TLS_RELOAD_HOUR;
-    const coreClient = stubCoreClient();
+    const coreClient = stubCore();
     coreClient.liveCalls = [LIVE_CALL];
     let now = new Date('2026-01-01T01:00:00Z');
     const sync = new CertSync({
@@ -476,7 +472,7 @@ describe('CertSync', () => {
     const db = await makeTestDb();
     await seedSettings(db);
     delete process.env.TLS_RELOAD_HOUR;
-    const coreClient = stubCoreClient();
+    const coreClient = stubCore();
     coreClient.liveCalls = [LIVE_CALL];
     let now = new Date('2026-01-01T02:00:00Z');
     const sync = new CertSync({
@@ -518,7 +514,7 @@ describe('CertSync', () => {
     const source = caIssuedCert(workDir, 3650);
     await seedCaddyCert(caddyDataDir, source.crt, source.key);
     const db = await makeTestDb();
-    const coreClient = stubCoreClient();
+    const coreClient = stubCore();
     coreClient.liveCalls = [LIVE_CALL];
 
     await expect(
@@ -536,7 +532,7 @@ describe('CertSync', () => {
     const db = await makeTestDb();
     await seedSettings(db);
     await seedFarOoo(db);
-    const coreClient = stubCoreClient();
+    const coreClient = stubCore();
 
     await expect(
       new CertSync({ db, coreClient, genDir, caddyDataDir }).run()
@@ -568,7 +564,7 @@ describe('startCertSync', () => {
     await mkdir(genDir, { recursive: true });
     await mkdir(caddyDataDir, { recursive: true });
     const db = await makeTestDb();
-    const coreClient = stubCoreClient();
+    const coreClient = stubCore();
     expect(certSyncStatus()).toBe('unknown');
 
     const scheduler = startCertSync({ db, coreClient, genDir, caddyDataDir });

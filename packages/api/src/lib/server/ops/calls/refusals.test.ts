@@ -1,11 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createCoreClient } from '#lib/server/coreClient.js';
+import { createCoreClient, getCoreClient } from '#lib/server/coreClient.js';
 import { handleRest } from '#lib/server/rest.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 
 import { type Actor } from '../types.js';
-import { setCoreClientForTest } from './_shared.js';
 
 import './index.js';
 
@@ -22,7 +21,9 @@ function coreRefusing(status: number, title: string, reason: string): void {
         { status, headers: { 'content-type': 'application/problem+json' } }
       )
     )) as typeof fetch;
-  setCoreClientForTest(createCoreClient('http://core.test', fetchFn));
+  vi.mocked(getCoreClient).mockReturnValue(
+    createCoreClient('http://core.test', fetchFn)
+  );
 }
 
 async function post(path: string, body: unknown): Promise<Response> {
@@ -38,7 +39,7 @@ async function post(path: string, body: unknown): Promise<Response> {
 }
 
 afterEach(() => {
-  setCoreClientForTest(createCoreClient());
+  vi.mocked(getCoreClient).mockReset();
 });
 
 // §10.3: errors are RFC 9457 problems; a refusal `core` answers keeps its status and reason, as

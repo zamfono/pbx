@@ -1,17 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  DEFAULT_FEATURE_CODES,
-  newId,
-  nowIso,
-  type Db,
-  type ReloadKind
-} from '@zamfono/shared';
+import { DEFAULT_FEATURE_CODES, newId, nowIso, type Db } from '@zamfono/shared';
 
+import { propagateConfig } from '#lib/server/propagation.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 
-import { onPropagate, runOperation, type RunInput } from '../runner.js';
+import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';
 
 import './index.js';
@@ -128,32 +123,24 @@ describe('settings', () => {
   it('propagates a column change that names no reload kind, language among them', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const propagated: { operation: string; kind: ReloadKind[] }[] = [];
-    onPropagate(change => {
-      propagated.push(change);
-      return Promise.resolve();
-    });
+    vi.mocked(propagateConfig).mockClear();
 
     await runOperation(db, 'settings.update', { language: 'de' }, asRun());
 
-    expect(propagated).toEqual([{ operation: 'settings.update', kind: [] }]);
+    expect(vi.mocked(propagateConfig).mock.calls).toEqual([[db, []]]);
   });
 
   it('propagates nothing for a settings.update that changed no column', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
     await runOperation(db, 'settings.update', { language: 'de' }, asRun());
-    const propagated: { operation: string; kind: ReloadKind[] }[] = [];
-    onPropagate(change => {
-      propagated.push(change);
-      return Promise.resolve();
-    });
+    vi.mocked(propagateConfig).mockClear();
 
     // The tenant is already `de`: nothing in `columns` changes, so this write, unlike the one
     // above, has nothing for `core` to re-read.
     await runOperation(db, 'settings.update', { language: 'de' }, asRun());
 
-    expect(propagated).toEqual([]);
+    expect(propagateConfig).not.toHaveBeenCalled();
   });
 
   it('refuses an owner-only field for an admin and allows it for an owner', async () => {

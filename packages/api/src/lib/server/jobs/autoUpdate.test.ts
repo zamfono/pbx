@@ -1,5 +1,5 @@
 import { sql } from 'kysely';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   MS_PER_DAY,
@@ -19,7 +19,7 @@ import {
   MAX_AUTO_UPDATE_ATTEMPTS
 } from '../ops/system/_state.js';
 import {
-  setUpdaterClient,
+  updaterClient,
   UpdaterRefusal,
   type UpdaterClient
 } from '../ops/system/_updater.js';
@@ -35,6 +35,11 @@ import {
   type GateCheck,
   type MaintenanceGate
 } from './maintenanceWindow.js';
+
+vi.mock('../ops/system/_updater.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../ops/system/_updater.js')>()),
+  updaterClient: vi.fn()
+}));
 
 const STATUS_CONFLICT = 409;
 const STARTED_AT = '2026-10-01T03:00:00.000Z';
@@ -131,7 +136,7 @@ function harness(db: Db): Harness {
       return updaterAnswer.next();
     }
   };
-  setUpdaterClient(() => client);
+  vi.mocked(updaterClient).mockImplementation(() => client);
   const gate: MaintenanceGate = {
     check: () => {
       gateChecks.count += 1;

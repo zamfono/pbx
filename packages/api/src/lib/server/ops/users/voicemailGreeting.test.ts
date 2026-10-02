@@ -3,10 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
 import { storeAudio } from '#lib/server/audio/types.js';
+import { propagateConfig } from '#lib/server/propagation.js';
 import { handleRest } from '#lib/server/rest.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 
-import { onPropagate, runOperation, type RunInput } from '../runner.js';
+import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';
 
 import './index.js';
@@ -67,11 +68,7 @@ describe('users.setVoicemailGreeting and users.clearVoicemailGreeting', () => {
   it("stores a user's own greeting as *96 does, outside the audit log, and makes core reload", async () => {
     const db = await makeTestDb();
     await seedUsers(db);
-    const propagated: string[] = [];
-    onPropagate(change => {
-      propagated.push(change.operation);
-      return Promise.resolve();
-    });
+    vi.mocked(propagateConfig).mockClear();
 
     const result = await runOperation<unknown, { mailboxAudioId: string }>(
       db,
@@ -94,7 +91,7 @@ describe('users.setVoicemailGreeting and users.clearVoicemailGreeting', () => {
     await expect(greetingOf(db, 'anna')).resolves.toBe(asset.id);
     const audit = await db.selectFrom('auditLog').selectAll().execute();
     expect(audit).toEqual([]);
-    expect(propagated).toContain('users.setVoicemailGreeting');
+    expect(propagateConfig).toHaveBeenCalledOnce();
   });
 
   it("refuses a user setting or clearing another's greeting, and lets an admin do both", async () => {

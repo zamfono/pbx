@@ -1,15 +1,21 @@
 import process from 'node:process';
 import { sql } from 'kysely';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { getCoreClient } from '#lib/server/coreClient.js';
+import { stubCoreClient } from '#lib/server/coreClientStub.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 
 import '../index.js';
 
-import { setUpdaterClient } from './_updater.js';
-import { setCoreVersionLookup } from './info.js';
+import { updaterClient } from './_updater.js';
+
+vi.mock('./_updater.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('./_updater.js')>()),
+  updaterClient: vi.fn()
+}));
 
 // The lowest role: every signed-in user may read what the stack runs.
 const asUser: RunInput = {
@@ -32,8 +38,8 @@ const NO_UPDATER = {
 };
 
 afterEach(() => {
-  setCoreVersionLookup(undefined);
-  setUpdaterClient(undefined);
+  vi.mocked(getCoreClient).mockReset();
+  vi.mocked(updaterClient).mockReset();
   delete process.env.ZAMFONO_VERSION;
   delete process.env.ZAMFONO_REVISION;
   delete process.env.FQDN;
@@ -45,7 +51,9 @@ describe('system.info', () => {
   it("reports api's version and the one core reports, each on its own", async () => {
     process.env.ZAMFONO_VERSION = '0.0.5';
     process.env.ZAMFONO_REVISION = '79c1041aaaaaaa';
-    setCoreVersionLookup(() => Promise.resolve(CORE));
+    vi.mocked(getCoreClient).mockReturnValue(
+      stubCoreClient({ version: () => Promise.resolve(CORE) })
+    );
 
     expect(
       await runOperation(await makeTestDb(), 'system.info', {}, asUser)
@@ -81,8 +89,10 @@ describe('system.info', () => {
   });
 
   it('reports core as null while core does not answer', async () => {
-    setCoreVersionLookup(() =>
-      Promise.reject(new Error('connect ECONNREFUSED'))
+    vi.mocked(getCoreClient).mockReturnValue(
+      stubCoreClient({
+        version: () => Promise.reject(new Error('connect ECONNREFUSED'))
+      })
     );
 
     expect(
@@ -111,7 +121,7 @@ describe('system.info', () => {
       breaking: false,
       last: { state: 'idle' as const }
     };
-    setUpdaterClient(() => ({
+    vi.mocked(updaterClient).mockImplementation(() => ({
       status: () => Promise.resolve(status),
       update: () => Promise.reject(new Error('unused'))
     }));
@@ -120,7 +130,7 @@ describe('system.info', () => {
       update: status
     });
 
-    setUpdaterClient(() => ({
+    vi.mocked(updaterClient).mockImplementation(() => ({
       status: () => Promise.reject(new Error('connect ECONNREFUSED')),
       update: () => Promise.reject(new Error('unused'))
     }));
@@ -151,7 +161,9 @@ describe('system.info', () => {
         }),
       update: () => Promise.reject(new Error('unused'))
     });
-    setUpdaterClient(reporting({ ...last, trigger: 'host' }));
+    vi.mocked(updaterClient).mockImplementation(
+      reporting({ ...last, trigger: 'host' })
+    );
     expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
       update: { last: { trigger: 'host' } }
     });
@@ -165,7 +177,7 @@ describe('system.info', () => {
         runStartedAt: last.startedAt
       })
       .execute();
-    setUpdaterClient(reporting(last));
+    vi.mocked(updaterClient).mockImplementation(reporting(last));
     expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
       update: { last: { ...last, trigger: 'automatic', by: 'Zamfono' } }
     });
@@ -205,7 +217,7 @@ describe('system.info', () => {
     expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
       autoUpdate: { enabled: true, failed: null }
     });
-    setUpdaterClient(() => ({
+    vi.mocked(updaterClient).mockImplementation(() => ({
       status: () => Promise.reject(new Error('not answering')),
       update: () => Promise.reject(new Error('not asked'))
     }));

@@ -1,16 +1,16 @@
 import { access, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import type { CoreClient } from '#lib/server/coreClient.js';
+import { getCoreClient } from '#lib/server/coreClient.js';
+import { stubCoreClient } from '#lib/server/coreClientStub.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';
-import { setCoreClientForTest } from './_shared.js';
 
 import './index.js';
 
@@ -19,24 +19,6 @@ const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 
 function asRun(overrides: Partial<RunInput> = {}): RunInput {
   return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
-
-/** A `CoreClient` double whose methods reject unless `overrides` supplies one. */
-function stubCoreClient(overrides: Partial<CoreClient>): CoreClient {
-  const notImplemented = (): Promise<never> =>
-    Promise.reject(new Error('not implemented in test stub'));
-  return {
-    configChanged: notImplemented,
-    state: notImplemented,
-    originate: notImplemented,
-    transfer: notImplemented,
-    pickup: notImplemented,
-    hangup: notImplemented,
-    park: notImplemented,
-    parked: notImplemented,
-    mwi: notImplemented,
-    ...overrides
-  };
 }
 
 async function seedUser(db: Db, id: string, name: string): Promise<void> {
@@ -100,7 +82,7 @@ async function seedVoicemail(
 }
 
 afterEach(() => {
-  setCoreClientForTest(stubCoreClient({}));
+  vi.mocked(getCoreClient).mockReset();
 });
 
 describe('voicemails', () => {
@@ -140,7 +122,7 @@ describe('voicemails', () => {
     await seedUser(db, 'u1', 'Anna');
     const vmId = await seedVoicemail(db, { mailboxUserId: 'u1' });
     const mwiCalls: string[] = [];
-    setCoreClientForTest(
+    vi.mocked(getCoreClient).mockReturnValue(
       stubCoreClient({
         mwi: mailbox => {
           mwiCalls.push(mailbox);
@@ -170,7 +152,7 @@ describe('voicemails', () => {
     const db = await makeTestDb();
     await seedUser(db, 'u1', 'Anna');
     const vmId = await seedVoicemail(db, { mailboxUserId: 'u1' });
-    setCoreClientForTest(
+    vi.mocked(getCoreClient).mockReturnValue(
       stubCoreClient({ mwi: () => Promise.reject(new Error('core down')) })
     );
 

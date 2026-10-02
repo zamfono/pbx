@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
+import { getCoreClient } from '#lib/server/coreClient.js';
+
 import { defineOperation } from '../types.js';
-import { getCallControlClient, proxyCallAction } from './_shared.js';
+import { proxyCallAction } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -27,7 +29,7 @@ export const decline = defineOperation({
   audit: false,
   run: async (ctx, input) => {
     await proxyCallAction(() =>
-      getCallControlClient().decline(input.id, { actorUserId: ctx.actor.id })
+      getCoreClient().decline(input.id, { actorUserId: ctx.actor.id })
     );
     return { id: input.id };
   }

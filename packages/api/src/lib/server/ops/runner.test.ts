@@ -1,12 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
-import type { ReloadKind } from '@zamfono/shared';
+import { propagateConfig } from '#lib/server/propagation.js';
 
 import { makeTestDb } from '../testDb.js';
 import { register } from './registry.js';
 import {
-  onPropagate,
   propagate,
   recordChange,
   runOperation,
@@ -206,11 +205,7 @@ describe('runOperation', () => {
 
   it('propagates the deduplicated reload kinds an operation requests, once after commit, never on a throw, a readOnly op, or a write that never called propagate', async () => {
     const db = await makeTestDb();
-    const propagated: { operation: string; kind: ReloadKind[] }[] = [];
-    onPropagate(change => {
-      propagated.push(change);
-      return Promise.resolve();
-    });
+    vi.mocked(propagateConfig).mockClear();
     register(
       defineOperation({
         name: 'test.propagatingWrite',
@@ -267,17 +262,13 @@ describe('runOperation', () => {
     ).rejects.toThrow('nope');
     await runOperation(db, 'test.propagatingReadOnly', {}, asRun());
     await runOperation(db, 'test.noKindRequested', {}, asRun());
-    expect(propagated).toEqual([
-      { operation: 'test.propagatingWrite', kind: ['pjsip', 'dialplan'] }
+    expect(vi.mocked(propagateConfig).mock.calls).toEqual([
+      [db, ['pjsip', 'dialplan']]
     ]);
   });
   it('propagates a write that changed config but asked for no reload', async () => {
     const db = await makeTestDb();
-    const propagated: { operation: string; kind: ReloadKind[] }[] = [];
-    onPropagate(change => {
-      propagated.push(change);
-      return Promise.resolve();
-    });
+    vi.mocked(propagateConfig).mockClear();
     register(
       defineOperation({
         name: 'test.configOnlyWrite',
@@ -294,19 +285,14 @@ describe('runOperation', () => {
     await runOperation(db, 'test.configOnlyWrite', {}, asRun());
     // §3.1: `core` drops its config cache for this, and reloads nothing. A DID, a menu, an
     // outbound route and an out-of-office rule all change routing without touching Asterisk.
-    expect(propagated).toEqual([
-      { operation: 'test.configOnlyWrite', kind: [] }
-    ]);
+    expect(vi.mocked(propagateConfig).mock.calls).toEqual([[db, []]]);
   });
 
-  it('reports the committed write when a propagation hook fails after commit', async () => {
+  it('reports the committed write when its propagation fails after commit', async () => {
     const db = await makeTestDb();
-    const reached: string[] = [];
-    onPropagate(() => Promise.reject(new Error('core unreachable')));
-    onPropagate(change => {
-      reached.push(change.operation);
-      return Promise.resolve();
-    });
+    vi.mocked(propagateConfig).mockRejectedValueOnce(
+      new Error('core unreachable')
+    );
     register(
       defineOperation({
         name: 'test.propagatingWriteThatFailsToReload',
@@ -349,7 +335,5 @@ describe('runOperation', () => {
       .where('operation', '=', 'test.propagatingWriteThatFailsToReload')
       .execute();
     expect(audit).toHaveLength(1);
-    // A hook that rejects does not keep the remaining hooks from running.
-    expect(reached).toEqual(['test.propagatingWriteThatFailsToReload']);
   });
 });

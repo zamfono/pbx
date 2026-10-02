@@ -1,11 +1,9 @@
 import { z } from 'zod';
 
+import { getCoreClient } from '#lib/server/coreClient.js';
+
 import { defineOperation } from '../types.js';
-import {
-  assertOwnLiveCall,
-  getCallControlClient,
-  proxyCallAction
-} from './_shared.js';
+import { assertOwnLiveCall, proxyCallAction } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -37,7 +35,7 @@ export const addParty = defineOperation({
   run: async (ctx, input) => {
     await assertOwnLiveCall(ctx, input.id);
     const { callId } = await proxyCallAction(() =>
-      getCallControlClient().addParty(input.id, {
+      getCoreClient().addParty(input.id, {
         target: input.target,
         actorUserId: ctx.actor.id
       })

@@ -2,15 +2,8 @@ import type { Selectable, Transaction } from 'kysely';
 
 import type { DB } from '@zamfono/shared';
 
-import {
-  createCallControlClient,
-  type CallControlClient
-} from '#lib/server/callControlClient.js';
-import {
-  coreRefusal,
-  createCoreClient,
-  type CoreClient
-} from '#lib/server/coreClient.js';
+import { getCoreClient } from '#lib/server/coreClient.js';
+import { coreRefusal } from '#lib/server/coreHttp.js';
 
 import { OpError, type Context } from '../types.js';
 
@@ -119,28 +112,6 @@ export function isOwnCall(actorId: string, row: CallRow): boolean {
   );
 }
 
-let coreClient: CoreClient = createCoreClient();
-
-/** Test-only: replaces the `CoreClient` the live-call operations proxy through. */
-export function setCoreClientForTest(client: CoreClient): void {
-  coreClient = client;
-}
-
-export function getCoreClient(): CoreClient {
-  return coreClient;
-}
-
-let callControlClient: CallControlClient = createCallControlClient();
-
-/** Test-only: replaces the `CallControlClient` the call-control operations proxy through. */
-export function setCallControlClientForTest(client: CallControlClient): void {
-  callControlClient = client;
-}
-
-export function getCallControlClient(): CallControlClient {
-  return callControlClient;
-}
-
 /**
  * Throws 403 for a `user` actor naming another user in `userId` (§10.3 "Click-to-dial"): a
  * `user` may act only for themselves, an admin for any user. Returns the effective user id.
@@ -169,7 +140,7 @@ export async function assertOwnLiveCall(
   if (ctx.actor.role !== 'user') {
     return;
   }
-  const state = await coreClient.state();
+  const state = await getCoreClient().state();
   const call = state.calls.find(candidate => candidate.callId === callId);
   if (!call?.connectedUserIds.includes(ctx.actor.id)) {
     throw new OpError(

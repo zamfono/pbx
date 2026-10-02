@@ -10,19 +10,11 @@ import { addressKey } from '#lib/server/addressKey.js';
 import { authenticateRequest } from '#lib/server/auth/bearer.js';
 import { crossSiteFormRejection } from '#lib/server/auth/crossSiteForms.js';
 import { requiredJwtSecret } from '#lib/server/auth/jwtSigning.js';
-import { createCoreClient, fetchCoreVersion } from '#lib/server/coreClient.js';
 import { getDb } from '#lib/server/db.js';
 import { startBackgroundJobs } from '#lib/server/jobs/background.js';
 import { Limiter, type LimitKind } from '#lib/server/limiter.js';
 import { recordApiRequestSeconds } from '#lib/server/metrics.js';
-import { onPropagate } from '#lib/server/ops/runner.js';
-import { setCoreVersionLookup } from '#lib/server/ops/system/info.js';
-import {
-  coreTrunkStatusLookup,
-  setTrunkStatusLookup
-} from '#lib/server/ops/trunks/index.js';
 import { problem } from '#lib/server/problem.js';
-import { propagateConfig } from '#lib/server/propagation.js';
 import { keyringFromEnv, type Keyring } from '#lib/server/secretbox.js';
 
 const UNAUTHORIZED_STATUS = 401;
@@ -46,7 +38,7 @@ function tryGetDb(): ReturnType<typeof getDb> | null {
   } catch (error) {
     jobsLogger.error(
       { error },
-      'boot: DB_FILE missing, config propagation and the background jobs disabled'
+      'boot: DB_FILE missing, the background jobs disabled'
     );
     return null;
   }
@@ -66,22 +58,16 @@ function tryKeyring(): Keyring | null {
 }
 
 /**
- * Wires the operations to `core` and starts the background jobs
- * (`lib/server/jobs/background.ts`). SvelteKit runs it once, and serves no request before it
- * resolves; a failure of the first-boot seed rejects it, which fails loading the handler and so
+ * Starts the background jobs (`lib/server/jobs/background.ts`). SvelteKit runs it once, and
+ * serves no request before it resolves; a failure of the first-boot seed rejects it, which fails loading the handler and so
  * `api`'s boot. The jobs stop on `sveltekit:shutdown`, which `server.ts` emits on SIGTERM and
  * SIGINT.
  */
 export const init: ServerInit = async () => {
-  // §9.4 "Provisioning and status": trunk status is the core's live state, read per request.
-  setTrunkStatusLookup(coreTrunkStatusLookup(createCoreClient()));
-  // §7 "Version": `system.info` asks `core` what it runs, per request.
-  setCoreVersionLookup(() => fetchCoreVersion());
   const db = tryGetDb();
   if (!db) {
     return;
   }
-  onPropagate(change => propagateConfig(db, change.kind));
   const kr = tryKeyring();
   if (!kr) {
     return;

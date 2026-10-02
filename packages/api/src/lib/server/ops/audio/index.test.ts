@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, type Db, type ReloadKind } from '@zamfono/shared';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
 import { deleteAudioFile, storeAudio } from '#lib/server/audio/types.js';
+import { propagateConfig } from '#lib/server/propagation.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 
 import '../ringGroups/index.js';
 
-import { onPropagate, runOperation, type RunInput } from '../runner.js';
+import { runOperation, type RunInput } from '../runner.js';
 import { Conflict, type Actor } from '../types.js';
 
 import './index.js';
@@ -156,11 +157,7 @@ describe('audio', () => {
 
   it('create propagates moh only for a moh-kind asset', async () => {
     const db = await makeTestDb();
-    const propagated: { operation: string; kind: ReloadKind[] }[] = [];
-    onPropagate(change => {
-      propagated.push(change);
-      return Promise.resolve();
-    });
+    vi.mocked(propagateConfig).mockClear();
     await runOperation(
       db,
       'audio.create',
@@ -173,7 +170,7 @@ describe('audio', () => {
       { kind: 'moh', label: 'Hold music', upload },
       asRun()
     );
-    expect(propagated).toEqual([{ operation: 'audio.create', kind: ['moh'] }]);
+    expect(vi.mocked(propagateConfig).mock.calls).toEqual([[db, ['moh']]]);
   });
 
   it('delete propagates moh only for a moh-kind asset', async () => {
@@ -190,11 +187,7 @@ describe('audio', () => {
       { kind: 'moh', label: 'Hold music', upload },
       asRun()
     );
-    const propagated: { operation: string; kind: ReloadKind[] }[] = [];
-    onPropagate(change => {
-      propagated.push(change);
-      return Promise.resolve();
-    });
+    vi.mocked(propagateConfig).mockClear();
     await runOperation(
       db,
       'audio.delete',
@@ -207,7 +200,7 @@ describe('audio', () => {
       { id: moh.id },
       asRun({ confirm: true })
     );
-    expect(propagated).toEqual([{ operation: 'audio.delete', kind: ['moh'] }]);
+    expect(vi.mocked(propagateConfig).mock.calls).toEqual([[db, ['moh']]]);
   });
 
   it('allows deleting an audio asset whose announcement forward_targets row is an orphan no owner references', async () => {

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, type Db, type UpdateState } from '@zamfono/shared';
 
@@ -10,10 +10,15 @@ import { OpError } from '../types.js';
 import '../index.js';
 
 import {
-  setUpdaterClient,
+  updaterClient,
   UpdaterRefusal,
   type UpdaterClient
 } from './_updater.js';
+
+vi.mock('./_updater.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('./_updater.js')>()),
+  updaterClient: vi.fn()
+}));
 
 const asOwner: RunInput = {
   actor: { id: 'o1', name: 'Owner', role: 'owner' },
@@ -27,7 +32,7 @@ const STATUS_CONFLICT = 409;
 const STATUS_UNAVAILABLE = 503;
 
 afterEach(() => {
-  setUpdaterClient(undefined);
+  vi.mocked(updaterClient).mockReset();
 });
 
 /** One `ok` backup run that finished `ageMs` ago. */
@@ -97,7 +102,7 @@ describe('system.update', () => {
       startedAt: '2026-10-01T03:00:00.000Z'
     };
     const updater = recordingUpdater(() => Promise.resolve(started));
-    setUpdaterClient(() => updater);
+    vi.mocked(updaterClient).mockImplementation(() => updater);
 
     expect(
       await runOperation(db, 'system.update', { version: '0.0.7' }, asOwner)
@@ -128,7 +133,7 @@ describe('system.update', () => {
     const updater = recordingUpdater(() =>
       Promise.resolve({ state: 'running' })
     );
-    setUpdaterClient(() => updater);
+    vi.mocked(updaterClient).mockImplementation(() => updater);
 
     const error = await refusal(runOperation(db, 'system.update', {}, asOwner));
     expect(error.status).toBe(STATUS_CONFLICT);
@@ -139,7 +144,7 @@ describe('system.update', () => {
   it('passes on the updater’s refusal', async () => {
     const db = await makeTestDb();
     await backupFinished(db, MINUTE_MS);
-    setUpdaterClient(() =>
+    vi.mocked(updaterClient).mockImplementation(() =>
       recordingUpdater(() =>
         Promise.reject(
           new UpdaterRefusal(
@@ -159,7 +164,7 @@ describe('system.update', () => {
   it('is unavailable without UPDATER_TOKEN', async () => {
     const db = await makeTestDb();
     await backupFinished(db, MINUTE_MS);
-    setUpdaterClient(() => undefined);
+    vi.mocked(updaterClient).mockImplementation(() => undefined);
     const error = await refusal(runOperation(db, 'system.update', {}, asOwner));
     expect(error.status).toBe(STATUS_UNAVAILABLE);
     expect(error.message).toContain('update.sh');

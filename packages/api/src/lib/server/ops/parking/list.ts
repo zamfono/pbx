@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { getCoreClient } from '../calls/_shared.js';
+import { getCoreClient } from '#lib/server/coreClient.js';
+
 import { defineOperation } from '../types.js';
 
 /**

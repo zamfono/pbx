@@ -1,13 +1,18 @@
 import { sql } from 'kysely';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { nowIso, openDb, type Db } from '@zamfono/shared';
 
 import { apiHealth, type ApiHealth } from './health.js';
 import { updateNews } from './ops/system/_state.js';
-import { setUpdaterClient, type UpdaterClient } from './ops/system/_updater.js';
+import { updaterClient, type UpdaterClient } from './ops/system/_updater.js';
 import { keyringFromEnv } from './secretbox.js';
 import { makeTestDb } from './testDb.js';
+
+vi.mock('./ops/system/_updater.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('./ops/system/_updater.js')>()),
+  updaterClient: vi.fn()
+}));
 
 /** An updater `apiHealth` only needs to be configured: it never asks it anything. */
 const UNUSED_UPDATER: UpdaterClient = {
@@ -52,11 +57,11 @@ async function seedTrunk(
 
 describe('apiHealth update fields (§6.3 "Automatic updates", §10.3 Health row)', () => {
   afterEach(() => {
-    setUpdaterClient(undefined);
+    vi.mocked(updaterClient).mockReset();
   });
 
   it('says whether an automatic update failed, and nothing of releases', async () => {
-    setUpdaterClient(() => UNUSED_UPDATER);
+    vi.mocked(updaterClient).mockImplementation(() => UNUSED_UPDATER);
     const db = await makeTestDb();
     await expect(healthOf(db)).resolves.toMatchObject({
       autoUpdateFailed: false
@@ -79,7 +84,7 @@ describe('apiHealth update fields (§6.3 "Automatic updates", §10.3 Health row)
   });
 
   it('reports no failure without an updater, whatever update_state stores, and keeps the record', async () => {
-    setUpdaterClient(() => undefined);
+    vi.mocked(updaterClient).mockImplementation(() => undefined);
     const db = await makeTestDb();
     await db
       .updateTable('updateState')
@@ -97,7 +102,7 @@ describe('apiHealth update fields (§6.3 "Automatic updates", §10.3 Health row)
     });
 
     // The token back, and nothing succeeded since: it reappears.
-    setUpdaterClient(() => UNUSED_UPDATER);
+    vi.mocked(updaterClient).mockImplementation(() => UNUSED_UPDATER);
     await expect(healthOf(db)).resolves.toMatchObject({
       autoUpdateFailed: true
     });
@@ -110,7 +115,7 @@ describe('apiHealth update fields (§6.3 "Automatic updates", §10.3 Health row)
   });
 
   it('rejects a read of update_state that fails, rather than reporting no failure', async () => {
-    setUpdaterClient(() => UNUSED_UPDATER);
+    vi.mocked(updaterClient).mockImplementation(() => UNUSED_UPDATER);
     await expect(updateNews(openDb(':memory:'))).rejects.toThrow();
   });
 });

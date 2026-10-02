@@ -1,12 +1,9 @@
 import { z } from 'zod';
 
+import { getCoreClient } from '#lib/server/coreClient.js';
+
 import { defineOperation, OpError } from '../types.js';
-import {
-  assertOwnLiveCall,
-  getCallControlClient,
-  getCoreClient,
-  proxyCallAction
-} from './_shared.js';
+import { assertOwnLiveCall, proxyCallAction } from './_shared.js';
 
 const STATUS_UNPROCESSABLE_ENTITY = 422;
 
@@ -66,7 +63,7 @@ export const transfer = defineOperation({
     if (toCallId !== undefined) {
       await assertOwnLiveCall(ctx, toCallId);
       await proxyCallAction(() =>
-        getCallControlClient().attendedTransfer(input.id, {
+        getCoreClient().attendedTransfer(input.id, {
           toCallId,
           actorUserId
         })

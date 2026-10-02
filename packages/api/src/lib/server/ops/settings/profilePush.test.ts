@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   newId,
@@ -8,11 +8,12 @@ import {
 } from '@zamfono/shared';
 
 import { watchAsteriskRestarts } from '#lib/server/jobs/ringotelRereg.js';
+import { propagateConfig } from '#lib/server/propagation.js';
 import { isProfilePending } from '#lib/server/provisioning/profilePending.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 
-import { onPropagate, runOperation, type RunInput } from '../runner.js';
+import { runOperation, type RunInput } from '../runner.js';
 
 import './index.js';
 
@@ -137,10 +138,8 @@ describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile 
     // How many Ringotel calls had been made when the write propagated: none, since the push
     // waits for the commit and the propagation.
     const callsAtPropagation: number[] = [];
-    onPropagate(change => {
-      if (change.operation === 'settings.update') {
-        callsAtPropagation.push(ringotel.methods.length);
-      }
+    vi.mocked(propagateConfig).mockImplementationOnce(() => {
+      callsAtPropagation.push(ringotel.methods.length);
       return Promise.resolve();
     });
 

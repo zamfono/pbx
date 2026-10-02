@@ -6,7 +6,8 @@ import { z } from 'zod';
 
 import type { Db, ReloadKind } from '@zamfono/shared';
 
-import type { CoreClient } from './coreClient.js';
+import { getCoreClient, type CoreClient } from './coreClient.js';
+import { stubCoreClient } from './coreClientStub.js';
 import { apiHealth } from './health.js';
 import { renderMetrics, resetMetricsAccumulators } from './metrics.js';
 import { runAfterCommit } from './ops/afterCommit.js';
@@ -15,51 +16,46 @@ import { register } from './ops/registry.js';
 import {
   afterCommit,
   afterPropagation,
-  onPropagate,
   propagate,
   runOperation
 } from './ops/runner.js';
 import { defineOperation } from './ops/types.js';
-import { propagateConfig, type PropagationDeps } from './propagation.js';
+import { propagateConfig } from './propagation.js';
 import { isPropagationPending } from './propagationPending.js';
 import { keyringFromEnv } from './secretbox.js';
 import { makeTestDb, seedTenantTimeZone } from './testDb.js';
 
-const kr = keyringFromEnv({
-  SECRETBOX_KEY: `1:${Buffer.alloc(32, 7).toString('base64')}`
-});
+// The propagation under test, not the setup file's stand-in for it.
+vi.unmock('./propagation.js');
+
+process.env.SECRETBOX_KEY = `1:${Buffer.alloc(32, 7).toString('base64')}`;
+const kr = keyringFromEnv(process.env);
 
 /** `core` as the test sets it: up or down, and every `configChanged` it was asked for. */
 const core = { up: true, reloads: [] as ReloadKind[][] };
 
 function coreClient(): CoreClient {
-  const unused = (): Promise<never> => Promise.reject(new Error('not used'));
-  return {
-    configChanged: (kinds: ReloadKind[]) => {
+  return stubCoreClient({
+    configChanged: kinds => {
       core.reloads.push(kinds);
       return core.up
         ? Promise.resolve()
         : Promise.reject(new Error('core unreachable'));
-    },
-    state: unused,
-    originate: unused,
-    transfer: unused,
-    pickup: unused,
-    hangup: unused,
-    park: unused,
-    parked: unused,
-    mwi: unused
-  };
+    }
+  });
 }
 
 const dirs: string[] = [];
 
-async function setUp(): Promise<{ db: Db; deps: PropagationDeps }> {
+/** A database whose propagations render into a directory of their own and reach `core`. */
+async function setUp(): Promise<Db> {
   const db = await makeTestDb();
   await seedTenantTimeZone(db, 'UTC');
   const genDir = await mkdtemp(path.join(tmpdir(), 'zamfono-gen-'));
   dirs.push(genDir);
-  return { db, deps: { kr, coreClient: coreClient(), genDir } };
+  process.env.ASTERISK_GEN_DIR = genDir;
+  vi.mocked(getCoreClient).mockReturnValue(coreClient());
+  return db;
 }
 
 beforeEach(() => {
@@ -69,6 +65,8 @@ beforeEach(() => {
 
 afterEach(async () => {
   vi.useRealTimers();
+  vi.mocked(getCoreClient).mockReset();
+  delete process.env.ASTERISK_GEN_DIR;
   resetMetricsAccumulators();
   await Promise.all(
     dirs.splice(0).map(dir => rm(dir, { recursive: true, force: true }))
@@ -78,11 +76,9 @@ afterEach(async () => {
 // §3.1 "Config propagation": a failed propagation is owed until one succeeds.
 describe('an owed config propagation', () => {
   it('is shown by /healthz and /metrics until a propagation succeeds, which reloads every module', async () => {
-    const { db, deps } = await setUp();
+    const db = await setUp();
     core.up = false;
-    await expect(propagateConfig(db, [], deps)).rejects.toThrow(
-      'core unreachable'
-    );
+    await expect(propagateConfig(db, [])).rejects.toThrow('core unreachable');
 
     expect(await isPropagationPending(db)).toBe(true);
     const health = await apiHealth({
@@ -104,16 +100,16 @@ describe('an owed config propagation', () => {
     expect(metrics).toContain('zamfono_config_propagation_failures_total 1');
 
     core.up = true;
-    await propagateConfig(db, [], deps);
+    await propagateConfig(db, []);
     expect(core.reloads).toEqual([[], ['pjsip', 'dialplan', 'moh']]);
     expect(await isPropagationPending(db)).toBe(false);
   });
 
   it('is retried on its own, and then runs what waited for it', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    const { db, deps } = await setUp();
+    const db = await setUp();
     core.up = false;
-    await expect(propagateConfig(db, ['pjsip'], deps)).rejects.toThrow(
+    await expect(propagateConfig(db, ['pjsip'])).rejects.toThrow(
       'core unreachable'
     );
     const ran: string[] = [];
@@ -158,8 +154,7 @@ describe('an owed config propagation', () => {
   });
 
   it('answers the write with a warning, holds its Ringotel step and runs it after the next write propagates', async () => {
-    const { db, deps } = await setUp();
-    onPropagate(change => propagateConfig(db, change.kind, deps));
+    const db = await setUp();
     const ran: string[] = [];
     register(
       defineOperation({

@@ -6,7 +6,7 @@ import {
   withWarnings
 } from './afterCommit.js';
 import { newEffects, type Effects } from './effects.js';
-import { notifyPropagation } from './propagationHooks.js';
+import { notifyPropagation } from './propagate.js';
 import { registry, type ErasedOperation } from './registry.js';
 import { runRollbackHooks } from './rollbackHooks.js';
 import {
@@ -24,7 +24,7 @@ export {
   recordFieldChanges,
   setUndoable
 } from './audit.js';
-export { onPropagate, propagate } from './propagationHooks.js';
+export { propagate } from './propagate.js';
 export { afterCommit, afterPropagation } from './afterCommit.js';
 export { onRollback } from './rollbackHooks.js';
 
@@ -194,10 +194,9 @@ async function executeInTransaction(
 /**
  * Validates `input` against the named operation's schema (422), enforces its `minRole` (403)
  * and its confirmation gate (409), runs it in one transaction with its audit row, then, for a
- * non-`readOnly` operation that requested reload kinds via `propagate()`, notifies every
- * `onPropagate` hook with the deduplicated set once the transaction has committed (§10.3, §3.1).
- * The operation's own result is returned once the commit succeeds, whatever the hooks report; a
- * failed propagation is a warning of it.
+ * non-`readOnly` operation that called `propagate()`, propagates the deduplicated reload kinds
+ * once the transaction has committed (§10.3, §3.1). The operation's own result is returned once
+ * the commit succeeds, whatever follows it reports; a failed propagation is a warning of it.
  */
 export async function runOperation<In, Out>(
   db: Db,
@@ -225,7 +224,7 @@ export async function runOperation<In, Out>(
   // a successful one first runs what waited for an owed one.
   let propagationFailure: string | null = null;
   if (!op.readOnly && effects.propagates) {
-    propagationFailure = await notifyPropagation(name, [
+    propagationFailure = await notifyPropagation(db, name, [
       ...effects.reloadKinds
     ]);
     if (propagationFailure === null) {

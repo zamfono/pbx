@@ -2,11 +2,12 @@ import { z } from 'zod';
 
 import type { LiveCall } from '@zamfono/shared';
 
+import { getCoreClient } from '#lib/server/coreClient.js';
 import { decodeCursor, encodeCursor } from '#lib/server/pagination.js';
 
 import { instantInput, tenantInstantReader } from '../instantInput.js';
 import { defineOperation, OpError } from '../types.js';
-import { getCoreClient, toCallOut } from './_shared.js';
+import { toCallOut } from './_shared.js';
 
 const STATUS_FORBIDDEN = 403;
 const DEFAULT_LIMIT = 50;

@@ -1,14 +1,16 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Db } from '@zamfono/shared';
 
+import { getCoreClient } from '#lib/server/coreClient.js';
+import { stubCoreClient } from '#lib/server/coreClientStub.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 
 import { runOperation } from '../runner.js';
 import type { Actor } from '../types.js';
-import { coreTrunkStatusLookup, setTrunkStatusLookup } from './index.js';
 
 import '../outboundRoutes/index.js';
+import './index.js';
 
 process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
 
@@ -372,33 +374,29 @@ describe('trunks operations', () => {
     expect(rows.map(row => row.id)).toEqual([first.trunk.id, second.trunk.id]);
   });
 
-  it('answers status unknown for every trunk while the status lookup rejects', async () => {
+  it('answers status unknown for every trunk while core does not answer', async () => {
     const db = await makeTestDb();
     const { trunk } = await createTrunk(db);
-    setTrunkStatusLookup(() => Promise.reject(new Error('core unreachable')));
-    try {
-      const { items } = await runOperation<
-        unknown,
-        {
-          items: {
-            id: string;
-            status: string;
-            statusChangedAt: string | null;
-          }[];
-        }
-      >(db, 'trunks.list', {}, asRun());
-      expect(items).toEqual([
-        expect.objectContaining({ status: 'unknown', statusChangedAt: null })
-      ]);
+    // Unstubbed, `getCoreClient()` fails every request, as an unreachable `core` does.
+    const { items } = await runOperation<
+      unknown,
+      {
+        items: {
+          id: string;
+          status: string;
+          statusChangedAt: string | null;
+        }[];
+      }
+    >(db, 'trunks.list', {}, asRun());
+    expect(items).toEqual([
+      expect.objectContaining({ status: 'unknown', statusChangedAt: null })
+    ]);
 
-      const one = await runOperation<
-        unknown,
-        { status: string; statusChangedAt: string | null }
-      >(db, 'trunks.get', { id: trunk.id }, asRun());
-      expect(one).toMatchObject({ status: 'unknown', statusChangedAt: null });
-    } finally {
-      setTrunkStatusLookup(undefined);
-    }
+    const one = await runOperation<
+      unknown,
+      { status: string; statusChangedAt: string | null }
+    >(db, 'trunks.get', { id: trunk.id }, asRun());
+    expect(one).toMatchObject({ status: 'unknown', statusChangedAt: null });
   });
 
   it("answers the core's own status through the core's state (§9.4 Provisioning and status)", async () => {
@@ -408,8 +406,8 @@ describe('trunks operations', () => {
       status: 'registered' as const,
       statusChangedAt: '2026-09-23T00:00:00.000Z'
     };
-    setTrunkStatusLookup(
-      coreTrunkStatusLookup({
+    vi.mocked(getCoreClient).mockReturnValue(
+      stubCoreClient({
         state: () =>
           Promise.resolve({
             calls: [],
@@ -430,7 +428,7 @@ describe('trunks operations', () => {
       >(db, 'trunks.get', { id: trunk.id }, asRun());
       expect(one).toMatchObject(reported);
     } finally {
-      setTrunkStatusLookup(undefined);
+      vi.mocked(getCoreClient).mockReset();
     }
   });
 

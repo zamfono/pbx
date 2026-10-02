@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   nowIso,
@@ -7,7 +7,8 @@ import {
   type StateResponse
 } from '@zamfono/shared';
 
-import { createCoreClient, type CoreClient } from '#lib/server/coreClient.js';
+import { createCoreClient, getCoreClient } from '#lib/server/coreClient.js';
+import { stubCoreClient } from '#lib/server/coreClientStub.js';
 import { handleRest } from '#lib/server/rest.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 
@@ -15,7 +16,6 @@ import '../parking/index.js';
 
 import { runOperation } from '../runner.js';
 import { type Actor } from '../types.js';
-import { setCoreClientForTest } from './_shared.js';
 
 import './index.js';
 
@@ -77,8 +77,7 @@ function core(): unknown[] {
     asteriskChannels: 0,
     recordingsInProgress: 0
   };
-  const client: CoreClient = {
-    ...createCoreClient('http://core.test'),
+  const client = stubCoreClient({
     state: () => Promise.resolve(state),
     park: (callId, req) => {
       requests.push({ park: callId, ...req });
@@ -97,8 +96,8 @@ function core(): unknown[] {
       requests.push({ originate: req.target, ...req });
       return Promise.resolve({ callId: 'new' });
     }
-  };
-  setCoreClientForTest(client);
+  });
+  vi.mocked(getCoreClient).mockReturnValue(client);
   return requests;
 }
 
@@ -123,7 +122,9 @@ function coreRefusing(status: number, title: string, reason: string): void {
         { status, headers: { 'content-type': 'application/problem+json' } }
       )
     )) as typeof fetch;
-  setCoreClientForTest(createCoreClient('http://core.test', fetchFn));
+  vi.mocked(getCoreClient).mockReturnValue(
+    createCoreClient('http://core.test', fetchFn)
+  );
 }
 
 async function post(path: string, body: unknown): Promise<Response> {
@@ -139,7 +140,7 @@ async function post(path: string, body: unknown): Promise<Response> {
 }
 
 afterEach(() => {
-  setCoreClientForTest(createCoreClient());
+  vi.mocked(getCoreClient).mockReset();
 });
 
 describe('calls.park', () => {

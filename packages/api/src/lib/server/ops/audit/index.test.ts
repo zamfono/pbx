@@ -1,11 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, type Db, type ReloadKind } from '@zamfono/shared';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
+import { propagateConfig } from '#lib/server/propagation.js';
 import { makeTestDb, seedTenantTimeZone } from '#lib/server/testDb.js';
 
 import type { HoursWire } from '../hours/get.js';
-import { onPropagate, runOperation, type RunInput } from '../runner.js';
+import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';
 
 import '../blockedNumbers/index.js';
@@ -233,16 +234,12 @@ describe('audit.undo', () => {
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     await runOperation(db, 'users.delete', { id: user.id }, asRun());
     const entry = await latestAuditEntry(db, user.id);
-    const propagated: { operation: string; kind: ReloadKind[] }[] = [];
-    onPropagate(change => {
-      propagated.push(change);
-      return Promise.resolve();
-    });
+    vi.mocked(propagateConfig).mockClear();
 
     await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
 
-    expect(propagated).toEqual([
-      { operation: 'audit.undo', kind: ['pjsip', 'dialplan'] }
+    expect(vi.mocked(propagateConfig).mock.calls).toEqual([
+      [db, ['pjsip', 'dialplan']]
     ]);
   });
 

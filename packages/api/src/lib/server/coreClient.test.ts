@@ -1,11 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  CoreRequestError,
-  createCoreClient,
-  fetchCoreHealth,
-  fetchCoreVersion
-} from './coreClient.js';
+import { createCoreClient } from './coreClient.js';
+import { CoreRequestError } from './coreHttp.js';
 
 const HTTP_INTERNAL_SERVER_ERROR = 500;
 const HTTP_SERVICE_UNAVAILABLE = 503;
@@ -49,7 +45,7 @@ describe('createCoreClient', () => {
     const client = createCoreClient('http://core:3000', fetchFn);
 
     await expect(client.state()).resolves.toEqual(snapshot);
-    expect(fetchFn).toHaveBeenCalledWith('http://core:3000/internal/state');
+    expect(fetchFn.mock.calls[0]?.[0]).toBe('http://core:3000/internal/state');
   });
 
   it('originate returns the callId on 201', async () => {
@@ -163,7 +159,7 @@ describe('createCoreClient', () => {
   });
 });
 
-describe('fetchCoreHealth', () => {
+describe('CoreClient.health', () => {
   it("returns core's body on a 503 too, since it says which check is down", async () => {
     const fetchFn = vi.fn(() =>
       Promise.resolve(
@@ -175,7 +171,7 @@ describe('fetchCoreHealth', () => {
       )
     );
 
-    const health = await fetchCoreHealth('http://core:3000', fetchFn);
+    const health = await createCoreClient('http://core:3000', fetchFn).health();
 
     expect(health).toEqual({ ok: false, ari: false, db: true });
     expect(fetchFn).toHaveBeenCalledWith('http://core:3000/healthz', {
@@ -195,13 +191,13 @@ describe('fetchCoreHealth', () => {
       AbortSignal.timeout(HANG_TIMEOUT_MS)
     );
 
-    await expect(fetchCoreHealth('http://core:3000', fetchFn)).rejects.toThrow(
-      'aborted'
-    );
+    await expect(
+      createCoreClient('http://core:3000', fetchFn).health()
+    ).rejects.toThrow('aborted');
   });
 });
 
-describe('fetchCoreVersion', () => {
+describe('CoreClient.version', () => {
   it('rejects once its timeout aborts a request core never answers', async () => {
     // A core that hangs: `system.info` then answers `core: null` rather than hanging with it.
     const fetchFn = (_url: string | URL | Request, init?: RequestInit) =>
@@ -214,8 +210,8 @@ describe('fetchCoreVersion', () => {
       AbortSignal.timeout(HANG_TIMEOUT_MS)
     );
 
-    await expect(fetchCoreVersion('http://core:3000', fetchFn)).rejects.toThrow(
-      'aborted'
-    );
+    await expect(
+      createCoreClient('http://core:3000', fetchFn).version()
+    ).rejects.toThrow('aborted');
   });
 });

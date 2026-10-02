@@ -1,11 +1,9 @@
 import { z } from 'zod';
 
+import { getCoreClient } from '#lib/server/coreClient.js';
+
 import { defineOperation } from '../types.js';
-import {
-  getCoreClient,
-  proxyCallAction,
-  resolveActingUserId
-} from './_shared.js';
+import { proxyCallAction, resolveActingUserId } from './_shared.js';
 
 const inputSchema = z
   .object({

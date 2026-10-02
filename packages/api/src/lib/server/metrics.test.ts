@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
 
@@ -7,8 +7,13 @@ import {
   renderMetrics,
   resetMetricsAccumulators
 } from './metrics.js';
-import { setUpdaterClient, type UpdaterClient } from './ops/system/_updater.js';
+import { updaterClient, type UpdaterClient } from './ops/system/_updater.js';
 import { makeTestDb } from './testDb.js';
+
+vi.mock('./ops/system/_updater.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('./ops/system/_updater.js')>()),
+  updaterClient: vi.fn()
+}));
 
 const EMPTY_STATE: StateResponse = {
   calls: [],
@@ -287,9 +292,9 @@ describe('renderMetrics', () => {
       })
       .execute();
 
-    setUpdaterClient(() => undefined);
+    vi.mocked(updaterClient).mockImplementation(() => undefined);
     const without = parseMetrics(await renderMetrics(stubDeps({ db })));
-    setUpdaterClient(() => updater);
+    vi.mocked(updaterClient).mockImplementation(() => updater);
     const withUpdater = await renderMetrics(stubDeps({ db }));
     await db
       .updateTable('updateState')
@@ -302,7 +307,7 @@ describe('renderMetrics', () => {
       })
       .execute();
     const cleared = parseMetrics(await renderMetrics(stubDeps({ db })));
-    setUpdaterClient(undefined);
+    vi.mocked(updaterClient).mockReset();
 
     expect(withUpdater).toContain('# TYPE zamfono_auto_update_failed gauge');
     const parsed = parseMetrics(withUpdater);

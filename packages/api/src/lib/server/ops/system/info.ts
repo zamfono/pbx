@@ -11,6 +11,7 @@ import {
   type ZamfonoVersion
 } from '@zamfono/shared';
 
+import { getCoreClient } from '#lib/server/coreClient.js';
 import { errorMessage } from '#lib/server/errors.js';
 import {
   lastGiveUps,
@@ -103,22 +104,6 @@ async function autoUpdateStatus(db: Db): Promise<Output['autoUpdate']> {
   return { enabled, failed };
 }
 
-/** Reads `core`'s version; installed at boot by `hooks.server.ts`, unset in tests. */
-export type CoreVersionLookup = () => Promise<CoreVersionResponse>;
-
-// One mutable module slot, held in an object rather than a `let`, as `trunks/_status.ts` holds
-// its lookup: ESLint's `init-declarations` and `no-undef-init` leave no way to declare an
-// optional `let` binding directly.
-const lookupHolder: { current: CoreVersionLookup | undefined } = {
-  current: undefined
-};
-
-export function setCoreVersionLookup(
-  lookup: CoreVersionLookup | undefined
-): void {
-  lookupHolder.current = lookup;
-}
-
 /**
  * `GET /system/info` (§7 "Version", §10.3): the version and commit `api` and `core` each run and
  * since when, when Asterisk started, the latest release with how the last update went and who asked for it, whether automatic updates are on and why the last one failed, after how many attempts (§6.3 "Automatic updates"), when and why the maintenance gate last gave up (§6.4), whether a tenant profile change still waits for Ringotel (§10.4), and the stack's domain and public IPv4 address (§6.1), for anyone signed in. The MCP `serverInfo.version` carries `api`'s too, but only in the connection
@@ -134,9 +119,9 @@ export const info = defineOperation<Record<string, never>, Output>({
   run: async ctx => {
     const [core, update, autoUpdate, maintenanceGate, profilePending] =
       await Promise.all([
-        lookupHolder.current
-          ? lookupHolder.current().catch(() => null)
-          : Promise.resolve(null),
+        getCoreClient()
+          .version()
+          .catch(() => null),
         updateStatus(ctx.db),
         autoUpdateStatus(ctx.db),
         lastGiveUps(ctx.db),

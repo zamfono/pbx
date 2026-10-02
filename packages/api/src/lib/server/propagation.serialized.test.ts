@@ -1,37 +1,28 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { ReloadKind } from '@zamfono/shared';
-
-import type { CoreClient } from './coreClient.js';
+import { getCoreClient } from './coreClient.js';
+import { stubCoreClient } from './coreClientStub.js';
 import { propagateConfig } from './propagation.js';
-import { keyringFromEnv } from './secretbox.js';
 import { makeTestDb } from './testDb.js';
 
-const kr = keyringFromEnv({
-  SECRETBOX_KEY: `1:${Buffer.alloc(32, 7).toString('base64')}`
-});
+// The propagation under test, not the setup file's stand-in for it.
+vi.unmock('./propagation.js');
 
-/** A `CoreClient` whose `configChanged` records its call and settles as `answer` says. */
-function coreClient(
+/** Has `core` take the propagations' reloads one by one, each recorded under its name in `log`
+ * and settling as its `answer` says. */
+function coreAnswering(
   log: string[],
-  name: string,
-  answer: () => Promise<void>
-): CoreClient {
-  const unused = (): Promise<never> => Promise.reject(new Error('not used'));
-  return {
-    configChanged: (kinds: ReloadKind[]) => {
-      log.push(`${name}:${kinds.join(',')}`);
-      return answer();
-    },
-    state: unused,
-    originate: unused,
-    transfer: unused,
-    pickup: unused,
-    hangup: unused,
-    park: unused,
-    parked: unused,
-    mwi: unused
-  };
+  answers: { name: string; answer: () => Promise<void> }[]
+): void {
+  vi.mocked(getCoreClient).mockReturnValue(
+    stubCoreClient({
+      configChanged: async kinds => {
+        const next = answers.shift();
+        log.push(`${next?.name ?? 'unexpected'}:${kinds.join(',')}`);
+        return next?.answer();
+      }
+    })
+  );
 }
 
 function flush(): Promise<void> {
@@ -40,30 +31,31 @@ function flush(): Promise<void> {
   });
 }
 
+afterEach(() => {
+  vi.mocked(getCoreClient).mockReset();
+});
+
 // §3.1 "Config propagation": a propagation that overtook an older one could load a stale render.
 describe('propagateConfig runs one propagation at a time', () => {
   it('starts a propagation only once the one before it has settled, even when it failed', async () => {
     const db = await makeTestDb();
     const log: string[] = [];
     let release: () => void = () => undefined;
-    const first = propagateConfig(db, [], {
-      kr,
-      coreClient: coreClient(
-        log,
-        'first',
-        () =>
+    coreAnswering(log, [
+      {
+        name: 'first',
+        answer: () =>
           new Promise<void>((_resolve, reject) => {
             release = () => {
               reject(new Error('core refused'));
             };
           })
-      )
-    });
+      },
+      { name: 'second', answer: () => Promise.resolve() }
+    ]);
+    const first = propagateConfig(db, []);
     await flush();
-    const second = propagateConfig(db, [], {
-      kr,
-      coreClient: coreClient(log, 'second', () => Promise.resolve())
-    });
+    const second = propagateConfig(db, []);
     await flush();
     expect(log).toEqual(['first:']);
 

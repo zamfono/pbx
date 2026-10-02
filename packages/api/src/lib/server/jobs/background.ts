@@ -19,11 +19,7 @@ import type { Logger } from 'pino';
 
 import type { Db, Envelope } from '@zamfono/shared';
 
-import {
-  coreUrlFromEnv,
-  createCoreClient,
-  fetchCoreVersion
-} from '../coreClient.js';
+import { coreUrlFromEnv, getCoreClient } from '../coreClient.js';
 import { connectCoreEvents } from '../coreEvents.js';
 import { publishEvent } from '../eventSink.js';
 import { updateMailSender } from '../mail/owners.js';
@@ -73,7 +69,7 @@ export type BackgroundJobs = { stop(): void };
 /** The certificate sync (§6.4 "The same sync runs at `api` start"); a failed start costs only it. */
 function syncCertificates(db: Db, log: Logger): CertSyncScheduler | null {
   try {
-    return startCertSync({ db, coreClient: createCoreClient() });
+    return startCertSync({ db, coreClient: getCoreClient() });
   } catch (error) {
     log.error({ error }, 'boot: certificate-sync scheduler failed to start');
     return null;
@@ -88,7 +84,7 @@ function startAutoUpdate(
   log: Logger
 ): AutoUpdateScheduler | null {
   try {
-    const core = createCoreClient();
+    const core = getCoreClient();
     return scheduleAutoUpdate({
       db,
       backUp: async () => backupEnabledTargets(db, kr, backup),
@@ -136,7 +132,7 @@ function relayCoreEvents(
 ): { close: () => void } {
   const rereg = watchAsteriskRestarts({
     db,
-    lookup: () => fetchCoreVersion(),
+    lookup: async () => getCoreClient().version(),
     retryProfile: trigger => retryPendingProfile(db, trigger)
   });
   return connectCoreEvents({
