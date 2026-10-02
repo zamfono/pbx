@@ -21,9 +21,6 @@ export async function parkOnRequest(
   req: ParkRequest
 ): Promise<{ slot: string }> {
   const { presence } = pipeline.deps;
-  if (presence === null) {
-    throw new Error('park: presence is not wired');
-  }
   const channelId = channelOf(call, req.userId);
   if (channelId === null) {
     throw new ActionError(

@@ -2,8 +2,7 @@
 
 /** Minimal structural logger contract satisfied by pino (constructed in main.ts). */
 export type Logger = {
-  /** Optional: most test loggers leave it out, and nothing that must be seen is logged at debug. */
-  debug?: (msgOrFields: string | Record<string, unknown>, msg?: string) => void;
+  debug: (msgOrFields: string | Record<string, unknown>, msg?: string) => void;
   info: (msgOrFields: string | Record<string, unknown>, msg?: string) => void;
   warn: (msgOrFields: string | Record<string, unknown>, msg?: string) => void;
   error: (msgOrFields: string | Record<string, unknown>, msg?: string) => void;

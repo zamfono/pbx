@@ -146,7 +146,7 @@ export async function ringUser(
     existingBridgeId: existingBridgeId ?? takeJoinBridge(call)
   });
   // §9.3 "a user: RINGING while any of their devices rings".
-  pipeline.deps.presence?.setCallState(
+  pipeline.deps.presence.setCallState(
     userId,
     'ringing',
     call.from,
@@ -181,7 +181,7 @@ export async function ringUser(
   }
   // Ringing stopped for `userId` either way (abandoned, busy or no answer); `winLeg` sets
   // `inCall` on the answered path instead (§9.3, §10.2 "Presence and BLF").
-  pipeline.deps.presence?.setCallState(userId, 'idle', null, null, call.id);
+  pipeline.deps.presence.setCallState(userId, 'idle', null, null, call.id);
   if (outcome === 'abandoned') {
     return null;
   }

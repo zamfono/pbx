@@ -5,9 +5,9 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
-import type { Logger } from '../ari/types.js';
 import { Presence } from '../presence.js';
 import { eventually } from '../testing/eventually.js';
+import { noopLogger, testActions } from '../testing/pipelineDeps.js';
 import { EventBus } from './eventBus.js';
 import { startInternalServer } from './server.js';
 import { ConfigCache } from './snapshot.js';
@@ -15,11 +15,6 @@ import { StateStore } from './stateStore.js';
 
 const ANY_FREE_PORT = 0;
 const HTTP_NO_CONTENT = 204;
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 /** The settings row, a user with extension 101 and one device, `e101-dabc`. */
 async function seedUserWithDevice(db: Db): Promise<string> {
@@ -134,9 +129,9 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
         cache,
         state,
         bus,
-        actions: null,
+        actions: testActions(ari, db),
         presence,
-        trunks: null
+        trunks: { refreshMonitoring: () => Promise.resolve() }
       },
       ANY_FREE_PORT
     );
@@ -200,8 +195,8 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
         cache,
         state: new StateStore(),
         bus: new EventBus(),
-        actions: null,
-        presence: null,
+        actions: testActions(ari, db),
+        presence: { refreshAll: () => Promise.resolve() },
         trunks: {
           refreshMonitoring: () => {
             invalidatedFirst = invalidated;

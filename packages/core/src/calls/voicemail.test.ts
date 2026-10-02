@@ -13,20 +13,16 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
-import type { Logger } from '../ari/types.js';
 import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
 import { eventually, requestTo } from '../testing/eventually.js';
+import {
+  noopCdr,
+  noopLogger,
+  testPipelineDeps
+} from '../testing/pipelineDeps.js';
 import { newCall, type Call } from './call.js';
 import { Pipeline, type PipelineDeps } from './pipeline.js';
 import { deposit, type MailSender } from './voicemail.js';
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 const VOICEMAIL_MAX_S = 120;
 
@@ -41,6 +37,7 @@ function fakeCdr(): FakeCdr {
   const statuses: (Call['status'] | null)[] = [];
   const done = new Set<string>();
   return {
+    ...noopCdr(),
     finished,
     statuses,
     open: () => Promise.resolve(),
@@ -163,18 +160,7 @@ describe('deposit', () => {
     cdr = fakeCdr();
     bus = new EventBus();
     apiClient = stubApiClient();
-    pipeline = new Pipeline({
-      ari,
-      cache: new ConfigCache(db),
-      state: new StateStore(),
-      bus,
-      cdr,
-      now: nowIso,
-      db,
-      apiClient,
-      trunkState: null,
-      presence: null
-    });
+    pipeline = new Pipeline(testPipelineDeps(ari, db, { bus, cdr, apiClient }));
   });
 
   afterEach(async () => {

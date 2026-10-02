@@ -53,7 +53,7 @@ export async function ringBatch(
       .filter((userId): userId is string => userId !== null)
   );
   for (const userId of ringingUserIds) {
-    pipeline.deps.presence?.setCallState(
+    pipeline.deps.presence.setCallState(
       userId,
       'ringing',
       call.from,
@@ -75,7 +75,7 @@ export async function ringBatch(
   // this batch goes back to idle (§9.3, §10.2 "Presence and BLF").
   for (const userId of ringingUserIds) {
     if (userId !== call.answeredByUserId) {
-      pipeline.deps.presence?.setCallState(userId, 'idle', null, null, call.id);
+      pipeline.deps.presence.setCallState(userId, 'idle', null, null, call.id);
     }
   }
   return outcome;

@@ -9,7 +9,7 @@ import { buildMemberStates } from './ringGroupState.js';
 
 // `buildMemberStates` reads only presence and the calls in progress from the pipeline.
 const idlePipeline = {
-  deps: { presence: null },
+  deps: { presence: { isInCall: () => false } },
   callByChannel: new Map()
 } as unknown as Pipeline;
 

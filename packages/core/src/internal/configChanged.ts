@@ -115,17 +115,17 @@ async function readConfigChangedBody(
   }
 }
 
-/** `presence.ts`'s `Presence`, as far as a config change needs it; `null` recomputes nothing. */
+/** `presence.ts`'s `Presence`, as far as a config change needs it. */
 export type PresenceRefresh = { refreshAll: () => Promise<void> };
 
-/** `trunkState.ts`'s `TrunkState`, as far as a config change needs it; `null` recomputes nothing. */
+/** `trunkState.ts`'s `TrunkState`, as far as a config change needs it. */
 export type TrunkMonitoringRefresh = { refreshMonitoring: () => Promise<void> };
 
 export type ConfigChangedDeps = {
   cache: ConfigCache;
   ari: AriClient;
-  presence: PresenceRefresh | null;
-  trunks: TrunkMonitoringRefresh | null;
+  presence: PresenceRefresh;
+  trunks: TrunkMonitoringRefresh;
 };
 
 /**
@@ -175,9 +175,9 @@ export async function handleConfigChanged(
   );
   // A write `api` made can change a user's presence without any call or registration event:
   // DND set over REST, the last device deleted (§5.7, §10.2). `*90`/`*91` refresh on their own.
-  await deps.presence?.refreshAll();
+  await deps.presence.refreshAll();
   // A trunk's `qualify` switched either way (§9.4 "Provisioning and status").
-  await deps.trunks?.refreshMonitoring();
+  await deps.trunks.refreshMonitoring();
   response.writeHead(HTTP_NO_CONTENT);
   response.end();
 }

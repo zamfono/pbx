@@ -4,18 +4,12 @@ import { newId } from '@zamfono/shared';
 
 import { AriClient } from './ari/client.js';
 import { FakeAri } from './ari/fake.js';
-import type { Logger } from './ari/types.js';
 import { newCall, type Call } from './calls/call.js';
 import { SipCapture, type SipMessage } from './sipCapture.js';
+import { noopLogger } from './testing/pipelineDeps.js';
 
 /** §7 level `sip`: "the call's SIP messages", every dialog's, the INVITE and early responses
  * that race the join included. */
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 function buildCall(): Call {
   return newCall({

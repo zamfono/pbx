@@ -200,7 +200,7 @@ export async function ringExternalLeg(
 ): Promise<void> {
   const { trunkState } = pipeline.deps;
   const dialable = target.trunkId !== undefined || isE164(target.number);
-  if (trunkState === null || !dialable) {
+  if (!dialable) {
     call.log.event({ event: 'externalLegUnrouted', number: target.number });
     return;
   }

@@ -8,13 +8,18 @@ import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../ari/fakeDial.js';
-import type { AriEvent, Channel, Logger } from '../ari/types.js';
+import type { AriEvent, Channel } from '../ari/types.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { PROMPTS } from '../prompts.js';
 import { ATTEMPT_NO_RESPONSE_MS } from '../routing/trunk.js';
 import { eventually } from '../testing/eventually.js';
+import {
+  noopLogger,
+  noopRecorder,
+  testPipelineDeps
+} from '../testing/pipelineDeps.js';
 import { callerChannel, type Call, type Leg } from './call.js';
 import { handleOutbound } from './outbound.js';
 import { Pipeline } from './pipeline.js';
@@ -22,19 +27,7 @@ import type { ParticipationRecorder } from './recordParticipation.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { TrunkState } from './trunkState.js';
 
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 const SETTLE_DELAY_MS = 60;
-
-function fakeCdr(): {
-  open: (call: Call) => Promise<void>;
-  finish: (call: Call) => Promise<void>;
-} {
-  return { open: () => Promise.resolve(), finish: () => Promise.resolve() };
-}
 
 async function seedSettings(
   db: Db,
@@ -272,6 +265,7 @@ function spyRecorder(): ParticipationRecorder & {
   const callers: Call[] = [];
   const legs: Leg[] = [];
   return {
+    ...noopRecorder,
     callers,
     legs,
     onCallerUp: call => {
@@ -355,16 +349,7 @@ describe('outbound dialing', () => {
       log: noopLogger
     });
     state = new StateStore();
-    pipeline = new Pipeline({
-      ari,
-      cache: new ConfigCache(db),
-      state,
-      bus: new EventBus(),
-      cdr: fakeCdr(),
-      now: nowIso,
-      trunkState: null,
-      presence: null
-    });
+    pipeline = new Pipeline(testPipelineDeps(ari, db, { state }));
     trunkState = new TrunkState({
       log: noopLogger,
       ari,
@@ -963,8 +948,7 @@ describe('outbound dialing', () => {
     await seedTrunk(db, 1, { emergency: false });
     let loggedError: Record<string, unknown> | string | null = null;
     pipeline.deps.logger = {
-      info: () => undefined,
-      warn: () => undefined,
+      ...noopLogger,
       error: fields => {
         loggedError = fields;
       }
@@ -985,8 +969,7 @@ describe('outbound dialing', () => {
     });
     let loggedError: Record<string, unknown> | string | null = null;
     pipeline.deps.logger = {
-      info: () => undefined,
-      warn: () => undefined,
+      ...noopLogger,
       error: fields => {
         loggedError = fields;
       }
@@ -1011,8 +994,7 @@ describe('outbound dialing', () => {
     await seedTrunk(db, 1);
     let loggedError: Record<string, unknown> | string | null = null;
     pipeline.deps.logger = {
-      info: () => undefined,
-      warn: () => undefined,
+      ...noopLogger,
       error: fields => {
         loggedError = fields;
       }

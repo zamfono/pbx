@@ -6,24 +6,24 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
-import type { AriEvent, Channel, Logger } from '../ari/types.js';
+import type { AriEvent, Channel } from '../ari/types.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { eventually } from '../testing/eventually.js';
+import {
+  noopCdr,
+  noopLogger,
+  testPipelineDeps
+} from '../testing/pipelineDeps.js';
 import type { Call } from './call.js';
 import { Pipeline, type PipelineDeps } from './pipeline.js';
 import { TrunkState } from './trunkState.js';
 
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
-
 function fakeCdr(): PipelineDeps['cdr'] & { opened: Call[] } {
   const opened: Call[] = [];
   return {
+    ...noopCdr(),
     opened,
     open: call => {
       opened.push(call);
@@ -141,16 +141,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
     });
     await ari.connect();
     cdr = fakeCdr();
-    pipeline = new Pipeline({
-      ari,
-      cache: new ConfigCache(db),
-      state: new StateStore(),
-      bus: new EventBus(),
-      cdr,
-      now: nowIso,
-      trunkState: null,
-      presence: null
-    });
+    pipeline = new Pipeline(testPipelineDeps(ari, db, { cdr }));
   });
 
   afterEach(async () => {

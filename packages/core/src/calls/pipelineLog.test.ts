@@ -5,22 +5,17 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
-import type { Logger } from '../ari/types.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
 import { eventually } from '../testing/eventually.js';
+import {
+  noopCdr,
+  noopLogger,
+  testPipelineDeps
+} from '../testing/pipelineDeps.js';
 import { newCall } from './call.js';
 import { Pipeline } from './pipeline.js';
 
 /** §7: "Every call-related line carries the per-call correlation id", the pipeline's own account
  * of a routing failure included. */
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 describe('pipeline routing-failure log line', () => {
   // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
@@ -47,30 +42,26 @@ describe('pipeline routing-failure log line', () => {
     });
     await ari.connect();
     errors = [];
-    pipeline = new Pipeline({
-      ari,
-      cache: new ConfigCache(db),
-      state: new StateStore(),
-      bus: new EventBus(),
-      cdr: {
-        open: () => Promise.resolve(),
-        finish: () => Promise.resolve(),
-        noteQosLegs: () => {
-          throw new Error('noting the QoS legs failed');
-        }
-      },
-      now: nowIso,
-      logger: {
-        ...noopLogger,
-        error: fields => {
-          if (typeof fields !== 'string') {
-            errors.push(fields);
+    pipeline = new Pipeline(
+      testPipelineDeps(ari, db, {
+        cdr: {
+          ...noopCdr(),
+          open: () => Promise.resolve(),
+          finish: () => Promise.resolve(),
+          noteQosLegs: () => {
+            throw new Error('noting the QoS legs failed');
+          }
+        },
+        logger: {
+          ...noopLogger,
+          error: fields => {
+            if (typeof fields !== 'string') {
+              errors.push(fields);
+            }
           }
         }
-      },
-      trunkState: null,
-      presence: null
-    });
+      })
+    );
   });
 
   afterEach(async () => {

@@ -48,12 +48,12 @@ type InternalDeps = {
   cache: ConfigCache;
   state: StateStore;
   bus: EventBus;
-  /** The live-call actions (§3); `null` leaves their routes 404. */
-  actions: CallActions | null;
-  /** Recomputed after every config change (`configChanged.ts`); `null` leaves presence alone. */
-  presence: PresenceRefresh | null;
-  /** The `unmonitored` trunk statuses, likewise; `null` leaves them alone. */
-  trunks: TrunkMonitoringRefresh | null;
+  /** The live-call actions (§3). */
+  actions: CallActions;
+  /** Recomputed after every config change (`configChanged.ts`). */
+  presence: PresenceRefresh;
+  /** The `unmonitored` trunk statuses, likewise. */
+  trunks: TrunkMonitoringRefresh;
 };
 
 async function handleHealthz(

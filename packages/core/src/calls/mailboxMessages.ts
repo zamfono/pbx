@@ -107,12 +107,9 @@ function positionInFolder(messages: MailboxMessage[], index: number): number {
     .length;
 }
 
-/** The session's store dependencies; `runMailboxMenu` starts a session only with a database. */
+/** The session's store dependencies. */
 function storeDeps(session: MailboxSession): { ari: AriClient; db: Db } {
   const { ari, db } = session.pipeline.deps;
-  if (db === undefined) {
-    throw new Error('mailbox: no database');
-  }
   return { ari, db };
 }
 

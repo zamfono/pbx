@@ -140,7 +140,7 @@ export async function dialEmergency(
   // alongside the routing-trace line above; live emergency trunks that were tried and failed are
   // no such outage. Statuses are read at the failure, the moment the line reports on.
   if (!anyLiveEmergencyTrunk(pipeline, snapshot)) {
-    pipeline.deps.logger?.error(
+    pipeline.deps.logger.error(
       { callId: call.id, number },
       'emergency call failed: no live emergency trunk'
     );

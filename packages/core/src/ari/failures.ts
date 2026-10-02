@@ -25,11 +25,11 @@ export function ignoreGone(error: unknown): void {
 /** A `.catch` handler for a promise nothing awaits: logs that `what` failed, with `fields` as the
  * line's context (a call's `callId`, §7), and continues. */
 export function logFailure(
-  log: Logger | undefined,
+  log: Logger,
   what: string,
   fields: Record<string, unknown> = {}
 ): (error: unknown) => void {
   return (error: unknown) => {
-    log?.error({ err: error, ...fields }, `${what} failed`);
+    log.error({ err: error, ...fields }, `${what} failed`);
   };
 }

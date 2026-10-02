@@ -133,7 +133,7 @@ export async function transferToConsultation(
         callId: call.id
       })
     );
-  await pipeline.deps.recorder?.onTransfereeUp(consultation, transferee).catch(
+  await pipeline.deps.recorder.onTransfereeUp(consultation, transferee).catch(
     logFailure(pipeline.deps.logger, 'transferee recording', {
       callId: consultation.id
     })

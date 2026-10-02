@@ -20,7 +20,7 @@ describe('ignoreGone', () => {
 describe('logFailure', () => {
   it('logs what failed, with its context, and continues', async () => {
     const error = vi.fn();
-    const log: Logger = { info: vi.fn(), warn: vi.fn(), error };
+    const log: Logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error };
     const failure = new Error('POST /internal/mail responded 502');
     await expect(
       Promise.reject(failure).catch(

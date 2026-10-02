@@ -117,11 +117,7 @@ export async function originateLeg(
   const { ari, cdr } = pipeline.deps;
   const { callerId, timeout, variables, ...placement } = params;
   const { channelId } = placement;
-  const stasis = stasisEntry(
-    ari,
-    channelId,
-    pipeline.deps.legStasisWaitMs ?? STASIS_WAIT_MS
-  );
+  const stasis = stasisEntry(ari, channelId, pipeline.deps.legStasisWaitMs);
   const channel = await ari.channels
     .create({
       ...placement,
@@ -131,7 +127,7 @@ export async function originateLeg(
       stasis.stop();
       throw new PlacementError('create', error);
     });
-  const joined = cdr.joinLeg?.(call, channel.id) ?? Promise.resolve();
+  const joined = cdr.joinLeg(call, channel.id);
   if (call.log.level === 'sip') {
     await joined;
   }

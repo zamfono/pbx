@@ -13,18 +13,12 @@ import { beforeEach, describe, expect, it, onTestFinished } from 'vitest';
 import { newId, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import type { Logger } from './ari/types.js';
 import { runRetention } from './retention.js';
+import { noopLogger } from './testing/pipelineDeps.js';
 
 const NOW = '2026-06-01T00:00:00.000Z';
 const LONG_AGO = '2026-01-01T00:00:00.000Z';
 const YESTERDAY = '2026-05-31T00:00:00.000Z';
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 async function seedSettings(db: Db, retentionDays: number): Promise<void> {
   const targetId = newId();

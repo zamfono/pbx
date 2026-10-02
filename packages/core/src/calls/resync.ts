@@ -26,9 +26,9 @@ export type ResyncDeps = {
   now: () => string;
   // The pipeline whose calls arrive while the resync runs; a bridge holding a channel of one of
   // its calls is that call's, not an orphan.
-  pipeline?: Pipeline;
+  pipeline: Pipeline;
   voicemailDir?: string;
-  log?: Logger;
+  log: Logger;
 };
 
 type AdoptedBridge = { id: string; channels: Set<string> };
@@ -102,7 +102,7 @@ async function adoptBridges(deps: ResyncDeps): Promise<Adopted> {
   const { ari } = deps;
   const bridges = await ari.bridges.list();
   const handled = (channelId: string): boolean =>
-    deps.pipeline?.callByChannel.has(channelId) ?? false;
+    deps.pipeline.callByChannel.has(channelId);
   const watched: AdoptedBridge[] = [];
   const parked: AdoptedBridge[] = [];
   for (const bridge of bridges) {
@@ -151,7 +151,7 @@ export async function resyncOnBoot(deps: ResyncDeps): Promise<void> {
   const interrupted = await markOpenCallsInterrupted(deps);
   const adopted = await adoptBridges(deps);
   const deletedFiles = await deleteOrphanedVoicemailFiles(deps);
-  deps.log?.info(
+  deps.log.info(
     { interrupted, ...adopted, deletedFiles },
     'boot resync: orphaned bridges adopted for cleanup'
   );

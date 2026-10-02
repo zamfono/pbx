@@ -43,13 +43,9 @@ export function softphoneCallerId(
   if (call.softphoneCallerId !== undefined) {
     return call.softphoneCallerId;
   }
-  const { db } = pipeline.deps;
-  const lookup =
-    db === undefined
-      ? Promise.resolve(call.from)
-      : contactName(db, call.from)
-          .then(name => formatCallerId(call.from, name))
-          .catch(() => call.from);
+  const lookup = contactName(pipeline.deps.db, call.from)
+    .then(name => formatCallerId(call.from, name))
+    .catch(() => call.from);
   call.softphoneCallerId = lookup;
   return lookup;
 }

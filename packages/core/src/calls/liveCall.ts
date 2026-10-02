@@ -107,7 +107,7 @@ export async function closeCall(
 ): Promise<void> {
   // §7: the channels whose `call_qos` rows this call has are noted before the legs below stop
   // counting as up.
-  pipeline.deps.cdr.noteQosLegs?.(call);
+  pipeline.deps.cdr.noteQosLegs(call);
   traceSystemEnd(call);
   if (call.depositing === true) {
     // §10.2 "Voicemail": a caller in a mailbox deposit is hung up like one ending the message
@@ -143,7 +143,7 @@ export async function closeCall(
     }
   }
   for (const userId of participants(call)) {
-    pipeline.deps.presence?.setCallState(userId, 'idle', null, null, call.id);
+    pipeline.deps.presence.setCallState(userId, 'idle', null, null, call.id);
   }
   // §10.2 "Mail": a call this ends unanswered, still ringing, is missed like any other.
   const missed = call.status === null && status === 'missed';
@@ -155,8 +155,8 @@ export async function closeCall(
   // §10.2: each recorded participation is stopped while its channel is still up, then mixed and
   // stored; nothing else ends it once the channels are no longer this call's.
   const recordings = Promise.all([
-    recorder?.onCallerEnded(call),
-    ...upLegs.map(leg => recorder?.onLegEnded(call, leg))
+    recorder.onCallerEnded(call),
+    ...upLegs.map(leg => recorder.onLegEnded(call, leg))
   ]).catch(
     logFailure(pipeline.deps.logger, 'recording stop', { callId: call.id })
   );

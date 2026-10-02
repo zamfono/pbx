@@ -22,12 +22,7 @@ export async function notifyMissedCall(
 ): Promise<void> {
   const { db, apiClient } = pipeline.deps;
   const userId = call.calleeUserId;
-  if (
-    db === undefined ||
-    apiClient === undefined ||
-    userId === null ||
-    call.direction !== 'inbound'
-  ) {
+  if (userId === null || call.direction !== 'inbound') {
     return;
   }
   const snapshot = await pipeline.deps.cache.get();

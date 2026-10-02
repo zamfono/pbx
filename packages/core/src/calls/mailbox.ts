@@ -151,11 +151,6 @@ async function runMailboxMenu(
   call: Call,
   owner: Owner
 ): Promise<void> {
-  const db = pipeline.deps.db;
-  if (db === undefined) {
-    await concludeFeature(pipeline, call, 'failed');
-    return;
-  }
   await pipeline.deps.ari.channels
     .answer(callerChannel(call))
     .catch(ignoreGone);
@@ -164,7 +159,7 @@ async function runMailboxMenu(
     pipeline,
     call,
     owner,
-    messages: await loadMessages(db, owner),
+    messages: await loadMessages(pipeline.deps.db, owner),
     playbacks: 0,
     hungUp: false
   };

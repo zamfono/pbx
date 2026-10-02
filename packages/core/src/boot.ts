@@ -9,6 +9,7 @@ import { nowIso, type Db } from '@zamfono/shared';
 import { ApiClient } from './apiClient.js';
 import type { AriClient } from './ari/client.js';
 import type { Logger } from './ari/types.js';
+import { STASIS_WAIT_MS } from './calls/legOriginate.js';
 import { Pipeline } from './calls/pipeline.js';
 import { Recorder } from './calls/recording.js';
 import type { TrunkState } from './calls/trunkState.js';
@@ -71,6 +72,7 @@ export function buildPipeline(deps: {
     now: nowIso,
     stackTz: deps.stackTz,
     stackSipHost: deps.stackSipHost,
+    legStasisWaitMs: STASIS_WAIT_MS,
     db,
     apiClient: new ApiClient(),
     logger: log,

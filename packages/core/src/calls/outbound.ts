@@ -40,7 +40,7 @@ function markCallerInCall(
   ) {
     return;
   }
-  pipeline.deps.presence?.setCallState(
+  pipeline.deps.presence.setCallState(
     call.callerUserId,
     'inCall',
     call.to,

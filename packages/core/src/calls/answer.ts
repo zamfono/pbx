@@ -116,7 +116,7 @@ export async function bridgeAnswered(
     // The caller's channel, if any, is not in the bridge joined (`*5`'s feature dial), so the
     // joining leg is the one new participation (§10.2 "Three-way calls": "evaluates
     // Ben's participation on its own flags").
-    await recorder?.onLegUp(call, leg);
+    await recorder.onLegUp(call, leg);
   }
   callUp(pipeline.deps, call);
   traceCodecs(

@@ -17,6 +17,7 @@ import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import type { Logger } from '../ari/types.js';
 import { newCall } from '../calls/call.js';
+import { noopLogger, testActions } from '../testing/pipelineDeps.js';
 import { EventBus } from './eventBus.js';
 import { startInternalServer } from './server.js';
 import { ConfigCache } from './snapshot.js';
@@ -32,11 +33,6 @@ const HTTP_PAYLOAD_TOO_LARGE = 413;
 const HTTP_SERVICE_UNAVAILABLE = 503;
 // Over the internal server's 65536-byte cap (server.ts's `MAX_INTERNAL_BODY_BYTES`).
 const OVERSIZED_BODY_BYTES = 65537;
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 // What the server under test logged at error, the message and its fields.
 const errorsLogged: { fields: unknown; msg: unknown }[] = [];
 const serverLogger: Logger = {
@@ -126,9 +122,9 @@ describe('startInternalServer', () => {
         cache,
         state,
         bus: new EventBus(),
-        actions: null,
-        presence: null,
-        trunks: null
+        actions: testActions(ari, db),
+        presence: { refreshAll: () => Promise.resolve() },
+        trunks: { refreshMonitoring: () => Promise.resolve() }
       },
       ANY_FREE_PORT
     );
@@ -330,9 +326,9 @@ describe('startInternalServer', () => {
         cache: new ConfigCache(db),
         state: new StateStore(),
         bus,
-        actions: null,
-        presence: null,
-        trunks: null
+        actions: testActions(ari, db),
+        presence: { refreshAll: () => Promise.resolve() },
+        trunks: { refreshMonitoring: () => Promise.resolve() }
       },
       ANY_FREE_PORT
     );
@@ -390,9 +386,9 @@ describe('startInternalServer', () => {
         cache: new ConfigCache(db),
         state: new StateStore(),
         bus,
-        actions: null,
-        presence: null,
-        trunks: null
+        actions: testActions(ari, db),
+        presence: { refreshAll: () => Promise.resolve() },
+        trunks: { refreshMonitoring: () => Promise.resolve() }
       },
       ANY_FREE_PORT
     );

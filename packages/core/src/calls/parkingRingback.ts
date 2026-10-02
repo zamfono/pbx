@@ -80,12 +80,12 @@ function takeOverAnsweredLeg(
   trackLeg(pipeline, parked, leg);
   const { cdr, presence, recorder } = pipeline.deps;
   if (leg.userId !== null) {
-    presence?.setCallState(leg.userId, 'inCall', parked.from, null, parked.id);
-    presence?.setCallState(leg.userId, 'idle', null, null, ringback.id);
+    presence.setCallState(leg.userId, 'inCall', parked.from, null, parked.id);
+    presence.setCallState(leg.userId, 'idle', null, null, ringback.id);
   }
   // §7 level `sip`: the parker's dialog is the parked call's leg now, not the ring-back's.
-  cdr.registerLeg?.(parked, leg.channelId);
-  recorder?.onLegMoved?.(ringback, parked, leg);
+  cdr.registerLeg(parked, leg.channelId);
+  recorder.onLegMoved(ringback, parked, leg);
 }
 
 type RingbackContext = {

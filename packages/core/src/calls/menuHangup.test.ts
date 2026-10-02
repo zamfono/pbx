@@ -7,23 +7,19 @@ import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
 import { isPlacement } from '../ari/fakeDial.js';
-import { AriError, type Logger } from '../ari/types.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
+import { AriError } from '../ari/types.js';
 import { eventually, requestTo } from '../testing/eventually.js';
+import {
+  noopLogger,
+  registerDevice,
+  testPipelineDeps
+} from '../testing/pipelineDeps.js';
 import { newCall, type Call } from './call.js';
 import { playMenu } from './menu.js';
-import { Pipeline, type PipelineDeps } from './pipeline.js';
+import { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
 
 /** A caller who hangs up inside a menu, and a greeting Asterisk refuses to play (§10.1 step 6). */
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 const HTTP_SERVER_ERROR = 500;
 
@@ -39,10 +35,6 @@ async function within<T>(
   ms: number
 ): Promise<T | 'pending'> {
   return Promise.race([promise, sleep(ms).then(() => 'pending' as const)]);
-}
-
-function fakeCdr(): PipelineDeps['cdr'] {
-  return { open: () => Promise.resolve(), finish: () => Promise.resolve() };
 }
 
 async function seedSettings(db: Db): Promise<void> {
@@ -157,16 +149,7 @@ describe('menu hangup and a refused greeting', () => {
       log: noopLogger
     });
     await ari.connect();
-    pipeline = new Pipeline({
-      ari,
-      cache: new ConfigCache(db),
-      state: new StateStore(),
-      bus: new EventBus(),
-      cdr: fakeCdr(),
-      now: nowIso,
-      trunkState: null,
-      presence: null
-    });
+    pipeline = new Pipeline(testPipelineDeps(ari, db));
   });
 
   afterEach(async () => {
@@ -274,6 +257,7 @@ describe('menu hangup and a refused greeting', () => {
 
   it('starts the silence timer when Asterisk refuses to play the greeting', async () => {
     const menuId = await seedMenu(db, 1);
+    await registerDevice(fakeAri, pipeline, 'e100-ddesk');
     const channel = fakeAri.addChannel({});
     const call = makeCall(channel.id);
     vi.spyOn(ari.channels, 'play').mockRejectedValue(

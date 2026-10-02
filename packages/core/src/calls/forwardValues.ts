@@ -70,9 +70,9 @@ async function callerNameOf(
   call: Call,
   snapshot: Snapshot
 ): Promise<string> {
-  const { db } = pipeline.deps;
-  const contact =
-    db === undefined ? '' : await contactName(db, call.from).catch(() => '');
+  const contact = await contactName(pipeline.deps.db, call.from).catch(
+    () => ''
+  );
   if (contact !== '') {
     return contact;
   }

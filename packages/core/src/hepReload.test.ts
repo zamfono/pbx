@@ -14,7 +14,12 @@ function spyLogger(): Logger & {
   info: ReturnType<typeof vi.fn<LogFn>>;
   warn: ReturnType<typeof vi.fn<LogFn>>;
 } {
-  return { info: vi.fn<LogFn>(), warn: vi.fn<LogFn>(), error: vi.fn<LogFn>() };
+  return {
+    debug: vi.fn<LogFn>(),
+    info: vi.fn<LogFn>(),
+    warn: vi.fn<LogFn>(),
+    error: vi.fn<LogFn>()
+  };
 }
 
 describe('reloadHepOnConnect (§7 level sip, §9.1)', () => {

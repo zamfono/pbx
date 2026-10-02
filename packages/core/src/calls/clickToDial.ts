@@ -98,7 +98,7 @@ export async function beginOriginatedCall(
   );
   const isCallOfUser = action.kind !== 'feature' && action.kind !== 'refuse';
   if (call.callerUserId !== null && isCallOfUser) {
-    pipeline.deps.presence?.setCallState(
+    pipeline.deps.presence.setCallState(
       call.callerUserId,
       'inCall',
       call.to,

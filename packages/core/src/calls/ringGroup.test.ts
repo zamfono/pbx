@@ -14,23 +14,20 @@ import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../ari/fakeDial.js';
-import type { Channel, Logger } from '../ari/types.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
+import type { Channel } from '../ari/types.js';
 import { eventually, requestTo } from '../testing/eventually.js';
+import {
+  noopLogger,
+  noopRecorder,
+  registerDevice,
+  testPipelineDeps
+} from '../testing/pipelineDeps.js';
 import { newCall, type Call, type Leg } from './call.js';
 import { liveView } from './callState.js';
-import { Pipeline, type PipelineDeps } from './pipeline.js';
+import { Pipeline } from './pipeline.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 // Asterisk's Q.850 mapping of SIP 486 Busy Here (matches ringGroup.ts's own constant).
 const AST_CAUSE_USER_BUSY = 17;
@@ -39,13 +36,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => {
     setTimeout(resolve, ms);
   });
-}
-
-function fakeCdr(): PipelineDeps['cdr'] {
-  return {
-    open: () => Promise.resolve(),
-    finish: () => Promise.resolve()
-  };
 }
 
 /** A `settings` row plus the `dids` row its `mainDidId` FK requires; no DID is dialed in these tests. */
@@ -172,6 +162,7 @@ function spyRecorder(): ParticipationRecorder & {
   const callers: Call[] = [];
   const legs: Leg[] = [];
   return {
+    ...noopRecorder,
     callers,
     legs,
     onCallerUp: call => {
@@ -247,16 +238,7 @@ describe('ringGroup', () => {
       log: noopLogger
     });
     await ari.connect();
-    pipeline = new Pipeline({
-      ari,
-      cache: new ConfigCache(db),
-      state: new StateStore(),
-      bus: new EventBus(),
-      cdr: fakeCdr(),
-      now: nowIso,
-      trunkState: null,
-      presence: null
-    });
+    pipeline = new Pipeline(testPipelineDeps(ari, db));
     callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
     });
@@ -293,7 +275,10 @@ describe('ringGroup', () => {
       seedUser(db)
     ]);
     await Promise.all(
-      userIds.map((userId, index) => seedDevice(db, userId, `member-${index}`))
+      userIds.map(async (userId, index) => {
+        await seedDevice(db, userId, `member-${index}`);
+        await registerDevice(fakeAri, pipeline, `member-${index}`);
+      })
     );
     await Promise.all(
       userIds.map((userId, index) => seedMember(db, groupId, index, userId))
@@ -379,7 +364,10 @@ describe('ringGroup', () => {
     ]);
     const members = [declining, winning, losing];
     await Promise.all(
-      members.map((userId, index) => seedDevice(db, userId, `seen-${index}`))
+      members.map(async (userId, index) => {
+        await seedDevice(db, userId, `seen-${index}`);
+        await registerDevice(fakeAri, pipeline, `seen-${index}`);
+      })
     );
     await Promise.all(
       members.map((userId, index) => seedMember(db, groupId, index, userId))
@@ -452,7 +440,10 @@ describe('ringGroup', () => {
     const groupId = await seedRingGroup(db, { strategy: 'simultaneous' });
     const userIds = await Promise.all([seedUser(db), seedUser(db)]);
     await Promise.all(
-      userIds.map((userId, index) => seedDevice(db, userId, `member-${index}`))
+      userIds.map(async (userId, index) => {
+        await seedDevice(db, userId, `member-${index}`);
+        await registerDevice(fakeAri, pipeline, `member-${index}`);
+      })
     );
     await Promise.all(
       userIds.map((userId, index) => seedMember(db, groupId, index, userId))
@@ -486,10 +477,12 @@ describe('ringGroup', () => {
     const userA = await seedUser(db);
     const userB = await seedUser(db);
     await seedDevice(db, userA, 'race-a');
+    fakeAri.answerAfterMs = 60_000;
+    await registerDevice(fakeAri, pipeline, 'race-a');
     await seedDevice(db, userB, 'race-b');
+    await registerDevice(fakeAri, pipeline, 'race-b');
     await seedMember(db, groupId, 0, userA);
     await seedMember(db, groupId, 1, userB);
-    fakeAri.answerAfterMs = 60_000;
 
     const finished = ringGroup(pipeline, call, groupId);
     await membersRinging(call, 2);
@@ -535,10 +528,12 @@ describe('ringGroup', () => {
     const userA = await seedUser(db);
     const userB = await seedUser(db);
     await seedDevice(db, userA, 'slow-a');
+    fakeAri.answerAfterMs = 60_000;
+    await registerDevice(fakeAri, pipeline, 'slow-a');
     await seedDevice(db, userB, 'slow-b');
+    await registerDevice(fakeAri, pipeline, 'slow-b');
     await seedMember(db, groupId, 0, userA);
     await seedMember(db, groupId, 1, userB);
-    fakeAri.answerAfterMs = 60_000;
     // The winner's bridge comes only after the batch's one-second timeout.
     fakeAri.requestDelayMs = request =>
       request.method === 'POST' && request.path === 'bridges' ? 1500 : 0;
@@ -573,13 +568,15 @@ describe('ringGroup', () => {
       ringTimeoutS: 1
     });
     const users = [await seedUser(db), await seedUser(db), await seedUser(db)];
+    fakeAri.answerAfterMs = 60_000;
     for (const [index, userId] of users.entries()) {
       // eslint-disable-next-line no-await-in-loop -- members keep their positions in order
       await seedDevice(db, userId, `late-${index}`);
       // eslint-disable-next-line no-await-in-loop -- members keep their positions in order
+      await registerDevice(fakeAri, pipeline, `late-${index}`);
+      // eslint-disable-next-line no-await-in-loop -- members keep their positions in order
       await seedMember(db, groupId, index, userId);
     }
-    fakeAri.answerAfterMs = 60_000;
     // late-1 rings only after the timeout; late-2 is still being placed when late-1 answers.
     const createDelays: Record<string, number> = {
       'PJSIP/late-1': 1500,
@@ -621,18 +618,20 @@ describe('ringGroup', () => {
     const userA = await seedUser(db);
     const userB = await seedUser(db);
     await seedDevice(db, userA, 'both-a');
-    await seedDevice(db, userB, 'both-b');
-    await seedMember(db, groupId, 0, userA);
-    await seedMember(db, groupId, 1, userB);
+    fakeAri.answerAfterMs = 60_000;
     const recorder = spyRecorder();
     pipeline.deps.recorder = recorder;
+    await registerDevice(fakeAri, pipeline, 'both-a');
+    await seedDevice(db, userB, 'both-b');
+    await registerDevice(fakeAri, pipeline, 'both-b');
+    await seedMember(db, groupId, 0, userA);
+    await seedMember(db, groupId, 1, userB);
     const states: string[] = [];
     pipeline.deps.bus.subscribe(envelope => {
       if (envelope.type === 'call.state') {
         states.push(envelope.state);
       }
     });
-    fakeAri.answerAfterMs = 60_000;
 
     const finished = ringGroup(pipeline, call, groupId);
     await membersRinging(call, 2);
@@ -682,10 +681,12 @@ describe('ringGroup', () => {
     const userA = await seedUser(db);
     const userB = await seedUser(db);
     await seedDevice(db, userA, 'seq-a');
+    fakeAri.answerAfterMs = 60_000;
+    await registerDevice(fakeAri, pipeline, 'seq-a');
     await seedDevice(db, userB, 'seq-b');
+    await registerDevice(fakeAri, pipeline, 'seq-b');
     await seedMember(db, groupId, 0, userA);
     await seedMember(db, groupId, 1, userB);
-    fakeAri.answerAfterMs = 60_000;
 
     const finished = ringGroup(pipeline, call, groupId);
     await membersRinging(call, 1);
@@ -717,10 +718,12 @@ describe('ringGroup', () => {
     const userA = await seedUser(db);
     const userB = await seedUser(db);
     await seedDevice(db, userA, 'pf-a');
+    fakeAri.failDial = { status: 409 };
+    await registerDevice(fakeAri, pipeline, 'pf-a');
     await seedDevice(db, userB, 'pf-b');
+    await registerDevice(fakeAri, pipeline, 'pf-b');
     await seedMember(db, groupId, 0, userA);
     await seedMember(db, groupId, 1, userB);
-    fakeAri.failDial = { status: 409 };
 
     const started = Date.now();
     await ringGroup(pipeline, call, groupId);
@@ -750,10 +753,12 @@ describe('ringGroup', () => {
     const userA = await seedUser(db);
     const userB = await seedUser(db);
     await seedDevice(db, userA, 'decline-a');
+    fakeAri.answerAfterMs = 60_000;
+    await registerDevice(fakeAri, pipeline, 'decline-a');
     await seedDevice(db, userB, 'decline-b');
+    await registerDevice(fakeAri, pipeline, 'decline-b');
     await seedMember(db, groupId, 0, userA);
     await seedMember(db, groupId, 1, userB);
-    fakeAri.answerAfterMs = 60_000;
 
     const finished = ringGroup(pipeline, call, groupId);
     await membersRinging(call, 1);
@@ -809,10 +814,12 @@ describe('ringGroup', () => {
     const userA = await seedUser(db);
     const userB = await seedUser(db);
     await seedDevice(db, userA, 'decline-a');
+    fakeAri.answerAfterMs = 60_000;
+    await registerDevice(fakeAri, pipeline, 'decline-a');
     await seedDevice(db, userB, 'decline-b');
+    await registerDevice(fakeAri, pipeline, 'decline-b');
     await seedMember(db, groupId, 0, userA);
     await seedMember(db, groupId, 1, userB);
-    fakeAri.answerAfterMs = 60_000;
     // Asterisk dials the phone while it answers the originate; a 486 at once destroys the
     // channel before the core learns its id.
     fakeAri.onOriginate = channel => {
@@ -853,10 +860,12 @@ describe('ringGroup', () => {
     const userA = await seedUser(db);
     const userB = await seedUser(db);
     await seedDevice(db, userA, 'noreject-a');
+    fakeAri.answerAfterMs = 60_000;
+    await registerDevice(fakeAri, pipeline, 'noreject-a');
     await seedDevice(db, userB, 'noreject-b');
+    await registerDevice(fakeAri, pipeline, 'noreject-b');
     await seedMember(db, groupId, 0, userA);
     await seedMember(db, groupId, 1, userB);
-    fakeAri.answerAfterMs = 60_000;
 
     const finished = ringGroup(pipeline, call, groupId);
     await membersRinging(call, 1);
@@ -897,7 +906,9 @@ describe('ringGroup', () => {
     const userA = await seedUser(db);
     const userB = await seedUser(db);
     await seedDevice(db, userA, 'rand-a');
+    await registerDevice(fakeAri, pipeline, 'rand-a');
     await seedDevice(db, userB, 'rand-b');
+    await registerDevice(fakeAri, pipeline, 'rand-b');
     await seedMember(db, groupId, 0, userA);
     await seedMember(db, groupId, 1, userB);
 
@@ -919,10 +930,12 @@ describe('ringGroup', () => {
     const userA = await seedUser(db);
     const userB = await seedUser(db);
     await seedDevice(db, userA, 'cap-a');
+    fakeAri.answerAfterMs = 60_000;
+    await registerDevice(fakeAri, pipeline, 'cap-a');
     await seedDevice(db, userB, 'cap-b');
+    await registerDevice(fakeAri, pipeline, 'cap-b');
     await seedMember(db, groupId, 0, userA);
     await seedMember(db, groupId, 1, userB);
-    fakeAri.answerAfterMs = 60_000;
 
     await ringGroup(pipeline, call, groupId);
 
@@ -938,9 +951,10 @@ describe('ringGroup', () => {
     });
     const userId = await seedUser(db);
     await seedDevice(db, userId, 'abandon-greeting');
+    fakeAri.playbackFinishedAfterMs = 60_000;
+    await registerDevice(fakeAri, pipeline, 'abandon-greeting');
     await seedMember(db, groupId, 0, userId);
     // The greeting must not finish on its own during this test; the caller hangs up first.
-    fakeAri.playbackFinishedAfterMs = 60_000;
 
     const finished = ringGroup(pipeline, call, groupId);
     await requestTo(fakeAri, 'POST', `channels/${callerChannel.id}/play`);
@@ -965,10 +979,12 @@ describe('ringGroup', () => {
     const userA = await seedUser(db);
     const userB = await seedUser(db);
     await seedDevice(db, userA, 'abandon-ring-a');
+    fakeAri.answerAfterMs = 60_000;
+    await registerDevice(fakeAri, pipeline, 'abandon-ring-a');
     await seedDevice(db, userB, 'abandon-ring-b');
+    await registerDevice(fakeAri, pipeline, 'abandon-ring-b');
     await seedMember(db, groupId, 0, userA);
     await seedMember(db, groupId, 1, userB);
-    fakeAri.answerAfterMs = 60_000;
 
     const finished = ringGroup(pipeline, call, groupId);
     await membersRinging(call, 2);
@@ -1004,10 +1020,12 @@ describe('ringGroup', () => {
     const userA = await seedUser(db);
     const userB = await seedUser(db);
     await seedDevice(db, userA, 'language-ring-a');
+    fakeAri.answerAfterMs = 60_000;
+    await registerDevice(fakeAri, pipeline, 'language-ring-a');
     await seedDevice(db, userB, 'language-ring-b');
+    await registerDevice(fakeAri, pipeline, 'language-ring-b');
     await seedMember(db, groupId, 0, userA);
     await seedMember(db, groupId, 1, userB);
-    fakeAri.answerAfterMs = 60_000;
 
     const finished = ringGroup(pipeline, call, groupId);
     await membersRinging(call, 2);

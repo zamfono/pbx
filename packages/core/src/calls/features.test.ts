@@ -8,7 +8,7 @@ import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
 import { isPlacement } from '../ari/fakeDial.js';
-import type { AriEvent, Channel, Logger } from '../ari/types.js';
+import type { AriEvent, Channel } from '../ari/types.js';
 import { CdrWriter } from '../cdr.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
@@ -20,25 +20,24 @@ import {
   nextSubscription,
   requestTo
 } from '../testing/eventually.js';
+import {
+  noopLogger,
+  noopRecorder,
+  testPipelineDeps
+} from '../testing/pipelineDeps.js';
 import { newCall, type Call, type Leg } from './call.js';
 import { channelOf, otherChannelIn } from './callLookup.js';
 import { callUp, liveView } from './callState.js';
 import { handleFeature } from './features.js';
 import { handleOutbound } from './outbound.js';
 import { retrieveParkedCall } from './parkingRetrieval.js';
-import { Pipeline, type PipelineDeps } from './pipeline.js';
+import { Pipeline } from './pipeline.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';
 import { ringUser } from './ringUser.js';
 import { TrunkState } from './trunkState.js';
 import type { MailSender } from './voicemail.js';
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 // How long a check that something does NOT happen gives the flow to do it anyway.
 const SETTLE_MS = 50;
@@ -325,19 +324,16 @@ describe('features', () => {
     });
     // Wired the way `main.ts` does it, so the ring/answer/end points reach `presence`; a test
     // that dials externally sets `trunkState` itself.
-    const deps: PipelineDeps = {
-      ari,
-      cache,
-      state,
-      bus,
-      cdr,
-      now: nowIso,
-      db,
-      apiClient: stubMailSender(),
-      trunkState: null,
-      presence
-    };
-    pipeline = new Pipeline(deps);
+    pipeline = new Pipeline(
+      testPipelineDeps(ari, db, {
+        cache,
+        state,
+        bus,
+        cdr,
+        apiClient: stubMailSender(),
+        presence
+      })
+    );
   }
 
   /** A `TrunkState` over an AMI client that never connects, enough for route selection. */
@@ -585,6 +581,7 @@ describe('features', () => {
     const callers: Call[] = [];
     const legs: Leg[] = [];
     const recorder: ParticipationRecorder = {
+      ...noopRecorder,
       onCallerUp: call => {
         callers.push(call);
         return Promise.resolve();
@@ -997,6 +994,7 @@ describe('features', () => {
     const callers: Call[] = [];
     const legs: Leg[] = [];
     pipeline.deps.recorder = {
+      ...noopRecorder,
       onCallerUp: call => {
         callers.push(call);
         return Promise.resolve();
@@ -1872,7 +1870,7 @@ describe('features', () => {
     parkerChannelId: string;
   }> {
     await setUp();
-    pipeline.deps.recorder = options.recorder ?? null;
+    pipeline.deps.recorder = options.recorder ?? noopRecorder;
     await seedExtension(db, '701', { isParkingSlot: true });
     const parkerUserId = await seedUser(db);
     await seedExtension(db, '100', { userId: parkerUserId });
@@ -2166,6 +2164,7 @@ describe('features', () => {
   /** A stub recorder noting each participation it is told has started or ended. */
   function endingRecorder(ended: string[]): ParticipationRecorder {
     return {
+      ...noopRecorder,
       onCallerUp: () => Promise.resolve(),
       onLegUp: (_call, leg) => {
         ended.push(`up:${leg.channelId}`);

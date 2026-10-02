@@ -26,7 +26,7 @@ export async function recordGreeting(
   instructions: string
 ): Promise<boolean> {
   const db = pipeline.deps.db;
-  if (db === undefined || call.callerUserId === null) {
+  if (call.callerUserId === null) {
     return false;
   }
   const channelId = callerChannel(call);

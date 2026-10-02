@@ -104,7 +104,7 @@ async function winLeg(
   pipeline.pendingRing.delete(call.id);
   // §9.3 "a user: ... INUSE in a call"; a leg whose join failed is hung up.
   if (leg.userId !== null && joined) {
-    pipeline.deps.presence?.setCallState(
+    pipeline.deps.presence.setCallState(
       leg.userId,
       'inCall',
       call.from,

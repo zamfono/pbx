@@ -6,6 +6,7 @@ import { newId, nowIso } from '@zamfono/shared';
 import { defaultChannel } from '../ari/fakeChannel.js';
 import { AriError, type CreateParams } from '../ari/types.js';
 import type { LogLevel } from '../callLog.js';
+import { noopLogger } from '../testing/pipelineDeps.js';
 import { newCall } from './call.js';
 import {
   originateLeg,
@@ -35,6 +36,8 @@ function stubPipeline(
   const events = new EventEmitter();
   const pipeline = {
     deps: {
+      legStasisWaitMs: STASIS_WAIT_MS,
+      logger: noopLogger,
       ari: {
         on: events.on.bind(events),
         off: events.off.bind(events),

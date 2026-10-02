@@ -43,7 +43,7 @@ function participantsOf(call: Call): Set<string> {
  * call from both the caller's own channel ending and an answered leg's. */
 function clearParticipantPresence(pipeline: Pipeline, call: Call): void {
   for (const userId of participantsOf(call)) {
-    pipeline.deps.presence?.setCallState(userId, 'idle', null, null, call.id);
+    pipeline.deps.presence.setCallState(userId, 'idle', null, null, call.id);
   }
 }
 
@@ -141,11 +141,11 @@ async function endCallerCall(
       // `ChannelDestroyed` no longer reaches this call — so its snoops are stopped while the
       // channel is still up, then mixed and stored, as `closeCall` does (`liveCall.ts`).
       recordings.push(
-        pipeline.deps.recorder?.onLegEnded(call, leg).catch(
+        pipeline.deps.recorder.onLegEnded(call, leg).catch(
           logFailure(pipeline.deps.logger, 'recording stop', {
             callId: call.id
           })
-        ) ?? Promise.resolve()
+        )
       );
       // Answered: `releaseLastParty` below hangs up the other side of the bridge. A leg left `up`
       // reports its user as already in a call for the process's lifetime, and `skip_busy` then
@@ -196,7 +196,7 @@ export async function handleChannelEnded(
     }
     // §10.2: the caller's own participation is mixed and stored when their channel goes, whether
     // the call was answered or abandoned; the recorder ignores a channel it never recorded.
-    await pipeline.deps.recorder?.onCallerEnded(call);
+    await pipeline.deps.recorder.onCallerEnded(call);
     await endCallerCall(pipeline, call, channelId);
     return;
   }
@@ -207,7 +207,7 @@ export async function handleChannelEnded(
   if (leg?.state === 'up' && ev.type === 'ChannelDestroyed') {
     clearParticipantPresence(pipeline, call);
     // §10.2: an answered leg leaving the bridge ends its participation's recording and mixes it.
-    await pipeline.deps.recorder?.onLegEnded(call, leg);
+    await pipeline.deps.recorder.onLegEnded(call, leg);
     endLeg(pipeline, channelId, leg);
     // The callee hanging up ends a two-party call for the caller too; the caller's own channel
     // ending then closes the call out above.

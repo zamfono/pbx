@@ -221,7 +221,7 @@ export async function ringGroup(
   // §9.3 "a ring group: RINGING while the group rings, else NOT_INUSE".
   const groupExt = extensionOf(snapshot, { ringGroupId: groupId });
   if (groupExt !== null) {
-    await pipeline.deps.presence?.setHint(groupExt, 'RINGING');
+    await pipeline.deps.presence.setHint(groupExt, 'RINGING');
   }
   try {
     await runBatchPlan(pipeline, call, plan, {
@@ -233,7 +233,7 @@ export async function ringGroup(
     });
   } finally {
     if (groupExt !== null) {
-      await pipeline.deps.presence?.setHint(groupExt, 'NOT_INUSE');
+      await pipeline.deps.presence.setHint(groupExt, 'NOT_INUSE');
     }
   }
 }

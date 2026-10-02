@@ -6,22 +6,16 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
-import type { Logger } from '../ari/types.js';
 import { CdrWriter } from '../cdr.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { eventually, requestTo } from '../testing/eventually.js';
+import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
 import { callerChannel, newCall, type Call } from './call.js';
 import { ownVoicemail } from './mailbox.js';
 import { introMedia, mainMenuMedia } from './mailboxPrompts.js';
 import { Pipeline } from './pipeline.js';
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 // A prompt "plays" until the test barges in with a key or ends it itself, so every step of the
 // menu waits on exactly what the test does next.
@@ -135,17 +129,7 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
       state: new StateStore(),
       now: nowIso
     });
-    pipeline = new Pipeline({
-      ari,
-      cache,
-      state: new StateStore(),
-      bus,
-      cdr,
-      now: nowIso,
-      db,
-      trunkState: null,
-      presence: null
-    });
+    pipeline = new Pipeline(testPipelineDeps(ari, db, { cache, bus, cdr }));
     const channel = fakeAri.addChannel({});
     call = newCall({
       id: newId(),

@@ -8,24 +8,23 @@ import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../ari/fakeDial.js';
-import type { Channel, Logger } from '../ari/types.js';
+import type { Channel } from '../ari/types.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { ATTEMPT_NO_RESPONSE_MS } from '../routing/trunk.js';
 import { eventually } from '../testing/eventually.js';
+import {
+  noopLogger,
+  registerDevice,
+  testPipelineDeps
+} from '../testing/pipelineDeps.js';
 import { newCall, type Call } from './call.js';
-import { Pipeline, type PipelineDeps } from './pipeline.js';
+import { Pipeline } from './pipeline.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';
 import { ringUser } from './ringUser.js';
 import { TrunkState } from './trunkState.js';
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 // Q.850 causes as ARI's `ChannelDestroyed` carries them: 41 temporary failure (SIP 503), 17 user
 // busy (SIP 486).
@@ -33,10 +32,6 @@ const AST_CAUSE_TEMPORARY_FAILURE = 41;
 const AST_CAUSE_USER_BUSY = 17;
 // Q.850 21, call rejected: what chan_pjsip maps 401, 403, 407 and 603 alike to.
 const AST_CAUSE_CALL_REJECTED = 21;
-
-function fakeCdr(): PipelineDeps['cdr'] {
-  return { open: () => Promise.resolve(), finish: () => Promise.resolve() };
-}
 
 async function seedDid(db: Db, number: string): Promise<string> {
   const targetId = newId();
@@ -337,16 +332,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       bus: new EventBus(),
       now: nowIso
     });
-    pipeline = new Pipeline({
-      ari,
-      cache: new ConfigCache(db),
-      state,
-      bus: new EventBus(),
-      cdr: fakeCdr(),
-      now: nowIso,
-      trunkState,
-      presence: null
-    });
+    pipeline = new Pipeline(testPipelineDeps(ari, db, { state, trunkState }));
     callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
     });
@@ -377,8 +363,10 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       await seedExternalForward(db, forwarding, '+15557777');
       // A member who forwards is still skipped while offline (§10.1 step 5).
       await seedDevice(db, forwarding, 'member-forwarding');
+      await registerDevice(fakeAri, pipeline, 'member-forwarding');
       const other = await seedUser(db);
       await seedDevice(db, other, 'member-other');
+      await registerDevice(fakeAri, pipeline, 'member-other');
       const trunkId = await seedTrunk(db, 1, 'ip');
       await seedRoute(db, 1, trunkId);
       const groupId = await seedRingGroup(db, [forwarding, other]);
@@ -415,6 +403,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const forwarding = await seedUser(db);
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
+      await registerDevice(fakeAri, pipeline, 'member-forwarding');
       const trunkId = await seedTrunk(db, 1);
       await seedRoute(db, 1, trunkId);
       const groupId = await seedRingGroup(db, [forwarding]);
@@ -439,6 +428,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const forwarding = await seedUser(db);
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
+      await registerDevice(fakeAri, pipeline, 'member-forwarding');
       const trunk1 = await seedTrunk(db, 1);
       const trunk2 = await seedTrunk(db, 2);
       await seedRoute(db, 1, trunk1);
@@ -476,6 +466,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const forwarding = await seedUser(db);
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
+      await registerDevice(fakeAri, pipeline, 'member-forwarding');
       const trunk1 = await seedTrunk(db, 1);
       const trunk2 = await seedTrunk(db, 2);
       await seedRoute(db, 1, trunk1);
@@ -514,6 +505,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
         const forwarding = await seedUser(db);
         await seedExternalForward(db, forwarding, '+15557777');
         await seedDevice(db, forwarding, 'member-forwarding');
+        await registerDevice(fakeAri, pipeline, 'member-forwarding');
         const trunk1 = await seedTrunk(db, 1);
         await seedRoute(db, 1, trunk1);
         const groupId = await seedRingGroup(db, [forwarding]);
@@ -542,6 +534,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const forwarding = await seedUser(db);
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
+      await registerDevice(fakeAri, pipeline, 'member-forwarding');
       const trunk1 = await seedTrunk(db, 1);
       const trunk2 = await seedTrunk(db, 2);
       await seedRoute(db, 1, trunk1);
@@ -567,6 +560,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const forwarding = await seedUser(db);
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
+      await registerDevice(fakeAri, pipeline, 'member-forwarding');
       const trunk1 = await seedTrunk(db, 1);
       const trunk2 = await seedTrunk(db, 2);
       await seedRoute(db, 1, trunk1);
@@ -587,6 +581,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const forwarding = await seedUser(db);
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
+      await registerDevice(fakeAri, pipeline, 'member-forwarding');
       const trunkId = await seedTrunk(db, 1);
       await seedRoute(db, 1, trunkId);
       const groupId = await seedRingGroup(db, [forwarding]);
@@ -607,6 +602,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const forwarding = await seedUser(db);
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
+      await registerDevice(fakeAri, pipeline, 'member-forwarding');
       const someoneElse = await seedUser(db);
       const trunkId = await seedTrunk(db, 1);
       await seedRoute(db, 1, trunkId, someoneElse);
@@ -638,6 +634,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
         findMe: [{ number: '+15557000', delayS: 0 }]
       });
       await seedDevice(db, userId, 'e101-d1');
+      await registerDevice(fakeAri, pipeline, 'e101-d1');
       const trunkId = await seedTrunk(db, 1);
       await seedRoute(db, 1, trunkId, userId);
 
@@ -760,6 +757,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
         findMe: [{ number: '+15557000', delayS: 0 }]
       });
       await seedDevice(db, userId, 'e101-d1');
+      await registerDevice(fakeAri, pipeline, 'e101-d1');
       const trunkId = await seedTrunk(db, 1);
       await seedRoute(db, 1, trunkId);
 
@@ -847,6 +845,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
         findMe: [{ number: '+15557000', delayS: 0 }]
       });
       await seedDevice(db, userId, 'e101-d1');
+      await registerDevice(fakeAri, pipeline, 'e101-d1');
       const someoneElse = await seedUser(db);
       const trunkId = await seedTrunk(db, 1);
       await seedRoute(db, 1, trunkId, someoneElse);

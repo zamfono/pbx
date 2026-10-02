@@ -5,22 +5,16 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from './ari/client.js';
 import { FakeAri } from './ari/fake.js';
-import type { Logger } from './ari/types.js';
 import { EventBus } from './internal/eventBus.js';
 import { ConfigCache } from './internal/snapshot.js';
 import { StateStore } from './internal/stateStore.js';
 import { Presence } from './presence.js';
 import { eventually } from './testing/eventually.js';
+import { noopLogger } from './testing/pipelineDeps.js';
 
 // How long the fake holds a hint PUT to model a slow connection: well past the round trip of the
 // refresh sent after it, so that one lands first unless the pushes are serialized.
 const SLOW_HINT_PUT_MS = 100;
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 /** A throwaway forward-target/DID chain, just to satisfy `settings.main_did_id`'s FK. */
 async function seedSettings(db: Db): Promise<void> {

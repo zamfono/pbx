@@ -16,15 +16,20 @@ import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
 import { isPlacement } from '../ari/fakeDial.js';
-import type { Channel, Logger } from '../ari/types.js';
+import type { Channel } from '../ari/types.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import { eventually } from '../testing/eventually.js';
+import {
+  noopLogger,
+  registerDevice,
+  testPipelineDeps
+} from '../testing/pipelineDeps.js';
 import { newCall, type Call } from './call.js';
 import { enterTarget } from './inbound.js';
-import { Pipeline, type PipelineDeps } from './pipeline.js';
+import { Pipeline } from './pipeline.js';
 import { ringGroup } from './ringGroup.js';
 import { TrunkState } from './trunkState.js';
 
@@ -32,21 +37,11 @@ import { TrunkState } from './trunkState.js';
 // part over its own trunk's hosts, bypassing `outbound_routes`, and every forwarded trunk leg,
 // `sip` or `external`, carries the call's forwarding context.
 
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
-
 const CALLER = '+15559999';
 const CALLED = '+15551077';
 const SIP_USER = 'proj_abc123';
 // Q.850 38, network out of order, which a 503 from the far end maps to.
 const AST_CAUSE_NETWORK_OUT_OF_ORDER = 38;
-
-function fakeCdr(): PipelineDeps['cdr'] {
-  return { open: () => Promise.resolve(), finish: () => Promise.resolve() };
-}
 
 async function seedTarget(
   db: Db,
@@ -266,16 +261,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
       bus: new EventBus(),
       now: nowIso
     });
-    pipeline = new Pipeline({
-      ari,
-      cache: new ConfigCache(db),
-      state,
-      bus: new EventBus(),
-      cdr: fakeCdr(),
-      now: nowIso,
-      trunkState,
-      presence: null
-    });
+    pipeline = new Pipeline(testPipelineDeps(ari, db, { state, trunkState }));
     callerChannel = fakeAri.addChannel({
       caller: { number: CALLER, name: '' }
     });
@@ -590,7 +576,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
         createdAt: nowIso()
       })
       .execute();
-    // With no presence tracker every live device counts as registered (`userDevices.ts`).
+    await registerDevice(fakeAri, pipeline, 'e177-d1');
     await seedRule(db, member, 'unconditional', await sipTargetId(db, trunkId));
     const groupId = newId();
     await db

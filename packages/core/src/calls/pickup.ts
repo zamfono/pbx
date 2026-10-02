@@ -76,7 +76,7 @@ async function bridgePickup(
   }
   // Presence (§9.3, §10.2 "Presence and BLF"): the ringing callee idle, the picker in the call.
   if (target.calleeUserId !== null) {
-    pipeline.deps.presence?.setCallState(
+    pipeline.deps.presence.setCallState(
       target.calleeUserId,
       'idle',
       null,
@@ -85,7 +85,7 @@ async function bridgePickup(
     );
   }
   if (picker.userId !== null) {
-    pipeline.deps.presence?.setCallState(
+    pipeline.deps.presence.setCallState(
       picker.userId,
       'inCall',
       target.from,
@@ -94,7 +94,7 @@ async function bridgePickup(
     );
   }
   // §7 level `sip`: the picker's dialog is `target`'s answered leg now.
-  pipeline.deps.cdr.registerLeg?.(target, picker.channelId);
+  pipeline.deps.cdr.registerLeg(target, picker.channelId);
 }
 
 /**

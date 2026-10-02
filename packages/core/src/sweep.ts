@@ -30,7 +30,7 @@ export type SweepDeps = {
   log: Logger;
   now: () => string;
   // The stack's `TZ` (§11.4 `timezone`: "NULL = stack `TZ`, else UTC"), `CoreEnv.tz`.
-  stackTz?: string;
+  stackTz: string;
 };
 
 // The backstop: a wall-clock jump (NTP step, suspended VM) or a zone's rule change moves the

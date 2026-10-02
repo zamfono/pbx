@@ -15,7 +15,7 @@ export type ParticipationRecorder = {
   onCallerEnded(call: Call): Promise<void>;
   onLegEnded(call: Call, leg: Leg): Promise<void>;
   /** `leg`'s channel goes on in `to` (a parking ring-back's answer, §10.2 "Call parking"). */
-  onLegMoved?(from: Call, to: Call, leg: Leg): void;
+  onLegMoved(from: Call, to: Call, leg: Leg): void;
 };
 
 /**
@@ -24,10 +24,10 @@ export type ParticipationRecorder = {
  * channel, so this follows the bridge rather than the answer.
  */
 export async function recordAnsweredParticipation(
-  recorder: ParticipationRecorder | null | undefined,
+  recorder: ParticipationRecorder,
   call: Call,
   leg: Leg
 ): Promise<void> {
-  await recorder?.onCallerUp(call);
-  await recorder?.onLegUp(call, leg);
+  await recorder.onCallerUp(call);
+  await recorder.onLegUp(call, leg);
 }

@@ -8,11 +8,11 @@ import { isPlacement } from '../ari/fakeDial.js';
 import type { LogLevel } from '../callLog.js';
 import type { CdrWriter } from '../cdr.js';
 import { eventually } from '../testing/eventually.js';
+import { noopLogger } from '../testing/pipelineDeps.js';
 import {
   answeredCall,
   languageSet,
   legOf,
-  noopLogger,
   startRig,
   type Rig
 } from '../testing/pipelineRig.js';
@@ -75,10 +75,10 @@ async function seedTrunkWithRoute(db: Db, userId: string): Promise<string> {
   return trunkId;
 }
 
-/** A user at `ext` with one device, never registered. */
+/** A user at `ext` with one registered device. */
 async function seedUserWithDevice(rig: Rig, ext: string): Promise<string> {
   const id = await seedUser(rig.db, ext);
-  await seedDevice(rig, id, `e${ext}-a`, false);
+  await seedDevice(rig, id, `e${ext}-a`);
   return id;
 }
 
@@ -97,7 +97,7 @@ describe('transfers', () => {
   let cdr: CdrWriter;
 
   async function setUp(): Promise<void> {
-    rig = await startRig({ presence: null });
+    rig = await startRig();
     ({ db, fakeAri, ari, pipeline, cdr } = rig);
     pipeline.deps.trunkState = rig.trunkState();
   }

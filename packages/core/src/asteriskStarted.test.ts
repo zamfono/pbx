@@ -12,7 +12,12 @@ import { EventBus } from './internal/eventBus.js';
 type LogFn = Logger['info'];
 
 function spyLogger(): Logger & { warn: ReturnType<typeof vi.fn<LogFn>> } {
-  return { info: vi.fn<LogFn>(), warn: vi.fn<LogFn>(), error: vi.fn<LogFn>() };
+  return {
+    debug: vi.fn<LogFn>(),
+    info: vi.fn<LogFn>(),
+    warn: vi.fn<LogFn>(),
+    error: vi.fn<LogFn>()
+  };
 }
 
 // The fake Asterisk's `startup_time` (`FAKE_ASTERISK_STARTUP_TIME`), `+0000` read as UTC.

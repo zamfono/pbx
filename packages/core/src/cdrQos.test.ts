@@ -11,7 +11,7 @@ import { newCall, type Call } from './calls/call.js';
 import { QosRows } from './cdrQos.js';
 import { RtcpQos } from './rtcpQos.js';
 import { parseRtcpReport, type RtcpHepReport } from './rtcpReport.js';
-import { noopLogger } from './testing/pipelineRig.js';
+import { noopLogger } from './testing/pipelineDeps.js';
 import { fixedPoint, ntpMiddle, rtcpPayload } from './testing/rtcpPayload.js';
 
 /** `id`'s `ChannelDestroyed` channel, carrying `rtpAudioQos` as its `RTPAUDIOQOS`. */

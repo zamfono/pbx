@@ -5,23 +5,19 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
-import type { Logger } from '../ari/types.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
+import {
+  noopCdr,
+  noopLogger,
+  testPipelineDeps
+} from '../testing/pipelineDeps.js';
 import { announce } from './announce.js';
 import { newCall, type Call } from './call.js';
 import { Pipeline, type PipelineDeps } from './pipeline.js';
 
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
-
 function fakeCdr(): PipelineDeps['cdr'] & { finished: Call[] } {
   const finished: Call[] = [];
   return {
+    ...noopCdr(),
     finished,
     open: () => Promise.resolve(),
     finish: call => {
@@ -97,16 +93,7 @@ describe('announce', () => {
     });
     await ari.connect();
     cdr = fakeCdr();
-    pipeline = new Pipeline({
-      ari,
-      cache: new ConfigCache(db),
-      state: new StateStore(),
-      bus: new EventBus(),
-      cdr,
-      now: nowIso,
-      trunkState: null,
-      presence: null
-    });
+    pipeline = new Pipeline(testPipelineDeps(ari, db, { cdr }));
   });
 
   afterEach(async () => {

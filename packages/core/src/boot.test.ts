@@ -4,7 +4,6 @@ import { nowIso, openDb, type Db } from '@zamfono/shared';
 
 import { AmiClient } from './ami/client.js';
 import { AriClient } from './ari/client.js';
-import type { Logger } from './ari/types.js';
 import { buildPipeline } from './boot.js';
 import { Recorder } from './calls/recording.js';
 import { TrunkState } from './calls/trunkState.js';
@@ -12,12 +11,7 @@ import { EventBus } from './internal/eventBus.js';
 import { ConfigCache } from './internal/snapshot.js';
 import { StateStore } from './internal/stateStore.js';
 import { Presence } from './presence.js';
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
+import { noopLogger } from './testing/pipelineDeps.js';
 
 describe('buildPipeline', () => {
   // eslint-disable-next-line init-declarations -- assigned in the test before any use

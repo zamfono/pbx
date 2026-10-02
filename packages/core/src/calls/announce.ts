@@ -31,7 +31,7 @@ export async function announce(
   // eslint-disable-next-line require-atomic-updates -- this call's only writer is this function
   call.status = 'answered';
   // §7: the channel whose `call_qos` row this call has is noted before it goes.
-  pipeline.deps.cdr.noteQosLegs?.(call);
+  pipeline.deps.cdr.noteQosLegs(call);
   await pipeline.deps.ari.channels
     .hangup(channelId)
     .catch(ignoreGone)

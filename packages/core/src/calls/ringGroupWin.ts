@@ -72,7 +72,7 @@ export async function winBatch(
   await hangupAllRinging(pipeline, tracked);
   // §9.3 "a user: ... INUSE in a call"; a leg whose join failed is hung up.
   if (winningLeg.userId !== null && joined) {
-    pipeline.deps.presence?.setCallState(
+    pipeline.deps.presence.setCallState(
       winningLeg.userId,
       'inCall',
       call.from,

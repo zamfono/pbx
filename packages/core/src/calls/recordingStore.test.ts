@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import type { Db } from '@zamfono/shared';
 
 import type { Logger } from '../ari/types.js';
+import { noopLogger } from '../testing/pipelineDeps.js';
 import { storeParticipation } from './recordingStore.js';
 
 // Only the `recordings` insert is reached; its content is covered by `recording.test.ts`.
@@ -19,7 +20,7 @@ describe('storeParticipation', () => {
     const undeletable = await mkdtemp(path.join(tmpdir(), 'recording-store-'));
     const warnings: unknown[][] = [];
     const log: Logger = {
-      info: () => undefined,
+      ...noopLogger,
       warn: (...args) => {
         warnings.push(args);
       },

@@ -171,7 +171,7 @@ export async function originateTrunkLeg(
     if (ctx.forward !== undefined) {
       // The one place a forwarded leg's `REDIRECTING` data, `Diversion` and custom headers are
       // applied, the `Diversion` under this attempt's trunk's policy (§9.4 "Forwarded calls").
-      const stackSipHost = pipeline.deps.stackSipHost ?? null;
+      const { stackSipHost } = pipeline.deps;
       Object.assign(
         variables,
         forwardVariables(

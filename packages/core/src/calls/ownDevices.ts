@@ -174,11 +174,11 @@ export function ringOwnDevices(
     }
   };
   pipeline.pendingRing.set(host.id, ring);
-  presence?.setCallState(userId, 'ringing', peer, null, presenceKey);
+  presence.setCallState(userId, 'ringing', peer, null, presenceKey);
   const own: OwnRingState = { placed: new Map<string, Channel>(), ring };
   const { placed } = own;
   const outcome = promise.then((result): OwnRingOutcome => {
-    presence?.setCallState(userId, 'idle', null, null, presenceKey);
+    presence.setCallState(userId, 'idle', null, null, presenceKey);
     const leg = answered;
     const channel = leg === null ? undefined : placed.get(leg.channelId);
     if (result === 'answered' && channel !== undefined) {

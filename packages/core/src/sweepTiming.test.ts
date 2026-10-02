@@ -10,7 +10,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { EventBus } from './internal/eventBus.js';
 import { ConfigCache } from './internal/snapshot.js';
 import { startSweep } from './sweep.js';
-import { noopLogger } from './testing/pipelineRig.js';
+import { noopLogger } from './testing/pipelineDeps.js';
 
 const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 3_600_000;
@@ -117,7 +117,13 @@ describe('startSweep timing', () => {
       seen.push({ event, atMs: Date.now() });
     });
     sweep = startSweep(
-      { cache, bus, log: noopLogger, now: () => new Date().toISOString() },
+      {
+        cache,
+        bus,
+        log: noopLogger,
+        now: () => new Date().toISOString(),
+        stackTz: 'UTC'
+      },
       backstopMs
     );
     await vi.advanceTimersByTimeAsync(0);
@@ -256,7 +262,8 @@ describe('startSweep timing', () => {
       cache,
       bus,
       log: { ...noopLogger, error },
-      now: () => new Date().toISOString()
+      now: () => new Date().toISOString(),
+      stackTz: 'UTC'
     });
     await vi.advanceTimersByTimeAsync(0);
     expect(error).toHaveBeenCalledWith(

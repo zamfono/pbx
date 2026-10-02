@@ -1,15 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { noopLogger } from '../testing/pipelineDeps.js';
 import { AriClient } from './client.js';
 import { FakeAri } from './fake.js';
-import { AriError, type AriEvent, type Logger } from './types.js';
+import { AriError, type AriEvent } from './types.js';
 
 const TEST_APP = 'zamfono';
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 describe('AriClient', () => {
   // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs

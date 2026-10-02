@@ -24,8 +24,6 @@ import { liveTrunk, prepareRoute } from './routeSelection.js';
 import { dialTargets } from './trunkDial.js';
 import type { TrunkState } from './trunkState.js';
 
-const FORWARD_TARGET_UNAVAILABLE = 480;
-
 type SipTarget = Extract<ForwardTarget, { kind: 'sip' }>;
 
 /** Why `trunk` cannot carry a SIP target at all (§9.4 "SIP targets"), else `null`. */
@@ -125,10 +123,6 @@ export async function dialForwardTarget(
   asUser: string | null
 ): Promise<void> {
   const { trunkState } = pipeline.deps;
-  if (trunkState === null) {
-    await release(pipeline, call, FORWARD_TARGET_UNAVAILABLE, 'failed');
-    return;
-  }
   if (target.kind === 'sip') {
     await dialSipTarget({ pipeline, trunkState }, call, target, asUser);
     return;

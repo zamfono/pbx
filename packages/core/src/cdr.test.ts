@@ -7,7 +7,7 @@ import { AriClient } from './ari/client.js';
 import { FakeAri } from './ari/fake.js';
 import { defaultChannel } from './ari/fakeChannel.js';
 import { fakeRtpAudioQos } from './ari/fakeRtp.js';
-import type { Channel, Logger } from './ari/types.js';
+import type { Channel } from './ari/types.js';
 import type { LogLevel } from './callLog.js';
 import { callerChannel, newCall, type Call } from './calls/call.js';
 import { CdrWriter } from './cdr.js';
@@ -15,13 +15,8 @@ import { EventBus } from './internal/eventBus.js';
 import { ConfigCache } from './internal/snapshot.js';
 import { StateStore } from './internal/stateStore.js';
 import { parseRtcpReport } from './rtcpReport.js';
+import { noopLogger } from './testing/pipelineDeps.js';
 import { fixedPoint, ntpMiddle, rtcpPayload } from './testing/rtcpPayload.js';
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 const NOW = '2026-01-01T00:05:00.000Z';
 

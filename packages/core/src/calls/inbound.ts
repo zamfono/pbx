@@ -132,7 +132,7 @@ export async function handleInboundStart(
   const args = (ev.args as string[] | undefined) ?? [];
   // §9.4 "Channels": the leg occupies one of the delivering trunk's channels for its lifetime,
   // watched from here so a hangup during the config read below is not missed.
-  const countInboundLeg = pipeline.deps.trunkState?.watchInboundLeg(channel.id);
+  const countInboundLeg = pipeline.deps.trunkState.watchInboundLeg(channel.id);
   const snapshot = await pipeline.deps.cache.get();
   const { trunkId, called, calledFromTo, from } = await inboundBoundary(
     pipeline.deps.ari,
@@ -140,7 +140,7 @@ export async function handleInboundStart(
     args[1] ?? '',
     snapshot
   );
-  countInboundLeg?.(trunkId);
+  countInboundLeg(trunkId);
 
   const call = newCall({
     id: newId(),

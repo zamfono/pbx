@@ -12,26 +12,13 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
-import type { Logger } from '../ari/types.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
 import { MAX_HOPS } from '../routing/targets.js';
 import { eventually } from '../testing/eventually.js';
+import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
 import { newCall, type Call } from './call.js';
 import { playMenu } from './menu.js';
-import { Pipeline, type PipelineDeps } from './pipeline.js';
+import { Pipeline } from './pipeline.js';
 import type { MailSender } from './voicemail.js';
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
-
-function fakeCdr(): PipelineDeps['cdr'] {
-  return { open: () => Promise.resolve(), finish: () => Promise.resolve() };
-}
 
 function stubApiClient(): MailSender & { sent: MailRequest[] } {
   const sent: MailRequest[] = [];
@@ -232,18 +219,9 @@ describe('playMenu', () => {
       log: noopLogger
     });
     await ari.connect();
-    pipeline = new Pipeline({
-      ari,
-      cache: new ConfigCache(db),
-      state: new StateStore(),
-      bus: new EventBus(),
-      cdr: fakeCdr(),
-      now: nowIso,
-      db,
-      apiClient: stubApiClient(),
-      trunkState: null,
-      presence: null
-    });
+    pipeline = new Pipeline(
+      testPipelineDeps(ari, db, { apiClient: stubApiClient() })
+    );
   });
 
   afterEach(async () => {

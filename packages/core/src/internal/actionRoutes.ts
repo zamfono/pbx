@@ -82,18 +82,17 @@ function respondProblem(
 }
 
 /**
- * Serves one action `POST`; `false` when `pathname` names no action route, or the actions are
- * not mounted. A refused action (`ActionError`) answers its status as a problem whose `detail` is
+ * Serves one action `POST`; `false` when `pathname` names no action route. A refused action (`ActionError`) answers its status as a problem whose `detail` is
  * the cause, where `api`'s core client reads it (§10.2 `noRegisteredDevice`).
  */
 export async function handleActionRoute(
-  actions: CallActions | null,
+  actions: CallActions,
   pathname: string,
   request: http.IncomingMessage,
   response: http.ServerResponse
 ): Promise<boolean> {
   const route = matchActionRoute(pathname);
-  if (route === null || actions === null) {
+  if (route === null) {
     return false;
   }
   const body = await readActionBody(request);
@@ -118,14 +117,13 @@ export async function handleActionRoute(
   return true;
 }
 
-/** `GET /internal/parking` (§10.2 "Call parking"): the occupied slots; `false` off that path or
- * while the actions are not mounted. */
+/** `GET /internal/parking` (§10.2 "Call parking"): the occupied slots; `false` off that path. */
 export async function handleParkingRead(
-  actions: CallActions | null,
+  actions: CallActions,
   pathname: string,
   response: http.ServerResponse
 ): Promise<boolean> {
-  if (pathname !== '/internal/parking' || actions === null) {
+  if (pathname !== '/internal/parking') {
     return false;
   }
   respondJson(response, HTTP_OK, await actions.parked());

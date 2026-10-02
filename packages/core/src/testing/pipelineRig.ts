@@ -4,30 +4,23 @@
 import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
-import type { Logger } from '../ari/types.js';
 import type { CallActions } from '../calls/actions.js';
 import { newCall, type Call } from '../calls/call.js';
 import { Pipeline, type PipelineDeps } from '../calls/pipeline.js';
-import { TrunkState } from '../calls/trunkState.js';
+import type { TrunkState } from '../calls/trunkState.js';
 import { CdrWriter } from '../cdr.js';
 import { EventBus } from '../internal/eventBus.js';
 import { startInternalServer } from '../internal/server.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { Presence } from '../presence.js';
+import { noopLogger, testPipelineDeps, trunkStateFor } from './pipelineDeps.js';
 import { seedSettings } from './seedRows.js';
 
 // Any free port, never a fixed one another suite running on the same host may already hold.
 const ANY_FREE_PORT = 0;
-
-export const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 /** The rig's own collaborators, one of each, wired as `main.ts` wires them. */
 export type Rig = {
@@ -51,25 +44,6 @@ export type Rig = {
   stop: () => Promise<void>;
 };
 
-/** A `TrunkState` over an AMI client that never connects, enough for route selection. */
-function trunkStateFor(ari: AriClient, db: Db): TrunkState {
-  return new TrunkState({
-    log: noopLogger,
-    ari,
-    ami: new AmiClient({
-      host: '127.0.0.1',
-      port: 1,
-      username: 'zamfono',
-      password: 'secret',
-      log: noopLogger
-    }),
-    cache: new ConfigCache(db),
-    state: new StateStore(),
-    bus: new EventBus(),
-    now: nowIso
-  });
-}
-
 /** An ARI client connected to a fake Asterisk listening on a free port. */
 async function connectFakeAri(): Promise<{ fakeAri: FakeAri; ari: AriClient }> {
   const fakeAri = new FakeAri();
@@ -86,8 +60,7 @@ async function connectFakeAri(): Promise<{ fakeAri: FakeAri; ari: AriClient }> {
   return { fakeAri, ari };
 }
 
-/** A Pipeline whose deps `overrides` may replace (a stub mail sender, a trunk state, no
- * presence), over a fresh database and a listening fake Asterisk. */
+/** A Pipeline whose deps `overrides` may replace (a stub mail sender, a trunk state), over a fresh database and a listening fake Asterisk. */
 export async function startRig(
   overrides: Partial<PipelineDeps> = {}
 ): Promise<Rig> {
@@ -101,18 +74,16 @@ export async function startRig(
   const live = { db, ari, cache, bus, state, log: noopLogger, now: nowIso };
   const cdr = new CdrWriter(live);
   const presence = new Presence(live);
-  const pipeline = new Pipeline({
-    ari,
-    cache,
-    state,
-    bus,
-    cdr,
-    now: nowIso,
-    db,
-    trunkState: null,
-    presence,
-    ...overrides
-  });
+  const pipeline = new Pipeline(
+    testPipelineDeps(ari, db, {
+      cache,
+      state,
+      bus,
+      cdr,
+      presence,
+      ...overrides
+    })
+  );
   let closeServer: (() => Promise<void>) | null = null;
   return {
     db,
@@ -139,8 +110,8 @@ export async function startRig(
           state: new StateStore(),
           bus: new EventBus(),
           actions,
-          presence: null,
-          trunks: null
+          presence,
+          trunks: pipeline.deps.trunkState
         },
         ANY_FREE_PORT
       );

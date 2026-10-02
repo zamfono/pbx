@@ -22,7 +22,7 @@ import { CdrWriter } from '../cdr.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
-import { noopLogger } from '../testing/pipelineRig.js';
+import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
 import { callerChannel, newCall, type Call, type Leg } from './call.js';
 import { trackLeg } from './legs.js';
 import { handleChannelEnded } from './legsEnded.js';
@@ -60,8 +60,7 @@ function fakeLogger(): Logger & { errors: unknown[][] } {
   const errors: unknown[][] = [];
   return {
     errors,
-    info: () => undefined,
-    warn: () => undefined,
+    ...noopLogger,
     error: (...args) => {
       errors.push(args);
     }
@@ -173,11 +172,7 @@ describe('Recorder', () => {
       user: 'zamfono',
       password: 'secret',
       app: 'zamfono',
-      log: {
-        info: () => undefined,
-        warn: () => undefined,
-        error: () => undefined
-      }
+      log: noopLogger
     });
     await ari.connect();
     cache = new ConfigCache(db);
@@ -842,17 +837,9 @@ describe('Recorder', () => {
       log: fakeLogger(),
       now: () => NOW
     });
-    const pipeline = new Pipeline({
-      ari,
-      cache,
-      state: new StateStore(),
-      bus: new EventBus(),
-      cdr,
-      recorder,
-      now: nowIso,
-      trunkState: null,
-      presence: null
-    });
+    const pipeline = new Pipeline(
+      testPipelineDeps(ari, db, { cache, cdr, recorder })
+    );
     // An inbound trunk call answered by a user who records (`record_calls`): the trunk's own
     // caller is nobody's participation, the answering user's is.
     const call = buildCall(null);

@@ -26,7 +26,7 @@ async function setDnd(
   dnd: boolean
 ): Promise<void> {
   const db = pipeline.deps.db;
-  if (call.callerUserId === null || db === undefined) {
+  if (call.callerUserId === null) {
     await release(pipeline, call, RELEASE_CODE_FORBIDDEN, 'failed');
     return;
   }

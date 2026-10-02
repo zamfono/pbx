@@ -15,11 +15,18 @@ import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../ari/fakeDial.js';
-import type { AriEvent, Channel, Logger } from '../ari/types.js';
+import type { AriEvent, Channel } from '../ari/types.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { eventually } from '../testing/eventually.js';
+import {
+  noopCdr,
+  noopLogger,
+  noopRecorder,
+  registerDevice,
+  testPipelineDeps
+} from '../testing/pipelineDeps.js';
 import { newCall, type Call } from './call.js';
 import { liveView } from './callState.js';
 import { Pipeline, type PipelineDeps } from './pipeline.js';
@@ -31,17 +38,12 @@ import { runUserStep } from './userStep.js';
 // once it elapses, so the wait for that drop runs past it.
 const FIND_ME_DROP_WAIT_MS = 6500;
 
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
-
 /** Records every `open`/`finish` call, standing in for the real `CdrWriter`. */
 function fakeCdr(): PipelineDeps['cdr'] & { opened: Call[]; finished: Call[] } {
   const opened: Call[] = [];
   const finished: Call[] = [];
   return {
+    ...noopCdr(),
     opened,
     finished,
     open: call => {
@@ -316,44 +318,40 @@ describe('Pipeline', () => {
       bus: new EventBus(),
       now: nowIso
     });
-    pipeline = new Pipeline({
-      ari,
-      cache: new ConfigCache(db),
-      state: new StateStore(),
-      bus: new EventBus(),
-      cdr,
-      db,
-      // §3.1 "Mail": a deposit reaches `api` through this client; the stub records the request so
-      // the test asserts the deposit completed rather than that a network call happened.
-      apiClient: {
-        mail: (request: MailRequest) => {
-          mailRequests.push(request);
-          return Promise.resolve();
-        }
-      },
-      recorder: {
-        onCallerUp: call => {
-          recorderCalls.push(`callerUp:${call.id}`);
-          return Promise.resolve();
+    pipeline = new Pipeline(
+      testPipelineDeps(ari, db, {
+        cdr,
+        // §3.1 "Mail": a deposit reaches `api` through this client; the stub records the request so
+        // the test asserts the deposit completed rather than that a network call happened.
+        apiClient: {
+          mail: (request: MailRequest) => {
+            mailRequests.push(request);
+            return Promise.resolve();
+          }
         },
-        onLegUp: (call, leg) => {
-          recorderCalls.push(`legUp:${leg.channelId}`);
-          return Promise.resolve();
+        recorder: {
+          ...noopRecorder,
+          onCallerUp: call => {
+            recorderCalls.push(`callerUp:${call.id}`);
+            return Promise.resolve();
+          },
+          onLegUp: (call, leg) => {
+            recorderCalls.push(`legUp:${leg.channelId}`);
+            return Promise.resolve();
+          },
+          onTransfereeUp: () => Promise.resolve(),
+          onCallerEnded: call => {
+            recorderCalls.push(`callerEnded:${call.id}`);
+            return Promise.resolve();
+          },
+          onLegEnded: (call, leg) => {
+            recorderCalls.push(`legEnded:${leg.channelId}`);
+            return Promise.resolve();
+          }
         },
-        onTransfereeUp: () => Promise.resolve(),
-        onCallerEnded: call => {
-          recorderCalls.push(`callerEnded:${call.id}`);
-          return Promise.resolve();
-        },
-        onLegEnded: (call, leg) => {
-          recorderCalls.push(`legEnded:${leg.channelId}`);
-          return Promise.resolve();
-        }
-      },
-      now: nowIso,
-      trunkState,
-      presence: null
-    });
+        trunkState
+      })
+    );
   });
 
   afterEach(async () => {
@@ -371,6 +369,7 @@ describe('Pipeline', () => {
     const didId = await seedDid(db, '+15551000', targetId);
     await seedSettings(db, didId);
     fakeAri.answerAfterMs = 60_000;
+    await registerDevice(fakeAri, pipeline, 'e101-d1');
 
     const callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
@@ -447,6 +446,7 @@ describe('Pipeline', () => {
     const targetId = await seedForwardTargetUser(db, userId);
     const didId = await seedDid(db, '+15551000', targetId);
     await seedSettings(db, didId);
+    await registerDevice(fakeAri, pipeline, 'e101-d1');
     await db.updateTable('settings').set({ language: 'de' }).execute();
 
     const callerChannel = fakeAri.addChannel({
@@ -480,6 +480,7 @@ describe('Pipeline', () => {
     const didId = await seedDid(db, '+15551000', targetId);
     await seedSettings(db, didId);
     fakeAri.answerAfterMs = 60_000;
+    await registerDevice(fakeAri, pipeline, 'e101-d1');
 
     const callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
@@ -567,6 +568,7 @@ describe('Pipeline', () => {
     const targetId = await seedForwardTargetUser(db, userId);
     const didId = await seedDid(db, '+15551000', targetId);
     await seedSettings(db, didId);
+    await registerDevice(fakeAri, pipeline, 'e101-d1');
 
     const callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
@@ -588,6 +590,7 @@ describe('Pipeline', () => {
     const targetId = await seedForwardTargetUser(db, userId);
     const didId = await seedDid(db, '+15551000', targetId);
     await seedSettings(db, didId);
+    await registerDevice(fakeAri, pipeline, 'e101-d1');
 
     const callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
@@ -610,6 +613,8 @@ describe('Pipeline', () => {
     const targetId = await seedForwardTargetUser(db, userId);
     const didId = await seedDid(db, '+15551000', targetId);
     await seedSettings(db, didId);
+    await registerDevice(fakeAri, pipeline, 'e101-d1');
+    await registerDevice(fakeAri, pipeline, 'e101-d2');
 
     const callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
@@ -689,6 +694,7 @@ describe('Pipeline', () => {
     const targetId = await seedForwardTargetUser(db, userId);
     const didId = await seedDid(db, '+15551000', targetId);
     await seedSettings(db, didId);
+    await registerDevice(fakeAri, pipeline, 'e101-d1');
 
     const known = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
@@ -739,6 +745,7 @@ describe('Pipeline', () => {
     const primaryTargetId = await seedForwardTargetUser(db, primaryUserId);
     const didId = await seedDid(db, '+15551000', primaryTargetId);
     await seedSettings(db, didId);
+    await registerDevice(fakeAri, pipeline, 'e101-d1');
     await db
       .insertInto('oooRules')
       .values({
@@ -771,6 +778,7 @@ describe('Pipeline', () => {
     const primaryTargetId = await seedForwardTargetUser(db, primaryUserId);
     const didId = await seedDid(db, '+15551000', primaryTargetId);
     await seedSettings(db, didId);
+    await registerDevice(fakeAri, pipeline, 'e101-d1');
     await seedClosedOpeningHours(db, primaryUserId, closedTargetId);
 
     const callerChannel = fakeAri.addChannel({
@@ -870,8 +878,10 @@ describe('Pipeline', () => {
     const targetId = await seedForwardTargetUser(db, userId);
     const didId = await seedDid(db, '+15551000', targetId);
     await seedSettings(db, didId);
-    // The test declines both legs itself before this fires.
     fakeAri.answerAfterMs = 60_000;
+    await registerDevice(fakeAri, pipeline, 'e101-d1');
+    await registerDevice(fakeAri, pipeline, 'e101-d2');
+    // The test declines both legs itself before this fires.
 
     const callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
@@ -922,6 +932,7 @@ describe('Pipeline', () => {
     const didId = await seedDid(db, '+15551000', targetId);
     await seedSettings(db, didId);
     fakeAri.answerAfterMs = 60_000;
+    await registerDevice(fakeAri, pipeline, 'e101-d1');
     // Asterisk dials the device while it answers the originate; a phone that answers 486 at once
     // has the channel destroyed before the core learns its id.
     fakeAri.onOriginate = channel => {
@@ -954,8 +965,9 @@ describe('Pipeline', () => {
     const targetId = await seedForwardTargetUser(db, userId);
     const didId = await seedDid(db, '+15551000', targetId);
     await seedSettings(db, didId);
-    // The test abandons the call itself before this fires.
     fakeAri.answerAfterMs = 60_000;
+    await registerDevice(fakeAri, pipeline, 'e101-d1');
+    // The test abandons the call itself before this fires.
 
     const callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }

@@ -129,11 +129,7 @@ export async function dialAddPartyTarget(
   }
   call.to = target.number;
   call.direction = 'outbound';
-  const trunkState = pipeline.deps.trunkState;
-  if (trunkState === null) {
-    await release(pipeline, call, RELEASE_CODE_UNAVAILABLE, 'failed');
-    return false;
-  }
+  const { trunkState } = pipeline.deps;
   if (target.kind === 'external') {
     return dialExternalTarget(
       { pipeline, trunkState },

@@ -5,25 +5,12 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
-import type { Logger } from '../ari/types.js';
 import { SIT_DURATION_MS } from '../indications.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
 import { PROMPTS } from '../prompts.js';
+import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
 import { newCall, type Call } from './call.js';
 import { concludeExhausted } from './conclude.js';
-import { Pipeline, type PipelineDeps } from './pipeline.js';
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
-
-function fakeCdr(): PipelineDeps['cdr'] {
-  return { open: () => Promise.resolve(), finish: () => Promise.resolve() };
-}
+import { Pipeline } from './pipeline.js';
 
 /** A throwaway forward-target/DID chain, just to satisfy `settings.main_did_id`'s FK. */
 async function seedSettings(
@@ -113,16 +100,7 @@ describe('concludeExhausted — failed-call announcement vs. special information
       log: noopLogger
     });
     await ari.connect();
-    pipeline = new Pipeline({
-      ari,
-      cache: new ConfigCache(db),
-      state: new StateStore(),
-      bus: new EventBus(),
-      cdr: fakeCdr(),
-      now: nowIso,
-      trunkState: null,
-      presence: null
-    });
+    pipeline = new Pipeline(testPipelineDeps(ari, db));
   });
 
   afterEach(async () => {

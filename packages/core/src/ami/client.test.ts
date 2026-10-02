@@ -1,13 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { noopLogger } from '../testing/pipelineDeps.js';
 import { AmiClient, type AmiEvent } from './client.js';
 import { FakeAmi } from './fake.js';
-
-const noopLogger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 describe('AmiClient', () => {
   // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs

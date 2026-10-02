@@ -8,16 +8,21 @@ import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../ari/fakeDial.js';
-import type { Channel, Logger } from '../ari/types.js';
+import type { Channel } from '../ari/types.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { eventually } from '../testing/eventually.js';
+import {
+  noopLogger,
+  registerDevice,
+  testPipelineDeps
+} from '../testing/pipelineDeps.js';
 import { newCall, type Call } from './call.js';
 import { enterTarget } from './inbound.js';
 import { playMenu } from './menu.js';
 import { dispatchAction } from './outboundDispatch.js';
-import { Pipeline, type PipelineDeps } from './pipeline.js';
+import { Pipeline } from './pipeline.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';
 import { TrunkState } from './trunkState.js';
@@ -27,20 +32,10 @@ import { TrunkState } from './trunkState.js';
 // forwards" — route caller lists, presented number and CLIR are the forwarder's, never those of
 // the caller whose call is being forwarded.
 
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
-
 // Q.850 17, user busy (SIP 486), as ARI's `ChannelDestroyed` carries it.
 const AST_CAUSE_USER_BUSY = 17;
 const MAIN_NUMBER = '+491110000';
 const FORWARD_NUMBER = '+15557777';
-
-function fakeCdr(): PipelineDeps['cdr'] {
-  return { open: () => Promise.resolve(), finish: () => Promise.resolve() };
-}
 
 async function seedTarget(
   db: Db,
@@ -296,16 +291,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       bus: new EventBus(),
       now: nowIso
     });
-    pipeline = new Pipeline({
-      ari,
-      cache: new ConfigCache(db),
-      state,
-      bus: new EventBus(),
-      cdr: fakeCdr(),
-      now: nowIso,
-      trunkState,
-      presence: null
-    });
+    pipeline = new Pipeline(testPipelineDeps(ari, db, { state, trunkState }));
     callerChannel = fakeAri.addChannel({
       caller: { number: '101', name: '' }
     });
@@ -434,6 +420,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
     it("a busy forward, applied once the forwarder's device answers 486, is the forwarder's call", async () => {
       const forwarder = await seedUser(db, { number: '+491110202' });
       await seedDevice(db, forwarder, 'e102-d1');
+      await registerDevice(fakeAri, pipeline, 'e102-d1');
       await seedUserRule(db, forwarder, 'busy');
       await seedTrunkRoute(db, 1, caller);
       const forwarderTrunk = await seedTrunkRoute(db, 2, forwarder);

@@ -6,7 +6,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { EventBus } from './internal/eventBus.js';
 import { ConfigCache } from './internal/snapshot.js';
 import { startSweep } from './sweep.js';
-import { noopLogger } from './testing/pipelineRig.js';
+import { noopLogger } from './testing/pipelineDeps.js';
 
 const SWEEP_INTERVAL_MS = 5;
 // Real-timer waits around a 5 ms sweep interval: generous enough for several ticks to have run
@@ -101,7 +101,8 @@ describe('startSweep', () => {
         cache: new ConfigCache(db),
         bus,
         log: noopLogger,
-        now: () => current.toISOString()
+        now: () => current.toISOString(),
+        stackTz: 'UTC'
       },
       SWEEP_INTERVAL_MS
     );
@@ -156,7 +157,8 @@ describe('startSweep', () => {
         cache: new ConfigCache(db),
         bus,
         log: noopLogger,
-        now: () => current.toISOString()
+        now: () => current.toISOString(),
+        stackTz: 'UTC'
       },
       SWEEP_INTERVAL_MS
     );
@@ -208,7 +210,8 @@ describe('startSweep', () => {
         cache: new ConfigCache(db),
         bus,
         log: noopLogger,
-        now: () => '2026-01-05T16:30:00.000Z'
+        now: () => '2026-01-05T16:30:00.000Z',
+        stackTz: 'UTC'
       },
       SWEEP_INTERVAL_MS
     );
@@ -287,7 +290,7 @@ describe('startSweep', () => {
     });
     const cache = new ConfigCache(db);
     sweep = startSweep(
-      { cache, bus, log: noopLogger, now: () => current },
+      { cache, bus, log: noopLogger, now: () => current, stackTz: 'UTC' },
       SWEEP_INTERVAL_MS
     );
     await settle();

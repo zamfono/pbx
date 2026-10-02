@@ -16,15 +16,10 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
-import type { Logger } from '../ari/types.js';
 import { eventually } from '../testing/eventually.js';
+import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
+import { Pipeline } from './pipeline.js';
 import { resyncOnBoot } from './resync.js';
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 async function seedUser(db: Db): Promise<string> {
   const id = newId();
@@ -110,7 +105,14 @@ describe('resyncOnBoot', () => {
     const placeholder = await seedOpenCall(db, 'interrupted');
     const unbridged = fakeAri.addChannel({ name: 'PJSIP/e101-a-00000001' });
 
-    await resyncOnBoot({ db, ari, now: nowIso, voicemailDir: '/nonexistent' });
+    await resyncOnBoot({
+      db,
+      ari,
+      now: nowIso,
+      pipeline: new Pipeline(testPipelineDeps(ari, db)),
+      log: noopLogger,
+      voicemailDir: '/nonexistent'
+    });
 
     const rows = await db
       .selectFrom('calls')
@@ -133,7 +135,14 @@ describe('resyncOnBoot', () => {
     await ari.bridges.addChannel(bridge.id, caller.id);
     await ari.bridges.addChannel(bridge.id, callee.id);
 
-    await resyncOnBoot({ db, ari, now: nowIso, voicemailDir: '/nonexistent' });
+    await resyncOnBoot({
+      db,
+      ari,
+      now: nowIso,
+      pipeline: new Pipeline(testPipelineDeps(ari, db)),
+      log: noopLogger,
+      voicemailDir: '/nonexistent'
+    });
     expect(hungUp(caller.id)).toBe(false);
     expect(hungUp(callee.id)).toBe(false);
     expect(bridgeDestroyed(bridge.id)).toBe(false);
@@ -156,7 +165,14 @@ describe('resyncOnBoot', () => {
     const holding = await ari.bridges.create({ type: 'holding' });
     await ari.bridges.addChannel(holding.id, parked.id);
 
-    await resyncOnBoot({ db, ari, now: nowIso, voicemailDir: '/nonexistent' });
+    await resyncOnBoot({
+      db,
+      ari,
+      now: nowIso,
+      pipeline: new Pipeline(testPipelineDeps(ari, db)),
+      log: noopLogger,
+      voicemailDir: '/nonexistent'
+    });
 
     expect(hungUp(parked.id)).toBe(true);
     expect(bridgeDestroyed(holding.id)).toBe(true);
@@ -183,7 +199,14 @@ describe('resyncOnBoot', () => {
       })
       .execute();
 
-    await resyncOnBoot({ db, ari, now: nowIso, voicemailDir: dir });
+    await resyncOnBoot({
+      db,
+      ari,
+      now: nowIso,
+      pipeline: new Pipeline(testPipelineDeps(ari, db)),
+      log: noopLogger,
+      voicemailDir: dir
+    });
 
     const remaining = await readdir(dir);
     expect(remaining.sort()).toEqual(['kept.wav', 'notes.txt']);

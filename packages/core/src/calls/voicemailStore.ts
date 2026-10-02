@@ -108,7 +108,7 @@ export async function persistVoicemail(ctx: DepositContext): Promise<void> {
     );
 
   call.status = 'voicemail';
-  pipeline.deps.cdr.noteQosLegs?.(call);
+  pipeline.deps.cdr.noteQosLegs(call);
   await pipeline.deps.ari.channels
     .hangup(callerChannel(call))
     .catch(ignoreGone)
@@ -117,5 +117,3 @@ export async function persistVoicemail(ctx: DepositContext): Promise<void> {
     );
   await pipeline.finishCall(call);
 }
-
-/** `pipeline.deps.db`/`apiClient`, or `null` for a test Pipeline built without them. */

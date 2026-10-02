@@ -18,7 +18,6 @@ import {
   toLogLevel,
   type Call
 } from './call.js';
-import { SIP_SERVICE_UNAVAILABLE } from './conclude.js';
 import { dialEmergency, emergencyLogLevel } from './emergency.js';
 import { handleFeature } from './features.js';
 import { enterTarget } from './inbound.js';
@@ -83,7 +82,7 @@ async function playInvalidAndRelease(
 }
 
 /** An emergency or external number, dialled as `asUser`'s call through the pipeline's
- * `TrunkState` (§9.4); 503 without one. */
+ * `TrunkState` (§9.4). */
 async function dialTrunk(
   pipeline: Pipeline,
   call: Call,
@@ -91,10 +90,6 @@ async function dialTrunk(
   asUser: string | null
 ): Promise<void> {
   const { trunkState } = pipeline.deps;
-  if (trunkState === null) {
-    await release(pipeline, call, SIP_SERVICE_UNAVAILABLE, 'failed');
-    return;
-  }
   if (action.kind === 'emergency') {
     await dialEmergency(pipeline, trunkState, call, action.number, asUser);
     return;
@@ -142,14 +137,9 @@ async function dispatchExtension(
   }
   // §10.1 step 3: a parking slot retrieves the call parked there, or plays the short error tone
   // when the slot is empty (§9.3 table).
-  const presence = pipeline.deps.presence;
-  if (presence === null) {
-    await release(pipeline, call, SIP_SERVICE_UNAVAILABLE, 'failed');
-    return;
-  }
   const result = await retrieveParkedCall(
     pipeline,
-    presence,
+    pipeline.deps.presence,
     call,
     action.owner.ext
   );
@@ -201,15 +191,11 @@ export async function dispatchAction(
     return;
   }
   // `action.kind === 'feature'`: §9.3 "Feature codes".
-  const presence = pipeline.deps.presence;
-  if (presence === null) {
-    call.log.event({
-      event: 'feature',
-      key: action.key,
-      result: 'unavailable'
-    });
-    await release(pipeline, call, SIP_SERVICE_UNAVAILABLE, 'failed');
-    return;
-  }
-  await handleFeature(pipeline, presence, call, action.key, action.rest);
+  await handleFeature(
+    pipeline,
+    pipeline.deps.presence,
+    call,
+    action.key,
+    action.rest
+  );
 }

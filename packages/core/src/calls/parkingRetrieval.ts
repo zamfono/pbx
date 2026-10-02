@@ -34,7 +34,7 @@ async function joinRetriever(
   trackLeg(pipeline, parked, leg);
   if (call.callerUserId !== null) {
     const { presence } = pipeline.deps;
-    presence?.setCallState(
+    presence.setCallState(
       call.callerUserId,
       'inCall',
       parked.from,
@@ -43,11 +43,11 @@ async function joinRetriever(
     );
     // The slot dial's own in-call state (`outbound.ts`) is carried by `parked` from here on; the
     // dial's row closes below and its channel no longer ends it.
-    presence?.setCallState(call.callerUserId, 'idle', null, null, call.id);
+    presence.setCallState(call.callerUserId, 'idle', null, null, call.id);
   }
   // §7 level `sip`: the retriever's dialog is the parked call's leg now, not the slot dial's.
-  pipeline.deps.cdr.registerLeg?.(parked, callerChannel(call));
-  await pipeline.deps.recorder?.onLegUp(parked, leg);
+  pipeline.deps.cdr.registerLeg(parked, callerChannel(call));
+  await pipeline.deps.recorder.onLegUp(parked, leg);
 }
 
 /** Retrieves the call parked at `ext` (§9.3 table) into a mixing bridge shared with the

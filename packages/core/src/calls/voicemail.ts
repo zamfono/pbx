@@ -4,7 +4,7 @@
  * volume, then writes the `voicemails` row, updates MWI, emits `voicemail.new`, and posts the
  * mail request that `api` sends on `core`'s behalf (§3.1 "Mail").
  */
-import { newId, type Db } from '@zamfono/shared';
+import { newId } from '@zamfono/shared';
 
 import type { ApiClient } from '../apiClient.js';
 import { ignoreGone } from '../ari/failures.js';
@@ -18,7 +18,6 @@ import { recordCaller } from './voicemailRecording.js';
 import { persistVoicemail } from './voicemailStore.js';
 
 const RELEASE_CODE_UNAVAILABLE = 480;
-const RELEASE_CODE_SERVER_ERROR = 500;
 
 /** Just the surface `deposit` needs from `ApiClient`, so a test can stub it without its private
  * `baseUrl` field. */
@@ -63,15 +62,6 @@ function findOwner(
   return row;
 }
 
-/** The phone-book caller name for `from` (§10.2 "Phone book"), empty for an anonymous caller or
- * one no `contact_phones` row matches. */
-function mailDeps(
-  pipeline: Pipeline
-): { db: Db; apiClient: MailSender } | null {
-  const { db, apiClient } = pipeline.deps;
-  return db === undefined || apiClient === undefined ? null : { db, apiClient };
-}
-
 /** `deposit`'s own steps, from the answer to the row the outcome leaves. */
 async function recordMessage(
   pipeline: Pipeline,
@@ -79,13 +69,7 @@ async function recordMessage(
   mailbox: Owner,
   reason: DepositReason | null
 ): Promise<void> {
-  const deps = mailDeps(pipeline);
-  if (deps === null) {
-    call.log.event({ event: 'voicemailFailed', reason: 'missingDeps' });
-    await release(pipeline, call, RELEASE_CODE_SERVER_ERROR, 'failed');
-    return;
-  }
-  const { db, apiClient } = deps;
+  const { db, apiClient } = pipeline.deps;
   const snapshot = await pipeline.deps.cache.get();
   const owner = findOwner(snapshot, mailbox);
   const greeting =

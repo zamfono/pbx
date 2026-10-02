@@ -91,13 +91,13 @@ async function dropParker(
   const { recorder } = pipeline.deps;
   if (parkerChannelId === active.callerChannelId) {
     active.callerEnded = true;
-    recorder?.onCallerEnded(active).catch(
+    recorder.onCallerEnded(active).catch(
       logFailure(pipeline.deps.logger, 'parker recording stop', {
         callId: active.id
       })
     );
   } else if (parkerLeg !== undefined) {
-    recorder?.onLegEnded(active, parkerLeg).catch(
+    recorder.onLegEnded(active, parkerLeg).catch(
       logFailure(pipeline.deps.logger, 'parker recording stop', {
         callId: active.id
       })

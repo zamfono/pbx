@@ -8,10 +8,9 @@ import type { Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 
 /** §10.1 step 5 "already in a call": presence's own in-call view (§9.3 `INUSE`), which counts a
- * call the member placed as well as one they answered; without presence (tests), any of the
- * member's legs bridged in. */
+ * call the member placed as well as one they answered, or any of the member's legs bridged in. */
 export function isUserInCall(pipeline: Pipeline, userId: string): boolean {
-  if (pipeline.deps.presence?.isInCall(userId) === true) {
+  if (pipeline.deps.presence.isInCall(userId)) {
     return true;
   }
   const seen = new Set<Call>();
@@ -32,8 +31,7 @@ export function isUserInCall(pipeline: Pipeline, userId: string): boolean {
 /** `userId`'s devices that can ring (§10.1 steps 4 and 5 "offline"; §10.2 "Click-to-dial"
  * `noRegisteredDevice` and pickup): live rows whose AOR is registered. Registration is the AOR's
  * own reachability, which `Presence` tracks from `ContactStatusChange` and the boot endpoint list,
- * not the user's presence status: a user on DND is not thereby unreachable. Without presence
- * (tests) every live device counts, as `ringUser` treats them (§10.1 step 4). */
+ * not the user's presence status: a user on DND is not thereby unreachable. */
 export function registeredDevices(
   pipeline: Pipeline,
   snapshot: Snapshot,
@@ -44,7 +42,7 @@ export function registeredDevices(
     device =>
       device.userId === userId &&
       device.deletedAt === null &&
-      (presence === null || presence.isRegistered(device.sipUsername))
+      presence.isRegistered(device.sipUsername)
   );
 }
 

@@ -7,29 +7,24 @@ import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
-import type { Channel, Logger } from '../ari/types.js';
+import type { Channel } from '../ari/types.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { eventually } from '../testing/eventually.js';
+import {
+  noopLogger,
+  registerDevice,
+  testPipelineDeps
+} from '../testing/pipelineDeps.js';
 import { newCall, type Call } from './call.js';
-import { Pipeline, type PipelineDeps } from './pipeline.js';
+import { Pipeline } from './pipeline.js';
 import { ringUser } from './ringUser.js';
 import { TrunkState } from './trunkState.js';
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 // Q.850 normal clearing, as ARI's `ChannelDestroyed` carries it.
 const AST_CAUSE_NORMAL = 16;
 const FIND_ME_NUMBER = '+15557000';
-
-function fakeCdr(): PipelineDeps['cdr'] {
-  return { open: () => Promise.resolve(), finish: () => Promise.resolve() };
-}
 
 async function seedSettings(db: Db): Promise<void> {
   const targetId = newId();
@@ -191,16 +186,7 @@ describe('a find-me leg still to come (§10.1 step 4)', () => {
       bus: new EventBus(),
       now: nowIso
     });
-    pipeline = new Pipeline({
-      ari,
-      cache: new ConfigCache(db),
-      state,
-      bus: new EventBus(),
-      cdr: fakeCdr(),
-      now: nowIso,
-      trunkState,
-      presence: null
-    });
+    pipeline = new Pipeline(testPipelineDeps(ari, db, { state, trunkState }));
     callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
     });
@@ -225,6 +211,7 @@ describe('a find-me leg still to come (§10.1 step 4)', () => {
 
   it('keeps the race open after the last device leg ends, and still rings the find-me number', async () => {
     const userId = await seedUser(db, 1);
+    await registerDevice(fakeAri, pipeline, 'e101-d1');
     const trunkId = await seedRoute(db);
 
     const finished = ringUser(pipeline, call, userId);
@@ -247,6 +234,7 @@ describe('a find-me leg still to come (§10.1 step 4)', () => {
 
   it('settles the race once a find-me leg that could not be routed was the last one to come', async () => {
     const userId = await seedUser(db, 1);
+    await registerDevice(fakeAri, pipeline, 'e101-d1');
 
     const finished = ringUser(pipeline, call, userId);
     await eventually(() => {

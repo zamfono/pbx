@@ -1,18 +1,12 @@
 import { createSocket } from 'node:dgram';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { Logger } from './ari/types.js';
 import { asteriskAddresses, parseHep, startHepListener } from './hep.js';
 import { dispatchHep } from './hepDispatch.js';
 import type { RtcpHepReport } from './rtcpReport.js';
 import type { SipMessage } from './sipCapture.js';
+import { noopLogger } from './testing/pipelineDeps.js';
 import { rtcpPayload } from './testing/rtcpPayload.js';
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 const HEP_MAGIC = 'HEP3';
 const HEADER_LEN = 6;

@@ -12,22 +12,18 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
-import type { Logger } from '../ari/types.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
 import { eventually } from '../testing/eventually.js';
+import {
+  noopCdr,
+  noopLogger,
+  noopRecorder,
+  testPipelineDeps
+} from '../testing/pipelineDeps.js';
 import { callerChannel, newCall, type Call, type Leg } from './call.js';
 import type { RingOutcome } from './legs.js';
 import { closeCall } from './liveCall.js';
 import { Pipeline, type PipelineDeps } from './pipeline.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
 
 describe('closeCall', () => {
   // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
@@ -65,6 +61,7 @@ describe('closeCall', () => {
     });
     await ari.connect();
     const cdr: PipelineDeps['cdr'] = {
+      ...noopCdr(),
       open: () => Promise.resolve(),
       noteQosLegs: () => {
         trail.push(`qos after ${hangupsSoFar()} hangups`);
@@ -75,6 +72,7 @@ describe('closeCall', () => {
       }
     };
     const recorder: ParticipationRecorder = {
+      ...noopRecorder,
       onCallerUp: () => Promise.resolve(),
       onLegUp: () => Promise.resolve(),
       onTransfereeUp: () => Promise.resolve(),
@@ -89,17 +87,7 @@ describe('closeCall', () => {
         return Promise.resolve();
       }
     };
-    pipeline = new Pipeline({
-      ari,
-      cache: new ConfigCache(db),
-      state: new StateStore(),
-      bus: new EventBus(),
-      cdr,
-      recorder,
-      now: nowIso,
-      trunkState: null,
-      presence: null
-    });
+    pipeline = new Pipeline(testPipelineDeps(ari, db, { cdr, recorder }));
     const caller = fakeAri.addChannel({ name: 'PJSIP/trunk-1-00000001' });
     const leg = fakeAri.addChannel({ name: 'PJSIP/e101-a-00000002' });
     call = newCall({
@@ -215,29 +203,24 @@ describe('closeCall, on a call not yet answered', () => {
     await ari.connect();
     finished = [];
     mails = [];
-    pipeline = new Pipeline({
-      ari,
-      cache: new ConfigCache(db),
-      state: new StateStore(),
-      bus: new EventBus(),
-      cdr: {
-        open: () => Promise.resolve(),
-        finish: (ended: Call) => {
-          finished.push(ended.status);
-          return Promise.resolve();
+    pipeline = new Pipeline(
+      testPipelineDeps(ari, db, {
+        cdr: {
+          ...noopCdr(),
+          open: () => Promise.resolve(),
+          finish: (ended: Call) => {
+            finished.push(ended.status);
+            return Promise.resolve();
+          }
+        },
+        apiClient: {
+          mail: request => {
+            mails.push(request);
+            return Promise.resolve();
+          }
         }
-      },
-      db,
-      apiClient: {
-        mail: request => {
-          mails.push(request);
-          return Promise.resolve();
-        }
-      },
-      now: nowIso,
-      trunkState: null,
-      presence: null
-    });
+      })
+    );
   });
 
   afterEach(async () => {

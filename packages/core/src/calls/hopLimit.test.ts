@@ -5,14 +5,11 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
-import type { Logger } from '../ari/types.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
 import { MAX_HOPS } from '../routing/targets.js';
+import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
 import { newCall, type Call } from './call.js';
 import { enterTarget } from './inbound.js';
-import { Pipeline, type PipelineDeps } from './pipeline.js';
+import { Pipeline } from './pipeline.js';
 
 // The mailbox a call ends in, recorded instead of deposited: no deposit is made here.
 const { deposit } = vi.hoisted(() => ({
@@ -22,16 +19,6 @@ vi.mock('./voicemail.js', async importOriginal => ({
   ...(await importOriginal<typeof import('./voicemail.js')>()),
   deposit
 }));
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
-
-function fakeCdr(): PipelineDeps['cdr'] {
-  return { open: () => Promise.resolve(), finish: () => Promise.resolve() };
-}
 
 /** A throwaway forward-target/DID chain, just to satisfy `settings.main_did_id`'s FK. */
 async function seedSettings(db: Db): Promise<void> {
@@ -111,16 +98,7 @@ describe('hop limit (§10.1 step 7)', () => {
       log: noopLogger
     });
     await ari.connect();
-    pipeline = new Pipeline({
-      ari,
-      cache: new ConfigCache(db),
-      state: new StateStore(),
-      bus: new EventBus(),
-      cdr: fakeCdr(),
-      now: nowIso,
-      trunkState: null,
-      presence: null
-    });
+    pipeline = new Pipeline(testPipelineDeps(ari, db));
     deposit.mockReset();
     deposit.mockResolvedValue(undefined);
   });

@@ -39,41 +39,37 @@ export type PipelineDeps = {
     open(call: Call): Promise<void>;
     finish(call: Call): Promise<void>;
     /** §7 level `qos`: notes the call's channels as the ones its `call_qos` rows come from. */
-    noteQosLegs?(call: Call): void;
+    noteQosLegs(call: Call): void;
     /** §7 level `qos`: a channel's `ChannelDestroyed`, carrying its `RTPAUDIOQOS`. */
-    channelEnded?(channel: Channel): Promise<void>;
-    registerLeg?(call: Call, channelId: string): void;
+    channelEnded(channel: Channel): Promise<void>;
+    registerLeg(call: Call, channelId: string): void;
     /** `registerLeg`, resolving once the join is in place (`legOriginate.ts`). */
-    joinLeg?(call: Call, channelId: string): Promise<void>;
+    joinLeg(call: Call, channelId: string): Promise<void>;
   };
   // §10.2 "Call recording": the answer and end points below hand every participation to the
-  // recorder, which decides per participation whether the effective flag is set. Structural so a
-  // test Pipeline can stand one in; `null` for a Pipeline that records nothing.
-  recorder?: ParticipationRecorder | null;
+  // recorder, which decides per participation whether the effective flag is set.
+  recorder: ParticipationRecorder;
   now: () => string;
-  // The stack's `TZ` (§11.4 `timezone`: "NULL = stack `TZ`, else UTC"), `CoreEnv.tz`; optional so
-  // a test Pipeline that never evaluates opening hours need not supply it (absent = UTC).
-  stackTz?: string;
+  // The stack's `TZ` (§11.4 `timezone`: "NULL = stack `TZ`, else UTC"), `CoreEnv.tz`.
+  stackTz: string;
   // The address the stack writes into SIP (`CoreEnv.sipHost`), the host a forwarded leg's
-  // `Diversion` entries name (§9.4 "Forwarded calls"); optional, absent = the trunk's own host.
-  stackSipHost?: string | null;
+  // `Diversion` entries name (§9.4 "Forwarded calls"); `null` = the trunk's own host.
+  stackSipHost: string | null;
   /** How long a created leg may take to enter the app before it counts as not placed
-   * (`legOriginate.ts`); tests shorten it. Default `STASIS_WAIT_MS`. */
-  legStasisWaitMs?: number;
-  // Voicemail deposit's own collaborators (§3.1): optional so a test Pipeline that never deposits
-  // a call need not supply them; `main.ts`'s real Pipeline always does.
-  db?: Db;
-  apiClient?: MailSender;
+   * (`legOriginate.ts`), `STASIS_WAIT_MS`. */
+  legStasisWaitMs: number;
+  // Voicemail deposit's own collaborators (§3.1).
+  db: Db;
+  apiClient: MailSender;
   // Process-level logging (§10.1 "Emergency calls": an ERROR line while no live emergency trunk
-  // exists); optional so a test Pipeline that never needs it can omit it.
-  logger?: Logger;
-  // Required, `null` until `main.ts` constructs them (§10.2 "Presence and BLF", "Three-way
-  // calls"), so a `Pipeline` states at construction whether it carries them: `addParty.ts`'s
-  // `addParty` reaches `outboundExternal.ts`'s `originateExternalLeg` through `trunkState` for an
-  // external `*5` target, and the ring/answer/end call sites in `outbound.ts`, `legs.ts`,
-  // `legsEnded.ts`, `ringGroup.ts` and `ringGroupDial.ts` call `presence.setCallState`.
-  trunkState: TrunkState | null;
-  presence: Presence | null;
+  // exists).
+  logger: Logger;
+  // `addParty.ts`'s `addParty` reaches `outboundExternal.ts`'s `originateExternalLeg` through
+  // `trunkState` for an external `*5` target, and the ring/answer/end call sites in
+  // `outbound.ts`, `legs.ts`, `legsEnded.ts`, `ringGroup.ts` and `ringGroupDial.ts` call
+  // `presence.setCallState` (§10.2 "Presence and BLF", "Three-way calls").
+  trunkState: TrunkState;
+  presence: Presence;
 };
 
 // One Pipeline per `core` process, wired directly to its `AriClient`'s event stream so
@@ -111,7 +107,7 @@ export class Pipeline {
       // it, so the log line is the only account of what went wrong.
       this.routeEvent(ev).catch((error: unknown) => {
         // §7: a call-related line carries the call's correlation id.
-        this.deps.logger?.error(
+        this.deps.logger.error(
           { err: error, event: ev.type, callId: this.callIdOf(ev) },
           'pipeline: routing failed'
         );
@@ -145,18 +141,18 @@ export class Pipeline {
     const before =
       channel === undefined ? undefined : this.callByChannel.get(channel.id);
     if (before !== undefined) {
-      this.deps.cdr.noteQosLegs?.(before);
+      this.deps.cdr.noteQosLegs(before);
     }
     const qosWritten =
       ev.type === 'ChannelDestroyed' && channel !== undefined
-        ? this.deps.cdr.channelEnded?.(channel)
+        ? this.deps.cdr.channelEnded(channel)
         : undefined;
     await Promise.all([this.dispatch(ev), qosWritten]);
     const after =
       channel === undefined ? undefined : this.callByChannel.get(channel.id);
     for (const call of new Set([before, after])) {
       if (call !== undefined) {
-        this.deps.cdr.noteQosLegs?.(call);
+        this.deps.cdr.noteQosLegs(call);
       }
     }
   }

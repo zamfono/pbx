@@ -6,31 +6,19 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { isPlacement } from '../ari/fakeDial.js';
-import type { Channel, Logger } from '../ari/types.js';
+import type { Channel } from '../ari/types.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { Presence } from '../presence.js';
 import { eventually } from '../testing/eventually.js';
+import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
 import { newCall, type Call } from './call.js';
-import { Pipeline, type PipelineDeps } from './pipeline.js';
+import { Pipeline } from './pipeline.js';
 import { ringGroup } from './ringGroup.js';
 
 /** Who is ringable (registration, busy) and which of the group's own rules fires when nobody
  * rings or answers (§10.1 step 5): `unavailable`, `unanswered`, and the group mailbox default. */
-
-const noopLogger: Logger = {
-  info: () => undefined,
-  warn: () => undefined,
-  error: () => undefined
-};
-
-function fakeCdr(): PipelineDeps['cdr'] {
-  return {
-    open: () => Promise.resolve(),
-    finish: () => Promise.resolve()
-  };
-}
 
 async function seedSettings(db: Db): Promise<void> {
   const targetId = newId();
@@ -225,18 +213,15 @@ describe('ring-group ringability and fallback rules', () => {
       db,
       now: nowIso
     });
-    pipeline = new Pipeline({
-      ari,
-      cache,
-      state,
-      bus,
-      cdr: fakeCdr(),
-      db,
-      apiClient: { mail: () => Promise.resolve() },
-      now: nowIso,
-      trunkState: null,
-      presence
-    });
+    pipeline = new Pipeline(
+      testPipelineDeps(ari, db, {
+        cache,
+        state,
+        bus,
+        apiClient: { mail: () => Promise.resolve() },
+        presence
+      })
+    );
     callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
     });

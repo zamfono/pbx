@@ -199,7 +199,7 @@ export async function release(
     await notifyMissedCall(pipeline, call);
   }
   // §7: the channel whose `call_qos` row this call has is noted before it goes.
-  pipeline.deps.cdr.noteQosLegs?.(call);
+  pipeline.deps.cdr.noteQosLegs(call);
   if (call.callerChannelId !== null) {
     await pipeline.deps.ari.channels
       .hangup(call.callerChannelId, { reasonCode: sipToHangupCause(code) })
