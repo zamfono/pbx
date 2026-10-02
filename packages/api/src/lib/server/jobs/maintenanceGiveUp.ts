@@ -8,7 +8,7 @@ import pino from 'pino';
 
 import type { Db, StateResponse } from '@zamfono/shared';
 
-import { errorMessage } from '$lib/server/errors.js';
+import { errorMessage } from '#lib/server/errors.js';
 
 import type { CoreClient } from '../coreClient.js';
 import {

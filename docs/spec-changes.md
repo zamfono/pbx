@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-02 · §6.3 Compose stack, §10 Node.js Application.** `api` runs on SvelteKit 3: server-only modules are imported through the `#lib` subpath import (package.json `imports`) instead of the `$lib` alias, and `ORIGIN` is only `api`'s own configuration (the OAuth issuer, redirect and link base), no longer read by adapter-node, which takes the origin of each request from the `Host` header Caddy passes through.
+*Why:* requested by the product owner: SvelteKit 3 was published, and the codebase follows its conventions.
+
 **2026-10-02 · §6.5 Continuous replication.** The continuous-replication overlay is `compose.dr.yaml` in the stack directory, a fixed name: when it exists, the boot unit, `update.sh` and the updater run Compose on `compose.yaml`, `compose.override.yaml` and then `compose.dr.yaml`, and without it on the first two as before; it is no longer added with a further `-f`.
 *Why:* requested by the product owner: with the overlay linked as `compose.override.yaml`, a plain `compose up -d` dropped the DR overlay on every update and boot.
 

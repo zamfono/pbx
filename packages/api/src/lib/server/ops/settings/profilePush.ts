@@ -11,9 +11,9 @@ import pino from 'pino';
 
 import type { Db } from '@zamfono/shared';
 
-import { errorMessage } from '$lib/server/errors.js';
-import { activeRingotelProvider } from '$lib/server/provisioning/index.js';
-import { setProfilePending } from '$lib/server/provisioning/profilePending.js';
+import { errorMessage } from '#lib/server/errors.js';
+import { activeRingotelProvider } from '#lib/server/provisioning/index.js';
+import { setProfilePending } from '#lib/server/provisioning/profilePending.js';
 
 import { afterPropagation } from '../afterPropagationHooks.js';
 import {

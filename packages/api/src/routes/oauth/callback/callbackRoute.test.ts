@@ -5,18 +5,18 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { encodeMetadataClientId } from '$lib/server/auth/clients.js';
-import { CONSENT_COOKIE } from '$lib/server/auth/consent.js';
-import { setSealedCookie } from '$lib/server/auth/sealedCookie.js';
+import { encodeMetadataClientId } from '#lib/server/auth/clients.js';
+import { CONSENT_COOKIE } from '#lib/server/auth/consent.js';
+import { setSealedCookie } from '#lib/server/auth/sealedCookie.js';
 import {
   discover,
   finishLogin,
   SSO_COOKIE,
   ssoConfigFromSettings,
   type PendingLogin
-} from '$lib/server/auth/sso.js';
-import { getDb } from '$lib/server/db.js';
-import { keyringFromEnv } from '$lib/server/secretbox.js';
+} from '#lib/server/auth/sso.js';
+import { getDb } from '#lib/server/db.js';
+import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { GET } from './+server.js';
 
@@ -26,9 +26,9 @@ process.env.DB_FILE = ':memory:';
 process.env.ORIGIN = 'https://pbx.example.com';
 process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
 
-vi.mock('$lib/server/auth/sso.js', async importOriginal => {
+vi.mock('#lib/server/auth/sso.js', async importOriginal => {
   const actual =
-    await importOriginal<typeof import('$lib/server/auth/sso.js')>();
+    await importOriginal<typeof import('#lib/server/auth/sso.js')>();
   return {
     ...actual,
     ssoConfigFromSettings: vi.fn(),

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { dictionaryFor } from '$lib/i18n/index.js';
+import { dictionaryFor } from '#lib/i18n/index.js';
 
 import { makeTestDb, seedTenantTimeZone } from '../testDb.js';
 import { loadBranding } from './branding.js';

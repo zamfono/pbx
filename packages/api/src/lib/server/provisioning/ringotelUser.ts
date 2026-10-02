@@ -5,7 +5,7 @@
  * provider" (§5.2), so a device whose Ringotel user is missing is provisioned when one of its
  * hooks next needs that user, rather than failing the Zamfono operation.
  */
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
 import { errorMessage } from '../errors.js';
 import { decrypt, keyringFromEnv } from '../secretbox.js';

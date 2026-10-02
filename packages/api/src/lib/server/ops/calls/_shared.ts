@@ -5,12 +5,12 @@ import type { DB } from '@zamfono/shared';
 import {
   createCallControlClient,
   type CallControlClient
-} from '$lib/server/callControlClient.js';
+} from '#lib/server/callControlClient.js';
 import {
   coreRefusal,
   createCoreClient,
   type CoreClient
-} from '$lib/server/coreClient.js';
+} from '#lib/server/coreClient.js';
 
 import { OpError, type Context } from '../types.js';
 

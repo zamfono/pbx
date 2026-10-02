@@ -1,12 +1,12 @@
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import pino from 'pino';
 import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
-import { issueResetToken } from '$lib/server/auth/tokens.js';
-import { sendMail } from '$lib/server/mail/index.js';
-import { keyringFromEnv } from '$lib/server/secretbox.js';
+import { issueResetToken } from '#lib/server/auth/tokens.js';
+import { sendMail } from '#lib/server/mail/index.js';
+import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { pushRoster } from '../roster.js';
 import { propagate, recordChange } from '../runner.js';

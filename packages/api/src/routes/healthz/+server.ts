@@ -1,15 +1,15 @@
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
-import { fetchCoreHealth } from '$lib/server/coreClient.js';
-import { getDb } from '$lib/server/db.js';
+import { fetchCoreHealth } from '#lib/server/coreClient.js';
+import { getDb } from '#lib/server/db.js';
 import {
   apiHealth,
   countKeyRotationRemaining,
   healthStatus,
   type CoreReachability
-} from '$lib/server/health.js';
-import { certSyncStatus } from '$lib/server/jobs/certSync.js';
-import { keyringFromEnv, type Keyring } from '$lib/server/secretbox.js';
+} from '#lib/server/health.js';
+import { certSyncStatus } from '#lib/server/jobs/certSync.js';
+import { keyringFromEnv, type Keyring } from '#lib/server/secretbox.js';
 
 const keyringCache: { resolved: boolean; keyring: Keyring | null } = {
   resolved: false,

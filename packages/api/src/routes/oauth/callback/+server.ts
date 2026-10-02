@@ -1,18 +1,18 @@
 import { redirect, type RequestEvent } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import pino from 'pino';
 
 import { nowIso, type Db } from '@zamfono/shared';
 
-import { requiredOrigin } from '$lib/server/auth/authorizationResponse.js';
-import { clientMetaFor } from '$lib/server/auth/authorizeRequest.js';
-import { authCodeStore } from '$lib/server/auth/codes.js';
-import { CONSENT_COOKIE } from '$lib/server/auth/consent.js';
-import { loginRedirect } from '$lib/server/auth/loginRedirect.js';
+import { requiredOrigin } from '#lib/server/auth/authorizationResponse.js';
+import { clientMetaFor } from '#lib/server/auth/authorizeRequest.js';
+import { authCodeStore } from '#lib/server/auth/codes.js';
+import { CONSENT_COOKIE } from '#lib/server/auth/consent.js';
+import { loginRedirect } from '#lib/server/auth/loginRedirect.js';
 import {
   setSealedCookie,
   unsealCookie
-} from '$lib/server/auth/sealedCookie.js';
+} from '#lib/server/auth/sealedCookie.js';
 import {
   discover,
   finishLogin,
@@ -20,9 +20,9 @@ import {
   ssoConfigFromSettings,
   type Discovery,
   type SsoConfig
-} from '$lib/server/auth/sso.js';
-import { getDb } from '$lib/server/db.js';
-import { keyringFromEnv } from '$lib/server/secretbox.js';
+} from '#lib/server/auth/sso.js';
+import { getDb } from '#lib/server/db.js';
+import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 type FinishLoginResult = Awaited<ReturnType<typeof finishLogin>>;
 
@@ -34,7 +34,7 @@ const STATUS_FOUND = 302;
 function toErrorPage(origin: string, reason: string): never {
   const url = new URL('/auth/error', origin);
   url.searchParams.set('reason', reason);
-  return redirect(STATUS_FOUND, url.toString());
+  return redirect(STATUS_FOUND, url.toString(), { external: [origin] });
 }
 
 /** The reason shown on the error page: a `subMismatch` is reported as `noUser` there too, so an
@@ -133,7 +133,8 @@ export async function GET(event: RequestEvent): Promise<Response> {
   if (pending.authorizeParams === null) {
     redirect(
       STATUS_FOUND,
-      loginRedirect(authCodeStore, result.userId, null, origin)
+      loginRedirect(authCodeStore, result.userId, null, origin),
+      { external: [origin] }
     );
   }
   // A client re-resolution failure here (an expired CIMD cache entry gone stale mid-flow) cannot
@@ -147,5 +148,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     clientName: meta.name,
     authorize: pending.authorizeParams
   });
-  redirect(STATUS_FOUND, new URL('/oauth/authorize', origin).toString());
+  redirect(STATUS_FOUND, new URL('/oauth/authorize', origin).toString(), {
+    external: [origin]
+  });
 }

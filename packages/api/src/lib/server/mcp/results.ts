@@ -1,4 +1,4 @@
-import { env as privateEnv } from '$env/dynamic/private';
+import * as privateEnv from '$app/env/private';
 
 import { resolveVersion } from '@zamfono/shared';
 

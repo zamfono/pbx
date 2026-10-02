@@ -1,11 +1,11 @@
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
-import { resolveClient, ssoInfo } from '$lib/server/auth/authorizeRequest.js';
-import { CONSENT_COOKIE } from '$lib/server/auth/consent.js';
-import { relayConfigured } from '$lib/server/auth/passwordReset.js';
-import { unsealCookie } from '$lib/server/auth/sealedCookie.js';
-import { getDb } from '$lib/server/db.js';
-import { keyringFromEnv } from '$lib/server/secretbox.js';
+import { resolveClient, ssoInfo } from '#lib/server/auth/authorizeRequest.js';
+import { CONSENT_COOKIE } from '#lib/server/auth/consent.js';
+import { relayConfigured } from '#lib/server/auth/passwordReset.js';
+import { unsealCookie } from '#lib/server/auth/sealedCookie.js';
+import { getDb } from '#lib/server/db.js';
+import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import type { PageServerLoad } from './$types.js';
 import { consentForRequest } from './consentSubmit.js';

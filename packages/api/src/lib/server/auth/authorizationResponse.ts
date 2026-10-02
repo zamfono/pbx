@@ -5,7 +5,7 @@
  * request had one.
  */
 import { redirect } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
 const STATUS_FOUND = 302;
 
@@ -53,6 +53,7 @@ export function authorizationErrorRedirect(
 ): never {
   return redirect(
     STATUS_FOUND,
-    authorizationResponseUrl(request, requiredOrigin(), { error: code })
+    authorizationResponseUrl(request, requiredOrigin(), { error: code }),
+    { external: true }
   );
 }

@@ -5,7 +5,8 @@
  * repository string and backend env.
  */
 import path from 'node:path';
-import { env as privateEnv } from '$env/dynamic/private';
+import process from 'node:process';
+import * as privateEnv from '$app/env/private';
 
 import type { BackupTargetRow } from '../ops/backups/_shared.js';
 import { decrypt, type Keyring } from '../secretbox.js';
@@ -94,7 +95,7 @@ async function obscurePassword(
   password: string
 ): Promise<string> {
   const { stdout } = await exec('rclone', ['obscure'], {
-    env: privateEnv,
+    env: process.env,
     input: password
   });
   return stdout.trim();

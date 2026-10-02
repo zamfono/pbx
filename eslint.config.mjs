@@ -6,8 +6,6 @@ import svelte from 'eslint-plugin-svelte';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-import svelteConfig from './packages/api/svelte.config.js';
-
 export default tseslint.config(
   {
     ignores: [
@@ -20,10 +18,6 @@ export default tseslint.config(
       '**/build/**',
       '**/dist/**',
       '**/.svelte-kit/**',
-      // SvelteKit's generated tsconfig deliberately excludes svelte.config.js
-      // from its `include` (it must load before the TS project exists), so
-      // typed linting has no project for it.
-      '**/svelte.config.js',
       // Each package's tsconfig `include`/`rootDir` covers only its own src,
       // so these per-package vitest configs have no TS project.
       'packages/*/vitest.config.ts'
@@ -100,7 +94,7 @@ export default tseslint.config(
             {
               regex: '^(?:\\.\\./){2}',
               message:
-                "Two or more directories up, import through SvelteKit's `$lib` alias in packages/api instead (e.g. '$lib/server/db.js'), and through the package's subpath imports (package.json \"imports\") in the other packages."
+                "Two or more directories up, import through the package's subpath imports (package.json \"imports\") instead, e.g. '#lib/server/db.js' in packages/api."
             }
           ]
         }
@@ -161,8 +155,7 @@ export default tseslint.config(
       parserOptions: {
         projectService: true,
         extraFileExtensions: ['.svelte'],
-        parser: tseslint.parser,
-        svelteConfig
+        parser: tseslint.parser
       }
     },
     rules: {

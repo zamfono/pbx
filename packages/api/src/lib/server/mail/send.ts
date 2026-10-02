@@ -1,5 +1,5 @@
 import { setTimeout as sleep } from 'node:timers/promises';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import type { Transporter } from 'nodemailer';
 import pino from 'pino';
 

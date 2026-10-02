@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { loginLimiter } from '$lib/server/limiter.js';
-import { installRingotelFake } from '$lib/server/provisioning/ringotelFake.js';
-import { encrypt, keyringFromEnv } from '$lib/server/secretbox.js';
-import { makeTestDb } from '$lib/server/testDb.js';
+import { loginLimiter } from '#lib/server/limiter.js';
+import { installRingotelFake } from '#lib/server/provisioning/ringotelFake.js';
+import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
+import { makeTestDb } from '#lib/server/testDb.js';
 
 import { onPropagate, runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';

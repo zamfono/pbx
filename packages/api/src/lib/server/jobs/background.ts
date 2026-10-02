@@ -14,7 +14,7 @@
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import type { Logger } from 'pino';
 
 import type { Db, Envelope } from '@zamfono/shared';

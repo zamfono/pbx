@@ -1,5 +1,5 @@
-import { loadBranding } from '$lib/server/auth/branding.js';
-import { getDb } from '$lib/server/db.js';
+import { loadBranding } from '#lib/server/auth/branding.js';
+import { getDb } from '#lib/server/db.js';
 
 import type { LayoutServerLoad } from './$types.js';
 

@@ -3,7 +3,7 @@
  * handler in a plain HTTP server so a WebSocket can be attached for `/events` (§10.6). Every
  * event reaches those sockets from the SvelteKit bundle, where the background jobs run
  * (`lib/server/jobs/background.ts`), through the sink this file provides
- * (`lib/server/eventSink.ts`). It runs outside that bundle, where SvelteKit's `$env` does not
+ * (`lib/server/eventSink.ts`). It runs outside that bundle, where SvelteKit's `$app/env/private` does not
  * exist, so it reads `process.env` itself and passes what the modules it imports need, the
  * database file, `JWT_SECRET` and the keyring, into them; none of them reads the environment.
  */
@@ -20,10 +20,10 @@ import {
   type Db
 } from '@zamfono/shared';
 
-import { EventHub } from '$lib/server/events.js';
-import { authenticateEventsSocket } from '$lib/server/eventsAuth.js';
-import { provideEventSink } from '$lib/server/eventSink.js';
-import { keyringFromEnv } from '$lib/server/secretbox.js';
+import { EventHub } from '#lib/server/events.js';
+import { authenticateEventsSocket } from '#lib/server/eventsAuth.js';
+import { provideEventSink } from '#lib/server/eventSink.js';
+import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 // Global Constraints "Fixed internal ports": api's port is never configurable per stack.
 const API_INTERNAL_PORT = 3000;

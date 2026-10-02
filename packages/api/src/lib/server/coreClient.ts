@@ -4,7 +4,7 @@
  * network with no authentication, since that network is the trust boundary.
  */
 
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
 import type {
   CoreHealth,

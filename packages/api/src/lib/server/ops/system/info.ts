@@ -1,5 +1,5 @@
 import process from 'node:process';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import { z } from 'zod';
 
 import {
@@ -11,14 +11,14 @@ import {
   type ZamfonoVersion
 } from '@zamfono/shared';
 
-import { errorMessage } from '$lib/server/errors.js';
+import { errorMessage } from '#lib/server/errors.js';
 import {
   lastGiveUps,
   type LastGiveUp,
   type MaintenanceWork
-} from '$lib/server/jobs/maintenanceGiveUp.js';
-import { isProfilePending } from '$lib/server/provisioning/profilePending.js';
-import { stackDomain, stackIpv4 } from '$lib/server/stackAddress.js';
+} from '#lib/server/jobs/maintenanceGiveUp.js';
+import { isProfilePending } from '#lib/server/provisioning/profilePending.js';
+import { stackDomain, stackIpv4 } from '#lib/server/stackAddress.js';
 
 import { defineOperation } from '../types.js';
 import {

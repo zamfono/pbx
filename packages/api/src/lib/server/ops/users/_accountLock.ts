@@ -2,7 +2,7 @@
  * The §5.5 account lock, as the user record reports it ("an active lock is visible to admins on
  * the user record"). The lock lives in the login limiter's memory, not in a column.
  */
-import { loginLimiter } from '$lib/server/limiter.js';
+import { loginLimiter } from '#lib/server/limiter.js';
 
 /**
  * The key the §5.5 account lock is counted and looked up under: the e-mail, lower-cased.

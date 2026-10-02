@@ -7,7 +7,7 @@
 import { mkdir, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { env as privateEnv } from '$env/dynamic/private';
+import process from 'node:process';
 import { sql } from 'kysely';
 
 import {
@@ -125,12 +125,12 @@ export async function performBackup(
       RESTIC_REPOSITORY: repository,
       RESTIC_PASSWORD: secret.resticPassword
     };
-    await ensureRepository(deps.exec, { ...privateEnv, ...fullEnv }, options);
+    await ensureRepository(deps.exec, { ...process.env, ...fullEnv }, options);
     await sql`VACUUM INTO ${snapshotFile}`.execute(db);
     const { stdout } = await deps.exec(
       RESTIC_BIN,
       ['backup', snapshotFile, deps.mediaDir, '--json', ...options],
-      { env: { ...privateEnv, ...fullEnv } }
+      { env: { ...process.env, ...fullEnv } }
     );
     const { snapshotId, bytesAdded, bytesTotal } = parseResticSummary(stdout);
     const finishedAt = now();

@@ -496,7 +496,7 @@ services:
     networks:
       - internal
     environment:
-      ORIGIN: https://${FQDN}                   # SvelteKit adapter-node: OAuth issuer, redirect and link base (§5.2)
+      ORIGIN: https://${FQDN}                   # public origin: OAuth issuer, redirect and link base (§5.2)
       ADDRESS_HEADER: X-Forwarded-For           # client address for rate limiting (§5.5)
       XFF_DEPTH: "1"                            # trust exactly one proxy hop (Caddy)
       CORE_URL: http://core:3000                # live-call actions, reload triggers, event stream (§3)
@@ -1002,7 +1002,7 @@ packages/
 │   └── src/
 │       ├── server.ts            # entry: http server, SvelteKit handler, /events WS; stops on SIGTERM
 │       ├── hooks.server.ts      # init: first-boot seed and every background job (lib/server/jobs/background.ts); token → actor resolution, rate limits (§5)
-│       ├── lib/server/          # `$lib/server`: everything the browser must never receive, which SvelteKit refuses to bundle for it
+│       ├── lib/server/          # `#lib/server`: everything the browser must never receive, which SvelteKit refuses to bundle for it
 │       │   ├── ops/             # operations layer (§10.3): registry and runner, then one directory per area
 │       │   │   ├── users/       #   one module per operation (list.ts, create.ts, update.ts, …); index.ts registers the area
 │       │   │   └── …/

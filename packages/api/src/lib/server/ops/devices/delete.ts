@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { activeRingotelProvider } from '$lib/server/provisioning/index.js';
+import { activeRingotelProvider } from '#lib/server/provisioning/index.js';
 
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';

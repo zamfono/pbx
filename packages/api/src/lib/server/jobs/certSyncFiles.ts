@@ -7,7 +7,7 @@
 import { createPrivateKey, X509Certificate } from 'node:crypto';
 import { mkdir, stat } from 'node:fs/promises';
 import path from 'node:path';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
 import { writeFileAtomically } from '../propagation.js';
 

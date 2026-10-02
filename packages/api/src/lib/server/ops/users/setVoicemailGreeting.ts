@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { deleteAudioFile, storeAudio } from '$lib/server/audio/types.js';
+import { deleteAudioFile, storeAudio } from '#lib/server/audio/types.js';
 
 import { uploadSchema } from '../audio/create.js';
 import { propagate } from '../runner.js';

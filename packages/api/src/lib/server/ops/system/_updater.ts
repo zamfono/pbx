@@ -2,7 +2,7 @@
  * `api`'s side of the updater service (§6.3 "Updates"): the one process that holds
  * `UPDATER_TOKEN` besides the updater itself, over the stack's internal network.
  */
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
 import type { RunRequester, UpdaterStatus, UpdateState } from '@zamfono/shared';
 

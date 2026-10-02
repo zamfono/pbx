@@ -40,7 +40,7 @@ function keyFor(secret: string): Uint8Array {
  * Encodes `payload` as an HS256 access token signed with `secret`, its claims in `payload`'s own
  * order. `jwtSigning.ts` builds the payload and reads the secret from the environment, which this
  * module never does: `server.ts` verifies tokens through it outside the SvelteKit bundle, where
- * there is no `$env`.
+ * there is no `$app/env/private`.
  */
 export function encodeAccessToken(
   secret: string,

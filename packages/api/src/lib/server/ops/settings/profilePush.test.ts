@@ -7,10 +7,10 @@ import {
   type Db
 } from '@zamfono/shared';
 
-import { watchAsteriskRestarts } from '$lib/server/jobs/ringotelRereg.js';
-import { isProfilePending } from '$lib/server/provisioning/profilePending.js';
-import { encrypt, keyringFromEnv } from '$lib/server/secretbox.js';
-import { makeTestDb } from '$lib/server/testDb.js';
+import { watchAsteriskRestarts } from '#lib/server/jobs/ringotelRereg.js';
+import { isProfilePending } from '#lib/server/provisioning/profilePending.js';
+import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
+import { makeTestDb } from '#lib/server/testDb.js';
 
 import { onPropagate, runOperation, type RunInput } from '../runner.js';
 

@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db, type ReloadKind } from '@zamfono/shared';
 
-import { deleteAudioFile, storeAudio } from '$lib/server/audio/types.js';
-import { makeTestDb } from '$lib/server/testDb.js';
+import { deleteAudioFile, storeAudio } from '#lib/server/audio/types.js';
+import { makeTestDb } from '#lib/server/testDb.js';
 
 import '../ringGroups/index.js';
 
@@ -12,7 +12,7 @@ import { Conflict, type Actor } from '../types.js';
 
 import './index.js';
 
-vi.mock('$lib/server/audio/types.js', () => ({
+vi.mock('#lib/server/audio/types.js', () => ({
   storeAudio: vi.fn(async (kind: string, upload: { filename: string }) =>
     Promise.resolve({ id: newId(), filename: `${kind}-${upload.filename}.wav` })
   ),

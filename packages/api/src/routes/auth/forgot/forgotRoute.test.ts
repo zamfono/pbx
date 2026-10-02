@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { newId, nowIso, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { getDb } from '$lib/server/db.js';
+import { getDb } from '#lib/server/db.js';
 
 import { load } from './+page.server.js';
 

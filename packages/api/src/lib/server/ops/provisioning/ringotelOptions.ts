@@ -1,11 +1,11 @@
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import { z } from 'zod';
 
 import {
   createRingotelClient,
   type RingotelClient
-} from '$lib/server/provisioning/ringotelClient.js';
-import { keyringFromEnv } from '$lib/server/secretbox.js';
+} from '#lib/server/provisioning/ringotelClient.js';
+import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { loadSettings } from '../settings/_shared.js';
 import { defineOperation, OpError } from '../types.js';

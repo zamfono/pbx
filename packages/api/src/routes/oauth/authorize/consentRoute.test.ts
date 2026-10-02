@@ -6,11 +6,11 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { encodeMetadataClientId } from '$lib/server/auth/clients.js';
-import { CONSENT_COOKIE } from '$lib/server/auth/consent.js';
-import { setSealedCookie } from '$lib/server/auth/sealedCookie.js';
-import { getDb } from '$lib/server/db.js';
-import { keyringFromEnv } from '$lib/server/secretbox.js';
+import { encodeMetadataClientId } from '#lib/server/auth/clients.js';
+import { CONSENT_COOKIE } from '#lib/server/auth/consent.js';
+import { setSealedCookie } from '#lib/server/auth/sealedCookie.js';
+import { getDb } from '#lib/server/db.js';
+import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { load } from './+page.server.js';
 import { approveConsentSubmit } from './consentSubmit.js';

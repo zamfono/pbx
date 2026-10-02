@@ -9,8 +9,8 @@ import {
   hashToken,
   issueRefresh,
   issueResetToken
-} from '$lib/server/auth/tokens.js';
-import { getDb } from '$lib/server/db.js';
+} from '#lib/server/auth/tokens.js';
+import { getDb } from '#lib/server/db.js';
 
 import { POST } from './+server.js';
 

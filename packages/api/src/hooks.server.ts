@@ -1,28 +1,29 @@
 import process from 'node:process';
-import type { Handle, RequestEvent, ServerInit } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
+import type { RequestEvent } from '@sveltejs/kit';
+import type { Handle, ServerInit } from '@sveltejs/kit/hooks';
+import * as env from '$app/env/private';
 import pino from 'pino';
 
 import { MS_PER_SECOND } from '@zamfono/shared';
 
-import { addressKey } from '$lib/server/addressKey.js';
-import { authenticateRequest } from '$lib/server/auth/bearer.js';
-import { crossSiteFormRejection } from '$lib/server/auth/crossSiteForms.js';
-import { requiredJwtSecret } from '$lib/server/auth/jwtSigning.js';
-import { createCoreClient, fetchCoreVersion } from '$lib/server/coreClient.js';
-import { getDb } from '$lib/server/db.js';
-import { startBackgroundJobs } from '$lib/server/jobs/background.js';
-import { Limiter, type LimitKind } from '$lib/server/limiter.js';
-import { recordApiRequestSeconds } from '$lib/server/metrics.js';
-import { onPropagate } from '$lib/server/ops/runner.js';
-import { setCoreVersionLookup } from '$lib/server/ops/system/info.js';
+import { addressKey } from '#lib/server/addressKey.js';
+import { authenticateRequest } from '#lib/server/auth/bearer.js';
+import { crossSiteFormRejection } from '#lib/server/auth/crossSiteForms.js';
+import { requiredJwtSecret } from '#lib/server/auth/jwtSigning.js';
+import { createCoreClient, fetchCoreVersion } from '#lib/server/coreClient.js';
+import { getDb } from '#lib/server/db.js';
+import { startBackgroundJobs } from '#lib/server/jobs/background.js';
+import { Limiter, type LimitKind } from '#lib/server/limiter.js';
+import { recordApiRequestSeconds } from '#lib/server/metrics.js';
+import { onPropagate } from '#lib/server/ops/runner.js';
+import { setCoreVersionLookup } from '#lib/server/ops/system/info.js';
 import {
   coreTrunkStatusLookup,
   setTrunkStatusLookup
-} from '$lib/server/ops/trunks/index.js';
-import { problem } from '$lib/server/problem.js';
-import { propagateConfig } from '$lib/server/propagation.js';
-import { keyringFromEnv, type Keyring } from '$lib/server/secretbox.js';
+} from '#lib/server/ops/trunks/index.js';
+import { problem } from '#lib/server/problem.js';
+import { propagateConfig } from '#lib/server/propagation.js';
+import { keyringFromEnv, type Keyring } from '#lib/server/secretbox.js';
 
 const UNAUTHORIZED_STATUS = 401;
 const NOT_FOUND_STATUS = 404;

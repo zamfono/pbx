@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-import { deleteAudioFile, storeAudio } from '$lib/server/audio/types.js';
-import { isAcceptedUploadType } from '$lib/server/audio/uploadTypes.js';
+import { deleteAudioFile, storeAudio } from '#lib/server/audio/types.js';
+import { isAcceptedUploadType } from '#lib/server/audio/uploadTypes.js';
 
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';

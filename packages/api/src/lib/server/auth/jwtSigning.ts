@@ -1,9 +1,9 @@
 /**
  * Issues access tokens (§5.2) with the stack's `JWT_SECRET`. Kept apart from `jwt.ts`, the token
  * format and its verification, which `server.ts` also runs, for the `/events` handshake, outside
- * the SvelteKit bundle, where `$env` does not exist.
+ * the SvelteKit bundle, where `$app/env/private` does not exist.
  */
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
 import {
   ACCESS_TOKEN_TTL_S,

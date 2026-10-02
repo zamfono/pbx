@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { newId } from '@zamfono/shared';
 
-import { makeTestDb, seedTenantTimeZone } from '$lib/server/testDb.js';
+import { makeTestDb, seedTenantTimeZone } from '#lib/server/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';

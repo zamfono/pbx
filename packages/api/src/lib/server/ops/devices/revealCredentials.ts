@@ -1,7 +1,7 @@
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { decrypt, keyringFromEnv } from '$lib/server/secretbox.js';
+import { decrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { setUndoable } from '../runner.js';
 import { defineOperation } from '../types.js';

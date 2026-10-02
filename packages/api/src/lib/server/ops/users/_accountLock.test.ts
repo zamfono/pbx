@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { loginLimiter } from '$lib/server/limiter.js';
+import { loginLimiter } from '#lib/server/limiter.js';
 
 import { accountLockedUntil, accountLockKey } from './_accountLock.js';
 

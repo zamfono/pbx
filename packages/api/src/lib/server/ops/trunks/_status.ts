@@ -1,6 +1,6 @@
 import type { TrunkStatus } from '@zamfono/shared';
 
-import type { CoreClient } from '$lib/server/coreClient.js';
+import type { CoreClient } from '#lib/server/coreClient.js';
 
 /** The status `getTrunkStatuses` reports for a trunk that was asked for but never came back
  * reported: unset, or the lookup itself rejected. Also the fallback for a trunk id read back out

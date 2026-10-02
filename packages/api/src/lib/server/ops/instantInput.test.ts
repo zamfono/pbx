@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { makeTestDb, seedTenantTimeZone } from '$lib/server/testDb.js';
+import { makeTestDb, seedTenantTimeZone } from '#lib/server/testDb.js';
 
 import {
   instantInput,

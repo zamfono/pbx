@@ -19,7 +19,7 @@ import {
   type UpdaterStatus
 } from '@zamfono/shared';
 
-import { errorMessage } from '$lib/server/errors.js';
+import { errorMessage } from '#lib/server/errors.js';
 
 import type { SendUpdateMail } from '../mail/owners.js';
 import type { BackupRunRow } from '../ops/backups/_shared.js';

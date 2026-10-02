@@ -1,8 +1,8 @@
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
 import type { Db } from '@zamfono/shared';
 
-import { getDb } from '$lib/server/db.js';
+import { getDb } from '#lib/server/db.js';
 
 import { OpError, type Context } from '../types.js';
 

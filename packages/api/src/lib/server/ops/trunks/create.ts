@@ -1,9 +1,9 @@
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import { z } from 'zod';
 
 import { newId, type Db } from '@zamfono/shared';
 
-import { encrypt, keyringFromEnv } from '$lib/server/secretbox.js';
+import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError, type Context } from '../types.js';

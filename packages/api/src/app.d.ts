@@ -1,6 +1,6 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
-import type { Dictionary } from '$lib/i18n/index.js';
-import type { Authenticated } from '$lib/server/auth/bearer.js';
+import type { Dictionary } from '#lib/i18n/index.js';
+import type { Authenticated } from '#lib/server/auth/bearer.js';
 
 declare global {
   namespace App {

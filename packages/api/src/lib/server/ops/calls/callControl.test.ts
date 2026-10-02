@@ -5,13 +5,13 @@ import { nowIso, type LiveCall, type StateResponse } from '@zamfono/shared';
 import {
   createCallControlClient,
   type CallControlClient
-} from '$lib/server/callControlClient.js';
+} from '#lib/server/callControlClient.js';
 import {
   CoreRequestError,
   createCoreClient,
   type CoreClient
-} from '$lib/server/coreClient.js';
-import { makeTestDb } from '$lib/server/testDb.js';
+} from '#lib/server/coreClient.js';
+import { makeTestDb } from '#lib/server/testDb.js';
 
 import { runOperation } from '../runner.js';
 import { type Actor } from '../types.js';

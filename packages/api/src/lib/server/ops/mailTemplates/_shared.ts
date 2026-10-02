@@ -7,7 +7,7 @@ import {
   type Language,
   type TemplateKind,
   type TemplateSource
-} from '$lib/server/mail/index.js';
+} from '#lib/server/mail/index.js';
 
 import { OpError } from '../types.js';
 

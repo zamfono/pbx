@@ -1,8 +1,8 @@
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
 import type { DiversionPolicy } from '@zamfono/shared';
 
-import { encrypt, keyringFromEnv } from '$lib/server/secretbox.js';
+import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
 import type {
   AuthMode,

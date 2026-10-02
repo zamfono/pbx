@@ -1,22 +1,22 @@
 import { randomBytes } from 'node:crypto';
 import { error, redirect, type RequestEvent } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
-import { requiredOrigin } from '$lib/server/auth/authorizationResponse.js';
+import { requiredOrigin } from '#lib/server/auth/authorizationResponse.js';
 import {
   paramsFromPayload,
   resolveClient,
   type AuthorizePayload
-} from '$lib/server/auth/authorizeRequest.js';
-import { setSealedCookie } from '$lib/server/auth/sealedCookie.js';
+} from '#lib/server/auth/authorizeRequest.js';
+import { setSealedCookie } from '#lib/server/auth/sealedCookie.js';
 import {
   discover,
   SSO_COOKIE,
   ssoConfigFromSettings,
   startLogin
-} from '$lib/server/auth/sso.js';
-import { getDb } from '$lib/server/db.js';
-import { keyringFromEnv } from '$lib/server/secretbox.js';
+} from '#lib/server/auth/sso.js';
+import { getDb } from '#lib/server/db.js';
+import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 const STATUS_BAD_REQUEST = 400;
 const STATUS_FOUND = 302;
@@ -60,6 +60,7 @@ export async function ssoSubmit(
   });
   redirect(
     STATUS_FOUND,
-    startLogin(cfg, disc, origin, state, nonce, codeVerifier)
+    startLogin(cfg, disc, origin, state, nonce, codeVerifier),
+    { external: true }
   );
 }

@@ -5,8 +5,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { MS_PER_SECOND, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { signAccessToken } from '$lib/server/auth/jwtSigning.js';
-import { getDb } from '$lib/server/db.js';
+import { signAccessToken } from '#lib/server/auth/jwtSigning.js';
+import { getDb } from '#lib/server/db.js';
 
 import { POST } from './+server.js';
 

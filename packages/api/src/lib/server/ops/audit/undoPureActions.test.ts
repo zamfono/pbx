@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '$lib/server/testDb.js';
+import { makeTestDb } from '#lib/server/testDb.js';
 
 import type { MailTemplateWire } from '../mailTemplates/_shared.js';
 import { runOperation, type RunInput } from '../runner.js';

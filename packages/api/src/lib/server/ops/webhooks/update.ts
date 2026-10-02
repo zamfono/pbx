@@ -1,7 +1,7 @@
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { encrypt, keyringFromEnv } from '$lib/server/secretbox.js';
+import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { orBefore } from '../patch.js';
 import { recordChange } from '../runner.js';

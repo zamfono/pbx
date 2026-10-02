@@ -1,8 +1,8 @@
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { encrypt, keyringFromEnv } from '$lib/server/secretbox.js';
-import { newSipPassword } from '$lib/server/sip.js';
+import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
+import { newSipPassword } from '#lib/server/sip.js';
 
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';

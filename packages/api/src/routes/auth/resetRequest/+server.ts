@@ -1,8 +1,8 @@
 import type { RequestEvent } from '@sveltejs/kit';
 
-import { requestPasswordReset } from '$lib/server/auth/passwordReset.js';
-import { getDb } from '$lib/server/db.js';
-import { problem } from '$lib/server/problem.js';
+import { requestPasswordReset } from '#lib/server/auth/passwordReset.js';
+import { getDb } from '#lib/server/db.js';
+import { problem } from '#lib/server/problem.js';
 
 const STATUS_NOT_FOUND = 404;
 const STATUS_ACCEPTED = 202;

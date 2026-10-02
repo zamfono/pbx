@@ -8,9 +8,9 @@ import {
   type StateResponse
 } from '@zamfono/shared';
 
-import type { CoreClient } from '$lib/server/coreClient.js';
-import { handleRest } from '$lib/server/rest.js';
-import { makeTestDb, seedTenantTimeZone } from '$lib/server/testDb.js';
+import type { CoreClient } from '#lib/server/coreClient.js';
+import { handleRest } from '#lib/server/rest.js';
+import { makeTestDb, seedTenantTimeZone } from '#lib/server/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';

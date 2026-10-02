@@ -7,9 +7,9 @@ import {
   type StateResponse
 } from '@zamfono/shared';
 
-import { createCoreClient, type CoreClient } from '$lib/server/coreClient.js';
-import { handleRest } from '$lib/server/rest.js';
-import { makeTestDb } from '$lib/server/testDb.js';
+import { createCoreClient, type CoreClient } from '#lib/server/coreClient.js';
+import { handleRest } from '#lib/server/rest.js';
+import { makeTestDb } from '#lib/server/testDb.js';
 
 import '../parking/index.js';
 

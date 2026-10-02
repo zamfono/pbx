@@ -1,6 +1,6 @@
 import type { Db } from '@zamfono/shared';
 
-import { dictionaryFor, type Dictionary } from '$lib/i18n/index.js';
+import { dictionaryFor, type Dictionary } from '#lib/i18n/index.js';
 
 /** What every authentication page renders with (§5.2 "Authentication pages"): the strings of
  *  `settings.language` and `settings.company_name`, its title. */

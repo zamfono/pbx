@@ -4,9 +4,9 @@ import { sql, type Selectable, type Transaction } from 'kysely';
 
 import { mwiMailboxOf, type DB, type MwiMailbox } from '@zamfono/shared';
 
-import { transcodeForDownload } from '$lib/server/audio/transcode.js';
-import { createCoreClient, type CoreClient } from '$lib/server/coreClient.js';
-import { mediaDirFromEnv } from '$lib/server/mediaDir.js';
+import { transcodeForDownload } from '#lib/server/audio/transcode.js';
+import { createCoreClient, type CoreClient } from '#lib/server/coreClient.js';
+import { mediaDirFromEnv } from '#lib/server/mediaDir.js';
 
 import { OpError, type Role } from '../types.js';
 

@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { ringotelLog } from '$lib/server/provisioning/ringotelBranchHooks.js';
-import { installRingotelFake } from '$lib/server/provisioning/ringotelFake.js';
-import { encrypt, keyringFromEnv } from '$lib/server/secretbox.js';
-import { makeTestDb } from '$lib/server/testDb.js';
+import { ringotelLog } from '#lib/server/provisioning/ringotelBranchHooks.js';
+import { installRingotelFake } from '#lib/server/provisioning/ringotelFake.js';
+import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
+import { makeTestDb } from '#lib/server/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';

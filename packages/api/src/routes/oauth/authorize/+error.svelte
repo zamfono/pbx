@@ -2,7 +2,7 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
 
-  import { dictionaryFor } from '$lib/i18n/index.js';
+  import { dictionaryFor } from '#lib/i18n/index.js';
 
   // `+error.svelte` only ever receives `error` as a prop (SvelteKit 2 + Svelte 5); the layout
   // data that survived the failed page load (`+layout.server.ts`'s `dictionary`/`companyName`)

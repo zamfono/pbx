@@ -1,6 +1,6 @@
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
-import { encrypt, keyringFromEnv } from '$lib/server/secretbox.js';
+import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { recordChange } from '../runner.js';
 import type { Context } from '../types.js';

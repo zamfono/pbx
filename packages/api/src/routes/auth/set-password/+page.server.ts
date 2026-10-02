@@ -2,8 +2,8 @@ import { redirect } from '@sveltejs/kit';
 
 import { nowIso } from '@zamfono/shared';
 
-import { hashToken } from '$lib/server/auth/tokens.js';
-import { getDb } from '$lib/server/db.js';
+import { hashToken } from '#lib/server/auth/tokens.js';
+import { getDb } from '#lib/server/db.js';
 
 import type { PageServerLoad } from './$types.js';
 

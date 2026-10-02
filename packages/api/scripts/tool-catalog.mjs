@@ -21,7 +21,7 @@ import { build } from 'esbuild';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const entry = path.join(here, '../src/lib/server/ops/catalog.ts');
-const libDir = path.join(here, '../src/lib');
+const envFile = path.join(here, '../src/env.ts');
 const catalogFile = path.join(
   here,
   '../../../skills/zamfono/reference/tools.md'
@@ -34,24 +34,53 @@ const DRIFT_EXIT_CODE = 1;
 // never shows up as an untracked file.
 const outfile = path.join(here, '.tool-catalog.generated.mjs');
 const globShim = path.join(here, 'viteGlobShim.mjs');
-const envShim = path.join(here, 'envShim.mjs');
 const WORKSPACE_PREFIX = '@zamfono/';
 
-// Bundles this monorepo's own `.ts` sources (ops/* through relative and `$lib` imports, the
-// latter resolved by the `alias` below as Vite resolves it, and @zamfono/shared, all on the ".js"
-// specifier / ".ts" file NodeNext convention `node` cannot resolve on its own) while leaving every
-// real npm package a bare import, so the result stays small and native modules such as
-// `sodium-native` are loaded normally instead of esbuild trying to inline their bindings. The
-// same `alias` points `$env/dynamic/private` at `envShim.mjs`.
+// Bundles this monorepo's own `.ts` sources (ops/* through relative and `#lib` imports, the
+// latter resolved through package.json `imports` as Vite resolves them, and @zamfono/shared, all
+// on the ".js" specifier / ".ts" file convention `node` cannot resolve on its own) while leaving
+// every real npm package a bare import, so the result stays small and native modules such as
+// `sodium-native` are loaded normally instead of esbuild trying to inline their bindings.
 /** @type {import('esbuild').Plugin} */
 const externalizeNpmPackages = {
   name: 'externalize-npm-packages',
   setup(pluginBuild) {
     // eslint-disable-next-line require-unicode-regexp -- esbuild compiles this filter as a Go regexp, which rejects the JS u-flag prefix
-    pluginBuild.onResolve({ filter: /^[^./$]/ }, args =>
+    pluginBuild.onResolve({ filter: /^[^./$#]/ }, args =>
       args.path.startsWith(WORKSPACE_PREFIX)
         ? undefined
         : { path: args.path, external: true }
+    );
+  }
+};
+
+// Stands in for SvelteKit's `$app/env/private`, generated the way SvelteKit generates it from
+// `src/env.ts`: one export per declared variable, read from the process's environment. The
+// catalog reads no setting, so that is enough to let the operations load.
+const APP_ENV_PRIVATE = '$app/env/private';
+/** @type {import('esbuild').Plugin} */
+const appEnvPrivate = {
+  name: 'app-env-private',
+  setup(pluginBuild) {
+    // eslint-disable-next-line require-unicode-regexp -- esbuild compiles this filter as a Go regexp, which rejects the JS u-flag prefix
+    pluginBuild.onResolve({ filter: /^\$app\/env\/private$/ }, () => ({
+      path: APP_ENV_PRIVATE,
+      namespace: APP_ENV_PRIVATE
+    }));
+    pluginBuild.onLoad(
+      // eslint-disable-next-line require-unicode-regexp -- as above
+      { filter: /.*/, namespace: APP_ENV_PRIVATE },
+      async () => {
+        /** @type {{ variables: Record<string, unknown> }} */
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- a dynamic import of a runtime path is untyped; the JSDoc @type above documents the module's real shape
+        const { variables } = await import(pathToFileURL(envFile).href);
+        return {
+          contents: Object.keys(variables)
+            .map(name => `export const ${name} = process.env.${name};`)
+            .join('\n'),
+          loader: 'js'
+        };
+      }
     );
   }
 };
@@ -115,8 +144,7 @@ await build({
   format: 'esm',
   // @zamfono/shared's source, as `vite dev` and vitest resolve it, not its build output.
   conditions: ['development'],
-  plugins: [externalizeNpmPackages],
-  alias: { $lib: libDir, '$env/dynamic/private': envShim },
+  plugins: [appEnvPrivate, externalizeNpmPackages],
   inject: [globShim],
   define: { 'import.meta.glob': 'viteGlobShim' },
   outfile

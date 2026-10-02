@@ -6,7 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import type { Logger } from 'pino';
 
 import type { Db, ReloadKind } from '@zamfono/shared';

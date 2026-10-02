@@ -1,15 +1,15 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import { z } from 'zod';
 
 import {
   sendMail,
   type AnyMailRequest,
   type Language
-} from '$lib/server/mail/index.js';
-import { keyringFromEnv } from '$lib/server/secretbox.js';
+} from '#lib/server/mail/index.js';
+import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { setUndoable } from '../runner.js';
 import { defineOperation } from '../types.js';

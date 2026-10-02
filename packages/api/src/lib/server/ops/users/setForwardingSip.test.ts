@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_SIP_HEADERS, type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '$lib/server/testDb.js';
+import { makeTestDb } from '#lib/server/testDb.js';
 
 import type { Actor } from '../types.js';
 import {

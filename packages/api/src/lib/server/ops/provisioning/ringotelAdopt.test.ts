@@ -7,9 +7,9 @@ import {
   FAKE_REGIONS,
   installRingotelFake,
   type RingotelFake
-} from '$lib/server/provisioning/ringotelFake.js';
-import { encrypt, keyringFromEnv } from '$lib/server/secretbox.js';
-import { makeTestDb } from '$lib/server/testDb.js';
+} from '#lib/server/provisioning/ringotelFake.js';
+import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
+import { makeTestDb } from '#lib/server/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';

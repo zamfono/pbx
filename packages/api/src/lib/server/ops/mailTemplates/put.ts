@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { compileTemplate } from '$lib/server/mail/index.js';
+import { compileTemplate } from '#lib/server/mail/index.js';
 
 import { recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';

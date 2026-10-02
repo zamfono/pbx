@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { CoreHealth, StateResponse } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { getDb } from '$lib/server/db.js';
+import { getDb } from '#lib/server/db.js';
 
 import { GET } from './+server.js';
 

@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 
-import { relayConfigured } from '$lib/server/auth/passwordReset.js';
-import { getDb } from '$lib/server/db.js';
+import { relayConfigured } from '#lib/server/auth/passwordReset.js';
+import { getDb } from '#lib/server/db.js';
 
 import type { PageServerLoad } from './$types.js';
 

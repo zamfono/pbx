@@ -1,9 +1,5 @@
 {
-  "extends": ["../../tsconfig.base.json", "./.svelte-kit/tsconfig.json"],
-  "compilerOptions": {
-    "noEmit": false,
-    "outDir": "dist"
-  },
+  "extends": ["../../tsconfig.base.json", "$app/tsconfig"],
   "references": [
     {
       "path": "../shared/tsconfig.lib.json"
@@ -56,5 +52,6 @@
     "src/lib/server/mail/builtin/voicemail.fr.json",
     "src/lib/server/mail/builtin/voicemail.it.json",
     "src/lib/server/mail/builtin/voicemail.ru.json"
-  ]
+  ],
+  "include": ["src", "*"]
 }

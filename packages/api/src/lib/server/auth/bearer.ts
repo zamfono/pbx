@@ -1,6 +1,6 @@
 /**
  * The access token to `Actor` step every authenticated channel shares (§5.2, §5.3): REST's
- * server hook, the MCP endpoint and the `/events` handshake. It never reads `$env`, since
+ * server hook, the MCP endpoint and the `/events` handshake. It never reads `$app/env/private`, since
  * `server.ts` runs the handshake outside the SvelteKit bundle.
  */
 import { MS_PER_SECOND, type Db } from '@zamfono/shared';

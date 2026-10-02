@@ -1,6 +1,6 @@
 /**
  * The CSRF origin check for the browser-served pages (§5.2 "Authentication pages"), which
- * `hooks.server.ts` applies in place of SvelteKit's built-in one (`svelte.config.js` turns that
+ * `hooks.server.ts` applies in place of SvelteKit's built-in one (`vite.config.ts` turns that
  * off). SvelteKit's check covers every route alike, so it also refused the endpoints the spec
  * defines for non-browser clients, which send no `Origin` at all: the form-encoded
  * `/oauth/token` and `/oauth/revoke` (RFC 6749 §3.2, RFC 7009 §2.1), and a bearer-authenticated
@@ -27,7 +27,7 @@ const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 // The client endpoints (§5.2, §10.3, §10.5): none reads a cookie, so a cross-site form gains no
 // ambient authority there. REST authenticates by bearer token, the OAuth endpoints by the grant
-// or token in the body, and `/mcp` validates `Origin` itself (`$lib/server/mcp/origin.ts`).
+// or token in the body, and `/mcp` validates `Origin` itself (`#lib/server/mcp/origin.ts`).
 const CLIENT_PATHS = new Set([
   '/oauth/token',
   '/oauth/revoke',

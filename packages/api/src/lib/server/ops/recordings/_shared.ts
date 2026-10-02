@@ -4,8 +4,8 @@ import type { Selectable, Transaction } from 'kysely';
 
 import type { DB } from '@zamfono/shared';
 
-import { transcodeForDownload } from '$lib/server/audio/transcode.js';
-import { mediaDirFromEnv } from '$lib/server/mediaDir.js';
+import { transcodeForDownload } from '#lib/server/audio/transcode.js';
+import { mediaDirFromEnv } from '#lib/server/mediaDir.js';
 
 import { OpError } from '../types.js';
 

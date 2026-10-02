@@ -3,7 +3,7 @@
  * the tenant's own quiet windows first, a configured quiet hour otherwise.
  */
 
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
 import {
   addDays,

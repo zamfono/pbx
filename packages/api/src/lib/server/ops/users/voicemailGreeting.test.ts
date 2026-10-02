@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { storeAudio } from '$lib/server/audio/types.js';
-import { handleRest } from '$lib/server/rest.js';
-import { makeTestDb } from '$lib/server/testDb.js';
+import { storeAudio } from '#lib/server/audio/types.js';
+import { handleRest } from '#lib/server/rest.js';
+import { makeTestDb } from '#lib/server/testDb.js';
 
 import { onPropagate, runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';
@@ -15,7 +15,7 @@ import './index.js';
 // stores a recorded one, an `audio_assets` row of kind `vmGreeting` set as the user's
 // `mailbox_audio_id`, and like it outside the audit log (§5.7).
 
-vi.mock('$lib/server/audio/types.js', () => ({
+vi.mock('#lib/server/audio/types.js', () => ({
   storeAudio: vi.fn(async () =>
     Promise.resolve({ id: newId(), filename: 'greeting.wav' })
   ),

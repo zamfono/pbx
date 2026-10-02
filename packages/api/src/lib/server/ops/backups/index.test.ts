@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { makeTestDb } from '$lib/server/testDb.js';
+import { makeTestDb } from '#lib/server/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';

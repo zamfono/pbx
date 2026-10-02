@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MS_PER_DAY, newId, nowIso, type Db } from '@zamfono/shared';
 
-import { installRingotelFake } from '$lib/server/provisioning/ringotelFake.js';
-import { encrypt, keyringFromEnv } from '$lib/server/secretbox.js';
-import { makeTestDb } from '$lib/server/testDb.js';
+import { installRingotelFake } from '#lib/server/provisioning/ringotelFake.js';
+import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
+import { makeTestDb } from '#lib/server/testDb.js';
 
 import { onPropagate } from '../propagationHooks.js';
 import { runOperation, type RunInput } from '../runner.js';

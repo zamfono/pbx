@@ -6,8 +6,8 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { getDb } from '$lib/server/db.js';
-import { seedTenantTimeZone } from '$lib/server/testDb.js';
+import { getDb } from '#lib/server/db.js';
+import { seedTenantTimeZone } from '#lib/server/testDb.js';
 
 import { login } from './authorize.remote.js';
 

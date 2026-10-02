@@ -1,9 +1,9 @@
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
-import { buildBranchProvision } from '$lib/server/provisioning/ringotel.js';
-import type { RingotelClient } from '$lib/server/provisioning/ringotelClient.js';
-import { branchBlfEntries } from '$lib/server/provisioning/ringotelRoster.js';
-import { provisionExistingDevices } from '$lib/server/provisioning/ringotelUser.js';
+import { buildBranchProvision } from '#lib/server/provisioning/ringotel.js';
+import type { RingotelClient } from '#lib/server/provisioning/ringotelClient.js';
+import { branchBlfEntries } from '#lib/server/provisioning/ringotelRoster.js';
+import { provisionExistingDevices } from '#lib/server/provisioning/ringotelUser.js';
 
 import { reportPush } from '../devices/_ringotelPush.js';
 import { loadParkingSlots } from '../parking/_shared.js';

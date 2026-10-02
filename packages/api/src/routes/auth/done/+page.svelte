@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
 
-  import { format } from '$lib/i18n/index.js';
+  import { format } from '#lib/i18n/index.js';
 
   import type { PageData } from './$types.js';
 

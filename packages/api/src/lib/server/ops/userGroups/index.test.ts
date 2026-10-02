@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { nowIso, type ReloadKind } from '@zamfono/shared';
 
-import { makeTestDb } from '$lib/server/testDb.js';
+import { makeTestDb } from '#lib/server/testDb.js';
 
 import { onPropagate, runOperation, type RunInput } from '../runner.js';
 import { Conflict, OpError, type Actor } from '../types.js';

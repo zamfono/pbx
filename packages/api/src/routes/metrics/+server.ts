@@ -1,13 +1,13 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { RequestEvent } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
 import { resolveVersion } from '@zamfono/shared';
 
-import { createCoreClient, fetchCoreHealth } from '$lib/server/coreClient.js';
-import { getDb } from '$lib/server/db.js';
-import { certSyncStatus } from '$lib/server/jobs/certSync.js';
-import { renderMetrics } from '$lib/server/metrics.js';
+import { createCoreClient, fetchCoreHealth } from '#lib/server/coreClient.js';
+import { getDb } from '#lib/server/db.js';
+import { certSyncStatus } from '#lib/server/jobs/certSync.js';
+import { renderMetrics } from '#lib/server/metrics.js';
 
 const STATUS_NOT_FOUND = 404;
 const STATUS_UNAUTHORIZED = 401;

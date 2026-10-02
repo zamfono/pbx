@@ -1,6 +1,6 @@
 import type { Db, RunRequester, UpdateState } from '@zamfono/shared';
 
-import { errorMessage } from '$lib/server/errors.js';
+import { errorMessage } from '#lib/server/errors.js';
 
 import { OpError } from '../types.js';
 import { updaterClient, UpdaterRefusal } from './_updater.js';

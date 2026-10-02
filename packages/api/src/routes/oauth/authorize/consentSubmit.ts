@@ -1,5 +1,5 @@
 import { error, redirect, type RequestEvent } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import pino from 'pino';
 
 import { nowIso } from '@zamfono/shared';
@@ -7,21 +7,21 @@ import { nowIso } from '@zamfono/shared';
 import {
   authorizationErrorRedirect,
   requiredOrigin
-} from '$lib/server/auth/authorizationResponse.js';
+} from '#lib/server/auth/authorizationResponse.js';
 import {
   clientMetaFor,
   requestState
-} from '$lib/server/auth/authorizeRequest.js';
-import { upsertClient } from '$lib/server/auth/clients.js';
-import { authCodeStore } from '$lib/server/auth/codes.js';
+} from '#lib/server/auth/authorizeRequest.js';
+import { upsertClient } from '#lib/server/auth/clients.js';
+import { authCodeStore } from '#lib/server/auth/codes.js';
 import {
   CONSENT_COOKIE,
   type PendingConsent
-} from '$lib/server/auth/consent.js';
-import { loginRedirect } from '$lib/server/auth/loginRedirect.js';
-import { unsealCookie } from '$lib/server/auth/sealedCookie.js';
-import { getDb } from '$lib/server/db.js';
-import { keyringFromEnv } from '$lib/server/secretbox.js';
+} from '#lib/server/auth/consent.js';
+import { loginRedirect } from '#lib/server/auth/loginRedirect.js';
+import { unsealCookie } from '#lib/server/auth/sealedCookie.js';
+import { getDb } from '#lib/server/db.js';
+import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 const STATUS_BAD_REQUEST = 400;
 const STATUS_FOUND = 302;
@@ -117,7 +117,8 @@ export async function approveConsentSubmit(
       pending.userId,
       pending.authorize,
       requiredOrigin()
-    )
+    ),
+    { external: true }
   );
 }
 

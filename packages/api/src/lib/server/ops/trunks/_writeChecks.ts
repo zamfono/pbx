@@ -1,4 +1,4 @@
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 
 import { TRUNK_SECTION_PREFIX, type Db } from '@zamfono/shared';
 

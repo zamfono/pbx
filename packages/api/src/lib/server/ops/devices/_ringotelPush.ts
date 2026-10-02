@@ -2,12 +2,12 @@ import pino from 'pino';
 
 import type { Db } from '@zamfono/shared';
 
-import { errorMessage } from '$lib/server/errors.js';
+import { errorMessage } from '#lib/server/errors.js';
 import {
   activeRingotelProvider,
   type ProvisioningProvider,
   type PushReceipt
-} from '$lib/server/provisioning/index.js';
+} from '#lib/server/provisioning/index.js';
 
 import {
   callerOf,

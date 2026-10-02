@@ -1,7 +1,7 @@
 import { error, type RequestEvent } from '@sveltejs/kit';
 
-import { addressKey } from '$lib/server/addressKey.js';
-import { loginLimiter } from '$lib/server/limiter.js';
+import { addressKey } from '#lib/server/addressKey.js';
+import { loginLimiter } from '#lib/server/limiter.js';
 
 const STATUS_TOO_MANY_REQUESTS = 429;
 

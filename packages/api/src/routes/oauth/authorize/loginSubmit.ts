@@ -1,24 +1,24 @@
 import { redirect, type RequestEvent } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { requiredOrigin } from '$lib/server/auth/authorizationResponse.js';
+import { requiredOrigin } from '#lib/server/auth/authorizationResponse.js';
 import {
   AuthorizePayloadSchema,
   lookupUser,
   paramsFromPayload,
   resolveClient
-} from '$lib/server/auth/authorizeRequest.js';
-import { loadBranding } from '$lib/server/auth/branding.js';
-import { authCodeStore } from '$lib/server/auth/codes.js';
-import { CONSENT_COOKIE } from '$lib/server/auth/consent.js';
-import { loginRedirect } from '$lib/server/auth/loginRedirect.js';
-import { verifyPassword } from '$lib/server/auth/password.js';
-import { setSealedCookie } from '$lib/server/auth/sealedCookie.js';
-import { getDb } from '$lib/server/db.js';
-import { loginLimiter } from '$lib/server/limiter.js';
-import { accountLockKey } from '$lib/server/ops/users/_accountLock.js';
-import { keyringFromEnv } from '$lib/server/secretbox.js';
+} from '#lib/server/auth/authorizeRequest.js';
+import { loadBranding } from '#lib/server/auth/branding.js';
+import { authCodeStore } from '#lib/server/auth/codes.js';
+import { CONSENT_COOKIE } from '#lib/server/auth/consent.js';
+import { loginRedirect } from '#lib/server/auth/loginRedirect.js';
+import { verifyPassword } from '#lib/server/auth/password.js';
+import { setSealedCookie } from '#lib/server/auth/sealedCookie.js';
+import { getDb } from '#lib/server/db.js';
+import { loginLimiter } from '#lib/server/limiter.js';
+import { accountLockKey } from '#lib/server/ops/users/_accountLock.js';
+import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 const STATUS_FOUND = 302;
 
@@ -88,7 +88,13 @@ export async function loginSubmit(
   }
   loginLimiter.loginSucceeded(account);
   if (!resolved) {
-    redirect(STATUS_FOUND, loginRedirect(authCodeStore, user.id, null, origin));
+    redirect(
+      STATUS_FOUND,
+      loginRedirect(authCodeStore, user.id, null, origin),
+      {
+        external: [origin]
+      }
+    );
   }
   setSealedCookie(event.cookies, kr, CONSENT_COOKIE, {
     userId: user.id,

@@ -8,8 +8,8 @@ import {
   type ReloadKind
 } from '@zamfono/shared';
 
-import { encrypt, keyringFromEnv } from '$lib/server/secretbox.js';
-import { makeTestDb } from '$lib/server/testDb.js';
+import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
+import { makeTestDb } from '#lib/server/testDb.js';
 
 import { onPropagate, runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';

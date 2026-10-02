@@ -6,13 +6,13 @@
  * and outcomes are the same whichever path a request takes; each caller only maps the outcome
  * onto its own response (problem+json, or a re-rendered page).
  */
-import { env } from '$env/dynamic/private';
+import * as env from '$app/env/private';
 import pino from 'pino';
 import { z } from 'zod';
 
 import { nowIso, type Db } from '@zamfono/shared';
 
-import { MIN_PASSWORD_LENGTH } from '$lib/auth/passwordPolicy.js';
+import { MIN_PASSWORD_LENGTH } from '#lib/auth/passwordPolicy.js';
 
 import { addressKey } from '../addressKey.js';
 import { Limiter } from '../limiter.js';

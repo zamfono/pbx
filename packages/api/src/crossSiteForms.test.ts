@@ -1,12 +1,12 @@
 import process from 'node:process';
-import type { Config, RequestEvent } from '@sveltejs/kit';
+import type { RequestEvent } from '@sveltejs/kit';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { MS_PER_SECOND, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { signAccessToken } from '$lib/server/auth/jwtSigning.js';
-import { getDb } from '$lib/server/db.js';
+import { signAccessToken } from '#lib/server/auth/jwtSigning.js';
+import { getDb } from '#lib/server/db.js';
 
 import { handle } from './hooks.server.js';
 
@@ -16,7 +16,7 @@ const FORM = { 'content-type': 'application/x-www-form-urlencoded' };
 // A no-JavaScript submission of one of the login page's remote `form`s posts to the page itself.
 const LOGIN_SUBMISSION = `${ORIGIN}/oauth/authorize?/remote=login`;
 
-vi.mock('$lib/server/jobs/keyRotation.js', () => ({
+vi.mock('#lib/server/jobs/keyRotation.js', () => ({
   reencryptSweep: () => Promise.resolve()
 }));
 
@@ -25,15 +25,15 @@ process.env.JWT_SECRET = JWT_SECRET;
 process.env.ORIGIN = ORIGIN;
 
 // SvelteKit's built-in check runs before `handle` and refuses an origin-less form POST to any
-// route; it is off when `csrf.trustedOrigins` lists `'*'` (what SvelteKit's sync writes as
-// `csrf_check_origin`, the deprecated `checkOrigin` being unset), and while it is on no client
-// request below reaches `handle`. The config is untyped JavaScript, so it is loaded through a
-// specifier TypeScript does not resolve.
-const CONFIG_URL = new URL('../svelte.config.js', import.meta.url).href;
-const { default: config } = (await import(CONFIG_URL)) as { default: Config };
-const svelteKitChecksOrigin = !(
-  config.kit?.csrf?.trustedOrigins ?? []
-).includes('*');
+// route; it is off when `csrf.trustedOrigins` lists `'*'`, and while it is on no client request
+// below reaches `handle`. SvelteKit's Vite plugin compiles that decision into this constant, the
+// one its server reads, and vitest applies the same `define`.
+// eslint-disable-next-line no-underscore-dangle -- SvelteKit's own name for the constant
+declare const __SVELTEKIT_CSRF_CHECK_ORIGIN__: boolean;
+const svelteKitChecksOrigin = __SVELTEKIT_CSRF_CHECK_ORIGIN__;
+// `paths.origin`, compiled the same way; unset, SvelteKit takes its own origin from each request.
+// eslint-disable-next-line no-underscore-dangle -- as above
+declare const __SVELTEKIT_PATHS_ORIGIN__: string | undefined;
 
 beforeAll(async () => {
   const db = getDb();
@@ -83,6 +83,12 @@ function audioUpload(): FormData {
   body.set('upload', new Blob(['RIFF'], { type: 'audio/wav' }), 'hold.wav');
   return body;
 }
+
+describe("SvelteKit's own origin", () => {
+  it('is derived per request, never fixed when the image is built', () => {
+    expect(__SVELTEKIT_PATHS_ORIGIN__).toBeUndefined();
+  });
+});
 
 describe('form submissions without an Origin header', () => {
   it('lets a bearer multipart POST /api/v1/audio through to the route', async () => {

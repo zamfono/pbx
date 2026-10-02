@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { getDb } from '$lib/server/db.js';
+import { getDb } from '#lib/server/db.js';
 
 import { GET } from './[...path]/+server.js';
 
