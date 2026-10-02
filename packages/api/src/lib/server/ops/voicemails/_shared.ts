@@ -1,12 +1,13 @@
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
-import { sql, type Selectable, type Transaction } from 'kysely';
+import type { Selectable, Transaction } from 'kysely';
 import pino from 'pino';
 
 import { mwiMailboxOf, type DB, type MwiMailbox } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { mediaDirFromEnv } from '#lib/server/mediaDir.js';
+import { ringGroupMemberships } from '#lib/server/ringGroupMembership.js';
 
 import { afterCommit } from '../afterCommit.js';
 import { OpError, type Context, type Role } from '../types.js';
@@ -59,32 +60,12 @@ export async function loadVoicemail(
   return row;
 }
 
-type RingGroupIdRow = { ringGroupId: string };
-
-/**
- * The ring groups `userId` belongs to (§5.3), direct or through a nested `user_groups` tree: the
- * recursive CTE mirrors the schema's own `user_group_groups_no_cycle` trigger, since nesting can
- * be arbitrarily deep and cycles are already rejected on write (mirrors `propagation.ts`'s own
- * per-tenant version of this query).
- */
+/** The ring groups `userId` belongs to (§5.3, `ringGroupMemberships`). */
 export async function ringGroupIdsForUser(
   db: Transaction<DB>,
   userId: string
 ): Promise<string[]> {
-  const { rows } = await sql<RingGroupIdRow>`
-    WITH RECURSIVE group_reach(root_group_id, group_id) AS (
-      SELECT id, id FROM user_groups
-      UNION
-      SELECT gr.root_group_id, ugg.child_group_id
-      FROM group_reach gr
-      JOIN user_group_groups ugg ON ugg.parent_group_id = gr.group_id
-    )
-    SELECT DISTINCT rgm.group_id AS ringGroupId
-    FROM ring_group_members rgm
-    LEFT JOIN group_reach gr ON gr.root_group_id = rgm.user_group_id
-    LEFT JOIN user_group_users ugu ON ugu.group_id = gr.group_id
-    WHERE rgm.user_id = ${userId} OR ugu.user_id = ${userId}
-  `.execute(db);
+  const rows = await ringGroupMemberships(db, { userId });
   return rows.map(row => row.ringGroupId);
 }
 

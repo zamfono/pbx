@@ -13,6 +13,7 @@ import {
 } from '@zamfono/shared';
 
 import type { Actor } from './ops/types.js';
+import { ringGroupMemberships } from './ringGroupMembership.js';
 
 const RING_GROUP_MAILBOX_PREFIX = 'ringGroup:';
 const USER_MAILBOX_PREFIX = 'user:';
@@ -51,53 +52,10 @@ export function visibleTo(actor: Actor, ev: Event): boolean {
 
 type Subscription = { actor: Actor; ringGroupIds: ReadonlySet<string> };
 
-/**
- * The ring group ids `userId` may see mailbox events for (§5.3): groups `userId` is a direct
- * member of, plus groups whose membership includes a user group `userId` belongs to, nested
- * arbitrarily deep through `user_group_groups` (§11.2). Mirrors `resolveRingGroupUserIds` in
- * `mail/recipients.ts`, walked in reverse: up from the user to its ancestor groups rather than
- * down from a group to its member users.
- */
+/** The ring group ids `userId` may see mailbox events for (§5.3, `ringGroupMemberships`). */
 async function ringGroupIdsFor(db: Db, userId: string): Promise<Set<string>> {
-  const direct = await db
-    .selectFrom('ringGroupMembers')
-    .select('groupId')
-    .where('userId', '=', userId)
-    .execute();
-  const groupIds = new Set(direct.map(row => row.groupId));
-
-  const ownGroups = await db
-    .selectFrom('userGroupUsers')
-    .select('groupId')
-    .where('userId', '=', userId)
-    .execute();
-  const ancestorGroupIds = new Set(ownGroups.map(row => row.groupId));
-  const pending = [...ancestorGroupIds];
-  for (let groupId = pending.pop(); groupId; groupId = pending.pop()) {
-    // eslint-disable-next-line no-await-in-loop -- each ancestor's parents extend `pending`, so the next iteration depends on this one
-    const parents = await db
-      .selectFrom('userGroupGroups')
-      .select('parentGroupId')
-      .where('childGroupId', '=', groupId)
-      .execute();
-    for (const row of parents) {
-      if (!ancestorGroupIds.has(row.parentGroupId)) {
-        ancestorGroupIds.add(row.parentGroupId);
-        pending.push(row.parentGroupId);
-      }
-    }
-  }
-  if (ancestorGroupIds.size > 0) {
-    const viaGroups = await db
-      .selectFrom('ringGroupMembers')
-      .select('groupId')
-      .where('userGroupId', 'in', [...ancestorGroupIds])
-      .execute();
-    for (const row of viaGroups) {
-      groupIds.add(row.groupId);
-    }
-  }
-  return groupIds;
+  const rows = await ringGroupMemberships(db, { userId });
+  return new Set(rows.map(row => row.ringGroupId));
 }
 
 function isVisible(sub: Subscription, ev: Event): boolean {

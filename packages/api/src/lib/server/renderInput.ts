@@ -2,41 +2,18 @@
  * The render's input (§9.1, §9.3, §9.4): every live user, device, ring group, parking slot, trunk
  * and hold-music asset the generated Asterisk configuration names, read from the database.
  */
-import { sql } from 'kysely';
-
 import type { Db } from '@zamfono/shared';
 
 import { loadParkingSlots } from './ops/parking/_shared.js';
 import { loadSettings } from './ops/settings/_shared.js';
 import type { RenderInput } from './pjsip/render.js';
+import { ringGroupMemberships } from './ringGroupMembership.js';
 import { decrypt, type Keyring } from './secretbox.js';
 
-type RingGroupIdRow = { ringGroupId: string; userId: string };
-
-/**
- * Every user's ring-group memberships (§11.2 `ring_group_members`), direct or through a nested
- * `user_groups` tree: the recursive CTE mirrors the schema's own `user_group_groups_no_cycle`
- * trigger, since nesting can be arbitrarily deep and cycles are already rejected on write.
- */
+/** Every user's ring groups (`ringGroupMemberships`), by user id. */
 async function ringGroupIdsByUser(db: Db): Promise<Map<string, string[]>> {
-  const { rows } = await sql<RingGroupIdRow>`
-    WITH RECURSIVE group_reach(root_group_id, group_id) AS (
-      SELECT id, id FROM user_groups
-      UNION
-      SELECT gr.root_group_id, ugg.child_group_id
-      FROM group_reach gr
-      JOIN user_group_groups ugg ON ugg.parent_group_id = gr.group_id
-    )
-    SELECT DISTINCT
-      rgm.group_id AS ringGroupId,
-      COALESCE(rgm.user_id, ugu.user_id) AS userId
-    FROM ring_group_members rgm
-    LEFT JOIN group_reach gr ON gr.root_group_id = rgm.user_group_id
-    LEFT JOIN user_group_users ugu ON ugu.group_id = gr.group_id
-    WHERE COALESCE(rgm.user_id, ugu.user_id) IS NOT NULL
-  `.execute(db);
   const byUser = new Map<string, string[]>();
-  for (const row of rows) {
+  for (const row of await ringGroupMemberships(db)) {
     const list = byUser.get(row.userId) ?? [];
     list.push(row.ringGroupId);
     byUser.set(row.userId, list);
