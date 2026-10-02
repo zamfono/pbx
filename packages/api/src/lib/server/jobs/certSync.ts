@@ -4,18 +4,17 @@
  * with the copy on the `asterisk-config` volume, and on a change copies chain and key across —
  * at once for a fresh stack's self-signed placeholder or an expiring current certificate,
  * otherwise once the maintenance gate opens (`maintenanceWindow.ts`) — then triggers the PJSIP
- * reload through `core`. Runs on a poll, and can be run early by `notify()` when the hook's
- * own `POST /internal/certificate` reaches `api` (routes/internal/certificate/+server.ts).
+ * reload through `core`. Runs on a poll, and can be run early by `notifyCertSync()` when the
+ * hook's own `POST /internal/certificate` reaches `api` (routes/internal/certificate/+server.ts).
  */
 import { createHash, X509Certificate } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import pino from 'pino';
 
-import { MINUTES_PER_HOUR, MS_PER_SECOND, type Db } from '@zamfono/shared';
+import type { Db } from '@zamfono/shared';
 
-import { createCoreClient, type CoreClient } from '../coreClient.js';
-import { getDb } from '../db.js';
+import type { CoreClient } from '../coreClient.js';
 import { asteriskGenDirFromEnv } from '../propagation.js';
 import {
   caddyDataDirFromEnv,
@@ -24,6 +23,7 @@ import {
   isMatchingPair,
   TLS_CERT_FILENAME
 } from './certSyncFiles.js';
+import { scheduleDrawnIn } from './drawnIn.js';
 import { coreBusy } from './maintenanceGiveUp.js';
 import {
   createMaintenanceGate,
@@ -63,217 +63,168 @@ type PendingChange = {
   nextCheckMs: number;
 };
 
-// Keyed by the `CertSyncDeps` object a caller keeps passing across polls (the scheduler below
-// reuses one instance): a source certificate's gate, which holds its resolved maintenance moment
-// across polls, lives here until the change is applied or superseded.
-const pendingChangeByDeps = new WeakMap<CertSyncDeps, PendingChange>();
-
 /**
- * Whether to apply the change to `sourceHash` now: at once over no certificate or the
- * placeholder; otherwise once the gate opens, or at once when the current certificate expires
- * before the gate is next worth asking (the safety valve).
+ * The certificate sync over its deps, which keeps between its passes what it learnt: a change
+ * waiting for its gate, and a copy whose reload `core` has not confirmed yet. Its owner runs
+ * one pass at a time (`drawnIn.ts`).
  */
-async function dueNow(
-  deps: CertSyncDeps,
-  now: Date,
-  sourceHash: string,
-  currentCrt: Buffer | null
-): Promise<boolean> {
-  if (currentCrt === null || isSelfSigned(currentCrt)) {
-    return true;
-  }
-  const held = pendingChangeByDeps.get(deps);
-  const pending =
-    held?.sourceHash === sourceHash
-      ? held
-      : {
-          sourceHash,
-          gate: createMaintenanceGate({
-            db: deps.db,
-            work: 'certSync',
-            busy: async () => coreBusy(deps.coreClient)
-          }),
-          nextCheckMs: now.getTime()
-        };
-  pendingChangeByDeps.set(deps, pending);
-  const verdict = await pending.gate.check(now);
-  if (verdict.open) {
-    return true;
-  }
-  const expiresAtMs = Date.parse(new X509Certificate(currentCrt).validTo);
-  if (expiresAtMs < verdict.nextCheckAt.getTime()) {
-    return true;
-  }
-  pending.nextCheckMs = verdict.nextCheckAt.getTime();
-  return false;
-}
+export class CertSync {
+  readonly #deps: CertSyncDeps;
+  // A source certificate's gate, which holds its resolved maintenance moment across passes,
+  // until the change is applied or superseded.
+  #pending: PendingChange | undefined;
+  // The hash of a certificate copied onto the volume whose reload `core` has not confirmed yet,
+  // so a pass that finds the file already up to date still retries the reload.
+  #reloadPendingHash: string | undefined;
 
-// Keyed the same way as `pendingChangeByDeps`, but tracks the far side of a copy: once
-// `copyCertificate` has written a source certificate's hash to the volume, that hash stays here
-// until `configChanged` confirms the reload, so a poll that finds the file already up to date
-// still retries the reload.
-const reloadPendingHashByDeps = new WeakMap<CertSyncDeps, string>();
+  constructor(deps: CertSyncDeps) {
+    this.#deps = deps;
+  }
 
-/**
- * One check-and-act pass (§6.4): `'missing'` while the hook's copy does not exist yet on
- * `caddy-data` (the alert case: a fresh stack before its first certificate, or a `proxy` upgrade
- * gone wrong); `'ok'` otherwise, whether nothing had changed, the change was applied now, or it
- * was left for a later poll to apply once due.
- */
-export async function runCertSync(deps: CertSyncDeps): Promise<CertSyncStatus> {
-  const genDir = deps.genDir ?? asteriskGenDirFromEnv();
-  const caddyDataDir = deps.caddyDataDir ?? caddyDataDirFromEnv();
-  const source = await findCaddyCert(caddyDataDir);
-  if (!source) {
-    pendingChangeByDeps.delete(deps);
-    reloadPendingHashByDeps.delete(deps);
-    return 'missing';
+  /** When the change waiting for its gate is next worth checking; `null` while none waits. */
+  nextCheckAt(): Date | null {
+    return this.#pending === undefined
+      ? null
+      : new Date(this.#pending.nextCheckMs);
   }
-  const currentCrtPath = path.join(genDir, 'tls', TLS_CERT_FILENAME);
-  const [sourceCrt, sourceKey, currentCrt] = await Promise.all([
-    readFile(source.crt),
-    readFile(source.key),
-    readFile(currentCrtPath).catch(() => null)
-  ]);
-  if (!isMatchingPair(sourceCrt, sourceKey)) {
-    // Read between the hook's two renames; the next pass (or the hook's notification) sees both.
-    logger.warn(
-      'certSync: the certificate and key on caddy-data do not match yet; retrying on the next pass'
-    );
-    return 'ok';
-  }
-  const sourceHash = sha256(sourceCrt);
-  const upToDate = currentCrt !== null && sha256(currentCrt) === sourceHash;
-  const reloadPending = reloadPendingHashByDeps.get(deps) === sourceHash;
-  if (upToDate && !reloadPending) {
-    pendingChangeByDeps.delete(deps);
-    return 'ok';
-  }
-  if (!upToDate) {
-    const now = (deps.now ?? (() => new Date()))();
-    if (!(await dueNow(deps, now, sourceHash, currentCrt))) {
+
+  /**
+   * One check-and-act pass (§6.4): `'missing'` while the hook's copy does not exist yet on
+   * `caddy-data` (the alert case: a fresh stack before its first certificate, or a `proxy`
+   * upgrade gone wrong); `'ok'` otherwise, whether nothing had changed, the change was applied
+   * now, or it was left for a later pass to apply once due.
+   */
+  async run(): Promise<CertSyncStatus> {
+    const deps = this.#deps;
+    const genDir = deps.genDir ?? asteriskGenDirFromEnv();
+    const caddyDataDir = deps.caddyDataDir ?? caddyDataDirFromEnv();
+    const source = await findCaddyCert(caddyDataDir);
+    if (!source) {
+      this.#pending = undefined;
+      this.#reloadPendingHash = undefined;
+      return 'missing';
+    }
+    const currentCrtPath = path.join(genDir, 'tls', TLS_CERT_FILENAME);
+    const [sourceCrt, sourceKey, currentCrt] = await Promise.all([
+      readFile(source.crt),
+      readFile(source.key),
+      readFile(currentCrtPath).catch(() => null)
+    ]);
+    if (!isMatchingPair(sourceCrt, sourceKey)) {
+      // Read between the hook's two renames; the next pass (or the hook's notification) sees both.
+      logger.warn(
+        'certSync: the certificate and key on caddy-data do not match yet; retrying on the next pass'
+      );
       return 'ok';
     }
-    pendingChangeByDeps.delete(deps);
-    await copyCertificate(genDir, { crt: sourceCrt, key: sourceKey });
-    reloadPendingHashByDeps.set(deps, sourceHash);
-    logger.info(
-      { sourceHash },
-      'certSync: copied a new certificate onto asterisk-config'
-    );
+    const sourceHash = sha256(sourceCrt);
+    const upToDate = currentCrt !== null && sha256(currentCrt) === sourceHash;
+    if (upToDate && this.#reloadPendingHash !== sourceHash) {
+      this.#pending = undefined;
+      return 'ok';
+    }
+    if (!upToDate) {
+      if (!(await this.#dueNow(sourceHash, currentCrt))) {
+        return 'ok';
+      }
+      this.#pending = undefined;
+      await copyCertificate(genDir, { crt: sourceCrt, key: sourceKey });
+      this.#reloadPendingHash = sourceHash;
+      logger.info(
+        { sourceHash },
+        'certSync: copied a new certificate onto asterisk-config'
+      );
+    }
+    // `configChanged` rejecting here (a non-2xx from `core`) leaves `#reloadPendingHash` set, so
+    // the next pass retries this call alone, without re-copying an already up-to-date file.
+    await deps.coreClient.configChanged(['pjsip']);
+    this.#reloadPendingHash = undefined;
+    logger.info({ sourceHash }, 'certSync: triggered the pjsip reload');
+    return 'ok';
   }
-  // `configChanged` rejecting here (a non-2xx from `core`) leaves `reloadPendingHashByDeps` set,
-  // so the next poll retries this call alone, without re-copying an already up-to-date file.
-  await deps.coreClient.configChanged(['pjsip']);
-  reloadPendingHashByDeps.delete(deps);
-  logger.info({ sourceHash }, 'certSync: triggered the pjsip reload');
-  return 'ok';
-}
 
-/** The delay, in ms, before the next poll should run: the pending change's next gate check when that is closer than the regular poll interval, else `pollIntervalMs`. */
-function nextPollDelayMs(
-  deps: CertSyncDeps,
-  now: () => Date,
-  pollIntervalMs: number
-): number {
-  const pending = pendingChangeByDeps.get(deps);
-  if (!pending) {
-    return pollIntervalMs;
+  /**
+   * Whether to apply the change to `sourceHash` now: at once over no certificate or the
+   * placeholder; otherwise once the gate opens, or at once when the current certificate expires
+   * before the gate is next worth asking (the safety valve).
+   */
+  async #dueNow(
+    sourceHash: string,
+    currentCrt: Buffer | null
+  ): Promise<boolean> {
+    if (currentCrt === null || isSelfSigned(currentCrt)) {
+      return true;
+    }
+    const deps = this.#deps;
+    const now = (deps.now ?? (() => new Date()))();
+    if (this.#pending?.sourceHash !== sourceHash) {
+      this.#pending = {
+        sourceHash,
+        gate: createMaintenanceGate({
+          db: deps.db,
+          work: 'certSync',
+          busy: async () => coreBusy(deps.coreClient)
+        }),
+        nextCheckMs: now.getTime()
+      };
+    }
+    const pending = this.#pending;
+    const verdict = await pending.gate.check(now);
+    if (verdict.open) {
+      return true;
+    }
+    const expiresAtMs = Date.parse(new X509Certificate(currentCrt).validTo);
+    if (expiresAtMs < verdict.nextCheckAt.getTime()) {
+      return true;
+    }
+    pending.nextCheckMs = verdict.nextCheckAt.getTime();
+    return false;
   }
-  const untilDueMs = pending.nextCheckMs - now().getTime();
-  return Math.min(pollIntervalMs, Math.max(0, untilDueMs));
 }
 
 export type CertSyncScheduler = {
   status(): CertSyncStatus;
   /** Runs a pass right away (§6.4: the `POST /internal/certificate` notification), instead of
-   * waiting for the next poll; the regular poll timer is reset around it so the two never race. */
+   * waiting for the next poll; the poll timer is reset around it. */
   notify(): void;
   stop(): void;
 };
 
-const SECONDS_PER_MINUTE = 60;
-// Coarser than the day-scale timing this job targets is enough (§6.4): the gate's next check is
-// held across polls (`pendingChangeByDeps`), and the poll is drawn in to land on it.
-const POLL_INTERVAL_MS = MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND;
+let running: CertSyncScheduler | undefined;
 
 /**
- * Runs `runCertSync` once immediately (§6.4 "The same sync runs at `api` start") and then on a
- * poll no coarser than an hour, drawn in to land exactly on a pending change's next gate check
- * (`maintenanceWindow.ts`) whenever that falls sooner, exposing its last-known status for
- * `/healthz` and `/metrics` to read.
+ * Starts the process's certificate sync, which `startBackgroundJobs` does once at boot (§6.4
+ * "The same sync runs at `api` start"): a pass at once, then on the drawn-in poll (`drawnIn.ts`),
+ * which lands on a pending change's next gate check. A failed pass is logged, and the status
+ * `/healthz` and `/metrics` read stays the last one known.
  */
-export function scheduleCertSync(deps: CertSyncDeps): CertSyncScheduler {
-  const now = deps.now ?? (() => new Date());
-  const state: {
-    current: CertSyncStatus;
-    timer?: NodeJS.Timeout;
-    stopped: boolean;
-  } = { current: 'unknown', stopped: false };
-
-  const tick = (): void => {
-    if (state.timer !== undefined) {
-      clearTimeout(state.timer);
-      state.timer = undefined;
-    }
-    runCertSync(deps)
-      .then(result => {
-        state.current = result;
-      })
-      .catch(() => {
-        // The previous status stands; the next poll retries.
-      })
-      .finally(() => {
-        if (!state.stopped) {
-          state.timer = setTimeout(
-            tick,
-            nextPollDelayMs(deps, now, POLL_INTERVAL_MS)
-          );
-        }
-      });
-  };
-  tick();
-
-  return {
-    status: () => state.current,
-    notify: () => {
-      if (!state.stopped) {
-        tick();
-      }
+export function startCertSync(deps: CertSyncDeps): CertSyncScheduler {
+  const sync = new CertSync(deps);
+  let status: CertSyncStatus = 'unknown';
+  const schedule = scheduleDrawnIn({
+    pass: async () => {
+      status = await sync.run();
+      return sync.nextCheckAt();
     },
-    stop: () => {
-      state.stopped = true;
-      if (state.timer !== undefined) {
-        clearTimeout(state.timer);
-      }
-    }
-  };
-}
-
-const schedulerCache: { scheduler?: CertSyncScheduler } = {};
-
-/**
- * The process-wide certificate-sync scheduler, started once from the environment (§6.4 "The
- * same sync runs at `api` start") and cached like `getDb()`, so `/healthz` and `/metrics` read
- * the same running instance the boot call started.
- */
-export function getCertSyncScheduler(): CertSyncScheduler {
-  schedulerCache.scheduler ??= scheduleCertSync({
-    db: getDb(),
-    coreClient: createCoreClient()
+    failed: error => {
+      logger.error({ error }, 'certSync: the pass failed; the next retries');
+    },
+    now: deps.now
   });
-  return schedulerCache.scheduler;
+  running = {
+    status: () => status,
+    notify: schedule.runNow,
+    stop: schedule.stop
+  };
+  return running;
 }
 
-/**
- * The running scheduler's status, as `/healthz` and `/metrics` report it (§6.4, §7). `DB_FILE`
- * absent must not turn either into a 500, so a scheduler that fails to construct reports
- * `'unknown'`, the same as one that has not polled yet.
- */
+/** The running sync's status (§6.4, §7); `'unknown'` before its first pass, or with none started. */
 export function certSyncStatus(): CertSyncStatus {
-  try {
-    return getCertSyncScheduler().status();
-  } catch {
-    return 'unknown';
-  }
+  return running?.status() ?? 'unknown';
+}
+
+/** Runs the running sync's pass at once; does nothing with none started. */
+export function notifyCertSync(): void {
+  running?.notify();
 }

@@ -16,9 +16,10 @@ import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
 import type { CoreClient } from '../coreClient.js';
 import { makeTestDb } from '../testDb.js';
 import {
-  runCertSync,
-  scheduleCertSync,
-  type CertSyncDeps
+  CertSync,
+  certSyncStatus,
+  notifyCertSync,
+  startCertSync
 } from './certSync.js';
 
 const FQDN = 'pbx.example.com';
@@ -248,7 +249,7 @@ async function seedSettings(db: Db): Promise<void> {
     .execute();
 }
 
-describe('runCertSync', () => {
+describe('CertSync', () => {
   const work: { dir?: string } = {};
 
   afterEach(async () => {
@@ -277,14 +278,14 @@ describe('runCertSync', () => {
     const { genDir, caddyDataDir } = await makeDirs();
     const db = await makeTestDb();
     const coreClient = stubCoreClient();
-    const deps: CertSyncDeps = {
+    const sync = new CertSync({
       db,
       coreClient,
       genDir,
       caddyDataDir
-    };
+    });
 
-    await expect(runCertSync(deps)).resolves.toBe('missing');
+    await expect(sync.run()).resolves.toBe('missing');
     expect(coreClient.configChangedCalls).toEqual([]);
   });
 
@@ -297,7 +298,7 @@ describe('runCertSync', () => {
     const coreClient = stubCoreClient();
 
     await expect(
-      runCertSync({ db, coreClient, genDir, caddyDataDir })
+      new CertSync({ db, coreClient, genDir, caddyDataDir }).run()
     ).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([]);
   });
@@ -310,7 +311,7 @@ describe('runCertSync', () => {
     const coreClient = stubCoreClient();
 
     await expect(
-      runCertSync({ db, coreClient, genDir, caddyDataDir })
+      new CertSync({ db, coreClient, genDir, caddyDataDir }).run()
     ).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
     const installed = await readFile(path.join(genDir, 'tls', 'cert.pem'));
@@ -328,14 +329,14 @@ describe('runCertSync', () => {
     await seedCaddyCert(caddyDataDir, renewed.crt, previous.key);
     const db = await makeTestDb();
     const coreClient = stubCoreClient();
-    const deps: CertSyncDeps = { db, coreClient, genDir, caddyDataDir };
+    const sync = new CertSync({ db, coreClient, genDir, caddyDataDir });
 
-    await expect(runCertSync(deps)).resolves.toBe('ok');
+    await expect(sync.run()).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([]);
     await expect(stat(path.join(genDir, 'tls', 'cert.pem'))).rejects.toThrow();
 
     await seedCaddyCert(caddyDataDir, renewed.crt, renewed.key);
-    await expect(runCertSync(deps)).resolves.toBe('ok');
+    await expect(sync.run()).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
     const installedKey = await readFile(
       path.join(genDir, 'tls', 'privkey.pem')
@@ -353,7 +354,7 @@ describe('runCertSync', () => {
     const coreClient = stubCoreClient();
 
     await expect(
-      runCertSync({ db, coreClient, genDir, caddyDataDir })
+      new CertSync({ db, coreClient, genDir, caddyDataDir }).run()
     ).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
   });
@@ -371,19 +372,19 @@ describe('runCertSync', () => {
         ? Promise.reject(new Error('core unavailable'))
         : Promise.resolve();
     };
-    const deps: CertSyncDeps = {
+    const sync = new CertSync({
       db,
       coreClient,
       genDir,
       caddyDataDir
-    };
+    });
 
-    await expect(runCertSync(deps)).rejects.toThrow('core unavailable');
+    await expect(sync.run()).rejects.toThrow('core unavailable');
     const installed = await readFile(path.join(genDir, 'tls', 'cert.pem'));
     expect(installed.equals(source.crt)).toBe(true);
 
     shouldFail = false;
-    await expect(runCertSync(deps)).resolves.toBe('ok');
+    await expect(sync.run()).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([['pjsip'], ['pjsip']]);
   });
 
@@ -399,7 +400,7 @@ describe('runCertSync', () => {
     const coreClient = stubCoreClient();
 
     await expect(
-      runCertSync({ db, coreClient, genDir, caddyDataDir })
+      new CertSync({ db, coreClient, genDir, caddyDataDir }).run()
     ).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([]);
   });
@@ -416,20 +417,20 @@ describe('runCertSync', () => {
     const coreClient = stubCoreClient();
     // Before the default 03:00 maintenance hour.
     let now = new Date('2026-01-01T01:00:00Z');
-    const deps: CertSyncDeps = {
+    const sync = new CertSync({
       db,
       coreClient,
       genDir,
       caddyDataDir,
       now: () => now
-    };
+    });
 
-    await expect(runCertSync(deps)).resolves.toBe('ok');
+    await expect(sync.run()).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([]);
 
     // Past 03:00: the deferred change comes due.
     now = new Date('2026-01-01T04:00:00Z');
-    await expect(runCertSync(deps)).resolves.toBe('ok');
+    await expect(sync.run()).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
     const installed = await readFile(path.join(genDir, 'tls', 'cert.pem'));
     expect(installed.equals(nextCert.crt)).toBe(true);
@@ -447,22 +448,22 @@ describe('runCertSync', () => {
     const coreClient = stubCoreClient();
     coreClient.liveCalls = [LIVE_CALL];
     let now = new Date('2026-01-01T01:00:00Z');
-    const deps: CertSyncDeps = {
+    const sync = new CertSync({
       db,
       coreClient,
       genDir,
       caddyDataDir,
       now: () => now
-    };
+    });
 
-    await expect(runCertSync(deps)).resolves.toBe('ok');
+    await expect(sync.run()).resolves.toBe('ok');
     now = new Date('2026-01-01T03:00:00Z');
-    await expect(runCertSync(deps)).resolves.toBe('ok');
+    await expect(sync.run()).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([]);
 
     coreClient.liveCalls = [];
     now = new Date('2026-01-01T03:10:00Z');
-    await expect(runCertSync(deps)).resolves.toBe('ok');
+    await expect(sync.run()).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
   });
 
@@ -478,21 +479,21 @@ describe('runCertSync', () => {
     const coreClient = stubCoreClient();
     coreClient.liveCalls = [LIVE_CALL];
     let now = new Date('2026-01-01T02:00:00Z');
-    const deps: CertSyncDeps = {
+    const sync = new CertSync({
       db,
       coreClient,
       genDir,
       caddyDataDir,
       now: () => now
-    };
+    });
 
-    await expect(runCertSync(deps)).resolves.toBe('ok');
+    await expect(sync.run()).resolves.toBe('ok');
     now = new Date('2026-01-01T03:00:00Z');
-    await expect(runCertSync(deps)).resolves.toBe('ok');
+    await expect(sync.run()).resolves.toBe('ok');
     coreClient.liveCalls = [];
     // Past the two-hour wait: the next chance is tomorrow's 03:00, idle or not.
     now = new Date('2026-01-01T05:30:00Z');
-    await expect(runCertSync(deps)).resolves.toBe('ok');
+    await expect(sync.run()).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([]);
     expect(
       await db.selectFrom('maintenanceGate').selectAll().execute()
@@ -506,7 +507,7 @@ describe('runCertSync', () => {
     ]);
 
     now = new Date('2026-01-02T03:00:00Z');
-    await expect(runCertSync(deps)).resolves.toBe('ok');
+    await expect(sync.run()).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
   });
 
@@ -521,7 +522,7 @@ describe('runCertSync', () => {
     coreClient.liveCalls = [LIVE_CALL];
 
     await expect(
-      runCertSync({ db, coreClient, genDir, caddyDataDir })
+      new CertSync({ db, coreClient, genDir, caddyDataDir }).run()
     ).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
   });
@@ -538,13 +539,13 @@ describe('runCertSync', () => {
     const coreClient = stubCoreClient();
 
     await expect(
-      runCertSync({ db, coreClient, genDir, caddyDataDir })
+      new CertSync({ db, coreClient, genDir, caddyDataDir }).run()
     ).resolves.toBe('ok');
     expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
   });
 });
 
-describe('scheduleCertSync', () => {
+describe('startCertSync', () => {
   const work: { dir?: string } = {};
 
   afterEach(async () => {
@@ -556,10 +557,10 @@ describe('scheduleCertSync', () => {
   });
 
   // §6.4: `POST /internal/certificate` (routes/internal/certificate/+server.ts) calls
-  // `getCertSyncScheduler().notify()` to run a pass right away, instead of waiting for the
+  // `notifyCertSync()` to run a pass right away, instead of waiting for the
   // hourly poll (POLL_INTERVAL_MS) that would otherwise be the only thing to pick up a
   // certificate the hook wrote after the scheduler's own start-of-process pass ran.
-  it('notify() picks up a certificate the hook wrote after start, without waiting for the poll', async () => {
+  it('notifyCertSync() picks up a certificate the hook wrote after start, without waiting for the poll', async () => {
     const workDir = await mkdtemp(path.join(tmpdir(), 'zamfono-certsync-'));
     work.dir = workDir;
     const genDir = path.join(workDir, 'gen');
@@ -568,9 +569,9 @@ describe('scheduleCertSync', () => {
     await mkdir(caddyDataDir, { recursive: true });
     const db = await makeTestDb();
     const coreClient = stubCoreClient();
-    const deps: CertSyncDeps = { db, coreClient, genDir, caddyDataDir };
+    expect(certSyncStatus()).toBe('unknown');
 
-    const scheduler = scheduleCertSync(deps);
+    const scheduler = startCertSync({ db, coreClient, genDir, caddyDataDir });
     try {
       // Nothing under caddyDataDir yet: the start-of-process pass finds no hook copy.
       await vi.waitFor(() => {
@@ -580,10 +581,10 @@ describe('scheduleCertSync', () => {
 
       const source = caIssuedCert(workDir, 3650);
       await seedCaddyCert(caddyDataDir, source.crt, source.key);
-      scheduler.notify();
+      notifyCertSync();
 
       await vi.waitFor(() => {
-        expect(scheduler.status()).toBe('ok');
+        expect(certSyncStatus()).toBe('ok');
       });
       expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
       const installed = await readFile(path.join(genDir, 'tls', 'cert.pem'));

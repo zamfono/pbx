@@ -6,11 +6,7 @@ const STATUS_ACCEPTED = 202;
 
 const notify = vi.fn();
 vi.mock('#lib/server/jobs/certSync.js', () => ({
-  getCertSyncScheduler: () => ({
-    status: () => 'ok',
-    notify,
-    stop: () => undefined
-  })
+  notifyCertSync: notify
 }));
 
 const { POST } = await import('./+server.js');

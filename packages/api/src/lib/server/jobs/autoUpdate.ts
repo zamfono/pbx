@@ -12,12 +12,7 @@
  */
 import pino from 'pino';
 
-import {
-  MINUTES_PER_HOUR,
-  nowIso,
-  type Db,
-  type UpdaterStatus
-} from '@zamfono/shared';
+import { nowIso, type Db, type UpdaterStatus } from '@zamfono/shared';
 
 import { errorMessage } from '#lib/server/errors.js';
 
@@ -41,6 +36,7 @@ import {
   reportFailure,
   type Attempt
 } from './autoUpdateReport.js';
+import { scheduleDrawnIn } from './drawnIn.js';
 import {
   IDLE_RECHECK_MS,
   type GateCheck,
@@ -49,9 +45,6 @@ import {
 
 const logger = pino({ name: 'autoUpdate' });
 
-const MS_PER_MINUTE = 60_000;
-/** How often the job asks the updater, whose own lookup of the latest release is cached an hour. */
-const POLL_INTERVAL_MS = MINUTES_PER_HOUR * MS_PER_MINUTE;
 /** How many maintenance moments in a row the gate may give up before that is a failed attempt. */
 export const GIVE_UPS_PER_ATTEMPT = 3;
 
@@ -215,36 +208,11 @@ export type AutoUpdateScheduler = { stop: () => void };
  * sooner. A pass that fails is logged; the next one retries.
  */
 export function scheduleAutoUpdate(deps: AutoUpdateDeps): AutoUpdateScheduler {
-  const now = deps.now ?? (() => new Date());
-  const state: { timer?: NodeJS.Timeout; stopped: boolean } = {
-    stopped: false
-  };
-  const tick = (): void => {
-    runAutoUpdatePass(deps)
-      .catch((error: unknown) => {
-        logger.warn({ error }, 'autoUpdate: the pass failed; the next retries');
-        return null;
-      })
-      .then(next => {
-        if (state.stopped) {
-          return;
-        }
-        const delayMs =
-          next === null
-            ? POLL_INTERVAL_MS
-            : Math.min(
-                POLL_INTERVAL_MS,
-                Math.max(0, next.getTime() - now().getTime())
-              );
-        state.timer = setTimeout(tick, delayMs);
-      })
-      .catch(() => undefined);
-  };
-  tick();
-  return {
-    stop: () => {
-      state.stopped = true;
-      clearTimeout(state.timer);
-    }
-  };
+  return scheduleDrawnIn({
+    pass: async () => runAutoUpdatePass(deps),
+    failed: error => {
+      logger.warn({ error }, 'autoUpdate: the pass failed; the next retries');
+    },
+    now: deps.now
+  });
 }

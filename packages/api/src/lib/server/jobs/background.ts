@@ -38,7 +38,7 @@ import { WebhookDispatcher } from '../webhooks.js';
 import { scheduleAutoUpdate, type AutoUpdateScheduler } from './autoUpdate.js';
 import type { BackupJobDeps, Bus, ExecFn } from './backup.js';
 import { backupEnabledTargets } from './backupTurns.js';
-import { getCertSyncScheduler, type CertSyncScheduler } from './certSync.js';
+import { startCertSync, type CertSyncScheduler } from './certSync.js';
 import { scheduleBackups } from './cron.js';
 import { reencryptSweep } from './keyRotation.js';
 import { coreBusy } from './maintenanceGiveUp.js';
@@ -71,9 +71,9 @@ function coreEventsUrl(coreUrl: string): string {
 export type BackgroundJobs = { stop(): void };
 
 /** The certificate sync (§6.4 "The same sync runs at `api` start"); a failed start costs only it. */
-function startCertSync(log: Logger): CertSyncScheduler | null {
+function syncCertificates(db: Db, log: Logger): CertSyncScheduler | null {
   try {
-    return getCertSyncScheduler();
+    return startCertSync({ db, coreClient: createCoreClient() });
   } catch (error) {
     log.error({ error }, 'boot: certificate-sync scheduler failed to start');
     return null;
@@ -174,7 +174,7 @@ export async function startBackgroundJobs(
   } catch (error) {
     log.error({ error }, 'boot: key-rotation sweep failed');
   }
-  const certSync = startCertSync(log);
+  const certSync = syncCertificates(db, log);
   const dispatcher = new WebhookDispatcher({ db, kr });
   // The deliveries the previous process left pending (§10.6), alongside the new ones.
   dispatcher.resume().catch((error: unknown) => {

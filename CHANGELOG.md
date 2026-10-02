@@ -206,6 +206,11 @@ why the specified behaviour changed; the commit history, how.
   secrets left to re-encrypt, no Ringotel profile pending or no failed automatic update; it now
   answers 500, which the uptime check sees. `/metrics` likewise reported an automatic update it
   could not read as none failed, and now answers 500 too.
+- A certificate sync that failed, such as `core` refusing the PJSIP reload of a new certificate,
+  left no log line; it is now logged as an error and retried at the next hourly poll. A sync
+  whose maintenance-window check failed retried at once, over and over, and now waits for that
+  poll too; a certificate notification arriving while a sync runs is taken up once it ends,
+  rather than in a second sync beside it.
 
 ### Upgrade notes
 

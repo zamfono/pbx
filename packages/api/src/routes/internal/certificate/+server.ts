@@ -1,6 +1,6 @@
 import type { RequestEvent } from '@sveltejs/kit';
 
-import { getCertSyncScheduler } from '#lib/server/jobs/certSync.js';
+import { notifyCertSync } from '#lib/server/jobs/certSync.js';
 
 const STATUS_NOT_FOUND = 404;
 const STATUS_ACCEPTED = 202;
@@ -27,6 +27,6 @@ export function POST(event: RequestEvent): Response {
   if (event.request.headers.has('x-forwarded-for')) {
     return new Response(null, { status: STATUS_NOT_FOUND });
   }
-  getCertSyncScheduler().notify();
+  notifyCertSync();
   return new Response(null, { status: STATUS_ACCEPTED });
 }
