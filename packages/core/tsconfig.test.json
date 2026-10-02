@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*.test.ts",
+    "src/testing",
+    "src/ari/fake*.ts",
+    "src/ami/fake.ts"
+  ],
+  "references": [
+    { "path": "./tsconfig.lib.json" },
+    { "path": "../shared/tsconfig.lib.json" }
+  ]
+}

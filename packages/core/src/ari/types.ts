@@ -1,5 +1,4 @@
 // Shapes shared between the thin ARI client and the in-process fake ARI server (§3, §9.2).
-import { randomUUID } from 'node:crypto';
 
 /** Minimal structural logger contract satisfied by pino (constructed in main.ts). */
 export type Logger = {
@@ -27,19 +26,6 @@ export type Channel = {
   dialplan: { context: string; exten: string };
   channelvars?: Record<string, string>;
 };
-
-/** Fills in a `Channel`'s defaults for the fields the fake ARI server does not receive. */
-export function defaultChannel(overrides: Partial<Channel>): Channel {
-  return {
-    id: overrides.id ?? randomUUID(),
-    name: overrides.name ?? 'PJSIP/unknown',
-    state: overrides.state ?? 'Ring',
-    caller: overrides.caller ?? { number: '', name: '' },
-    connected: overrides.connected ?? { number: '', name: '' },
-    dialplan: overrides.dialplan ?? { context: '', exten: '' },
-    channelvars: overrides.channelvars
-  };
-}
 
 /** Thrown by every ARI REST wrapper when Asterisk answers with a non-2xx status. */
 export class AriError extends Error {

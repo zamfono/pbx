@@ -2,7 +2,9 @@
  * Channel behaviour `FakeAri` delegates: the parts of Asterisk's own conduct a test relies on but
  * that need no access to the fake's channel model.
  */
-import type { AriEvent } from './types.js';
+import { randomUUID } from 'node:crypto';
+
+import type { AriEvent, Channel } from './types.js';
 
 const HTTP_OK = 200;
 const HTTP_NOT_FOUND = 404;
@@ -124,5 +126,18 @@ export function contactReachable(sipUsername: string): AriEvent {
     application: 'zamfono',
     // eslint-disable-next-line camelcase -- ARI's own field names on the contact_info payload
     contact_info: { aor: sipUsername, contact_status: 'Reachable' }
+  };
+}
+
+/** Fills in a `Channel`'s defaults for the fields a test does not set. */
+export function defaultChannel(overrides: Partial<Channel>): Channel {
+  return {
+    id: overrides.id ?? randomUUID(),
+    name: overrides.name ?? 'PJSIP/unknown',
+    state: overrides.state ?? 'Ring',
+    caller: overrides.caller ?? { number: '', name: '' },
+    connected: overrides.connected ?? { number: '', name: '' },
+    dialplan: overrides.dialplan ?? { context: '', exten: '' },
+    channelvars: overrides.channelvars
   };
 }

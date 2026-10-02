@@ -5,8 +5,9 @@
  * channel is in the app at once (its `StasisStart`, in state `Down`), and a dialled one answers
  * `answerAfterMs` later with a `ChannelStateChange` to `Up`.
  */
+import { defaultChannel } from './fakeChannel.js';
 import type { RouteResult } from './fakeHttp.js';
-import { defaultChannel, type AriEvent, type Channel } from './types.js';
+import type { AriEvent, Channel } from './types.js';
 
 const HTTP_OK = 200;
 

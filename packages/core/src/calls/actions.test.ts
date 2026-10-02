@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
 import { type FakeAri } from '../ari/fake.js';
+import { defaultChannel } from '../ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../ari/fakeDial.js';
-import { defaultChannel } from '../ari/types.js';
 import type { CdrWriter } from '../cdr.js';
 import { eventually } from '../testing/eventually.js';
 import {

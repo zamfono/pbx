@@ -3,6 +3,7 @@ import type { RtpQos } from '../qosFigures.js';
 import { routeBridge, type Bridge } from './fakeBridge.js';
 import {
   contactReachable,
+  defaultChannel,
   fakeEndpoint,
   readChannelVariable,
   routeMisc,
@@ -14,7 +15,7 @@ import { splitResource, type RouteResult } from './fakeHttp.js';
 import { FakePlaybacks } from './fakePlayback.js';
 import { fakeChannelVars } from './fakeRtp.js';
 import { FakeAriTransport, type FakeRequest } from './fakeTransport.js';
-import { defaultChannel, type AriEvent, type Channel } from './types.js';
+import type { AriEvent, Channel } from './types.js';
 
 const DEFAULT_ANSWER_AFTER_MS = 10;
 // A real playback takes some time to reach the end; a fixed short delay lets code that awaits

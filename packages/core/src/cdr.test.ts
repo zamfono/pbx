@@ -5,8 +5,9 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from './ari/client.js';
 import { FakeAri } from './ari/fake.js';
+import { defaultChannel } from './ari/fakeChannel.js';
 import { fakeRtpAudioQos } from './ari/fakeRtp.js';
-import { defaultChannel, type Channel, type Logger } from './ari/types.js';
+import type { Channel, Logger } from './ari/types.js';
 import type { LogLevel } from './callLog.js';
 import { callerChannel, newCall, type Call } from './calls/call.js';
 import { CdrWriter } from './cdr.js';

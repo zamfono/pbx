@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/testing",
+    "src/ari/fake*.ts",
+    "src/ami/fake.ts"
+  ],
+  "references": [{ "path": "../shared/tsconfig.lib.json" }]
+}

@@ -5,8 +5,9 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
+import { defaultChannel } from '../ari/fakeChannel.js';
 import { isPlacement } from '../ari/fakeDial.js';
-import { defaultChannel, type Channel, type Logger } from '../ari/types.js';
+import type { Channel, Logger } from '../ari/types.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';

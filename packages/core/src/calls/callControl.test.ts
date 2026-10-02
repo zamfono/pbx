@@ -4,7 +4,7 @@ import { newId, nowIso, type Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import type { FakeAri } from '../ari/fake.js';
-import { defaultChannel } from '../ari/types.js';
+import { defaultChannel } from '../ari/fakeChannel.js';
 import type { StateStore } from '../internal/stateStore.js';
 import { eventually } from '../testing/eventually.js';
 import {
