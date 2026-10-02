@@ -12,6 +12,7 @@ import type { Channel } from '../ari/types.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
+import { AST_CAUSE_USER_BUSY } from '../sipCodes.js';
 import { eventually } from '../testing/eventually.js';
 import {
   noopLogger,
@@ -33,7 +34,6 @@ import { TrunkState } from './trunkState.js';
 // the caller whose call is being forwarded.
 
 // Q.850 17, user busy (SIP 486), as ARI's `ChannelDestroyed` carries it.
-const AST_CAUSE_USER_BUSY = 17;
 const MAIN_NUMBER = '+491110000';
 const FORWARD_NUMBER = '+15557777';
 

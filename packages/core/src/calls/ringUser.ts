@@ -6,6 +6,7 @@ import { MS_PER_SECOND, newId } from '@zamfono/shared';
 
 import { ignoreGone } from '../ari/failures.js';
 import { channelLanguageVariable } from '../prompts.js';
+import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { release, takeJoinBridge, type Call, type Leg } from './call.js';
 import { callPartiesChanged, callRinging } from './callState.js';
 import { softphoneCallerId } from './contactName.js';
@@ -16,8 +17,6 @@ import type { Pipeline } from './pipeline.js';
 import { concludeRing, placeAll } from './ringConclusion.js';
 import { devicesToRing, registeredDevices } from './userDevices.js';
 import { applyRingOutcome, type UnappliedDecision } from './userStep.js';
-
-const RELEASE_CODE_UNAVAILABLE = 480;
 
 type DeviceRing = {
   userId: string;
@@ -115,7 +114,7 @@ export async function ringUser(
   const snapshot = await pipeline.deps.cache.get();
   const user = snapshot.users.find(row => row.id === userId);
   if (user === undefined) {
-    await release(pipeline, call, RELEASE_CODE_UNAVAILABLE, 'failed');
+    await release(pipeline, call, SIP_TEMPORARILY_UNAVAILABLE, 'failed');
     return null;
   }
   // §10.1 step 4 rings the user's registered devices; an unregistered one has nowhere to ring,

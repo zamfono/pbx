@@ -12,6 +12,7 @@ import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { Presence } from '../presence.js';
+import { AST_CAUSE_USER_BUSY } from '../sipCodes.js';
 import { eventually } from '../testing/eventually.js';
 import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
 import { newCall, type Call } from './call.js';
@@ -23,7 +24,6 @@ import { runUserStep } from './userStep.js';
  * the `busy` rule at once when they have none. */
 
 // Asterisk's Q.850 mapping of SIP 486 Busy Here.
-const AST_CAUSE_USER_BUSY = 17;
 
 async function seedSettings(db: Db): Promise<void> {
   const targetId = newId();

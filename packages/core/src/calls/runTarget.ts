@@ -1,12 +1,11 @@
 /** Pipeline step 7 "Forward targets" (§10.1): hop counting, the hop a forward records for its
  * forwarded leg (§9.4 "Forwarded calls"), then `inbound.ts`'s dispatch of the target. */
 import { nextHop, type ForwardTarget } from '../routing/targets.js';
+import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { endTargetOwner, type Call, type Owner } from './call.js';
 import { noteDiversion, type Diversion } from './forwardContext.js';
 import { enterTarget } from './inbound.js';
 import type { Pipeline } from './pipeline.js';
-
-const RELEASE_CODE_UNAVAILABLE = 480;
 
 /** Step 7 "Forward targets": hop counting, then dispatch, or the hop-limit mailbox fallback.
  * `asUser` is `enterTarget`'s: the forwarding user, `null` for a forward nobody's own rule made.
@@ -30,7 +29,7 @@ export async function runTarget(
       owner = { ringGroupId: call.ringGroupId };
     }
     await endTargetOwner(pipeline, call, owner, snapshot, {
-      code: RELEASE_CODE_UNAVAILABLE,
+      code: SIP_TEMPORARILY_UNAVAILABLE,
       status: 'missed',
       reason: 'hopLimit'
     });

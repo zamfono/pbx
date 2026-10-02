@@ -9,6 +9,7 @@ import type { Snapshot } from '../internal/snapshot.js';
 import { assetMedia, defaultPrompt } from '../prompts.js';
 import type { MenuMap } from '../routing/menu.js';
 import type { ForwardTarget } from '../routing/targets.js';
+import { SIP_SERVER_ERROR, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import {
   callerChannel,
   findForwardTarget,
@@ -20,9 +21,6 @@ import { collectMenuInput } from './menuInput.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
 import { runTarget } from './runTarget.js';
-
-const RELEASE_CODE_UNAVAILABLE = 480;
-const RELEASE_CODE_SERVER_ERROR = 500;
 
 type MenuRow = Snapshot['menus'][number];
 
@@ -172,12 +170,12 @@ export async function playMenu(
   const snapshot = await pipeline.deps.cache.get();
   const menu = snapshot.menus.find(row => row.id === menuId);
   if (menu === undefined) {
-    await release(pipeline, call, RELEASE_CODE_SERVER_ERROR, 'failed');
+    await release(pipeline, call, SIP_SERVER_ERROR, 'failed');
     return;
   }
   if (call.menuAttempts >= menu.maxAttempts) {
     call.log.event({ event: 'menuAttemptsExceeded', menuId });
-    await release(pipeline, call, RELEASE_CODE_UNAVAILABLE, 'missed');
+    await release(pipeline, call, SIP_TEMPORARILY_UNAVAILABLE, 'missed');
     return;
   }
   // A greeting played into an unanswered channel never reaches a trunk caller, who keeps

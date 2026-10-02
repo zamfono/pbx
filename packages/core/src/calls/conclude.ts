@@ -10,16 +10,18 @@ import {
   LANGUAGES_WITH_FAILED_CALL_PROMPT
 } from '../prompts.js';
 import type { AttemptFailure } from '../routing/trunk.js';
+import {
+  SIP_BUSY_EVERYWHERE,
+  SIP_BUSY_HERE,
+  SIP_DECLINE,
+  SIP_FORBIDDEN,
+  SIP_SERVICE_UNAVAILABLE,
+  SIP_TEMPORARILY_UNAVAILABLE
+} from '../sipCodes.js';
 import { release, type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait, playToneAndWait } from './playback.js';
 
-export const SIP_SERVICE_UNAVAILABLE = 503;
-const SIP_TEMPORARILY_UNAVAILABLE = 480;
-const SIP_BUSY_HERE = 486;
-const SIP_BUSY_EVERYWHERE = 600;
-const SIP_DECLINE = 603;
-const SIP_CLIR_UNSUPPORTED = 403;
 const CALLEE_BUSY_CODES = new Set<number>([
   SIP_BUSY_HERE,
   SIP_BUSY_EVERYWHERE,
@@ -96,7 +98,7 @@ export async function concludeExhausted(
     return;
   }
   if (lastFailureKind === 'clirUnsupported') {
-    await release(pipeline, call, SIP_CLIR_UNSUPPORTED, 'failed');
+    await release(pipeline, call, SIP_FORBIDDEN, 'failed');
     return;
   }
   await playFailedCallAnnouncement(pipeline, call);

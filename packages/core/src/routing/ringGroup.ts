@@ -4,6 +4,7 @@
  * ring plan and the group's fallback (§11.2 `ring_group_forward_rules`).
  */
 
+import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import type { ForwardTarget } from './targets.js';
 
 type MemberRow = {
@@ -187,10 +188,6 @@ export function ringPlan(
   return plan;
 }
 
-/** The release status of the group step's implicit default (§10.1 step 5). */
-
-const RELEASE_CODE_UNAVAILABLE = 480;
-
 /**
  * The fallback once ringing ends without an answer: the matching rule, or for `unavailable` the
  * `unanswered` rule when `unavailable` is absent; else the implicit default, the group's own
@@ -214,5 +211,5 @@ export function groupFallback(
   if (group.mailboxEnabled) {
     return { kind: 'mailbox', ringGroupId: group.ringGroupId };
   }
-  return { kind: 'release', code: RELEASE_CODE_UNAVAILABLE };
+  return { kind: 'release', code: SIP_TEMPORARILY_UNAVAILABLE };
 }

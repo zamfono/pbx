@@ -15,6 +15,7 @@ import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../ari/fakeDial.js';
 import type { Channel } from '../ari/types.js';
+import { AST_CAUSE_USER_BUSY } from '../sipCodes.js';
 import { eventually, requestTo } from '../testing/eventually.js';
 import {
   noopLogger,
@@ -30,7 +31,6 @@ import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';
 
 // Asterisk's Q.850 mapping of SIP 486 Busy Here (matches ringGroup.ts's own constant).
-const AST_CAUSE_USER_BUSY = 17;
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => {

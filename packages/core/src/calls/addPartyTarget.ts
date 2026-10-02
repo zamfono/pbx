@@ -7,9 +7,9 @@
  */
 import type { Snapshot } from '../internal/snapshot.js';
 import { resolveDialed } from '../routing/outbound.js';
+import { SIP_NOT_FOUND } from '../sipCodes.js';
 import { findForwardTarget } from './call.js';
 import { extensionOf } from './extensionOwner.js';
-import { RELEASE_CODE_NOT_FOUND } from './featureCall.js';
 import { resolveDialedContext } from './outboundLookup.js';
 
 /**
@@ -62,7 +62,7 @@ function ownDidTarget(
       withCaller: false
     };
   }
-  return { kind: 'refuse', code: RELEASE_CODE_NOT_FOUND };
+  return { kind: 'refuse', code: SIP_NOT_FOUND };
 }
 
 /** Resolves `*5`'s target string (everything after the feature code) against `snapshot`. */
@@ -93,7 +93,7 @@ export function resolveAddedTarget(
       const { owner } = action;
       if (owner.kind === 'parking') {
         // A parked call is retrieved by dialling its slot, not added to another conversation.
-        return { kind: 'refuse', code: RELEASE_CODE_NOT_FOUND };
+        return { kind: 'refuse', code: SIP_NOT_FOUND };
       }
       const ownerRef =
         owner.kind === 'user'
@@ -101,7 +101,7 @@ export function resolveAddedTarget(
           : { ringGroupId: owner.ringGroupId };
       const ext = extensionOf(snapshot, ownerRef);
       if (ext === null) {
-        return { kind: 'refuse', code: RELEASE_CODE_NOT_FOUND };
+        return { kind: 'refuse', code: SIP_NOT_FOUND };
       }
       return owner.kind === 'user'
         ? { kind: 'user', userId: owner.userId, to: ext }
@@ -109,6 +109,6 @@ export function resolveAddedTarget(
     }
     default:
       // Another feature code is no party to add.
-      return { kind: 'refuse', code: RELEASE_CODE_NOT_FOUND };
+      return { kind: 'refuse', code: SIP_NOT_FOUND };
   }
 }

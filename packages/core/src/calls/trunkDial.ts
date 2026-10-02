@@ -10,6 +10,7 @@ import type { AriEvent } from '../ari/types.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { channelLanguageVariable } from '../prompts.js';
 import type { AttemptFailure } from '../routing/trunk.js';
+import { SIP_SERVER_ERROR } from '../sipCodes.js';
 import { raiseLogLevel, type Call } from './call.js';
 import type { AttemptIdentity, TrunkRow } from './callerIdentity.js';
 import { forwardVariables, type ForwardLeg } from './forwardContext.js';
@@ -20,7 +21,6 @@ import type { TrunkLeg } from './provisional.js';
 import type { TrunkState } from './trunkState.js';
 import { outboundHosts } from './trunkStatus.js';
 
-const SIP_SERVER_ERROR = 500;
 const HTTP_5XX_LOW = 500;
 const HTTP_5XX_HIGH = 599;
 const SIP_FINAL_LOW = 300;

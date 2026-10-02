@@ -1,3 +1,5 @@
+import { SIP_NOT_FOUND } from '../sipCodes.js';
+
 /**
  * Routing pipeline step 1, "Entry" (spec §10.1): caller screening against the tenant blocklist,
  * inbound DID and number-block resolution, and the withheld-caller check against a target's
@@ -53,9 +55,6 @@ function matchingBlock(
   return { id: widest.id, fallbackTargetId: widest.fallbackTargetId };
 }
 
-/** The release status for a called number outside every DID and block (§11.3). */
-const RELEASE_CODE_NOT_FOUND = 404;
-
 /**
  * Resolves an inbound `called` number, most precise match first: an exact `dids` row, else the
  * longest matching number block's fallback, else the tenant-wide fallback, else a 404 release
@@ -83,7 +82,7 @@ export function resolveInbound(
   const block = matchingBlock(called, blocks);
   const targetId = block?.fallbackTargetId ?? tenantFallbackTargetId;
   if (targetId === null) {
-    return { kind: 'release', code: RELEASE_CODE_NOT_FOUND };
+    return { kind: 'release', code: SIP_NOT_FOUND };
   }
   return { kind: 'fallback', targetId, blockId: block?.id ?? null };
 }

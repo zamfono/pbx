@@ -6,13 +6,10 @@
  * recording the greeting `mailboxGreeting.ts`'s.
  */
 import { ignoreGone } from '../ari/failures.js';
+import { SIP_FORBIDDEN, SIP_NOT_FOUND } from '../sipCodes.js';
 import { callerChannel, release, type Call, type Owner } from './call.js';
 import { ownerForExt, ringGroupMemberIds } from './extensionOwner.js';
-import {
-  concludeFeature,
-  RELEASE_CODE_FORBIDDEN,
-  RELEASE_CODE_NOT_FOUND
-} from './featureCall.js';
+import { concludeFeature } from './featureCall.js';
 import { recordGreeting } from './mailboxGreeting.js';
 import type { MenuInput } from './mailboxInput.js';
 import {
@@ -177,7 +174,7 @@ export async function ownVoicemail(
   call: Call
 ): Promise<void> {
   if (call.callerUserId === null) {
-    await release(pipeline, call, RELEASE_CODE_FORBIDDEN, 'failed');
+    await release(pipeline, call, SIP_FORBIDDEN, 'failed');
     return;
   }
   await runMailboxMenu(pipeline, call, { userId: call.callerUserId });
@@ -191,13 +188,13 @@ export async function mailboxAccess(
   ext: string
 ): Promise<void> {
   if (call.callerUserId === null) {
-    await release(pipeline, call, RELEASE_CODE_FORBIDDEN, 'failed');
+    await release(pipeline, call, SIP_FORBIDDEN, 'failed');
     return;
   }
   const snapshot = await pipeline.deps.cache.get();
   const owner = ownerForExt(snapshot, ext);
   if (owner === null) {
-    await release(pipeline, call, RELEASE_CODE_NOT_FOUND, 'failed');
+    await release(pipeline, call, SIP_NOT_FOUND, 'failed');
     return;
   }
   const allowed =
@@ -205,7 +202,7 @@ export async function mailboxAccess(
       ? owner.userId === call.callerUserId
       : ringGroupMemberIds(snapshot, owner.ringGroupId).has(call.callerUserId);
   if (!allowed) {
-    await release(pipeline, call, RELEASE_CODE_FORBIDDEN, 'failed');
+    await release(pipeline, call, SIP_FORBIDDEN, 'failed');
     return;
   }
   await runMailboxMenu(pipeline, call, owner);

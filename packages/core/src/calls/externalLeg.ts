@@ -11,6 +11,7 @@ import { isE164, newId } from '@zamfono/shared';
 
 import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { AttemptFailure } from '../routing/trunk.js';
+import { SIP_SERVER_ERROR } from '../sipCodes.js';
 import type { Call } from './call.js';
 import {
   startBudget,
@@ -29,8 +30,6 @@ import {
 import type { ForwardLeg } from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';
 import { originateTrunkLeg } from './trunkDial.js';
-
-const SIP_SERVER_ERROR = 500;
 
 // An attempt Asterisk would not place (its create or dial refused, `legOriginate.ts`) fails as a
 // 500 before alerting would: the next host, then the next route, is tried (§9.4 "Route fallthrough").

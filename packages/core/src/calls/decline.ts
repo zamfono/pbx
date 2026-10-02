@@ -8,14 +8,12 @@
 import type { DeclineRequest } from '@zamfono/shared';
 
 import { ignoreGone, logFailure } from '../ari/failures.js';
+import { AST_CAUSE_CALL_REJECTED } from '../sipCodes.js';
 import { ActionError, HTTP_CONFLICT } from './actionError.js';
 import type { Call } from './call.js';
 import { activeBatchHasRingingLeg, declineInBatch } from './groupPickup.js';
 import type { Pipeline } from './pipeline.js';
 import { endRingingLeg } from './ringConclusion.js';
-
-// Asterisk's Q.850 mapping of SIP 603 Decline (`ringGroupRace.ts`, `ringConclusion.ts`).
-const AST_CAUSE_CALL_REJECTED = 21;
 
 /** `POST /internal/calls/{id}/decline`; 409 `notRinging` when no leg of the actor's rings. */
 export function decline(

@@ -13,6 +13,7 @@ import {
   ringPlan,
   type Strategy
 } from '../routing/ringGroup.js';
+import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { raiseLogLevel, release, type Call } from './call.js';
 import { extensionOf } from './extensionOwner.js';
 import { CONDITION_REASONS, diversionFor } from './forwardContext.js';
@@ -29,7 +30,6 @@ import { runTarget } from './runTarget.js';
 import { busyDevices } from './userDevices.js';
 import { deposit } from './voicemail.js';
 
-const RELEASE_CODE_UNAVAILABLE = 480;
 /** Answers the caller (no early media without it), plays the group's greeting to completion if it
  * has one (§10.2 "Ring groups"), then starts its MoH class in place of ringback. A call with no
  * caller channel has nobody to play to. */
@@ -174,7 +174,7 @@ export async function ringGroup(
     row => row.id === groupId && row.deletedAt === null
   );
   if (group === undefined) {
-    await release(pipeline, call, RELEASE_CODE_UNAVAILABLE, 'failed');
+    await release(pipeline, call, SIP_TEMPORARILY_UNAVAILABLE, 'failed');
     return;
   }
   // §7: the ring group's diagnostics override counts toward the call's level.

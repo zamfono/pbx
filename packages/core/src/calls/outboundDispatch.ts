@@ -11,6 +11,7 @@ import type { LogLevel } from '../callLog.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { defaultPrompt } from '../prompts.js';
 import { resolveDialed, type DialAction } from '../routing/outbound.js';
+import { SIP_NOT_FOUND } from '../sipCodes.js';
 import {
   callerChannel,
   findForwardTarget,
@@ -26,8 +27,6 @@ import { resolveDialedContext, toFor } from './outboundLookup.js';
 import { retrieveParkedCall } from './parkingRetrieval.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
-
-const SIP_EXTENSION_NOT_FOUND = 404;
 
 export type ResolvedTarget = {
   action: DialAction;
@@ -78,7 +77,7 @@ async function playInvalidAndRelease(
     defaultPrompt('invalid'),
     `${channelId}:invalid`
   );
-  await release(pipeline, call, SIP_EXTENSION_NOT_FOUND, 'failed');
+  await release(pipeline, call, SIP_NOT_FOUND, 'failed');
 }
 
 /** An emergency or external number, dialled as `asUser`'s call through the pipeline's

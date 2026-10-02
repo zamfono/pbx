@@ -8,6 +8,7 @@ import { newId } from '@zamfono/shared';
 import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
+import { SIP_NOT_FOUND } from '../sipCodes.js';
 import {
   findForwardTarget,
   newCall,
@@ -16,7 +17,6 @@ import {
   type Call
 } from './call.js';
 import { extensionOf } from './extensionOwner.js';
-import { RELEASE_CODE_NOT_FOUND } from './featureCall.js';
 import { endHold } from './hold.js';
 import { trackLeg } from './legs.js';
 import { closeCall } from './liveCall.js';
@@ -140,7 +140,7 @@ async function routeParkedParty(
   if (route === null) {
     // The party is the one channel left for the release to end.
     parked.callerChannelId = partyChannelId;
-    await release(pipeline, parked, RELEASE_CODE_NOT_FOUND, 'missed');
+    await release(pipeline, parked, SIP_NOT_FOUND, 'missed');
     return;
   }
   const result = undone?.kind ?? 'fallback';

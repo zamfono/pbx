@@ -7,14 +7,11 @@
 import type { Snapshot } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import { shouldFallThrough } from '../routing/trunk.js';
+import { SIP_SERVICE_UNAVAILABLE } from '../sipCodes.js';
 import { settleAnswered } from './answer.js';
 import { release, type Call } from './call.js';
 import type { TrunkRow } from './callerIdentity.js';
-import {
-  concludeExhausted,
-  concludeFinal,
-  SIP_SERVICE_UNAVAILABLE
-} from './conclude.js';
+import { concludeExhausted, concludeFinal } from './conclude.js';
 import { attemptRoute } from './dialAttempt.js';
 import type { ForwardLeg } from './forwardContext.js';
 import { sipForwardLeg } from './forwardValues.js';

@@ -2,16 +2,13 @@
  * dispatch stays under the repository's `max-lines` lint rule. */
 import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
+import { SIP_FORBIDDEN, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { resolveAddedTarget, type AddedTarget } from './addPartyTarget.js';
 import { settleAnswered } from './answer.js';
 import { release, type Call } from './call.js';
 import { activeCallOf, channelOf } from './callLookup.js';
 import { concludeExhausted, concludeFinal } from './conclude.js';
 import { dialEmergency } from './emergency.js';
-import {
-  RELEASE_CODE_FORBIDDEN,
-  RELEASE_CODE_UNAVAILABLE
-} from './featureCall.js';
 import { originateExternalLeg } from './outboundExternal.js';
 import type { Pipeline } from './pipeline.js';
 import { ringGroup } from './ringGroup.js';
@@ -164,13 +161,13 @@ export async function addParty(
   rest: string
 ): Promise<void> {
   if (call.callerUserId === null) {
-    await release(pipeline, call, RELEASE_CODE_FORBIDDEN, 'failed');
+    await release(pipeline, call, SIP_FORBIDDEN, 'failed');
     return;
   }
   const active = activeCallOf(pipeline, call.callerUserId);
   const activeBridgeId = active?.bridgeId ?? null;
   if (active === null || activeBridgeId === null) {
-    await release(pipeline, call, RELEASE_CODE_UNAVAILABLE, 'failed');
+    await release(pipeline, call, SIP_TEMPORARILY_UNAVAILABLE, 'failed');
     return;
   }
 

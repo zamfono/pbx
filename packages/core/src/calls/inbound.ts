@@ -11,6 +11,7 @@ import {
   resolveInbound
 } from '../routing/entry.js';
 import { targetFromRow, type ForwardTarget } from '../routing/targets.js';
+import { SIP_DECLINE, SIP_SERVER_ERROR } from '../sipCodes.js';
 import { announce } from './announce.js';
 import {
   endTargetOwner,
@@ -28,10 +29,6 @@ import type { Pipeline } from './pipeline.js';
 import { ringGroup } from './ringGroup.js';
 import { runUserStep } from './userStep.js';
 import { deposit } from './voicemail.js';
-
-const RELEASE_CODE_REJECTED = 603;
-// A DID/block's forward_targets row missing from the snapshot (FK-guaranteed present).
-const RELEASE_CODE_SERVER_ERROR = 500;
 
 /** Step 1 "Entry" for an already-resolved target (§10.1): reject-anonymous, OOO/hours, then the
  * target's own step. Exported for outbound dialling of an internal extension or own DID, which
@@ -94,7 +91,7 @@ export async function enterTarget(
     )
   ) {
     await endTargetOwner(pipeline, call, owner, snapshot, {
-      code: RELEASE_CODE_REJECTED,
+      code: SIP_DECLINE,
       status: 'blocked',
       reason: 'rejectAnonymous'
     });
@@ -179,7 +176,7 @@ export async function handleInboundStart(
   }));
   if (isBlocked(from, blocklist)) {
     call.log.event({ event: 'entry', result: 'blocked' });
-    await release(pipeline, call, RELEASE_CODE_REJECTED, 'blocked');
+    await release(pipeline, call, SIP_DECLINE, 'blocked');
     return;
   }
 
@@ -204,7 +201,8 @@ export async function handleInboundStart(
     row => row.id === resolved.targetId
   );
   if (!targetRow) {
-    await release(pipeline, call, RELEASE_CODE_SERVER_ERROR, 'failed');
+    // The foreign key keeps a DID's or block's target row present.
+    await release(pipeline, call, SIP_SERVER_ERROR, 'failed');
     return;
   }
   // §10.1 step 7: a DID's own target is dialled without a caller.

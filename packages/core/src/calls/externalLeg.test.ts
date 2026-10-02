@@ -13,6 +13,7 @@ import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { ATTEMPT_NO_RESPONSE_MS } from '../routing/trunk.js';
+import { AST_CAUSE_CALL_REJECTED, AST_CAUSE_USER_BUSY } from '../sipCodes.js';
 import { eventually } from '../testing/eventually.js';
 import {
   noopLogger,
@@ -29,9 +30,7 @@ import { TrunkState } from './trunkState.js';
 // Q.850 causes as ARI's `ChannelDestroyed` carries them: 41 temporary failure (SIP 503), 17 user
 // busy (SIP 486).
 const AST_CAUSE_TEMPORARY_FAILURE = 41;
-const AST_CAUSE_USER_BUSY = 17;
 // Q.850 21, call rejected: what chan_pjsip maps 401, 403, 407 and 603 alike to.
-const AST_CAUSE_CALL_REJECTED = 21;
 
 async function seedDid(db: Db, number: string): Promise<string> {
   const targetId = newId();

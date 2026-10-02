@@ -4,14 +4,11 @@
 import type { FeatureCodeKey } from '@zamfono/shared';
 
 import type { Presence } from '../presence.js';
+import { SIP_FORBIDDEN, SIP_NOT_FOUND } from '../sipCodes.js';
 import { addParty } from './addParty.js';
 import { release, type Call } from './call.js';
 import { ownerForExt } from './extensionOwner.js';
-import {
-  concludeFeature,
-  RELEASE_CODE_FORBIDDEN,
-  RELEASE_CODE_NOT_FOUND
-} from './featureCall.js';
+import { concludeFeature } from './featureCall.js';
 import { mailboxAccess, ownVoicemail } from './mailbox.js';
 import { park } from './parking.js';
 import { pickupByExtension } from './pickup.js';
@@ -27,7 +24,7 @@ async function setDnd(
 ): Promise<void> {
   const db = pipeline.deps.db;
   if (call.callerUserId === null) {
-    await release(pipeline, call, RELEASE_CODE_FORBIDDEN, 'failed');
+    await release(pipeline, call, SIP_FORBIDDEN, 'failed');
     return;
   }
   await db
@@ -52,7 +49,7 @@ async function depositFeature(
   const snapshot = await pipeline.deps.cache.get();
   const owner = ownerForExt(snapshot, ext);
   if (owner === null) {
-    await release(pipeline, call, RELEASE_CODE_NOT_FOUND, 'failed');
+    await release(pipeline, call, SIP_NOT_FOUND, 'failed');
     return;
   }
   await deposit(pipeline, call, owner, 'feature');
@@ -78,7 +75,7 @@ export async function handleFeature(
   };
   const action = actions[key];
   if (action === undefined) {
-    await release(pipeline, call, RELEASE_CODE_NOT_FOUND, 'failed');
+    await release(pipeline, call, SIP_NOT_FOUND, 'failed');
     return;
   }
   await action();

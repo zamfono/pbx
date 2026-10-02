@@ -7,6 +7,13 @@
 
 import { callingCode, type TrunkStatus } from '@zamfono/shared';
 
+import {
+  SIP_BUSY_EVERYWHERE,
+  SIP_BUSY_HERE,
+  SIP_DECLINE,
+  SIP_TEMPORARILY_UNAVAILABLE
+} from '../sipCodes.js';
+
 export type Route = {
   id: string;
   priority: number;
@@ -69,10 +76,6 @@ export type AttemptFailure =
   | { kind: 'final'; code: number; alerted: boolean };
 
 /** SIP final responses that state the callee's own condition (§9.4 "Route fallthrough"). */
-const SIP_TEMPORARILY_UNAVAILABLE = 480;
-const SIP_BUSY_HERE = 486;
-const SIP_BUSY_EVERYWHERE = 600;
-const SIP_DECLINE = 603;
 const CALLEE_CONDITION_CODES = new Set<number>([
   SIP_TEMPORARILY_UNAVAILABLE,
   SIP_BUSY_HERE,

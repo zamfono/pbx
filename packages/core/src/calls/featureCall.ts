@@ -6,10 +6,6 @@ import { ignoreGone, logFailure } from '../ari/failures.js';
 import { callerChannel, type Call, type CallsRow } from './call.js';
 import type { Pipeline } from './pipeline.js';
 
-export const RELEASE_CODE_FORBIDDEN = 403;
-export const RELEASE_CODE_NOT_FOUND = 404;
-export const RELEASE_CODE_UNAVAILABLE = 480;
-
 /** `answeredAt` for a feature call closing out `answered` (§10.2 "Call history": renders "Ben
  * joined at 14:02"), stamped here rather than at each call site's own point of answer, so every
  * feature shares one instant for it. Left untouched when already set, so this never overwrites a

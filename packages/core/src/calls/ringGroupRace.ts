@@ -7,16 +7,12 @@
  */
 import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { AriEvent, Channel } from '../ari/types.js';
+import { AST_CAUSE_CALL_REJECTED, AST_CAUSE_USER_BUSY } from '../sipCodes.js';
 import type { Call } from './call.js';
 import { callPartiesChanged } from './callState.js';
 import { hangupMemberSiblings, type GroupLeg } from './groupLegs.js';
 import type { Pipeline } from './pipeline.js';
 import { winBatch } from './ringGroupWin.js';
-
-// Asterisk's Q.850 mapping of SIP 486 Busy Here / 600 Busy Everywhere and SIP 603 Decline
-// (mirrors legs.ts's own mapping for the single-user ring race).
-const AST_CAUSE_USER_BUSY = 17;
-const AST_CAUSE_CALL_REJECTED = 21;
 
 /** A batch's outcome: `answered` bridges the caller, `unanswered` moves the plan to its next
  * batch or fallback, `abandoned` means the caller's own channel ended while the batch rang —

@@ -10,14 +10,13 @@ import type { ApiClient } from '../apiClient.js';
 import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { assetMedia, defaultPrompt } from '../prompts.js';
+import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { callerChannel, release, type Call, type Owner } from './call.js';
 import { finishAbandoned } from './missedCall.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
 import { recordCaller } from './voicemailRecording.js';
 import { persistVoicemail } from './voicemailStore.js';
-
-const RELEASE_CODE_UNAVAILABLE = 480;
 
 /** Just the surface `deposit` needs from `ApiClient`, so a test can stub it without its private
  * `baseUrl` field. */
@@ -115,7 +114,7 @@ async function recordMessage(
       outcome.kind === 'destroyed' || call.callerEnded === true;
     await (callerLeft
       ? finishAbandoned(pipeline, call)
-      : release(pipeline, call, RELEASE_CODE_UNAVAILABLE, 'failed'));
+      : release(pipeline, call, SIP_TEMPORARILY_UNAVAILABLE, 'failed'));
     return;
   }
   await playAndWait(

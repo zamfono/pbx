@@ -11,6 +11,7 @@ import {
   userEntryDecision,
   userOutcomeDecision
 } from '../routing/user.js';
+import { SIP_BUSY_HERE, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { buildUserRules, raiseLogLevel, release, type Call } from './call.js';
 import { CONDITION_REASONS, diversionFor } from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';
@@ -18,8 +19,6 @@ import { ringUser } from './ringUser.js';
 import { runTarget } from './runTarget.js';
 import { registeredDevices } from './userDevices.js';
 import { deposit, type DepositReason } from './voicemail.js';
-
-const RELEASE_CODE_UNAVAILABLE = 480;
 
 /**
  * A user's forward or mailbox decision, with the condition that made it. A call with no caller
@@ -107,12 +106,11 @@ export async function applyRingOutcome(
   // A call with no caller channel has nobody to release.
   if (decision.kind === 'release' && call.callerChannelId !== null) {
     const status =
-      decision.code === RELEASE_CODE_UNAVAILABLE ? 'missed' : 'busy';
+      decision.code === SIP_TEMPORARILY_UNAVAILABLE ? 'missed' : 'busy';
     await release(pipeline, call, decision.code, status);
   }
   return null;
 }
-const RELEASE_CODE_BUSY = 486;
 /** Step 4 "Target user": the Entry-time decision, then its outcome (ring/forward/mailbox/release).
  * A forward or mailbox of a call with no caller channel, at Entry or after its ring, is handed
  * back (`UnappliedDecision`). */
@@ -124,7 +122,7 @@ export async function runUserStep(
 ): Promise<UnappliedDecision | null> {
   const user = snapshot.users.find(row => row.id === userId);
   if (user === undefined) {
-    await release(pipeline, call, RELEASE_CODE_UNAVAILABLE, 'failed');
+    await release(pipeline, call, SIP_TEMPORARILY_UNAVAILABLE, 'failed');
     return null;
   }
   // §7: the target user's diagnostics override counts toward the call's level.
@@ -171,7 +169,7 @@ export async function runUserStep(
     });
   }
   if (call.callerChannelId !== null) {
-    const status = decision.code === RELEASE_CODE_BUSY ? 'busy' : 'missed';
+    const status = decision.code === SIP_BUSY_HERE ? 'busy' : 'missed';
     await release(pipeline, call, decision.code, status);
   }
   return null;

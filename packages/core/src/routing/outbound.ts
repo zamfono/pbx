@@ -11,11 +11,7 @@ import {
   type FeatureCodes
 } from '@zamfono/shared';
 
-/** A digit string of extension length or shorter that no row owns is refused (§10.1 Outbound step 3). */
-const UNOWNED_EXTENSION_STATUS = 404;
-
-/** A digit string longer than an extension that normalizes to neither international nor national form (§10.1 Outbound step 4). */
-const INCOMPLETE_ADDRESS_STATUS = 484;
+import { SIP_ADDRESS_INCOMPLETE, SIP_NOT_FOUND } from '../sipCodes.js';
 
 export type ExtensionOwner =
   | { kind: 'user'; userId: string }
@@ -36,7 +32,7 @@ export type DialAction =
   | { kind: 'external'; number: string; clir: boolean | null }
   | {
       kind: 'refuse';
-      code: typeof UNOWNED_EXTENSION_STATUS | typeof INCOMPLETE_ADDRESS_STATUS;
+      code: typeof SIP_NOT_FOUND | typeof SIP_ADDRESS_INCOMPLETE;
     };
 
 export type ExtensionRow = {
@@ -112,13 +108,13 @@ export function resolveDialed(
   if (dialed.length <= ctx.extLength) {
     const row = ctx.extensions.get(dialed);
     if (row === undefined) {
-      return { kind: 'refuse', code: UNOWNED_EXTENSION_STATUS };
+      return { kind: 'refuse', code: SIP_NOT_FOUND };
     }
     return { kind: 'extension', owner: ownerFromRow(dialed, row), clir: null };
   }
   const normalized = normalizeDialed(dialed, ctx.country);
   if (normalized.kind === 'incomplete') {
-    return { kind: 'refuse', code: INCOMPLETE_ADDRESS_STATUS };
+    return { kind: 'refuse', code: SIP_ADDRESS_INCOMPLETE };
   }
   const did = ctx.dids.get(normalized.number);
   if (did !== undefined) {

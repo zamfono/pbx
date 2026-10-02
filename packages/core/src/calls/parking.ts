@@ -8,14 +8,11 @@ import { MS_PER_SECOND } from '@zamfono/shared';
 import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import type { Presence } from '../presence.js';
+import { SIP_FORBIDDEN, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { callerChannel, release, type Call } from './call.js';
 import { activeCallOf, bridgedParty, channelOf } from './callLookup.js';
 import { callPartiesChanged } from './callState.js';
-import {
-  concludeFeature,
-  RELEASE_CODE_FORBIDDEN,
-  RELEASE_CODE_UNAVAILABLE
-} from './featureCall.js';
+import { concludeFeature } from './featureCall.js';
 import { moveParkedParty, ringParkerBack } from './parkingRingback.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
@@ -214,12 +211,12 @@ export async function park(
   call: Call
 ): Promise<void> {
   if (call.callerUserId === null) {
-    await release(pipeline, call, RELEASE_CODE_FORBIDDEN, 'failed');
+    await release(pipeline, call, SIP_FORBIDDEN, 'failed');
     return;
   }
   const ext = await parkActiveCall(pipeline, presence, call.callerUserId);
   if (ext === null) {
-    await release(pipeline, call, RELEASE_CODE_UNAVAILABLE, 'failed');
+    await release(pipeline, call, SIP_TEMPORARILY_UNAVAILABLE, 'failed');
     return;
   }
   const channelId = callerChannel(call);

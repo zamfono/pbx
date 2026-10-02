@@ -6,6 +6,7 @@ import { type FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../ari/fakeDial.js';
 import type { CdrWriter } from '../cdr.js';
+import { SIP_ADDRESS_INCOMPLETE } from '../sipCodes.js';
 import { eventually } from '../testing/eventually.js';
 import {
   answeredCall,
@@ -27,7 +28,6 @@ const HTTP_CREATED = 201;
 const HTTP_NO_CONTENT = 204;
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
-const SIP_ADDRESS_INCOMPLETE = 484;
 const RING_TIMER_MS = 60_000;
 
 type OriginateRecord = {

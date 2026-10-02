@@ -3,11 +3,8 @@
  * to a user, and the outcome once ringing ends (§11.2 `user_forward_rules`).
  */
 
+import { SIP_BUSY_HERE, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import type { ForwardTarget } from './targets.js';
-
-/** The SIP release codes of the user step's implicit defaults (§10.1). */
-const RELEASE_CODE_BUSY = 486;
-const RELEASE_CODE_UNAVAILABLE = 480;
 
 export type UserDecision =
   | { kind: 'forward'; target: ForwardTarget }
@@ -22,7 +19,7 @@ type EntryCondition = 'unconditional' | 'dnd' | OutcomeCondition;
 /** The implicit default when no rule applies: the user's own mailbox, else `code`. */
 function implicitDefault(
   user: { id: string; mailboxEnabled: boolean },
-  code: typeof RELEASE_CODE_BUSY | typeof RELEASE_CODE_UNAVAILABLE
+  code: typeof SIP_BUSY_HERE | typeof SIP_TEMPORARILY_UNAVAILABLE
 ): UserDecision {
   if (user.mailboxEnabled) {
     return { kind: 'mailbox', userId: user.id };
@@ -46,7 +43,7 @@ export function userOutcomeDecision(
   }
   return implicitDefault(
     user,
-    outcome === 'busy' ? RELEASE_CODE_BUSY : RELEASE_CODE_UNAVAILABLE
+    outcome === 'busy' ? SIP_BUSY_HERE : SIP_TEMPORARILY_UNAVAILABLE
   );
 }
 
@@ -97,7 +94,7 @@ export function userEntryDecision(
     if (rules.dnd) {
       return { kind: 'forward', target: rules.dnd };
     }
-    return implicitDefault(user, RELEASE_CODE_BUSY);
+    return implicitDefault(user, SIP_BUSY_HERE);
   }
   if (condition === 'offline') {
     return userOutcomeDecision(user, rules, 'offline');

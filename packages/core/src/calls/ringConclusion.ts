@@ -4,6 +4,7 @@
  * of a call's answered legs and caller, stays under the repository's `max-lines` lint rule.
  */
 import { logFailure } from '../ari/failures.js';
+import { AST_CAUSE_USER_BUSY } from '../sipCodes.js';
 import type { Call, Leg } from './call.js';
 import { clearFindMeTimers, findMeLegsPending } from './findMe.js';
 import { endLeg, hangupLeg, type RingResolver } from './legs.js';
@@ -12,8 +13,6 @@ import type { Pipeline } from './pipeline.js';
 // `ChannelDestroyed.cause` is Asterisk's Q.850 hangup cause: AST_CAUSE_USER_BUSY for SIP 486/600
 // (§10.1 step 4 speaks of the SIP codes; this is Asterisk's own mapping of them). A 603 decline
 // maps to AST_CAUSE_CALL_REJECTED instead, which step 4 does not count as busy.
-const AST_CAUSE_USER_BUSY = 17;
-
 /** Step 4's busy/noAnswer split: busy only once every device leg has answered 486 or 600; any
  * other end, a 603 decline included, leaves the ring to the `noAnswer` rule. */
 function ringOutcome(call: Call): 'busy' | 'noAnswer' {

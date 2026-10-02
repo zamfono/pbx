@@ -5,6 +5,7 @@
  * pickup (`pickupAction.ts`), which names the call.
  */
 import { ignoreGone, logFailure } from '../ari/failures.js';
+import { SIP_NOT_FOUND } from '../sipCodes.js';
 import { bridgeAnswered, claimAnswer } from './answer.js';
 import {
   callerChannel,
@@ -15,7 +16,7 @@ import {
 } from './call.js';
 import { findLiveCall } from './callLookup.js';
 import { ownerForExt } from './extensionOwner.js';
-import { closeFeatureCall, RELEASE_CODE_NOT_FOUND } from './featureCall.js';
+import { closeFeatureCall } from './featureCall.js';
 import { activeBatchHasRingingLeg, stopGroupRinging } from './groupPickup.js';
 import type { Pipeline } from './pipeline.js';
 
@@ -165,7 +166,7 @@ export async function pickupByExtension(
   // (§9.3 table: `*8<ext>` is directed pickup); falling through to the group search below with
   // both `userId` and `groupId` null would otherwise match any live ring-group call at all.
   if (owner === null) {
-    await release(pipeline, call, RELEASE_CODE_NOT_FOUND, 'failed');
+    await release(pipeline, call, SIP_NOT_FOUND, 'failed');
     return;
   }
   const userId = 'userId' in owner ? owner.userId : null;
@@ -211,5 +212,5 @@ export async function pickupByExtension(
     return;
   }
 
-  await release(pipeline, call, RELEASE_CODE_NOT_FOUND, 'failed');
+  await release(pipeline, call, SIP_NOT_FOUND, 'failed');
 }
