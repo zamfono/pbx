@@ -1,3 +1,6 @@
+// Side-effect import: fills the registry (§10.3) with every operation `tools/list` offers.
+import '../ops/index.js';
+
 import { publishedInputSchema } from '../ops/publishedSchema.js';
 import { registry, type ErasedOperation } from '../ops/registry.js';
 import { HELP_TOOL } from './guide.js';

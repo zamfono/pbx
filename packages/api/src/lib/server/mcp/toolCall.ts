@@ -1,6 +1,9 @@
 import { newId } from '@zamfono/shared';
 
 import type { Authenticated } from '../auth/bearer.js';
+// Side-effect import: fills the registry (§10.3) with every operation a tool call runs.
+import '../ops/index.js';
+
 import { registry } from '../ops/registry.js';
 import { runOperation, type RunInput } from '../ops/runner.js';
 import { ConfirmationRequired, OpError } from '../ops/types.js';
