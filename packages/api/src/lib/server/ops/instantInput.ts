@@ -62,10 +62,7 @@ export function toStoredInstant(value: string, timeZone: string): string {
   return new Date(wallTimeToInstant(wallAsUtc, timeZone)).toISOString();
 }
 
-/**
- * `toStoredInstant` bound to the tenant's time zone as `api` resolves it (§11.4 `timezone`); a
- * database without its `settings` row reads as one whose `timezone` is unset.
- */
+/** `toStoredInstant` bound to the tenant's time zone as `api` resolves it (§11.4 `timezone`). */
 export async function tenantInstantReader(
   db: Db
 ): Promise<(value: string) => string> {
@@ -73,7 +70,7 @@ export async function tenantInstantReader(
     .selectFrom('settings')
     .select('timezone')
     .where('id', '=', 1)
-    .executeTakeFirst();
-  const timeZone = tenantTimeZone(row?.timezone ?? null);
+    .executeTakeFirstOrThrow();
+  const timeZone = tenantTimeZone(row.timezone);
   return value => toStoredInstant(value, timeZone);
 }

@@ -19,10 +19,11 @@ export async function makeTestDb(): Promise<Db> {
   return db;
 }
 
-/** Adds the `settings` row, with a main DID, its clock in `timezone`, for a test that reads it. */
+/** Adds the `settings` row, with a main DID, its clock in `timezone` (`null`: unset), for a test
+ * that reads it. */
 export async function seedTenantTimeZone(
   db: Db,
-  timezone: string
+  timezone: string | null
 ): Promise<void> {
   const targetId = newId();
   await db

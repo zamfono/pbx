@@ -70,6 +70,7 @@ async function seedCall(
 describe('calls', () => {
   it("calls.list as user excludes other users' calls", async () => {
     const db = await makeTestDb();
+    await seedTenantTimeZone(db, null);
     await seedUser(db, 'u1');
     await seedUser(db, 'u2');
     await seedUser(db, 'u3');
@@ -91,6 +92,7 @@ describe('calls', () => {
 
   it('calls.list and calls.get leave out a call still in progress (§10.1 "Call aggregate")', async () => {
     const db = await makeTestDb();
+    await seedTenantTimeZone(db, null);
     const ended = await seedCall(db, {});
     const live = await seedCall(db, { inProgress: true });
 

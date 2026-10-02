@@ -26,6 +26,7 @@ type SnapshotItem = {
 describe('presenceLog.snapshot', () => {
   it("picks each user's latest `since` <= `at` and ignores rows recorded later", async () => {
     const db = await makeTestDb();
+    await seedTenantTimeZone(db, null);
     await db
       .insertInto('presenceLog')
       .values([
@@ -76,6 +77,7 @@ describe('presenceLog.snapshot', () => {
 
   it('scopes to `userId` when given', async () => {
     const db = await makeTestDb();
+    await seedTenantTimeZone(db, null);
     await db
       .insertInto('users')
       .values({

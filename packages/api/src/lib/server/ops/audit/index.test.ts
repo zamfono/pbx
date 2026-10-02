@@ -397,6 +397,7 @@ describe('audit.list', () => {
 describe('audit.list time range', () => {
   it('compares `from` and `to` with an offset as the instants they name, and refuses a non-instant', async () => {
     const db = await makeTestDb();
+    await seedTenantTimeZone(db, null);
     const createdAts = [
       '2026-10-01T09:59:59.999Z',
       '2026-10-01T10:00:00.000Z',

@@ -74,12 +74,14 @@ describe('tenantInstantReader', () => {
   });
 
   it("reads in settings.timezone, and in UTC while it and the stack's TZ are unset", async () => {
-    const db = await makeTestDb();
     vi.stubEnv('TZ', undefined);
+    const unsetDb = await makeTestDb();
+    await seedTenantTimeZone(unsetDb, null);
+    const viennaDb = await makeTestDb();
+    await seedTenantTimeZone(viennaDb, 'Europe/Vienna');
 
-    const unset = await tenantInstantReader(db);
-    await seedTenantTimeZone(db, 'Europe/Vienna');
-    const vienna = await tenantInstantReader(db);
+    const unset = await tenantInstantReader(unsetDb);
+    const vienna = await tenantInstantReader(viennaDb);
 
     expect(unset('2026-10-01T12:00')).toBe('2026-10-01T12:00:00.000Z');
     expect(vienna('2026-10-01T12:00')).toBe('2026-10-01T10:00:00.000Z');
