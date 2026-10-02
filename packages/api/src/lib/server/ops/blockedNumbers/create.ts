@@ -1,16 +1,15 @@
 import { z } from 'zod';
 
-import { newId } from '@zamfono/shared';
+import { isE164, newId } from '@zamfono/shared';
 
 import { propagate, recordChange } from '../runner.js';
 import { Conflict, defineOperation } from '../types.js';
-import { E164_PATTERN } from './_shared.js';
 
 const inputSchema = z
   .object({
     number: z
       .string()
-      .regex(E164_PATTERN)
+      .refine(isE164, 'number must be E.164')
       .describe('The caller number to block, E.164 such as +4930123456.'),
     isPrefix: z
       .boolean()

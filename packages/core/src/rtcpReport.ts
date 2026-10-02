@@ -13,6 +13,8 @@
  * report, whose is null; `lsr` alone is a string.
  */
 
+import { isRecord } from '@zamfono/shared';
+
 /** One report block: what the report's sender measured of the stream `sourceSsrc` sent. */
 export type RtcpReportBlock = {
   sourceSsrc: number;
@@ -47,10 +49,6 @@ const RTCP_RR = 201;
 // (res_rtp_asterisk.c): a value with the sign bit set is a negative count, more duplicates than
 // losses, and so no loss.
 const PACKETS_LOST_SIGN_BIT = 0x800000;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 /** A field as a non-negative integer, from a number or a numeric string; null otherwise. */
 function integer(value: unknown): number | null {

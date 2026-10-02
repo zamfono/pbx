@@ -2,6 +2,9 @@
  * The realtime event union delivered on the `/events` WebSocket and to webhooks (§10.6). Every
  * event also carries `id` (uuid v7) and `at` (ISO), added by the emitter, as `Envelope`.
  */
+
+import type { MwiMailbox } from './internalApi.js';
+
 export type Scope =
   'tenant' | `user:${string}` | `ringGroup:${string}` | `menu:${string}`;
 
@@ -38,7 +41,7 @@ export type Event =
   | {
       type: 'voicemail.new';
       voicemailId: string;
-      mailbox: `user:${string}` | `ringGroup:${string}`;
+      mailbox: MwiMailbox;
     }
   | {
       type: 'ooo';

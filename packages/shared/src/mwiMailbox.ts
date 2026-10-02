@@ -14,6 +14,15 @@ export function mwiMailboxOf(owner: MailboxOwner): MwiMailbox {
     : `ringGroup:${owner.ringGroupId}`;
 }
 
+// The owner part is an entity id, a UUID (§11.1).
+const MWI_MAILBOX =
+  /^(?:user|ringGroup):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+
+/** Whether `value` is an MWI name in exactly the shape `mwiMailboxOf` produces. */
+export function isMwiMailbox(value: string): value is MwiMailbox {
+  return MWI_MAILBOX.test(value);
+}
+
 /** The owner an MWI name addresses, the inverse of `mwiMailboxOf`. */
 export function parseMwiMailbox(mailbox: MwiMailbox): MailboxOwner {
   const ownerId = mailbox.slice(mailbox.indexOf(':') + 1);

@@ -1,6 +1,6 @@
 import * as privateEnv from '$app/env/private';
 
-import { resolveVersion } from '@zamfono/shared';
+import { isRecord, resolveVersion } from '@zamfono/shared';
 
 import type { OpError } from '../ops/types.js';
 import { extensionMembers } from '../problem.js';
@@ -133,10 +133,6 @@ export function promptResult(legacy: boolean, prompt: PromptContent): Result {
   return legacy ? { ...prompt } : complete({ ...prompt });
 }
 
-function isJsonObject(value: unknown): value is Result {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 // A `CallToolResult` carries the tool's value twice: as `structuredContent` for a client that
 // reads it, and serialised in a text block, which the schema says a structured result SHOULD also
 // carry for a client that does not. 2025-11-25 limits `structuredContent` to a JSON object, so a
@@ -151,7 +147,7 @@ function callToolResult(
     { type: 'text', text: JSON.stringify(structured) }
   ];
   const fields: Result =
-    legacy && !isJsonObject(structured)
+    legacy && !isRecord(structured)
       ? { content, isError }
       : { content, structuredContent: structured, isError };
   return legacy ? fields : complete(fields);
