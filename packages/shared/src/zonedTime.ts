@@ -1,11 +1,13 @@
 /**
  * Wall-clock arithmetic in an IANA time zone, for core's opening-hours evaluation
  * (`packages/core/src/routing/schedule.ts`) and api's maintenance-moment resolution
- * (`packages/api/src/lib/jobs/reloadTiming.ts`, §6.4 "Reload timing"):
- * reading the local date, weekday and time of an instant, converting a local date and time back
- * to an instant across DST transitions, and calendar-day and weekday shifts. Every computation
+ * (`packages/api/src/lib/jobs/reloadTiming.ts`, §6.4 "Reload timing") and the time filters of
+ * api's reads (§10.3): reading the local date, weekday and time of an instant, converting a
+ * local date and time back to an instant (the earlier one where a DST change skips or repeats
+ * it), and calendar-day and weekday shifts. Every computation
  * goes through `Intl` rather than a date library.
  */
+import { MS_PER_DAY } from './time.js';
 
 /** ISO 8601 weekday: 1 = Monday … 7 = Sunday. */
 // eslint-disable-next-line no-magic-numbers -- the seven ISO weekday literals of the type itself
@@ -13,10 +15,7 @@ export type Weekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export const MINUTES_PER_HOUR = 60;
 const ISO_WEEK_DAYS = 7;
-// Two passes resolve the DST-transition case (the first guess lands on the wrong side of the
-// offset change); a third pass would never change the result since the offset only takes one
-// of two values around a transition.
-const ZONE_CONVERSION_PASSES = 2;
+const MS_PER_MINUTE = 60_000;
 
 const WEEKDAY_NUMBERS: Record<string, Weekday> = {
   Mon: 1,
@@ -75,10 +74,43 @@ export function parseTimeOfDay(value: string): number {
   return Number(hourPart) * MINUTES_PER_HOUR + Number(minutePart);
 }
 
+/** `timeZone`'s offset from UTC at `instant`, in ms, to the minute that `localParts` reads. */
+function offsetAt(instant: number, timeZone: string): number {
+  const local = localParts(instant, timeZone);
+  const localAsUtc = Date.UTC(
+    local.year,
+    local.month - 1,
+    local.day,
+    local.hour,
+    local.minute
+  );
+  return localAsUtc - Math.floor(instant / MS_PER_MINUTE) * MS_PER_MINUTE;
+}
+
 /**
- * The UTC instant at which `timeZone`'s wall clock reads `year`-`month`-`day`
- * plus `minuteOfDay` minutes. `minuteOfDay` may exceed a day's length
- * (`'24:00'` parses to 1440), which rolls over to the next calendar day.
+ * The instant at which `timeZone`'s wall clock reads `wallAsUtc` (the wall time's fields taken
+ * as UTC). It is read with the zone's offset a day before and a day after; a reading that the
+ * zone's clock actually shows wins, and where both do (a DST overlap) or neither does (a DST
+ * gap) the earlier one is taken.
+ */
+export function wallClockToInstant(
+  wallAsUtc: number,
+  timeZone: string
+): number {
+  const readings = [
+    wallAsUtc - offsetAt(wallAsUtc - MS_PER_DAY, timeZone),
+    wallAsUtc - offsetAt(wallAsUtc + MS_PER_DAY, timeZone)
+  ];
+  const shown = readings.filter(
+    instant => instant + offsetAt(instant, timeZone) === wallAsUtc
+  );
+  return Math.min(...(shown.length > 0 ? shown : readings));
+}
+
+/**
+ * The instant at which `timeZone`'s wall clock reads `year`-`month`-`day` plus `minuteOfDay`
+ * minutes, by `wallClockToInstant`. `minuteOfDay` may exceed a day's length (`'24:00'` parses
+ * to 1440), which rolls over to the next calendar day.
  */
 export function zonedTimeToInstant(
   year: number,
@@ -87,26 +119,10 @@ export function zonedTimeToInstant(
   minuteOfDay: number,
   timeZone: string
 ): number {
-  const hour = Math.floor(minuteOfDay / MINUTES_PER_HOUR);
-  const minute = minuteOfDay % MINUTES_PER_HOUR;
-  const wantedAsUtc = Date.UTC(year, month - 1, day, hour, minute);
-  let guess = wantedAsUtc;
-  for (let pass = 0; pass < ZONE_CONVERSION_PASSES; pass += 1) {
-    const seen = localParts(guess, timeZone);
-    const seenAsUtc = Date.UTC(
-      seen.year,
-      seen.month - 1,
-      seen.day,
-      seen.hour,
-      seen.minute
-    );
-    const drift = seenAsUtc - wantedAsUtc;
-    if (drift === 0) {
-      break;
-    }
-    guess -= drift;
-  }
-  return guess;
+  return wallClockToInstant(
+    Date.UTC(year, month - 1, day, 0, minuteOfDay),
+    timeZone
+  );
 }
 
 /** Shifts a calendar date by `offset` days, independent of any time zone. */

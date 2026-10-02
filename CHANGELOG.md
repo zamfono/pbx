@@ -75,6 +75,11 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
+- On a DST night, an opening-hours edge or a maintenance hour at a local time the clock change
+  skips or repeats now lies at the earlier of its two possible instants, as the time filters of
+  `GET /calls`, `GET /audit` and `GET /presence/log` already read such a time: the `hours`
+  events and the certificate reload follow it. In zones east of UTC this is an hour earlier than
+  before.
 - The lists of DIDs, number blocks, blocked numbers, webhooks and backup targets and runs return
   the same opaque `nextCursor` as every other list instead of the last row's id. A row id passed
   as `cursor`, as these lists returned it up to 0.1.0, is still taken throughout 0.1.

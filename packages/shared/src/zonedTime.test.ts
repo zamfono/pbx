@@ -65,6 +65,31 @@ describe('zonedTimeToInstant', () => {
     ).toBe('2026-03-30T07:00:00.000Z');
   });
 
+  it.each([
+    // Europe/Berlin: 02:00-03:00 is skipped on 2026-03-29 and repeated on 2026-10-25.
+    ['Europe/Berlin', '2026-03-29', '02:30', '2026-03-29T00:30:00.000Z'],
+    ['Europe/Berlin', '2026-10-25', '02:30', '2026-10-25T00:30:00.000Z'],
+    // America/New_York: 02:00-03:00 is skipped on 2026-03-08, 01:00-02:00 repeated on 2026-11-01.
+    ['America/New_York', '2026-03-08', '02:30', '2026-03-08T06:30:00.000Z'],
+    ['America/New_York', '2026-11-01', '01:30', '2026-11-01T05:30:00.000Z']
+  ])(
+    'takes the earlier instant where DST skips or repeats the local time: %s %s %s',
+    (timeZone, date, time, instant) => {
+      const day = new Date(date);
+      expect(
+        new Date(
+          zonedTimeToInstant(
+            day.getUTCFullYear(),
+            day.getUTCMonth() + 1,
+            day.getUTCDate(),
+            parseTimeOfDay(time),
+            timeZone
+          )
+        ).toISOString()
+      ).toBe(instant);
+    }
+  );
+
   it('rolls 24:00 over to the next midnight', () => {
     expect(
       new Date(

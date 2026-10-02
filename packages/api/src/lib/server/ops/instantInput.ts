@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { localParts, MS_PER_DAY, type Db } from '@zamfono/shared';
+import { wallClockToInstant, type Db } from '@zamfono/shared';
 
 import { tenantTimeZone } from '../tenantTimeZone.js';
 
@@ -16,38 +16,6 @@ export const instantInput = z.union([
 
 const ISO_DATE_LENGTH = 'YYYY-MM-DD'.length;
 const HAS_OFFSET = /(?:Z|[+-]\d{2}:\d{2})$/u;
-const MS_PER_MINUTE = 60_000;
-
-/** `timeZone`'s offset from UTC at `instant`, in ms, to the minute that `localParts` reads. */
-function offsetAt(instant: number, timeZone: string): number {
-  const local = localParts(instant, timeZone);
-  const localAsUtc = Date.UTC(
-    local.year,
-    local.month - 1,
-    local.day,
-    local.hour,
-    local.minute
-  );
-  return localAsUtc - Math.floor(instant / MS_PER_MINUTE) * MS_PER_MINUTE;
-}
-
-/**
- * The instant at which `timeZone`'s wall clock reads `wallAsUtc` (the wall time's fields taken
- * as UTC). It is read with the zone's offset a day before and a day after; a reading that the
- * zone's clock actually shows wins, and where both do (a DST overlap) or neither does (a DST
- * gap) the earlier one is taken.
- */
-function wallTimeToInstant(wallAsUtc: number, timeZone: string): number {
-  const readings = [
-    wallAsUtc - offsetAt(wallAsUtc - MS_PER_DAY, timeZone),
-    wallAsUtc - offsetAt(wallAsUtc + MS_PER_DAY, timeZone)
-  ];
-  const shown = readings.filter(
-    instant => instant + offsetAt(instant, timeZone) === wallAsUtc
-  );
-  return Math.min(...(shown.length > 0 ? shown : readings));
-}
-
 /**
  * `value`, an `instantInput`, in the form an `_at` column holds (`toISOString`: UTC with
  * milliseconds), so a string comparison against the column compares instants. A value with an
@@ -59,7 +27,7 @@ export function toStoredInstant(value: string, timeZone: string): string {
   }
   const wall = value.length === ISO_DATE_LENGTH ? `${value}T00:00` : value;
   const wallAsUtc = Date.parse(`${wall}Z`);
-  return new Date(wallTimeToInstant(wallAsUtc, timeZone)).toISOString();
+  return new Date(wallClockToInstant(wallAsUtc, timeZone)).toISOString();
 }
 
 /** `toStoredInstant` bound to the tenant's time zone as `api` resolves it (§11.4 `timezone`). */
