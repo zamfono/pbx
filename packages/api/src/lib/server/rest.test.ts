@@ -1,190 +1,95 @@
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { describe, expect, it } from 'vitest';
-import { z } from 'zod';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
+
+import { storeAudio } from './audio/types.js';
+import { getCoreClient } from './coreClient.js';
+import { stubCoreClient } from './coreClientStub.js';
 import { buildOpenApiDocument, type OpenApiDocument } from './openapi.js';
-import { register } from './ops/registry.js';
-import { Conflict, defineOperation, type Actor } from './ops/types.js';
-import { decodeCursor, encodeCursor } from './pagination.js';
+import { registry } from './ops/registry.js';
+import { type Actor } from './ops/types.js';
 import { handleRest, type RestDeps } from './rest.js';
 import { routes } from './restRoutes.js';
-import { makeTestDb } from './testDb.js';
+import { makeTestDb, seedTenantTimeZone } from './testDb.js';
 
-const PAGE_ITEM_COUNT = 5;
-const ITEMS = Array.from({ length: PAGE_ITEM_COUNT }, (_unused, index) => ({
-  id: `user-${index}`
+// The upload is the REST transport's to parse; transcoding it is `audio.create`'s own concern.
+vi.mock('./audio/types.js', () => ({
+  storeAudio: vi.fn(async () =>
+    Promise.resolve({ id: newId(), filename: 'welcome.wav' })
+  ),
+  deleteAudioFile: vi.fn(async () => Promise.resolve())
 }));
 
-// Stubs standing in for `users.list`/`users.delete` and `trunks.delete`: these tests cover the
-// REST catch-all's own plumbing — pagination, confirmation, error shapes — against real
-// route-table entries, without depending on those operations' own behaviour.
-register(
-  defineOperation({
-    name: 'users.list',
-    description: 'Lists tenant users, paginated.',
-    input: z.object({
-      limit: z.number().optional(),
-      cursor: z.string().optional()
-    }),
-    minRole: 'admin',
-    readOnly: true,
-    run: (_ctx, input) => {
-      const offset =
-        input.cursor === undefined
-          ? 0
-          : (decodeCursor(input.cursor) as { offset: number }).offset;
-      const limit = input.limit ?? ITEMS.length;
-      const page = ITEMS.slice(offset, offset + limit);
-      const nextOffset = offset + limit;
-      const nextCursor =
-        nextOffset < ITEMS.length ? encodeCursor({ offset: nextOffset }) : null;
-      return Promise.resolve({ items: page, nextCursor });
-    }
-  })
-);
-
-register(
-  defineOperation({
-    name: 'users.delete',
-    description: 'Deletes a user.',
-    input: z.object({ id: z.string() }),
-    minRole: 'admin',
-    confirm: input => `Delete user ${input.id}?`,
-    entity: input => ({ kind: 'user', id: input.id }),
-    run: () => Promise.resolve({ ok: true })
-  })
-);
-
-register(
-  defineOperation({
-    name: 'trunks.delete',
-    description: 'Deletes a trunk.',
-    input: z.object({ id: z.string() }),
-    minRole: 'admin',
-    confirm: input => `Delete trunk ${input.id}?`,
-    entity: input => ({ kind: 'trunk', id: input.id }),
-    run: () =>
-      Promise.reject(
-        new Conflict('trunk is in use', [
-          { kind: 'outboundRoute', id: 'route-1', label: 'Main route' }
-        ])
-      )
-  })
-);
-
-// Mirrors ops/search/query.ts's own schema, so `q` (a digits-only string is a legal search term)
-// is never guessed into a number by the transport (§10.3, `GET /search?q=`).
-register(
-  defineOperation({
-    name: 'search.query',
-    description: 'The type-ahead behind the search bar.',
-    // eslint-disable-next-line id-length -- 'q' is the wire query-parameter name fixed by §10.3
-    input: z.object({ q: z.string().min(1) }).strict(),
-    minRole: 'user',
-    readOnly: true,
-    run: (_ctx, input) =>
-      // eslint-disable-next-line id-length -- 'q' is the wire query-parameter name fixed by §10.3
-      Promise.resolve({ items: [], q: input.q })
-  })
-);
-
-register(
-  defineOperation({
-    name: 'calls.list',
-    description: 'Lists call history.',
-    input: z
-      .object({
-        live: z.boolean().optional(),
-        limit: z.number().optional(),
-        cursor: z.string().optional()
-      })
-      .strict(),
-    minRole: 'user',
-    readOnly: true,
-    run: (_ctx, input) =>
-      Promise.resolve({ items: [], live: input.live ?? false })
-  })
-);
-
-// Mirrors `ops/ooo`'s own scope shape: a scope route's path carries the area and the id, and the
-// operation takes them as the one discriminated object its schema declares (§10.3).
-const scopeSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('tenant') }),
-  z.object({ kind: z.literal('user'), id: z.string() }),
-  z.object({ kind: z.literal('ringGroup'), id: z.string() }),
-  z.object({ kind: z.literal('menu'), id: z.string() })
-]);
-register(
-  defineOperation({
-    name: 'ooo.list',
-    description: 'Lists out-of-office periods for a scope.',
-    input: z.object({ scope: scopeSchema }).strict(),
-    minRole: 'admin',
-    readOnly: true,
-    run: (_ctx, input) =>
-      Promise.resolve({ items: [input.scope], nextCursor: null })
-  })
-);
-register(
-  defineOperation({
-    name: 'ooo.create',
-    description: 'Creates an out-of-office period for a scope.',
-    input: z
-      .object({ scope: scopeSchema, from: z.string(), to: z.string() })
-      .strict(),
-    minRole: 'admin',
-    entity: () => ({ kind: 'ooo', id: null }),
-    run: () => Promise.resolve({ id: 'ooo-1' })
-  })
-);
-
-// Mirrors ops/audio/create.ts's own schema: a `multipart: true` route's file field must reach the
-// operation as `{ filename, mimeType, data }`, the shape `upload` requires (§10.3 "Audio").
-register(
-  defineOperation({
-    name: 'audio.create',
-    description: 'Uploads a new audio asset.',
-    input: z
-      .object({
-        kind: z.enum(['greeting', 'moh', 'vmGreeting', 'announcement']),
-        label: z.string().min(1),
-        upload: z.object({
-          filename: z.string().min(1),
-          mimeType: z.string().min(1),
-          data: z.instanceof(Buffer)
-        })
-      })
-      .strict(),
-    minRole: 'admin',
-    entity: (_input, out: { id: string }) => ({ kind: 'audio', id: out.id }),
-    run: (_ctx, input) =>
-      Promise.resolve({ id: 'audio-1', filename: input.upload.filename })
-  })
-);
-
-register(
-  defineOperation({
-    name: 'voicemails.audio',
-    description: "Returns a voicemail's recorded audio.",
-    input: z.object({ id: z.string() }).strict(),
-    minRole: 'user',
-    readOnly: true,
-    run: (_ctx, input) =>
-      Promise.resolve({
-        bytes: Buffer.from(`audio-for-${input.id}`),
-        contentType: 'audio/mpeg',
-        filename: `${input.id}.mp3`
-      })
-  })
-);
-
-const admin: Actor = { id: 'admin1', name: 'Admin', role: 'admin' };
+const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
+const USER_IDS = ['u0', 'u1', 'u2', 'u3'];
 
 /** A fresh in-memory database per test, so the tests never share mutable state. */
 async function testDeps(): Promise<RestDeps> {
   const db = await makeTestDb();
   return { db, requestId: 'req-1' };
 }
+
+async function seedUsers(db: Db): Promise<void> {
+  await db
+    .insertInto('users')
+    .values(
+      USER_IDS.map(id => ({
+        id,
+        name: id,
+        email: `${id}@x.test`,
+        role: 'user' as const,
+        createdAt: nowIso()
+      }))
+    )
+    .execute();
+  // `makeTestDb`'s owner and every user above, each with the extension a user always has.
+  await db
+    .insertInto('extensions')
+    .values(
+      ['owner', ...USER_IDS].map((userId, index) => ({
+        ext: `${100 + index}`,
+        userId,
+        ringGroupId: null
+      }))
+    )
+    .execute();
+}
+
+function rest(
+  deps: RestDeps,
+  url: string,
+  init?: RequestInit
+): Promise<Response> {
+  return handleRest(new Request(`http://api/api/v1${url}`, init), owner, deps);
+}
+
+function postJson(body: unknown): RequestInit {
+  return {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body)
+  };
+}
+
+const OOO_PERIOD = {
+  startsAt: '2026-08-01T00:00:00Z',
+  expiresAt: '2026-08-08T00:00:00Z',
+  target: { kind: 'external', external: '+491234567' }
+};
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe('the REST route table', () => {
+  it('names a registered operation on every row', () => {
+    expect(routes.filter(route => !registry.has(route.op))).toEqual([]);
+  });
+});
 
 describe('handleRest', () => {
   it('answers 401 problem+json for a request without a bearer token', async () => {
@@ -204,56 +109,37 @@ describe('handleRest', () => {
 
   it('answers 404 for a path matching no route', async () => {
     const deps = await testDeps();
-    const response = await handleRest(
-      new Request('http://api/api/v1/nope'),
-      admin,
-      deps
-    );
+    const response = await rest(deps, '/nope');
     expect(response.status).toBe(404);
   });
 
   it("hands a scope route's area and id to the operation as one scope object", async () => {
     const deps = await testDeps();
-    const response = await handleRest(
-      new Request('http://api/api/v1/ringGroups/rg-1/ooo'),
-      admin,
-      deps
-    );
-    expect(response.status).toBe(200);
     // The operation's schema declares `scope` as a discriminated object, so a flat `scope`
     // string with a separate `scopeId` is refused by its own validation before it ever runs.
-    const body = (await response.json()) as { items: unknown[] };
-    expect(body.items[0]).toEqual({ kind: 'ringGroup', id: 'rg-1' });
+    const created = await rest(deps, '/users/owner/ooo', postJson(OOO_PERIOD));
+    expect(created.status).toBe(200);
+    const response = await rest(deps, '/users/owner/ooo');
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { items: { scope: unknown }[] };
+    expect(body.items.map(item => item.scope)).toEqual([
+      { kind: 'user', id: 'owner' }
+    ]);
   });
 
   it('hands a tenant-scoped route the scope with no id', async () => {
     const deps = await testDeps();
-    const response = await handleRest(
-      new Request('http://api/api/v1/tenant/ooo'),
-      admin,
-      deps
-    );
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as { items: unknown[] };
-    expect(body.items[0]).toEqual({ kind: 'tenant' });
-  });
-
-  it('answers 501 for a route whose operation is not registered yet', async () => {
-    const deps = await testDeps();
-    const response = await handleRest(
-      new Request('http://api/api/v1/ringGroups'),
-      admin,
-      deps
-    );
-    expect(response.status).toBe(501);
+    const created = await rest(deps, '/tenant/ooo', postJson(OOO_PERIOD));
+    expect(created.status).toBe(200);
+    const response = await rest(deps, '/tenant/ooo');
+    const body = (await response.json()) as { items: { scope: unknown }[] };
+    expect(body.items.map(item => item.scope)).toEqual([{ kind: 'tenant' }]);
   });
 
   it('answers 409 with the confirmation question when DELETE omits confirm', async () => {
     const deps = await testDeps();
-    const request = new Request('http://api/api/v1/users/u1', {
-      method: 'DELETE'
-    });
-    const response = await handleRest(request, admin, deps);
+    await seedUsers(deps.db);
+    const response = await rest(deps, '/users/u1', { method: 'DELETE' });
     expect(response.status).toBe(409);
     const body = (await response.json()) as {
       confirmationRequired: boolean;
@@ -265,77 +151,71 @@ describe('handleRest', () => {
 
   it('runs the operation once the body carries confirm: true', async () => {
     const deps = await testDeps();
-    const request = new Request('http://api/api/v1/users/u1', {
+    await seedUsers(deps.db);
+    // Deleting a user re-pushes the provisioning roster, which reads the tenant settings.
+    await seedTenantTimeZone(deps.db, null);
+    const response = await rest(deps, '/users/u1', {
       method: 'DELETE',
       body: JSON.stringify({ confirm: true })
     });
-    const response = await handleRest(request, admin, deps);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true });
+    expect(await response.json()).toEqual({ id: 'u1' });
   });
 
   it('answers 409 with the blocking references for a Conflict', async () => {
     const deps = await testDeps();
-    const request = new Request('http://api/api/v1/trunks/t1', {
-      method: 'DELETE',
-      body: JSON.stringify({ confirm: true })
-    });
-    const response = await handleRest(request, admin, deps);
+    const number = '+4930123456';
+    const first = await rest(deps, '/blockedNumbers', postJson({ number }));
+    const { id } = (await first.json()) as { id: string };
+    const response = await rest(deps, '/blockedNumbers', postJson({ number }));
     expect(response.status).toBe(409);
     const body = (await response.json()) as {
       references: { kind: string; id: string; label: string }[];
     };
     expect(body.references).toEqual([
-      { kind: 'outboundRoute', id: 'route-1', label: 'Main route' }
+      { kind: 'blockedNumber', id, label: number }
     ]);
   });
 
   it('paginates with ?limit= and continues from the returned nextCursor', async () => {
     const deps = await testDeps();
+    await seedUsers(deps.db);
     const LIMIT = 2;
-    const first = await handleRest(
-      new Request(`http://api/api/v1/users?limit=${LIMIT}`),
-      admin,
-      deps
-    );
+    const first = await rest(deps, `/users?limit=${LIMIT}`);
     const firstBody = (await first.json()) as {
-      items: unknown[];
+      items: { id: string }[];
       nextCursor: string;
     };
-    expect(firstBody.items).toEqual(ITEMS.slice(0, LIMIT));
+    expect(firstBody.items).toHaveLength(LIMIT);
     expect(typeof firstBody.nextCursor).toBe('string');
 
-    const second = await handleRest(
-      new Request(
-        `http://api/api/v1/users?limit=${LIMIT}&cursor=${encodeURIComponent(firstBody.nextCursor)}`
-      ),
-      admin,
-      deps
+    const second = await rest(
+      deps,
+      `/users?limit=${LIMIT}&cursor=${encodeURIComponent(firstBody.nextCursor)}`
     );
-    const secondBody = (await second.json()) as { items: unknown[] };
-    expect(secondBody.items).toEqual(ITEMS.slice(LIMIT, LIMIT * 2));
+    const secondBody = (await second.json()) as { items: { id: string }[] };
+    expect(secondBody.items).toHaveLength(LIMIT);
+    const seen = [...firstBody.items, ...secondBody.items].map(item => item.id);
+    expect(new Set(seen).size).toBe(LIMIT * 2);
   });
 
   it('does not coerce a digits-only string filter into a number', async () => {
     const deps = await testDeps();
-    const response = await handleRest(
-      new Request('http://api/api/v1/search?q=101'),
-      admin,
-      deps
-    );
+    // `search.query`'s `q` is a string; a number would fail its validation with a 422.
+    const response = await rest(deps, '/search?q=101');
     expect(response.status).toBe(200);
-    // eslint-disable-next-line id-length -- 'q' is the wire query-parameter name fixed by §10.3
-    expect(await response.json()).toEqual({ items: [], q: '101' });
   });
 
   it('coerces a boolean query field the operation schema declares', async () => {
     const deps = await testDeps();
-    const response = await handleRest(
-      new Request('http://api/api/v1/calls?live=true'),
-      admin,
-      deps
+    const state = vi.fn(() =>
+      Promise.resolve({ calls: [] } as unknown as StateResponse)
     );
-    expect(await response.json()).toEqual({ items: [], live: true });
+    vi.mocked(getCoreClient).mockReturnValue(stubCoreClient({ state }));
+    const response = await rest(deps, '/calls?live=true');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ items: [], nextCursor: null });
+    expect(state).toHaveBeenCalledOnce();
   });
 
   it('parses a multipart upload into the operation contract', async () => {
@@ -349,34 +229,46 @@ describe('handleRest', () => {
         type: 'audio/wav'
       })
     );
-    const response = await handleRest(
-      new Request('http://api/api/v1/audio', { method: 'POST', body: form }),
-      admin,
-      deps
-    );
+    const response = await rest(deps, '/audio', { method: 'POST', body: form });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      id: 'audio-1',
-      filename: 'welcome.wav'
+    expect(vi.mocked(storeAudio)).toHaveBeenCalledWith('greeting', {
+      filename: 'welcome.wav',
+      mimeType: 'audio/wav',
+      data: Buffer.from('audio-bytes')
     });
+    expect(await response.json()).toMatchObject({ label: 'Welcome' });
   });
 
   it('answers audio bytes directly instead of JSON-wrapping a Buffer', async () => {
     const deps = await testDeps();
-    const response = await handleRest(
-      new Request('http://api/api/v1/voicemails/vm1/audio'),
-      admin,
-      deps
+    const mediaDir = await mkdtemp(path.join(os.tmpdir(), 'zamfono-rest-'));
+    await mkdir(path.join(mediaDir, 'voicemail'));
+    await writeFile(
+      path.join(mediaDir, 'voicemail', 'vm1.wav'),
+      'audio-for-vm1'
     );
+    vi.stubEnv('MEDIA_DIR', mediaDir);
+    await deps.db
+      .insertInto('voicemails')
+      .values({
+        id: 'vm1',
+        mailboxUserId: 'owner',
+        caller: '+491234',
+        filename: 'vm1.wav',
+        durationS: 10,
+        read: 0,
+        createdAt: nowIso()
+      })
+      .execute();
+    const response = await rest(deps, '/voicemails/vm1/audio');
     expect(response.status).toBe(200);
-    expect(response.headers.get('content-type')).toBe('audio/mpeg');
+    expect(response.headers.get('content-type')).toBe('audio/wav');
     const body = Buffer.from(await response.arrayBuffer());
     expect(body.toString()).toBe('audio-for-vm1');
   });
 });
 
-/** `doc.paths[pattern][method]`, every route table entry this describe block asserts on
- * (registered by the routes above or `ops/index.js`). */
+/** `doc.paths[pattern][method]`, every route table entry this describe block asserts on. */
 function operationAt(
   doc: OpenApiDocument,
   pattern: string,
@@ -390,7 +282,7 @@ function operationAt(
 }
 
 describe('buildOpenApiDocument', () => {
-  it('lists every route of the table, with a zod-derived schema where the operation is registered', () => {
+  it("lists every route of the table, with its operation's zod-derived schema", () => {
     const doc = buildOpenApiDocument();
     expect(doc.openapi).toBe('3.1.0');
     for (const route of routes) {
@@ -403,7 +295,7 @@ describe('buildOpenApiDocument', () => {
     const limitParam = usersList.parameters?.find(
       parameter => parameter.name === 'limit'
     );
-    expect(limitParam?.schema.type).toBe('number');
+    expect(limitParam?.schema.type).toBe('integer');
     // `{id}` is the URL's (§10.3); the body carries the confirmation instead.
     const usersDelete = operationAt(doc, '/users/{id}', 'delete');
     const deleteBody =
@@ -413,7 +305,7 @@ describe('buildOpenApiDocument', () => {
   });
 
   it('does not throw building the document once an area with an unrepresentable input type (a Buffer) is registered', () => {
-    // `audio.create` (registered above) carries `z.instanceof(Buffer)`; without
+    // `audio.create` carries `z.instanceof(Buffer)`; without
     // `unrepresentable: 'any'`, z.toJSONSchema throws for it.
     expect(() => buildOpenApiDocument()).not.toThrow();
     const doc = buildOpenApiDocument();

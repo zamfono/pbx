@@ -38,7 +38,7 @@ function eventFor(url: string): RequestEvent {
 }
 
 describe('GET /api/v1/[...path]', () => {
-  it('dispatches to a real registered operation instead of answering 501, proving the registry is filled', async () => {
+  it('dispatches to a real registered operation, proving the registry is filled', async () => {
     // eslint-disable-next-line new-cap -- GET is the fixed SvelteKit route-handler export name
     const response = await GET(eventFor('http://api/api/v1/blockedNumbers'));
     expect(response.status).toBe(200);

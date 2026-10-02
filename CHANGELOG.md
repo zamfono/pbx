@@ -154,6 +154,8 @@ why the specified behaviour changed; the commit history, how.
   `api` now logs a warning saying so, where it said nothing.
 - A frame on `core`'s internal event stream that `api` cannot read is still dropped, and `api`
   now logs a warning with it.
+- The OpenAPI document no longer lists a `501` response for every endpoint: every REST endpoint
+  runs its operation, so none answers `501`.
 
 ### Fixed
 

@@ -3,6 +3,11 @@
  * how each row builds its operation's path-derived input fields. `rest.ts` matches requests
  * against it; `openapi.ts` documents it.
  */
+// Side-effect import: fills the registry (§10.3) with the operations the rows below name.
+import './ops/index.js';
+
+import { registry, type ErasedOperation } from './ops/registry.js';
+
 export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 type ParamsFn = (match: RegExpMatchArray) => Record<string, unknown>;
 
@@ -86,8 +91,7 @@ function scopeRoutes(suffix: string, entries: ScopeEntry[]): RouteTuple[] {
   );
 }
 
-// §10.3's REST surface table, one row per endpoint. A name absent from the registry answers 501
-// (checked in `handleRest`), so the table may name an endpoint no operation backs.
+// §10.3's REST surface table, one row per endpoint.
 const STATIC_ROUTES: RouteTuple[] = [
   ...crud('users', '/users', ALL_CRUD),
   ['POST', '/users/{id}/resetPassword', 'users.resetPassword'],
@@ -184,3 +188,14 @@ const STATIC_ROUTES: RouteTuple[] = [
 ];
 
 export const routes: RouteEntry[] = STATIC_ROUTES.map(toRouteEntry);
+
+/** The operation `route` runs; every row names a registered one, so a miss is a bug in the table. */
+export function routeOperation(route: RouteEntry): ErasedOperation {
+  const op = registry.get(route.op);
+  if (!op) {
+    throw new Error(
+      `restRoutes: ${route.method} ${route.pattern} names no registered operation '${route.op}'`
+    );
+  }
+  return op;
+}

@@ -1,11 +1,16 @@
 import type { Db } from '@zamfono/shared';
 
-import { registry } from './ops/registry.js';
+import type { ErasedOperation } from './ops/registry.js';
 import { runOperation } from './ops/runner.js';
 import { type Actor } from './ops/types.js';
 import { problem, problemFromError } from './problem.js';
 import { readBody } from './restBody.js';
-import { defaultParams, routes, type RouteEntry } from './restRoutes.js';
+import {
+  defaultParams,
+  routeOperation,
+  routes,
+  type RouteEntry
+} from './restRoutes.js';
 import { outputResponse } from './restTransport.js';
 
 export type RestDeps = {
@@ -28,21 +33,26 @@ function compilePattern(pattern: string): RegExp {
   return new RegExp(`^${source}$`, 'u');
 }
 
-type Matched = { route: RouteEntry; match: RegExpMatchArray };
+type Matched = {
+  route: RouteEntry;
+  op: ErasedOperation;
+  match: RegExpMatchArray;
+};
 
 const compiled = routes.map(route => ({
   route,
+  op: routeOperation(route),
   regex: compilePattern(route.pattern)
 }));
 
 function matchRoute(method: string, path: string): Matched | null {
-  for (const { route, regex } of compiled) {
+  for (const { route, op, regex } of compiled) {
     if (route.method !== method) {
       continue;
     }
     const match = path.match(regex);
     if (match) {
-      return { route, match };
+      return { route, op, match };
     }
   }
   return null;
@@ -50,7 +60,6 @@ function matchRoute(method: string, path: string): Matched | null {
 
 const UNAUTHORIZED_STATUS = 401;
 const NOT_FOUND_STATUS = 404;
-const NOT_IMPLEMENTED_STATUS = 501;
 const API_PREFIX = '/api/v1';
 
 function requestPath(request: Request): string {
@@ -61,8 +70,8 @@ function requestPath(request: Request): string {
 }
 
 /**
- * The REST catch-all (§10.3): matches `request` against the route table, checks the operation is
- * registered, builds its input from the path, query or body, and runs it. `actor` is `null` for a
+ * The REST catch-all (§10.3): matches `request` against the route table, builds the operation's
+ * input from the path, query or body, and runs it. `actor` is `null` for a
  * missing or invalid bearer token; every other REST convention (confirmation, RBAC, validation)
  * is the runner's.
  */
@@ -78,11 +87,7 @@ export async function handleRest(
   if (!matched) {
     return problem(NOT_FOUND_STATUS, 'no such endpoint');
   }
-  const { route, match } = matched;
-  const op = registry.get(route.op);
-  if (!op) {
-    return problem(NOT_IMPLEMENTED_STATUS, 'operation not yet available');
-  }
+  const { route, op, match } = matched;
   try {
     const { confirm, ...fields } = await readBody(request, route, op.input);
     const input = { ...fields, ...(route.params ?? defaultParams)(match) };

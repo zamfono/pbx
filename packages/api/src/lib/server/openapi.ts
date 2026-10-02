@@ -8,8 +8,7 @@ import {
   publishedInputSchema,
   type JsonSchema
 } from './ops/publishedSchema.js';
-import { registry } from './ops/registry.js';
-import { routes, type RouteEntry } from './restRoutes.js';
+import { routeOperation, routes, type RouteEntry } from './restRoutes.js';
 
 type Parameter = {
   name: string;
@@ -63,9 +62,8 @@ const PROBLEM_SCHEMA: JsonSchema = {
 };
 
 // Every operation can answer any of these through the runner (§10.3 "Confirmation", RBAC, input
-// validation) or the route table itself (an operation not yet registered), regardless of its own
-// success shape.
-const PROBLEM_STATUSES = ['401', '403', '404', '409', '422', '501'];
+// validation), regardless of its own success shape.
+const PROBLEM_STATUSES = ['401', '403', '404', '409', '422'];
 
 const BEARER_SECURITY_SCHEME: JsonSchema = {
   type: 'http',
@@ -121,13 +119,13 @@ function responses(): OpenApiOperation['responses'] {
 }
 
 function operationFor(route: RouteEntry): OpenApiOperation {
-  const op = registry.get(route.op);
+  const op = routeOperation(route);
   const captures = pathParamNames(route.pattern);
   const { byCapture, constants } = routeFieldMapping(route);
   const pathFields = new Set(byCapture.values());
-  const inputSchema = op ? inputJsonSchema(op) : undefined;
+  const inputSchema = inputJsonSchema(op);
   const properties =
-    (inputSchema?.properties as Record<string, JsonSchema> | undefined) ?? {};
+    (inputSchema.properties as Record<string, JsonSchema> | undefined) ?? {};
   // OpenAPI 3.1 §4.8.12.1 / Path Templating: a path parameter's `name` is the template expression
   // itself (`{id}` → `id`), regardless of the operation field it fills; `x-operation-field` carries
   // that field name where it differs (`{id}` → `userId` on `/users/{id}/devices`).
@@ -145,14 +143,11 @@ function operationFor(route: RouteEntry): OpenApiOperation {
   });
   const base: OpenApiOperation = {
     operationId: OPERATION_IDS.get(route) ?? route.op,
-    summary: op?.description ?? route.op,
+    summary: op.description,
     'x-operation-name': route.op,
     parameters,
     responses: responses()
   };
-  if (!op || !inputSchema) {
-    return base;
-  }
   if (route.method === 'GET') {
     return {
       ...base,
@@ -179,8 +174,7 @@ function operationFor(route: RouteEntry): OpenApiOperation {
 
 /**
  * The OpenAPI 3.1 document served at `/api/v1/openapi.json` (§10.3): every route of the table
- * appears, with the zod-derived JSON Schema for an operation already in the registry — a route
- * whose operation is not registered yet still lists its path and its possible 501.
+ * appears, with its operation's zod-derived JSON Schema.
  */
 export function buildOpenApiDocument(): OpenApiDocument {
   const paths: OpenApiDocument['paths'] = {};
