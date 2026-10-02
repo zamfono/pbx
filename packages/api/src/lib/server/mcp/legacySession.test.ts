@@ -4,13 +4,12 @@ import { handleMcpRequest } from '../mcp.js';
 import {
   CURRENT,
   LEGACY,
-  legacyRequest,
-  legacySession,
   mcpRequest,
   rpc,
   seededDeps,
   type RpcBody
 } from './testKit.js';
+import { legacyRequest, legacySession } from './testKitLegacy.js';
 
 // A legacy session's handshake and the requests that follow it, per
 // https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle#version-negotiation and

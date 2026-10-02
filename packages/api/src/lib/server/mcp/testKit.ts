@@ -20,7 +20,6 @@ export const CLIENT_ID = 'client-1';
 const CLIENT_NAME = 'Ops Console';
 export const CURRENT = '2026-07-28';
 export const LEGACY = '2025-11-25';
-const SSE_SEPARATOR = '\n\n';
 const STATUS_CONFLICT = 409;
 
 register(
@@ -158,65 +157,6 @@ export type RpcBody = {
 
 export async function rpc(deps: McpDeps, request: Request): Promise<RpcBody> {
   return (await (await handleMcpRequest(deps, request)).json()) as RpcBody;
-}
-
-/** Opens a legacy session and returns the headers every later request of it carries. */
-export async function legacySession(
-  deps: McpDeps,
-  capabilities: Record<string, unknown> = {}
-): Promise<Record<string, string>> {
-  const init = await handleMcpRequest(
-    deps,
-    mcpRequest({
-      jsonrpc: '2.0',
-      id: 'init',
-      method: 'initialize',
-      params: {
-        protocolVersion: LEGACY,
-        capabilities,
-        clientInfo: { name: 'test', version: '1' }
-      }
-    })
-  );
-  return {
-    'mcp-protocol-version': LEGACY,
-    'mcp-session-id': init.headers.get('mcp-session-id') ?? ''
-  };
-}
-
-export function legacyRequest(
-  headers: Record<string, string>,
-  id: number,
-  method: string,
-  params: Record<string, unknown> = {}
-): Request {
-  return mcpRequest({ jsonrpc: '2.0', id, method, params }, headers);
-}
-
-/** Reads newline-delimited `data: <json>` SSE events off a Streamable HTTP response one at a time. */
-export async function* readSseEvents(response: Response): AsyncGenerator {
-  const body = response.body;
-  if (!body) {
-    throw new Error('SSE response has no body');
-  }
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  for (;;) {
-    let separator = buffer.indexOf(SSE_SEPARATOR);
-    while (separator === -1) {
-      // eslint-disable-next-line no-await-in-loop -- one stream reader, reads are inherently sequential
-      const { value, done } = await reader.read();
-      if (done) {
-        return;
-      }
-      buffer += decoder.decode(value, { stream: true });
-      separator = buffer.indexOf(SSE_SEPARATOR);
-    }
-    const raw = buffer.slice(0, separator);
-    buffer = buffer.slice(separator + SSE_SEPARATOR.length);
-    yield JSON.parse(raw.replace(/^data: /u, ''));
-  }
 }
 
 export const SERVER_INFO_META = {

@@ -1,13 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { handleMcpRequest } from '../mcp.js';
-import {
-  currentRequest,
-  legacyRequest,
-  legacySession,
-  seededDeps,
-  type RpcBody
-} from './testKit.js';
+import { currentRequest, seededDeps, type RpcBody } from './testKit.js';
+import { legacyRequest, legacySession } from './testKitLegacy.js';
 
 // `ping` exists in 2025-11-25 only
 // (https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/ping); 2026-07-28

@@ -15,16 +15,18 @@ import {
   currentToolResult,
   JWT_SECRET,
   LEGACY,
-  legacyRequest,
-  legacySession,
   mcpRequest,
   ORIGIN,
-  readSseEvents,
   rpc,
   seededDeps,
   SERVER_INFO_META,
   type RpcBody
 } from './mcp/testKit.js';
+import {
+  legacyRequest,
+  legacySession,
+  readSseEvents
+} from './mcp/testKitLegacy.js';
 
 // The result shapes below are asserted field by field against the MCP schema of the era the
 // request speaks: https://modelcontextprotocol.io/specification/2026-07-28/schema for a

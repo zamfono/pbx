@@ -4,13 +4,12 @@ import { handleMcpRequest } from '../mcp.js';
 import {
   currentHeaders,
   currentMeta,
-  legacyRequest,
-  legacySession,
   mcpRequest,
   ORIGIN,
   OWNER_TOKEN,
   seededDeps
 } from './testKit.js';
+import { legacyRequest, legacySession } from './testKitLegacy.js';
 
 // The Streamable HTTP transport's DNS-rebinding check, the same in both revisions
 // (https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http#security-%26-endpoint,

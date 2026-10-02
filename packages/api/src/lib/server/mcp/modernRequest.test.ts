@@ -7,11 +7,11 @@ import {
   currentMeta,
   currentRequest,
   LEGACY,
-  legacySession,
   mcpRequest,
   seededDeps,
   type RpcBody
 } from './testKit.js';
+import { legacySession } from './testKitLegacy.js';
 
 // What https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http
 // ("Request Metadata", "Server Validation"), .../basic#meta and .../basic/versioning require of a

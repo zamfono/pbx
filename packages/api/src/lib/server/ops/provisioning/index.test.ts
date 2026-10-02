@@ -3,11 +3,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
+import { installRingotelFake } from '#lib/server/provisioning/ringotelFake.js';
 import {
   FAKE_PACKAGES,
-  FAKE_REGIONS,
-  installRingotelFake
-} from '#lib/server/provisioning/ringotelFake.js';
+  FAKE_REGIONS
+} from '#lib/server/provisioning/ringotelFakeHandlers.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 

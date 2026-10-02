@@ -9,13 +9,13 @@ import {
   resolveLogLevel
 } from '../settings/logLevel.js';
 import { defineOperation } from '../types.js';
+import { ringGroupFields } from './_input.js';
 import { replaceMembers, ringGroupMembers } from './_members.js';
 import {
   assertGroupAudioFieldsAvailable,
   assertNameAvailable,
   liveRingGroup,
   optionalFlag,
-  ringGroupFields,
   toRingGroupOut,
   type RingGroupRow
 } from './_shared.js';

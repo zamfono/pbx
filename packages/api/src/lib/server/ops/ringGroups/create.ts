@@ -5,13 +5,13 @@ import { newId } from '@zamfono/shared';
 import { pushRoster } from '../roster.js';
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
+import { ringGroupFields } from './_input.js';
 import { replaceMembers } from './_members.js';
 import {
   assertGroupAudioFieldsAvailable,
   assertNameAvailable,
   nextExtension,
   optionalFlag,
-  ringGroupFields,
   toRingGroupOut,
   type RingGroupOut
 } from './_shared.js';

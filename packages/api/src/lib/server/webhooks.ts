@@ -9,7 +9,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 
 import { newId, publicEnvelope, type Db, type Envelope } from '@zamfono/shared';
 
-import { tryParseJson } from './json.js';
+import { attempt } from './errors.js';
 import { decrypt, type Keyring } from './secretbox.js';
 import {
   errorReason,
@@ -17,20 +17,11 @@ import {
   SECRET_UNREADABLE
 } from './webhookFailure.js';
 import { settleDelivery } from './webhookHealth.js';
+import { backoffMs, DELIVERY_ATTEMPTS, matchesFilter } from './webhookRules.js';
 
-// §10.6: three attempts total per delivery, a 5 s timeout per request, and the two backoff
-// delays between them.
+// §10.6: a 5 s timeout per request.
 const REQUEST_TIMEOUT_MS = 5000;
-const DELIVERY_ATTEMPTS = 3;
-const FIRST_RETRY_DELAY_MS = 1000;
-const SECOND_RETRY_DELAY_MS = 4000;
-const RETRY_BACKOFF_MS = [FIRST_RETRY_DELAY_MS, SECOND_RETRY_DELAY_MS];
 const SIGNATURE_HEADER = 'X-Zamfono-Signature';
-
-type WebhookRow = {
-  id: string;
-  eventTypesJson: string | null;
-};
 
 /** A `webhook_deliveries` row: one event's body on its way to one hook. */
 type DeliveryRow = {
@@ -46,39 +37,6 @@ type DeliveryRow = {
  * failure is worth another attempt.
  */
 type AttemptOutcome = { failure: string | null; retryable: boolean };
-
-/** `secretEnc` decrypted, `null` when no key of `kr` opens it. */
-function readSecret(kr: Keyring, secretEnc: Buffer): string | null {
-  try {
-    return decrypt(kr, secretEnc).toString('utf8');
-  } catch {
-    return null;
-  }
-}
-
-/**
- * `true` when `hook`'s optional event-type filter admits `eventType`; `null` means every type.
- * An unparsable filter admits nothing, so one malformed row never blocks delivery to the other
- * hooks matching the same event.
- */
-function matchesFilter(hook: WebhookRow, eventType: string): boolean {
-  if (hook.eventTypesJson === null) {
-    return true;
-  }
-  const types = tryParseJson(hook.eventTypesJson);
-  return Array.isArray(types) && types.includes(eventType);
-}
-
-/** The wait before retry `retry` (1-based), from `RETRY_BACKOFF_MS`. */
-function backoffMs(retry: number): number {
-  const delay = RETRY_BACKOFF_MS[retry - 1];
-  // `RETRY_BACKOFF_MS` has one entry per retry (`DELIVERY_ATTEMPTS - 1`), so this is always
-  // in range.
-  if (delay === undefined) {
-    throw new Error(`webhooks: no backoff for retry ${retry}`);
-  }
-  return delay;
-}
 
 export type WebhookDispatcherDeps = {
   db: Db;
@@ -129,7 +87,9 @@ export class WebhookDispatcher {
       .where('active', '=', 1)
       .where('deletedAt', 'is', null)
       .execute();
-    const matching = hooks.filter(hook => matchesFilter(hook, ev.type));
+    const matching = hooks.filter(hook =>
+      matchesFilter(hook.eventTypesJson, ev.type)
+    );
     if (matching.length === 0) {
       return;
     }
@@ -224,8 +184,10 @@ export class WebhookDispatcher {
         .execute();
       return null;
     }
-    const secret = readSecret(this.deps.kr, hook.secretEnc);
-    if (secret === null) {
+    const secret = attempt(() =>
+      decrypt(this.deps.kr, hook.secretEnc).toString('utf8')
+    );
+    if (secret === undefined) {
       return { failure: SECRET_UNREADABLE, retryable: false };
     }
     const signature = createHmac('sha256', secret)
