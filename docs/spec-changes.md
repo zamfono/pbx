@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-02 · §10.4 Device provisioning, §10.3 Devices, §12, §10 layout.** A `manual` device has no provider; creating one, and revealing its credentials, returns its full connection settings: server and domain (the FQDN), transport and port, username (also the authentication username) and password, extension and display name, media encryption, codecs and the own-voicemail feature code. Specified, not yet implemented: the response carries only the username and password so far.
+*Why:* requested by the product owner: an admin setting up an external phone needs every value it asks for in one place, not only a username and password.
+
 **2026-10-02 · §6.5 Backups, §10.3 Backups.** A backup target's secret is one JSON object, stored and taken as such: `resticPassword` and exactly the backend credentials its kind takes. A bare password is no longer a secret, neither on the wire nor in `secret_enc`.
 *Why:* product-owner decision: one stored form, read without guessing, and no backwards compatibility in the breaking 0.2.0.
 

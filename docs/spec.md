@@ -1013,7 +1013,7 @@ packages/
 │       │   ├── pjsip/           # pjsip_users.conf + pjsip_trunks.conf + hints + musiconhold renderer
 │       │   ├── audio/           # upload, transcode (ffmpeg), prompt management
 │       │   ├── mail/            # templates, relay, sending (§10.2 "Mail")
-│       │   ├── provisioning/    # manual and Ringotel providers (§10.4)
+│       │   ├── provisioning/    # the Ringotel provider (§10.4)
 │       │   └── jobs/            # purge, retention, backups, certificate sync, key rotation, Ringotel re-registration (§5.9, §6.4, §6.5, §10.4)
 │       ├── lib/i18n/            # the authentication pages' dictionaries (§5.2), which their browser code shares
 │       └── routes/
@@ -1137,7 +1137,7 @@ Timers, the hop counter and busy handling live entirely in the core.
 
 **Click-to-dial.** `POST /calls` with a target, an extension or an external number, originates a call on behalf of a user. The core rings the user's devices first; when one answers, it dials the target exactly as if that device had dialled it, so CLIR, routes, caller-ID and the channel cap all apply. A parking slot as target retrieves the call parked there, as dialling it does, and the optional `clir` is the call's own CLIR, as `#31#`/`*31#` give it (§9.4), which an emergency call ignores. A `user` may originate for themselves, an `admin` for any user. The call is a normal `calls` row with the originating actor in its routing trace (§7). A user with no registered device is refused with a 409 problem whose `detail` names the cause, `noRegisteredDevice`, and the attempt appears in the history with a trace line. This is the operation behind a CRM's call button and the MCP assistant's "call John".
 
-**Device provisioning.** See §10.4: `manual` and `ringotel` providers in the MVP. QR-code login is provided by Ringotel's own onboarding flow.
+**Device provisioning.** See §10.4: `manual` devices, set up by hand from their connection settings, and the `ringotel` provider. QR-code login is provided by Ringotel's own onboarding flow.
 
 #### Mail
 
@@ -1257,7 +1257,7 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Users** (min. role: admin (self-service subset for `user`)) — `GET/POST /users` (`POST` returns the one-time set-password link, mailed too with a relay), `GET/PATCH/DELETE /users/{id}` (`DELETE` answers 409 with the blocking references, §5.9), `POST /users/{id}/resetPassword` (same link semantics), `POST /users/{id}/erase` (owners only, §5.10), `GET /users/{id}/forwarding` (the rules, in the shape the `PUT` takes, `sip` targets with their `headers`), `PUT /users/{id}/forwarding` (the rules replaced as a whole), `PUT /users/{id}/presence` (dnd; outside the audit log, §5.7), `PUT/DELETE /users/{id}/voicemailGreeting` (the personal greeting, a WAV or MP3 upload; outside the audit log, §5.7). Self-service, on the user's own id alone (403 for another's): `GET /users/{id}`, `GET /users/{id}/forwarding`, `PUT /users/{id}/forwarding` (a new or changed `sip` target excepted, Forward targets), `PUT /users/{id}/presence`, `PUT/DELETE /users/{id}/voicemailGreeting` and the `PATCH` fields `clir`, `rejectAnonymous`, `ringTimeoutS`, `notifyMissedCalls`, `findMe`; `calleridDidId` is admin-set (§9.4)
 
-**Devices** (min. role: user (own, `tls` only) / admin; `plain` devices, reveal and rotate admin) — `GET /users/{id}/devices`, `POST` (transport class + allowlist for `plain`, refused while both plain transports are disabled, §9.3; returns the SIP credentials), `PATCH /devices/{id}` (label, `allowedIps`), `DELETE /devices/{id}`, `GET /devices/{id}/credentials` (reveal, audited), `POST /devices/{id}/rotate` (new password, re-pushed and returned), `GET/PUT /devices/{id}/blf` (the `ringotel` device's BLF panel, an ordered list of extensions and parking slots replaced as a whole, §10.4)
+**Devices** (min. role: user (own, `tls` only) / admin; `plain` devices, reveal and rotate admin) — `GET /users/{id}/devices`, `POST` (transport class + allowlist for `plain`, refused while both plain transports are disabled, §9.3; returns a `manual` device's connection settings, §10.4), `PATCH /devices/{id}` (label, `allowedIps`), `DELETE /devices/{id}`, `GET /devices/{id}/credentials` (reveal, audited; a `manual` device's connection settings), `POST /devices/{id}/rotate` (new password, re-pushed and returned), `GET/PUT /devices/{id}/blf` (the `ringotel` device's BLF panel, an ordered list of extensions and parking slots replaced as a whole, §10.4)
 
 **Provisioning** (min. role: owner) — `POST /provisioning/ringotel/setup` (input: Ringotel `domain`, `region`, `packageid`) — runs `createOrganization` + `createBranch` (§10.4) and stores the ids in `settings`; a `region` or `packageid` the account does not offer is refused before anything is created, naming the ones it does, and a domain the account already has with 409, naming its organization and the adoption call that takes it over. `GET /provisioning/ringotel/options` lists those choices live (`getRegions`, `getPackages`, each package with the registrations per user it allows), since Ringotel adds regions and the packages are the account's own. Setup and adoption set `ringotel_max_regs` to the package's while it is still at its default (§11.4). `POST /provisioning/ringotel/adopt` (input: `orgId`, `domain`, optional `branchId`; confirmed) takes over an organization that already exists instead (§10.4)
 
@@ -1346,7 +1346,17 @@ interface ProvisioningProvider {
 }
 ```
 
-**`manual`** is always available. `POST /users/{id}/devices` returns the SIP credentials once in the response, and the admin enters them into any SIP softphone or desk phone by hand. The admin guide documents tested bring-your-own clients with their settings: Groundwire (Acrobits' retail app; one-time purchase, vendor-run push, BLF; the recommended no-subscription mobile option) and MicroSIP (Windows desktop, which needs no push).
+**`manual`** is always available: a device set up by hand on any SIP softphone or desk phone. A `manual` device has no provider. `POST /users/{id}/devices` answers it once with its **connection settings**, and `GET /devices/{id}/credentials` returns the same set later (audited, §5.2):
+
+- `server` and `domain`: the stack's FQDN;
+- `transport` and `port`: for a `tls` device, TLS on 5061 with SDES-SRTP media; for a `plain` device, 5060 over UDP or TCP, whichever `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED` allow (§9.1), accepted only from the device's IP allowlist;
+- `username`, which is also the authentication username, and `password`;
+- `extension` and `displayName`: the user's extension and name, the caller ID the phone shows;
+- `mediaEncryption`: `srtp` for a `tls` device, `none` for a `plain` one;
+- `codecs`: `settings.codecs_json` in order;
+- `voicemailCode`: the own-voicemail feature code (§9.3).
+
+No STUN server or outbound proxy is needed: Asterisk handles NAT itself (§9.1). The admin guide documents tested bring-your-own clients and maps these fields onto each: Groundwire (Acrobits' retail app; one-time purchase, vendor-run push, BLF; the recommended no-subscription mobile option) and MicroSIP (Windows desktop, which needs no push).
 
 **`ringotel`** drives the Ringotel Admin API: RPC-style `POST https://shell.ringotel.co/api` with a Bearer API key and `{"method": …, "params": …}` bodies. Object mapping:
 
