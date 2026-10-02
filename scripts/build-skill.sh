@@ -19,7 +19,9 @@ for recipe in "$repo_root"/docs/guide/recipes/*.md; do
     cp "$recipe" "$target"
   fi
 done
-node "$repo_root/packages/api/scripts/tool-catalog.mjs" >"$tmp_dir/tools.md"
+# The catalog test's file snapshot is the catalog: updating it rewrites the committed copy.
+(cd "$repo_root/packages/api" && npx vitest run catalogDrift --update)
+cp "$reference_dir/tools.md" "$tmp_dir/tools.md"
 
 rm -rf "$reference_dir"
 mv "$tmp_dir" "$reference_dir"

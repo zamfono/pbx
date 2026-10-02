@@ -17,7 +17,6 @@ packages/*/build
 db/dist
 .svelte-kit/
 *.tsbuildinfo
-packages/api/scripts/.tool-catalog.generated.mjs
 handoff.md
 __pycache__
 # the link to the mode's overlay setup.sh makes in a stack directory, deploy/ in a checkout
