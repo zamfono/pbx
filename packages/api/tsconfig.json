@@ -5,17 +5,5 @@
       "path": "../shared/tsconfig.lib.json"
     }
   ],
-  "files": [
-    "src/routes/.well-known/oauth-authorization-server/+server.ts",
-    "src/routes/.well-known/oauth-protected-resource/+server.ts",
-    "src/routes/.well-known/openid-configuration/+server.ts",
-    "src/lib/server/data/emergencyNumbers.json",
-    "src/lib/i18n/de.json",
-    "src/lib/i18n/en.json",
-    "src/lib/i18n/es.json",
-    "src/lib/i18n/fr.json",
-    "src/lib/i18n/it.json",
-    "src/lib/i18n/ru.json"
-  ],
-  "include": ["src", "*"]
+  "include": ["src", "src/**/*.json", "src/routes/.well-known/**/*.ts", "*"]
 }
