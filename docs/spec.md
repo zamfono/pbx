@@ -1326,7 +1326,7 @@ Conventions: one casing on the wire, camelCase, for every name a client sees: pa
 - Columns are snake_case in the database (§11.1). The operations' zod schemas name the wire fields, and Kysely's `CamelCasePlugin` maps column names, configured with `maintainNestedObjectKeys: true`, since the plugin otherwise recurses into any value that is already an object and rewrites the keys inside JSON columns; JSON columns are therefore parsed in the operations layer, after the row is mapped.
 - Enum values are stored camelCase (§11.1), so they need no mapping.
 - Storage suffixes do not cross the boundary: `codecs_json` is `codecs` and carries a JSON value, `sso_client_secret_enc` is the write-only `ssoClientSecret`. A unit suffix such as `ringTimeoutS` is meaning, and crosses.
-- List endpoints paginate with `?limit=` and an opaque `?cursor=` and return `{ items, nextCursor }`; errors are RFC 9457 `application/problem+json`.
+- List endpoints paginate with `?limit=` and an opaque `?cursor=` and return `{ items, nextCursor }`, every list the same cursor form; errors are RFC 9457 `application/problem+json`. Throughout 0.1, the lists of DIDs, number blocks, blocked numbers, webhooks and backup targets and runs also take a bare row id as `cursor`, the `nextCursor` they returned up to 0.1.0.
 
 An **OpenAPI 3.1 document** is generated from the REST route table and the operations' zod schemas (JSON Schema export) and served at `/api/v1/openapi.json` — the same schemas drive request validation, remote-function validation and the MCP tool definitions (§10.5).
 

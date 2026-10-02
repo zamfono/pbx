@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import { OpError } from './ops/types.js';
 
 // §10.3 "Conventions": list endpoints paginate with `?limit=` and an opaque `?cursor=`, returning
@@ -23,4 +25,22 @@ export function decodeCursor(cursor: string): unknown {
   } catch {
     throw new OpError(INVALID_CURSOR_STATUS, 'invalid cursor');
   }
+}
+
+const ROW_ID = z.uuid();
+
+/**
+ * The row id an id-keyed list resumes after, from its cursor `encodeCursor({ id })`. A bare row
+ * id is taken as such a list's cursor too, throughout 0.1 (§10.3).
+ */
+// ponytail: the bare row id goes in 0.2, once no client still holds a cursor 0.1.0 handed out.
+export function decodeIdCursor(cursor: string): string {
+  if (ROW_ID.safeParse(cursor).success) {
+    return cursor;
+  }
+  const position = decodeCursor(cursor) as { id?: unknown } | null;
+  if (typeof position?.id !== 'string') {
+    throw new OpError(INVALID_CURSOR_STATUS, 'invalid cursor');
+  }
+  return position.id;
 }

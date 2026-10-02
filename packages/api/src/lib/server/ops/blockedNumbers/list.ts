@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { decodeIdCursor, encodeCursor } from '#lib/server/pagination.js';
+
 import { defineOperation } from '../types.js';
 
 const DEFAULT_LIMIT = 50;
@@ -26,12 +28,13 @@ export const list = defineOperation({
       .selectAll()
       .where('deletedAt', 'is', null)
       .$if(input.cursor !== undefined, qb =>
-        qb.where('id', '>', input.cursor ?? '')
+        qb.where('id', '>', decodeIdCursor(input.cursor ?? ''))
       )
       .orderBy('id')
       .limit(limit + 1)
       .execute();
     const page = rows.slice(0, limit);
+    const last = page.at(-1);
     return {
       items: page.map(row => ({
         id: row.id,
@@ -40,7 +43,8 @@ export const list = defineOperation({
         label: row.label,
         createdAt: row.createdAt
       })),
-      nextCursor: rows.length > limit ? (page.at(-1)?.id ?? null) : null
+      nextCursor:
+        rows.length > limit && last ? encodeCursor({ id: last.id }) : null
     };
   }
 });

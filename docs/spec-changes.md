@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-02 · §10.3 Conventions.** Every list hands out the same opaque cursor; the lists of DIDs, number blocks, blocked numbers, webhooks and backup targets and runs, whose `nextCursor` was the last row's id, return it too, and take a bare row id as `cursor` as well throughout 0.1.
+*Why:* product-owner decision: one cursor format on all lists; a client holding a cursor from 0.1.0 keeps paging until the next breaking release.
+
 **2026-10-02 · §10.2 Call parking.** When the parking ring-back goes unanswered, a forward or mailbox the parker's own rules decided takes the parked party, as it would a direct call to the parker; only otherwise does the tenant fallback target. The ring-back itself still rings only the parker's phones.
 *Why:* requested by the product owner: the ring-back ignored the parker's forward and mailbox rules.
 

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { decodeIdCursor, encodeCursor } from '#lib/server/pagination.js';
+
 import { defineOperation } from '../types.js';
 import { runToWire } from './_shared.js';
 
@@ -33,15 +35,17 @@ export const runsList = defineOperation({
         qb.where('targetId', '=', input.targetId ?? '')
       )
       .$if(input.cursor !== undefined, qb =>
-        qb.where('id', '<', input.cursor ?? '')
+        qb.where('id', '<', decodeIdCursor(input.cursor ?? ''))
       )
       .orderBy('id', 'desc')
       .limit(limit + 1)
       .execute();
     const page = rows.slice(0, limit);
+    const last = page.at(-1);
     return {
       items: page.map(runToWire),
-      nextCursor: rows.length > limit ? (page.at(-1)?.id ?? null) : null
+      nextCursor:
+        rows.length > limit && last ? encodeCursor({ id: last.id }) : null
     };
   }
 });

@@ -44,6 +44,54 @@ describe('blockedNumbers', () => {
     expect(afterDelete.items).toHaveLength(0);
   });
 
+  it('pages with an opaque cursor, and takes a bare row id as one too', async () => {
+    const db = await makeTestDb();
+    await runOperation(
+      db,
+      'blockedNumbers.create',
+      { number: '+491111' },
+      asRun()
+    );
+    await runOperation(
+      db,
+      'blockedNumbers.create',
+      { number: '+492222' },
+      asRun()
+    );
+    type Page = { items: { id: string }[]; nextCursor: string | null };
+    const first = (await runOperation(
+      db,
+      'blockedNumbers.list',
+      { limit: 1 },
+      asRun()
+    )) as Page;
+    const firstId = first.items[0]?.id ?? '';
+    expect(first.nextCursor).not.toBe(firstId);
+    const second = (await runOperation(
+      db,
+      'blockedNumbers.list',
+      { limit: 1, cursor: first.nextCursor },
+      asRun()
+    )) as Page;
+    const fromBareId = (await runOperation(
+      db,
+      'blockedNumbers.list',
+      { limit: 1, cursor: firstId },
+      asRun()
+    )) as Page;
+    expect(second.items).toHaveLength(1);
+    expect(second.items[0]?.id).not.toBe(firstId);
+    expect(fromBareId.items).toEqual(second.items);
+    await expect(
+      runOperation(
+        db,
+        'blockedNumbers.list',
+        { cursor: 'not-a-cursor' },
+        asRun()
+      )
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
   it('refuses a duplicate live number/prefix pair', async () => {
     const db = await makeTestDb();
     await runOperation(

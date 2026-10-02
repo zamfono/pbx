@@ -75,6 +75,9 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
+- The lists of DIDs, number blocks, blocked numbers, webhooks and backup targets and runs return
+  the same opaque `nextCursor` as every other list instead of the last row's id. A row id passed
+  as `cursor`, as these lists returned it up to 0.1.0, is still taken throughout 0.1.
 - A renewed TLS certificate is swapped in at the maintenance moment only once nothing is in
   progress: no call, no parked call, no voicemail being left and no recording being made or
   mixed. While something is, the stack looks again every 5 minutes for up to two hours, then

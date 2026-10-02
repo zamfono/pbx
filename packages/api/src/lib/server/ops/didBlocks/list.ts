@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { decodeIdCursor, encodeCursor } from '#lib/server/pagination.js';
+
 import { resolveOptionalTarget } from '../dids/_shared.js';
 import { defineOperation } from '../types.js';
 
@@ -28,12 +30,13 @@ export const list = defineOperation({
       .selectAll()
       .where('deletedAt', 'is', null)
       .$if(input.cursor !== undefined, qb =>
-        qb.where('id', '>', input.cursor ?? '')
+        qb.where('id', '>', decodeIdCursor(input.cursor ?? ''))
       )
       .orderBy('id')
       .limit(limit + 1)
       .execute();
     const page = rows.slice(0, limit);
+    const last = page.at(-1);
     const items = await Promise.all(
       page.map(async row => ({
         id: row.id,
@@ -49,7 +52,8 @@ export const list = defineOperation({
     );
     return {
       items,
-      nextCursor: rows.length > limit ? (page.at(-1)?.id ?? null) : null
+      nextCursor:
+        rows.length > limit && last ? encodeCursor({ id: last.id }) : null
     };
   }
 });
