@@ -202,6 +202,10 @@ why the specified behaviour changed; the commit history, how.
   propagation still owed as `configPropagationPending`, and `/metrics` as
   `zamfono_config_propagation_pending`, with the failures in
   `zamfono_config_propagation_failures_total`.
+- `/healthz` reported a check whose database query failed as a reassuring default, such as no
+  secrets left to re-encrypt, no Ringotel profile pending or no failed automatic update; it now
+  answers 500, which the uptime check sees. `/metrics` likewise reported an automatic update it
+  could not read as none failed, and now answers 500 too.
 
 ### Upgrade notes
 

@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-02 · §6.3 Health.** A `/healthz` field that `api`'s migrated database fails to answer fails the request with 500 instead of reporting a default such as no rows left to re-encrypt or no failed automatic update.
+*Why:* found in the design review: every check caught its own errors to tolerate an unmigrated database, so a real fault read as all clear on the endpoint the uptime check reads.
+
 **2026-10-02 · §3.1 Config propagation, §7 Metrics, §10.3 Health, §11.2 Schema, §11.4 Settings.** A failed config propagation leaves the write committed and is the first `warnings` entry of its result; `api` owes it, recorded in the new state column `settings.config_propagation_pending`, renders and reloads every module while one is owed, retries 5 seconds after a failure, doubling up to a minute, and at its start, and clears it with the first propagation that succeeds. The Ringotel pushes that need Asterisk to hold the write wait in memory for that success; what needs only the commit runs regardless. `/healthz` shows the marker as `configPropagationPending`, `/metrics` as `zamfono_config_propagation_pending` with `zamfono_config_propagation_failures_total`.
 *Why:* found in the design review: a failed propagation was invisible and its follow-up pushes ran anyway.
 

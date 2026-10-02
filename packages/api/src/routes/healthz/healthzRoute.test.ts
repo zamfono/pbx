@@ -10,8 +10,9 @@ const HTTP_OK = 200;
 const HTTP_SERVICE_UNAVAILABLE = 503;
 const KEY_BYTE_LENGTH = 32;
 
-// `getDb()` and `keyringFromEnv()` read these once per process; an in-memory, unmigrated
-// database is enough since these tests only care about the `core` field the route derives.
+// `getDb()` reads `DB_FILE` once per process, the route `SECRETBOX_KEY` per request; an
+// in-memory, unmigrated database is enough since these tests only care about the `core` field
+// the route derives.
 process.env.DB_FILE = ':memory:';
 process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
 
@@ -71,13 +72,11 @@ describe('GET /healthz', () => {
     expect(response.status).toBe(HTTP_SERVICE_UNAVAILABLE);
   });
 
-  it('reports keyRotationRemaining 0 instead of throwing when SECRETBOX_KEY is unset', async () => {
+  it('fails without SECRETBOX_KEY, which api does not run without', async () => {
     stubCoreHealthz(HTTP_OK, { ok: true, ari: true, db: true });
     delete process.env.SECRETBOX_KEY;
     vi.resetModules();
     const { GET: freshGet } = await import('./+server.js');
-    const response = await freshGet();
-    const body = (await response.json()) as { keyRotationRemaining: number };
-    expect(body.keyRotationRemaining).toBe(0);
+    await expect(freshGet()).rejects.toThrow(/SECRETBOX_KEY/u);
   });
 });

@@ -87,7 +87,7 @@ describe('an owed config propagation', () => {
     const health = await apiHealth({
       db,
       checkCore: () => Promise.resolve({ reachable: false, ari: false }),
-      keyRotationRemaining: 0,
+      keyring: kr,
       certificateSync: 'unknown'
     });
     expect(health.configPropagationPending).toBe(true);

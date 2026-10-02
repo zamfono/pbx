@@ -51,7 +51,7 @@ export type ApiHealth = {
 export type ApiHealthDeps = {
   db: Db;
   checkCore: () => Promise<CoreReachability>;
-  keyRotationRemaining: number;
+  keyring: Keyring;
   certificateSync: 'ok' | 'missing' | 'unknown';
 };
 
@@ -66,23 +66,17 @@ async function countRemainingInColumn(
   table: string,
   column: string
 ): Promise<number> {
-  try {
-    const { rows } = await sql<{
-      versionByte: Buffer | null;
-    }>`SELECT substr(${sql.ref(column)}, 1, 1) AS versionByte FROM ${sql.table(table)} WHERE ${sql.ref(column)} IS NOT NULL`.execute(
-      db
-    );
-    return rows.filter(
-      row =>
-        row.versionByte === null ||
-        row.versionByte.length === 0 ||
-        row.versionByte.readUInt8(0) !== kr.current.generation
-    ).length;
-  } catch {
-    // The table does not exist yet, e.g. before the first migration; `migrated` already
-    // reports that, so this contributes nothing rather than failing the whole health check.
-    return 0;
-  }
+  const { rows } = await sql<{
+    versionByte: Buffer | null;
+  }>`SELECT substr(${sql.ref(column)}, 1, 1) AS versionByte FROM ${sql.table(table)} WHERE ${sql.ref(column)} IS NOT NULL`.execute(
+    db
+  );
+  return rows.filter(
+    row =>
+      row.versionByte === null ||
+      row.versionByte.length === 0 ||
+      row.versionByte.readUInt8(0) !== kr.current.generation
+  ).length;
 }
 
 /**
@@ -105,87 +99,67 @@ export async function countKeyRotationRemaining(
   return remaining;
 }
 
-/** `pendingMigrations`, or `null` when the migrations directory itself cannot be read. */
-async function pendingMigrationsOrNull(db: Db): Promise<string[] | null> {
-  try {
-    return await pendingMigrations(db);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * `settings.smtp_host` set means a relay is configured (§11.4); no row yet — before first
- * boot has seeded one, or while a migration is still pending — means it is not.
- */
+/** `settings.smtp_host` set means a relay is configured (§11.4). */
 async function mailConfigured(db: Db): Promise<'configured' | 'notConfigured'> {
-  try {
-    const settings = await db
-      .selectFrom('settings')
-      .select('smtpHost')
-      .where('id', '=', 1)
-      .executeTakeFirst();
-    return settings?.smtpHost ? 'configured' : 'notConfigured';
-  } catch {
-    return 'notConfigured';
-  }
+  const settings = await db
+    .selectFrom('settings')
+    .select('smtpHost')
+    .where('id', '=', 1)
+    .executeTakeFirst();
+  return settings?.smtpHost ? 'configured' : 'notConfigured';
 }
 
-/**
- * Whether a live trunk has `trunks.emergency` set (§9.4 "Emergency trunks"): without one,
- * emergency calls fail (§10.1). A database that cannot answer — no `trunks` table yet, before
- * the first migration — reports none; `migrated` already says why.
- */
-async function emergencyTrunkPresent(db: Db): Promise<boolean> {
-  try {
-    return await hasEmergencyTrunk(db);
-  } catch {
-    return false;
-  }
-}
+/** The body fields read from the tables, which only a migrated database holds. */
+type TableChecks = Pick<
+  ApiHealth,
+  | 'mail'
+  | 'keyRotationRemaining'
+  | 'emergencyTrunk'
+  | 'ringotelProfilePending'
+  | 'configPropagationPending'
+  | 'autoUpdateFailed'
+>;
 
-/** `pending(db)`, or `false` for a database without the column or row yet. */
-async function markerSet(
-  db: Db,
-  pending: (db: Db) => Promise<boolean>
-): Promise<boolean> {
-  try {
-    return await pending(db);
-  } catch {
-    return false;
-  }
+/** What `apiHealth` reports for the table checks while `migrated` is false. */
+const UNMIGRATED_CHECKS: TableChecks = {
+  mail: 'notConfigured',
+  keyRotationRemaining: 0,
+  emergencyTrunk: false,
+  ringotelProfilePending: false,
+  configPropagationPending: false,
+  autoUpdateFailed: false
+};
+
+async function tableChecks(db: Db, kr: Keyring): Promise<TableChecks> {
+  return {
+    mail: await mailConfigured(db),
+    keyRotationRemaining: await countKeyRotationRemaining(db, kr),
+    emergencyTrunk: await hasEmergencyTrunk(db),
+    ringotelProfilePending: await isProfilePending(db),
+    configPropagationPending: await isPropagationPending(db),
+    autoUpdateFailed: (await updateNews(db)).autoUpdateFailed
+  };
 }
 
 /**
  * `api`'s own liveness plus the fields a client cannot otherwise observe (§6.3 "Health"):
  * `ok` is true only while the database is open and holds no pending migration, since `api`
- * never runs one itself (§6.3 "Migrations").
+ * never runs one itself (§6.3 "Migrations"). The table checks run only then; a query that
+ * fails on a migrated database rejects.
  */
 export async function apiHealth(deps: ApiHealthDeps): Promise<ApiHealth> {
   const dbOpen = await isDbOpen(deps.db);
-  const pending = dbOpen ? await pendingMigrationsOrNull(deps.db) : [];
-  const migrated = dbOpen && pending !== null && pending.length === 0;
-  const mail = dbOpen ? await mailConfigured(deps.db) : 'notConfigured';
-  const emergencyTrunk = dbOpen && (await emergencyTrunkPresent(deps.db));
-  const ringotelProfilePending =
-    dbOpen && (await markerSet(deps.db, isProfilePending));
-  const configPropagationPending =
-    dbOpen && (await markerSet(deps.db, isPropagationPending));
-  const autoUpdateFailed =
-    dbOpen && (await updateNews(deps.db)).autoUpdateFailed;
-  const core = await deps.checkCore();
+  const migrated = dbOpen && (await pendingMigrations(deps.db)).length === 0;
+  const checks = migrated
+    ? await tableChecks(deps.db, deps.keyring)
+    : UNMIGRATED_CHECKS;
   return {
-    ok: dbOpen && migrated,
+    ok: migrated,
     db: dbOpen,
     migrated,
-    core,
-    mail,
-    keyRotationRemaining: deps.keyRotationRemaining,
+    core: await deps.checkCore(),
     certificateSync: deps.certificateSync,
-    emergencyTrunk,
-    ringotelProfilePending,
-    configPropagationPending,
-    autoUpdateFailed
+    ...checks
   };
 }
 

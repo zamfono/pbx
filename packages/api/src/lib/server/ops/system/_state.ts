@@ -113,25 +113,21 @@ const NO_UPDATE_NEWS: UpdateNews = {
 };
 
 /**
- * `UpdateNews` from `update_state`; none for a database without the table yet, and while `.env`
- * sets no `UPDATER_TOKEN`: without an updater there are no automatic updates and no report of a
- * breaking release. The record is kept, should the token come back.
+ * `UpdateNews` from `update_state`; none while `.env` sets no `UPDATER_TOKEN`: without an
+ * updater there are no automatic updates and no report of a breaking release. The record is
+ * kept, should the token come back.
  */
 export async function updateNews(db: Db): Promise<UpdateNews> {
   if (updaterClient() === undefined) {
     return NO_UPDATE_NEWS;
   }
-  try {
-    const row = await loadUpdateState(db);
-    const failure = autoUpdateFailure(row);
-    return {
-      autoUpdateFailed: failure !== null,
-      autoUpdateFailedAttempts: failure?.attempts ?? 0,
-      breakingUpdateAvailable: (row?.breakingVersion ?? null) !== null
-    };
-  } catch {
-    return NO_UPDATE_NEWS;
-  }
+  const row = await loadUpdateState(db);
+  const failure = autoUpdateFailure(row);
+  return {
+    autoUpdateFailed: failure !== null,
+    autoUpdateFailedAttempts: failure?.attempts ?? 0,
+    breakingUpdateAvailable: (row?.breakingVersion ?? null) !== null
+  };
 }
 
 /** `settings.auto_update` (§11.4); off for a database without its settings row yet. */

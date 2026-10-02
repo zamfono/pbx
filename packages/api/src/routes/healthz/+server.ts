@@ -4,35 +4,11 @@ import { fetchCoreHealth } from '#lib/server/coreClient.js';
 import { getDb } from '#lib/server/db.js';
 import {
   apiHealth,
-  countKeyRotationRemaining,
   healthStatus,
   type CoreReachability
 } from '#lib/server/health.js';
 import { certSyncStatus } from '#lib/server/jobs/certSync.js';
-import { keyringFromEnv, type Keyring } from '#lib/server/secretbox.js';
-
-const keyringCache: { resolved: boolean; keyring: Keyring | null } = {
-  resolved: false,
-  keyring: null
-};
-
-/**
- * The keyring, resolved once per process and cached like `getDb()`. `SECRETBOX_KEY` absent or
- * malformed (§5.4) must not turn the public, unauthenticated `/healthz` (§10.3 Health row) into
- * a 500: `keyRotationRemaining` is reported only while a keyring is available, and
- * `healthStatus` never depends on it.
- */
-function resolveKeyring(): Keyring | null {
-  if (!keyringCache.resolved) {
-    try {
-      keyringCache.keyring = keyringFromEnv(env);
-    } catch {
-      keyringCache.keyring = null;
-    }
-    keyringCache.resolved = true;
-  }
-  return keyringCache.keyring;
-}
+import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 /**
  * `core`'s own `/healthz` (Task 19, `CoreHealth`), reached over the internal Docker network
@@ -54,14 +30,10 @@ async function checkCore(): Promise<CoreReachability> {
  * external uptime check (§7) can reach it through the proxy.
  */
 export async function GET(): Promise<Response> {
-  const db = getDb();
-  const keyring = resolveKeyring();
   const health = await apiHealth({
-    db,
+    db: getDb(),
     checkCore,
-    keyRotationRemaining: keyring
-      ? await countKeyRotationRemaining(db, keyring)
-      : 0,
+    keyring: keyringFromEnv(env),
     certificateSync: certSyncStatus()
   });
   return Response.json(health, { status: healthStatus(health) });

@@ -614,7 +614,7 @@ describe('apiHealth', () => {
     const health = await apiHealth({
       db,
       checkCore: () => Promise.resolve({ reachable: false, ari: false }),
-      keyRotationRemaining: 0,
+      keyring: testKeyring(),
       certificateSync: 'unknown'
     });
     expect(health).toEqual({
@@ -638,7 +638,7 @@ describe('apiHealth', () => {
     const health = await apiHealth({
       db,
       checkCore: () => Promise.resolve({ reachable: true, ari: true }),
-      keyRotationRemaining: 2,
+      keyring: testKeyring(),
       certificateSync: 'ok'
     });
     expect(health.ok).toBe(true);
