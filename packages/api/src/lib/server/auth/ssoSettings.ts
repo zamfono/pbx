@@ -3,27 +3,31 @@ import type { Db } from '@zamfono/shared';
 import { decrypt, type Keyring } from '../secretbox.js';
 import type { SsoConfig } from './oidc.js';
 
-// §5.2 "Login and SSO": one row (id 1) carries every tenant's SSO configuration.
-const SETTINGS_ROW_ID = 1;
 const MICROSOFT_ISSUER_BASE = 'https://login.microsoftonline.com/';
 const MICROSOFT_ISSUER_SUFFIX = '/v2.0';
 const GOOGLE_ISSUER = 'https://accounts.google.com';
 
-function isSsoProvider(value: string): value is SsoConfig['provider'] {
-  return value === 'microsoft' || value === 'google' || value === 'oidc';
+/** `value` of a column §11.4's CHECKs require for the row's `sso_provider`; a row without it
+ *  breaks that invariant, which is an error rather than SSO switched off. */
+function required<T>(value: T | null, column: string): T {
+  if (value === null) {
+    throw new Error(`settings: ${column} is unset for the SSO provider`);
+  }
+  return value;
 }
 
-/** The preset button label for `provider` while `sso_label` is unset. §11.4's CHECK requires
- *  `sso_label` for `oidc`, so `provider` falls back to its own name only for a row that check
- *  should already have refused. */
-function presetLabel(provider: SsoConfig['provider']): string {
+/** The button label: `sso_label`, which §11.4's CHECK requires for `oidc`, or the preset one. */
+function buttonLabel(
+  provider: SsoConfig['provider'],
+  ssoLabel: string | null
+): string {
   if (provider === 'microsoft') {
-    return 'Microsoft';
+    return ssoLabel ?? 'Microsoft';
   }
   if (provider === 'google') {
-    return 'Google';
+    return ssoLabel ?? 'Google';
   }
-  return provider;
+  return required(ssoLabel, 'sso_label');
 }
 
 type SettingsSsoRow = { ssoTenantId: string | null; ssoIssuer: string | null };
@@ -33,18 +37,14 @@ type SettingsSsoRow = { ssoTenantId: string | null; ssoIssuer: string | null };
 function resolveIssuer(
   provider: SsoConfig['provider'],
   row: SettingsSsoRow
-): string | null {
+): string {
   if (provider === 'microsoft') {
-    if (row.ssoTenantId === null) {
-      // Unreachable: the `microsoft` CHECK constraint requires `sso_tenant_id` to be set (§11.4).
-      return null;
-    }
-    return `${MICROSOFT_ISSUER_BASE}${row.ssoTenantId}${MICROSOFT_ISSUER_SUFFIX}`;
+    return `${MICROSOFT_ISSUER_BASE}${required(row.ssoTenantId, 'sso_tenant_id')}${MICROSOFT_ISSUER_SUFFIX}`;
   }
   if (provider === 'google') {
     return GOOGLE_ISSUER;
   }
-  return row.ssoIssuer;
+  return required(row.ssoIssuer, 'sso_issuer');
 }
 
 /**
@@ -67,32 +67,22 @@ export async function ssoConfigFromSettings(
       'ssoAllowedDomain',
       'ssoLabel'
     ])
-    .where('id', '=', SETTINGS_ROW_ID)
+    .where('id', '=', 1)
     .executeTakeFirstOrThrow();
-  if (
-    row.ssoProvider === null ||
-    row.ssoClientId === null ||
-    !isSsoProvider(row.ssoProvider)
-  ) {
-    return null;
-  }
   const provider = row.ssoProvider;
-  const issuer = resolveIssuer(provider, row);
-  if (issuer === null) {
-    // Unreachable: §11.4's CHECK requires `sso_issuer` for `oidc` and `sso_tenant_id` for
-    // `microsoft`.
+  if (provider === null) {
     return null;
   }
   return {
     provider,
-    issuer,
-    clientId: row.ssoClientId,
+    issuer: resolveIssuer(provider, row),
+    clientId: required(row.ssoClientId, 'sso_client_id'),
     clientSecret:
       row.ssoClientSecretEnc === null
         ? null
         : decrypt(kr, row.ssoClientSecretEnc).toString('utf8'),
     tenantId: row.ssoTenantId,
     allowedDomain: row.ssoAllowedDomain,
-    label: row.ssoLabel ?? presetLabel(provider)
+    label: buttonLabel(provider, row.ssoLabel)
   };
 }

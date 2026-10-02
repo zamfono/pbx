@@ -138,7 +138,7 @@ export async function rowToWire(
     backupCron: row.backupCron,
     tlsReloadHour: row.tlsReloadHour,
     autoUpdate: row.autoUpdate === 1,
-    ssoProvider: row.ssoProvider as (typeof SSO_PROVIDERS)[number] | null,
+    ssoProvider: row.ssoProvider,
     ssoLabel: row.ssoLabel,
     ssoIssuer: row.ssoIssuer,
     ssoClientId: row.ssoClientId,

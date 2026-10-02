@@ -20,6 +20,11 @@
     "camelCase": true,
     "dialect": "sqlite",
     "outFile": "./src/generated/db.d.ts",
+    "overrides": {
+      "columns": {
+        "settings.sso_provider": "'google' | 'microsoft' | 'oidc' | null"
+      }
+    },
     "url": "env(DB_FILE)"
   },
   "dependencies": {

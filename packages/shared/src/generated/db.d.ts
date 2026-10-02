@@ -360,7 +360,7 @@ export interface Settings {
   ssoClientSecretEnc: Buffer | null;
   ssoIssuer: string | null;
   ssoLabel: string | null;
-  ssoProvider: string | null;
+  ssoProvider: 'google' | 'microsoft' | 'oidc' | null;
   ssoTenantId: string | null;
   timezone: string | null;
   tlsReloadHour: number | null;
