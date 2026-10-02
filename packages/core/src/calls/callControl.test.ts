@@ -6,6 +6,10 @@ import type { AriClient } from '../ari/client.js';
 import type { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
 import type { StateStore } from '../internal/stateStore.js';
+import {
+  AST_CAUSE_CALL_REJECTED,
+  AST_CAUSE_NORMAL_CLEARING
+} from '../sipCodes.js';
 import { eventually } from '../testing/eventually.js';
 import {
   answeredCall,
@@ -29,8 +33,6 @@ const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
 const HTTP_UNPROCESSABLE = 422;
 const RING_TIMER_MS = 60_000;
-const CAUSE_NORMAL = 16;
-const CAUSE_CALL_REJECTED = 21;
 
 /** A user at `ext` with one device, reported registered. */
 async function seedUserWithDevice(rig: Rig, ext: string): Promise<string> {
@@ -86,7 +88,7 @@ describe('call control', () => {
       timestamp: nowIso(),
       application: 'zamfono',
       channel: defaultChannel({ id: channelId }),
-      cause: CAUSE_NORMAL
+      cause: AST_CAUSE_NORMAL_CLEARING
     });
   }
 
@@ -434,7 +436,7 @@ describe('call control', () => {
       timestamp: nowIso(),
       application: 'zamfono',
       channel: defaultChannel({ id: ringing }),
-      cause: CAUSE_CALL_REJECTED
+      cause: AST_CAUSE_CALL_REJECTED
     });
     await eventually(async () => {
       expect((await rowOf(declined.callId))?.status).toBe('missed');
@@ -496,7 +498,7 @@ describe('call control', () => {
     ).toEqual({ status: HTTP_CONFLICT, reason: 'notRinging' });
 
     actions.decline(call.id, { actorUserId: memberId });
-    expect(call.legs.get(ringing.id)?.endCause).toBe(CAUSE_CALL_REJECTED);
+    expect(call.legs.get(ringing.id)?.endCause).toBe(AST_CAUSE_CALL_REJECTED);
     // 603 is no busy: the ring settles as unanswered, for the user's noAnswer rule.
     expect(outcome).toBe('noAnswer');
     await eventually(() => {
@@ -550,7 +552,7 @@ describe('call control', () => {
       }
     });
     actions.decline(call.id, { actorUserId: memberId });
-    expect(ended).toEqual([[own.id, CAUSE_CALL_REJECTED]]);
+    expect(ended).toEqual([[own.id, AST_CAUSE_CALL_REJECTED]]);
     expect(tracked.get(other.id)?.state).toBe('ringing');
     await eventually(() => {
       expect(rig.hungUp(own.id)).toBe(true);

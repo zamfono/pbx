@@ -11,6 +11,7 @@ import type { Channel } from '../ari/types.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
+import { AST_CAUSE_NORMAL_CLEARING } from '../sipCodes.js';
 import { eventually } from '../testing/eventually.js';
 import {
   noopLogger,
@@ -23,7 +24,6 @@ import { ringUser } from './ringUser.js';
 import { TrunkState } from './trunkState.js';
 
 // Q.850 normal clearing, as ARI's `ChannelDestroyed` carries it.
-const AST_CAUSE_NORMAL = 16;
 const FIND_ME_NUMBER = '+15557000';
 
 async function seedSettings(db: Db): Promise<void> {
@@ -220,12 +220,12 @@ describe('a find-me leg still to come (§10.1 step 4)', () => {
         'ringing'
       ]);
     });
-    destroy((await channelTo('PJSIP/e101-d1')).id, AST_CAUSE_NORMAL);
+    destroy((await channelTo('PJSIP/e101-d1')).id, AST_CAUSE_NORMAL_CLEARING);
 
     const findMeEndpoint = `PJSIP/${FIND_ME_NUMBER}@trunk-${trunkId}`;
     const findMe = await eventually(() => channelTo(findMeEndpoint), 3000);
     expect(pipeline.pendingRing.has(call.id)).toBe(true);
-    destroy(findMe.id, AST_CAUSE_NORMAL);
+    destroy(findMe.id, AST_CAUSE_NORMAL_CLEARING);
     await finished;
 
     expect(call.status).toBe('missed');
@@ -242,7 +242,7 @@ describe('a find-me leg still to come (§10.1 step 4)', () => {
         'ringing'
       ]);
     });
-    destroy((await channelTo('PJSIP/e101-d1')).id, AST_CAUSE_NORMAL);
+    destroy((await channelTo('PJSIP/e101-d1')).id, AST_CAUSE_NORMAL_CLEARING);
     await eventually(() => {
       expect([...call.legs.values()].map(leg => leg.state)).toEqual(['ended']);
     });

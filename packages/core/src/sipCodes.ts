@@ -13,6 +13,8 @@ export const SIP_SERVICE_UNAVAILABLE = 503;
 export const SIP_BUSY_EVERYWHERE = 600;
 export const SIP_DECLINE = 603;
 
+/** Asterisk's cause for a normal hangup; chan_pjsip answers a release with it as 603 Decline. */
+export const AST_CAUSE_NORMAL_CLEARING = 16;
 /** Asterisk's cause for SIP 486 Busy Here and 600 Busy Everywhere. */
 export const AST_CAUSE_USER_BUSY = 17;
 /** Asterisk's cause for SIP 603 Decline. */

@@ -15,6 +15,7 @@ import {
   type AttemptFailure,
   type Route
 } from '../routing/trunk.js';
+import { SIP_SERVER_ERROR } from '../sipCodes.js';
 import type { Leg } from './call.js';
 import { callRinging } from './callState.js';
 import { alertsOn, provisionalArrived, type TrunkLeg } from './provisional.js';
@@ -35,7 +36,7 @@ export type AttemptOutcome =
 // before alerting would: the next host, then the next route, is tried (§9.4 "Route fallthrough").
 const PLACEMENT_FAILED: AttemptFailure = {
   kind: 'final',
-  code: 500,
+  code: SIP_SERVER_ERROR,
   alerted: false
 };
 

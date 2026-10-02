@@ -1,3 +1,5 @@
+import { AST_CAUSE_NORMAL_CLEARING } from '../sipCodes.js';
+
 /**
  * SIP release code → the Q.850 hangup cause ARI's `DELETE /channels/{id}?reason_code=` takes.
  *
@@ -40,10 +42,10 @@ const SIP_TO_HANGUP_CAUSE: Readonly<Record<number, number>> = {
   600: 17
 };
 
-// AST_CAUSE_NORMAL_CLEARING, which `hangup_cause2sip()` leaves unmapped: chan_pjsip answers 603.
-const DECLINE_CAUSE = 16;
-
-/** The `reason_code` whose wire response is `sipCode`; 603 and any unlisted code go out as 603. */
+/**
+ * The `reason_code` whose wire response is `sipCode`; 603 and any unlisted code go out as 603, as
+ * AST_CAUSE_NORMAL_CLEARING, which `hangup_cause2sip()` leaves unmapped.
+ */
 export function sipToHangupCause(sipCode: number): number {
-  return SIP_TO_HANGUP_CAUSE[sipCode] ?? DECLINE_CAUSE;
+  return SIP_TO_HANGUP_CAUSE[sipCode] ?? AST_CAUSE_NORMAL_CLEARING;
 }

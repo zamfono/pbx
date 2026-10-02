@@ -11,6 +11,7 @@ import {
   SIP_BUSY_EVERYWHERE,
   SIP_BUSY_HERE,
   SIP_DECLINE,
+  SIP_FORBIDDEN,
   SIP_TEMPORARILY_UNAVAILABLE
 } from '../sipCodes.js';
 
@@ -167,9 +168,6 @@ export function channelCapAllows(
   return maxChannels === null || active < maxChannels;
 }
 
-/** A withheld call refused because its trunk has nowhere to carry the identity (§9.4 "Anonymous calls (CLIR)"). */
-const CLIR_UNSUPPORTED_STATUS = 403;
-
 /** Renders `number` (E.164) per `format` (§9.4 "Caller-ID"): `national` drops the country's calling code for a leading `0`. */
 export function formatCallerId(
   number: string,
@@ -202,9 +200,9 @@ export function callerIdHeaders(params: {
   country: string;
 }):
   | { ok: true; number: string; withhold: boolean }
-  | { ok: false; code: typeof CLIR_UNSUPPORTED_STATUS } {
+  | { ok: false; code: typeof SIP_FORBIDDEN } {
   if (params.withhold && params.trunk.callerIdHeader === 'from') {
-    return { ok: false, code: CLIR_UNSUPPORTED_STATUS };
+    return { ok: false, code: SIP_FORBIDDEN };
   }
   return {
     ok: true,
