@@ -1,14 +1,15 @@
-import {
-  operationIds,
-  pathParamNames,
-  routeFieldMapping
-} from './openapiRouteFields.js';
+import { operationIds, pathParamNames } from './openapiRouteFields.js';
 import {
   inputJsonSchema,
   publishedInputSchema,
   type JsonSchema
 } from './ops/publishedSchema.js';
-import { routeOperation, routes, type RouteEntry } from './restRoutes.js';
+import {
+  captureField,
+  routeOperation,
+  routes,
+  type RouteEntry
+} from './restRoutes.js';
 
 type Parameter = {
   name: string;
@@ -87,7 +88,7 @@ function problemResponse(): {
   };
 }
 
-/** The input schema's own top-level fields, minus `exclude`d ones (a path parameter's field, or a route's own constant), as query parameters. */
+/** The input schema's own top-level fields, minus `exclude`d ones (the fields the route fills from its path), as query parameters. */
 function queryParameters(
   schema: JsonSchema,
   exclude: Set<string>
@@ -121,8 +122,14 @@ function responses(): OpenApiOperation['responses'] {
 function operationFor(route: RouteEntry): OpenApiOperation {
   const op = routeOperation(route);
   const captures = pathParamNames(route.pattern);
-  const { byCapture, constants } = routeFieldMapping(route);
-  const pathFields = new Set(byCapture.values());
+  // The fields the route fills from its path, never the client's: its captures', and a scope
+  // route's `scope` (`pathInput`).
+  const routeFields = new Set(
+    captures.map(capture => captureField(route, capture))
+  );
+  if (route.scope !== undefined) {
+    routeFields.add('scope');
+  }
   const inputSchema = inputJsonSchema(op);
   const properties =
     (inputSchema.properties as Record<string, JsonSchema> | undefined) ?? {};
@@ -130,7 +137,7 @@ function operationFor(route: RouteEntry): OpenApiOperation {
   // itself (`{id}` → `id`), regardless of the operation field it fills; `x-operation-field` carries
   // that field name where it differs (`{id}` → `userId` on `/users/{id}/devices`).
   const parameters: Parameter[] = captures.map(capture => {
-    const fieldName = byCapture.get(capture) ?? capture;
+    const fieldName = captureField(route, capture);
     const parameter: Parameter = {
       name: capture,
       in: 'path',
@@ -151,21 +158,15 @@ function operationFor(route: RouteEntry): OpenApiOperation {
   if (route.method === 'GET') {
     return {
       ...base,
-      parameters: [
-        ...parameters,
-        ...queryParameters(inputSchema, new Set([...pathFields, ...constants]))
-      ]
+      parameters: [...parameters, ...queryParameters(inputSchema, routeFields)]
     };
   }
   const contentType = route.multipart
     ? MULTIPART_CONTENT_TYPE
     : JSON_CONTENT_TYPE;
-  // The route fills its path parameters and constants after the body is read (`handleRest`), so
-  // they are the URL's, never the body's; `confirm` rides in the body (§10.3 "Confirmation").
-  const bodySchema = publishedInputSchema(
-    op,
-    new Set([...pathFields, ...constants])
-  );
+  // The route fills its own fields after the body is read (`handleRest`), so they are the URL's,
+  // never the body's; `confirm` rides in the body (§10.3 "Confirmation").
+  const bodySchema = publishedInputSchema(op, routeFields);
   return {
     ...base,
     requestBody: { content: { [contentType]: { schema: bodySchema } } }

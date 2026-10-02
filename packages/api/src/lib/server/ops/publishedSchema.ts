@@ -55,9 +55,9 @@ export function inputJsonSchema(op: ErasedOperation): JsonSchema {
 }
 
 /**
- * The input a client sends for `op`: its own fields minus `exclude`d ones (a REST route's path
- * parameters and constants, which the route fills itself), plus an optional `confirm` for a
- * confirm-guarded operation. Optional, because the first, unconfirmed call is what earns the
+ * The input a client sends for `op`: its own fields minus `exclude`d ones (the fields a REST
+ * route fills from its path), plus an optional `confirm` for a confirm-guarded operation.
+ * Optional, because the first, unconfirmed call is what earns the
  * question. Any other field is as the operation's own schema has it: a `.strict()` one still
  * forbids an unknown key, since validation rejects it (§10.3, e.g. `PATCH /settings`).
  */

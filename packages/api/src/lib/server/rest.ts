@@ -6,7 +6,7 @@ import { type Actor } from './ops/types.js';
 import { problem, problemFromError } from './problem.js';
 import { readBody } from './restBody.js';
 import {
-  defaultParams,
+  pathInput,
   routeOperation,
   routes,
   type RouteEntry
@@ -94,7 +94,7 @@ export async function handleRest(
   const { route, queryKinds, match } = matched;
   try {
     const { confirm, ...fields } = await readBody(request, route, queryKinds);
-    const input = { ...fields, ...(route.params ?? defaultParams)(match) };
+    const input = { ...fields, ...pathInput(route, match.groups ?? {}) };
     const output = await runOperation(deps.db, route.op, input, {
       actor,
       channel: 'rest',

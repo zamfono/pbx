@@ -361,7 +361,7 @@ describe('buildOpenApiDocument', () => {
     ).toBe('menus.getTargets');
   });
 
-  it("excludes a scope route's own constant field from its query parameters and request body", () => {
+  it("excludes a scope route's own `scope` field from its query parameters and request body", () => {
     const doc = buildOpenApiDocument();
     const oooList = operationAt(doc, '/users/{id}/ooo', 'get');
     expect(

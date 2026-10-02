@@ -9,7 +9,9 @@ import './ops/index.js';
 import { registry, type ErasedOperation } from './ops/registry.js';
 
 export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
-type ParamsFn = (match: RegExpMatchArray) => Record<string, unknown>;
+
+/** The scopes §10.3's Out of Office and Opening hours rows attach OOO rules and hours to. */
+type ScopeArea = 'user' | 'ringGroup' | 'menu' | 'tenant';
 
 /** One row of the REST route table (§10.3): a `(method, path pattern) → operation` mapping. */
 export type RouteEntry = {
@@ -17,28 +19,49 @@ export type RouteEntry = {
   /** An OpenAPI 3.1 path template (`/users/{id}`); `{name}` segments become regex captures. */
   pattern: string;
   op: string;
-  /** Builds the operation input's path-derived fields; defaults to the pattern's own capture names. */
-  params?: ParamsFn;
+  /** Capture name → the input field it fills, where the two differ (`{id}` → `userId`). */
+  fields?: Readonly<Record<string, string>>;
+  /** The scope a scope route addresses: the input's `scope` object, of this kind with the `{id}` capture as its id. */
+  scope?: ScopeArea;
   multipart?: true;
 };
 
-/** The pattern's own capture names, spread verbatim; every route's default unless it overrides `params`. */
-export function defaultParams(match: RegExpMatchArray): Record<string, string> {
-  return { ...match.groups };
+/** The input field `capture` of `route`'s pattern is documented under: itself unless `fields` renames it. */
+export function captureField(route: RouteEntry, capture: string): string {
+  return route.fields?.[capture] ?? capture;
 }
 
-function withUserId(match: RegExpMatchArray): Record<string, string> {
-  return { userId: match.groups?.id ?? '' };
+/**
+ * The input fields `route`'s path supplies, from its pattern's captures: each capture under its
+ * own field, or, for a scope route, the one `scope` object the operation takes (§10.3).
+ */
+export function pathInput(
+  route: RouteEntry,
+  captures: Readonly<Record<string, string>>
+): Record<string, unknown> {
+  if (route.scope !== undefined) {
+    const { id } = captures;
+    return {
+      scope:
+        id === undefined ? { kind: route.scope } : { kind: route.scope, id }
+    };
+  }
+  return Object.fromEntries(
+    Object.entries(captures).map(([capture, value]) => [
+      captureField(route, capture),
+      value
+    ])
+  );
 }
 
-type RouteExtra = { params?: ParamsFn; multipart?: true };
+type RouteExtra = Pick<RouteEntry, 'fields' | 'scope' | 'multipart'>;
 type RouteTuple = readonly [HttpMethod, string, string, RouteExtra?];
 
 function toRouteEntry([method, pattern, op, extra]: RouteTuple): RouteEntry {
   return { method, pattern, op, ...extra };
 }
 
-const WITH_USER_ID: RouteExtra = { params: withUserId };
+const WITH_USER_ID: RouteExtra = { fields: { id: 'userId' } };
 const MULTIPART: RouteExtra = { multipart: true };
 
 type CrudOp = 'list' | 'get' | 'create' | 'update' | 'delete';
@@ -58,8 +81,6 @@ function crud(area: string, base: string, ops: CrudOp[]): RouteTuple[] {
 const ALL_CRUD: CrudOp[] = ['list', 'get', 'create', 'update', 'delete'];
 const NO_GET: CrudOp[] = ['list', 'create', 'update', 'delete'];
 
-/** The scopes §10.3's Out of Office and Opening hours rows attach OOO rules and hours to. */
-type ScopeArea = 'user' | 'ringGroup' | 'menu' | 'tenant';
 const SCOPE_BASE: Record<ScopeArea, string> = {
   user: '/users/{id}',
   ringGroup: '/ringGroups/{id}',
@@ -70,8 +91,7 @@ type ScopeEntry = [HttpMethod, string];
 
 /**
  * One `{scope}/{suffix}` route per scope area for each `[method, op]`, the op call told which
- * scope it addresses. The operation takes the scope as one discriminated object (§10.3), so the
- * path's area and id are assembled into that shape here; `tenant`'s base carries no `{id}`.
+ * scope it addresses (`pathInput`); `tenant`'s base carries no `{id}`.
  */
 function scopeRoutes(suffix: string, entries: ScopeEntry[]): RouteTuple[] {
   return (Object.keys(SCOPE_BASE) as ScopeArea[]).flatMap(area =>
@@ -79,14 +99,7 @@ function scopeRoutes(suffix: string, entries: ScopeEntry[]): RouteTuple[] {
       method,
       `${SCOPE_BASE[area]}/${suffix}`,
       op,
-      {
-        params: match => {
-          const id = match.groups?.id;
-          return {
-            scope: id === undefined ? { kind: area } : { kind: area, id }
-          };
-        }
-      }
+      { scope: area }
     ])
   );
 }
