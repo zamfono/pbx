@@ -4,6 +4,8 @@ import type { z } from 'zod';
 
 import type { DB } from '@zamfono/shared';
 
+import type { Effects } from './effects.js';
+
 /** RBAC roles, ordered most to least privileged (§5.3). */
 export type Role = 'owner' | 'admin' | 'user';
 
@@ -22,6 +24,8 @@ export type Context = {
   clientId?: string;
   clientName?: string;
   requestId: string;
+  /** What `run` accumulates for the runner: the audit diff, reload kinds, after-commit steps. */
+  effects: Effects;
 };
 
 /**

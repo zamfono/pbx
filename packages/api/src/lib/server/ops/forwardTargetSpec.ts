@@ -2,7 +2,7 @@ import type { Transaction } from 'kysely';
 
 import { newId, type DB, type SipHeaderTemplate } from '@zamfono/shared';
 
-import { noteWarning } from './afterPropagationHooks.js';
+import { noteWarning } from './afterCommit.js';
 import { targetSpecSchema, type TargetSpec } from './forwardTargetSchema.js';
 import { udpHeadersWarning } from './sipHeaders.js';
 import { OpError, type Context } from './types.js';

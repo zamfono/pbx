@@ -1,6 +1,6 @@
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import type { ChangeEntry } from './audit.js';
+import type { ChangeEntry } from './effects.js';
 import type { Actor, Channel, Context } from './types.js';
 
 /**

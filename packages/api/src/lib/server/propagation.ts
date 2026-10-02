@@ -13,7 +13,7 @@ import type { Db, ReloadKind } from '@zamfono/shared';
 
 import { createCoreClient, type CoreClient } from './coreClient.js';
 import { recordConfigPropagationFailure } from './metrics.js';
-import { runWaitingHooks } from './ops/afterPropagationHooks.js';
+import { runWaitingHooks } from './ops/afterCommit.js';
 import { render } from './pjsip/render.js';
 import {
   isPropagationPending,

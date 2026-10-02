@@ -9,7 +9,7 @@ import { transcodeForDownload } from '#lib/server/audio/transcode.js';
 import { createCoreClient, type CoreClient } from '#lib/server/coreClient.js';
 import { mediaDirFromEnv } from '#lib/server/mediaDir.js';
 
-import { afterCommit } from '../afterPropagationHooks.js';
+import { afterCommit } from '../afterCommit.js';
 import { OpError, type Context, type Role } from '../types.js';
 
 const logger = pino({ name: 'voicemails' });

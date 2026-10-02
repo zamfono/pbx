@@ -1,18 +1,11 @@
-import { newId, nowIso, type Db, type ReloadKind } from '@zamfono/shared';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
 import {
-  runAfterPropagationHooks,
+  runAfterCommit,
   runWaitingHooks,
-  takeAfterPropagationHooks,
-  withWarnings,
-  type AfterPropagationStep
-} from './afterPropagationHooks.js';
-import {
-  beginAudit,
-  readAudit,
-  readPropagates,
-  readReloadKinds
-} from './audit.js';
+  withWarnings
+} from './afterCommit.js';
+import { newEffects, type Effects } from './effects.js';
 import { notifyPropagation } from './propagationHooks.js';
 import { registry, type ErasedOperation } from './registry.js';
 import { runRollbackHooks } from './rollbackHooks.js';
@@ -32,7 +25,7 @@ export {
   setUndoable
 } from './audit.js';
 export { onPropagate, propagate } from './propagationHooks.js';
-export { afterCommit, afterPropagation } from './afterPropagationHooks.js';
+export { afterCommit, afterPropagation } from './afterCommit.js';
 export { onRollback } from './rollbackHooks.js';
 
 /** What the runner needs beyond the operation's own input to build a `Context` (§10.3). */
@@ -119,7 +112,7 @@ async function writeAuditRow({
       `operation '${name}': entity() is required to audit a write`
     );
   }
-  const audit = readAudit(ctx);
+  const { changes, undoable } = ctx.effects;
   await ctx.db
     .insertInto('auditLog')
     .values({
@@ -132,8 +125,8 @@ async function writeAuditRow({
       operation: name,
       entityKind: entity.kind,
       entityId: entity.id,
-      changesJson: JSON.stringify(audit?.changes ?? []),
-      undoable: audit?.undoable === false ? 0 : 1,
+      changesJson: JSON.stringify(changes),
+      undoable: undoable ? 1 : 0,
       revertsId: null,
       undoneAt: null,
       createdAt: ctx.now
@@ -156,7 +149,6 @@ async function executeOperation({
   name,
   input
 }: Execution): Promise<unknown> {
-  beginAudit(ctx);
   const output = await op.run(ctx, input);
   if (!op.readOnly && op.audit !== false) {
     await writeAuditRow({ ctx, op, name, run, input, output });
@@ -164,48 +156,35 @@ async function executeOperation({
   return output;
 }
 
-type Committed = {
-  output: unknown;
-  kinds: ReloadKind[];
-  propagates: boolean;
-  after: AfterPropagationStep[];
-};
-
 /**
- * Runs the operation and its audit write in one transaction. Should the transaction not commit,
- * the rollback hooks the operation registered (`onRollback`) run before the error reaches the
- * caller, since the rollback takes back only what the database holds.
+ * Runs the operation and its audit write in one transaction, accumulating its `effects`. Should
+ * the transaction not commit, the rollback hooks the operation registered (`onRollback`) run
+ * before the error reaches the caller, since the rollback takes back only what the database
+ * holds.
  */
 async function executeInTransaction(
   db: Db,
+  effects: Effects,
   execution: Omit<Execution, 'ctx'>
-): Promise<Committed> {
-  // Held outside the transaction, so its hooks can still be reached once the transaction failed.
-  const scope: { ctx?: Context } = {};
+): Promise<unknown> {
   try {
-    return await db.transaction().execute(async trx => {
-      const ctx: Context = {
-        actor: execution.run.actor,
-        db: trx,
-        now: nowIso(),
-        channel: execution.run.channel,
-        clientId: execution.run.clientId,
-        clientName: execution.run.clientName,
-        requestId: execution.run.requestId
-      };
-      scope.ctx = ctx;
-      const output = await executeOperation({ ...execution, ctx });
-      return {
-        output,
-        kinds: readReloadKinds(ctx),
-        propagates: readPropagates(ctx),
-        after: takeAfterPropagationHooks(ctx)
-      };
-    });
+    return await db.transaction().execute(async trx =>
+      executeOperation({
+        ...execution,
+        ctx: {
+          actor: execution.run.actor,
+          db: trx,
+          now: nowIso(),
+          channel: execution.run.channel,
+          clientId: execution.run.clientId,
+          clientName: execution.run.clientName,
+          requestId: execution.run.requestId,
+          effects
+        }
+      })
+    );
   } catch (error) {
-    if (scope.ctx) {
-      await runRollbackHooks(scope.ctx, error);
-    }
+    await runRollbackHooks(effects, error);
     throw error;
   }
 }
@@ -230,7 +209,8 @@ export async function runOperation<In, Out>(
   const parsedInput = parseInput(op, input);
   checkRole(op, run.actor);
   checkConfirmation(op, run, parsedInput);
-  const { output, kinds, propagates, after } = await executeInTransaction(db, {
+  const effects = newEffects();
+  const output = await executeInTransaction(db, effects, {
     op,
     run,
     name,
@@ -244,8 +224,10 @@ export async function runOperation<In, Out>(
   // A failed propagation is the result's first warning, and `api` owes it until one succeeds;
   // a successful one first runs what waited for an owed one.
   let propagationFailure: string | null = null;
-  if (!op.readOnly && propagates) {
-    propagationFailure = await notifyPropagation(name, kinds);
+  if (!op.readOnly && effects.propagates) {
+    propagationFailure = await notifyPropagation(name, [
+      ...effects.reloadKinds
+    ]);
     if (propagationFailure === null) {
       await runWaitingHooks(db);
     }
@@ -254,7 +236,7 @@ export async function runOperation<In, Out>(
   // registering a new device; its problems are the result's warnings, since the write stands.
   return withWarnings(
     output,
-    await runAfterPropagationHooks(db, after, propagationFailure)
+    await runAfterCommit(db, effects, propagationFailure)
   ) as Out;
 }
 /* eslint-enable @typescript-eslint/no-unused-vars */

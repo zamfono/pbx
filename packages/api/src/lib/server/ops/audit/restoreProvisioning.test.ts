@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DeviceRow } from '#lib/server/provisioning/types.js';
 import { makeTestDb } from '#lib/server/testDb.js';
 
-import { takeAfterPropagationHooks } from '../afterPropagationHooks.js';
+import { newEffects } from '../effects.js';
 import type { Context } from '../types.js';
 import { restoreProvisionedDevices } from './restoreProvisioning.js';
 
@@ -49,13 +49,18 @@ describe('restoreProvisionedDevices', () => {
       })
       .execute();
 
-    const ctx = { db, actor, channel: 'rest' } as unknown as Context;
+    const ctx = {
+      db,
+      actor,
+      channel: 'rest',
+      effects: newEffects()
+    } as unknown as Context;
     await restoreProvisionedDevices(ctx, 'device', 'dev-1');
 
     // Nothing reaches Ringotel inside the undo's transaction: the push waits until Asterisk
     // holds the restored endpoint (§10.4), as a creation's does.
     expect(created).toHaveLength(0);
-    const hooks = takeAfterPropagationHooks(ctx);
+    const hooks = ctx.effects.after;
     expect(hooks).toHaveLength(1);
     expect(hooks[0]?.waitsForAsterisk).toBe(true);
     expect(await hooks[0]?.hook(db)).toBeNull();
@@ -90,10 +95,15 @@ describe('restoreProvisionedDevices', () => {
       })
       .execute();
 
-    const ctx = { db, actor, channel: 'rest' } as unknown as Context;
+    const ctx = {
+      db,
+      actor,
+      channel: 'rest',
+      effects: newEffects()
+    } as unknown as Context;
     await restoreProvisionedDevices(ctx, 'device', 'dev-2');
 
-    expect(takeAfterPropagationHooks(ctx)).toHaveLength(0);
+    expect(ctx.effects.after).toHaveLength(0);
     expect(created).toHaveLength(0);
   });
 });

@@ -3,7 +3,6 @@ import pino from 'pino';
 import type { ReloadKind } from '@zamfono/shared';
 
 import { errorMessage } from '../errors.js';
-import { addReloadKinds } from './audit.js';
 import type { Context } from './types.js';
 
 // §3.1: a failed config propagation is logged, besides the warning the write's result carries,
@@ -28,11 +27,14 @@ export function onPropagate(hook: PropagationHook): void {
 }
 
 /**
- * Accumulates the reload kinds `ctx`'s operation's write touched, next to its audit diff state;
- * the runner passes the deduplicated set to every `onPropagate` hook once it commits (§3.1).
+ * Accumulates the reload kinds `ctx`'s operation's write touched; the runner passes the
+ * deduplicated set, in first-requested order, to every `onPropagate` hook once it commits (§3.1).
  */
 export function propagate(ctx: Context, kinds: ReloadKind[]): void {
-  addReloadKinds(ctx, kinds);
+  ctx.effects.propagates = true;
+  for (const kind of kinds) {
+    ctx.effects.reloadKinds.add(kind);
+  }
 }
 
 /**

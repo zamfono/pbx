@@ -9,7 +9,8 @@ import type { Db, ReloadKind } from '@zamfono/shared';
 import type { CoreClient } from './coreClient.js';
 import { apiHealth } from './health.js';
 import { renderMetrics, resetMetricsAccumulators } from './metrics.js';
-import { runAfterPropagationHooks } from './ops/afterPropagationHooks.js';
+import { runAfterCommit } from './ops/afterCommit.js';
+import { newEffects } from './ops/effects.js';
 import { register } from './ops/registry.js';
 import {
   afterCommit,
@@ -120,25 +121,28 @@ describe('an owed config propagation', () => {
     const done = new Promise<void>(resolve => {
       waited = resolve;
     });
-    const warnings = await runAfterPropagationHooks(
+    const warnings = await runAfterCommit(
       db,
-      [
-        {
-          hook: () => {
-            ran.push('ringotel');
-            waited();
-            return Promise.resolve(null);
+      {
+        ...newEffects(),
+        after: [
+          {
+            hook: () => {
+              ran.push('ringotel');
+              waited();
+              return Promise.resolve(null);
+            },
+            waitsForAsterisk: true
           },
-          waitsForAsterisk: true
-        },
-        {
-          hook: () => {
-            ran.push('mail');
-            return Promise.resolve(null);
-          },
-          waitsForAsterisk: false
-        }
-      ],
+          {
+            hook: () => {
+              ran.push('mail');
+              return Promise.resolve(null);
+            },
+            waitsForAsterisk: false
+          }
+        ]
+      },
       'core unreachable'
     );
     expect(warnings).toHaveLength(2);
