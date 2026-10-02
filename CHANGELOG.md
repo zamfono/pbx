@@ -258,6 +258,11 @@ why the specified behaviour changed; the commit history, how.
   the call or take it to their mailbox, as they would a call to the parker directly, the parked
   caller now goes there; the tenant fallback takes them otherwise. The ring-back itself still
   rings only the parker's phones.
+- The members of a soft-deleted ring group, or of a soft-deleted user group in one, still counted
+  as its members until the purge: their phones kept the group mailbox's MWI subscription, they
+  could read and delete the group's voicemails, and they got its `voicemail.new` events and
+  voicemail mails. A soft-deleted group is now skipped until it is restored, as a soft-deleted
+  user already was.
 
 ### Upgrade notes
 
