@@ -2,7 +2,7 @@
  * with, and the two ways a feature closes that call out with a real outcome (§11.2
  * `calls.status`). Shared by `features.ts`, `mailbox.ts`, `parking.ts`, `parkingRingback.ts` and
  * `addParty.ts`; its coverage lives in `features.test.ts` alongside theirs. */
-import type { Call, CallsRow } from './call.js';
+import { callerChannel, type Call, type CallsRow } from './call.js';
 import type { Pipeline } from './pipeline.js';
 
 export const RELEASE_CODE_FORBIDDEN = 403;
@@ -29,9 +29,10 @@ export async function concludeFeature(
 ): Promise<void> {
   call.status = status;
   stampAnsweredAt(pipeline, call);
-  const { ari, cdr } = pipeline.deps;
-  await ari.channels.hangup(call.callerChannelId).catch(() => undefined);
-  await cdr.finish(call);
+  await pipeline.deps.ari.channels
+    .hangup(callerChannel(call))
+    .catch(() => undefined);
+  await pipeline.finishCall(call);
 }
 
 /** Closes the feature-code dial's own CDR entry without hanging up its channel: pickup and
@@ -44,5 +45,5 @@ export async function closeFeatureCall(
 ): Promise<void> {
   call.status = status;
   stampAnsweredAt(pipeline, call);
-  await pipeline.deps.cdr.finish(call);
+  await pipeline.finishCall(call);
 }

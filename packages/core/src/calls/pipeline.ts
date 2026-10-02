@@ -83,6 +83,9 @@ export type PipelineDeps = {
 export class Pipeline {
   readonly deps: PipelineDeps;
   readonly callByChannel = new Map<string, Call>();
+  /** The calls with no caller channel (`Call.callerChannelId` `null`), by id: reachable for the
+   * live-call actions until they get one (`registerCall`) or end (`finishCall`). */
+  readonly channelless = new Map<string, Call>();
   readonly pendingRing = new Map<string, RingResolver>();
   readonly findMeTimers = new Map<string, ReturnType<typeof setTimeout>[]>();
   readonly pendingFindMeAccept = new Map<string, FindMeAcceptWait>();
@@ -207,7 +210,20 @@ export class Pipeline {
     // id from the originate and drives its recording directly, so the pipeline leaves it alone.
   }
 
+  /** Makes `call` reachable: by its caller channel, or by its id while it has none. */
   registerCall(call: Call): void {
+    if (call.callerChannelId === null) {
+      this.channelless.set(call.id, call);
+      return;
+    }
+    this.channelless.delete(call.id);
     this.callByChannel.set(call.callerChannelId, call);
+  }
+
+  /** Writes `call`'s history entry (`CdrWriter.finish`): every way a call ends comes through here,
+   * so a call with no caller channel leaves `channelless` with it. */
+  async finishCall(call: Call): Promise<void> {
+    this.channelless.delete(call.id);
+    await this.deps.cdr.finish(call);
   }
 }

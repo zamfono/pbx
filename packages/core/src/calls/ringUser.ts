@@ -161,9 +161,11 @@ export async function ringUser(
   if (!ringing && !findMeLegsPending(pipeline, call.id)) {
     concludeRing(pipeline, call);
   }
-  await pipeline.deps.ari.channels
-    .ring(call.callerChannelId)
-    .catch(() => undefined);
+  if (call.callerChannelId !== null) {
+    await pipeline.deps.ari.channels
+      .ring(call.callerChannelId)
+      .catch(() => undefined);
+  }
 
   const outcome = await outcomePromise;
   if (outcome === 'answered') {

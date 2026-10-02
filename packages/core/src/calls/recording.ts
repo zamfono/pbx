@@ -104,9 +104,16 @@ export class Recorder {
   /** Starts recording the calling party's own participation when their `record_calls` flag is
    * set (§10.2 "Internal calls": a call between two flagged users produces two recordings, one
    * per side). The caller is never a `Leg` — it has no routing group of its own — so its flag is
-   * evaluated alone, unlike `onLegUp`'s OR-resolution with the routing group. */
+   * evaluated alone, unlike `onLegUp`'s OR-resolution with the routing group. A call with no
+   * caller channel has no calling party in it to record. */
   async onCallerUp(call: Call): Promise<void> {
-    await this.startOnOwnFlag(call.id, call.callerUserId, call.callerChannelId);
+    if (call.callerChannelId !== null) {
+      await this.startOnOwnFlag(
+        call.id,
+        call.callerUserId,
+        call.callerChannelId
+      );
+    }
   }
 
   /** Starts recording a transferee's participation in the call it now carries on (§10.1
@@ -204,7 +211,9 @@ export class Recorder {
 
   /** The caller-side counterpart of `onLegEnded`, for a participation started by `onCallerUp`. */
   async onCallerEnded(call: Call): Promise<void> {
-    await this.end(call, call.callerChannelId);
+    if (call.callerChannelId !== null) {
+      await this.end(call, call.callerChannelId);
+    }
   }
 
   private async end(call: Call, channelId: string): Promise<void> {

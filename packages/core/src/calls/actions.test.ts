@@ -18,7 +18,7 @@ import {
   seedUser
 } from '../testing/seedRows.js';
 import { CallActions } from './actions.js';
-import { newCall, type Call } from './call.js';
+import { callerChannel, newCall, type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { sipToHangupCause } from './releaseCause.js';
 
@@ -158,6 +158,8 @@ describe('CallActions', () => {
       );
       expect(live?.status).toBe('answered');
       expect(live?.callerUserId).toBe(callerId);
+      // Its answered device is its caller channel now, so it leaves the channel-less index.
+      expect(pipeline.channelless.size).toBe(0);
     });
 
     await actions.hangup(callId, { actorUserId });
@@ -562,6 +564,37 @@ describe('CallActions', () => {
     expect(row.status).toBe('failed');
     expect(row.log).toContain('"cause":"placementFailed"');
     expect(row.log).toContain('"event":"originate","result":"unanswered"');
+    expect(pipeline.channelless.size).toBe(0);
+  });
+
+  it('keeps a click-to-dial reachable by its id while its phones ring, and lets go of it on a REST hangup', async () => {
+    await setUp();
+    fakeAri.answerAfterMs = 60_000;
+    const callerId = await seedUser(db, '101');
+    await seedDevice(rig, callerId, 'e101-a');
+    await rig.devicesUp();
+
+    const result = await actions.originate({
+      userId: callerId,
+      target: '102',
+      actorUserId: callerId,
+      requestId: 'req-hangup'
+    });
+    const callId = 'callId' in result ? result.callId : '';
+    expect(pipeline.channelless.get(callId)?.callerChannelId).toBeNull();
+
+    await actions.hangup(callId, { actorUserId: callerId });
+    expect(pipeline.channelless.size).toBe(0);
+    const row = await db
+      .selectFrom('calls')
+      .select(['status', 'endedAt'])
+      .where('id', '=', callId)
+      .executeTakeFirstOrThrow();
+    expect(row.status).toBe('missed');
+    expect(row.endedAt).not.toBeNull();
+    expect(originates().every(entry => rig.hungUp(entry.channelId ?? ''))).toBe(
+      true
+    );
   });
 
   it('answers 409 noRegisteredDevice when the user has devices but none is registered', async () => {
@@ -638,7 +671,7 @@ describe('CallActions', () => {
       }
     );
     expect(response.status).toBe(HTTP_NO_CONTENT);
-    expect(rig.hungUp(call.callerChannelId)).toBe(true);
+    expect(rig.hungUp(callerChannel(call))).toBe(true);
     for (const leg of call.legs.values()) {
       expect(rig.hungUp(leg.channelId)).toBe(true);
     }

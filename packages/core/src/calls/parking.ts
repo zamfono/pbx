@@ -7,7 +7,7 @@ import { MS_PER_SECOND } from '@zamfono/shared';
 
 import type { Snapshot } from '../internal/snapshot.js';
 import type { Presence } from '../presence.js';
-import { release, type Call } from './call.js';
+import { callerChannel, release, type Call } from './call.js';
 import { activeCallOf, bridgedParty, channelOf } from './callLookup.js';
 import { callPartiesChanged } from './callState.js';
 import {
@@ -202,14 +202,10 @@ export async function park(
     await release(pipeline, call, RELEASE_CODE_UNAVAILABLE, 'failed');
     return;
   }
+  const channelId = callerChannel(call);
   const ari = pipeline.deps.ari;
-  await ari.channels.answer(call.callerChannelId).catch(() => undefined);
-  await playAndWait(
-    ari,
-    call.callerChannelId,
-    `digits:${ext}`,
-    `${call.callerChannelId}:park`
-  );
+  await ari.channels.answer(channelId).catch(() => undefined);
+  await playAndWait(ari, channelId, `digits:${ext}`, `${channelId}:park`);
   await concludeFeature(pipeline, call, 'answered');
 }
 

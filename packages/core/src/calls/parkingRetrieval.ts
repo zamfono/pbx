@@ -4,7 +4,7 @@
  * registry, so both stay under the repository's `max-lines` lint rule.
  */
 import type { Presence } from '../presence.js';
-import type { Call, Leg } from './call.js';
+import { callerChannel, type Call, type Leg } from './call.js';
 import { closeFeatureCall } from './featureCall.js';
 import { trackLeg } from './legs.js';
 import { takeParkedEntry } from './parking.js';
@@ -24,7 +24,7 @@ async function joinRetriever(
   call: Call
 ): Promise<void> {
   const leg: Leg = {
-    channelId: call.callerChannelId,
+    channelId: callerChannel(call),
     kind: 'device',
     userId: call.callerUserId,
     state: 'up',
@@ -45,7 +45,7 @@ async function joinRetriever(
     presence?.setCallState(call.callerUserId, 'idle', null, null, call.id);
   }
   // §7 level `sip`: the retriever's dialog is the parked call's leg now, not the slot dial's.
-  pipeline.deps.cdr.registerLeg?.(parked, call.callerChannelId);
+  pipeline.deps.cdr.registerLeg?.(parked, callerChannel(call));
   await pipeline.deps.recorder?.onLegUp(parked, leg);
 }
 
@@ -72,10 +72,9 @@ export async function retrieveParkedCall(
     entry.partyChannelId,
     'mixing'
   );
-  await ari.channels.answer(call.callerChannelId).catch(() => undefined);
-  await ari.bridges
-    .addChannel(bridgeId, call.callerChannelId)
-    .catch(() => undefined);
+  const channelId = callerChannel(call);
+  await ari.channels.answer(channelId).catch(() => undefined);
+  await ari.bridges.addChannel(bridgeId, channelId).catch(() => undefined);
   await joinRetriever(pipeline, parked, call);
   // The retriever's own channel now carries the conversation; it stays up (§9.3 table).
   await closeFeatureCall(pipeline, call, 'answered');

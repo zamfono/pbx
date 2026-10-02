@@ -119,12 +119,14 @@ export async function holdOnRequest(
   call: Call,
   req: HoldRequest
 ): Promise<void> {
-  const byChannelId = transferrerChannel(call, req.actorUserId);
-  const conversation = bridgedParty(call, byChannelId);
+  const conversation = bridgedParty(
+    call,
+    transferrerChannel(call, req.actorUserId)
+  );
   if (conversation === null) {
     throw notBridged();
   }
-  const { bridgeId, party } = conversation;
+  const { bridgeId, party, byChannelId } = conversation;
   if (holdIn(pipeline, bridgeId) !== null) {
     throw new ActionError(HTTP_CONFLICT, 'held', 'call is on hold');
   }

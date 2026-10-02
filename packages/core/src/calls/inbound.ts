@@ -170,7 +170,7 @@ export async function handleInboundStart(
   );
   await setChannelLanguage(
     pipeline.deps.ari,
-    call.callerChannelId,
+    channel.id,
     snapshot.settings.language
   );
 

@@ -68,9 +68,9 @@ export function hangupLeg(pipeline: Pipeline, leg: Leg): Promise<void> {
 /**
  * The first accepted answer: bridges it with the caller and ends every other leg. With
  * `existingBridgeId` (§10.2 "Call parking"'s ring-back, "Three-way calls"'s `*5`) the
- * winning leg joins that bridge in place of one of its own, and `call.callerChannelId` — a
- * placeholder channel for parking's synthetic ring-back call, or `*5`'s own disposable
- * feature-code channel — is left untouched.
+ * winning leg joins that bridge in place of one of its own, and `call.callerChannelId` — none
+ * for parking's ring-back or a party `api` adds, `*5`'s own disposable feature-code channel — is
+ * left untouched.
  */
 async function winLeg(
   pipeline: Pipeline,

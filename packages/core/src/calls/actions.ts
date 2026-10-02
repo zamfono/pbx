@@ -45,9 +45,6 @@ import { registeredDevices } from './userDevices.js';
 /** The live-call actions of the internal API (§3), over one `Pipeline`. */
 export class CallActions {
   private readonly pipeline: Pipeline;
-  // Calls whose devices still ring for an originate: reachable by id before any channel of theirs
-  // is registered with the pipeline.
-  private readonly originating = new Map<string, Call>();
 
   constructor(pipeline: Pipeline) {
     this.pipeline = pipeline;
@@ -66,11 +63,12 @@ export class CallActions {
     if (devices.length === 0) {
       call.log.event({ event: 'originate', result: 'noRegisteredDevice' });
       call.status = 'failed';
-      await this.pipeline.deps.cdr.finish(call);
+      await this.pipeline.finishCall(call);
       return { error: 'noRegisteredDevice' };
     }
     await this.pipeline.deps.cdr.open(call);
-    this.originating.set(call.id, call);
+    // Reachable by its id while it has no caller channel (`Pipeline.channelless`).
+    this.pipeline.registerCall(call);
     const ring = ringOwnDevices(this.pipeline, {
       host: call,
       sipCall: call,
@@ -85,7 +83,6 @@ export class CallActions {
     });
     ring.outcome
       .then(async outcome => {
-        this.originating.delete(call.id);
         if (outcome.kind === 'answered') {
           await beginOriginatedCall(
             this.pipeline,
@@ -112,7 +109,8 @@ export class CallActions {
   async hangup(callId: string, req: HangupRequest): Promise<void> {
     const call = this.findCall(callId);
     call.log.event({ event: 'hangup', actorUserId: req.actorUserId });
-    if (this.originating.delete(callId)) {
+    // A ring that is all a call with no caller channel has stops outright.
+    if (call.callerChannelId === null) {
       abandonOwnRing(this.pipeline, call);
     }
     await closeCall(this.pipeline, call, 'missed', true);
@@ -169,10 +167,10 @@ export class CallActions {
   }
 
   private findCall(callId: string): Call {
-    const call =
-      findLiveCall(this.pipeline, candidate => candidate.id === callId) ??
-      this.originating.get(callId) ??
-      null;
+    const call = findLiveCall(
+      this.pipeline,
+      candidate => candidate.id === callId
+    );
     if (call === null) {
       throw new ActionError(HTTP_NOT_FOUND, 'notFound', 'call not found');
     }

@@ -58,9 +58,13 @@ export function ownBridge(call: Call): string | null {
 }
 
 /** The channel the actor acts through in `call`: the actor's own, else the answerer's, else the
- * caller's. Only an admin's action on someone else's call reaches the fallbacks: `api` lets a
- * `user` act on a call only as its caller or with a leg up in it (§10.3 "Live calls"). */
-export function transferrerChannel(call: Call, actorUserId: string): string {
+ * caller's, `null` where the call has none of them. Only an admin's action on someone else's call
+ * reaches the fallbacks: `api` lets a `user` act on a call only as its caller or with a leg up in
+ * it (§10.3 "Live calls"). */
+export function transferrerChannel(
+  call: Call,
+  actorUserId: string
+): string | null {
   const answerer =
     call.answeredByUserId === null
       ? null
@@ -69,23 +73,31 @@ export function transferrerChannel(call: Call, actorUserId: string): string {
 }
 
 /** The conversation `call` carries in its own bridge, seen from `byChannelId`: the bridge and the
- * other party in it. `null` for a call that has no bridge of its own (`ownBridge`) or nobody
- * else in it, which transfer, consult, hold and park all refuse. */
+ * other party in it. `null` for a call that has no bridge of its own (`ownBridge`), no channel
+ * to see it from or nobody else in it, which transfer, consult, hold and park all refuse. */
 export function bridgedParty(
   call: Call,
-  byChannelId: string
-): { bridgeId: string; party: string } | null {
+  byChannelId: string | null
+): { bridgeId: string; party: string; byChannelId: string } | null {
   const bridgeId = ownBridge(call);
-  const party = otherChannelIn(call, byChannelId);
-  return bridgeId === null || party === null ? null : { bridgeId, party };
+  const party = byChannelId === null ? null : otherChannelIn(call, byChannelId);
+  return bridgeId === null || party === null || byChannelId === null
+    ? null
+    : { bridgeId, party, byChannelId };
 }
 
-/** The first live call matching `test`, over `callByChannel`'s several entries per call. */
+/** The first live call matching `test`, over `callByChannel`'s several entries per call, then
+ * the calls with no channel there yet (`Pipeline.channelless`). */
 export function findLiveCall(
   pipeline: Pipeline,
   test: (call: Call) => boolean
 ): Call | null {
   for (const call of pipeline.callByChannel.values()) {
+    if (test(call)) {
+      return call;
+    }
+  }
+  for (const call of pipeline.channelless.values()) {
     if (test(call)) {
       return call;
     }

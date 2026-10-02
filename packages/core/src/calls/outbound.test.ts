@@ -18,7 +18,7 @@ import { StateStore } from '../internal/stateStore.js';
 import { PROMPTS } from '../prompts.js';
 import { ATTEMPT_NO_RESPONSE_MS } from '../routing/trunk.js';
 import { eventually } from '../testing/eventually.js';
-import type { Call, Leg } from './call.js';
+import { callerChannel, type Call, type Leg } from './call.js';
 import { handleOutbound } from './outbound.js';
 import { Pipeline } from './pipeline.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
@@ -503,7 +503,7 @@ describe('outbound dialing', () => {
 
     const call = await dial('+498912345');
 
-    expect(languageSet(fakeAri, call.callerChannelId, 'de')).toBe(true);
+    expect(languageSet(fakeAri, callerChannel(call), 'de')).toBe(true);
   });
 
   it('stores the resolved E.164 form in calls.to, the dialled digits only in the trace', async () => {

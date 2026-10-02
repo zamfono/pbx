@@ -63,5 +63,5 @@ export async function finishAbandoned(
     call.status = 'missed';
     await notifyMissedCall(pipeline, call);
   }
-  await pipeline.deps.cdr.finish(call);
+  await pipeline.finishCall(call);
 }

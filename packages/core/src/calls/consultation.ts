@@ -27,12 +27,14 @@ export async function consult(
   call: Call,
   req: ConsultRequest
 ): Promise<{ callId: string }> {
-  const byChannelId = transferrerChannel(call, req.actorUserId);
-  const conversation = bridgedParty(call, byChannelId);
+  const conversation = bridgedParty(
+    call,
+    transferrerChannel(call, req.actorUserId)
+  );
   if (conversation === null) {
     throw notBridged();
   }
-  const { bridgeId, party } = conversation;
+  const { bridgeId, party, byChannelId } = conversation;
   if (consultationLive(pipeline, call)) {
     throw new ActionError(
       HTTP_CONFLICT,

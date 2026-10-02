@@ -4,7 +4,7 @@
  * over the API, a transferrer leaving). The other, sending a channel through the dial
  * resolution, is `outboundDispatch.ts`'s.
  */
-import type { Call, CallsRow } from './call.js';
+import { callerChannel, type Call, type CallsRow } from './call.js';
 import { traceSystemEnd } from './callEnd.js';
 import { clearFindMeTimers } from './findMe.js';
 import { stopGroupRinging } from './groupPickup.js';
@@ -95,7 +95,7 @@ export async function closeCall(
     // §10.2 "Voicemail": a caller in a mailbox deposit is hung up like one ending the message
     // themselves, and the deposit closes the row once the recording's outcome follows.
     await pipeline.deps.ari.channels
-      .hangup(call.callerChannelId)
+      .hangup(callerChannel(call))
       .catch(() => undefined);
     return;
   }
@@ -106,7 +106,8 @@ export async function closeCall(
   }
   clearFindMeTimers(pipeline, call.id);
   stopGroupRinging(pipeline, call, null);
-  const live = [call.callerChannelId];
+  const own = call.callerChannelId === null ? [] : [call.callerChannelId];
+  const live = [...own];
   const upLegs = [...call.legs.values()].filter(leg => leg.state === 'up');
   for (const leg of call.legs.values()) {
     if (leg.state !== 'ended') {
@@ -114,7 +115,7 @@ export async function closeCall(
     }
     leg.state = 'ended';
   }
-  for (const channelId of [call.callerChannelId, ...call.legs.keys()]) {
+  for (const channelId of [...own, ...call.legs.keys()]) {
     if (pipeline.callByChannel.get(channelId) === call) {
       pipeline.callByChannel.delete(channelId);
     }
@@ -146,6 +147,6 @@ export async function closeCall(
     await dropStrandedHold(pipeline, call);
   }
   await recordings;
-  await pipeline.deps.cdr.finish(call);
+  await pipeline.finishCall(call);
   pending?.resolve('abandoned');
 }

@@ -5,7 +5,13 @@
  * pickup (`pickupAction.ts`), which names the call.
  */
 import { bridgeAnswered, claimAnswer } from './answer.js';
-import { release, type Call, type Leg, type Owner } from './call.js';
+import {
+  callerChannel,
+  release,
+  type Call,
+  type Leg,
+  type Owner
+} from './call.js';
 import { findLiveCall } from './callLookup.js';
 import { ownerForExt } from './extensionOwner.js';
 import { closeFeatureCall, RELEASE_CODE_NOT_FOUND } from './featureCall.js';
@@ -156,7 +162,7 @@ export async function pickupByExtension(
   }
   const userId = 'userId' in owner ? owner.userId : null;
   const groupId = 'ringGroupId' in owner ? owner.ringGroupId : null;
-  const picker = { channelId: call.callerChannelId, userId: call.callerUserId };
+  const picker = { channelId: callerChannel(call), userId: call.callerUserId };
 
   if (userId !== null) {
     const target = findLiveCall(

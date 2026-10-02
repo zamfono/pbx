@@ -51,9 +51,11 @@ export async function winBatch(
       .catch(() => undefined);
     return false;
   }
-  await pipeline.deps.ari.channels
-    .stopMoh(call.callerChannelId)
-    .catch(() => undefined);
+  if (call.callerChannelId !== null) {
+    await pipeline.deps.ari.channels
+      .stopMoh(call.callerChannelId)
+      .catch(() => undefined);
+  }
   // A registered bridge to join (`addParty.ts`'s `*5`) in place of a bridge of its own.
   const joined = await bridgeAnswered(
     pipeline,

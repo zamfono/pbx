@@ -15,7 +15,7 @@ import {
 } from '../testing/pipelineRig.js';
 import { seedDevice, seedUser } from '../testing/seedRows.js';
 import { CallActions } from './actions.js';
-import { newCall, type Call } from './call.js';
+import { callerChannel, newCall, type Call } from './call.js';
 import { liveView } from './callState.js';
 import type { GroupLeg } from './groupLegs.js';
 import type { Pipeline } from './pipeline.js';
@@ -165,12 +165,12 @@ describe('call control', () => {
     await actions.hold(first.id, { actorUserId: memberId });
     channelDestroyed(legOf(first));
     await eventually(() => {
-      expect(rig.hungUp(first.callerChannelId)).toBe(true);
+      expect(rig.hungUp(callerChannel(first))).toBe(true);
     });
 
     const second = await answeredCall(rig, memberId);
     await actions.hold(second.id, { actorUserId: memberId });
-    channelDestroyed(second.callerChannelId);
+    channelDestroyed(callerChannel(second));
     await eventually(() => {
       expect(rig.hungUp(legOf(second))).toBe(true);
     });
@@ -183,7 +183,7 @@ describe('call control', () => {
     const call = await answeredCall(rig, memberId);
     await actions.hold(call.id, { actorUserId: memberId });
     await actions.hangup(call.id, { actorUserId: memberId });
-    expect(rig.hungUp(call.callerChannelId)).toBe(true);
+    expect(rig.hungUp(callerChannel(call))).toBe(true);
     expect(rig.hungUp(legOf(call))).toBe(true);
   });
 
@@ -197,7 +197,7 @@ describe('call control', () => {
     await actions.hold(call.id, { actorUserId: memberId });
     await actions.transfer(call.id, { target: '102', actorUserId: memberId });
     expect(
-      requested('POST', `bridges/${bridgeId}/addChannel`, call.callerChannelId)
+      requested('POST', `bridges/${bridgeId}/addChannel`, callerChannel(call))
     ).toBe(true);
     expect(requested('DELETE', `channels/${call.callerChannelId}/moh`)).toBe(
       true
@@ -222,8 +222,8 @@ describe('call control', () => {
       }
       expect(consultation.status).toBe('answered');
       expect(consultation.bridgeId).toBe(call.bridgeId);
-      // Its dial has settled: the placeholder caller channel is released.
-      expect(pipeline.callByChannel.has(`consult:${callId}`)).toBe(false);
+      // It has no caller channel: reachable by its id until it gets one or ends.
+      expect(pipeline.channelless.get(callId)).toBe(consultation);
       return consultation;
     });
   }
@@ -264,7 +264,8 @@ describe('call control', () => {
     expect(rig.hungUp(actorChannel)).toBe(true);
     expect(consultation.parentCallId).toBe(call.id);
     expect(consultation.callerChannelId).toBe(call.callerChannelId);
-    expect(pipeline.callByChannel.get(call.callerChannelId)).toBe(consultation);
+    expect(pipeline.callByChannel.get(callerChannel(call))).toBe(consultation);
+    expect(pipeline.channelless.size).toBe(0);
     // The history's caller stays the member; the live control is the parties' still in it.
     expect(consultation.callerUserId).toBe(memberId);
     expect(
@@ -280,7 +281,7 @@ describe('call control', () => {
     expect(original?.log).toContain('"event":"attendedTransfer"');
 
     // The transferee hanging up ends the conversation and the consultation's row.
-    channelDestroyed(call.callerChannelId);
+    channelDestroyed(callerChannel(call));
     await eventually(async () => {
       expect(rig.hungUp(targetLeg)).toBe(true);
       const row = await rowOf(consultation.id);
@@ -300,8 +301,9 @@ describe('call control', () => {
     await eventually(async () => {
       expect((await rowOf(consultation.id))?.endedAt).not.toBeNull();
     });
+    expect(pipeline.channelless.size).toBe(0);
     expect(rig.hungUp(legOf(call))).toBe(false);
-    expect(rig.hungUp(call.callerChannelId)).toBe(false);
+    expect(rig.hungUp(callerChannel(call))).toBe(false);
     expect(
       await refusal(
         Promise.resolve().then(() =>
@@ -325,9 +327,15 @@ describe('call control', () => {
     const consultation = await answeredConsultation(call, memberId);
     channelDestroyed(legOf(call));
     await eventually(() => {
-      expect(rig.hungUp(call.callerChannelId)).toBe(true);
+      expect(rig.hungUp(callerChannel(call))).toBe(true);
       expect(rig.hungUp(legOf(consultation))).toBe(true);
     });
+    // The consulted party's channel, hung up, ends the consultation's row.
+    channelDestroyed(legOf(consultation));
+    await eventually(async () => {
+      expect((await rowOf(consultation.id))?.endedAt).not.toBeNull();
+    });
+    expect(pipeline.channelless.size).toBe(0);
   });
 
   it('refuses a transfer to a call that is not the consultation, or not answered yet', async () => {
@@ -395,7 +403,51 @@ describe('call control', () => {
     await eventually(async () => {
       expect((await rowOf(callId))?.endedAt).not.toBeNull();
     });
-    expect(rig.hungUp(call.callerChannelId)).toBe(false);
+    expect(pipeline.channelless.size).toBe(0);
+    expect(rig.hungUp(callerChannel(call))).toBe(false);
+  });
+
+  it('lets go of an added party nobody answers, and of one a REST hangup ends while it rings', async () => {
+    await setUp();
+    fakeAri.answerAfterMs = RING_TIMER_MS;
+    const memberId = await seedUserWithDevice(rig, '101');
+    await seedUserWithDevice(rig, '102');
+    await rig.devicesUp();
+    const call = await answeredCall(rig, memberId);
+
+    const declined = await actions.addParty(call.id, {
+      target: '102',
+      actorUserId: memberId
+    });
+    expect(pipeline.channelless.has(declined.callId)).toBe(true);
+    const ringing = await eventually(() => {
+      const leg = [...pipeline.callByChannel.entries()].find(
+        ([, candidate]) => candidate.id === declined.callId
+      );
+      expect(leg).toBeDefined();
+      return leg?.[0] ?? '';
+    });
+    fakeAri.emit({
+      type: 'ChannelDestroyed',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: defaultChannel({ id: ringing }),
+      cause: CAUSE_CALL_REJECTED
+    });
+    await eventually(async () => {
+      expect((await rowOf(declined.callId))?.status).toBe('missed');
+    });
+    expect(pipeline.channelless.size).toBe(0);
+
+    const hungUp = await actions.addParty(call.id, {
+      target: '102',
+      actorUserId: memberId
+    });
+    await actions.hangup(hungUp.callId, { actorUserId: memberId });
+    await eventually(async () => {
+      expect((await rowOf(hungUp.callId))?.endedAt).not.toBeNull();
+    });
+    expect(pipeline.channelless.size).toBe(0);
   });
 
   it('declines the actor’s own ringing legs of a direct ring, and refuses 409 when none rings', async () => {

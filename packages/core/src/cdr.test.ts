@@ -8,7 +8,7 @@ import { FakeAri } from './ari/fake.js';
 import { fakeRtpAudioQos } from './ari/fakeRtp.js';
 import { defaultChannel, type Channel, type Logger } from './ari/types.js';
 import type { LogLevel } from './callLog.js';
-import { newCall, type Call } from './calls/call.js';
+import { callerChannel, newCall, type Call } from './calls/call.js';
 import { CdrWriter } from './cdr.js';
 import { EventBus } from './internal/eventBus.js';
 import { ConfigCache } from './internal/snapshot.js';
@@ -349,7 +349,7 @@ describe('CdrWriter', () => {
   it('routes a HEP message to the call whose SIP Call-ID it carries (§7 level sip)', async () => {
     await seedSettings(db, 'sip');
     const call = buildCall('sip');
-    fakeAri.addChannel({ id: call.callerChannelId });
+    fakeAri.addChannel({ id: callerChannel(call) });
     fakeAri.channelVariables.set(
       `${call.callerChannelId}:CHANNEL(pjsip,call-id)`,
       'call-id-abc@10.0.0.1'
@@ -373,7 +373,7 @@ describe('CdrWriter', () => {
     // before its Call-ID was read, and Asterisk's 404 left after the log had been written.
     await seedSettings(db, 'sip');
     const call = buildCall('sip');
-    fakeAri.addChannel({ id: call.callerChannelId });
+    fakeAri.addChannel({ id: callerChannel(call) });
     fakeAri.channelVariables.set(
       `${call.callerChannelId}:CHANNEL(pjsip,call-id)`,
       'call-id-404@10.0.0.1'
@@ -429,7 +429,7 @@ describe('CdrWriter', () => {
     // Every call-ending path hangs the caller up and writes the call without waiting for its
     // `ChannelDestroyed`, which carries the statistics Asterisk set as it hung the channel up.
     await cdr.finish(call);
-    await cdr.channelEnded(endedChannel(call.callerChannelId));
+    await cdr.channelEnded(endedChannel(callerChannel(call)));
 
     const rows = await db
       .selectFrom('callQos')
@@ -443,7 +443,7 @@ describe('CdrWriter', () => {
   it('takes a leg’s RTCP reports, joined by its Call-ID, into its call_qos row (§7 level qos)', async () => {
     await seedSettings(db, 'qos');
     const call = buildCall('qos');
-    fakeAri.addChannel({ id: call.callerChannelId });
+    fakeAri.addChannel({ id: callerChannel(call) });
     fakeAri.channelVariables.set(
       `${call.callerChannelId}:CHANNEL(pjsip,call-id)`,
       'call-id-rtcp@10.0.0.1'
@@ -473,7 +473,7 @@ describe('CdrWriter', () => {
 
     await cdr.finish(call);
     await cdr.channelEnded(
-      endedChannel(call.callerChannelId, fakeRtpAudioQos({ rtt: 0 }))
+      endedChannel(callerChannel(call), fakeRtpAudioQos({ rtt: 0 }))
     );
 
     const row = await db

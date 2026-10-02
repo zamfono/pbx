@@ -2355,7 +2355,12 @@ describe('features', () => {
         .execute();
       expect(ringbackRows).toHaveLength(1);
       expect(ringbackRows[0]?.status).not.toBe('interrupted');
+      expect(pipeline.channelless.size).toBe(0);
     }, RINGBACK_WAIT_MS);
+    // The ring-back has no caller channel, and no request is made against one.
+    expect(fakeAri.calls.some(entry => entry.path.includes('/null'))).toBe(
+      false
+    );
   }, 10_000);
 
   it('parking timeout rings the parker back through the pipeline and joins the parked bridge on answer', async () => {
@@ -2458,6 +2463,7 @@ describe('features', () => {
       expect(ringbackRow.endedAt).not.toBeNull();
     }, RINGBACK_WAIT_MS);
     expect(activeCall.answeredByUserId).toBe(parkerUserId);
+    expect(pipeline.channelless.size).toBe(0);
     // §10.3 "Live calls": the parker who answered is connected in the parked call itself, their
     // answered leg one of its own, so they may end or transfer it.
     const parkerLeg = [...activeCall.legs.values()].find(

@@ -142,9 +142,9 @@ export class CdrWriter {
   async open(call: Call): Promise<void> {
     // At level `sip` the join is in place before routing starts: a call released at once would
     // otherwise be gone before its Call-ID is read, and its dialog would reach no call at all.
-    // A click-to-dial call has no caller channel yet; its devices join as they are placed.
+    // A call with no caller channel has its legs join as they are placed.
     const joined =
-      call.callerChannelId === ''
+      call.callerChannelId === null
         ? Promise.resolve()
         : this.join(call, call.callerChannelId);
     // §7 level `qos`: the caller's channel has a `call_qos` row from the start.

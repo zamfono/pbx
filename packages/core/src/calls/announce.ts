@@ -5,7 +5,7 @@
  * the announcement has actually played to the end.
  */
 import { assetMedia } from '../prompts.js';
-import type { Call } from './call.js';
+import { callerChannel, type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
 
@@ -17,14 +17,13 @@ export async function announce(
   const snapshot = await pipeline.deps.cache.get();
   const media = assetMedia(snapshot.audioAssets, audioId);
   call.log.event({ event: 'announce', audioId });
-  await pipeline.deps.ari.channels
-    .answer(call.callerChannelId)
-    .catch(() => undefined);
+  const channelId = callerChannel(call);
+  await pipeline.deps.ari.channels.answer(channelId).catch(() => undefined);
   await playAndWait(
     pipeline.deps.ari,
-    call.callerChannelId,
+    channelId,
     media,
-    `${call.callerChannelId}:announce`
+    `${channelId}:announce`
   );
   // eslint-disable-next-line require-atomic-updates -- this call's only writer is this function
   call.answeredAt = pipeline.deps.now();
@@ -32,8 +31,6 @@ export async function announce(
   call.status = 'answered';
   // §7: the channel whose `call_qos` row this call has is noted before it goes.
   pipeline.deps.cdr.noteQosLegs?.(call);
-  await pipeline.deps.ari.channels
-    .hangup(call.callerChannelId)
-    .catch(() => undefined);
-  await pipeline.deps.cdr.finish(call);
+  await pipeline.deps.ari.channels.hangup(channelId).catch(() => undefined);
+  await pipeline.finishCall(call);
 }

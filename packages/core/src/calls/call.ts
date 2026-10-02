@@ -33,7 +33,13 @@ export type Leg = {
 export type Call = {
   id: string;
   direction: 'inbound' | 'outbound' | 'internal';
-  callerChannelId: string;
+  /** The caller's own channel; `null` while the call has none: a click-to-dial before one of
+   * the user's devices answers, a party `api` adds (`addedParty.ts`), the parking ring-back and
+   * the ring of an `api` pickup. Each but the pickup's ring, which is never written nor
+   * addressed, is reachable by its id through `Pipeline.channelless` (`registerCall`). Such a call
+   * only rings (`userStep.ts`, `ringGroup.ts`): a forward, mailbox or release has no caller to
+   * act on. */
+  callerChannelId: string | null;
   from: string;
   to: string;
   didId: string | null;
@@ -57,11 +63,6 @@ export type Call = {
   parentCallId: string | null;
   evaluated: Set<Scope>;
   menuAttempts: number;
-  /** §10.2 "Call parking": a system-initiated ring-back rings its target and stops there. Its
-   * caller is a placeholder channel with nobody behind it, so the target's forward, mailbox and
-   * release rules have no caller to act on; the initiator decides what follows an unanswered
-   * ring. A party added or consulted through the API (`addedParty.ts`) rings the same way. */
-  ringOnly?: boolean;
   /** The bridge this call's next answer joins in place of a bridge of its own: the parked
    * party's for the parking ring-back (§10.2 "Call parking"), the running call's for `*5`
    * (§10.2 "Three-way calls"). Read once by the answer it is for (`takeJoinBridge`), and
@@ -93,14 +94,14 @@ export type Call = {
 
 export type CallEnding = {
   by: 'caller' | 'callee' | 'system';
-  channelId: string;
+  channelId: string | null;
   logged: boolean;
 };
 
 export type NewCallParams = {
   id: string;
   direction: Call['direction'];
-  callerChannelId: string;
+  callerChannelId: string | null;
   from: string;
   to: string;
   startedAt: string;
@@ -129,6 +130,15 @@ export function newCall(params: NewCallParams): Call {
     evaluated: new Set(),
     menuAttempts: 0
   };
+}
+
+/** The caller's own channel of a call routed from one: every step that answers, plays to, records
+ * or bridges the caller runs only for such a call, never for one with no caller channel. */
+export function callerChannel(call: Call): string {
+  if (call.callerChannelId === null) {
+    throw new Error(`call ${call.id} has no caller channel`);
+  }
+  return call.callerChannelId;
 }
 
 /** Reads and clears `call.joinBridgeId`, so the bridge is joined by one answer only. */
@@ -187,10 +197,12 @@ export async function release(
   }
   // §7: the channel whose `call_qos` row this call has is noted before it goes.
   pipeline.deps.cdr.noteQosLegs?.(call);
-  await pipeline.deps.ari.channels
-    .hangup(call.callerChannelId, { reasonCode: sipToHangupCause(code) })
-    .catch(() => undefined);
-  await pipeline.deps.cdr.finish(call);
+  if (call.callerChannelId !== null) {
+    await pipeline.deps.ari.channels
+      .hangup(call.callerChannelId, { reasonCode: sipToHangupCause(code) })
+      .catch(() => undefined);
+  }
+  await pipeline.finishCall(call);
 }
 /** A user's or a ring group's mailbox, the two owners a target can end into. */
 export type Owner = { userId: string } | { ringGroupId: string };

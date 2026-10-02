@@ -33,7 +33,8 @@ export async function applyRingOutcome(
     outcome
   );
   call.log.event({ event: 'ringOutcome', outcome, decision: decision.kind });
-  if (call.ringOnly === true) {
+  // A call with no caller channel only rings: its forward, mailbox or release has nobody to act on.
+  if (call.callerChannelId === null) {
     return;
   }
   if (decision.kind === 'forward') {
@@ -98,7 +99,7 @@ export async function runUserStep(
     await ringUser(pipeline, call, userId);
     return;
   }
-  if (call.ringOnly === true) {
+  if (call.callerChannelId === null) {
     return;
   }
   if (decision.kind === 'forward') {

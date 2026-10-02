@@ -17,7 +17,7 @@ import {
 } from '../testing/pipelineRig.js';
 import { seedDevice, seedUser } from '../testing/seedRows.js';
 import { newAddedLeg } from './addedParty.js';
-import { newCall, type Call } from './call.js';
+import { callerChannel, newCall, type Call } from './call.js';
 import { channelOf } from './callLookup.js';
 import { closeCall } from './liveCall.js';
 import type { Pipeline } from './pipeline.js';
@@ -111,7 +111,7 @@ describe('transfers', () => {
     legName: string
   ): Promise<{ call: Call; callerId: string; legId: string }> {
     const call = await answeredCall(rig, userId, { legName });
-    return { call, callerId: call.callerChannelId, legId: legOf(call) };
+    return { call, callerId: callerChannel(call), legId: legOf(call) };
   }
 
   /**

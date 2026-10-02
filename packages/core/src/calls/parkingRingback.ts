@@ -129,13 +129,12 @@ async function routeParkedPartyToFallback(
 
 /**
  * §10.2 "Call parking" timeout: rings the parker back as a fresh internal call to their own
- * extension through the routing pipeline's own user step (`runUserStep`), so the parker's rules
- * — DND, forwards, mailbox — apply exactly as they would for any other call to that extension.
- * The ring-back's own `callerChannelId` is a placeholder, never a real ARI channel: the party
- * waits in a mixing bridge of its own, which whichever device answers joins through `legs.ts`'s
- * `winLeg` (`existingBridgeId`, handed over as the ring-back's `joinBridgeId`). Its `calls` row
- * closes here on either outcome. On no answer (a DND skip, an unreachable mailbox decision, no
- * registered device or a ring nobody took), the parked party goes to the tenant fallback target.
+ * extension through the routing pipeline's own user step (`runUserStep`). The ring-back has no
+ * caller channel, so it only rings (`Call.callerChannelId`): the party waits in a mixing bridge
+ * of its own, which whichever device answers joins through `legs.ts`'s `winLeg`
+ * (`existingBridgeId`, handed over as the ring-back's `joinBridgeId`). Its `calls` row closes here
+ * on either outcome. On no answer (a DND, forward or mailbox decision, no registered device or a
+ * ring nobody took), the parked party goes to the tenant fallback target.
  */
 export async function ringParkerBack(
   pipeline: Pipeline,
@@ -163,7 +162,7 @@ export async function ringParkerBack(
   const ringback = newCall({
     id: newId(),
     direction: 'internal',
-    callerChannelId: `parkRingback:${parked.id}`,
+    callerChannelId: null,
     from: parked.from,
     to: parkerExt,
     startedAt: pipeline.deps.now(),
@@ -172,6 +171,7 @@ export async function ringParkerBack(
   });
   ringback.calleeUserId = parkerUserId;
   await pipeline.deps.cdr.open(ringback);
+  pipeline.registerCall(ringback);
   const bridgeId = await moveParkedParty(
     pipeline,
     parked,
@@ -180,11 +180,10 @@ export async function ringParkerBack(
   );
   ringback.joinBridgeId = bridgeId;
   try {
-    ringback.ringOnly = true;
     await runUserStep(pipeline, ringback, snapshot, parkerUserId);
   } catch {
-    // The party must not stay parked because the parker's own rules failed to run (the
-    // placeholder channel answers no ARI request); the fallback below still takes them.
+    // The party must not stay parked because the parker's own rules failed to run; the fallback
+    // below still takes them.
     ringback.log.event({ event: 'ringbackFailed' });
   }
   delete ringback.joinBridgeId;
@@ -195,14 +194,14 @@ export async function ringParkerBack(
     parked.answeredByUserId = parkerUserId;
     parked.log.event({ event: 'parkingRetrieved', by: parkerUserId });
     takeOverAnsweredLeg(pipeline, ringback, parked);
-    await pipeline.deps.cdr.finish(ringback);
+    await pipeline.finishCall(ringback);
     return;
   }
-  // A release, a deposit or a forward through `runUserStep` closes the ring-back's own row
-  // itself; a row still open is closed here, so none stays at `CdrWriter.open`'s placeholder.
+  // A row a release or a REST hangup closed already stays as it is; a row still open is closed
+  // here, so none stays at `CdrWriter.open`'s placeholder.
   if (ringback.status === null || ringback.status === 'answered') {
     ringback.status ??= 'missed';
-    await pipeline.deps.cdr.finish(ringback);
+    await pipeline.finishCall(ringback);
   }
   await routeParkedPartyToFallback(pipeline, snapshot, parked, partyChannelId);
 }

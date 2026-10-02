@@ -8,7 +8,12 @@ import type { Snapshot } from '../internal/snapshot.js';
 import { assetMedia, defaultPrompt } from '../prompts.js';
 import type { MenuMap } from '../routing/menu.js';
 import type { ForwardTarget } from '../routing/targets.js';
-import { findForwardTarget, release, type Call } from './call.js';
+import {
+  callerChannel,
+  findForwardTarget,
+  release,
+  type Call
+} from './call.js';
 import { enterTarget } from './inbound.js';
 import { collectMenuInput } from './menuInput.js';
 import type { Pipeline } from './pipeline.js';
@@ -84,13 +89,14 @@ async function attemptMenuRound(
     menuId: menu.id,
     attempt: call.menuAttempts
   });
+  const channelId = callerChannel(call);
   const extensions = liveExtensions(menu, snapshot);
   const result = await collectMenuInput(
     pipeline.deps.ari,
     {
-      channelId: call.callerChannelId,
+      channelId,
       media: assetMedia(snapshot.audioAssets, menu.audioId),
-      playbackId: `${call.callerChannelId}:menu:${menu.id}:${call.menuAttempts}`
+      playbackId: `${channelId}:menu:${menu.id}:${call.menuAttempts}`
     },
     collectionMap(menu, snapshot),
     menu.timeoutS,
@@ -138,9 +144,9 @@ async function attemptMenuRound(
   }
   const invalid = await playAndWait(
     pipeline.deps.ari,
-    call.callerChannelId,
+    channelId,
     defaultPrompt('pbxInvalid'),
-    `${call.callerChannelId}:menu:${menu.id}:${call.menuAttempts}:invalid`
+    `${channelId}:menu:${menu.id}:${call.menuAttempts}:invalid`
   );
   if (invalid === 'hangup' || callEnded(call)) {
     call.log.event({ event: 'menuHangup', menuId: menu.id });
@@ -176,7 +182,7 @@ export async function playMenu(
   // A greeting played into an unanswered channel never reaches a trunk caller, who keeps
   // hearing the provider's ringback and has no media path to key a choice into (§10.1 step 6).
   await pipeline.deps.ari.channels
-    .answer(call.callerChannelId)
+    .answer(callerChannel(call))
     .catch(() => undefined);
   await attemptMenuRound(pipeline, call, snapshot, menu);
 }

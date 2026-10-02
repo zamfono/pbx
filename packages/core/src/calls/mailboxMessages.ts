@@ -7,7 +7,7 @@
 import type { Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
-import type { Call, Owner } from './call.js';
+import { callerChannel, type Call, type Owner } from './call.js';
 import { playForDigit, type MenuInput } from './mailboxInput.js';
 import {
   MAILBOX_KEYS,
@@ -65,7 +65,7 @@ export async function sessionInput(
   waitMs: number
 ): Promise<MenuInput> {
   session.playbacks += 1;
-  const channelId = session.call.callerChannelId;
+  const channelId = callerChannel(session.call);
   const input = await playForDigit(
     session.pipeline.deps.ari,
     channelId,
@@ -85,7 +85,7 @@ export async function sayPrompt(
   key: Parameters<typeof promptMedia>[0]
 ): Promise<void> {
   session.playbacks += 1;
-  const channelId = session.call.callerChannelId;
+  const channelId = callerChannel(session.call);
   const end = await playAndWait(
     session.pipeline.deps.ari,
     channelId,

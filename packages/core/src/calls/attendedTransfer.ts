@@ -12,7 +12,7 @@
  */
 import type { AriEvent } from '../ari/types.js';
 import type { Call } from './call.js';
-import { otherChannelIn } from './callLookup.js';
+import { otherChannelIn, presentCallerUserId } from './callLookup.js';
 import { callPartiesChanged } from './callState.js';
 import { endHold } from './hold.js';
 import { closeCall } from './liveCall.js';
@@ -26,16 +26,20 @@ type Named = { id: string } | undefined;
  * its place (§10.1): their channel takes the one the transferrer held, as the call's caller or as
  * an answered leg, so the transferee leaving ends the conversation the way that side's leaving
  * always does. Synchronous, so no event for either channel falls between the two. Shared with
- * the attended transfer `api` requests (`consultation.ts`).
+ * the attended transfer `api` requests (`consultation.ts`), whose consultation has no caller
+ * channel (`secondLeg` `null`): the transferee takes that empty caller place.
  */
 export function handOver(
   pipeline: Pipeline,
   consultation: Call,
-  secondLeg: string,
+  secondLeg: string | null,
   transferee: { channelId: string; userId: string | null }
 ): void {
   const { recorder, presence } = pipeline.deps;
-  const transferrerUserId = userOfChannel(consultation, secondLeg);
+  const transferrerUserId =
+    secondLeg === null
+      ? presentCallerUserId(consultation)
+      : userOfChannel(consultation, secondLeg);
   if (transferrerUserId !== null) {
     presence?.setCallState(
       transferrerUserId,
@@ -45,13 +49,16 @@ export function handOver(
       consultation.id
     );
   }
-  pipeline.callByChannel.delete(secondLeg);
+  if (secondLeg !== null) {
+    pipeline.callByChannel.delete(secondLeg);
+  }
   pipeline.callByChannel.set(transferee.channelId, consultation);
   // §10.2: the transferrer's recorded participation in this row ends here, not with the row.
-  if (secondLeg === consultation.callerChannelId) {
+  if (secondLeg === null || secondLeg === consultation.callerChannelId) {
     recorder?.onCallerEnded(consultation).catch(() => undefined);
     consultation.callerChannelId = transferee.channelId;
     consultation.callerChannelUserId = transferee.userId;
+    pipeline.registerCall(consultation);
     callPartiesChanged(pipeline.deps, consultation);
     return;
   }

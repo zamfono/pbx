@@ -180,12 +180,18 @@ export async function transferCall(
   req: TransferRequest
 ): Promise<Call> {
   const onward = onwardOf(await pipeline.deps.cache.get(), req);
-  const transferrer = transferrerChannel(call, req.actorUserId);
-  const conversation = bridgedParty(call, transferrer);
+  const conversation = bridgedParty(
+    call,
+    transferrerChannel(call, req.actorUserId)
+  );
   if (conversation === null) {
     throw notBridged();
   }
-  const { bridgeId, party: transferee } = conversation;
+  const {
+    bridgeId,
+    party: transferee,
+    byChannelId: transferrer
+  } = conversation;
   // A transferee held through the API (`hold.ts`) leaves from the bridge it was held out of.
   await endHold(pipeline, bridgeId, bridgeId);
   call.log.event({

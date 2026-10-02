@@ -7,7 +7,7 @@
  * its participations offered to the recorder (§10.2 "Recording semantics"), and the live view
  * told the call is up (§10.6).
  */
-import type { Call, Leg } from './call.js';
+import { callerChannel, type Call, type Leg } from './call.js';
 import { callUp } from './callState.js';
 import { traceCodecs } from './codecTrace.js';
 import type { Pipeline } from './pipeline.js';
@@ -92,9 +92,10 @@ export async function bridgeAnswered(
 ): Promise<boolean> {
   const { ari, recorder } = pipeline.deps;
   if (existingBridgeId === null) {
-    await ari.channels.answer(call.callerChannelId);
+    const callerChannelId = callerChannel(call);
+    await ari.channels.answer(callerChannelId);
     const bridge = await ari.bridges.create({ type: 'mixing' });
-    await ari.bridges.addChannel(bridge.id, call.callerChannelId);
+    await ari.bridges.addChannel(bridge.id, callerChannelId);
     // eslint-disable-next-line require-atomic-updates -- the answer is this caller's own claim (`claimAnswer`); nothing else writes bridgeId
     call.bridgeId = bridge.id;
     await ari.bridges.addChannel(bridge.id, leg.channelId);
@@ -104,8 +105,8 @@ export async function bridgeAnswered(
     if (!(await joinBridge(pipeline, call, leg, existingBridgeId))) {
       return false;
     }
-    // The caller's channel is not in the bridge joined (parking's placeholder, `*5`'s feature
-    // dial), so the joining leg is the one new participation (§10.2 "Three-way calls": "evaluates
+    // The caller's channel, if any, is not in the bridge joined (`*5`'s feature dial), so the
+    // joining leg is the one new participation (§10.2 "Three-way calls": "evaluates
     // Ben's participation on its own flags").
     await recorder?.onLegUp(call, leg);
   }

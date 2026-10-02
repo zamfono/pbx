@@ -4,7 +4,7 @@
 import { MS_PER_SECOND, newId } from '@zamfono/shared';
 
 import { waitForRecording } from './ariWaits.js';
-import type { Call, Owner } from './call.js';
+import { callerChannel, type Call, type Owner } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
 
@@ -28,13 +28,14 @@ export async function recordGreeting(
   if (db === undefined || call.callerUserId === null) {
     return false;
   }
+  const channelId = callerChannel(call);
   const ari = pipeline.deps.ari;
   const id = newId();
   const played = await playAndWait(
     ari,
-    call.callerChannelId,
+    channelId,
     instructions,
-    `${call.callerChannelId}:greetingInstructions:${id}`
+    `${channelId}:greetingInstructions:${id}`
   );
   if (played === 'hangup') {
     return false;
@@ -46,7 +47,7 @@ export async function recordGreeting(
     (MAILBOX_GREETING_MAX_S + RECORDING_FALLBACK_BUFFER_S) * MS_PER_SECOND
   );
   await ari.channels
-    .record(call.callerChannelId, {
+    .record(channelId, {
       name,
       format: 'wav',
       maxDurationSeconds: MAILBOX_GREETING_MAX_S,

@@ -106,7 +106,11 @@ async function releaseLastParty(
  * until `finish()` runs, and a leg left `up` keeps reporting its user as already in a call to
  * every later ring group (§10.1 step 5).
  */
-async function endCallerCall(pipeline: Pipeline, call: Call): Promise<void> {
+async function endCallerCall(
+  pipeline: Pipeline,
+  call: Call,
+  callerChannelId: string
+): Promise<void> {
   call.callerEnded = true;
   const pending = pipeline.pendingRing.get(call.id);
   if (pending) {
@@ -114,7 +118,7 @@ async function endCallerCall(pipeline: Pipeline, call: Call): Promise<void> {
     pipeline.pendingRing.delete(call.id);
   }
   clearFindMeTimers(pipeline, call.id);
-  pipeline.callByChannel.delete(call.callerChannelId);
+  pipeline.callByChannel.delete(callerChannelId);
   const recordings: Promise<void>[] = [];
   for (const leg of call.legs.values()) {
     if (leg.state === 'ringing') {
@@ -135,7 +139,7 @@ async function endCallerCall(pipeline: Pipeline, call: Call): Promise<void> {
       endLeg(pipeline, leg.channelId, leg);
     }
   }
-  await releaseLastParty(pipeline, call, call.callerChannelId);
+  await releaseLastParty(pipeline, call, callerChannelId);
   await Promise.all(recordings);
   // §10.2 "Voicemail": a caller in a mailbox deposit ends the message by hanging up, and the
   // recording's outcome arrives only after the channel has gone; the deposit closes the row once
@@ -179,7 +183,7 @@ export async function handleChannelEnded(
     // §10.2: the caller's own participation is mixed and stored when their channel goes, whether
     // the call was answered or abandoned; the recorder ignores a channel it never recorded.
     await pipeline.deps.recorder?.onCallerEnded(call);
-    await endCallerCall(pipeline, call);
+    await endCallerCall(pipeline, call, channelId);
     return;
   }
   const leg = call.legs.get(channelId);
@@ -198,7 +202,7 @@ export async function handleChannelEnded(
     // whose caller already left it (a caller who parked the other party, §10.2 "Call parking")
     // has no caller channel left to end it, so its row ends with the conversation it left.
     if (call.addedLeg === true || call.callerEnded === true) {
-      await pipeline.deps.cdr.finish(call);
+      await pipeline.finishCall(call);
     }
     return;
   }

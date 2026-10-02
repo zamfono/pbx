@@ -65,9 +65,11 @@ export function stopGroupRinging(
   // The group's hold music replaced ringback while its members rang (§10.2 "Ring groups"); a
   // batch's own win stops it (`winBatch`), and so does this. Requested before the caller's
   // bridging, which the caller then does.
-  pipeline.deps.ari.channels
-    .stopMoh(call.callerChannelId)
-    .catch(() => undefined);
+  if (call.callerChannelId !== null) {
+    pipeline.deps.ari.channels
+      .stopMoh(call.callerChannelId)
+      .catch(() => undefined);
+  }
   for (const [channelId, leg] of active.tracked) {
     if (leg.state === 'ringing') {
       leg.state = 'ended';

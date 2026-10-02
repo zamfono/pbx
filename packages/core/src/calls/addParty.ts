@@ -19,9 +19,9 @@ import { runUserStep } from './userStep.js';
 
 /**
  * The added leg answered: it joined the running call's bridge through the answer path
- * (`answer.ts`), or was hung up there when that bridge was already gone. `call`'s own channel
- * was only ever the feature-code dial, so it is hung up like any other feature call's
- * disposable one, but the row stays open (§10.2 "Three-way calls": "The added leg is its own
+ * (`answer.ts`), or was hung up there when that bridge was already gone. `call`'s own channel,
+ * where it has one, was only ever the feature-code dial, so it is hung up like any other feature
+ * call's disposable one, but the row stays open (§10.2 "Three-way calls": "The added leg is its own
  * calls row", ended when the added party leaves). Its `ChannelDestroyed` must not close this call
  * out (`legsEnded.ts`'s `endCallerCall` would end the row and drop the added party's presence
  * while they are still bridged, §9.3), so the channel leaves `callByChannel` first; the added
@@ -32,6 +32,9 @@ async function releaseFeatureDial(
   pipeline: Pipeline,
   call: Call
 ): Promise<void> {
+  if (call.callerChannelId === null) {
+    return;
+  }
   pipeline.callByChannel.delete(call.callerChannelId);
   await pipeline.deps.ari.channels
     .hangup(call.callerChannelId)
@@ -102,7 +105,8 @@ async function dialExternalTarget(
  * either answer joins the bridge through `answer.ts`'s `settleAnswered`. `call.to` and
  * `call.direction` become the pipeline's view of the target (§11.2 `calls`). `call`'s own
  * channel, never part of the added leg, is released once the dial settles. Whether the added
- * party joined. Shared with the party `api` adds (`addedParty.ts`), whose call has no channel.
+ * party joined. Shared with the party `api` adds (`addedParty.ts`), whose call has no caller
+ * channel.
  */
 export async function dialAddPartyTarget(
   pipeline: Pipeline,

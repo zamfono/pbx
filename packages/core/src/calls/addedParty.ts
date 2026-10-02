@@ -3,9 +3,9 @@
  * `calls.addParty`'s leg, and `calls.consult`'s consultation, the same leg dialled while the other
  * party is held (`consultation.ts`). It is `*5`'s leg (`addParty.ts`), resolved and dialled the
  * same way, its answer joining the conversation's bridge and its own row ending when it leaves.
- * No line of anyone's dials it, so its caller channel is a placeholder and it rings its target
- * and stops there (`Call.ringOnly`): no forward or mailbox of the target's applies, since nobody
- * would hear them.
+ * No line of anyone's dials it, so it has no caller channel and rings its target and stops there
+ * (`Call.callerChannelId`): no forward or mailbox of the target's applies, since nobody would hear
+ * them.
  */
 import { newId, type AddPartyRequest } from '@zamfono/shared';
 
@@ -52,7 +52,7 @@ export async function newAddedLeg(
   const leg = newCall({
     id,
     direction: 'internal',
-    callerChannelId: `${kind}:${id}`,
+    callerChannelId: null,
     from:
       (callerUserId === null
         ? null
@@ -64,7 +64,6 @@ export async function newAddedLeg(
   });
   leg.callerUserId = callerUserId;
   leg.addedLeg = true;
-  leg.ringOnly = true;
   leg.log.event({
     event: kind,
     actorUserId: req.actorUserId,
@@ -78,14 +77,16 @@ export async function newAddedLeg(
     callId: id
   });
   await pipeline.deps.cdr.open(leg);
-  // Reachable by its id from here on, as a `*5` dial is through its own channel.
+  // Reachable by its id from here on (`Pipeline.channelless`), as a `*5` dial is through its own
+  // channel.
   pipeline.registerCall(leg);
   return leg;
 }
 
 /**
  * Dials the added leg in the background, its answer joining `bridgeId`; `onJoined` runs once it
- * did. A ring nobody answered leaves the row open (`Call.ringOnly`), so it closes here as missed.
+ * did. A ring nobody answered leaves the row open (a call with no caller channel only rings), so
+ * it closes here as missed.
  */
 export function dialAddedLeg(
   pipeline: Pipeline,
@@ -107,10 +108,9 @@ export function dialAddedLeg(
       onJoined();
       return;
     }
-    pipeline.callByChannel.delete(leg.callerChannelId);
     if (leg.status === null) {
       leg.status = 'missed';
-      await pipeline.deps.cdr.finish(leg);
+      await pipeline.finishCall(leg);
     }
   };
   dial().catch(() => undefined);
@@ -125,10 +125,10 @@ export async function addPartyOnRequest(
   req: AddPartyRequest
 ): Promise<{ callId: string }> {
   const bridgeId = ownBridge(call);
-  if (bridgeId === null) {
+  const byChannelId = transferrerChannel(call, req.actorUserId);
+  if (bridgeId === null || byChannelId === null) {
     throw notBridged();
   }
-  const byChannelId = transferrerChannel(call, req.actorUserId);
   const leg = await newAddedLeg(pipeline, call, byChannelId, req, 'addParty');
   leg.parentCallId = call.id;
   dialAddedLeg(pipeline, leg, bridgeId, req.target, () => {

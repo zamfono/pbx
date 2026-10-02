@@ -9,7 +9,7 @@ import { newId, type Db } from '@zamfono/shared';
 import type { ApiClient } from '../apiClient.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { assetMedia, defaultPrompt } from '../prompts.js';
-import { release, type Call, type Owner } from './call.js';
+import { callerChannel, release, type Call, type Owner } from './call.js';
 import { finishAbandoned } from './missedCall.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
@@ -97,14 +97,13 @@ async function recordMessage(
   const recordingName = `voicemail/${id}`;
 
   call.log.event({ event: 'voicemail', mailbox, reason });
-  await pipeline.deps.ari.channels
-    .answer(call.callerChannelId)
-    .catch(() => undefined);
+  const channelId = callerChannel(call);
+  await pipeline.deps.ari.channels.answer(channelId).catch(() => undefined);
   const greetingEnd = await playAndWait(
     pipeline.deps.ari,
-    call.callerChannelId,
+    channelId,
     greeting,
-    `${call.callerChannelId}:vmGreeting`
+    `${channelId}:vmGreeting`
   );
   if (greetingEnd === 'hangup') {
     call.log.event({ event: 'voicemailFailed', mailbox, reason: 'hangup' });
@@ -114,7 +113,7 @@ async function recordMessage(
 
   const outcome = await recordCaller(
     pipeline.deps.ari,
-    call.callerChannelId,
+    channelId,
     recordingName,
     snapshot.settings.voicemailMaxS
   );
@@ -136,9 +135,9 @@ async function recordMessage(
   }
   await playAndWait(
     pipeline.deps.ari,
-    call.callerChannelId,
+    channelId,
     defaultPrompt('vmGoodbye'),
-    `${call.callerChannelId}:vmGoodbye`
+    `${channelId}:vmGoodbye`
   );
 
   await persistVoicemail({

@@ -78,7 +78,7 @@ export async function pickupOnRequest(
   const host = newCall({
     id: newId(),
     direction: 'internal',
-    callerChannelId: '',
+    callerChannelId: null,
     from: target.from,
     to: ext,
     startedAt: pipeline.deps.now(),

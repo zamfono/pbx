@@ -39,7 +39,7 @@ export function resolveOriginateTarget(
 }
 
 /** The originated call, from the user's own extension to `resolved`, with the actor in its trace;
- * it has no caller channel (`callerChannelId` "") until one of the user's devices answers. */
+ * it has no caller channel until one of the user's devices answers. */
 export function newOriginatedCall(
   pipeline: Pipeline,
   snapshot: Snapshot,
@@ -50,7 +50,7 @@ export function newOriginatedCall(
   const call = newCall({
     id: newId(),
     direction: resolved.direction,
-    callerChannelId: '',
+    callerChannelId: null,
     from: extensionOf(snapshot, { userId: req.userId }) ?? '',
     to: resolved.to,
     startedAt,
@@ -75,10 +75,11 @@ export function newOriginatedCall(
   return call;
 }
 
-/** The originated call's device answered: that channel is the call's own from here on, and the
- * target is dialled as the device would have dialled it (§10.2 "Click-to-dial"), including
- * the user's presence: in a call from the dial on (§9.3 "a user: ... INUSE in a call"), except
- * for a feature-code dial or a refused string, which is no call of the user's. */
+/** The originated call's device answered: that channel is the call's own from here on (it leaves
+ * `Pipeline.channelless` for `callByChannel`), and the target is dialled as the device would have
+ * dialled it (§10.2 "Click-to-dial"), including the user's presence: in a call from the dial on
+ * (§9.3 "a user: ... INUSE in a call"), except for a feature-code dial or a refused string, which
+ * is no call of the user's. */
 export async function beginOriginatedCall(
   pipeline: Pipeline,
   call: Call,

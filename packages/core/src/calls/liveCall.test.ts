@@ -16,7 +16,7 @@ import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { eventually } from '../testing/eventually.js';
-import { newCall, type Call, type Leg } from './call.js';
+import { callerChannel, newCall, type Call, type Leg } from './call.js';
 import type { RingOutcome } from './legs.js';
 import { closeCall } from './liveCall.js';
 import { Pipeline, type PipelineDeps } from './pipeline.js';
@@ -312,7 +312,7 @@ describe('closeCall, on a call not yet answered', () => {
       type: 'ChannelDestroyed',
       timestamp: nowIso(),
       application: 'zamfono',
-      channel: defaultChannel({ id: call.callerChannelId })
+      channel: defaultChannel({ id: callerChannel(call) })
     });
     await eventually(() => {
       expect(call.callerEnded).toBe(true);

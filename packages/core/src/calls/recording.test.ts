@@ -14,7 +14,7 @@ import { CdrWriter } from '../cdr.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
-import { newCall, type Call, type Leg } from './call.js';
+import { callerChannel, newCall, type Call, type Leg } from './call.js';
 import { trackLeg } from './legs.js';
 import { handleChannelEnded } from './legsEnded.js';
 import { Pipeline } from './pipeline.js';
@@ -638,7 +638,7 @@ describe('Recorder', () => {
     const call = buildCall(null);
     call.callerUserId = callerId;
     await cdr.open(call);
-    fakeAri.addChannel({ id: call.callerChannelId });
+    fakeAri.addChannel({ id: callerChannel(call) });
     fakeAri.addChannel({ id: 'callee-channel' });
     const leg = buildLeg({ channelId: 'callee-channel', userId: calleeId });
 
@@ -846,12 +846,12 @@ describe('Recorder', () => {
     const call = buildCall(null);
     await cdr.open(call);
     pipeline.registerCall(call);
-    fakeAri.addChannel({ id: call.callerChannelId });
+    fakeAri.addChannel({ id: callerChannel(call) });
     fakeAri.addChannel({ id: 'leg-channel' });
     const leg = buildLeg({ channelId: 'leg-channel', userId });
     trackLeg(pipeline, call, leg);
     const bridge = await ari.bridges.create({ type: 'mixing' });
-    await ari.bridges.addChannel(bridge.id, call.callerChannelId);
+    await ari.bridges.addChannel(bridge.id, callerChannel(call));
     await ari.bridges.addChannel(bridge.id, leg.channelId);
     call.bridgeId = bridge.id;
     call.status = 'answered';

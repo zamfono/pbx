@@ -30,7 +30,8 @@ import { deposit } from './voicemail.js';
 
 const RELEASE_CODE_UNAVAILABLE = 480;
 /** Answers the caller (no early media without it), plays the group's greeting to completion if it
- * has one (§10.2 "Ring groups"), then starts its MoH class in place of ringback. */
+ * has one (§10.2 "Ring groups"), then starts its MoH class in place of ringback. A call with no
+ * caller channel has nobody to play to. */
 async function playGreetingAndMoh(
   pipeline: Pipeline,
   call: Call,
@@ -38,19 +39,21 @@ async function playGreetingAndMoh(
   snapshot: Snapshot,
   group: { greetingAudioId: string | null; mohAudioId: string | null }
 ): Promise<void> {
-  await pipeline.deps.ari.channels
-    .answer(call.callerChannelId)
-    .catch(() => undefined);
+  const channelId = call.callerChannelId;
+  if (channelId === null) {
+    return;
+  }
+  await pipeline.deps.ari.channels.answer(channelId).catch(() => undefined);
   if (group.greetingAudioId !== null) {
     await playAndWait(
       pipeline.deps.ari,
-      call.callerChannelId,
+      channelId,
       assetMedia(snapshot.audioAssets, group.greetingAudioId),
-      `${call.callerChannelId}:ringGroup:${groupId}`
+      `${channelId}:ringGroup:${groupId}`
     );
   }
   await pipeline.deps.ari.channels
-    .startMoh(call.callerChannelId, group.mohAudioId ?? undefined)
+    .startMoh(channelId, group.mohAudioId ?? undefined)
     .catch(() => undefined);
 }
 
@@ -61,8 +64,8 @@ function callEnded(call: Call): boolean {
   return call.status !== null;
 }
 
-/** Dispatches `groupFallback`'s decision once ringing ends without an answer (§10.1 step 5);
- * a call that only rings (`Call.ringOnly`) stops there, as a user's does (`userStep.ts`). */
+/** Dispatches `groupFallback`'s decision once ringing ends without an answer (§10.1 step 5); a
+ * call with no caller channel stops there, as a user's does (`userStep.ts`). */
 async function applyGroupFallback(
   pipeline: Pipeline,
   call: Call,
@@ -70,7 +73,7 @@ async function applyGroupFallback(
   rules: GroupRules,
   outcome: GroupOutcome
 ): Promise<void> {
-  if (call.ringOnly === true) {
+  if (call.callerChannelId === null) {
     return;
   }
   const action = groupFallback(group, rules, outcome);
@@ -133,9 +136,11 @@ async function runBatchPlan(
   }
 
   if (result === 'unanswered') {
-    await pipeline.deps.ari.channels
-      .stopMoh(call.callerChannelId)
-      .catch(() => undefined);
+    if (call.callerChannelId !== null) {
+      await pipeline.deps.ari.channels
+        .stopMoh(call.callerChannelId)
+        .catch(() => undefined);
+    }
     call.log.event({
       event: 'ringGroup',
       groupId: ctx.groupId,

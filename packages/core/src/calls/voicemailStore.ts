@@ -7,7 +7,7 @@
 import { mwiMailboxOf, type Db, type MailRequest } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
-import type { Call, Owner } from './call.js';
+import { callerChannel, type Call, type Owner } from './call.js';
 import { contactName } from './contactName.js';
 import type { Pipeline } from './pipeline.js';
 import type { MailSender } from './voicemail.js';
@@ -105,9 +105,9 @@ export async function persistVoicemail(ctx: DepositContext): Promise<void> {
   call.status = 'voicemail';
   pipeline.deps.cdr.noteQosLegs?.(call);
   await pipeline.deps.ari.channels
-    .hangup(call.callerChannelId)
+    .hangup(callerChannel(call))
     .catch(() => undefined);
-  await pipeline.deps.cdr.finish(call);
+  await pipeline.finishCall(call);
 }
 
 /** `pipeline.deps.db`/`apiClient`, or `null` for a test Pipeline built without them. */

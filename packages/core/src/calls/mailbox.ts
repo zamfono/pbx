@@ -5,7 +5,7 @@
  * leave. Walking the messages is `mailboxMessages.ts`'s, the spoken prompts `mailboxPrompts.ts`'s,
  * recording the greeting `mailboxGreeting.ts`'s.
  */
-import { release, type Call, type Owner } from './call.js';
+import { callerChannel, release, type Call, type Owner } from './call.js';
 import { ownerForExt, ringGroupMemberIds } from './extensionOwner.js';
 import {
   concludeFeature,
@@ -156,7 +156,7 @@ async function runMailboxMenu(
     return;
   }
   await pipeline.deps.ari.channels
-    .answer(call.callerChannelId)
+    .answer(callerChannel(call))
     .catch(() => undefined);
   markAnswered(pipeline, call);
   const session: MailboxSession = {

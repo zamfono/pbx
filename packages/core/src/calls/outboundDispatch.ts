@@ -10,7 +10,13 @@ import type { LogLevel } from '../callLog.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { defaultPrompt } from '../prompts.js';
 import { resolveDialed, type DialAction } from '../routing/outbound.js';
-import { findForwardTarget, release, toLogLevel, type Call } from './call.js';
+import {
+  callerChannel,
+  findForwardTarget,
+  release,
+  toLogLevel,
+  type Call
+} from './call.js';
 import { SIP_SERVICE_UNAVAILABLE } from './conclude.js';
 import { dialEmergency, emergencyLogLevel } from './emergency.js';
 import { handleFeature } from './features.js';
@@ -63,13 +69,14 @@ async function playInvalidAndRelease(
   pipeline: Pipeline,
   call: Call
 ): Promise<void> {
+  const channelId = callerChannel(call);
   const ari = pipeline.deps.ari;
-  await ari.channels.answer(call.callerChannelId).catch(() => undefined);
+  await ari.channels.answer(channelId).catch(() => undefined);
   await playAndWait(
     ari,
-    call.callerChannelId,
+    channelId,
     defaultPrompt('invalid'),
-    `${call.callerChannelId}:invalid`
+    `${channelId}:invalid`
   );
   await release(pipeline, call, SIP_EXTENSION_NOT_FOUND, 'failed');
 }

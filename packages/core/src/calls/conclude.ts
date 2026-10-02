@@ -47,29 +47,31 @@ export async function concludeFinal(
 /** Answers and plays the failed-call announcement, or — where the tenant's `language` (§11.4) has
  * no such prompt — ITU-T E.180's special information tone, to completion (§9.4 "Cross-trunk
  * failover"), the same answer-then-play order `announce.ts` uses, since this ARI layer has no
- * early media. */
+ * early media. A call with no caller channel (a party `api` adds) has nobody to play to. */
 async function playFailedCallAnnouncement(
   pipeline: Pipeline,
   call: Call
 ): Promise<void> {
-  await pipeline.deps.ari.channels
-    .answer(call.callerChannelId)
-    .catch(() => undefined);
+  const channelId = call.callerChannelId;
+  if (channelId === null) {
+    return;
+  }
+  await pipeline.deps.ari.channels.answer(channelId).catch(() => undefined);
   const snapshot = await pipeline.deps.cache.get();
   if (LANGUAGES_WITH_FAILED_CALL_PROMPT.includes(snapshot.settings.language)) {
     await playAndWait(
       pipeline.deps.ari,
-      call.callerChannelId,
+      channelId,
       defaultPrompt('failedCall'),
-      `${call.callerChannelId}:failed`
+      `${channelId}:failed`
     );
     return;
   }
   await playToneAndWait(
     pipeline.deps.ari,
-    call.callerChannelId,
+    channelId,
     SPECIAL_INFORMATION_TONE_MEDIA,
-    `${call.callerChannelId}:failed-tone`,
+    `${channelId}:failed-tone`,
     SIT_DURATION_MS
   );
 }

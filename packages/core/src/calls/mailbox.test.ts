@@ -11,7 +11,7 @@ import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { eventually, requestTo } from '../testing/eventually.js';
-import { newCall, type Call } from './call.js';
+import { callerChannel, newCall, type Call } from './call.js';
 import { ownVoicemail } from './mailbox.js';
 import { introMedia, mainMenuMedia } from './mailboxPrompts.js';
 import { Pipeline } from './pipeline.js';
@@ -190,7 +190,7 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
       type: 'ChannelDtmfReceived',
       timestamp: nowIso(),
       application: 'zamfono',
-      channel: defaultChannel({ id: call.callerChannelId, state: 'Up' }),
+      channel: defaultChannel({ id: callerChannel(call), state: 'Up' }),
       digit
     });
   }
@@ -330,7 +330,7 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
       type: 'StasisEnd',
       timestamp: nowIso(),
       application: 'zamfono',
-      channel: defaultChannel({ id: call.callerChannelId })
+      channel: defaultChannel({ id: callerChannel(call) })
     });
     await done;
   });
@@ -407,7 +407,7 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
       type: 'ChannelDestroyed',
       timestamp: nowIso(),
       application: 'zamfono',
-      channel: defaultChannel({ id: call.callerChannelId }),
+      channel: defaultChannel({ id: callerChannel(call) }),
       cause: 16
     });
     await done;
