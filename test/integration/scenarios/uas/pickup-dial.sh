@@ -11,7 +11,7 @@ password=$2
 exit_file=/tmp/pickup-dial.exit
 
 rm -f "$exit_file" /tmp/pickup-dial-messages.log
-sipp -sf /scenarios/uas/pickup-dial.xml -m 1 -p 5071 -timeout 30s -nostdin \
+sipp -sf /scenarios/uas/pickup-dial.xml -m 1 -p 5071 -timeout 30s -timeout_error -nostdin \
   -key user "$user" -au "$user" -ap "$password" \
   -trace_msg -message_file /tmp/pickup-dial-messages.log \
   asterisk:5060 > /tmp/pickup-dial.log 2>&1

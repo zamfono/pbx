@@ -60,7 +60,7 @@ registration() {
   [ "$scenario" = unregister ] || port=(-p "$PORT")
   dc exec -T sipp-phone sipp -sf "/scenarios/uas/$scenario.xml" \
     -key user "$sip_username" -au "$sip_username" -ap "$sip_password" \
-    -m 1 "${port[@]}" -timeout 15s -nostdin asterisk:5060 >/dev/null 2>&1 \
+    -m 1 "${port[@]}" -timeout 15s -timeout_error -nostdin asterisk:5060 >/dev/null 2>&1 \
     || { echo "the device's $scenario did not complete" >&2; return 1; }
 }
 
@@ -111,7 +111,7 @@ case $action in
     clear_phone_trace
     dc exec -T -d sipp-phone sh -c \
       "sh /scenarios/_sipp-run.sh phone-$3 \
-        -sf /scenarios/uas/$3.xml -p $PORT -aa -nostdin -m 1 -timeout 90s \
+        -sf /scenarios/uas/$3.xml -p $PORT -aa -nostdin -m 1 -timeout 90s -timeout_error \
         -trace_msg -message_file $MESSAGES \
         -key user '$4' -au '$4' -ap '$5' asterisk:5060 > /tmp/$3.log 2>&1; \
         echo \$? > $CALL_EXIT"

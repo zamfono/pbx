@@ -217,10 +217,13 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
   if [ "$scenario" = "$here/scenarios/$name.call.sh" ]; then
     bash "$scenario" "$api_base" "$token" "$compose_cmd" || fail "the API call of $name did not complete"
   else
+    # `-timeout_error` makes the scenario's budget a bound: with `-timeout` alone, sipp reaching it
+    # only stops placing calls and waits for the open ones to end, which a call stuck in its
+    # scenario never does. Every sipp run that has a budget sets both.
     # shellcheck disable=SC2086 # the extra arguments are separate words by design
     $COMPOSE "${compose_args[@]}" exec -T "$CALLER" \
       sipp -sf "/scenarios/$name.xml" -s "$MAIN_DID" -m "$calls" -l 1 \
-        -p "$CALLER_PORT" -timeout 90s \
+        -p "$CALLER_PORT" -timeout 90s -timeout_error \
         $CALLER_ARGS "${dials[@]}" -nostdin asterisk:5060 \
       || fail "sipp scenario $name did not complete"
   fi
