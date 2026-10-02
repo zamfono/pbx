@@ -1,48 +1,20 @@
-import type { Transaction } from 'kysely';
 import { z } from 'zod';
 
-import type { DB } from '@zamfono/shared';
-
 import { recordChange, recordFieldChanges } from '../runner.js';
-import { defineOperation, OpError } from '../types.js';
+import { defineOperation } from '../types.js';
 import {
+  contactFields,
   contactPhones,
-  phoneSchema,
+  liveContact,
   replacePhones,
   tenantCountry,
   toContactOut,
   type ContactRow
 } from './_shared.js';
 
-const STATUS_NOT_FOUND = 404;
-
 export const updateContactInput = z
-  .object({
-    id: z.string(),
-    displayName: z.string().min(1).optional(),
-    company: z.string().nullish(),
-    email: z.email().nullish(),
-    phones: z
-      .array(phoneSchema)
-      .optional()
-      .describe(
-        'The contact numbers; on update, the set is replaced as a whole.'
-      )
-  })
+  .object({ id: z.string(), ...z.object(contactFields).partial().shape })
   .strict();
-
-async function fetchLive(db: Transaction<DB>, id: string): Promise<ContactRow> {
-  const row = await db
-    .selectFrom('contacts')
-    .selectAll()
-    .where('id', '=', id)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!row) {
-    throw new OpError(STATUS_NOT_FOUND, `contact '${id}' not found`);
-  }
-  return row;
-}
 
 /** The row's next scalar values: `input`'s value where given, `before`'s own otherwise. */
 function resolvedFields(
@@ -64,7 +36,7 @@ export const updateContact = defineOperation({
   minRole: 'admin',
   entity: input => ({ kind: 'contact', id: input.id }),
   run: async (ctx, input) => {
-    const before = await fetchLive(ctx.db, input.id);
+    const before = await liveContact(ctx.db, input.id);
     const after = resolvedFields(before, input);
     recordFieldChanges(ctx, before, after);
     await ctx.db

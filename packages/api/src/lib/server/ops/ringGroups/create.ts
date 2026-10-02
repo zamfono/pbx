@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
-import { memberSchema } from '../members.js';
 import { pushRoster } from '../roster.js';
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
@@ -12,63 +11,12 @@ import {
   assertNameAvailable,
   nextExtension,
   optionalFlag,
-  RING_GROUP_FIELD_DESCRIPTIONS,
+  ringGroupFields,
   toRingGroupOut,
   type RingGroupOut
 } from './_shared.js';
 
-export const ringGroupInputSchema = z
-  .object({
-    name: z.string().min(1),
-    strategy: z
-      .enum(['simultaneous', 'sequential', 'random'])
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.strategy),
-    ringTimeoutS: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.ringTimeoutS),
-    ringTotalS: z
-      .number()
-      .int()
-      .positive()
-      .nullish()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.ringTotalS),
-    skipBusy: z
-      .boolean()
-      .optional()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.skipBusy),
-    allowReject: z
-      .boolean()
-      .optional()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.allowReject),
-    greetingAudioId: z
-      .string()
-      .nullish()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.greetingAudioId),
-    mohAudioId: z
-      .string()
-      .nullish()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.mohAudioId),
-    recordCalls: z
-      .boolean()
-      .optional()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.recordCalls),
-    mailboxEnabled: z
-      .boolean()
-      .optional()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.mailboxEnabled),
-    mailboxAudioId: z
-      .string()
-      .nullish()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.mailboxAudioId),
-    members: z
-      .array(memberSchema)
-      .optional()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.members)
-  })
-  .strict();
+export const ringGroupInputSchema = z.object(ringGroupFields).strict();
 
 export const createRingGroup = defineOperation({
   name: 'ringGroups.create',

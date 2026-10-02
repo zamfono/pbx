@@ -3,11 +3,9 @@ import { z } from 'zod';
 import { loadDroppedBlfKeys } from '../devices/_shared.js';
 import { pushRoster } from '../roster.js';
 import { propagate, recordChange } from '../runner.js';
-import { Conflict, defineOperation, OpError } from '../types.js';
+import { Conflict, defineOperation } from '../types.js';
 import { findRingGroupReferences } from './_references.js';
-import { ringGroupExtension } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
+import { liveRingGroup, ringGroupExtension } from './_shared.js';
 
 export const deleteRingGroup = defineOperation({
   name: 'ringGroups.delete',
@@ -18,15 +16,7 @@ export const deleteRingGroup = defineOperation({
     `Delete this ring group? The deletion can be undone for 30 days. (${input.id})`,
   entity: input => ({ kind: 'ringGroup', id: input.id }),
   run: async (ctx, input) => {
-    const before = await ctx.db
-      .selectFrom('ringGroups')
-      .selectAll()
-      .where('id', '=', input.id)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (!before) {
-      throw new OpError(STATUS_NOT_FOUND, `ring group '${input.id}' not found`);
-    }
+    await liveRingGroup(ctx.db, input.id);
     const references = await findRingGroupReferences(ctx.db, input.id);
     if (references.length > 0) {
       throw new Conflict('ring group is still in use', references);

@@ -1,9 +1,6 @@
-import type { Transaction } from 'kysely';
 import { z } from 'zod';
 
-import type { DB } from '@zamfono/shared';
-
-import { memberSchema, type MemberSpec } from '../members.js';
+import type { MemberSpec } from '../members.js';
 import { pushRoster } from '../roster.js';
 import { propagate, recordChange, recordFieldChanges } from '../runner.js';
 import {
@@ -11,90 +8,25 @@ import {
   recordLogLevelChanges,
   resolveLogLevel
 } from '../settings/logLevel.js';
-import { defineOperation, OpError } from '../types.js';
+import { defineOperation } from '../types.js';
 import { replaceMembers, ringGroupMembers } from './_members.js';
 import {
   assertGroupAudioFieldsAvailable,
   assertNameAvailable,
+  liveRingGroup,
   optionalFlag,
-  RING_GROUP_FIELD_DESCRIPTIONS,
+  ringGroupFields,
   toRingGroupOut,
   type RingGroupRow
 } from './_shared.js';
 
-const STATUS_NOT_FOUND = 404;
-
 export const updateRingGroupInput = z
   .object({
     id: z.string(),
-    name: z.string().min(1).optional(),
-    strategy: z
-      .enum(['simultaneous', 'sequential', 'random'])
-      .optional()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.strategy),
-    ringTimeoutS: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.ringTimeoutS),
-    ringTotalS: z
-      .number()
-      .int()
-      .positive()
-      .nullish()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.ringTotalS),
-    skipBusy: z
-      .boolean()
-      .optional()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.skipBusy),
-    allowReject: z
-      .boolean()
-      .optional()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.allowReject),
-    greetingAudioId: z
-      .string()
-      .nullish()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.greetingAudioId),
-    mohAudioId: z
-      .string()
-      .nullish()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.mohAudioId),
-    recordCalls: z
-      .boolean()
-      .optional()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.recordCalls),
-    mailboxEnabled: z
-      .boolean()
-      .optional()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.mailboxEnabled),
-    mailboxAudioId: z
-      .string()
-      .nullish()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.mailboxAudioId),
-    members: z
-      .array(memberSchema)
-      .optional()
-      .describe(RING_GROUP_FIELD_DESCRIPTIONS.members),
+    ...z.object(ringGroupFields).partial().shape,
     ...logLevelInputFields
   })
   .strict();
-
-async function fetchLive(
-  db: Transaction<DB>,
-  id: string
-): Promise<RingGroupRow> {
-  const row = await db
-    .selectFrom('ringGroups')
-    .selectAll()
-    .where('id', '=', id)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!row) {
-    throw new OpError(STATUS_NOT_FOUND, `ring group '${id}' not found`);
-  }
-  return row;
-}
 
 /** The row's next scalar values: `input`'s value where given, `before`'s own otherwise. */
 function resolvedFields(
@@ -134,7 +66,7 @@ export const updateRingGroup = defineOperation({
   minRole: 'admin',
   entity: input => ({ kind: 'ringGroup', id: input.id }),
   run: async (ctx, input) => {
-    const before = await fetchLive(ctx.db, input.id);
+    const before = await liveRingGroup(ctx.db, input.id);
     if (input.name !== undefined && input.name !== before.name) {
       await assertNameAvailable(ctx.db, input.name, input.id);
     }

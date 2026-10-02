@@ -1,10 +1,8 @@
 import { z } from 'zod';
 
 import { propagate, recordChange } from '../runner.js';
-import { Conflict, defineOperation, OpError } from '../types.js';
-import { findAudioAssetReferences } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
+import { Conflict, defineOperation } from '../types.js';
+import { findAudioAssetReferences, liveAudioAsset } from './_shared.js';
 
 /**
  * `DELETE /audio/{id}` (§5.9): soft-deletes an audio asset; the file stays on the media volume
@@ -19,18 +17,7 @@ export const deleteAudioAsset = defineOperation({
     `Delete this audio asset? The deletion can be undone for 30 days. (${input.id})`,
   entity: input => ({ kind: 'audio', id: input.id }),
   run: async (ctx, input) => {
-    const before = await ctx.db
-      .selectFrom('audioAssets')
-      .select(['id', 'kind'])
-      .where('id', '=', input.id)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (!before) {
-      throw new OpError(
-        STATUS_NOT_FOUND,
-        `audio asset '${input.id}' not found`
-      );
-    }
+    const before = await liveAudioAsset(ctx.db, input.id);
     const references = await findAudioAssetReferences(ctx.db, input.id);
     if (references.length > 0) {
       throw new Conflict('audio asset is still in use', references);

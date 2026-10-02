@@ -16,26 +16,35 @@ export const TARGET_KINDS = [
   'webdav'
 ] as const;
 
-export const targetKindSchema = z
-  .enum(TARGET_KINDS)
-  .describe(
-    'The restic backend: local (a host path or volume), ftp, ftps, sftp, s3 or webdav.'
-  );
-
-/** `params_json`: backend location plus the restic forget policy (§6.5), free-form per kind. */
-export const paramsSchema = z
-  .record(z.string(), z.unknown())
-  .describe(
-    'The repository location per kind: local { path }, s3 { endpoint, bucket, path? }, sftp { host, path }, ftp and ftps { host, path? }, webdav { url, path? }; optional forget { keepDaily, keepWeekly, keepMonthly }, default 7/4/6.'
-  );
-
-/** A target's `secret_enc` plaintext (§6.5), the same field on create and update. */
-export const targetSecretSchema = z
-  .string()
-  .min(1)
-  .describe(
-    'The restic repository password, or JSON { resticPassword, username, password } (sftp, ftp(s), webdav) or { resticPassword, accessKeyId, secretAccessKey } (s3); write-only.'
-  );
+/**
+ * The fields `backups.targets.create` takes and `backups.targets.update` takes each optionally
+ * (§6.5 "Backups"). `params` becomes `params_json`, free-form per kind; `secret` becomes
+ * `secret_enc`'s plaintext.
+ */
+export const targetFields = {
+  kind: z
+    .enum(TARGET_KINDS)
+    .describe(
+      'The restic backend: local (a host path or volume), ftp, ftps, sftp, s3 or webdav.'
+    ),
+  params: z
+    .record(z.string(), z.unknown())
+    .describe(
+      'The repository location per kind: local { path }, s3 { endpoint, bucket, path? }, sftp { host, path }, ftp and ftps { host, path? }, webdav { url, path? }; optional forget { keepDaily, keepWeekly, keepMonthly }, default 7/4/6.'
+    ),
+  secret: z
+    .string()
+    .min(1)
+    .describe(
+      'The restic repository password, or JSON { resticPassword, username, password } (sftp, ftp(s), webdav) or { resticPassword, accessKeyId, secretAccessKey } (s3); write-only.'
+    ),
+  enabled: z
+    .boolean()
+    .optional()
+    .describe(
+      'Whether scheduled runs back up to this target; on for a new one.'
+    )
+};
 
 /** The restic forget policy applied when a target's `params_json` names none (§6.5). */
 export const DEFAULT_FORGET_POLICY: Record<string, number> = {

@@ -3,11 +3,30 @@ import type { Selectable, Transaction } from 'kysely';
 import type { DB } from '@zamfono/shared';
 
 import { assertMembersValid, type MemberSpec } from '../members.js';
-import { Conflict } from '../types.js';
+import { Conflict, OpError } from '../types.js';
 import { assertNoCycle, loadEdgesExcludingParent } from './_nesting.js';
 
 /** A `user_groups` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
+const STATUS_NOT_FOUND = 404;
+
 export type UserGroupRow = Selectable<DB['userGroups']>;
+
+/** Loads a live user group by id, or throws `OpError(404)`. */
+export async function liveUserGroup(
+  db: Transaction<DB>,
+  id: string
+): Promise<UserGroupRow> {
+  const row = await db
+    .selectFrom('userGroups')
+    .selectAll()
+    .where('id', '=', id)
+    .where('deletedAt', 'is', null)
+    .executeTakeFirst();
+  if (!row) {
+    throw new OpError(STATUS_NOT_FOUND, `user group '${id}' not found`);
+  }
+  return row;
+}
 
 /** Throws 409 when `name` is already used by another live user group (`user_groups_name` partial UNIQUE, §11.2). */
 export async function assertNameAvailable(

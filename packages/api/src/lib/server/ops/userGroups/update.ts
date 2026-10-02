@@ -2,15 +2,14 @@ import { z } from 'zod';
 
 import { memberSchema } from '../members.js';
 import { propagate, recordChange } from '../runner.js';
-import { defineOperation, OpError } from '../types.js';
+import { defineOperation } from '../types.js';
 import {
   assertNameAvailable,
+  liveUserGroup,
   replaceMembers,
   toUserGroupOut,
   userGroupMembers
 } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
 
 export const updateUserGroupInput = z
   .object({
@@ -32,15 +31,7 @@ export const updateUserGroup = defineOperation({
   minRole: 'admin',
   entity: input => ({ kind: 'userGroup', id: input.id }),
   run: async (ctx, input) => {
-    const before = await ctx.db
-      .selectFrom('userGroups')
-      .selectAll()
-      .where('id', '=', input.id)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (!before) {
-      throw new OpError(STATUS_NOT_FOUND, `user group '${input.id}' not found`);
-    }
+    const before = await liveUserGroup(ctx.db, input.id);
     if (input.name !== undefined && input.name !== before.name) {
       await assertNameAvailable(ctx.db, input.name, input.id);
       recordChange(ctx, { field: 'name', from: before.name, to: input.name });

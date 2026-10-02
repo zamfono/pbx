@@ -8,7 +8,26 @@ import { OpError } from '../types.js';
 const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 /** A `contacts` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
+const STATUS_NOT_FOUND = 404;
+
 export type ContactRow = Selectable<DB['contacts']>;
+
+/** Loads a live contact by id, or throws `OpError(404)`. */
+export async function liveContact(
+  db: Transaction<DB>,
+  id: string
+): Promise<ContactRow> {
+  const row = await db
+    .selectFrom('contacts')
+    .selectAll()
+    .where('id', '=', id)
+    .where('deletedAt', 'is', null)
+    .executeTakeFirst();
+  if (!row) {
+    throw new OpError(STATUS_NOT_FOUND, `contact '${id}' not found`);
+  }
+  return row;
+}
 
 export const phoneSchema = z.object({
   label: z
@@ -25,6 +44,17 @@ export const phoneSchema = z.object({
     )
 });
 export type PhoneInput = z.infer<typeof phoneSchema>;
+
+/** The fields `contacts.create` takes and `contacts.update` takes each optionally (§10.3). */
+export const contactFields = {
+  displayName: z.string().min(1),
+  company: z.string().nullish(),
+  email: z.email().nullish(),
+  phones: z
+    .array(phoneSchema)
+    .optional()
+    .describe('The contact numbers; on update, the set is replaced as a whole.')
+};
 
 export type ContactPhoneOut = { label: string; number: string };
 export type ContactOut = {

@@ -5,11 +5,11 @@ import { defineOperation, OpError } from '../types.js';
 import {
   deleteForwardTarget,
   insertForwardTarget,
+  liveRingGroup,
   rowToTarget,
   targetSpecSchema
 } from './_shared.js';
 
-const STATUS_NOT_FOUND = 404;
 const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 const forwardingRuleSchema = z.object({
@@ -40,15 +40,7 @@ export const setRingGroupForwarding = defineOperation({
   minRole: 'admin',
   entity: input => ({ kind: 'ringGroup', id: input.id }),
   run: async (ctx, input) => {
-    const group = await ctx.db
-      .selectFrom('ringGroups')
-      .select('id')
-      .where('id', '=', input.id)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (!group) {
-      throw new OpError(STATUS_NOT_FOUND, `ring group '${input.id}' not found`);
-    }
+    await liveRingGroup(ctx.db, input.id);
     const seenConditions = new Set<string>();
     for (const rule of input.rules) {
       if (seenConditions.has(rule.condition)) {

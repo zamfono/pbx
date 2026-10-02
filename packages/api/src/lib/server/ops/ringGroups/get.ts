@@ -1,9 +1,7 @@
 import { z } from 'zod';
 
-import { defineOperation, OpError } from '../types.js';
-import { toRingGroupOut } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
+import { defineOperation } from '../types.js';
+import { liveRingGroup, toRingGroupOut } from './_shared.js';
 
 export const getRingGroup = defineOperation({
   name: 'ringGroups.get',
@@ -12,15 +10,7 @@ export const getRingGroup = defineOperation({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const row = await ctx.db
-      .selectFrom('ringGroups')
-      .selectAll()
-      .where('id', '=', input.id)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (!row) {
-      throw new OpError(STATUS_NOT_FOUND, `ring group '${input.id}' not found`);
-    }
+    const row = await liveRingGroup(ctx.db, input.id);
     return toRingGroupOut(ctx.db, row);
   }
 });

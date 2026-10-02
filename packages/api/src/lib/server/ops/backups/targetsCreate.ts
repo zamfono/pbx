@@ -8,27 +8,13 @@ import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
 import {
-  paramsSchema,
-  targetKindSchema,
-  targetSecretSchema,
+  targetFields,
   targetToWire,
   withDefaultForgetPolicy,
   type BackupTargetWire
 } from './_shared.js';
 
-const inputSchema = z
-  .object({
-    kind: targetKindSchema,
-    params: paramsSchema,
-    secret: targetSecretSchema,
-    enabled: z
-      .boolean()
-      .optional()
-      .describe(
-        'Whether scheduled runs back up to this target; on for a new one.'
-      )
-  })
-  .strict();
+const inputSchema = z.object(targetFields).strict();
 
 type Input = z.infer<typeof inputSchema>;
 

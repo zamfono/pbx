@@ -8,8 +8,7 @@ import {
   assertAudioAvailable,
   assertNameAvailable,
   insertForwardTarget,
-  MENU_FIELD_DESCRIPTIONS,
-  targetSpecSchema,
+  menuFields,
   toMenuOut,
   type MenuOut
 } from './_shared.js';
@@ -17,31 +16,7 @@ import {
 const DEFAULT_TIMEOUT_S = 5;
 const DEFAULT_MAX_ATTEMPTS = 3;
 
-export const menuInputSchema = z
-  .object({
-    name: z.string().min(1),
-    audioId: z.string().describe(MENU_FIELD_DESCRIPTIONS.audioId),
-    timeoutS: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(MENU_FIELD_DESCRIPTIONS.timeoutS),
-    maxAttempts: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(MENU_FIELD_DESCRIPTIONS.maxAttempts),
-    allowExtensionDialing: z
-      .boolean()
-      .optional()
-      .describe(MENU_FIELD_DESCRIPTIONS.allowExtensionDialing),
-    fallbackTarget: targetSpecSchema.describe(
-      MENU_FIELD_DESCRIPTIONS.fallbackTarget
-    )
-  })
-  .strict();
+export const menuInputSchema = z.object(menuFields).strict();
 
 export const createMenu = defineOperation({
   name: 'menus.create',

@@ -1,9 +1,8 @@
 import { z } from 'zod';
 
 import { recordChange } from '../runner.js';
-import { defineOperation, OpError } from '../types.js';
-
-const STATUS_NOT_FOUND = 404;
+import { defineOperation } from '../types.js';
+import { liveContact } from './_shared.js';
 
 /**
  * `DELETE /contacts/{id}` (§10.3 "Phone book"): soft-deletes a contact. Nothing in the routing
@@ -18,15 +17,7 @@ export const deleteContact = defineOperation({
     `Delete this contact? The deletion can be undone for 30 days. (${input.id})`,
   entity: input => ({ kind: 'contact', id: input.id }),
   run: async (ctx, input) => {
-    const before = await ctx.db
-      .selectFrom('contacts')
-      .select('id')
-      .where('id', '=', input.id)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (!before) {
-      throw new OpError(STATUS_NOT_FOUND, `contact '${input.id}' not found`);
-    }
+    await liveContact(ctx.db, input.id);
     await ctx.db
       .updateTable('contacts')
       .set({ deletedAt: ctx.now })

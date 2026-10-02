@@ -1,63 +1,22 @@
-import type { Transaction } from 'kysely';
 import { z } from 'zod';
 
-import type { DB } from '@zamfono/shared';
-
 import { propagate, recordChange } from '../runner.js';
-import { defineOperation, OpError, type Context } from '../types.js';
+import { defineOperation, type Context } from '../types.js';
 import {
   assertAudioAvailable,
   assertNameAvailable,
   deleteForwardTarget,
   insertForwardTarget,
-  MENU_FIELD_DESCRIPTIONS,
+  liveMenu,
+  menuFields,
   rowToTarget,
-  targetSpecSchema,
   toMenuOut,
   type MenuRow
 } from './_shared.js';
 
-const STATUS_NOT_FOUND = 404;
-
 export const updateMenuInput = z
-  .object({
-    id: z.string(),
-    name: z.string().min(1).optional(),
-    audioId: z.string().optional().describe(MENU_FIELD_DESCRIPTIONS.audioId),
-    timeoutS: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(MENU_FIELD_DESCRIPTIONS.timeoutS),
-    maxAttempts: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(MENU_FIELD_DESCRIPTIONS.maxAttempts),
-    allowExtensionDialing: z
-      .boolean()
-      .optional()
-      .describe(MENU_FIELD_DESCRIPTIONS.allowExtensionDialing),
-    fallbackTarget: targetSpecSchema
-      .optional()
-      .describe(MENU_FIELD_DESCRIPTIONS.fallbackTarget)
-  })
+  .object({ id: z.string(), ...z.object(menuFields).partial().shape })
   .strict();
-
-async function fetchLive(db: Transaction<DB>, id: string): Promise<MenuRow> {
-  const row = await db
-    .selectFrom('menus')
-    .selectAll()
-    .where('id', '=', id)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!row) {
-    throw new OpError(STATUS_NOT_FOUND, `menu '${id}' not found`);
-  }
-  return row;
-}
 
 /** The row's next scalar values: `input`'s value where given, `before`'s own otherwise. */
 function resolvedFields(
@@ -144,7 +103,7 @@ export const updateMenu = defineOperation({
   minRole: 'admin',
   entity: input => ({ kind: 'menu', id: input.id }),
   run: async (ctx, input) => {
-    const before = await fetchLive(ctx.db, input.id);
+    const before = await liveMenu(ctx.db, input.id);
     if (input.name !== undefined && input.name !== before.name) {
       await assertNameAvailable(ctx.db, input.name, input.id);
     }

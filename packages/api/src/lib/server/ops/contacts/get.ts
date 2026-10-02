@@ -1,9 +1,7 @@
 import { z } from 'zod';
 
-import { defineOperation, OpError } from '../types.js';
-import { toContactOut } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
+import { defineOperation } from '../types.js';
+import { liveContact, toContactOut } from './_shared.js';
 
 export const getContact = defineOperation({
   name: 'contacts.get',
@@ -12,15 +10,7 @@ export const getContact = defineOperation({
   minRole: 'user',
   readOnly: true,
   run: async (ctx, input) => {
-    const row = await ctx.db
-      .selectFrom('contacts')
-      .selectAll()
-      .where('id', '=', input.id)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (!row) {
-      throw new OpError(STATUS_NOT_FOUND, `contact '${input.id}' not found`);
-    }
+    const row = await liveContact(ctx.db, input.id);
     return toContactOut(ctx.db, row);
   }
 });

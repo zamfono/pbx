@@ -3,7 +3,6 @@ import { z } from 'zod';
 import {
   createTarget,
   resolveTarget,
-  targetInputSchema,
   type TargetInput
 } from '../dids/_shared.js';
 import { assertMayHoldTarget } from '../forwardTargets.js';
@@ -12,10 +11,9 @@ import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError, type Context } from '../types.js';
 import {
   assertVisibleScope,
-  isoDatetimeInput,
   liveOooRulesInScope,
   normalizeIsoOrNull,
-  OOO_FIELD_DESCRIPTIONS,
+  oooFields,
   rangesOverlap,
   scopeFromColumns,
   type ScopeInput
@@ -25,19 +23,7 @@ const STATUS_NOT_FOUND = 404;
 const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 const inputSchema = z
-  .object({
-    id: z.string(),
-    active: z.boolean().optional().describe(OOO_FIELD_DESCRIPTIONS.active),
-    startsAt: isoDatetimeInput
-      .nullable()
-      .optional()
-      .describe(OOO_FIELD_DESCRIPTIONS.startsAt),
-    expiresAt: isoDatetimeInput
-      .nullable()
-      .optional()
-      .describe(OOO_FIELD_DESCRIPTIONS.expiresAt),
-    target: targetInputSchema.optional().describe(OOO_FIELD_DESCRIPTIONS.target)
-  })
+  .object({ id: z.string(), ...z.object(oooFields).partial().shape })
   .strict();
 
 type Input = z.infer<typeof inputSchema>;

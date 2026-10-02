@@ -1,10 +1,9 @@
 import { z } from 'zod';
 
 import { propagate, recordChange } from '../runner.js';
-import { Conflict, defineOperation, OpError } from '../types.js';
+import { Conflict, defineOperation } from '../types.js';
 import { findMenuReferences } from './_references.js';
-
-const STATUS_NOT_FOUND = 404;
+import { liveMenu } from './_shared.js';
 
 export const deleteMenu = defineOperation({
   name: 'menus.delete',
@@ -15,15 +14,7 @@ export const deleteMenu = defineOperation({
     `Delete this menu? The deletion can be undone for 30 days. (${input.id})`,
   entity: input => ({ kind: 'menu', id: input.id }),
   run: async (ctx, input) => {
-    const before = await ctx.db
-      .selectFrom('menus')
-      .select('id')
-      .where('id', '=', input.id)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (!before) {
-      throw new OpError(STATUS_NOT_FOUND, `menu '${input.id}' not found`);
-    }
+    await liveMenu(ctx.db, input.id);
     const references = await findMenuReferences(ctx.db, input.id);
     if (references.length > 0) {
       throw new Conflict('menu is still in use', references);

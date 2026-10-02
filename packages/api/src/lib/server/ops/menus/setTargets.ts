@@ -6,11 +6,11 @@ import {
   deleteForwardTarget,
   digitsSchema,
   insertForwardTarget,
+  liveMenu,
   rowToTarget,
   targetSpecSchema
 } from './_shared.js';
 
-const STATUS_NOT_FOUND = 404;
 const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 export const setMenuTargetsInput = z
@@ -32,15 +32,7 @@ export const setMenuTargets = defineOperation({
   minRole: 'admin',
   entity: input => ({ kind: 'menu', id: input.id }),
   run: async (ctx, input) => {
-    const menu = await ctx.db
-      .selectFrom('menus')
-      .select('id')
-      .where('id', '=', input.id)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (!menu) {
-      throw new OpError(STATUS_NOT_FOUND, `menu '${input.id}' not found`);
-    }
+    await liveMenu(ctx.db, input.id);
     const seenDigits = new Set<string>();
     for (const target of input.targets) {
       if (seenDigits.has(target.digits)) {

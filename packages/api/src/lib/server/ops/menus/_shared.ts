@@ -25,6 +25,23 @@ const STATUS_NOT_FOUND = 404;
 /** A `menus` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type MenuRow = Selectable<DB['menus']>;
 
+/** Loads a live menu by id, or throws `OpError(404)`. */
+export async function liveMenu(
+  db: Transaction<DB>,
+  id: string
+): Promise<MenuRow> {
+  const row = await db
+    .selectFrom('menus')
+    .selectAll()
+    .where('id', '=', id)
+    .where('deletedAt', 'is', null)
+    .executeTakeFirst();
+  if (!row) {
+    throw new OpError(STATUS_NOT_FOUND, `menu '${id}' not found`);
+  }
+  return row;
+}
+
 /**
  * Throws 404 when `audioId` names no live `audio_assets` row of kind `announcement` (`menus.audio_id`,
  * §11.2 `ON DELETE RESTRICT`; §11.2 "audio_id: the greeting, an audio_assets row of kind 'announcement'").
@@ -76,17 +93,41 @@ export const digitsSchema = z
   .regex(/^[0-9*#]+$/u)
   .describe('The keys the caller presses, one or more of 0-9 * #.');
 
-/** The meaning of each `menus.create`/`menus.update` field (§10.1 step 6, §11.2 `menus`). */
-export const MENU_FIELD_DESCRIPTIONS = {
-  audioId: 'The greeting, an audio asset of kind announcement.',
-  timeoutS:
-    'Seconds to wait for the first key after the greeting; 5 by default.',
-  maxAttempts:
-    'Greeting replays on silence or an unmapped string before fallbackTarget applies; 3 by default.',
-  allowExtensionDialing:
-    'Lets an unmapped string that is a live user or ring-group extension route to it; off by default.',
-  fallbackTarget: 'Where the call goes after the last attempt.'
-} as const;
+/**
+ * The fields `menus.create` takes and `menus.update` takes each optionally (§10.1 step 6, §11.2
+ * `menus`).
+ */
+export const menuFields = {
+  name: z.string().min(1),
+  audioId: z
+    .string()
+    .describe('The greeting, an audio asset of kind announcement.'),
+  timeoutS: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      'Seconds to wait for the first key after the greeting; 5 by default.'
+    ),
+  maxAttempts: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      'Greeting replays on silence or an unmapped string before fallbackTarget applies; 3 by default.'
+    ),
+  allowExtensionDialing: z
+    .boolean()
+    .optional()
+    .describe(
+      'Lets an unmapped string that is a live user or ring-group extension route to it; off by default.'
+    ),
+  fallbackTarget: targetSpecSchema.describe(
+    'Where the call goes after the last attempt.'
+  )
+};
 
 export type MenuTargetOut = { digits: string; target: TargetSpec };
 

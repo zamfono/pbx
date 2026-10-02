@@ -1,9 +1,8 @@
 import { z } from 'zod';
 
 import { propagate, recordChange } from '../runner.js';
-import { defineOperation, OpError } from '../types.js';
-
-const STATUS_NOT_FOUND = 404;
+import { defineOperation } from '../types.js';
+import { liveUserGroup } from './_shared.js';
 
 /**
  * Soft-deletes a user group (§5.9): ring-group memberships and outbound-route caller lists that
@@ -19,15 +18,7 @@ export const deleteUserGroup = defineOperation({
     `Delete this user group? The deletion can be undone for 30 days. (${input.id})`,
   entity: input => ({ kind: 'userGroup', id: input.id }),
   run: async (ctx, input) => {
-    const before = await ctx.db
-      .selectFrom('userGroups')
-      .select('id')
-      .where('id', '=', input.id)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (!before) {
-      throw new OpError(STATUS_NOT_FOUND, `user group '${input.id}' not found`);
-    }
+    await liveUserGroup(ctx.db, input.id);
     await ctx.db
       .updateTable('userGroups')
       .set({ deletedAt: ctx.now })

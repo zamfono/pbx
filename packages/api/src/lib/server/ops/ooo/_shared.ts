@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import type { Db, DB } from '@zamfono/shared';
 
+import { targetInputSchema } from '../dids/_shared.js';
 import { OpError, type Actor } from '../types.js';
 
 export type OooRuleRow = Selectable<DB['oooRules']>;
@@ -24,16 +25,6 @@ export const scopeInputSchema = z
   );
 
 /** The meaning of each `ooo.create`/`ooo.update` field (§10.2 "Out of office", §11.2 `ooo_rules`). */
-export const OOO_FIELD_DESCRIPTIONS = {
-  active: 'Whether the rule applies at all; on by default.',
-  startsAt:
-    'When the rule takes effect, ISO 8601 with an offset; null: immediately.',
-  expiresAt:
-    'When the rule ends, after startsAt; null: until deactivated. Active periods within a scope must not overlap.',
-  target:
-    "Where the scope's calls go while the rule is in effect, ahead of opening hours (see zamfono.help vacation-rule)."
-} as const;
-
 export type ScopeInput = z.infer<typeof scopeInputSchema>;
 
 /**
@@ -42,6 +33,29 @@ export type ScopeInput = z.infer<typeof scopeInputSchema>;
  * "Timestamps TEXT ISO 8601 UTC").
  */
 export const isoDatetimeInput = z.iso.datetime({ offset: true });
+
+/** The fields `ooo.create` takes and `ooo.update` takes each optionally (§10.3). */
+export const oooFields = {
+  active: z
+    .boolean()
+    .optional()
+    .describe('Whether the rule applies at all; on by default.'),
+  startsAt: isoDatetimeInput
+    .nullable()
+    .optional()
+    .describe(
+      'When the rule takes effect, ISO 8601 with an offset; null: immediately.'
+    ),
+  expiresAt: isoDatetimeInput
+    .nullable()
+    .optional()
+    .describe(
+      'When the rule ends, after startsAt; null: until deactivated. Active periods within a scope must not overlap.'
+    ),
+  target: targetInputSchema.describe(
+    "Where the scope's calls go while the rule is in effect, ahead of opening hours (see zamfono.help vacation-rule)."
+  )
+};
 
 /** `value` as a UTC ISO-8601 string, so stored `_at` values compare and parse consistently. */
 export function toUtcIso(value: string): string {

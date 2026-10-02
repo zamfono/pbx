@@ -2,19 +2,14 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
-import {
-  createTarget,
-  targetInputSchema,
-  type TargetInput
-} from '../dids/_shared.js';
+import { createTarget, type TargetInput } from '../dids/_shared.js';
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError, type Context } from '../types.js';
 import {
   assertOwnScopeOrAdmin,
-  isoDatetimeInput,
   liveOooRulesInScope,
   normalizeIsoOrNull,
-  OOO_FIELD_DESCRIPTIONS,
+  oooFields,
   rangesOverlap,
   scopeColumns,
   scopeInputSchema,
@@ -24,19 +19,7 @@ import {
 const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 const inputSchema = z
-  .object({
-    scope: scopeInputSchema,
-    active: z.boolean().optional().describe(OOO_FIELD_DESCRIPTIONS.active),
-    startsAt: isoDatetimeInput
-      .nullable()
-      .optional()
-      .describe(OOO_FIELD_DESCRIPTIONS.startsAt),
-    expiresAt: isoDatetimeInput
-      .nullable()
-      .optional()
-      .describe(OOO_FIELD_DESCRIPTIONS.expiresAt),
-    target: targetInputSchema.describe(OOO_FIELD_DESCRIPTIONS.target)
-  })
+  .object({ scope: scopeInputSchema, ...oooFields })
   .strict();
 
 type Input = z.infer<typeof inputSchema>;

@@ -5,26 +5,14 @@ import { newId } from '@zamfono/shared';
 import { recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
 import {
-  phoneSchema,
+  contactFields,
   replacePhones,
   tenantCountry,
   toContactOut,
   type ContactOut
 } from './_shared.js';
 
-export const contactInputSchema = z
-  .object({
-    displayName: z.string().min(1),
-    company: z.string().nullish(),
-    email: z.email().nullish(),
-    phones: z
-      .array(phoneSchema)
-      .optional()
-      .describe(
-        'The contact numbers; on update, the set is replaced as a whole.'
-      )
-  })
-  .strict();
+export const contactInputSchema = z.object(contactFields).strict();
 
 export const createContact = defineOperation({
   name: 'contacts.create',

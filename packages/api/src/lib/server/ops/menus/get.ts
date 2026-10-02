@@ -1,9 +1,7 @@
 import { z } from 'zod';
 
-import { defineOperation, OpError } from '../types.js';
-import { toMenuOut } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
+import { defineOperation } from '../types.js';
+import { liveMenu, toMenuOut } from './_shared.js';
 
 export const getMenu = defineOperation({
   name: 'menus.get',
@@ -12,15 +10,7 @@ export const getMenu = defineOperation({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const row = await ctx.db
-      .selectFrom('menus')
-      .selectAll()
-      .where('id', '=', input.id)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (!row) {
-      throw new OpError(STATUS_NOT_FOUND, `menu '${input.id}' not found`);
-    }
+    const row = await liveMenu(ctx.db, input.id);
     return toMenuOut(ctx.db, row);
   }
 });

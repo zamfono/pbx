@@ -1,10 +1,8 @@
 import { z } from 'zod';
 
 import { propagate, recordChange } from '../runner.js';
-import { defineOperation, OpError } from '../types.js';
-import { toAudioAssetOut } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
+import { defineOperation } from '../types.js';
+import { liveAudioAsset, toAudioAssetOut } from './_shared.js';
 
 export const updateAudioAssetInput = z
   .object({ id: z.string(), label: z.string().min(1) })
@@ -18,18 +16,7 @@ export const updateAudioAsset = defineOperation({
   minRole: 'admin',
   entity: input => ({ kind: 'audio', id: input.id }),
   run: async (ctx, input) => {
-    const before = await ctx.db
-      .selectFrom('audioAssets')
-      .selectAll()
-      .where('id', '=', input.id)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (!before) {
-      throw new OpError(
-        STATUS_NOT_FOUND,
-        `audio asset '${input.id}' not found`
-      );
-    }
+    const before = await liveAudioAsset(ctx.db, input.id);
     if (input.label !== before.label) {
       recordChange(ctx, {
         field: 'label',

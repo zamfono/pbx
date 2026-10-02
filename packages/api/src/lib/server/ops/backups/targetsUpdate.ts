@@ -8,9 +8,7 @@ import { recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import {
   loadLiveTarget,
-  paramsSchema,
-  targetKindSchema,
-  targetSecretSchema,
+  targetFields,
   targetToWire,
   withDefaultForgetPolicy,
   type BackupTargetWire
@@ -19,18 +17,7 @@ import {
 const STATUS_NOT_FOUND = 404;
 
 const inputSchema = z
-  .object({
-    id: z.string(),
-    kind: targetKindSchema.optional(),
-    params: paramsSchema.optional(),
-    secret: targetSecretSchema.optional(),
-    enabled: z
-      .boolean()
-      .optional()
-      .describe(
-        'Whether scheduled runs back up to this target; on for a new one.'
-      )
-  })
+  .object({ id: z.string(), ...z.object(targetFields).partial().shape })
   .strict();
 
 type Input = z.infer<typeof inputSchema>;

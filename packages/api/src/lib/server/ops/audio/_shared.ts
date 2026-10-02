@@ -12,6 +12,23 @@ const STATUS_NOT_FOUND = 404;
 /** An `audio_assets` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type AudioAssetRow = Selectable<DB['audioAssets']>;
 
+/** Loads a live audio asset by id, or throws `OpError(404)`. */
+export async function liveAudioAsset(
+  db: Transaction<DB>,
+  id: string
+): Promise<AudioAssetRow> {
+  const row = await db
+    .selectFrom('audioAssets')
+    .selectAll()
+    .where('id', '=', id)
+    .where('deletedAt', 'is', null)
+    .executeTakeFirst();
+  if (!row) {
+    throw new OpError(STATUS_NOT_FOUND, `audio asset '${id}' not found`);
+  }
+  return row;
+}
+
 export type AudioAssetOut = {
   id: string;
   label: string;
