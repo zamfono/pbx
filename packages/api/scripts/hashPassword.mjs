@@ -9,9 +9,7 @@
 //
 // The password arrives on stdin, which keeps it out of the shell history and out of the
 // process list that every user on the host can read.
-import console from 'node:console';
 import { readFileSync } from 'node:fs';
-import process from 'node:process';
 import argon2 from 'argon2';
 
 const NO_PASSWORD_EXIT_CODE = 1;
