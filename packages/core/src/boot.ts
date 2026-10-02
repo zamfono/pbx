@@ -39,7 +39,7 @@ export function buildPipeline(deps: {
   env: CoreEnv;
   trunkState: TrunkState;
   presence: Presence;
-}): { pipeline: Pipeline; cdr: CdrWriter } {
+}): { pipeline: Pipeline; cdr: CdrWriter; recorder: Recorder } {
   const { db, ari, cache, state, bus, log, env } = deps;
   const cdr = new CdrWriter({ db, ari, cache, bus, state, log, now: nowIso });
   const recorder = new Recorder({
@@ -50,14 +50,6 @@ export function buildPipeline(deps: {
     log,
     now: nowIso
   });
-  // §10.2 "Best effort": a failed mix "is visible in /metrics", which `api` renders from the
-  // live state.
-  state.readRecordingMixFailuresFrom(() => recorder.mixFailureCount);
-  // §6.4 "Maintenance gate": `api` touches the running system only while both read zero.
-  state.readRecordingsInProgressFrom(() => recorder.inProgressCount);
-  state.readAsteriskChannelsFrom(
-    async () => (await ari.channels.list()).length
-  );
   const pipeline = new Pipeline({
     ari,
     cache,
@@ -77,7 +69,7 @@ export function buildPipeline(deps: {
     trunkState: deps.trunkState,
     presence: deps.presence
   });
-  return { pipeline, cdr };
+  return { pipeline, cdr, recorder };
 }
 
 /**

@@ -106,8 +106,6 @@ async function startLiveState(deps: {
     now: nowIso
   });
   await presence.resyncOnBoot();
-  // §7 "registered devices": the live state serves the count `Presence`'s registrations give.
-  state.readRegisteredDevicesFrom(() => presence.registeredDevices());
   const trunkState = new TrunkState({
     ari,
     ami,
@@ -157,7 +155,7 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
       bus,
       log
     });
-    const { pipeline, cdr } = buildPipeline({
+    const { pipeline, cdr, recorder } = buildPipeline({
       db,
       ari,
       cache,
@@ -183,6 +181,7 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
         bus,
         actions,
         presence,
+        recorder,
         trunks: trunkState
       },
       CORE_INTERNAL_PORT

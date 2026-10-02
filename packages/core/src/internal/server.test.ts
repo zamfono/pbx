@@ -17,7 +17,12 @@ import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import type { Logger } from '../ari/types.js';
 import { newCall } from '../calls/call.js';
-import { noopLogger, testActions } from '../testing/pipelineDeps.js';
+import {
+  idlePresence,
+  idleRecorder,
+  noopLogger,
+  testActions
+} from '../testing/pipelineDeps.js';
 import { EventBus } from './eventBus.js';
 import { startInternalServer } from './server.js';
 import { ConfigCache } from './snapshot.js';
@@ -93,6 +98,10 @@ describe('startInternalServer', () => {
   // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let state: StateStore;
   // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
+  let presence: ReturnType<typeof idlePresence>;
+  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
+  let recorder: typeof idleRecorder;
+  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let close: () => Promise<void>;
   // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let port: number;
@@ -113,6 +122,8 @@ describe('startInternalServer', () => {
     await ari.connect();
     cache = new ConfigCache(db);
     state = new StateStore();
+    presence = idlePresence();
+    recorder = { ...idleRecorder };
     errorsLogged.length = 0;
     const started = await startInternalServer(
       {
@@ -123,7 +134,8 @@ describe('startInternalServer', () => {
         state,
         bus: new EventBus(),
         actions: testActions(ari, db),
-        presence: { refreshAll: () => Promise.resolve() },
+        presence,
+        recorder,
         trunks: { refreshMonitoring: () => Promise.resolve() }
       },
       ANY_FREE_PORT
@@ -162,7 +174,7 @@ describe('startInternalServer', () => {
   });
 
   it('answers 503 for a request whose route failed, and logs the failure with the request', async () => {
-    state.readRegisteredDevicesFrom(() => Promise.reject(new Error('boom')));
+    presence.registeredDevices = () => Promise.reject(new Error('boom'));
 
     const response = await fetch(`http://127.0.0.1:${port}/internal/state`);
 
@@ -178,7 +190,7 @@ describe('startInternalServer', () => {
     ]);
   });
 
-  it('answers /internal/state with the StateStore snapshot', async () => {
+  it('answers /internal/state with the StateStore snapshot and the readings derived as it is served', async () => {
     const call = newCall({
       id: newId(),
       direction: 'inbound',
@@ -193,7 +205,7 @@ describe('startInternalServer', () => {
       status: 'registered',
       statusChangedAt: nowIso()
     };
-    const presence: Presence = {
+    const available: Presence = {
       status: 'available',
       peer: null,
       ringGroupId: null,
@@ -201,12 +213,14 @@ describe('startInternalServer', () => {
     };
     state.calls.set(call.id, { call, state: 'ringing', notified: new Set() });
     state.trunks.set('mainTrunk', trunk);
-    state.presence.set('user1', presence);
+    state.presence.set('user1', available);
     state.trunkChannels.set('mainTrunk', 2);
-    state.readRegisteredDevicesFrom(() => Promise.resolve(3));
-    state.readRecordingMixFailuresFrom(() => 1);
-    state.readAsteriskChannelsFrom(() => Promise.resolve(4));
-    state.readRecordingsInProgressFrom(() => 2);
+    presence.registeredDevices = () => Promise.resolve(3);
+    recorder.mixFailureCount = 1;
+    recorder.inProgressCount = 2;
+    for (let index = 0; index < 4; index += 1) {
+      fakeAri.addChannel({});
+    }
 
     const response = await fetch(`http://127.0.0.1:${port}/internal/state`);
     expect(response.status).toBe(HTTP_OK);
@@ -226,7 +240,7 @@ describe('startInternalServer', () => {
       ],
       trunks: { mainTrunk: trunk },
       trunkChannels: { mainTrunk: 2 },
-      presence: { user1: presence },
+      presence: { user1: available },
       registeredDevices: 3,
       recordingMixFailures: 1,
       asteriskChannels: 4,
@@ -327,7 +341,8 @@ describe('startInternalServer', () => {
         state: new StateStore(),
         bus,
         actions: testActions(ari, db),
-        presence: { refreshAll: () => Promise.resolve() },
+        presence: idlePresence(),
+        recorder: idleRecorder,
         trunks: { refreshMonitoring: () => Promise.resolve() }
       },
       ANY_FREE_PORT
@@ -387,7 +402,8 @@ describe('startInternalServer', () => {
         state: new StateStore(),
         bus,
         actions: testActions(ari, db),
-        presence: { refreshAll: () => Promise.resolve() },
+        presence: idlePresence(),
+        recorder: idleRecorder,
         trunks: { refreshMonitoring: () => Promise.resolve() }
       },
       ANY_FREE_PORT

@@ -435,7 +435,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
     const call = await arrive(trunkId, '030123456', '08912345');
 
     expect(trunkState.activeChannels(trunkId)).toBe(1);
-    expect((await state.snapshot()).trunkChannels).toEqual({ [trunkId]: 1 });
+    expect(state.snapshot().trunkChannels).toEqual({ [trunkId]: 1 });
 
     fakeAri.emit({
       type: 'ChannelDestroyed',
@@ -443,9 +443,9 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
       application: 'zamfono',
       channel: { id: call?.callerChannelId }
     });
-    await eventually(async () => {
+    await eventually(() => {
       expect(trunkState.activeChannels(trunkId)).toBe(0);
-      expect((await state.snapshot()).trunkChannels).toEqual({});
+      expect(state.snapshot().trunkChannels).toEqual({});
     });
   });
 

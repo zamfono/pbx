@@ -120,6 +120,21 @@ export function testActions(ari: AriClient, db: Db): CallActions {
   return new CallActions(new Pipeline(testPipelineDeps(ari, db)));
 }
 
+/** The internal server's presence for a suite that drives none: nothing to refresh, nobody
+ * registered. */
+export function idlePresence(): Pick<
+  Presence,
+  'refreshAll' | 'registeredDevices'
+> {
+  return {
+    refreshAll: () => Promise.resolve(),
+    registeredDevices: () => Promise.resolve(0)
+  };
+}
+
+/** The internal server's recorder for a suite that records nothing. */
+export const idleRecorder = { inProgressCount: 0, mixFailureCount: 0 };
+
 /** Registers `sipUsername`, whose `devices` row is seeded along with the `settings` row, the way a
  * phone's REGISTER reaches the pipeline's `Presence`: a device rings only while registered
  * (§10.1 step 4). */

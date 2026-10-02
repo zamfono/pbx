@@ -321,11 +321,10 @@ describe('Presence', () => {
     });
   });
 
-  it('serves the live registered-device count, which falls when a contact becomes unreachable (§7)', async () => {
+  it('counts the live registered devices, which fall when a contact becomes unreachable (§7)', async () => {
     const userId = await seedUser(db);
     await seedDevice(db, userId, 'e104-dabc');
     await seedDevice(db, userId, 'e104-dxyz');
-    state.readRegisteredDevicesFrom(() => presence.registeredDevices());
 
     /** One of the two devices' contacts changing state, as Asterisk reports it (§9.3). */
     function contact(aor: string, status: string): void {
@@ -341,12 +340,12 @@ describe('Presence', () => {
     contact('e104-dabc', 'Reachable');
     contact('e104-dxyz', 'Reachable');
     await eventually(async () => {
-      expect((await state.snapshot()).registeredDevices).toBe(2);
+      expect(await presence.registeredDevices()).toBe(2);
     });
 
     contact('e104-dabc', 'Unreachable');
     await eventually(async () => {
-      expect((await state.snapshot()).registeredDevices).toBe(1);
+      expect(await presence.registeredDevices()).toBe(1);
     });
     // The event's timestamp stays on the row (§3.1) without counting the device as registered.
     await eventually(async () => {

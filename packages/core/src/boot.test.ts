@@ -5,7 +5,6 @@ import { nowIso, openDb, type Db } from '@zamfono/shared';
 import { AmiClient } from './ami/client.js';
 import { AriClient } from './ari/client.js';
 import { buildPipeline } from './boot.js';
-import { Recorder } from './calls/recording.js';
 import { TrunkState } from './calls/trunkState.js';
 import { readEnv } from './env.js';
 import { EventBus } from './internal/eventBus.js';
@@ -59,26 +58,6 @@ describe('buildPipeline', () => {
     });
     return { ...built, state };
   }
-
-  it('serves its recorder\'s mix failures in the live state (§10.2 "visible in /metrics")', async () => {
-    // The count the recorder keeps as mixes fail; `recording.test.ts` covers how it grows.
-    vi.spyOn(Recorder.prototype, 'mixFailureCount', 'get').mockReturnValue(2);
-
-    const { state } = build('UTC');
-
-    expect((await state.snapshot()).recordingMixFailures).toBe(2);
-  });
-
-  it("serves the recordings in progress and Asterisk's channels, null while ARI does not answer (§6.4)", async () => {
-    vi.spyOn(Recorder.prototype, 'inProgressCount', 'get').mockReturnValue(1);
-
-    const { state } = build('UTC');
-    const snapshot = await state.snapshot();
-
-    expect(snapshot.recordingsInProgress).toBe(1);
-    // The client in `build` points at a port nothing listens on.
-    expect(snapshot.asteriskChannels).toBeNull();
-  });
 
   it("hands the stack's TZ to the pipeline, the tenant clock while settings.timezone is NULL (§11.4)", () => {
     const { pipeline } = build('Europe/Vienna');

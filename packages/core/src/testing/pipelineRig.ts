@@ -16,7 +16,12 @@ import { startInternalServer } from '../internal/server.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { Presence } from '../presence.js';
-import { noopLogger, testPipelineDeps, trunkStateFor } from './pipelineDeps.js';
+import {
+  idleRecorder,
+  noopLogger,
+  testPipelineDeps,
+  trunkStateFor
+} from './pipelineDeps.js';
 import { seedSettings } from './seedRows.js';
 
 // Any free port, never a fixed one another suite running on the same host may already hold.
@@ -111,6 +116,7 @@ export async function startRig(
           bus: new EventBus(),
           actions,
           presence,
+          recorder: idleRecorder,
           trunks: pipeline.deps.trunkState
         },
         ANY_FREE_PORT

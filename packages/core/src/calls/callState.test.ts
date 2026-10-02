@@ -123,7 +123,7 @@ describe('a live call’s users (§10.3 "Live calls", §10.6)', () => {
     expect(call.callerUserId).toBe('caller');
   });
 
-  it('serves the users as they are now, not as they were at the last transition', async () => {
+  it('serves the users as they are now, not as they were at the last transition', () => {
     const ringing = leg('member', 'ringing');
     call.legs.set(ringing.channelId, ringing);
     callRinging(deps, call);
@@ -131,7 +131,7 @@ describe('a live call’s users (§10.3 "Live calls", §10.6)', () => {
 
     ringing.state = 'ended';
     expect(live().userIds).not.toContain('member');
-    const served = JSON.parse(JSON.stringify(await deps.state.snapshot())) as {
+    const served = JSON.parse(JSON.stringify(deps.state.snapshot())) as {
       calls: { userIds: string[]; connectedUserIds: string[] }[];
     };
     expect(served.calls[0]?.userIds.sort()).toEqual(['callee', 'caller']);

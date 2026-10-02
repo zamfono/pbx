@@ -19,6 +19,8 @@ import {
 import type { AriClient } from '../ari/client.js';
 import type { Logger } from '../ari/types.js';
 import type { CallActions } from '../calls/actions.js';
+import type { Recorder } from '../calls/recording.js';
+import type { Presence } from '../presence.js';
 import { handleActionRoute, handleParkingRead } from './actionRoutes.js';
 import {
   handleConfigChanged,
@@ -50,8 +52,11 @@ type InternalDeps = {
   bus: EventBus;
   /** The live-call actions (§3). */
   actions: CallActions;
-  /** Recomputed after every config change (`configChanged.ts`). */
-  presence: PresenceRefresh;
+  /** Recomputed after every config change (`configChanged.ts`); its registrations give the
+   * registered devices `/internal/state` serves (§7). */
+  presence: PresenceRefresh & Pick<Presence, 'registeredDevices'>;
+  /** The recordings in progress and the failed mixes `/internal/state` serves (§6.4, §10.2). */
+  recorder: Pick<Recorder, 'inProgressCount' | 'mixFailureCount'>;
   /** The `unmonitored` trunk statuses, likewise. */
   trunks: TrunkMonitoringRefresh;
 };
@@ -91,11 +96,28 @@ async function handleVersion(
   respondJson(response, HTTP_OK, body);
 }
 
+/**
+ * `GET /internal/state`: the live state, with the readings derived as it is served. §7
+ * "registered devices" counts against the current config, so a device deleted while registered
+ * drops out at once; §10.2 "Best effort": a failed mix "is visible in /metrics", which `api`
+ * renders from here; §6.4 "Maintenance gate": `api` touches the running system only while the
+ * recordings in progress and Asterisk's channels read zero, the latter `null` while ARI does not
+ * answer.
+ */
 async function handleState(
   deps: InternalDeps,
   response: http.ServerResponse
 ): Promise<void> {
-  const body: StateResponse = await deps.state.snapshot();
+  const body: StateResponse = {
+    ...deps.state.snapshot(),
+    registeredDevices: await deps.presence.registeredDevices(),
+    recordingMixFailures: deps.recorder.mixFailureCount,
+    asteriskChannels: await deps.ari.channels
+      .list()
+      .then(channels => channels.length)
+      .catch(() => null),
+    recordingsInProgress: deps.recorder.inProgressCount
+  };
   respondJson(response, HTTP_OK, body);
 }
 

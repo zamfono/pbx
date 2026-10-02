@@ -7,7 +7,12 @@ import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { Presence } from '../presence.js';
 import { eventually } from '../testing/eventually.js';
-import { noopLogger, testActions } from '../testing/pipelineDeps.js';
+import {
+  idlePresence,
+  idleRecorder,
+  noopLogger,
+  testActions
+} from '../testing/pipelineDeps.js';
 import { EventBus } from './eventBus.js';
 import { startInternalServer } from './server.js';
 import { ConfigCache } from './snapshot.js';
@@ -131,6 +136,7 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
         bus,
         actions: testActions(ari, db),
         presence,
+        recorder: idleRecorder,
         trunks: { refreshMonitoring: () => Promise.resolve() }
       },
       ANY_FREE_PORT
@@ -196,7 +202,8 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
         state: new StateStore(),
         bus: new EventBus(),
         actions: testActions(ari, db),
-        presence: { refreshAll: () => Promise.resolve() },
+        presence: idlePresence(),
+        recorder: idleRecorder,
         trunks: {
           refreshMonitoring: () => {
             invalidatedFirst = invalidated;
