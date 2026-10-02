@@ -2,6 +2,8 @@ import type { Transaction } from 'kysely';
 
 import type { DB } from '@zamfono/shared';
 
+import type { OwnScope } from './forwardTargetOwners.js';
+
 /** The out-of-office rules and opening-hours schedules still pointing at one of the targets. */
 export type ScheduleSources = {
   ooo: { id: string }[];
@@ -9,17 +11,16 @@ export type ScheduleSources = {
 };
 
 /**
- * `ooo_rules.target_id`, outside `ringGroupId`'s and `menuId`'s own scope and outside every
+ * `ooo_rules.target_id`, outside `exclude`'s own scope and outside every
  * soft-deleted scope, whose rules travel with it (§5.9). A left join leaves the scope's
  * `deleted_at` NULL wherever the scope column is NULL, which keeps the tenant-wide rows in.
  */
 async function loadScopedOooRules(
   db: Transaction<DB>,
   ftIds: string[],
-  ringGroupId: string,
-  menuId: string
+  exclude: OwnScope
 ): Promise<{ id: string }[]> {
-  return db
+  let query = db
     .selectFrom('oooRules')
     .leftJoin('users as scopeUser', 'scopeUser.id', 'oooRules.scopeUserId')
     .leftJoin(
@@ -33,30 +34,34 @@ async function loadScopedOooRules(
     .where('oooRules.deletedAt', 'is', null)
     .where('scopeUser.deletedAt', 'is', null)
     .where('scopeGroup.deletedAt', 'is', null)
-    .where('scopeMenu.deletedAt', 'is', null)
-    .where(eb =>
+    .where('scopeMenu.deletedAt', 'is', null);
+  const { ringGroupId, menuId } = exclude;
+  if (ringGroupId !== undefined) {
+    query = query.where(eb =>
       eb.or([
         eb('oooRules.scopeRingGroupId', 'is', null),
         eb('oooRules.scopeRingGroupId', '!=', ringGroupId)
       ])
-    )
-    .where(eb =>
+    );
+  }
+  if (menuId !== undefined) {
+    query = query.where(eb =>
       eb.or([
         eb('oooRules.scopeMenuId', 'is', null),
         eb('oooRules.scopeMenuId', '!=', menuId)
       ])
-    )
-    .execute();
+    );
+  }
+  return query.execute();
 }
 
 /** `opening_hours.closed_target_id` under the same scope rules as `loadScopedOooRules`. */
 async function loadScopedOpeningHours(
   db: Transaction<DB>,
   ftIds: string[],
-  ringGroupId: string,
-  menuId: string
+  exclude: OwnScope
 ): Promise<{ id: string }[]> {
-  return db
+  let query = db
     .selectFrom('openingHours')
     .leftJoin('users as scopeUser', 'scopeUser.id', 'openingHours.scopeUserId')
     .leftJoin(
@@ -70,35 +75,39 @@ async function loadScopedOpeningHours(
     .where('openingHours.deletedAt', 'is', null)
     .where('scopeUser.deletedAt', 'is', null)
     .where('scopeGroup.deletedAt', 'is', null)
-    .where('scopeMenu.deletedAt', 'is', null)
-    .where(eb =>
+    .where('scopeMenu.deletedAt', 'is', null);
+  const { ringGroupId, menuId } = exclude;
+  if (ringGroupId !== undefined) {
+    query = query.where(eb =>
       eb.or([
         eb('openingHours.scopeRingGroupId', 'is', null),
         eb('openingHours.scopeRingGroupId', '!=', ringGroupId)
       ])
-    )
-    .where(eb =>
+    );
+  }
+  if (menuId !== undefined) {
+    query = query.where(eb =>
       eb.or([
         eb('openingHours.scopeMenuId', 'is', null),
         eb('openingHours.scopeMenuId', '!=', menuId)
       ])
-    )
-    .execute();
+    );
+  }
+  return query.execute();
 }
 
 /**
  * The two schedule owners of a `forward_targets` row, `ooo_rules.target_id` and
- * `opening_hours.closed_target_id`, each outside `ringGroupId`'s and `menuId`'s own scope (§5.9).
+ * `opening_hours.closed_target_id`, each outside `exclude`'s own scope (§5.9).
  */
 export async function loadScheduleSources(
   db: Transaction<DB>,
   ftIds: string[],
-  ringGroupId: string,
-  menuId: string
+  exclude: OwnScope
 ): Promise<ScheduleSources> {
   const [ooo, hours] = await Promise.all([
-    loadScopedOooRules(db, ftIds, ringGroupId, menuId),
-    loadScopedOpeningHours(db, ftIds, ringGroupId, menuId)
+    loadScopedOooRules(db, ftIds, exclude),
+    loadScopedOpeningHours(db, ftIds, exclude)
   ]);
   return { ooo, hours };
 }

@@ -175,7 +175,8 @@ export type MailRequest =
         receivedAt: string;
         durationS: number;
       };
-      attachmentPath: string;
+      /** The recording, under `/media/voicemail/` (§11.6); absent for a test mail. */
+      attachmentPath?: string;
     }
   | {
       kind: 'missedCall';

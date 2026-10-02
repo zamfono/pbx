@@ -1,6 +1,3 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
@@ -25,31 +22,12 @@ const SAMPLE_FROM_VERSION = '1.2.3';
 const SAMPLE_TO_VERSION = '1.2.4';
 const SAMPLE_BREAKING_VERSION = '2.0.0';
 
-// ponytail: a placeholder file stands in for a real recording — `test` renders the template and
-// exercises the relay, not the voicemail pipeline, so the attachment's content is unobserved.
-const SAMPLE_ATTACHMENT_TEXT =
-  'Sample attachment for mailTemplates.test (§10.2 "Templates").';
-
-/**
- * Writes the placeholder file `mailTemplates.test` attaches for kind `voicemail`, in a fresh
- * per-call directory (`mkdtemp`) rather than a fixed name, since a predictable path in the shared
- * `tmpdir()` lets another local process pre-place a symlink there.
- */
-async function sampleAttachmentPath(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'zamfono-mailtest-'));
-  const path = join(dir, 'sample.txt');
-  await writeFile(path, SAMPLE_ATTACHMENT_TEXT, 'utf8');
-  return path;
-}
-
-type SampleRequestBuilder = (
-  userId: string,
-  now: string
-) => Promise<AnyMailRequest> | AnyMailRequest;
+type SampleRequestBuilder = (userId: string, now: string) => AnyMailRequest;
 
 /** One sample-valued request builder per kind (§10.2), keyed so `sampleRequest` needs no switch to stay exhaustive. */
 const SAMPLE_REQUEST_BUILDERS: Record<Input['kind'], SampleRequestBuilder> = {
-  voicemail: async (userId, now) => ({
+  // A test mail carries no recording: it renders the template and exercises the relay.
+  voicemail: (userId, now) => ({
     kind: 'voicemail',
     to: { userId },
     values: {
@@ -58,8 +36,7 @@ const SAMPLE_REQUEST_BUILDERS: Record<Input['kind'], SampleRequestBuilder> = {
       mailboxName: 'Sample Mailbox',
       receivedAt: now,
       durationS: SAMPLE_DURATION_S
-    },
-    attachmentPath: await sampleAttachmentPath()
+    }
   }),
   missedCall: (userId, now) => ({
     kind: 'missedCall',
@@ -110,15 +87,6 @@ const SAMPLE_REQUEST_BUILDERS: Record<Input['kind'], SampleRequestBuilder> = {
   })
 };
 
-/** The sample-valued request `sendMail` renders for `kind` (§10.2). */
-async function sampleRequest(
-  kind: Input['kind'],
-  userId: string,
-  now: string
-): Promise<AnyMailRequest> {
-  return SAMPLE_REQUEST_BUILDERS[kind](userId, now);
-}
-
 /**
  * `POST /mailTemplates/{kind}/test` (§10.2 "Templates"): sends the effective template, in the
  * tenant language, to the caller with sample values.
@@ -140,19 +108,8 @@ export const test = defineOperation<
     const language = await tenantLanguage(ctx.db);
     // A test send is a pure action on no prior state: nothing to revert (§5.8).
     setUndoable(ctx, false);
-    const request = await sampleRequest(input.kind, ctx.actor.id, ctx.now);
-    try {
-      const keyring = keyringFromEnv(env);
-      const status = await sendMail(ctx.db, keyring, request);
-      return { status, language };
-    } finally {
-      // Only kind `voicemail` created an attachment dir (via `sampleAttachmentPath`).
-      if ('attachmentPath' in request) {
-        await rm(dirname(request.attachmentPath), {
-          recursive: true,
-          force: true
-        });
-      }
-    }
+    const request = SAMPLE_REQUEST_BUILDERS[input.kind](ctx.actor.id, ctx.now);
+    const status = await sendMail(ctx.db, keyringFromEnv(env), request);
+    return { status, language };
   }
 });

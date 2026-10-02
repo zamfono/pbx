@@ -16,10 +16,6 @@ export type Reference = { kind: string; id: string; label: string };
  */
 export type OwnScope = { ringGroupId?: string; menuId?: string };
 
-// ponytail: '' stands in for "exclude nothing" (no id `newId()` ever generates is empty), so the
-// scope-exclusion queries below stay one unconditional `!=` each instead of a branch per caller.
-const NO_EXCLUSION = '';
-
 type UnscopedSources = {
   dids: { id: string; label: string | null; number: string }[];
   didBlocks: { id: string; label: string | null; base: string }[];
@@ -81,26 +77,28 @@ type MenuOwnedSources = {
 async function loadMenuOwnedSources(
   db: Transaction<DB>,
   ftIds: string[],
-  menuId: string
+  menuId: string | undefined
 ): Promise<MenuOwnedSources> {
-  const [menus, menuTargets] = await Promise.all([
-    db
-      .selectFrom('menus')
-      .select(['id', 'name'])
-      .where('fallbackTargetId', 'in', ftIds)
-      .where('deletedAt', 'is', null)
-      .where('id', '!=', menuId)
-      .execute(),
-    db
-      .selectFrom('menuTargets')
-      .innerJoin('menus', 'menus.id', 'menuTargets.menuId')
-      .select(['menuTargets.menuId as menuId', 'menuTargets.digits as digits'])
-      .where('menuTargets.targetId', 'in', ftIds)
-      .where('menus.deletedAt', 'is', null)
-      .where('menuTargets.menuId', '!=', menuId)
-      .execute()
+  let menus = db
+    .selectFrom('menus')
+    .select(['id', 'name'])
+    .where('fallbackTargetId', 'in', ftIds)
+    .where('deletedAt', 'is', null);
+  let menuTargets = db
+    .selectFrom('menuTargets')
+    .innerJoin('menus', 'menus.id', 'menuTargets.menuId')
+    .select(['menuTargets.menuId as menuId', 'menuTargets.digits as digits'])
+    .where('menuTargets.targetId', 'in', ftIds)
+    .where('menus.deletedAt', 'is', null);
+  if (menuId !== undefined) {
+    menus = menus.where('id', '!=', menuId);
+    menuTargets = menuTargets.where('menuTargets.menuId', '!=', menuId);
+  }
+  const [menuRows, menuTargetRows] = await Promise.all([
+    menus.execute(),
+    menuTargets.execute()
   ]);
-  return { menus, menuTargets };
+  return { menus: menuRows, menuTargets: menuTargetRows };
 }
 
 /**
@@ -110,9 +108,9 @@ async function loadMenuOwnedSources(
 async function loadRingGroupOwnedSources(
   db: Transaction<DB>,
   ftIds: string[],
-  ringGroupId: string
+  ringGroupId: string | undefined
 ): Promise<{ groupId: string; condition: string }[]> {
-  return db
+  const query = db
     .selectFrom('ringGroupForwardRules')
     .innerJoin('ringGroups', 'ringGroups.id', 'ringGroupForwardRules.groupId')
     .select([
@@ -120,9 +118,10 @@ async function loadRingGroupOwnedSources(
       'ringGroupForwardRules.condition as condition'
     ])
     .where('ringGroupForwardRules.targetId', 'in', ftIds)
-    .where('ringGroups.deletedAt', 'is', null)
-    .where('ringGroupForwardRules.groupId', '!=', ringGroupId)
-    .execute();
+    .where('ringGroups.deletedAt', 'is', null);
+  return ringGroupId === undefined
+    ? query.execute()
+    : query.where('ringGroupForwardRules.groupId', '!=', ringGroupId).execute();
 }
 
 /** Flattens every §5.9 reference source into the wire shape a delete refusal carries. */
@@ -196,13 +195,11 @@ export async function findForwardTargetOwners(
   if (ftIds.length === 0) {
     return [];
   }
-  const ringGroupId = exclude.ringGroupId ?? NO_EXCLUSION;
-  const menuId = exclude.menuId ?? NO_EXCLUSION;
   const [unscoped, menuOwned, groupRules, schedules] = await Promise.all([
     loadUnscopedSources(db, ftIds),
-    loadMenuOwnedSources(db, ftIds, menuId),
-    loadRingGroupOwnedSources(db, ftIds, ringGroupId),
-    loadScheduleSources(db, ftIds, ringGroupId, menuId)
+    loadMenuOwnedSources(db, ftIds, exclude.menuId),
+    loadRingGroupOwnedSources(db, ftIds, exclude.ringGroupId),
+    loadScheduleSources(db, ftIds, exclude)
   ]);
   return toReferences(unscoped, menuOwned, groupRules, schedules);
 }

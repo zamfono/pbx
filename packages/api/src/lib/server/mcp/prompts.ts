@@ -40,8 +40,9 @@ function frontMatterEnd(lines: string[]): number {
 }
 
 // ponytail: parses only the flat shape the guide's recipes use (a `title` line and a flat
-// `arguments` list of `{name, description, required}`); a maintained YAML parser replaces this if
-// the front matter grows nested or multi-line values.
+// `arguments` list of `{name, description, required}`) and throws on any other line, so a recipe
+// whose front matter grows nested or multi-line values fails the build's tests; a maintained YAML
+// parser replaces this then.
 export function parseRecipeFrontMatter(content: string): {
   title: string;
   arguments: RecipeArgument[];
@@ -68,6 +69,8 @@ export function parseRecipeFrontMatter(content: string): {
       lastArg.description = (descMatch.groups.value ?? '').trim();
     } else if (requiredMatch?.groups && lastArg) {
       lastArg.required = requiredMatch.groups.value === 'true';
+    } else if (line.trim() !== '' && line.trim() !== 'arguments:') {
+      throw new Error(`recipe front matter: unparsed line '${line}'`);
     }
   }
   const complete = args.map(arg => ({

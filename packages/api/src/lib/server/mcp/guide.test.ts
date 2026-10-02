@@ -57,6 +57,12 @@ describe('parseRecipeFrontMatter', () => {
     });
   });
 
+  it('refuses a front-matter line outside the flat shape it parses', () => {
+    expect(() =>
+      parseRecipeFrontMatter('---\ntitle: T\ntags:\n  nested: x\n---\n')
+    ).toThrow("unparsed line 'tags:'");
+  });
+
   it('returns an empty title and no arguments when there is no front matter', () => {
     expect(parseRecipeFrontMatter('# Just a heading\n')).toEqual({
       title: '',
