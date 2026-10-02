@@ -3,6 +3,7 @@ import pino from 'pino';
 import type { Db } from '@zamfono/shared';
 
 import { errorMessage } from '../errors.js';
+import { isPropagationPending } from '../propagationPending.js';
 import type { AfterCommitHook, Effects } from './effects.js';
 import type { Context } from './types.js';
 
@@ -25,6 +26,25 @@ export function afterPropagation(ctx: Context, hook: AfterCommitHook): void {
 /** Registers `hook` to run once `ctx`'s operation has committed, whatever its propagation did. */
 export function afterCommit(ctx: Context, hook: AfterCommitHook): void {
   ctx.effects.after.push({ hook, waitsForAsterisk: false });
+}
+
+/**
+ * Runs `step` now or, while a propagation is owed (§3.1), with the steps that wait for the next
+ * one to succeed: a step outside any operation that needs Asterisk to hold the configuration, as
+ * a Ringotel push does.
+ */
+export async function onceConfigPropagated(
+  db: Db,
+  step: (db: Db) => Promise<void>
+): Promise<void> {
+  if (!(await isPropagationPending(db))) {
+    await step(db);
+    return;
+  }
+  waiting.push(async later => {
+    await step(later);
+    return null;
+  });
 }
 
 /** Notes `warning`, found while `ctx`'s operation writes, for its result: it joins the hooks'

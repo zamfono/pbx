@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-02 · §10.4 Tenant profile push.** The retry of a pending tenant profile at `api`'s start and at an Asterisk start waits, while a propagation is owed, until one has succeeded, as a device's Ringotel push does.
+*Why:* after a failed boot propagation the retry reached Ringotel before Asterisk held the profile it carries.
+
 **2026-10-02 · §10.3 Conventions.** No list takes a bare row id as `cursor` any more; the lists of DIDs, number blocks, blocked numbers, webhooks and backup targets and runs answer one with 422, like any cursor they did not hand out.
 *Why:* product-owner decision: the next release is a breaking 0.2.0, without any backwards compatibility.
 

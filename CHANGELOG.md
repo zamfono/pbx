@@ -270,6 +270,10 @@ why the specified behaviour changed; the commit history, how.
 - `voicemails.delete` and `recordings.delete` removed the audio file before the row's delete was
   stored, so a delete that failed left a voicemail or recording without its audio. The file is
   now removed once the delete is stored.
+- An `api` that started while a config propagation was still owed, or whose boot propagation
+  failed, sent a pending tenant profile to Ringotel at once, before Asterisk held it. That retry,
+  and the one at an Asterisk start, now waits until a propagation has succeeded, as a device's
+  Ringotel push does.
 
 ### Upgrade notes
 

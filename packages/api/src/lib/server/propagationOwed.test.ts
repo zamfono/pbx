@@ -10,7 +10,7 @@ import { getCoreClient, type CoreClient } from './coreClient.js';
 import { stubCoreClient } from './coreClientStub.js';
 import { apiHealth } from './health.js';
 import { renderMetrics } from './metrics.js';
-import { runAfterCommit } from './ops/afterCommit.js';
+import { onceConfigPropagated, runAfterCommit } from './ops/afterCommit.js';
 import { newEffects } from './ops/effects.js';
 import { register } from './ops/registry.js';
 import {
@@ -149,6 +149,30 @@ describe('an owed config propagation', () => {
     await done;
     expect(ran).toEqual(['mail', 'ringotel']);
     expect(core.reloads.at(-1)).toEqual(['pjsip', 'dialplan', 'moh']);
+    expect(await isPropagationPending(db)).toBe(false);
+  });
+
+  it('holds a step outside any operation until it succeeds', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const db = await setUp();
+    core.up = false;
+    await expect(propagateConfig(db, [])).rejects.toThrow('core unreachable');
+    let ran = false;
+    let waited: () => void = () => undefined;
+    const done = new Promise<void>(resolve => {
+      waited = resolve;
+    });
+    await onceConfigPropagated(db, () => {
+      ran = true;
+      waited();
+      return Promise.resolve();
+    });
+    expect(ran).toBe(false);
+
+    core.up = true;
+    await vi.advanceTimersByTimeAsync(5000);
+    await done;
+    expect(ran).toBe(true);
     expect(await isPropagationPending(db)).toBe(false);
   });
 

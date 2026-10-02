@@ -24,6 +24,7 @@ import { connectCoreEvents } from '../coreEvents.js';
 import { publishEvent } from '../eventSink.js';
 import { updateMailSender } from '../mail/owners.js';
 import { mediaDirFromEnv } from '../mediaDir.js';
+import { onceConfigPropagated } from '../ops/afterCommit.js';
 import { oweDevicePushesAtStart } from '../ops/devices/_ringotelPush.js';
 import { retryPendingProfile } from '../ops/settings/profilePush.js';
 import { updaterClient } from '../ops/system/_updater.js';
@@ -136,7 +137,9 @@ function relayCoreEvents(
   const rereg = watchAsteriskRestarts({
     db,
     lookup: async () => getCoreClient().version(),
-    retryProfile: trigger => retryPendingProfile(db, trigger)
+    // The profile reaches the apps only once Asterisk holds it, as the device pushes do.
+    retryProfile: trigger =>
+      onceConfigPropagated(db, later => retryPendingProfile(later, trigger))
   });
   return connectCoreEvents({
     url: coreEventsUrl(coreUrlFromEnv()),
