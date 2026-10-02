@@ -3,6 +3,7 @@
  * ending; its own module so `legs.ts` stays under the repository's `max-lines` lint rule. A ring
  * race concluding without an answer is `ringConclusion.ts`'s.
  */
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { AriEvent, Channel } from '../ari/types.js';
 import type { Call } from './call.js';
 import { traceChannelEnded } from './callEnd.js';
@@ -92,10 +93,20 @@ async function releaseLastParty(
   await endHold(pipeline, bridge.id, null);
   await Promise.all(
     remaining.map(channelId =>
-      ari.channels.hangup(channelId).catch(() => undefined)
+      ari.channels
+        .hangup(channelId)
+        .catch(ignoreGone)
+        .catch(
+          logFailure(pipeline.deps.logger, 'party hangup', { callId: call.id })
+        )
     )
   );
-  await ari.bridges.destroy(bridge.id).catch(() => undefined);
+  await ari.bridges
+    .destroy(bridge.id)
+    .catch(ignoreGone)
+    .catch(
+      logFailure(pipeline.deps.logger, 'bridge destroy', { callId: call.id })
+    );
 }
 
 /**
@@ -130,8 +141,11 @@ async function endCallerCall(
       // `ChannelDestroyed` no longer reaches this call — so its snoops are stopped while the
       // channel is still up, then mixed and stored, as `closeCall` does (`liveCall.ts`).
       recordings.push(
-        pipeline.deps.recorder?.onLegEnded(call, leg).catch(() => undefined) ??
-          Promise.resolve()
+        pipeline.deps.recorder?.onLegEnded(call, leg).catch(
+          logFailure(pipeline.deps.logger, 'recording stop', {
+            callId: call.id
+          })
+        ) ?? Promise.resolve()
       );
       // Answered: `releaseLastParty` below hangs up the other side of the bridge. A leg left `up`
       // reports its user as already in a call for the process's lifetime, and `skip_busy` then

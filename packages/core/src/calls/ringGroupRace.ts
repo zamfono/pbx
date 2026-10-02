@@ -5,6 +5,7 @@
  * the batch settled is hung up. Its own module so `ringGroupDial.ts`, which places the batch and
  * waits on this race, stays under the repository's `max-lines` lint rule.
  */
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { AriEvent, Channel } from '../ari/types.js';
 import type { Call } from './call.js';
 import { callPartiesChanged } from './callState.js';
@@ -83,7 +84,8 @@ function handleBatchEvent(ctx: RaceContext, ev: AriEvent): void {
         leg.state = 'ended';
         ctx.pipeline.deps.ari.channels
           .hangup(channel.id)
-          .catch(() => undefined);
+          .catch(ignoreGone)
+          .catch(logFailure(ctx.pipeline.deps.logger, 'late answer hangup'));
         return;
       }
       winBatch(ctx.pipeline, ctx.call, channel.id, ctx.tracked)
@@ -92,7 +94,7 @@ function handleBatchEvent(ctx: RaceContext, ev: AriEvent): void {
             ctx.settle('answered');
           }
         })
-        .catch(() => undefined);
+        .catch(logFailure(ctx.pipeline.deps.logger, 'ring group answer'));
     }
     return;
   }

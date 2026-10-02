@@ -86,23 +86,23 @@ export class ModuleReloader {
     const [module, waiters] = next.value;
     this.waiting.delete(module);
     this.running = true;
-    // `run` settles every waiter itself and never rejects.
-    this.run(module, waiters).catch(() => undefined);
-  }
-
-  private async run(module: AsteriskModule, waiters: Waiter[]): Promise<void> {
-    try {
-      await this.reloadWithRetry(module, 0);
-      for (const waiter of waiters) {
-        waiter.resolve();
-      }
-    } catch (error) {
-      for (const waiter of waiters) {
-        waiter.reject(error);
-      }
-    }
-    this.running = false;
-    this.startNext();
+    this.reloadWithRetry(module, 0)
+      .then(
+        () => {
+          for (const waiter of waiters) {
+            waiter.resolve();
+          }
+        },
+        (error: unknown) => {
+          for (const waiter of waiters) {
+            waiter.reject(error);
+          }
+        }
+      )
+      .finally(() => {
+        this.running = false;
+        this.startNext();
+      });
   }
 
   private async reloadWithRetry(

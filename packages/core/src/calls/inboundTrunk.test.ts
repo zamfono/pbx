@@ -431,6 +431,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
       log: noopLogger
     });
     const trunkState = new TrunkState({
+      log: noopLogger,
       ari,
       ami,
       cache: new ConfigCache(db),
@@ -460,6 +461,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   it('does not count a call whose channel is destroyed during the config read that names its trunk', async () => {
     const trunkId = await seedTrunk(db, 'national');
     const trunkState = new TrunkState({
+      log: noopLogger,
       ari,
       ami: new AmiClient({
         host: '127.0.0.1',

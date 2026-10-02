@@ -6,8 +6,8 @@
 import { MS_PER_SECOND } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
+import { isGone } from '../ari/failures.js';
 import type { AriEvent, RecordParams } from '../ari/types.js';
-import { isChannelGone } from './playback.js';
 
 // §10.2 "Voicemail": the silence stop is a fixed constant, not a per-tenant setting, since it has
 // to outlast a caller's pause for thought and stay short enough not to record dead air.
@@ -90,7 +90,7 @@ function recordAndWait(
     pending.timer.unref();
     // Requested once the listener is up, so no outcome of the recording can fire unseen.
     ari.channels.record(channelId, options).catch((error: unknown) => {
-      finish({ kind: isChannelGone(error) ? 'destroyed' : 'failed' });
+      finish({ kind: isGone(error) ? 'destroyed' : 'failed' });
     });
   });
 }

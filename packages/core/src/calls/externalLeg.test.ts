@@ -322,6 +322,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
     await ari.connect();
     const state = new StateStore();
     trunkState = new TrunkState({
+      log: noopLogger,
       ari,
       ami: new AmiClient({
         host: '127.0.0.1',

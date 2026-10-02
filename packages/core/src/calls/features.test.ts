@@ -310,6 +310,7 @@ describe('features', () => {
     const state = new StateStore();
     const bus = new EventBus();
     cdr = new CdrWriter({
+      log: noopLogger,
       db,
       ari,
       cache,
@@ -317,7 +318,15 @@ describe('features', () => {
       state: new StateStore(),
       now: nowIso
     });
-    presence = new Presence({ ari, cache, state, bus, db, now: nowIso });
+    presence = new Presence({
+      log: noopLogger,
+      ari,
+      cache,
+      state,
+      bus,
+      db,
+      now: nowIso
+    });
     // Wired the way `main.ts` does it, so the ring/answer/end points reach `presence`; a test
     // that dials externally sets `trunkState` itself.
     const deps: PipelineDeps = {
@@ -345,6 +354,7 @@ describe('features', () => {
       log: noopLogger
     });
     return new TrunkState({
+      log: noopLogger,
       ari,
       ami,
       cache: new ConfigCache(db),

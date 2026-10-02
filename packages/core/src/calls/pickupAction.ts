@@ -6,6 +6,7 @@
  */
 import { newId, type PickupRequest } from '@zamfono/shared';
 
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { RelayedCallLog } from '../relayedCallLog.js';
 import { ActionError, HTTP_CONFLICT } from './actionError.js';
@@ -42,7 +43,7 @@ async function takeOnAnswer(
     return;
   }
   target.log.event({ event: 'pickup', userId, result: 'notRinging' });
-  await pipeline.deps.ari.channels.hangup(channelId).catch(() => undefined);
+  await pipeline.deps.ari.channels.hangup(channelId).catch(ignoreGone);
 }
 
 /** `req.userId` picks up `target`: 409 `notRinging` for a call that rings nobody, 409
@@ -117,6 +118,6 @@ export async function pickupOnRequest(
         });
       }
     })
-    .catch(() => undefined);
+    .catch(logFailure(pipeline.deps.logger, 'pickup', { callId: target.id }));
   await ring.placed;
 }

@@ -10,6 +10,7 @@ import { newCall, type Call } from './calls/call.js';
 import { QosRows } from './cdrQos.js';
 import { RtcpQos } from './rtcpQos.js';
 import { parseRtcpReport, type RtcpHepReport } from './rtcpReport.js';
+import { noopLogger } from './testing/pipelineRig.js';
 import { fixedPoint, ntpMiddle, rtcpPayload } from './testing/rtcpPayload.js';
 
 /** `id`'s `ChannelDestroyed` channel, carrying `rtpAudioQos` as its `RTPAUDIOQOS`. */
@@ -126,7 +127,7 @@ describe('QosRows (§7 level qos)', () => {
   }
 
   it('writes one row per up leg, in milliseconds and percent, from what each hangup left', async () => {
-    const qos = new QosRows(db, holding([]));
+    const qos = new QosRows(db, holding([]), noopLogger);
     const call = await openCall(db);
     qos.note(call);
     answerWith(call, 'leg');
@@ -163,7 +164,7 @@ describe('QosRows (§7 level qos)', () => {
   });
 
   it('reads the exact variable Asterisk 22 sets, fields it does not read included', async () => {
-    const qos = new QosRows(db, holding([]));
+    const qos = new QosRows(db, holding([]), noopLogger);
     const call = await openCall(db);
     qos.note(call);
 
@@ -191,7 +192,7 @@ describe('QosRows (§7 level qos)', () => {
   });
 
   it('keeps the row of a leg that hung up and left the call before it ended', async () => {
-    const qos = new QosRows(db, holding([]));
+    const qos = new QosRows(db, holding([]), noopLogger);
     const call = await openCall(db);
     answerWith(call, 'leg');
     qos.note(call);
@@ -213,7 +214,7 @@ describe('QosRows (§7 level qos)', () => {
   });
 
   it('writes the row of a leg hung up after the call was written, as it goes', async () => {
-    const qos = new QosRows(db, holding([]));
+    const qos = new QosRows(db, holding([]), noopLogger);
     const call = await openCall(db);
     qos.note(call);
     answerWith(call, 'leg');
@@ -228,7 +229,7 @@ describe('QosRows (§7 level qos)', () => {
   });
 
   it('writes no row for a channel without an RTP instance, nor twice for one', async () => {
-    const qos = new QosRows(db, holding([]));
+    const qos = new QosRows(db, holding([]), noopLogger);
     const call = await openCall(db);
     answerWith(call, 'local');
     qos.note(call);
@@ -247,7 +248,7 @@ describe('QosRows (§7 level qos)', () => {
   });
 
   it('writes a row of nothing measured but its packet counts of 0 for a leg that carried no media', async () => {
-    const qos = new QosRows(db, holding([]));
+    const qos = new QosRows(db, holding([]), noopLogger);
     const call = await openCall(db);
     qos.note(call);
 
@@ -284,7 +285,7 @@ describe('QosRows (§7 level qos)', () => {
   });
 
   it('writes no loss for a one-way-audio leg whose peer never sent a receiver report', async () => {
-    const qos = new QosRows(db, holding([]));
+    const qos = new QosRows(db, holding([]), noopLogger);
     const call = await openCall(db);
     qos.note(call);
 
@@ -313,7 +314,7 @@ describe('QosRows (§7 level qos)', () => {
   });
 
   it('writes no packet count RTPAUDIOQOS does not name, rather than 0', async () => {
-    const qos = new QosRows(db, holding([]));
+    const qos = new QosRows(db, holding([]), noopLogger);
     const call = await openCall(db);
     qos.note(call);
 
@@ -328,7 +329,7 @@ describe('QosRows (§7 level qos)', () => {
   });
 
   it('writes nothing below level qos, before or after the write, unless routing raised it', async () => {
-    const qos = new QosRows(db, holding([]));
+    const qos = new QosRows(db, holding([]), noopLogger);
     const low = await openCall(db, 'events');
     qos.note(low);
     answerWith(low, 'leg');
@@ -350,7 +351,7 @@ describe('QosRows (§7 level qos)', () => {
   // A `ChannelDestroyed` lost while the ARI connection was down never arrives.
   it('lets go of a written call’s channel Asterisk no longer holds once the tail has passed, and keeps one that lives on', async () => {
     const live = ['caller'];
-    const qos = new QosRows(db, holding(live), 20);
+    const qos = new QosRows(db, holding(live), noopLogger, 20);
     const call = await openCall(db);
     qos.note(call);
     answerWith(call, 'leg');
@@ -370,7 +371,7 @@ describe('QosRows (§7 level qos)', () => {
 
   it('lets go of every awaited channel Asterisk no longer holds as ARI reconnects, of a call not written yet too', async () => {
     const live = ['caller'];
-    const qos = new QosRows(db, holding(live));
+    const qos = new QosRows(db, holding(live), noopLogger);
     const call = await openCall(db);
     const other = await openCall(db, 'qos', 'caller-2');
     qos.note(call);
@@ -391,7 +392,7 @@ describe('QosRows (§7 level qos)', () => {
 
   it('fills from the leg’s RTCP reports what RTPAUDIOQOS left unmeasured, and keeps what it measured', async () => {
     const rtcp = new RtcpQos();
-    const qos = new QosRows(db, holding([]), undefined, rtcp);
+    const qos = new QosRows(db, holding([]), noopLogger, undefined, rtcp);
     const call = await openCall(db);
     qos.note(call);
     rtcp.join('caller', 'caller-call-id');
@@ -418,7 +419,7 @@ describe('QosRows (§7 level qos)', () => {
 
   it('keeps a packet count of 0 RTPAUDIOQOS measured over the RTCP reports’ count', async () => {
     const rtcp = new RtcpQos();
-    const qos = new QosRows(db, holding([]), undefined, rtcp);
+    const qos = new QosRows(db, holding([]), noopLogger, undefined, rtcp);
     const call = await openCall(db);
     qos.note(call);
     rtcp.join('caller', 'caller-call-id');
@@ -437,7 +438,7 @@ describe('QosRows (§7 level qos)', () => {
 
   it('writes the row of a leg whose ChannelDestroyed was lost from its RTCP reports', async () => {
     const rtcp = new RtcpQos();
-    const qos = new QosRows(db, holding([]), undefined, rtcp);
+    const qos = new QosRows(db, holding([]), noopLogger, undefined, rtcp);
     const call = await openCall(db);
     qos.note(call);
     rtcp.join('caller', 'caller-call-id');

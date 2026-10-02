@@ -3,6 +3,7 @@
  * §10.2 "Voicemail", "Greetings and audio"). Asterisk resolves a `sound:` name's language variant
  * from the channel's own language, so one name covers every tenant language (§9.1).
  */
+import { ignoreGone } from './ari/failures.js';
 
 /** Asterisk core-sounds names played where no tenant audio applies. */
 export const PROMPTS = {
@@ -79,7 +80,7 @@ export async function setChannelLanguage(
 ): Promise<void> {
   await ari.channels
     .setVar(channelId, 'CHANNEL(language)', language)
-    .catch(() => undefined);
+    .catch(ignoreGone);
 }
 
 /** The originate `variables` entry that gives a channel the core dials the tenant's language from

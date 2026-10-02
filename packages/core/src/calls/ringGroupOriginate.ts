@@ -5,6 +5,7 @@
  */
 import { newId } from '@zamfono/shared';
 
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { channelLanguageVariable } from '../prompts.js';
 import type { MemberLeg } from '../routing/ringGroup.js';
@@ -39,7 +40,14 @@ function hangUpIfAlreadyWon(
     return;
   }
   leg.state = 'ended';
-  pipeline.deps.ari.channels.hangup(leg.channelId).catch(() => undefined);
+  pipeline.deps.ari.channels
+    .hangup(leg.channelId)
+    .catch(ignoreGone)
+    .catch(
+      logFailure(pipeline.deps.logger, 'ringing leg hangup', {
+        callId: call.id
+      })
+    );
 }
 
 /** Originates one of `owner`'s devices, tracked under `owner.memberKey`: placing, then ringing. */

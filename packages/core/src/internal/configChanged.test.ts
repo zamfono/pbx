@@ -106,7 +106,15 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
     const cache = new ConfigCache(db);
     const state = new StateStore();
     const bus = new EventBus();
-    const presence = new Presence({ ari, cache, state, bus, db, now: nowIso });
+    const presence = new Presence({
+      log: noopLogger,
+      ari,
+      cache,
+      state,
+      bus,
+      db,
+      now: nowIso
+    });
     await presence.resyncOnBoot();
     fakeAri.emit({
       type: 'ContactStatusChange',

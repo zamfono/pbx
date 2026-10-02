@@ -5,6 +5,7 @@
  * (`attendedTransfer.ts`) events it reports. The transfer `api` requests over the internal API
  * is `transfers.ts`'s.
  */
+import { logFailure } from '../ari/failures.js';
 import type { AriEvent } from '../ari/types.js';
 import { onAttendedTransfer } from './attendedTransfer.js';
 import { followBlindTransfers } from './blindTransfer.js';
@@ -15,7 +16,9 @@ export function followTransfers(pipeline: Pipeline): void {
   followBlindTransfers(pipeline);
   pipeline.deps.ari.on('event', (ev: AriEvent) => {
     if (ev.type === 'BridgeAttendedTransfer') {
-      onAttendedTransfer(pipeline, ev).catch(() => undefined);
+      onAttendedTransfer(pipeline, ev).catch(
+        logFailure(pipeline.deps.logger, 'attended transfer')
+      );
     }
   });
 }

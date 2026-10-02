@@ -6,6 +6,7 @@
  * dialling user's call, an own DID enters at its target and an internal extension at Entry, or a
  * parking slot retrieves the call parked there.
  */
+import { ignoreGone } from '../ari/failures.js';
 import type { LogLevel } from '../callLog.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { defaultPrompt } from '../prompts.js';
@@ -71,7 +72,7 @@ async function playInvalidAndRelease(
 ): Promise<void> {
   const channelId = callerChannel(call);
   const ari = pipeline.deps.ari;
-  await ari.channels.answer(channelId).catch(() => undefined);
+  await ari.channels.answer(channelId).catch(ignoreGone);
   await playAndWait(
     ari,
     channelId,

@@ -4,6 +4,7 @@
  * over the API, a transferrer leaving). The other, sending a channel through the dial
  * resolution, is `outboundDispatch.ts`'s.
  */
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import { callerChannel, type Call, type CallsRow } from './call.js';
 import { traceSystemEnd } from './callEnd.js';
 import { clearFindMeTimers } from './findMe.js';
@@ -52,9 +53,23 @@ async function endConversation(
   await Promise.all(
     others
       .filter(channelId => !hungUp.includes(channelId))
-      .map(channelId => ari.channels.hangup(channelId).catch(() => undefined))
+      .map(channelId =>
+        ari.channels
+          .hangup(channelId)
+          .catch(ignoreGone)
+          .catch(
+            logFailure(pipeline.deps.logger, 'party hangup', {
+              callId: call.id
+            })
+          )
+      )
   );
-  await ari.bridges.destroy(bridgeId).catch(() => undefined);
+  await ari.bridges
+    .destroy(bridgeId)
+    .catch(ignoreGone)
+    .catch(
+      logFailure(pipeline.deps.logger, 'bridge destroy', { callId: call.id })
+    );
 }
 
 /** A call closed with its channels left to whoever carries them (a transfer) whose party is still
@@ -68,7 +83,10 @@ async function dropStrandedHold(pipeline: Pipeline, call: Call): Promise<void> {
   await endHold(pipeline, call.bridgeId, null);
   await pipeline.deps.ari.channels
     .hangup(hold.channelId)
-    .catch(() => undefined);
+    .catch(ignoreGone)
+    .catch(
+      logFailure(pipeline.deps.logger, 'held party hangup', { callId: call.id })
+    );
 }
 
 /**
@@ -96,7 +114,7 @@ export async function closeCall(
     // themselves, and the deposit closes the row once the recording's outcome follows.
     await pipeline.deps.ari.channels
       .hangup(callerChannel(call))
-      .catch(() => undefined);
+      .catch(ignoreGone);
     return;
   }
   const pending = pipeline.pendingRing.get(call.id);
@@ -139,11 +157,20 @@ export async function closeCall(
   const recordings = Promise.all([
     recorder?.onCallerEnded(call),
     ...upLegs.map(leg => recorder?.onLegEnded(call, leg))
-  ]).catch(() => undefined);
+  ]).catch(
+    logFailure(pipeline.deps.logger, 'recording stop', { callId: call.id })
+  );
   if (hangupChannels) {
     await Promise.all(
       live.map(channelId =>
-        ari.channels.hangup(channelId).catch(() => undefined)
+        ari.channels
+          .hangup(channelId)
+          .catch(ignoreGone)
+          .catch(
+            logFailure(pipeline.deps.logger, 'party hangup', {
+              callId: call.id
+            })
+          )
       )
     );
     await endConversation(pipeline, call, live);

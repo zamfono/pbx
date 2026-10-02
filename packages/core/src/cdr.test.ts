@@ -169,6 +169,7 @@ describe('CdrWriter', () => {
     await ari.connect();
     bus = new EventBus();
     cdr = new CdrWriter({
+      log: noopLogger,
       db,
       ari,
       cache: new ConfigCache(db),
@@ -328,6 +329,7 @@ describe('CdrWriter', () => {
     await seedSettings(db, 'events');
     const call = buildCall();
     cdr = new CdrWriter({
+      log: noopLogger,
       db: withSlowCallsInsert(db),
       ari,
       cache: new ConfigCache(db),
@@ -379,6 +381,7 @@ describe('CdrWriter', () => {
       'call-id-404@10.0.0.1'
     );
     cdr = new CdrWriter({
+      log: noopLogger,
       db,
       ari,
       cache: new ConfigCache(db),

@@ -127,4 +127,15 @@ describe('AriClient', () => {
 
     expect(value).toBeNull();
   });
+
+  it('answers null for a dialplan function with nothing to read, an absent SIP header', async () => {
+    const channel = fake.addChannel({});
+
+    const value = await client.channels.getVariable(
+      channel.id,
+      'PJSIP_HEADER(read,Privacy)'
+    );
+
+    expect(value).toBeNull();
+  });
 });

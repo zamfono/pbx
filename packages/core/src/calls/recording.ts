@@ -7,6 +7,7 @@ import path from 'node:path';
 import { newId, type Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { Logger } from '../ari/types.js';
 import type { ConfigCache, Snapshot } from '../internal/snapshot.js';
 import type { Call, Leg } from './call.js';
@@ -245,10 +246,20 @@ export class Recorder {
     await Promise.all([
       this.deps.ari.channels
         .hangup(participation.leftChannelId)
-        .catch(() => undefined),
+        .catch(ignoreGone)
+        .catch(
+          logFailure(this.deps.log, 'snoop hangup', {
+            participationId: participation.id
+          })
+        ),
       this.deps.ari.channels
         .hangup(participation.rightChannelId)
-        .catch(() => undefined)
+        .catch(ignoreGone)
+        .catch(
+          logFailure(this.deps.log, 'snoop hangup', {
+            participationId: participation.id
+          })
+        )
     ]);
     await Promise.all([leftFinished, rightFinished]);
     const stored = await storeParticipation(

@@ -7,6 +7,7 @@
 import { newId, type Db } from '@zamfono/shared';
 
 import type { ApiClient } from '../apiClient.js';
+import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { assetMedia, defaultPrompt } from '../prompts.js';
 import { callerChannel, release, type Call, type Owner } from './call.js';
@@ -98,7 +99,7 @@ async function recordMessage(
 
   call.log.event({ event: 'voicemail', mailbox, reason });
   const channelId = callerChannel(call);
-  await pipeline.deps.ari.channels.answer(channelId).catch(() => undefined);
+  await pipeline.deps.ari.channels.answer(channelId).catch(ignoreGone);
   const greetingEnd = await playAndWait(
     pipeline.deps.ari,
     channelId,

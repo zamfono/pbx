@@ -251,6 +251,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     await ari.connect();
     const state = new StateStore();
     const trunkState = new TrunkState({
+      log: noopLogger,
       ari,
       ami: new AmiClient({
         host: '127.0.0.1',

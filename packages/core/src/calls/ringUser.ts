@@ -4,6 +4,7 @@
 
 import { MS_PER_SECOND, newId } from '@zamfono/shared';
 
+import { ignoreGone } from '../ari/failures.js';
 import { channelLanguageVariable } from '../prompts.js';
 import { release, takeJoinBridge, type Call, type Leg } from './call.js';
 import { callPartiesChanged, callRinging } from './callState.js';
@@ -172,7 +173,7 @@ export async function ringUser(
   if (call.callerChannelId !== null) {
     await pipeline.deps.ari.channels
       .ring(call.callerChannelId)
-      .catch(() => undefined);
+      .catch(ignoreGone);
   }
 
   const outcome = await outcomePromise;

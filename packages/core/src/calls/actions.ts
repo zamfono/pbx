@@ -21,6 +21,7 @@ import {
   type TransferRequest
 } from '@zamfono/shared';
 
+import { logFailure } from '../ari/failures.js';
 import { ActionError, HTTP_NOT_FOUND } from './actionError.js';
 import { addPartyOnRequest } from './addedParty.js';
 import type { Call } from './call.js';
@@ -95,7 +96,9 @@ export class CallActions {
           await closeCall(this.pipeline, call, 'failed', false);
         }
       })
-      .catch(() => undefined);
+      .catch(
+        logFailure(this.pipeline.deps.logger, 'originate', { callId: call.id })
+      );
     await ring.placed;
     return { callId: call.id };
   }

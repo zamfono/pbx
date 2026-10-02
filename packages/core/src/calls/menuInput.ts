@@ -6,13 +6,14 @@
 import { MS_PER_SECOND } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
+import { isGone } from '../ari/failures.js';
 import type { AriEvent, Channel } from '../ari/types.js';
 import {
   INTER_DIGIT_TIMEOUT_MS,
   menuStep,
   type MenuMap
 } from '../routing/menu.js';
-import { isChannelGone } from './playback.js';
+import { stopPlayback } from './playback.js';
 
 export type CollectResult =
   | { kind: 'match'; targetId: string; typed: string }
@@ -113,7 +114,7 @@ export function collectMenuInput(
       if (ev.type === 'ChannelDtmfReceived') {
         if (greetingPlaying) {
           greetingPlaying = false;
-          ari.playbacks.stop(playbackId).catch(() => undefined);
+          stopPlayback(ari, playbackId);
         }
         typed += typeof ev.digit === 'string' ? ev.digit : '';
         if (keepsCollecting(map, typed, extensionPrefixes)) {
@@ -129,7 +130,7 @@ export function collectMenuInput(
     }
     ari.on('event', onEvent);
     ari.channels.play(channelId, media, playbackId).catch((error: unknown) => {
-      if (isChannelGone(error)) {
+      if (isGone(error)) {
         settle({ kind: 'hangup' });
         return;
       }

@@ -3,6 +3,7 @@
  * its own module so `ringGroupDial.ts`, whose race calls it, stays under the repository's
  * `max-lines` lint rule.
  */
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import { bridgeAnswered, claimAnswer } from './answer.js';
 import { takeJoinBridge, type Call, type Leg } from './call.js';
 import { hangupAllRinging, type GroupLeg } from './groupLegs.js';
@@ -48,13 +49,18 @@ export async function winBatch(
   ) {
     await pipeline.deps.ari.channels
       .hangup(winningChannelId)
-      .catch(() => undefined);
+      .catch(ignoreGone)
+      .catch(
+        logFailure(pipeline.deps.logger, 'late answer hangup', {
+          callId: call.id
+        })
+      );
     return false;
   }
   if (call.callerChannelId !== null) {
     await pipeline.deps.ari.channels
       .stopMoh(call.callerChannelId)
-      .catch(() => undefined);
+      .catch(ignoreGone);
   }
   // A registered bridge to join (`addParty.ts`'s `*5`) in place of a bridge of its own.
   const joined = await bridgeAnswered(

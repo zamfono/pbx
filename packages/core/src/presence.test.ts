@@ -115,6 +115,7 @@ describe('Presence', () => {
     await ari.connect();
     state = new StateStore();
     presence = new Presence({
+      log: noopLogger,
       ari,
       cache: new ConfigCache(db),
       state,

@@ -44,7 +44,7 @@ export function buildPipeline(deps: {
   stackSipHost: string | null;
 }): { pipeline: Pipeline; cdr: CdrWriter } {
   const { db, ari, cache, state, bus, log } = deps;
-  const cdr = new CdrWriter({ db, ari, cache, bus, state, now: nowIso });
+  const cdr = new CdrWriter({ db, ari, cache, bus, state, log, now: nowIso });
   const recorder = new Recorder({
     ari,
     cache,

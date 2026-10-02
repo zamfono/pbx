@@ -4,6 +4,7 @@
  * batch's own ring race) and applies the group's fallback once ringing ends without an answer.
  * The members' state and the group's rules it decides on are `ringGroupState.ts`'s.
  */
+import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { assetMedia } from '../prompts.js';
 import {
@@ -43,7 +44,7 @@ async function playGreetingAndMoh(
   if (channelId === null) {
     return;
   }
-  await pipeline.deps.ari.channels.answer(channelId).catch(() => undefined);
+  await pipeline.deps.ari.channels.answer(channelId).catch(ignoreGone);
   if (group.greetingAudioId !== null) {
     await playAndWait(
       pipeline.deps.ari,
@@ -54,7 +55,7 @@ async function playGreetingAndMoh(
   }
   await pipeline.deps.ari.channels
     .startMoh(channelId, group.mohAudioId ?? undefined)
-    .catch(() => undefined);
+    .catch(ignoreGone);
 }
 
 /** Whether the call has already been concluded elsewhere — a function boundary keeps TypeScript
@@ -139,7 +140,7 @@ async function runBatchPlan(
     if (call.callerChannelId !== null) {
       await pipeline.deps.ari.channels
         .stopMoh(call.callerChannelId)
-        .catch(() => undefined);
+        .catch(ignoreGone);
     }
     call.log.event({
       event: 'ringGroup',

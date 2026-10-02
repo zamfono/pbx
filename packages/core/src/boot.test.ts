@@ -56,8 +56,8 @@ describe('buildPipeline', () => {
       db,
       log: noopLogger,
       mediaDir: '/media',
-      trunkState: new TrunkState({ ...deps, ami }),
-      presence: new Presence({ ...deps, db }),
+      trunkState: new TrunkState({ log: noopLogger, ...deps, ami }),
+      presence: new Presence({ log: noopLogger, ...deps, db }),
       stackTz,
       stackSipHost: null
     });

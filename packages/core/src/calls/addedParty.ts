@@ -9,6 +9,7 @@
  */
 import { newId, type AddPartyRequest } from '@zamfono/shared';
 
+import { logFailure } from '../ari/failures.js';
 import { ActionError, HTTP_UNPROCESSABLE, notBridged } from './actionError.js';
 import { dialAddPartyTarget } from './addParty.js';
 import { resolveAddedTarget } from './addPartyTarget.js';
@@ -113,7 +114,7 @@ export function dialAddedLeg(
       await pipeline.finishCall(leg);
     }
   };
-  dial().catch(() => undefined);
+  dial().catch(logFailure(pipeline.deps.logger, 'added party dial'));
 }
 
 /** `POST /internal/calls/{id}/parties`: dials `req.target` from the actor, its answer joining

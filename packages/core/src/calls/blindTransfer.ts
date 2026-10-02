@@ -10,6 +10,7 @@
  * line to the onward call: when either end of it goes, the other is hung up, as it would be if
  * the transferee's own channel had re-entered.
  */
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { AriEvent, Channel } from '../ari/types.js';
 import { closeCall } from './liveCall.js';
 import {
@@ -84,9 +85,7 @@ async function onBlindTransfer(
     });
   }
   await closeCall(pipeline, call, 'answered', false);
-  await pipeline.deps.ari.channels
-    .hangup(transferrer.id)
-    .catch(() => undefined);
+  await pipeline.deps.ari.channels.hangup(transferrer.id).catch(ignoreGone);
 }
 
 /** One end of a Local line went: the other end is hung up, and the bridge they shared destroyed. */
@@ -105,8 +104,8 @@ async function endLocalLine(
   // The Local half's hangup ends its dialling half too, and with it the onward call.
   const other =
     channelId === line.transfereeId ? line.localId : line.transfereeId;
-  await ari.channels.hangup(other).catch(() => undefined);
-  await ari.bridges.destroy(line.bridgeId).catch(() => undefined);
+  await ari.channels.hangup(other).catch(ignoreGone);
+  await ari.bridges.destroy(line.bridgeId).catch(ignoreGone);
 }
 
 /** Subscribes to `pipeline`'s ARI stream for the blind transfers Asterisk executes on `REFER`. */
@@ -114,7 +113,9 @@ export function followBlindTransfers(pipeline: Pipeline): void {
   const state: BlindState = { lines: new Map() };
   pipeline.deps.ari.on('event', (ev: AriEvent) => {
     if (ev.type === 'BridgeBlindTransfer') {
-      onBlindTransfer(pipeline, state, ev).catch(() => undefined);
+      onBlindTransfer(pipeline, state, ev).catch(
+        logFailure(pipeline.deps.logger, 'blind transfer')
+      );
       return;
     }
     const channel = ev.channel as Channel | undefined;
@@ -122,7 +123,9 @@ export function followBlindTransfers(pipeline: Pipeline): void {
       return;
     }
     if (ev.type === 'ChannelDestroyed') {
-      endLocalLine(pipeline, state, channel.id).catch(() => undefined);
+      endLocalLine(pipeline, state, channel.id).catch(
+        logFailure(pipeline.deps.logger, 'blind transfer line end')
+      );
       // A transferee whose channel ended before it re-entered takes no onward call.
       dropPendingTransfer(pipeline, channel.id);
     }

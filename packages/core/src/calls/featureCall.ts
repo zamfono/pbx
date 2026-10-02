@@ -2,6 +2,7 @@
  * with, and the two ways a feature closes that call out with a real outcome (§11.2
  * `calls.status`). Shared by `features.ts`, `mailbox.ts`, `parking.ts`, `parkingRingback.ts` and
  * `addParty.ts`; its coverage lives in `features.test.ts` alongside theirs. */
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import { callerChannel, type Call, type CallsRow } from './call.js';
 import type { Pipeline } from './pipeline.js';
 
@@ -31,7 +32,10 @@ export async function concludeFeature(
   stampAnsweredAt(pipeline, call);
   await pipeline.deps.ari.channels
     .hangup(callerChannel(call))
-    .catch(() => undefined);
+    .catch(ignoreGone)
+    .catch(
+      logFailure(pipeline.deps.logger, 'caller hangup', { callId: call.id })
+    );
   await pipeline.finishCall(call);
 }
 

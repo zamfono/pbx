@@ -176,6 +176,7 @@ describe('a find-me leg still to come (§10.1 step 4)', () => {
     await ari.connect();
     const state = new StateStore();
     const trunkState = new TrunkState({
+      log: noopLogger,
       ari,
       ami: new AmiClient({
         host: '127.0.0.1',

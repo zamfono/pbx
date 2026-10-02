@@ -42,6 +42,9 @@ export class AriClient extends EventEmitter {
   readonly mailboxes: MailboxesApi;
   readonly endpoints: EndpointsApi;
   readonly asterisk: AsteriskApi;
+  /** The process logger this client logs its own failures to; a request helper that holds only
+   * the client logs the failures of its requests to it as well. */
+  readonly log: Logger;
   private readonly options: AriClientOptions;
   private socket: WebSocket | null = null;
   private readonly reconnect: ReconnectBackoff;
@@ -50,6 +53,7 @@ export class AriClient extends EventEmitter {
   constructor(options: AriClientOptions) {
     super();
     this.options = options;
+    this.log = options.log;
     this.reconnect = reconnectBackoff(
       () => (this.closing ? Promise.resolve() : this.connectOnce()),
       (error: unknown) => {

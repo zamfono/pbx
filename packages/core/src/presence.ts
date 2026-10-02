@@ -14,7 +14,8 @@ import {
 } from '@zamfono/shared';
 
 import type { AriClient } from './ari/client.js';
-import type { AriEvent, DeviceState } from './ari/types.js';
+import { logFailure } from './ari/failures.js';
+import type { AriEvent, DeviceState, Logger } from './ari/types.js';
 import { extensionOf } from './calls/extensionOwner.js';
 import type { EventBus } from './internal/eventBus.js';
 import type { ConfigCache, Snapshot } from './internal/snapshot.js';
@@ -34,6 +35,7 @@ export type PresenceDeps = {
   state: StateStore;
   bus: EventBus;
   db: Db;
+  log: Logger;
   now: () => string;
 };
 
@@ -84,7 +86,9 @@ export class Presence {
     this.hints = new HintPusher(deps.ari);
     this.deps.ari.on('event', (event: AriEvent) => {
       if (event.type === 'ContactStatusChange') {
-        this.handleContactStatusChange(event).catch(() => undefined);
+        this.handleContactStatusChange(event).catch(
+          logFailure(this.deps.log, 'presence contact status change')
+        );
       }
     });
   }
@@ -162,7 +166,9 @@ export class Presence {
     } else {
       this.callFlags.set(userId, perCall);
     }
-    this.refreshUser(userId).catch(() => undefined);
+    this.refreshUser(userId).catch(
+      logFailure(this.deps.log, 'presence refresh', { userId })
+    );
   }
 
   /** The strongest state across every call `userId` currently participates in: a bridged call

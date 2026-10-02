@@ -7,6 +7,7 @@
 import { newId } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { AriEvent, Channel } from '../ari/types.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import {
@@ -118,7 +119,7 @@ function watchAttemptOutcome(ari: AriClient, channelId: string): AttemptWatch {
             finish({ kind: 'failure', failure: { kind: 'noResponse' } });
           }
         })
-        .catch(() => undefined);
+        .catch(logFailure(ari.log, 'provisional response read'));
     }, timeoutMs);
     timer.unref();
   };
@@ -219,7 +220,10 @@ async function attemptOnce(
     leg.state = 'ended';
   }
   trunkState.noteAttemptEnded(trunk.id);
-  await pipeline.deps.ari.channels.hangup(channelId).catch(() => undefined);
+  await pipeline.deps.ari.channels
+    .hangup(channelId)
+    .catch(ignoreGone)
+    .catch(logFailure(pipeline.deps.logger, 'trunk attempt hangup'));
   return outcome;
 }
 

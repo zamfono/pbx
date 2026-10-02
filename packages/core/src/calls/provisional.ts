@@ -44,8 +44,9 @@ export async function provisionalArrived(
   ari: AriClient,
   leg: TrunkLeg
 ): Promise<boolean> {
-  const cause = await ari.channels
-    .getVariable(leg.id, `HANGUPCAUSE(${leg.name},tech)`)
-    .catch(() => null);
+  const cause = await ari.channels.getVariable(
+    leg.id,
+    `HANGUPCAUSE(${leg.name},tech)`
+  );
   return cause !== null && PROVISIONAL_TECH_CAUSE.test(cause);
 }

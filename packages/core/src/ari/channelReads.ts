@@ -3,11 +3,23 @@
  * variable that is not set (§7 level `sip`, reading `CHANNEL(pjsip,call-id)`). It takes the
  * client's own JSON request function so it needs none of the client's internals.
  */
+import { AriError } from './types.js';
+
+const HTTP_NOT_FOUND = 404;
+const HTTP_INTERNAL_SERVER_ERROR = 500;
+// Asterisk's answers that mean "no value": 404 for an unset variable and for an unknown channel
+// alike, 500 ("Unable to read provided function") for a dialplan function with nothing to read,
+// such as `PJSIP_HEADER(read,Privacy)` of a request without that header.
+const NO_VALUE_STATUSES: ReadonlySet<number> = new Set([
+  HTTP_NOT_FOUND,
+  HTTP_INTERNAL_SERVER_ERROR
+]);
+
 export type JsonRequest = <T>(method: string, path: string) => Promise<T>;
 
 /**
- * `GET /channels/{id}/variable`, `null` when the variable is unset. Asterisk answers 404 for an
- * unset variable and for an unknown channel alike, and both mean "no value" to every caller.
+ * `GET /channels/{id}/variable`, `null` when there is no value (`NO_VALUE_STATUSES`); every other
+ * failure, such as refused credentials or an unreachable Asterisk, is the caller's.
  */
 export async function channelVariable(
   request: JsonRequest,
@@ -20,7 +32,10 @@ export async function channelVariable(
       `channels/${id}/variable?variable=${encodeURIComponent(name)}`
     );
     return body.value ?? null;
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof AriError && NO_VALUE_STATUSES.has(error.status)) {
+      return null;
+    }
+    throw error;
   }
 }

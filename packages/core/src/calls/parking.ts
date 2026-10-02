@@ -5,6 +5,7 @@
  * rather than one `*.test.ts` each. */
 import { MS_PER_SECOND } from '@zamfono/shared';
 
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import type { Presence } from '../presence.js';
 import { callerChannel, release, type Call } from './call.js';
@@ -49,7 +50,9 @@ export function releaseParkedChannel(
     clearTimeout(entry.timer);
     slots.delete(ext);
   }
-  presence?.setHint(ext, 'NOT_INUSE').catch(() => undefined);
+  presence
+    ?.setHint(ext, 'NOT_INUSE')
+    .catch(logFailure(pipeline.deps.logger, 'parking slot hint', { ext }));
   return true;
 }
 
@@ -88,16 +91,27 @@ async function dropParker(
   const { recorder } = pipeline.deps;
   if (parkerChannelId === active.callerChannelId) {
     active.callerEnded = true;
-    recorder?.onCallerEnded(active).catch(() => undefined);
+    recorder?.onCallerEnded(active).catch(
+      logFailure(pipeline.deps.logger, 'parker recording stop', {
+        callId: active.id
+      })
+    );
   } else if (parkerLeg !== undefined) {
-    recorder?.onLegEnded(active, parkerLeg).catch(() => undefined);
+    recorder?.onLegEnded(active, parkerLeg).catch(
+      logFailure(pipeline.deps.logger, 'parker recording stop', {
+        callId: active.id
+      })
+    );
     parkerLeg.state = 'ended';
     callPartiesChanged(pipeline.deps, active);
   }
   pipeline.callByChannel.delete(parkerChannelId);
   await pipeline.deps.ari.channels
     .hangup(parkerChannelId)
-    .catch(() => undefined);
+    .catch(ignoreGone)
+    .catch(
+      logFailure(pipeline.deps.logger, 'parker hangup', { callId: active.id })
+    );
   presence.setCallState(parkerUserId, 'idle', null, null, active.id);
 }
 
@@ -125,26 +139,32 @@ export async function parkParty(
     return null;
   }
   const ari = pipeline.deps.ari;
-  await ari.bridges.removeChannel(bridgeId, parkerCh).catch(() => undefined);
+  await ari.bridges.removeChannel(bridgeId, parkerCh).catch(ignoreGone);
   await dropParker(pipeline, presence, active, parkerUserId, parkerCh);
   await moveParkedParty(pipeline, active, partyChannelId, 'holding');
   // Tenant's own hold music class, falling back to Asterisk's `default` (§10.2 "Call parking",
   // "Hold music"), the same resolution ring groups use for their `moh_audio_id`.
   await ari.channels
     .startMoh(partyChannelId, snapshot.settings.holdMohAudioId ?? undefined)
-    .catch(() => undefined);
+    .catch(ignoreGone);
   const actor =
     parker.actorUserId === undefined ? {} : { actorUserId: parker.actorUserId };
   active.log.event({ event: 'parked', by: parkerUserId, ext, ...actor });
   const timer = setTimeout(() => {
     slots.delete(ext);
     pipeline.parkedSlotByChannel.delete(partyChannelId);
-    presence.setHint(ext, 'NOT_INUSE').catch(() => undefined);
+    presence
+      .setHint(ext, 'NOT_INUSE')
+      .catch(logFailure(pipeline.deps.logger, 'parking slot hint', { ext }));
     ringParkerBack(pipeline, {
       parkerUserId,
       parked: active,
       partyChannelId
-    }).catch(() => undefined);
+    }).catch(
+      logFailure(pipeline.deps.logger, 'parking ringback', {
+        callId: active.id
+      })
+    );
   }, snapshot.settings.parkingTimeoutS * MS_PER_SECOND);
   timer.unref();
   const parkedAt = pipeline.deps.now();
@@ -204,7 +224,7 @@ export async function park(
   }
   const channelId = callerChannel(call);
   const ari = pipeline.deps.ari;
-  await ari.channels.answer(channelId).catch(() => undefined);
+  await ari.channels.answer(channelId).catch(ignoreGone);
   await playAndWait(ari, channelId, `digits:${ext}`, `${channelId}:park`);
   await concludeFeature(pipeline, call, 'answered');
 }

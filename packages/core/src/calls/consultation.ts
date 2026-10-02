@@ -10,6 +10,7 @@
  */
 import type { AttendedTransferRequest, ConsultRequest } from '@zamfono/shared';
 
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import { ActionError, HTTP_CONFLICT, notBridged } from './actionError.js';
 import { dialAddedLeg, newAddedLeg } from './addedParty.js';
 import { handOver } from './attendedTransfer.js';
@@ -115,12 +116,26 @@ export async function transferToConsultation(
   const { ari } = pipeline.deps;
   await ari.bridges
     .removeChannel(bridgeId, hold.byChannelId)
-    .catch(() => undefined);
+    .catch(ignoreGone)
+    .catch(
+      logFailure(pipeline.deps.logger, 'transferrer removal', {
+        callId: call.id
+      })
+    );
   await endHold(pipeline, bridgeId, bridgeId);
   await closeCall(pipeline, call, 'answered', false);
   // The actor's channel is left with nobody, as a phone's first channel is after its transfer.
-  await ari.channels.hangup(hold.byChannelId).catch(() => undefined);
-  await pipeline.deps.recorder
-    ?.onTransfereeUp(consultation, transferee)
-    .catch(() => undefined);
+  await ari.channels
+    .hangup(hold.byChannelId)
+    .catch(ignoreGone)
+    .catch(
+      logFailure(pipeline.deps.logger, 'transferrer hangup', {
+        callId: call.id
+      })
+    );
+  await pipeline.deps.recorder?.onTransfereeUp(consultation, transferee).catch(
+    logFailure(pipeline.deps.logger, 'transferee recording', {
+      callId: consultation.id
+    })
+  );
 }

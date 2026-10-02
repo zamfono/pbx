@@ -9,7 +9,8 @@
 import type { Db } from '@zamfono/shared';
 
 import type { AriClient } from './ari/client.js';
-import type { Channel } from './ari/types.js';
+import { logFailure } from './ari/failures.js';
+import type { Channel, Logger } from './ari/types.js';
 import type { Call } from './calls/call.js';
 import { callEnded } from './calls/callState.js';
 import { QosRows } from './cdrQos.js';
@@ -26,6 +27,7 @@ export type CdrWriterDeps = {
   cache: ConfigCache;
   bus: EventBus;
   state: StateStore;
+  log: Logger;
   now: () => string;
   /** How long a `sip`-level call keeps collecting mirrored messages after it ends; tests pass 0. */
   sipTailMs?: number;
@@ -82,11 +84,17 @@ export class CdrWriter {
 
   constructor(deps: CdrWriterDeps) {
     this.deps = deps;
-    this.qos = new QosRows(deps.db, deps.ari.channels, undefined, this.rtcp);
+    this.qos = new QosRows(
+      deps.db,
+      deps.ari.channels,
+      deps.log,
+      undefined,
+      this.rtcp
+    );
     this.sip = new SipCapture(deps.ari);
     // §7 level `qos`: a `ChannelDestroyed` sent while the connection was down never arrives.
     deps.ari.on('connected', () => {
-      this.qos.resync().catch(() => undefined);
+      this.qos.resync().catch(logFailure(this.deps.log, 'qos resync'));
     });
   }
 
@@ -115,7 +123,12 @@ export class CdrWriter {
   /** Joins a leg's SIP dialog to `call` (§7 level `sip`: the call's SIP messages are every
    * dialog's, not the caller's alone). */
   registerLeg(call: Call, channelId: string): void {
-    this.join(call, channelId).catch(() => undefined);
+    this.join(call, channelId).catch(
+      logFailure(this.deps.log, 'SIP dialog join', {
+        callId: call.id,
+        channelId
+      })
+    );
   }
 
   /** `registerLeg`, resolving once the join is in place or has failed: a leg created but not yet
@@ -172,7 +185,9 @@ export class CdrWriter {
         log: null
       })
       .execute()
-      .catch(() => undefined);
+      .catch(
+        logFailure(this.deps.log, 'calls row insert', { callId: call.id })
+      );
   }
 
   /** Closes out `call`: the `calls` row (upserted, since `open()` may already have inserted its

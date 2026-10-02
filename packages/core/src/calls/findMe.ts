@@ -4,6 +4,7 @@
  */
 import { MS_PER_SECOND } from '@zamfono/shared';
 
+import { logFailure } from '../ari/failures.js';
 import { defaultPrompt } from '../prompts.js';
 import type { Call, Leg } from './call.js';
 import { callPartiesChanged } from './callState.js';
@@ -147,7 +148,9 @@ export function scheduleFindMeLegs(
   const timers = entries.map(entry => {
     const timer: ReturnType<typeof setTimeout> = setTimeout(() => {
       originateFindMeLeg(pipeline, call, userId, entry)
-        .catch(() => undefined)
+        .catch(
+          logFailure(pipeline.deps.logger, 'find-me leg', { callId: call.id })
+        )
         .finally(() => {
           settleFindMeEntry(pipeline, call, timer);
         });
@@ -183,10 +186,12 @@ export function beginFindMeAccept(
       }
       wait.timer = setTimeout(() => {
         if (leg.state === 'ringing') {
-          hangupLeg(pipeline, leg).catch(() => undefined);
+          hangupLeg(pipeline, leg).catch(
+            logFailure(pipeline.deps.logger, 'find-me leg hangup')
+          );
         }
       }, FIND_ME_ACCEPT_TIMEOUT_MS);
       wait.timer.unref();
     })
-    .catch(() => undefined);
+    .catch(logFailure(pipeline.deps.logger, 'find-me acceptance'));
 }

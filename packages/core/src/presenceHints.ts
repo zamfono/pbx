@@ -7,6 +7,7 @@
 import { presenceHintDevice } from '@zamfono/shared';
 
 import type { AriClient } from './ari/client.js';
+import { logFailure } from './ari/failures.js';
 import type { DeviceState } from './ari/types.js';
 
 export class HintPusher {
@@ -21,7 +22,7 @@ export class HintPusher {
   }
 
   /** Sets `ext`'s hint to `state`, resolving once it (or a newer state after it) is written. A
-   * failed PUT is dropped, as before: the next refresh writes the hint again. */
+   * failed PUT is logged and dropped: the next refresh writes the hint again. */
   push(ext: string, state: DeviceState): Promise<void> {
     this.pending.set(ext, state);
     const running = this.draining.get(ext);
@@ -40,7 +41,7 @@ export class HintPusher {
       // eslint-disable-next-line no-await-in-loop -- one PUT at a time per ext is the point
       await this.ari.deviceStates
         .put(presenceHintDevice(ext), state)
-        .catch(() => undefined);
+        .catch(logFailure(this.ari.log, 'presence hint update', { ext }));
       state = this.pending.get(ext);
     }
     // In the same tick as the last `pending` check, so no `push` can join a drain that is over.

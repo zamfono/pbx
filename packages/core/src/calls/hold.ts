@@ -10,6 +10,7 @@
  */
 import type { HoldRequest } from '@zamfono/shared';
 
+import { ignoreGone } from '../ari/failures.js';
 import { ActionError, HTTP_CONFLICT, notBridged } from './actionError.js';
 import type { Call } from './call.js';
 import {
@@ -71,12 +72,10 @@ export async function holdParty(
   pipeline.holds.set(bridgeId, hold);
   const snapshot = await pipeline.deps.cache.get();
   const { ari } = pipeline.deps;
-  await ari.bridges
-    .removeChannel(bridgeId, partyChannelId)
-    .catch(() => undefined);
+  await ari.bridges.removeChannel(bridgeId, partyChannelId).catch(ignoreGone);
   await ari.channels
     .startMoh(partyChannelId, snapshot.settings.holdMohAudioId ?? undefined)
-    .catch(() => undefined);
+    .catch(ignoreGone);
   return hold;
 }
 
@@ -100,10 +99,8 @@ export async function endHold(
     return true;
   }
   const { ari } = pipeline.deps;
-  await ari.channels.stopMoh(hold.channelId).catch(() => undefined);
-  await ari.bridges
-    .addChannel(intoBridgeId, hold.channelId)
-    .catch(() => undefined);
+  await ari.channels.stopMoh(hold.channelId).catch(ignoreGone);
+  await ari.bridges.addChannel(intoBridgeId, hold.channelId).catch(ignoreGone);
   return true;
 }
 

@@ -126,6 +126,7 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
     const cache = new ConfigCache(db);
     const bus = new EventBus();
     cdr = new CdrWriter({
+      log: noopLogger,
       db,
       ari,
       cache,

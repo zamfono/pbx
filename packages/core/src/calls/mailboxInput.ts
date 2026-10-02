@@ -5,8 +5,9 @@
  * the wait for a key starts once the media has played out.
  */
 import type { AriClient } from '../ari/client.js';
+import { isGone } from '../ari/failures.js';
 import type { AriEvent, Channel } from '../ari/types.js';
-import { isChannelGone } from './playback.js';
+import { stopPlayback } from './playback.js';
 
 export type MenuInput =
   { kind: 'digit'; digit: string } | { kind: 'timeout' } | { kind: 'hangup' };
@@ -62,7 +63,7 @@ export function playForDigit(
       }
       if (ev.type === 'ChannelDtmfReceived' && typeof ev.digit === 'string') {
         if (playing) {
-          ari.playbacks.stop(playbackId).catch(() => undefined);
+          stopPlayback(ari, playbackId);
         }
         settle({ kind: 'digit', digit: ev.digit });
         return;
@@ -73,7 +74,7 @@ export function playForDigit(
     }
     ari.on('event', onEvent);
     ari.channels.play(channelId, media, playbackId).catch((error: unknown) => {
-      if (isChannelGone(error)) {
+      if (isGone(error)) {
         settle({ kind: 'hangup' });
         return;
       }

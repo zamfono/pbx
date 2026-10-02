@@ -3,6 +3,7 @@
  * hangups the race ends them with. Shared by the batch's originate step
  * (`ringGroupOriginate.ts`), its win (`ringGroupWin.ts`) and a pickup of it (`groupPickup.ts`).
  */
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { Pipeline } from './pipeline.js';
 
 export type GroupLeg = {
@@ -27,7 +28,10 @@ export function hangupMemberSiblings(
   for (const [channelId, leg] of tracked) {
     if (leg.memberKey === memberKey && leg.state === 'ringing') {
       leg.state = 'ended';
-      pipeline.deps.ari.channels.hangup(channelId).catch(() => undefined);
+      pipeline.deps.ari.channels
+        .hangup(channelId)
+        .catch(ignoreGone)
+        .catch(logFailure(pipeline.deps.logger, 'member leg hangup'));
     }
   }
 }
@@ -43,6 +47,9 @@ export async function hangupAllRinging(
     }
     leg.state = 'ended';
     // eslint-disable-next-line no-await-in-loop -- losing legs are hung up one at a time; a batch has at most a handful
-    await pipeline.deps.ari.channels.hangup(channelId).catch(() => undefined);
+    await pipeline.deps.ari.channels
+      .hangup(channelId)
+      .catch(ignoreGone)
+      .catch(logFailure(pipeline.deps.logger, 'losing leg hangup'));
   }
 }

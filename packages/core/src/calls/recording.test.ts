@@ -14,6 +14,7 @@ import { CdrWriter } from '../cdr.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
+import { noopLogger } from '../testing/pipelineRig.js';
 import { callerChannel, newCall, type Call, type Leg } from './call.js';
 import { trackLeg } from './legs.js';
 import { handleChannelEnded } from './legsEnded.js';
@@ -175,6 +176,7 @@ describe('Recorder', () => {
     // `recordings.call_id` is a hard FK (§11.2): `cdr.open()` is what gives a call's row to
     // reference before the call itself ends, exactly as the pipeline does in production.
     cdr = new CdrWriter({
+      log: noopLogger,
       db,
       ari,
       cache,

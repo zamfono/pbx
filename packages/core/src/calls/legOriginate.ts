@@ -32,6 +32,7 @@
  * waiting for the answer, so the caller has settled the leg before that hangup's
  * `ChannelDestroyed` can arrive.
  */
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { AriEvent, Channel, OriginateParams } from '../ari/types.js';
 import type { Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
@@ -135,14 +136,28 @@ export async function originateLeg(
     await joined;
   }
   if ((await stasis.entered) !== 'entered') {
-    await ari.channels.hangup(channel.id).catch(() => undefined);
+    await ari.channels
+      .hangup(channel.id)
+      .catch(ignoreGone)
+      .catch(
+        logFailure(pipeline.deps.logger, 'unplaced leg hangup', {
+          callId: call.id
+        })
+      );
     throw new PlacementError('stasis');
   }
   dialling(channel);
   try {
     await ari.channels.dial(channel.id, timeout ?? NO_DIAL_TIMEOUT);
   } catch (error: unknown) {
-    ari.channels.hangup(channel.id).catch(() => undefined);
+    ari.channels
+      .hangup(channel.id)
+      .catch(ignoreGone)
+      .catch(
+        logFailure(pipeline.deps.logger, 'undialled leg hangup', {
+          callId: call.id
+        })
+      );
     throw new PlacementError('dial', error);
   }
   return channel;

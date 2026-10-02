@@ -1,5 +1,6 @@
 /** `*5<ext or number>` (§10.2 "Three-way calls"), its own module so `features.ts`'s feature-code
  * dispatch stays under the repository's `max-lines` lint rule. */
+import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { resolveAddedTarget, type AddedTarget } from './addPartyTarget.js';
 import { settleAnswered } from './answer.js';
@@ -38,7 +39,7 @@ async function releaseFeatureDial(
   pipeline.callByChannel.delete(call.callerChannelId);
   await pipeline.deps.ari.channels
     .hangup(call.callerChannelId)
-    .catch(() => undefined);
+    .catch(ignoreGone);
 }
 
 /** An internal target (§10.1 steps 4-5) rung on a fresh pass over `call`, its win joining

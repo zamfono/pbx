@@ -13,6 +13,7 @@ import path from 'node:path';
 import type { Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { AriEvent, Channel, Logger } from '../ari/types.js';
 import type { Pipeline } from './pipeline.js';
 
@@ -46,10 +47,10 @@ async function markOpenCallsInterrupted(deps: ResyncDeps): Promise<number> {
 async function tearDown(ari: AriClient, bridge: AdoptedBridge): Promise<void> {
   await Promise.all(
     [...bridge.channels].map(channelId =>
-      ari.channels.hangup(channelId).catch(() => undefined)
+      ari.channels.hangup(channelId).catch(ignoreGone)
     )
   );
-  await ari.bridges.destroy(bridge.id).catch(() => undefined);
+  await ari.bridges.destroy(bridge.id).catch(ignoreGone);
 }
 
 /** Watches the adopted multi-party bridges: the first party to leave takes the rest down. */
@@ -78,7 +79,9 @@ function watchBridges(ari: AriClient, bridges: AdoptedBridge[]): void {
       byChannel.delete(channelId);
     }
     bridge.channels.delete(channel.id);
-    tearDown(ari, bridge).catch(() => undefined);
+    tearDown(ari, bridge).catch(
+      logFailure(ari.log, 'adopted bridge teardown', { bridgeId: bridge.id })
+    );
     if (byChannel.size === 0) {
       ari.off('event', onEvent);
     }
@@ -134,7 +137,11 @@ async function deleteOrphanedVoicemailFiles(deps: ResyncDeps): Promise<number> {
     name => name.endsWith(VOICEMAIL_EXTENSION) && !known.has(name)
   );
   await Promise.all(
-    orphans.map(name => unlink(path.join(dir, name)).catch(() => undefined))
+    orphans.map(name =>
+      unlink(path.join(dir, name)).catch(
+        logFailure(deps.log, 'orphaned voicemail removal')
+      )
+    )
   );
   return orphans.length;
 }

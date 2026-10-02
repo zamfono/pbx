@@ -7,6 +7,7 @@
 import { mwiMailboxOf, type Db, type MailRequest } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import { callerChannel, type Call, type Owner } from './call.js';
 import { contactName } from './contactName.js';
 import type { Pipeline } from './pipeline.js';
@@ -41,7 +42,7 @@ export async function refreshMwi(
   const { oldMessages, newMessages } = await mwiCounts(deps.db, mailbox);
   await deps.ari.mailboxes
     .put(mwiMailboxOf(mailbox), oldMessages, newMessages)
-    .catch(() => undefined);
+    .catch(logFailure(deps.ari.log, 'MWI update'));
 }
 
 export type DepositContext = {
@@ -80,7 +81,7 @@ export async function persistVoicemail(ctx: DepositContext): Promise<void> {
   const { oldMessages, newMessages } = await mwiCounts(db, mailbox);
   await pipeline.deps.ari.mailboxes
     .put(name, oldMessages, newMessages)
-    .catch(() => undefined);
+    .catch(logFailure(pipeline.deps.logger, 'MWI update', { callId: call.id }));
   pipeline.deps.bus.emit({
     type: 'voicemail.new',
     voicemailId: id,
@@ -100,13 +101,20 @@ export async function persistVoicemail(ctx: DepositContext): Promise<void> {
     },
     attachmentPath: `${VOICEMAIL_DIR}/${filename}`
   };
-  apiClient.mail(mailRequest).catch(() => undefined);
+  apiClient
+    .mail(mailRequest)
+    .catch(
+      logFailure(pipeline.deps.logger, 'voicemail mail', { callId: call.id })
+    );
 
   call.status = 'voicemail';
   pipeline.deps.cdr.noteQosLegs?.(call);
   await pipeline.deps.ari.channels
     .hangup(callerChannel(call))
-    .catch(() => undefined);
+    .catch(ignoreGone)
+    .catch(
+      logFailure(pipeline.deps.logger, 'caller hangup', { callId: call.id })
+    );
   await pipeline.finishCall(call);
 }
 

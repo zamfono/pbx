@@ -10,6 +10,7 @@
  * then moves the transferee into the consultation's bridge and ends the pair, so the conversation
  * is one bridge of two parties again and ends like any other when either of them leaves.
  */
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { AriEvent } from '../ari/types.js';
 import type { Call } from './call.js';
 import { otherChannelIn, presentCallerUserId } from './callLookup.js';
@@ -55,7 +56,11 @@ export function handOver(
   pipeline.callByChannel.set(transferee.channelId, consultation);
   // §10.2: the transferrer's recorded participation in this row ends here, not with the row.
   if (secondLeg === null || secondLeg === consultation.callerChannelId) {
-    recorder?.onCallerEnded(consultation).catch(() => undefined);
+    recorder?.onCallerEnded(consultation).catch(
+      logFailure(pipeline.deps.logger, 'transferrer recording stop', {
+        callId: consultation.id
+      })
+    );
     consultation.callerChannelId = transferee.channelId;
     consultation.callerChannelUserId = transferee.userId;
     pipeline.registerCall(consultation);
@@ -64,7 +69,11 @@ export function handOver(
   }
   const leg = consultation.legs.get(secondLeg);
   if (leg !== undefined) {
-    recorder?.onLegEnded(consultation, leg).catch(() => undefined);
+    recorder?.onLegEnded(consultation, leg).catch(
+      logFailure(pipeline.deps.logger, 'transferrer recording stop', {
+        callId: consultation.id
+      })
+    );
     leg.state = 'ended';
   }
   consultation.legs.set(transferee.channelId, {
@@ -89,20 +98,20 @@ async function collapseLink(
   if (firstBridge !== undefined) {
     await ari.bridges
       .removeChannel(firstBridge, transfereeId)
-      .catch(() => undefined);
+      .catch(ignoreGone);
   }
   await ari.bridges
     .addChannel(consultationBridgeId, transfereeId)
-    .catch(() => undefined);
+    .catch(ignoreGone);
   const halves = [
     ev.destination_link_first_leg as Named,
     ev.destination_link_second_leg as Named
   ].flatMap(half => (half === undefined ? [] : [half.id]));
   await Promise.all(
-    halves.map(id => ari.channels.hangup(id).catch(() => undefined))
+    halves.map(id => ari.channels.hangup(id).catch(ignoreGone))
   );
   if (firstBridge !== undefined) {
-    await ari.bridges.destroy(firstBridge).catch(() => undefined);
+    await ari.bridges.destroy(firstBridge).catch(ignoreGone);
   }
 }
 
@@ -129,9 +138,11 @@ async function carryOn(
   }
   // §10.1 "Recordings follow the participation rule (§10.2) per row": the transferee's
   // participation in the consultation is its own, starting now that it is in that bridge.
-  await pipeline.deps.recorder
-    ?.onTransfereeUp(consultation, transferee)
-    .catch(() => undefined);
+  await pipeline.deps.recorder?.onTransfereeUp(consultation, transferee).catch(
+    logFailure(pipeline.deps.logger, 'transferee recording', {
+      callId: consultation.id
+    })
+  );
 }
 
 /** `BridgeAttendedTransfer` (§10.1 "Transfers and pickup"), as the file comment describes. */
@@ -176,5 +187,5 @@ export async function onAttendedTransfer(
   }
   await closeCall(pipeline, original, 'answered', false);
   // The transferrer's first channel is left with nobody; Asterisk ends the second itself.
-  await pipeline.deps.ari.channels.hangup(first.id).catch(() => undefined);
+  await pipeline.deps.ari.channels.hangup(first.id).catch(ignoreGone);
 }

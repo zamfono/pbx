@@ -184,7 +184,15 @@ describe('user step against registration', () => {
     const cache = new ConfigCache(db);
     const state = new StateStore();
     const bus = new EventBus();
-    presence = new Presence({ ari, cache, state, bus, db, now: nowIso });
+    presence = new Presence({
+      log: noopLogger,
+      ari,
+      cache,
+      state,
+      bus,
+      db,
+      now: nowIso
+    });
     pipeline = new Pipeline({
       ari,
       cache,

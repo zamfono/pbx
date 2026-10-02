@@ -6,6 +6,7 @@
  * `ringBatch` call; a call rings at most one batch at a time (`ringGroup.ts`'s own sequential
  * loop).
  */
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { Call } from './call.js';
 import type { GroupLeg } from './groupLegs.js';
 import type { Pipeline } from './pipeline.js';
@@ -68,12 +69,24 @@ export function stopGroupRinging(
   if (call.callerChannelId !== null) {
     pipeline.deps.ari.channels
       .stopMoh(call.callerChannelId)
-      .catch(() => undefined);
+      .catch(ignoreGone)
+      .catch(
+        logFailure(pipeline.deps.logger, 'caller hold music stop', {
+          callId: call.id
+        })
+      );
   }
   for (const [channelId, leg] of active.tracked) {
     if (leg.state === 'ringing') {
       leg.state = 'ended';
-      pipeline.deps.ari.channels.hangup(channelId).catch(() => undefined);
+      pipeline.deps.ari.channels
+        .hangup(channelId)
+        .catch(ignoreGone)
+        .catch(
+          logFailure(pipeline.deps.logger, 'ringing leg hangup', {
+            callId: call.id
+          })
+        );
     }
   }
   active.settle('answered');
@@ -99,7 +112,14 @@ export function declineInBatch(
     // With `allow_reject` the first decline already hung up the member's other legs.
     if (leg.state === 'ringing') {
       active?.endLeg(leg, cause);
-      pipeline.deps.ari.channels.hangup(leg.channelId).catch(() => undefined);
+      pipeline.deps.ari.channels
+        .hangup(leg.channelId)
+        .catch(ignoreGone)
+        .catch(
+          logFailure(pipeline.deps.logger, 'ringing leg hangup', {
+            callId: call.id
+          })
+        );
     }
   }
 }

@@ -1,5 +1,6 @@
 /** Terminal failures of an outbound or emergency dial: the releases of §9.4 "Route fallthrough" /
  * "Outbound routing" once a route (or the trunk list) is done. An answer settles in `answer.ts`. */
+import { ignoreGone } from '../ari/failures.js';
 import {
   SIT_DURATION_MS,
   SPECIAL_INFORMATION_TONE_MEDIA
@@ -56,7 +57,7 @@ async function playFailedCallAnnouncement(
   if (channelId === null) {
     return;
   }
-  await pipeline.deps.ari.channels.answer(channelId).catch(() => undefined);
+  await pipeline.deps.ari.channels.answer(channelId).catch(ignoreGone);
   const snapshot = await pipeline.deps.cache.get();
   if (LANGUAGES_WITH_FAILED_CALL_PROMPT.includes(snapshot.settings.language)) {
     await playAndWait(

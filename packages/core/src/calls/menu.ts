@@ -4,6 +4,7 @@
  * a live extension, or, after `menus.max_attempts`, the menu's fallback. The DTMF collection
  * itself is `menuInput.ts`'s.
  */
+import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { assetMedia, defaultPrompt } from '../prompts.js';
 import type { MenuMap } from '../routing/menu.js';
@@ -183,6 +184,6 @@ export async function playMenu(
   // hearing the provider's ringback and has no media path to key a choice into (§10.1 step 6).
   await pipeline.deps.ari.channels
     .answer(callerChannel(call))
-    .catch(() => undefined);
+    .catch(ignoreGone);
   await attemptMenuRound(pipeline, call, snapshot, menu);
 }

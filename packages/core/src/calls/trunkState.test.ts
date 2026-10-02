@@ -192,6 +192,7 @@ describe('TrunkState', () => {
     bus = new EventBus();
     cache = new ConfigCache(db);
     trunkState = new TrunkState({
+      log: noopLogger,
       ari,
       ami,
       cache,

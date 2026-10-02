@@ -5,6 +5,7 @@
  */
 import type { MailRequest } from '@zamfono/shared';
 
+import { logFailure } from '../ari/failures.js';
 import type { Call } from './call.js';
 import { contactName } from './contactName.js';
 import type { Pipeline } from './pipeline.js';
@@ -49,7 +50,11 @@ export async function notifyMissedCall(
       didLabel: did?.label ?? did?.number ?? ''
     }
   };
-  await apiClient.mail(request).catch(() => undefined);
+  await apiClient
+    .mail(request)
+    .catch(
+      logFailure(pipeline.deps.logger, 'missed-call mail', { callId: call.id })
+    );
 }
 
 /** Closes out a call whose caller left before any outcome was reached (§11.2 `calls.status`

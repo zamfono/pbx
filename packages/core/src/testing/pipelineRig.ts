@@ -54,6 +54,7 @@ export type Rig = {
 /** A `TrunkState` over an AMI client that never connects, enough for route selection. */
 function trunkStateFor(ari: AriClient, db: Db): TrunkState {
   return new TrunkState({
+    log: noopLogger,
     ari,
     ami: new AmiClient({
       host: '127.0.0.1',
@@ -97,8 +98,9 @@ export async function startRig(
   const cache = new ConfigCache(db);
   const state = new StateStore();
   const bus = new EventBus();
-  const cdr = new CdrWriter({ db, ari, cache, bus, state, now: nowIso });
-  const presence = new Presence({ ari, cache, state, bus, db, now: nowIso });
+  const live = { db, ari, cache, bus, state, log: noopLogger, now: nowIso };
+  const cdr = new CdrWriter(live);
+  const presence = new Presence(live);
   const pipeline = new Pipeline({
     ari,
     cache,

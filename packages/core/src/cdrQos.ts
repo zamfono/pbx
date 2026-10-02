@@ -27,7 +27,8 @@
  */
 import type { Db } from '@zamfono/shared';
 
-import type { Channel, ChannelsApi } from './ari/types.js';
+import { logFailure } from './ari/failures.js';
+import type { Channel, ChannelsApi, Logger } from './ari/types.js';
 import type { LogLevel } from './callLog.js';
 import type { Call } from './calls/call.js';
 import {
@@ -69,6 +70,7 @@ function eligible(call: Call): boolean {
 export class QosRows {
   private readonly db: Db;
   private readonly channels: Pick<ChannelsApi, 'list'>;
+  private readonly log: Logger;
   private readonly tailMs: number;
   private readonly rtcp: RtcpQos;
   private readonly calls = new Map<string, Tracked>();
@@ -78,11 +80,13 @@ export class QosRows {
   constructor(
     db: Db,
     channels: Pick<ChannelsApi, 'list'>,
+    log: Logger,
     tailMs = QOS_TAIL_MS,
     rtcp = new RtcpQos()
   ) {
     this.db = db;
     this.channels = channels;
+    this.log = log;
     this.tailMs = tailMs;
     this.rtcp = rtcp;
   }
@@ -233,7 +237,7 @@ export class QosRows {
       const awaited = [...tracked.roles.keys()];
       this.liveChannels()
         .then(async live => this.settleGone(awaited, live))
-        .catch(() => undefined);
+        .catch(logFailure(this.log, 'qos settle'));
     }, this.tailMs);
     timer.unref();
   }

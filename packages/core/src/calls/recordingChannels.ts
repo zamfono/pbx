@@ -9,6 +9,7 @@ import { rm } from 'node:fs/promises';
 import { newId } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { AriEvent, Channel } from '../ari/types.js';
 import type { RecordFormat } from './recordingRate.js';
 
@@ -128,7 +129,10 @@ async function startSnoop(
     });
   } catch (error) {
     // A snoop channel that records nothing must not outlive the failure.
-    await ari.channels.hangup(snoopId).catch(() => undefined);
+    await ari.channels
+      .hangup(snoopId)
+      .catch(ignoreGone)
+      .catch(logFailure(ari.log, 'snoop hangup'));
     throw error;
   }
   return snoopId;
@@ -163,7 +167,10 @@ export async function startSnoopPair(
     ];
   } catch (error) {
     const finished = waitForRecordingFinished(ari, left.name);
-    await ari.channels.hangup(leftId).catch(() => undefined);
+    await ari.channels
+      .hangup(leftId)
+      .catch(ignoreGone)
+      .catch(logFailure(ari.log, 'snoop hangup'));
     // Not awaited: the file goes once Asterisk has closed it, without holding up the call.
     finished
       .then(() =>
@@ -171,7 +178,7 @@ export async function startSnoopPair(
           [left.file, right.file].map(file => rm(file, { force: true }))
         )
       )
-      .catch(() => undefined);
+      .catch(logFailure(ari.log, 'snoop file removal'));
     throw error;
   }
 }

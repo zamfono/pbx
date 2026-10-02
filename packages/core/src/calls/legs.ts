@@ -2,6 +2,7 @@
 // winning, and the ARI events that answer a leg (a device picking up, find-me's accept key).
 // `ringUser.ts` starts the race; `ringConclusion.ts` settles it when legs end without an answer.
 
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { AriEvent, Channel } from '../ari/types.js';
 import { bridgeAnswered, claimAnswer } from './answer.js';
 import type { Call, Leg } from './call.js';
@@ -67,9 +68,7 @@ export function untrackLeg(pipeline: Pipeline, call: Call, leg: Leg): void {
 /** Ends `leg` and hangs up its still-live channel; never for a channel that already ended itself. */
 export function hangupLeg(pipeline: Pipeline, leg: Leg): Promise<void> {
   endLeg(pipeline, leg.channelId, leg);
-  return pipeline.deps.ari.channels
-    .hangup(leg.channelId)
-    .catch(() => undefined);
+  return pipeline.deps.ari.channels.hangup(leg.channelId).catch(ignoreGone);
 }
 
 /**
@@ -182,7 +181,11 @@ export function handleDtmf(pipeline: Pipeline, ev: AriEvent): void {
   clearTimeout(pending.timer);
   pipeline.pendingFindMeAccept.delete(channelId);
   if (ev.digit === FIND_ME_REJECT_DIGIT) {
-    hangupLeg(pipeline, pending.leg).catch(() => undefined);
+    hangupLeg(pipeline, pending.leg).catch(
+      logFailure(pipeline.deps.logger, 'find-me leg hangup', {
+        callId: pending.call.id
+      })
+    );
     return;
   }
   const existingBridgeId =

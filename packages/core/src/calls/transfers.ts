@@ -7,6 +7,7 @@
  */
 import { newId, type TransferRequest } from '@zamfono/shared';
 
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import { ActionError, HTTP_UNPROCESSABLE, notBridged } from './actionError.js';
@@ -146,7 +147,9 @@ async function startTransfereeCall(
           snapshot,
           asUser: transferrerUserId
         });
-  routing.catch(() => undefined);
+  routing.catch(
+    logFailure(pipeline.deps.logger, 'onward routing', { callId: child.id })
+  );
   return child;
 }
 
@@ -203,10 +206,29 @@ export async function transferCall(
   });
   const transferrerUserId = userOfChannel(call, transferrer);
   const { ari } = pipeline.deps;
-  await ari.bridges.removeChannel(bridgeId, transferee).catch(() => undefined);
+  await ari.bridges
+    .removeChannel(bridgeId, transferee)
+    .catch(ignoreGone)
+    .catch(
+      logFailure(pipeline.deps.logger, 'transferee removal', {
+        callId: call.id
+      })
+    );
   await closeCall(pipeline, call, 'answered', false);
-  await ari.channels.hangup(transferrer).catch(() => undefined);
-  await ari.bridges.destroy(bridgeId).catch(() => undefined);
+  await ari.channels
+    .hangup(transferrer)
+    .catch(ignoreGone)
+    .catch(
+      logFailure(pipeline.deps.logger, 'transferrer hangup', {
+        callId: call.id
+      })
+    );
+  await ari.bridges
+    .destroy(bridgeId)
+    .catch(ignoreGone)
+    .catch(
+      logFailure(pipeline.deps.logger, 'bridge destroy', { callId: call.id })
+    );
   return startTransfereeCall(
     pipeline,
     call,

@@ -5,6 +5,7 @@
  */
 import { newId } from '@zamfono/shared';
 
+import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import {
@@ -40,13 +41,11 @@ export async function moveParkedParty(
   await endHold(pipeline, previous, previous);
   const bridge = await ari.bridges.create({ type });
   if (previous !== null) {
-    await ari.bridges
-      .removeChannel(previous, partyChannelId)
-      .catch(() => undefined);
+    await ari.bridges.removeChannel(previous, partyChannelId).catch(ignoreGone);
   }
   await ari.bridges.addChannel(bridge.id, partyChannelId);
   if (previous !== null) {
-    await ari.bridges.destroy(previous).catch(() => undefined);
+    await ari.bridges.destroy(previous).catch(ignoreGone);
   }
   // eslint-disable-next-line require-atomic-updates -- `parked` is this park's own aggregate; nothing else writes `bridgeId` while the party is parked
   parked.bridgeId = bridge.id;
@@ -100,12 +99,12 @@ async function routeParkedPartyToFallback(
   partyChannelId: string
 ): Promise<void> {
   const ari = pipeline.deps.ari;
-  await ari.channels.stopMoh(partyChannelId).catch(() => undefined);
+  await ari.channels.stopMoh(partyChannelId).catch(ignoreGone);
   if (parked.bridgeId !== null) {
     await ari.bridges
       .removeChannel(parked.bridgeId, partyChannelId)
-      .catch(() => undefined);
-    await ari.bridges.destroy(parked.bridgeId).catch(() => undefined);
+      .catch(ignoreGone);
+    await ari.bridges.destroy(parked.bridgeId).catch(ignoreGone);
   }
   // eslint-disable-next-line require-atomic-updates -- `parked` is this park's own aggregate; no concurrent write races this reassignment before the awaits below
   parked.bridgeId = null;
@@ -188,9 +187,7 @@ export async function ringParkerBack(
   }
   delete ringback.joinBridgeId;
   if (ringback.status === 'answered' && ringback.answeredByUserId !== null) {
-    await pipeline.deps.ari.channels
-      .stopMoh(partyChannelId)
-      .catch(() => undefined);
+    await pipeline.deps.ari.channels.stopMoh(partyChannelId).catch(ignoreGone);
     parked.answeredByUserId = parkerUserId;
     parked.log.event({ event: 'parkingRetrieved', by: parkerUserId });
     takeOverAnsweredLeg(pipeline, ringback, parked);

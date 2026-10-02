@@ -8,6 +8,7 @@ import { unlink } from 'node:fs/promises';
 import type { Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
+import { logFailure } from '../ari/failures.js';
 import type { Owner } from './call.js';
 import type { Folder } from './mailboxPrompts.js';
 import { refreshMwi } from './voicemailStore.js';
@@ -70,6 +71,8 @@ export async function deleteMessage(
   message: MailboxMessage
 ): Promise<void> {
   await deps.db.deleteFrom('voicemails').where('id', '=', message.id).execute();
-  await unlink(`${VOICEMAIL_DIR}/${message.filename}`).catch(() => undefined);
+  await unlink(`${VOICEMAIL_DIR}/${message.filename}`).catch(
+    logFailure(deps.ari.log, 'voicemail file removal')
+  );
   await refreshMwi(deps, owner);
 }

@@ -4,7 +4,8 @@
  * once the media has played to the end, never right after the play request is merely accepted.
  */
 import type { AriClient } from '../ari/client.js';
-import { AriError, type AriEvent, type Channel } from '../ari/types.js';
+import { ignoreGone, isGone, logFailure } from '../ari/failures.js';
+import type { AriEvent, Channel } from '../ari/types.js';
 
 // Asterisk emits a caller channel's StasisEnd and ChannelDestroyed exactly once each; a caller
 // channel already torn down before this wait's own listener was registered (an earlier
@@ -13,15 +14,16 @@ import { AriError, type AriEvent, type Channel } from '../ari/types.js';
 // a playback whose events never arrive, far longer than any real prompt.
 const PLAYBACK_FALLBACK_MS = 600_000;
 
-const HTTP_NOT_FOUND = 404;
-
 /** How a wait ended: the media played out, the channel went away, or no playback happened. */
 export type PlaybackEnd = 'finished' | 'hangup' | 'failed';
 
-/** Whether a rejected ARI request says the channel no longer exists: ARI answers 404 "Channel
- * not found" for a channel that has hung up, which no event this listener registers will report. */
-export function isChannelGone(error: unknown): boolean {
-  return error instanceof AriError && error.status === HTTP_NOT_FOUND;
+/** Stops `playbackId` once a key interrupts it, without waiting: the playback having already
+ * ended is the expected race, and any other failure is logged. */
+export function stopPlayback(ari: AriClient, playbackId: string): void {
+  ari.playbacks
+    .stop(playbackId)
+    .catch(ignoreGone)
+    .catch(logFailure(ari.log, 'playback stop', { playbackId }));
 }
 
 /**
@@ -64,7 +66,7 @@ export function playAndWait(
     }, PLAYBACK_FALLBACK_MS);
     timer.unref();
     ari.channels.play(channelId, media, playbackId).catch((error: unknown) => {
-      finish(isChannelGone(error) ? 'hangup' : 'failed');
+      finish(isGone(error) ? 'hangup' : 'failed');
     });
   });
 }
@@ -105,14 +107,15 @@ export function playToneAndWait(
     const timer = setTimeout(() => {
       ari.playbacks
         .stop(playbackId)
-        .catch(() => undefined)
+        .catch(ignoreGone)
+        .catch(logFailure(ari.log, 'tone stop'))
         .finally(() => {
           finish('finished');
         });
     }, durationMs);
     timer.unref();
     ari.channels.play(channelId, media, playbackId).catch((error: unknown) => {
-      finish(isChannelGone(error) ? 'hangup' : 'failed');
+      finish(isGone(error) ? 'hangup' : 'failed');
     });
   });
 }

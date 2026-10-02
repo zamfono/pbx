@@ -4,6 +4,7 @@
  * without a SIP capture. Its own module so `answer.ts` stays well under the repository's
  * `max-lines` lint rule.
  */
+import { logFailure } from '../ari/failures.js';
 import type { Call, Leg } from './call.js';
 import type { Pipeline } from './pipeline.js';
 
@@ -52,5 +53,7 @@ export function traceCodecs(
         ...(callee === null ? {} : { callee })
       });
     })
-    .catch(() => undefined);
+    .catch(
+      logFailure(pipeline.deps.logger, 'codec trace', { callId: call.id })
+    );
 }

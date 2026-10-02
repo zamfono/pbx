@@ -3,6 +3,7 @@
  * ending, and the busy/noAnswer outcome that follows. Its own module so `legsEnded.ts`, the end
  * of a call's answered legs and caller, stays under the repository's `max-lines` lint rule.
  */
+import { logFailure } from '../ari/failures.js';
 import type { Call, Leg } from './call.js';
 import { clearFindMeTimers, findMeLegsPending } from './findMe.js';
 import { endLeg, hangupLeg, type RingResolver } from './legs.js';
@@ -52,7 +53,11 @@ export function concludeRing(
   const outcome = ringOutcome(call);
   for (const leg of call.legs.values()) {
     if (leg.state === 'ringing') {
-      hangupLeg(pipeline, leg).catch(() => undefined);
+      hangupLeg(pipeline, leg).catch(
+        logFailure(pipeline.deps.logger, 'ringing leg hangup', {
+          callId: call.id
+        })
+      );
     }
   }
   pending.resolve(outcome);

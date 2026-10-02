@@ -88,14 +88,23 @@ function createAmiClient(env: CoreEnv, log: Logger): AmiClient {
  */
 async function startLiveState(deps: {
   db: Db;
+  log: Logger;
   ari: AriClient;
   ami: AmiClient;
   cache: ConfigCache;
   state: StateStore;
   bus: EventBus;
 }): Promise<{ presence: Presence; trunkState: TrunkState }> {
-  const { db, ari, ami, cache, state, bus } = deps;
-  const presence = new Presence({ ari, cache, state, bus, db, now: nowIso });
+  const { db, ari, ami, cache, state, bus, log } = deps;
+  const presence = new Presence({
+    ari,
+    cache,
+    state,
+    bus,
+    db,
+    log,
+    now: nowIso
+  });
   await presence.resyncOnBoot();
   // §7 "registered devices": the live state serves the count `Presence`'s registrations give.
   state.readRegisteredDevicesFrom(() => presence.registeredDevices());
@@ -105,6 +114,7 @@ async function startLiveState(deps: {
     cache,
     state,
     bus,
+    log,
     now: nowIso
   });
   await trunkState.resyncOnBoot();
@@ -144,7 +154,8 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
       ami,
       cache,
       state,
-      bus
+      bus,
+      log
     });
     const { pipeline, cdr } = buildPipeline({
       db,

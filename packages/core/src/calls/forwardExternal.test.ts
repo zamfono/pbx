@@ -281,6 +281,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
     await ari.connect();
     const state = new StateStore();
     const trunkState = new TrunkState({
+      log: noopLogger,
       ari,
       ami: new AmiClient({
         host: '127.0.0.1',

@@ -370,6 +370,7 @@ describe('outbound dialing', () => {
       presence: null
     });
     trunkState = new TrunkState({
+      log: noopLogger,
       ari,
       ami,
       cache: new ConfigCache(db),

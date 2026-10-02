@@ -6,6 +6,7 @@ import type { AriEvent } from './types.js';
 
 const HTTP_OK = 200;
 const HTTP_NOT_FOUND = 404;
+const HTTP_INTERNAL_SERVER_ERROR = 500;
 
 type RouteResult = { status: number; body: unknown };
 
@@ -41,7 +42,8 @@ export function scheduleRecordingFinished(
   timer.unref();
 }
 
-/** `GET /channels/{id}/variable`: 404 for an unset variable, as Asterisk answers. */
+/** `GET /channels/{id}/variable`, answered as Asterisk does: 404 for an unset variable, 500 for a
+ * dialplan function (`NAME(args)`) with nothing to read. */
 export function readChannelVariable(
   variables: ReadonlyMap<string, string>,
   id: string,
@@ -49,9 +51,15 @@ export function readChannelVariable(
 ): RouteResult {
   const name = new URLSearchParams(queryString).get('variable') ?? '';
   const value = variables.get(`${id}:${name}`);
-  return value === undefined
-    ? { status: HTTP_NOT_FOUND, body: { message: 'Variable not found' } }
-    : { status: HTTP_OK, body: { value } };
+  if (value !== undefined) {
+    return { status: HTTP_OK, body: { value } };
+  }
+  return name.includes('(')
+    ? {
+        status: HTTP_INTERNAL_SERVER_ERROR,
+        body: { message: 'Unable to read provided function' }
+      }
+    : { status: HTTP_NOT_FOUND, body: { message: 'Variable not found' } };
 }
 
 /** One entry of `GET /ari/endpoints`, in ARI's own wire shape. */

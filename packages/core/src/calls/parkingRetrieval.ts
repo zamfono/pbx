@@ -3,6 +3,7 @@
  * call out of the bridge"; §9.3 table), its own module beside `parking.ts`, which owns the slot
  * registry, so both stay under the repository's `max-lines` lint rule.
  */
+import { ignoreGone } from '../ari/failures.js';
 import type { Presence } from '../presence.js';
 import { callerChannel, type Call, type Leg } from './call.js';
 import { closeFeatureCall } from './featureCall.js';
@@ -65,7 +66,7 @@ export async function retrieveParkedCall(
   parked.answeredByUserId = call.callerUserId;
   parked.log.event({ event: 'parkingRetrieved', ext, by: call.callerUserId });
   const ari = pipeline.deps.ari;
-  await ari.channels.stopMoh(entry.partyChannelId).catch(() => undefined);
+  await ari.channels.stopMoh(entry.partyChannelId).catch(ignoreGone);
   const bridgeId = await moveParkedParty(
     pipeline,
     parked,
@@ -73,8 +74,8 @@ export async function retrieveParkedCall(
     'mixing'
   );
   const channelId = callerChannel(call);
-  await ari.channels.answer(channelId).catch(() => undefined);
-  await ari.bridges.addChannel(bridgeId, channelId).catch(() => undefined);
+  await ari.channels.answer(channelId).catch(ignoreGone);
+  await ari.bridges.addChannel(bridgeId, channelId).catch(ignoreGone);
   await joinRetriever(pipeline, parked, call);
   // The retriever's own channel now carries the conversation; it stays up (§9.3 table).
   await closeFeatureCall(pipeline, call, 'answered');

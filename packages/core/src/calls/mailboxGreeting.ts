@@ -3,6 +3,7 @@
  * "Known cross-writes"). The menu itself is `mailbox.ts`'s. */
 import { MS_PER_SECOND, newId } from '@zamfono/shared';
 
+import { ignoreGone } from '../ari/failures.js';
 import { waitForRecording } from './ariWaits.js';
 import { callerChannel, type Call, type Owner } from './call.js';
 import type { Pipeline } from './pipeline.js';
@@ -55,7 +56,7 @@ export async function recordGreeting(
       terminateOn: '#',
       beep: true
     })
-    .catch(() => undefined);
+    .catch(ignoreGone);
   const durationS = await finished;
   if (durationS === null) {
     return false;

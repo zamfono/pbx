@@ -119,6 +119,13 @@ why the specified behaviour changed; the commit history, how.
 - `core` logs an error, with the method and path, when its internal API fails to serve a request
   `api` made (which `api` sees as a 503), and a warning when its internal event stream fails;
   neither left a trace before.
+- `core` logs an error, with the call's id where there is one, when a step it runs in the
+  background fails: a voicemail or missed-call mail it could not hand to `api`, the onward call
+  after a transfer, a blind or attended transfer Asterisk carried out, the outcome of a placed
+  call or a pickup, an MWI, presence or trunk status update, a recording. None of these left a
+  trace. An ARI request on a channel or bridge that has already gone is still dropped silently,
+  the expected race with a hangup; any other ARI failure, such as refused credentials or an
+  Asterisk error, is now logged too.
 - The release bundle carries a `VERSION` file naming its release. `update.sh`, `setup.sh` and
   the `updater` service read the release a stack runs from it, unless `.env` sets
   `ZAMFONO_VERSION`; `update.sh` still reads a stack unpacked from an older bundle, which has no

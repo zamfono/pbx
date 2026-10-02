@@ -312,6 +312,7 @@ describe('Pipeline', () => {
     });
     await ami.connect();
     const trunkState = new TrunkState({
+      log: noopLogger,
       ari,
       ami,
       cache: new ConfigCache(db),

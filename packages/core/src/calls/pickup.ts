@@ -4,6 +4,7 @@
  * by the `*8<ext>` feature code, which finds the call by the extension it rings, and the API
  * pickup (`pickupAction.ts`), which names the call.
  */
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import { bridgeAnswered, claimAnswer } from './answer.js';
 import {
   callerChannel,
@@ -56,14 +57,21 @@ async function bridgePickup(
   leg: Leg
 ): Promise<void> {
   const ari = pipeline.deps.ari;
-  await ari.channels.answer(picker.channelId).catch(() => undefined);
+  await ari.channels.answer(picker.channelId).catch(ignoreGone);
   await bridgeAnswered(pipeline, target, leg);
   for (const other of target.legs.values()) {
     if (other.state === 'ringing') {
       other.state = 'ended';
       pipeline.callByChannel.delete(other.channelId);
       // eslint-disable-next-line no-await-in-loop -- a handful of legs at most, hung up one at a time
-      await ari.channels.hangup(other.channelId).catch(() => undefined);
+      await ari.channels
+        .hangup(other.channelId)
+        .catch(ignoreGone)
+        .catch(
+          logFailure(pipeline.deps.logger, 'ringing leg hangup', {
+            callId: target.id
+          })
+        );
     }
   }
   // Presence (§9.3, §10.2 "Presence and BLF"): the ringing callee idle, the picker in the call.

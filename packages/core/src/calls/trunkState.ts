@@ -9,7 +9,8 @@
  */
 import type { AmiClient, AmiEvent } from '../ami/client.js';
 import type { AriClient } from '../ari/client.js';
-import type { AriEvent } from '../ari/types.js';
+import { logFailure } from '../ari/failures.js';
+import type { AriEvent, Logger } from '../ari/types.js';
 import type { EventBus } from '../internal/eventBus.js';
 import type { ConfigCache } from '../internal/snapshot.js';
 import type { StateStore } from '../internal/stateStore.js';
@@ -30,6 +31,7 @@ type TrunkStateDeps = {
   cache: ConfigCache;
   state: StateStore;
   bus: EventBus;
+  log: Logger;
   now: () => string;
 };
 
@@ -40,16 +42,22 @@ export class TrunkState {
     this.deps = deps;
     this.deps.ari.on('event', (event: AriEvent) => {
       if (event.type === 'ContactStatusChange') {
-        this.handleContactStatusChange(event).catch(() => undefined);
+        this.handleContactStatusChange(event).catch(
+          logFailure(this.deps.log, 'trunk contact status change')
+        );
       }
     });
     this.deps.ami.on('event', (event: AmiEvent) => {
       if (event.Event === 'Registry') {
-        this.handleRegistry(event).catch(() => undefined);
+        this.handleRegistry(event).catch(
+          logFailure(this.deps.log, 'trunk registration update')
+        );
       }
     });
     this.deps.ami.on('connected', () => {
-      this.resyncRegistrations().catch(() => undefined);
+      this.resyncRegistrations().catch(
+        logFailure(this.deps.log, 'trunk registration resync')
+      );
     });
   }
 
