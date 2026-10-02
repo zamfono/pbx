@@ -3,11 +3,9 @@
  * `multipart: true` route's form. Separate from the route table and the handler so each one is
  * read on its own.
  */
-import type { z } from 'zod';
-
 import { OpError } from './ops/types.js';
 import type { RouteEntry } from './restRoutes.js';
-import { parseQuery } from './restTransport.js';
+import { parseQuery, type QueryFieldKinds } from './restTransport.js';
 
 type Fields = Record<string, unknown>;
 
@@ -52,10 +50,10 @@ async function parseMultipart(request: Request): Promise<Fields> {
 export function readBody(
   request: Request,
   route: RouteEntry,
-  input: z.ZodType
+  queryKinds: QueryFieldKinds
 ): Promise<Fields> {
   if (route.method === 'GET') {
-    return Promise.resolve(parseQuery(request, input));
+    return Promise.resolve(parseQuery(request, queryKinds));
   }
   return route.multipart ? parseMultipart(request) : parseJsonBody(request);
 }

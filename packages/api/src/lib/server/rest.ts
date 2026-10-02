@@ -1,6 +1,6 @@
 import type { Db } from '@zamfono/shared';
 
-import type { ErasedOperation } from './ops/registry.js';
+import { inputJsonSchema } from './ops/publishedSchema.js';
 import { runOperation } from './ops/runner.js';
 import { type Actor } from './ops/types.js';
 import { problem, problemFromError } from './problem.js';
@@ -11,7 +11,11 @@ import {
   routes,
   type RouteEntry
 } from './restRoutes.js';
-import { outputResponse } from './restTransport.js';
+import {
+  outputResponse,
+  queryFieldKinds,
+  type QueryFieldKinds
+} from './restTransport.js';
 
 export type RestDeps = {
   db: Db;
@@ -35,24 +39,24 @@ function compilePattern(pattern: string): RegExp {
 
 type Matched = {
   route: RouteEntry;
-  op: ErasedOperation;
+  queryKinds: QueryFieldKinds;
   match: RegExpMatchArray;
 };
 
 const compiled = routes.map(route => ({
   route,
-  op: routeOperation(route),
+  queryKinds: queryFieldKinds(inputJsonSchema(routeOperation(route))),
   regex: compilePattern(route.pattern)
 }));
 
 function matchRoute(method: string, path: string): Matched | null {
-  for (const { route, op, regex } of compiled) {
+  for (const { route, queryKinds, regex } of compiled) {
     if (route.method !== method) {
       continue;
     }
     const match = path.match(regex);
     if (match) {
-      return { route, op, match };
+      return { route, queryKinds, match };
     }
   }
   return null;
@@ -87,9 +91,9 @@ export async function handleRest(
   if (!matched) {
     return problem(NOT_FOUND_STATUS, 'no such endpoint');
   }
-  const { route, op, match } = matched;
+  const { route, queryKinds, match } = matched;
   try {
-    const { confirm, ...fields } = await readBody(request, route, op.input);
+    const { confirm, ...fields } = await readBody(request, route, queryKinds);
     const input = { ...fields, ...(route.params ?? defaultParams)(match) };
     const output = await runOperation(deps.db, route.op, input, {
       actor,

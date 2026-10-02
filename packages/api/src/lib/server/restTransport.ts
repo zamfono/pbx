@@ -1,7 +1,7 @@
-import { z } from 'zod';
+import type { JsonSchema } from './ops/publishedSchema.js';
 
-type JsonSchema = Record<string, unknown>;
 type QueryFieldKind = 'number' | 'boolean';
+export type QueryFieldKinds = Map<string, QueryFieldKind>;
 
 /** The JSON-Schema `type`(s) declared for one of `schema`'s own properties, as a `Set` for a quick `has`. */
 function jsonSchemaTypes(propertySchema: JsonSchema): Set<string> {
@@ -14,26 +14,14 @@ function jsonSchemaTypes(propertySchema: JsonSchema): Set<string> {
   return new Set(typeof type === 'string' ? [type] : []);
 }
 
-/** `z.toJSONSchema`, or `null` for an input it still cannot represent even with `unrepresentable: 'any'`. */
-function safeJsonSchema(input: z.ZodType): JsonSchema | null {
-  try {
-    return z.toJSONSchema(input, { unrepresentable: 'any' });
-  } catch {
-    return null;
-  }
-}
-
 /**
- * The operation's own declared type per query-facing field name — `number` for `number`/`integer`,
- * `boolean` for `boolean`, absent for everything else (including `string`, which is left alone so
- * a digits-only filter like `search.query`'s `q` is never guessed into a number, §10.3).
+ * The declared type per top-level field of an operation's input JSON Schema — `number` for
+ * `number`/`integer`, `boolean` for `boolean`, absent for everything else (including `string`,
+ * which is left alone so a digits-only filter like `search.query`'s `q` is never guessed into a
+ * number, §10.3).
  */
-function queryFieldKinds(input: z.ZodType): Map<string, QueryFieldKind> {
-  const kinds = new Map<string, QueryFieldKind>();
-  const schema = safeJsonSchema(input);
-  if (!schema) {
-    return kinds;
-  }
+export function queryFieldKinds(schema: JsonSchema): QueryFieldKinds {
+  const kinds: QueryFieldKinds = new Map();
   const properties =
     (schema.properties as Record<string, JsonSchema> | undefined) ?? {};
   for (const [name, propertySchema] of Object.entries(properties)) {
@@ -61,9 +49,8 @@ function coerceTyped(
 /** Query values are coerced only where the matched operation's own schema says `number`/`boolean` (§10.3); every other value, `cursor` included, stays the wire string. */
 export function parseQuery(
   request: Request,
-  input: z.ZodType
+  kinds: QueryFieldKinds
 ): Record<string, unknown> {
-  const kinds = queryFieldKinds(input);
   const out: Record<string, unknown> = {};
   for (const [key, value] of new URL(request.url).searchParams) {
     const kind = kinds.get(key);
