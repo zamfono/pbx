@@ -121,17 +121,11 @@ async function seedRoute(db: Db): Promise<string> {
 }
 
 describe('a find-me leg still to come (§10.1 step 4)', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let pipeline: Pipeline;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let callerChannel: Channel;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let call: Call;
 
   function destroy(channelId: string, cause: number): void {

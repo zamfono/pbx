@@ -44,16 +44,13 @@ function recordAndWait(
 ): Promise<RecordingOutcome> {
   const { name } = options;
   return new Promise(resolve => {
-    // Rearmed when the caller's channel goes, so the two waits share one handle; held in an
-    // object because ESLint's `init-declarations` leaves no way to declare it unassigned.
-    const pending: { timer: ReturnType<typeof setTimeout> | null } = {
-      timer: null
-    };
+    // Rearmed when the caller's channel goes, so the two waits share one handle.
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const finish = (outcome: RecordingOutcome): void => {
       // eslint-disable-next-line no-use-before-define -- finish and onEvent reference each other
       ari.off('event', onEvent);
-      if (pending.timer !== null) {
-        clearTimeout(pending.timer);
+      if (timer !== null) {
+        clearTimeout(timer);
       }
       resolve(outcome);
     };
@@ -63,13 +60,13 @@ function recordAndWait(
         (ev.type === 'ChannelDestroyed' || ev.type === 'StasisEnd') &&
         channel?.id === channelId
       ) {
-        if (pending.timer !== null) {
-          clearTimeout(pending.timer);
+        if (timer !== null) {
+          clearTimeout(timer);
         }
-        pending.timer = setTimeout(() => {
+        timer = setTimeout(() => {
           finish({ kind: 'destroyed' });
         }, RECORDING_AFTER_HANGUP_MS);
-        pending.timer.unref();
+        timer.unref();
         return;
       }
       const recording = ev.recording as
@@ -84,10 +81,10 @@ function recordAndWait(
       }
     }
     ari.on('event', onEvent);
-    pending.timer = setTimeout(() => {
+    timer = setTimeout(() => {
       finish({ kind: 'failed' });
     }, timeoutMs);
-    pending.timer.unref();
+    timer.unref();
     // Requested once the listener is up, so no outcome of the recording can fire unseen.
     ari.channels.record(channelId, options).catch((error: unknown) => {
       finish({ kind: isGone(error) ? 'destroyed' : 'failed' });

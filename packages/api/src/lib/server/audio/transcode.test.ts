@@ -7,7 +7,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { transcodeForDownload, voicemailAttachment } from './transcode.js';
 
 describe('transcodeForDownload', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeAll before each test runs
   let wavPath: string;
 
   beforeAll(async () => {

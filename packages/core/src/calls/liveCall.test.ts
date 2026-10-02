@@ -26,18 +26,12 @@ import { Pipeline, type PipelineDeps } from './pipeline.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 
 describe('closeCall', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let pipeline: Pipeline;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let call: Call;
   /** What happened, in order: each QoS capture, recorder end and finish, with the hangups so far. */
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let trail: string[];
 
   function hangupsSoFar(): number {
@@ -142,19 +136,12 @@ describe('closeCall', () => {
 });
 
 describe('closeCall, on a call not yet answered', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let pipeline: Pipeline;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let finished: (Call['status'] | null)[];
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let mails: MailRequest[];
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let userId: string;
 
   beforeEach(async () => {

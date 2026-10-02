@@ -82,15 +82,10 @@ async function seedExtension(
 }
 
 describe('Presence', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let state: StateStore;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let presence: Presence;
 
   beforeEach(async () => {

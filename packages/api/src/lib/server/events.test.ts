@@ -175,7 +175,6 @@ describe('visibleTo', () => {
 });
 
 describe('authenticateEventsSocket', () => {
-  // eslint-disable-next-line init-declarations -- assigned in each test, closed in afterEach
   let wss: WebSocketServer;
 
   afterEach(async () => {
@@ -284,7 +283,6 @@ describe('authenticateEventsSocket', () => {
 });
 
 describe('EventHub', () => {
-  // eslint-disable-next-line init-declarations -- assigned in each test, closed in afterEach
   let wss: WebSocketServer;
 
   afterEach(async () => {

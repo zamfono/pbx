@@ -24,9 +24,7 @@ function spyLogger(): Logger & { warn: ReturnType<typeof vi.fn<LogFn>> } {
 const STARTED = '2026-09-29T08:00:00.000Z';
 
 describe('announceAsteriskStartOnConnect (§10.4 "After a restart")', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fake: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
 
   beforeEach(async () => {

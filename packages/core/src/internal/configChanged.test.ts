@@ -71,13 +71,9 @@ async function seedUserWithDevice(db: Db): Promise<string> {
 }
 
 describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let close: () => Promise<void>;
 
   beforeEach(async () => {

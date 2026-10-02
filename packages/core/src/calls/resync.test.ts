@@ -59,11 +59,8 @@ async function seedOpenCall(
 }
 
 describe('resyncOnBoot', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
 
   beforeEach(async () => {

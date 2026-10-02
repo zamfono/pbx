@@ -87,19 +87,12 @@ async function seedMessage(
 }
 
 describe('mailbox menu (§10.2 "Mailbox access")', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let pipeline: Pipeline;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let cdr: CdrWriter;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ownerId: string;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let call: Call;
   let playsSeen = 0;
 

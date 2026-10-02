@@ -193,15 +193,10 @@ function traceEvents(call: Call): Record<string, unknown>[] {
 }
 
 describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let pipeline: Pipeline;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let callerChannel: Channel;
 
   /** An inbound call from `from` to the company number `CALLED`, still ringing. */

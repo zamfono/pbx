@@ -108,7 +108,6 @@ function inboundCall(): ReturnType<typeof newCall> {
 }
 
 describe('applyOooAndHours', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
 
   beforeEach(async () => {

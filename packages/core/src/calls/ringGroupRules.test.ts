@@ -170,19 +170,12 @@ function playedMedia(fakeAri: FakeAri, channelId: string): string[] {
 }
 
 describe('ring-group ringability and fallback rules', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let presence: Presence;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let pipeline: Pipeline;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let callerChannel: Channel;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let call: Call;
 
   beforeEach(async () => {

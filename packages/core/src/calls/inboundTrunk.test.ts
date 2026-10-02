@@ -103,17 +103,11 @@ function traceEvents(call: Call | undefined): Record<string, unknown>[] {
 }
 
 describe('inbound number normalization at the trunk boundary (§9.4)', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let cdr: PipelineDeps['cdr'] & { opened: Call[] };
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let pipeline: Pipeline;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let mainDidId: string;
 
   beforeEach(async () => {

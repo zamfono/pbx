@@ -85,9 +85,7 @@ async function seedCall(db: Db, at: string, filename: string): Promise<string> {
 }
 
 describe('runRetention', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let mediaDir: string;
 
   beforeEach(async () => {

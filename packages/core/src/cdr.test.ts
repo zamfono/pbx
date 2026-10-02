@@ -140,15 +140,10 @@ function buildCall(logLevel: LogLevel = 'events'): Call {
 }
 
 describe('CdrWriter', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let bus: EventBus;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let cdr: CdrWriter;
 
   beforeEach(async () => {

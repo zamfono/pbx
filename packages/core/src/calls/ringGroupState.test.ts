@@ -70,7 +70,6 @@ async function seedOoo(db: Db, scopeUserId: string | null): Promise<void> {
 }
 
 describe('buildMemberStates', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
 
   beforeEach(async () => {

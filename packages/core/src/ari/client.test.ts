@@ -8,9 +8,7 @@ import { AriError, type AriEvent } from './types.js';
 const TEST_APP = 'zamfono';
 
 describe('AriClient', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fake: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let client: AriClient;
 
   beforeEach(async () => {

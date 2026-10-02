@@ -21,9 +21,7 @@ function debugLogger(): Logger & { debugs: unknown[][] } {
 }
 
 describe('recordFormatFor (§10.2 "Sample rate")', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
 
   beforeEach(async () => {

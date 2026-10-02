@@ -23,9 +23,7 @@ function spyLogger(): Logger & {
 }
 
 describe('reloadHepOnConnect (§7 level sip, §9.1)', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fake: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
 
   beforeEach(async () => {

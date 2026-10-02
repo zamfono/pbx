@@ -5,9 +5,7 @@ import { AmiClient, type AmiEvent } from './client.js';
 import { FakeAmi } from './fake.js';
 
 describe('AmiClient', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fake: FakeAmi;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let client: AmiClient;
 
   beforeEach(async () => {

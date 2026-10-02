@@ -98,7 +98,6 @@ function rtcpOfLeg(sipCallId: string): RtcpHepReport[] {
 }
 
 describe('QosRows (§7 level qos)', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
 
   beforeEach(async () => {

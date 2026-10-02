@@ -154,7 +154,6 @@ function sampleEvent(): Envelope {
 }
 
 describe('WebhookDispatcher', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach, closed in afterEach
   let stub: Awaited<ReturnType<typeof startStub>>;
 
   beforeEach(async () => {
@@ -321,7 +320,6 @@ describe('WebhookDispatcher', () => {
 });
 
 describe('WebhookDispatcher across a restart', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach, closed in afterEach
   let stub: Awaited<ReturnType<typeof startStub>>;
 
   beforeEach(async () => {

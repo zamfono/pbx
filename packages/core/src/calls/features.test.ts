@@ -272,17 +272,11 @@ function languageSet(
 }
 
 describe('features', () => {
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let ari: AriClient;
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let pipeline: Pipeline;
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let cdr: CdrWriter;
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let presence: Presence;
 
   async function setUp(parkingTimeoutS?: number): Promise<void> {

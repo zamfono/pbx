@@ -66,7 +66,6 @@ async function seedTenant(
 }
 
 describe('startSweep', () => {
-  // eslint-disable-next-line init-declarations -- assigned per test, stopped in afterEach
   let sweep: { stop: () => void } | undefined;
 
   afterEach(() => {

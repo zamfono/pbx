@@ -44,11 +44,8 @@ function fakePipeline(deps: CallStateDeps): Pipeline {
 }
 
 describe('a live call’s users (§10.3 "Live calls", §10.6)', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let deps: CallStateDeps;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let call: Call;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let events: CallStateEvent[];
 
   beforeEach(() => {

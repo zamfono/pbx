@@ -18,13 +18,9 @@ import { Pipeline } from './pipeline.js';
  * of a routing failure included. */
 
 describe('pipeline routing-failure log line', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let pipeline: Pipeline;
   let errors: Record<string, unknown>[] = [];
 

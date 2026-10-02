@@ -73,7 +73,6 @@ export function collectMenuInput(
   return new Promise(resolve => {
     let typed = '';
     let greetingPlaying = true;
-    // eslint-disable-next-line init-declarations -- assigned by armTimer before any event can fire
     let timer: ReturnType<typeof setTimeout>;
     const settle = (result: CollectResult): void => {
       // eslint-disable-next-line no-use-before-define -- settle and onEvent reference each other; onEvent is declared below

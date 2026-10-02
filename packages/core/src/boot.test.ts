@@ -14,7 +14,6 @@ import { Presence } from './presence.js';
 import { noopLogger } from './testing/pipelineDeps.js';
 
 describe('buildPipeline', () => {
-  // eslint-disable-next-line init-declarations -- assigned in the test before any use
   let db: Db;
 
   afterEach(async () => {

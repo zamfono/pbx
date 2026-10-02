@@ -85,20 +85,19 @@ function writesMade(fake: RingotelFake): string[] {
     .filter(method => WRITES.includes(method));
 }
 
-// The fake a test installed, put back after it; a holder, since ESLint's `init-declarations`
-// leaves no way to declare an optional `let` directly.
-const installed: { fake?: RingotelFake } = {};
+// The fake a test installed, put back after it.
+let installed: RingotelFake | undefined;
 
 function install(
   ...args: Parameters<typeof installRingotelFake>
 ): RingotelFake {
-  installed.fake = installRingotelFake(...args);
-  return installed.fake;
+  installed = installRingotelFake(...args);
+  return installed;
 }
 
 afterEach(() => {
-  installed.fake?.restore();
-  delete installed.fake;
+  installed?.restore();
+  installed = undefined;
 });
 
 describe('provisioning.ringotelAdopt', () => {

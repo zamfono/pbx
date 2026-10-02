@@ -94,11 +94,8 @@ async function insertTenantOoo(
 }
 
 describe('startSweep timing', () => {
-  // eslint-disable-next-line init-declarations -- assigned per test, stopped in afterEach
   let sweep: { stop: () => void } | undefined;
-  // eslint-disable-next-line init-declarations -- assigned per test
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned per test
   let cache: ConfigCache;
   let seen: Seen[] = [];
 

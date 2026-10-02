@@ -37,15 +37,10 @@ function traceOf(call: Call): Record<string, unknown>[] {
 }
 
 describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let rig: Rig;
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let pipeline: Pipeline;
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let actions: CallActions;
 
   async function setUp(): Promise<void> {

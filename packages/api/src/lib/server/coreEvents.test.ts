@@ -45,7 +45,6 @@ function envelope(id: string): Envelope {
 }
 
 describe('connectCoreEvents', () => {
-  // eslint-disable-next-line init-declarations -- assigned in each test, closed in afterEach
   let wss: WebSocketServer;
 
   afterEach(async () => {

@@ -25,9 +25,7 @@ async function readWavFormat(
 }
 
 describe('storeAudio', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeAll before each test runs
   let mediaDir: string;
-  // eslint-disable-next-line init-declarations -- assigned in beforeAll before each test runs
   let sineMp3: Buffer;
 
   beforeAll(async () => {

@@ -215,19 +215,12 @@ function trunkOriginates(fakeAri: FakeAri): Originate[] {
 }
 
 describe('an external forward target is dialled as the forwarding user (§10.1 step 7, §9.4)', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let pipeline: Pipeline;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let callerChannel: Channel;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let caller: string;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let call: Call;
 
   /** A call from `caller` (or from outside, `null`), still ringing, whose promise never floats. */

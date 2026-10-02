@@ -151,15 +151,10 @@ function buildLeg(overrides: Partial<Leg> & { channelId: string }): Leg {
 }
 
 describe('Recorder', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let cache: ConfigCache;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let cdr: CdrWriter;
 
   beforeEach(async () => {

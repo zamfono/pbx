@@ -25,17 +25,11 @@ const MEMBER_CHANNEL = 'member-1';
 const MEMBER_USER = 'user-1';
 
 describe('handleChannelEnded, the caller channel', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let pipeline: Pipeline;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let call: Call;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let finished: Call[];
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
 
   beforeEach(async () => {

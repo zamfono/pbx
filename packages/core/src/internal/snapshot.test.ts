@@ -31,7 +31,6 @@ async function seedSettings(db: Db): Promise<{ didId: string }> {
 }
 
 describe('ConfigCache snapshot', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
 
   beforeEach(async () => {

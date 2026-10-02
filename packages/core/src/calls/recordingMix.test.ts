@@ -134,13 +134,9 @@ function channelMeanVolumeDb(
 }
 
 describe('ffmpegMix', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeAll before each test runs
   let dir: string;
-  // eslint-disable-next-line init-declarations -- see above
   let leftPath: string;
-  // eslint-disable-next-line init-declarations -- see above
   let rightPath: string;
-  // eslint-disable-next-line init-declarations -- see above
   let headerOnlyPath: string;
 
   beforeAll(async () => {

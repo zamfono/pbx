@@ -129,19 +129,12 @@ async function seedAudioAsset(db: Db): Promise<string> {
 }
 
 describe('deposit', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let cdr: FakeCdr;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let bus: EventBus;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let apiClient: MailSender & { sent: MailRequest[] };
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let pipeline: Pipeline;
 
   beforeEach(async () => {

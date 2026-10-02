@@ -42,19 +42,12 @@ async function seedUserWithDevice(rig: Rig, ext: string): Promise<string> {
 }
 
 describe('call control', () => {
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let rig: Rig;
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let db: Db;
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let ari: AriClient;
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let pipeline: Pipeline;
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let actions: CallActions;
-  // eslint-disable-next-line init-declarations -- assigned by setUp() at the start of each test
   let state: StateStore;
 
   async function setUp(): Promise<void> {

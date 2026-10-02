@@ -27,7 +27,6 @@ export function playForDigit(
 ): Promise<MenuInput> {
   return new Promise(resolve => {
     let playing = true;
-    // eslint-disable-next-line init-declarations -- assigned once the media ends, before it can fire
     let timer: ReturnType<typeof setTimeout> | undefined;
     const settle = (input: MenuInput): void => {
       // eslint-disable-next-line no-use-before-define -- settle and onEvent reference each other; onEvent is declared below

@@ -36,12 +36,9 @@ function loggedPayloads(call: Call): string[] {
 }
 
 describe('SipCapture', () => {
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let fakeAri: FakeAri;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let ari: AriClient;
   let clock = 0;
-  // eslint-disable-next-line init-declarations -- assigned in beforeEach before each test runs
   let capture: SipCapture;
   // The Call-ID lookup each `register` starts, for `joined` to wait on.
   let lookups: Promise<unknown>[] = [];
