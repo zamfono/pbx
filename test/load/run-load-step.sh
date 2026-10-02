@@ -85,7 +85,7 @@ if [ "$concurrency" -gt 0 ]; then
   dc exec -T -d sipp sh -c \
     "rm -f /tmp/caller-$step.exit; sipp -sf /load-scenarios/load-caller.xml -s '$main_did' \
       -l $concurrency -m $concurrency -r $rate -rp 1s \
-      -min_rtp_port 20000 -max_rtp_port 29999 -timeout 180s \
+      -min_rtp_port 20000 -max_rtp_port 29999 -timeout 180s -timeout_error \
       -trace_stat -stf /tmp/caller-$step.csv \
       -trace_msg -message_file /tmp/caller-$step-messages.log \
       -nostdin asterisk:5060 > /tmp/caller-$step.stdout 2>&1; echo \$? > /tmp/caller-$step.exit"
