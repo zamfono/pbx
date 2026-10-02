@@ -238,5 +238,3 @@ export async function endTargetOwner(
   }
   await release(pipeline, call, fallback.code, fallback.status);
 }
-
-export { raiseLogLevel, toLogLevel } from './callLogLevel.js';

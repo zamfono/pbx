@@ -15,8 +15,6 @@ import type { Pipeline } from './pipeline.js';
 import { originateBatch } from './ringGroupOriginate.js';
 import { createBatchRace, type BatchOutcome } from './ringGroupRace.js';
 
-export type { BatchOutcome } from './ringGroupRace.js';
-
 /** One `ringPlan` batch: originates its legs, races them (first `Up` wins, a declined member's
  * siblings drop when `allowReject`), and resolves once answered, the caller abandons, or the
  * batch's `timeoutS` elapses. */

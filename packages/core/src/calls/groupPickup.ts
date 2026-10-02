@@ -10,7 +10,7 @@ import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { Call } from './call.js';
 import type { GroupLeg } from './groupLegs.js';
 import type { Pipeline } from './pipeline.js';
-import type { BatchOutcome } from './ringGroupDial.js';
+import type { BatchOutcome } from './ringGroupRace.js';
 
 export type ActiveBatch = {
   tracked: Map<string, GroupLeg>;

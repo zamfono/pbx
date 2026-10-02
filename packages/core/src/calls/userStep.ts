@@ -12,7 +12,8 @@ import {
   userOutcomeDecision
 } from '../routing/user.js';
 import { SIP_BUSY_HERE, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
-import { buildUserRules, raiseLogLevel, release, type Call } from './call.js';
+import { buildUserRules, release, type Call } from './call.js';
+import { raiseLogLevel } from './callLogLevel.js';
 import { CONDITION_REASONS, diversionFor } from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';
 import { ringUser } from './ringUser.js';

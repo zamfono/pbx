@@ -14,7 +14,8 @@ import {
   type Strategy
 } from '../routing/ringGroup.js';
 import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
-import { raiseLogLevel, release, type Call } from './call.js';
+import { release, type Call } from './call.js';
+import { raiseLogLevel } from './callLogLevel.js';
 import { extensionOf } from './extensionOwner.js';
 import { CONDITION_REASONS, diversionFor } from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';

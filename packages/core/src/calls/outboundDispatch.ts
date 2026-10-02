@@ -16,9 +16,9 @@ import {
   callerChannel,
   findForwardTarget,
   release,
-  toLogLevel,
   type Call
 } from './call.js';
+import { toLogLevel } from './callLogLevel.js';
 import { dialEmergency, emergencyLogLevel } from './emergency.js';
 import { handleFeature } from './features.js';
 import { enterTarget } from './inbound.js';

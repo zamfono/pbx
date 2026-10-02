@@ -9,7 +9,8 @@ import { newId } from '@zamfono/shared';
 import type { AriEvent, Channel } from '../ari/types.js';
 import { setChannelLanguage } from '../prompts.js';
 import type { DialAction } from '../routing/outbound.js';
-import { newCall, raiseLogLevel, type Call } from './call.js';
+import { newCall, type Call } from './call.js';
+import { raiseLogLevel } from './callLogLevel.js';
 import {
   dispatchAction,
   logLevelFor,

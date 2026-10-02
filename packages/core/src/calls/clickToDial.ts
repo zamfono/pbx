@@ -10,7 +10,8 @@ import type { Channel } from '../ari/types.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import { withClir, type DialAction } from '../routing/outbound.js';
-import { newCall, raiseLogLevel, type Call } from './call.js';
+import { newCall, type Call } from './call.js';
+import { raiseLogLevel } from './callLogLevel.js';
 import { extensionOf } from './extensionOwner.js';
 import {
   dispatchAction,

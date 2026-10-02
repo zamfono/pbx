@@ -9,13 +9,8 @@ import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import { SIP_NOT_FOUND } from '../sipCodes.js';
-import {
-  findForwardTarget,
-  newCall,
-  release,
-  toLogLevel,
-  type Call
-} from './call.js';
+import { findForwardTarget, newCall, release, type Call } from './call.js';
+import { toLogLevel } from './callLogLevel.js';
 import { extensionOf } from './extensionOwner.js';
 import { endHold } from './hold.js';
 import { trackLeg } from './legs.js';
