@@ -1,11 +1,10 @@
-import { readFile, rm } from 'node:fs/promises';
+import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import { sql, type Selectable, type Transaction } from 'kysely';
 import pino from 'pino';
 
 import { mwiMailboxOf, type DB, type MwiMailbox } from '@zamfono/shared';
 
-import { transcodeForDownload } from '#lib/server/audio/transcode.js';
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { mediaDirFromEnv } from '#lib/server/mediaDir.js';
 
@@ -129,7 +128,7 @@ export function mailboxKey(
   );
 }
 
-const VOICEMAIL_SUBDIR = 'voicemail';
+export const VOICEMAIL_SUBDIR = 'voicemail';
 
 /** Removes a voicemail's audio file from the media volume; missing files are not an error. */
 export async function deleteVoicemailFile(
@@ -137,43 +136,6 @@ export async function deleteVoicemailFile(
   mediaDir: string = mediaDirFromEnv()
 ): Promise<void> {
   await rm(path.join(mediaDir, VOICEMAIL_SUBDIR, filename), { force: true });
-}
-
-export type AudioBytes = {
-  bytes: Buffer;
-  contentType: string;
-  filename: string;
-};
-
-const CONTENT_TYPE_BY_DOWNLOAD_FORMAT: Record<'opus' | 'mp3', string> = {
-  opus: 'audio/ogg',
-  mp3: 'audio/mpeg'
-};
-
-/**
- * A voicemail's recorded audio (§10.3, §11.6): the stored WAV as-is with no `format`, or
- * transcoded to Opus/MP3 for download.
- */
-export async function loadVoicemailAudio(
-  filename: string,
-  format: 'opus' | 'mp3' | undefined,
-  mediaDir: string = mediaDirFromEnv()
-): Promise<AudioBytes> {
-  const filePath = path.join(mediaDir, VOICEMAIL_SUBDIR, filename);
-  if (format === undefined) {
-    return {
-      bytes: await readFile(filePath),
-      contentType: 'audio/wav',
-      filename
-    };
-  }
-  const bytes = await transcodeForDownload(filePath, format);
-  const base = path.basename(filename, path.extname(filename));
-  return {
-    bytes,
-    contentType: CONTENT_TYPE_BY_DOWNLOAD_FORMAT[format],
-    filename: `${base}.${format}`
-  };
 }
 
 /**

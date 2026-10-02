@@ -1,10 +1,9 @@
-import { readFile, rm } from 'node:fs/promises';
+import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import type { Selectable, Transaction } from 'kysely';
 
 import type { DB } from '@zamfono/shared';
 
-import { transcodeForDownload } from '#lib/server/audio/transcode.js';
 import { mediaDirFromEnv } from '#lib/server/mediaDir.js';
 
 import { OpError } from '../types.js';
@@ -50,7 +49,7 @@ export async function loadRecording(
   return row;
 }
 
-const RECORDINGS_SUBDIR = 'recordings';
+export const RECORDINGS_SUBDIR = 'recordings';
 // The raw pair's names beside `<id>.wav`: Asterisk's 8 kHz `.wav` or 16 kHz `.wav16`.
 const RAW_SUFFIXES = ['-l.wav', '-r.wav', '-l.wav16', '-r.wav16'];
 
@@ -69,41 +68,4 @@ export async function deleteRecordingFile(
       rm(path.join(mediaDir, RECORDINGS_SUBDIR, name), { force: true })
     )
   );
-}
-
-export type AudioBytes = {
-  bytes: Buffer;
-  contentType: string;
-  filename: string;
-};
-
-const CONTENT_TYPE_BY_DOWNLOAD_FORMAT: Record<'opus' | 'mp3', string> = {
-  opus: 'audio/ogg',
-  mp3: 'audio/mpeg'
-};
-
-/**
- * A recording's mixed stereo audio (§10.3, §11.6): the stored WAV as-is with no `format`, or
- * transcoded to Opus/MP3 for download.
- */
-export async function loadRecordingAudio(
-  filename: string,
-  format: 'opus' | 'mp3' | undefined,
-  mediaDir: string = mediaDirFromEnv()
-): Promise<AudioBytes> {
-  const filePath = path.join(mediaDir, RECORDINGS_SUBDIR, filename);
-  if (format === undefined) {
-    return {
-      bytes: await readFile(filePath),
-      contentType: 'audio/wav',
-      filename
-    };
-  }
-  const bytes = await transcodeForDownload(filePath, format);
-  const base = path.basename(filename, path.extname(filename));
-  return {
-    bytes,
-    contentType: CONTENT_TYPE_BY_DOWNLOAD_FORMAT[format],
-    filename: `${base}.${format}`
-  };
 }

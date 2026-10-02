@@ -1,7 +1,11 @@
+import path from 'node:path';
 import { z } from 'zod';
 
+import { downloadAudio } from '#lib/server/audio/transcode.js';
+import { mediaDirFromEnv } from '#lib/server/mediaDir.js';
+
 import { defineOperation } from '../types.js';
-import { loadRecording, loadRecordingAudio } from './_shared.js';
+import { loadRecording, RECORDINGS_SUBDIR } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -27,6 +31,9 @@ export const audio = defineOperation({
   readOnly: true,
   run: async (ctx, input) => {
     const row = await loadRecording(ctx.db, input.id);
-    return loadRecordingAudio(row.filename, input.format);
+    return downloadAudio(
+      path.join(mediaDirFromEnv(), RECORDINGS_SUBDIR, row.filename),
+      input.format
+    );
   }
 });

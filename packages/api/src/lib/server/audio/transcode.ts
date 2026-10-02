@@ -22,7 +22,7 @@ const CONTENT_TYPE_BY_FORMAT = {
  */
 export async function transcodeForDownload(
   src: string,
-  format: 'opus' | 'mp3'
+  format: DownloadFormat
 ): Promise<Buffer> {
   const tmpPath = path.join(
     os.tmpdir(),
@@ -48,6 +48,37 @@ export async function transcodeForDownload(
   }
 }
 
+export type DownloadFormat = 'opus' | 'mp3';
+
+export type AudioDownload = {
+  bytes: Buffer;
+  contentType: string;
+  filename: string;
+};
+
+/**
+ * The audio file at `filePath` for download (§10.3, §11.6): the stored WAV as-is with no
+ * `format`, or transcoded, named after the source with the format's extension.
+ */
+export async function downloadAudio(
+  filePath: string,
+  format: DownloadFormat | undefined
+): Promise<AudioDownload> {
+  if (format === undefined) {
+    return {
+      bytes: await readFile(filePath),
+      contentType: 'audio/wav',
+      filename: path.basename(filePath)
+    };
+  }
+  const base = path.basename(filePath, path.extname(filePath));
+  return {
+    bytes: await transcodeForDownload(filePath, format),
+    contentType: CONTENT_TYPE_BY_FORMAT[format],
+    filename: `${base}.${format}`
+  };
+}
+
 // §10.2 "Attachments": MP3 or Opus, never WAV; MP3 is the wider-compatibility choice across mail
 // clients.
 const VOICEMAIL_ATTACHMENT_FORMAT = 'mp3';
@@ -58,15 +89,6 @@ const VOICEMAIL_ATTACHMENT_FORMAT = 'mp3';
  */
 export async function voicemailAttachment(
   voicemailPath: string
-): Promise<{ filename: string; bytes: Buffer; contentType: string }> {
-  const bytes = await transcodeForDownload(
-    voicemailPath,
-    VOICEMAIL_ATTACHMENT_FORMAT
-  );
-  const base = path.basename(voicemailPath, path.extname(voicemailPath));
-  return {
-    filename: `${base}.${VOICEMAIL_ATTACHMENT_FORMAT}`,
-    bytes,
-    contentType: CONTENT_TYPE_BY_FORMAT[VOICEMAIL_ATTACHMENT_FORMAT]
-  };
+): Promise<AudioDownload> {
+  return downloadAudio(voicemailPath, VOICEMAIL_ATTACHMENT_FORMAT);
 }

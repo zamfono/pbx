@@ -1,11 +1,15 @@
+import path from 'node:path';
 import { z } from 'zod';
+
+import { downloadAudio } from '#lib/server/audio/transcode.js';
+import { mediaDirFromEnv } from '#lib/server/mediaDir.js';
 
 import { defineOperation } from '../types.js';
 import {
   assertVoicemailScope,
   loadVoicemail,
-  loadVoicemailAudio,
-  ringGroupIdsForUser
+  ringGroupIdsForUser,
+  VOICEMAIL_SUBDIR
 } from './_shared.js';
 
 const inputSchema = z
@@ -37,6 +41,9 @@ export const audio = defineOperation({
         ? await ringGroupIdsForUser(ctx.db, ctx.actor.id)
         : [];
     assertVoicemailScope(ctx.actor.role, ctx.actor.id, row, ringGroupIds);
-    return loadVoicemailAudio(row.filename, input.format);
+    return downloadAudio(
+      path.join(mediaDirFromEnv(), VOICEMAIL_SUBDIR, row.filename),
+      input.format
+    );
   }
 });
