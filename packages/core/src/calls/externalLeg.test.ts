@@ -692,7 +692,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
      * its accept key (§10.1 step 4). */
     async function answeredFindMeLeg(): Promise<{
       channelId: string;
-      finished: Promise<void>;
+      finished: Promise<unknown>;
     }> {
       const userId = await seedUser(db, {
         findMe: [{ number: '+15557000', delayS: 0 }]

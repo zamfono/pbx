@@ -15,7 +15,7 @@ import { hangupLeg, trackLeg, untrackLeg, type RingOutcome } from './legs.js';
 import type { Pipeline } from './pipeline.js';
 import { concludeRing, placeAll } from './ringConclusion.js';
 import { devicesToRing, registeredDevices } from './userDevices.js';
-import { applyRingOutcome } from './userStep.js';
+import { applyRingOutcome, type UnappliedDecision } from './userStep.js';
 
 const RELEASE_CODE_UNAVAILABLE = 480;
 
@@ -104,19 +104,19 @@ async function ringDevices(
 /**
  * Step 4: originate every registered device (+ find-me legs), first answer wins (§10.1).
  * `existingBridgeId`, else the call's own `joinBridgeId`, makes the win join that bridge rather
- * than a fresh one.
+ * than a fresh one. Returns the decision `applyRingOutcome` hands back.
  */
 export async function ringUser(
   pipeline: Pipeline,
   call: Call,
   userId: string,
   existingBridgeId: string | null = null
-): Promise<void> {
+): Promise<UnappliedDecision | null> {
   const snapshot = await pipeline.deps.cache.get();
   const user = snapshot.users.find(row => row.id === userId);
   if (user === undefined) {
     await release(pipeline, call, RELEASE_CODE_UNAVAILABLE, 'failed');
-    return;
+    return null;
   }
   // §10.1 step 4 rings the user's registered devices; an unregistered one has nowhere to ring,
   // and the `offline` rule counts the same view (`runUserStep`). A user already in a call is rung
@@ -131,8 +131,7 @@ export async function ringUser(
     // rings: the core gives the busy answer those devices would have ("Timers, the hop counter
     // and busy handling live entirely in the core") and applies the `busy` rule at once.
     call.log.event({ event: 'ringSkipped', reason: 'everyDeviceInCall' });
-    await applyRingOutcome(pipeline, call, snapshot, user, 'busy');
-    return;
+    return applyRingOutcome(pipeline, call, snapshot, user, 'busy');
   }
   // pendingRing is set before any originate, so a delayS-0 find-me leg's guard never races it.
   const { promise: outcomePromise, resolve: resolveOutcome } =
@@ -178,13 +177,13 @@ export async function ringUser(
 
   const outcome = await outcomePromise;
   if (outcome === 'answered') {
-    return;
+    return null;
   }
   // Ringing stopped for `userId` either way (abandoned, busy or no answer); `winLeg` sets
   // `inCall` on the answered path instead (§9.3, §10.2 "Presence and BLF").
   pipeline.deps.presence?.setCallState(userId, 'idle', null, null, call.id);
   if (outcome === 'abandoned') {
-    return;
+    return null;
   }
-  await applyRingOutcome(pipeline, call, snapshot, user, outcome);
+  return applyRingOutcome(pipeline, call, snapshot, user, outcome);
 }

@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-02 · §10.2 Call parking.** When the parking ring-back goes unanswered, a forward or mailbox the parker's own rules decided takes the parked party, as it would a direct call to the parker; only otherwise does the tenant fallback target. The ring-back itself still rings only the parker's phones.
+*Why:* requested by the product owner: the ring-back ignored the parker's forward and mailbox rules.
+
 **2026-10-02 · §10.2 Call parking.** A parked party whose ring-back goes unanswered goes to the tenant fallback target as a blind transfer's transferee does: the parked call ends as answered, and the party's call to the target is a new `calls` row whose `parent_call_id` is the parked call.
 *Why:* a parked party could not be connected to a fallback target that answers; product owner: record it like a transfer.
 

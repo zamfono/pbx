@@ -2307,8 +2307,14 @@ describe('features', () => {
     await db.updateTable('settings').set({ language: 'de' }).execute();
     // No device for the parker at all: `ringParkerBack` originates nothing and settles the
     // ring-back as unanswered immediately, without needing to wait out its own 30 s race window.
+    // Nor a mailbox, which would take the party in the tenant fallback's place.
     await seedExtension(db, '701', { isParkingSlot: true });
     const parkerUserId = await seedUser(db);
+    await db
+      .updateTable('users')
+      .set({ mailboxEnabled: 0 })
+      .where('id', '=', parkerUserId)
+      .execute();
     await seedExtension(db, '100', { userId: parkerUserId });
     const customerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }

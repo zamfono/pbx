@@ -238,6 +238,11 @@ why the specified behaviour changed; the commit history, how.
   never connected to whoever picked up. The parked caller is now connected, as after a blind
   transfer: the parked call ends in the call history, and the call to the fallback target follows
   it as a call of its own, linked to it.
+- The parking ring-back ignored the parker's forwarding and mailbox: when it went unanswered, the
+  parked caller always went to the tenant fallback target. Where the parker's own rules forward
+  the call or take it to their mailbox, as they would a call to the parker directly, the parked
+  caller now goes there; the tenant fallback takes them otherwise. The ring-back itself still
+  rings only the parker's phones.
 
 ### Upgrade notes
 

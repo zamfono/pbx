@@ -54,6 +54,7 @@ async function ringInternalTarget(
   call.joinBridgeId = activeBridgeId;
   if (target.kind === 'user') {
     call.calleeUserId = target.userId;
+    // An added party is only rung: a forward or mailbox handed back is left undone.
     await runUserStep(pipeline, call, snapshot, target.userId);
   } else {
     await ringGroup(pipeline, call, target.ringGroupId);

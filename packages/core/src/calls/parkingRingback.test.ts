@@ -61,14 +61,32 @@ describe('parking ring-back', () => {
     return anna;
   }
 
-  /** Makes the forward target of `values` the tenant fallback (§11.3). */
-  async function seedFallback(values: Record<string, string>): Promise<void> {
+  /** A forward target of `values`. */
+  async function seedTarget(values: Record<string, string>): Promise<string> {
     const id = newId();
     await db
       .insertInto('forwardTargets')
       .values({ id, ...values })
       .execute();
-    await db.updateTable('settings').set({ fallbackTargetId: id }).execute();
+    return id;
+  }
+
+  /** Makes the forward target of `values` the tenant fallback (§11.3). */
+  async function seedFallback(values: Record<string, string>): Promise<void> {
+    const fallbackTargetId = await seedTarget(values);
+    await db.updateTable('settings').set({ fallbackTargetId }).execute();
+  }
+
+  /** Gives `userId` a forward rule for `condition` to the target of `values`. */
+  async function seedRule(
+    userId: string,
+    condition: string,
+    values: Record<string, string>
+  ): Promise<void> {
+    await db
+      .insertInto('userForwardRules')
+      .values({ userId, condition, targetId: await seedTarget(values) })
+      .execute();
   }
 
   /** Ben at 102, with a registered phone that answers. */
@@ -215,5 +233,85 @@ describe('parking ring-back', () => {
 
     expect((await bridgedLeg(parked, onward)).kind).toBe('trunk');
     expect(placedTo('agent')).toBe(true);
+  });
+
+  it("sends the parked party where the parker's own forward to a colleague goes, not to the tenant fallback", async () => {
+    await setUp();
+    const anna = await seedParker();
+    const ben = await seedBen();
+    const carl = await seedUser(db, '103');
+    await seedDevice(rig, carl, 'e103-a');
+    await seedFallback({ userId: carl });
+    // Anna has no phone registered, so her `offline` rule decides the ring-back.
+    await seedRule(anna, 'offline', { userId: ben });
+    const parked = await parkFor(anna);
+
+    const { onward } = await answeredOnward(parked);
+
+    expect(onward.parentCallId).toBe(parked.id);
+    expect((await bridgedLeg(parked, onward)).userId).toBe(ben);
+    // A hop of Anna's, as her forward of a direct call to her would be (§9.4 "Forwarded calls").
+    expect(onward.diversions.map(hop => [hop.number, hop.reason])).toEqual([
+      ['101', 'unavailable']
+    ]);
+    expect(placedTo('e103-a')).toBe(false);
+  });
+
+  it("sends the parked party to the external number the parker's own forward names", async () => {
+    await setUp();
+    await seedExternalRoute(db);
+    const anna = await seedParker();
+    await seedRule(anna, 'unconditional', { external: '+4930999888' });
+    const parked = await parkFor(anna);
+
+    const { onward } = await answeredOnward(parked);
+
+    expect((await bridgedLeg(parked, onward)).kind).toBe('trunk');
+    expect(placedTo('+4930999888')).toBe(true);
+  });
+
+  it("leaves the parked party in the parker's mailbox when the parker's rules decide it", async () => {
+    await setUp();
+    // A deposit waits for Asterisk to end its recording (§10.2 "Voicemail").
+    fakeAri.recordingFinishedAfterMs = 5;
+    // Anna has her mailbox and no phone registered: `offline`'s implicit default.
+    const anna = await seedUser(db, '101');
+    const ben = await seedBen();
+    await seedFallback({ userId: ben });
+    const parked = await parkFor(anna);
+
+    await eventually(async () => {
+      const onward = await db
+        .selectFrom('calls')
+        .select(['status', 'toUri'])
+        .where('parentCallId', '=', parked.id)
+        .execute();
+      expect(onward).toEqual([{ status: 'voicemail', toUri: '101' }]);
+      const messages = await db
+        .selectFrom('voicemails')
+        .select('mailboxUserId')
+        .execute();
+      expect(messages).toEqual([{ mailboxUserId: anna }]);
+    }, RINGBACK_WAIT_MS);
+    expect(placedTo('e102-a')).toBe(false);
+  });
+
+  it('sends the parked party to the tenant fallback when the parker has no forward or mailbox to follow', async () => {
+    await setUp();
+    const anna = await seedParker();
+    // DND without a mailbox releases the ring-back, which leaves the party to the fallback.
+    await db
+      .updateTable('users')
+      .set({ dnd: 1 })
+      .where('id', '=', anna)
+      .execute();
+    const ben = await seedBen();
+    await seedFallback({ userId: ben });
+    const parked = await parkFor(anna);
+
+    const { onward } = await answeredOnward(parked);
+
+    expect((await bridgedLeg(parked, onward)).userId).toBe(ben);
+    expect(onward.diversions).toEqual([]);
   });
 });

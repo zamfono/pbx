@@ -33,10 +33,12 @@ group while it is a slot, and a menu's `allowExtensionDialing` never reaches one
    the parked party and the slot is free again. Dialling an empty slot plays a short error tone.
 3. **Ring-back.** A call still parked after `settings.parkingTimeoutS` seconds (default 300) rings
    the parker back as an internal call to the parker's own extension, so the parker's own rules
-   apply: DND, forwarding, the mailbox. When that call ends unanswered, the parked party goes to
-   the tenant-wide fallback target (`settings.fallbackTarget`, `numbers`), or is released when
-   there is none. As after a transfer, the parked call then ends in the call history, and the
-   party's call to the fallback is a call of its own whose `parentCallId` is the parked call.
+   apply: DND, forwarding, the mailbox. Only the parker's phones ring; when the parker's rules
+   forward the call or send it to their mailbox, the parked party goes there. When the ring-back
+   ends unanswered otherwise, the parked party goes to the tenant-wide fallback target
+   (`settings.fallbackTarget`, `numbers`), or is released when there is none. As after a
+   transfer, the parked call then ends in the call history, and the party's onward call is a call
+   of its own whose `parentCallId` is the parked call.
 
 A parked party who hangs up frees the slot. A restart of the `core` container hangs up parked
 calls whose parker it no longer knows. The parker appears in the call's routing trace

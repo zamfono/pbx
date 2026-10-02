@@ -21,10 +21,14 @@ import { RELEASE_CODE_NOT_FOUND } from './featureCall.js';
 import { endHold } from './hold.js';
 import { trackLeg } from './legs.js';
 import { closeCall } from './liveCall.js';
-import { startOnwardCall } from './onwardCall.js';
+import { startOnwardCall, type OnwardEntry } from './onwardCall.js';
 import type { Pipeline } from './pipeline.js';
 import { runTarget } from './runTarget.js';
-import { runUserStep } from './userStep.js';
+import {
+  applyUserDecision,
+  runUserStep,
+  type UnappliedDecision
+} from './userStep.js';
 
 /** Moves the parked party's channel into a fresh bridge of `type` — `holding` for the park itself
  * (§10.2 "Call parking": "moves the other party into a holding bridge"), `mixing` once someone is
@@ -90,20 +94,40 @@ type RingbackContext = {
   partyChannelId: string;
 };
 
+/** Where the parked party goes on: `undone`, the parker's own forward or mailbox, else the tenant
+ * fallback target (§11.3) as a forward without a caller (§10.1 step 7); `null` with neither. */
+function onwardRoute(
+  pipeline: Pipeline,
+  snapshot: Snapshot,
+  undone: UnappliedDecision | null
+): ((child: Call) => Promise<void>) | null {
+  if (undone !== null) {
+    return child => applyUserDecision(pipeline, child, snapshot, undone);
+  }
+  const targetId = snapshot.settings.fallbackTargetId;
+  if (targetId === null) {
+    return null;
+  }
+  const target = findForwardTarget(snapshot, targetId);
+  return child => runTarget(pipeline, child, target, null, null);
+}
+
 /**
- * §10.2 "Call parking": on an unanswered ring-back, the parked party goes to the tenant fallback
- * target (§11.3), released with 404 while the tenant carries none. Like a blind transfer's
- * transferee (§10.1 "Transfers and pickup"), the party goes on in a call of its own, a child of
- * `parked`, whose conversation ends here as answered; the onward call goes `to` the extension
- * the ring-back rang.
+ * §10.2 "Call parking": on an unanswered ring-back, a forward or mailbox of the parker's own rules
+ * (`undone`, handed back by the ring-back's user step) takes the parked party; otherwise the
+ * tenant fallback target does, released with 404 while the tenant carries none. Like a blind
+ * transfer's transferee (§10.1 "Transfers and pickup"), the party goes on in a call of its own, a
+ * child of `parked`, whose conversation ends here as answered; the onward call goes `to` the
+ * extension the ring-back rang, routed as the parker's call where their own rule sends it on.
  */
-async function routeParkedPartyToFallback(
+async function routeParkedParty(
   pipeline: Pipeline,
   snapshot: Snapshot,
   ctx: RingbackContext,
-  to: string
+  onward: { to: string; undone: UnappliedDecision | null }
 ): Promise<void> {
   const { parked, partyChannelId } = ctx;
+  const { undone } = onward;
   const ari = pipeline.deps.ari;
   await ari.channels.stopMoh(partyChannelId).catch(ignoreGone);
   if (parked.bridgeId !== null) {
@@ -113,30 +137,29 @@ async function routeParkedPartyToFallback(
     await ari.bridges.destroy(parked.bridgeId).catch(ignoreGone);
   }
   parked.bridgeId = null;
-  const targetId = snapshot.settings.fallbackTargetId;
-  if (targetId === null) {
+  const route = onwardRoute(pipeline, snapshot, undone);
+  if (route === null) {
     // The party is the one channel left for the release to end.
     parked.callerChannelId = partyChannelId;
     await release(pipeline, parked, RELEASE_CODE_NOT_FOUND, 'missed');
     return;
   }
-  parked.log.event({ event: 'parkingTimeout', result: 'fallback' });
+  const result = undone?.kind ?? 'fallback';
+  parked.log.event({ event: 'parkingTimeout', result });
   await closeCall(pipeline, parked, 'answered', false);
-  const target = findForwardTarget(snapshot, targetId);
-  const entry = {
-    to,
+  const entry: OnwardEntry = {
+    to: onward.to,
     direction: 'internal',
     logLevel: toLogLevel(snapshot.settings.callLogLevel),
-    asUserId: null,
-    trace: { parkingTimeout: 'fallback' }
-  } as const;
-  // The tenant fallback forwards without a caller (§10.1 step 7).
+    asUserId: undone === null ? null : ctx.parkerUserId,
+    trace: { parkingTimeout: result }
+  };
   await startOnwardCall(
     pipeline,
     parked,
     partyChannelId,
     { snapshot, entry },
-    child => runTarget(pipeline, child, target, null, null)
+    route
   );
 }
 
@@ -146,8 +169,9 @@ async function routeParkedPartyToFallback(
  * caller channel, so it only rings (`Call.callerChannelId`): the party waits in a mixing bridge
  * of its own, which whichever device answers joins through `legs.ts`'s `winLeg`
  * (`existingBridgeId`, handed over as the ring-back's `joinBridgeId`). Its `calls` row closes here
- * on either outcome. On no answer (a DND, forward or mailbox decision, no registered device or a
- * ring nobody took), the parked party goes to the tenant fallback target.
+ * on either outcome. On no answer, a forward or mailbox the parker's rules decided takes the
+ * parked party; otherwise (a release, no registered device or a ring nobody took with no rule of
+ * theirs to follow) the tenant fallback target does.
  */
 export async function ringParkerBack(
   pipeline: Pipeline,
@@ -164,12 +188,10 @@ export async function ringParkerBack(
   );
   const parkerExt = extensionOf(snapshot, { userId: parkerUserId });
   if (parkerExt === null || parked.bridgeId === null) {
-    await routeParkedPartyToFallback(
-      pipeline,
-      snapshot,
-      ctx,
-      parkerExt ?? parked.to
-    );
+    await routeParkedParty(pipeline, snapshot, ctx, {
+      to: parkerExt ?? parked.to,
+      undone: null
+    });
     return;
   }
   const ringback = newCall({
@@ -192,8 +214,9 @@ export async function ringParkerBack(
     'mixing'
   );
   ringback.joinBridgeId = bridgeId;
+  let undone: UnappliedDecision | null = null;
   try {
-    await runUserStep(pipeline, ringback, snapshot, parkerUserId);
+    undone = await runUserStep(pipeline, ringback, snapshot, parkerUserId);
   } catch {
     // The party must not stay parked because the parker's own rules failed to run; the fallback
     // below still takes them.
@@ -214,5 +237,5 @@ export async function ringParkerBack(
     ringback.status ??= 'missed';
     await pipeline.finishCall(ringback);
   }
-  await routeParkedPartyToFallback(pipeline, snapshot, ctx, parkerExt);
+  await routeParkedParty(pipeline, snapshot, ctx, { to: parkerExt, undone });
 }
