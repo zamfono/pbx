@@ -1,4 +1,4 @@
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { nowIso, type Db } from '@zamfono/shared';
 
 import {
   runAfterCommit,
@@ -6,23 +6,24 @@ import {
   runWaitingHooks,
   withWarnings
 } from './afterCommit.js';
-import { newEffects, type Effects } from './effects.js';
+import { insertAuditRow, type AuditCaller } from './audit.js';
+import { absorbEffects, newEffects, type Effects } from './effects.js';
+import {
+  checkConfirmation,
+  checkRole,
+  findOperation,
+  parseInput
+} from './gates.js';
 import { notifyPropagation } from './propagate.js';
 import { registry, type ErasedOperation } from './registry.js';
 import { runRollbackHooks } from './rollbackHooks.js';
-import {
-  ConfirmationRequired,
-  OpError,
-  type Actor,
-  type Channel,
-  type Context,
-  type Role
-} from './types.js';
+import { OpError, type Actor, type Channel, type Context } from './types.js';
 
 export {
   maskContent,
   recordChange,
   recordFieldChanges,
+  recordRevert,
   setUndoable
 } from './audit.js';
 export { propagate } from './propagate.js';
@@ -39,53 +40,7 @@ export type RunInput = {
   confirm?: boolean;
 };
 
-const STATUS_NOT_FOUND = 404;
-const STATUS_FORBIDDEN = 403;
-const STATUS_UNPROCESSABLE_ENTITY = 422;
-
-/** Owner outranks admin outranks user (§5.3); a lower number is more privileged. */
-const ROLE_RANK: Record<Role, number> = { owner: 0, admin: 1, user: 2 };
-
-function findOperation(name: string): ErasedOperation {
-  const op = registry.get(name);
-  if (!op) {
-    throw new OpError(STATUS_NOT_FOUND, `unknown operation '${name}'`);
-  }
-  return op;
-}
-
-function parseInput(op: ErasedOperation, input: unknown): unknown {
-  const parsed = op.input.safeParse(input);
-  if (!parsed.success) {
-    throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
-      'validation failed',
-      parsed.error.issues
-    );
-  }
-  return parsed.data;
-}
-
-// Only `minRole` is enforced here. §5.3's own-scope rules (e.g. a `user` reading only their own
-// voicemails) have no field on `Operation` to declare them and are each operation's own concern,
-// inside its `run`.
-function checkRole(op: ErasedOperation, actor: Actor): void {
-  if (ROLE_RANK[actor.role] > ROLE_RANK[op.minRole]) {
-    throw new OpError(STATUS_FORBIDDEN, 'forbidden');
-  }
-}
-
-/** MCP elicitation, the REST `confirm: true` body field and the UI dialog share this gate (§10.3); undo and jobs never ask. */
-function checkConfirmation(
-  op: ErasedOperation,
-  run: RunInput,
-  input: unknown
-): void {
-  const alwaysConfirmed = run.channel === 'undo' || run.channel === 'job';
-  if (op.confirm && !alwaysConfirmed && run.confirm !== true) {
-    throw new ConfirmationRequired(op.confirm(input));
-  }
-}
+const STATUS_CONFLICT = 409;
 
 type AuditWrite = {
   ctx: Context;
@@ -96,7 +51,10 @@ type AuditWrite = {
   output: unknown;
 };
 
-/** Writes the `audit_log` row for a completed write, in the same transaction as its body (§5.7). */
+/**
+ * Writes the `audit_log` row for a completed write, in the same transaction as its body (§5.7).
+ * An undo's own entry is channel `undo` with no OAuth client, whoever called it (§5.8, §11.2).
+ */
 async function writeAuditRow({
   ctx,
   op,
@@ -105,34 +63,24 @@ async function writeAuditRow({
   input,
   output
 }: AuditWrite): Promise<void> {
-  // `register()` refuses an operation that needs an audit row but omits `entity()`, so this is
-  // reached only for operations that supply one; the check narrows `entity` for TypeScript.
-  const entity = op.entity?.(input, output);
+  const { changes, undoable, reverts } = ctx.effects;
+  const entity = reverts?.entity ?? op.entity?.(input, output);
   if (!entity) {
     throw new Error(
       `operation '${name}': entity() is required to audit a write`
     );
   }
-  const { changes, undoable } = ctx.effects;
-  await ctx.db
-    .insertInto('auditLog')
-    .values({
-      id: newId(),
-      actorUserId: run.actor.id,
-      actorUserName: run.actor.name,
-      channel: run.channel,
-      clientId: run.clientId ?? null,
-      clientName: run.clientName ?? null,
-      operation: name,
-      entityKind: entity.kind,
-      entityId: entity.id,
-      changesJson: JSON.stringify(changes),
-      undoable: undoable ? 1 : 0,
-      revertsId: null,
-      undoneAt: null,
-      createdAt: ctx.now
-    })
-    .execute();
+  const caller: AuditCaller =
+    reverts === null ? run : { actor: run.actor, channel: 'undo' };
+  await insertAuditRow(ctx.db, {
+    caller,
+    operation: name,
+    entity,
+    changes,
+    undoable,
+    revertsId: reverts?.id ?? null,
+    createdAt: ctx.now
+  });
 }
 
 type Execution = {
@@ -239,4 +187,40 @@ export async function runOperation(
     await runRestartPush(db);
   }
   return withWarnings(output, warnings);
+}
+
+/**
+ * Writes `input` back through the operation `name` as part of the undo `ctx` runs (§5.8: "Field
+ * changes are reverted by writing the `from` values back through the normal operations"), so it
+ * never asks confirmation (§10.3). It writes no audit entry of its own, since the undo's entry
+ * records the revert; what it propagates, runs after the commit or warns joins `ctx`'s. An operation not registered, or a recorded diff that does not form a valid input for
+ * it, is refused with a 409, so the entry stays live and the caller learns why.
+ */
+export async function replayOperation(
+  ctx: Context,
+  name: string,
+  input: unknown
+): Promise<void> {
+  const op = registry.get(name);
+  if (!op) {
+    throw new OpError(
+      STATUS_CONFLICT,
+      `audit.undo: operation '${name}' is not registered`
+    );
+  }
+  const parsed = op.input.safeParse(input);
+  if (!parsed.success) {
+    throw new OpError(
+      STATUS_CONFLICT,
+      `audit.undo: '${name}' cannot take this change back`,
+      parsed.error.issues
+    );
+  }
+  checkConfirmation(op, { channel: 'undo' }, parsed.data);
+  const effects = newEffects();
+  try {
+    await op.run({ ...ctx, effects }, parsed.data);
+  } finally {
+    absorbEffects(ctx.effects, effects);
+  }
 }

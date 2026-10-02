@@ -1,6 +1,6 @@
+import { replayOperation } from '../runner.js';
 import { revertTrunkOrder } from '../trunks/revertOrder.js';
 import { OpError, type Context } from '../types.js';
-import { replayOperation } from './_replay.js';
 import type { ChangeEntry } from './_shared.js';
 
 const STATUS_CONFLICT = 409;

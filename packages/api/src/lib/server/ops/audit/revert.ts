@@ -2,6 +2,7 @@ import { revertHoursSet } from '../hours/revert.js';
 import { revertMailTemplate } from '../mailTemplates/revert.js';
 import { revertParkingSet } from '../parking/revert.js';
 import { pushRoster } from '../roster.js';
+import { replayOperation } from '../runner.js';
 import { revertSettingsUpdate } from '../settings/revert.js';
 import { OpError, type Context } from '../types.js';
 import {
@@ -11,7 +12,6 @@ import {
   revertSoftDelete
 } from './_cascadeRevert.js';
 import { LIST_REVERTS, type EntryRevert } from './_listReverts.js';
-import { replayOperation } from './_replay.js';
 import type { ChangeEntry } from './_shared.js';
 import { restoreProvisionedDevices } from './restoreProvisioning.js';
 

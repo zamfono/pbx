@@ -16,12 +16,12 @@ import { activeRingotelProvider } from '#lib/server/provisioning/index.js';
 import { setProfilePending } from '#lib/server/provisioning/profilePending.js';
 
 import { afterPropagation } from '../afterCommit.js';
+import type { AuditCaller } from '../audit.js';
 import {
   callerOf,
   JOB_CALLER,
   outcomeChanges,
-  recordOutcome,
-  type OutcomeCaller
+  recordOutcome
 } from '../outcomeLog.js';
 import type { Context } from '../types.js';
 import { loadSettings } from './_shared.js';
@@ -56,7 +56,7 @@ async function attempt(db: Db): Promise<ProfileOutcome> {
  */
 async function settle(
   db: Db,
-  caller: OutcomeCaller,
+  caller: AuditCaller,
   trigger: ProfileTrigger,
   result: ProfileOutcome
 ): Promise<void> {

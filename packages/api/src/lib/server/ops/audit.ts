@@ -1,5 +1,7 @@
-import type { ChangeEntry } from './effects.js';
-import type { Context } from './types.js';
+import { newId, type Db } from '@zamfono/shared';
+
+import type { ChangeEntry, RevertedEntry } from './effects.js';
+import type { Actor, Channel, Context } from './types.js';
 
 /**
  * Fields whose value is a secret: masked in `changes_json` and never revertible, since there is
@@ -68,4 +70,66 @@ export function maskContent(ctx: Context): void {
 /** Overrides `ctx`'s audit entry's undoability, for operations `recordChange` cannot cover (§5.8). */
 export function setUndoable(ctx: Context, undoable: boolean): void {
   ctx.effects.undoable = undoable;
+}
+
+/**
+ * Makes `ctx`'s audit entry the undo of `reverted` (§5.8): it names `reverted`'s entity, records
+ * the reverse of `changes`, its diff, points `reverts_id` at it and is never undoable itself.
+ */
+export function recordRevert(
+  ctx: Context,
+  reverted: RevertedEntry,
+  changes: ChangeEntry[]
+): void {
+  ctx.effects.reverts = reverted;
+  ctx.effects.undoable = false;
+  for (const change of changes) {
+    recordChange(ctx, {
+      field: change.field,
+      from: change.to,
+      to: change.from
+    });
+  }
+}
+
+/** Who an `audit_log` entry is attributed to: the actor, the channel and, for a token, the client. */
+export type AuditCaller = {
+  actor: Pick<Actor, 'id' | 'name'>;
+  channel: Channel;
+  clientId?: string;
+  clientName?: string;
+};
+
+/** One `audit_log` entry as its writers fill it; the insert assigns its id (§5.7, §11.2). */
+export type AuditRow = {
+  caller: AuditCaller;
+  operation: string;
+  entity: { kind: string; id: string | null };
+  changes: ChangeEntry[];
+  undoable: boolean;
+  revertsId: string | null;
+  createdAt: string;
+};
+
+/** Appends `row` to `audit_log`, not yet undone. */
+export async function insertAuditRow(db: Db, row: AuditRow): Promise<void> {
+  await db
+    .insertInto('auditLog')
+    .values({
+      id: newId(),
+      actorUserId: row.caller.actor.id,
+      actorUserName: row.caller.actor.name,
+      channel: row.caller.channel,
+      clientId: row.caller.clientId ?? null,
+      clientName: row.caller.clientName ?? null,
+      operation: row.operation,
+      entityKind: row.entity.kind,
+      entityId: row.entity.id,
+      changesJson: JSON.stringify(row.changes),
+      undoable: row.undoable ? 1 : 0,
+      revertsId: row.revertsId,
+      undoneAt: null,
+      createdAt: row.createdAt
+    })
+    .execute();
 }

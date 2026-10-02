@@ -1,5 +1,5 @@
-import { replayOperation } from '../audit/_replay.js';
 import type { ChangeEntry } from '../audit/_shared.js';
+import { replayOperation } from '../runner.js';
 import { Conflict, OpError, type Context } from '../types.js';
 
 const STATUS_CONFLICT = 409;

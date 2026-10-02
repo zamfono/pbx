@@ -1,7 +1,7 @@
 import { revertBlfKeys } from '../audit/_cascadeRevert.js';
-import { replayOperation } from '../audit/_replay.js';
 import type { ChangeEntry } from '../audit/_shared.js';
 import type { DroppedBlfKey } from '../devices/_shared.js';
+import { replayOperation } from '../runner.js';
 import { OpError, type Context } from '../types.js';
 
 const STATUS_CONFLICT = 409;

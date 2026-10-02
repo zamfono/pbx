@@ -48,7 +48,10 @@ export type Operation<In, Out> = {
    * (§5.8).
    */
   pureAction?: true;
-  /** Omitted on reads; required for the audit_log row's entity columns on a write. */
+  /**
+   * Omitted on reads; on a write, the entity its audit_log row names, except for an undo, whose
+   * row names the entity of the entry it reverts (`recordRevert`).
+   */
   entity?: (input: In, out: Out) => { kind: string; id: string | null };
   run(ctx: Context, input: In): Promise<Out>;
 };

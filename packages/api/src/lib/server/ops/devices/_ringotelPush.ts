@@ -16,12 +16,12 @@ import {
 } from '#lib/server/provisioning/ringotelUser.js';
 
 import { oweRestartPush } from '../afterCommit.js';
+import type { AuditCaller } from '../audit.js';
 import {
   callerOf,
   JOB_CALLER,
   outcomeChanges,
-  recordOutcome,
-  type OutcomeCaller
+  recordOutcome
 } from '../outcomeLog.js';
 import { afterCommit, afterPropagation } from '../runner.js';
 import type { Context } from '../types.js';
@@ -51,7 +51,7 @@ type Push = PushTarget & {
  */
 async function auditPush(
   db: Db,
-  caller: OutcomeCaller,
+  caller: AuditCaller,
   push: PushTarget,
   result: PushOutcome
 ): Promise<void> {

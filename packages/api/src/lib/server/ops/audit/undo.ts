@@ -1,9 +1,8 @@
 import { z } from 'zod';
 
-import { newId } from '@zamfono/shared';
-
 import { OUTCOME_OPERATIONS } from '../outcomeLog.js';
 import { registry } from '../registry.js';
+import { recordRevert } from '../runner.js';
 import { Conflict, defineOperation, OpError, type Context } from '../types.js';
 import { isTenantListOperation, revertTenantList } from './_listReverts.js';
 import { ENTITY_TABLES, parseChanges, type ChangeEntry } from './_shared.js';
@@ -143,39 +142,10 @@ async function assertRowNotPurged(
   }
 }
 
-/** Appends the `audit.undo` row itself: channel `undo` and `revertsId` are its own concern, which
- * is why this operation opts out of the runner's generic audit write (§5.8). */
-async function appendUndoEntry(
-  ctx: Context,
-  reverted: UndoableEntry,
-  reverseChanges: ChangeEntry[]
-): Promise<void> {
-  await ctx.db
-    .insertInto('auditLog')
-    .values({
-      id: newId(),
-      actorUserId: ctx.actor.id,
-      actorUserName: ctx.actor.name,
-      channel: 'undo',
-      // NULL for undo whoever calls it, as for UI sessions and jobs (§11.2 `audit_log`).
-      clientId: null,
-      clientName: null,
-      operation: 'audit.undo',
-      entityKind: reverted.entityKind,
-      entityId: reverted.entityId,
-      changesJson: JSON.stringify(reverseChanges),
-      undoable: 0,
-      revertsId: reverted.id,
-      undoneAt: null,
-      createdAt: ctx.now
-    })
-    .execute();
-}
-
 /**
  * `POST /audit/{id}/undo` (§5.8): reverts one `audit_log` entry by writing its `changes_json`
- * `from` values back, through the reverted entity's own operation, and appends the entry's own
- * `audit.undo` row. Never asks confirmation (§10.3).
+ * `from` values back, through the reverted entity's own operation; its own entry is the reverse
+ * of the reverted one (`recordRevert`). Never asks confirmation (§10.3).
  */
 export const undo = defineOperation({
   name: 'audit.undo',
@@ -187,7 +157,6 @@ export const undo = defineOperation({
     })
     .strict(),
   minRole: 'admin',
-  audit: false,
   run: async (ctx, input) => {
     const entry = await loadUndoableEntry(ctx, input.id);
     await assertNoLaterChange(ctx, entry);
@@ -209,12 +178,11 @@ export const undo = defineOperation({
       .set({ undoneAt: ctx.now })
       .where('id', '=', entry.id)
       .execute();
-    const reverseChanges: ChangeEntry[] = changes.map(change => ({
-      field: change.field,
-      from: change.to,
-      to: change.from
-    }));
-    await appendUndoEntry(ctx, entry, reverseChanges);
+    recordRevert(
+      ctx,
+      { id: entry.id, entity: { kind: entry.entityKind, id: entry.entityId } },
+      changes
+    );
     return { id: entry.id };
   }
 });

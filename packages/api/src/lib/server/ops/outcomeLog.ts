@@ -1,7 +1,8 @@
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { nowIso, type Db } from '@zamfono/shared';
 
+import { insertAuditRow, type AuditCaller } from './audit.js';
 import type { ChangeEntry } from './effects.js';
-import type { Actor, Channel, Context } from './types.js';
+import type { Context } from './types.js';
 
 /**
  * The `audit_log` operations that record what an effect outside Zamfono answered, rather than a
@@ -26,22 +27,14 @@ export const OUTCOME_OPERATIONS: ReadonlySet<string> = new Set(
 
 export type OutcomeOperation = (typeof OUTCOME_OPERATION_NAMES)[number];
 
-/** Who an outcome row is attributed to: the caller of the operation it follows, or a job. */
-export type OutcomeCaller = {
-  actor: Pick<Actor, 'id' | 'name'>;
-  channel: Channel;
-  clientId?: string;
-  clientName?: string;
-};
-
 /** A background job's own entries (channel `job`): no person's action caused them. */
-export const JOB_CALLER: OutcomeCaller = {
+export const JOB_CALLER: AuditCaller = {
   actor: { id: 'system', name: 'Zamfono' },
   channel: 'job'
 };
 
 /** `ctx`'s caller, captured for an outcome row written once `ctx`'s transaction has ended. */
-export function callerOf(ctx: Context): OutcomeCaller {
+export function callerOf(ctx: Context): AuditCaller {
   return {
     actor: { id: ctx.actor.id, name: ctx.actor.name },
     channel: ctx.channel,
@@ -61,29 +54,16 @@ export function outcomeChanges(fields: Record<string, unknown>): ChangeEntry[] {
 export async function recordOutcome(
   db: Db,
   entry: {
-    caller: OutcomeCaller;
+    caller: AuditCaller;
     operation: OutcomeOperation;
     entity: { kind: string; id: string | null };
     changes: ChangeEntry[];
   }
 ): Promise<void> {
-  await db
-    .insertInto('auditLog')
-    .values({
-      id: newId(),
-      actorUserId: entry.caller.actor.id,
-      actorUserName: entry.caller.actor.name,
-      channel: entry.caller.channel,
-      clientId: entry.caller.clientId ?? null,
-      clientName: entry.caller.clientName ?? null,
-      operation: entry.operation,
-      entityKind: entry.entity.kind,
-      entityId: entry.entity.id,
-      changesJson: JSON.stringify(entry.changes),
-      undoable: 0,
-      revertsId: null,
-      undoneAt: null,
-      createdAt: nowIso()
-    })
-    .execute();
+  await insertAuditRow(db, {
+    ...entry,
+    undoable: false,
+    revertsId: null,
+    createdAt: nowIso()
+  });
 }

@@ -1,5 +1,5 @@
-import { replayOperation } from '../audit/_replay.js';
 import type { ChangeEntry } from '../audit/_shared.js';
+import { replayOperation } from '../runner.js';
 import type { Context } from '../types.js';
 import {
   restoreSsoSubjects,

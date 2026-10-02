@@ -1,6 +1,6 @@
-import { replayOperation } from '../audit/_replay.js';
 import type { ChangeEntry } from '../audit/_shared.js';
 import { resolveTarget } from '../dids/_shared.js';
+import { replayOperation } from '../runner.js';
 import { OpError, type Context } from '../types.js';
 import { loadIntervals, scopeFromColumns } from './_shared.js';
 
