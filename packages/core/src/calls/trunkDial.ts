@@ -164,7 +164,7 @@ export async function originateTrunkLeg(
   }
   // §7: the trunk carrying the call's leg counts toward its diagnostics level.
   raiseLogLevel(call.log, trunk, pipeline.deps.now());
-  trunkState.noteAttemptStarted(trunk.id);
+  trunkState.noteAttemptStarted(trunk.id, channelId);
   try {
     // Read after the attempt is counted, so the language adds no wait ahead of the channel count.
     const snapshot = await pipeline.deps.cache.get();
@@ -198,7 +198,7 @@ export async function originateTrunkLeg(
     );
     return { id: channel.id, name: channel.name };
   } catch (error: unknown) {
-    trunkState.noteAttemptEnded(trunk.id);
+    trunkState.noteAttemptEnded(channelId);
     throw error;
   }
 }

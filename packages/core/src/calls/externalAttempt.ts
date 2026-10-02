@@ -65,7 +65,7 @@ function closeAttempt(attempt: Attempt): void {
   if (attempt.onEvent !== null) {
     attempt.leg.pipeline.deps.ari.off('event', attempt.onEvent);
   }
-  attempt.leg.trunkState.noteAttemptEnded(attempt.candidate.trunk.id);
+  attempt.leg.trunkState.noteAttemptEnded(attempt.channelId);
 }
 
 /** Ends the 8-second no-response budget: a provisional response arrived (§9.4 "Route fallthrough"). */

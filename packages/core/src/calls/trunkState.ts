@@ -37,6 +37,9 @@ type TrunkStateDeps = {
 
 export class TrunkState {
   private readonly deps: TrunkStateDeps;
+  // The trunk each counted leg's channel occupies, by channel: a leg ends once, however many of
+  // its watchers see it end (an attempt hung up while its dial is in flight is seen by both).
+  private readonly countedLegs = new Map<string, string>();
 
   constructor(deps: TrunkStateDeps) {
     this.deps = deps;
@@ -67,14 +70,25 @@ export class TrunkState {
     return this.deps.state.trunkChannels.get(trunkId) ?? 0;
   }
 
-  noteAttemptStarted(trunkId: string): void {
+  /** Counts the leg on `channelId` among `trunkId`'s active legs. */
+  noteAttemptStarted(trunkId: string, channelId: string): void {
+    if (this.countedLegs.has(channelId)) {
+      return;
+    }
+    this.countedLegs.set(channelId, trunkId);
     this.deps.state.trunkChannels.set(
       trunkId,
       this.activeChannels(trunkId) + 1
     );
   }
 
-  noteAttemptEnded(trunkId: string): void {
+  /** Counts the leg on `channelId` off its trunk; a leg not counted (any more) is left alone. */
+  noteAttemptEnded(channelId: string): void {
+    const trunkId = this.countedLegs.get(channelId);
+    if (trunkId === undefined) {
+      return;
+    }
+    this.countedLegs.delete(channelId);
     const next = this.activeChannels(trunkId) - 1;
     // Kept in the live state, which `/metrics` reports (§7), so a trunk carrying none drops out.
     if (next > 0) {
@@ -94,7 +108,6 @@ export class TrunkState {
    */
   watchInboundLeg(channelId: string): (trunkId: string | null) => void {
     let destroyed = false;
-    let counted: string | null = null;
     const onEvent = (event: AriEvent): void => {
       const channel = event.channel as { id?: string } | undefined;
       if (event.type !== 'ChannelDestroyed' || channel?.id !== channelId) {
@@ -102,9 +115,7 @@ export class TrunkState {
       }
       this.deps.ari.off('event', onEvent);
       destroyed = true;
-      if (counted !== null) {
-        this.noteAttemptEnded(counted);
-      }
+      this.noteAttemptEnded(channelId);
     };
     this.deps.ari.on('event', onEvent);
     return trunkId => {
@@ -114,8 +125,7 @@ export class TrunkState {
       }
       // A leg already gone never occupies a channel.
       if (!destroyed) {
-        counted = trunkId;
-        this.noteAttemptStarted(trunkId);
+        this.noteAttemptStarted(trunkId, channelId);
       }
     };
   }

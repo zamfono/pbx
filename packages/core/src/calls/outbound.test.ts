@@ -603,7 +603,7 @@ describe('outbound dialing', () => {
     const trunk2 = await seedTrunk(db, 2);
     await seedRoute(db, 1, trunk1);
     await seedRoute(db, 2, trunk2);
-    trunkState.noteAttemptStarted(trunk1);
+    trunkState.noteAttemptStarted(trunk1, 'busy-channel');
 
     const call = await dial('+498912345');
 

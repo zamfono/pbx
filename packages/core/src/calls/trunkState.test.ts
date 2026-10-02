@@ -483,17 +483,19 @@ describe('TrunkState', () => {
   });
 
   it("serves each trunk's channels in use in the live state until it carries none (§7, §9.4)", async () => {
-    trunkState.noteAttemptStarted('trunkA');
-    trunkState.noteAttemptStarted('trunkA');
-    trunkState.noteAttemptStarted('trunkB');
-    trunkState.noteAttemptEnded('trunkB');
+    trunkState.noteAttemptStarted('trunkA', 'a1');
+    trunkState.noteAttemptStarted('trunkA', 'a2');
+    trunkState.noteAttemptStarted('trunkB', 'b1');
+    trunkState.noteAttemptEnded('b1');
 
     expect((await state.snapshot()).trunkChannels).toEqual({ trunkA: 2 });
     expect(trunkState.activeChannels('trunkA')).toBe(2);
 
-    trunkState.noteAttemptEnded('trunkA');
-    trunkState.noteAttemptEnded('trunkA');
-    trunkState.noteAttemptEnded('trunkA');
+    // A leg seen ending twice (its placement failing and its channel's end) counts off once.
+    trunkState.noteAttemptEnded('a1');
+    trunkState.noteAttemptEnded('a1');
+    expect(trunkState.activeChannels('trunkA')).toBe(1);
+    trunkState.noteAttemptEnded('a2');
 
     expect((await state.snapshot()).trunkChannels).toEqual({});
     expect(trunkState.activeChannels('trunkA')).toBe(0);

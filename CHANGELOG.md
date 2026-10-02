@@ -224,6 +224,10 @@ why the specified behaviour changed; the commit history, how.
   whose maintenance-window check failed retried at once, over and over, and now waits for that
   poll too; a certificate notification arriving while a sync runs is taken up once it ends,
   rather than in a second sync beside it.
+- A call to an external number that was hung up just as its trunk was being dialled, for
+  example because another of the call's phones answered, could be counted off its trunk twice.
+  The trunk's channels in use in `/metrics` then read one too low, and its `max_channels` let one
+  call too many through. Each call now counts off once.
 
 ### Upgrade notes
 

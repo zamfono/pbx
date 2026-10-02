@@ -130,7 +130,6 @@ function watchAttemptOutcome(ari: AriClient, channelId: string): AttemptWatch {
 function watchAttemptChannelEnd(
   ari: AriClient,
   trunkState: TrunkState,
-  trunkId: string,
   channelId: string
 ): void {
   const onEvent = (event: AriEvent): void => {
@@ -139,7 +138,7 @@ function watchAttemptChannelEnd(
       return;
     }
     ari.off('event', onEvent);
-    trunkState.noteAttemptEnded(trunkId);
+    trunkState.noteAttemptEnded(channelId);
   };
   ari.on('event', onEvent);
 }
@@ -213,13 +212,13 @@ async function attemptOnce(
     if (leg) {
       leg.state = 'up';
     }
-    watchAttemptChannelEnd(pipeline.deps.ari, trunkState, trunk.id, channelId);
+    watchAttemptChannelEnd(pipeline.deps.ari, trunkState, channelId);
     return outcome;
   }
   if (leg) {
     leg.state = 'ended';
   }
-  trunkState.noteAttemptEnded(trunk.id);
+  trunkState.noteAttemptEnded(channelId);
   await pipeline.deps.ari.channels
     .hangup(channelId)
     .catch(ignoreGone)
