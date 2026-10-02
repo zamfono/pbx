@@ -27,7 +27,6 @@ import {
 } from './tokens.js';
 
 const logger = pino({ name: 'auth-reset-request' });
-const SETTINGS_ROW_ID = 1;
 // Where `src/routes/auth/set-password` is mounted; a self-service reset mail's link opens this
 // page directly (§5.2 "Set password", §10.2 "Mail").
 const SET_PASSWORD_PATH = '/auth/set-password';
@@ -42,7 +41,7 @@ export async function relayConfigured(db: Db): Promise<boolean> {
   const row = await db
     .selectFrom('settings')
     .select('smtpHost')
-    .where('id', '=', SETTINGS_ROW_ID)
+    .where('id', '=', 1)
     .executeTakeFirstOrThrow();
   return row.smtpHost !== null;
 }

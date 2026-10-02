@@ -17,9 +17,9 @@ export type SipCredentials = { username: string; password: string };
 export type PushReceipt = { remoteId: string } | null;
 
 /**
- * A device provisioning provider (§10.4): `manual` (no-op, entered by hand) and `ringotel`
- * are the MVP implementations. Every method but the first three is optional, since `manual`
- * has nothing to push for them.
+ * A device provisioning provider (§10.4). `ringotel` is the one that pushes; a `manual` device is
+ * entered into its phone by hand, so nothing is pushed for it and it needs no provider. Every
+ * method but the first three is optional.
  */
 export type ProvisioningProvider = {
   onDeviceCreated(
@@ -39,11 +39,4 @@ export type ProvisioningProvider = {
   onTenantProfileChanged?(settings: SettingsRow): Promise<void>;
   /** Asterisk restarted and holds no registration: a provider whose apps register re-registers them. */
   onPbxRestarted?(): Promise<void>;
-};
-
-/** The `manual` provider: nothing to push, since a manual device is entered into its phone by hand. */
-export const noopProvider: ProvisioningProvider = {
-  onDeviceCreated: () => Promise.resolve(null),
-  onDeviceDeleted: () => Promise.resolve(),
-  onCredentialsRotated: () => Promise.resolve(null)
 };

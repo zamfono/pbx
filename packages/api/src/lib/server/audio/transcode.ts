@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
+import { BinaryResult } from '../binaryResult.js';
+
 const execFileAsync = promisify(execFile);
 
 const CONTAINER_BY_FORMAT = { opus: 'ogg', mp3: 'mp3' } as const;
@@ -50,12 +52,6 @@ export async function transcodeForDownload(
 
 export type DownloadFormat = 'opus' | 'mp3';
 
-export type AudioDownload = {
-  bytes: Buffer;
-  contentType: string;
-  filename: string;
-};
-
 /**
  * The audio file at `filePath` for download (§10.3, §11.6): the stored WAV as-is with no
  * `format`, or transcoded, named after the source with the format's extension.
@@ -63,20 +59,20 @@ export type AudioDownload = {
 export async function downloadAudio(
   filePath: string,
   format: DownloadFormat | undefined
-): Promise<AudioDownload> {
+): Promise<BinaryResult> {
   if (format === undefined) {
-    return {
-      bytes: await readFile(filePath),
-      contentType: 'audio/wav',
-      filename: path.basename(filePath)
-    };
+    return new BinaryResult(
+      await readFile(filePath),
+      'audio/wav',
+      path.basename(filePath)
+    );
   }
   const base = path.basename(filePath, path.extname(filePath));
-  return {
-    bytes: await transcodeForDownload(filePath, format),
-    contentType: CONTENT_TYPE_BY_FORMAT[format],
-    filename: `${base}.${format}`
-  };
+  return new BinaryResult(
+    await transcodeForDownload(filePath, format),
+    CONTENT_TYPE_BY_FORMAT[format],
+    `${base}.${format}`
+  );
 }
 
 // §10.2 "Attachments": MP3 or Opus, never WAV; MP3 is the wider-compatibility choice across mail
@@ -89,6 +85,6 @@ const VOICEMAIL_ATTACHMENT_FORMAT = 'mp3';
  */
 export async function voicemailAttachment(
   voicemailPath: string
-): Promise<AudioDownload> {
+): Promise<BinaryResult> {
   return downloadAudio(voicemailPath, VOICEMAIL_ATTACHMENT_FORMAT);
 }

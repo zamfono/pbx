@@ -4,8 +4,7 @@ import { newId, nowIso, type Db } from '@zamfono/shared';
 
 import { encrypt, keyringFromEnv } from '../secretbox.js';
 import { makeTestDb } from '../testDb.js';
-import { activeRingotelProvider, providerFor } from './index.js';
-import type { RingotelClient } from './ringotelClient.js';
+import { activeRingotelProvider } from './index.js';
 
 process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
 
@@ -57,24 +56,5 @@ describe('activeRingotelProvider', () => {
 
     expect(provider).not.toBeNull();
     expect(typeof provider?.onDeviceCreated).toBe('function');
-  });
-});
-
-describe('providerFor', () => {
-  it("returns the no-op manual provider for 'manual'", async () => {
-    const provider = providerFor('manual');
-    await expect(
-      provider.onDeviceCreated({} as never, { username: 'x', password: 'y' })
-    ).resolves.toBeNull();
-  });
-
-  it("builds a Ringotel provider for 'ringotel'", () => {
-    const client: RingotelClient = {
-      call: <T>() => Promise.resolve(undefined as T)
-    };
-    // An overload of `providerFor` requires this second argument for `'ringotel'` at compile
-    // time, so there is no runtime case of a caller omitting it to test.
-    const provider = providerFor('ringotel', { client, db: {} as never });
-    expect(typeof provider.onDeviceCreated).toBe('function');
   });
 });

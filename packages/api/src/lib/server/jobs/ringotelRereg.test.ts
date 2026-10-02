@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { newId, type CoreVersionResponse, type Db } from '@zamfono/shared';
 
 import type { ProvisioningProvider } from '../provisioning/index.js';
-import { noopProvider } from '../provisioning/types.js';
 import { makeTestDb } from '../testDb.js';
 import {
   checkAsteriskRestart,
@@ -39,7 +38,13 @@ function ringotel(onPbxRestarted: () => Promise<void>): {
   provider: () => Promise<ProvisioningProvider>;
 } {
   return {
-    provider: () => Promise.resolve({ ...noopProvider, onPbxRestarted })
+    provider: () =>
+      Promise.resolve({
+        onDeviceCreated: () => Promise.resolve(null),
+        onDeviceDeleted: () => Promise.resolve(),
+        onCredentialsRotated: () => Promise.resolve(null),
+        onPbxRestarted
+      })
   };
 }
 

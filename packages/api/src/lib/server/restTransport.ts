@@ -1,3 +1,4 @@
+import { BinaryResult } from './binaryResult.js';
 import type { JsonSchema } from './ops/publishedSchema.js';
 
 type QueryFieldKind = 'number' | 'boolean';
@@ -60,26 +61,8 @@ export function parseQuery(
 }
 
 const OK_STATUS = 200;
-const OCTET_STREAM_CONTENT_TYPE = 'application/octet-stream';
 
 /** An operation's binary result (§10.3 `voicemails.audio`/`recordings.audio`): raw bytes plus the wire content type. */
-type BinaryResult = {
-  bytes: Uint8Array;
-  contentType: string;
-  filename?: string;
-};
-
-function isBinaryResult(output: unknown): output is BinaryResult {
-  if (typeof output !== 'object' || output === null) {
-    return false;
-  }
-  const candidate = output as Record<string, unknown>;
-  return (
-    candidate.bytes instanceof Uint8Array &&
-    typeof candidate.contentType === 'string'
-  );
-}
-
 // `Buffer`/`Uint8Array` is typed over `ArrayBufferLike` (it may back onto a `SharedArrayBuffer`);
 // `Response`'s body type wants one backed by a plain `ArrayBuffer`, so the bytes are copied into a
 // fresh view rather than passed straight through.
@@ -95,25 +78,15 @@ function quoteFilename(filename: string): string {
     .replace(/"/gu, '\\"');
 }
 
-/** Every operation's result is JSON, except a `Uint8Array`/`Buffer` result or a `{ bytes, contentType, filename? }` one, answered as its own bytes so a download route never gets JSON-wrapped. */
+/** Every operation's result is JSON, except a `BinaryResult`, answered as its own bytes so a download route never gets JSON-wrapped. */
 export function outputResponse(output: unknown): Response {
-  if (output instanceof Uint8Array) {
-    return new Response(toResponseBody(output), {
-      status: OK_STATUS,
-      headers: { 'content-type': OCTET_STREAM_CONTENT_TYPE }
-    });
-  }
-  if (isBinaryResult(output)) {
-    const headers: Record<string, string> = {
-      'content-type': output.contentType
-    };
-    if (output.filename !== undefined) {
-      headers['content-disposition'] =
-        `attachment; filename="${quoteFilename(output.filename)}"`;
-    }
+  if (output instanceof BinaryResult) {
     return new Response(toResponseBody(output.bytes), {
       status: OK_STATUS,
-      headers
+      headers: {
+        'content-type': output.contentType,
+        'content-disposition': `attachment; filename="${quoteFilename(output.filename)}"`
+      }
     });
   }
   return new Response(JSON.stringify(output), {
