@@ -16,9 +16,9 @@ Moving a stack to another host, or recovering it after data loss, is the same pr
   created, or an out-of-band copy kept alongside `.env` — a target's encrypted repository password
   lives inside the database itself, so it is not available until after a restic-based restore has
   already produced that database.
-- **The database**, from `litestream restore` (with the optional continuous-replication overlay
-  running, using that overlay's own bucket credentials) or from the latest restic snapshot
-  otherwise.
+- **The database**, from `litestream restore` (with the optional continuous-replication overlay,
+  `compose.dr.yaml` in the stack directory, running, using that overlay's own bucket credentials)
+  or from the latest restic snapshot otherwise.
 - **`media/`**, from the latest restic snapshot — voicemail and recording audio, uploaded
   greetings and hold-music files.
 
@@ -29,7 +29,8 @@ Moving a stack to another host, or recovering it after data loss, is the same pr
    restic restore of the latest snapshot using the repository location and password from the
    operator's own record.
 3. Restore `media/` from the latest restic snapshot, the same way.
-4. `docker compose up -d` (or the Podman equivalent).
+4. `docker compose up -d` (or the Podman equivalent); with `compose.dr.yaml` in the stack
+   directory, `./setup/compose.sh up -d`, which runs Compose on it too.
 
 With continuous replication, configuration, users and call history are current to within
 seconds, and media newer than the last restic run is lost. Without it, everything is as old as

@@ -735,7 +735,7 @@ All hours resolve in the tenant's time zone: `settings.timezone` (an IANA name),
 
 The restore procedure is part of the admin guide.
 
-**Continuous replication (optional).** An operator who wants a recovery point of seconds for the database adds a Litestream sidecar through a compose overlay (`compose.dr.yaml`, added with a further `-f` after `compose.yaml` and `compose.override.yaml`). The published files run unmodified; the overlay carries its own image pin and bucket credentials, and mounts `litestream.caddy` into the proxy (§6.3).
+**Continuous replication (optional).** An operator who wants a recovery point of seconds for the database adds a Litestream sidecar through a compose overlay (`compose.dr.yaml` in the stack directory, a fixed name: when it exists, the boot unit, `update.sh` and the updater run Compose on `compose.yaml`, `compose.override.yaml` and then `compose.dr.yaml`, so a boot or an update keeps it; without it, on the first two alone). The published files run unmodified; the overlay carries its own image pin and bucket credentials, and mounts `litestream.caddy` into the proxy (§6.3).
 
 The sidecar mounts the `db` volume and streams the SQLite WAL continuously to an S3-compatible bucket. Nothing in the applications integrates with it, since Litestream works at file level. Restic remains the backup of record, for point-in-time history, retention policy and `media/`.
 

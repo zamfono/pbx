@@ -131,6 +131,11 @@ why the specified behaviour changed; the commit history, how.
   without `-f`. The Podman boot unit `setup.sh` installs runs `podman compose up -d`; a unit
   installed earlier keeps working as it is. `update.sh` makes the link for a stack that has none,
   from the overlay its boot unit names, else from whether `.env` sets `STACK_IPV4`.
+- The continuous-replication overlay (`docs/spec.md` §6.5) has a fixed name, `compose.dr.yaml` in
+  the stack directory. Where it exists, `update.sh`, the `updater` service and the Podman boot
+  unit run Compose on `compose.yaml`, `compose.override.yaml` and `compose.dr.yaml`, so an update
+  or a boot keeps the Litestream sidecar. By hand, `setup/compose.sh <command>` runs Compose on the
+  same files. The boot unit `setup.sh` installs runs `setup/compose.sh up -d`.
 - `update.sh --check` says what an update would do as before, and its exit status now carries
   the verdict: 0 for an update it would install, 10 for a breaking one, 11 for a release that is
   not newer than the stack's, 12 when the stack directory names no release, anything else for an

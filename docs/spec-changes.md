@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-02 · §6.5 Continuous replication.** The continuous-replication overlay is `compose.dr.yaml` in the stack directory, a fixed name: when it exists, the boot unit, `update.sh` and the updater run Compose on `compose.yaml`, `compose.override.yaml` and then `compose.dr.yaml`, and without it on the first two as before; it is no longer added with a further `-f`.
+*Why:* requested by the product owner: with the overlay linked as `compose.override.yaml`, a plain `compose up -d` dropped the DR overlay on every update and boot.
+
 **2026-10-01 · §6.3 Updates.** `update.sh --check <version>` answers by its exit status, 0 for an update the updater may install, 10 for a breaking one, 11 for a release not newer than the stack's and 12 for a directory that names no release, and the updater asks it instead of judging the release itself.
 *Why:* found in the design review: the update policy was implemented twice, in `update.sh` and in the updater, and held together by a shared test table.
 

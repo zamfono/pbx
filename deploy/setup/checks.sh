@@ -35,6 +35,15 @@ detect_runtime() {
     "install one first (README.md, step 2)"
 }
 
+# The files the stack's Compose runs on, appended to the array `compose`: none, so Compose reads
+# compose.yaml and the compose.override.yaml link by itself, unless the stack directory holds the
+# continuous-replication overlay, compose.dr.yaml (§6.5), which Compose reads only when named,
+# after the other two. update.sh and setup/compose.sh, which the boot unit runs, both use it.
+add_stack_files() {
+  [[ -e compose.dr.yaml ]] || return 0
+  compose+=(-f compose.yaml -f compose.override.yaml -f compose.dr.yaml)
+}
+
 # The address the host uses to reach the internet: on most VPSs its public one. A host behind
 # the provider's NAT (some clouds) shows a private one, which the user corrects.
 detect_ipv4() {

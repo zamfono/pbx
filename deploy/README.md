@@ -302,8 +302,9 @@ Requires=podman.socket
 Type=oneshot
 RemainAfterExit=true
 WorkingDirectory=/srv/zamfono
-ExecStart=/usr/bin/podman compose up -d
-ExecStop=/usr/bin/podman compose down
+Environment=ZAMFONO_RUNTIME=podman
+ExecStart=/srv/zamfono/setup/compose.sh up -d
+ExecStop=/srv/zamfono/setup/compose.sh down
 
 [Install]
 WantedBy=multi-user.target
@@ -388,6 +389,18 @@ bundle (`download/vX.Y.Z`) before `up -d`.
 
 Always `up -d` the whole stack, never `asterisk` alone: `proxy` lives in `asterisk`'s network
 namespace, and a recreated `asterisk` leaves it on the old one.
+
+## Continuous replication
+
+The optional Litestream sidecar of `docs/spec.md` §6.5 is an overlay of your own, named
+`compose.dr.yaml` in the stack directory. Where that file exists, `update.sh`, the `updater` and
+the boot unit of step 7 run Compose on `compose.yaml`, `compose.override.yaml` and
+`compose.dr.yaml`, so an update or a reboot keeps the sidecar. By hand, run Compose through
+`setup/compose.sh`, which names the same files:
+
+```bash
+./setup/compose.sh up -d
+```
 
 ## Logs
 

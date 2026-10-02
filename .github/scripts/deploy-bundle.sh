@@ -21,7 +21,7 @@ fi
 root=$(cd "$(dirname "$0")/../.." && pwd)
 files=(compose.yaml compose.ports.yaml compose.macvlan.yaml Caddyfile litestream.caddy .env.example README.md
   setup.sh update.sh setup/ui.sh setup/checks.sh setup/envfile.sh setup/boot-unit.sh setup/versions.sh
-  setup/recreate.sh setup/outcome.sh)
+  setup/recreate.sh setup/outcome.sh setup/compose.sh)
 
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
@@ -33,7 +33,8 @@ cp "$root/CHANGELOG.md" "$stage/zamfono/CHANGELOG.md"
 echo "$version" >"$stage/zamfono/VERSION"
 # Every file 644 but the ones the operator runs, whatever the checkout's modes were.
 chmod 644 "$stage"/zamfono/{.env.example,*,setup/*} 2>/dev/null || true
-chmod 755 "$stage/zamfono/setup" "$stage/zamfono/setup.sh" "$stage/zamfono/update.sh"
+chmod 755 "$stage/zamfono/setup" "$stage/zamfono/setup.sh" "$stage/zamfono/update.sh" \
+  "$stage/zamfono/setup/compose.sh"
 
 sed -i "s/\${ZAMFONO_VERSION:-latest}/\${ZAMFONO_VERSION:-$version}/g" "$stage/zamfono/compose.yaml"
 if grep -q ':-latest}' "$stage/zamfono/compose.yaml"; then

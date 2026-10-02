@@ -47,7 +47,7 @@ done
 mkdir -p "$work/bin"
 cat >"$work/bin/docker" <<'STUB'
 #!/usr/bin/env bash
-if [[ $* == 'compose up --help' ]]; then
+if [[ $* == compose*' up --help' ]]; then
   [[ -n ${STUB_PODMAN_COMPOSE:-} ]] || echo '      --wait    Wait for services to be running|healthy.'
   exit 0
 fi
@@ -191,6 +191,34 @@ UNIT
 [[ $(overlay_after_update podman) == compose.macvlan.yaml ]] ||
   fail "the boot unit's overlay was not the one linked"
 rm "$work/units/zamfono-test.service"
+
+echo "  - a stack with compose.dr.yaml runs Compose on it, after compose.yaml and the link"
+fresh_stack
+printf 'services: {}\n' >"$work/stack/compose.dr.yaml"
+update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update with compose.dr.yaml failed"; }
+dr_files='-f compose.yaml -f compose.override.yaml -f compose.dr.yaml'
+grep -qx "compose $dr_files pull" "$work/runtime.log" ||
+  fail "the pull left compose.dr.yaml out: $(cat "$work/runtime.log")"
+grep -qx "compose $dr_files up -d --wait --wait-timeout 180" "$work/runtime.log" ||
+  fail "the up left compose.dr.yaml out: $(cat "$work/runtime.log")"
+fresh_stack
+printf 'services: {}\n' >"$work/stack/compose.dr.yaml"
+(cd "$work/stack" && ZAMFONO_UPDATER=1 PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" \
+  ZAMFONO_REPO_URL="http://127.0.0.1:$port" ./update.sh 1.2.4 </dev/null >"$work/out" 2>&1) ||
+  { cat "$work/out"; fail "the updater's run with compose.dr.yaml failed"; }
+grep -q "^compose $dr_files up -d --wait" "$work/runtime.log" ||
+  fail "the updater's run left compose.dr.yaml out: $(cat "$work/runtime.log")"
+# The boot unit's command, setup/compose.sh, names it too, and nothing more without it.
+(cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_RUNTIME=podman \
+  setup/compose.sh up -d)
+grep -qx "compose $dr_files up -d" "$work/runtime.log" ||
+  fail "setup/compose.sh left compose.dr.yaml out: $(cat "$work/runtime.log")"
+rm "$work/stack/compose.dr.yaml"
+: >"$work/runtime.log"
+(cd "$work/stack" && PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_RUNTIME=podman \
+  setup/compose.sh up -d)
+grep -qx 'compose up -d' "$work/runtime.log" ||
+  fail "setup/compose.sh named files without compose.dr.yaml: $(cat "$work/runtime.log")"
 
 echo "  - on Podman without a boot unit"
 fresh_stack

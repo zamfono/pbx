@@ -4,7 +4,8 @@
 # .env), adds the settings a newer .env.example introduced that update.sh can fill in itself,
 # pulls the images and recreates the stack. The `updater` service runs this same script for
 # `system.update` (§6.3 "Updates"). Compose reads compose.yaml and compose.override.yaml, the link
-# to the mode's overlay setup.sh makes, which update.sh makes too where it is missing.
+# to the mode's overlay setup.sh makes, which update.sh makes too where it is missing, and
+# compose.dr.yaml where the stack directory holds one (§6.5).
 #
 #   ./update.sh [--yes] [--check] [VERSION]
 #
@@ -58,7 +59,7 @@ for arg in "$@"; do
     --yes) assume_yes=1 ;;
     --check) check_only=1 ;;
     -h | --help)
-      sed -n '2,22p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
+      sed -n '2,23p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     -*) fail "unknown option $arg" ;;
@@ -197,6 +198,7 @@ main() {
   else
     detect_runtime
   fi
+  add_stack_files
   unit=$(find_unit)
   [[ -n $check_only ]] || link_overlay
   # The services `pull` and `up` name: all of them, but for the updater's run.
