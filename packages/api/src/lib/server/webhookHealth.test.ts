@@ -1,7 +1,14 @@
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 
-import { nowIso, openDb, type Db, type Envelope } from '@zamfono/shared';
+import {
+  MS_PER_DAY,
+  MS_PER_HOUR,
+  nowIso,
+  openDb,
+  type Db,
+  type Envelope
+} from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { encrypt, keyringFromEnv, type Keyring } from './secretbox.js';
@@ -25,8 +32,6 @@ vi.mock('pino', () => ({
 }));
 
 const KEY_BYTE_LENGTH = 32;
-const HOUR_MS = 3_600_000;
-const DAY_MS = 24 * HOUR_MS;
 const URL = 'https://crm.example/hooks/zamfono?token=abc';
 
 function testKeyring(): Keyring {
@@ -117,7 +122,7 @@ describe('webhook failure logging', () => {
 
     answer.next = 404;
     await dispatcher.enqueue(event('e1'));
-    clock.ms += HOUR_MS;
+    clock.ms += MS_PER_HOUR;
     answer.next = 403;
     await dispatcher.enqueue(event('e2'));
 
@@ -157,16 +162,16 @@ describe('webhook failure logging', () => {
     answer.next = new DOMException('timed out', 'TimeoutError');
 
     await dispatcher.enqueue(event('e1'));
-    clock.ms += HOUR_MS;
+    clock.ms += MS_PER_HOUR;
     await dispatcher.enqueue(event('e2'));
     expect(logged).toHaveLength(1);
 
-    clock.ms += DAY_MS - HOUR_MS - 1;
+    clock.ms += MS_PER_DAY - MS_PER_HOUR - 1;
     await dispatcher.enqueue(event('e3'));
     expect(logged).toHaveLength(1);
     clock.ms += 1;
     await dispatcher.enqueue(event('e4'));
-    clock.ms += HOUR_MS;
+    clock.ms += MS_PER_HOUR;
     await dispatcher.enqueue(event('e5'));
 
     expect(logged).toHaveLength(2);
@@ -190,7 +195,7 @@ describe('webhook failure logging', () => {
     await dispatcher.enqueue(event('e1'));
     await dispatcher.enqueue(event('e2'));
 
-    clock.ms += HOUR_MS;
+    clock.ms += MS_PER_HOUR;
     answer.next = 204;
     await dispatcher.enqueue(event('e3'));
     await dispatcher.enqueue(event('e4'));

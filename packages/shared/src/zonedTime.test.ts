@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import { MINUTES_PER_HOUR } from './time.js';
 import {
   addDays,
   localParts,
-  MINUTES_PER_HOUR,
   parseTimeOfDay,
   weekdayAt,
   zonedTimeToInstant

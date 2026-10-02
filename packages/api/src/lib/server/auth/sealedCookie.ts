@@ -6,7 +6,7 @@
 import type { Cookies } from '@sveltejs/kit';
 import { z } from 'zod';
 
-import { MS_PER_SECOND } from '@zamfono/shared';
+import { epochSeconds, MS_PER_SECOND } from '@zamfono/shared';
 
 import { attempt } from '../errors.js';
 import { tryParseJson } from '../json.js';
@@ -32,7 +32,7 @@ export function setSealedCookie<T extends object>(
   cookie: SealedCookie<T>,
   payload: T
 ): void {
-  const expiresAtS = Math.floor(Date.now() / MS_PER_SECOND) + cookie.ttlS;
+  const expiresAtS = epochSeconds(Date.now()) + cookie.ttlS;
   const sealed = encrypt(kr, JSON.stringify({ ...payload, expiresAtS }));
   cookies.set(cookie.name, sealed.toString('base64url'), {
     path: cookie.path,

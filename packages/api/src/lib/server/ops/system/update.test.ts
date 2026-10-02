@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, type Db, type UpdateState } from '@zamfono/shared';
+import {
+  MS_PER_HOUR,
+  MS_PER_MINUTE,
+  newId,
+  type Db,
+  type UpdateState
+} from '@zamfono/shared';
 
 import { makeTestDb } from '#lib/server/testDb.js';
 
@@ -26,8 +32,6 @@ const asOwner: RunInput = {
   requestId: 'req-1',
   confirm: true
 };
-const MINUTE_MS = 60_000;
-const HOUR_MS = 60 * MINUTE_MS;
 const STATUS_CONFLICT = 409;
 const STATUS_UNAVAILABLE = 503;
 
@@ -94,7 +98,7 @@ async function refusal(promise: Promise<unknown>): Promise<OpError> {
 describe('system.update', () => {
   it('asks the updater once a backup finished within the hour, and answers at once', async () => {
     const db = await makeTestDb();
-    await backupFinished(db, 5 * MINUTE_MS);
+    await backupFinished(db, 5 * MS_PER_MINUTE);
     const started = {
       state: 'running' as const,
       from: '0.0.6',
@@ -129,7 +133,7 @@ describe('system.update', () => {
 
   it('refuses without a recent backup, and leaves the updater alone', async () => {
     const db = await makeTestDb();
-    await backupFinished(db, 2 * HOUR_MS);
+    await backupFinished(db, 2 * MS_PER_HOUR);
     const updater = recordingUpdater(() =>
       Promise.resolve({ state: 'running' })
     );
@@ -143,7 +147,7 @@ describe('system.update', () => {
 
   it('passes on the updater’s refusal', async () => {
     const db = await makeTestDb();
-    await backupFinished(db, MINUTE_MS);
+    await backupFinished(db, MS_PER_MINUTE);
     vi.mocked(updaterClient).mockImplementation(() =>
       recordingUpdater(() =>
         Promise.reject(
@@ -163,7 +167,7 @@ describe('system.update', () => {
 
   it('is unavailable without UPDATER_TOKEN', async () => {
     const db = await makeTestDb();
-    await backupFinished(db, MINUTE_MS);
+    await backupFinished(db, MS_PER_MINUTE);
     vi.mocked(updaterClient).mockImplementation(() => undefined);
     const error = await refusal(runOperation(db, 'system.update', {}, asOwner));
     expect(error.status).toBe(STATUS_UNAVAILABLE);

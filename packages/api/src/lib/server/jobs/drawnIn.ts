@@ -3,12 +3,10 @@
  * certificate sync (§6.4) and the automatic update (§6.3 "Automatic updates"): a pass at once,
  * then hourly, drawn in to the moment a pass names whenever that falls sooner.
  */
-import { MINUTES_PER_HOUR, MS_PER_SECOND } from '@zamfono/shared';
+import { MS_PER_HOUR } from '@zamfono/shared';
 
-const SECONDS_PER_MINUTE = 60;
 /** The coarsest poll; the jobs' own timing is day-scale, and the poll is drawn in to it. */
-export const POLL_INTERVAL_MS =
-  MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND;
+export const POLL_INTERVAL_MS = MS_PER_HOUR;
 
 export type DrawnInJob = {
   /** One pass; resolves to when the next is due, or `null` for the regular poll. */

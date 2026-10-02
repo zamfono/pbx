@@ -4,7 +4,15 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, openDb, type Db, type Envelope } from '@zamfono/shared';
+import {
+  MS_PER_HOUR,
+  MS_PER_MINUTE,
+  newId,
+  nowIso,
+  openDb,
+  type Db,
+  type Envelope
+} from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { EventBus } from './internal/eventBus.js';
@@ -13,8 +21,6 @@ import { startSweep } from './sweep.js';
 import { onEvents } from './testing/busEvents.js';
 import { noopLogger } from './testing/pipelineDeps.js';
 
-const MS_PER_MINUTE = 60_000;
-const MS_PER_HOUR = 3_600_000;
 const EIGHT_DAYS_MS = 8 * 24 * MS_PER_HOUR;
 
 type Seen = { event: Envelope; atMs: number };

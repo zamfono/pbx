@@ -8,9 +8,11 @@ import {
 } from 'jose';
 import { z } from 'zod';
 
+import { MS_PER_HOUR } from '@zamfono/shared';
+
 const DISCOVERY_PATH = '/.well-known/openid-configuration';
 // Discovery documents are cached for 1 hour (§5.2 "SSO", `discover`).
-const DISCOVERY_CACHE_TTL_MS = 3_600_000;
+const DISCOVERY_CACHE_TTL_MS = MS_PER_HOUR;
 const AUTHORIZATION_SCOPE = 'openid email profile';
 const CODE_CHALLENGE_METHOD = 'S256';
 const GRANT_TYPE_AUTHORIZATION_CODE = 'authorization_code';

@@ -1,13 +1,11 @@
 import pino from 'pino';
 
-import { MS_PER_SECOND } from '@zamfono/shared';
+import { MS_PER_HOUR, MS_PER_MINUTE, MS_PER_SECOND } from '@zamfono/shared';
 
 // §5.5: lockouts and limit hits are logged with the account or address.
 const logger = pino({ name: 'limiter' });
 
 // §5.5 rate limits: the endpoint's key and the window it counts attempts in.
-const MINUTE_MS = 60_000;
-const HOUR_MS = 3_600_000;
 const LOGIN_ADDRESS_LIMIT = 60;
 const TOKEN_LIMIT = 60;
 const RESET_ADDRESS_LIMIT = 30;
@@ -27,10 +25,10 @@ const SWEEP_THRESHOLD = 1000;
 export type LimitKind = 'loginAddress' | 'token' | 'resetAddress' | 'register';
 
 const CHECK_LIMITS: Record<LimitKind, { max: number; windowMs: number }> = {
-  loginAddress: { max: LOGIN_ADDRESS_LIMIT, windowMs: MINUTE_MS },
-  token: { max: TOKEN_LIMIT, windowMs: MINUTE_MS },
-  resetAddress: { max: RESET_ADDRESS_LIMIT, windowMs: HOUR_MS },
-  register: { max: REGISTER_LIMIT, windowMs: MINUTE_MS }
+  loginAddress: { max: LOGIN_ADDRESS_LIMIT, windowMs: MS_PER_MINUTE },
+  token: { max: TOKEN_LIMIT, windowMs: MS_PER_MINUTE },
+  resetAddress: { max: RESET_ADDRESS_LIMIT, windowMs: MS_PER_HOUR },
+  register: { max: REGISTER_LIMIT, windowMs: MS_PER_MINUTE }
 };
 
 type FixedWindow = { start: number; count: number; windowMs: number };
@@ -158,9 +156,9 @@ export class Limiter {
     sweepExpired(this.#resetRequests, win => now - win.start >= win.windowMs);
     const current = this.#resetRequests.get(account);
     const win =
-      current && now - current.start < HOUR_MS
+      current && now - current.start < MS_PER_HOUR
         ? current
-        : { start: now, count: 0, windowMs: HOUR_MS };
+        : { start: now, count: 0, windowMs: MS_PER_HOUR };
     win.count += 1;
     this.#resetRequests.set(account, win);
     return win.count <= RESET_ACCOUNT_LIMIT;

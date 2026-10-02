@@ -1,6 +1,12 @@
 import type { Selectable } from 'kysely';
 
-import type { Db, DB, UpdaterStatus, UpdateState } from '@zamfono/shared';
+import {
+  MS_PER_HOUR,
+  type Db,
+  type DB,
+  type UpdaterStatus,
+  type UpdateState
+} from '@zamfono/shared';
 
 import { updaterClient } from './_updater.js';
 
@@ -16,7 +22,6 @@ export type UpdateStateRow = Selectable<DB['updateState']>;
 export const MAX_AUTO_UPDATE_ATTEMPTS = 3;
 
 const RETRY_GAP_HOURS = 20;
-const MS_PER_HOUR = 3_600_000;
 /**
  * How long after a failed automatic attempt the release waits before the next, so it is retried
  * at about one maintenance moment a day even where every moment is one (§6.3 "Automatic updates").

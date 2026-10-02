@@ -6,7 +6,7 @@
  * `IDLE_RECHECK_MS`, and `IDLE_WAIT_MS` after the moment it gives up until the moment after,
  * reporting what kept the system busy (`maintenanceGiveUp.ts`).
  */
-import { MINUTES_PER_HOUR, type Db } from '@zamfono/shared';
+import { MS_PER_HOUR, MS_PER_MINUTE, type Db } from '@zamfono/shared';
 
 import {
   clearGiveUpsInARow,
@@ -17,12 +17,11 @@ import {
 } from './maintenanceGiveUp.js';
 import { nextMaintenanceMoment } from './reloadTiming.js';
 
-const MS_PER_MINUTE = 60_000;
 const IDLE_WAIT_HOURS = 2;
 const IDLE_RECHECK_MINUTES = 5;
 
 /** How long past its maintenance moment the gate waits for an idle system. */
-export const IDLE_WAIT_MS = IDLE_WAIT_HOURS * MINUTES_PER_HOUR * MS_PER_MINUTE;
+export const IDLE_WAIT_MS = IDLE_WAIT_HOURS * MS_PER_HOUR;
 /** How often the gate looks again while the system is busy within that wait. */
 export const IDLE_RECHECK_MS = IDLE_RECHECK_MINUTES * MS_PER_MINUTE;
 

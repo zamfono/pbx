@@ -1,7 +1,7 @@
 import process from 'node:process';
 import { z } from 'zod';
 
-import { MS_PER_SECOND, nowIso, resolveVersion } from '@zamfono/shared';
+import { epochSeconds, nowIso, resolveVersion } from '@zamfono/shared';
 
 import { signAccessToken } from '../auth/jwtSigning.js';
 import { handleMcpRequest, type McpDeps } from '../mcp.js';
@@ -68,7 +68,7 @@ register(
 export const OWNER_TOKEN = await signAccessToken(
   JWT_SECRET,
   { sub: 'owner', role: 'owner', cid: CLIENT_ID },
-  Math.floor(Date.now() / MS_PER_SECOND),
+  epochSeconds(Date.now()),
   ORIGIN
 );
 

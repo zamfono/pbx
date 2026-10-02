@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { closedPeriods } from './openingHours.js';
-
-const MILLISECONDS_PER_HOUR = 3_600_000;
+import { MS_PER_HOUR } from './time.js';
 
 const weekdayHoursSchedule = {
   intervals: [1, 2, 3, 4, 5].map(weekday => ({
@@ -13,7 +12,7 @@ const weekdayHoursSchedule = {
 };
 
 const hoursOf = (period: { start: string; end: string }): number =>
-  (Date.parse(period.end) - Date.parse(period.start)) / MILLISECONDS_PER_HOUR;
+  (Date.parse(period.end) - Date.parse(period.start)) / MS_PER_HOUR;
 
 describe('closedPeriods', () => {
   it('contains one weekend period of at least 63 hours for a Mon-Fri 9-17 schedule', () => {

@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MS_PER_DAY, newId, nowIso, type Db } from '@zamfono/shared';
+import {
+  MS_PER_DAY,
+  MS_PER_HOUR,
+  newId,
+  nowIso,
+  type Db
+} from '@zamfono/shared';
 
 import { propagateConfig } from '#lib/server/propagation.js';
 import { installRingotelFake } from '#lib/server/provisioning/ringotelFake.js';
@@ -19,7 +25,6 @@ process.env.FQDN ??= 'pbx.example.test';
 
 const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 const START = new Date('2026-06-01T12:00:00.000Z');
-const HOUR_MS = 3_600_000;
 
 function asRun(): RunInput {
   return { actor: owner, channel: 'rest', requestId: 'req-1', confirm: true };
@@ -125,7 +130,7 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
 
     await runOperation(db, 'users.delete', { id: userId }, asRun());
     expect(ringotel.users.map(user => user.extension)).toEqual(['102']);
-    advance(HOUR_MS);
+    advance(MS_PER_HOUR);
     const callsBeforeUndo = ringotel.calls.length;
     await undoLatest(db, 'users.delete');
 
@@ -149,7 +154,7 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
 
     await runOperation(db, 'devices.delete', { id: deviceId }, asRun());
     expect(ringotel.users).toEqual([]);
-    advance(HOUR_MS);
+    advance(MS_PER_HOUR);
     await undoLatest(db, 'devices.delete');
 
     const recovery = ringotel.calls.find(
@@ -167,7 +172,7 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
     const remoteId = ringotel.users[0]?.id;
 
     await runOperation(db, 'devices.delete', { id: deviceId }, asRun());
-    advance(MS_PER_DAY + HOUR_MS);
+    advance(MS_PER_DAY + MS_PER_HOUR);
     const callsBeforeUndo = ringotel.calls.length;
     await undoLatest(db, 'devices.delete');
 
@@ -193,7 +198,7 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
     )) as { user: { id: string } };
     await runOperation(db, 'users.delete', { id: created.user.id }, asRun());
     await undoLatest(db, 'users.delete');
-    advance(HOUR_MS);
+    advance(MS_PER_HOUR);
 
     await runOperation(
       db,
@@ -211,7 +216,7 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
     const ringotel = installRingotelFake();
     const { deviceId } = await userWithRingotelDevice(db, 'anna@x.test', '101');
     await runOperation(db, 'devices.delete', { id: deviceId }, asRun());
-    advance(HOUR_MS);
+    advance(MS_PER_HOUR);
     propagated = false;
     const fakeFetch = globalThis.fetch;
     const sentBeforePropagation: unknown[] = [];

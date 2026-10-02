@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
-import { MS_PER_SECOND } from '@zamfono/shared';
+import { epochSeconds } from '@zamfono/shared';
 
 import { makeTestDb } from '../testDb.js';
 import { AuthCodeStore } from './codes.js';
@@ -14,7 +14,7 @@ import { issueRefresh } from './tokens.js';
 const ORIGIN = 'https://pbx.example.com';
 const MCP_RESOURCE = `${ORIGIN}/mcp`;
 const NOW = '2026-01-01T00:00:00.000Z';
-const NOW_S = Math.floor(Date.parse(NOW) / MS_PER_SECOND);
+const NOW_S = epochSeconds(Date.parse(NOW));
 const SECRET = 'test-secret';
 const CLIENT_ID = 'client-1';
 const REDIRECT_URI = 'https://client.test/callback';

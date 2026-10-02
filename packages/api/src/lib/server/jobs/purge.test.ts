@@ -3,7 +3,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, onTestFinished } from 'vitest';
 
-import { MS_PER_DAY, newId, nowIso, openDb, type Db } from '@zamfono/shared';
+import {
+  MS_PER_DAY,
+  MS_PER_HOUR,
+  newId,
+  nowIso,
+  openDb,
+  type Db
+} from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { runOperation, type RunInput } from '../ops/runner.js';
@@ -652,7 +659,7 @@ describe('runPurge', () => {
     await insertClient(
       db,
       'abandoned',
-      new Date(Date.parse(now) - 3_600_000).toISOString()
+      new Date(Date.parse(now) - MS_PER_HOUR).toISOString()
     );
 
     await runPurge(db, now);

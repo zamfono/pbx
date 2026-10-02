@@ -7,7 +7,12 @@
  * opening hours opening or closing), so a client renders live status without polling. It runs at the
  * next transition instant of any scope, at once after a config change, and at least hourly.
  */
-import { resolveTenantTimeZone, type Scope } from '@zamfono/shared';
+import {
+  MS_PER_HOUR,
+  MS_PER_MINUTE,
+  resolveTenantTimeZone,
+  type Scope
+} from '@zamfono/shared';
 
 import type { Logger } from './ari/types.js';
 import type { EventBus } from './internal/eventBus.js';
@@ -35,9 +40,9 @@ export type SweepDeps = {
 
 // The backstop: a wall-clock jump (NTP step, suspended VM) or a zone's rule change moves the
 // transition instants a timer armed earlier waits for, so no timer waits longer than this.
-const DEFAULT_BACKSTOP_MS = 3_600_000;
+const DEFAULT_BACKSTOP_MS = MS_PER_HOUR;
 // A sweep that failed to load the snapshot retries after this, rather than waiting an hour.
-const RETRY_MS = 60_000;
+const RETRY_MS = MS_PER_MINUTE;
 
 type ScopeState = {
   oooActive: boolean;

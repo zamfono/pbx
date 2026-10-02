@@ -1,4 +1,9 @@
-import type { Db, RunRequester, UpdateState } from '@zamfono/shared';
+import {
+  MS_PER_HOUR,
+  type Db,
+  type RunRequester,
+  type UpdateState
+} from '@zamfono/shared';
 
 import { errorMessage } from '#lib/server/errors.js';
 
@@ -10,7 +15,7 @@ const STATUS_NOT_FOUND = 404;
 const STATUS_CONFLICT = 409;
 const STATUS_UNAVAILABLE = 503;
 /** How recent the backup an update needs must be (§6.3 "Updates"). */
-export const BACKUP_MAX_AGE_MS = 3_600_000;
+export const BACKUP_MAX_AGE_MS = MS_PER_HOUR;
 
 /** The updater's refusals keep their status where the operations layer has it, else 503. */
 function passOn(error: unknown): never {

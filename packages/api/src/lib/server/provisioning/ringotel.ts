@@ -1,4 +1,4 @@
-import { MS_PER_DAY } from '@zamfono/shared';
+import { MS_PER_DAY, nowIso } from '@zamfono/shared';
 
 import {
   ringotelLog,
@@ -44,7 +44,7 @@ async function ringotelDeviceCreated(
 ): Promise<PushReceipt> {
   const { orgId } = await resolveIds(deps.db);
   const { name, email, ext } = await userProfile(deps.db, device.userId);
-  const nowMs = Date.parse(deps.now ? deps.now() : new Date().toISOString());
+  const nowMs = Date.parse((deps.now ?? nowIso)());
   const deletedAt = await lastDeviceDeletionAt(deps.db, device);
   const isRecovery =
     deletedAt !== null && nowMs - Date.parse(deletedAt) <= RECOVER_WINDOW_MS;

@@ -1,4 +1,4 @@
-import { MS_PER_SECOND } from '@zamfono/shared';
+import { epochSeconds } from '@zamfono/shared';
 
 import type { AuthCodeStore } from './codes.js';
 import { ACCESS_TOKEN_TTL_S, isRole } from './jwt.js';
@@ -72,7 +72,7 @@ async function handleAuthorizationCode(
     return oauthError(STATUS_BAD_REQUEST, 'invalid_grant');
   }
   const nowIso = deps.now();
-  const nowS = Math.floor(Date.parse(nowIso) / MS_PER_SECOND);
+  const nowS = epochSeconds(Date.parse(nowIso));
   const accessToken = await signAccessToken(
     deps.jwtSecret,
     { sub: user.id, role: user.role, cid: clientId },
@@ -105,7 +105,7 @@ async function handleRefreshToken(
   if (!user || !isRole(user.role)) {
     return oauthError(STATUS_BAD_REQUEST, 'invalid_grant');
   }
-  const nowS = Math.floor(Date.parse(nowIso) / MS_PER_SECOND);
+  const nowS = epochSeconds(Date.parse(nowIso));
   const accessToken = await signAccessToken(
     deps.jwtSecret,
     { sub: user.id, role: user.role, cid: rotated.clientId },

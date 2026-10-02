@@ -7,7 +7,13 @@
 import { createHmac } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
 
-import { newId, publicEnvelope, type Db, type Envelope } from '@zamfono/shared';
+import {
+  newId,
+  nowIso,
+  publicEnvelope,
+  type Db,
+  type Envelope
+} from '@zamfono/shared';
 
 import { attempt } from './errors.js';
 import { decrypt, type Keyring } from './secretbox.js';
@@ -68,7 +74,7 @@ export class WebhookDispatcher {
       kr: deps.kr,
       fetchImpl: deps.fetchImpl ?? fetch,
       delay: deps.delay ?? (ms => sleep(ms)),
-      now: deps.now ?? (() => new Date().toISOString())
+      now: deps.now ?? nowIso
     };
   }
 

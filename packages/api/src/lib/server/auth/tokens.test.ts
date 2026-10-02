@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { MS_PER_DAY, type Db } from '@zamfono/shared';
+import { MS_PER_DAY, MS_PER_HOUR, type Db } from '@zamfono/shared';
 
 import { makeTestDb } from '../testDb.js';
 import { upsertClient } from './clients.js';
@@ -14,7 +14,6 @@ import {
 } from './tokens.js';
 
 const NOW = '2026-01-01T00:00:00.000Z';
-const HOUR_MS = 3_600_000;
 
 function afterMs(iso: string, ms: number): string {
   return new Date(new Date(iso).getTime() + ms).toISOString();
@@ -151,7 +150,7 @@ describe('issueResetToken / redeemResetToken', () => {
     const setup = await issueResetToken(db, 'owner', 'setup', NOW);
     const reset = await issueResetToken(db, 'owner', 'reset', NOW);
     expect(setup.expiresAt).toBe(afterMs(NOW, 7 * MS_PER_DAY));
-    expect(reset.expiresAt).toBe(afterMs(NOW, HOUR_MS));
+    expect(reset.expiresAt).toBe(afterMs(NOW, MS_PER_HOUR));
   });
 
   it('redeems a token once; a second redemption fails', async () => {
@@ -167,7 +166,7 @@ describe('issueResetToken / redeemResetToken', () => {
   it('refuses a token past its expiry', async () => {
     const db = await makeTestDb();
     const { raw } = await issueResetToken(db, 'owner', 'reset', NOW);
-    const past = afterMs(NOW, HOUR_MS + 1);
+    const past = afterMs(NOW, MS_PER_HOUR + 1);
     expect(await redeemResetToken(db, raw, past)).toEqual({ ok: false });
   });
 });

@@ -3,7 +3,7 @@ import process from 'node:process';
 import type { RequestEvent } from '@sveltejs/kit';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { MS_PER_SECOND, nowIso } from '@zamfono/shared';
+import { epochSeconds, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { signAccessToken } from '#lib/server/auth/jwtSigning.js';
@@ -176,7 +176,7 @@ describe('hooks handle', () => {
         lastLoginAt: nowIso()
       })
       .execute();
-    const nowS = Math.floor(Date.now() / MS_PER_SECOND);
+    const nowS = epochSeconds(Date.now());
     const token = await signAccessToken(
       JWT_SECRET,
       { sub: 'admin1', role: 'admin', cid: 'client1' },

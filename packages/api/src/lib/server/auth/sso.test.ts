@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { exportJWK, generateKeyPair, SignJWT, type JWK } from 'jose';
 import { describe, expect, it } from 'vitest';
 
-import { nowIso, type Db } from '@zamfono/shared';
+import { epochSeconds, nowIso, type Db } from '@zamfono/shared';
 
 import { encrypt, keyringFromEnv, type Keyring } from '../secretbox.js';
 import { makeTestDb } from '../testDb.js';
@@ -16,7 +16,7 @@ import {
 } from './sso.js';
 
 const NOW = '2026-01-01T00:00:00.000Z';
-const NOW_S = Math.floor(Date.parse(NOW) / 1000);
+const NOW_S = epochSeconds(Date.parse(NOW));
 const TOKEN_TTL_S = 300;
 const ORIGIN = 'https://pbx.example.com';
 const CLIENT_ID = 'test-client';

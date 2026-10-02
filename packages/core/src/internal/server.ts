@@ -8,7 +8,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 
 import {
   isDbOpen,
-  MS_PER_SECOND,
+  processStartedAtIso,
   resolveVersion,
   type CoreHealth,
   type CoreVersionResponse,
@@ -40,9 +40,7 @@ const HTTP_SERVICE_UNAVAILABLE = 503;
 
 // When this process started, however late this module loads: `system.info` shows it (§10.3), so
 // a restart is visible.
-const processStartedAt = new Date(
-  Date.now() - process.uptime() * MS_PER_SECOND
-).toISOString();
+const processStartedAt = processStartedAtIso();
 
 type InternalDeps = {
   db: Db;

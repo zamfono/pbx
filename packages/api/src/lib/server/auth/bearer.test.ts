@@ -1,7 +1,7 @@
 import { sql } from 'kysely';
 import { describe, expect, it } from 'vitest';
 
-import { MS_PER_SECOND, nowIso, type Db } from '@zamfono/shared';
+import { epochSeconds, nowIso, type Db } from '@zamfono/shared';
 
 import { makeTestDb } from '../testDb.js';
 import { authenticateRequest, authenticateToken } from './bearer.js';
@@ -15,7 +15,7 @@ function tokenFor(sub: string, cid: string | null = null): Promise<string> {
   return signAccessToken(
     JWT_SECRET,
     { sub, role: 'owner', cid },
-    Math.floor(Date.now() / MS_PER_SECOND),
+    epochSeconds(Date.now()),
     ORIGIN
   );
 }

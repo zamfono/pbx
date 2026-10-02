@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { nowIso } from '@zamfono/shared';
+import { epochSeconds, nowIso } from '@zamfono/shared';
 
 import { signAccessToken } from './auth/jwtSigning.js';
 import { handleMcpRequest } from './mcp.js';
@@ -469,7 +469,7 @@ describe('handleMcpRequest, legacy 2025-11-25', () => {
     const otherActorToken = await signAccessToken(
       JWT_SECRET,
       { sub: 'someone-else', role: 'owner', cid: CLIENT_ID },
-      Math.floor(Date.now() / 1000),
+      epochSeconds(Date.now()),
       ORIGIN
     );
     await deps.db

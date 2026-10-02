@@ -2,7 +2,7 @@ import process from 'node:process';
 import type { RequestEvent } from '@sveltejs/kit';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { MS_PER_SECOND, nowIso } from '@zamfono/shared';
+import { epochSeconds, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { signAccessToken } from '#lib/server/auth/jwtSigning.js';
@@ -97,7 +97,7 @@ describe('form submissions without an Origin header', () => {
     const token = await signAccessToken(
       JWT_SECRET,
       { sub: 'admin1', role: 'admin', cid: null },
-      Math.floor(Date.now() / MS_PER_SECOND),
+      epochSeconds(Date.now()),
       ORIGIN
     );
     const { resolved } = await serve(`${ORIGIN}/api/v1/audio`, {

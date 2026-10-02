@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocket, WebSocketServer } from 'ws';
 
 import {
+  epochSeconds,
   newId,
   nowIso,
   openDb,
@@ -20,7 +21,7 @@ import type { Actor } from './ops/types.js';
 const JWT_SECRET = 'test-secret';
 const SHORT_TIMEOUT_MS = 30;
 const FAN_OUT_WAIT_MS = 40;
-const NOW_S = Math.floor(Date.now() / 1000);
+const NOW_S = epochSeconds(Date.now());
 
 /**
  * A WebSocket server on whatever port is free, once it listens: a fixed port can already be held

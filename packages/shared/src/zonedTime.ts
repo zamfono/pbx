@@ -7,15 +7,16 @@
  * it), and calendar-day and weekday shifts. Every computation
  * goes through `Intl` rather than a date library.
  */
-import { MS_PER_DAY } from './time.js';
+import {
+  DAYS_PER_WEEK,
+  MINUTES_PER_HOUR,
+  MS_PER_DAY,
+  MS_PER_MINUTE
+} from './time.js';
 
 /** ISO 8601 weekday: 1 = Monday … 7 = Sunday. */
 // eslint-disable-next-line no-magic-numbers -- the seven ISO weekday literals of the type itself
 export type Weekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
-
-export const MINUTES_PER_HOUR = 60;
-const ISO_WEEK_DAYS = 7;
-const MS_PER_MINUTE = 60_000;
 
 const WEEKDAY_NUMBERS: Record<string, Weekday> = {
   Mon: 1,
@@ -143,7 +144,7 @@ export function addDays(
 /** The ISO weekday `offset` days after `startWeekday`. */
 export function weekdayAt(startWeekday: number, offset: number): Weekday {
   const index =
-    (((startWeekday - 1 + offset) % ISO_WEEK_DAYS) + ISO_WEEK_DAYS) %
-    ISO_WEEK_DAYS;
+    (((startWeekday - 1 + offset) % DAYS_PER_WEEK) + DAYS_PER_WEEK) %
+    DAYS_PER_WEEK;
   return (index + 1) as Weekday;
 }

@@ -1,4 +1,10 @@
-import { MINUTES_PER_HOUR, MS_PER_DAY, MS_PER_SECOND } from '@zamfono/shared';
+import {
+  DAYS_PER_WEEK,
+  MS_PER_DAY,
+  MS_PER_HOUR,
+  MS_PER_MINUTE,
+  MS_PER_SECOND
+} from '@zamfono/shared';
 
 export const METRICS = [
   'answerRate',
@@ -11,10 +17,6 @@ export type Metric = (typeof METRICS)[number];
 export const BUCKET_UNITS = ['minute', 'hour', 'day', 'week'] as const;
 export type BucketUnit = (typeof BUCKET_UNITS)[number];
 
-const SECONDS_PER_MINUTE = 60;
-const DAYS_PER_WEEK = 7;
-const MS_PER_MINUTE = SECONDS_PER_MINUTE * MS_PER_SECOND;
-const MS_PER_HOUR = MINUTES_PER_HOUR * MS_PER_MINUTE;
 const MS_PER_WEEK = DAYS_PER_WEEK * MS_PER_DAY;
 
 const STEP_MS_BY_UNIT: Record<BucketUnit, number> = {

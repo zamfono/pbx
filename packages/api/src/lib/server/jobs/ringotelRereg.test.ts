@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { newId, type CoreVersionResponse, type Db } from '@zamfono/shared';
+import {
+  MS_PER_HOUR,
+  MS_PER_MINUTE,
+  newId,
+  type CoreVersionResponse,
+  type Db
+} from '@zamfono/shared';
 
 import type { ProvisioningProvider } from '../provisioning/index.js';
 import { makeTestDb } from '../testDb.js';
@@ -10,11 +16,9 @@ import {
   type ReregState
 } from './ringotelRereg.js';
 
-const MINUTE_MS = 60_000;
-
 /** `minutes` from now, as the ISO time an audit entry or an Asterisk start carries. */
 function at(minutes: number): string {
-  return new Date(Date.now() + minutes * MINUTE_MS).toISOString();
+  return new Date(Date.now() + minutes * MS_PER_MINUTE).toISOString();
 }
 
 // Every entry this suite's checks write is dated now: an Asterisk start before it is an old one.
@@ -211,7 +215,7 @@ describe('watchAsteriskRestarts (§10.4 "After a restart")', () => {
       watcher.streamConnected();
       await watcher.idle();
       // No timer asks in between: an hour passes without a lookup.
-      await vi.advanceTimersByTimeAsync(MINUTE_MS * 60);
+      await vi.advanceTimersByTimeAsync(MS_PER_HOUR);
       expect(lookup).toHaveBeenCalledOnce();
 
       watcher.streamConnected();

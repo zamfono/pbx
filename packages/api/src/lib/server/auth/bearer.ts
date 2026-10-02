@@ -3,7 +3,7 @@
  * server hook, the MCP endpoint and the `/events` handshake. It never reads `$app/env/private`, since
  * `server.ts` runs the handshake outside the SvelteKit bundle.
  */
-import { MS_PER_SECOND, type Db } from '@zamfono/shared';
+import { epochSeconds, type Db } from '@zamfono/shared';
 
 import type { Actor } from '../ops/types.js';
 import { isRole, verifyAccessToken } from './jwt.js';
@@ -30,7 +30,7 @@ export async function authenticateToken(
   token: string,
   audience?: string
 ): Promise<Authenticated | null> {
-  const nowS = Math.floor(Date.now() / MS_PER_SECOND);
+  const nowS = epochSeconds(Date.now());
   const claims = await verifyAccessToken(deps.jwtSecret, token, nowS, audience);
   if (!claims) {
     return null;

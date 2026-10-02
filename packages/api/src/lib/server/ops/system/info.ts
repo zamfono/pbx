@@ -1,9 +1,8 @@
-import process from 'node:process';
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
 import {
-  MS_PER_SECOND,
+  processStartedAtIso,
   resolveVersion,
   type CoreVersionResponse,
   type Db,
@@ -32,9 +31,7 @@ import {
 import { updaterClient } from './_updater.js';
 
 // When this process started, however late this module loads, so a restart is visible (§10.3).
-const apiStartedAt = new Date(
-  Date.now() - process.uptime() * MS_PER_SECOND
-).toISOString();
+const apiStartedAt = processStartedAtIso();
 
 type Output = {
   /** What `api` runs, the process answering this call, and since when. */
