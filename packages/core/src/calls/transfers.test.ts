@@ -21,9 +21,10 @@ import { newAddedLeg } from './addedParty.js';
 import { callerChannel, newCall, type Call } from './call.js';
 import { channelOf } from './callLookup.js';
 import { closeCall } from './liveCall.js';
+import { fromOf, userOfChannel } from './onwardCall.js';
 import type { Pipeline } from './pipeline.js';
 import { Recorder } from './recording.js';
-import { fromOf, transferCall, userOfChannel } from './transfers.js';
+import { transferCall } from './transfers.js';
 
 // How long a check that something does NOT happen gives the flow to do it anyway.
 const SETTLE_MS = 50;

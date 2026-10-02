@@ -17,8 +17,8 @@ import { otherChannelIn, presentCallerUserId } from './callLookup.js';
 import { callPartiesChanged } from './callState.js';
 import { endHold } from './hold.js';
 import { closeCall } from './liveCall.js';
+import { userOfChannel } from './onwardCall.js';
 import type { Pipeline } from './pipeline.js';
-import { userOfChannel } from './transfers.js';
 
 type Named = { id: string } | undefined;
 

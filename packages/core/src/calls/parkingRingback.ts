@@ -20,6 +20,8 @@ import { extensionOf } from './extensionOwner.js';
 import { RELEASE_CODE_NOT_FOUND } from './featureCall.js';
 import { endHold } from './hold.js';
 import { trackLeg } from './legs.js';
+import { closeCall } from './liveCall.js';
+import { startOnwardCall } from './onwardCall.js';
 import type { Pipeline } from './pipeline.js';
 import { runTarget } from './runTarget.js';
 import { runUserStep } from './userStep.js';
@@ -88,16 +90,20 @@ type RingbackContext = {
   partyChannelId: string;
 };
 
-/** §10.2 "Call parking": on an unanswered ring-back, the parked party goes to the tenant fallback
- * target (§11.3), released with 404 while the tenant carries none, as an ordinary re-entry of the
- * routing pipeline — `parked` continues as the same `calls` row, its `callerChannelId` becoming
- * the party's own still-controlled channel now that nobody else shares its bridge. */
+/**
+ * §10.2 "Call parking": on an unanswered ring-back, the parked party goes to the tenant fallback
+ * target (§11.3), released with 404 while the tenant carries none. Like a blind transfer's
+ * transferee (§10.1 "Transfers and pickup"), the party goes on in a call of its own, a child of
+ * `parked`, whose conversation ends here as answered; the onward call goes `to` the extension
+ * the ring-back rang.
+ */
 async function routeParkedPartyToFallback(
   pipeline: Pipeline,
   snapshot: Snapshot,
-  parked: Call,
-  partyChannelId: string
+  ctx: RingbackContext,
+  to: string
 ): Promise<void> {
+  const { parked, partyChannelId } = ctx;
   const ari = pipeline.deps.ari;
   await ari.channels.stopMoh(partyChannelId).catch(ignoreGone);
   if (parked.bridgeId !== null) {
@@ -106,23 +112,31 @@ async function routeParkedPartyToFallback(
       .catch(ignoreGone);
     await ari.bridges.destroy(parked.bridgeId).catch(ignoreGone);
   }
-  // eslint-disable-next-line require-atomic-updates -- `parked` is this park's own aggregate; no concurrent write races this reassignment before the awaits below
   parked.bridgeId = null;
-  // eslint-disable-next-line require-atomic-updates -- see above
-  parked.callerChannelId = partyChannelId;
   const targetId = snapshot.settings.fallbackTargetId;
   if (targetId === null) {
+    // The party is the one channel left for the release to end.
+    parked.callerChannelId = partyChannelId;
     await release(pipeline, parked, RELEASE_CODE_NOT_FOUND, 'missed');
     return;
   }
   parked.log.event({ event: 'parkingTimeout', result: 'fallback' });
+  await closeCall(pipeline, parked, 'answered', false);
+  const target = findForwardTarget(snapshot, targetId);
+  const entry = {
+    to,
+    direction: 'internal',
+    logLevel: toLogLevel(snapshot.settings.callLogLevel),
+    asUserId: null,
+    trace: { parkingTimeout: 'fallback' }
+  } as const;
   // The tenant fallback forwards without a caller (§10.1 step 7).
-  await runTarget(
+  await startOnwardCall(
     pipeline,
     parked,
-    findForwardTarget(snapshot, targetId),
-    null,
-    null
+    partyChannelId,
+    { snapshot, entry },
+    child => runTarget(pipeline, child, target, null, null)
   );
 }
 
@@ -153,8 +167,8 @@ export async function ringParkerBack(
     await routeParkedPartyToFallback(
       pipeline,
       snapshot,
-      parked,
-      partyChannelId
+      ctx,
+      parkerExt ?? parked.to
     );
     return;
   }
@@ -200,5 +214,5 @@ export async function ringParkerBack(
     ringback.status ??= 'missed';
     await pipeline.finishCall(ringback);
   }
-  await routeParkedPartyToFallback(pipeline, snapshot, parked, partyChannelId);
+  await routeParkedPartyToFallback(pipeline, snapshot, ctx, parkerExt);
 }

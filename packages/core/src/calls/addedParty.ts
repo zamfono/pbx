@@ -16,8 +16,8 @@ import { resolveAddedTarget } from './addPartyTarget.js';
 import { callLogMaxBytesFromEnv, newCall, type Call } from './call.js';
 import { ownBridge, transferrerChannel } from './callLookup.js';
 import { extensionOf } from './extensionOwner.js';
+import { userOfChannel } from './onwardCall.js';
 import type { Pipeline } from './pipeline.js';
-import { userOfChannel } from './transfers.js';
 
 /** Which action the leg is for, as its trace and the running call's name it. */
 export type AddedLegKind = 'addParty' | 'consult';

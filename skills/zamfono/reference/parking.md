@@ -35,7 +35,8 @@ group while it is a slot, and a menu's `allowExtensionDialing` never reaches one
    the parker back as an internal call to the parker's own extension, so the parker's own rules
    apply: DND, forwarding, the mailbox. When that call ends unanswered, the parked party goes to
    the tenant-wide fallback target (`settings.fallbackTarget`, `numbers`), or is released when
-   there is none.
+   there is none. As after a transfer, the parked call then ends in the call history, and the
+   party's call to the fallback is a call of its own whose `parentCallId` is the parked call.
 
 A parked party who hangs up frees the slot. A restart of the `core` container hangs up parked
 calls whose parker it no longer knows. The parker appears in the call's routing trace

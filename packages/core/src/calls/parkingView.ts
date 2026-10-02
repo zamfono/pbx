@@ -5,8 +5,8 @@
  */
 import { ANONYMOUS, type ParkedCall } from '@zamfono/shared';
 
+import { fromOf } from './onwardCall.js';
 import type { Pipeline } from './pipeline.js';
-import { fromOf } from './transfers.js';
 
 /** One entry per occupied slot, by slot: a withheld caller's number is none (§9.4 "Withheld
  * caller"). */

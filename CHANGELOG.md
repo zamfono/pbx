@@ -233,6 +233,11 @@ why the specified behaviour changed; the commit history, how.
   example because another of the call's phones answered, could be counted off its trunk twice.
   The trunk's channels in use in `/metrics` then read one too low, and its `max_channels` let one
   call too many through. Each call now counts off once.
+- A parked call whose ring-back went unanswered could not reach a tenant fallback target that
+  answers: a user, ring group, external number or SIP target rang, and the parked caller was
+  never connected to whoever picked up. The parked caller is now connected, as after a blind
+  transfer: the parked call ends in the call history, and the call to the fallback target follows
+  it as a call of its own, linked to it.
 
 ### Upgrade notes
 

@@ -13,13 +13,13 @@
 import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { AriEvent, Channel } from '../ari/types.js';
 import { closeCall } from './liveCall.js';
+import { fromOf, transfereeEntry, userOfChannel } from './onwardCall.js';
 import {
   dropPendingTransfer,
   localDiallingHalf,
   setPendingTransfer
 } from './pendingTransfer.js';
 import type { Pipeline } from './pipeline.js';
-import { fromOf, transfereeEntry, userOfChannel } from './transfers.js';
 
 /** The transferee's channel and the Local half bridged with it, and the bridge they share. */
 type LocalLine = { transfereeId: string; localId: string; bridgeId: string };

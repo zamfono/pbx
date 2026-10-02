@@ -18,8 +18,8 @@ import type { Call } from './call.js';
 import { bridgedParty, ownBridge, transferrerChannel } from './callLookup.js';
 import { consultationLive, endHold, holdOf, holdParty } from './hold.js';
 import { closeCall } from './liveCall.js';
+import { userOfChannel } from './onwardCall.js';
 import type { Pipeline } from './pipeline.js';
-import { userOfChannel } from './transfers.js';
 
 /** `POST /internal/calls/{id}/consult`: holds the other party and dials `target` from the actor;
  * the consultation's own call. */
