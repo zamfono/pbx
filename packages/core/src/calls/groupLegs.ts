@@ -9,7 +9,8 @@ export type GroupLeg = {
   channelId: string;
   userId: string | null;
   memberKey: string;
-  state: 'ringing' | 'ended';
+  /** As a `Leg`'s: `placing` until its dial is sent, its placement's to settle until then. */
+  state: 'placing' | 'ringing' | 'ended';
   /** The device a member's own leg rings; absent for an external (forwarded) member leg. */
   deviceId?: string;
   /** An external (forwarded) member leg, whose channel's end its attempt handles

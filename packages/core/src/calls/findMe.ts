@@ -6,11 +6,12 @@ import { MS_PER_SECOND } from '@zamfono/shared';
 
 import { defaultPrompt } from '../prompts.js';
 import type { Call, Leg } from './call.js';
+import { callPartiesChanged } from './callState.js';
 import { ringExternalLeg, type ExternalLegOwner } from './externalLeg.js';
 import {
-  endLeg,
   hangupLeg,
   trackLeg,
+  untrackLeg,
   type FindMeAcceptWait,
   type RingResolver
 } from './legs.js';
@@ -51,28 +52,32 @@ function findMeOwner(
     return leg?.state === 'ringing' ? leg : null;
   };
   return {
-    track: channelId => {
-      const leg: Leg = {
+    place: channelId => {
+      trackLeg(pipeline, call, {
         channelId,
         kind: 'findMe',
         userId,
-        state: 'ringing',
+        state: 'placing',
         endCause: null
-      };
-      trackLeg(pipeline, call, leg);
+      });
+    },
+    track: channelId => {
       call.log.event({ event: 'rungFindMe', channelId, userId });
-      // The race may have settled while this attempt was being originated, the call ringing on
-      // for its next target by now (a `noAnswer` forward to another user): never a leg of that.
-      if (pipeline.pendingRing.get(call.id) !== ring) {
-        hangupLeg(pipeline, leg).catch(() => undefined);
+      const leg = call.legs.get(channelId);
+      // The race may have settled while this attempt was being placed, the call ringing on for
+      // its next target by now (a `noAnswer` forward to another user): never a leg of that.
+      if (leg === undefined || pipeline.pendingRing.get(call.id) !== ring) {
+        return false;
       }
+      leg.state = 'ringing';
+      callPartiesChanged(pipeline.deps, call);
+      return true;
     },
     ringing: channelId => ringingLeg(channelId) !== null,
     retire: channelId => {
-      const leg = ringingLeg(channelId);
-      if (leg !== null) {
-        endLeg(pipeline, channelId, leg);
-        call.legs.delete(channelId);
+      const leg = call.legs.get(channelId);
+      if (leg !== undefined) {
+        untrackLeg(pipeline, call, leg);
       }
     },
     end: (channelId, cause) => {

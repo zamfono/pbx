@@ -639,9 +639,12 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       await seedRoute(db, 1, trunkId, userId);
 
       const finished = ringUser(pipeline, call, userId);
-      // The device leg and the find-me leg, each tracked once its originate returned.
+      // The device leg and the find-me leg, each ringing once its dial is sent.
       await eventually(() => {
-        expect(call.legs.size).toBe(2);
+        const ringing = [...call.legs.values()].filter(
+          leg => leg.state === 'ringing'
+        );
+        expect(ringing).toHaveLength(2);
       });
 
       expect(originates(fakeAri).map(body => body.endpoint)).toEqual([
@@ -672,7 +675,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
 
       const finished = ringUser(pipeline, call, userId);
       await eventually(() => {
-        expect(findMeLegs()).toHaveLength(1);
+        expect(findMeLegs().map(found => found.state)).toEqual(['ringing']);
       });
       const leg = originates(fakeAri).find(
         body => body.endpoint === `PJSIP/+15557000@trunk-${trunkId}`
@@ -697,7 +700,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const finished = ringUser(pipeline, call, userId);
       const leg = await eventually(() => {
         const found = findMeLegs().at(0);
-        if (found === undefined) {
+        if (found?.state !== 'ringing') {
           throw new Error('the find-me leg is not ringing yet');
         }
         return found;
@@ -758,9 +761,12 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       await seedRoute(db, 1, trunkId);
 
       const finished = ringUser(pipeline, call, userId);
-      // The device leg and the find-me leg, each tracked once its originate returned.
+      // The device leg and the find-me leg, each ringing once its dial is sent.
       await eventually(() => {
-        expect(call.legs.size).toBe(2);
+        const ringing = [...call.legs.values()].filter(
+          leg => leg.state === 'ringing'
+        );
+        expect(ringing).toHaveLength(2);
       });
       const findMe = findMeLegs().at(0);
       emit('ChannelDestroyed', callerChannel.id, { cause: 16 });
@@ -782,7 +788,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const finished = ringUser(pipeline, call, userId);
       const first = await eventually(() => {
         const leg = findMeLegs().at(0);
-        if (leg === undefined) {
+        if (leg?.state !== 'ringing') {
           throw new Error('the find-me leg is not ringing yet');
         }
         return leg;
@@ -845,7 +851,9 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const finished = ringUser(pipeline, call, userId);
       // The find-me leg is judged unrouted (and traced) once the device leg rings.
       await eventually(() => {
-        expect(call.legs.size).toBe(1);
+        expect([...call.legs.values()].map(leg => leg.state)).toEqual([
+          'ringing'
+        ]);
         expect(traceEvents(call)).toContain('externalLegUnrouted');
       });
 

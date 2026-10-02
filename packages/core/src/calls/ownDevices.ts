@@ -8,17 +8,18 @@
  * (`RingResolver.handOver`), which makes it the caller of the click-to-dial call, or the
  * picked-up call's answer.
  */
-import { MS_PER_SECOND } from '@zamfono/shared';
+import { MS_PER_SECOND, newId } from '@zamfono/shared';
 
 import type { Channel } from '../ari/types.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { channelLanguageVariable } from '../prompts.js';
 import type { Call, Leg } from './call.js';
-import { recordEvents, redeliverEarlyEvents } from './earlyEvents.js';
+import { callPartiesChanged } from './callState.js';
 import { originateLeg } from './legOriginate.js';
 import {
   hangupLeg,
   trackLeg,
+  untrackLeg,
   type RingOutcome,
   type RingResolver
 } from './legs.js';
@@ -71,9 +72,9 @@ export type OwnRing = {
  * `pendingRing`, which the call's next ring replaces once this one has handed its answer over. */
 type OwnRingState = { placed: Map<string, Channel>; ring: RingResolver };
 
-/** Places one leg for `device` on `host`, tracked as a ringing device leg. A placement that
- * fails leaves the ring; one placed after the race settled is hung up, even once the host call
- * rings on for its next party. */
+/** Places one leg for `device` on `host`, tracked as a device leg: placing, then ringing. A
+ * placement that fails leaves the ring; one placed after the race settled is hung up, even once
+ * the host call rings on for its next party. */
 async function placeDevice(
   pipeline: Pipeline,
   params: OwnRingParams,
@@ -82,17 +83,37 @@ async function placeDevice(
 ): Promise<void> {
   const { placed } = own;
   const { host, sipCall, userId, callerId, language } = params;
-  const early = recordEvents(pipeline.deps.ari);
-  const channel = await originateLeg(pipeline, sipCall, {
-    endpoint: `PJSIP/${device.sipUsername}`,
-    app: 'zamfono',
-    appArgs: `leg,${host.id}`,
-    callerId,
-    variables: channelLanguageVariable(language)
-  })
-    .catch(() => null)
-    .finally(early.stop);
-  if (channel === null) {
+  const leg: Leg = {
+    channelId: newId(),
+    kind: 'device',
+    userId,
+    state: 'placing',
+    endCause: null,
+    deviceId: device.id
+  };
+  trackLeg(pipeline, host, leg);
+  const ok = await originateLeg(
+    pipeline,
+    sipCall,
+    {
+      channelId: leg.channelId,
+      endpoint: `PJSIP/${device.sipUsername}`,
+      app: 'zamfono',
+      appArgs: `leg,${host.id}`,
+      callerId,
+      variables: channelLanguageVariable(language)
+    },
+    channel => {
+      placed.set(channel.id, channel);
+      leg.state = 'ringing';
+      host.log.event({ event: 'rungDevice', channelId: channel.id, userId });
+    }
+  ).then(
+    () => true,
+    () => false
+  );
+  if (!ok) {
+    untrackLeg(pipeline, host, leg);
     host.log.event({
       event: 'rungDevice',
       deviceId: device.id,
@@ -101,24 +122,13 @@ async function placeDevice(
     });
     return;
   }
-  placed.set(channel.id, channel);
-  trackLeg(pipeline, host, {
-    channelId: channel.id,
-    kind: 'device',
-    userId,
-    state: 'ringing',
-    endCause: null,
-    deviceId: device.id
-  });
-  host.log.event({ event: 'rungDevice', channelId: channel.id, userId });
-  // A phone that declined or answered at once did so before it was tracked.
-  redeliverEarlyEvents(pipeline.deps.ari, early, channel.id);
-  const leg = host.legs.get(channel.id);
+  callPartiesChanged(pipeline.deps, host);
+  const tracked = host.legs.get(leg.channelId);
   if (
     pipeline.pendingRing.get(host.id) !== own.ring &&
-    leg?.state === 'ringing'
+    tracked?.state === 'ringing'
   ) {
-    await hangupLeg(pipeline, leg);
+    await hangupLeg(pipeline, tracked);
   }
 }
 

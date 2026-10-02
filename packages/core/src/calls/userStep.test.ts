@@ -19,6 +19,9 @@ import { runUserStep } from './userStep.js';
  * `offline` rule at once, and one already in a call is rung on their other devices only, or meets
  * the `busy` rule at once when they have none. */
 
+// Asterisk's Q.850 mapping of SIP 486 Busy Here.
+const AST_CAUSE_USER_BUSY = 17;
+
 const noopLogger: Logger = {
   info: () => undefined,
   warn: () => undefined,
@@ -300,7 +303,8 @@ describe('user step against registration', () => {
   it.each([
     'its create is refused',
     'its dial is refused',
-    'it never enters the app'
+    'it never enters the app',
+    'it is gone before it enters the app'
   ] as const)(
     'applies the noAnswer rule at once when the only phone cannot be placed: %s',
     async refusal => {
@@ -311,9 +315,26 @@ describe('user step against registration', () => {
         fakeAri.failOriginate = { status: 500 };
       } else if (refusal === 'its dial is refused') {
         fakeAri.failDial = { status: 409 };
-      } else {
+      } else if (refusal === 'it never enters the app') {
         fakeAri.createdEntersStasis = false;
         pipeline.deps.legStasisWaitMs = 20;
+      } else {
+        fakeAri.createdEntersStasis = false;
+        fakeAri.requestDelayMs = request => {
+          const channelId = (request.body as { channelId?: string } | undefined)
+            ?.channelId;
+          if (request.path === 'channels/create' && channelId !== undefined) {
+            // Gone with a busy cause, which a ringing phone's decline would make the busy rule.
+            fakeAri.emit({
+              type: 'ChannelDestroyed',
+              timestamp: nowIso(),
+              application: 'zamfono',
+              channel: defaultChannel({ id: channelId }),
+              cause: AST_CAUSE_USER_BUSY
+            });
+          }
+          return 0;
+        };
       }
 
       const started = Date.now();
@@ -328,7 +349,10 @@ describe('user step against registration', () => {
         'sound:/media/prompts/noanswer'
       ]);
       expect(Date.now() - started).toBeLessThan(900);
-      expect(call.log.finish().log).toContain('"cause":"placementFailed"');
+      // Traced as a placement failure, its channel's end never taken for a decline.
+      const log = call.log.finish().log ?? '';
+      expect(log).toContain('"cause":"placementFailed"');
+      expect(log).not.toContain('"event":"declined"');
     }
   );
 

@@ -2,16 +2,15 @@
 // find-me legs, then, once the race ends without an answer, the busy or noAnswer outcome. The race
 // itself — the first accepted answer winning, a leg ending early — is `legs.ts`'s.
 
-import { MS_PER_SECOND } from '@zamfono/shared';
+import { MS_PER_SECOND, newId } from '@zamfono/shared';
 
 import { channelLanguageVariable } from '../prompts.js';
-import { release, takeJoinBridge, type Call } from './call.js';
-import { callRinging } from './callState.js';
+import { release, takeJoinBridge, type Call, type Leg } from './call.js';
+import { callPartiesChanged, callRinging } from './callState.js';
 import { softphoneCallerId } from './contactName.js';
-import { recordEvents, redeliverEarlyEvents } from './earlyEvents.js';
 import { findMeLegsPending, scheduleFindMeLegs } from './findMe.js';
 import { originateLeg } from './legOriginate.js';
-import { hangupLeg, trackLeg, type RingOutcome } from './legs.js';
+import { hangupLeg, trackLeg, untrackLeg, type RingOutcome } from './legs.js';
 import type { Pipeline } from './pipeline.js';
 import { concludeRing, placeAll } from './ringConclusion.js';
 import { devicesToRing, registeredDevices } from './userDevices.js';
@@ -25,7 +24,7 @@ type DeviceRing = {
   language: string;
 };
 
-/** Originates one leg for `device`, tracked on `call` as a ringing device leg. */
+/** Originates one leg for `device`, tracked on `call` as a device leg: placing, then ringing. */
 async function ringDevice(
   pipeline: Pipeline,
   call: Call,
@@ -33,19 +32,38 @@ async function ringDevice(
   device: { id: string; sipUsername: string }
 ): Promise<void> {
   const { userId } = ring;
-  const early = recordEvents(pipeline.deps.ari);
-  const channel = await originateLeg(pipeline, call, {
-    endpoint: `PJSIP/${device.sipUsername}`,
-    app: 'zamfono',
-    appArgs: `leg,${call.id}`,
-    callerId: ring.callerId,
-    // §9.1 "every channel's language": a device leg has been through no entry of its own.
-    variables: channelLanguageVariable(ring.language)
-  })
-    .catch(() => null)
-    .finally(early.stop);
-  if (channel === null) {
+  const leg: Leg = {
+    channelId: newId(),
+    kind: 'device',
+    userId,
+    state: 'placing',
+    endCause: null,
+    deviceId: device.id
+  };
+  trackLeg(pipeline, call, leg);
+  const placed = await originateLeg(
+    pipeline,
+    call,
+    {
+      channelId: leg.channelId,
+      endpoint: `PJSIP/${device.sipUsername}`,
+      app: 'zamfono',
+      appArgs: `leg,${call.id}`,
+      callerId: ring.callerId,
+      // §9.1 "every channel's language": a device leg has been through no entry of its own.
+      variables: channelLanguageVariable(ring.language)
+    },
+    () => {
+      leg.state = 'ringing';
+      call.log.event({ event: 'rungDevice', channelId: leg.channelId, userId });
+    }
+  ).then(
+    () => true,
+    () => false
+  );
+  if (!placed) {
     // Refused before it rang (`legOriginate.ts`): the device leaves the race as if it declined.
+    untrackLeg(pipeline, call, leg);
     call.log.event({
       event: 'rungDevice',
       deviceId: device.id,
@@ -54,24 +72,14 @@ async function ringDevice(
     });
     return;
   }
-  trackLeg(pipeline, call, {
-    channelId: channel.id,
-    kind: 'device',
-    userId,
-    state: 'ringing',
-    endCause: null,
-    deviceId: device.id
-  });
-  call.log.event({ event: 'rungDevice', channelId: channel.id, userId });
-  // A phone that declined at once (486, 603) ended before it was tracked (§10.1 step 4).
-  redeliverEarlyEvents(pipeline.deps.ari, early, channel.id);
+  callPartiesChanged(pipeline.deps, call);
   // §10.1 step 4: a win landing during this originate must not leave its leg ringing,
   // nor must the race ending unanswered meanwhile, its timeout or its last other leg ending.
-  const leg = call.legs.get(channel.id);
+  const tracked = call.legs.get(leg.channelId);
   const raceOver =
     call.answeredAt !== null || !pipeline.pendingRing.has(call.id);
-  if (raceOver && leg?.state === 'ringing') {
-    await hangupLeg(pipeline, leg);
+  if (raceOver && tracked?.state === 'ringing') {
+    await hangupLeg(pipeline, tracked);
   }
 }
 

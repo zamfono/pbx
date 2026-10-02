@@ -227,7 +227,9 @@ describe('a find-me leg still to come (§10.1 step 4)', () => {
 
     const finished = ringUser(pipeline, call, userId);
     await eventually(() => {
-      expect(call.legs.size).toBe(1);
+      expect([...call.legs.values()].map(leg => leg.state)).toEqual([
+        'ringing'
+      ]);
     });
     destroy((await channelTo('PJSIP/e101-d1')).id, AST_CAUSE_NORMAL);
 
@@ -246,7 +248,9 @@ describe('a find-me leg still to come (§10.1 step 4)', () => {
 
     const finished = ringUser(pipeline, call, userId);
     await eventually(() => {
-      expect(call.legs.size).toBe(1);
+      expect([...call.legs.values()].map(leg => leg.state)).toEqual([
+        'ringing'
+      ]);
     });
     destroy((await channelTo('PJSIP/e101-d1')).id, AST_CAUSE_NORMAL);
     await eventually(() => {

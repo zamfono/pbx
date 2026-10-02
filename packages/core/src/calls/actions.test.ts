@@ -209,6 +209,17 @@ describe('CallActions', () => {
         )?.body as { endpoint?: string } | undefined
       )?.endpoint;
     fakeAri.requestDelayMs = request => {
+      const created = request.body as { endpoint?: string } | undefined;
+      if (
+        request.path === 'channels/create' &&
+        created?.endpoint === 'PJSIP/e101-b'
+      ) {
+        // Still being placed once the target's ring has begun, and its dial refused then.
+        setTimeout(() => {
+          fakeAri.failDial = { status: 409, count: 1 };
+        }, 250);
+        return 300;
+      }
       const dial = /^channels\/(?<id>[^/]+)\/dial$/u.exec(request.path);
       const channelId = dial?.groups?.id ?? '';
       const endpoint = endpointOf(channelId);
@@ -221,13 +232,6 @@ describe('CallActions', () => {
           channel: defaultChannel({ id: channelId, state: 'Up' })
         });
         return 50;
-      }
-      if (endpoint === 'PJSIP/e101-b') {
-        // Refused once the target's ring has begun, its phone still being placed.
-        setTimeout(() => {
-          fakeAri.failDial = { status: 409, count: 1 };
-        }, 250);
-        return 300;
       }
       return endpoint === 'PJSIP/e102-a' ? 600 : 0;
     };

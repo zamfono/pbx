@@ -4,6 +4,8 @@
  * `emergency.ts`'s per-trunk dialling; the INVITE itself is `trunkDial.ts`, caller-ID resolution
  * `callerIdentity.ts`, the terminal outcomes `answer.ts` and `conclude.ts`.
  */
+import { newId } from '@zamfono/shared';
+
 import type { AriClient } from '../ari/client.js';
 import type { AriEvent, Channel } from '../ari/types.js';
 import type { Snapshot } from '../internal/snapshot.js';
@@ -12,8 +14,8 @@ import {
   type AttemptFailure,
   type Route
 } from '../routing/trunk.js';
+import type { Leg } from './call.js';
 import { callRinging } from './callState.js';
-import { recordEvents, type EventRecording } from './earlyEvents.js';
 import { alertsOn, provisionalArrived, type TrunkLeg } from './provisional.js';
 import {
   dialTargets,
@@ -36,69 +38,80 @@ const PLACEMENT_FAILED: AttemptFailure = {
   alerted: false
 };
 
+/** An attempt's outcome as its channel's events tell it, and the no-response budget's start. */
+type AttemptWatch = {
+  outcome: Promise<AttemptOutcome>;
+  /** Starts the budget, once the leg is placed: it needs the channel's name. */
+  start: (leg: TrunkLeg, timeoutMs: number) => void;
+  /** Stops watching a leg that could not be placed. */
+  stop: () => void;
+};
+
 /**
- * Resolves once `leg` alerts and later ends, answers, or times out (§9.4 "Route fallthrough"),
- * `early` holding the events that arrived while the leg was being originated.
+ * Watches `channelId`, from before its create, until it alerts and later ends, answers, or times
+ * out (§9.4 "Route fallthrough"): a far end that answers or refuses at once may do so before the
+ * leg's placement returns.
  */
-function waitForAttemptOutcome(
-  ari: AriClient,
-  leg: TrunkLeg,
-  early: EventRecording,
-  timeoutMs: number
-): Promise<AttemptOutcome> {
-  return new Promise(resolve => {
-    let alerted = false;
-    let settled = false;
-    // Both fields are set once, right below, before `finish` can possibly run; one holder object,
-    // so neither field needs a dummy initializer.
-    const listener: {
-      timer: ReturnType<typeof setTimeout> | null;
-      onEvent: ((event: AriEvent) => void) | null;
-    } = { timer: null, onEvent: null };
-    const stopBudget = (): void => {
-      if (listener.timer !== null) {
-        clearTimeout(listener.timer);
-        listener.timer = null;
-      }
-    };
-    const finish = (outcome: AttemptOutcome): void => {
-      if (settled) {
-        return;
-      }
-      settled = true;
+function watchAttemptOutcome(ari: AriClient, channelId: string): AttemptWatch {
+  const { promise, resolve } = Promise.withResolvers<AttemptOutcome>();
+  let alerted = false;
+  let settled = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  // Set right below, before `stop` can possibly run; a holder, so it needs no dummy initializer.
+  const listener: { onEvent: ((event: AriEvent) => void) | null } = {
+    onEvent: null
+  };
+  const stopBudget = (): void => {
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+  const stop = (): void => {
+    stopBudget();
+    if (listener.onEvent !== null) {
+      ari.off('event', listener.onEvent);
+    }
+  };
+  const finish = (outcome: AttemptOutcome): void => {
+    if (settled) {
+      return;
+    }
+    settled = true;
+    stop();
+    resolve(outcome);
+  };
+  listener.onEvent = event => {
+    if (!alerted && alertsOn(event, channelId)) {
+      // The no-response budget covers only the interval before the first provisional
+      // response (§9.4 "Route fallthrough"); once the far end alerted, the attempt is final
+      // only on answer or a terminal response, never on this timer.
+      alerted = true;
       stopBudget();
-      if (listener.onEvent !== null) {
-        ari.off('event', listener.onEvent);
-      }
-      resolve(outcome);
-    };
-    listener.onEvent = event => {
-      if (!alerted && alertsOn(event, leg.id)) {
-        // The no-response budget covers only the interval before the first provisional
-        // response (§9.4 "Route fallthrough"); once the far end alerted, the attempt is final
-        // only on answer or a terminal response, never on this timer.
-        alerted = true;
-        stopBudget();
-        return;
-      }
-      const channel = event.channel as Channel | undefined;
-      if (channel?.id !== leg.id) {
-        return;
-      }
-      if (event.type === 'ChannelStateChange' && channel.state === 'Up') {
-        finish({ kind: 'answered', channelId: leg.id });
-        return;
-      }
-      if (event.type === 'ChannelDestroyed') {
-        const code = endedSipStatus(event);
-        finish({ kind: 'failure', failure: { kind: 'final', code, alerted } });
-      }
-    };
-    ari.on('event', listener.onEvent);
-    listener.timer = setTimeout(() => {
-      listener.timer = null;
-      // A `100 Trying` ends the budget as any provisional response does, though no event says so;
-      // the attempt then waits for its outcome like one that alerted.
+      return;
+    }
+    const channel = event.channel as Channel | undefined;
+    if (channel?.id !== channelId) {
+      return;
+    }
+    if (event.type === 'ChannelStateChange' && channel.state === 'Up') {
+      finish({ kind: 'answered', channelId });
+      return;
+    }
+    if (event.type === 'ChannelDestroyed') {
+      const code = endedSipStatus(event);
+      finish({ kind: 'failure', failure: { kind: 'final', code, alerted } });
+    }
+  };
+  ari.on('event', listener.onEvent);
+  const start = (leg: TrunkLeg, timeoutMs: number): void => {
+    if (settled || alerted) {
+      return;
+    }
+    timer = setTimeout(() => {
+      timer = null;
+      // A `100 Trying` ends the budget as any provisional response does, though no event says
+      // so; the attempt then waits for its outcome like one that alerted.
       provisionalArrived(ari, leg)
         .then(arrived => {
           if (!arrived) {
@@ -107,14 +120,9 @@ function waitForAttemptOutcome(
         })
         .catch(() => undefined);
     }, timeoutMs);
-    listener.timer.unref();
-    // Handed over in the same tick as the listener started, so no event falls between the two;
-    // an outcome among them settles the attempt and stops the budget just set.
-    early.stop();
-    for (const event of early.events) {
-      listener.onEvent(event);
-    }
-  });
+    timer.unref();
+  };
+  return { outcome: promise, start, stop };
 }
 
 /** Decrements the trunk's active count once the answered leg's channel eventually ends. */
@@ -153,10 +161,23 @@ async function attemptOnce(
   endpoint: string
 ): Promise<AttemptOutcome> {
   const { pipeline, call, trunkState, route, trunk } = ctx;
-  const early = recordEvents(pipeline.deps.ari);
-  const trunkLeg = await originateTrunkLeg(ctx, endpoint).catch(() => null);
+  const channelId = newId();
+  const placing: Leg = {
+    channelId,
+    kind: 'trunk',
+    userId: null,
+    state: 'placing',
+    endCause: null,
+    trunkId: trunk.id
+  };
+  call.legs.set(channelId, placing);
+  const watch = watchAttemptOutcome(pipeline.deps.ari, channelId);
+  const trunkLeg = await originateTrunkLeg(ctx, endpoint, channelId, () => {
+    placing.state = 'ringing';
+  }).catch(() => null);
   if (trunkLeg === null) {
-    early.stop();
+    watch.stop();
+    call.legs.delete(channelId);
     call.log.event({
       event: 'attempt',
       routeId: route?.id ?? null,
@@ -166,23 +187,10 @@ async function attemptOnce(
     });
     return { kind: 'failure', failure: PLACEMENT_FAILED };
   }
-  const channelId = trunkLeg.id;
-  call.legs.set(channelId, {
-    channelId,
-    kind: 'trunk',
-    userId: null,
-    state: 'ringing',
-    endCause: null,
-    trunkId: trunk.id
-  });
   // The live view (§10.6) shows the call ringing its external target from the first INVITE on.
   callRinging(pipeline.deps, call);
-  const outcome = await waitForAttemptOutcome(
-    pipeline.deps.ari,
-    trunkLeg,
-    early,
-    ATTEMPT_NO_RESPONSE_MS
-  );
+  watch.start(trunkLeg, ATTEMPT_NO_RESPONSE_MS);
+  const outcome = await watch.outcome;
   const leg = call.legs.get(channelId);
   // One `events` trace line per attempt, naming route, trunk and cause (§9.4 "Route fallthrough").
   call.log.event({

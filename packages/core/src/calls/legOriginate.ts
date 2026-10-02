@@ -21,12 +21,17 @@
  * it first is refused with 409 "Channel not in Stasis application", as happens on a loaded host. So
  * the leg is dialled once its `StasisStart` has arrived.
  *
+ * The caller picks the channel's id and tracks the leg under it, `placing`, before the create, so
+ * every event of the channel finds it tracked. `dialling` runs with the created channel as the dial
+ * is sent: from then on the leg rings, and its far end may answer or refuse before the dial's own
+ * answer arrives.
+ *
  * A leg that cannot be placed (the create or the dial refused, the channel gone or never in the
  * app) throws `PlacementError`; every caller takes it as a leg that ended at once, so a refusal
- * never escapes the ring or the attempt it belongs to.
+ * never escapes the ring or the attempt it belongs to. A refused dial's channel is hung up without
+ * waiting for the answer, so the caller has settled the leg before that hangup's
+ * `ChannelDestroyed` can arrive.
  */
-import { newId } from '@zamfono/shared';
-
 import type { AriEvent, Channel, OriginateParams } from '../ari/types.js';
 import type { Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
@@ -97,18 +102,20 @@ function callerIdVariables(
 }
 
 /**
- * Creates `params`' channel, joins its SIP dialog to `call` (waiting for the join at level `sip`,
- * where it is what the call records), then dials it once it is in the app. A leg that cannot be
- * placed has its created channel hung up and throws `PlacementError`.
+ * Creates `params`' channel under the caller's `channelId`, joins its SIP dialog to `call`
+ * (waiting for the join at level `sip`, where it is what the call records), then dials it once it
+ * is in the app, running `dialling` first. A leg that cannot be placed has its created channel
+ * hung up and throws `PlacementError`.
  */
 export async function originateLeg(
   pipeline: Pipeline,
   call: Call,
-  params: OriginateParams
+  params: OriginateParams & { channelId: string },
+  dialling: (channel: Channel) => void
 ): Promise<Channel> {
   const { ari, cdr } = pipeline.deps;
   const { callerId, timeout, variables, ...placement } = params;
-  const channelId = placement.channelId ?? newId();
+  const { channelId } = placement;
   const stasis = stasisEntry(
     ari,
     channelId,
@@ -117,7 +124,6 @@ export async function originateLeg(
   const channel = await ari.channels
     .create({
       ...placement,
-      channelId,
       variables: { ...callerIdVariables(callerId), ...variables }
     })
     .catch((error: unknown) => {
@@ -132,10 +138,11 @@ export async function originateLeg(
     await ari.channels.hangup(channel.id).catch(() => undefined);
     throw new PlacementError('stasis');
   }
+  dialling(channel);
   try {
     await ari.channels.dial(channel.id, timeout ?? NO_DIAL_TIMEOUT);
   } catch (error: unknown) {
-    await ari.channels.hangup(channel.id).catch(() => undefined);
+    ari.channels.hangup(channel.id).catch(() => undefined);
     throw new PlacementError('dial', error);
   }
   return channel;

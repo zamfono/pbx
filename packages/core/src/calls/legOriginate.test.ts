@@ -13,7 +13,8 @@ import {
 } from './legOriginate.js';
 import type { Pipeline } from './pipeline.js';
 
-/** A stand-in pipeline whose ARI and CDR record, in order, what the leg's originate did. */
+/** A stand-in pipeline whose ARI and CDR record, in order, what the leg's originate did, the
+ * originate's `dialling` hook included. */
 function stubPipeline(
   options: {
     dialFails?: boolean;
@@ -25,6 +26,7 @@ function stubPipeline(
   steps: string[];
   created: CreateParams[];
   releaseJoin: () => void;
+  dialling: () => void;
 } {
   const steps: string[] = [];
   const created: CreateParams[] = [];
@@ -80,6 +82,9 @@ function stubPipeline(
     created,
     releaseJoin: () => {
       join.resolve(undefined);
+    },
+    dialling: () => {
+      steps.push('dialling');
     }
   };
 }
@@ -108,8 +113,8 @@ const PARAMS = {
 
 describe('originateLeg (§7 level sip)', () => {
   it('joins the SIP dialog of a sip-level call before the INVITE leaves', async () => {
-    const { pipeline, steps, releaseJoin } = stubPipeline();
-    const placing = originateLeg(pipeline, callAt('sip'), PARAMS);
+    const { pipeline, steps, releaseJoin, dialling } = stubPipeline();
+    const placing = originateLeg(pipeline, callAt('sip'), PARAMS, dialling);
     await new Promise(resolve => {
       setTimeout(resolve, 10);
     });
@@ -124,20 +129,28 @@ describe('originateLeg (§7 level sip)', () => {
       'join leg-1',
       'stasisStart',
       'joined',
+      // The leg rings from its dial on.
+      'dialling',
       // No timeout of Asterisk's: the ring the leg belongs to times it out (§10.1).
       'dial leg-1 0'
     ]);
   });
 
   it('dials a call below level sip without waiting for the join', async () => {
-    const { pipeline, steps } = stubPipeline();
+    const { pipeline, steps, dialling } = stubPipeline();
 
-    await originateLeg(pipeline, callAt('events'), { ...PARAMS, timeout: 20 });
+    await originateLeg(
+      pipeline,
+      callAt('events'),
+      { ...PARAMS, timeout: 20 },
+      dialling
+    );
 
     expect(steps).toEqual([
       'create',
       'join leg-1',
       'stasisStart',
+      'dialling',
       'dial leg-1 20'
     ]);
   });
@@ -147,8 +160,15 @@ describe('originateLeg (§7 level sip)', () => {
   it('dials the created channel only once it has entered the app, and never one that did not', async () => {
     vi.useFakeTimers();
     try {
-      const { pipeline, steps } = stubPipeline({ enterStasis: false });
-      const placing = originateLeg(pipeline, callAt('events'), PARAMS);
+      const { pipeline, steps, dialling } = stubPipeline({
+        enterStasis: false
+      });
+      const placing = originateLeg(
+        pipeline,
+        callAt('events'),
+        PARAMS,
+        dialling
+      );
       const failed = expect(placing).rejects.toMatchObject({
         name: 'PlacementError',
         step: 'stasis'
@@ -166,18 +186,18 @@ describe('originateLeg (§7 level sip)', () => {
   });
 
   it('throws a placement error, dialling nothing, when the create is refused', async () => {
-    const { pipeline, steps } = stubPipeline({ createFails: true });
+    const { pipeline, steps, dialling } = stubPipeline({ createFails: true });
 
     await expect(
-      originateLeg(pipeline, callAt('events'), PARAMS)
+      originateLeg(pipeline, callAt('events'), PARAMS, dialling)
     ).rejects.toMatchObject({ name: 'PlacementError', step: 'create' });
     expect(steps).toEqual(['create']);
   });
 
   it('sets the caller ID as the originate would, the leg’s own variables after it', async () => {
-    const { pipeline, created } = stubPipeline();
+    const { pipeline, created, dialling } = stubPipeline();
 
-    await originateLeg(pipeline, callAt('events'), PARAMS);
+    await originateLeg(pipeline, callAt('events'), PARAMS, dialling);
 
     expect(created).toEqual([
       {
@@ -195,9 +215,9 @@ describe('originateLeg (§7 level sip)', () => {
   });
 
   it('hangs the created channel up and throws when the dial is refused', async () => {
-    const { pipeline, steps } = stubPipeline({ dialFails: true });
+    const { pipeline, steps, dialling } = stubPipeline({ dialFails: true });
 
-    const placing = originateLeg(pipeline, callAt('events'), PARAMS);
+    const placing = originateLeg(pipeline, callAt('events'), PARAMS, dialling);
     await expect(placing).rejects.toBeInstanceOf(PlacementError);
     await expect(placing).rejects.toMatchObject({
       step: 'dial',

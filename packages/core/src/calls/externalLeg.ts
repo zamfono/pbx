@@ -7,11 +7,17 @@
  * fails before alerting is replaced by the next one, and the race sees one leg throughout, ringing
  * on whichever attempt's channel is current.
  */
-import { isE164 } from '@zamfono/shared';
+import { isE164, newId } from '@zamfono/shared';
 
+import type { AttemptFailure } from '../routing/trunk.js';
 import type { Call } from './call.js';
-import { recordEvents, redeliverEarlyEvents } from './earlyEvents.js';
-import { watchAttempt, type AttemptFailed } from './externalAttempt.js';
+import {
+  startBudget,
+  unwatchAttempt,
+  watchAttempt,
+  type Attempt,
+  type AttemptFailed
+} from './externalAttempt.js';
 import {
   nextCandidate,
   nextRoute,
@@ -21,18 +27,29 @@ import {
 } from './externalLegRoutes.js';
 import type { ForwardLeg } from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';
-import type { TrunkLeg } from './provisional.js';
 import { originateTrunkLeg } from './trunkDial.js';
 
 const SIP_SERVER_ERROR = 500;
 
+// An attempt Asterisk would not place (its create or dial refused, `legOriginate.ts`) fails as a
+// 500 before alerting would: the next host, then the next route, is tried (§9.4 "Route fallthrough").
+const PLACEMENT_FAILED: AttemptFailure = {
+  kind: 'final',
+  code: SIP_SERVER_ERROR,
+  alerted: false
+};
+
 /** How the race that owns the leg holds it; every channel id named here is one attempt's. */
 export type ExternalLegOwner = {
-  /** Tracks a newly originated attempt as the leg's ringing channel. */
-  track: (channelId: string) => void;
+  /** Tracks an attempt's channel, before its create, as one of the leg's still being placed. */
+  place: (channelId: string) => void;
+  /** Takes the attempt's channel, as its INVITE is sent, as the leg's ringing one; false once the
+   * race is over, the channel then hung up as soon as it is placed. */
+  track: (channelId: string) => boolean;
   /** Whether the race still rings `channelId`: false once it hung the leg up or settled. */
   ringing: (channelId: string) => boolean;
-  /** Forgets `channelId`, superseded by the next attempt, without counting it as the leg ending. */
+  /** Forgets `channelId` without counting it as the leg ending: superseded by the next attempt,
+   * or never ringing at all. */
   retire: (channelId: string) => void;
   /** Ends the leg on `channelId` for good, as though that channel had ended with `cause`. */
   end: (channelId: string, cause: number | null) => void;
@@ -55,71 +72,57 @@ export type ExternalLegTarget = {
   forward?: ForwardLeg;
 };
 
-/** Watches the newly originated `trunkLeg` and hands it to the race in place of `previous`, or
- * hangs it up when the race hung the leg up, or settled, while it was being originated. */
-function takeOver(
-  leg: ExternalLeg,
-  candidate: Candidate,
-  trunkLeg: TrunkLeg,
-  attempt: { previous: string | null; onFailed: AttemptFailed }
-): void {
-  const { pipeline, owner } = leg;
-  const channelId = trunkLeg.id;
-  const { previous } = attempt;
-  watchAttempt(leg, candidate, trunkLeg, attempt.onFailed);
-  if (previous !== null && !owner.ringing(previous)) {
-    pipeline.deps.ari.channels.hangup(channelId).catch(() => undefined);
-    return;
+/** Whether an attempt was placed, and the channel holding the leg for the race now. */
+type Placement = { placed: boolean; holder: string | null };
+
+/** As `attempt`'s INVITE is sent, its channel takes the leg over from `holder`, the channel that
+ * held it so far (`null` for the first), unless the race hung the leg up or settled meanwhile. */
+function takeOver(attempt: Attempt, holder: string | null): boolean {
+  const { owner } = attempt.leg;
+  attempt.dialled = true;
+  if (holder !== null && !owner.ringing(holder)) {
+    return false;
   }
-  owner.track(channelId);
-  if (previous !== null) {
-    owner.retire(previous);
+  if (!owner.track(attempt.channelId)) {
+    return false;
   }
+  if (holder !== null) {
+    owner.retire(holder);
+  }
+  return true;
 }
 
-/** Originates `candidate`'s attempt, or the next ones should originating fail, and hands the
- * channel to the race in place of `previous`, the attempt it replaces (`null` for the first). An
- * attempt that fails while the race rings the leg is replaced by the next one, as §9.4 "Route
- * fallthrough" or "Hosts" retries it, else ends the leg for the race, as a device's end would. */
-async function dialFrom(
+/** Places `candidate`'s attempt, its channel tracked by the race from before its create, and
+ * hands it the leg as it is dialled (`takeOver`). One placed after the race hung the leg up is
+ * hung up at once; a failed one is traced, the leg still held by whichever channel holds it.
+ * `failover` is how the attempt goes on should its channel fail later. */
+async function placeAttempt(
   leg: ExternalLeg,
-  first: Candidate,
-  previous: string | null
-): Promise<void> {
+  candidate: Candidate,
+  holder: string | null,
+  failover: (channelId: string) => AttemptFailed
+): Promise<Placement> {
   const { pipeline, trunkState, call, number, owner, forward } = leg;
-  for (
-    let candidate: Candidate | null = first;
-    candidate !== null;
-    candidate = nextCandidate(leg, {
-      kind: 'final',
-      code: SIP_SERVER_ERROR,
-      alerted: false
-    })
-  ) {
-    const { trunk, identity, endpoint } = candidate;
-    const early = recordEvents(pipeline.deps.ari);
-    // eslint-disable-next-line no-await-in-loop -- attempts are dialled one at a time, in fallthrough order
-    const trunkLeg = await originateTrunkLeg(
-      { pipeline, call, trunkState, trunk, number, identity, forward },
-      endpoint
-    ).catch(() => null);
-    if (trunkLeg !== null) {
-      const channelId = trunkLeg.id;
-      takeOver(leg, candidate, trunkLeg, {
-        previous,
-        onFailed: (failure, cause) => {
-          const next = nextCandidate(leg, failure);
-          if (next === null) {
-            owner.end(channelId, cause);
-            return;
-          }
-          dialFrom(leg, next, channelId).catch(() => undefined);
-        }
-      });
-      redeliverEarlyEvents(pipeline.deps.ari, early, trunkLeg.id);
-      return;
+  const { trunk, identity, endpoint } = candidate;
+  const channelId = newId();
+  owner.place(channelId);
+  const attempt = watchAttempt(leg, candidate, channelId, failover(channelId));
+  // Set as the INVITE is sent, while the placement is still under way.
+  const taken = { over: false };
+  const trunkLeg = await originateTrunkLeg(
+    { pipeline, call, trunkState, trunk, number, identity, forward },
+    endpoint,
+    channelId,
+    () => {
+      taken.over = takeOver(attempt, holder);
     }
-    early.stop();
+  ).catch(() => null);
+  const rang = taken.over;
+  if (trunkLeg === null) {
+    unwatchAttempt(attempt);
+    if (!rang) {
+      owner.retire(channelId);
+    }
     call.log.event({
       event: 'attempt',
       routeId: candidate.route?.id ?? null,
@@ -127,9 +130,52 @@ async function dialFrom(
       endpoint,
       cause: 'placementFailed'
     });
+    return { placed: false, holder: rang ? channelId : holder };
   }
-  if (previous !== null) {
-    owner.end(previous, null);
+  if (!rang) {
+    owner.retire(channelId);
+    pipeline.deps.ari.channels.hangup(channelId).catch(() => undefined);
+    return { placed: true, holder };
+  }
+  startBudget(attempt, trunkLeg);
+  return { placed: true, holder: channelId };
+}
+
+/** Places `first`'s attempt, or the next ones should placing fail, to hold the leg in place of
+ * `previous`, the attempt it replaces (`null` for the first). A leg none of whose attempts could
+ * be placed ends for the race. An attempt that fails while the race rings the leg is replaced by
+ * the next one, as §9.4 "Route fallthrough" or "Hosts" retries it, else ends the leg for the race,
+ * as a device's end would. */
+async function dialFrom(
+  leg: ExternalLeg,
+  first: Candidate,
+  previous: string | null
+): Promise<void> {
+  const failover =
+    (channelId: string): AttemptFailed =>
+    (failure, cause) => {
+      const next = nextCandidate(leg, failure);
+      if (next === null) {
+        leg.owner.end(channelId, cause);
+        return;
+      }
+      dialFrom(leg, next, channelId).catch(() => undefined);
+    };
+  let holder = previous;
+  for (
+    let candidate: Candidate | null = first;
+    candidate !== null;
+    candidate = nextCandidate(leg, PLACEMENT_FAILED)
+  ) {
+    // eslint-disable-next-line no-await-in-loop -- attempts are dialled one at a time, in fallthrough order
+    const placement = await placeAttempt(leg, candidate, holder, failover);
+    if (placement.placed) {
+      return;
+    }
+    holder = placement.holder;
+  }
+  if (holder !== null) {
+    leg.owner.end(holder, null);
   }
 }
 

@@ -9,8 +9,9 @@ import type { LiveCall } from '@zamfono/shared';
 
 import type { EventBus } from '../internal/eventBus.js';
 import type { StateStore } from '../internal/stateStore.js';
-import type { Call } from './call.js';
+import type { Call, Leg } from './call.js';
 import { presentCallerUserId } from './callLookup.js';
+import type { GroupLeg } from './groupLegs.js';
 
 /** The two collaborators the live view needs, so `CdrWriter` can publish the end as well. */
 export type CallStateDeps = { state: StateStore; bus: EventBus };
@@ -23,6 +24,12 @@ export type LiveEntry = {
   state: 'ringing' | 'up';
   notified: ReadonlySet<string>;
 };
+
+/** Whether a leg's user sees the call: while it rings or is up, never while it is still being
+ * placed (`placing`, not rung yet) nor once it ended. */
+function seen(state: Leg['state'] | GroupLeg['state']): boolean {
+  return state === 'ringing' || state === 'up';
+}
 
 /**
  * Every user whose call this is to see (§10.3 "Live calls", §10.6 "own calls"): the caller, the
@@ -47,7 +54,7 @@ function participants(call: Call): string[] {
     ...call.legs.values(),
     ...(call.batchLegs?.values() ?? [])
   ]) {
-    if (leg.userId !== null && leg.state !== 'ended') {
+    if (leg.userId !== null && seen(leg.state)) {
       ids.add(leg.userId);
     }
   }

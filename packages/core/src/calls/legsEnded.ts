@@ -207,6 +207,7 @@ export async function handleChannelEnded(
     return;
   }
   // StasisEnd precedes ChannelDestroyed for a Stasis channel and carries no cause, so only ChannelDestroyed ends a ringing leg (its Q.850 cause is what ringOutcome() needs).
+  // A leg still `placing` never rang: its end is its placement's failure (`legOriginate.ts`).
   if (leg?.state !== 'ringing' || ev.type === 'StasisEnd') {
     return;
   }

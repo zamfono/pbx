@@ -139,12 +139,15 @@ export type TrunkLegCtx = {
 /**
  * Originates one INVITE for `number` to `endpoint` (`PJSIP/<number>@<endpoint>`, §9.4 "Flows") with
  * the attempt's resolved caller identity, counted against the trunk's channels (§9.4 "Channels")
- * from here on; the caller counts it off again once the channel ends. Returns the channel's id
- * and name.
+ * from here on; the caller counts it off again once the channel ends. The channel takes the
+ * caller's `channelId`, under which its leg is tracked already, and `dialling` runs as its
+ * INVITE is sent (`legOriginate.ts`). Returns the channel's id and name.
  */
 export async function originateTrunkLeg(
   ctx: TrunkLegCtx,
-  endpoint: string
+  endpoint: string,
+  channelId: string,
+  dialling: () => void
 ): Promise<TrunkLeg> {
   const { pipeline, call, trunkState, trunk, number, identity } = ctx;
   const variables: Record<string, string> = {
@@ -177,16 +180,22 @@ export async function originateTrunkLeg(
         )
       );
     }
-    const channel = await originateLeg(pipeline, call, {
-      endpoint: `PJSIP/${number}@${endpoint}`,
-      app: 'zamfono',
-      appArgs: `leg,${call.id}`,
-      callerId: identity.number,
-      variables: {
-        ...channelLanguageVariable(snapshot.settings.language),
-        ...variables
-      }
-    });
+    const channel = await originateLeg(
+      pipeline,
+      call,
+      {
+        channelId,
+        endpoint: `PJSIP/${number}@${endpoint}`,
+        app: 'zamfono',
+        appArgs: `leg,${call.id}`,
+        callerId: identity.number,
+        variables: {
+          ...channelLanguageVariable(snapshot.settings.language),
+          ...variables
+        }
+      },
+      dialling
+    );
     return { id: channel.id, name: channel.name };
   } catch (error: unknown) {
     trunkState.noteAttemptEnded(trunk.id);

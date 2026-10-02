@@ -17,12 +17,14 @@ import { deposit, type DepositReason } from './voicemail.js';
 export type CallsRow = Selectable<DB['calls']>;
 
 /** One channel dialed for a call: a device, a find-me leg, a trunk leg or a group member. `endCause`
- * is the Q.850 hangup cause `ringOutcome()` reads, set from `ChannelDestroyed` while ringing. */
+ * is the Q.850 hangup cause `ringOutcome()` reads, set from `ChannelDestroyed` while ringing.
+ * `placing` from before its channel is created until it is dialled (`legOriginate.ts`): such a leg
+ * is its placement's to settle, never shown, counted as ringing or hung up by anything else. */
 export type Leg = {
   channelId: string;
   kind: 'device' | 'findMe' | 'trunk' | 'member';
   userId: string | null;
-  state: 'ringing' | 'up' | 'ended';
+  state: 'placing' | 'ringing' | 'up' | 'ended';
   endCause: number | null;
   /** The device a `device` or `member` leg rings, the trunk a `trunk` leg dials over; for the
    * routing trace's `answered` line (§7). */

@@ -3,13 +3,14 @@
  * the batch's own `tracked` map. Owned and raced by `ringGroupDial.ts`; kept in its own module so
  * both stay under the size limits (§ Global Constraints).
  */
+import { newId } from '@zamfono/shared';
+
 import type { Snapshot } from '../internal/snapshot.js';
 import { channelLanguageVariable } from '../prompts.js';
 import type { MemberLeg } from '../routing/ringGroup.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import type { Call } from './call.js';
 import { softphoneCallerId } from './contactName.js';
-import { recordEvents, redeliverEarlyEvents } from './earlyEvents.js';
 import { ringExternalLeg } from './externalLeg.js';
 import {
   CONDITION_REASONS,
@@ -28,20 +29,20 @@ type LegOwner = { userId: string; memberKey: string };
 
 /** A leg still ringing after the batch has already been won must not keep the winner's phone
  * ringing (§10.1 step 5: "the other legs are hung up"); one racing win can land between this
- * origination's request and its response, so every newly tracked leg is checked again. */
+ * origination's request and its response, so every newly placed leg is checked again. */
 function hangUpIfAlreadyWon(
   pipeline: Pipeline,
   call: Call,
   leg: GroupLeg
 ): void {
-  if (call.answeredAt === null) {
+  if (call.answeredAt === null || leg.state !== 'ringing') {
     return;
   }
   leg.state = 'ended';
   pipeline.deps.ari.channels.hangup(leg.channelId).catch(() => undefined);
 }
 
-/** Originates one of `owner`'s devices, tracked under `owner.memberKey`. */
+/** Originates one of `owner`'s devices, tracked under `owner.memberKey`: placing, then ringing. */
 async function originateDevice(
   pipeline: Pipeline,
   call: Call,
@@ -50,19 +51,41 @@ async function originateDevice(
   tracked: Map<string, GroupLeg>
 ): Promise<void> {
   const { owner } = member;
-  const early = recordEvents(pipeline.deps.ari);
-  const channel = await originateLeg(pipeline, call, {
-    endpoint: `PJSIP/${device.sipUsername}`,
-    app: 'zamfono',
-    appArgs: `leg,${call.id}`,
-    callerId: member.callerId,
-    // §9.1 "every channel's language": a member's leg has been through no entry of its own.
-    variables: channelLanguageVariable(member.language)
-  })
-    .catch(() => null)
-    .finally(early.stop);
-  if (channel === null) {
+  const leg: GroupLeg = {
+    channelId: newId(),
+    userId: owner.userId,
+    memberKey: owner.memberKey,
+    state: 'placing',
+    deviceId: device.id
+  };
+  tracked.set(leg.channelId, leg);
+  const placed = await originateLeg(
+    pipeline,
+    call,
+    {
+      channelId: leg.channelId,
+      endpoint: `PJSIP/${device.sipUsername}`,
+      app: 'zamfono',
+      appArgs: `leg,${call.id}`,
+      callerId: member.callerId,
+      // §9.1 "every channel's language": a member's leg has been through no entry of its own.
+      variables: channelLanguageVariable(member.language)
+    },
+    () => {
+      leg.state = 'ringing';
+      call.log.event({
+        event: 'ringGroupMember',
+        channelId: leg.channelId,
+        userId: owner.userId
+      });
+    }
+  ).then(
+    () => true,
+    () => false
+  );
+  if (!placed) {
     // Refused before it rang (`legOriginate.ts`): the member's device leaves the batch.
+    tracked.delete(leg.channelId);
     call.log.event({
       event: 'ringGroupMember',
       deviceId: device.id,
@@ -71,22 +94,7 @@ async function originateDevice(
     });
     return;
   }
-  const leg: GroupLeg = {
-    channelId: channel.id,
-    userId: owner.userId,
-    memberKey: owner.memberKey,
-    state: 'ringing',
-    deviceId: device.id
-  };
-  tracked.set(channel.id, leg);
-  call.log.event({
-    event: 'ringGroupMember',
-    channelId: channel.id,
-    userId: owner.userId
-  });
   hangUpIfAlreadyWon(pipeline, call, leg);
-  // A member's phone that declined at once (486, 603) ended before it was tracked (§10.1 step 5).
-  redeliverEarlyEvents(pipeline.deps.ari, early, channel.id);
 }
 
 /** Originates every registered device of `owner.userId` at once (§9.3 "One endpoint per device"),
@@ -162,17 +170,23 @@ async function originateExternalLeg(
         }
       : { number: target.number, asUser: memberKey, forward },
     {
-      track: channelId => {
-        const leg: GroupLeg = {
+      place: channelId => {
+        tracked.set(channelId, {
           channelId,
           userId: null,
           memberKey,
-          state: 'ringing',
+          state: 'placing',
           external: true
-        };
-        tracked.set(channelId, leg);
+        });
+      },
+      track: channelId => {
         call.log.event({ event: 'ringGroupMember', channelId, userId: null });
-        hangUpIfAlreadyWon(pipeline, call, leg);
+        const leg = tracked.get(channelId);
+        if (leg === undefined || call.answeredAt !== null) {
+          return false;
+        }
+        leg.state = 'ringing';
+        return true;
       },
       ringing: channelId => tracked.get(channelId)?.state === 'ringing',
       retire: channelId => {

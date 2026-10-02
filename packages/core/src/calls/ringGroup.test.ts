@@ -579,20 +579,16 @@ describe('ringGroup', () => {
     }
     fakeAri.answerAfterMs = 60_000;
     // late-1 rings only after the timeout; late-2 is still being placed when late-1 answers.
-    const dialDelays: Record<string, number> = {
+    const createDelays: Record<string, number> = {
       'PJSIP/late-1': 1500,
       'PJSIP/late-2': 2500
     };
     fakeAri.requestDelayMs = request => {
-      const dial = /^channels\/(?<id>[^/]+)\/dial$/u.exec(request.path);
-      const created = fakeAri.calls.find(
-        entry =>
-          entry.path === 'channels/create' &&
-          (entry.body as { channelId?: string }).channelId === dial?.groups?.id
-      );
-      const endpoint = (created?.body as { endpoint?: string } | undefined)
+      const endpoint = (request.body as { endpoint?: string } | undefined)
         ?.endpoint;
-      return dial === null ? 0 : (dialDelays[endpoint ?? ''] ?? 0);
+      return request.path === 'channels/create'
+        ? (createDelays[endpoint ?? ''] ?? 0)
+        : 0;
     };
 
     const finished = ringGroup(pipeline, call, groupId);

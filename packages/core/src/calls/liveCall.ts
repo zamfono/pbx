@@ -110,6 +110,10 @@ export async function closeCall(
   const live = [...own];
   const upLegs = [...call.legs.values()].filter(leg => leg.state === 'up');
   for (const leg of call.legs.values()) {
+    // A leg still `placing` is its placement's to settle (`Leg`), its ring being over.
+    if (leg.state === 'placing') {
+      continue;
+    }
     if (leg.state !== 'ended') {
       live.push(leg.channelId);
     }

@@ -57,6 +57,13 @@ export function endLeg(pipeline: Pipeline, channelId: string, leg: Leg): void {
   }
 }
 
+/** Takes `leg` out of `call` altogether: its placement failed, or a later attempt of the same
+ * external leg took its place (`externalLeg.ts`). */
+export function untrackLeg(pipeline: Pipeline, call: Call, leg: Leg): void {
+  endLeg(pipeline, leg.channelId, leg);
+  call.legs.delete(leg.channelId);
+}
+
 /** Ends `leg` and hangs up its still-live channel; never for a channel that already ended itself. */
 export function hangupLeg(pipeline: Pipeline, leg: Leg): Promise<void> {
   endLeg(pipeline, leg.channelId, leg);

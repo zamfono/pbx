@@ -147,9 +147,9 @@ function recordBodies(fakeAri: FakeAri): { name?: string }[] {
 }
 
 /**
- * The call the pipeline created for `callerChannel`, once its ring race has originated
- * `legCount` legs: the ring spans a config read and one awaited originate per device, so a test
- * that ends the legs itself waits for them to exist rather than guessing how long that takes.
+ * The call the pipeline created for `callerChannel`, once its ring race rings `legCount` legs:
+ * the ring spans a config read and one awaited originate per device, so a test that ends the legs
+ * itself waits for them to ring rather than guessing how long that takes.
  */
 function ringingCall(
   pipeline: Pipeline,
@@ -158,7 +158,10 @@ function ringingCall(
 ): Promise<Call> {
   return eventually(() => {
     const call = pipeline.callByChannel.get(callerChannel.id);
-    expect(call?.legs.size).toBe(legCount);
+    const ringing = [...(call?.legs.values() ?? [])].filter(
+      leg => leg.state === 'ringing'
+    );
+    expect(ringing).toHaveLength(legCount);
     if (call === undefined) {
       throw new Error('no call for the caller channel');
     }

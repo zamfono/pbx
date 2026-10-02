@@ -23,12 +23,14 @@ export type AttemptFailed = (
   cause: number | null
 ) => void;
 
-/** One attempt's live channel; `alerted` once the far end sent 180/183 or answered, `closed`
+/** One attempt's channel; `dialled` once its INVITE is sent, before which its events are its
+ * placement's (`legOriginate.ts`), `alerted` once the far end sent 180/183 or answered, `closed`
  * once its channel is gone. */
-type Attempt = {
+export type Attempt = {
   leg: ExternalLeg;
   candidate: Candidate;
   channelId: string;
+  dialled: boolean;
   alerted: boolean;
   noResponse: boolean;
   logged: boolean;
@@ -100,6 +102,9 @@ function attemptEnded(attempt: Attempt, destroyed: AriEvent): void {
 }
 
 function onAttemptEvent(attempt: Attempt, event: AriEvent): void {
+  if (!attempt.dialled) {
+    return;
+  }
   if (alertsOn(event, attempt.channelId)) {
     // The no-response budget covers only the interval before the first provisional response.
     attempt.alerted = true;
@@ -121,20 +126,19 @@ function onAttemptEvent(attempt: Attempt, event: AriEvent): void {
   }
 }
 
-/** Watches the attempt's channel: its outcome listener and its 8-second no-response budget;
- * `onFailed` once it fails while its race still rings the leg. */
+/** Watches the attempt's channel `channelId` from before its create: its outcome listener, which
+ * acts once `dialled` is set; `onFailed` once it fails while its race still rings the leg. */
 export function watchAttempt(
   leg: ExternalLeg,
   candidate: Candidate,
-  trunkLeg: TrunkLeg,
+  channelId: string,
   onFailed: AttemptFailed
-): void {
-  const { ari } = leg.pipeline.deps;
-  const channelId = trunkLeg.id;
+): Attempt {
   const attempt: Attempt = {
     leg,
     candidate,
     channelId,
+    dialled: false,
     alerted: false,
     noResponse: false,
     logged: false,
@@ -146,6 +150,24 @@ export function watchAttempt(
   attempt.onEvent = event => {
     onAttemptEvent(attempt, event);
   };
+  leg.pipeline.deps.ari.on('event', attempt.onEvent);
+  return attempt;
+}
+
+/** Stops watching an attempt that could not be placed; its placement counts it off the trunk. */
+export function unwatchAttempt(attempt: Attempt): void {
+  if (attempt.onEvent !== null) {
+    attempt.leg.pipeline.deps.ari.off('event', attempt.onEvent);
+  }
+}
+
+/** Starts the placed attempt's 8-second no-response budget (§9.4 "Route fallthrough"), unless the
+ * far end alerted, or the channel ended, while it was being placed. */
+export function startBudget(attempt: Attempt, trunkLeg: TrunkLeg): void {
+  if (attempt.alerted || attempt.closed) {
+    return;
+  }
+  const { ari } = attempt.leg.pipeline.deps;
   attempt.timer = setTimeout(() => {
     attempt.timer = null;
     // A `100 Trying` ends the budget too, though no event says so; only its absence hangs up. An
@@ -154,11 +176,10 @@ export function watchAttempt(
       .then(arrived => {
         if (!arrived && !attempt.alerted && !attempt.closed) {
           attempt.noResponse = true;
-          ari.channels.hangup(channelId).catch(() => undefined);
+          ari.channels.hangup(attempt.channelId).catch(() => undefined);
         }
       })
       .catch(() => undefined);
   }, ATTEMPT_NO_RESPONSE_MS);
   attempt.timer.unref();
-  ari.on('event', attempt.onEvent);
 }
