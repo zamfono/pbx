@@ -1,4 +1,5 @@
-import type { Selectable, Transaction } from 'kysely';
+import type { ExpressionBuilder, Selectable, Transaction } from 'kysely';
+import { z } from 'zod';
 
 import type { DB } from '@zamfono/shared';
 
@@ -12,15 +13,33 @@ const STATUS_FORBIDDEN = 403;
 /** A `calls` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type CallRow = Selectable<DB['calls']>;
 
-export type CallDirection = 'inbound' | 'outbound' | 'internal';
-export type CallStatus =
-  | 'answered'
-  | 'missed'
-  | 'busy'
-  | 'failed'
-  | 'voicemail'
-  | 'blocked'
-  | 'interrupted';
+export const CALL_DIRECTIONS = ['inbound', 'outbound', 'internal'] as const;
+export type CallDirection = (typeof CALL_DIRECTIONS)[number];
+export const CALL_STATUSES = [
+  'answered',
+  'missed',
+  'busy',
+  'failed',
+  'voicemail',
+  'blocked',
+  'interrupted'
+] as const;
+export type CallStatus = (typeof CALL_STATUSES)[number];
+
+/** The `id` input of an action on a live call (§10.3 "Live calls"). */
+export const liveCallIdInput = z
+  .string()
+  .describe("The live call's id, as calls.list with live=true lists it.");
+
+/** The `target` input of an action that dials from the caller's own phone: `verb` names whom. */
+export function dialTargetInput(verb: string): z.ZodString {
+  return z
+    .string()
+    .min(1)
+    .describe(
+      `Whom to ${verb}, dialled from you as your phone would: an extension, or an external number E.164 or national.`
+    );
+}
 
 export type CallOut = {
   id: string;
@@ -103,6 +122,18 @@ export async function toCallDetailOut(
   return { ...toCallOut(row), log: row.log, qos };
 }
 
+/** `calls` rows `userId` is the caller, the callee or the answering user of (§5.3, §10.3). */
+export function ownCallWhere(
+  eb: ExpressionBuilder<DB, 'calls'>,
+  userId: string
+) {
+  return eb.or([
+    eb('callerUserId', '=', userId),
+    eb('calleeUserId', '=', userId),
+    eb('answeredByUserId', '=', userId)
+  ]);
+}
+
 /** Whether `actor` is the caller, the callee or the answering user of `row` (§5.3, §10.3). */
 export function isOwnCall(actorId: string, row: CallRow): boolean {
   return (
@@ -154,7 +185,7 @@ export async function assertOwnLiveCall(
  * Runs a live-call action through `core`, turning its refusal into the matching problem (§10.3):
  * a call `core` holds no live state for is a 404, one it cannot act on in its current state a 409,
  * a target it cannot act on a 422, each with `core`'s reason as `detail` (`notFound`,
- * `notBridged`, `notRinging`, `noRegisteredDevice`, `noFreeSlot`, `noMailbox`, `held`,
+ * `notBridged`, `notInCall`, `notRinging`, `noRegisteredDevice`, `noFreeSlot`, `noMailbox`, `held`,
  * `notHeld`, `consulting`, `notConsultation`, `notAnswered`, `invalidTarget`), as
  * `calls.originate` answers its own `noRegisteredDevice` (§10.2). Resolves with what the action
  * answered.

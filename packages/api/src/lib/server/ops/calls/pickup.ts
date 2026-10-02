@@ -3,11 +3,15 @@ import { z } from 'zod';
 import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { defineOperation } from '../types.js';
-import { proxyCallAction, resolveActingUserId } from './_shared.js';
+import {
+  liveCallIdInput,
+  proxyCallAction,
+  resolveActingUserId
+} from './_shared.js';
 
 const inputSchema = z
   .object({
-    id: z.string(),
+    id: liveCallIdInput,
     userId: z
       .string()
       .optional()

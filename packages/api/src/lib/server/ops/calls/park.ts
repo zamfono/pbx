@@ -5,15 +5,14 @@ import { getCoreClient } from '#lib/server/coreClient.js';
 import { defineOperation } from '../types.js';
 import {
   assertOwnLiveCall,
+  liveCallIdInput,
   proxyCallAction,
   resolveActingUserId
 } from './_shared.js';
 
 const inputSchema = z
   .object({
-    id: z
-      .string()
-      .describe('The live call, as `calls.list` with `live` names it.'),
+    id: liveCallIdInput,
     userId: z
       .string()
       .optional()

@@ -3,13 +3,15 @@ import { z } from 'zod';
 import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { defineOperation } from '../types.js';
-import { assertOwnLiveCall, proxyCallAction } from './_shared.js';
+import {
+  assertOwnLiveCall,
+  liveCallIdInput,
+  proxyCallAction
+} from './_shared.js';
 
 const inputSchema = z
   .object({
-    id: z
-      .string()
-      .describe("The live call's id, as calls.list with live=true lists it.")
+    id: liveCallIdInput
   })
   .strict();
 

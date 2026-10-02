@@ -3,9 +3,13 @@ import { z } from 'zod';
 import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { defineOperation } from '../types.js';
-import { assertOwnLiveCall, proxyCallAction } from './_shared.js';
+import {
+  assertOwnLiveCall,
+  liveCallIdInput,
+  proxyCallAction
+} from './_shared.js';
 
-const inputSchema = z.object({ id: z.string() }).strict();
+const inputSchema = z.object({ id: liveCallIdInput }).strict();
 
 /**
  * `POST /calls/{id}/hangup` (§10.1, §5.7): ends the live call `id`, proxied to `core`; recorded

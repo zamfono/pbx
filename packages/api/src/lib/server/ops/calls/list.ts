@@ -7,26 +7,20 @@ import { decodeCursor, encodeCursor } from '#lib/server/pagination.js';
 
 import { instantInput, tenantInstantReader } from '../instantInput.js';
 import { defineOperation, OpError } from '../types.js';
-import { toCallOut } from './_shared.js';
+import {
+  CALL_DIRECTIONS,
+  CALL_STATUSES,
+  ownCallWhere,
+  toCallOut
+} from './_shared.js';
 
 const STATUS_FORBIDDEN = 403;
 const DEFAULT_LIMIT = 50;
 
-const DIRECTIONS = ['inbound', 'outbound', 'internal'] as const;
-const STATUSES = [
-  'answered',
-  'missed',
-  'busy',
-  'failed',
-  'voicemail',
-  'blocked',
-  'interrupted'
-] as const;
-
 const inputSchema = z
   .object({
     direction: z
-      .enum(DIRECTIONS)
+      .enum(CALL_DIRECTIONS)
       .optional()
       .describe('Only calls in this direction.'),
     from: instantInput
@@ -48,7 +42,7 @@ const inputSchema = z
       .optional()
       .describe('Only calls that rang this ring group.'),
     status: z
-      .enum(STATUSES)
+      .enum(CALL_STATUSES)
       .optional()
       .describe(
         "History only: the call's outcome; blocked means released at entry by the blocklist or anonymous-call rejection."
@@ -171,22 +165,10 @@ export const list = defineOperation({
       .$if(from !== undefined, qb => qb.where('startedAt', '>=', from ?? ''))
       .$if(to !== undefined, qb => qb.where('startedAt', '<=', to ?? ''))
       .$if(input.userId !== undefined, qb =>
-        qb.where(eb =>
-          eb.or([
-            eb('callerUserId', '=', input.userId ?? ''),
-            eb('calleeUserId', '=', input.userId ?? ''),
-            eb('answeredByUserId', '=', input.userId ?? '')
-          ])
-        )
+        qb.where(eb => ownCallWhere(eb, input.userId ?? ''))
       )
       .$if(ownUserId !== null, qb =>
-        qb.where(eb =>
-          eb.or([
-            eb('callerUserId', '=', ownUserId ?? ''),
-            eb('calleeUserId', '=', ownUserId ?? ''),
-            eb('answeredByUserId', '=', ownUserId ?? '')
-          ])
-        )
+        qb.where(eb => ownCallWhere(eb, ownUserId ?? ''))
       )
       .$if(cursor !== undefined, qb => qb.where('id', '<', cursor ?? ''))
       .orderBy('id', 'desc')

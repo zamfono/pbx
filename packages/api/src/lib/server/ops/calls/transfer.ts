@@ -3,13 +3,17 @@ import { z } from 'zod';
 import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { defineOperation, OpError } from '../types.js';
-import { assertOwnLiveCall, proxyCallAction } from './_shared.js';
+import {
+  assertOwnLiveCall,
+  liveCallIdInput,
+  proxyCallAction
+} from './_shared.js';
 
 const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 const inputSchema = z
   .object({
-    id: z.string(),
+    id: liveCallIdInput,
     target: z
       .string()
       .min(1)
