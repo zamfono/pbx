@@ -1,10 +1,18 @@
 import { randomBytes } from 'node:crypto';
-import { access, mkdtemp, readdir, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { sql } from 'kysely';
 import pino from 'pino';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi
+} from 'vitest';
 
 import { openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
@@ -65,8 +73,14 @@ async function migratedDb(): Promise<Db> {
   return db;
 }
 
+async function tempDir(prefix: string): Promise<string> {
+  const dir = await mkdtemp(path.join(tmpdir(), prefix));
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  return dir;
+}
+
 function tempMediaDir(): Promise<string> {
-  return mkdtemp(path.join(tmpdir(), 'zamfono-media-'));
+  return tempDir('zamfono-media-');
 }
 
 /** A source directory holding the wav and g722 variant of every bundled MoH track. */
@@ -96,6 +110,8 @@ let mohSourceDir = '';
 beforeAll(async () => {
   mohSourceDir = await mohSourceFixture();
 });
+
+afterAll(() => rm(mohSourceDir, { recursive: true, force: true }));
 
 function baseEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
   return {
@@ -215,7 +231,7 @@ describe('seedIfEmpty', () => {
     const db = await migratedDb();
     const mediaDir = await tempMediaDir();
     const missingSourceDir = path.join(
-      await mkdtemp(path.join(tmpdir(), 'zamfono-moh-missing-')),
+      await tempDir('zamfono-moh-missing-'),
       'does-not-exist'
     );
 

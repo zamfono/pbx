@@ -1,8 +1,16 @@
 import { execFileSync } from 'node:child_process';
-import { access, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi
+} from 'vitest';
 
 import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
@@ -466,6 +474,7 @@ describe('Recorder', () => {
     const didId = await seedDid(db, targetId);
     await seedSettings(db, didId);
     const mediaDir = await mkdtemp(path.join(tmpdir(), 'zamfono-recording-'));
+    onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));
     await mkdir(path.join(mediaDir, 'recordings'));
     let failMix = false;
     const recorder = new Recorder({
@@ -759,6 +768,7 @@ describe('Recorder', () => {
   it('removes the half-recorded raw file of a pair whose second snoop fails (§10.2 "Best effort")', async () => {
     const userId = await seedRecordingUser();
     const mediaDir = await mkdtemp(path.join(tmpdir(), 'zamfono-recording-'));
+    onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));
     await mkdir(path.join(mediaDir, 'recordings'));
     const log = fakeLogger();
     const recorder = new Recorder({
@@ -898,6 +908,7 @@ describe('Recorder', () => {
       const mediaDir = await mkdtemp(
         path.join(tmpdir(), 'zamfono-recording-mix-')
       );
+      onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));
       await mkdir(path.join(mediaDir, 'recordings'));
       const log = fakeLogger();
       // No `mix` override: this exercises the real `ffmpegMix` default, not a mocked one.

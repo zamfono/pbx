@@ -1,8 +1,8 @@
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import pino from 'pino';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished } from 'vitest';
 
 import { nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
@@ -23,7 +23,9 @@ async function migratedDb(): Promise<Db> {
 }
 
 async function tempDir(prefix: string): Promise<string> {
-  return mkdtemp(path.join(tmpdir(), prefix));
+  const dir = await mkdtemp(path.join(tmpdir(), prefix));
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  return dir;
 }
 
 /** A source directory holding both variants of each bundled track. */

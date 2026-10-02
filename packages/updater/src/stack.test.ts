@@ -1,12 +1,13 @@
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished } from 'vitest';
 
 import { checkUpdate, stackVersion } from './stack.js';
 
 async function stackDir(files: Record<string, string>): Promise<string> {
   const dir = await mkdtemp(path.join(tmpdir(), 'zamfono-stack-'));
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
   await Promise.all(
     Object.entries(files).map(async ([name, text]) =>
       writeFile(path.join(dir, name), text)

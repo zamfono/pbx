@@ -1,7 +1,7 @@
-import { access, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished } from 'vitest';
 
 import { MS_PER_DAY, newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
@@ -758,6 +758,7 @@ describe('runPurge: voicemail files', () => {
 
   it("unlinks a purged user's and ring group's voicemail files, and keeps a live user's", async () => {
     const mediaDir = await mkdtemp(path.join(os.tmpdir(), 'zamfono-purge-'));
+    onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));
     await mkdir(path.join(mediaDir, 'voicemail'), { recursive: true });
     process.env.MEDIA_DIR = mediaDir;
     const db = await migratedDb();

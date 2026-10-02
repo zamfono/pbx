@@ -1,12 +1,14 @@
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished } from 'vitest';
 
 import { createRunner, HOST_RUN_STALE_MS, loadState } from './runner.js';
 
 async function tempDir(): Promise<string> {
-  return mkdtemp(path.join(tmpdir(), 'zamfono-updater-'));
+  const dir = await mkdtemp(path.join(tmpdir(), 'zamfono-updater-'));
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  return dir;
 }
 
 /**

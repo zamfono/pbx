@@ -1,7 +1,7 @@
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { newId, nowIso, openDb } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
@@ -43,6 +43,7 @@ const ENV_KEYS = [
  */
 async function migratedDbFile(): Promise<string> {
   const dir = await mkdtemp(path.join(tmpdir(), 'zamfono-core-boot-'));
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
   const file = path.join(dir, 'zamfono.sqlite3');
   const db = openDb(file);
   await migrateForTest(db);

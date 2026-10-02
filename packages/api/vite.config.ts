@@ -41,6 +41,11 @@ export default defineConfig({
   ],
   test: {
     include: ['src/**/*.test.ts'],
-    setupFiles: ['src/testEnv.ts']
+    setupFiles: ['src/testEnv.ts'],
+    // Transformed modules are cached in this package's own `node_modules/.vite`, not copied into
+    // a fresh directory under the OS temp dir on every run, which a run that is killed leaves
+    // behind.
+    fsModuleCache: true,
+    fsModuleCachePath: 'node_modules/.vite/vitest'
   }
 });

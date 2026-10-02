@@ -1,7 +1,14 @@
-import { access, mkdir, mkdtemp, utimes, writeFile } from 'node:fs/promises';
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  rm,
+  utimes,
+  writeFile
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished } from 'vitest';
 
 import { newId, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
@@ -94,6 +101,7 @@ describe('runRetention', () => {
     await migrateForTest(db);
     await seedSettings(db, 90);
     mediaDir = await mkdtemp(path.join(tmpdir(), 'zamfono-retention-'));
+    onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));
   });
 
   it('removes recordings past retention, with their files, and keeps recent ones', async () => {

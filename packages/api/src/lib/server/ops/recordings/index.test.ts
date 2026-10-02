@@ -1,7 +1,7 @@
-import { access, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
@@ -73,6 +73,7 @@ describe('recordings', () => {
     const filename = 'rec-1.wav';
     const { id } = await seedRecording(db, { id: 'rec-1', filename });
     const mediaDir = await mkdtemp(path.join(os.tmpdir(), 'zamfono-rec-'));
+    onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));
     await mkdir(path.join(mediaDir, 'recordings'), { recursive: true });
     const filePath = path.join(mediaDir, 'recordings', filename);
     await writeFile(filePath, 'audio-bytes');

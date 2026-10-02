@@ -1,7 +1,14 @@
-import { mkdtemp, readdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished
+} from 'vitest';
 
 import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
@@ -158,6 +165,7 @@ describe('resyncOnBoot', () => {
   it('deletes voicemail files without a voicemails row and keeps the others', async () => {
     const userId = await seedUser(db);
     const dir = await mkdtemp(path.join(os.tmpdir(), 'zamfono-vm-'));
+    onTestFinished(() => rm(dir, { recursive: true, force: true }));
     await writeFile(path.join(dir, 'kept.wav'), 'RIFF');
     await writeFile(path.join(dir, 'orphan.wav'), 'RIFF');
     await writeFile(path.join(dir, 'notes.txt'), 'x');

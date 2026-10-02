@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { transcodeForDownload, voicemailAttachment } from './transcode.js';
 
@@ -31,6 +31,8 @@ describe('transcodeForDownload', () => {
       wavPath
     ]);
   });
+
+  afterAll(() => rm(path.dirname(wavPath), { recursive: true, force: true }));
 
   it('transcodes to Opus bytes carrying the Ogg magic', async () => {
     const opus = await transcodeForDownload(wavPath, 'opus');

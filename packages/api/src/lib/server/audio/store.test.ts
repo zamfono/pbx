@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, readdir, readFile, stat } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { deleteAudioFile, storeAudio } from './store.js';
 
@@ -48,6 +48,8 @@ describe('storeAudio', () => {
     ]);
     sineMp3 = await readFile(sinePath);
   });
+
+  afterAll(() => rm(mediaDir, { recursive: true, force: true }));
 
   it('transcodes an uploaded MP3 to a 16 kHz mono 16-bit WAV', async () => {
     const stored = await storeAudio(
