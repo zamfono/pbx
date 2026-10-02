@@ -20,18 +20,14 @@ import {
 } from '@zamfono/shared';
 
 import { errorMessage } from '../errors.js';
+import { openTargetSecret } from '../ops/backups/_secret.js';
 import {
   loadLiveTarget,
   type BackupRunRow,
   type BackupTargetRow
 } from '../ops/backups/_shared.js';
 import { type Keyring } from '../secretbox.js';
-import {
-  decodeSecret,
-  loadParams,
-  repositoryAndEnv,
-  type ExecFn
-} from './backupBackends.js';
+import { loadParams, repositoryAndEnv, type ExecFn } from './backupBackends.js';
 import {
   ensureRepository,
   parseResticSummary,
@@ -114,7 +110,7 @@ export async function performBackup(
     // since the `finally` cleanup below never gets to run.
     await rm(snapshotDir, { recursive: true, force: true });
     await mkdir(snapshotDir, { recursive: true, mode: SNAPSHOT_DIR_MODE });
-    const secret = decodeSecret(kr, target);
+    const secret = openTargetSecret(kr, target.secretEnc);
     const { repository, env, options } = await repositoryAndEnv(
       target,
       secret,

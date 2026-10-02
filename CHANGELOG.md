@@ -170,6 +170,14 @@ why the specified behaviour changed; the commit history, how.
   now logs a warning with it.
 - The OpenAPI document no longer lists a `501` response for every endpoint: every REST endpoint
   runs its operation, so none answers `501`.
+- **Breaking:** a backup target's `secret` in `backups.targets.create` and
+  `backups.targets.update` is an object, no longer a string: `{ "resticPassword": … }` for
+  `local`, plus `username` and `password` for `sftp`, `ftp`, `ftps` and `webdav`, or
+  `accessKeyId` and `secretAccessKey` for `s3`. A plain password, or credentials the kind does
+  not take, is refused with 422, and so is a change of kind whose stored secret does not fit the
+  new kind without a new `secret`. The default `local` target from `BACKUP_PASSWORD` is stored the
+  same way. A backup target created before this release can no longer be read, and its runs fail
+  until it is re-entered: set its secret again with `backups.targets.update`.
 
 ### Fixed
 
@@ -281,6 +289,10 @@ why the specified behaviour changed; the commit history, how.
   `update.sh` installs this release without the `compose.override.yaml` link, and the second run,
   which finds the stack already on this release, makes it. Until then, run Compose with
   `-f compose.yaml -f <overlay>` as before.
+- **Re-enter every backup target's secret** after updating: run `backups.targets.update` with
+  `secret` in its new form for each target `backups.targets.list` shows, the default `local` one
+  included (`{ "resticPassword": "<BACKUP_PASSWORD from .env>" }`). Until then, its backup runs
+  fail.
 
 ## [0.1.0] - 2026-09-30
 

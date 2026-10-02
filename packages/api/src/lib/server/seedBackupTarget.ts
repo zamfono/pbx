@@ -2,8 +2,9 @@ import type { Logger } from 'pino';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
+import { sealTargetSecret } from './ops/backups/_secret.js';
 import { DEFAULT_FORGET_POLICY } from './ops/backups/_shared.js';
-import { encrypt, type Keyring } from './secretbox.js';
+import type { Keyring } from './secretbox.js';
 
 /**
  * The restic repository of the default `local` target, on the `backups` volume `compose.yaml`
@@ -46,7 +47,7 @@ export async function seedBackupTarget(
         forget: DEFAULT_FORGET_POLICY
       }),
       enabled: 1,
-      secretEnc: encrypt(kr, password),
+      secretEnc: sealTargetSecret(kr, { resticPassword: password }),
       createdAt: nowIso()
     })
     .execute();

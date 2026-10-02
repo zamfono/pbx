@@ -1,11 +1,16 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
+import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { orBefore } from '../patch.js';
 import { recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
+import {
+  assertSecretFitsKind,
+  openTargetSecret,
+  sealTargetSecret
+} from './_secret.js';
 import {
   loadLiveTarget,
   targetFields,
@@ -41,10 +46,18 @@ export const targetsUpdate = defineOperation<Input, BackupTargetWire>({
       input.params === undefined
         ? before.paramsJson
         : JSON.stringify(withDefaultForgetPolicy(input.params));
+    const kr = keyringFromEnv(env);
+    // A new kind takes other credentials: the stored secret must fit it, unless a new one comes.
+    if (input.secret !== undefined || kind !== before.kind) {
+      assertSecretFitsKind(
+        kind,
+        input.secret ?? openTargetSecret(kr, before.secretEnc)
+      );
+    }
     const secretEnc =
       input.secret === undefined
         ? before.secretEnc
-        : encrypt(keyringFromEnv(env), input.secret);
+        : sealTargetSecret(kr, input.secret);
     if (kind !== before.kind) {
       recordChange(ctx, { field: 'kind', from: before.kind, to: kind });
     }

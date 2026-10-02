@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 import type { Db, DB } from '@zamfono/shared';
 
+import { targetSecretSchema } from './_secret.js';
+
 export type BackupTargetRow = Selectable<DB['backupTargets']>;
 export type BackupRunRow = Selectable<DB['backupRuns']>;
 
@@ -18,8 +20,8 @@ export const TARGET_KINDS = [
 
 /**
  * The fields `backups.targets.create` takes and `backups.targets.update` takes each optionally
- * (§6.5 "Backups"). `params` becomes `params_json`, free-form per kind; `secret` becomes
- * `secret_enc`'s plaintext.
+ * (§6.5 "Backups"). `params` becomes `params_json`, free-form per kind; `secret` is
+ * sealed into `secret_enc`.
  */
 export const targetFields = {
   kind: z
@@ -32,12 +34,7 @@ export const targetFields = {
     .describe(
       'The repository location per kind: local { path }, s3 { endpoint, bucket, path? }, sftp { host, path }, ftp and ftps { host, path? }, webdav { url, path? }; optional forget { keepDaily, keepWeekly, keepMonthly }, default 7/4/6.'
     ),
-  secret: z
-    .string()
-    .min(1)
-    .describe(
-      'The restic repository password, or JSON { resticPassword, username, password } (sftp, ftp(s), webdav) or { resticPassword, accessKeyId, secretAccessKey } (s3); write-only.'
-    ),
+  secret: targetSecretSchema,
   enabled: z
     .boolean()
     .optional()

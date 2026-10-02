@@ -3,10 +3,11 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
-import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
+import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
+import { assertSecretFitsKind, sealTargetSecret } from './_secret.js';
 import {
   targetFields,
   targetToWire,
@@ -33,7 +34,8 @@ export const targetsCreate = defineOperation<Input, BackupTargetWire>({
     const id = newId();
     const enabled = input.enabled ?? true;
     const params = withDefaultForgetPolicy(input.params);
-    const secretEnc = encrypt(keyringFromEnv(env), input.secret);
+    assertSecretFitsKind(input.kind, input.secret);
+    const secretEnc = sealTargetSecret(keyringFromEnv(env), input.secret);
     await ctx.db
       .insertInto('backupTargets')
       .values({

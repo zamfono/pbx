@@ -729,7 +729,7 @@ All hours resolve in the tenant's time zone: `settings.timezone` (an IANA name),
 - Retention is a per-target restic forget policy in `params_json`, default 7 daily, 4 weekly, 6 monthly.
 - Default target: when `.env` sets `BACKUP_PASSWORD` and the stack has never had a target, live or deleted, `api` creates a `local` target at start, its repository `/backups/restic` on the `backups` volume and `BACKUP_PASSWORD` its restic password, so a restore needs only `.env` to open it. It shares the host with the stack: it covers a damaged database or a bad upgrade, not the loss of the host.
 - A run creates its target's repository when there is none at the location yet.
-- The restic repository password lives in the target's `secret_enc` next to the backend credentials. That column is readable only with the `.env` encryption key, so every restore starts from the preserved `.env` (§6.3).
+- The restic repository password lives in the target's `secret_enc` next to the backend credentials, one JSON object. That column is readable only with the `.env` encryption key, so every restore starts from the preserved `.env` (§6.3).
 - Every run is a `backup_runs` row (§11.2), the store behind `GET /backups/runs`, and emits `backup.started`, `backup.finished` (snapshot id, bytes added and total, duration) and `backup.failed` events over `/events` and webhooks (§10.6). A run records two sizes from restic's summary: `bytes_added` (`data_added`), what it uploaded after deduplication, and `bytes_total` (`total_bytes_processed`), the snapshot's full size.
 - A row still `running` when `api` starts belongs to a run its previous process did not finish; the start marks it `failed` with error `interrupted`.
 
@@ -1303,7 +1303,7 @@ The time filters of these reads, `from` and `to` of `GET /audit` and `GET /calls
 
 **Mail templates** (min. role: admin) — `GET /mailTemplates` (effective templates, each marked `builtin` or `tenant`), `GET/PUT/DELETE /mailTemplates/{kind}/{language}`, `POST /mailTemplates/{kind}/test` (sends to the caller with sample values) — §10.2 "Mail"
 
-**Backups** (min. role: admin) — `GET/POST /backups/targets`, `PATCH/DELETE /backups/targets/{id}`; `GET /backups/runs` (history and status), `POST /backups/runs` (start a run), `GET /backups/runs/{id}`; a run carries `bytesAdded` and `bytesTotal` (§6.5)
+**Backups** (min. role: admin) — `GET/POST /backups/targets`, `PATCH/DELETE /backups/targets/{id}`; `GET /backups/runs` (history and status), `POST /backups/runs` (start a run), `GET /backups/runs/{id}`; a target's write-only `secret` is that JSON object, `resticPassword` and the backend credentials its kind takes, `username` and `password` for `sftp`, `ftp`, `ftps` and `webdav`, `accessKeyId` and `secretAccessKey` for `s3`, and nothing else; a run carries `bytesAdded` and `bytesTotal` (§6.5)
 
 **Settings** (min. role: admin; owners for the columns marked 👑 in §11.4) — `GET/PATCH /settings` — the columns of the singleton row (§11.4) under their wire names; unknown fields rejected, secret values masked; a change to the tenant's Ringotel profile reaches Ringotel after the write committed, and a refusal is a `warnings` entry of the result, never a failed write (§10.4 "Tenant profile push")
 

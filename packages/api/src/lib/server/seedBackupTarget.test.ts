@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { decrypt, encrypt, keyringFromEnv } from './secretbox.js';
+import { openTargetSecret, sealTargetSecret } from './ops/backups/_secret.js';
+import { keyringFromEnv } from './secretbox.js';
 import {
   LOCAL_BACKUP_REPOSITORY,
   seedBackupTarget
@@ -42,9 +43,9 @@ describe('seedBackupTarget', () => {
       path: LOCAL_BACKUP_REPOSITORY,
       forget: { keepDaily: 7, keepWeekly: 4, keepMonthly: 6 }
     });
-    expect(decrypt(kr, row?.secretEnc ?? Buffer.alloc(0)).toString()).toBe(
-      'from-env'
-    );
+    expect(openTargetSecret(kr, row?.secretEnc ?? Buffer.alloc(0))).toEqual({
+      resticPassword: 'from-env'
+    });
   });
 
   it('creates nothing without BACKUP_PASSWORD', async () => {
@@ -74,7 +75,7 @@ describe('seedBackupTarget', () => {
         kind: 'local',
         paramsJson: '{"path":"/backups/restic"}',
         enabled: 1,
-        secretEnc: encrypt(kr, 'old'),
+        secretEnc: sealTargetSecret(kr, { resticPassword: 'old' }),
         createdAt: nowIso(),
         deletedAt: nowIso()
       })

@@ -26,7 +26,7 @@ describe('backups', () => {
       {
         kind: 'local',
         params: { path: '/backups' },
-        secret: 'restic-repo-password'
+        secret: { resticPassword: 'restic-repo-password' }
       },
       asRun()
     )) as BackupTargetWire & { secret?: unknown };
@@ -41,12 +41,64 @@ describe('backups', () => {
     );
   });
 
+  it('takes the secret as JSON with exactly the credentials of the kind', async () => {
+    const db = await makeTestDb();
+    const create = (kind: string, secret: unknown): Promise<unknown> =>
+      runOperation(
+        db,
+        'backups.targets.create',
+        { kind, params: { path: '/backups' }, secret },
+        asRun()
+      );
+    for (const secret of [
+      'restic-repo-password',
+      { resticPassword: 'pw', username: 'u', password: 'p' }
+    ]) {
+      // eslint-disable-next-line no-await-in-loop -- one refusal at a time
+      await expect(create('local', secret)).rejects.toMatchObject({
+        status: 422
+      });
+    }
+    await expect(
+      create('s3', { resticPassword: 'pw', accessKeyId: 'AKID' })
+    ).rejects.toMatchObject({ status: 422 });
+    const created = (await create('s3', {
+      resticPassword: 'pw',
+      accessKeyId: 'AKID',
+      secretAccessKey: 'SECRET'
+    })) as BackupTargetWire;
+    // A new kind needs credentials the stored secret lacks, unless a secret comes along.
+    await expect(
+      runOperation(
+        db,
+        'backups.targets.update',
+        { id: created.id, kind: 'sftp' },
+        asRun()
+      )
+    ).rejects.toMatchObject({ status: 422 });
+    const updated = (await runOperation(
+      db,
+      'backups.targets.update',
+      {
+        id: created.id,
+        kind: 'sftp',
+        secret: { resticPassword: 'pw', username: 'u', password: 'p' }
+      },
+      asRun()
+    )) as BackupTargetWire;
+    expect(updated.kind).toBe('sftp');
+  });
+
   it('defaults the forget policy to 7 daily/4 weekly/6 monthly on create', async () => {
     const db = await makeTestDb();
     const created = (await runOperation(
       db,
       'backups.targets.create',
-      { kind: 'local', params: { path: '/backups' }, secret: 'x' },
+      {
+        kind: 'local',
+        params: { path: '/backups' },
+        secret: { resticPassword: 'x' }
+      },
       asRun()
     )) as BackupTargetWire;
     expect(created.params.forget).toEqual({
@@ -61,7 +113,11 @@ describe('backups', () => {
     const created = (await runOperation(
       db,
       'backups.targets.create',
-      { kind: 'local', params: { path: '/backups' }, secret: 'x' },
+      {
+        kind: 'local',
+        params: { path: '/backups' },
+        secret: { resticPassword: 'x' }
+      },
       asRun()
     )) as BackupTargetWire;
     const listed = (await runOperation(
@@ -98,7 +154,11 @@ describe('backups', () => {
     const target = (await runOperation(
       db,
       'backups.targets.create',
-      { kind: 'local', params: { path: '/backups' }, secret: 'x' },
+      {
+        kind: 'local',
+        params: { path: '/backups' },
+        secret: { resticPassword: 'x' }
+      },
       asRun()
     )) as BackupTargetWire;
     const started = (await runOperation(

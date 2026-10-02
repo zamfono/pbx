@@ -8,8 +8,8 @@ import path from 'node:path';
 import process from 'node:process';
 import * as privateEnv from '$app/env/private';
 
+import type { BackupSecret } from '../ops/backups/_secret.js';
 import type { BackupTargetRow } from '../ops/backups/_shared.js';
-import { decrypt, type Keyring } from '../secretbox.js';
 
 export type ExecFn = (
   file: string,
@@ -37,33 +37,6 @@ function optStr(params: Params, key: string): string | undefined {
 }
 export function loadParams(target: BackupTargetRow): Params {
   return JSON.parse(target.paramsJson) as Params;
-}
-
-// The restic password plus any backend credentials `target.kind` needs (§6.5, §5.4), decoded
-// from `secret_enc`: a bare string is the restic password alone; JSON adds the rest.
-export type BackupSecret = {
-  resticPassword: string;
-  username?: string;
-  password?: string;
-  accessKeyId?: string;
-  secretAccessKey?: string;
-};
-
-export function decodeSecret(
-  kr: Keyring,
-  target: BackupTargetRow
-): BackupSecret {
-  const plain = decrypt(kr, target.secretEnc).toString('utf8');
-  try {
-    const parsed: unknown = JSON.parse(plain);
-    const secret = parsed as Partial<BackupSecret> | null;
-    if (typeof secret?.resticPassword === 'string') {
-      return { ...secret, resticPassword: secret.resticPassword };
-    }
-  } catch {
-    // Not JSON: the whole string is the restic repository password.
-  }
-  return { resticPassword: plain };
 }
 
 type Credential = 'accessKeyId' | 'password' | 'secretAccessKey' | 'username';

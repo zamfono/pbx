@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { newId, nowIso, openDb, type Db, type Envelope } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { encrypt, keyringFromEnv, type Keyring } from '../secretbox.js';
+import { sealTargetSecret } from '../ops/backups/_secret.js';
+import { keyringFromEnv, type Keyring } from '../secretbox.js';
 import { type Bus, type ExecFn } from './backup.js';
 import { queueRun, scheduleBackups } from './cron.js';
 
@@ -64,7 +65,7 @@ async function insertTarget(db: Db, kr: Keyring): Promise<string> {
       kind: 'local',
       paramsJson: JSON.stringify({ path: '/backups/restic' }),
       enabled: 0,
-      secretEnc: encrypt(kr, 'restic-pw'),
+      secretEnc: sealTargetSecret(kr, { resticPassword: 'restic-pw' }),
       createdAt: nowIso()
     })
     .execute();

@@ -7,7 +7,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { newId, nowIso, openDb, type Db, type Envelope } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { encrypt, keyringFromEnv, type Keyring } from '../secretbox.js';
+import { sealTargetSecret, type BackupSecret } from '../ops/backups/_secret.js';
+import { keyringFromEnv, type Keyring } from '../secretbox.js';
 import { failBackupRun, runBackup, type Bus, type ExecFn } from './backup.js';
 import { markInterruptedRuns } from './cron.js';
 import { nextRun } from './cronExpression.js';
@@ -34,7 +35,7 @@ async function insertTarget(
   kr: Keyring,
   kind: string,
   params: Record<string, unknown>,
-  secret: string
+  secret: BackupSecret
 ): Promise<string> {
   const id = newId();
   await db
@@ -47,7 +48,7 @@ async function insertTarget(
         forget: { keepDaily: 7, keepWeekly: 4, keepMonthly: 6 }
       }),
       enabled: 1,
-      secretEnc: encrypt(kr, secret),
+      secretEnc: sealTargetSecret(kr, secret),
       createdAt: nowIso()
     })
     .execute();
@@ -136,7 +137,7 @@ describe('runBackup: command lines per target kind', () => {
       kr,
       'local',
       { path: '/backups/restic' },
-      'restic-pw'
+      { resticPassword: 'restic-pw' }
     );
     const { exec, calls } = recordingExec('snap-local', SNAPSHOT_BYTES);
     const { bus } = fakeBus();
@@ -158,11 +159,11 @@ describe('runBackup: command lines per target kind', () => {
       kr,
       's3',
       { bucket: 'zamfono-backups', endpoint: 's3.eu-central-1.amazonaws.com' },
-      JSON.stringify({
+      {
         resticPassword: 'pw',
         accessKeyId: 'AKID',
         secretAccessKey: 'SECRET'
-      })
+      }
     );
     const { exec, calls } = recordingExec('snap-s3', SNAPSHOT_BYTES);
     const { bus } = fakeBus();
@@ -187,11 +188,11 @@ describe('runBackup: command lines per target kind', () => {
       kr,
       'sftp',
       { host: 'backup.example.net', path: '/srv/restic' },
-      JSON.stringify({
+      {
         resticPassword: 'pw',
         username: 'zamfono',
         password: 'ssh pass'
-      })
+      }
     );
     const { exec, calls } = recordingExec('snap-sftp', SNAPSHOT_BYTES);
     const { bus } = fakeBus();
@@ -228,7 +229,7 @@ describe('runBackup: command lines per target kind', () => {
       kr,
       'sftp',
       { host: 'backup.example.net', path: '/srv/restic' },
-      JSON.stringify({ resticPassword: 'pw', username: 'zamfono' })
+      { resticPassword: 'pw', username: 'zamfono' }
     );
     const { exec, calls } = recordingExec('snap-sftp', SNAPSHOT_BYTES);
     const { bus } = fakeBus();
@@ -253,11 +254,11 @@ describe('runBackup: command lines per target kind', () => {
       kr,
       'ftp',
       { host: 'ftp.example.net', path: 'restic' },
-      JSON.stringify({
+      {
         resticPassword: 'pw',
         username: 'user1',
         password: 'pass1'
-      })
+      }
     );
     const { exec, calls } = recordingExec('snap-ftp', SNAPSHOT_BYTES);
     const { bus } = fakeBus();
@@ -289,11 +290,11 @@ describe('runBackup: command lines per target kind', () => {
       kr,
       'webdav',
       { url: 'https://dav.example.net/remote.php/webdav/', path: 'restic' },
-      JSON.stringify({
+      {
         resticPassword: 'pw',
         username: 'user1',
         password: 'pass1'
-      })
+      }
     );
     const { exec, calls } = recordingExec('snap-webdav', SNAPSHOT_BYTES);
     const { bus } = fakeBus();
@@ -318,7 +319,7 @@ describe('runBackup: retention grouping', () => {
       kr,
       'local',
       { path: '/backups/restic' },
-      'restic-pw'
+      { resticPassword: 'restic-pw' }
     );
     const { exec, calls } = recordingExec('snap-local', SNAPSHOT_BYTES);
     const { bus } = fakeBus();
@@ -343,7 +344,7 @@ describe('runBackup: retention grouping', () => {
       kr,
       'local',
       { path: '/backups/restic' },
-      'restic-pw'
+      { resticPassword: 'restic-pw' }
     );
     // Simulates a process killed mid-run: `VACUUM INTO`'s output file survives because the
     // `finally` cleanup never ran.
@@ -380,7 +381,7 @@ describe('pruneSnapshots: default retention', () => {
         kind: 'local',
         paramsJson: JSON.stringify({ path: '/backups/restic' }),
         enabled: 1,
-        secretEnc: encrypt(kr, 'restic-pw'),
+        secretEnc: sealTargetSecret(kr, { resticPassword: 'restic-pw' }),
         createdAt: nowIso()
       })
       .execute();
@@ -412,7 +413,7 @@ describe('failBackupRun', () => {
       kr,
       'local',
       { path: '/backups/restic' },
-      'restic-pw'
+      { resticPassword: 'restic-pw' }
     );
     const runId = newId();
     await db
@@ -481,7 +482,7 @@ describe('runBackup: run lifecycle', () => {
       kr,
       'local',
       { path: '/backups/restic' },
-      'restic-pw'
+      { resticPassword: 'restic-pw' }
     );
     let sawRunning = false;
     const exec: ExecFn = async (_file, args) => {
@@ -539,7 +540,7 @@ describe('runBackup: run lifecycle', () => {
       kr,
       'local',
       { path: '/backups/restic' },
-      'restic-pw'
+      { resticPassword: 'restic-pw' }
     );
     const exec: ExecFn = () =>
       Promise.reject(new Error('restic: repository not found'));
@@ -572,7 +573,7 @@ describe('markInterruptedRuns', () => {
       kr,
       'local',
       { path: '/backups/restic' },
-      'restic-pw'
+      { resticPassword: 'restic-pw' }
     );
     await db
       .insertInto('backupRuns')
@@ -609,7 +610,7 @@ describe('markInterruptedRuns', () => {
       kr,
       'local',
       { path: '/backups/restic' },
-      'restic-pw'
+      { resticPassword: 'restic-pw' }
     );
     const bootAt = nowIso();
     const runId = newId();

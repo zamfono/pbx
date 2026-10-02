@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-02 · §6.5 Backups, §10.3 Backups.** A backup target's secret is one JSON object, stored and taken as such: `resticPassword` and exactly the backend credentials its kind takes. A bare password is no longer a secret, neither on the wire nor in `secret_enc`.
+*Why:* product-owner decision: one stored form, read without guessing, and no backwards compatibility in the breaking 0.2.0.
+
 **2026-10-02 · §10.4 Tenant profile push.** The retry of a pending tenant profile at `api`'s start and at an Asterisk start waits, while a propagation is owed, until one has succeeded, as a device's Ringotel push does.
 *Why:* after a failed boot propagation the retry reached Ringotel before Asterisk held the profile it carries.
 
