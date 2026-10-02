@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
+import { memberSchema } from '../members.js';
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import {
   assertNameAvailable,
-  memberSchema,
   replaceMembers,
   toUserGroupOut,
   userGroupMembers

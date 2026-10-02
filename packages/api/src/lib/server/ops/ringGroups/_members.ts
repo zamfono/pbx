@@ -1,60 +1,8 @@
 import type { Transaction } from 'kysely';
-import { z } from 'zod';
 
 import type { DB } from '@zamfono/shared';
 
-import { OpError } from '../types.js';
-
-const STATUS_NOT_FOUND = 404;
-const STATUS_UNPROCESSABLE_ENTITY = 422;
-
-export const memberSchema = z.object({
-  kind: z
-    .enum(['user', 'userGroup'])
-    .describe('Whether id names a user or a user group.'),
-  id: z.string()
-});
-export type MemberSpec = z.infer<typeof memberSchema>;
-
-/** Throws 422 when `members` lists the same user or user group twice (`ring_group_members`' UNIQUEs, §11.2). */
-function assertMembersUnique(members: MemberSpec[]): void {
-  const userIds = new Set<string>();
-  const userGroupIds = new Set<string>();
-  for (const member of members) {
-    const seen = member.kind === 'user' ? userIds : userGroupIds;
-    if (seen.has(member.id)) {
-      throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
-        `ringGroups: duplicate ${member.kind} member '${member.id}'`
-      );
-    }
-    seen.add(member.id);
-  }
-}
-
-/** Throws 404 when a member names no live user or user-group row (`ring_group_members`' FKs, §11.2). */
-async function assertMembersAvailable(
-  db: Transaction<DB>,
-  members: MemberSpec[]
-): Promise<void> {
-  await Promise.all(
-    members.map(async member => {
-      const table = member.kind === 'user' ? 'users' : 'userGroups';
-      const row = await db
-        .selectFrom(table)
-        .select('id')
-        .where('id', '=', member.id)
-        .where('deletedAt', 'is', null)
-        .executeTakeFirst();
-      if (!row) {
-        throw new OpError(
-          STATUS_NOT_FOUND,
-          `${member.kind} '${member.id}' not found`
-        );
-      }
-    })
-  );
-}
+import { assertMembersValid, type MemberSpec } from '../members.js';
 
 export type RingGroupMemberOut = {
   position: number;
@@ -130,8 +78,7 @@ export async function replaceMembers(
   groupId: string,
   members: MemberSpec[]
 ): Promise<void> {
-  assertMembersUnique(members);
-  await assertMembersAvailable(db, members);
+  await assertMembersValid(db, members, 'ringGroups');
   const merged = [...members];
   const parked = (await loadMemberRows(db, groupId)).filter(
     row => !isLive(row)

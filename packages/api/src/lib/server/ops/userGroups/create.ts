@@ -2,11 +2,11 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
+import { memberSchema } from '../members.js';
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
 import {
   assertNameAvailable,
-  memberSchema,
   replaceMembers,
   toUserGroupOut,
   type UserGroupOut

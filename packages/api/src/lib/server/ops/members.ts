@@ -1,0 +1,57 @@
+import type { Transaction } from 'kysely';
+import { z } from 'zod';
+
+import type { DB } from '@zamfono/shared';
+
+import { OpError } from './types.js';
+
+const STATUS_NOT_FOUND = 404;
+const STATUS_UNPROCESSABLE_ENTITY = 422;
+
+/** One member of a ring group or user group (§10.3): a user or a user group, by id. */
+export const memberSchema = z.object({
+  kind: z
+    .enum(['user', 'userGroup'])
+    .describe('Whether id names a user or a user group.'),
+  id: z.string()
+});
+export type MemberSpec = z.infer<typeof memberSchema>;
+
+/**
+ * Throws 422 when `members` lists the same user or user group twice (the membership tables'
+ * UNIQUEs and PKs, §11.2), or 404 when a member names no live user or user-group row (their FKs);
+ * `label` (`ringGroups`, `userGroups`) prefixes the 422.
+ */
+export async function assertMembersValid(
+  db: Transaction<DB>,
+  members: MemberSpec[],
+  label: string
+): Promise<void> {
+  const seen = { user: new Set<string>(), userGroup: new Set<string>() };
+  for (const member of members) {
+    if (seen[member.kind].has(member.id)) {
+      throw new OpError(
+        STATUS_UNPROCESSABLE_ENTITY,
+        `${label}: duplicate ${member.kind} member '${member.id}'`
+      );
+    }
+    seen[member.kind].add(member.id);
+  }
+  await Promise.all(
+    members.map(async member => {
+      const table = member.kind === 'user' ? 'users' : 'userGroups';
+      const row = await db
+        .selectFrom(table)
+        .select('id')
+        .where('id', '=', member.id)
+        .where('deletedAt', 'is', null)
+        .executeTakeFirst();
+      if (!row) {
+        throw new OpError(
+          STATUS_NOT_FOUND,
+          `${member.kind} '${member.id}' not found`
+        );
+      }
+    })
+  );
+}

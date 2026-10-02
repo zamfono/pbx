@@ -1,13 +1,10 @@
 import type { Selectable, Transaction } from 'kysely';
-import { z } from 'zod';
 
 import type { DB } from '@zamfono/shared';
 
-import { Conflict, OpError } from '../types.js';
+import { assertMembersValid, type MemberSpec } from '../members.js';
+import { Conflict } from '../types.js';
 import { assertNoCycle, loadEdgesExcludingParent } from './_nesting.js';
-
-const STATUS_NOT_FOUND = 404;
-const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 /** A `user_groups` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type UserGroupRow = Selectable<DB['userGroups']>;
@@ -34,60 +31,12 @@ export async function assertNameAvailable(
   }
 }
 
-export const memberSchema = z.object({
-  kind: z
-    .enum(['user', 'userGroup'])
-    .describe('Whether id names a user or a user group.'),
-  id: z.string()
-});
-export type MemberSpec = z.infer<typeof memberSchema>;
-
 export type UserGroupMemberOut = { kind: 'user' | 'userGroup'; id: string };
 export type UserGroupOut = {
   id: string;
   name: string;
   members: UserGroupMemberOut[];
 };
-
-/** Throws 422 when `members` lists the same user or user group twice (`user_group_users`/`user_group_groups`' PKs, §11.2). */
-function assertMembersUnique(members: MemberSpec[]): void {
-  const userIds = new Set<string>();
-  const groupIds = new Set<string>();
-  for (const member of members) {
-    const seen = member.kind === 'user' ? userIds : groupIds;
-    if (seen.has(member.id)) {
-      throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
-        `userGroups: duplicate ${member.kind} member '${member.id}'`
-      );
-    }
-    seen.add(member.id);
-  }
-}
-
-/** Throws 404 when a member names no live user or user-group row (`user_group_users`/`user_group_groups`' FKs, §11.2). */
-async function assertMembersAvailable(
-  db: Transaction<DB>,
-  members: MemberSpec[]
-): Promise<void> {
-  await Promise.all(
-    members.map(async member => {
-      const table = member.kind === 'user' ? 'users' : 'userGroups';
-      const row = await db
-        .selectFrom(table)
-        .select('id')
-        .where('id', '=', member.id)
-        .where('deletedAt', 'is', null)
-        .executeTakeFirst();
-      if (!row) {
-        throw new OpError(
-          STATUS_NOT_FOUND,
-          `${member.kind} '${member.id}' not found`
-        );
-      }
-    })
-  );
-}
 
 /**
  * Replaces a user group's direct user members and nested child groups as a whole (§10.3 "User
@@ -98,8 +47,7 @@ export async function replaceMembers(
   groupId: string,
   members: MemberSpec[]
 ): Promise<void> {
-  assertMembersUnique(members);
-  await assertMembersAvailable(db, members);
+  await assertMembersValid(db, members, 'userGroups');
   const childGroupIds = members
     .filter(member => member.kind === 'userGroup')
     .map(member => member.id);
@@ -111,7 +59,7 @@ export async function replaceMembers(
   }
   // `members` is the live list, the one a read returns: a link to a soft-deleted member stays, so
   // the membership survives the member's delete and undo round-trip (§5.9, §11.1 "the membership
-  // tables"), and `members` cannot name that member again (`assertMembersAvailable`).
+  // tables"), and `members` cannot name that member again (`assertMembersValid`).
   await db
     .deleteFrom('userGroupUsers')
     .where('groupId', '=', groupId)

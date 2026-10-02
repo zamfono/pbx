@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import type { DB } from '@zamfono/shared';
 
+import { memberSchema, type MemberSpec } from '../members.js';
 import { pushRoster } from '../roster.js';
 import { propagate, recordChange, recordFieldChanges } from '../runner.js';
 import {
@@ -11,12 +12,7 @@ import {
   resolveLogLevel
 } from '../settings/logLevel.js';
 import { defineOperation, OpError } from '../types.js';
-import {
-  memberSchema,
-  replaceMembers,
-  ringGroupMembers,
-  type MemberSpec
-} from './_members.js';
+import { replaceMembers, ringGroupMembers } from './_members.js';
 import {
   assertGroupAudioFieldsAvailable,
   assertNameAvailable,

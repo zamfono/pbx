@@ -2,10 +2,11 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
+import { memberSchema } from '../members.js';
 import { pushRoster } from '../roster.js';
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
-import { memberSchema, replaceMembers } from './_members.js';
+import { replaceMembers } from './_members.js';
 import {
   assertGroupAudioFieldsAvailable,
   assertNameAvailable,
