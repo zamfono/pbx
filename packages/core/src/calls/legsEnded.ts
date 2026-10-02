@@ -67,7 +67,12 @@ async function releaseLastParty(
     return;
   }
   const { ari } = pipeline.deps;
-  const bridges = await ari.bridges.list().catch(() => []);
+  const bridges =
+    (await ari.bridges
+      .list()
+      .catch(
+        logFailure(pipeline.deps.logger, 'bridge list', { callId: call.id })
+      )) ?? [];
   const bridge = bridges.find(candidate => candidate.id === call.bridgeId);
   if (bridge === undefined) {
     return;

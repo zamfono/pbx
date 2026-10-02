@@ -6,6 +6,7 @@
  */
 import { ANONYMOUS, type Db } from '@zamfono/shared';
 
+import { logFailure } from '../ari/failures.js';
 import type { Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 
@@ -44,8 +45,10 @@ export function softphoneCallerId(
     return call.softphoneCallerId;
   }
   const lookup = contactName(pipeline.deps.db, call.from)
-    .then(name => formatCallerId(call.from, name))
-    .catch(() => call.from);
+    .catch(
+      logFailure(pipeline.deps.logger, 'phone book lookup', { callId: call.id })
+    )
+    .then(name => formatCallerId(call.from, name ?? ''));
   call.softphoneCallerId = lookup;
   return lookup;
 }

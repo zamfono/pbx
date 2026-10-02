@@ -3,6 +3,7 @@
  * registered, and whether the user is already in a call. Shared by the user step, its ring race
  * and the ring group's member states and originate step.
  */
+import { logFailure } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import type { Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
@@ -53,7 +54,10 @@ const CHANNEL_SEQUENCE_SUFFIX = /-[0-9a-f]{8}$/u;
 /** The SIP usernames of the devices carrying a call right now: every `PJSIP/` channel that is up,
  * whether the device placed the call or answered it. */
 export async function busyDevices(pipeline: Pipeline): Promise<Set<string>> {
-  const channels = await pipeline.deps.ari.channels.list().catch(() => []);
+  const channels =
+    (await pipeline.deps.ari.channels
+      .list()
+      .catch(logFailure(pipeline.deps.logger, 'channel list'))) ?? [];
   const busy = new Set<string>();
   for (const channel of channels) {
     if (channel.state === 'Up' && channel.name.startsWith('PJSIP/')) {

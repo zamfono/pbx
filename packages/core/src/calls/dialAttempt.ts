@@ -174,8 +174,13 @@ async function attemptOnce(
   const watch = watchAttemptOutcome(pipeline.deps.ari, channelId);
   const trunkLeg = await originateTrunkLeg(ctx, endpoint, channelId, () => {
     placing.state = 'ringing';
-  }).catch(() => null);
-  if (trunkLeg === null) {
+  }).catch(
+    logFailure(pipeline.deps.logger, 'trunk attempt placement', {
+      callId: call.id,
+      trunkId: trunk.id
+    })
+  );
+  if (trunkLeg === undefined) {
     watch.stop();
     call.legs.delete(channelId);
     call.log.event({

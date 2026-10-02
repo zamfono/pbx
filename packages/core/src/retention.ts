@@ -10,7 +10,9 @@ import path from 'node:path';
 
 import { cutoffIso, MS_PER_DAY, repeat, type Db } from '@zamfono/shared';
 
+import { logFailure } from './ari/failures.js';
 import type { Logger } from './ari/types.js';
+import { ignoreMissing } from './fsFailures.js';
 
 const RECORDINGS_DIR_NAME = 'recordings';
 // A participation's raw pair, `<id>-l.wav` and `<id>-r.wav` (§11.6 "raw per-leg call recordings"),
@@ -51,15 +53,21 @@ async function removeRecordingFiles(
  * and are purged on the same schedule. Returns how many went. */
 async function removeStaleRawFiles(
   dir: string,
-  before: string
+  before: string,
+  log: Logger
 ): Promise<number> {
-  const names = await readdir(dir).catch(() => []);
+  const names =
+    (await readdir(dir)
+      .catch(ignoreMissing)
+      .catch(logFailure(log, 'recordings directory read', { dir }))) ?? [];
   let removed = 0;
   for (const name of names.filter(candidate => RAW_FILE.test(candidate))) {
     const file = path.join(dir, name);
     // eslint-disable-next-line no-await-in-loop -- one file at a time; the sweep is not latency-bound
-    const info = await stat(file).catch(() => null);
-    if (info !== null && info.mtime.toISOString() < before) {
+    const info = await stat(file)
+      .catch(ignoreMissing)
+      .catch(logFailure(log, 'raw recording file read', { file }));
+    if (info !== undefined && info.mtime.toISOString() < before) {
       // eslint-disable-next-line no-await-in-loop -- see above
       await rm(file, { force: true });
       removed += 1;
@@ -96,7 +104,7 @@ export async function runRetention(
     .deleteFrom('recordings')
     .where('createdAt', '<', before)
     .executeTakeFirst();
-  const rawFiles = await removeStaleRawFiles(recordingsDir, before);
+  const rawFiles = await removeStaleRawFiles(recordingsDir, before, deps.log);
 
   const presenceLog = await db
     .deleteFrom('presenceLog')

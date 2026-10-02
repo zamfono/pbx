@@ -15,6 +15,7 @@ import type { Db } from '@zamfono/shared';
 import type { AriClient } from '../ari/client.js';
 import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { AriEvent, Channel, Logger } from '../ari/types.js';
+import { ignoreMissing } from '../fsFailures.js';
 import { VOICEMAIL_DIR_NAME } from './mailboxStore.js';
 import type { Pipeline } from './pipeline.js';
 
@@ -120,22 +121,15 @@ async function adoptBridges(deps: ResyncDeps): Promise<Adopted> {
   return { bridged: watched.length, parked: parked.length };
 }
 
-function isNotFound(error: unknown): boolean {
-  return (error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT';
-}
-
 /** Deletes every `.wav` in the voicemail directory that no `voicemails` row names; returns the count. */
 async function deleteOrphanedVoicemailFiles(deps: ResyncDeps): Promise<number> {
   const dir = path.join(deps.pipeline.deps.mediaDir, VOICEMAIL_DIR_NAME);
   // A fresh volume has no voicemail directory until the first message is recorded; any other
   // failure to read it is logged, and the files are left for the next boot.
-  const names = await readdir(dir).catch((error: unknown) => {
-    if (!isNotFound(error)) {
-      logFailure(deps.log, 'voicemail directory read', { dir })(error);
-    }
-    return null;
-  });
-  if (names === null) {
+  const names = await readdir(dir)
+    .catch(ignoreMissing)
+    .catch(logFailure(deps.log, 'voicemail directory read', { dir }));
+  if (names === undefined) {
     return 0;
   }
   const rows = await deps.db

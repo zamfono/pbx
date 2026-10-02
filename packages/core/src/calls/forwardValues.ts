@@ -5,6 +5,7 @@
  */
 import { ANONYMOUS, isE164 } from '@zamfono/shared';
 
+import { logFailure } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import type { Call } from './call.js';
@@ -64,15 +65,17 @@ export function forwardValues(
 }
 
 /** The caller's name (§10.2 "Phone book"): the phone book's, else an internal caller's own user
- * name, else empty. A failed lookup reads as no name, since a header never holds up a call. */
+ * name, else empty. A failed lookup is logged and reads as no name, since a header never holds
+ * up a call. */
 async function callerNameOf(
   pipeline: Pipeline,
   call: Call,
   snapshot: Snapshot
 ): Promise<string> {
-  const contact = await contactName(pipeline.deps.db, call.from).catch(
-    () => ''
-  );
+  const contact =
+    (await contactName(pipeline.deps.db, call.from).catch(
+      logFailure(pipeline.deps.logger, 'phone book lookup', { callId: call.id })
+    )) ?? '';
   if (contact !== '') {
     return contact;
   }

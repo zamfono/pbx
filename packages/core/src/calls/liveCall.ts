@@ -47,7 +47,12 @@ async function endConversation(
   const { ari } = pipeline.deps;
   const held = holdIn(pipeline, bridgeId)?.channelId;
   await endHold(pipeline, bridgeId, null);
-  const bridges = await ari.bridges.list().catch(() => []);
+  const bridges =
+    (await ari.bridges
+      .list()
+      .catch(
+        logFailure(pipeline.deps.logger, 'bridge list', { callId: call.id })
+      )) ?? [];
   const inBridge = bridges.find(bridge => bridge.id === bridgeId)?.channels;
   const others = [...(inBridge ?? []), ...(held === undefined ? [] : [held])];
   await Promise.all(

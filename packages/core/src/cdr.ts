@@ -134,7 +134,12 @@ export class CdrWriter {
   /** `registerLeg`, resolving once the join is in place or has failed: a leg created but not yet
    * dialled (`legOriginate.ts`) joins before its INVITE leaves. */
   joinLeg(call: Call, channelId: string): Promise<void> {
-    return this.join(call, channelId);
+    return this.join(call, channelId).catch(
+      logFailure(this.deps.log, 'SIP dialog join', {
+        callId: call.id,
+        channelId
+      })
+    );
   }
 
   /** Joins `channelId`'s Call-ID to `call` for its SIP messages, and to the channel for its RTCP

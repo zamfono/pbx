@@ -17,6 +17,7 @@ import {
 } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
+import { logFailure } from '../ari/failures.js';
 import type { Logger } from '../ari/types.js';
 import type { CallActions } from '../calls/actions.js';
 import type { Recorder } from '../calls/recording.js';
@@ -86,7 +87,9 @@ async function handleVersion(
   response: http.ServerResponse
 ): Promise<void> {
   const asteriskStartedAt = deps.ari.connected
-    ? await deps.ari.asterisk.startupTime().catch(() => null)
+    ? ((await deps.ari.asterisk
+        .startupTime()
+        .catch(logFailure(deps.log, 'Asterisk start time read'))) ?? null)
     : null;
   const body: CoreVersionResponse = {
     ...resolveVersion(process.env),
@@ -112,10 +115,12 @@ async function handleState(
     ...deps.state.snapshot(),
     registeredDevices: await deps.presence.registeredDevices(),
     recordingMixFailures: deps.recorder.mixFailureCount,
-    asteriskChannels: await deps.ari.channels
-      .list()
-      .then(channels => channels.length)
-      .catch(() => null),
+    asteriskChannels: deps.ari.connected
+      ? ((await deps.ari.channels
+          .list()
+          .then(channels => channels.length)
+          .catch(logFailure(deps.log, 'Asterisk channel count'))) ?? null)
+      : null,
     recordingsInProgress: deps.recorder.inProgressCount
   };
   respondJson(response, HTTP_OK, body);

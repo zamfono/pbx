@@ -116,9 +116,14 @@ async function placeAttempt(
     () => {
       taken.over = takeOver(attempt, holder);
     }
-  ).catch(() => null);
+  ).catch(
+    logFailure(pipeline.deps.logger, 'trunk attempt placement', {
+      callId: call.id,
+      trunkId: trunk.id
+    })
+  );
   const rang = taken.over;
-  if (trunkLeg === null) {
+  if (trunkLeg === undefined) {
     unwatchAttempt(attempt);
     if (!rang) {
       owner.retire(channelId);

@@ -72,8 +72,8 @@ export class SipCapture {
   }
 
   /** Joins `channelId`'s SIP dialog to `call`, handing it the messages held for that dialog;
-   *  resolves once the join is in place, with the dialog's Call-ID, or has failed, with null,
-   *  which a caller may wait for. */
+   *  resolves once the join is in place, with the dialog's Call-ID, or with null for a channel
+   *  that has none, which a caller may wait for. */
   register(call: Call, channelId: string): Promise<string | null> {
     return this.ari.channels
       .getVariable(channelId, 'CHANNEL(pjsip,call-id)')
@@ -84,8 +84,7 @@ export class SipCapture {
         this.callsByCallId.set(callId, call);
         this.release(callId, call);
         return callId;
-      })
-      .catch(() => null);
+      });
   }
 
   /** Drops every Call-ID joined to `call`, once it has closed. */

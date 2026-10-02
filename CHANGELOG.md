@@ -136,6 +136,11 @@ why the specified behaviour changed; the commit history, how.
   Asterisk error, is now logged too.
 - `core` logs an error when the sweep that announces out-of-office and opening-hours changes
   fails, and retries it a minute later as before; until now it retried without a trace.
+- `core` also logs an error, and carries on as before, when a read it falls back from fails: a
+  trunk attempt it could not place, the phone-book lookup of a caller's name, the bridge and
+  channel lists a hangup or a busy check reads, the Call-ID of a leg's SIP dialog, Asterisk's
+  start time and channel count for `api`, and the recordings directory the retention sweep
+  reads. A recordings or voicemail directory that does not exist yet is still no failure.
 - The release bundle carries a `VERSION` file naming its release. `update.sh`, `setup.sh` and
   the `updater` service read the release a stack runs from it, unless `.env` sets
   `ZAMFONO_VERSION`; `update.sh` still reads a stack unpacked from an older bundle, which has no
