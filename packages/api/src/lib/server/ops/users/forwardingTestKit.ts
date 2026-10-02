@@ -14,7 +14,7 @@ import './index.js';
 const SECRETBOX_KEY_BYTES = 32;
 const SECRETBOX_KEY_FILL = 7;
 process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(SECRETBOX_KEY_BYTES, SECRETBOX_KEY_FILL).toString('base64')}`;
-process.env.ORIGIN ??= 'https://pbx.example.test';
+process.env.FQDN ??= 'pbx.example.test';
 
 export const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 export const admin: Actor = { id: 'admin-1', name: 'Admin', role: 'admin' };

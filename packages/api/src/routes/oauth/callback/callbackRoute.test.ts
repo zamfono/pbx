@@ -23,7 +23,7 @@ import { GET } from './+server.js';
 const KEY_BYTE_LENGTH = 32;
 
 process.env.DB_FILE = ':memory:';
-process.env.ORIGIN = 'https://pbx.example.com';
+process.env.FQDN = 'pbx.example.com';
 process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
 
 vi.mock('#lib/server/auth/sso.js', async importOriginal => {

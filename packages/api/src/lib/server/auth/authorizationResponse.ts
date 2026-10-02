@@ -7,6 +7,8 @@
 import { redirect } from '@sveltejs/kit';
 import * as env from '$app/env/private';
 
+import { stackDomain, stackOrigin } from '../stackAddress.js';
+
 const STATUS_FOUND = 302;
 
 /** The part of the authorization request its response echoes; `state` is `null` for a request
@@ -34,13 +36,13 @@ export function authorizationResponseUrl(
   return url.toString();
 }
 
-/** The stack's own issuer, which every authorization response carries as `iss` (RFC 9207). */
+/** The stack's own origin, the issuer every authorization response carries as `iss` (RFC 9207). */
 export function requiredOrigin(): string {
-  const value = env.ORIGIN;
-  if (!value) {
-    throw new Error('ORIGIN environment variable is required.');
+  const fqdn = stackDomain(env);
+  if (fqdn === null) {
+    throw new Error('FQDN environment variable is required.');
   }
-  return value;
+  return stackOrigin(fqdn);
 }
 
 /** The standard OAuth 2.1 error response (§4.1.2.1), delivered to the request's own validated

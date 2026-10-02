@@ -15,7 +15,7 @@ import { runOperation, type RunInput } from '../runner.js';
 import '../index.js';
 
 process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-process.env.ORIGIN = 'https://pbx.example.com';
+process.env.FQDN = 'pbx.example.com';
 
 const admin: RunInput = {
   actor: { id: 'admin', name: 'Admin', role: 'admin' },

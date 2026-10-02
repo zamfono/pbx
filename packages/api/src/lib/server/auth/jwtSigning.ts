@@ -22,7 +22,7 @@ export function requiredJwtSecret(): string {
 }
 
 /**
- * Signs an HS256 access token issued by `origin`, the stack's `ORIGIN`, for its MCP server, the
+ * Signs an HS256 access token issued by `origin`, the stack's own (`requiredOrigin()`), for its MCP server, the
  * one resource it issues tokens for (`resource.ts`): `exp` is `nowS + 900` (§5.2, §6.3).
  */
 export function signAccessToken(

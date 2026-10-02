@@ -1,19 +1,20 @@
 type Env = Record<string, string | undefined>;
 
-/**
- * The stack's public hostname, the `FQDN` of `.env` (§6.1), read from `ORIGIN` (`https://${FQDN}`,
- * §6.3) rather than a second variable carrying the same value; `null` when unset or unparseable.
- */
+/** The stack's public hostname, the `FQDN` of `.env` (§6.1); `null` while unset. */
 export function stackDomain(env: Env): string | null {
-  const origin = env.ORIGIN;
-  if (!origin) {
-    return null;
+  // An empty value is unset: compose.yaml hands `${FQDN}` to `api` as is.
+  if (env.FQDN) {
+    return env.FQDN;
   }
-  try {
-    return new URL(origin).hostname;
-  } catch {
-    return null;
-  }
+  return null;
+}
+
+/**
+ * The stack's public origin, `https://${fqdn}`: the OAuth issuer, the MCP resource and the base of
+ * every absolute link `api` hands out (§5.2).
+ */
+export function stackOrigin(fqdn: string): string {
+  return `https://${fqdn}`;
 }
 
 /**

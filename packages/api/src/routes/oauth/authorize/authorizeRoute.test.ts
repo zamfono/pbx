@@ -26,11 +26,12 @@ import { approveConsentSubmit, denyConsentSubmit } from './consentSubmit.js';
 import { loginSubmit } from './loginSubmit.js';
 
 const KEY_BYTE_LENGTH = 32;
-const ORIGIN = 'https://pbx.example.com';
+const FQDN = 'pbx.example.com';
+const ORIGIN = `https://${FQDN}`;
 const PASSWORD = 'correct horse battery staple';
 
 process.env.DB_FILE = ':memory:';
-process.env.ORIGIN = ORIGIN;
+process.env.FQDN = FQDN;
 process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
 
 /** A dynamically-registered client id (§5.2), so tests never hit the network for a CIMD fetch. */

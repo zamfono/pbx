@@ -4,6 +4,7 @@ import { buildBranchProvision } from '#lib/server/provisioning/ringotel.js';
 import type { RingotelClient } from '#lib/server/provisioning/ringotelClient.js';
 import { branchBlfEntries } from '#lib/server/provisioning/ringotelRoster.js';
 import { provisionExistingDevices } from '#lib/server/provisioning/ringotelUser.js';
+import { stackDomain } from '#lib/server/stackAddress.js';
 
 import { reportPush } from '../devices/_ringotelPush.js';
 import { loadParkingSlots } from '../parking/_shared.js';
@@ -22,19 +23,19 @@ export const STATUS_NOT_FOUND = 404;
 const STATUS_SERVICE_UNAVAILABLE = 503;
 
 /**
- * The stack's connection address, `<fqdn>:5061`, from `ORIGIN` (`https://<fqdn>`, §6.3), the one
- * hostname `api` is given. `ORIGIN` is set by the deployment, never by the caller, so a missing
- * one is this stack's own misconfiguration rather than a bad request.
+ * The stack's connection address, `<fqdn>:5061`, from `FQDN` (§6.3), the one hostname `api` is
+ * given. `FQDN` is set by the deployment, never by the caller, so a missing one is this stack's
+ * own misconfiguration rather than a bad request.
  */
 export function stackBranchAddress(): string {
-  const origin = env.ORIGIN;
-  if (!origin) {
+  const fqdn = stackDomain(env);
+  if (fqdn === null) {
     throw new OpError(
       STATUS_SERVICE_UNAVAILABLE,
-      'provisioning: ORIGIN is not set'
+      'provisioning: FQDN is not set'
     );
   }
-  return `${new URL(origin).hostname}:${SIP_TLS_PORT}`;
+  return `${fqdn}:${SIP_TLS_PORT}`;
 }
 
 /** One organization and one connection per stack (§10.4): a stack already set up refuses a

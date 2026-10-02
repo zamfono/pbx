@@ -6,7 +6,7 @@ import { serverInfo } from './results.js';
 const STATIC_DIR = new URL('../../../../static/', import.meta.url);
 
 describe('serverInfo', () => {
-  it('names the stack, and has no icons without ORIGIN', () => {
+  it('names the stack, and has no icons without FQDN', () => {
     expect(serverInfo({})).toEqual({
       name: 'zamfono',
       title: 'Zamfono',
@@ -16,7 +16,7 @@ describe('serverInfo', () => {
   });
 
   it("points each icon at the stack's own origin, light and dark", () => {
-    const { icons } = serverInfo({ ORIGIN: 'https://pbx.example/' });
+    const { icons } = serverInfo({ FQDN: 'pbx.example' });
     expect(icons).toEqual([
       {
         src: 'https://pbx.example/logo.svg',
@@ -46,7 +46,7 @@ describe('serverInfo', () => {
   });
 
   it('names only files the stack serves from static/', () => {
-    const { icons } = serverInfo({ ORIGIN: 'https://pbx.example' }) as {
+    const { icons } = serverInfo({ FQDN: 'pbx.example' }) as {
       icons: { src: string }[];
     };
     for (const { src } of icons) {

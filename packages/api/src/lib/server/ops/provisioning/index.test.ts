@@ -17,7 +17,7 @@ import { type Actor } from '../types.js';
 import './index.js';
 
 process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-process.env.ORIGIN = 'https://pbx.example.com';
+process.env.FQDN = 'pbx.example.com';
 
 const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 
@@ -206,12 +206,12 @@ describe('provisioning.ringotelSetup', () => {
     expect(ringotel.organizations).toHaveLength(1);
   });
 
-  it('is refused with 503 while ORIGIN is not set', async () => {
+  it('is refused with 503 while FQDN is not set', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
     stubFetch({ createOrganization: { id: 'org-1' } });
-    const previousOrigin = process.env.ORIGIN;
-    delete process.env.ORIGIN;
+    const previousFqdn = process.env.FQDN;
+    delete process.env.FQDN;
 
     try {
       await expect(
@@ -223,7 +223,7 @@ describe('provisioning.ringotelSetup', () => {
         )
       ).rejects.toMatchObject({ status: 503 });
     } finally {
-      process.env.ORIGIN = previousOrigin;
+      process.env.FQDN = previousFqdn;
     }
   });
 
@@ -241,15 +241,15 @@ describe('provisioning.ringotelSetup', () => {
       )
     ).rejects.toThrow();
   });
-  it('checks its ORIGIN precondition before creating the organization', async () => {
+  it('checks its FQDN precondition before creating the organization', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
     const calls = stubFetch({
       createOrganization: { id: 'org-1' },
       createBranch: { id: 'branch-1' }
     });
-    const origin = process.env.ORIGIN;
-    delete process.env.ORIGIN;
+    const fqdn = process.env.FQDN;
+    delete process.env.FQDN;
 
     try {
       const attempt = runOperation(
@@ -260,7 +260,7 @@ describe('provisioning.ringotelSetup', () => {
       );
       await expect(attempt).rejects.toMatchObject({ status: 503 });
     } finally {
-      process.env.ORIGIN = origin;
+      process.env.FQDN = fqdn;
     }
     expect(calls).toEqual([]);
   });

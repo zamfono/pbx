@@ -11,7 +11,8 @@ import { getDb } from '#lib/server/db.js';
 import { handle } from './hooks.server.js';
 
 const JWT_SECRET = 'test-secret';
-const ORIGIN = 'https://pbx.example.com';
+const FQDN = 'pbx.example.com';
+const ORIGIN = `https://${FQDN}`;
 const FORM = { 'content-type': 'application/x-www-form-urlencoded' };
 // A no-JavaScript submission of one of the login page's remote `form`s posts to the page itself.
 const LOGIN_SUBMISSION = `${ORIGIN}/oauth/authorize?/remote=login`;
@@ -22,7 +23,7 @@ vi.mock('#lib/server/jobs/keyRotation.js', () => ({
 
 process.env.DB_FILE = ':memory:';
 process.env.JWT_SECRET = JWT_SECRET;
-process.env.ORIGIN = ORIGIN;
+process.env.FQDN = FQDN;
 
 // SvelteKit's built-in check runs before `handle` and refuses an origin-less form POST to any
 // route; it is off when `csrf.trustedOrigins` lists `'*'`, and while it is on no client request

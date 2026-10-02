@@ -20,6 +20,7 @@ import {
 } from './seedEnv.js';
 import { createOwnerExtension, createParkingSlots } from './seedExtensions.js';
 import { createMohAssets } from './seedMoh.js';
+import { stackOrigin } from './stackAddress.js';
 
 const RANDOM_PASSWORD_BYTES = 32;
 const EU_DEFAULT_KEY = 'EU_DEFAULT';
@@ -158,8 +159,8 @@ async function sendSetupMail(
 ): Promise<void> {
   const { env, ownerId, now } = params;
   const { raw, expiresAt } = await issueResetToken(db, ownerId, 'setup', now);
-  // `assertOriginWhenMailingSetupLink` has already required `ORIGIN` before the transaction.
-  const link = `${requiredEnv(env, 'ORIGIN')}${SET_PASSWORD_PATH}?token=${raw}`;
+  // `assertOriginWhenMailingSetupLink` has already required `FQDN` before the transaction.
+  const link = `${stackOrigin(requiredEnv(env, 'FQDN'))}${SET_PASSWORD_PATH}?token=${raw}`;
   const outcome = await sendMail(db, kr, {
     kind: 'setup',
     to: { userId: ownerId },

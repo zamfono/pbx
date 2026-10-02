@@ -10,13 +10,14 @@ import { getDb } from '#lib/server/db.js';
 
 import { POST } from './+server.js';
 
-const ORIGIN = 'https://pbx.example';
+const FQDN = 'pbx.example';
+const ORIGIN = `https://${FQDN}`;
 const JWT_SECRET = 'test-secret';
 const CURRENT = '2026-07-28';
 
 process.env.DB_FILE = ':memory:';
 process.env.JWT_SECRET = JWT_SECRET;
-process.env.ORIGIN = ORIGIN;
+process.env.FQDN = FQDN;
 
 beforeAll(async () => {
   const db = getDb();

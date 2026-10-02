@@ -3,6 +3,7 @@ import * as env from '$app/env/private';
 import type { Db } from '@zamfono/shared';
 
 import { getDb } from '#lib/server/db.js';
+import { stackDomain, stackOrigin } from '#lib/server/stackAddress.js';
 
 import { OpError, type Context } from '../types.js';
 
@@ -21,18 +22,18 @@ export function mailDb(ctx: Context): Db {
 }
 
 /**
- * The absolute `<ORIGIN>/auth/set-password?token=` link a setup or reset mail carries (§5.2,
- * §10.2 "Mail"), the path the page is mounted at; throws `OpError(503)` while `ORIGIN` is unset,
+ * The absolute `https://<FQDN>/auth/set-password?token=` link a setup or reset mail carries (§5.2,
+ * §10.2 "Mail"), the path the page is mounted at; throws `OpError(503)` while `FQDN` is unset,
  * since a relative link would not open from a mail client and the admin has nothing usable to
  * pass on either (§10.2 "Without a relay").
  */
 export function setupLinkFor(token: string): string {
-  const origin = env.ORIGIN;
-  if (!origin) {
+  const fqdn = stackDomain(env);
+  if (fqdn === null) {
     throw new OpError(
       STATUS_SERVICE_UNAVAILABLE,
-      'ORIGIN is not configured for this deployment'
+      'FQDN is not configured for this deployment'
     );
   }
-  return `${origin}${SET_PASSWORD_PATH}?token=${token}`;
+  return `${stackOrigin(fqdn)}${SET_PASSWORD_PATH}?token=${token}`;
 }

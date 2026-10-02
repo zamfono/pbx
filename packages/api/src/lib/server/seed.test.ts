@@ -541,7 +541,7 @@ describe('seedIfEmpty', () => {
     const env = baseEnv({
       SMTP_HOST: 'smtp.example.com',
       MAIL_FROM: 'no-reply@example.com',
-      ORIGIN: 'https://pbx.example.test'
+      FQDN: 'pbx.example.test'
     });
     delete env.BOOTSTRAP_OWNER_PASSWORD_HASH;
     const result = await seedIfEmpty(
@@ -582,7 +582,7 @@ describe('seedIfEmpty', () => {
     const env = baseEnv({
       SMTP_HOST: 'smtp.example.com',
       MAIL_FROM: 'no-reply@example.com',
-      ORIGIN: 'https://pbx.example.test'
+      FQDN: 'pbx.example.test'
     });
     delete env.BOOTSTRAP_OWNER_PASSWORD_HASH;
     await expect(
@@ -593,7 +593,7 @@ describe('seedIfEmpty', () => {
     expect(owner).toBeUndefined();
   });
 
-  it('rejects a missing hash without ORIGIN, before mailing anything', async () => {
+  it('rejects a missing hash without FQDN, before mailing anything', async () => {
     const db = await migratedDb();
     const mediaDir = await tempMediaDir();
     const env = baseEnv({
@@ -601,10 +601,10 @@ describe('seedIfEmpty', () => {
       MAIL_FROM: 'no-reply@example.com'
     });
     delete env.BOOTSTRAP_OWNER_PASSWORD_HASH;
-    delete env.ORIGIN;
+    delete env.FQDN;
     await expect(
       seedIfEmpty(db, env, testKeyring(), mediaDir, silentLogger)
-    ).rejects.toThrow(/ORIGIN/u);
+    ).rejects.toThrow(/FQDN/u);
   });
 });
 

@@ -1,19 +1,22 @@
 import { describe, expect, it } from 'vitest';
 
-import { stackDomain, stackIpv4 } from './stackAddress.js';
+import { stackDomain, stackIpv4, stackOrigin } from './stackAddress.js';
 
 describe('stackDomain', () => {
-  it("reads the FQDN from ORIGIN's host", () => {
-    expect(stackDomain({ ORIGIN: 'https://pbx.example.com' })).toBe(
-      'pbx.example.com'
-    );
+  it('reads FQDN', () => {
+    expect(stackDomain({ FQDN: 'pbx.example.com' })).toBe('pbx.example.com');
   });
 
-  it('is null while ORIGIN is unset, empty or unparseable', () => {
+  it('is null while FQDN is unset or empty', () => {
     expect(stackDomain({})).toBeNull();
-    expect(stackDomain({ ORIGIN: '' })).toBeNull();
-    // `https://${FQDN}` with FQDN unset: Compose renders `https://`.
-    expect(stackDomain({ ORIGIN: 'https://' })).toBeNull();
+    // Compose hands `${FQDN}` to `api` as an empty string while `.env` leaves it unset.
+    expect(stackDomain({ FQDN: '' })).toBeNull();
+  });
+});
+
+describe('stackOrigin', () => {
+  it('is the https origin of the FQDN', () => {
+    expect(stackOrigin('pbx.example.com')).toBe('https://pbx.example.com');
   });
 });
 

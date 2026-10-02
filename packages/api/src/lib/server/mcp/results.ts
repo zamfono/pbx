@@ -4,6 +4,7 @@ import { resolveVersion } from '@zamfono/shared';
 
 import type { OpError } from '../ops/types.js';
 import { extensionMembers } from '../problem.js';
+import { stackDomain, stackOrigin } from '../stackAddress.js';
 import { SUPPORTED_PROTOCOL_VERSIONS } from './era.js';
 import type { PromptContent } from './prompts.js';
 
@@ -55,7 +56,7 @@ const ICONS = [
 
 /**
  * The `serverInfo` (`Implementation`) both eras send (§10.5). An icon's `src` must be an absolute
- * URI, so the icons are left out while `ORIGIN` is unset, as it is outside a stack (`vite dev`).
+ * URI, so the icons are left out while `FQDN` is unset, as it is outside a stack (`vite dev`).
  */
 export function serverInfo(env: NodeJS.ProcessEnv): Result {
   const info: Result = {
@@ -64,10 +65,11 @@ export function serverInfo(env: NodeJS.ProcessEnv): Result {
     version: resolveVersion(env).display,
     websiteUrl: WEBSITE_URL
   };
-  if (!env.ORIGIN) {
+  const fqdn = stackDomain(env);
+  if (fqdn === null) {
     return info;
   }
-  const origin = new URL(env.ORIGIN).origin;
+  const origin = stackOrigin(fqdn);
   return {
     ...info,
     icons: ICONS.map(({ path, ...icon }) => ({
@@ -77,7 +79,7 @@ export function serverInfo(env: NodeJS.ProcessEnv): Result {
   };
 }
 
-// `version` is the stack's own (§7 "Version") and the icons follow `ORIGIN`, read once: none of
+// `version` is the stack's own (§7 "Version") and the icons follow `FQDN`, read once: none of
 // these environment variables changes for the life of the process.
 const SERVER_INFO = serverInfo(privateEnv);
 

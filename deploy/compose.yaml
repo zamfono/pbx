@@ -80,7 +80,7 @@ services:
     networks:
       - internal
     environment:
-      ORIGIN: https://${FQDN}                   # public origin: OAuth issuer, redirect and link base (§5.2)
+      FQDN: ${FQDN}                             # public host name; https://<FQDN> is the OAuth issuer, redirect and link base (§5.2)
       ADDRESS_HEADER: X-Forwarded-For           # client address for rate limiting (§5.5)
       XFF_DEPTH: "1"                            # trust exactly one proxy hop (Caddy)
       CORE_URL: http://core:3000                # live-call actions, reload triggers, event stream (§3)

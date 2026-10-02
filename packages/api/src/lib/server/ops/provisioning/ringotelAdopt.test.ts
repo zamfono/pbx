@@ -18,7 +18,7 @@ import '../settings/index.js';
 import './index.js';
 
 process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-process.env.ORIGIN = 'https://pbx.example.com';
+process.env.FQDN = 'pbx.example.com';
 
 const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 const confirmed: RunInput = {

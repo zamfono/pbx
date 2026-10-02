@@ -67,8 +67,8 @@ export function crossSiteFormRejection(
   if (isClientEndpoint(pathname) || !isFormSubmission(request)) {
     return null;
   }
-  // `Origin` is serialised canonically (RFC 6454 §6.1), so it is compared with the configured
-  // value's own origin, which drops a trailing slash or path an operator may have written.
+  // `Origin` is serialised canonically (RFC 6454 §6.1), so it is compared with the stack's
+  // origin in the same form, its host name lowercased as an operator may not have written it.
   if (request.headers.get('origin') === new URL(requiredOrigin()).origin) {
     return null;
   }

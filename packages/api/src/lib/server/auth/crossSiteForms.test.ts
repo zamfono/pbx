@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { crossSiteFormRejection } from './crossSiteForms.js';
 
-process.env.ORIGIN = 'https://pbx.example.com';
+process.env.FQDN = 'pbx.example.com';
 
 const STATUS_FORBIDDEN = 403;
 

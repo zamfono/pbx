@@ -128,13 +128,13 @@ describe('relayFromSettings', () => {
 });
 
 describe('sendMail', () => {
-  const originalOrigin = process.env.ORIGIN;
+  const originalFqdn = process.env.FQDN;
 
   afterEach(() => {
-    if (originalOrigin === undefined) {
-      delete process.env.ORIGIN;
+    if (originalFqdn === undefined) {
+      delete process.env.FQDN;
     } else {
-      process.env.ORIGIN = originalOrigin;
+      process.env.FQDN = originalFqdn;
     }
   });
 
@@ -314,8 +314,8 @@ describe('sendMail', () => {
     expect(result).toBe('skipped');
   });
 
-  it('renders a non-empty fqdn from ORIGIN', async () => {
-    process.env.ORIGIN = 'https://pbx.example.test';
+  it('renders a non-empty fqdn from FQDN', async () => {
+    process.env.FQDN = 'pbx.example.test';
     const db = await migratedDb();
     await insertSettings(db, { smtpHost: 'smtp.example.test' });
     await insertUser(db, 'u1', 'user@example.test');

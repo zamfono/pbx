@@ -52,7 +52,7 @@ export function assertHashOrRelay(env: NodeJS.ProcessEnv): void {
 /** Mailing the setup link needs a real origin to build an absolute URL a mail client can open. */
 export function assertOriginWhenMailingSetupLink(env: NodeJS.ProcessEnv): void {
   if (!env.BOOTSTRAP_OWNER_PASSWORD_HASH) {
-    requiredEnv(env, 'ORIGIN');
+    requiredEnv(env, 'FQDN');
   }
 }
 

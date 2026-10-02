@@ -224,7 +224,7 @@ export const SERVER_INFO_META = {
     name: 'zamfono',
     title: 'Zamfono',
     // Mirrors `results.ts`'s own `SERVER_INFO`: the test process sets neither version variable
-    // either, so both resolve the same fallback (§7 "Version"), nor `ORIGIN`, so it has no icons.
+    // either, so both resolve the same fallback (§7 "Version"), nor `FQDN`, so it has no icons.
     version: resolveVersion(process.env).display,
     websiteUrl: 'https://github.com/zamfono/pbx'
   }

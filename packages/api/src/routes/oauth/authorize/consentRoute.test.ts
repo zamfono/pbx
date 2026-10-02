@@ -16,12 +16,13 @@ import { load } from './+page.server.js';
 import { approveConsentSubmit } from './consentSubmit.js';
 
 const KEY_BYTE_LENGTH = 32;
-const ORIGIN = 'https://pbx.example.com';
+const FQDN = 'pbx.example.com';
+const ORIGIN = `https://${FQDN}`;
 const REDIRECT_A = 'https://a.example.com/callback';
 const REDIRECT_B = 'https://b.example.com/callback';
 
 process.env.DB_FILE = ':memory:';
-process.env.ORIGIN = ORIGIN;
+process.env.FQDN = FQDN;
 process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
 
 function clientIdFor(name: string, redirectUri: string): string {

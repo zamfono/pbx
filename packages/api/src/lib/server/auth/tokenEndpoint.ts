@@ -20,7 +20,7 @@ const BEARER_TOKEN_TYPE = 'Bearer';
 export type TokenDeps = BaseDeps & {
   jwtSecret: string;
   codes: AuthCodeStore;
-  /** The stack's `ORIGIN` (§6.3), which names the one resource tokens are issued for. */
+  /** The stack's own origin, `https://${FQDN}` (§6.3), which names the one resource tokens are issued for. */
   origin: string;
 };
 

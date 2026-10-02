@@ -17,7 +17,7 @@ const RESET_ADDRESS_LIMIT = 30;
 const RESET_ACCOUNT_LIMIT = 3;
 
 process.env.DB_FILE = ':memory:';
-process.env.ORIGIN = 'https://pbx.example.com';
+process.env.FQDN = 'pbx.example.com';
 process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
 
 const current: { event: RequestEvent | undefined } = { event: undefined };

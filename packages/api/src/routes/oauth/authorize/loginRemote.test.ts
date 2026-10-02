@@ -16,7 +16,7 @@ const KEY_BYTE_LENGTH = 32;
 const LOGIN_ADDRESS_LIMIT = 60;
 
 process.env.DB_FILE = ':memory:';
-process.env.ORIGIN = 'https://pbx.example.com';
+process.env.FQDN = 'pbx.example.com';
 process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
 
 const current: { event: RequestEvent | undefined } = { event: undefined };

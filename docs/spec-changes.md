@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-02 · §6.3 Compose stack, §10.3 System, §10.5 Protocol revision.** `api` receives `FQDN` from `.env`, as `proxy` does, and builds its public origin `https://<FQDN>` (the OAuth issuer, the MCP resource, the redirect and link base, the icons' base) itself; the compose file no longer hands it `ORIGIN`. Operators still set only `FQDN`.
+*Why:* requested by the product owner: the api received the FQDN as a URL and parsed it back; SvelteKit 3 no longer reads ORIGIN.
+
 **2026-10-02 · §6.3 Compose stack, §10 Node.js Application.** `api` runs on SvelteKit 3: server-only modules are imported through the `#lib` subpath import (package.json `imports`) instead of the `$lib` alias, and `ORIGIN` is only `api`'s own configuration (the OAuth issuer, redirect and link base), no longer read by adapter-node, which takes the origin of each request from the `Host` header Caddy passes through.
 *Why:* requested by the product owner: SvelteKit 3 was published, and the codebase follows its conventions.
 
