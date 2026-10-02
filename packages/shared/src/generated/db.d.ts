@@ -330,6 +330,7 @@ export interface Settings {
   clir: Generated<number>;
   codecsJson: Generated<string>;
   companyName: string;
+  configPropagationPending: Generated<number>;
   country: string;
   emergencyNumbersJson: string;
   extLength: Generated<number>;

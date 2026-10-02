@@ -9,7 +9,7 @@ import { sendMail } from '#lib/server/mail/index.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { pushRoster } from '../roster.js';
-import { afterPropagation, propagate, recordChange } from '../runner.js';
+import { afterCommit, propagate, recordChange } from '../runner.js';
 import { defineOperation, type Context } from '../types.js';
 import {
   assertExtensionAvailable,
@@ -115,7 +115,7 @@ export const create = defineOperation({
     const setupLink = setupLinkFor(raw);
     // Started once the write has committed, never after a rollback, and not awaited:
     // `sendMail`'s in-process retries (§10.2 "Failure") run over several minutes.
-    afterPropagation(ctx, db => {
+    afterCommit(ctx, db => {
       sendMail(db, keyringFromEnv(env), {
         kind: 'setup',
         to: { userId: id },

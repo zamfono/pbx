@@ -4,7 +4,7 @@ import { newId } from '@zamfono/shared';
 
 import { queueRun } from '#lib/server/jobs/cron.js';
 
-import { afterPropagation, setUndoable } from '../runner.js';
+import { afterCommit, setUndoable } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import { loadLiveTarget, runToWire, type BackupRunWire } from './_shared.js';
 
@@ -63,7 +63,7 @@ export const runsStart = defineOperation<Input, BackupRunWire>({
       .where('id', '=', id)
       .executeTakeFirstOrThrow();
     // After the commit: the scheduler reads the row outside this transaction.
-    afterPropagation(ctx, () =>
+    afterCommit(ctx, () =>
       Promise.resolve(
         queueRun(row)
           ? null

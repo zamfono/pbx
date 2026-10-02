@@ -15,7 +15,7 @@ import {
   recordOutcome,
   type OutcomeCaller
 } from '../outcomeLog.js';
-import { afterPropagation } from '../runner.js';
+import { afterCommit, afterPropagation } from '../runner.js';
 import type { Context } from '../types.js';
 
 const log = pino({ name: 'ringotel' });
@@ -124,7 +124,7 @@ export function reportPush(
   result: PushOutcome
 ): void {
   const caller = callerOf(ctx);
-  afterPropagation(ctx, async db => {
+  afterCommit(ctx, async db => {
     await auditPush(db, caller, push, result);
     return pushWarning(push, result);
   });

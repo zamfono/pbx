@@ -194,6 +194,14 @@ why the specified behaviour changed; the commit history, how.
 - When `core` did not take the message-waiting update that follows marking a voicemail read or
   deleting it, the phones' voicemail lamp stayed as it was without a word in any log. `api` now
   logs a warning, and sends the update only once the change is stored.
+- When a configuration change was stored but did not reach Asterisk, for example because `core`
+  did not answer, the request still succeeded without a word, nothing tried again until the next
+  change, and a new Ringotel device was pushed to Ringotel although Asterisk did not know it yet.
+  The result now carries a warning naming the failure, `api` retries until Asterisk has the
+  configuration, and the Ringotel pushes of such a change wait until it has. `/healthz` shows a
+  propagation still owed as `configPropagationPending`, and `/metrics` as
+  `zamfono_config_propagation_pending`, with the failures in
+  `zamfono_config_propagation_failures_total`.
 
 ### Upgrade notes
 

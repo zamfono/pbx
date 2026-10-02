@@ -1,8 +1,8 @@
 /**
  * `GET /metrics` (§7 "Metrics"): Prometheus text exposition of active calls, registered
  * devices, trunk registration and capacity, ARI connection state, API request latency,
- * database size, backup freshness, recording-mix failures, certificate-sync status and what is
- * known of updates.
+ * database size, backup freshness, recording-mix failures, certificate-sync status, config
+ * propagation and what is known of updates.
  */
 import { stat } from 'node:fs/promises';
 
@@ -15,6 +15,7 @@ import {
 
 import type { CertSyncStatus } from './jobs/certSync.js';
 import { updateNews } from './ops/system/_state.js';
+import { isPropagationPending } from './propagationPending.js';
 
 /* eslint-disable no-magic-numbers -- Prometheus's suggested latency-histogram bucket bounds, meaningful only as this literal list */
 const API_REQUEST_SECONDS_BUCKETS = [
@@ -69,11 +70,32 @@ export function recordApiRequestSeconds(seconds: number): void {
   });
 }
 
-/** Test-only: clears the accumulator between cases. */
+// The config propagations that failed since `api` started (§3.1), counted where they fail.
+const configPropagation = { failures: 0 };
+
+/** Counts one failed config propagation for `zamfono_config_propagation_failures_total`. */
+export function recordConfigPropagationFailure(): void {
+  configPropagation.failures += 1;
+}
+
+/** Test-only: clears the accumulators between cases. */
 export function resetMetricsAccumulators(): void {
   apiRequestSeconds.bucketCounts.fill(0);
   apiRequestSeconds.sum = 0;
   apiRequestSeconds.count = 0;
+  configPropagation.failures = 0;
+}
+
+/** §3.1 "Config propagation": whether one is owed, and the failures since `api` started. */
+async function configPropagationLines(db: Db): Promise<string[]> {
+  return [
+    ...gaugeLines(
+      'zamfono_config_propagation_pending',
+      (await isPropagationPending(db)) ? 1 : 0
+    ),
+    '# TYPE zamfono_config_propagation_failures_total counter',
+    `zamfono_config_propagation_failures_total ${configPropagation.failures}`
+  ];
 }
 
 /** §10.2 "Best effort": the mixes `core`'s recorder failed since it started. Without a reading
@@ -234,6 +256,7 @@ export async function renderMetrics(deps: MetricsDeps): Promise<string> {
       deps.certSyncStatus() === 'ok' ? 1 : 0
     ),
     ...recordingMixFailureLines(state),
+    ...(await configPropagationLines(deps.db)),
     ...(await updateLines(deps.db)),
     ...buildInfoLines(deps.version)
   ];

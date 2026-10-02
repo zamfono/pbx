@@ -2,9 +2,10 @@ import { newId, nowIso, type Db, type ReloadKind } from '@zamfono/shared';
 
 import {
   runAfterPropagationHooks,
+  runWaitingHooks,
   takeAfterPropagationHooks,
   withWarnings,
-  type AfterPropagationHook
+  type AfterPropagationStep
 } from './afterPropagationHooks.js';
 import {
   beginAudit,
@@ -31,7 +32,7 @@ export {
   setUndoable
 } from './audit.js';
 export { onPropagate, propagate } from './propagationHooks.js';
-export { afterPropagation } from './afterPropagationHooks.js';
+export { afterCommit, afterPropagation } from './afterPropagationHooks.js';
 export { onRollback } from './rollbackHooks.js';
 
 /** What the runner needs beyond the operation's own input to build a `Context` (§10.3). */
@@ -167,7 +168,7 @@ type Committed = {
   output: unknown;
   kinds: ReloadKind[];
   propagates: boolean;
-  after: AfterPropagationHook[];
+  after: AfterPropagationStep[];
 };
 
 /**
@@ -216,7 +217,8 @@ async function executeInTransaction(
  * and its confirmation gate (409), runs it in one transaction with its audit row, then, for a
  * non-`readOnly` operation that requested reload kinds via `propagate()`, notifies every
  * `onPropagate` hook with the deduplicated set once the transaction has committed (§10.3, §3.1).
- * The operation's own result is returned once the commit succeeds, whatever the hooks report.
+ * The operation's own result is returned once the commit succeeds, whatever the hooks report; a
+ * failed propagation is a warning of it.
  */
 export async function runOperation<In, Out>(
   db: Db,
@@ -239,12 +241,21 @@ export async function runOperation<In, Out>(
   // where the accumulated kinds ask for them. An operation that names no kind still propagates
   // when it called `propagate`, since a DID, a menu, an outbound route or an out-of-office rule
   // changes what `core` routes on without changing anything Asterisk holds.
+  // A failed propagation is the result's first warning, and `api` owes it until one succeeds;
+  // a successful one first runs what waited for an owed one.
+  let propagationFailure: string | null = null;
   if (!op.readOnly && propagates) {
-    await notifyPropagation(name, kinds);
+    propagationFailure = await notifyPropagation(name, kinds);
+    if (propagationFailure === null) {
+      await runWaitingHooks(db);
+    }
   }
-  // What had to wait for Asterisk to hold the write (`afterPropagation`), such as Ringotel
+  // What had to wait for the commit or for Asterisk to hold the write, such as Ringotel
   // registering a new device; its problems are the result's warnings, since the write stands.
-  return withWarnings(output, await runAfterPropagationHooks(db, after)) as Out;
+  return withWarnings(
+    output,
+    await runAfterPropagationHooks(db, after, propagationFailure)
+  ) as Out;
 }
 /* eslint-enable @typescript-eslint/no-unused-vars */
 /* eslint-enable @typescript-eslint/no-unnecessary-type-parameters */

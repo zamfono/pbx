@@ -6,7 +6,7 @@ import { issueResetToken } from '#lib/server/auth/tokens.js';
 import { sendMail } from '#lib/server/mail/index.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
-import { afterPropagation, setUndoable } from '../runner.js';
+import { afterCommit, setUndoable } from '../runner.js';
 import { defineOperation } from '../types.js';
 import { setupLinkFor } from './_setupMail.js';
 import { liveUser } from './_shared.js';
@@ -32,7 +32,7 @@ export const resetPassword = defineOperation({
     );
     const link = setupLinkFor(raw);
     // Sent once the write has committed, never after a rollback; not awaited, as in `users.create`.
-    afterPropagation(ctx, db => {
+    afterCommit(ctx, db => {
       sendMail(db, keyringFromEnv(env), {
         kind: 'reset',
         to: { userId: input.id },

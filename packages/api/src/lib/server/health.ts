@@ -5,6 +5,7 @@ import { isDbOpen, pendingMigrations, type Db } from '@zamfono/shared';
 import { ENC_COLUMNS } from './jobs/keyRotation.js';
 import { updateNews } from './ops/system/_state.js';
 import { hasEmergencyTrunk } from './ops/trunks/_shared.js';
+import { isPropagationPending } from './propagationPending.js';
 import { isProfilePending } from './provisioning/profilePending.js';
 import type { Keyring } from './secretbox.js';
 
@@ -33,6 +34,11 @@ export type ApiHealth = {
    * yet (§10.4 "Tenant profile push").
    */
   ringotelProfilePending: boolean;
+  /**
+   * Whether a config propagation failed and none has succeeded since, so Asterisk may run on an
+   * older configuration than the one stored (§3.1 "Config propagation").
+   */
+  configPropagationPending: boolean;
   /**
    * Whether an automatic update failed, from its first failed attempt until an update succeeds;
    * `false` without an updater, which automatic updates need (§6.3 "Automatic updates"). What
@@ -138,10 +144,13 @@ async function emergencyTrunkPresent(db: Db): Promise<boolean> {
   }
 }
 
-/** `isProfilePending`, or `false` for a database without the column or row yet. */
-async function profilePending(db: Db): Promise<boolean> {
+/** `pending(db)`, or `false` for a database without the column or row yet. */
+async function markerSet(
+  db: Db,
+  pending: (db: Db) => Promise<boolean>
+): Promise<boolean> {
   try {
-    return await isProfilePending(db);
+    return await pending(db);
   } catch {
     return false;
   }
@@ -158,7 +167,10 @@ export async function apiHealth(deps: ApiHealthDeps): Promise<ApiHealth> {
   const migrated = dbOpen && pending !== null && pending.length === 0;
   const mail = dbOpen ? await mailConfigured(deps.db) : 'notConfigured';
   const emergencyTrunk = dbOpen && (await emergencyTrunkPresent(deps.db));
-  const ringotelProfilePending = dbOpen && (await profilePending(deps.db));
+  const ringotelProfilePending =
+    dbOpen && (await markerSet(deps.db, isProfilePending));
+  const configPropagationPending =
+    dbOpen && (await markerSet(deps.db, isPropagationPending));
   const autoUpdateFailed =
     dbOpen && (await updateNews(deps.db)).autoUpdateFailed;
   const core = await deps.checkCore();
@@ -172,6 +184,7 @@ export async function apiHealth(deps: ApiHealthDeps): Promise<ApiHealth> {
     certificateSync: deps.certificateSync,
     emergencyTrunk,
     ringotelProfilePending,
+    configPropagationPending,
     autoUpdateFailed
   };
 }

@@ -57,7 +57,8 @@ describe('restoreProvisionedDevices', () => {
     expect(created).toHaveLength(0);
     const hooks = takeAfterPropagationHooks(ctx);
     expect(hooks).toHaveLength(1);
-    expect(await hooks[0]?.(db)).toBeNull();
+    expect(hooks[0]?.waitsForAsterisk).toBe(true);
+    expect(await hooks[0]?.hook(db)).toBeNull();
     // §10.4: `onDeviceCreated` is what recovers a user deleted inside Ringotel's 24-hour window
     // and creates a fresh one after it, so a restore goes through the same door a create does.
     expect(created.map(device => device.id)).toEqual(['dev-1']);

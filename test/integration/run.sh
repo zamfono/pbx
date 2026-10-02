@@ -8,9 +8,9 @@
 #
 # Usage:
 #   bash test/integration/run.sh
-#     A full run: every prerequisite (bring-up, tenant configuration), every
-#     named step (steps.sh, trunk-status.sh, cert-sync.sh) and every scenario under scenarios/, in
-#     the same order this file always ran them in. cert-sync always runs last.
+#     A full run: every prerequisite (bring-up, tenant configuration), every named step
+#     (steps.sh, trunk-status.sh, propagation-owed.sh, cert-sync.sh) and every scenario under
+#     scenarios/, in the same order this file always ran them in. cert-sync always runs last.
 #
 #   ONLY=<glob>[,<glob>...] bash test/integration/run.sh
 #     Only the scenarios and named steps whose name matches one of the (comma-separated) globs —
@@ -130,6 +130,8 @@ OWNER_EMAIL='owner@ci.test'
 . "$here/steps.sh"
 # shellcheck source=trunk-status.sh
 . "$here/trunk-status.sh"
+# shellcheck source=propagation-owed.sh
+. "$here/propagation-owed.sh"
 # shellcheck source=cert-sync.sh
 . "$here/cert-sync.sh"
 # shellcheck source=upgrade.sh
@@ -183,6 +185,10 @@ name_selected updater && step_updater
 
 if shard_owns_steps && name_selected trunk-status; then
   run_trunk_status_step
+fi
+
+if shard_owns_steps && name_selected propagation-owed; then
+  run_propagation_owed_step
 fi
 
 # Last (see cert-sync.sh's own comment for why): every sipp scenario, including device-tls-srtp,

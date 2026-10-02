@@ -9,7 +9,7 @@ import { transcodeForDownload } from '#lib/server/audio/transcode.js';
 import { createCoreClient, type CoreClient } from '#lib/server/coreClient.js';
 import { mediaDirFromEnv } from '#lib/server/mediaDir.js';
 
-import { afterPropagation } from '../afterPropagationHooks.js';
+import { afterCommit } from '../afterPropagationHooks.js';
 import { OpError, type Context, type Role } from '../types.js';
 
 const logger = pino({ name: 'voicemails' });
@@ -189,7 +189,7 @@ export function setCoreClientForTest(client: CoreClient): void {
  * failure leaves the lamp as it was until the mailbox next changes, and is logged.
  */
 export function notifyMwi(ctx: Context, mailbox: MwiMailbox): void {
-  afterPropagation(ctx, () => {
+  afterCommit(ctx, () => {
     coreClient.mwi(mailbox).catch((error: unknown) => {
       logger.warn({ err: error, mailbox }, 'MWI update failed');
     });

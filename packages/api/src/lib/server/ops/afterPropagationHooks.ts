@@ -1,42 +1,68 @@
+import pino from 'pino';
+
 import type { Db } from '@zamfono/shared';
 
 import { errorMessage } from '../errors.js';
 import type { Context } from './types.js';
 
 /**
- * A step that must wait until the operation's write has committed and its configuration reached
- * Asterisk (§3.1 "Config propagation"): an effect elsewhere that depends on Asterisk already
- * holding the write, such as Ringotel registering a device's new SIP credentials (§10.4), or one
- * that must not happen for a write that rolls back, such as a user's setup mail. It gets
- * the database outside the transaction, which has ended, and answers `null`, or a warning for
- * the operation's result: the write stands whatever the step reports, so it cannot fail the call.
+ * A step that runs once the operation's write has committed, outside its transaction, which has
+ * ended: an effect that must not happen for a write that rolls back, such as a user's setup mail
+ * (`afterCommit`), or one that also depends on Asterisk already holding the write, such as
+ * Ringotel registering a device's new SIP credentials (§10.4, `afterPropagation`). It answers
+ * `null`, or a warning for the operation's result: the write stands whatever the step reports, so
+ * it cannot fail the call.
  */
 export type AfterPropagationHook = (db: Db) => Promise<string | null>;
 
-const hooks = new WeakMap<Context, AfterPropagationHook[]>();
+/** A registered step, and whether it waits for Asterisk to hold the write (§3.1). */
+export type AfterPropagationStep = {
+  hook: AfterPropagationHook;
+  waitsForAsterisk: boolean;
+};
 
-/** Registers `hook` to run once `ctx`'s operation has committed and propagated (§3.1). */
+const steps = new WeakMap<Context, AfterPropagationStep[]>();
+
+// ponytail: in memory, so an `api` restart drops what waits; the writes and their warnings stand.
+// The steps that wait for a propagation `api` still owes (§3.1), oldest first.
+const waiting: AfterPropagationHook[] = [];
+
+const log = pino({ name: 'ops.runner' });
+
+function register(ctx: Context, step: AfterPropagationStep): void {
+  const list = steps.get(ctx) ?? [];
+  list.push(step);
+  steps.set(ctx, list);
+}
+
+/**
+ * Registers `hook` to run once `ctx`'s operation has committed and its configuration reached
+ * Asterisk (§3.1 "Config propagation"); while that propagation is owed, it waits for it.
+ */
 export function afterPropagation(
   ctx: Context,
   hook: AfterPropagationHook
 ): void {
-  const list = hooks.get(ctx) ?? [];
-  list.push(hook);
-  hooks.set(ctx, list);
+  register(ctx, { hook, waitsForAsterisk: true });
+}
+
+/** Registers `hook` to run once `ctx`'s operation has committed, whatever its propagation did. */
+export function afterCommit(ctx: Context, hook: AfterPropagationHook): void {
+  register(ctx, { hook, waitsForAsterisk: false });
 }
 
 /** Notes `warning`, found while `ctx`'s operation writes, for its result: it joins the hooks'
  * warnings, since the write it warns about stands. */
 export function noteWarning(ctx: Context, warning: string): void {
-  afterPropagation(ctx, () => Promise.resolve(warning));
+  afterCommit(ctx, () => Promise.resolve(warning));
 }
 
-/** Takes `ctx`'s hooks for the runner, in registration order, and forgets them. */
+/** Takes `ctx`'s steps for the runner, in registration order, and forgets them. */
 export function takeAfterPropagationHooks(
   ctx: Context
-): AfterPropagationHook[] {
-  const list = hooks.get(ctx) ?? [];
-  hooks.delete(ctx);
+): AfterPropagationStep[] {
+  const list = steps.get(ctx) ?? [];
+  steps.delete(ctx);
   return list;
 }
 
@@ -44,7 +70,7 @@ export function takeAfterPropagationHooks(
  * Runs `list` one after the other and returns their warnings. A hook that throws is a warning
  * too, carrying its message, since the operation it follows has already committed.
  */
-export async function runAfterPropagationHooks(
+async function runInOrder(
   db: Db,
   list: AfterPropagationHook[]
 ): Promise<string[]> {
@@ -59,6 +85,51 @@ export async function runAfterPropagationHooks(
     }
   }
   return warnings;
+}
+
+/**
+ * Runs the steps that waited for an owed propagation, once one succeeded (§3.1). Their
+ * operations have answered already, so their warnings go to the log.
+ */
+export async function runWaitingHooks(db: Db): Promise<void> {
+  const warnings = await runInOrder(db, waiting.splice(0));
+  for (const warning of warnings) {
+    log.warn({ warning }, 'a step that waited for config propagation warns');
+  }
+}
+
+/**
+ * Runs `list`, `ctx`'s steps, once its write committed and returns their warnings.
+ * `propagationFailure`, the reason its propagation failed, or `null`, is the first warning; while
+ * a propagation is owed, by this write or one before it, the steps that wait for Asterisk join
+ * the waiting ones, ahead of anything that awaits, so the next successful propagation finds them.
+ */
+export async function runAfterPropagationHooks(
+  db: Db,
+  list: AfterPropagationStep[],
+  propagationFailure: string | null
+): Promise<string[]> {
+  const owed = propagationFailure !== null || waiting.length > 0;
+  const now: AfterPropagationHook[] = [];
+  for (const step of list) {
+    if (owed && step.waitsForAsterisk) {
+      waiting.push(step.hook);
+    } else {
+      now.push(step.hook);
+    }
+  }
+  const warnings: string[] = [];
+  if (propagationFailure !== null) {
+    warnings.push(
+      `the change is stored but has not reached Asterisk (${propagationFailure}); api retries it until it does`
+    );
+  }
+  if (now.length < list.length) {
+    warnings.push(
+      'what waits for Asterisk to hold the change, such as a Ringotel push, runs once it does'
+    );
+  }
+  return [...warnings, ...(await runInOrder(db, now))];
 }
 
 /** `output` with `warnings` appended to any it already carries; a non-object passes unchanged. */
