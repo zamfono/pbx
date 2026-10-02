@@ -30,8 +30,6 @@ const SET_PASSWORD_PATH = '/auth/set-password';
 
 type EmergencyNumbersTable = Record<string, string[]>;
 
-// A JSON import attribute, not a Vite-only glob, so the module loads the same under any bundler
-// or none (`package.json`'s `build` bundles `server.ts` through esbuild, with no Vite transform).
 const EMERGENCY_NUMBERS_TABLE: EmergencyNumbersTable = rawEmergencyNumbers;
 
 /** Owner row created at first boot (§6.3 "First boot"). */

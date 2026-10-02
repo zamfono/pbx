@@ -1,8 +1,6 @@
 /// <reference types="vite/client" />
 import type { MailKind } from '@zamfono/shared';
 
-import { BUILTIN_TEMPLATES } from './builtinIndex.js';
-
 /** §10.2 "Templates": the mail kinds `api` renders, one shipped template per kind and language. */
 export type TemplateKind = MailKind;
 
@@ -76,10 +74,20 @@ export const PLACEHOLDERS: Record<
   }
 };
 
+// The shipped templates (§10.2 "Templates"), bundled into the server at build time.
+const BUILTIN_TEMPLATES = import.meta.glob<TemplateSource>('./builtin/*.json', {
+  eager: true,
+  import: 'default'
+});
+
 /** The shipped `builtin/<kind>.<language>.json` template (§10.2 "Templates"). */
 export function loadBuiltinTemplate(
   kind: TemplateKind,
   language: Language
 ): TemplateSource {
-  return BUILTIN_TEMPLATES[`${kind}.${language}`];
+  const source = BUILTIN_TEMPLATES[`./builtin/${kind}.${language}.json`];
+  if (source === undefined) {
+    throw new Error(`mail: no shipped template ${kind}.${language}`);
+  }
+  return source;
 }
