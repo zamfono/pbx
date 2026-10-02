@@ -34,20 +34,32 @@ export function extensionOf(snapshot: Snapshot, owner: Owner): string | null {
 
 /** `groupId`'s member user ids in ring order: `ring_group_members` rows taken directly, and each
  * user-group row flattened through `user_group_users`/`user_group_groups` (nested groups
- * included) by `routing/ringGroup.ts`'s `expandMembers`, soft-deleted users dropped (§10.1 step 5,
- * §11.2 `ring_group_members`'s exclusive arc `user_id`/`user_group_id`). */
+ * included) by `routing/ringGroup.ts`'s `expandMembers`, soft-deleted users and user groups
+ * dropped (§5.9, §10.1 step 5, §11.2 `ring_group_members`'s exclusive arc
+ * `user_id`/`user_group_id`). */
 export function groupMemberUserIds(
   snapshot: Snapshot,
   groupId: string
 ): string[] {
+  // The snapshot holds live user groups only, while their link rows outlive a soft delete.
+  const liveGroupIds = new Set(snapshot.userGroups.map(group => group.id));
   const userGroupUsers = new Map<string, string[]>();
   for (const row of snapshot.userGroupUsers) {
+    if (!liveGroupIds.has(row.groupId)) {
+      continue;
+    }
     const list = userGroupUsers.get(row.groupId) ?? [];
     list.push(row.userId);
     userGroupUsers.set(row.groupId, list);
   }
   const userGroupGroups = new Map<string, string[]>();
   for (const row of snapshot.userGroupGroups) {
+    if (
+      !liveGroupIds.has(row.parentGroupId) ||
+      !liveGroupIds.has(row.childGroupId)
+    ) {
+      continue;
+    }
     const list = userGroupGroups.get(row.parentGroupId) ?? [];
     list.push(row.childGroupId);
     userGroupGroups.set(row.parentGroupId, list);

@@ -50,17 +50,22 @@ export function buildRoutes(snapshot: Snapshot): Route[] {
 /**
  * The groups `userId` matches for route caller lists (§9.4 "Outbound routing"): direct
  * memberships plus every ancestor group they nest under, so a route naming the parent group
- * matches a member of one of its nested subgroups too.
+ * matches a member of one of its nested subgroups too. A soft-deleted group is skipped (§5.9): the
+ * snapshot holds live user groups only, while their link rows outlive the delete.
  */
 export function callerGroupIds(userId: string, snapshot: Snapshot): string[] {
+  const liveGroupIds = new Set(snapshot.userGroups.map(group => group.id));
   const parentsOf = new Map<string, string[]>();
   for (const row of snapshot.userGroupGroups) {
+    if (!liveGroupIds.has(row.parentGroupId)) {
+      continue;
+    }
     const parents = parentsOf.get(row.childGroupId) ?? [];
     parents.push(row.parentGroupId);
     parentsOf.set(row.childGroupId, parents);
   }
   const queue = snapshot.userGroupUsers
-    .filter(row => row.userId === userId)
+    .filter(row => row.userId === userId && liveGroupIds.has(row.groupId))
     .map(row => row.groupId);
   const result = new Set<string>();
   // `queue.push` below extends the array the `for...of` iterator is still walking, so later

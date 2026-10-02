@@ -263,6 +263,9 @@ why the specified behaviour changed; the commit history, how.
   could read and delete the group's voicemails, and they got its `voicemail.new` events and
   voicemail mails. A soft-deleted group is now skipped until it is restored, as a soft-deleted
   user already was.
+- A ring group still rang the members of a soft-deleted user group in it, nested or not, and an
+  outbound route naming a soft-deleted user group still let its members call over it, until the
+  purge. A soft-deleted user group is now skipped in both until it is restored.
 
 ### Upgrade notes
 
