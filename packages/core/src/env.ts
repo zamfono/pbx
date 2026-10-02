@@ -12,6 +12,7 @@ const DEFAULT_DB_FILE = '/data/zamfono.sqlite3';
 const DEFAULT_MEDIA_DIR = '/media';
 const DEFAULT_CALL_LOG_MAX_BYTES = 1048576;
 const DEFAULT_TZ = 'UTC';
+const DEFAULT_API_INTERNAL_URL = 'http://api:3000';
 const MIN_PORT = 1;
 const MAX_PORT = 65535;
 
@@ -26,9 +27,15 @@ export type CoreEnv = {
   hepEnabled: boolean;
   callLogMaxBytes: number;
   tz: string;
+  /** `STACK_IPV4` and `EXTERNAL_IPV4`, `null` while unset: the addresses the HEP collector counts
+   * as Asterisk's own, besides the `ariUrl` host's (§7). */
+  stackIpv4: string | null;
+  externalIpv4: string | null;
   /** The address the stack writes into SIP (§6.1, §9.1): `EXTERNAL_IPV4` in the ports mode, else
    * `STACK_IPV4`, which the transports bind in the macvlan mode; `null` while neither is set. */
   sipHost: string | null;
+  /** `api`'s internal HTTP API, where `core` posts its mail requests (§3.1 "Mail"). */
+  apiInternalUrl: string;
 };
 
 function requireEnv(env: NodeJS.ProcessEnv, name: string): string {
@@ -81,15 +88,10 @@ function parseTz(raw: string | undefined): string {
   return raw ?? DEFAULT_TZ;
 }
 
-/** `EXTERNAL_IPV4`, else `STACK_IPV4`, the Asterisk entrypoint's order; `null` for neither. */
-function parseSipHost(env: NodeJS.ProcessEnv): string | null {
-  // An empty value is unset: compose.yaml hands both to `core` as `${…:-}`.
-  for (const value of [env.EXTERNAL_IPV4, env.STACK_IPV4]) {
-    if (value !== undefined && value !== '') {
-      return value;
-    }
-  }
-  return null;
+/** An address variable, `null` while unset: compose.yaml hands `STACK_IPV4` and `EXTERNAL_IPV4`
+ * to `core` as `${…:-}`, so an empty value is unset too. */
+function parseAddress(raw: string | undefined): string | null {
+  return raw === undefined || raw === '' ? null : raw;
 }
 
 // amiHost's port, callLogMaxBytes and tz are validated here and carried on `CoreEnv` for the
@@ -98,6 +100,8 @@ function parseSipHost(env: NodeJS.ProcessEnv): string | null {
 // string 'false' as true.
 export function readEnv(env: NodeJS.ProcessEnv): CoreEnv {
   const ami = parseHostPort(env.AMI_HOST ?? DEFAULT_AMI_HOST);
+  const stackIpv4 = parseAddress(env.STACK_IPV4);
+  const externalIpv4 = parseAddress(env.EXTERNAL_IPV4);
   return {
     ariUrl: env.ARI_URL ?? DEFAULT_ARI_URL,
     ariPassword: requireEnv(env, 'ARI_PASSWORD'),
@@ -109,6 +113,10 @@ export function readEnv(env: NodeJS.ProcessEnv): CoreEnv {
     hepEnabled: env.HEP_ENABLED !== 'false',
     callLogMaxBytes: parseCallLogMaxBytes(env.CALL_LOG_MAX_BYTES),
     tz: parseTz(env.TZ),
-    sipHost: parseSipHost(env)
+    stackIpv4,
+    externalIpv4,
+    // The Asterisk entrypoint's order.
+    sipHost: externalIpv4 ?? stackIpv4,
+    apiInternalUrl: env.API_INTERNAL_URL ?? DEFAULT_API_INTERNAL_URL
   };
 }

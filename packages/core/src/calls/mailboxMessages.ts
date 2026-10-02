@@ -7,6 +7,7 @@
 import type { Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
+import { ASTERISK_MEDIA_DIR } from '../prompts.js';
 import { callerChannel, type Call, type Owner } from './call.js';
 import { playForDigit, type MenuInput } from './mailboxInput.js';
 import {
@@ -18,7 +19,7 @@ import {
 import {
   deleteMessage,
   markRead,
-  VOICEMAIL_DIR,
+  VOICEMAIL_DIR_NAME,
   type MailboxMessage
 } from './mailboxStore.js';
 import type { Pipeline } from './pipeline.js';
@@ -108,9 +109,13 @@ function positionInFolder(messages: MailboxMessage[], index: number): number {
 }
 
 /** The session's store dependencies. */
-function storeDeps(session: MailboxSession): { ari: AriClient; db: Db } {
-  const { ari, db } = session.pipeline.deps;
-  return { ari, db };
+function storeDeps(session: MailboxSession): {
+  ari: AriClient;
+  db: Db;
+  mediaDir: string;
+} {
+  const { ari, db, mediaDir } = session.pipeline.deps;
+  return { ari, db, mediaDir };
 }
 
 /** "New message 2" and the message itself, as one playback a key interrupts. */
@@ -130,7 +135,7 @@ async function playMessage(
         message.folder,
         positionInFolder(session.messages, index)
       ),
-      `sound:${VOICEMAIL_DIR}/${base}`
+      `sound:${ASTERISK_MEDIA_DIR}/${VOICEMAIL_DIR_NAME}/${base}`
     ],
     0
   );

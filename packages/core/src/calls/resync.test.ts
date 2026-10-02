@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
@@ -110,8 +110,7 @@ describe('resyncOnBoot', () => {
       ari,
       now: nowIso,
       pipeline: new Pipeline(testPipelineDeps(ari, db)),
-      log: noopLogger,
-      voicemailDir: '/nonexistent'
+      log: noopLogger
     });
 
     const rows = await db
@@ -140,8 +139,7 @@ describe('resyncOnBoot', () => {
       ari,
       now: nowIso,
       pipeline: new Pipeline(testPipelineDeps(ari, db)),
-      log: noopLogger,
-      voicemailDir: '/nonexistent'
+      log: noopLogger
     });
     expect(hungUp(caller.id)).toBe(false);
     expect(hungUp(callee.id)).toBe(false);
@@ -170,8 +168,7 @@ describe('resyncOnBoot', () => {
       ari,
       now: nowIso,
       pipeline: new Pipeline(testPipelineDeps(ari, db)),
-      log: noopLogger,
-      voicemailDir: '/nonexistent'
+      log: noopLogger
     });
 
     expect(hungUp(parked.id)).toBe(true);
@@ -180,8 +177,10 @@ describe('resyncOnBoot', () => {
 
   it('deletes voicemail files without a voicemails row and keeps the others', async () => {
     const userId = await seedUser(db);
-    const dir = await mkdtemp(path.join(os.tmpdir(), 'zamfono-vm-'));
-    onTestFinished(() => rm(dir, { recursive: true, force: true }));
+    const mediaDir = await mkdtemp(path.join(os.tmpdir(), 'zamfono-media-'));
+    onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));
+    const dir = path.join(mediaDir, 'voicemail');
+    await mkdir(dir);
     await writeFile(path.join(dir, 'kept.wav'), 'RIFF');
     await writeFile(path.join(dir, 'orphan.wav'), 'RIFF');
     await writeFile(path.join(dir, 'notes.txt'), 'x');
@@ -203,9 +202,8 @@ describe('resyncOnBoot', () => {
       db,
       ari,
       now: nowIso,
-      pipeline: new Pipeline(testPipelineDeps(ari, db)),
-      log: noopLogger,
-      voicemailDir: dir
+      pipeline: new Pipeline(testPipelineDeps(ari, db, { mediaDir })),
+      log: noopLogger
     });
 
     const remaining = await readdir(dir);

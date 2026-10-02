@@ -13,7 +13,7 @@ import { logFailure } from '../ari/failures.js';
 import { ActionError, HTTP_UNPROCESSABLE, notBridged } from './actionError.js';
 import { dialAddPartyTarget } from './addParty.js';
 import { resolveAddedTarget } from './addPartyTarget.js';
-import { callLogMaxBytesFromEnv, newCall, type Call } from './call.js';
+import { newCall, type Call } from './call.js';
 import { ownBridge, transferrerChannel } from './callLookup.js';
 import { extensionOf } from './extensionOwner.js';
 import { userOfChannel } from './onwardCall.js';
@@ -61,7 +61,7 @@ export async function newAddedLeg(
     to: req.target,
     startedAt: pipeline.deps.now(),
     logLevel: running.log.level,
-    callLogMaxBytes: callLogMaxBytesFromEnv()
+    callLogMaxBytes: pipeline.deps.callLogMaxBytes
   });
   leg.callerUserId = callerUserId;
   leg.addedLeg = true;

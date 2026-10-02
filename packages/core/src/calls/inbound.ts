@@ -13,7 +13,6 @@ import {
 import { targetFromRow, type ForwardTarget } from '../routing/targets.js';
 import { announce } from './announce.js';
 import {
-  callLogMaxBytesFromEnv,
   endTargetOwner,
   newCall,
   raiseLogLevel,
@@ -150,7 +149,7 @@ export async function handleInboundStart(
     to: called,
     startedAt: pipeline.deps.now(),
     logLevel: toLogLevel(snapshot.settings.callLogLevel),
-    callLogMaxBytes: callLogMaxBytesFromEnv()
+    callLogMaxBytes: pipeline.deps.callLogMaxBytes
   });
   // §7: the delivering trunk's diagnostics override counts toward the call's level.
   raiseLogLevel(

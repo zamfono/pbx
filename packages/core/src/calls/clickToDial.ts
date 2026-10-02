@@ -10,12 +10,7 @@ import type { Channel } from '../ari/types.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import { withClir, type DialAction } from '../routing/outbound.js';
-import {
-  callLogMaxBytesFromEnv,
-  newCall,
-  raiseLogLevel,
-  type Call
-} from './call.js';
+import { newCall, raiseLogLevel, type Call } from './call.js';
 import { extensionOf } from './extensionOwner.js';
 import {
   dispatchAction,
@@ -55,7 +50,7 @@ export function newOriginatedCall(
     to: resolved.to,
     startedAt,
     logLevel: logLevelFor(snapshot, resolved.action, startedAt),
-    callLogMaxBytes: callLogMaxBytesFromEnv()
+    callLogMaxBytes: pipeline.deps.callLogMaxBytes
   });
   call.callerUserId = req.userId;
   // §7: the call is routed as the user's own, so their diagnostics override counts toward its level.

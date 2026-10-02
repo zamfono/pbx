@@ -9,12 +9,7 @@ import { newId } from '@zamfono/shared';
 import type { AriEvent, Channel } from '../ari/types.js';
 import { setChannelLanguage } from '../prompts.js';
 import type { DialAction } from '../routing/outbound.js';
-import {
-  callLogMaxBytesFromEnv,
-  newCall,
-  raiseLogLevel,
-  type Call
-} from './call.js';
+import { newCall, raiseLogLevel, type Call } from './call.js';
 import {
   dispatchAction,
   logLevelFor,
@@ -72,7 +67,7 @@ export async function handleOutbound(
     to,
     startedAt: pipeline.deps.now(),
     logLevel: logLevelFor(snapshot, action, pipeline.deps.now()),
-    callLogMaxBytes: callLogMaxBytesFromEnv()
+    callLogMaxBytes: pipeline.deps.callLogMaxBytes
   });
   call.callerUserId =
     transfer === null

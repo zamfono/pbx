@@ -10,7 +10,7 @@ import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { RelayedCallLog } from '../relayedCallLog.js';
 import { ActionError, HTTP_CONFLICT } from './actionError.js';
-import { callLogMaxBytesFromEnv, newCall, type Call } from './call.js';
+import { newCall, type Call } from './call.js';
 import { extensionOf } from './extensionOwner.js';
 import { ringOwnDevices, ringTimeoutOf } from './ownDevices.js';
 import { pickUp, pickupRingOf } from './pickup.js';
@@ -84,13 +84,13 @@ export async function pickupOnRequest(
     to: ext,
     startedAt: pipeline.deps.now(),
     logLevel: target.log.level,
-    callLogMaxBytes: callLogMaxBytesFromEnv()
+    callLogMaxBytes: pipeline.deps.callLogMaxBytes
   });
   host.log = new RelayedCallLog(
     host.id,
     target.log,
     'pickupRing',
-    callLogMaxBytesFromEnv()
+    pipeline.deps.callLogMaxBytes
   );
   const ring = ringOwnDevices(pipeline, {
     host,

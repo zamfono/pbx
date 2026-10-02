@@ -149,7 +149,11 @@ describe('asteriskAddresses', () => {
       .mockResolvedValue([{ address: '10.0.0.5' }, { address: '10.0.0.6' }]);
 
     const addresses = await asteriskAddresses(
-      { STACK_IPV4: '203.0.113.34', ARI_URL: 'http://asterisk:8088' },
+      {
+        stackIpv4: '203.0.113.34',
+        externalIpv4: null,
+        ariUrl: 'http://asterisk:8088'
+      },
       fakeLookup
     );
 
@@ -163,7 +167,7 @@ describe('asteriskAddresses', () => {
     const fakeLookup = vi.fn().mockResolvedValue([{ address: '10.0.0.5' }]);
 
     const addresses = await asteriskAddresses(
-      { ARI_URL: 'http://asterisk:8088' },
+      { stackIpv4: null, externalIpv4: null, ariUrl: 'http://asterisk:8088' },
       fakeLookup
     );
 

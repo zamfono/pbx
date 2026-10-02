@@ -92,6 +92,8 @@ export function testPipelineDeps(
     stackTz: 'UTC',
     stackSipHost: null,
     legStasisWaitMs: STASIS_WAIT_MS,
+    callLogMaxBytes: 1_048_576,
+    mediaDir: '/nonexistent',
     db,
     apiClient: { mail: () => Promise.resolve() },
     logger: noopLogger,

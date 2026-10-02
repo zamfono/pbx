@@ -4,6 +4,7 @@
  * it moved (§9.3 "MWI"). `mailboxMessages.ts` walks them.
  */
 import { unlink } from 'node:fs/promises';
+import path from 'node:path';
 
 import type { Db } from '@zamfono/shared';
 
@@ -13,11 +14,13 @@ import type { Owner } from './call.js';
 import type { Folder } from './mailboxPrompts.js';
 import { refreshMwi } from './voicemailStore.js';
 
-export const VOICEMAIL_DIR = '/media/voicemail';
+/** The voicemail directory under the media volume (§11.6). */
+export const VOICEMAIL_DIR_NAME = 'voicemail';
 
 export type MailboxMessage = { id: string; filename: string; folder: Folder };
 
-type StoreDeps = { ari: AriClient; db: Db };
+/** `mediaDir` is `CoreEnv.mediaDir`, `core`'s own mount of the media volume. */
+type StoreDeps = { ari: AriClient; db: Db; mediaDir: string };
 
 /** The mailbox's messages in walking order: new before old, each folder oldest first. */
 export async function loadMessages(
@@ -71,8 +74,8 @@ export async function deleteMessage(
   message: MailboxMessage
 ): Promise<void> {
   await deps.db.deleteFrom('voicemails').where('id', '=', message.id).execute();
-  await unlink(`${VOICEMAIL_DIR}/${message.filename}`).catch(
-    logFailure(deps.ari.log, 'voicemail file removal')
-  );
+  await unlink(
+    path.join(deps.mediaDir, VOICEMAIL_DIR_NAME, message.filename)
+  ).catch(logFailure(deps.ari.log, 'voicemail file removal'));
   await refreshMwi(deps, owner);
 }

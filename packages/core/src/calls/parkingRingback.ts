@@ -9,7 +9,6 @@ import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import {
-  callLogMaxBytesFromEnv,
   findForwardTarget,
   newCall,
   release,
@@ -202,7 +201,7 @@ export async function ringParkerBack(
     to: parkerExt,
     startedAt: pipeline.deps.now(),
     logLevel: toLogLevel(snapshot.settings.callLogLevel),
-    callLogMaxBytes: callLogMaxBytesFromEnv()
+    callLogMaxBytes: pipeline.deps.callLogMaxBytes
   });
   ringback.calleeUserId = parkerUserId;
   await pipeline.deps.cdr.open(ringback);

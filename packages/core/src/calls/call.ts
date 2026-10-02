@@ -239,8 +239,4 @@ export async function endTargetOwner(
   await release(pipeline, call, fallback.code, fallback.status);
 }
 
-export {
-  callLogMaxBytesFromEnv,
-  raiseLogLevel,
-  toLogLevel
-} from './callLogLevel.js';
+export { raiseLogLevel, toLogLevel } from './callLogLevel.js';

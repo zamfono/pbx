@@ -12,6 +12,7 @@ import { lookup as dnsLookup } from 'node:dns/promises';
 import { MS_PER_SECOND } from '@zamfono/shared';
 
 import type { Logger } from './ari/types.js';
+import type { CoreEnv } from './env.js';
 import { dispatchHep, type HepHandlers } from './hepDispatch.js';
 
 const HEP_MAGIC = 'HEP3';
@@ -57,25 +58,22 @@ async function defaultLookup(host: string): Promise<{ address: string }[]> {
  * itself (spec §7): the stack's own address in macvlan mode
  * (`STACK_IPV4`), the address written into SIP/SDP in ports mode
  * (`EXTERNAL_IPV4`), and every address the `asterisk` service resolves to on
- * the internal network (its `ARI_URL` host) — the address its transports
+ * the internal network (the `ariUrl` host) — the address its transports
  * bind to in ports mode.
  */
 export async function asteriskAddresses(
-  env: Record<string, string | undefined>,
+  env: Pick<CoreEnv, 'ariUrl' | 'stackIpv4' | 'externalIpv4'>,
   lookup: LookupFn = defaultLookup
 ): Promise<Set<string>> {
   const addresses = new Set<string>();
-  for (const value of [env.STACK_IPV4, env.EXTERNAL_IPV4]) {
-    if (value) {
+  for (const value of [env.stackIpv4, env.externalIpv4]) {
+    if (value !== null) {
       addresses.add(value);
     }
   }
-  const ariUrl = env.ARI_URL;
-  if (ariUrl) {
-    const resolved = await lookup(new URL(ariUrl).hostname);
-    for (const { address } of resolved) {
-      addresses.add(address);
-    }
+  const resolved = await lookup(new URL(env.ariUrl).hostname);
+  for (const { address } of resolved) {
+    addresses.add(address);
   }
   return addresses;
 }

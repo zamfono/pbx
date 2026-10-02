@@ -58,6 +58,10 @@ export type PipelineDeps = {
   /** How long a created leg may take to enter the app before it counts as not placed
    * (`legOriginate.ts`), `STASIS_WAIT_MS`. */
   legStasisWaitMs: number;
+  /** `CALL_LOG_MAX_BYTES` (§7), `CoreEnv.callLogMaxBytes`: each new call's log cap. */
+  callLogMaxBytes: number;
+  /** `core`'s own mount of the media volume, `CoreEnv.mediaDir` (§11.6). */
+  mediaDir: string;
   // Voicemail deposit's own collaborators (§3.1).
   db: Db;
   apiClient: MailSender;

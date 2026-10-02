@@ -4,18 +4,13 @@
  * and sends the mail itself, retrying on its own (§10.2 "Failure") — this client makes one
  * request and does not retry.
  */
-import process from 'node:process';
-
 import type { MailRequest } from '@zamfono/shared';
-
-const DEFAULT_API_INTERNAL_URL = 'http://api:3000';
 
 export class ApiClient {
   private readonly baseUrl: string;
 
-  constructor(
-    baseUrl: string = process.env.API_INTERNAL_URL ?? DEFAULT_API_INTERNAL_URL
-  ) {
+  /** `baseUrl` is `CoreEnv.apiInternalUrl`. */
+  constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
   }
 

@@ -11,12 +11,7 @@ import { logFailure } from '../ari/failures.js';
 import type { LogLevel } from '../callLog.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
-import {
-  callLogMaxBytesFromEnv,
-  newCall,
-  raiseLogLevel,
-  type Call
-} from './call.js';
+import { newCall, raiseLogLevel, type Call } from './call.js';
 import { presentCallerUserId } from './callLookup.js';
 import { extensionOf } from './extensionOwner.js';
 import type { Pipeline } from './pipeline.js';
@@ -97,7 +92,7 @@ export async function startOnwardCall(
     to: entry.to,
     startedAt,
     logLevel: entry.logLevel,
-    callLogMaxBytes: callLogMaxBytesFromEnv()
+    callLogMaxBytes: pipeline.deps.callLogMaxBytes
   });
   child.parentCallId = parent.id;
   child.callerUserId = userOfChannel(parent, transferee);

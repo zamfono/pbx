@@ -1,14 +1,9 @@
 /**
- * The per-call diagnostics level and log cap (§7): validating `settings.call_log_level` into its
- * `LogLevel`, raising a call's level by the overrides of the user, trunk and ring group that route
- * it, and reading `CALL_LOG_MAX_BYTES` from the environment.
+ * The per-call diagnostics level (§7): validating `settings.call_log_level` into its `LogLevel`
+ * and raising a call's level by the overrides of the user, trunk and ring group that route it.
  */
-import process from 'node:process';
-
 import { effectiveLevel, type CallLog, type LogLevel } from '../callLog.js';
 
-/** `CALL_LOG_MAX_BYTES` (§7), default 1 MB. */
-const DEFAULT_CALL_LOG_MAX_BYTES = 1_048_576;
 const LOG_LEVELS: ReadonlySet<LogLevel> = new Set([
   'none',
   'events',
@@ -56,15 +51,4 @@ export function raiseLogLevel(
       nowIso
     )
   );
-}
-
-/** `CALL_LOG_MAX_BYTES` from the environment, falling back to the spec default on anything invalid. */
-export function callLogMaxBytesFromEnv(
-  env: NodeJS.ProcessEnv = process.env
-): number {
-  const raw = env.CALL_LOG_MAX_BYTES;
-  const value = raw === undefined ? DEFAULT_CALL_LOG_MAX_BYTES : Number(raw);
-  return Number.isInteger(value) && value > 0
-    ? value
-    : DEFAULT_CALL_LOG_MAX_BYTES;
 }

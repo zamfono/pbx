@@ -164,11 +164,9 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
       state,
       bus,
       log,
-      mediaDir: env.mediaDir,
+      env,
       trunkState,
-      presence,
-      stackTz: env.tz,
-      stackSipHost: env.sipHost
+      presence
     });
     // The boot resync (§10.1 "Boot and restart") runs once the ARI connection is up and the
     // pipeline exists, so a channel the pipeline already handles is left alone, and before the
@@ -192,7 +190,7 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
     // The OOO/hours sweep (§3.1 "Events", §10.2) is the only source of `ooo` and `hours` events: it
     // evaluates every scope against the clock and emits on a transition, which no call path does.
     const jobs = startBackgroundJobs({ db, cache, bus, log, env });
-    const hep = await startHepCollector(env.hepEnabled, cdr, log);
+    const hep = await startHepCollector(env, cdr, log);
     log.info(
       { port: CORE_INTERNAL_PORT, hepEnabled: env.hepEnabled },
       'core internal server listening'

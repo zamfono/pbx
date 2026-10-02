@@ -45,8 +45,10 @@ export function defaultPrompt(key: PromptKey): string {
   return `sound:${PROMPTS[key]}`;
 }
 
-// media/prompts/ (§11.6), fixed by the Global Constraints' path list, not environment-configurable.
-const PROMPTS_DIR = '/media/prompts';
+/** The media volume as Asterisk mounts it (§11.6), the root of every `sound:` path handed to it;
+ * fixed by the asterisk image, whatever `MEDIA_DIR` says for `core`'s own mount. */
+export const ASTERISK_MEDIA_DIR = '/media';
+const PROMPTS_DIR = `${ASTERISK_MEDIA_DIR}/prompts`;
 
 /**
  * The `sound:` reference for an `audio_assets` row (§10.2 "Greetings and audio"): Asterisk picks

@@ -7,6 +7,7 @@ import { AriClient } from './ari/client.js';
 import { buildPipeline } from './boot.js';
 import { Recorder } from './calls/recording.js';
 import { TrunkState } from './calls/trunkState.js';
+import { readEnv } from './env.js';
 import { EventBus } from './internal/eventBus.js';
 import { ConfigCache } from './internal/snapshot.js';
 import { StateStore } from './internal/stateStore.js';
@@ -49,11 +50,12 @@ describe('buildPipeline', () => {
       ...deps,
       db,
       log: noopLogger,
-      mediaDir: '/media',
+      env: {
+        ...readEnv({ ARI_PASSWORD: 'secret', AMI_PASSWORD: 'secret' }),
+        tz: stackTz
+      },
       trunkState: new TrunkState({ log: noopLogger, ...deps, ami }),
-      presence: new Presence({ log: noopLogger, ...deps, db }),
-      stackTz,
-      stackSipHost: null
+      presence: new Presence({ log: noopLogger, ...deps, db })
     });
     return { ...built, state };
   }

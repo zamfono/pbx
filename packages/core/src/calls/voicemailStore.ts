@@ -13,8 +13,9 @@ import { contactName } from './contactName.js';
 import type { Pipeline } from './pipeline.js';
 import type { MailSender } from './voicemail.js';
 
-// §11.6: voicemail recordings live here, the directory Asterisk's recording base resolves to.
-const VOICEMAIL_DIR = '/media/voicemail';
+// §11.6: the voicemail directory as `api` mounts the media volume, where it reads the attachment;
+// its `/internal/mail` accepts one under this path only.
+const API_VOICEMAIL_DIR = '/media/voicemail';
 
 /** The mailbox's current old (read) and new (unread) counts (§9.3 "MWI"); `refreshMwi` reuses it. */
 export async function mwiCounts(
@@ -99,7 +100,7 @@ export async function persistVoicemail(ctx: DepositContext): Promise<void> {
       receivedAt: createdAt,
       durationS
     },
-    attachmentPath: `${VOICEMAIL_DIR}/${filename}`
+    attachmentPath: `${API_VOICEMAIL_DIR}/${filename}`
   };
   apiClient
     .mail(mailRequest)

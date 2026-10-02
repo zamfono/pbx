@@ -2,8 +2,6 @@
  * The long-lived parts `main()` builds and starts once ARI and AMI are up: the call pipeline with
  * the collaborators it owns, the timers no call drives, and the HEP collector (§3.1, §7).
  */
-import process from 'node:process';
-
 import { nowIso, type Db } from '@zamfono/shared';
 
 import { ApiClient } from './apiClient.js';
@@ -29,7 +27,7 @@ const HEP_PORT = 9060;
 /**
  * The call pipeline and the collaborators it owns: the CDR writer (§7 "Call history"), the
  * recorder (§10.2 "Call recording") and the mail client that carries a deposit to `api`
- * (§3.1 "Mail") — a `Pipeline` without it releases every deposit unrecorded.
+ * (§3.1 "Mail").
  */
 export function buildPipeline(deps: {
   db: Db;
@@ -38,19 +36,17 @@ export function buildPipeline(deps: {
   state: StateStore;
   bus: EventBus;
   log: Logger;
-  mediaDir: string;
+  env: CoreEnv;
   trunkState: TrunkState;
   presence: Presence;
-  stackTz: string;
-  stackSipHost: string | null;
 }): { pipeline: Pipeline; cdr: CdrWriter } {
-  const { db, ari, cache, state, bus, log } = deps;
+  const { db, ari, cache, state, bus, log, env } = deps;
   const cdr = new CdrWriter({ db, ari, cache, bus, state, log, now: nowIso });
   const recorder = new Recorder({
     ari,
     cache,
     db,
-    mediaDir: deps.mediaDir,
+    mediaDir: env.mediaDir,
     log,
     now: nowIso
   });
@@ -70,11 +66,13 @@ export function buildPipeline(deps: {
     cdr,
     recorder,
     now: nowIso,
-    stackTz: deps.stackTz,
-    stackSipHost: deps.stackSipHost,
+    stackTz: env.tz,
+    stackSipHost: env.sipHost,
     legStasisWaitMs: STASIS_WAIT_MS,
+    callLogMaxBytes: env.callLogMaxBytes,
+    mediaDir: env.mediaDir,
     db,
-    apiClient: new ApiClient(),
+    apiClient: new ApiClient(env.apiInternalUrl),
     logger: log,
     trunkState: deps.trunkState,
     presence: deps.presence
@@ -122,14 +120,14 @@ export function startBackgroundJobs(deps: {
  * come from `RTPAUDIOQOS` alone.
  */
 export async function startHepCollector(
-  enabled: boolean,
+  env: CoreEnv,
   cdr: CdrWriter,
   log: Logger
 ): Promise<{ close: () => void } | null> {
-  if (!enabled) {
+  if (!env.hepEnabled) {
     return null;
   }
-  const addresses = await asteriskAddresses(process.env);
+  const addresses = await asteriskAddresses(env);
   return startHepListener(
     HEP_PORT,
     addresses,
