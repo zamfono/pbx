@@ -170,6 +170,8 @@ if [ -n "${UPGRADE_FROM:-}" ] && [ "$reused" = false ]; then
   upgrade_verify "$UPGRADE_BEFORE" "$upgrade_after"
 fi
 
+name_selected caddy && step_caddy
+
 if [ "$reused" = true ]; then
   load_state
 else

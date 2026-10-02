@@ -1,7 +1,7 @@
 # Sourced by `run.sh`: the stack's own prerequisites (bring-up and tenant configuration — REUSE
-# skips both, run.sh's own usage block) as functions, plus the two
-# selectable named steps that sit either side of the scenario loop in a full run (`runtime-asserts`
-# and `prompts`; `trunk-status` and `cert-sync` wrap their own files' bodies as
+# skips both, run.sh's own usage block) as functions, plus the selectable named steps that sit
+# either side of the scenario loop in a full run (`runtime-asserts`, `prompts`, `caddy`, `backups`
+# and `updater`; `trunk-status` and `cert-sync` wrap their own files' bodies as
 # `run_trunk_status_step`/`run_cert_sync_step`, called directly by run.sh).
 #
 # Reads and sets `run.sh`'s own COMPOSE, compose_args, run_dir, here, compose_cmd, api_base,
@@ -68,6 +68,31 @@ step_runtime_asserts() {
 step_prompts() {
   bash "$here/prompts.sh" "$compose_cmd" \
     || fail "a prompt the core plays is missing from the asterisk image"
+}
+
+# §6.1: the stack as every real client reaches it, Caddy on 443 in front of api, at
+# `https://$FQDN` with the certificate it serves trusted (issued by Caddy's local CA here,
+# Caddyfile.local-ca): `/healthz`, a login whose forms are submitted as the page's own script
+# submits them (bootstrap-token.sh `--remote`), and a REST call with the token that got. api checks
+# a remote form's `Origin` against the origin it derives from what Caddy passes on, the `Host`
+# and the scheme, so a proxy that passed either on wrongly would refuse every such login.
+# Selectable as `caddy`; cheap enough to run on every shard.
+step_caddy() {
+  echo "== §6.1 through Caddy: https://$FQDN, a login as the page's script submits it =="
+  # curl's own configuration, for every curl this step runs: the FQDN at the stack's published
+  # 443, and Caddy's CA trusted. `api` (test/api.sh) reads this step's api_base and token.
+  local -x CURL_HOME=$run_dir/caddy-client
+  local api_base=https://$FQDN token
+  mkdir -p "$CURL_HOME"
+  $COMPOSE "${compose_args[@]}" exec -T proxy cat /data/caddy/pki/authorities/local/root.crt \
+    >"$CURL_HOME/root.crt" || fail "Caddy's local CA has no root certificate"
+  printf 'resolve = %s:443:127.0.0.1\ncacert = %s\n' "$FQDN" "$CURL_HOME/root.crt" \
+    >"$CURL_HOME/.curlrc"
+  curl -fsS "$api_base/healthz" >/dev/null || fail "GET /healthz did not answer through Caddy"
+  token=$(bash "$here/bootstrap-token.sh" --remote "$api_base" "$OWNER_EMAIL" "$OWNER_PASSWORD" \
+    "$api_base") || fail "the login's remote forms gave no access token through Caddy"
+  api GET /users >/dev/null || fail "GET /users did not answer through Caddy"
+  echo '   /healthz, the login and GET /users answered through Caddy'
 }
 
 # The tenant §8's scenarios are played against, built over the REST API the way an operator
