@@ -188,6 +188,9 @@ why the specified behaviour changed; the commit history, how.
   onward call when it was transferred, in `GET /parking/calls` when it was parked, and as the
   caller of a party added from its side. The first two now show the number the call went to,
   the last the call's own caller.
+- `POST /users` and `POST /users/{id}/resetPassword` could mail a setup or reset link although
+  the request failed and nothing was stored, for example when Ringotel could not be reached, so
+  the mailed link did not work. The mail now goes out only once the request has succeeded.
 
 ### Upgrade notes
 

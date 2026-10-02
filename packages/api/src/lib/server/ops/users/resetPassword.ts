@@ -6,9 +6,9 @@ import { issueResetToken } from '#lib/server/auth/tokens.js';
 import { sendMail } from '#lib/server/mail/index.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
-import { setUndoable } from '../runner.js';
+import { afterPropagation, setUndoable } from '../runner.js';
 import { defineOperation } from '../types.js';
-import { mailDb, setupLinkFor } from './_setupMail.js';
+import { setupLinkFor } from './_setupMail.js';
 import { liveUser } from './_shared.js';
 
 const logger = pino({ name: 'users.resetPassword' });
@@ -31,13 +31,16 @@ export const resetPassword = defineOperation({
       ctx.now
     );
     const link = setupLinkFor(raw);
-    // Not awaited: see `users.create` — a held write transaction must not wait on the relay.
-    sendMail(mailDb(ctx), keyringFromEnv(env), {
-      kind: 'reset',
-      to: { userId: input.id },
-      values: { link, linkExpiresAt: expiresAt }
-    }).catch((error: unknown) => {
-      logger.warn({ err: error }, 'users.resetPassword: reset mail failed');
+    // Sent once the write has committed, never after a rollback; not awaited, as in `users.create`.
+    afterPropagation(ctx, db => {
+      sendMail(db, keyringFromEnv(env), {
+        kind: 'reset',
+        to: { userId: input.id },
+        values: { link, linkExpiresAt: expiresAt }
+      }).catch((error: unknown) => {
+        logger.warn({ err: error }, 'users.resetPassword: reset mail failed');
+      });
+      return Promise.resolve(null);
     });
     // Issuing a link is nothing to revert: there is no prior state for undo to restore.
     setUndoable(ctx, false);

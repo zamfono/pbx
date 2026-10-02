@@ -6,7 +6,8 @@ import type { Context } from './types.js';
 /**
  * A step that must wait until the operation's write has committed and its configuration reached
  * Asterisk (§3.1 "Config propagation"): an effect elsewhere that depends on Asterisk already
- * holding the write, such as Ringotel registering a device's new SIP credentials (§10.4). It gets
+ * holding the write, such as Ringotel registering a device's new SIP credentials (§10.4), or one
+ * that must not happen for a write that rolls back, such as a user's setup mail. It gets
  * the database outside the transaction, which has ended, and answers `null`, or a warning for
  * the operation's result: the write stands whatever the step reports, so it cannot fail the call.
  */

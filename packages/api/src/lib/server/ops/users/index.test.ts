@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
 import { loginLimiter } from '#lib/server/limiter.js';
+import { sendMail } from '#lib/server/mail/index.js';
 import { installRingotelFake } from '#lib/server/provisioning/ringotelFake.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { makeTestDb } from '#lib/server/testDb.js';
@@ -15,6 +16,14 @@ import './index.js';
 
 process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
 process.env.FQDN ??= 'pbx.example.test';
+
+vi.mock('#lib/server/mail/index.js', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('#lib/server/mail/index.js')>();
+  return { ...actual, sendMail: vi.fn(() => Promise.resolve('sent')) };
+});
+
+const sendMailMock = vi.mocked(sendMail);
 
 const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 
@@ -114,6 +123,7 @@ const realFetch = globalThis.fetch;
 
 afterEach(() => {
   globalThis.fetch = realFetch;
+  sendMailMock.mockClear();
 });
 
 describe('users', () => {
@@ -129,6 +139,53 @@ describe('users', () => {
       .where('ext', '=', '101')
       .executeTakeFirstOrThrow();
     expect(ext.userId).toBe(result.user.id);
+  });
+
+  it('create sends the setup mail once committed, on the database outside the transaction', async () => {
+    const db = await makeTestDb();
+    await seedTenant(db);
+    const result = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
+    expect(sendMailMock).toHaveBeenCalledOnce();
+    const [mailDb, , request] = sendMailMock.mock.calls[0] ?? [];
+    expect(mailDb).toBe(db);
+    expect(request).toMatchObject({
+      kind: 'setup',
+      to: { userId: result.user.id },
+      values: { link: result.setupLink }
+    });
+  });
+
+  it('create sends no setup mail when its transaction rolls back', async () => {
+    const db = await makeTestDb();
+    await seedTenant(db);
+    await enableRingotel(db);
+    // Ringotel cannot be reached for the roster push, which rolls the new user back (§10.4).
+    globalThis.fetch = () => Promise.reject(new Error('unreachable'));
+    await expect(
+      createUser(db, 'Anna Huber', 'anna@x.test', '101')
+    ).rejects.toThrow('unreachable');
+    expect(sendMailMock).not.toHaveBeenCalled();
+  });
+
+  it('resetPassword sends the reset mail once committed, on the database outside the transaction', async () => {
+    const db = await makeTestDb();
+    await seedTenant(db);
+    const created = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
+    sendMailMock.mockClear();
+    const result = await runOperation<unknown, { link: string }>(
+      db,
+      'users.resetPassword',
+      { id: created.user.id },
+      asRun()
+    );
+    expect(sendMailMock).toHaveBeenCalledOnce();
+    const [mailDb, , request] = sendMailMock.mock.calls[0] ?? [];
+    expect(mailDb).toBe(db);
+    expect(request).toMatchObject({
+      kind: 'reset',
+      to: { userId: created.user.id },
+      values: { link: result.link }
+    });
   });
 
   it('refuses a duplicate extension with 409', async () => {

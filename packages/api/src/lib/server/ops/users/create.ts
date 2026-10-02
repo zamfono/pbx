@@ -9,13 +9,13 @@ import { sendMail } from '#lib/server/mail/index.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { pushRoster } from '../roster.js';
-import { propagate, recordChange } from '../runner.js';
+import { afterPropagation, propagate, recordChange } from '../runner.js';
 import { defineOperation, type Context } from '../types.js';
 import {
   assertExtensionAvailable,
   assertValidExtension
 } from './_extensions.js';
-import { mailDb, setupLinkFor } from './_setupMail.js';
+import { setupLinkFor } from './_setupMail.js';
 import {
   assertEmailAvailable,
   EXTENSION_DESCRIPTION,
@@ -113,19 +113,21 @@ export const create = defineOperation({
       ctx.now
     );
     const setupLink = setupLinkFor(raw);
-    // Not awaited: `sendMail`'s in-process retries (§10.2 "Failure") run over several minutes,
-    // and this operation runs inside the write transaction (§10.3) — waiting here would hold it,
-    // and every other writer, for as long as the relay is unreachable (§6.6 `busy_timeout`).
-    sendMail(mailDb(ctx), keyringFromEnv(env), {
-      kind: 'setup',
-      to: { userId: id },
-      values: {
-        link: setupLink,
-        linkExpiresAt: expiresAt,
-        invitedBy: ctx.actor.name
-      }
-    }).catch((error: unknown) => {
-      logger.warn({ err: error }, 'users.create: setup mail failed');
+    // Started once the write has committed, never after a rollback, and not awaited:
+    // `sendMail`'s in-process retries (§10.2 "Failure") run over several minutes.
+    afterPropagation(ctx, db => {
+      sendMail(db, keyringFromEnv(env), {
+        kind: 'setup',
+        to: { userId: id },
+        values: {
+          link: setupLink,
+          linkExpiresAt: expiresAt,
+          invitedBy: ctx.actor.name
+        }
+      }).catch((error: unknown) => {
+        logger.warn({ err: error }, 'users.create: setup mail failed');
+      });
+      return Promise.resolve(null);
     });
 
     recordChange(ctx, { field: 'name', from: null, to: input.name });
