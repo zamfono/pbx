@@ -1,6 +1,7 @@
 import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { sql, type Selectable, type Transaction } from 'kysely';
+import pino from 'pino';
 
 import { mwiMailboxOf, type DB, type MwiMailbox } from '@zamfono/shared';
 
@@ -8,7 +9,10 @@ import { transcodeForDownload } from '#lib/server/audio/transcode.js';
 import { createCoreClient, type CoreClient } from '#lib/server/coreClient.js';
 import { mediaDirFromEnv } from '#lib/server/mediaDir.js';
 
-import { OpError, type Role } from '../types.js';
+import { afterPropagation } from '../afterPropagationHooks.js';
+import { OpError, type Context, type Role } from '../types.js';
+
+const logger = pino({ name: 'voicemails' });
 
 const STATUS_NOT_FOUND = 404;
 const STATUS_FORBIDDEN = 403;
@@ -180,12 +184,15 @@ export function setCoreClientForTest(client: CoreClient): void {
 }
 
 /**
- * Notifies `core` that `mailbox`'s voicemail count changed (§3.1, §9.3 MWI), deferred past the
- * current microtask queue so it always runs after the calling operation's transaction — still
- * mid-commit while `run` itself executes — has actually committed.
+ * Has `core` refresh `mailbox`'s voicemail count (§3.1, §9.3 MWI) once `ctx`'s write has
+ * committed, never after a rollback. Not awaited, so the caller's result never waits on `core`; a
+ * failure leaves the lamp as it was until the mailbox next changes, and is logged.
  */
-export function notifyMwi(mailbox: MwiMailbox): void {
-  setImmediate(() => {
-    coreClient.mwi(mailbox).catch(() => undefined);
+export function notifyMwi(ctx: Context, mailbox: MwiMailbox): void {
+  afterPropagation(ctx, () => {
+    coreClient.mwi(mailbox).catch((error: unknown) => {
+      logger.warn({ err: error, mailbox }, 'MWI update failed');
+    });
+    return Promise.resolve(null);
   });
 }

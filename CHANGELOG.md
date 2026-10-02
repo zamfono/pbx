@@ -191,6 +191,9 @@ why the specified behaviour changed; the commit history, how.
 - `POST /users` and `POST /users/{id}/resetPassword` could mail a setup or reset link although
   the request failed and nothing was stored, for example when Ringotel could not be reached, so
   the mailed link did not work. The mail now goes out only once the request has succeeded.
+- When `core` did not take the message-waiting update that follows marking a voicemail read or
+  deleting it, the phones' voicemail lamp stayed as it was without a word in any log. `api` now
+  logs a warning, and sends the update only once the change is stored.
 
 ### Upgrade notes
 

@@ -1,7 +1,6 @@
 import { access, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { setImmediate as setImmediateAsync } from 'node:timers/promises';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
@@ -157,8 +156,6 @@ describe('voicemails', () => {
       asRun({ actor: anna })
     );
     expect(result.read).toBe(true);
-
-    await setImmediateAsync();
     expect(mwiCalls).toEqual(['user:u1']);
 
     const auditRows = await db
@@ -167,6 +164,23 @@ describe('voicemails', () => {
       .where('operation', '=', 'voicemails.markRead')
       .execute();
     expect(auditRows).toHaveLength(0);
+  });
+
+  it('markRead succeeds when core refuses the mwi update', async () => {
+    const db = await makeTestDb();
+    await seedUser(db, 'u1', 'Anna');
+    const vmId = await seedVoicemail(db, { mailboxUserId: 'u1' });
+    setCoreClientForTest(
+      stubCoreClient({ mwi: () => Promise.reject(new Error('core down')) })
+    );
+
+    const result = await runOperation<unknown, { id: string; read: boolean }>(
+      db,
+      'voicemails.markRead',
+      { id: vmId, read: true },
+      asRun({ actor: anna })
+    );
+    expect(result).toEqual({ id: vmId, read: true });
   });
 
   it('voicemails.delete removes file and row with undoable 0', async () => {

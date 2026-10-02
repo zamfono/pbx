@@ -42,7 +42,7 @@ export const markRead = defineOperation({
       .set({ read: Number(input.read) })
       .where('id', '=', input.id)
       .execute();
-    notifyMwi(mailboxKey(row));
+    notifyMwi(ctx, mailboxKey(row));
     return { id: input.id, read: input.read };
   }
 });

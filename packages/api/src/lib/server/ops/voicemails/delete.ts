@@ -36,7 +36,7 @@ export const deleteVoicemail = defineOperation({
     await deleteVoicemailFile(row.filename);
     await ctx.db.deleteFrom('voicemails').where('id', '=', input.id).execute();
     setUndoable(ctx, false);
-    notifyMwi(mailboxKey(row));
+    notifyMwi(ctx, mailboxKey(row));
     return { id: input.id };
   }
 });
