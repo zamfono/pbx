@@ -19,6 +19,7 @@ import type { FakeEndpoint } from '../ari/fakeChannel.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
+import { onEvents } from '../testing/busEvents.js';
 import { eventually } from '../testing/eventually.js';
 import { noopLogger } from '../testing/pipelineDeps.js';
 import { TrunkState } from './trunkState.js';
@@ -238,7 +239,7 @@ describe('TrunkState', () => {
     expect(state.trunks.get(trunkId)?.status).toBe('registered');
 
     const emitted: Envelope[] = [];
-    const unsubscribe = bus.subscribe(envelope => {
+    const unsubscribe = onEvents(bus, envelope => {
       emitted.push(envelope);
     });
 
@@ -275,7 +276,7 @@ describe('TrunkState', () => {
     await seedSettings(db);
     const trunkId = await seedIpTrunk(db, 'carrier', 1);
     const emitted: Envelope[] = [];
-    const unsubscribe = bus.subscribe(envelope => {
+    const unsubscribe = onEvents(bus, envelope => {
       emitted.push(envelope);
     });
 
@@ -364,7 +365,7 @@ describe('TrunkState', () => {
     );
     const deletedId = await seedIpTrunk(db, 'gone', 2, nowIso());
     const emitted: Envelope[] = [];
-    const unsubscribe = bus.subscribe(envelope => {
+    const unsubscribe = onEvents(bus, envelope => {
       emitted.push(envelope);
     });
 
@@ -414,7 +415,7 @@ describe('TrunkState', () => {
       await seedSettings(db);
       const trunkId = await seedIpTrunk(db, 'agent', 1, null, 0);
       const emitted: Envelope[] = [];
-      const unsubscribe = bus.subscribe(envelope => {
+      const unsubscribe = onEvents(bus, envelope => {
         emitted.push(envelope);
       });
 

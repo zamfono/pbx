@@ -4,6 +4,7 @@ import { newId, nowIso, type Envelope } from '@zamfono/shared';
 
 import { EventBus } from '../internal/eventBus.js';
 import { StateStore } from '../internal/stateStore.js';
+import { onEvents } from '../testing/busEvents.js';
 import { newCall, type Call, type Leg } from './call.js';
 import {
   callEnded,
@@ -53,7 +54,7 @@ describe('a live call’s users (§10.3 "Live calls", §10.6)', () => {
   beforeEach(() => {
     deps = { state: new StateStore(), bus: new EventBus() };
     events = [];
-    deps.bus.subscribe(envelope => {
+    onEvents(deps.bus, envelope => {
       if (envelope.type === 'call.state') {
         events.push(envelope);
       }

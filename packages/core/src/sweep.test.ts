@@ -6,6 +6,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { EventBus } from './internal/eventBus.js';
 import { ConfigCache } from './internal/snapshot.js';
 import { startSweep } from './sweep.js';
+import { onEvents } from './testing/busEvents.js';
 import { noopLogger } from './testing/pipelineDeps.js';
 
 const SWEEP_INTERVAL_MS = 5;
@@ -93,7 +94,7 @@ describe('startSweep', () => {
     let current = start;
     const events: Envelope[] = [];
     const bus = new EventBus();
-    bus.subscribe(event => {
+    onEvents(bus, event => {
       events.push(event);
     });
     sweep = startSweep(
@@ -149,7 +150,7 @@ describe('startSweep', () => {
     let current = new Date('2026-01-05T16:59:00.000Z');
     const events: Envelope[] = [];
     const bus = new EventBus();
-    bus.subscribe(event => {
+    onEvents(bus, event => {
       events.push(event);
     });
     sweep = startSweep(
@@ -202,7 +203,7 @@ describe('startSweep', () => {
       .execute();
     const events: Envelope[] = [];
     const bus = new EventBus();
-    bus.subscribe(event => {
+    onEvents(bus, event => {
       events.push(event);
     });
     sweep = startSweep(
@@ -243,7 +244,7 @@ describe('startSweep', () => {
       .execute();
     const events: Envelope[] = [];
     const bus = new EventBus();
-    bus.subscribe(event => {
+    onEvents(bus, event => {
       events.push(event);
     });
     // Monday 10:00 UTC: open in UTC, but 05:00 in New York, before opening time.
@@ -285,7 +286,7 @@ describe('startSweep', () => {
     let current = '2026-01-01T00:30:00.000Z';
     const events: Envelope[] = [];
     const bus = new EventBus();
-    bus.subscribe(event => {
+    onEvents(bus, event => {
       events.push(event);
     });
     const cache = new ConfigCache(db);

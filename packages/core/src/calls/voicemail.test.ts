@@ -14,6 +14,7 @@ import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
 import { EventBus } from '../internal/eventBus.js';
+import { onEvents } from '../testing/busEvents.js';
 import { eventually, requestTo } from '../testing/eventually.js';
 import {
   noopCdr,
@@ -229,7 +230,7 @@ describe('deposit', () => {
       callLogMaxBytes: 1_048_576
     });
     const envelopes: Envelope[] = [];
-    bus.subscribe(envelope => {
+    onEvents(bus, envelope => {
       envelopes.push(envelope);
     });
 

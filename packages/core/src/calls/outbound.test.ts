@@ -14,6 +14,7 @@ import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { PROMPTS } from '../prompts.js';
 import { ATTEMPT_NO_RESPONSE_MS } from '../routing/trunk.js';
+import { onEvents } from '../testing/busEvents.js';
 import { eventually } from '../testing/eventually.js';
 import {
   noopLogger,
@@ -1022,7 +1023,7 @@ describe('outbound dialing', () => {
     const recorder = spyRecorder();
     pipeline.deps.recorder = recorder;
     const states: string[] = [];
-    pipeline.deps.bus.subscribe(envelope => {
+    onEvents(pipeline.deps.bus, envelope => {
       if (envelope.type === 'call.state') {
         states.push(envelope.state);
       }
@@ -1048,7 +1049,7 @@ describe('outbound dialing', () => {
     const trunkId = await seedTrunk(db, 1);
     await seedRoute(db, 1, trunkId);
     const events: { userId: string | null; userIds: string[] }[] = [];
-    pipeline.deps.bus.subscribe(envelope => {
+    onEvents(pipeline.deps.bus, envelope => {
       if (envelope.type === 'call.state') {
         events.push({ userId: envelope.userId, userIds: envelope.userIds });
       }

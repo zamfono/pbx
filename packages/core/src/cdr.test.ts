@@ -15,6 +15,7 @@ import { EventBus } from './internal/eventBus.js';
 import { ConfigCache } from './internal/snapshot.js';
 import { StateStore } from './internal/stateStore.js';
 import { parseRtcpReport } from './rtcpReport.js';
+import { onEvents } from './testing/busEvents.js';
 import { noopLogger } from './testing/pipelineDeps.js';
 import { fixedPoint, ntpMiddle, rtcpPayload } from './testing/rtcpPayload.js';
 
@@ -205,7 +206,7 @@ describe('CdrWriter', () => {
     const call = buildCall();
     call.status = 'missed';
     const received: Envelope[] = [];
-    bus.subscribe(envelope => {
+    onEvents(bus, envelope => {
       received.push(envelope);
     });
 

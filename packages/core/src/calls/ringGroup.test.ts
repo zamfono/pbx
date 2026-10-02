@@ -16,6 +16,7 @@ import { defaultChannel } from '../ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../ari/fakeDial.js';
 import type { Channel } from '../ari/types.js';
 import { AST_CAUSE_USER_BUSY } from '../sipCodes.js';
+import { onEvents } from '../testing/busEvents.js';
 import { eventually, requestTo } from '../testing/eventually.js';
 import {
   noopLogger,
@@ -373,7 +374,7 @@ describe('ringGroup', () => {
       members.map((userId, index) => seedMember(db, groupId, index, userId))
     );
     const events: Extract<Envelope, { type: 'call.state' }>[] = [];
-    pipeline.deps.bus.subscribe(envelope => {
+    onEvents(pipeline.deps.bus, envelope => {
       if (envelope.type === 'call.state') {
         events.push(envelope);
       }
@@ -627,7 +628,7 @@ describe('ringGroup', () => {
     await seedMember(db, groupId, 0, userA);
     await seedMember(db, groupId, 1, userB);
     const states: string[] = [];
-    pipeline.deps.bus.subscribe(envelope => {
+    onEvents(pipeline.deps.bus, envelope => {
       if (envelope.type === 'call.state') {
         states.push(envelope.state);
       }

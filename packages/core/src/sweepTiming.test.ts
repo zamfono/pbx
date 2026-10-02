@@ -10,6 +10,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { EventBus } from './internal/eventBus.js';
 import { ConfigCache } from './internal/snapshot.js';
 import { startSweep } from './sweep.js';
+import { onEvents } from './testing/busEvents.js';
 import { noopLogger } from './testing/pipelineDeps.js';
 
 const MS_PER_MINUTE = 60_000;
@@ -113,7 +114,7 @@ describe('startSweep timing', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     vi.setSystemTime(new Date(startIso));
     const bus = new EventBus();
-    bus.subscribe(event => {
+    onEvents(bus, event => {
       seen.push({ event, atMs: Date.now() });
     });
     sweep = startSweep(
@@ -255,7 +256,7 @@ describe('startSweep timing', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     vi.setSystemTime(new Date('2026-01-05T00:00:00.000Z'));
     const bus = new EventBus();
-    bus.subscribe(event => {
+    onEvents(bus, event => {
       seen.push({ event, atMs: Date.now() });
     });
     sweep = startSweep({

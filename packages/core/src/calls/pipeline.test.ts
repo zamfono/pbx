@@ -19,6 +19,7 @@ import type { AriEvent, Channel } from '../ari/types.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
+import { onEvents } from '../testing/busEvents.js';
 import { eventually } from '../testing/eventually.js';
 import {
   noopCdr,
@@ -558,7 +559,7 @@ describe('Pipeline', () => {
 
   it('publishes call.state and the live view as a call rings, answers and ends (§10.6, §3.1)', async () => {
     const seen: string[] = [];
-    pipeline.deps.bus.subscribe(envelope => {
+    onEvents(pipeline.deps.bus, envelope => {
       if (envelope.type === 'call.state') {
         seen.push(envelope.state);
       }

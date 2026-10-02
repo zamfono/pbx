@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CoreStreamFrame, Envelope } from '@zamfono/shared';
+import type { CoreStreamFrame } from '@zamfono/shared';
 
 import { AriClient } from './ari/client.js';
 import { FakeAri } from './ari/fake.js';
@@ -46,15 +46,11 @@ describe('announceAsteriskStartOnConnect (§10.4 "After a restart")', () => {
     await fake.close();
   });
 
-  it('announces the Asterisk start on the internal stream at every ARI connection, to no in-process subscriber', async () => {
+  it('announces the Asterisk start on the internal stream at every ARI connection', async () => {
     const bus = new EventBus();
     const frames: CoreStreamFrame[] = [];
-    const envelopes: Envelope[] = [];
     bus.subscribeStream(frame => {
       frames.push(frame);
-    });
-    bus.subscribe(envelope => {
-      envelopes.push(envelope);
     });
     announceAsteriskStartOnConnect(ari, bus, spyLogger());
     await ari.connect();
@@ -76,7 +72,6 @@ describe('announceAsteriskStartOnConnect (§10.4 "After a restart")', () => {
       { type: 'asterisk.started', asteriskStartedAt: STARTED },
       { type: 'asterisk.started', asteriskStartedAt: STARTED }
     ]);
-    expect(envelopes).toEqual([]);
   });
 
   it('reads an unreadable start time again until it is read, and announces it then', async () => {

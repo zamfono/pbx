@@ -15,6 +15,7 @@ import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { Presence } from '../presence.js';
 import { defaultPrompt } from '../prompts.js';
+import { onEvents } from '../testing/busEvents.js';
 import {
   eventually,
   nextSubscription,
@@ -1008,7 +1009,7 @@ describe('features', () => {
       onLegEnded: () => Promise.resolve()
     };
     const states: string[] = [];
-    pipeline.deps.bus.subscribe(envelope => {
+    onEvents(pipeline.deps.bus, envelope => {
       if (
         envelope.type === 'call.state' &&
         envelope.callId === addPartyCall.id

@@ -6,6 +6,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
 import { Presence } from '../presence.js';
+import { onEvents } from '../testing/busEvents.js';
 import { eventually } from '../testing/eventually.js';
 import {
   idlePresence,
@@ -143,7 +144,7 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
     );
     close = started.close;
     const events: Envelope[] = [];
-    bus.subscribe(envelope => events.push(envelope));
+    onEvents(bus, envelope => events.push(envelope));
 
     // What `PUT /users/{id}/presence` writes, then the propagation it triggers.
     await db
