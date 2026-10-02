@@ -1,8 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import path from 'node:path';
-
-import { attempt } from '../errors.js';
-import { bundledEntries, MD_EXT } from './guide.js';
+import { bundledEntries, type BundledEntry } from './guide.js';
 
 // §10.5 "Prompts": every `docs/guide/recipes/*.md` file is published as an MCP prompt, its
 // parameters from the recipe's front matter, listed by `prompts/list` and fetched, filled in with
@@ -11,7 +7,6 @@ import { bundledEntries, MD_EXT } from './guide.js';
 // (https://modelcontextprotocol.io/specification/2026-07-28/server/prompts).
 const FRONT_MATTER_DELIM = '---';
 type RecipeArgument = { name: string; description: string; required: boolean };
-type Recipe = { name: string; content: string };
 export type Prompt = {
   name: string;
   title: string;
@@ -93,22 +88,12 @@ function recipeBody(content: string): string {
     .trim();
 }
 
-/** Every recipe, named by its file. With no `recipesDir` override this reads the files bundled at
- * build time; passing one (fixture tests only) reads them from disk instead. */
-function recipes(recipesDir?: string): Recipe[] {
-  if (recipesDir === undefined) {
-    return bundledEntries().filter(entry => entry.isRecipe);
-  }
-  const files = attempt(() => readdirSync(recipesDir)) ?? [];
-  return files
-    .filter(file => file.endsWith(MD_EXT))
-    .map(file => ({
-      name: file.slice(0, -MD_EXT.length),
-      content: readFileSync(path.join(recipesDir, file), 'utf8')
-    }));
+/** Every recipe, named by its file. */
+function recipes(): BundledEntry[] {
+  return bundledEntries().filter(entry => entry.isRecipe);
 }
 
-function promptFrom({ name, content }: Recipe): Prompt {
+function promptFrom({ name, content }: BundledEntry): Prompt {
   const { title, arguments: args } = parseRecipeFrontMatter(content);
   return {
     name,
@@ -119,8 +104,8 @@ function promptFrom({ name, content }: Recipe): Prompt {
 }
 
 /** One MCP prompt per recipe, its parameters from the front matter (§10.5). */
-export function listPrompts(recipesDir?: string): Prompt[] {
-  return recipes(recipesDir).map(promptFrom);
+export function listPrompts(): Prompt[] {
+  return recipes().map(promptFrom);
 }
 
 /** `prompts/get`'s `arguments`, the schema's `{ [key: string]: string }`; `null` when malformed. */
@@ -144,15 +129,12 @@ function promptArguments(value: unknown): Record<string, string> | null {
  * field left blank. Each value is quoted as a JSON string, so a newline in one cannot forge
  * another parameter line of the message.
  */
-export function getPrompt(
-  params: Record<string, unknown>,
-  recipesDir?: string
-): PromptContent {
+export function getPrompt(params: Record<string, unknown>): PromptContent {
   const name = params.name;
   if (typeof name !== 'string') {
     throw new PromptRequestError('prompts/get needs a prompt name');
   }
-  const recipe = recipes(recipesDir).find(entry => entry.name === name);
+  const recipe = recipes().find(entry => entry.name === name);
   if (!recipe) {
     throw new PromptRequestError(`Unknown prompt: ${name}`);
   }

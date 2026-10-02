@@ -1,7 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { OpError } from '../ops/types.js';
 import { callHelp } from './guide.js';
@@ -22,15 +21,22 @@ arguments:
 Steps.
 `;
 
-const guideDir = mkdtempSync(path.join(tmpdir(), 'zamfono-guide-'));
-const recipesDir = path.join(guideDir, 'recipes');
-mkdirSync(recipesDir);
-writeFileSync(path.join(guideDir, 'mental-model.md'), '# Mental model\n');
-writeFileSync(path.join(recipesDir, 'onboard-employee.md'), RECIPE_CONTENT);
+// The guide the build bundles (§10.5), read from disk to check what the bundle serves.
+const GUIDE_DIR = path.resolve(
+  import.meta.dirname,
+  '../../../../../../docs/guide'
+);
+const RECIPES_DIR = path.join(GUIDE_DIR, 'recipes');
 
-afterAll(() => {
-  rmSync(guideDir, { recursive: true, force: true });
-});
+function topicNames(dir: string): string[] {
+  return readdirSync(dir)
+    .filter(file => file.endsWith('.md'))
+    .map(file => path.basename(file, '.md'));
+}
+
+const TOPICS = [
+  ...new Set([...topicNames(GUIDE_DIR), ...topicNames(RECIPES_DIR)])
+].sort();
 
 describe('parseRecipeFrontMatter', () => {
   it('reads the title and the flat arguments list', () => {
@@ -61,62 +67,48 @@ describe('parseRecipeFrontMatter', () => {
 
 describe('listPrompts', () => {
   it('publishes one prompt per recipe with its title and parameters', () => {
-    expect(listPrompts(recipesDir)).toEqual([
-      {
-        name: 'onboard-employee',
-        title: 'Onboard an employee',
-        description: 'Onboard an employee',
-        arguments: [
-          {
-            name: 'employeeName',
-            description: "The employee's full name",
-            required: true
-          },
-          {
-            name: 'extension',
-            description: 'Desired extension number',
-            required: false
-          }
-        ]
-      }
-    ]);
+    const prompts = listPrompts();
+    expect(prompts.map(prompt => prompt.name).sort()).toEqual(
+      topicNames(RECIPES_DIR).sort()
+    );
+    const recipe = readFileSync(
+      path.join(RECIPES_DIR, 'onboard-employee.md'),
+      'utf8'
+    );
+    const { title, arguments: args } = parseRecipeFrontMatter(recipe);
+    expect(title).not.toBe('');
+    expect(prompts.find(prompt => prompt.name === 'onboard-employee')).toEqual({
+      name: 'onboard-employee',
+      title,
+      description: title,
+      arguments: args
+    });
   });
 });
 
 describe('callHelp', () => {
   it('resolves a recipe name as a help topic', () => {
-    const result = callHelp(
-      { topic: 'onboard-employee' },
-      guideDir,
-      recipesDir
-    );
-    expect(result).toEqual({
+    expect(callHelp({ topic: 'onboard-employee' })).toEqual({
       topic: 'onboard-employee',
-      content: RECIPE_CONTENT
+      content: readFileSync(
+        path.join(RECIPES_DIR, 'onboard-employee.md'),
+        'utf8'
+      )
     });
   });
 
   it('lists guide topics and recipe topics together', () => {
-    const result = callHelp({}, guideDir, recipesDir);
-    expect(result).toEqual({
-      topics: ['mental-model', 'onboard-employee']
-    });
+    expect(callHelp({})).toEqual({ topics: TOPICS });
   });
 
   it('throws on an unknown topic, naming how to list the topics and the topics themselves', () => {
-    expect(() =>
-      callHelp({ topic: 'no-such-topic' }, guideDir, recipesDir)
-    ).toThrow(OpError);
-    expect(() =>
-      callHelp({ topic: 'no-such-topic' }, guideDir, recipesDir)
-    ).toThrow(
-      "unknown help topic 'no-such-topic'; call zamfono.help without a topic for the list: mental-model, onboard-employee"
+    expect(() => callHelp({ topic: 'no-such-topic' })).toThrow(OpError);
+    expect(() => callHelp({ topic: 'no-such-topic' })).toThrow(
+      `unknown help topic 'no-such-topic'; call zamfono.help without a topic for the list: ${TOPICS.join(', ')}`
     );
   });
 
   it('reads `index` as the topic list', () => {
-    expect(callHelp({ topic: 'index' }, guideDir, recipesDir)).toEqual({
-      topics: ['mental-model', 'onboard-employee']
-    });
+    expect(callHelp({ topic: 'index' })).toEqual({ topics: TOPICS });
   });
 });
