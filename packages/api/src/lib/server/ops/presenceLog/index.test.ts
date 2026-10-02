@@ -57,12 +57,12 @@ describe('presenceLog.snapshot', () => {
       ])
       .execute();
 
-    const result = await runOperation<unknown, { items: SnapshotItem[] }>(
+    const result = (await runOperation(
       db,
       'presenceLog.snapshot',
       { at: '2026-01-01T00:15:00.000Z' },
       asRun()
-    );
+    )) as { items: SnapshotItem[] };
 
     expect(result.items).toEqual([
       {
@@ -110,12 +110,12 @@ describe('presenceLog.snapshot', () => {
       ])
       .execute();
 
-    const result = await runOperation<unknown, { items: SnapshotItem[] }>(
+    const result = (await runOperation(
       db,
       'presenceLog.snapshot',
       { at: '2026-01-01T00:30:00.000Z', userId: 'other' },
       asRun()
-    );
+    )) as { items: SnapshotItem[] };
 
     expect(result.items.map(item => item.userId)).toEqual(['other']);
   });
@@ -158,12 +158,12 @@ describe('presenceLog.snapshot', () => {
       ])
       .execute();
 
-    const result = await runOperation<unknown, { items: SnapshotItem[] }>(
+    const result = (await runOperation(
       db,
       'presenceLog.snapshot',
       { at },
       asRun()
-    );
+    )) as { items: SnapshotItem[] };
 
     expect(result.items.map(item => item.status)).toEqual(['busy']);
   });

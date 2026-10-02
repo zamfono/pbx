@@ -17,18 +17,18 @@ function asRun(overrides: Partial<RunInput> = {}): RunInput {
 describe('hours', () => {
   it('has no schedule for a scope until one is set', async () => {
     const db = await makeTestDb();
-    const read = await runOperation<unknown, { schedule: HoursWire | null }>(
+    const read = (await runOperation(
       db,
       'hours.get',
       { scope: { kind: 'tenant' } },
       asRun()
-    );
+    )) as { schedule: HoursWire | null };
     expect(read.schedule).toBeNull();
   });
 
   it('sets, sorts and reads back a schedule, then deletes it', async () => {
     const db = await makeTestDb();
-    const set = await runOperation<unknown, HoursWire>(
+    const set = (await runOperation(
       db,
       'hours.set',
       {
@@ -40,17 +40,17 @@ describe('hours', () => {
         ]
       },
       asRun()
-    );
+    )) as HoursWire;
     expect(set.intervals).toEqual([
       { weekday: 1, opens: '09:00', closes: '12:00' },
       { weekday: 1, opens: '13:00', closes: '17:00' }
     ]);
-    const read = await runOperation<unknown, { schedule: HoursWire | null }>(
+    const read = (await runOperation(
       db,
       'hours.get',
       { scope: { kind: 'tenant' } },
       asRun()
-    );
+    )) as { schedule: HoursWire | null };
     expect(read.schedule?.intervals).toHaveLength(2);
     await runOperation(
       db,
@@ -58,10 +58,12 @@ describe('hours', () => {
       { scope: { kind: 'tenant' } },
       asRun({ confirm: true })
     );
-    const afterDelete = await runOperation<
-      unknown,
-      { schedule: HoursWire | null }
-    >(db, 'hours.get', { scope: { kind: 'tenant' } }, asRun());
+    const afterDelete = (await runOperation(
+      db,
+      'hours.get',
+      { scope: { kind: 'tenant' } },
+      asRun()
+    )) as { schedule: HoursWire | null };
     expect(afterDelete.schedule).toBeNull();
   });
 

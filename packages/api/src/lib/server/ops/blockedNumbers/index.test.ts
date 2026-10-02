@@ -16,18 +16,18 @@ function asRun(overrides: Partial<RunInput> = {}): RunInput {
 describe('blockedNumbers', () => {
   it('creates, lists and deletes a blocked number', async () => {
     const db = await makeTestDb();
-    const created = await runOperation<unknown, { id: string; number: string }>(
+    const created = (await runOperation(
       db,
       'blockedNumbers.create',
       { number: '+491234567', label: 'Nuisance caller' },
       asRun()
-    );
-    const listed = await runOperation<unknown, { items: { id: string }[] }>(
+    )) as { id: string; number: string };
+    const listed = (await runOperation(
       db,
       'blockedNumbers.list',
       {},
       asRun()
-    );
+    )) as { items: { id: string }[] };
     expect(listed.items.map(item => item.id)).toContain(created.id);
     await runOperation(
       db,
@@ -35,10 +35,12 @@ describe('blockedNumbers', () => {
       { id: created.id },
       asRun({ confirm: true })
     );
-    const afterDelete = await runOperation<
-      unknown,
-      { items: { id: string }[] }
-    >(db, 'blockedNumbers.list', {}, asRun());
+    const afterDelete = (await runOperation(
+      db,
+      'blockedNumbers.list',
+      {},
+      asRun()
+    )) as { items: { id: string }[] };
     expect(afterDelete.items).toHaveLength(0);
   });
 

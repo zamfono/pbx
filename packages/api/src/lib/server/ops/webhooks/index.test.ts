@@ -20,15 +20,12 @@ function asRun(overrides: Partial<RunInput> = {}): RunInput {
 describe('webhooks', () => {
   it('creates a webhook inactive, never returning the secret', async () => {
     const db = await makeTestDb();
-    const created = await runOperation<
-      unknown,
-      WebhookWire & { secret?: unknown }
-    >(
+    const created = (await runOperation(
       db,
       'webhooks.create',
       { url: 'https://example.invalid/hook', secret: 'sh-secret' },
       asRun()
-    );
+    )) as WebhookWire & { secret?: unknown };
     expect(created.active).toBe(false);
     expect(created.secret).toBeUndefined();
     const row = await db
@@ -41,25 +38,22 @@ describe('webhooks', () => {
 
   it('lists, activates and deletes a webhook', async () => {
     const db = await makeTestDb();
-    const created = await runOperation<unknown, WebhookWire>(
+    const created = (await runOperation(
       db,
       'webhooks.create',
       { url: 'https://example.invalid/hook', secret: 'sh-secret' },
       asRun()
-    );
-    const listed = await runOperation<unknown, { items: WebhookWire[] }>(
-      db,
-      'webhooks.list',
-      {},
-      asRun()
-    );
+    )) as WebhookWire;
+    const listed = (await runOperation(db, 'webhooks.list', {}, asRun())) as {
+      items: WebhookWire[];
+    };
     expect(listed.items.map(item => item.id)).toContain(created.id);
-    const updated = await runOperation<unknown, WebhookWire>(
+    const updated = (await runOperation(
       db,
       'webhooks.update',
       { id: created.id, active: true, eventTypes: ['voicemail.new'] },
       asRun()
-    );
+    )) as WebhookWire;
     expect(updated.active).toBe(true);
     expect(updated.eventTypes).toEqual(['voicemail.new']);
     await runOperation(
@@ -68,23 +62,23 @@ describe('webhooks', () => {
       { id: created.id },
       asRun({ confirm: true })
     );
-    const afterDelete = await runOperation<unknown, { items: WebhookWire[] }>(
+    const afterDelete = (await runOperation(
       db,
       'webhooks.list',
       {},
       asRun()
-    );
+    )) as { items: WebhookWire[] };
     expect(afterDelete.items.map(item => item.id)).not.toContain(created.id);
   });
 
   it("drops a deleted webhook's pending deliveries", async () => {
     const db = await makeTestDb();
-    const created = await runOperation<unknown, WebhookWire>(
+    const created = (await runOperation(
       db,
       'webhooks.create',
       { url: 'https://example.invalid/hook', secret: 'sh-secret' },
       asRun()
-    );
+    )) as WebhookWire;
     await db
       .insertInto('webhookDeliveries')
       .values({
@@ -113,12 +107,12 @@ describe('webhooks', () => {
 
   it("lists a failing hook's failures since it turned failing and its last error", async () => {
     const db = await makeTestDb();
-    const created = await runOperation<unknown, WebhookWire>(
+    const created = (await runOperation(
       db,
       'webhooks.create',
       { url: 'https://example.invalid/hook', secret: 'sh-secret' },
       asRun()
-    );
+    )) as WebhookWire;
     expect(created).toMatchObject({
       failingSince: null,
       failedDeliveries: 0,
@@ -137,12 +131,9 @@ describe('webhooks', () => {
       })
       .execute();
 
-    const listed = await runOperation<unknown, { items: WebhookWire[] }>(
-      db,
-      'webhooks.list',
-      {},
-      asRun()
-    );
+    const listed = (await runOperation(db, 'webhooks.list', {}, asRun())) as {
+      items: WebhookWire[];
+    };
 
     expect(listed.items).toMatchObject([
       {

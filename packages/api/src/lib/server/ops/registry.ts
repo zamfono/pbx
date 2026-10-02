@@ -5,7 +5,7 @@ import type { Operation } from './types.js';
 // concrete pair. `unknown` erases both generics without `any` (disallowed by lint).
 export type ErasedOperation = Operation<unknown, unknown>;
 
-/** Every registered operation by name, filled by importing `src/lib/ops/index.ts` (§10.3). */
+/** Every registered operation by name, filled by importing `$lib/server/ops/index.ts` (§10.3). */
 export const registry = new Map<string, ErasedOperation>();
 
 /**

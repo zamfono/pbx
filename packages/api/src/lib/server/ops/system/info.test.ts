@@ -74,12 +74,12 @@ describe('system.info', () => {
   });
 
   it("dates api's start to this process's own, so a restart is visible", async () => {
-    const out = await runOperation<unknown, { api: { startedAt: string } }>(
+    const out = (await runOperation(
       await makeTestDb(),
       'system.info',
       {},
       asUser
-    );
+    )) as { api: { startedAt: string } };
 
     const startedMs = Date.parse(out.api.startedAt);
     expect(startedMs).toBeLessThanOrEqual(Date.now());

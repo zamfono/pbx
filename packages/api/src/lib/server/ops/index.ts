@@ -1,6 +1,6 @@
 // Registers every operations area (§10.3): importing this module for its side effects fills the
-// registry the REST route table, the MCP tool list and the OpenAPI document all read from. Grows
-// with each task; each adds its own line, alphabetized.
+// registry the REST route table, the MCP tool list and the OpenAPI document all read from; one
+// line per area, alphabetized.
 import './audio/index.js';
 import './audit/index.js';
 import './backups/index.js';

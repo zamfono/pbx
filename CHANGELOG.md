@@ -143,6 +143,8 @@ why the specified behaviour changed; the commit history, how.
   disagree on which releases are breaking.
 - `trunks.list` and `trunks.get` still answer status `unknown` while `core` does not answer, and
   `api` now logs a warning saying so, where it said nothing.
+- A frame on `core`'s internal event stream that `api` cannot read is still dropped, and `api`
+  now logs a warning with it.
 
 ### Fixed
 

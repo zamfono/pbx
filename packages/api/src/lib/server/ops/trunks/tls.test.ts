@@ -30,7 +30,7 @@ async function createTrunk(
   db: Db,
   fields: Record<string, unknown>
 ): Promise<TrunkWire> {
-  const { trunk } = await runOperation<unknown, TrunkOutput>(
+  const { trunk } = (await runOperation(
     db,
     'trunks.create',
     {
@@ -41,7 +41,7 @@ async function createTrunk(
       ...fields
     },
     asRun()
-  );
+  )) as TrunkOutput;
   return trunk;
 }
 
@@ -50,12 +50,12 @@ async function updateTrunk(
   id: string,
   fields: Record<string, unknown>
 ): Promise<TrunkWire> {
-  const { trunk } = await runOperation<unknown, TrunkOutput>(
+  const { trunk } = (await runOperation(
     db,
     'trunks.update',
     { id, ...fields },
     asRun()
-  );
+  )) as TrunkOutput;
   return trunk;
 }
 

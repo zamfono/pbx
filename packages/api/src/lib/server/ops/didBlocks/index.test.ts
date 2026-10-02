@@ -58,37 +58,34 @@ describe('didBlocks', () => {
   it('creates, lists and updates a block', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const created = await runOperation<unknown, { id: string; base: string }>(
+    const created = (await runOperation(
       db,
       'didBlocks.create',
       { base: '+49891234', digits: 2 },
       asRun()
-    );
-    const listed = await runOperation<unknown, { items: { id: string }[] }>(
-      db,
-      'didBlocks.list',
-      {},
-      asRun()
-    );
+    )) as { id: string; base: string };
+    const listed = (await runOperation(db, 'didBlocks.list', {}, asRun())) as {
+      items: { id: string }[];
+    };
     expect(listed.items.map(item => item.id)).toContain(created.id);
-    const updated = await runOperation<unknown, { label: string | null }>(
+    const updated = (await runOperation(
       db,
       'didBlocks.update',
       { id: created.id, label: 'Sales range' },
       asRun()
-    );
+    )) as { label: string | null };
     expect(updated.label).toBe('Sales range');
   });
 
   it('refuses to change the immutable base', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const created = await runOperation<unknown, { id: string }>(
+    const created = (await runOperation(
       db,
       'didBlocks.create',
       { base: '+49891234', digits: 2 },
       asRun()
-    );
+    )) as { id: string };
     await expect(
       runOperation(
         db,
@@ -102,12 +99,12 @@ describe('didBlocks', () => {
   it('refuses to delete a block with a live DID inside it', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const created = await runOperation<unknown, { id: string }>(
+    const created = (await runOperation(
       db,
       'didBlocks.create',
       { base: '+49891234', digits: 2 },
       asRun()
-    );
+    )) as { id: string };
     await insertLiveDid(db, '+4989123401');
     await expect(
       runOperation(
@@ -122,12 +119,12 @@ describe('didBlocks', () => {
   it('the soft-delete guard trigger holds when the operation check is bypassed', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const created = await runOperation<unknown, { id: string }>(
+    const created = (await runOperation(
       db,
       'didBlocks.create',
       { base: '+49891234', digits: 2 },
       asRun()
-    );
+    )) as { id: string };
     await insertLiveDid(db, '+4989123401');
     await expect(
       db
@@ -141,12 +138,12 @@ describe('didBlocks', () => {
   it('normalizes a national base to the international form', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const created = await runOperation<unknown, { base: string }>(
+    const created = (await runOperation(
       db,
       'didBlocks.create',
       { base: '089123' },
       asRun()
-    );
+    )) as { base: string };
     expect(created.base).toBe('+4989123');
   });
 

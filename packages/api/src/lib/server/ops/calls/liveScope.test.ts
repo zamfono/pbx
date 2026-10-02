@@ -92,12 +92,12 @@ async function act(
 }
 
 async function liveIds(actor: Actor): Promise<string[]> {
-  const result = await runOperation<unknown, { items: LiveCall[] }>(
+  const result = (await runOperation(
     await makeTestDb(),
     'calls.list',
     { live: true },
     { actor, channel: 'rest', requestId: 'req-1' }
-  );
+  )) as { items: LiveCall[] };
   return result.items.map(item => item.callId);
 }
 
@@ -160,12 +160,12 @@ describe('who may see and control a live call (§10.3 "Live calls")', () => {
 
   it('lists a live call without who may control it', async () => {
     coreWith(CALLS);
-    const result = await runOperation<unknown, { items: object[] }>(
+    const result = (await runOperation(
       await makeTestDb(),
       'calls.list',
       { live: true },
       { actor: admin, channel: 'rest', requestId: 'req-1' }
-    );
+    )) as { items: object[] };
     expect(result.items).toHaveLength(CALLS.length);
     for (const item of result.items) {
       expect(item).not.toHaveProperty('connectedUserIds');

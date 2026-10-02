@@ -70,12 +70,12 @@ describe('users.setVoicemailGreeting and users.clearVoicemailGreeting', () => {
     await seedUsers(db);
     vi.mocked(propagateConfig).mockClear();
 
-    const result = await runOperation<unknown, { mailboxAudioId: string }>(
+    const result = (await runOperation(
       db,
       'users.setVoicemailGreeting',
       { id: 'anna', upload },
       as(anna)
-    );
+    )) as { mailboxAudioId: string };
 
     expect(storeAudio).toHaveBeenCalledWith('vmGreeting', upload);
     const asset = await db

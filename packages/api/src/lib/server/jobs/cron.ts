@@ -110,17 +110,17 @@ export type BackupScheduler = {
 };
 
 // The scheduler this process runs, for `backups.runs.start` to hand its runs to (`queueRun`).
-const active: { scheduler?: BackupScheduler } = {};
+let activeScheduler: BackupScheduler | undefined;
 
 /**
  * Hands a committed manual run to this process's scheduler; `false` while none runs (a unit test,
  * `vite dev` without a keyring), where the run stays `running` until the next boot sweep fails it.
  */
 export function queueRun(run: BackupRunRow): boolean {
-  if (active.scheduler === undefined) {
+  if (activeScheduler === undefined) {
     return false;
   }
-  active.scheduler.enqueue(run);
+  activeScheduler.enqueue(run);
   return true;
 }
 
@@ -130,15 +130,12 @@ function manualRunQueue(
   kr: Keyring,
   deps: BackupJobDeps
 ): (run: BackupRunRow) => void {
-  let tail = Promise.resolve();
   return run => {
-    tail = tail.then(async () =>
-      inTurn(async () => executeRun(db, kr, deps, run)).catch(
-        (error: unknown) => {
-          // The failure already lives in the run row and `backup.failed` event; this is a trace.
-          logger.error({ error, runId: run.id }, 'queued backup run failed');
-        }
-      )
+    inTurn(async () => executeRun(db, kr, deps, run)).catch(
+      (error: unknown) => {
+        // The failure already lives in the run row and `backup.failed` event; this is a trace.
+        logger.error({ error, runId: run.id }, 'queued backup run failed');
+      }
     );
   };
 }
@@ -196,11 +193,11 @@ export function scheduleBackups(
     enqueue: manualRunQueue(db, kr, deps),
     stop() {
       stopper.abort();
-      if (active.scheduler === scheduler) {
-        delete active.scheduler;
+      if (activeScheduler === scheduler) {
+        activeScheduler = undefined;
       }
     }
   };
-  active.scheduler = scheduler;
+  activeScheduler = scheduler;
   return scheduler;
 }

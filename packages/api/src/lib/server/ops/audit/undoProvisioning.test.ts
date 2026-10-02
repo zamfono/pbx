@@ -58,18 +58,18 @@ async function userWithRingotelDevice(
   email: string,
   extension: string
 ): Promise<{ userId: string; deviceId: string }> {
-  const created = await runOperation<unknown, { user: { id: string } }>(
+  const created = (await runOperation(
     db,
     'users.create',
     { name: `User ${extension}`, email, extension },
     asRun()
-  );
-  const device = await runOperation<unknown, { device: { id: string } }>(
+  )) as { user: { id: string } };
+  const device = (await runOperation(
     db,
     'devices.create',
     { userId: created.user.id, label: 'App', kind: 'ringotel' },
     asRun()
-  );
+  )) as { device: { id: string } };
   return { userId: created.user.id, deviceId: device.device.id };
 }
 
@@ -85,7 +85,9 @@ async function undoLatest(
     .where('undoneAt', 'is', null)
     .orderBy('createdAt', 'desc')
     .executeTakeFirstOrThrow();
-  return runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+  return (await runOperation(db, 'audit.undo', { id: entry.id }, asRun())) as {
+    warnings?: string[];
+  };
 }
 
 // Whether the undo's configuration had reached Asterisk when a Ringotel call went out.
@@ -183,12 +185,12 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
     const db = await makeTestDb();
     await seedTenant(db);
     const ringotel = installRingotelFake();
-    const created = await runOperation<unknown, { user: { id: string } }>(
+    const created = (await runOperation(
       db,
       'users.create',
       { name: 'Anna Huber', email: 'anna@x.test', extension: '101' },
       asRun()
-    );
+    )) as { user: { id: string } };
     await runOperation(db, 'users.delete', { id: created.user.id }, asRun());
     await undoLatest(db, 'users.delete');
     advance(HOUR_MS);

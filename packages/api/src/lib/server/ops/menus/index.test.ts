@@ -35,10 +35,7 @@ describe('menus', () => {
   it('create stores the greeting and fallback target, reachable on the returned menu', async () => {
     const db = await makeTestDb();
     const audioId = await seedAudio(db);
-    const menu = await runOperation<
-      unknown,
-      { id: string; fallbackTarget: unknown }
-    >(
+    const menu = (await runOperation(
       db,
       'menus.create',
       {
@@ -47,7 +44,7 @@ describe('menus', () => {
         fallbackTarget: { kind: 'external', external: '+490000000' }
       },
       asRun()
-    );
+    )) as { id: string; fallbackTarget: unknown };
     expect(menu.fallbackTarget).toEqual({
       kind: 'external',
       external: '+490000000'
@@ -84,7 +81,7 @@ describe('menus', () => {
   it('setTargets replaces the DTMF map as a whole', async () => {
     const db = await makeTestDb();
     const audioId = await seedAudio(db);
-    const menu = await runOperation<unknown, { id: string }>(
+    const menu = (await runOperation(
       db,
       'menus.create',
       {
@@ -93,7 +90,7 @@ describe('menus', () => {
         fallbackTarget: { kind: 'external', external: '+490000000' }
       },
       asRun()
-    );
+    )) as { id: string };
     await runOperation(
       db,
       'menus.setTargets',
@@ -122,7 +119,7 @@ describe('menus', () => {
   it('getTargets returns the DTMF map in the shape setTargets takes, so it round-trips', async () => {
     const db = await makeTestDb();
     const audioId = await seedAudio(db);
-    const menu = await runOperation<unknown, { id: string }>(
+    const menu = (await runOperation(
       db,
       'menus.create',
       {
@@ -131,7 +128,7 @@ describe('menus', () => {
         fallbackTarget: { kind: 'external', external: '+490000000' }
       },
       asRun()
-    );
+    )) as { id: string };
     const targets = [
       { digits: '1', target: { kind: 'user', userId: 'owner' } },
       { digits: '2', target: { kind: 'external', external: '+491111111' } }
@@ -167,7 +164,7 @@ describe('menus', () => {
   it('setTargets refuses two targets with the same digits, with a 422', async () => {
     const db = await makeTestDb();
     const audioId = await seedAudio(db);
-    const menu = await runOperation<unknown, { id: string }>(
+    const menu = (await runOperation(
       db,
       'menus.create',
       {
@@ -176,7 +173,7 @@ describe('menus', () => {
         fallbackTarget: { kind: 'external', external: '+490000000' }
       },
       asRun()
-    );
+    )) as { id: string };
     const attempt = runOperation(
       db,
       'menus.setTargets',
@@ -210,7 +207,7 @@ describe('menus', () => {
   it('update replaces the fallback target, deleting the superseded forward_targets row', async () => {
     const db = await makeTestDb();
     const audioId = await seedAudio(db);
-    const menu = await runOperation<unknown, { id: string }>(
+    const menu = (await runOperation(
       db,
       'menus.create',
       {
@@ -219,8 +216,8 @@ describe('menus', () => {
         fallbackTarget: { kind: 'external', external: '+490000000' }
       },
       asRun()
-    );
-    const updated = await runOperation<unknown, { fallbackTarget: unknown }>(
+    )) as { id: string };
+    const updated = (await runOperation(
       db,
       'menus.update',
       {
@@ -228,7 +225,7 @@ describe('menus', () => {
         fallbackTarget: { kind: 'external', external: '+491111111' }
       },
       asRun()
-    );
+    )) as { fallbackTarget: unknown };
     expect(updated.fallbackTarget).toEqual({
       kind: 'external',
       external: '+491111111'
@@ -241,7 +238,7 @@ describe('menus', () => {
   it('allows deleting a menu whose own OOO rule routes back into its own scope', async () => {
     const db = await makeTestDb();
     const audioId = await seedAudio(db);
-    const menu = await runOperation<unknown, { id: string }>(
+    const menu = (await runOperation(
       db,
       'menus.create',
       {
@@ -250,7 +247,7 @@ describe('menus', () => {
         fallbackTarget: { kind: 'external', external: '+490000000' }
       },
       asRun()
-    );
+    )) as { id: string };
     const selfTargetId = newId();
     await db
       .insertInto('forwardTargets')
@@ -289,7 +286,7 @@ describe('menus', () => {
   it('refuses to delete a menu another menu still targets, with a Conflict listing it', async () => {
     const db = await makeTestDb();
     const audioId = await seedAudio(db);
-    const target = await runOperation<unknown, { id: string }>(
+    const target = (await runOperation(
       db,
       'menus.create',
       {
@@ -298,7 +295,7 @@ describe('menus', () => {
         fallbackTarget: { kind: 'external', external: '+490000000' }
       },
       asRun()
-    );
+    )) as { id: string };
     await runOperation(
       db,
       'menus.create',
@@ -322,7 +319,7 @@ describe('menus', () => {
   it('refuses to delete a menu when a live DID uses a forward_targets row other than the first one pointing at it', async () => {
     const db = await makeTestDb();
     const audioId = await seedAudio(db);
-    const target = await runOperation<unknown, { id: string }>(
+    const target = (await runOperation(
       db,
       'menus.create',
       {
@@ -331,7 +328,7 @@ describe('menus', () => {
         fallbackTarget: { kind: 'external', external: '+490000000' }
       },
       asRun()
-    );
+    )) as { id: string };
     // An orphaned `forward_targets` row pointing at the menu, inserted first, that no other
     // table references (a purge-pending row per §5.9): it must not be the only one inspected.
     await db

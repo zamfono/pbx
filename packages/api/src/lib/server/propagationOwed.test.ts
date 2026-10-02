@@ -9,7 +9,7 @@ import type { Db, ReloadKind } from '@zamfono/shared';
 import { getCoreClient, type CoreClient } from './coreClient.js';
 import { stubCoreClient } from './coreClientStub.js';
 import { apiHealth } from './health.js';
-import { renderMetrics, resetMetricsAccumulators } from './metrics.js';
+import { renderMetrics } from './metrics.js';
 import { runAfterCommit } from './ops/afterCommit.js';
 import { newEffects } from './ops/effects.js';
 import { register } from './ops/registry.js';
@@ -67,7 +67,6 @@ afterEach(async () => {
   vi.useRealTimers();
   vi.mocked(getCoreClient).mockReset();
   delete process.env.ASTERISK_GEN_DIR;
-  resetMetricsAccumulators();
   await Promise.all(
     dirs.splice(0).map(dir => rm(dir, { recursive: true, force: true }))
   );
@@ -185,24 +184,24 @@ describe('an owed config propagation', () => {
     };
 
     core.up = false;
-    const first = await runOperation<unknown, { warnings?: string[] }>(
+    const first = (await runOperation(
       db,
       'test.owedWrite',
       { label: 'first' },
       run
-    );
+    )) as { warnings?: string[] };
     expect(first.warnings?.[0]).toBe(
       'the change is stored but has not reached Asterisk (core unreachable); api retries it until it does'
     );
     expect(ran).toEqual(['commit first']);
 
     core.up = true;
-    const second = await runOperation<unknown, { warnings?: string[] }>(
+    const second = (await runOperation(
       db,
       'test.owedWrite',
       { label: 'second' },
       run
-    );
+    )) as { warnings?: string[] };
     expect(second.warnings).toBeUndefined();
     expect(ran).toEqual([
       'commit first',

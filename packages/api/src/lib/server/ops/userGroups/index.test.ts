@@ -19,15 +19,12 @@ function asRun(overrides: Partial<RunInput> = {}): RunInput {
 describe('userGroups', () => {
   it('create assigns an id and stores its direct user members', async () => {
     const db = await makeTestDb();
-    const group = await runOperation<
-      unknown,
-      { id: string; members: unknown[] }
-    >(
+    const group = (await runOperation(
       db,
       'userGroups.create',
       { name: 'Support', members: [{ kind: 'user', id: 'owner' }] },
       asRun()
-    );
+    )) as { id: string; members: unknown[] };
     expect(group.members).toEqual([{ kind: 'user', id: 'owner' }]);
   });
 
@@ -75,17 +72,19 @@ describe('userGroups', () => {
 
   it('update replaces members as a whole and propagates pjsip', async () => {
     const db = await makeTestDb();
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'userGroups.create',
       { name: 'Support', members: [{ kind: 'user', id: 'owner' }] },
       asRun()
-    );
+    )) as { id: string };
     vi.mocked(propagateConfig).mockClear();
-    const updated = await runOperation<
-      unknown,
-      { id: string; members: unknown[] }
-    >(db, 'userGroups.update', { id: group.id, members: [] }, asRun());
+    const updated = (await runOperation(
+      db,
+      'userGroups.update',
+      { id: group.id, members: [] },
+      asRun()
+    )) as { id: string; members: unknown[] };
     expect(updated.members).toEqual([]);
     expect(vi.mocked(propagateConfig).mock.calls).toEqual([[db, ['pjsip']]]);
   });
@@ -105,38 +104,35 @@ describe('userGroups', () => {
 
   it('nests one user group under another and lists the child on the parent', async () => {
     const db = await makeTestDb();
-    const child = await runOperation<unknown, { id: string }>(
+    const child = (await runOperation(
       db,
       'userGroups.create',
       { name: 'Tier 2' },
       asRun()
-    );
-    const parent = await runOperation<
-      unknown,
-      { id: string; members: unknown[] }
-    >(
+    )) as { id: string };
+    const parent = (await runOperation(
       db,
       'userGroups.create',
       { name: 'Tier 1', members: [{ kind: 'userGroup', id: child.id }] },
       asRun()
-    );
+    )) as { id: string; members: unknown[] };
     expect(parent.members).toEqual([{ kind: 'userGroup', id: child.id }]);
   });
 
   it('refuses a nesting that would create a cycle, with a 409 naming the path', async () => {
     const db = await makeTestDb();
-    const groupA = await runOperation<unknown, { id: string }>(
+    const groupA = (await runOperation(
       db,
       'userGroups.create',
       { name: 'A' },
       asRun()
-    );
-    const groupB = await runOperation<unknown, { id: string }>(
+    )) as { id: string };
+    const groupB = (await runOperation(
       db,
       'userGroups.create',
       { name: 'B', members: [{ kind: 'userGroup', id: groupA.id }] },
       asRun()
-    );
+    )) as { id: string };
     const attempt = runOperation(
       db,
       'userGroups.update',
@@ -152,18 +148,18 @@ describe('userGroups', () => {
 
   it('deletes a user group without checking ring-group membership as a blocking reference', async () => {
     const db = await makeTestDb();
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'userGroups.create',
       { name: 'Sales' },
       asRun()
-    );
-    const deleted = await runOperation<unknown, { id: string }>(
+    )) as { id: string };
+    const deleted = (await runOperation(
       db,
       'userGroups.delete',
       { id: group.id },
       asRun({ confirm: true })
-    );
+    )) as { id: string };
     expect(deleted.id).toBe(group.id);
     const row = await db
       .selectFrom('userGroups')
@@ -185,7 +181,7 @@ describe('userGroups', () => {
         createdAt: nowIso()
       })
       .execute();
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'userGroups.create',
       {
@@ -196,27 +192,27 @@ describe('userGroups', () => {
         ]
       },
       asRun()
-    );
+    )) as { id: string };
     await db
       .updateTable('users')
       .set({ deletedAt: nowIso() })
       .where('id', '=', 'anna')
       .execute();
 
-    const read = await runOperation<unknown, { members: unknown[] }>(
+    const read = (await runOperation(
       db,
       'userGroups.get',
       { id: group.id },
       asRun()
-    );
+    )) as { members: unknown[] };
 
     expect(read.members).toEqual([{ kind: 'user', id: 'owner' }]);
-    const written = await runOperation<unknown, { members: unknown[] }>(
+    const written = (await runOperation(
       db,
       'userGroups.update',
       { id: group.id, members: read.members },
       asRun()
-    );
+    )) as { members: unknown[] };
     expect(written.members).toEqual([{ kind: 'user', id: 'owner' }]);
   });
 });

@@ -57,7 +57,7 @@ describe('stats.query', () => {
       status: 'answered'
     });
 
-    const result = await runOperation<unknown, QueryOutput>(
+    const result = (await runOperation(
       db,
       'stats.query',
       {
@@ -67,7 +67,7 @@ describe('stats.query', () => {
         bucket: 'day'
       },
       asRun()
-    );
+    )) as QueryOutput;
 
     expect(result.buckets).toEqual([
       { start: '2026-01-01T00:00:00.000Z', value: 2 },
@@ -87,7 +87,7 @@ describe('stats.query', () => {
       status: 'interrupted'
     });
 
-    const result = await runOperation<unknown, QueryOutput>(
+    const result = (await runOperation(
       db,
       'stats.query',
       {
@@ -97,7 +97,7 @@ describe('stats.query', () => {
         bucket: 'day'
       },
       asRun()
-    );
+    )) as QueryOutput;
 
     expect(result.buckets).toEqual([
       { start: '2026-01-01T00:00:00.000Z', value: 1 }
@@ -124,7 +124,7 @@ describe('stats.query', () => {
       status: 'failed'
     });
 
-    const result = await runOperation<unknown, QueryOutput>(
+    const result = (await runOperation(
       db,
       'stats.query',
       {
@@ -134,7 +134,7 @@ describe('stats.query', () => {
         bucket: 'day'
       },
       asRun()
-    );
+    )) as QueryOutput;
 
     expect(result.buckets).toEqual([
       { start: '2026-01-01T00:00:00.000Z', value: 1 / 3 }
@@ -144,7 +144,7 @@ describe('stats.query', () => {
   it('is null for a bucket with no calls', async () => {
     const db = await makeTestDb();
 
-    const result = await runOperation<unknown, QueryOutput>(
+    const result = (await runOperation(
       db,
       'stats.query',
       {
@@ -154,7 +154,7 @@ describe('stats.query', () => {
         bucket: 'day'
       },
       asRun()
-    );
+    )) as QueryOutput;
 
     expect(result.buckets).toEqual([
       { start: '2026-01-01T00:00:00.000Z', value: null }
@@ -182,7 +182,7 @@ describe('stats.query', () => {
   it('serves a week at minute resolution', async () => {
     const db = await makeTestDb();
 
-    const result = await runOperation<unknown, QueryOutput>(
+    const result = (await runOperation(
       db,
       'stats.query',
       {
@@ -192,7 +192,7 @@ describe('stats.query', () => {
         bucket: 'minute'
       },
       asRun()
-    );
+    )) as QueryOutput;
 
     expect(result.buckets).toHaveLength(7 * 24 * 60);
   });
@@ -222,7 +222,7 @@ describe('stats.query', () => {
       status: 'answered'
     });
 
-    const result = await runOperation<unknown, QueryOutput>(
+    const result = (await runOperation(
       db,
       'stats.query',
       {
@@ -232,7 +232,7 @@ describe('stats.query', () => {
         bucket: 'hour'
       },
       asRun()
-    );
+    )) as QueryOutput;
 
     expect(result.buckets[0]).toEqual({
       start: '2026-01-01T23:00:00.000Z',

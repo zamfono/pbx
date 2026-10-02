@@ -189,8 +189,6 @@ async function executeInTransaction(
   }
 }
 
-/* eslint-disable @typescript-eslint/no-unused-vars -- `In` documents an operation's input type at the call site; only `name` selects the operation at runtime */
-/* eslint-disable @typescript-eslint/no-unnecessary-type-parameters -- `In` documents an operation's input type at the call site; only `name` selects the operation at runtime */
 /**
  * Validates `input` against the named operation's schema (422), enforces its `minRole` (403)
  * and its confirmation gate (409), runs it in one transaction with its audit row, then, for a
@@ -198,12 +196,12 @@ async function executeInTransaction(
  * once the transaction has committed (§10.3, §3.1). The operation's own result is returned once
  * the commit succeeds, whatever follows it reports; a failed propagation is a warning of it.
  */
-export async function runOperation<In, Out>(
+export async function runOperation(
   db: Db,
   name: string,
   input: unknown,
   run: RunInput
-): Promise<Out> {
+): Promise<unknown> {
   const op = findOperation(name);
   const parsedInput = parseInput(op, input);
   checkRole(op, run.actor);
@@ -236,7 +234,5 @@ export async function runOperation<In, Out>(
   return withWarnings(
     output,
     await runAfterCommit(db, effects, propagationFailure)
-  ) as Out;
+  );
 }
-/* eslint-enable @typescript-eslint/no-unused-vars */
-/* eslint-enable @typescript-eslint/no-unnecessary-type-parameters */

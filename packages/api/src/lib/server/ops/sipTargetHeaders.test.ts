@@ -50,7 +50,7 @@ async function createTrunk(
   name: string,
   transport: 'udp' | 'tls'
 ): Promise<string> {
-  const { trunk } = await runOperation<unknown, { trunk: { id: string } }>(
+  const { trunk } = (await runOperation(
     db,
     'trunks.create',
     {
@@ -61,7 +61,7 @@ async function createTrunk(
       hosts: [{ host: `${name.toLowerCase()}.example` }]
     },
     asRun()
-  );
+  )) as { trunk: { id: string } };
   return trunk.id;
 }
 
@@ -79,12 +79,12 @@ async function createDid(
     user: 'proj_abc123',
     ...(headers === undefined ? {} : { headers })
   };
-  return runOperation<unknown, DidOut>(
+  return runOperation(
     db,
     'dids.create',
     { number: `+43${String(Math.floor(Math.random() * 1e8))}`, target },
     asRun()
-  );
+  ) as Promise<DidOut>;
 }
 
 async function storedHeaders(db: Db, didId: string): Promise<unknown> {
@@ -185,7 +185,7 @@ describe('sip target headers', () => {
     expect((await createDid(db, tlsId, large)).warnings).toBeUndefined();
 
     // The shared target writer warns on every operation that writes through it.
-    const forwarding = await runOperation<unknown, { warnings?: string[] }>(
+    const forwarding = (await runOperation(
       db,
       'users.setForwarding',
       {
@@ -203,7 +203,7 @@ describe('sip target headers', () => {
         ]
       },
       asRun()
-    );
+    )) as { warnings?: string[] };
     expect(forwarding.warnings).toHaveLength(1);
   });
 });

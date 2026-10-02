@@ -60,12 +60,12 @@ describe('ringGroups', () => {
     const db = await makeTestDb();
     await seedTenant(db);
     vi.mocked(propagateConfig).mockClear();
-    const created = await runOperation<unknown, { id: string; ext: string }>(
+    const created = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Support', strategy: 'simultaneous' },
       asRun()
-    );
+    )) as { id: string; ext: string };
     expect(created.ext).toBe('001');
     const row = await db
       .selectFrom('extensions')
@@ -100,12 +100,12 @@ describe('ringGroups', () => {
   it('refuses a malformed external forwarding target with a validation error', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Bad target', strategy: 'simultaneous' },
       asRun()
-    );
+    )) as { id: string };
     const attempt = runOperation(
       db,
       'ringGroups.setForwarding',
@@ -126,7 +126,7 @@ describe('ringGroups', () => {
   it('update replaces members as a whole and propagates pjsip', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       {
@@ -135,7 +135,7 @@ describe('ringGroups', () => {
         members: [{ kind: 'user', id: 'owner' }]
       },
       asRun()
-    );
+    )) as { id: string };
     vi.mocked(propagateConfig).mockClear();
     await runOperation(
       db,
@@ -155,7 +155,7 @@ describe('ringGroups', () => {
   it('update of a routing field alone tells core, without an Asterisk reload (§3.1, §7)', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       {
@@ -164,7 +164,7 @@ describe('ringGroups', () => {
         members: [{ kind: 'user', id: 'owner' }]
       },
       asRun()
-    );
+    )) as { id: string };
     vi.mocked(propagateConfig).mockClear();
     await runOperation(
       db,
@@ -190,7 +190,7 @@ describe('ringGroups', () => {
         createdAt: nowIso()
       })
       .execute();
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       {
@@ -202,16 +202,18 @@ describe('ringGroups', () => {
         ]
       },
       asRun()
-    );
+    )) as { id: string };
     await db
       .updateTable('users')
       .set({ deletedAt: nowIso() })
       .where('id', '=', memberId)
       .execute();
-    const read = await runOperation<
-      unknown,
-      { members: { kind: string; id: string }[] }
-    >(db, 'ringGroups.get', { id: group.id }, asRun());
+    const read = (await runOperation(
+      db,
+      'ringGroups.get',
+      { id: group.id },
+      asRun()
+    )) as { members: { kind: string; id: string }[] };
     expect(read.members).toEqual([{ position: 0, kind: 'user', id: 'owner' }]);
     await expect(
       runOperation(
@@ -236,12 +238,12 @@ describe('ringGroups', () => {
       asRun()
     );
     await expect(createAttempt).rejects.toMatchObject({ status: 422 });
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Strict target', strategy: 'simultaneous' },
       asRun()
-    );
+    )) as { id: string };
     const forwardingAttempt = runOperation(
       db,
       'ringGroups.setForwarding',
@@ -261,12 +263,12 @@ describe('ringGroups', () => {
   it('refuses to delete a ring group a DID still targets, with a Conflict listing it', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Reception', strategy: 'simultaneous' },
       asRun()
-    );
+    )) as { id: string };
     const targetId = newId();
     await db
       .insertInto('forwardTargets')
@@ -308,12 +310,12 @@ describe('ringGroups', () => {
   it('allows deleting a ring group whose own opening-hours schedule closes to its own mailbox', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Own Schedule', strategy: 'simultaneous' },
       asRun()
-    );
+    )) as { id: string };
     const ownMailboxTargetId = newId();
     await db
       .insertInto('forwardTargets')
@@ -352,12 +354,12 @@ describe('ringGroups', () => {
   it('delete records the removed extension and BLF keys in the audit diff', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const group = await runOperation<unknown, { id: string; ext: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Reception', strategy: 'simultaneous' },
       asRun()
-    );
+    )) as { id: string; ext: string };
     const deviceId = newId();
     await db
       .insertInto('devices')
@@ -415,12 +417,12 @@ describe('ringGroups', () => {
   it('setForwarding replaces the unanswered and unavailable rules as a whole', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Support', strategy: 'simultaneous' },
       asRun()
-    );
+    )) as { id: string };
     await runOperation(
       db,
       'ringGroups.setForwarding',
@@ -453,12 +455,12 @@ describe('ringGroups', () => {
   it('setForwarding refuses two rules with the same condition, with a 422', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Duplicate condition', strategy: 'simultaneous' },
       asRun()
-    );
+    )) as { id: string };
     const attempt = runOperation(
       db,
       'ringGroups.setForwarding',
@@ -483,12 +485,12 @@ describe('ringGroups', () => {
   it('update refuses two members naming the same user, with a 422', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Duplicate member', strategy: 'simultaneous' },
       asRun()
-    );
+    )) as { id: string };
     const attempt = runOperation(
       db,
       'ringGroups.update',
@@ -518,12 +520,12 @@ describe('ringGroups', () => {
   it('setForwarding refuses a soft-deleted ring group with a 404', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Gone', strategy: 'simultaneous' },
       asRun()
-    );
+    )) as { id: string };
     await runOperation(
       db,
       'ringGroups.delete',
@@ -542,18 +544,18 @@ describe('ringGroups', () => {
   it('setForwarding refuses a rule targeting a soft-deleted ring group, with a 404', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Front desk', strategy: 'simultaneous' },
       asRun()
-    );
-    const deletedTarget = await runOperation<unknown, { id: string }>(
+    )) as { id: string };
+    const deletedTarget = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Gone target', strategy: 'simultaneous' },
       asRun()
-    );
+    )) as { id: string };
     await runOperation(
       db,
       'ringGroups.delete',
@@ -586,12 +588,12 @@ describe('ringGroups', () => {
   it('setForwarding refuses a rule targeting an unknown user id, with a 404 rather than a raw DB error', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Sales', strategy: 'simultaneous' },
       asRun()
-    );
+    )) as { id: string };
     const attempt = runOperation(
       db,
       'ringGroups.setForwarding',
@@ -640,17 +642,19 @@ describe('ringGroups', () => {
   it('sets a diagnostics override and gives it a 7-day expiry (§7)', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Support', strategy: 'simultaneous' },
       asRun()
-    );
+    )) as { id: string };
 
-    const out = await runOperation<
-      unknown,
-      { logLevel: string | null; logLevelExpiresAt: string | null }
-    >(db, 'ringGroups.update', { id: group.id, logLevel: 'qos' }, asRun());
+    const out = (await runOperation(
+      db,
+      'ringGroups.update',
+      { id: group.id, logLevel: 'qos' },
+      asRun()
+    )) as { logLevel: string | null; logLevelExpiresAt: string | null };
 
     expect(out.logLevel).toBe('qos');
     const expiresAt = Date.parse(out.logLevelExpiresAt ?? '');
@@ -674,17 +678,14 @@ describe('ringGroups', () => {
   it('keeps an explicit override expiry and clears the override on null (§7)', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Support', strategy: 'simultaneous' },
       asRun()
-    );
+    )) as { id: string };
 
-    const set = await runOperation<
-      unknown,
-      { logLevel: string | null; logLevelExpiresAt: string | null }
-    >(
+    const set = (await runOperation(
       db,
       'ringGroups.update',
       {
@@ -693,13 +694,15 @@ describe('ringGroups', () => {
         logLevelExpiresAt: '2026-10-01T00:00:00.000Z'
       },
       asRun()
-    );
+    )) as { logLevel: string | null; logLevelExpiresAt: string | null };
     expect(set.logLevelExpiresAt).toBe('2026-10-01T00:00:00.000Z');
 
-    const cleared = await runOperation<
-      unknown,
-      { logLevel: string | null; logLevelExpiresAt: string | null }
-    >(db, 'ringGroups.update', { id: group.id, logLevel: null }, asRun());
+    const cleared = (await runOperation(
+      db,
+      'ringGroups.update',
+      { id: group.id, logLevel: null },
+      asRun()
+    )) as { logLevel: string | null; logLevelExpiresAt: string | null };
 
     expect(cleared.logLevel).toBeNull();
     expect(cleared.logLevelExpiresAt).toBeNull();

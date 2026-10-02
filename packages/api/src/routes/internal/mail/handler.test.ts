@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 
 import { POST } from './+server.js';
 
-const STATUS_NOT_FOUND = 404;
 const STATUS_BAD_REQUEST = 400;
 const STATUS_ACCEPTED = 202;
 const KEY_BYTE_LENGTH = 32;
@@ -21,17 +20,6 @@ function eventFor(request: Request): RequestEvent {
 }
 
 describe('POST /internal/mail', () => {
-  it('returns 404 when the request carries X-Forwarded-For', async () => {
-    const request = new Request('http://internal/internal/mail', {
-      method: 'POST',
-      headers: { 'x-forwarded-for': '203.0.113.9' },
-      body: JSON.stringify({ kind: 'missedCall' })
-    });
-    // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
-    const response = await POST(eventFor(request));
-    expect(response.status).toBe(STATUS_NOT_FOUND);
-  });
-
   it('returns 400 for an attachmentPath outside the voicemail media directory', async () => {
     const request = new Request('http://internal/internal/mail', {
       method: 'POST',

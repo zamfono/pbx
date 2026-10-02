@@ -104,13 +104,13 @@ describe('search', () => {
   it("finds a contact and a user by name, without matching a non-admin's e-mail", async () => {
     const db = await makeTestDb();
     await seedFixtures(db);
-    const result = await runOperation<unknown, { items: Item[] }>(
+    const result = (await runOperation(
       db,
       'search.query',
       // eslint-disable-next-line id-length -- 'q' is the wire query-parameter name fixed by §10.3's `GET /search?q=`
       { q: 'hub' },
       asRun(user)
-    );
+    )) as { items: Item[] };
     expect(result.items).toContainEqual({
       kind: 'user',
       id: 'anna',
@@ -131,13 +131,13 @@ describe('search', () => {
   it('also finds an e-mail-only match for an admin', async () => {
     const db = await makeTestDb();
     await seedFixtures(db);
-    const result = await runOperation<unknown, { items: Item[] }>(
+    const result = (await runOperation(
       db,
       'search.query',
       // eslint-disable-next-line id-length -- 'q' is the wire query-parameter name fixed by §10.3's `GET /search?q=`
       { q: 'hub' },
       asRun(admin)
-    );
+    )) as { items: Item[] };
     expect(result.items).toContainEqual({
       kind: 'user',
       id: 'bob',
@@ -149,7 +149,7 @@ describe('search', () => {
   it('finds a contact by name and labels it with its first phone number', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const contact = await runOperation<unknown, { id: string }>(
+    const contact = (await runOperation(
       db,
       'contacts.create',
       {
@@ -157,14 +157,14 @@ describe('search', () => {
         phones: [{ label: 'work', number: '089 123' }]
       },
       asRun(owner)
-    );
-    const result = await runOperation<unknown, { items: Item[] }>(
+    )) as { id: string };
+    const result = (await runOperation(
       db,
       'search.query',
       // eslint-disable-next-line id-length -- 'q' is the wire query-parameter name fixed by §10.3's `GET /search?q=`
       { q: 'hub' },
       asRun(user)
-    );
+    )) as { items: Item[] };
     expect(result.items).toContainEqual({
       kind: 'contact',
       id: contact.id,
@@ -176,7 +176,7 @@ describe('search', () => {
   it('finds a contact by its normalized phone number', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const contact = await runOperation<unknown, { id: string }>(
+    const contact = (await runOperation(
       db,
       'contacts.create',
       {
@@ -184,14 +184,14 @@ describe('search', () => {
         phones: [{ label: 'work', number: '089 123' }]
       },
       asRun(owner)
-    );
-    const result = await runOperation<unknown, { items: Item[] }>(
+    )) as { id: string };
+    const result = (await runOperation(
       db,
       'search.query',
       // eslint-disable-next-line id-length -- 'q' is the wire query-parameter name fixed by §10.3's `GET /search?q=`
       { q: '+4989123' },
       asRun(user)
-    );
+    )) as { items: Item[] };
     expect(result.items).toContainEqual({
       kind: 'contact',
       id: contact.id,

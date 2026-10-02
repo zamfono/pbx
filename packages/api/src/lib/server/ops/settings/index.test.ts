@@ -108,10 +108,10 @@ describe('settings', () => {
       { smtpHost: 'mail.example.com', smtpPassword: 'sekret' },
       asRun()
     );
-    const settings = await runOperation<
-      unknown,
-      { smtpPassword: string | null; smtpHost: string | null }
-    >(db, 'settings.get', {}, asRun());
+    const settings = (await runOperation(db, 'settings.get', {}, asRun())) as {
+      smtpPassword: string | null;
+      smtpHost: string | null;
+    };
     expect(settings.smtpHost).toBe('mail.example.com');
     expect(settings.smtpPassword).toBe('***');
   });

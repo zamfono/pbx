@@ -283,12 +283,12 @@ describe('provisioning.ringotelSetup', () => {
 
     // The organization's domain is globally unique at Ringotel; an orphan would refuse this.
     ringotel.failing.delete('createBranch');
-    const output = await runOperation<unknown, { ringotelOrgId: string }>(
+    const output = (await runOperation(
       db,
       'provisioning.ringotelSetup',
       { domain: 'testco', region: '3', packageid: 1 },
       asRun()
-    );
+    )) as { ringotelOrgId: string };
     expect(ringotel.organizations).toEqual([
       { id: output.ringotelOrgId, domain: 'testco' }
     ]);

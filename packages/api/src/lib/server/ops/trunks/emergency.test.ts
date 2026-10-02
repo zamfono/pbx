@@ -29,7 +29,7 @@ async function createTrunk(
   name: string,
   emergency: boolean
 ): Promise<TrunkOutput> {
-  return runOperation<unknown, TrunkOutput>(
+  return runOperation(
     db,
     'trunks.create',
     {
@@ -39,7 +39,7 @@ async function createTrunk(
       hosts: [{ host: `${name}.provider.example` }]
     },
     asRun()
-  );
+  ) as Promise<TrunkOutput>;
 }
 
 async function updateTrunk(
@@ -47,12 +47,12 @@ async function updateTrunk(
   id: string,
   emergency: boolean
 ): Promise<TrunkOutput> {
-  return runOperation<unknown, TrunkOutput>(
+  return runOperation(
     db,
     'trunks.update',
     { id, emergency },
     asRun()
-  );
+  ) as Promise<TrunkOutput>;
 }
 
 /** Deletes `id` after dropping the outbound routes that name it, which would refuse the delete. */
@@ -61,12 +61,12 @@ async function deleteTrunk(
   id: string
 ): Promise<{ warnings: string[] }> {
   await db.deleteFrom('outboundRoutes').where('trunkId', '=', id).execute();
-  return runOperation<unknown, { warnings: string[] }>(
+  return runOperation(
     db,
     'trunks.delete',
     { id },
     { ...asRun(), confirm: true }
-  );
+  ) as Promise<{ warnings: string[] }>;
 }
 
 describe('emergency trunks (§9.4 "Emergency trunks")', () => {
@@ -92,12 +92,12 @@ describe('emergency trunks (§9.4 "Emergency trunks")', () => {
     expect(trunk.emergency).toBe(true);
     const updated = await updateTrunk(db, trunk.id, false);
     expect(updated.trunk.emergency).toBe(false);
-    const got = await runOperation<unknown, { emergency: boolean }>(
+    const got = (await runOperation(
       db,
       'trunks.get',
       { id: trunk.id },
       asRun()
-    );
+    )) as { emergency: boolean };
     expect(got.emergency).toBe(false);
   });
 

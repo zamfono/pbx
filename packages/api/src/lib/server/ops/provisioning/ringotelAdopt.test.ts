@@ -134,12 +134,12 @@ describe('provisioning.ringotelAdopt', () => {
     await seedSettings(db);
     const fake = install([TARGET]);
 
-    const output = await runOperation<unknown, { ringotelBranchId: string }>(
+    const output = (await runOperation(
       db,
       'provisioning.ringotelAdopt',
       { orgId: 'org-9', domain: 'zamfono-test' },
       confirmed
-    );
+    )) as { ringotelBranchId: string };
 
     expect(fake.branches).toEqual([
       {

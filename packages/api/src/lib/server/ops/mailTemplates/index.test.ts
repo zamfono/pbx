@@ -62,12 +62,12 @@ describe('mailTemplates', () => {
   it('lists the six builtin templates in the tenant language', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const listed = await runOperation<unknown, { items: MailTemplateWire[] }>(
+    const listed = (await runOperation(
       db,
       'mailTemplates.list',
       {},
       asRun()
-    );
+    )) as { items: MailTemplateWire[] };
     expect(listed.items).toHaveLength(6);
     expect(listed.items.every(item => item.source === 'builtin')).toBe(true);
   });
@@ -106,12 +106,12 @@ describe('mailTemplates', () => {
       },
       asRun()
     );
-    const read = await runOperation<unknown, MailTemplateWire>(
+    const read = (await runOperation(
       db,
       'mailTemplates.get',
       { kind: 'reset', language: 'en' },
       asRun()
-    );
+    )) as MailTemplateWire;
     expect(read.source).toBe('tenant');
     expect(read.subject).toBe('Reset your password');
     await runOperation(
@@ -120,24 +120,24 @@ describe('mailTemplates', () => {
       { kind: 'reset', language: 'en' },
       asRun({ confirm: true })
     );
-    const afterDelete = await runOperation<unknown, MailTemplateWire>(
+    const afterDelete = (await runOperation(
       db,
       'mailTemplates.get',
       { kind: 'reset', language: 'en' },
       asRun()
-    );
+    )) as MailTemplateWire;
     expect(afterDelete.source).toBe('builtin');
   });
 
   it('skips a test send while no relay is configured, auditing it as non-undoable', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const result = await runOperation<unknown, { status: string }>(
+    const result = (await runOperation(
       db,
       'mailTemplates.test',
       { kind: 'reset' },
       asRun()
-    );
+    )) as { status: string };
     expect(result.status).toBe('skipped');
     const audit = await db
       .selectFrom('auditLog')

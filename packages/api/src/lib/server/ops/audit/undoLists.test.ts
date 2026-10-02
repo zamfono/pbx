@@ -53,12 +53,12 @@ async function seedTenant(db: Db): Promise<void> {
 }
 
 async function createUser(db: Db, name: string, ext: string): Promise<string> {
-  const result = await runOperation<unknown, { user: { id: string } }>(
+  const result = (await runOperation(
     db,
     'users.create',
     { name, email: `${name.toLowerCase()}@x.test`, extension: ext },
     asRun()
-  );
+  )) as { user: { id: string } };
   return result.user.id;
 }
 
@@ -115,12 +115,12 @@ describe('audit.undo of a whole-list replace', () => {
   it("restores a ring group's forwarding rules", async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Support', strategy: 'simultaneous' },
       asRun()
-    );
+    )) as { id: string };
     await runOperation(
       db,
       'ringGroups.setForwarding',
@@ -162,12 +162,12 @@ describe('audit.undo of a whole-list replace', () => {
         createdAt: nowIso()
       })
       .execute();
-    const menu = await runOperation<unknown, { id: string }>(
+    const menu = (await runOperation(
       db,
       'menus.create',
       { name: 'Main menu', audioId, fallbackTarget: external('+4900') },
       asRun()
-    );
+    )) as { id: string };
     const first = [{ digits: '1', target: external('+4911') }];
     await runOperation(
       db,
@@ -184,12 +184,12 @@ describe('audit.undo of a whole-list replace', () => {
 
     await undoLatest(db, 'menus.setTargets', menu.id);
 
-    const read = await runOperation<unknown, { targets: unknown[] }>(
+    const read = (await runOperation(
       db,
       'menus.get',
       { id: menu.id },
       asRun()
-    );
+    )) as { targets: unknown[] };
     expect(read.targets).toEqual(first);
   });
 
@@ -198,12 +198,12 @@ describe('audit.undo of a whole-list replace', () => {
     await seedTenant(db);
     const anna = await createUser(db, 'Anna', '101');
     await createUser(db, 'Ben', '102');
-    const device = await runOperation<unknown, { device: { id: string } }>(
+    const device = (await runOperation(
       db,
       'devices.create',
       { userId: anna, label: 'App', kind: 'ringotel' },
       asRun()
-    );
+    )) as { device: { id: string } };
     const { id } = device.device;
     await runOperation(db, 'devices.setBlf', { id, keys: ['102'] }, asRun());
     await runOperation(
@@ -215,12 +215,12 @@ describe('audit.undo of a whole-list replace', () => {
 
     await undoLatest(db, 'devices.setBlf', id);
 
-    const read = await runOperation<unknown, { keys: string[] }>(
+    const read = (await runOperation(
       db,
       'devices.getBlf',
       { id },
       asRun()
-    );
+    )) as { keys: string[] };
     expect(read.keys).toEqual(['102']);
   });
 });

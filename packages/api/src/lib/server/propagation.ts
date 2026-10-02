@@ -12,7 +12,7 @@ import pino, { type Logger } from 'pino';
 import type { Db, ReloadKind } from '@zamfono/shared';
 
 import { getCoreClient } from './coreClient.js';
-import { recordConfigPropagationFailure } from './metrics.js';
+import { recordConfigPropagationFailure } from './metricsCounters.js';
 import { runWaitingHooks } from './ops/afterCommit.js';
 import { render } from './pjsip/render.js';
 import {

@@ -118,12 +118,12 @@ describe('devices.create/delete/rotate/setBlf: provisioning wiring (§10.4)', ()
     await enableRingotel(db);
     const calls = stubFetch();
 
-    await runOperation<unknown, CreateOutput>(
+    (await runOperation(
       db,
       'devices.create',
       { userId, label: 'App', kind: 'ringotel' },
       asRun()
-    );
+    )) as CreateOutput;
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.method).toBe('createUser');
@@ -139,20 +139,20 @@ describe('devices.create/delete/rotate/setBlf: provisioning wiring (§10.4)', ()
     await enableRingotel(db);
     const calls = stubFetch();
 
-    const created = await runOperation<unknown, Record<string, unknown>>(
+    const created = (await runOperation(
       db,
       'devices.create',
       { userId, label: 'App', kind: 'ringotel' },
       asRun()
-    );
+    )) as Record<string, unknown>;
 
     expect(Object.keys(created)).toEqual(['device']);
-    const revealed = await runOperation<unknown, CreateOutput>(
+    const revealed = (await runOperation(
       db,
       'devices.revealCredentials',
       { id: (created.device as { id: string }).id },
       asRun()
-    );
+    )) as CreateOutput;
     expect(revealed.sipPassword).toBe(calls[0]?.params?.password);
   });
 
@@ -161,12 +161,12 @@ describe('devices.create/delete/rotate/setBlf: provisioning wiring (§10.4)', ()
     const userId = await seedUser(db);
     const calls = stubFetch();
 
-    await runOperation<unknown, CreateOutput>(
+    (await runOperation(
       db,
       'devices.create',
       { userId, label: 'App', kind: 'ringotel' },
       asRun()
-    );
+    )) as CreateOutput;
 
     expect(calls).toEqual([]);
   });
@@ -176,12 +176,12 @@ describe('devices.create/delete/rotate/setBlf: provisioning wiring (§10.4)', ()
     const userId = await seedUser(db);
     await enableRingotel(db);
     const calls = stubFetch({ getUsers: [{ id: 'ru-1', extension: '101' }] });
-    const device = await runOperation<unknown, CreateOutput>(
+    const device = (await runOperation(
       db,
       'devices.create',
       { userId, label: 'App', kind: 'ringotel' },
       asRun()
-    );
+    )) as CreateOutput;
     const callsBeforeDelete = calls.length;
 
     await runOperation(
@@ -202,12 +202,12 @@ describe('devices.create/delete/rotate/setBlf: provisioning wiring (§10.4)', ()
     const userId = await seedUser(db);
     await enableRingotel(db);
     const calls = stubFetch({ getUsers: [{ id: 'ru-1', extension: '101' }] });
-    const device = await runOperation<unknown, CreateOutput>(
+    const device = (await runOperation(
       db,
       'devices.create',
       { userId, label: 'App', kind: 'ringotel' },
       asRun()
-    );
+    )) as CreateOutput;
     const callsBeforeRotate = calls.length;
 
     await runOperation(
@@ -231,12 +231,12 @@ describe('devices.create/delete/rotate/setBlf: provisioning wiring (§10.4)', ()
       .execute();
     await enableRingotel(db);
     const calls = stubFetch({ getUsers: [{ id: 'ru-1', extension: '101' }] });
-    const device = await runOperation<unknown, CreateOutput>(
+    const device = (await runOperation(
       db,
       'devices.create',
       { userId, label: 'App', kind: 'ringotel' },
       asRun()
-    );
+    )) as CreateOutput;
     const callsBeforeSetBlf = calls.length;
 
     await runOperation(
@@ -261,12 +261,12 @@ describe('devices', () => {
   it('create returns a 24-char alphanumeric password and stores only ciphertext', async () => {
     const db = await makeTestDb();
     const userId = await seedUser(db);
-    const result = await runOperation<unknown, CreateOutput>(
+    const result = (await runOperation(
       db,
       'devices.create',
       { userId, label: 'Desk', kind: 'manual' },
       asRun()
-    );
+    )) as CreateOutput;
     expect(result.sipPassword).toMatch(/^[A-Za-z0-9]{24}$/u);
     const row = await db
       .selectFrom('devices')
@@ -282,12 +282,12 @@ describe('devices', () => {
   it('revealCredentials writes an undoable-0 audit row', async () => {
     const db = await makeTestDb();
     const userId = await seedUser(db);
-    const device = await runOperation<unknown, CreateOutput>(
+    const device = (await runOperation(
       db,
       'devices.create',
       { userId, label: 'Desk', kind: 'manual' },
       asRun()
-    );
+    )) as CreateOutput;
     await runOperation(
       db,
       'devices.revealCredentials',
@@ -309,12 +309,12 @@ describe('devices', () => {
       .insertInto('extensions')
       .values({ ext: '701', isParkingSlot: 1 })
       .execute();
-    const device = await runOperation<unknown, CreateOutput>(
+    const device = (await runOperation(
       db,
       'devices.create',
       { userId, label: 'App', kind: 'ringotel' },
       asRun()
-    );
+    )) as CreateOutput;
     await expect(
       runOperation(
         db,
@@ -342,12 +342,12 @@ describe('devices', () => {
   it('create writes an undoable audit row (no secret-bearing diff field)', async () => {
     const db = await makeTestDb();
     const userId = await seedUser(db);
-    await runOperation<unknown, CreateOutput>(
+    (await runOperation(
       db,
       'devices.create',
       { userId, label: 'Desk', kind: 'manual' },
       asRun()
-    );
+    )) as CreateOutput;
     const audit = await db
       .selectFrom('auditLog')
       .select('undoable')
@@ -373,7 +373,7 @@ describe('devices', () => {
         asRun()
       )
     ).rejects.toMatchObject({ status: 422 });
-    const device = await runOperation<unknown, CreateOutput>(
+    const device = (await runOperation(
       db,
       'devices.create',
       {
@@ -384,7 +384,7 @@ describe('devices', () => {
         allowedIps: ['10.0.0.1']
       },
       asRun()
-    );
+    )) as CreateOutput;
     await expect(
       runOperation(
         db,
@@ -446,7 +446,7 @@ describe('devices', () => {
   it('records an allowedIps change as wire arrays, not the stored JSON string', async () => {
     const db = await makeTestDb();
     const userId = await seedUser(db);
-    const device = await runOperation<unknown, CreateOutput>(
+    const device = (await runOperation(
       db,
       'devices.create',
       {
@@ -457,7 +457,7 @@ describe('devices', () => {
         allowedIps: ['10.0.0.1']
       },
       asRun()
-    );
+    )) as CreateOutput;
     await runOperation(
       db,
       'devices.update',

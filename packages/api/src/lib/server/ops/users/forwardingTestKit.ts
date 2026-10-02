@@ -54,7 +54,7 @@ export async function createUser(
   name: string,
   extension: string
 ): Promise<Actor> {
-  const { user } = await runOperation<unknown, { user: { id: string } }>(
+  const { user } = (await runOperation(
     db,
     'users.create',
     {
@@ -64,7 +64,7 @@ export async function createUser(
       role: 'user'
     },
     asRun()
-  );
+  )) as { user: { id: string } };
   return { id: user.id, name, role: 'user' };
 }
 
@@ -74,7 +74,7 @@ export async function createTrunk(
   name = 'OpenAI',
   host = 'sip.api.openai.com'
 ): Promise<string> {
-  const { trunk } = await runOperation<unknown, { trunk: { id: string } }>(
+  const { trunk } = (await runOperation(
     db,
     'trunks.create',
     {
@@ -84,7 +84,7 @@ export async function createTrunk(
       hosts: [{ host, direction: 'outbound' }]
     },
     asRun()
-  );
+  )) as { trunk: { id: string } };
   return trunk.id;
 }
 
@@ -97,12 +97,12 @@ export async function setForwarding(
   rules: Rule[],
   actor: Actor = owner
 ): Promise<Forwarding> {
-  return runOperation(
+  return (await runOperation(
     db,
     'users.setForwarding',
     { id, rules },
     asRun({ actor })
-  );
+  )) as Forwarding;
 }
 
 export async function getForwarding(
@@ -110,7 +110,12 @@ export async function getForwarding(
   id: string,
   actor: Actor = owner
 ): Promise<Forwarding> {
-  return runOperation(db, 'users.getForwarding', { id }, asRun({ actor }));
+  return (await runOperation(
+    db,
+    'users.getForwarding',
+    { id },
+    asRun({ actor })
+  )) as Forwarding;
 }
 
 /** The stored rules' conditions, sorted, which each test compares against what it wrote. */

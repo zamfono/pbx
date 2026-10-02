@@ -62,7 +62,7 @@ async function createTrunk(db: Db): Promise<string> {
     },
     asRun()
   );
-  const { trunk } = await runOperation<unknown, { trunk: { id: string } }>(
+  const { trunk } = (await runOperation(
     db,
     'trunks.create',
     {
@@ -74,7 +74,7 @@ async function createTrunk(db: Db): Promise<string> {
       hosts: [{ host: 'sip.api.openai.com', port: 5061, direction: 'outbound' }]
     },
     asRun()
-  );
+  )) as { trunk: { id: string } };
   return trunk.id;
 }
 
@@ -86,12 +86,12 @@ async function createDid(
   db: Db,
   target: Record<string, string>
 ): Promise<{ id: string; target: unknown }> {
-  return runOperation<unknown, { id: string; target: unknown }>(
+  return runOperation(
     db,
     'dids.create',
     { number: '+4312345', target },
     asRun()
-  );
+  ) as Promise<{ id: string; target: unknown }>;
 }
 
 async function deleteTrunk(db: Db, id: string): Promise<unknown> {
@@ -122,10 +122,9 @@ describe('sip forward targets', () => {
       sipUser: 'proj_abc123',
       external: null
     });
-    const listed = await runOperation<
-      unknown,
-      { items: { target: unknown }[] }
-    >(db, 'dids.list', {}, asRun());
+    const listed = (await runOperation(db, 'dids.list', {}, asRun())) as {
+      items: { target: unknown }[];
+    };
     expect(listed.items.map(item => item.target)).toContainEqual(stored);
   });
 
@@ -159,12 +158,12 @@ describe('sip forward targets', () => {
       },
       asRun()
     );
-    const ooo = await runOperation<unknown, { id: string }>(
+    const ooo = (await runOperation(
       db,
       'ooo.create',
       { scope: { kind: 'user', id: 'owner' }, target: sipTarget(trunkId) },
       asRun()
-    );
+    )) as { id: string };
 
     // Creating one: an OOO rule, an opening-hours schedule.
     await expect(
@@ -201,7 +200,7 @@ describe('sip forward targets', () => {
       )
     ).rejects.toMatchObject({ status: 403 });
     // Replacing it with another kind is the user's own business.
-    const replaced = await runOperation<unknown, { target: unknown }>(
+    const replaced = (await runOperation(
       db,
       'ooo.update',
       {
@@ -209,7 +208,7 @@ describe('sip forward targets', () => {
         target: { kind: 'mailboxUser', userId: 'owner' }
       },
       asRun({ actor: self })
-    );
+    )) as { target: unknown };
     expect(replaced.target).toEqual({ kind: 'mailboxUser', userId: 'owner' });
   });
 

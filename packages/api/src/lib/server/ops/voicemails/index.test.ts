@@ -96,22 +96,22 @@ describe('voicemails', () => {
     const groupVmId = await seedVoicemail(db, { mailboxRingGroupId: groupId });
     const otherId = await seedVoicemail(db, { mailboxUserId: 'u2' });
 
-    const asUser = await runOperation<unknown, { items: { id: string }[] }>(
+    const asUser = (await runOperation(
       db,
       'voicemails.list',
       {},
       asRun({ actor: anna })
-    );
+    )) as { items: { id: string }[] };
     expect(new Set(asUser.items.map(item => item.id))).toEqual(
       new Set([ownId, groupVmId])
     );
 
-    const asOwner = await runOperation<unknown, { items: { id: string }[] }>(
+    const asOwner = (await runOperation(
       db,
       'voicemails.list',
       {},
       asRun({ actor: owner })
-    );
+    )) as { items: { id: string }[] };
     expect(new Set(asOwner.items.map(item => item.id))).toEqual(
       new Set([ownId, groupVmId, otherId])
     );
@@ -131,12 +131,12 @@ describe('voicemails', () => {
       })
     );
 
-    const result = await runOperation<unknown, { id: string; read: boolean }>(
+    const result = (await runOperation(
       db,
       'voicemails.markRead',
       { id: vmId, read: true },
       asRun({ actor: anna })
-    );
+    )) as { id: string; read: boolean };
     expect(result.read).toBe(true);
     expect(mwiCalls).toEqual(['user:u1']);
 
@@ -156,12 +156,12 @@ describe('voicemails', () => {
       stubCoreClient({ mwi: () => Promise.reject(new Error('core down')) })
     );
 
-    const result = await runOperation<unknown, { id: string; read: boolean }>(
+    const result = (await runOperation(
       db,
       'voicemails.markRead',
       { id: vmId, read: true },
       asRun({ actor: anna })
-    );
+    )) as { id: string; read: boolean };
     expect(result).toEqual({ id: vmId, read: true });
   });
 

@@ -162,12 +162,12 @@ async function insertDid(
 }
 
 async function createUser(db: Db, extension: string): Promise<string> {
-  const result = await runOperation<unknown, { user: { id: string } }>(
+  const result = (await runOperation(
     db,
     'users.create',
     { name: 'Anna Huber', email: `${extension}@x.test`, extension },
     asRun()
-  );
+  )) as { user: { id: string } };
   return result.user.id;
 }
 

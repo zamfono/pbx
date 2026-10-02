@@ -14,14 +14,12 @@ import {
 } from '@zamfono/shared';
 
 import type { CertSyncStatus } from './jobs/certSync.js';
+import {
+  apiRequestHistogramLines,
+  configPropagationFailureLines
+} from './metricsCounters.js';
 import { updateNews } from './ops/system/_state.js';
 import { isPropagationPending } from './propagationPending.js';
-
-/* eslint-disable no-magic-numbers -- Prometheus's suggested latency-histogram bucket bounds, meaningful only as this literal list */
-const API_REQUEST_SECONDS_BUCKETS = [
-  0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10
-] as const;
-/* eslint-enable no-magic-numbers */
 
 export type MetricsDeps = {
   db: Db;
@@ -46,46 +44,6 @@ function gaugeLines(name: string, value: number): string[] {
   return [`# TYPE ${name} gauge`, `${name} ${value}`];
 }
 
-// Module-level accumulator (§7 "API latency"): the request pipeline reports into it from
-// wherever it runs; this module only holds and renders the counts.
-const apiRequestSeconds = {
-  bucketCounts: API_REQUEST_SECONDS_BUCKETS.map(() => 0),
-  sum: 0,
-  count: 0
-};
-
-/** Records one completed API request's duration for the `zamfono_api_request_seconds` histogram. */
-export function recordApiRequestSeconds(seconds: number): void {
-  apiRequestSeconds.sum += seconds;
-  apiRequestSeconds.count += 1;
-  API_REQUEST_SECONDS_BUCKETS.forEach((bound, index) => {
-    if (seconds <= bound) {
-      const count = apiRequestSeconds.bucketCounts[index];
-      // `bucketCounts` is built from this same bucket list, so every index here is in range.
-      if (count === undefined) {
-        throw new Error(`metrics: bucket index out of range: ${index}`);
-      }
-      apiRequestSeconds.bucketCounts[index] = count + 1;
-    }
-  });
-}
-
-// The config propagations that failed since `api` started (§3.1), counted where they fail.
-const configPropagation = { failures: 0 };
-
-/** Counts one failed config propagation for `zamfono_config_propagation_failures_total`. */
-export function recordConfigPropagationFailure(): void {
-  configPropagation.failures += 1;
-}
-
-/** Test-only: clears the accumulators between cases. */
-export function resetMetricsAccumulators(): void {
-  apiRequestSeconds.bucketCounts.fill(0);
-  apiRequestSeconds.sum = 0;
-  apiRequestSeconds.count = 0;
-  configPropagation.failures = 0;
-}
-
 /** §3.1 "Config propagation": whether one is owed, and the failures since `api` started. */
 async function configPropagationLines(db: Db): Promise<string[]> {
   return [
@@ -93,8 +51,7 @@ async function configPropagationLines(db: Db): Promise<string[]> {
       'zamfono_config_propagation_pending',
       (await isPropagationPending(db)) ? 1 : 0
     ),
-    '# TYPE zamfono_config_propagation_failures_total counter',
-    `zamfono_config_propagation_failures_total ${configPropagation.failures}`
+    ...configPropagationFailureLines()
   ];
 }
 
@@ -108,21 +65,6 @@ function recordingMixFailureLines(state: StateResponse | null): string[] {
       `zamfono_recording_mix_failures_total ${state.recordingMixFailures}`
     );
   }
-  return lines;
-}
-
-function apiRequestHistogramLines(): string[] {
-  const lines = ['# TYPE zamfono_api_request_seconds histogram'];
-  API_REQUEST_SECONDS_BUCKETS.forEach((bound, index) => {
-    lines.push(
-      `zamfono_api_request_seconds_bucket{le="${bound}"} ${apiRequestSeconds.bucketCounts[index]}`
-    );
-  });
-  lines.push(
-    `zamfono_api_request_seconds_bucket{le="+Inf"} ${apiRequestSeconds.count}`,
-    `zamfono_api_request_seconds_sum ${apiRequestSeconds.sum}`,
-    `zamfono_api_request_seconds_count ${apiRequestSeconds.count}`
-  );
   return lines;
 }
 
@@ -177,9 +119,6 @@ function buildInfoLines(version: ZamfonoVersion): string[] {
 }
 
 async function dbSizeBytes(dbFile: string): Promise<number> {
-  if (dbFile === ':memory:') {
-    return 0;
-  }
   try {
     return (await stat(dbFile)).size;
   } catch {

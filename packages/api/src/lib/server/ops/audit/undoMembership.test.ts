@@ -52,12 +52,12 @@ async function seedTenant(db: Db): Promise<void> {
 }
 
 async function createUser(db: Db, name: string, ext: string): Promise<string> {
-  const result = await runOperation<unknown, { user: { id: string } }>(
+  const result = (await runOperation(
     db,
     'users.create',
     { name, email: `${name.toLowerCase()}@x.test`, extension: ext },
     asRun()
-  );
+  )) as { user: { id: string } };
   return result.user.id;
 }
 
@@ -86,7 +86,7 @@ describe('audit.undo of a deleted member after a members edit', () => {
     const anna = await createUser(db, 'Anna', '101');
     const ben = await createUser(db, 'Ben', '102');
     const carl = await createUser(db, 'Carl', '103');
-    const group = await runOperation<unknown, { id: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       {
@@ -99,7 +99,7 @@ describe('audit.undo of a deleted member after a members edit', () => {
         ]
       },
       asRun()
-    );
+    )) as { id: string };
     await runOperation(db, 'users.delete', { id: ben }, asRun());
     await runOperation(
       db,
@@ -116,12 +116,12 @@ describe('audit.undo of a deleted member after a members edit', () => {
 
     await undoLatest(db, 'users.delete', ben);
 
-    const read = await runOperation<unknown, Members>(
+    const read = (await runOperation(
       db,
       'ringGroups.get',
       { id: group.id },
       asRun()
-    );
+    )) as Members;
     expect(read.members).toEqual([
       { position: 0, kind: 'user', id: carl },
       { position: 1, kind: 'user', id: ben },
@@ -134,13 +134,13 @@ describe('audit.undo of a deleted member after a members edit', () => {
     await seedTenant(db);
     const anna = await createUser(db, 'Anna', '101');
     const ben = await createUser(db, 'Ben', '102');
-    const child = await runOperation<unknown, { id: string }>(
+    const child = (await runOperation(
       db,
       'userGroups.create',
       { name: 'Night shift', members: [] },
       asRun()
-    );
-    const parent = await runOperation<unknown, { id: string }>(
+    )) as { id: string };
+    const parent = (await runOperation(
       db,
       'userGroups.create',
       {
@@ -152,7 +152,7 @@ describe('audit.undo of a deleted member after a members edit', () => {
         ]
       },
       asRun()
-    );
+    )) as { id: string };
     await runOperation(db, 'users.delete', { id: ben }, asRun());
     await runOperation(db, 'userGroups.delete', { id: child.id }, asRun());
     await runOperation(
@@ -165,12 +165,12 @@ describe('audit.undo of a deleted member after a members edit', () => {
     await undoLatest(db, 'users.delete', ben);
     await undoLatest(db, 'userGroups.delete', child.id);
 
-    const read = await runOperation<unknown, Members>(
+    const read = (await runOperation(
       db,
       'userGroups.get',
       { id: parent.id },
       asRun()
-    );
+    )) as Members;
     expect(read.members).toEqual([
       { kind: 'user', id: ben },
       { kind: 'userGroup', id: child.id }

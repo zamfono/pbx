@@ -69,10 +69,9 @@ async function undoLatestSettingsUpdate(db: Db): Promise<void> {
 }
 
 async function fallbackTarget(db: Db): Promise<TargetSpec | null> {
-  const settings = await runOperation<
-    unknown,
-    { fallbackTarget: TargetSpec | null }
-  >(db, 'settings.get', {}, asRun());
+  const settings = (await runOperation(db, 'settings.get', {}, asRun())) as {
+    fallbackTarget: TargetSpec | null;
+  };
   return settings.fallbackTarget;
 }
 

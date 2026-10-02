@@ -78,12 +78,12 @@ describe('audio', () => {
 
   it('create stores the upload through storeAudio and rows it under the returned id', async () => {
     const db = await makeTestDb();
-    const asset = await runOperation<unknown, { id: string; filename: string }>(
+    const asset = (await runOperation(
       db,
       'audio.create',
       { kind: 'greeting', label: 'Main greeting', upload },
       asRun()
-    );
+    )) as { id: string; filename: string };
     const row = await db
       .selectFrom('audioAssets')
       .selectAll()
@@ -175,18 +175,18 @@ describe('audio', () => {
 
   it('delete propagates moh only for a moh-kind asset', async () => {
     const db = await makeTestDb();
-    const greeting = await runOperation<unknown, { id: string }>(
+    const greeting = (await runOperation(
       db,
       'audio.create',
       { kind: 'greeting', label: 'Greeting', upload },
       asRun()
-    );
-    const moh = await runOperation<unknown, { id: string }>(
+    )) as { id: string };
+    const moh = (await runOperation(
       db,
       'audio.create',
       { kind: 'moh', label: 'Hold music', upload },
       asRun()
-    );
+    )) as { id: string };
     vi.mocked(propagateConfig).mockClear();
     await runOperation(
       db,
@@ -205,12 +205,12 @@ describe('audio', () => {
 
   it('allows deleting an audio asset whose announcement forward_targets row is an orphan no owner references', async () => {
     const db = await makeTestDb();
-    const asset = await runOperation<unknown, { id: string }>(
+    const asset = (await runOperation(
       db,
       'audio.create',
       { kind: 'announcement', label: 'Orphaned', upload },
       asRun()
-    );
+    )) as { id: string };
     await db
       .insertInto('forwardTargets')
       .values({
@@ -236,12 +236,12 @@ describe('audio', () => {
 
   it('refuses to delete an audio asset a DID still reaches through its announcement target, with a Conflict', async () => {
     const db = await makeTestDb();
-    const asset = await runOperation<unknown, { id: string }>(
+    const asset = (await runOperation(
       db,
       'audio.create',
       { kind: 'announcement', label: 'Welcome', upload },
       asRun()
-    );
+    )) as { id: string };
     const targetId = newId();
     await db
       .insertInto('forwardTargets')
@@ -282,12 +282,12 @@ describe('audio', () => {
 
   it('refuses to delete an audio asset an out-of-office rule still announces, with a Conflict', async () => {
     const db = await makeTestDb();
-    const asset = await runOperation<unknown, { id: string }>(
+    const asset = (await runOperation(
       db,
       'audio.create',
       { kind: 'announcement', label: 'Away message', upload },
       asRun()
-    );
+    )) as { id: string };
     const targetId = newId();
     await db
       .insertInto('forwardTargets')
@@ -336,18 +336,18 @@ describe('audio', () => {
   it('refuses to delete an audio asset a ring group still uses as its greeting, with a Conflict', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const asset = await runOperation<unknown, { id: string }>(
+    const asset = (await runOperation(
       db,
       'audio.create',
       { kind: 'greeting', label: 'Main greeting', upload },
       asRun()
-    );
-    const group = await runOperation<unknown, { id: string }>(
+    )) as { id: string };
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Support', strategy: 'simultaneous', greetingAudioId: asset.id },
       asRun()
-    );
+    )) as { id: string };
     const attempt = runOperation(
       db,
       'audio.delete',

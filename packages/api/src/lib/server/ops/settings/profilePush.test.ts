@@ -143,10 +143,12 @@ describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile 
       return Promise.resolve();
     });
 
-    const result = await runOperation<
-      unknown,
-      { emergencyNumbers: string[]; warnings?: string[] }
-    >(db, 'settings.update', { emergencyNumbers: ['112', '110'] }, owner);
+    const result = (await runOperation(
+      db,
+      'settings.update',
+      { emergencyNumbers: ['112', '110'] },
+      owner
+    )) as { emergencyNumbers: string[]; warnings?: string[] };
 
     expect(result.emergencyNumbers).toEqual(['112', '110']);
     expect(
@@ -182,12 +184,12 @@ describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile 
     await seedTenant(db);
     const ringotel = stubRingotel(true);
 
-    const result = await runOperation<unknown, { warnings?: string[] }>(
+    const result = (await runOperation(
       db,
       'settings.update',
       { emergencyNumbers: ['112', '110'] },
       owner
-    );
+    )) as { warnings?: string[] };
 
     expect(result.warnings).toBeUndefined();
     expect(ringotel.methods).toEqual(['updateBranch', 'updateOrganization']);

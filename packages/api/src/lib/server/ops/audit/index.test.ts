@@ -71,12 +71,12 @@ async function createUser(
   email: string,
   extension: string
 ): Promise<{ id: string }> {
-  const result = await runOperation<unknown, { user: { id: string } }>(
+  const result = (await runOperation(
     db,
     'users.create',
     { name, email, extension },
     asRun()
-  );
+  )) as { user: { id: string } };
   return result.user;
 }
 
@@ -106,12 +106,12 @@ describe('audit.undo', () => {
     );
     const entry = await latestAuditEntry(db, user.id);
 
-    const result = await runOperation<unknown, { id: string }>(
+    const result = (await runOperation(
       db,
       'audit.undo',
       { id: entry.id },
       asRun()
-    );
+    )) as { id: string };
     expect(result.id).toBe(entry.id);
 
     const row = await db
@@ -197,12 +197,12 @@ describe('audit.undo', () => {
     const db = await makeTestDb();
     await seedTenant(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
-    const device = await runOperation<unknown, { device: { id: string } }>(
+    const device = (await runOperation(
       db,
       'devices.create',
       { userId: user.id, label: 'Desk phone', kind: 'manual' },
       asRun()
-    );
+    )) as { device: { id: string } };
     await runOperation(db, 'users.delete', { id: user.id }, asRun());
     const entry = await latestAuditEntry(db, user.id);
 
@@ -310,12 +310,12 @@ describe('audit.undo', () => {
   it('reverts a blocklist entry deletion', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const blocked = await runOperation<unknown, { id: string }>(
+    const blocked = (await runOperation(
       db,
       'blockedNumbers.create',
       { number: '+491234567' },
       asRun()
-    );
+    )) as { id: string };
     await runOperation(
       db,
       'blockedNumbers.delete',
@@ -338,12 +338,12 @@ describe('audit.undo', () => {
     const db = await makeTestDb();
     await seedTenant(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
-    const device = await runOperation<unknown, { device: { id: string } }>(
+    const device = (await runOperation(
       db,
       'devices.create',
       { userId: user.id, label: 'Desk phone', kind: 'manual' },
       asRun()
-    );
+    )) as { device: { id: string } };
     await runOperation(db, 'devices.rotate', { id: device.device.id }, asRun());
     const entry = await latestAuditEntry(db, device.device.id);
 
@@ -371,21 +371,23 @@ describe('audit.list', () => {
     const entry = await latestAuditEntry(db, user.id);
     await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
 
-    const live = await runOperation<
-      unknown,
-      { items: { entityId: string | null; operation: string }[] }
-    >(db, 'audit.list', { entityKind: 'user', entityId: user.id }, asRun());
+    const live = (await runOperation(
+      db,
+      'audit.list',
+      { entityKind: 'user', entityId: user.id },
+      asRun()
+    )) as { items: { entityId: string | null; operation: string }[] };
     expect(live.items.map(item => item.operation)).toEqual([
       'audit.undo',
       'users.create'
     ]);
 
-    const all = await runOperation<unknown, { items: { operation: string }[] }>(
+    const all = (await runOperation(
       db,
       'audit.list',
       { entityKind: 'user', entityId: user.id, state: 'all' },
       asRun()
-    );
+    )) as { items: { operation: string }[] };
     expect(all.items.map(item => item.operation)).toEqual([
       'audit.undo',
       'users.update',
@@ -423,15 +425,12 @@ describe('audit.list time range', () => {
       )
       .execute();
 
-    const result = await runOperation<
-      unknown,
-      { items: { operation: string }[] }
-    >(
+    const result = (await runOperation(
       db,
       'audit.list',
       { from: '2026-10-01T12:00:00+02:00', to: '2026-10-01T10:00:00Z' },
       asRun()
-    );
+    )) as { items: { operation: string }[] };
     const attempt = runOperation(db, 'audit.list', { from: '1 Oct' }, asRun());
 
     expect(result.items.map(item => item.operation)).toEqual(['op.1']);
@@ -467,15 +466,12 @@ describe('audit.list time range', () => {
       )
       .execute();
 
-    const result = await runOperation<
-      unknown,
-      { items: { operation: string }[] }
-    >(
+    const result = (await runOperation(
       db,
       'audit.list',
       { from: '2026-10-01', to: '2026-10-01T12:00:00' },
       asRun()
-    );
+    )) as { items: { operation: string }[] };
 
     expect(result.items.map(item => item.operation).sort()).toEqual([
       'op.1',
@@ -514,7 +510,7 @@ describe('audit.undo of a forward-target change', () => {
   it('restores the DID target a retarget replaced', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const did = await runOperation<unknown, { id: string }>(
+    const did = (await runOperation(
       db,
       'dids.create',
       {
@@ -522,7 +518,7 @@ describe('audit.undo of a forward-target change', () => {
         target: { kind: 'external', external: '+491111111' }
       },
       asRun()
-    );
+    )) as { id: string };
     await runOperation(
       db,
       'dids.update',
@@ -544,7 +540,7 @@ describe('audit.undo of a forward-target change', () => {
   it('restores the out-of-office target a retarget replaced', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const rule = await runOperation<unknown, { id: string }>(
+    const rule = (await runOperation(
       db,
       'ooo.create',
       {
@@ -552,7 +548,7 @@ describe('audit.undo of a forward-target change', () => {
         target: { kind: 'external', external: '+491111111' }
       },
       asRun()
-    );
+    )) as { id: string };
     await runOperation(
       db,
       'ooo.update',
@@ -574,7 +570,7 @@ describe('audit.undo of a forward-target change', () => {
   it('restores the number block fallback target a retarget replaced', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const block = await runOperation<unknown, { id: string }>(
+    const block = (await runOperation(
       db,
       'didBlocks.create',
       {
@@ -582,7 +578,7 @@ describe('audit.undo of a forward-target change', () => {
         fallbackTarget: { kind: 'external', external: '+491111111' }
       },
       asRun()
-    );
+    )) as { id: string };
     await runOperation(
       db,
       'didBlocks.update',
@@ -608,7 +604,7 @@ describe('audit.undo of a forward-target change', () => {
     const db = await makeTestDb();
     await seedTenant(db);
     const audioId = await seedAnnouncement(db);
-    const menu = await runOperation<unknown, { id: string }>(
+    const menu = (await runOperation(
       db,
       'menus.create',
       {
@@ -617,7 +613,7 @@ describe('audit.undo of a forward-target change', () => {
         fallbackTarget: { kind: 'external', external: '+491111111' }
       },
       asRun()
-    );
+    )) as { id: string };
     await runOperation(
       db,
       'menus.update',
@@ -713,7 +709,7 @@ describe('audit.undo of an opening-hours change', () => {
   it('restores the schedule the previous set replaced', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const first = await runOperation<unknown, HoursWire>(
+    const first = (await runOperation(
       db,
       'hours.set',
       {
@@ -722,7 +718,7 @@ describe('audit.undo of an opening-hours change', () => {
         intervals: [{ weekday: 1, opens: '09:00', closes: '17:00' }]
       },
       asRun()
-    );
+    )) as HoursWire;
     await runOperation(
       db,
       'hours.set',
@@ -738,12 +734,12 @@ describe('audit.undo of an opening-hours change', () => {
 
     await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
 
-    const read = await runOperation<unknown, { schedule: HoursWire | null }>(
+    const read = (await runOperation(
       db,
       'hours.get',
       { scope: { kind: 'tenant' } },
       asRun()
-    );
+    )) as { schedule: HoursWire | null };
     expect(read.schedule).toMatchObject({
       active: true,
       closedTarget: { kind: 'external', external: '+491111111' },
@@ -754,7 +750,7 @@ describe('audit.undo of an opening-hours change', () => {
   it('removes the schedule when undoing the entry that first set it', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const set = await runOperation<unknown, HoursWire>(
+    const set = (await runOperation(
       db,
       'hours.set',
       {
@@ -763,17 +759,17 @@ describe('audit.undo of an opening-hours change', () => {
         intervals: [{ weekday: 1, opens: '09:00', closes: '17:00' }]
       },
       asRun()
-    );
+    )) as HoursWire;
     const entry = await latestAuditEntry(db, set.id);
 
     await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
 
-    const read = await runOperation<unknown, { schedule: HoursWire | null }>(
+    const read = (await runOperation(
       db,
       'hours.get',
       { scope: { kind: 'tenant' } },
       asRun()
-    );
+    )) as { schedule: HoursWire | null };
     expect(read.schedule).toBeNull();
   });
 });

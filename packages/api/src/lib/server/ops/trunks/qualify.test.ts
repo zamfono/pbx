@@ -25,7 +25,7 @@ async function createTrunk(
   db: Db,
   fields: Record<string, unknown>
 ): Promise<TrunkOutput> {
-  return runOperation<unknown, TrunkOutput>(
+  return runOperation(
     db,
     'trunks.create',
     {
@@ -36,7 +36,7 @@ async function createTrunk(
       ...fields
     },
     asRun()
-  );
+  ) as Promise<TrunkOutput>;
 }
 
 async function updateTrunk(
@@ -44,12 +44,12 @@ async function updateTrunk(
   id: string,
   fields: Record<string, unknown>
 ): Promise<TrunkWire> {
-  const { trunk } = await runOperation<unknown, TrunkOutput>(
+  const { trunk } = (await runOperation(
     db,
     'trunks.update',
     { id, ...fields },
     asRun()
-  );
+  )) as TrunkOutput;
   return trunk;
 }
 
@@ -76,19 +76,16 @@ describe('trunk qualify setting', () => {
     const { trunk } = await createTrunk(db, { qualify: false });
     expect(trunk.qualify).toBe(false);
     expect(await storedQualify(db, trunk.id)).toBe(0);
-    const got = await runOperation<unknown, TrunkWire>(
+    const got = (await runOperation(
       db,
       'trunks.get',
       { id: trunk.id },
       asRun()
-    );
+    )) as TrunkWire;
     expect(got.qualify).toBe(false);
-    const listed = await runOperation<unknown, { items: TrunkWire[] }>(
-      db,
-      'trunks.list',
-      {},
-      asRun()
-    );
+    const listed = (await runOperation(db, 'trunks.list', {}, asRun())) as {
+      items: TrunkWire[];
+    };
     expect(listed.items.map(row => row.qualify)).toEqual([false]);
   });
 

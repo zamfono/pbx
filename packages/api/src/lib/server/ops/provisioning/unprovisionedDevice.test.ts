@@ -61,19 +61,19 @@ type Created = { device: { id: string } };
 async function deviceBeforeSetup(
   db: Db
 ): Promise<{ userId: string; device: Created }> {
-  const { user } = await runOperation<unknown, { user: { id: string } }>(
+  const { user } = (await runOperation(
     db,
     'users.create',
     { name: 'Anna', email: 'anna@x.test', extension: '101' },
     asRun()
-  );
+  )) as { user: { id: string } };
   // No provider exists yet, so no `createUser` runs for this device.
-  const device = await runOperation<unknown, Created>(
+  const device = (await runOperation(
     db,
     'devices.create',
     { userId: user.id, label: 'App', kind: 'ringotel' },
     asRun()
-  );
+  )) as Created;
   return { userId: user.id, device };
 }
 
@@ -109,10 +109,12 @@ describe('a ringotel device created before provisioning.ringotelSetup (§10.4)',
 
     await setup(db);
 
-    const { sipPassword } = await runOperation<
-      unknown,
-      { sipPassword: string }
-    >(db, 'devices.revealCredentials', { id: device.device.id }, asRun());
+    const { sipPassword } = (await runOperation(
+      db,
+      'devices.revealCredentials',
+      { id: device.device.id },
+      asRun()
+    )) as { sipPassword: string };
     expect(ringotel.users).toMatchObject([
       { extension: '101', name: 'Anna', password: sipPassword }
     ]);
@@ -170,15 +172,12 @@ describe('a ringotel device created before provisioning.ringotelSetup (§10.4)',
     const { device } = await deviceBeforeSetup(db);
     ringotel.failing.add('createUser');
 
-    const output = await runOperation<
-      unknown,
-      { ringotelOrgId: string; warnings?: string[] }
-    >(
+    const output = (await runOperation(
       db,
       'provisioning.ringotelSetup',
       { domain: 'testco', region: '3', packageid: 1 },
       asRun()
-    );
+    )) as { ringotelOrgId: string; warnings?: string[] };
 
     expect(output.ringotelOrgId).toBeTruthy();
     expect(output.warnings).toEqual([
@@ -212,12 +211,9 @@ describe('a ringotel device whose Ringotel user is missing (§10.4, §5.2)', () 
     const db = await makeTestDb();
     const { ringotel, id } = await orphanedDevice(db);
 
-    const out = await runOperation<unknown, { sipPassword: string }>(
-      db,
-      'devices.rotate',
-      { id },
-      asRun()
-    );
+    const out = (await runOperation(db, 'devices.rotate', { id }, asRun())) as {
+      sipPassword: string;
+    };
 
     expect(ringotel.users).toMatchObject([
       { extension: '101', password: out.sipPassword }

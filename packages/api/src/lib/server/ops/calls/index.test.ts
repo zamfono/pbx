@@ -79,12 +79,12 @@ describe('calls', () => {
     const asAnswerer = await seedCall(db, { answeredByUserId: 'u1' });
     await seedCall(db, { callerUserId: 'u2', calleeUserId: 'u3' });
 
-    const result = await runOperation<unknown, { items: { id: string }[] }>(
+    const result = (await runOperation(
       db,
       'calls.list',
       {},
       asRun({ actor: anna })
-    );
+    )) as { items: { id: string }[] };
     expect(new Set(result.items.map(item => item.id))).toEqual(
       new Set([asCaller, asCallee, asAnswerer])
     );
@@ -96,12 +96,9 @@ describe('calls', () => {
     const ended = await seedCall(db, {});
     const live = await seedCall(db, { inProgress: true });
 
-    const result = await runOperation<unknown, { items: { id: string }[] }>(
-      db,
-      'calls.list',
-      {},
-      asRun()
-    );
+    const result = (await runOperation(db, 'calls.list', {}, asRun())) as {
+      items: { id: string }[];
+    };
     const attempt = runOperation(db, 'calls.get', { id: live }, asRun());
 
     expect(result.items.map(item => item.id)).toEqual([ended]);
@@ -132,12 +129,12 @@ describe('calls', () => {
       )
       .execute();
 
-    const result = await runOperation<unknown, { items: { id: string }[] }>(
+    const result = (await runOperation(
       db,
       'calls.list',
       { from: '2026-10-01T12:00:00+02:00', to: '2026-10-01T12:30:00' },
       asRun()
-    );
+    )) as { items: { id: string }[] };
 
     expect(result.items.map(item => item.id).sort()).toEqual(
       [ids[1], ids[2]].sort()
@@ -182,23 +179,23 @@ describe('calls', () => {
       stubCoreClient({ state: () => Promise.resolve(state) })
     );
 
-    const asOwner = await runOperation<unknown, { items: LiveCall[] }>(
+    const asOwner = (await runOperation(
       db,
       'calls.list',
       { live: true },
       asRun()
-    );
+    )) as { items: LiveCall[] };
     expect(asOwner.items.map(item => item.callId).sort()).toEqual([
       'call-1',
       'call-2'
     ]);
 
-    const asUser = await runOperation<unknown, { items: LiveCall[] }>(
+    const asUser = (await runOperation(
       db,
       'calls.list',
       { live: true },
       asRun({ actor: anna })
-    );
+    )) as { items: LiveCall[] };
     expect(asUser.items.map(item => item.callId)).toEqual(['call-1']);
   });
 
@@ -294,22 +291,24 @@ describe('calls', () => {
       ])
       .execute();
 
-    const call = await runOperation<
-      unknown,
-      {
-        id: string;
-        log: string | null;
-        qos: {
-          channelId: string;
-          role: string;
-          jitterMs: number | null;
-          lossPct: number | null;
-          rttMs: number | null;
-          rxPackets: number | null;
-          txPackets: number | null;
-        }[];
-      }
-    >(db, 'calls.get', { id: callId }, asRun());
+    const call = (await runOperation(
+      db,
+      'calls.get',
+      { id: callId },
+      asRun()
+    )) as {
+      id: string;
+      log: string | null;
+      qos: {
+        channelId: string;
+        role: string;
+        jitterMs: number | null;
+        lossPct: number | null;
+        rttMs: number | null;
+        rxPackets: number | null;
+        txPackets: number | null;
+      }[];
+    };
 
     expect(call.id).toBe(callId);
     expect(call.log).toBe('{"event":"didMatch"}');

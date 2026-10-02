@@ -28,7 +28,7 @@ type RoutesOutput = { items: RouteWire[] };
 async function createTrunkAndCatchAll(
   db: Db
 ): Promise<{ trunkId: string; routeId: string }> {
-  const { trunk } = await runOperation<unknown, TrunkOutput>(
+  const { trunk } = (await runOperation(
     db,
     'trunks.create',
     {
@@ -38,13 +38,13 @@ async function createTrunkAndCatchAll(
       hosts: [{ host: 'sip.provider.example' }]
     },
     asRun()
-  );
-  const { items } = await runOperation<unknown, RoutesOutput>(
+  )) as TrunkOutput;
+  const { items } = (await runOperation(
     db,
     'outboundRoutes.list',
     {},
     asRun()
-  );
+  )) as RoutesOutput;
   const [catchAll] = items;
   if (catchAll === undefined) {
     throw new Error('outboundRoutes test: expected the catch-all route');
@@ -57,7 +57,7 @@ describe('outboundRoutes operations', () => {
     const db = await makeTestDb();
     const { trunkId, routeId } = await createTrunkAndCatchAll(db);
 
-    const { items } = await runOperation<unknown, RoutesOutput>(
+    const { items } = (await runOperation(
       db,
       'outboundRoutes.replace',
       {
@@ -72,7 +72,7 @@ describe('outboundRoutes operations', () => {
         ]
       },
       asRun()
-    );
+    )) as RoutesOutput;
 
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
@@ -86,7 +86,7 @@ describe('outboundRoutes operations', () => {
     const db = await makeTestDb();
     const { trunkId, routeId } = await createTrunkAndCatchAll(db);
 
-    await runOperation<unknown, RoutesOutput>(
+    (await runOperation(
       db,
       'outboundRoutes.replace',
       {
@@ -101,7 +101,7 @@ describe('outboundRoutes operations', () => {
         ]
       },
       asRun()
-    );
+    )) as RoutesOutput;
 
     const audit = await db
       .selectFrom('auditLog')
@@ -123,12 +123,12 @@ describe('outboundRoutes operations', () => {
     expect(routesChange?.to[0]).not.toHaveProperty('priority');
 
     // Undo replays `from` through the normal operation; this must validate (§5.8).
-    const { items } = await runOperation<unknown, RoutesOutput>(
+    const { items } = (await runOperation(
       db,
       'outboundRoutes.replace',
       { routes: routesChange?.from },
       asRun()
-    );
+    )) as RoutesOutput;
     expect(items).toMatchObject([{ id: routeId, numbers: [] }]);
   });
 
@@ -138,7 +138,7 @@ describe('outboundRoutes operations', () => {
 
     // `outboundRoutes.replace` writes routes in input order, so `firstReplace[1]` is the second
     // route's assigned id.
-    const { items: firstReplace } = await runOperation<unknown, RoutesOutput>(
+    const { items: firstReplace } = (await runOperation(
       db,
       'outboundRoutes.replace',
       {
@@ -154,7 +154,7 @@ describe('outboundRoutes operations', () => {
         ]
       },
       asRun()
-    );
+    )) as RoutesOutput;
     const [, second] = firstReplace;
     if (second === undefined) {
       throw new Error('outboundRoutes test: expected a second route');
@@ -162,7 +162,7 @@ describe('outboundRoutes operations', () => {
     const keptRouteId = second.id;
 
     // Drops `routeId`, keeping only `keptRouteId`.
-    await runOperation<unknown, RoutesOutput>(
+    (await runOperation(
       db,
       'outboundRoutes.replace',
       {
@@ -171,7 +171,7 @@ describe('outboundRoutes operations', () => {
         ]
       },
       asRun()
-    );
+    )) as RoutesOutput;
 
     const audit = await db
       .selectFrom('auditLog')
@@ -186,12 +186,12 @@ describe('outboundRoutes operations', () => {
     const from = changes.find(change => change.field === 'routes')?.from;
     expect(from?.some(route => route.id === routeId)).toBe(true);
 
-    const { items } = await runOperation<unknown, RoutesOutput>(
+    const { items } = (await runOperation(
       db,
       'outboundRoutes.replace',
       { routes: from },
       asRun()
-    );
+    )) as RoutesOutput;
     expect(items).toContainEqual(
       expect.objectContaining({
         id: routeId,
@@ -336,12 +336,12 @@ describe('outboundRoutes operations', () => {
       nextCursor: string | null;
     };
 
-    const one = await runOperation<unknown, Page>(
+    const one = (await runOperation(
       db,
       'outboundRoutes.list',
       { limit: 1 },
       asRun()
-    );
+    )) as Page;
     expect(one.items).toHaveLength(1);
     const [onlyItem] = one.items;
     if (onlyItem === undefined) {
@@ -350,12 +350,12 @@ describe('outboundRoutes operations', () => {
     expect(onlyItem.numbers).toHaveLength(1);
     expect(one.nextCursor).toEqual(expect.any(String));
 
-    const two = await runOperation<unknown, Page>(
+    const two = (await runOperation(
       db,
       'outboundRoutes.list',
       { limit: 1, cursor: one.nextCursor },
       asRun()
-    );
+    )) as Page;
     expect(two.items.map(item => item.id)).toEqual([routeId]);
     expect(two.nextCursor).toBeNull();
   });

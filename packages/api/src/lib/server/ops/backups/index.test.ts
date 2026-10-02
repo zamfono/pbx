@@ -20,10 +20,7 @@ function asRun(overrides: Partial<RunInput> = {}): RunInput {
 describe('backups', () => {
   it('creates a target, storing only the encrypted secret', async () => {
     const db = await makeTestDb();
-    const created = await runOperation<
-      unknown,
-      BackupTargetWire & { secret?: unknown }
-    >(
+    const created = (await runOperation(
       db,
       'backups.targets.create',
       {
@@ -32,7 +29,7 @@ describe('backups', () => {
         secret: 'restic-repo-password'
       },
       asRun()
-    );
+    )) as BackupTargetWire & { secret?: unknown };
     expect(created.secret).toBeUndefined();
     const row = await db
       .selectFrom('backupTargets')
@@ -46,12 +43,12 @@ describe('backups', () => {
 
   it('defaults the forget policy to 7 daily/4 weekly/6 monthly on create', async () => {
     const db = await makeTestDb();
-    const created = await runOperation<unknown, BackupTargetWire>(
+    const created = (await runOperation(
       db,
       'backups.targets.create',
       { kind: 'local', params: { path: '/backups' }, secret: 'x' },
       asRun()
-    );
+    )) as BackupTargetWire;
     expect(created.params.forget).toEqual({
       keepDaily: 7,
       keepWeekly: 4,
@@ -61,25 +58,25 @@ describe('backups', () => {
 
   it('lists, updates and deletes a target', async () => {
     const db = await makeTestDb();
-    const created = await runOperation<unknown, BackupTargetWire>(
+    const created = (await runOperation(
       db,
       'backups.targets.create',
       { kind: 'local', params: { path: '/backups' }, secret: 'x' },
       asRun()
-    );
-    const listed = await runOperation<unknown, { items: BackupTargetWire[] }>(
+    )) as BackupTargetWire;
+    const listed = (await runOperation(
       db,
       'backups.targets.list',
       {},
       asRun()
-    );
+    )) as { items: BackupTargetWire[] };
     expect(listed.items.map(item => item.id)).toContain(created.id);
-    const updated = await runOperation<unknown, BackupTargetWire>(
+    const updated = (await runOperation(
       db,
       'backups.targets.update',
       { id: created.id, enabled: false },
       asRun()
-    );
+    )) as BackupTargetWire;
     expect(updated.enabled).toBe(false);
     await runOperation(
       db,
@@ -87,41 +84,43 @@ describe('backups', () => {
       { id: created.id },
       asRun({ confirm: true })
     );
-    const afterDelete = await runOperation<
-      unknown,
-      { items: BackupTargetWire[] }
-    >(db, 'backups.targets.list', {}, asRun());
+    const afterDelete = (await runOperation(
+      db,
+      'backups.targets.list',
+      {},
+      asRun()
+    )) as { items: BackupTargetWire[] };
     expect(afterDelete.items.map(item => item.id)).not.toContain(created.id);
   });
 
   it('starts a run as a running row', async () => {
     const db = await makeTestDb();
-    const target = await runOperation<unknown, BackupTargetWire>(
+    const target = (await runOperation(
       db,
       'backups.targets.create',
       { kind: 'local', params: { path: '/backups' }, secret: 'x' },
       asRun()
-    );
-    const started = await runOperation<unknown, BackupRunWire>(
+    )) as BackupTargetWire;
+    const started = (await runOperation(
       db,
       'backups.runs.start',
       { targetId: target.id },
       asRun()
-    );
+    )) as BackupRunWire;
     expect(started.status).toBe('running');
-    const fetched = await runOperation<unknown, BackupRunWire>(
+    const fetched = (await runOperation(
       db,
       'backups.runs.get',
       { id: started.id },
       asRun()
-    );
+    )) as BackupRunWire;
     expect(fetched.id).toBe(started.id);
-    const listed = await runOperation<unknown, { items: BackupRunWire[] }>(
+    const listed = (await runOperation(
       db,
       'backups.runs.list',
       { targetId: target.id },
       asRun()
-    );
+    )) as { items: BackupRunWire[] };
     expect(listed.items.map(item => item.id)).toContain(started.id);
     const audit = await db
       .selectFrom('auditLog')

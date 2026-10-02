@@ -59,19 +59,16 @@ describe('parking', () => {
   it('replaces the slot set as a whole', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const result = await runOperation<unknown, { slots: string[] }>(
+    const result = (await runOperation(
       db,
       'parking.set',
       { slots: ['701', '702'] },
       asRun()
-    );
+    )) as { slots: string[] };
     expect(result.slots).toEqual(['701', '702']);
-    const read = await runOperation<unknown, { slots: string[] }>(
-      db,
-      'parking.get',
-      {},
-      asRun()
-    );
+    const read = (await runOperation(db, 'parking.get', {}, asRun())) as {
+      slots: string[];
+    };
     expect(read.slots).toEqual(['701', '702']);
   });
 
@@ -82,12 +79,9 @@ describe('parking', () => {
       runOperation(db, 'parking.set', { slots: ['701'] }, asRun())
     ).rejects.toMatchObject({ status: 422 });
     await runOperation(db, 'parking.set', { slots: ['7001'] }, asRun());
-    const read = await runOperation<unknown, { slots: string[] }>(
-      db,
-      'parking.get',
-      {},
-      asRun()
-    );
+    const read = (await runOperation(db, 'parking.get', {}, asRun())) as {
+      slots: string[];
+    };
     expect(read.slots).toEqual(['7001']);
   });
 

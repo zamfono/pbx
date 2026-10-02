@@ -71,7 +71,7 @@ async function undoLatest(db: Db, operation: string): Promise<void> {
 }
 
 async function createTrunk(db: Db, name: string): Promise<string> {
-  const { trunk } = await runOperation<unknown, { trunk: { id: string } }>(
+  const { trunk } = (await runOperation(
     db,
     'trunks.create',
     {
@@ -81,7 +81,7 @@ async function createTrunk(db: Db, name: string): Promise<string> {
       hosts: [{ host: 'sip.provider.example' }]
     },
     asRun()
-  );
+  )) as { trunk: { id: string } };
   return trunk.id;
 }
 
@@ -101,12 +101,12 @@ describe('audit.undo of a tenant-wide list replace', () => {
   it('restores the outbound routes a replace dropped', async () => {
     const db = await makeTestDb();
     const trunkId = await createTrunk(db, 'Provider A');
-    const before = await runOperation<unknown, Routes>(
+    const before = (await runOperation(
       db,
       'outboundRoutes.list',
       {},
       asRun()
-    );
+    )) as Routes;
     await runOperation(
       db,
       'outboundRoutes.replace',
@@ -125,12 +125,12 @@ describe('audit.undo of a tenant-wide list replace', () => {
 
     await undoLatest(db, 'outboundRoutes.replace');
 
-    const after = await runOperation<unknown, Routes>(
+    const after = (await runOperation(
       db,
       'outboundRoutes.list',
       {},
       asRun()
-    );
+    )) as Routes;
     expect(after.items).toEqual(before.items);
   });
 
@@ -178,18 +178,18 @@ describe('audit.undo of a parking or mail-template change', () => {
     const db = await makeTestDb();
     await seedTenant(db);
     await runOperation(db, 'parking.set', { slots: ['701'] }, asRun());
-    const { user } = await runOperation<unknown, { user: { id: string } }>(
+    const { user } = (await runOperation(
       db,
       'users.create',
       { name: 'Anna', email: 'anna@x.test', extension: '101' },
       asRun()
-    );
-    const { device } = await runOperation<unknown, { device: { id: string } }>(
+    )) as { user: { id: string } };
+    const { device } = (await runOperation(
       db,
       'devices.create',
       { userId: user.id, label: 'App', kind: 'ringotel' },
       asRun()
-    );
+    )) as { device: { id: string } };
     await runOperation(
       db,
       'devices.setBlf',
@@ -200,19 +200,16 @@ describe('audit.undo of a parking or mail-template change', () => {
 
     await undoLatest(db, 'parking.set');
 
-    const slots = await runOperation<unknown, { slots: string[] }>(
-      db,
-      'parking.get',
-      {},
-      asRun()
-    );
+    const slots = (await runOperation(db, 'parking.get', {}, asRun())) as {
+      slots: string[];
+    };
     expect(slots.slots).toEqual(['701']);
-    const blf = await runOperation<unknown, { keys: string[] }>(
+    const blf = (await runOperation(
       db,
       'devices.getBlf',
       { id: device.id },
       asRun()
-    );
+    )) as { keys: string[] };
     expect(blf.keys).toEqual(['701']);
   });
 
@@ -229,12 +226,12 @@ describe('audit.undo of a parking or mail-template change', () => {
     );
 
     await undoLatest(db, 'mailTemplates.put');
-    const restored = await runOperation<unknown, { source: string }>(
+    const restored = (await runOperation(
       db,
       'mailTemplates.get',
       key,
       asRun()
-    );
+    )) as { source: string };
     expect(restored).toMatchObject({ ...first, source: 'tenant' });
 
     // The live first `put` created the override: its undo removes it.
@@ -245,12 +242,12 @@ describe('audit.undo of a parking or mail-template change', () => {
       .where('undoneAt', 'is', null)
       .executeTakeFirstOrThrow();
     await runOperation(db, 'audit.undo', { id: firstPut.id }, asRun());
-    const builtin = await runOperation<unknown, { source: string }>(
+    const builtin = (await runOperation(
       db,
       'mailTemplates.get',
       key,
       asRun()
-    );
+    )) as { source: string };
     expect(builtin.source).toBe('builtin');
   });
 
@@ -268,12 +265,12 @@ describe('audit.undo of a parking or mail-template change', () => {
 
     await undoLatest(db, 'mailTemplates.delete');
 
-    const read = await runOperation<unknown, { source: string }>(
+    const read = (await runOperation(
       db,
       'mailTemplates.get',
       key,
       asRun()
-    );
+    )) as { source: string };
     expect(read).toMatchObject({ ...override, source: 'tenant' });
   });
 });

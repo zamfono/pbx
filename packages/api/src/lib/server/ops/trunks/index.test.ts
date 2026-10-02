@@ -26,7 +26,7 @@ async function createTrunk(
   db: Db,
   overrides: Record<string, unknown> = {}
 ): Promise<TrunkOutput> {
-  return runOperation<unknown, TrunkOutput>(
+  return runOperation(
     db,
     'trunks.create',
     {
@@ -37,7 +37,7 @@ async function createTrunk(
       ...overrides
     },
     asRun()
-  );
+  ) as Promise<TrunkOutput>;
 }
 
 describe('trunks operations', () => {
@@ -192,10 +192,7 @@ describe('trunks operations', () => {
     const { trunk } = await createTrunk(db, {
       hosts: [{ host: 'sip.provider.example' }]
     });
-    const result = await runOperation<
-      unknown,
-      { trunk: { id: string }; warnings: string[] }
-    >(
+    const result = (await runOperation(
       db,
       'trunks.update',
       {
@@ -203,7 +200,7 @@ describe('trunks operations', () => {
         hosts: [{ host: 'sip.provider.example', port: 5060 }]
       },
       asRun()
-    );
+    )) as { trunk: { id: string }; warnings: string[] };
     expect(result.warnings).toEqual(['host has explicit port; SRV disabled']);
     const audit = await db
       .selectFrom('auditLog')
@@ -378,24 +375,23 @@ describe('trunks operations', () => {
     const db = await makeTestDb();
     const { trunk } = await createTrunk(db);
     // Unstubbed, `getCoreClient()` fails every request, as an unreachable `core` does.
-    const { items } = await runOperation<
-      unknown,
-      {
-        items: {
-          id: string;
-          status: string;
-          statusChangedAt: string | null;
-        }[];
-      }
-    >(db, 'trunks.list', {}, asRun());
+    const { items } = (await runOperation(db, 'trunks.list', {}, asRun())) as {
+      items: {
+        id: string;
+        status: string;
+        statusChangedAt: string | null;
+      }[];
+    };
     expect(items).toEqual([
       expect.objectContaining({ status: 'unknown', statusChangedAt: null })
     ]);
 
-    const one = await runOperation<
-      unknown,
-      { status: string; statusChangedAt: string | null }
-    >(db, 'trunks.get', { id: trunk.id }, asRun());
+    const one = (await runOperation(
+      db,
+      'trunks.get',
+      { id: trunk.id },
+      asRun()
+    )) as { status: string; statusChangedAt: string | null };
     expect(one).toMatchObject({ status: 'unknown', statusChangedAt: null });
   });
 
@@ -422,10 +418,12 @@ describe('trunks operations', () => {
       })
     );
     try {
-      const one = await runOperation<
-        unknown,
-        { status: string; statusChangedAt: string | null }
-      >(db, 'trunks.get', { id: trunk.id }, asRun());
+      const one = (await runOperation(
+        db,
+        'trunks.get',
+        { id: trunk.id },
+        asRun()
+      )) as { status: string; statusChangedAt: string | null };
       expect(one).toMatchObject(reported);
     } finally {
       vi.mocked(getCoreClient).mockReset();
@@ -703,10 +701,14 @@ describe('trunks operations', () => {
     const db = await makeTestDb();
     const { trunk } = await createTrunk(db);
 
-    const out = await runOperation<
-      unknown,
-      { trunk: { logLevel: string | null; logLevelExpiresAt: string | null } }
-    >(db, 'trunks.update', { id: trunk.id, logLevel: 'sip' }, asRun());
+    const out = (await runOperation(
+      db,
+      'trunks.update',
+      { id: trunk.id, logLevel: 'sip' },
+      asRun()
+    )) as {
+      trunk: { logLevel: string | null; logLevelExpiresAt: string | null };
+    };
 
     expect(out.trunk.logLevel).toBe('sip');
     const expiresAt = Date.parse(out.trunk.logLevelExpiresAt ?? '');
@@ -740,21 +742,21 @@ describe('trunks operations', () => {
     const second = await createTrunk(db, { name: 'Provider B' });
     type Page = { items: { id: string }[]; nextCursor: string | null };
 
-    const one = await runOperation<unknown, Page>(
+    const one = (await runOperation(
       db,
       'trunks.list',
       { limit: 1 },
       asRun()
-    );
+    )) as Page;
     expect(one.items.map(item => item.id)).toEqual([first.trunk.id]);
     expect(one.nextCursor).toEqual(expect.any(String));
 
-    const two = await runOperation<unknown, Page>(
+    const two = (await runOperation(
       db,
       'trunks.list',
       { limit: 1, cursor: one.nextCursor },
       asRun()
-    );
+    )) as Page;
     expect(two.items.map(item => item.id)).toEqual([second.trunk.id]);
     expect(two.nextCursor).toBeNull();
   });

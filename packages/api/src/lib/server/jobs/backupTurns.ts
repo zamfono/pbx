@@ -15,12 +15,12 @@ import {
 } from './backup.js';
 
 // The tail of the work queued so far: each waits for the one before it, whatever its outcome.
-const turns: { tail: Promise<unknown> } = { tail: Promise.resolve() };
+let tail: Promise<unknown> = Promise.resolve();
 
 /** Runs `work` once every backup queued before it has ended. */
 export async function inTurn<T>(work: () => Promise<T>): Promise<T> {
-  const result = turns.tail.then(work, work);
-  turns.tail = result.catch(() => undefined);
+  const result = tail.then(work, work);
+  tail = result.catch(() => undefined);
   return result;
 }
 

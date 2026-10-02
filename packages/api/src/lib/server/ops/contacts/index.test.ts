@@ -58,10 +58,7 @@ describe('contacts', () => {
   it('create normalizes a national number to E.164 on write', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const contact = await runOperation<
-      unknown,
-      { id: string; phones: unknown[] }
-    >(
+    const contact = (await runOperation(
       db,
       'contacts.create',
       {
@@ -69,14 +66,14 @@ describe('contacts', () => {
         phones: [{ label: 'work', number: '089 123' }]
       },
       asRun()
-    );
+    )) as { id: string; phones: unknown[] };
     expect(contact.phones).toEqual([{ label: 'work', number: '+4989123' }]);
   });
 
   it('update replaces the phone set as a whole when phones is present', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const contact = await runOperation<unknown, { id: string }>(
+    const contact = (await runOperation(
       db,
       'contacts.create',
       {
@@ -84,7 +81,7 @@ describe('contacts', () => {
         phones: [{ label: 'work', number: '089 123' }]
       },
       asRun()
-    );
+    )) as { id: string };
     await runOperation(
       db,
       'contacts.update',

@@ -71,7 +71,7 @@ function undo(db: Db, id: string): Promise<unknown> {
 }
 
 async function createTrunk(db: Db, name: string): Promise<string> {
-  const { trunk } = await runOperation<unknown, { trunk: { id: string } }>(
+  const { trunk } = (await runOperation(
     db,
     'trunks.create',
     {
@@ -81,17 +81,17 @@ async function createTrunk(db: Db, name: string): Promise<string> {
       hosts: [{ host: 'sip.provider.example' }]
     },
     asRun()
-  );
+  )) as { trunk: { id: string } };
   return trunk.id;
 }
 
 async function createUser(db: Db, email: string, ext: string): Promise<string> {
-  const { user } = await runOperation<unknown, { user: { id: string } }>(
+  const { user } = (await runOperation(
     db,
     'users.create',
     { name: 'Anna Huber', email, extension: ext },
     asRun()
-  );
+  )) as { user: { id: string } };
   return user.id;
 }
 
@@ -101,15 +101,17 @@ async function createDevice(
   label: string,
   kind: 'manual' | 'ringotel'
 ): Promise<{ id: string; sipUsername: string }> {
-  const { device } = await runOperation<
-    unknown,
-    { device: { id: string; sipUsername: string } }
-  >(db, 'devices.create', { userId, label, kind }, asRun());
+  const { device } = (await runOperation(
+    db,
+    'devices.create',
+    { userId, label, kind },
+    asRun()
+  )) as { device: { id: string; sipUsername: string } };
   return device;
 }
 
 async function setHours(db: Db, scope: unknown): Promise<string> {
-  const hours = await runOperation<unknown, HoursWire>(
+  const hours = (await runOperation(
     db,
     'hours.set',
     {
@@ -118,7 +120,7 @@ async function setHours(db: Db, scope: unknown): Promise<string> {
       intervals: [{ weekday: 1, opens: '09:00', closes: '17:00' }]
     },
     asRun()
-  );
+  )) as HoursWire;
   return hours.id;
 }
 

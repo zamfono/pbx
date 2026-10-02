@@ -94,12 +94,12 @@ describe('settings.ringotel_profile_pending (§10.4 "Tenant profile push", §11.
     fake = installRingotelFake();
     fake.failing.add('updateOrganization');
 
-    const result = await runOperation<unknown, { warnings?: string[] }>(
+    const result = (await runOperation(
       db,
       'settings.update',
       { language: 'de' },
       owner
-    );
+    )) as { warnings?: string[] };
 
     expect(fake.calls.map(call => call.method)).toEqual([
       'updateBranch',
@@ -154,12 +154,12 @@ describe('settings.ringotel_profile_pending (§10.4 "Tenant profile push", §11.
     await seedTenant(db);
     fake = installRingotelFake();
 
-    const result = await runOperation<unknown, { warnings?: string[] }>(
+    const result = (await runOperation(
       db,
       'settings.update',
       { language: 'de' },
       owner
-    );
+    )) as { warnings?: string[] };
 
     expect(result.warnings).toBeUndefined();
     expect(fake.calls.map(call => call.method)).toEqual([

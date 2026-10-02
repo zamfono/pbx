@@ -13,9 +13,9 @@ import { requiredJwtSecret } from '#lib/server/auth/jwtSigning.js';
 import { getDb } from '#lib/server/db.js';
 import { startBackgroundJobs } from '#lib/server/jobs/background.js';
 import { Limiter, type LimitKind } from '#lib/server/limiter.js';
-import { recordApiRequestSeconds } from '#lib/server/metrics.js';
+import { recordApiRequestSeconds } from '#lib/server/metricsCounters.js';
 import { problem } from '#lib/server/problem.js';
-import { keyringFromEnv, type Keyring } from '#lib/server/secretbox.js';
+import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 const UNAUTHORIZED_STATUS = 401;
 const NOT_FOUND_STATUS = 404;
@@ -25,54 +25,20 @@ const INTERNAL_PREFIX = '/internal';
 const jobsLogger = pino({ name: 'hooks' });
 
 /**
- * Every background job is started from `init` below: this file is part of the SvelteKit build
- * that also builds `runOperation` and every route, so a job started here shares their module
- * instance of every import, and an operation reaches it by a call — `server.ts` is a separate
- * esbuild bundle with its own copy of every relative import. Outside a stack (`vite dev`), a
- * missing `DB_FILE` or `SECRETBOX_KEY` disables the jobs that need it, never the module.
- */
-/** `getDb()`, or `null` with a boot-time log line for a missing `DB_FILE`. */
-function tryGetDb(): ReturnType<typeof getDb> | null {
-  try {
-    return getDb();
-  } catch (error) {
-    jobsLogger.error(
-      { error },
-      'boot: DB_FILE missing, the background jobs disabled'
-    );
-    return null;
-  }
-}
-
-/** The `.env` keyring, or `null` with a boot-time log line for a missing `SECRETBOX_KEY`. */
-function tryKeyring(): Keyring | null {
-  try {
-    return keyringFromEnv(env);
-  } catch (error) {
-    jobsLogger.error(
-      { error },
-      'boot: SECRETBOX_KEY missing, the background jobs disabled'
-    );
-    return null;
-  }
-}
-
-/**
- * Starts the background jobs (`lib/server/jobs/background.ts`). SvelteKit runs it once, and
- * serves no request before it resolves; a failure of the first-boot seed rejects it, which fails loading the handler and so
- * `api`'s boot. The jobs stop on `sveltekit:shutdown`, which `server.ts` emits on SIGTERM and
- * SIGINT.
+ * Starts every background job (`lib/server/jobs/background.ts`), from this file since it is part
+ * of the SvelteKit build that also builds `runOperation` and every route: a job started here
+ * shares their module instance of every import, and an operation reaches it by a call, where
+ * `server.ts` is a separate esbuild bundle with its own copy of every relative import. SvelteKit
+ * runs it once, and serves no request before it resolves; a missing `DB_FILE` or `SECRETBOX_KEY`
+ * or a failure of the first-boot seed rejects it, which fails loading the handler and so `api`'s
+ * boot. The jobs stop on `sveltekit:shutdown`, which `server.ts` emits on SIGTERM and SIGINT.
  */
 export const init: ServerInit = async () => {
-  const db = tryGetDb();
-  if (!db) {
-    return;
-  }
-  const kr = tryKeyring();
-  if (!kr) {
-    return;
-  }
-  const jobs = await startBackgroundJobs(db, kr, jobsLogger);
+  const jobs = await startBackgroundJobs(
+    getDb(),
+    keyringFromEnv(env),
+    jobsLogger
+  );
   process.once('sveltekit:shutdown', () => {
     jobs.stop();
   });

@@ -58,12 +58,12 @@ describe('dids', () => {
     const db = await makeTestDb();
     const mainDidId = await insertDid(db, '+490000000');
     await seedTenant(db, mainDidId);
-    const created = await runOperation<unknown, { id: string; number: string }>(
+    const created = (await runOperation(
       db,
       'dids.create',
       { number: '089123456', target: { kind: 'user', userId: 'owner' } },
       asRun()
-    );
+    )) as { id: string; number: string };
     expect(created.number).toBe('+4989123456');
     const user = await db
       .selectFrom('users')
@@ -77,12 +77,12 @@ describe('dids', () => {
     const db = await makeTestDb();
     const mainDidId = await insertDid(db, '+490000000');
     await seedTenant(db, mainDidId);
-    const created = await runOperation<unknown, { id: string; number: string }>(
+    const created = (await runOperation(
       db,
       'dids.create',
       { number: 'acct-4711', target: { kind: 'user', userId: 'owner' } },
       asRun()
-    );
+    )) as { id: string; number: string };
     expect(created.number).toBe('acct-4711');
     const user = await db
       .selectFrom('users')

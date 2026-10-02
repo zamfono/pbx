@@ -74,12 +74,12 @@ async function createUser(
   extension: string,
   role?: 'admin' | 'user'
 ): Promise<CreateOutput> {
-  return runOperation<unknown, CreateOutput>(
+  return runOperation(
     db,
     'users.create',
     { name, email, extension, role },
     asRun()
-  );
+  ) as Promise<CreateOutput>;
 }
 
 /** Marks the tenant as already provisioned with Ringotel, so `activeRingotelProvider` pushes. */
@@ -173,12 +173,12 @@ describe('users', () => {
     await seedTenant(db);
     const created = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     sendMailMock.mockClear();
-    const result = await runOperation<unknown, { link: string }>(
+    const result = (await runOperation(
       db,
       'users.resetPassword',
       { id: created.user.id },
       asRun()
-    );
+    )) as { link: string };
     expect(sendMailMock).toHaveBeenCalledOnce();
     const [mailDb, , request] = sendMailMock.mock.calls[0] ?? [];
     expect(mailDb).toBe(db);
@@ -289,12 +289,12 @@ describe('users', () => {
     const db = await makeTestDb();
     await seedTenant(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
-    const device = await runOperation<unknown, { device: { id: string } }>(
+    const device = (await runOperation(
       db,
       'devices.create',
       { userId: user.user.id, label: 'Desk', kind: 'manual' },
       asRun()
-    );
+    )) as { device: { id: string } };
     const clientId = newId();
     await db
       .insertInto('oauthClients')
@@ -381,17 +381,19 @@ describe('users', () => {
     const db = await makeTestDb();
     await seedTenant(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
-    const device = await runOperation<unknown, { sipUsername: string }>(
+    const device = (await runOperation(
       db,
       'devices.create',
       { userId: user.user.id, label: 'Desk', kind: 'manual' },
       asRun()
-    );
+    )) as { sipUsername: string };
     expect(device.sipUsername.startsWith('e101-d')).toBe(true);
-    const result = await runOperation<
-      unknown,
-      { affectedDevices?: { id: string; sipUsername: string }[] }
-    >(db, 'users.update', { id: user.user.id, extension: '105' }, asRun());
+    const result = (await runOperation(
+      db,
+      'users.update',
+      { id: user.user.id, extension: '105' },
+      asRun()
+    )) as { affectedDevices?: { id: string; sipUsername: string }[] };
     expect(result.affectedDevices).toHaveLength(1);
     expect(result.affectedDevices?.[0]?.sipUsername.startsWith('e105-d')).toBe(
       true
@@ -432,22 +434,21 @@ describe('users', () => {
     await enableRingotel(db);
     const ringotel = installRingotelFake();
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
-    const device = await runOperation<
-      unknown,
-      { device: { id: string; sipUsername: string } }
-    >(
+    const device = (await runOperation(
       db,
       'devices.create',
       { userId: user.user.id, label: 'App', kind: 'ringotel' },
       asRun()
-    );
+    )) as { device: { id: string; sipUsername: string } };
     // Ringotel holds the user under the old extension until the rename reaches it.
     expect(ringotel.users.map(remote => remote.extension)).toEqual(['101']);
 
-    const renamed = await runOperation<
-      unknown,
-      { affectedDevices: { sipUsername: string }[] }
-    >(db, 'users.update', { id: user.user.id, extension: '205' }, asRun());
+    const renamed = (await runOperation(
+      db,
+      'users.update',
+      { id: user.user.id, extension: '205' },
+      asRun()
+    )) as { affectedDevices: { sipUsername: string }[] };
 
     const newUsername = renamed.affectedDevices[0]?.sipUsername;
     expect(newUsername).toBe(
@@ -457,12 +458,12 @@ describe('users', () => {
       { extension: '205', username: newUsername, authname: newUsername }
     ]);
     // A later rotation finds the user at the new extension and reaches it.
-    const rotated = await runOperation<unknown, { sipPassword: string }>(
+    const rotated = (await runOperation(
       db,
       'devices.rotate',
       { id: device.device.id },
       asRun({ confirm: true })
-    );
+    )) as { sipPassword: string };
     expect(ringotel.users[0]?.password).toBe(rotated.sipPassword);
     ringotel.restore();
   });
@@ -472,12 +473,12 @@ describe('users', () => {
     await seedTenant(db);
     const userA = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     const userB = await createUser(db, 'Ben Roth', 'ben@x.test', '102');
-    const deviceA = await runOperation<unknown, { sipUsername: string }>(
+    const deviceA = (await runOperation(
       db,
       'devices.create',
       { userId: userA.user.id, label: 'Desk', kind: 'manual' },
       asRun()
-    );
+    )) as { sipUsername: string };
     // Another live device already holds the exact sip_username userA's device would naively take
     // on by keeping its own slug and adopting the target ext '999' (unused, so the rename itself
     // is otherwise unconstrained); users.update must fall back to a fresh slug instead of erroring.
@@ -496,10 +497,12 @@ describe('users', () => {
         createdAt: nowIso()
       })
       .execute();
-    const result = await runOperation<
-      unknown,
-      { affectedDevices?: { id: string; sipUsername: string }[] }
-    >(db, 'users.update', { id: userA.user.id, extension: '999' }, asRun());
+    const result = (await runOperation(
+      db,
+      'users.update',
+      { id: userA.user.id, extension: '999' },
+      asRun()
+    )) as { affectedDevices?: { id: string; sipUsername: string }[] };
     expect(result.affectedDevices?.[0]?.sipUsername.startsWith('e999-')).toBe(
       true
     );
@@ -557,10 +560,12 @@ describe('users', () => {
       .select('id')
       .where('number', '=', '+490000000')
       .executeTakeFirstOrThrow();
-    const result = await runOperation<
-      unknown,
-      { user: { calleridDidId: string | null } }
-    >(db, 'users.update', { id: user.user.id, calleridDidId: did.id }, asRun());
+    const result = (await runOperation(
+      db,
+      'users.update',
+      { id: user.user.id, calleridDidId: did.id },
+      asRun()
+    )) as { user: { calleridDidId: string | null } };
     expect(result.user.calleridDidId).toBe(did.id);
   });
 
@@ -1056,12 +1061,12 @@ describe('users', () => {
       .where('id', '=', anna.user.id)
       .execute();
 
-    const deleted = await runOperation<unknown, { id: string }>(
+    const deleted = (await runOperation(
       db,
       'users.delete',
       { id: ben.user.id },
       asRun({ confirm: true })
-    );
+    )) as { id: string };
     expect(deleted.id).toBe(ben.user.id);
   });
 
@@ -1099,12 +1104,12 @@ describe('users', () => {
       .where('id', '=', anna.user.id)
       .execute();
 
-    const deleted = await runOperation<unknown, { id: string }>(
+    const deleted = (await runOperation(
       db,
       'users.delete',
       { id: ben.user.id },
       asRun({ confirm: true })
-    );
+    )) as { id: string };
     expect(deleted.id).toBe(ben.user.id);
   });
   it('carries an active account lock on the user record (§5.5)', async () => {
@@ -1118,12 +1123,12 @@ describe('users', () => {
     const locked = loginLimiter.isLocked('anna@x.test');
 
     try {
-      const read = await runOperation<unknown, { lockedUntil: string | null }>(
+      const read = (await runOperation(
         db,
         'users.get',
         { id: user.user.id },
         asRun()
-      );
+      )) as { lockedUntil: string | null };
       expect(locked.locked).toBe(true);
       expect(read.lockedUntil).toBe(
         locked.locked ? new Date(locked.until).toISOString() : null
@@ -1138,12 +1143,12 @@ describe('users', () => {
     await seedTenant(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
 
-    const read = await runOperation<unknown, { lockedUntil: string | null }>(
+    const read = (await runOperation(
       db,
       'users.get',
       { id: user.user.id },
       asRun()
-    );
+    )) as { lockedUntil: string | null };
 
     expect(read.lockedUntil).toBeNull();
   });
@@ -1152,10 +1157,14 @@ describe('users', () => {
     await seedTenant(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
 
-    const out = await runOperation<
-      unknown,
-      { user: { logLevel: string | null; logLevelExpiresAt: string | null } }
-    >(db, 'users.update', { id: user.user.id, logLevel: 'events' }, asRun());
+    const out = (await runOperation(
+      db,
+      'users.update',
+      { id: user.user.id, logLevel: 'events' },
+      asRun()
+    )) as {
+      user: { logLevel: string | null; logLevelExpiresAt: string | null };
+    };
 
     expect(out.user.logLevel).toBe('events');
     const expiresAt = Date.parse(out.user.logLevelExpiresAt ?? '');

@@ -58,12 +58,12 @@ async function createUser(
   name: string,
   extension: string
 ): Promise<string> {
-  const { user } = await runOperation<unknown, { user: { id: string } }>(
+  const { user } = (await runOperation(
     db,
     'users.create',
     { name, email: `${name.toLowerCase()}@x.test`, extension },
     asRun()
-  );
+  )) as { user: { id: string } };
   return user.id;
 }
 
@@ -80,12 +80,12 @@ describe('the Ringotel roster push re-renders the per-user panels (§10.4)', () 
     await seedRingotel(db);
     const anna = await createUser(db, 'Anna', '101');
     const bob = await createUser(db, 'Bob', '102');
-    const { device } = await runOperation<unknown, { device: { id: string } }>(
+    const { device } = (await runOperation(
       db,
       'devices.create',
       { userId: bob, label: 'App', kind: 'ringotel' },
       asRun()
-    );
+    )) as { device: { id: string } };
     await runOperation(
       db,
       'devices.setBlf',

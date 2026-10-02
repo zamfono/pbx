@@ -3,6 +3,7 @@
  * carries unauthenticated `CoreStreamFrame` JSON frames, since the internal Docker network is the
  * trust boundary, and a dropped connection reconnects.
  */
+import pino from 'pino';
 import { WebSocket } from 'ws';
 
 import {
@@ -11,17 +12,13 @@ import {
   type Envelope
 } from '@zamfono/shared';
 
+import { tryParseJson } from './json.js';
+
 // ponytail: fixed 1 s reconnect delay; add backoff if a `core` outage causes a reconnect storm
 // worth damping.
 const DEFAULT_RECONNECT_DELAY_MS = 1000;
 
-function tryParseFrame(raw: string): CoreStreamFrame | null {
-  try {
-    return JSON.parse(raw) as CoreStreamFrame;
-  } catch {
-    return null;
-  }
-}
+const logger = pino({ name: 'coreEvents' });
 
 export type CoreEventsDeps = {
   url: string;
@@ -62,10 +59,16 @@ export function connectCoreEvents(deps: CoreEventsDeps): { close: () => void } {
       deps.onOpen?.();
     });
     ws.on('message', raw => {
-      const frame = tryParseFrame(rawDataToString(raw));
-      if (frame === null) {
+      const text = rawDataToString(raw);
+      const parsed = tryParseJson(text);
+      if (typeof parsed !== 'object' || parsed === null) {
+        logger.warn(
+          { frame: text },
+          'core sent a frame that is no JSON object'
+        );
         return;
       }
+      const frame = parsed as CoreStreamFrame;
       if (frame.type === 'asterisk.started') {
         deps.onAsteriskStarted?.(frame.asteriskStartedAt);
         return;

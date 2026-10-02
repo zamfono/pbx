@@ -110,12 +110,12 @@ describe('a ringotel device reaches Ringotel once Asterisk holds it (§10.4)', (
     const userId = await seed(db);
     const fake = install();
 
-    const output = await runOperation<unknown, { warnings?: string[] }>(
+    const output = (await runOperation(
       db,
       'devices.create',
       { userId, label: 'Phone', kind: 'ringotel' },
       admin
-    );
+    )) as { warnings?: string[] };
 
     expect(events).toEqual(['propagated', 'createUser']);
     expect(fake.users.map(user => user.extension)).toEqual(['998']);
@@ -128,15 +128,12 @@ describe('a ringotel device reaches Ringotel once Asterisk holds it (§10.4)', (
     const fake = install();
     fake.failing.add('createUser');
 
-    const output = await runOperation<
-      unknown,
-      { device: { id: string }; warnings?: string[] }
-    >(
+    const output = (await runOperation(
       db,
       'devices.create',
       { userId, label: 'Phone', kind: 'ringotel' },
       admin
-    );
+    )) as { device: { id: string }; warnings?: string[] };
 
     expect(output.warnings).toEqual([
       expect.stringMatching(
@@ -155,12 +152,12 @@ describe('a ringotel device reaches Ringotel once Asterisk holds it (§10.4)', (
     const db = await makeTestDb();
     const userId = await seed(db);
     install();
-    const created = await runOperation<unknown, { device: { id: string } }>(
+    const created = (await runOperation(
       db,
       'devices.create',
       { userId, label: 'Phone', kind: 'ringotel' },
       admin
-    );
+    )) as { device: { id: string } };
     events.length = 0;
 
     await runOperation(db, 'devices.rotate', { id: created.device.id }, admin);
@@ -173,12 +170,12 @@ describe('a ringotel device reaches Ringotel once Asterisk holds it (§10.4)', (
     const db = await makeTestDb();
     const userId = await seed(db);
     const fake = install();
-    const created = await runOperation<unknown, { device: { id: string } }>(
+    const created = (await runOperation(
       db,
       'devices.create',
       { userId, label: 'Phone', kind: 'ringotel' },
       admin
-    );
+    )) as { device: { id: string } };
     fake.failing.add('updateUser');
     await runOperation(db, 'devices.rotate', { id: created.device.id }, admin);
 
@@ -214,15 +211,12 @@ describe('a ringotel device reaches Ringotel once Asterisk holds it (§10.4)', (
       .set({ ringotelOrgId: null, ringotelBranchId: null })
       .execute();
 
-    const output = await runOperation<
-      unknown,
-      { device: { id: string }; warnings?: string[] }
-    >(
+    const output = (await runOperation(
       db,
       'devices.create',
       { userId, label: 'Phone', kind: 'ringotel' },
       admin
-    );
+    )) as { device: { id: string }; warnings?: string[] };
 
     expect(output.warnings).toEqual([
       expect.stringMatching(/Ringotel is not set up/u)
@@ -239,12 +233,12 @@ describe('a ringotel device reaches Ringotel once Asterisk holds it (§10.4)', (
     const db = await makeTestDb();
     const userId = await seed(db);
     install();
-    const created = await runOperation<unknown, { device: { id: string } }>(
+    const created = (await runOperation(
       db,
       'devices.create',
       { userId, label: 'Phone', kind: 'ringotel' },
       admin
-    );
+    )) as { device: { id: string } };
     const entry = await db
       .selectFrom('auditLog')
       .select('id')

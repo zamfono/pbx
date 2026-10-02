@@ -59,12 +59,9 @@ describe('recordings', () => {
   it('lists recordings for an admin and refuses a user role', async () => {
     const db = await makeTestDb();
     const { id } = await seedRecording(db, {});
-    const listed = await runOperation<unknown, { items: { id: string }[] }>(
-      db,
-      'recordings.list',
-      {},
-      asRun()
-    );
+    const listed = (await runOperation(db, 'recordings.list', {}, asRun())) as {
+      items: { id: string }[];
+    };
     expect(listed.items.map(item => item.id)).toContain(id);
     await expect(
       runOperation(db, 'recordings.list', {}, asRun({ actor: user }))

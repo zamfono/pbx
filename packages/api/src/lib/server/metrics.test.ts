@@ -1,12 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
 
-import {
-  recordApiRequestSeconds,
-  renderMetrics,
-  resetMetricsAccumulators
-} from './metrics.js';
+import { renderMetrics } from './metrics.js';
+import { recordApiRequestSeconds } from './metricsCounters.js';
 import { updaterClient, type UpdaterClient } from './ops/system/_updater.js';
 import { makeTestDb } from './testDb.js';
 
@@ -89,10 +86,6 @@ async function insertTrunk(
 }
 
 describe('renderMetrics', () => {
-  afterEach(() => {
-    resetMetricsAccumulators();
-  });
-
   it('renders parseable Prometheus text with the active-calls and ARI gauges', async () => {
     const db = await makeTestDb();
     const state: StateResponse = {

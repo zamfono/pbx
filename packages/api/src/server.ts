@@ -5,11 +5,10 @@
  * (`lib/server/jobs/background.ts`), through the sink this file provides
  * (`lib/server/eventSink.ts`). It runs outside that bundle, where SvelteKit's `$app/env/private` does not
  * exist, so it reads `process.env` itself and passes what the modules it imports need, the
- * database file, `JWT_SECRET` and the keyring, into them; none of them reads the environment.
+ * database file and `JWT_SECRET`, into them; none of them reads the environment.
  */
 import http from 'node:http';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
 import pino from 'pino';
 import { WebSocketServer, type WebSocket } from 'ws';
 
@@ -23,7 +22,6 @@ import {
 import { EventHub } from '#lib/server/events.js';
 import { authenticateEventsSocket } from '#lib/server/eventsAuth.js';
 import { provideEventSink } from '#lib/server/eventSink.js';
-import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 // Global Constraints "Fixed internal ports": api's port is never configurable per stack.
 const API_INTERNAL_PORT = 3000;
@@ -88,7 +86,7 @@ function exitOnSignal(server: http.Server): void {
   process.once('SIGINT', shutdown);
 }
 
-export async function main(): Promise<void> {
+async function main(): Promise<void> {
   // §7 "Version": the first line api logs, before anything that can fail boots.
   logger.info({ version: zamfonoVersion.display }, 'api starting');
   const timeZoneError = stackTimeZoneError(process.env.TZ);
@@ -97,8 +95,6 @@ export async function main(): Promise<void> {
   }
   const db = openDb(requireEnv('DB_FILE'));
   const jwtSecret = requireEnv('JWT_SECRET');
-  // Fails the boot here, since the SvelteKit bundle only skips its jobs without a keyring.
-  keyringFromEnv(process.env);
   const hub = new EventHub(db);
   provideEventSink(envelope => {
     hub.publish(envelope);
@@ -126,11 +122,8 @@ export async function main(): Promise<void> {
   });
 }
 
-// Only run on direct execution (`node server.js`), not when imported by a test.
-if (fileURLToPath(import.meta.url) === process.argv[1]) {
-  main().catch((error: unknown) => {
-    // eslint-disable-next-line no-console -- fatal boot failure, before any logger exists
-    console.error('api failed to start', error);
-    process.exit(1);
-  });
-}
+main().catch((error: unknown) => {
+  // eslint-disable-next-line no-console -- fatal boot failure, before any logger exists
+  console.error('api failed to start', error);
+  process.exit(1);
+});

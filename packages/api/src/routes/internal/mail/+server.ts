@@ -10,7 +10,6 @@ import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 const logger = pino({ name: 'internal-mail' });
 
-const STATUS_NOT_FOUND = 404;
 const STATUS_BAD_REQUEST = 400;
 const STATUS_ACCEPTED = 202;
 
@@ -79,13 +78,9 @@ async function handleMailRequest(request: Request): Promise<Response> {
 
 /**
  * `POST /internal/mail` (§3.1 "Mail", §10.2 "Mail"): `core` posts a voicemail or missed-call
- * mail request here. Reachable from the `internal` network only — Caddy answers 404 for the
- * `/internal` prefix, so a request that carries `X-Forwarded-For` came through the proxy hop
- * instead and is refused the same way.
+ * mail request here, over the `internal` network (`hooks.server.ts` refuses one that came
+ * through the proxy hop).
  */
-export function POST(event: RequestEvent): Promise<Response> {
-  if (event.request.headers.has('x-forwarded-for')) {
-    return Promise.resolve(new Response(null, { status: STATUS_NOT_FOUND }));
-  }
+export async function POST(event: RequestEvent): Promise<Response> {
   return handleMailRequest(event.request);
 }

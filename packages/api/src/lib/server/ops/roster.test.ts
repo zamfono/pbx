@@ -83,12 +83,12 @@ describe('the Ringotel roster follows every user and extension change (§10.4)',
     await seedTenant(db);
     const ringotel = installRingotelFake();
 
-    const created = await runOperation<unknown, { user: { id: string } }>(
+    const created = (await runOperation(
       db,
       'users.create',
       { name: 'Anna Huber', email: 'anna@x.test', extension: '101' },
       asRun()
-    );
+    )) as { user: { id: string } };
     expect(roster(ringotel)).toEqual([{ number: '101', title: 'Anna Huber' }]);
 
     await runOperation(db, 'users.delete', { id: created.user.id }, asRun());
@@ -107,12 +107,12 @@ describe('the Ringotel roster follows every user and extension change (§10.4)',
     await seedTenant(db);
     const ringotel = installRingotelFake();
 
-    const group = await runOperation<unknown, { id: string; ext: string }>(
+    const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Sales', strategy: 'simultaneous' },
       asRun()
-    );
+    )) as { id: string; ext: string };
     expect(roster(ringotel)).toEqual([{ number: group.ext, title: 'Sales' }]);
 
     await runOperation(

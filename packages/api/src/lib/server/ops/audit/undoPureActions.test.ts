@@ -80,18 +80,18 @@ async function putResetTemplate(db: Db, subject: string): Promise<void> {
 
 /** A user with one device, and the device's label changed once: the entry the tests undo. */
 async function relabelledDevice(db: Db): Promise<string> {
-  const { user } = await runOperation<unknown, { user: { id: string } }>(
+  const { user } = (await runOperation(
     db,
     'users.create',
     { name: 'Anna Huber', email: 'anna@x.test', extension: '101' },
     asRun()
-  );
-  const { device } = await runOperation<unknown, { device: { id: string } }>(
+  )) as { user: { id: string } };
+  const { device } = (await runOperation(
     db,
     'devices.create',
     { userId: user.id, label: 'Desk phone', kind: 'manual' },
     asRun()
-  );
+  )) as { device: { id: string } };
   await runOperation(
     db,
     'devices.update',
@@ -120,12 +120,12 @@ describe('audit.undo past pure actions (§5.8)', () => {
 
     await undo(db, put);
 
-    const read = await runOperation<unknown, MailTemplateWire>(
+    const read = (await runOperation(
       db,
       'mailTemplates.get',
       RESET_EN,
       asRun()
-    );
+    )) as MailTemplateWire;
     expect(read.source).toBe('builtin');
   });
 
@@ -164,12 +164,12 @@ describe('audit.undo past pure actions (§5.8)', () => {
   it('undoes a user change that a later password-reset mail followed', async () => {
     const db = await makeTestDb();
     await seedTenant(db);
-    const { user } = await runOperation<unknown, { user: { id: string } }>(
+    const { user } = (await runOperation(
       db,
       'users.create',
       { name: 'Anna Huber', email: 'anna@x.test', extension: '101' },
       asRun()
-    );
+    )) as { user: { id: string } };
     await runOperation(
       db,
       'users.update',

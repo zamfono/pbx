@@ -23,7 +23,7 @@ type OooOutput = {
 describe('ooo', () => {
   it('creates, lists, updates and deletes a tenant rule', async () => {
     const db = await makeTestDb();
-    const created = await runOperation<unknown, OooOutput>(
+    const created = (await runOperation(
       db,
       'ooo.create',
       {
@@ -33,20 +33,20 @@ describe('ooo', () => {
         target: { kind: 'external', external: '+491234567' }
       },
       asRun()
-    );
-    const listed = await runOperation<unknown, { items: OooOutput[] }>(
+    )) as OooOutput;
+    const listed = (await runOperation(
       db,
       'ooo.list',
       { scope: { kind: 'tenant' } },
       asRun()
-    );
+    )) as { items: OooOutput[] };
     expect(listed.items.map(item => item.id)).toContain(created.id);
-    const updated = await runOperation<unknown, OooOutput>(
+    const updated = (await runOperation(
       db,
       'ooo.update',
       { id: created.id, active: false },
       asRun()
-    );
+    )) as OooOutput;
     expect(updated.active).toBe(false);
     await runOperation(
       db,
@@ -54,12 +54,12 @@ describe('ooo', () => {
       { id: created.id },
       asRun({ confirm: true })
     );
-    const afterDelete = await runOperation<unknown, { items: OooOutput[] }>(
+    const afterDelete = (await runOperation(
       db,
       'ooo.list',
       { scope: { kind: 'tenant' } },
       asRun()
-    );
+    )) as { items: OooOutput[] };
     expect(afterDelete.items.map(item => item.id)).not.toContain(created.id);
   });
 
@@ -69,7 +69,7 @@ describe('ooo', () => {
     const ids: string[] = [];
     for (const day of starts) {
       // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; creates must serialize
-      const created = await runOperation<unknown, OooOutput>(
+      const created = (await runOperation(
         db,
         'ooo.create',
         {
@@ -79,24 +79,24 @@ describe('ooo', () => {
           target: { kind: 'external', external: '+491234567' }
         },
         asRun()
-      );
+      )) as OooOutput;
       ids.push(created.id);
     }
     type Page = { items: OooOutput[]; nextCursor: string | null };
-    const first = await runOperation<unknown, Page>(
+    const first = (await runOperation(
       db,
       'ooo.list',
       { scope: { kind: 'tenant' }, limit: 2 },
       asRun()
-    );
+    )) as Page;
     expect(first.items.map(item => item.id)).toEqual(ids.slice(0, 2));
     expect(first.nextCursor).not.toBeNull();
-    const second = await runOperation<unknown, Page>(
+    const second = (await runOperation(
       db,
       'ooo.list',
       { scope: { kind: 'tenant' }, limit: 2, cursor: first.nextCursor },
       asRun()
-    );
+    )) as Page;
     expect(second.items.map(item => item.id)).toEqual(ids.slice(2));
     expect(second.nextCursor).toBeNull();
   });
