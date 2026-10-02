@@ -24,6 +24,7 @@ import { connectCoreEvents } from '../coreEvents.js';
 import { publishEvent } from '../eventSink.js';
 import { updateMailSender } from '../mail/owners.js';
 import { mediaDirFromEnv } from '../mediaDir.js';
+import { oweDevicePushesAtStart } from '../ops/devices/_ringotelPush.js';
 import { retryPendingProfile } from '../ops/settings/profilePush.js';
 import { updaterClient } from '../ops/system/_updater.js';
 import { propagateAtBoot } from '../propagation.js';
@@ -106,7 +107,8 @@ function startAutoUpdate(
  * The seed, the default backup target and the boot render, in that order and awaited: the
  * seed's failure propagates, so `api` never serves a database without an owner, a settings row
  * or its parking slots, and the Asterisk configuration is rendered from that database before
- * `api` reports healthy and so before `core` starts and reloads it.
+ * `api` reports healthy and so before `core` starts and reloads it. A propagation still owed
+ * from before the start also owes the device pushes that waited for it (§3.1).
  */
 export async function runBootSteps(
   db: Db,
@@ -116,6 +118,7 @@ export async function runBootSteps(
   const seeded = await seedIfEmpty(db, env, kr, mediaDirFromEnv(), log);
   log.info({ seeded }, 'boot: first-boot seed');
   await seedBackupTarget(db, env, kr, log);
+  await oweDevicePushesAtStart(db);
   await propagateAtBoot(db, log);
 }
 

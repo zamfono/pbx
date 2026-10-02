@@ -7,6 +7,8 @@
  */
 import * as env from '$app/env/private';
 
+import type { Db } from '@zamfono/shared';
+
 import { errorMessage } from '../errors.js';
 import { decrypt, keyringFromEnv } from '../secretbox.js';
 import { ringotelLog } from './ringotelBranchHooks.js';
@@ -55,7 +57,7 @@ export async function createRemoteUser(
 }
 
 /** The device's stored SIP credentials, decrypted (§5.4). */
-function storedCredentials(device: DeviceRow): SipCredentials {
+export function storedCredentials(device: DeviceRow): SipCredentials {
   return {
     username: device.sipUsername,
     password: decrypt(keyringFromEnv(env), device.sipPasswordEnc).toString(
@@ -108,6 +110,17 @@ async function provisionDevice(
   return remoteId;
 }
 
+/** Every live `ringotel` device, oldest first. */
+export async function liveRingotelDevices(db: Db): Promise<DeviceRow[]> {
+  return db
+    .selectFrom('devices')
+    .selectAll()
+    .where('kind', '=', 'ringotel')
+    .where('deletedAt', 'is', null)
+    .orderBy('createdAt')
+    .execute();
+}
+
 /** What Ringotel answered for one existing device: its new user's id, or why it refused. */
 export type ExistingDeviceOutcome = { deviceId: string } & (
   { remoteId: string } | { reason: string }
@@ -125,13 +138,7 @@ export async function provisionExistingDevices(
   deps: RingotelProviderDeps
 ): Promise<ExistingDeviceOutcome[]> {
   const { orgId } = await resolveIds(deps.db);
-  const devices = await deps.db
-    .selectFrom('devices')
-    .selectAll()
-    .where('kind', '=', 'ringotel')
-    .where('deletedAt', 'is', null)
-    .orderBy('createdAt')
-    .execute();
+  const devices = await liveRingotelDevices(deps.db);
   const outcomes: ExistingDeviceOutcome[] = [];
   for (const device of devices) {
     try {

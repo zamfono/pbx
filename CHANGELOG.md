@@ -215,6 +215,11 @@ why the specified behaviour changed; the commit history, how.
   propagation still owed as `configPropagationPending`, and `/metrics` as
   `zamfono_config_propagation_pending`, with the failures in
   `zamfono_config_propagation_failures_total`.
+- A Ringotel device push waiting for a configuration change to reach Asterisk was lost when `api`
+  restarted before it did, so a new or rotated Ringotel device could stay without its user or
+  password at Ringotel. An `api` that starts while a change is still owed now pushes every
+  Ringotel device once Asterisk has the configuration, each recorded as `ringotel.push` with
+  trigger `api.start`.
 - `/healthz` reported a check whose database query failed as a reassuring default, such as no
   secrets left to re-encrypt, no Ringotel profile pending or no failed automatic update; it now
   answers 500, which the uptime check sees. `/metrics` likewise reported an automatic update it

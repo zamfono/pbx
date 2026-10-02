@@ -3,14 +3,22 @@ import pino from 'pino';
 import type { Db } from '@zamfono/shared';
 
 import { errorMessage } from '#lib/server/errors.js';
+import { isPropagationPending } from '#lib/server/propagationPending.js';
 import {
   activeRingotelProvider,
+  type DeviceRow,
   type ProvisioningProvider,
   type PushReceipt
 } from '#lib/server/provisioning/index.js';
+import {
+  liveRingotelDevices,
+  storedCredentials
+} from '#lib/server/provisioning/ringotelUser.js';
 
+import { oweRestartPush } from '../afterCommit.js';
 import {
   callerOf,
+  JOB_CALLER,
   outcomeChanges,
   recordOutcome,
   type OutcomeCaller
@@ -128,4 +136,54 @@ export function reportPush(
     await auditPush(db, caller, push, result);
     return pushWarning(push, result);
   });
+}
+
+/** One device's stored credentials, pushed again as the job (`pushEveryDevice`). */
+async function pushStoredCredentials(db: Db, device: DeviceRow): Promise<void> {
+  const push: Push = {
+    trigger: 'api.start',
+    deviceId: device.id,
+    push: provider =>
+      provider.onCredentialsRotated(device, storedCredentials(device)),
+    failure: {
+      what: `device ${device.id}'s credentials are stored`,
+      retry: 'devices.rotate on the device pushes them again'
+    }
+  };
+  const result = await attempt(db, push);
+  await auditPush(db, JOB_CALLER, push, result);
+  const warning = pushWarning(push, result);
+  if (warning !== null) {
+    log.error(
+      { deviceId: device.id, warning },
+      'ringotel: a device push failed'
+    );
+  }
+}
+
+/**
+ * Pushes every live `ringotel` device's stored credentials (`onCredentialsRotated`, which creates
+ * a Ringotel user that is missing), as the job, with trigger `api.start`: what the pushes the
+ * `api` before this one held for an owed propagation were to send (§3.1, §10.4). Every outcome is
+ * a `ringotel.push` row; a refusal is logged. A stack without Ringotel pushes nothing.
+ */
+async function pushEveryDevice(db: Db): Promise<void> {
+  if ((await activeRingotelProvider(db)) === null) {
+    return;
+  }
+  for (const device of await liveRingotelDevices(db)) {
+    // eslint-disable-next-line no-await-in-loop -- the Ringotel RPC has no batch update; sequential pushes are the plain reading of the API
+    await pushStoredCredentials(db, device);
+  }
+}
+
+/**
+ * At `api`'s start, while a propagation is owed: the device pushes that waited for it were held
+ * in memory and went with the `api` before this one, so the first propagation that succeeds
+ * pushes every device again (`pushEveryDevice`).
+ */
+export async function oweDevicePushesAtStart(db: Db): Promise<void> {
+  if (await isPropagationPending(db)) {
+    oweRestartPush(pushEveryDevice);
+  }
 }

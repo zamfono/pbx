@@ -6,9 +6,11 @@ import { errorMessage } from '../errors.js';
 import type { AfterCommitHook, Effects } from './effects.js';
 import type { Context } from './types.js';
 
-// ponytail: in memory, so an `api` restart drops what waits; the writes and their warnings stand.
-// The steps that wait for a propagation `api` still owes (§3.1), oldest first.
+// The steps that wait for a propagation `api` still owes (§3.1), oldest first. They are held in
+// memory: what a restart drops of them, the push `oweRestartPush` registers sends again.
 const waiting: AfterCommitHook[] = [];
+// The push an `api` that started while a propagation was owed sends once one succeeds, or `null`.
+let restartPush: ((db: Db) => Promise<void>) | null = null;
 
 const log = pino({ name: 'ops.runner' });
 
@@ -57,6 +59,30 @@ export async function runWaitingHooks(db: Db): Promise<void> {
   const warnings = await runInOrder(db, waiting.splice(0));
   for (const warning of warnings) {
     log.warn({ warning }, 'a step that waited for config propagation warns');
+  }
+}
+
+/**
+ * Registers `push` to run once, after the first propagation that succeeds, in place of the steps
+ * the `api` before this one held for the propagation it owed (§3.1): it sends again, from the
+ * database, what they were to send.
+ */
+export function oweRestartPush(push: (db: Db) => Promise<void>): void {
+  restartPush = push;
+}
+
+/**
+ * Runs the push `oweRestartPush` registered, once a propagation succeeded: after the steps that
+ * waited for it and the succeeding write's own, since it sends what they send again. Nothing
+ * answers for it, so a failure goes to the log.
+ */
+export async function runRestartPush(db: Db): Promise<void> {
+  const push = restartPush;
+  restartPush = null;
+  if (push !== null) {
+    await push(db).catch((error: unknown) => {
+      log.error({ error }, 'the push owed since api started failed');
+    });
   }
 }
 

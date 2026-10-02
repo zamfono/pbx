@@ -2,6 +2,7 @@ import { newId, nowIso, type Db } from '@zamfono/shared';
 
 import {
   runAfterCommit,
+  runRestartPush,
   runWaitingHooks,
   withWarnings
 } from './afterCommit.js';
@@ -219,9 +220,11 @@ export async function runOperation(
   // when it called `propagate`, since a DID, a menu, an outbound route or an out-of-office rule
   // changes what `core` routes on without changing anything Asterisk holds.
   // A failed propagation is the result's first warning, and `api` owes it until one succeeds;
-  // a successful one first runs what waited for an owed one.
+  // a successful one first runs what waited for an owed one, and last the push owed since `api`
+  // started, which sends what those steps and this write's own send again.
   let propagationFailure: string | null = null;
-  if (!op.readOnly && effects.propagates) {
+  const propagated = !op.readOnly && effects.propagates;
+  if (propagated) {
     propagationFailure = await notifyPropagation(db, name, [
       ...effects.reloadKinds
     ]);
@@ -231,8 +234,9 @@ export async function runOperation(
   }
   // What had to wait for the commit or for Asterisk to hold the write, such as Ringotel
   // registering a new device; its problems are the result's warnings, since the write stands.
-  return withWarnings(
-    output,
-    await runAfterCommit(db, effects, propagationFailure)
-  );
+  const warnings = await runAfterCommit(db, effects, propagationFailure);
+  if (propagated && propagationFailure === null) {
+    await runRestartPush(db);
+  }
+  return withWarnings(output, warnings);
 }

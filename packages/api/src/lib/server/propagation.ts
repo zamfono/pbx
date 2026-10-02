@@ -13,7 +13,7 @@ import type { Db, ReloadKind } from '@zamfono/shared';
 
 import { getCoreClient } from './coreClient.js';
 import { recordConfigPropagationFailure } from './metricsCounters.js';
-import { runWaitingHooks } from './ops/afterCommit.js';
+import { runRestartPush, runWaitingHooks } from './ops/afterCommit.js';
 import { render } from './pjsip/render.js';
 import {
   isPropagationPending,
@@ -96,7 +96,10 @@ function scheduleRetry(db: Db): void {
     retryDelayMs = Math.min(retryDelayMs * RETRY_BACKOFF_FACTOR, RETRY_MAX_MS);
     // eslint-disable-next-line no-use-before-define -- the retry is a propagation, and a failed propagation schedules the retry
     propagateConfig(db, []).then(
-      async () => runWaitingHooks(db),
+      async () => {
+        await runWaitingHooks(db);
+        await runRestartPush(db);
+      },
       (error: unknown) => {
         log.warn({ error }, 'the owed config propagation failed again');
       }
@@ -158,16 +161,17 @@ export async function propagateConfig(
  * so `api` still serves and retries it. `core` starts only once `api` is healthy (§6.3) and
  * reloads every rendered module at its own boot, so on a fresh start its refusal here is
  * expected and owes nothing; a propagation owed from before the restart stays owed until `core`
- * takes one.
+ * takes one. Once one is taken, the push owed since `api` started runs (`runRestartPush`), while
+ * `api` already serves, since it waits on Ringotel.
  */
 export async function propagateAtBoot(db: Db, bootLog: Logger): Promise<void> {
-  await serialized(async () => {
+  const settled = await serialized(async () => {
     try {
       await renderConfig(db);
     } catch (error) {
       bootLog.error({ error }, 'boot: config render failed');
       await owe(db);
-      return;
+      return false;
     }
     try {
       await getCoreClient().configChanged(ALL_RELOAD_KINDS);
@@ -179,8 +183,13 @@ export async function propagateAtBoot(db: Db, bootLog: Logger): Promise<void> {
       if (await isPropagationPending(db)) {
         scheduleRetry(db);
       }
-      return;
+      return false;
     }
     await settle(db);
+    return true;
   });
+  if (settled) {
+    // `runRestartPush` logs its own failure.
+    runRestartPush(db).catch(() => undefined);
+  }
 }

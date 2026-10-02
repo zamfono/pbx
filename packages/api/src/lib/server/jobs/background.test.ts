@@ -25,6 +25,9 @@ vi.mock('../seed.js', () => ({
 vi.mock('../seedBackupTarget.js', () => ({
   seedBackupTarget: vi.fn(() => Promise.resolve('skipped'))
 }));
+vi.mock('../ops/devices/_ringotelPush.js', () => ({
+  oweDevicePushesAtStart: vi.fn(() => Promise.resolve())
+}));
 vi.mock('../propagation.js', () => ({
   propagateAtBoot: vi.fn(() => Promise.resolve())
 }));

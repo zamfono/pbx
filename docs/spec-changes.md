@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-02 · §3.1 Config propagation, §10.4 When a device reaches Ringotel.** An `api` that starts while a config propagation is owed has lost the device pushes held in memory for it, and pushes every `ringotel` device's stored credentials once the first propagation succeeds, after that write's own steps; each push is a `ringotel.push` entry with `trigger` `api.start`, attributed to the job. The tenant profile is not pushed again by it, since `settings.ringotel_profile_pending` already keeps it owed across the restart.
+*Why:* requested by the product owner: Ringotel pushes held for an owed propagation were lost on an api restart.
+
 **2026-10-02 · §6.3 Health.** A `/healthz` field that `api`'s migrated database fails to answer fails the request with 500 instead of reporting a default such as no rows left to re-encrypt or no failed automatic update.
 *Why:* found in the design review: every check caught its own errors to tolerate an unmigrated database, so a real fault read as all clear on the endpoint the uptime check reads.
 
