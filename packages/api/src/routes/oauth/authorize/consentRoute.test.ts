@@ -118,7 +118,6 @@ function sealConsent(
   );
 }
 
-/* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
 function authorizeUrl(clientId: string, redirectUri: string): URL {
   const url = new URL(`${ORIGIN}/oauth/authorize`);
   const params: Record<string, string> = {
@@ -134,7 +133,6 @@ function authorizeUrl(clientId: string, redirectUri: string): URL {
   }
   return url;
 }
-/* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
 
 function loadFor(url: URL, cookies: Jar): ReturnType<typeof load> {
   return load({ url, cookies } as unknown as Parameters<typeof load>[0]);
@@ -156,7 +154,6 @@ describe('GET /oauth/authorize with a pending consent cookie', () => {
     const clientA = clientIdFor('Client A', REDIRECT_A);
     sealConsent(jar, clientA, 'Client A');
     const url = new URL(`${ORIGIN}/oauth/authorize`);
-    /* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
     const params: Record<string, string> = {
       client_id: clientA,
       redirect_uri: REDIRECT_A,
@@ -164,7 +161,6 @@ describe('GET /oauth/authorize with a pending consent cookie', () => {
       code_challenge: 'challenge-a',
       scope: 'openid'
     };
-    /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
     for (const [name, value] of Object.entries(params)) {
       url.searchParams.set(name, value);
     }

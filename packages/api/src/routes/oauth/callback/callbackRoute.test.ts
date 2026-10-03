@@ -109,7 +109,6 @@ describe('GET /oauth/callback', () => {
       codeVerifier: 'verifier-1',
       authorizeParams: null
     });
-    // eslint-disable-next-line new-cap -- GET is the fixed SvelteKit route-handler export name
     const err = await GET(
       eventFor('state=state-1&code=auth-code', cookie)
     ).catch((caught: unknown) => caught);
@@ -124,7 +123,6 @@ describe('GET /oauth/callback', () => {
       codeVerifier: 'verifier-1',
       authorizeParams: null
     });
-    // eslint-disable-next-line new-cap -- GET is the fixed SvelteKit route-handler export name
     const err = await GET(
       eventFor('state=victim-state&code=victim-code', cookie)
     ).catch((caught: unknown) => caught);
@@ -135,7 +133,6 @@ describe('GET /oauth/callback', () => {
   });
 
   it('refuses a code/state pair presented with no cookie at all', async () => {
-    // eslint-disable-next-line new-cap -- GET is the fixed SvelteKit route-handler export name
     const err = await GET(
       eventFor('state=victim-state&code=victim-code', undefined)
     ).catch((caught: unknown) => caught);
@@ -178,7 +175,6 @@ describe('GET /oauth/callback', () => {
       }
     });
     const sets: { name: string; value: string }[] = [];
-    // eslint-disable-next-line new-cap -- GET is the fixed SvelteKit route-handler export name
     const err = await GET(
       eventFor('state=state-1&code=auth-code', cookie, sets)
     ).catch((caught: unknown) => caught);
@@ -206,7 +202,6 @@ describe('GET /oauth/callback', () => {
     });
     vi.stubEnv('SECRETBOX_KEY', 'not-a-key-spec');
     try {
-      // eslint-disable-next-line new-cap -- GET is the fixed SvelteKit route-handler export name
       const err = await GET(
         eventFor('state=state-1&code=auth-code', cookie)
       ).catch((caught: unknown) => caught);

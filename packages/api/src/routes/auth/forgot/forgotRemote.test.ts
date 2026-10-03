@@ -153,14 +153,13 @@ describe('the forgot-password form', () => {
       expect(await submit({ email: 'nobody@example.com' })).toEqual({
         sent: true
       });
-      // eslint-disable-next-line new-cap, no-await-in-loop -- the fixed SvelteKit handler name; sequential attempts
+      // eslint-disable-next-line no-await-in-loop -- sequential attempts
       const rest = await POST(
         eventFrom(address, { email: 'nobody@example.com' })
       );
       expect(rest.status).toBe(202);
     }
     expect(await statusOf(submit({ email: 'nobody@example.com' }))).toBe(429);
-    // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
     const refused = await POST(eventFrom(address, { email: 'x@example.com' }));
     expect(refused.status).toBe(429);
     // The limit is per address: another client is unaffected.
@@ -187,7 +186,6 @@ describe('the forgot-password form', () => {
     expect(await submit({ email: 'anna@example.com' })).toEqual({
       sent: true
     });
-    // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
     const viaRest = await POST(
       eventFrom('198.51.100.5', { email: 'ANNA@example.com' })
     );

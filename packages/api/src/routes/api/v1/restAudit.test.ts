@@ -61,7 +61,6 @@ function eventFor(
 
 describe('POST /api/v1/[...path]', () => {
   it('records the OAuth client name alongside its id in the audit entry (§5.7)', async () => {
-    // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
     const response = await POST(
       eventFor(
         'http://api/api/v1/blockedNumbers',
@@ -79,7 +78,6 @@ describe('POST /api/v1/[...path]', () => {
   });
 
   it('records no client for a call whose token names none', async () => {
-    // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
     await POST(
       eventFor(
         'http://api/api/v1/blockedNumbers',

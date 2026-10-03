@@ -65,7 +65,6 @@ describe('GET /metrics', () => {
     delete process.env.METRICS_TOKEN;
     stubCore();
 
-    // eslint-disable-next-line new-cap -- GET is the fixed SvelteKit route-handler export name
     const response = await GET(eventWithAuth('Bearer anything'));
 
     expect(response.status).toBe(HTTP_NOT_FOUND);
@@ -75,9 +74,7 @@ describe('GET /metrics', () => {
     process.env.METRICS_TOKEN = randomUUID();
     stubCore();
 
-    // eslint-disable-next-line new-cap -- GET is the fixed SvelteKit route-handler export name
     const missing = await GET(eventWithAuth(null));
-    // eslint-disable-next-line new-cap -- GET is the fixed SvelteKit route-handler export name
     const wrong = await GET(eventWithAuth('Bearer wrong-token'));
 
     expect(missing.status).toBe(HTTP_UNAUTHORIZED);
@@ -90,7 +87,6 @@ describe('GET /metrics', () => {
     stubCore();
     await migrateForTest(getDb());
 
-    // eslint-disable-next-line new-cap -- GET is the fixed SvelteKit route-handler export name
     const response = await GET(eventWithAuth(`Bearer ${token}`));
 
     expect(response.status).toBe(HTTP_OK);

@@ -44,14 +44,12 @@ export type Discovery = {
 
 const discoveryCache = new TtlMap<string, Discovery>();
 
-/* eslint-disable camelcase -- RFC 8414/OIDC discovery mandates these snake_case wire fields */
 const DiscoveryDocumentSchema = z.object({
   authorization_endpoint: z.string(),
   token_endpoint: z.string(),
   jwks_uri: z.string(),
   issuer: z.string()
 });
-/* eslint-enable camelcase -- RFC 8414/OIDC discovery mandates these snake_case wire fields */
 
 /** Fetches and caches (1 h) `cfg.issuer`'s OpenID discovery document. */
 export async function discover(

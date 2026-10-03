@@ -183,7 +183,6 @@ describe('the login step', () => {
     const db = getDb();
     await seedUser(db, email);
     const cookies = cookieJar();
-    /* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
     const authorize = {
       client_id: testClientId('https://client.example.com/callback'),
       redirect_uri: 'https://client.example.com/callback',
@@ -191,7 +190,6 @@ describe('the login step', () => {
       code_challenge: 'challenge-1',
       scope: 'openid'
     };
-    /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
     const loginResult = await loginSubmit(
       eventFor(cookies),
       loginPayload(email, PASSWORD, authorize)
@@ -222,7 +220,6 @@ describe('the login step', () => {
     const db = getDb();
     await seedUser(db, email);
     const cookies = cookieJar();
-    /* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
     const loginResult = await loginSubmit(
       eventFor(cookies),
       loginPayload(email, PASSWORD, {
@@ -232,7 +229,6 @@ describe('the login step', () => {
         scope: 'openid'
       })
     );
-    /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
     expect(loginResult).toMatchObject({ needsConsent: true });
     const err = await approveConsentSubmit(eventFor(cookies)).catch(
       (caught: unknown) => caught
@@ -253,7 +249,6 @@ describe('the login step', () => {
     const cookies = cookieJar();
     const clientId = testClientId('https://client.example.com/callback');
     const verifier = 'verifier-no-redirect-uri';
-    /* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
     await loginSubmit(
       eventFor(cookies),
       loginPayload(email, PASSWORD, {
@@ -292,7 +287,6 @@ describe('the login step', () => {
         })
       })
     );
-    /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
     expect(response.status).toBe(200);
   });
 
@@ -301,7 +295,6 @@ describe('the login step', () => {
     const db = getDb();
     await seedUser(db, email);
     const cookies = cookieJar();
-    /* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
     await loginSubmit(
       eventFor(cookies),
       loginPayload(email, PASSWORD, {
@@ -312,7 +305,6 @@ describe('the login step', () => {
         scope: 'openid'
       })
     );
-    /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
     const err = await denyConsentSubmit(eventFor(cookies)).catch(
       (caught: unknown) => caught
     );
@@ -367,7 +359,6 @@ describe('the login step', () => {
     const email = 'success-2@example.com';
     const db = getDb();
     await seedUser(db, email);
-    /* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
     const err = await loginSubmit(
       eventFor(),
       loginPayload(email, PASSWORD, {
@@ -378,7 +369,6 @@ describe('the login step', () => {
         scope: 'openid'
       })
     ).catch((caught: unknown) => caught);
-    /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
     expect(isRedirect(err)).toBe(false);
     if (!isHttpError(err)) {
       throw new Error('expected an HttpError');
@@ -473,7 +463,6 @@ describe('GET /oauth/authorize (load)', () => {
   }
 
   it('answers an unsupported response_type at the redirect_uri, with state and iss (OAuth 2.1 §4.1.2.1, RFC 9207)', async () => {
-    /* eslint-disable-next-line camelcase -- RFC 6749 mandates this snake_case wire field */
     const location = await loadRedirect(requestUrl({ response_type: 'token' }));
     expect(location.origin).toBe('https://client.example.com');
     expect(location.searchParams.get('error')).toBe(
@@ -504,7 +493,6 @@ describe('GET /oauth/authorize (load)', () => {
   });
 
   it('answers a request without response_type at the redirect_uri with invalid_request (OAuth 2.1 §4.1.1: required)', async () => {
-    /* eslint-disable-next-line camelcase -- RFC 6749 mandates this snake_case wire field */
     const location = await loadRedirect(requestUrl({ response_type: null }));
     expect(location.origin).toBe('https://client.example.com');
     expect(location.searchParams.get('error')).toBe('invalid_request');
@@ -515,7 +503,6 @@ describe('GET /oauth/authorize (load)', () => {
 
   it('resumes a request without redirect_uri at the single registered one (OAuth 2.1 §2.3.2)', async () => {
     const data = await load({
-      /* eslint-disable-next-line camelcase -- RFC 6749 mandates this snake_case wire field */
       url: requestUrl({ redirect_uri: null }),
       cookies: cookieJar()
     } as unknown as Parameters<typeof load>[0]);
@@ -535,7 +522,6 @@ describe('GET /oauth/authorize (load)', () => {
       applicationType: 'web'
     });
     const err = await load({
-      /* eslint-disable-next-line camelcase -- RFC 6749 mandates these snake_case wire fields */
       url: requestUrl({ client_id: clientId, redirect_uri: null }),
       cookies: cookieJar()
     } as unknown as Parameters<typeof load>[0]).catch(
@@ -550,7 +536,6 @@ describe('GET /oauth/authorize (load)', () => {
 
   it('answers an unsupported code_challenge_method at the redirect_uri, with iss', async () => {
     const location = await loadRedirect(
-      /* eslint-disable-next-line camelcase -- RFC 7636 mandates this snake_case wire field */
       requestUrl({ code_challenge_method: 'plain' })
     );
     expect(location.searchParams.get('error')).toBe('invalid_request');
@@ -559,7 +544,6 @@ describe('GET /oauth/authorize (load)', () => {
 
   it('answers a request without a PKCE challenge at the redirect_uri, with iss', async () => {
     const location = await loadRedirect(
-      /* eslint-disable-next-line camelcase -- RFC 7636 mandates this snake_case wire field */
       requestUrl({ code_challenge: null, state: null })
     );
     expect(location.searchParams.get('error')).toBe('invalid_request');
@@ -569,12 +553,10 @@ describe('GET /oauth/authorize (load)', () => {
 
   it('never redirects to an unregistered redirect_uri, whatever else is wrong', async () => {
     const err = await load({
-      /* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
       url: requestUrl({
         redirect_uri: 'https://not-registered.example.com/callback',
         response_type: 'token'
       }),
-      /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
       cookies: cookieJar()
     } as unknown as Parameters<typeof load>[0]).catch(
       (caught: unknown) => caught
@@ -603,7 +585,6 @@ describe("Claude Code's sign-in on a random loopback port (RFC 8252 §7.3)", () 
     globalThis.fetch = () =>
       Promise.resolve(
         new Response(
-          /* eslint-disable camelcase -- RFC 7591 mandates these snake_case wire fields */
           JSON.stringify({
             client_id: CLAUDE_CODE_CLIENT_ID,
             client_name: 'Claude Code',
@@ -616,7 +597,6 @@ describe("Claude Code's sign-in on a random loopback port (RFC 8252 §7.3)", () 
             response_types: ['code'],
             token_endpoint_auth_method: 'none'
           }),
-          /* eslint-enable camelcase -- RFC 7591 mandates these snake_case wire fields */
           { headers: { 'content-type': 'application/json' } }
         )
       );
@@ -627,7 +607,6 @@ describe("Claude Code's sign-in on a random loopback port (RFC 8252 §7.3)", () 
     serveClaudeCodeDocument();
     await seedUser(getDb(), email);
     const cookies = cookieJar();
-    /* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
     const loginResult = await loginSubmit(
       eventFor(cookies),
       loginPayload(email, PASSWORD, {
@@ -640,7 +619,6 @@ describe("Claude Code's sign-in on a random loopback port (RFC 8252 §7.3)", () 
         scope: 'openid'
       })
     );
-    /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
     expect(loginResult).toEqual({
       needsConsent: true,
       clientName: 'Claude Code',
@@ -672,7 +650,6 @@ describe("Claude Code's sign-in on a random loopback port (RFC 8252 §7.3)", () 
       },
       new Request(`${ORIGIN}/oauth/token`, {
         method: 'POST',
-        /* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
         body: new URLSearchParams({
           grant_type: 'authorization_code',
           code,
@@ -680,7 +657,6 @@ describe("Claude Code's sign-in on a random loopback port (RFC 8252 §7.3)", () 
           client_id: CLAUDE_CODE_CLIENT_ID,
           code_verifier: verifier
         })
-        /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
       })
     );
   }

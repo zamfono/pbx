@@ -12,7 +12,6 @@ const MAX_CLIENT_NAME_LENGTH = 100;
 const MAX_REDIRECT_URIS = 5;
 const MAX_REDIRECT_URI_LENGTH = 512;
 
-/* eslint-disable camelcase -- RFC 7591 mandates these snake_case wire fields */
 const RegisterRequestSchema = z.object({
   client_name: z.string().min(1).max(MAX_CLIENT_NAME_LENGTH),
   redirect_uris: z
@@ -21,7 +20,6 @@ const RegisterRequestSchema = z.object({
     .max(MAX_REDIRECT_URIS),
   application_type: z.enum(['native', 'web'])
 });
-/* eslint-enable camelcase -- RFC 7591 mandates these snake_case wire fields */
 
 export type RegisterDeps = BaseDeps & { keyring: Keyring };
 
@@ -48,7 +46,6 @@ export async function registerEndpoint(
     applicationType: parsed.data.application_type
   });
   return new Response(
-    /* eslint-disable camelcase -- RFC 7591 mandates these snake_case wire fields */
     JSON.stringify({
       client_id: clientId,
       client_name: parsed.data.client_name,
@@ -56,7 +53,6 @@ export async function registerEndpoint(
       application_type: parsed.data.application_type,
       token_endpoint_auth_method: NO_AUTH_METHOD
     }),
-    /* eslint-enable camelcase -- RFC 7591 mandates these snake_case wire fields */
     {
       status: HTTP_CREATED,
       headers: { 'content-type': 'application/json' }

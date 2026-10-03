@@ -58,7 +58,6 @@ async function insertTarget(
 
 /** `restic backup --json`'s output: a status line, then the summary line the job reads. */
 function resticBackupOutput(snapshotId: string, bytes: number): string {
-  /* eslint-disable camelcase -- restic's own --json field names */
   return [
     JSON.stringify({ message_type: 'status', percent_done: 1 }),
     JSON.stringify({
@@ -68,7 +67,6 @@ function resticBackupOutput(snapshotId: string, bytes: number): string {
       total_bytes_processed: SNAPSHOT_TOTAL_BYTES
     })
   ].join('\n');
-  /* eslint-enable camelcase -- restic's own --json field names */
 }
 
 function fakeBus(): { bus: Bus; published: Envelope[] } {

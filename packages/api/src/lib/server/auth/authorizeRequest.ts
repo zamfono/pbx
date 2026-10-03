@@ -35,7 +35,6 @@ const AUTHORIZE_PARAM_NAMES = [
   'scope'
 ] as const;
 
-/* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
 /** The outer authorization request as the login and SSO forms carry it: one hidden field per
  *  §5.2 client parameter, each absent for a bare login that names no client. */
 export const AuthorizePayloadSchema = z.object({
@@ -45,7 +44,6 @@ export const AuthorizePayloadSchema = z.object({
   code_challenge: z.string().optional(),
   scope: z.string().optional()
 });
-/* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
 
 export type AuthorizePayload = z.infer<typeof AuthorizePayloadSchema>;
 
@@ -54,7 +52,6 @@ export type AuthorizePayload = z.infer<typeof AuthorizePayloadSchema>;
  *  for a request whose GET passed `resolveClient`, so it carries no `response_type` (nor a
  *  `code_challenge_method`): the one value that check admits, `code`, is restored here. */
 export function paramsFromPayload(payload: AuthorizePayload): URLSearchParams {
-  // eslint-disable-next-line camelcase -- RFC 6749 mandates this snake_case wire field
   const params = new URLSearchParams({ response_type: VALID_RESPONSE_TYPE });
   for (const name of AUTHORIZE_PARAM_NAMES) {
     const value = payload[name];

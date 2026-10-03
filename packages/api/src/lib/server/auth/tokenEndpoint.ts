@@ -23,14 +23,12 @@ export type TokenDeps = BaseDeps & {
 
 function tokenResponse(accessToken: string, refreshToken: string): Response {
   return new Response(
-    /* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
     JSON.stringify({
       access_token: accessToken,
       token_type: BEARER_TOKEN_TYPE,
       expires_in: ACCESS_TOKEN_TTL_S,
       refresh_token: refreshToken
     }),
-    /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
     {
       status: HTTP_OK,
       headers: {

@@ -49,10 +49,54 @@ export default tseslint.config(
           checkForEach: true
         }
       ],
+      // Snake_case names other systems fix on the wire or in the schema.
       camelcase: [
         'error',
         {
-          allow: []
+          allow: [
+            // OAuth 2.0 (RFC 6749, 7591, 7636, 8414, 9728) and OpenID Connect fields
+            'access_token',
+            'application_type',
+            'authorization_endpoint',
+            'authorization_response_iss_parameter_supported',
+            'authorization_servers',
+            'client_id',
+            'client_id_metadata_document_supported',
+            'client_name',
+            'client_uri',
+            'code_challenge',
+            'code_challenge_method',
+            'code_challenge_methods_supported',
+            'code_verifier',
+            'email_verified',
+            'expires_in',
+            'grant_type',
+            'grant_types',
+            'grant_types_supported',
+            'id_token',
+            'jwks_uri',
+            'preferred_username',
+            'redirect_uri',
+            'redirect_uris',
+            'refresh_token',
+            'registration_endpoint',
+            'response_type',
+            'response_types',
+            'response_types_supported',
+            'revocation_endpoint',
+            'token_endpoint',
+            'token_endpoint_auth_method',
+            'token_endpoint_auth_methods_supported',
+            'token_type',
+            // restic's `--json` output
+            'data_added',
+            'message_type',
+            'percent_done',
+            'snapshot_id',
+            'total_bytes_processed',
+            // Table names
+            'backup_targets'
+          ]
         }
       ],
       'func-style': [
@@ -69,6 +113,13 @@ export default tseslint.config(
         'error',
         {
           max: 5
+        }
+      ],
+      'new-cap': [
+        'error',
+        {
+          // SvelteKit's route-handler export names, called directly by the route tests
+          capIsNewExceptions: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
         }
       ],
       'one-var': ['error', 'never'],

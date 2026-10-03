@@ -37,7 +37,6 @@ function stubCoreHealthz(body: CoreHealth): void {
 describe('GET /healthz', () => {
   it('reports core reachable with its own ari flag when core answers 200', async () => {
     stubCoreHealthz({ ok: true, ari: true, db: true });
-    // eslint-disable-next-line new-cap -- GET is the fixed SvelteKit route-handler export name
     const response = await GET();
     const body = (await response.json()) as { core: unknown };
     expect(body.core).toEqual({ reachable: true, ari: true });
@@ -49,14 +48,12 @@ describe('GET /healthz', () => {
       ari: false,
       db: true
     });
-    // eslint-disable-next-line new-cap -- GET is the fixed SvelteKit route-handler export name
     const response = await GET();
     const body = (await response.json()) as { core: unknown };
     expect(body.core).toEqual({ reachable: true, ari: false });
   });
 
   it('reports core unreachable when the request itself fails', async () => {
-    // eslint-disable-next-line new-cap -- GET is the fixed SvelteKit route-handler export name
     const response = await GET();
     const body = (await response.json()) as { core: unknown };
     expect(body.core).toEqual({ reachable: false, ari: false });
@@ -64,7 +61,6 @@ describe('GET /healthz', () => {
 
   it('is 503 while the database holds no migration record', async () => {
     stubCoreHealthz({ ok: true, ari: true, db: true });
-    // eslint-disable-next-line new-cap -- GET is the fixed SvelteKit route-handler export name
     const response = await GET();
     expect(response.status).toBe(HTTP_SERVICE_UNAVAILABLE);
   });

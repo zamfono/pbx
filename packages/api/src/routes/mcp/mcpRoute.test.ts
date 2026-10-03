@@ -77,7 +77,6 @@ async function eventFor(
 
 describe('POST /mcp', () => {
   it('lists the registered operations as tools, proving the registry is filled', async () => {
-    // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
     const response = await POST(await eventFor(1, 'tools/list'));
     const body = (await response.json()) as {
       result: { tools: { name: string }[] };
@@ -88,7 +87,6 @@ describe('POST /mcp', () => {
   });
 
   it('dispatches a tool call to a real operation instead of answering "unknown operation"', async () => {
-    // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
     const response = await POST(
       await eventFor(2, 'tools/call', {
         name: 'blockedNumbers.list',

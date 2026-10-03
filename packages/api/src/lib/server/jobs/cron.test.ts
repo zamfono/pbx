@@ -102,13 +102,11 @@ async function insertRun(
 }
 
 function resticBackupOutput(snapshotId: string): string {
-  /* eslint-disable camelcase -- restic's own --json field names */
   return JSON.stringify({
     message_type: 'summary',
     snapshot_id: snapshotId,
     data_added: SNAPSHOT_BYTES
   });
-  /* eslint-enable camelcase -- restic's own --json field names */
 }
 
 function fakeExec(snapshotId: string): ExecFn {

@@ -30,7 +30,5 @@ export function unauthorizedResponse(origin: string): Response {
 
 /** RFC 9728 protected-resource metadata: the MCP endpoint points at the stack's own AS (§5.2). */
 export function protectedResourceMetadata(origin: string): object {
-  /* eslint-disable camelcase -- RFC 9728 mandates this snake_case wire field */
   return { resource: mcpResourceUri(origin), authorization_servers: [origin] };
-  /* eslint-enable camelcase -- RFC 9728 mandates this snake_case wire field */
 }

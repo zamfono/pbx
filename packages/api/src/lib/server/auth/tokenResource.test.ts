@@ -53,7 +53,6 @@ async function setup(): Promise<{ deps: TokenDeps; code: string }> {
 
 /** An authorization_code token request, with each of `resources` as one `resource` field. */
 function codeRequest(code: string, resources: string[]): Request {
-  /* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
     code,
@@ -61,7 +60,6 @@ function codeRequest(code: string, resources: string[]): Request {
     client_id: CLIENT_ID,
     code_verifier: VERIFIER
   });
-  /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
   for (const resource of resources) {
     body.append('resource', resource);
   }
@@ -130,13 +128,11 @@ describe('tokenEndpoint (resource, RFC 8707)', () => {
   it('refuses a foreign resource on the refresh grant too', async () => {
     const { deps } = await setup();
     const refresh = await issueRefresh(deps.db, 'owner', CLIENT_ID, NOW);
-    /* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
     const body = new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: refresh.raw,
       resource: 'https://other.example/mcp'
     });
-    /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
     const response = await tokenEndpoint(
       deps,
       new Request(`${ORIGIN}/oauth/token`, { method: 'POST', body })

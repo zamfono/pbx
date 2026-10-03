@@ -41,12 +41,10 @@ describe('POST /auth/reset', () => {
       .execute();
     const { raw } = await issueResetToken(db, userId, 'reset', nowIso());
     // First redemption succeeds and revokes the token (`redeemResetToken`'s own job)...
-    // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
     const first = await POST(eventFor({ token: raw, password: PASSWORD }));
     expect(first.status).toBe(200);
     // ...so presenting the very same raw token a second time must hit the `revoked_at !== null`
     // branch specifically, not just "no row for this hash" (a never-issued token would too).
-    // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
     const second = await POST(eventFor({ token: raw, password: PASSWORD }));
     expect(second.status).toBe(400);
   });
@@ -91,7 +89,6 @@ describe('POST /auth/reset', () => {
       })
       .execute();
 
-    // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
     const response = await POST(
       eventFor({ token: rawResetToken, password: PASSWORD })
     );

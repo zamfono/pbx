@@ -526,12 +526,10 @@ describe('handleMcpRequest, JSON-RPC framing', () => {
 
 describe('protectedResourceMetadata', () => {
   it('points at the stack’s own authorization server', () => {
-    /* eslint-disable camelcase -- RFC 9728 mandates this snake_case wire field */
     expect(protectedResourceMetadata(ORIGIN)).toEqual({
       resource: `${ORIGIN}/mcp`,
       authorization_servers: [ORIGIN]
     });
-    /* eslint-enable camelcase -- RFC 9728 mandates this snake_case wire field */
   });
 });
 

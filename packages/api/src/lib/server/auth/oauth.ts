@@ -36,7 +36,6 @@ export async function revokeEndpoint(
 
 /** RFC 8414 authorization server metadata, also served as the OpenID discovery document. */
 export function metadataDocument(origin: string): object {
-  /* eslint-disable camelcase -- RFC 8414 mandates these snake_case wire fields */
   return {
     issuer: origin,
     authorization_endpoint: `${origin}/oauth/authorize`,
@@ -52,5 +51,4 @@ export function metadataDocument(origin: string): object {
     // authorization servers configured can tell which one a redirect came from.
     authorization_response_iss_parameter_supported: true
   };
-  /* eslint-enable camelcase -- RFC 8414 mandates these snake_case wire fields */
 }

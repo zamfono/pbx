@@ -51,14 +51,12 @@ describe('fetchCimd', () => {
     const fetchImpl = (() =>
       Promise.resolve(
         new Response(
-          /* eslint-disable camelcase -- RFC 7591 mandates these snake_case wire fields */
           JSON.stringify({
             client_id: 'https://attacker.example/metadata.json',
             client_name: 'Impostor',
             redirect_uris: ['https://client.example/callback'],
             application_type: 'web'
           }),
-          /* eslint-enable camelcase -- RFC 7591 mandates these snake_case wire fields */
           { headers: { 'content-type': 'application/json' } }
         )
       )) as typeof fetch;
@@ -75,7 +73,6 @@ describe('fetchCimd', () => {
     const fetchImpl = (() =>
       Promise.resolve(
         new Response(
-          /* eslint-disable camelcase -- RFC 7591 mandates these snake_case wire fields */
           JSON.stringify({
             client_id: url,
             client_name: 'Claude',
@@ -89,7 +86,6 @@ describe('fetchCimd', () => {
             response_types: ['code'],
             token_endpoint_auth_method: 'none'
           }),
-          /* eslint-enable camelcase -- RFC 7591 mandates these snake_case wire fields */
           { headers: { 'content-type': 'application/json' } }
         )
       )) as typeof fetch;
@@ -107,14 +103,12 @@ describe('fetchCimd', () => {
     const fetchImpl = (() =>
       Promise.resolve(
         new Response(
-          /* eslint-disable camelcase -- RFC 7591 mandates these snake_case wire fields */
           JSON.stringify({
             client_id: url,
             client_name: 'Odd',
             redirect_uris: ['https://client.example/callback'],
             application_type: 'service'
           }),
-          /* eslint-enable camelcase -- RFC 7591 mandates these snake_case wire fields */
           { headers: { 'content-type': 'application/json' } }
         )
       )) as typeof fetch;
@@ -131,7 +125,6 @@ describe('redirectUriAllowed', () => {
     const fetchImpl = (() =>
       Promise.resolve(
         new Response(
-          /* eslint-disable camelcase -- RFC 7591 mandates these snake_case wire fields */
           JSON.stringify({
             client_id: CLAUDE_CODE_CLIENT_ID,
             client_name: 'Claude Code',
@@ -144,7 +137,6 @@ describe('redirectUriAllowed', () => {
             response_types: ['code'],
             token_endpoint_auth_method: 'none'
           }),
-          /* eslint-enable camelcase -- RFC 7591 mandates these snake_case wire fields */
           { headers: { 'content-type': 'application/json' } }
         )
       )) as typeof fetch;

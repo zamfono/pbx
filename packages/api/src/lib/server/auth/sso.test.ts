@@ -53,7 +53,6 @@ async function issueIdToken(
 ): Promise<{ idToken: string; jwks: { keys: JWK[] } }> {
   const { privateKey, publicKey } = await generateKeyPair('RS256');
   const publicJwk = await exportJWK(publicKey);
-  /* eslint-disable camelcase -- OIDC's standard claim names are snake_case */
   const payload = {
     nonce: NONCE,
     sub: claims.sub,
@@ -61,7 +60,6 @@ async function issueIdToken(
     email_verified: claims.emailVerified,
     preferred_username: claims.preferredUsername
   };
-  /* eslint-enable camelcase -- OIDC's standard claim names are snake_case */
   const idToken = await new SignJWT(payload)
     .setProtectedHeader({ alg: 'RS256', kid: KEY_ID })
     .setIssuer(issuer)
@@ -91,7 +89,6 @@ function fetchFor(
   return (input: string | URL | Request) => {
     const url = urlOf(input);
     if (url === disc.tokenEndpoint) {
-      // eslint-disable-next-line camelcase -- RFC 6749 mandates this snake_case wire field
       return Promise.resolve(jsonResponse({ id_token: idToken }));
     }
     if (url === disc.jwksUri) {
@@ -465,7 +462,6 @@ describe('discover', () => {
     let calls = 0;
     const fetchImpl = (() => {
       calls += 1;
-      /* eslint-disable camelcase -- OIDC discovery documents use these snake_case wire fields */
       return Promise.resolve(
         jsonResponse({
           authorization_endpoint: `${issuer}/authorize`,
@@ -474,7 +470,6 @@ describe('discover', () => {
           issuer
         })
       );
-      /* eslint-enable camelcase -- OIDC discovery documents use these snake_case wire fields */
     }) as typeof fetch;
     const cfg = oidcConfig({ issuer });
     const first = await discover(cfg, fetchImpl);
@@ -486,7 +481,6 @@ describe('discover', () => {
 
   it('rejects a discovery document declaring another issuer (RFC 8414 §3.3)', async () => {
     const issuer = 'https://idp2.example.com';
-    /* eslint-disable camelcase -- OIDC discovery documents use these snake_case wire fields */
     const fetchImpl = (() =>
       Promise.resolve(
         jsonResponse({
@@ -496,7 +490,6 @@ describe('discover', () => {
           issuer: 'https://attacker.example.com'
         })
       )) as typeof fetch;
-    /* eslint-enable camelcase -- OIDC discovery documents use these snake_case wire fields */
     await expect(discover(oidcConfig({ issuer }), fetchImpl)).rejects.toThrow(
       /issuer/u
     );

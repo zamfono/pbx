@@ -74,7 +74,6 @@ describe('tokenEndpoint (authorization_code)', () => {
     });
     const response = await tokenEndpoint(
       deps,
-      /* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
       formRequest({
         grant_type: 'authorization_code',
         code,
@@ -82,7 +81,6 @@ describe('tokenEndpoint (authorization_code)', () => {
         client_id: 'client-1',
         code_verifier: verifier
       })
-      /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
     );
     expect(response.status).toBe(200);
     const body = (await response.json()) as {
@@ -104,7 +102,6 @@ describe('tokenEndpoint (authorization_code)', () => {
     });
     const response = await tokenEndpoint(
       deps,
-      /* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
       formRequest({
         grant_type: 'authorization_code',
         code,
@@ -112,7 +109,6 @@ describe('tokenEndpoint (authorization_code)', () => {
         client_id: 'client-1',
         code_verifier: 'a-wrong-verifier'
       })
-      /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
     );
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: 'invalid_grant' });
@@ -131,7 +127,6 @@ describe('tokenEndpoint (authorization_code)', () => {
     clock.nowMs = JUST_OVER_CODE_TTL_MS;
     const response = await tokenEndpoint(
       deps,
-      /* eslint-disable camelcase -- RFC 6749 mandates these snake_case wire fields */
       formRequest({
         grant_type: 'authorization_code',
         code,
@@ -139,7 +134,6 @@ describe('tokenEndpoint (authorization_code)', () => {
         client_id: 'client-1',
         code_verifier: verifier
       })
-      /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
     );
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: 'invalid_grant' });
@@ -157,7 +151,6 @@ describe('tokenEndpoint (rate limit)', () => {
       // eslint-disable-next-line no-await-in-loop -- each request must count before the next is made
       const response = await tokenEndpoint(
         deps,
-        // eslint-disable-next-line camelcase -- RFC 6749 mandates this snake_case wire field
         formRequest({ grant_type: 'password' })
       );
       statuses.push(response.status);
@@ -188,13 +181,11 @@ describe('registerEndpoint', () => {
       new Request('http://test/oauth/register', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        /* eslint-disable camelcase -- RFC 7591 mandates these snake_case wire fields */
         body: JSON.stringify({
           client_name: 'Too Many Redirects',
           redirect_uris: redirectUris,
           application_type: 'web'
         })
-        /* eslint-enable camelcase -- RFC 7591 mandates these snake_case wire fields */
       })
     );
     expect(response.status).toBe(400);
@@ -210,13 +201,11 @@ describe('registerEndpoint', () => {
       new Request('http://test/oauth/register', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        /* eslint-disable camelcase -- RFC 7591 mandates these snake_case wire fields */
         body: JSON.stringify({
           client_name: 'A CLI',
           redirect_uris: ['https://client.test/callback'],
           application_type: 'web'
         })
-        /* eslint-enable camelcase -- RFC 7591 mandates these snake_case wire fields */
       })
     );
     expect(response.status).toBe(201);

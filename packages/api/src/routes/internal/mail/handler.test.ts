@@ -36,7 +36,6 @@ describe('POST /internal/mail', () => {
         attachmentPath: '/etc/passwd'
       })
     });
-    // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
     const response = await POST(eventFor(request));
     expect(response.status).toBe(HTTP_BAD_REQUEST);
   });
@@ -55,7 +54,6 @@ describe('POST /internal/mail', () => {
         }
       })
     });
-    // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
     const response = await POST(eventFor(request));
     expect(response.status).toBe(HTTP_ACCEPTED);
   });

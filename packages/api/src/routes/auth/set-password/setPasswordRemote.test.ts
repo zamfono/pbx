@@ -125,7 +125,6 @@ describe('the set-password form', () => {
     expect(await verifyPassword(user.passwordHash, PASSWORD)).toBe(true);
     expect(await tokenRevoked(raw)).toBe(true);
     // The same token checks as `POST /auth/reset`: a link the form redeemed is refused there too.
-    // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
     const rest = await POST({
       request: {
         json: () => Promise.resolve({ token: raw, password: PASSWORD })
@@ -157,7 +156,6 @@ describe('the set-password form', () => {
     ).toEqual({ message: 'This link has expired or was already used.' });
     const userId = await newUser('dora@example.com');
     const { raw } = await issueResetToken(getDb(), userId, 'reset', nowIso());
-    // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
     const rest = await POST({
       request: {
         json: () => Promise.resolve({ token: raw, password: PASSWORD })
