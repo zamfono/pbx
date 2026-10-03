@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the api image (or takes the one IMAGE_TAG names) and asserts what the image itself has to carry, as opposed to what the
+# Builds the api image (or takes the one API_IMAGE names) and asserts what the image itself has to carry, as opposed to what the
 # code does with it: the admin guide bundled at build time (spec §10.5), the hold-music tracks
 # that first boot seeds into the media volume (§6.3, §10.2), the ssh client restic's sftp backend
 # spawns (§6.5), and the Argon2id generator for BOOTSTRAP_OWNER_PASSWORD_HASH (§6.3 "First boot"). Run from the repository root's build
@@ -12,12 +12,11 @@ MOH_SOURCE_DIR=/usr/share/asterisk/moh
 MOH_TRACK_COUNT=5
 TEST_PASSWORD='a test password'
 
-# CI passes the image it built as IMAGE_TAG, and nothing is built here, so the image checked is
-# the one published. Standalone, the image is built fresh under :test, through bake, which
-# supplies the runtime-base stage it starts from.
-if [ -z "${IMAGE_TAG:-}" ]; then
-  IMAGE_TAG=zamfono/api:test
-  API_IMAGE=$IMAGE_TAG docker buildx bake --load api
+# CI passes the image it built as API_IMAGE, docker-bake.hcl's variable, and nothing is built
+# here, so the image checked is the one published. Standalone, bake builds it fresh under :test.
+if [ -z "${API_IMAGE:-}" ]; then
+  export API_IMAGE=zamfono/api:test
+  docker buildx bake --load api
 fi
 
 fail() {
@@ -26,7 +25,7 @@ fail() {
 }
 
 run() {
-  docker run --rm --entrypoint sh "$IMAGE_TAG" -c "$1"
+  docker run --rm --entrypoint sh "$API_IMAGE" -c "$1"
 }
 
 # The guide is inlined into the server chunk by `import.meta.glob` at build time, so the
@@ -53,7 +52,7 @@ for bin in ssh sshpass; do
 done
 
 HASH=$(printf '%s' "$TEST_PASSWORD" \
-  | docker run --rm -i --entrypoint node "$IMAGE_TAG" hash-password.mjs)
+  | docker run --rm -i --entrypoint node "$API_IMAGE" hash-password.mjs)
 case "$HASH" in
   '$argon2id$'*) ;;
   *) fail "hash-password.mjs printed '$HASH', which is not an Argon2id PHC string" ;;

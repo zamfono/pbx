@@ -3,18 +3,17 @@
 # (docs/spec.md §6.3). Run from anywhere; it resolves its own paths from its own location.
 #
 # Caddy isn't assumed to be installed on the host (it isn't, on the CI runner): the Caddyfile is
-# validated inside the `proxy` image instead, built fresh here under a local :test tag unless
-# PROXY_IMAGE names one already built (e.g. by the CI job that builds all six images before
-# running this script).
+# validated inside the `proxy` image instead: the one PROXY_IMAGE, docker-bake.hcl's variable,
+# names (CI's own build), else one bake builds fresh here under :test.
 set -eu
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
 
-PROXY_IMAGE=${PROXY_IMAGE:-zamfono/proxy:test}
-
-if ! docker image inspect "$PROXY_IMAGE" >/dev/null 2>&1; then
-  docker build -f "$repo_root/images/proxy/Dockerfile" -t "$PROXY_IMAGE" "$repo_root" >/dev/null
+if [ -z "${PROXY_IMAGE:-}" ]; then
+  PROXY_IMAGE=zamfono/proxy:test
+  export PROXY_IMAGE
+  (cd "$repo_root" && docker buildx bake --load proxy) >/dev/null
 fi
 
 echo "==> compose config (ports overlay, .env.example values)"
@@ -23,7 +22,8 @@ bundle_dir=$(mktemp -d)
 trap 'rm -rf "$env_file" "$bundle_dir"' EXIT
 # Only the variables compose.yaml has no fallback for need a value; the rest are meant to be
 # exercised at their documented defaults.
-required='FQDN|EXTERNAL_IPV4|ARI_PASSWORD|AMI_PASSWORD|JWT_SECRET|SECRETBOX_KEY|BOOTSTRAP_OWNER_EMAIL|BOOTSTRAP_OWNER_NAME|COMPANY_NAME|MAIN_DID|COUNTRY'
+required=$(grep -ohE '\$\{[A-Z0-9_]+(:?\?[^}]*)?\}' "$script_dir/compose.yaml" "$script_dir/compose.ports.yaml" \
+  | sed -E 's/^\$\{([A-Z0-9_]+).*/\1/' | sort -u | paste -sd'|')
 sed -E "s/^($required)=\$/\1=placeholder/" "$script_dir/.env.example" >"$env_file"
 (cd "$script_dir" && docker compose --env-file "$env_file" -f compose.yaml -f compose.ports.yaml config) >/dev/null
 

@@ -85,10 +85,20 @@ target "runtime-base" {
   no-cache   = FRESH
 }
 
+# The installed npm workspace api's and core's build stages start from, handed to both as the
+# `workspace` context, so `npm ci` runs once for the two. It has no tag: nothing publishes it.
+target "workspace" {
+  context    = "."
+  dockerfile = "images/workspace/Dockerfile"
+  cache-from = cache_from("workspace")
+  cache-to   = cache_to("workspace")
+  no-cache   = FRESH
+}
+
 target "core" {
   context    = "."
   dockerfile = "images/core/Dockerfile"
-  contexts   = { runtime-base = "target:runtime-base" }
+  contexts   = { workspace = "target:workspace", runtime-base = "target:runtime-base" }
   tags       = [CORE_IMAGE]
   args       = { ZAMFONO_REVISION = REVISION }
   cache-from = cache_from("core")
@@ -99,7 +109,7 @@ target "core" {
 target "api" {
   context    = "."
   dockerfile = "images/api/Dockerfile"
-  contexts   = { runtime-base = "target:runtime-base" }
+  contexts   = { workspace = "target:workspace", runtime-base = "target:runtime-base" }
   tags       = [API_IMAGE]
   args       = { ZAMFONO_REVISION = REVISION }
   cache-from = cache_from("api")

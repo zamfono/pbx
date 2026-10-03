@@ -2,18 +2,19 @@
 # Builds the asterisk image and exercises it end to end (spec §9.1, §9.2, §9.4).
 set -euo pipefail
 cd "$(dirname "$0")"
+repo_root=$(CDPATH='' cd -- ../.. && pwd)
 
 CONTAINER=zamfono-asterisk-test
 STARTUP_TIMEOUT_S=30
 
-# CI passes the image it built and labelled as IMAGE_TAG, and nothing is built here, so the image
-# checked is the one published; a rebuild would drop the label CI adds after its own build.
-# Standalone, the image is built fresh under :test.
-if [ -z "${IMAGE_TAG:-}" ]; then
-  IMAGE_TAG=zamfono/asterisk:test
+# CI passes the image it built and labelled as ASTERISK_IMAGE, docker-bake.hcl's variable, and
+# nothing is built here, so the image checked is the one published; a rebuild would drop the label
+# CI adds after its own build. Standalone, bake builds it fresh under :test.
+if [ -z "${ASTERISK_IMAGE:-}" ]; then
+  export ASTERISK_IMAGE=zamfono/asterisk:test
   # The Zamfono APT repository publishes amd64 only (spec §4); pin the platform so the image
   # builds the same way on an arm64 development machine as it does on an amd64 CI runner.
-  docker build --platform linux/amd64 -t "$IMAGE_TAG" .
+  (cd "$repo_root" && docker buildx bake --load --set asterisk.platform=linux/amd64 asterisk)
 fi
 
 # The second run, with HEP on and the astdb on a volume, that the first one's HEP_ENABLED=false
@@ -34,7 +35,7 @@ docker run -d --name "$CONTAINER" --platform linux/amd64 \
   -e EXTERNAL_IPV4=192.0.2.10 \
   -e ARI_PASSWORD=x \
   -e AMI_PASSWORD=y \
-  "$IMAGE_TAG" > /dev/null
+  "$ASTERISK_IMAGE" > /dev/null
 
 # The container whose logs a failure prints: the one under test at the time.
 current=$CONTAINER
@@ -232,7 +233,7 @@ start_hep_container() {
     -e ARI_PASSWORD=x \
     -e AMI_PASSWORD=y \
     -v "$ASTDB_VOLUME:/var/lib/asterisk/astdb" \
-    "$IMAGE_TAG" > /dev/null
+    "$ASTERISK_IMAGE" > /dev/null
 }
 
 # Listens as the HEP collector on $1:9060, sends Asterisk one SIP OPTIONS, and prints the first

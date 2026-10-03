@@ -52,8 +52,7 @@ updates:
 
   - package-ecosystem: docker
     directories:
-      - /images/api
-      - /images/core
+      - /images/workspace
       - /images/runtime-base
       - /images/asterisk
       - /images/proxy

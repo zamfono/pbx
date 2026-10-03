@@ -140,19 +140,19 @@ jobs:
       - name: The image names, from docker-bake.hcl
         run: scripts/image-env.sh >>"$GITHUB_ENV"
       - name: Exercise each image's own checks
-        # db/test.sh, deploy/test.sh and the four images/*/test.sh each default to their own
-        # :test tag and build it themselves when run standalone; here they're pointed at the
-        # images the `images` job built, via IMAGE/IMAGE_TAG and via PROXY_IMAGE from the step
-        # above, so nothing is built twice and what is checked is the archive main.yaml
-        # publishes, asterisk with its label. `publish` there needs this whole workflow, this job
-        # included, so a failed check stops the push as a failed build does.
+        # db/test.sh, deploy/test.sh and the four images/*/test.sh each check the image their
+        # docker-bake.hcl variable names, the step above setting each to the one the `images` job
+        # built, so nothing is built twice and what is checked is the archive main.yaml publishes,
+        # asterisk with its label; run standalone, each builds its own under :test. `publish`
+        # there needs this whole workflow, this job included, so a failed check stops the push
+        # as a failed build does.
         run: |
-          IMAGE="$MIGRATE_IMAGE" bash db/test.sh
+          bash db/test.sh
           bash deploy/test.sh
-          IMAGE_TAG="$API_IMAGE" bash images/api/test.sh
-          IMAGE_TAG="$ASTERISK_IMAGE" bash images/asterisk/test.sh
-          IMAGE_TAG="$PROXY_IMAGE" bash images/proxy/test.sh
-          IMAGE_TAG="$UPDATER_IMAGE" bash images/updater/test.sh
+          bash images/api/test.sh
+          bash images/asterisk/test.sh
+          bash images/proxy/test.sh
+          bash images/updater/test.sh
 
   compose-docker:
     name: compose-docker (${{ matrix.shard }})

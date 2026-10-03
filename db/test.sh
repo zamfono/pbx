@@ -7,10 +7,6 @@ set -eu
 
 cd "$(dirname "$0")"
 
-IMAGE=${IMAGE:-zamfono-db-test}
-# The CI job that runs this already built $MIGRATE_IMAGE; pass it as IMAGE so the build below is
-# skipped instead of redone. Left unset, IMAGE keeps its :zamfono-db-test default and gets built,
-# as a standalone run has nothing to reuse.
 DATA_DIR=$(mktemp -d)
 BROKEN_DIR=$(mktemp -d)
 BROKEN_DATA_DIR=$(mktemp -d)
@@ -24,18 +20,19 @@ trap cleanup EXIT
 # mktemp's 0700 keeps the container's uid 1000 out of a directory the host's root created.
 chmod 0777 "$DATA_DIR" "$BROKEN_DIR" "$BROKEN_DATA_DIR" "$LOCKED_DATA_DIR"
 
-if docker image inspect "$IMAGE" >/dev/null 2>&1; then
-  echo "$IMAGE already built; reusing it"
-else
-  # images/migrate/Dockerfile builds from the repository root, whose lockfile covers db/.
-  docker build -t "$IMAGE" -f ../images/migrate/Dockerfile ..
+# CI passes the image it built as MIGRATE_IMAGE, docker-bake.hcl's variable, and nothing is built
+# here, so the image checked is the one published. Standalone, bake builds it fresh under :test.
+if [ -z "${MIGRATE_IMAGE:-}" ]; then
+  MIGRATE_IMAGE=zamfono/migrate:test
+  export MIGRATE_IMAGE
+  (cd .. && docker buildx bake --load migrate)
 fi
 
 echo '== first run: applies the migration =='
-docker run --rm -v "$DATA_DIR:/data" -e DB_FILE=/data/zamfono.sqlite3 "$IMAGE"
+docker run --rm -v "$DATA_DIR:/data" -e DB_FILE=/data/zamfono.sqlite3 "$MIGRATE_IMAGE"
 
 echo '== second run: nothing pending =='
-second_output=$(docker run --rm -v "$DATA_DIR:/data" -e DB_FILE=/data/zamfono.sqlite3 "$IMAGE" 2>&1)
+second_output=$(docker run --rm -v "$DATA_DIR:/data" -e DB_FILE=/data/zamfono.sqlite3 "$MIGRATE_IMAGE" 2>&1)
 echo "$second_output"
 echo "$second_output" | grep -qi 'no new migrations' || {
   echo 'expected the idle run to report that no migration is pending' >&2
@@ -44,7 +41,7 @@ echo "$second_output" | grep -qi 'no new migrations' || {
 
 # Read ownership from inside the container: a bind mount under Docker Desktop remaps the
 # container's uid 1000 to the host user on the host side, so a host-side stat would not reflect it.
-owner_uid=$(docker run --rm -v "$DATA_DIR:/data" --entrypoint stat "$IMAGE" -c '%u' /data/zamfono.sqlite3)
+owner_uid=$(docker run --rm -v "$DATA_DIR:/data" --entrypoint stat "$MIGRATE_IMAGE" -c '%u' /data/zamfono.sqlite3)
 [ "$owner_uid" = 1000 ] || {
   echo "expected the database file to be owned by uid 1000, got $owner_uid" >&2
   exit 1
@@ -53,7 +50,7 @@ owner_uid=$(docker run --rm -v "$DATA_DIR:/data" --entrypoint stat "$IMAGE" -c '
 echo '== locked database: retried until the lock is released =='
 # A second process holds an exclusive lock on the fresh database file for 8 s, so the first
 # attempt finds it locked and a later one, 5 s apart, applies the migration.
-LOCK_HOLDER=$(docker run -d -v "$LOCKED_DATA_DIR:/data" --entrypoint node "$IMAGE" -e "
+LOCK_HOLDER=$(docker run -d -v "$LOCKED_DATA_DIR:/data" --entrypoint node "$MIGRATE_IMAGE" -e "
   const db = new (require('better-sqlite3'))('/data/zamfono.sqlite3');
   db.exec('BEGIN EXCLUSIVE');
   require('node:fs').writeFileSync('/data/locked', '');
@@ -67,7 +64,7 @@ done
   echo 'the lock holder never took its lock' >&2
   exit 1
 }
-locked_output=$(docker run --rm -v "$LOCKED_DATA_DIR:/data" -e DB_FILE=/data/zamfono.sqlite3 "$IMAGE" 2>&1) || {
+locked_output=$(docker run --rm -v "$LOCKED_DATA_DIR:/data" -e DB_FILE=/data/zamfono.sqlite3 "$MIGRATE_IMAGE" 2>&1) || {
   echo "$locked_output"
   echo 'expected the migration to succeed once the lock was released' >&2
   exit 1
@@ -92,7 +89,7 @@ broken_output=$(docker run --rm \
   -v "$BROKEN_DATA_DIR:/data" \
   -v "$BROKEN_DIR:/app/db/migrations" \
   -e DB_FILE=/data/zamfono.sqlite3 \
-  "$IMAGE" 2>&1) || broken_status=$?
+  "$MIGRATE_IMAGE" 2>&1) || broken_status=$?
 echo "$broken_output"
 [ "$broken_status" = 1 ] || {
   echo "expected the broken migration to exit 1, got $broken_status" >&2

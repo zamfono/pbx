@@ -1,18 +1,12 @@
-# Multi-stage build (docs/spec.md §6.3, §4). The build stage installs the whole npm workspace and
-# produces the SvelteKit adapter-node output; the runtime stage ships only that output, its
+# Multi-stage build (docs/spec.md §6.3, §4). The build stage produces the SvelteKit adapter-node
+# output from the installed workspace; the runtime stage ships only that output, its
 # dependencies and the tools the api process shells out to (ffmpeg for recording mixdown,
 # restic/rclone for backups, §6.5). Build from the repository root through bake, which supplies
-# the runtime-base stage: `docker buildx bake --load api`.
-FROM node:26-slim AS build
-WORKDIR /app
-# better-sqlite3 (via @zamfono/shared) falls back to compiling from source when no prebuild
-# matches this platform's Node ABI; the toolchain never reaches the runtime stage.
-RUN apt-get update \
-	&& apt-get install -y --no-install-recommends python3 make g++ \
-	&& rm -rf /var/lib/apt/lists/*
-COPY package.json package-lock.json tsconfig.base.json tsconfig.json ./
-COPY packages packages
-RUN npm ci
+# the workspace and runtime-base stages: `docker buildx bake --load api`.
+
+# images/workspace/Dockerfile, the installed npm workspace docker-bake.hcl builds once for api and
+# core alike.
+FROM workspace AS build
 # packages/shared has no build step of its own; its tsconfig still builds standalone via project
 # references, emitting packages/shared/dist/*.js. Its manifest's default export is that output,
 # which plain `node` loads and Vite's production build resolves; the `development` condition that
