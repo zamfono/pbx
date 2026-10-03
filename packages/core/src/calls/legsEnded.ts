@@ -3,7 +3,7 @@
  * ending; its own module so `legs.ts` stays under the repository's `max-lines` lint rule. A ring
  * race concluding without an answer is `ringConclusion.ts`'s.
  */
-import { ignoreGone, logFailure } from '../ari/failures.js';
+import { logFailure, logUnlessGone } from '../ari/failures.js';
 import type { AriEvent, Channel } from '../ari/types.js';
 import type { Call } from './call.js';
 import { traceChannelEnded } from './callEnd.js';
@@ -98,19 +98,17 @@ async function releaseLastParty(
   await endHold(pipeline, bridge.id, null);
   await Promise.all(
     remaining.map(channelId =>
-      ari.channels
-        .hangup(channelId)
-        .catch(ignoreGone)
-        .catch(
-          logFailure(pipeline.deps.logger, 'party hangup', { callId: call.id })
-        )
+      ari.channels.hangup(channelId).catch(
+        logUnlessGone(pipeline.deps.logger, 'party hangup', {
+          callId: call.id
+        })
+      )
     )
   );
   await ari.bridges
     .destroy(bridge.id)
-    .catch(ignoreGone)
     .catch(
-      logFailure(pipeline.deps.logger, 'bridge destroy', { callId: call.id })
+      logUnlessGone(pipeline.deps.logger, 'bridge destroy', { callId: call.id })
     );
 }
 

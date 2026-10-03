@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { ignoreGone, logFailure } from './failures.js';
+import { ignoreGone, logFailure, logUnlessGone } from './failures.js';
 import { AriError, type Logger } from './types.js';
 
 describe('ignoreGone', () => {
@@ -30,6 +30,26 @@ describe('logFailure', () => {
     expect(error).toHaveBeenCalledWith(
       { err: failure, callId: 'c1' },
       'voicemail mail failed'
+    );
+  });
+});
+
+describe('logUnlessGone', () => {
+  it('drops a 404 and logs every other failure, with its context', async () => {
+    const error = vi.fn();
+    const log: Logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error };
+    const handler = logUnlessGone(log, 'caller hangup', { callId: 'c1' });
+    await expect(
+      Promise.reject(new AriError(404, {})).catch(handler)
+    ).resolves.toBeUndefined();
+    expect(error).not.toHaveBeenCalled();
+    const refused = new AriError(500, {});
+    await expect(
+      Promise.reject(refused).catch(handler)
+    ).resolves.toBeUndefined();
+    expect(error).toHaveBeenCalledWith(
+      { err: refused, callId: 'c1' },
+      'caller hangup failed'
     );
   });
 });

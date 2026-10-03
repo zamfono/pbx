@@ -9,7 +9,7 @@
  */
 import { isE164, newId } from '@zamfono/shared';
 
-import { ignoreGone, logFailure } from '../ari/failures.js';
+import { logFailure, logUnlessGone } from '../ari/failures.js';
 import type { AttemptFailure } from '../routing/trunk.js';
 import { SIP_SERVER_ERROR } from '../sipCodes.js';
 import type { Call } from './call.js';
@@ -141,8 +141,7 @@ async function placeAttempt(
     owner.retire(channelId);
     pipeline.deps.ari.channels
       .hangup(channelId)
-      .catch(ignoreGone)
-      .catch(logFailure(pipeline.deps.logger, 'unrung attempt hangup'));
+      .catch(logUnlessGone(pipeline.deps.logger, 'unrung attempt hangup'));
     return { placed: true, holder };
   }
   startBudget(attempt, trunkLeg);

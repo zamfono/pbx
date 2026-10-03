@@ -5,7 +5,7 @@
  * rather than one `*.test.ts` each. */
 import { MS_PER_SECOND } from '@zamfono/shared';
 
-import { ignoreGone, logFailure } from '../ari/failures.js';
+import { ignoreGone, logFailure, logUnlessGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import type { Presence } from '../presence.js';
 import { SIP_FORBIDDEN, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
@@ -103,12 +103,11 @@ async function dropParker(
     callPartiesChanged(pipeline.deps, active);
   }
   pipeline.callByChannel.delete(parkerChannelId);
-  await pipeline.deps.ari.channels
-    .hangup(parkerChannelId)
-    .catch(ignoreGone)
-    .catch(
-      logFailure(pipeline.deps.logger, 'parker hangup', { callId: active.id })
-    );
+  await pipeline.deps.ari.channels.hangup(parkerChannelId).catch(
+    logUnlessGone(pipeline.deps.logger, 'parker hangup', {
+      callId: active.id
+    })
+  );
   presence.setCallState(parkerUserId, 'idle', null, null, active.id);
 }
 

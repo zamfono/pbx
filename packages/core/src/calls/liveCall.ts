@@ -4,7 +4,7 @@
  * over the API, a transferrer leaving). The other, sending a channel through the dial
  * resolution, is `outboundDispatch.ts`'s.
  */
-import { ignoreGone, logFailure } from '../ari/failures.js';
+import { ignoreGone, logFailure, logUnlessGone } from '../ari/failures.js';
 import { callerChannel, type Call, type CallsRow } from './call.js';
 import { traceSystemEnd } from './callEnd.js';
 import { clearFindMeTimers } from './findMe.js';
@@ -59,21 +59,17 @@ async function endConversation(
     others
       .filter(channelId => !hungUp.includes(channelId))
       .map(channelId =>
-        ari.channels
-          .hangup(channelId)
-          .catch(ignoreGone)
-          .catch(
-            logFailure(pipeline.deps.logger, 'party hangup', {
-              callId: call.id
-            })
-          )
+        ari.channels.hangup(channelId).catch(
+          logUnlessGone(pipeline.deps.logger, 'party hangup', {
+            callId: call.id
+          })
+        )
       )
   );
   await ari.bridges
     .destroy(bridgeId)
-    .catch(ignoreGone)
     .catch(
-      logFailure(pipeline.deps.logger, 'bridge destroy', { callId: call.id })
+      logUnlessGone(pipeline.deps.logger, 'bridge destroy', { callId: call.id })
     );
 }
 
@@ -86,12 +82,11 @@ async function dropStrandedHold(pipeline: Pipeline, call: Call): Promise<void> {
     return;
   }
   await endHold(pipeline, call.bridgeId, null);
-  await pipeline.deps.ari.channels
-    .hangup(hold.channelId)
-    .catch(ignoreGone)
-    .catch(
-      logFailure(pipeline.deps.logger, 'held party hangup', { callId: call.id })
-    );
+  await pipeline.deps.ari.channels.hangup(hold.channelId).catch(
+    logUnlessGone(pipeline.deps.logger, 'held party hangup', {
+      callId: call.id
+    })
+  );
 }
 
 /** Hangs up `call`'s `live` channels, the caller's with `callerCause` where one is given, and
@@ -111,9 +106,10 @@ async function hangUpLive(
             ? { reasonCode: callerCause }
             : undefined
         )
-        .catch(ignoreGone)
         .catch(
-          logFailure(pipeline.deps.logger, 'party hangup', { callId: call.id })
+          logUnlessGone(pipeline.deps.logger, 'party hangup', {
+            callId: call.id
+          })
         )
     )
   );

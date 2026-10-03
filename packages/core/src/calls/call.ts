@@ -4,7 +4,7 @@ import type { Selectable } from 'kysely';
 
 import type { DB, Scope } from '@zamfono/shared';
 
-import { ignoreGone, logFailure } from '../ari/failures.js';
+import { logUnlessGone } from '../ari/failures.js';
 import { CallLog, type LogLevel } from '../callLog.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { targetFromRow, type ForwardTarget } from '../routing/targets.js';
@@ -203,9 +203,10 @@ export async function endCall(
   if (call.callerChannelId !== null) {
     await pipeline.deps.ari.channels
       .hangup(call.callerChannelId, { reasonCode })
-      .catch(ignoreGone)
       .catch(
-        logFailure(pipeline.deps.logger, 'caller hangup', { callId: call.id })
+        logUnlessGone(pipeline.deps.logger, 'caller hangup', {
+          callId: call.id
+        })
       );
   }
   await pipeline.finishCall(call);

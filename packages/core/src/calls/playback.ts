@@ -4,7 +4,7 @@
  * once the media has played to the end, never right after the play request is merely accepted.
  */
 import type { AriClient } from '../ari/client.js';
-import { ignoreGone, isGone, logFailure } from '../ari/failures.js';
+import { isGone, logUnlessGone } from '../ari/failures.js';
 import type { AriEvent, Channel } from '../ari/types.js';
 
 // Asterisk emits a caller channel's StasisEnd and ChannelDestroyed exactly once each; a caller
@@ -22,8 +22,7 @@ export type PlaybackEnd = 'finished' | 'hangup' | 'failed';
 export function stopPlayback(ari: AriClient, playbackId: string): void {
   ari.playbacks
     .stop(playbackId)
-    .catch(ignoreGone)
-    .catch(logFailure(ari.log, 'playback stop', { playbackId }));
+    .catch(logUnlessGone(ari.log, 'playback stop', { playbackId }));
 }
 
 /**
@@ -107,8 +106,7 @@ export function playToneAndWait(
     const timer = setTimeout(() => {
       ari.playbacks
         .stop(playbackId)
-        .catch(ignoreGone)
-        .catch(logFailure(ari.log, 'tone stop'))
+        .catch(logUnlessGone(ari.log, 'tone stop'))
         .finally(() => {
           finish('finished');
         });

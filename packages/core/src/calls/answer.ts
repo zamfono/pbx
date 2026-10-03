@@ -7,7 +7,7 @@
  * its participations offered to the recorder (§10.2 "Recording semantics"), and the live view
  * told the call is up (§10.6).
  */
-import { ignoreGone, logFailure } from '../ari/failures.js';
+import { logUnlessGone } from '../ari/failures.js';
 import { callerChannel, type Call, type Leg } from './call.js';
 import { callUp } from './callState.js';
 import { traceCodecs } from './codecTrace.js';
@@ -72,14 +72,11 @@ async function joinBridge(
     await ari.bridges.addChannel(bridgeId, leg.channelId);
   } catch {
     call.log.event({ event: 'joinFailed', bridgeId, channelId: leg.channelId });
-    await ari.channels
-      .hangup(leg.channelId)
-      .catch(ignoreGone)
-      .catch(
-        logFailure(pipeline.deps.logger, 'unjoined leg hangup', {
-          callId: call.id
-        })
-      );
+    await ari.channels.hangup(leg.channelId).catch(
+      logUnlessGone(pipeline.deps.logger, 'unjoined leg hangup', {
+        callId: call.id
+      })
+    );
     return false;
   }
   call.bridgeId = bridgeId;
@@ -148,14 +145,11 @@ export async function settleAnswered(
     endCause: null
   };
   if (!claimAnswer(pipeline, call, leg)) {
-    await pipeline.deps.ari.channels
-      .hangup(channelId)
-      .catch(ignoreGone)
-      .catch(
-        logFailure(pipeline.deps.logger, 'late answer hangup', {
-          callId: call.id
-        })
-      );
+    await pipeline.deps.ari.channels.hangup(channelId).catch(
+      logUnlessGone(pipeline.deps.logger, 'late answer hangup', {
+        callId: call.id
+      })
+    );
     return false;
   }
   return bridgeAnswered(pipeline, call, leg, existingBridgeId);

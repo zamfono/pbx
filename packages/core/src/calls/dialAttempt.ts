@@ -7,7 +7,7 @@
 import { newId } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
-import { ignoreGone, logFailure } from '../ari/failures.js';
+import { logFailure, logUnlessGone } from '../ari/failures.js';
 import type { AriEvent, Channel } from '../ari/types.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import {
@@ -227,8 +227,7 @@ async function attemptOnce(
   trunkState.noteAttemptEnded(channelId);
   await pipeline.deps.ari.channels
     .hangup(channelId)
-    .catch(ignoreGone)
-    .catch(logFailure(pipeline.deps.logger, 'trunk attempt hangup'));
+    .catch(logUnlessGone(pipeline.deps.logger, 'trunk attempt hangup'));
   return outcome;
 }
 

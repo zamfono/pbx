@@ -6,7 +6,7 @@
  * `ringBatch` call; a call rings at most one batch at a time (`ringGroup.ts`'s own sequential
  * loop).
  */
-import { ignoreGone, logFailure } from '../ari/failures.js';
+import { logUnlessGone } from '../ari/failures.js';
 import type { Call } from './call.js';
 import type { GroupLeg } from './groupLegs.js';
 import type { Pipeline } from './pipeline.js';
@@ -67,26 +67,20 @@ export function stopGroupRinging(
   // batch's own win stops it (`winBatch`), and so does this. Requested before the caller's
   // bridging, which the caller then does.
   if (call.callerChannelId !== null) {
-    pipeline.deps.ari.channels
-      .stopMoh(call.callerChannelId)
-      .catch(ignoreGone)
-      .catch(
-        logFailure(pipeline.deps.logger, 'caller hold music stop', {
-          callId: call.id
-        })
-      );
+    pipeline.deps.ari.channels.stopMoh(call.callerChannelId).catch(
+      logUnlessGone(pipeline.deps.logger, 'caller hold music stop', {
+        callId: call.id
+      })
+    );
   }
   for (const [channelId, leg] of active.tracked) {
     if (leg.state === 'ringing') {
       leg.state = 'ended';
-      pipeline.deps.ari.channels
-        .hangup(channelId)
-        .catch(ignoreGone)
-        .catch(
-          logFailure(pipeline.deps.logger, 'ringing leg hangup', {
-            callId: call.id
-          })
-        );
+      pipeline.deps.ari.channels.hangup(channelId).catch(
+        logUnlessGone(pipeline.deps.logger, 'ringing leg hangup', {
+          callId: call.id
+        })
+      );
     }
   }
   active.settle('answered');
@@ -112,14 +106,11 @@ export function declineInBatch(
     // With `allow_reject` the first decline already hung up the member's other legs.
     if (leg.state === 'ringing') {
       active?.endLeg(leg, cause);
-      pipeline.deps.ari.channels
-        .hangup(leg.channelId)
-        .catch(ignoreGone)
-        .catch(
-          logFailure(pipeline.deps.logger, 'ringing leg hangup', {
-            callId: call.id
-          })
-        );
+      pipeline.deps.ari.channels.hangup(leg.channelId).catch(
+        logUnlessGone(pipeline.deps.logger, 'ringing leg hangup', {
+          callId: call.id
+        })
+      );
     }
   }
 }

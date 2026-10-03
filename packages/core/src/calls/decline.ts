@@ -7,7 +7,7 @@
  */
 import { HTTP_CONFLICT, type DeclineRequest } from '@zamfono/shared';
 
-import { ignoreGone, logFailure } from '../ari/failures.js';
+import { logUnlessGone } from '../ari/failures.js';
 import { AST_CAUSE_CALL_REJECTED } from '../sipCodes.js';
 import { ActionError } from './actionError.js';
 import type { Call } from './call.js';
@@ -39,14 +39,11 @@ export function decline(
   // Each leg ends before its channel is hung up, so the hangup's own end is never read as a second.
   for (const leg of own) {
     endRingingLeg(pipeline, call, leg, AST_CAUSE_CALL_REJECTED);
-    pipeline.deps.ari.channels
-      .hangup(leg.channelId)
-      .catch(ignoreGone)
-      .catch(
-        logFailure(pipeline.deps.logger, 'declined leg hangup', {
-          callId: call.id
-        })
-      );
+    pipeline.deps.ari.channels.hangup(leg.channelId).catch(
+      logUnlessGone(pipeline.deps.logger, 'declined leg hangup', {
+        callId: call.id
+      })
+    );
   }
   declineInBatch(pipeline, call, userId, AST_CAUSE_CALL_REJECTED);
 }

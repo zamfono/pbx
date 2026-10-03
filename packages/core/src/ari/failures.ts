@@ -33,3 +33,18 @@ export function logFailure(
     log.error({ err: error, ...fields }, `${what} failed`);
   };
 }
+
+/** A `.catch` handler for a request nothing awaits on a channel or bridge that may already be
+ * gone: drops that outcome (`isGone`) and logs every other failure as `logFailure` does. */
+export function logUnlessGone(
+  log: Logger,
+  what: string,
+  fields: Record<string, unknown> = {}
+): (error: unknown) => void {
+  const logIt = logFailure(log, what, fields);
+  return (error: unknown) => {
+    if (!isGone(error)) {
+      logIt(error);
+    }
+  };
+}

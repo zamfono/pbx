@@ -6,7 +6,7 @@
  * race still rings fails over to its next attempt or ends (`onFailed`), any other channel had
  * been hung up by the race or had answered.
  */
-import { ignoreGone, logFailure } from '../ari/failures.js';
+import { logFailure, logUnlessGone } from '../ari/failures.js';
 import type { AriEvent, Channel } from '../ari/types.js';
 import {
   ATTEMPT_NO_RESPONSE_MS,
@@ -179,9 +179,11 @@ export function startBudget(attempt: Attempt, trunkLeg: TrunkLeg): void {
           attempt.noResponse = true;
           ari.channels
             .hangup(attempt.channelId)
-            .catch(ignoreGone)
             .catch(
-              logFailure(attempt.leg.pipeline.deps.logger, 'no-response hangup')
+              logUnlessGone(
+                attempt.leg.pipeline.deps.logger,
+                'no-response hangup'
+              )
             );
         }
       })

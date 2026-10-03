@@ -10,7 +10,7 @@ import {
   type TransferRequest
 } from '@zamfono/shared';
 
-import { ignoreGone, logFailure } from '../ari/failures.js';
+import { logUnlessGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { ActionError, notBridged } from './actionError.js';
 import { type Call, type Owner } from './call.js';
@@ -134,28 +134,21 @@ export async function transferCall(
   });
   const transferrerUserId = userOfChannel(call, transferrer);
   const { ari } = pipeline.deps;
-  await ari.bridges
-    .removeChannel(bridgeId, transferee)
-    .catch(ignoreGone)
-    .catch(
-      logFailure(pipeline.deps.logger, 'transferee removal', {
-        callId: call.id
-      })
-    );
+  await ari.bridges.removeChannel(bridgeId, transferee).catch(
+    logUnlessGone(pipeline.deps.logger, 'transferee removal', {
+      callId: call.id
+    })
+  );
   await closeCall(pipeline, call, 'answered', false);
-  await ari.channels
-    .hangup(transferrer)
-    .catch(ignoreGone)
-    .catch(
-      logFailure(pipeline.deps.logger, 'transferrer hangup', {
-        callId: call.id
-      })
-    );
+  await ari.channels.hangup(transferrer).catch(
+    logUnlessGone(pipeline.deps.logger, 'transferrer hangup', {
+      callId: call.id
+    })
+  );
   await ari.bridges
     .destroy(bridgeId)
-    .catch(ignoreGone)
     .catch(
-      logFailure(pipeline.deps.logger, 'bridge destroy', { callId: call.id })
+      logUnlessGone(pipeline.deps.logger, 'bridge destroy', { callId: call.id })
     );
   return startTransfereeCall(
     pipeline,
