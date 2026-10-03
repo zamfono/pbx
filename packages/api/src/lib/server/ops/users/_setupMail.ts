@@ -1,10 +1,11 @@
 import * as env from '$app/env/private';
 
+import { HTTP_SERVICE_UNAVAILABLE } from '@zamfono/shared';
+
 import { stackDomain, stackOrigin } from '#lib/server/stackAddress.js';
 
 import { OpError } from '../types.js';
 
-const STATUS_SERVICE_UNAVAILABLE = 503;
 const SET_PASSWORD_PATH = '/auth/set-password';
 
 /**
@@ -17,7 +18,7 @@ export function setupLinkFor(token: string): string {
   const fqdn = stackDomain(env);
   if (fqdn === null) {
     throw new OpError(
-      STATUS_SERVICE_UNAVAILABLE,
+      HTTP_SERVICE_UNAVAILABLE,
       'FQDN is not configured for this deployment'
     );
   }

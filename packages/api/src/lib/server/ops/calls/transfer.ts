@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+
 import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { defineOperation, OpError } from '../types.js';
@@ -8,8 +10,6 @@ import {
   liveCallIdInput,
   proxyCallAction
 } from './_shared.js';
-
-const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 const inputSchema = z
   .object({
@@ -58,7 +58,7 @@ export const transfer = defineOperation({
       (toCallId !== undefined && input.voicemail !== undefined)
     ) {
       throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
+        HTTP_UNPROCESSABLE_CONTENT,
         'calls: give either target (with voicemail, if wanted) or toCallId'
       );
     }

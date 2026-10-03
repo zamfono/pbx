@@ -1,8 +1,8 @@
+import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+
 import { recordChange } from '../runner.js';
 import { OpError, type Context } from '../types.js';
 import type { SettingsRow } from './_shared.js';
-
-const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 /** A `settings.sso_*` binding field: changing any of these invalidates every `users.sso_subject`. */
 export const SSO_RESET_FIELDS = [
@@ -40,13 +40,13 @@ export function assertSsoInvariants(
   ) as Record<SsoCheckField, unknown>;
   if (merged.ssoProvider !== null && merged.ssoClientId === null) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'settings: ssoClientId is required once ssoProvider is set'
     );
   }
   if (merged.ssoProvider === 'microsoft' && merged.ssoTenantId === null) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       "settings: ssoTenantId is required for ssoProvider 'microsoft'"
     );
   }
@@ -55,7 +55,7 @@ export function assertSsoInvariants(
     (merged.ssoIssuer === null || merged.ssoLabel === null)
   ) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       "settings: ssoIssuer and ssoLabel are required for ssoProvider 'oidc'"
     );
   }

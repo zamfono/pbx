@@ -1,13 +1,12 @@
 import type { Selectable, Transaction } from 'kysely';
 
-import type { DB } from '@zamfono/shared';
+import { HTTP_NOT_FOUND, type DB } from '@zamfono/shared';
 
 import { assertMembersValid, type MemberSpec } from '../members.js';
 import { Conflict, OpError } from '../types.js';
 import { assertNoCycle, loadEdgesExcludingParent } from './_nesting.js';
 
 /** A `user_groups` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
-const STATUS_NOT_FOUND = 404;
 
 export type UserGroupRow = Selectable<DB['userGroups']>;
 
@@ -23,7 +22,7 @@ export async function liveUserGroup(
     .where('deletedAt', 'is', null)
     .executeTakeFirst();
   if (!row) {
-    throw new OpError(STATUS_NOT_FOUND, `user group '${id}' not found`);
+    throw new OpError(HTTP_NOT_FOUND, `user group '${id}' not found`);
   }
   return row;
 }

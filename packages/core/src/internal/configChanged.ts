@@ -6,15 +6,18 @@
  */
 import type http from 'node:http';
 
-import type { ConfigChangedRequest, ReloadKind } from '@zamfono/shared';
+import {
+  HTTP_BAD_REQUEST,
+  HTTP_CONTENT_TOO_LARGE,
+  HTTP_NO_CONTENT,
+  type ConfigChangedRequest,
+  type ReloadKind
+} from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import type { AsteriskModule } from '../ari/types.js';
 import type { ConfigCache } from './snapshot.js';
 
-const HTTP_NO_CONTENT = 204;
-const HTTP_BAD_REQUEST = 400;
-const HTTP_PAYLOAD_TOO_LARGE = 413;
 // `configChanged` bodies are a short list of reload kinds; this only bounds a request from the
 // internal network's one client (§3.1), not a size any real body approaches.
 const MAX_INTERNAL_BODY_BYTES = 65536;
@@ -154,7 +157,7 @@ export async function handleConfigChanged(
   const parsed = await readConfigChangedBody(request);
   if (!parsed.ok) {
     if (parsed.reason === 'tooLarge') {
-      respondJson(response, HTTP_PAYLOAD_TOO_LARGE, {
+      respondJson(response, HTTP_CONTENT_TOO_LARGE, {
         message: 'body too large'
       });
       return;

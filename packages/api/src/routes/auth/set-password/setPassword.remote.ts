@@ -2,13 +2,13 @@ import { redirect } from '@sveltejs/kit';
 import { form } from '$app/server';
 import { z } from 'zod';
 
+import { HTTP_SEE_OTHER } from '@zamfono/shared';
+
 import { MIN_PASSWORD_LENGTH } from '#lib/auth/passwordPolicy.js';
 import { format } from '#lib/i18n/index.js';
 import { loadBranding } from '#lib/server/auth/branding.js';
 import { redeemPasswordReset } from '#lib/server/auth/passwordReset.js';
 import { getDb } from '#lib/server/db.js';
-
-const STATUS_SEE_OTHER = 303;
 
 // Where a set password lands: this same page's confirmation (`+page.server.ts`'s `done`), reached
 // by a redirect because the link it came from no longer redeems once it has been used.
@@ -38,7 +38,7 @@ export const setPassword = form(
     const db = getDb();
     const outcome = await redeemPasswordReset(db, { token, password });
     if (outcome.kind === 'passwordSet') {
-      redirect(STATUS_SEE_OTHER, PASSWORD_SET_LOCATION);
+      redirect(HTTP_SEE_OTHER, PASSWORD_SET_LOCATION);
     }
     const dict = (await loadBranding(db)).dictionary.setPassword;
     const tooShort =

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND, HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+
 import {
   createTarget,
   resolveTarget,
@@ -18,9 +20,6 @@ import {
   scopeFromColumns,
   type ScopeInput
 } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
-const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 const inputSchema = z
   .object({ id: z.string(), ...z.object(oooFields).partial().shape })
@@ -56,7 +55,7 @@ function resolveSchedule(
   );
   if (startsAt !== null && expiresAt !== null && !(startsAt < expiresAt)) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'ooo: expiresAt must be after startsAt'
     );
   }
@@ -80,7 +79,7 @@ async function assertNoOverlap(
   );
   if (overlapping) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'ooo: active period overlaps an existing rule in this scope'
     );
   }
@@ -102,7 +101,7 @@ export const update = defineOperation<Input, Output>({
       .where('deletedAt', 'is', null)
       .executeTakeFirst();
     if (!before) {
-      throw new OpError(STATUS_NOT_FOUND, 'ooo: rule not found');
+      throw new OpError(HTTP_NOT_FOUND, 'ooo: rule not found');
     }
     const scope = scopeFromColumns(before);
     assertVisibleScope(ctx.actor, scope, 'ooo: rule not found');

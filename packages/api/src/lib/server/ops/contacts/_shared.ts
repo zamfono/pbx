@@ -1,14 +1,16 @@
 import type { Selectable, Transaction } from 'kysely';
 import { z } from 'zod';
 
-import { normalizeDialed, type DB } from '@zamfono/shared';
+import {
+  HTTP_NOT_FOUND,
+  HTTP_UNPROCESSABLE_CONTENT,
+  normalizeDialed,
+  type DB
+} from '@zamfono/shared';
 
 import { OpError } from '../types.js';
 
-const STATUS_UNPROCESSABLE_ENTITY = 422;
-
 /** A `contacts` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
-const STATUS_NOT_FOUND = 404;
 
 export type ContactRow = Selectable<DB['contacts']>;
 
@@ -24,7 +26,7 @@ export async function liveContact(
     .where('deletedAt', 'is', null)
     .executeTakeFirst();
   if (!row) {
-    throw new OpError(STATUS_NOT_FOUND, `contact '${id}' not found`);
+    throw new OpError(HTTP_NOT_FOUND, `contact '${id}' not found`);
   }
   return row;
 }
@@ -76,7 +78,7 @@ export function normalizeContactPhone(raw: string, country: string): string {
   const normalized = normalizeDialed(cleaned, country);
   if (normalized.kind === 'incomplete') {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `contacts: '${raw}' is not a resolvable phone number`
     );
   }
@@ -90,14 +92,14 @@ function assertPhonesUnique(phones: { number: string; label: string }[]): void {
   for (const phone of phones) {
     if (numbers.has(phone.number)) {
       throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
+        HTTP_UNPROCESSABLE_CONTENT,
         `contacts: duplicate phone number '${phone.number}'`
       );
     }
     numbers.add(phone.number);
     if (labels.has(phone.label)) {
       throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
+        HTTP_UNPROCESSABLE_CONTENT,
         `contacts: duplicate phone label '${phone.label}'`
       );
     }

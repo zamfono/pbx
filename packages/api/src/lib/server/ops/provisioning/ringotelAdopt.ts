@@ -1,6 +1,8 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
+import { HTTP_CONFLICT, HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import {
   createRingotelClient,
   type RingotelClient
@@ -17,8 +19,6 @@ import {
   followPackageMaxRegs,
   organizationParams,
   stackBranchAddress,
-  STATUS_CONFLICT,
-  STATUS_NOT_FOUND,
   storeRingotelIds
 } from './ringotelConnection.js';
 import { ringotelOffer } from './ringotelOptions.js';
@@ -64,7 +64,7 @@ async function findOrganization(
   );
   if (found === undefined) {
     throw new OpError(
-      STATUS_NOT_FOUND,
+      HTTP_NOT_FOUND,
       `provisioning: the Ringotel account has no organization ${input.orgId} with domain ${input.domain}`
     );
   }
@@ -81,7 +81,7 @@ async function assertEmpty(
   });
   if (users.length > 0) {
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       `provisioning: organization ${input.domain} already has ${users.length} user(s); only an organization without users is adopted`
     );
   }
@@ -111,7 +111,7 @@ async function adoptConnection(
   });
   if (!branches.some(branch => branch.id === input.branchId)) {
     throw new OpError(
-      STATUS_NOT_FOUND,
+      HTTP_NOT_FOUND,
       `provisioning: organization ${input.domain} has no connection ${input.branchId}`
     );
   }

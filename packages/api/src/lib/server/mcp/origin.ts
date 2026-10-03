@@ -1,3 +1,5 @@
+import { HTTP_FORBIDDEN } from '@zamfono/shared';
+
 import { JSONRPC_INVALID_REQUEST } from './jsonRpc.js';
 
 // DNS-rebinding protection, which both revisions' Streamable HTTP transport requires of every
@@ -10,7 +12,6 @@ import { JSONRPC_INVALID_REQUEST } from './jsonRpc.js';
 // The one valid origin is the stack's own, `https://${FQDN}` (§6.3), which a browser
 // page served from this stack sends; a request without the header, as non-browser MCP clients
 // send it, is not refused, since the rule only covers a header that is present.
-const STATUS_FORBIDDEN = 403;
 
 /** The 403 refusing a request whose `Origin` is present and is not `origin`, or `null`. */
 export function originRejection(
@@ -28,6 +29,6 @@ export function originRejection(
       jsonrpc: '2.0',
       error: { code: JSONRPC_INVALID_REQUEST, message: 'Origin not allowed' }
     },
-    { status: STATUS_FORBIDDEN }
+    { status: HTTP_FORBIDDEN }
   );
 }

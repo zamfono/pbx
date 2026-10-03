@@ -12,13 +12,13 @@ import { formatVersion, parseVersion, type Version } from './version.js';
  * The updater's HTTP API on the stack's internal network (§6.3 "Updates"), no port published:
  * `GET /status` and `POST /update`, each only with `UPDATER_TOKEN`, which `api` alone holds.
  */
-const STATUS_OK = 200;
-const STATUS_ACCEPTED = 202;
-const STATUS_BAD_REQUEST = 400;
-const STATUS_UNAUTHORIZED = 401;
-const STATUS_NOT_FOUND = 404;
-const STATUS_CONFLICT = 409;
-const STATUS_UNAVAILABLE = 503;
+const HTTP_OK = 200;
+const HTTP_ACCEPTED = 202;
+const HTTP_BAD_REQUEST = 400;
+const HTTP_UNAUTHORIZED = 401;
+const HTTP_NOT_FOUND = 404;
+const HTTP_CONFLICT = 409;
+const HTTP_SERVICE_UNAVAILABLE = 503;
 const MAX_BODY_BYTES = 4096;
 const MAX_BY_LENGTH = 200;
 const PINS_NO_RELEASE =
@@ -58,7 +58,7 @@ async function readBody(request: http.IncomingMessage): Promise<unknown> {
     const buffer = chunk as Buffer;
     size += buffer.length;
     if (size > MAX_BODY_BYTES) {
-      throw new HttpError(STATUS_BAD_REQUEST, 'request body too large');
+      throw new HttpError(HTTP_BAD_REQUEST, 'request body too large');
     }
     chunks.push(buffer);
   }
@@ -69,7 +69,7 @@ async function readBody(request: http.IncomingMessage): Promise<unknown> {
   try {
     return JSON.parse(text);
   } catch {
-    throw new HttpError(STATUS_BAD_REQUEST, 'request body is not JSON');
+    throw new HttpError(HTTP_BAD_REQUEST, 'request body is not JSON');
   }
 }
 
@@ -128,7 +128,7 @@ function requesterOf(body: unknown): RunRequester | undefined {
   }
   if (trigger !== 'manual' && trigger !== 'automatic') {
     throw new HttpError(
-      STATUS_BAD_REQUEST,
+      HTTP_BAD_REQUEST,
       'trigger must be manual or automatic'
     );
   }
@@ -137,7 +137,7 @@ function requesterOf(body: unknown): RunRequester | undefined {
     (typeof by !== 'string' || by.length > MAX_BY_LENGTH)
   ) {
     throw new HttpError(
-      STATUS_BAD_REQUEST,
+      HTTP_BAD_REQUEST,
       `by must be a string of at most ${String(MAX_BY_LENGTH)} characters`
     );
   }
@@ -146,21 +146,24 @@ function requesterOf(body: unknown): RunRequester | undefined {
 
 async function update(deps: ServerDeps, body: unknown): Promise<UpdateState> {
   if (deps.runner === undefined) {
-    throw new HttpError(STATUS_UNAVAILABLE, deps.unavailable ?? 'no runner');
+    throw new HttpError(
+      HTTP_SERVICE_UNAVAILABLE,
+      deps.unavailable ?? 'no runner'
+    );
   }
   if (deps.runner.current().state === 'running') {
-    throw new HttpError(STATUS_CONFLICT, 'an update is already running');
+    throw new HttpError(HTTP_CONFLICT, 'an update is already running');
   }
   const current = await deps.currentVersion();
   if (current === undefined) {
-    throw new HttpError(STATUS_CONFLICT, PINS_NO_RELEASE);
+    throw new HttpError(HTTP_CONFLICT, PINS_NO_RELEASE);
   }
   const requester = requesterOf(body);
   const asked = (body as { version?: unknown }).version;
   const askedVersion =
     typeof asked === 'string' ? parseVersion(asked) : undefined;
   if (asked !== undefined && askedVersion === undefined) {
-    throw new HttpError(STATUS_BAD_REQUEST, 'version must be X.Y.Z');
+    throw new HttpError(HTTP_BAD_REQUEST, 'version must be X.Y.Z');
   }
   const release =
     askedVersion === undefined
@@ -168,7 +171,7 @@ async function update(deps: ServerDeps, body: unknown): Promise<UpdateState> {
       : await deps.releases.byVersion(formatVersion(askedVersion));
   if (release === undefined) {
     throw new HttpError(
-      STATUS_NOT_FOUND,
+      HTTP_NOT_FOUND,
       askedVersion === undefined
         ? 'GitHub lists no release'
         : `there is no published release ${formatVersion(askedVersion)}`
@@ -178,7 +181,7 @@ async function update(deps: ServerDeps, body: unknown): Promise<UpdateState> {
   const verdict = await deps.checkUpdate(to);
   if (verdict !== 'update') {
     throw new HttpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       refusal(verdict, formatVersion(current), to)
     );
   }
@@ -200,19 +203,19 @@ async function route(
   request: http.IncomingMessage
 ): Promise<[number, unknown]> {
   if (deps.token === '') {
-    throw new HttpError(STATUS_UNAVAILABLE, 'UPDATER_TOKEN is not set');
+    throw new HttpError(HTTP_SERVICE_UNAVAILABLE, 'UPDATER_TOKEN is not set');
   }
   if (!authorized(request.headers.authorization, deps.token)) {
-    throw new HttpError(STATUS_UNAUTHORIZED, 'missing or wrong token');
+    throw new HttpError(HTTP_UNAUTHORIZED, 'missing or wrong token');
   }
   const key = `${request.method ?? ''} ${request.url ?? ''}`;
   if (key === 'GET /status') {
-    return [STATUS_OK, await describeStatus(deps)];
+    return [HTTP_OK, await describeStatus(deps)];
   }
   if (key === 'POST /update') {
-    return [STATUS_ACCEPTED, await update(deps, await readBody(request))];
+    return [HTTP_ACCEPTED, await update(deps, await readBody(request))];
   }
-  throw new HttpError(STATUS_NOT_FOUND, `no route ${key}`);
+  throw new HttpError(HTTP_NOT_FOUND, `no route ${key}`);
 }
 
 export function createServer(deps: ServerDeps): http.Server {
@@ -226,7 +229,7 @@ export function createServer(deps: ServerDeps): http.Server {
           send(response, error.status, { error: error.message });
           return;
         }
-        send(response, STATUS_UNAVAILABLE, {
+        send(response, HTTP_SERVICE_UNAVAILABLE, {
           error: error instanceof Error ? error.message : String(error)
         });
       }

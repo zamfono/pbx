@@ -1,9 +1,9 @@
+import { HTTP_CONFLICT } from '@zamfono/shared';
+
 import { replayOperation } from '../runner.js';
 import { revertTrunkOrder } from '../trunks/revertOrder.js';
 import { OpError, type Context } from '../types.js';
 import type { ChangeEntry } from './_shared.js';
-
-const STATUS_CONFLICT = 409;
 
 /** Reverts one entry of an entity, given the entity's id and the entry's recorded changes. */
 export type EntryRevert = (
@@ -27,7 +27,7 @@ function replayList(
     const change = changes.find(candidate => candidate.field === field);
     if (!change) {
       throw new OpError(
-        STATUS_CONFLICT,
+        HTTP_CONFLICT,
         `audit.undo: the '${operation}' entry records no '${field}'`
       );
     }
@@ -82,7 +82,7 @@ export async function revertTenantList(
   const revert = TENANT_LIST_REVERTS[operation];
   if (!revert) {
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       `audit.undo: operation '${operation}' has no single row to revert`
     );
   }

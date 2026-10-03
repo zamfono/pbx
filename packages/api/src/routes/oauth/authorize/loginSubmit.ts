@@ -2,6 +2,8 @@ import { redirect, type RequestEvent } from '@sveltejs/kit';
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
+import { HTTP_FOUND } from '@zamfono/shared';
+
 import { requiredOrigin } from '#lib/server/auth/authorizationResponse.js';
 import {
   AuthorizePayloadSchema,
@@ -19,8 +21,6 @@ import { getDb } from '#lib/server/db.js';
 import { loginLimiter } from '#lib/server/limiter.js';
 import { accountLockKey } from '#lib/server/ops/users/_accountLock.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
-
-const STATUS_FOUND = 302;
 
 /** The login form's own fields, on top of the outer request's client parameters (§5.2). The
  *  leading underscore keeps the password out of the re-rendered page: SvelteKit repopulates a
@@ -88,13 +88,9 @@ export async function loginSubmit(
   }
   loginLimiter.loginSucceeded(account);
   if (!resolved) {
-    redirect(
-      STATUS_FOUND,
-      loginRedirect(authCodeStore, user.id, null, origin),
-      {
-        external: [origin]
-      }
-    );
+    redirect(HTTP_FOUND, loginRedirect(authCodeStore, user.id, null, origin), {
+      external: [origin]
+    });
   }
   setSealedCookie(event.cookies, kr, CONSENT_COOKIE, {
     userId: user.id,

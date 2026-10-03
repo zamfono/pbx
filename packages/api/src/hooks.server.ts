@@ -4,7 +4,12 @@ import type { Handle, ServerInit } from '@sveltejs/kit/hooks';
 import * as env from '$app/env/private';
 import pino from 'pino';
 
-import { MS_PER_SECOND } from '@zamfono/shared';
+import {
+  HTTP_NOT_FOUND,
+  HTTP_TOO_MANY_REQUESTS,
+  HTTP_UNAUTHORIZED,
+  MS_PER_SECOND
+} from '@zamfono/shared';
 
 import { addressKey } from '#lib/server/addressKey.js';
 import { authenticateRequest } from '#lib/server/auth/bearer.js';
@@ -17,9 +22,6 @@ import { recordApiRequestSeconds } from '#lib/server/metricsCounters.js';
 import { problem } from '#lib/server/problem.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
-const UNAUTHORIZED_STATUS = 401;
-const NOT_FOUND_STATUS = 404;
-const TOO_MANY_REQUESTS_STATUS = 429;
 const API_PREFIX = '/api/v1';
 const INTERNAL_PREFIX = '/internal';
 const jobsLogger = pino({ name: 'hooks' });
@@ -70,7 +72,7 @@ function rateLimitResponse(
   if (result.ok) {
     return null;
   }
-  return problem(TOO_MANY_REQUESTS_STATUS, 'too many requests', undefined, {
+  return problem(HTTP_TOO_MANY_REQUESTS, 'too many requests', undefined, {
     'retry-after': String(result.retryAfterS)
   });
 }
@@ -92,7 +94,7 @@ const handleRequest: Handle = async ({ event, resolve }) => {
     pathname.startsWith(INTERNAL_PREFIX) &&
     event.request.headers.has('x-forwarded-for')
   ) {
-    return new Response(null, { status: NOT_FOUND_STATUS });
+    return new Response(null, { status: HTTP_NOT_FOUND });
   }
   const limited = rateLimitResponse(pathname, event);
   if (limited) {
@@ -109,7 +111,7 @@ const handleRequest: Handle = async ({ event, resolve }) => {
     event.request
   );
   if (!auth) {
-    return problem(UNAUTHORIZED_STATUS, 'unauthorized');
+    return problem(HTTP_UNAUTHORIZED, 'unauthorized');
   }
   // eslint-disable-next-line require-atomic-updates -- `event` is this call's own local object, never mutated concurrently
   event.locals.auth = auth;

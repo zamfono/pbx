@@ -3,9 +3,11 @@
  * as a `CoreRequestError`, and the call-action refusals read back out of one.
  */
 
-const HTTP_NOT_FOUND = 404;
-const HTTP_CONFLICT = 409;
-const HTTP_UNPROCESSABLE = 422;
+import {
+  HTTP_CONFLICT,
+  HTTP_NOT_FOUND,
+  HTTP_UNPROCESSABLE_CONTENT
+} from '@zamfono/shared';
 
 /** A non-2xx response from `core`'s internal API, carrying the status and, if parseable, the body. */
 export class CoreRequestError extends Error {
@@ -82,7 +84,7 @@ export async function postJsonForBody(
 const REFUSAL_STATUSES = [
   HTTP_NOT_FOUND,
   HTTP_CONFLICT,
-  HTTP_UNPROCESSABLE
+  HTTP_UNPROCESSABLE_CONTENT
 ] as const;
 
 /** A call action `core` refused: its status and the RFC 9457 problem's `title` and `detail`. */

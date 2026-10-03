@@ -6,23 +6,24 @@
 
 import * as env from '$app/env/private';
 
-import type {
-  AddPartyRequest,
-  AttendedTransferRequest,
-  ConsultRequest,
-  CoreHealth,
-  CoreVersionResponse,
-  DeclineRequest,
-  HangupRequest,
-  HoldRequest,
-  MwiMailbox,
-  OriginateRequest,
-  ParkingResponse,
-  ParkRequest,
-  PickupRequest,
-  ReloadKind,
-  StateResponse,
-  TransferRequest
+import {
+  HTTP_CONFLICT,
+  type AddPartyRequest,
+  type AttendedTransferRequest,
+  type ConsultRequest,
+  type CoreHealth,
+  type CoreVersionResponse,
+  type DeclineRequest,
+  type HangupRequest,
+  type HoldRequest,
+  type MwiMailbox,
+  type OriginateRequest,
+  type ParkingResponse,
+  type ParkRequest,
+  type PickupRequest,
+  type ReloadKind,
+  type StateResponse,
+  type TransferRequest
 } from '@zamfono/shared';
 
 import {
@@ -34,7 +35,6 @@ import {
   throwIfNotOk
 } from './coreHttp.js';
 
-const HTTP_CONFLICT = 409;
 const DEFAULT_CORE_URL = 'http://core:3000';
 // `/healthz`, `/metrics` and `system.info` answer within this even while `core` hangs (§6.3
 // "Health", §7, §10.3), and a hung `core` holds up no re-registration check (§10.4).

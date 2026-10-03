@@ -1,6 +1,16 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import {
+  HTTP_BAD_REQUEST,
+  HTTP_CONFLICT,
+  HTTP_CREATED,
+  HTTP_NO_CONTENT,
+  HTTP_NOT_FOUND,
+  HTTP_UNPROCESSABLE_CONTENT,
+  newId,
+  nowIso,
+  type Db
+} from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import type { FakeAri } from '../ari/fake.js';
@@ -24,14 +34,8 @@ import { liveView } from './callState.js';
 import type { GroupLeg } from './groupLegs.js';
 import type { Pipeline } from './pipeline.js';
 
-const HTTP_CREATED = 201;
-const HTTP_NO_CONTENT = 204;
-const HTTP_BAD_REQUEST = 400;
 // Over the action routes' 65536-byte body cap (actionRoutes.ts's `MAX_ACTION_BODY_BYTES`).
 const OVERSIZED_BODY_BYTES = 65537;
-const HTTP_NOT_FOUND = 404;
-const HTTP_CONFLICT = 409;
-const HTTP_UNPROCESSABLE = 422;
 const RING_TIMER_MS = 60_000;
 
 /** A user at `ext` with one device, reported registered. */
@@ -377,7 +381,7 @@ describe('call control', () => {
       await refusal(
         actions.addParty(call.id, { target: '799', actorUserId: memberId })
       )
-    ).toEqual({ status: HTTP_UNPROCESSABLE, reason: 'invalidTarget' });
+    ).toEqual({ status: HTTP_UNPROCESSABLE_CONTENT, reason: 'invalidTarget' });
 
     const { callId } = await actions.addParty(call.id, {
       target: '102',

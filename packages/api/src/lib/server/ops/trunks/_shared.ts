@@ -5,9 +5,6 @@ import type { Db, DB, DiversionPolicy, TrunkStatus } from '@zamfono/shared';
 
 import { logLevelWire, type LogLevelColumns } from '../settings/logLevel.js';
 
-export const STATUS_NOT_FOUND = 404;
-export const STATUS_UNPROCESSABLE_ENTITY = 422;
-
 /** The highest TCP/UDP port number, shared by create's and update's host schemas. */
 export const MAX_PORT = 65535;
 

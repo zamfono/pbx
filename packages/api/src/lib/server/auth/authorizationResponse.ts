@@ -7,9 +7,9 @@
 import { redirect } from '@sveltejs/kit';
 import * as env from '$app/env/private';
 
-import { stackDomain, stackOrigin } from '../stackAddress.js';
+import { HTTP_FOUND } from '@zamfono/shared';
 
-const STATUS_FOUND = 302;
+import { stackDomain, stackOrigin } from '../stackAddress.js';
 
 /** The part of the authorization request its response echoes; `state` is `null` for a request
  *  that sent none (OAuth 2.1 §4.1.1: optional). */
@@ -54,7 +54,7 @@ export function authorizationErrorRedirect(
   code: string
 ): never {
   return redirect(
-    STATUS_FOUND,
+    HTTP_FOUND,
     authorizationResponseUrl(request, requiredOrigin(), { error: code }),
     { external: true }
   );

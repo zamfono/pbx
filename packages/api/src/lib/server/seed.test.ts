@@ -14,7 +14,12 @@ import {
   vi
 } from 'vitest';
 
-import { openDb, type Db } from '@zamfono/shared';
+import {
+  HTTP_OK,
+  HTTP_SERVICE_UNAVAILABLE,
+  openDb,
+  type Db
+} from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import {
@@ -33,8 +38,6 @@ import {
 
 const KEY_BYTES = 32;
 const EXT_LENGTH_TWO = 2;
-const HTTP_OK = 200;
-const HTTP_SERVICE_UNAVAILABLE = 503;
 
 const silentLogger = pino({ level: 'silent' });
 

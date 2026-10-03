@@ -1,11 +1,10 @@
 import type { RequestEvent } from '@sveltejs/kit';
 
+import { HTTP_BAD_REQUEST, HTTP_OK } from '@zamfono/shared';
+
 import { redeemPasswordReset } from '#lib/server/auth/passwordReset.js';
 import { getDb } from '#lib/server/db.js';
 import { problem } from '#lib/server/problem.js';
-
-const STATUS_OK = 200;
-const STATUS_BAD_REQUEST = 400;
 
 /**
  * `POST /auth/reset` (§5.2, §10.3): redeems a single-use set-password token and sets the new
@@ -18,10 +17,10 @@ export async function POST(event: RequestEvent): Promise<Response> {
     await event.request.json().catch(() => null)
   );
   if (outcome.kind === 'invalidRequest') {
-    return problem(STATUS_BAD_REQUEST, 'invalid request');
+    return problem(HTTP_BAD_REQUEST, 'invalid request');
   }
   if (outcome.kind === 'invalidLink') {
-    return problem(STATUS_BAD_REQUEST, 'invalid or expired link');
+    return problem(HTTP_BAD_REQUEST, 'invalid or expired link');
   }
-  return Response.json({ ok: true }, { status: STATUS_OK });
+  return Response.json({ ok: true }, { status: HTTP_OK });
 }

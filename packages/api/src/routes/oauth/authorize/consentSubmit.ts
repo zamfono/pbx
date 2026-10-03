@@ -2,7 +2,7 @@ import { error, redirect, type RequestEvent } from '@sveltejs/kit';
 import * as env from '$app/env/private';
 import pino from 'pino';
 
-import { nowIso } from '@zamfono/shared';
+import { HTTP_BAD_REQUEST, HTTP_FOUND, nowIso } from '@zamfono/shared';
 
 import {
   authorizationErrorRedirect,
@@ -23,8 +23,6 @@ import { unsealCookie } from '#lib/server/auth/sealedCookie.js';
 import { getDb } from '#lib/server/db.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
-const STATUS_BAD_REQUEST = 400;
-const STATUS_FOUND = 302;
 const ACCESS_DENIED = 'access_denied';
 const SERVER_ERROR = 'server_error';
 const logger = pino({ name: 'oauth-authorize' });
@@ -71,7 +69,7 @@ function takePendingConsent(event: RequestEvent): PendingConsent {
   );
   event.cookies.delete(CONSENT_COOKIE.name, { path: CONSENT_COOKIE.path });
   if (pending === null) {
-    error(STATUS_BAD_REQUEST, 'oauth/authorize: consent session expired');
+    error(HTTP_BAD_REQUEST, 'oauth/authorize: consent session expired');
   }
   return pending;
 }
@@ -111,7 +109,7 @@ export async function approveConsentSubmit(
     authorizationErrorRedirect(pending.authorize, SERVER_ERROR);
   }
   redirect(
-    STATUS_FOUND,
+    HTTP_FOUND,
     loginRedirect(
       authCodeStore,
       pending.userId,

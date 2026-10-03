@@ -1,13 +1,10 @@
 import { z } from 'zod';
 
+import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
-import {
-  assertDeviceScope,
-  liveDevice,
-  STATUS_UNPROCESSABLE_ENTITY,
-  toDeviceOut
-} from './_shared.js';
+import { assertDeviceScope, liveDevice, toDeviceOut } from './_shared.js';
 import { assertNonEmptyIps, assertValidIps } from './_transportPolicy.js';
 
 const inputSchema = z
@@ -36,7 +33,7 @@ export const update = defineOperation({
     assertDeviceScope(ctx.actor.role, ctx.actor.id, before);
     if (input.allowedIps !== undefined && before.transport !== 'plain') {
       throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
+        HTTP_UNPROCESSABLE_CONTENT,
         'devices: allowedIps applies only to a plain device'
       );
     }

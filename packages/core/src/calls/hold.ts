@@ -8,10 +8,10 @@
  * bridge (a party added to it, a consultation) must count the held party as still in it. Also
  * the `calls.hold` and `calls.resume` actions themselves.
  */
-import type { HoldRequest } from '@zamfono/shared';
+import { HTTP_CONFLICT, type HoldRequest } from '@zamfono/shared';
 
 import { ignoreGone } from '../ari/failures.js';
-import { ActionError, HTTP_CONFLICT, notBridged } from './actionError.js';
+import { ActionError, notBridged } from './actionError.js';
 import type { Call } from './call.js';
 import {
   bridgedParty,

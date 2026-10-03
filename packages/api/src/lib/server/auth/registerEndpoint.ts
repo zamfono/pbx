@@ -1,15 +1,11 @@
 import { z } from 'zod';
 
+import { HTTP_BAD_REQUEST, HTTP_CREATED } from '@zamfono/shared';
+
 import { tryReadJson } from '../json.js';
 import type { Keyring } from '../secretbox.js';
 import { encodeMetadataClientId } from './clients.js';
-import {
-  NO_AUTH_METHOD,
-  oauthError,
-  STATUS_BAD_REQUEST,
-  STATUS_CREATED,
-  type BaseDeps
-} from './oauthHttp.js';
+import { NO_AUTH_METHOD, oauthError, type BaseDeps } from './oauthHttp.js';
 
 // RFC 7591 dynamic client registration limits (§5.2).
 const MAX_CLIENT_NAME_LENGTH = 100;
@@ -40,11 +36,11 @@ export async function registerEndpoint(
 ): Promise<Response> {
   const body = await tryReadJson(req);
   if (body === undefined) {
-    return oauthError(STATUS_BAD_REQUEST, 'invalid_client_metadata');
+    return oauthError(HTTP_BAD_REQUEST, 'invalid_client_metadata');
   }
   const parsed = RegisterRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return oauthError(STATUS_BAD_REQUEST, 'invalid_client_metadata');
+    return oauthError(HTTP_BAD_REQUEST, 'invalid_client_metadata');
   }
   const clientId = encodeMetadataClientId(deps.keyring, {
     name: parsed.data.client_name,
@@ -62,7 +58,7 @@ export async function registerEndpoint(
     }),
     /* eslint-enable camelcase -- RFC 7591 mandates these snake_case wire fields */
     {
-      status: STATUS_CREATED,
+      status: HTTP_CREATED,
       headers: { 'content-type': 'application/json' }
     }
   );

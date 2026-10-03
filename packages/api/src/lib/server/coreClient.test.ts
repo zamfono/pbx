@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import {
+  HTTP_INTERNAL_SERVER_ERROR,
+  HTTP_SERVICE_UNAVAILABLE
+} from '@zamfono/shared';
+
 import { createCoreClient } from './coreClient.js';
 import { CoreRequestError } from './coreHttp.js';
 
-const HTTP_INTERNAL_SERVER_ERROR = 500;
-const HTTP_SERVICE_UNAVAILABLE = 503;
 const HANG_TIMEOUT_MS = 10;
 
 function jsonResponse(status: number, body: unknown): Response {

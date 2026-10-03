@@ -2,10 +2,9 @@
 // fake.ts under the file size limit.
 import { randomUUID } from 'node:crypto';
 
-import { splitResource, type RouteResult } from './fakeHttp.js';
+import { HTTP_NOT_FOUND, HTTP_OK } from '@zamfono/shared';
 
-const HTTP_OK = 200;
-const HTTP_NOT_FOUND = 404;
+import { splitResource, type RouteResult } from './fakeHttp.js';
 
 export type Bridge = { id: string; channels: string[] };
 

@@ -1,4 +1,4 @@
-import { newId } from '@zamfono/shared';
+import { HTTP_BAD_REQUEST, HTTP_NOT_FOUND, newId } from '@zamfono/shared';
 
 import {
   asRecord,
@@ -20,13 +20,9 @@ export const SUPPORTED_PROTOCOL_VERSIONS = [
   LEGACY_PROTOCOL_VERSION
 ];
 export const SESSION_ID_HEADER = 'mcp-session-id';
-/** JSON-RPC 2.0 §4.1: the status a notification (no `id` member) is answered with. */
-export const STATUS_ACCEPTED = 202;
 const PROTOCOL_VERSION_HEADER = 'mcp-protocol-version';
 /** The legacy revisions `initialize` can negotiate: the one §10.5 names. */
 const LEGACY_PROTOCOL_VERSIONS: readonly string[] = [LEGACY_PROTOCOL_VERSION];
-const STATUS_BAD_REQUEST = 400;
-const STATUS_NOT_FOUND = 404;
 
 type LegacySession = { elicits: boolean; protocolVersion: string };
 const legacySessions = new Map<string, LegacySession>();
@@ -131,16 +127,16 @@ function legacySession(
     jsonRpcErrorWithStatus(status, msg.id, JSONRPC_INVALID_REQUEST, message);
   const sessionId = request.headers.get(SESSION_ID_HEADER);
   if (sessionId === null) {
-    return reject(STATUS_BAD_REQUEST, 'missing Mcp-Session-Id header');
+    return reject(HTTP_BAD_REQUEST, 'missing Mcp-Session-Id header');
   }
   const session = legacySessions.get(sessionId);
   if (!session) {
-    return reject(STATUS_NOT_FOUND, 'session not found; initialize again');
+    return reject(HTTP_NOT_FOUND, 'session not found; initialize again');
   }
   const version = request.headers.get(PROTOCOL_VERSION_HEADER);
   if (version !== null && version !== session.protocolVersion) {
     return reject(
-      STATUS_BAD_REQUEST,
+      HTTP_BAD_REQUEST,
       `unsupported MCP-Protocol-Version '${version}'`
     );
   }

@@ -1,6 +1,8 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { orBefore } from '../patch.js';
@@ -19,8 +21,6 @@ import {
   type BackupTargetWire
 } from './_shared.js';
 
-const STATUS_NOT_FOUND = 404;
-
 const inputSchema = z
   .object({ id: z.string(), ...z.object(targetFields).partial().shape })
   .strict();
@@ -38,7 +38,7 @@ export const targetsUpdate = defineOperation<Input, BackupTargetWire>({
   run: async (ctx, input) => {
     const before = await loadLiveTarget(ctx.db, input.id);
     if (!before) {
-      throw new OpError(STATUS_NOT_FOUND, 'backups: target not found');
+      throw new OpError(HTTP_NOT_FOUND, 'backups: target not found');
     }
     const kind = orBefore(input.kind, before.kind);
     const enabled = orBefore(input.enabled, before.enabled === 1);

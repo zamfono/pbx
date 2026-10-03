@@ -1,11 +1,10 @@
 import pino from 'pino';
 
-import { newId, type Db } from '@zamfono/shared';
+import { HTTP_ACCEPTED, newId, type Db } from '@zamfono/shared';
 
 import { runOperation, type RunInput } from '../ops/runner.js';
 import { ConfirmationRequired, OpError } from '../ops/types.js';
 import { confirmElicitation, isAffirmative } from './confirm.js';
-import { STATUS_ACCEPTED } from './era.js';
 import { asRecord, JSONRPC_INTERNAL_ERROR, type JsonRpcId } from './jsonRpc.js';
 import { toolErrorResult, toolResult } from './results.js';
 
@@ -181,5 +180,6 @@ export function resolveElicitationAnswer(
   }
   pending.delete(id);
   entry.resolve(asRecord(record.result) ?? {});
-  return new Response(null, { status: STATUS_ACCEPTED });
+  // JSON-RPC 2.0 §4.1: the status a notification (no `id` member) is answered with.
+  return new Response(null, { status: HTTP_ACCEPTED });
 }

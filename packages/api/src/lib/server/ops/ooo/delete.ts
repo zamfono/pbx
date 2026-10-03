@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import {
@@ -7,8 +9,6 @@ import {
   loadLiveOooRule,
   scopeFromColumns
 } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
 
 const inputSchema = z.object({ id: z.string() }).strict();
 
@@ -23,7 +23,7 @@ export const del = defineOperation({
   run: async (ctx, input) => {
     const rule = await loadLiveOooRule(ctx.db, input.id);
     if (!rule) {
-      throw new OpError(STATUS_NOT_FOUND, 'ooo: rule not found');
+      throw new OpError(HTTP_NOT_FOUND, 'ooo: rule not found');
     }
     assertVisibleScope(
       ctx.actor,

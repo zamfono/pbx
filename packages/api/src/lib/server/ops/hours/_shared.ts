@@ -1,6 +1,6 @@
 import type { Selectable } from 'kysely';
 
-import type { DB, Db } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT, type DB, type Db } from '@zamfono/shared';
 
 import { scopeColumns, type ScopeInput } from '../ooo/_shared.js';
 import { OpError } from '../types.js';
@@ -20,8 +20,6 @@ export type IntervalRow = Selectable<DB['openingHoursIntervals']>;
 // `number` here since the zod input schema enforces the 1-7 range at runtime.
 export type IntervalInput = { weekday: number; opens: string; closes: string };
 
-const STATUS_UNPROCESSABLE_ENTITY = 422;
-
 // 'HH:MM', 00:00-23:59, plus '24:00' standing for the end of day (§11.2 `opening_hours_intervals`).
 const TIME_OF_DAY_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$|^24:00$/u;
 
@@ -38,13 +36,13 @@ export function validateIntervals(intervals: IntervalInput[]): IntervalInput[] {
       !TIME_OF_DAY_PATTERN.test(interval.closes)
     ) {
       throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
+        HTTP_UNPROCESSABLE_CONTENT,
         `hours: invalid time of day in ${interval.opens}-${interval.closes}`
       );
     }
     if (!(interval.opens < interval.closes)) {
       throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
+        HTTP_UNPROCESSABLE_CONTENT,
         `hours: interval ${interval.opens}-${interval.closes} crosses midnight`
       );
     }
@@ -54,7 +52,7 @@ export function validateIntervals(intervals: IntervalInput[]): IntervalInput[] {
     const key = `${interval.weekday}:${interval.opens}`;
     if (seen.has(key)) {
       throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
+        HTTP_UNPROCESSABLE_CONTENT,
         `hours: duplicate interval starting ${interval.opens} on weekday ${interval.weekday}`
       );
     }

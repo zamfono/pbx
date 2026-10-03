@@ -1,8 +1,6 @@
-import { isE164, type Db } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT, isE164, type Db } from '@zamfono/shared';
 
 import { OpError } from '../types.js';
-
-const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 /** The subset of a route input that `replace`'s pre-write assertions need. */
 export type RouteAssertInput = {
@@ -32,7 +30,7 @@ export async function assertTrunksLive(
   const missing = ids.filter(id => !found.has(id));
   if (missing.length > 0) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `unknown or deleted trunk: ${missing.join(', ')}`
     );
   }
@@ -64,13 +62,13 @@ export async function assertCallerIdsNumeric(
     const number = numberById.get(id);
     if (number === undefined) {
       throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
+        HTTP_UNPROCESSABLE_CONTENT,
         `unknown or deleted DID: ${id}`
       );
     }
     if (!isE164(number)) {
       throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
+        HTTP_UNPROCESSABLE_CONTENT,
         `calleridDidId must be a numeric DID: ${id}`
       );
     }
@@ -107,7 +105,7 @@ export async function assertCallersExist(
   ];
   if (missing.length > 0) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `unknown user or user group: ${missing.join(', ')}`
     );
   }
@@ -130,7 +128,7 @@ export async function assertRouteIdsLive(
   ];
   if (duplicates.length > 0) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `duplicate route id: ${duplicates.join(', ')}`
     );
   }
@@ -146,7 +144,7 @@ export async function assertRouteIdsLive(
   const missing = ids.filter(id => !found.has(id));
   if (missing.length > 0) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `unknown route id: ${missing.join(', ')}`
     );
   }

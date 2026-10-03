@@ -1,10 +1,8 @@
 import type { Transaction } from 'kysely';
 
-import type { DB } from '@zamfono/shared';
+import { HTTP_CONFLICT, type DB } from '@zamfono/shared';
 
 import { OpError } from '../types.js';
-
-const STATUS_CONFLICT = 409;
 
 /** One `user_group_groups` edge, as loaded for a cycle check. */
 export type Edge = { parentGroupId: string; childGroupId: string };
@@ -76,7 +74,7 @@ export function assertNoCycle(
 ): void {
   if (parentId === childId) {
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       'user group nesting would create a cycle',
       {
         path: [parentId, childId]
@@ -86,7 +84,7 @@ export function assertNoCycle(
   const path = findPath(edges, childId, parentId);
   if (path) {
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       'user group nesting would create a cycle',
       {
         path: [parentId, ...path]

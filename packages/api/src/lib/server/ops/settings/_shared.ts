@@ -1,14 +1,17 @@
 import type { Selectable } from 'kysely';
 
-import type { Db, DB, FeatureCodes } from '@zamfono/shared';
+import {
+  HTTP_FORBIDDEN,
+  type Db,
+  type DB,
+  type FeatureCodes
+} from '@zamfono/shared';
 
 import { resolveOptionalTarget, type TargetInput } from '../dids/_shared.js';
 import type { Codec } from '../trunks/_shared.js';
 import { OpError, type Role } from '../types.js';
 
 export type SettingsRow = Selectable<DB['settings']>;
-
-const STATUS_FORBIDDEN = 403;
 
 export const LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'ru'] as const;
 export type Language = (typeof LANGUAGES)[number];
@@ -87,7 +90,7 @@ export const OWNER_FIELDS: ReadonlySet<keyof SettingsWire> = new Set([
 /** Throws 403 when `role` may not write `field` (owner-only fields, §11.4). */
 export function checkFieldRole(field: keyof SettingsWire, role: Role): void {
   if (OWNER_FIELDS.has(field) && role !== 'owner') {
-    throw new OpError(STATUS_FORBIDDEN, `settings: '${field}' is owner-only`);
+    throw new OpError(HTTP_FORBIDDEN, `settings: '${field}' is owner-only`);
   }
 }
 

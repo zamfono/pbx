@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import {
@@ -7,8 +9,6 @@ import {
   loadSchedule,
   scopeInputSchema
 } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
 
 const inputSchema = z.object({ scope: scopeInputSchema }).strict();
 
@@ -31,7 +31,7 @@ export const del = defineOperation({
     const schedule = await loadSchedule(ctx.db, input.scope);
     if (!schedule) {
       throw new OpError(
-        STATUS_NOT_FOUND,
+        HTTP_NOT_FOUND,
         'hours: no schedule set for this scope'
       );
     }

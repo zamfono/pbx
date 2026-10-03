@@ -3,7 +3,12 @@ import process from 'node:process';
 import type { RequestEvent } from '@sveltejs/kit';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { StateResponse } from '@zamfono/shared';
+import {
+  HTTP_NOT_FOUND,
+  HTTP_OK,
+  HTTP_UNAUTHORIZED,
+  type StateResponse
+} from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
@@ -12,9 +17,6 @@ import { getDb } from '#lib/server/db.js';
 
 import { GET } from './+server.js';
 
-const HTTP_OK = 200;
-const HTTP_UNAUTHORIZED = 401;
-const HTTP_NOT_FOUND = 404;
 const EMPTY_STATE: StateResponse = {
   calls: [],
   trunks: {},

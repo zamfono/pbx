@@ -1,10 +1,10 @@
+import { HTTP_CONFLICT } from '@zamfono/shared';
+
 import { revertBlfKeys } from '../audit/_cascadeRevert.js';
 import type { ChangeEntry } from '../audit/_shared.js';
 import type { DroppedBlfKey } from '../devices/_shared.js';
 import { replayOperation } from '../runner.js';
 import { OpError, type Context } from '../types.js';
-
-const STATUS_CONFLICT = 409;
 
 /**
  * Reverts one `parking.set` entry (§5.8, §11.1 "extensions": parking-slot rows are "replaced as a
@@ -21,7 +21,7 @@ export async function revertParkingSet(
   const slots = changes.find(change => change.field === 'slots');
   if (!slots) {
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       "audit.undo: the 'parking.set' entry records no 'slots'"
     );
   }

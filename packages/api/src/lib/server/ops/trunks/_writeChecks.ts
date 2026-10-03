@@ -1,17 +1,19 @@
 import * as env from '$app/env/private';
 
-import { TRUNK_SECTION_PREFIX, type Db } from '@zamfono/shared';
+import {
+  HTTP_CONFLICT,
+  HTTP_UNPROCESSABLE_CONTENT,
+  TRUNK_SECTION_PREFIX,
+  type Db
+} from '@zamfono/shared';
 
 import { OpError } from '../types.js';
 import {
   hasEmergencyTrunk,
-  STATUS_UNPROCESSABLE_ENTITY,
   type CallerIdHeader,
   type HostInput,
   type Transport
 } from './_shared.js';
-
-const STATUS_CONFLICT = 409;
 
 /** Throws 422 when `transport` is switched off by its `.env` flag (§9.1, §9.4 "Signaling"). */
 export function assertTransportEnabled(transport: Transport): void {
@@ -20,7 +22,7 @@ export function assertTransportEnabled(transport: Transport): void {
     (transport === 'tcp' && env.SIP_TCP_ENABLED === 'false');
   if (disabled) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `transport '${transport}' is disabled by this deployment`
     );
   }
@@ -34,7 +36,7 @@ export function assertTransportEnabled(transport: Transport): void {
 export function assertSrtpNeedsTls(srtp: boolean, transport: Transport): void {
   if (srtp && transport !== 'tls') {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       "srtp requires transport 'tls'"
     );
   }
@@ -47,7 +49,7 @@ export function assertClirAllowed(
 ): void {
   if (clir === true && callerIdHeader === 'from') {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       "clir requires a 'pai' or 'both' callerIdHeader"
     );
   }
@@ -63,7 +65,7 @@ export function assertPaiHasIdentity(
 ): void {
   if (callerIdHeader === 'pai' && username === null) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       "callerIdHeader 'pai' requires a username, the trunk's account identity"
     );
   }
@@ -81,13 +83,13 @@ export function assertCredentialsConsistency(
 ): void {
   if (required && !(usernamePresent && passwordPresent)) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'username and password are required for this auth mode'
     );
   }
   if (!required && (usernamePresent || passwordPresent)) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'username and password are only accepted for registration auth or inbound auth'
     );
   }
@@ -109,7 +111,7 @@ export async function assertNameAvailable(
   }
   const existing = await query.executeTakeFirst();
   if (existing) {
-    throw new OpError(STATUS_CONFLICT, `trunk name already in use: ${name}`);
+    throw new OpError(HTTP_CONFLICT, `trunk name already in use: ${name}`);
   }
 }
 
@@ -127,7 +129,7 @@ export async function assertInboundAuthUsernameFree(
 ): Promise<void> {
   if (username.includes(';') || username.startsWith(TRUNK_SECTION_PREFIX)) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `username cannot name an inbound-auth endpoint: ${username}`
     );
   }
@@ -148,7 +150,7 @@ export async function assertInboundAuthUsernameFree(
     .executeTakeFirst();
   if (device !== undefined || (await trunks.executeTakeFirst()) !== undefined) {
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       `username already names a SIP endpoint: ${username}`
     );
   }

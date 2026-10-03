@@ -1,11 +1,11 @@
 import process from 'node:process';
 import { describe, expect, it } from 'vitest';
 
+import { HTTP_FORBIDDEN } from '@zamfono/shared';
+
 import { crossSiteFormRejection } from './crossSiteForms.js';
 
 process.env.FQDN = 'pbx.example.com';
-
-const STATUS_FORBIDDEN = 403;
 
 function post(url: string, contentType: string, origin?: string): Request {
   const headers = new Headers({ 'content-type': contentType });
@@ -45,9 +45,9 @@ describe('crossSiteFormRejection', () => {
           post(url, type, 'https://evil.example'),
           pathname
         )?.status
-      ).toBe(STATUS_FORBIDDEN);
+      ).toBe(HTTP_FORBIDDEN);
       expect(crossSiteFormRejection(post(url, type), pathname)?.status).toBe(
-        STATUS_FORBIDDEN
+        HTTP_FORBIDDEN
       );
     });
 

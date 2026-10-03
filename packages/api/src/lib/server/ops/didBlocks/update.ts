@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import {
   createTarget,
   resolveOptionalTarget,
@@ -13,8 +15,6 @@ import {
   FALLBACK_TARGET_SCHEMA,
   loadLiveDidBlock
 } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
 
 const inputSchema = z
   .object({
@@ -68,7 +68,7 @@ export const update = defineOperation<Input, UpdateOutput>({
   run: async (ctx, input) => {
     const before = await loadLiveDidBlock(ctx.db, input.id);
     if (!before) {
-      throw new OpError(STATUS_NOT_FOUND, 'didBlocks: block not found');
+      throw new OpError(HTTP_NOT_FOUND, 'didBlocks: block not found');
     }
     const label = orBefore(input.label, before.label);
     const digits = orBefore(input.digits, before.digits);

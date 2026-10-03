@@ -3,15 +3,14 @@ import * as env from '$app/env/private';
 import pino from 'pino';
 import { z } from 'zod';
 
+import { HTTP_ACCEPTED, HTTP_BAD_REQUEST } from '@zamfono/shared';
+
 import { getDb } from '#lib/server/db.js';
 import { tryReadJson } from '#lib/server/json.js';
 import { sendMail } from '#lib/server/mail/index.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 const logger = pino({ name: 'internal-mail' });
-
-const STATUS_BAD_REQUEST = 400;
-const STATUS_ACCEPTED = 202;
 
 // §11.6: voicemail audio lives under this media-volume prefix; `attachmentPath` is constrained
 // to it so a malformed request cannot make `sendMail` attach an arbitrary readable file.
@@ -59,7 +58,7 @@ const mailRequestSchema = z.discriminatedUnion('kind', [
 async function handleMailRequest(request: Request): Promise<Response> {
   const parsed = mailRequestSchema.safeParse(await tryReadJson(request));
   if (!parsed.success) {
-    return new Response(null, { status: STATUS_BAD_REQUEST });
+    return new Response(null, { status: HTTP_BAD_REQUEST });
   }
   const req = parsed.data;
   const db = getDb();
@@ -73,7 +72,7 @@ async function handleMailRequest(request: Request): Promise<Response> {
       'internal-mail: send threw'
     );
   });
-  return new Response(null, { status: STATUS_ACCEPTED });
+  return new Response(null, { status: HTTP_ACCEPTED });
 }
 
 /**

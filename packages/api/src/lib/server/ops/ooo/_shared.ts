@@ -1,7 +1,12 @@
 import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
-import type { Db, DB } from '@zamfono/shared';
+import {
+  HTTP_FORBIDDEN,
+  HTTP_NOT_FOUND,
+  type Db,
+  type DB
+} from '@zamfono/shared';
 
 import { targetInputSchema } from '../dids/_shared.js';
 import { OpError, type Actor } from '../types.js';
@@ -101,9 +106,6 @@ export function scopeFromColumns(row: ScopeColumns): ScopeInput {
   return { kind: 'tenant' };
 }
 
-const STATUS_FORBIDDEN = 403;
-const STATUS_NOT_FOUND = 404;
-
 /** Whether `actor` may act on `scope`: a `user` only their own user scope, `admin`/`owner` any. */
 function ownsScope(actor: Actor, scope: ScopeInput): boolean {
   return (
@@ -119,7 +121,7 @@ function ownsScope(actor: Actor, scope: ScopeInput): boolean {
  */
 export function assertOwnScopeOrAdmin(actor: Actor, scope: ScopeInput): void {
   if (!ownsScope(actor, scope)) {
-    throw new OpError(STATUS_FORBIDDEN, 'forbidden');
+    throw new OpError(HTTP_FORBIDDEN, 'forbidden');
   }
 }
 
@@ -134,7 +136,7 @@ export function assertVisibleScope(
   notFoundMessage: string
 ): void {
   if (!ownsScope(actor, scope)) {
-    throw new OpError(STATUS_NOT_FOUND, notFoundMessage);
+    throw new OpError(HTTP_NOT_FOUND, notFoundMessage);
   }
 }
 

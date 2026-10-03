@@ -10,9 +10,9 @@
  * itself (no JavaScript; the login and consent submissions carry the `zamfono_consent` cookie)
  * or to SvelteKit's `/_app/remote/…` endpoint.
  */
-import { requiredOrigin } from './authorizationResponse.js';
+import { HTTP_FORBIDDEN } from '@zamfono/shared';
 
-const STATUS_FORBIDDEN = 403;
+import { requiredOrigin } from './authorizationResponse.js';
 
 // The encodings an HTML form can submit cross-site without a CORS preflight, plus the one
 // SvelteKit's own enhanced forms use; the same list SvelteKit's check guards.
@@ -74,6 +74,6 @@ export function crossSiteFormRejection(
   }
   return new Response(
     `Cross-site ${request.method} form submissions are forbidden`,
-    { status: STATUS_FORBIDDEN, headers: { 'content-type': 'text/plain' } }
+    { status: HTTP_FORBIDDEN, headers: { 'content-type': 'text/plain' } }
   );
 }

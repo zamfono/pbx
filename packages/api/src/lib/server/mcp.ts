@@ -1,5 +1,7 @@
 import pino from 'pino';
 
+import { HTTP_ACCEPTED, HTTP_NOT_FOUND, HTTP_OK } from '@zamfono/shared';
+
 import type { Authenticated } from './auth/bearer.js';
 import { tryReadJson } from './json.js';
 import {
@@ -12,7 +14,6 @@ import {
   resolveEra,
   SESSION_ID_HEADER,
   startLegacySession,
-  STATUS_ACCEPTED,
   type Era
 } from './mcp/era.js';
 import INSTRUCTIONS_RAW from './mcp/instructions.txt?raw';
@@ -49,8 +50,6 @@ export type { McpDeps } from './mcp/auth.js';
 // layout.
 const INSTRUCTIONS = INSTRUCTIONS_RAW.trim();
 const logger = pino({ name: 'mcp' });
-const STATUS_OK = 200;
-const STATUS_NOT_FOUND = 404;
 
 // Legacy `initialize`: negotiates the session's version (`./mcp/era.js`) and starts the one
 // stateful session this endpoint keeps, returned as `Mcp-Session-Id` for the client to echo, with
@@ -93,7 +92,7 @@ function promptsGet(msg: IncomingMessage, legacy: boolean): Response {
 // a legacy session gets the plain JSON-RPC error.
 function unknownMethod(msg: IncomingMessage, legacy: boolean): Response {
   return jsonRpcErrorWithStatus(
-    legacy ? STATUS_OK : STATUS_NOT_FOUND,
+    legacy ? HTTP_OK : HTTP_NOT_FOUND,
     msg.id,
     JSONRPC_METHOD_NOT_FOUND,
     `unknown method '${msg.method}'`
@@ -179,7 +178,7 @@ export async function handleMcpRequest(
     return era;
   }
   if (msg.isNotification) {
-    return new Response(null, { status: STATUS_ACCEPTED });
+    return new Response(null, { status: HTTP_ACCEPTED });
   }
   try {
     const rejection = era.legacy ? null : modernRequestRejection(request, msg);

@@ -1,5 +1,7 @@
+import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+
 import { OpError } from '../types.js';
-import { STATUS_UNPROCESSABLE_ENTITY, type AuthMode } from './_shared.js';
+import { type AuthMode } from './_shared.js';
 import { assertValidPassword, assertValidUsername } from './hostValidation.js';
 
 /** The credential and registration fields of a `trunks.update` request these checks read. */
@@ -23,7 +25,7 @@ export function assertNoStrayCredentials(
   const passwordGiven = input.password !== undefined;
   if (!required && (usernameGiven || passwordGiven)) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'username and password are only accepted for registration auth or inbound auth'
     );
   }
@@ -43,7 +45,7 @@ export function assertNoStrayRegistrationFields(
     input.registerRetryS !== undefined && input.registerRetryS !== null;
   if (authMode !== 'registration' && (expiryGiven || retryGiven)) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'registerExpiryS and registerRetryS are only accepted for registration auth'
     );
   }

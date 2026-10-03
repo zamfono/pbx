@@ -3,9 +3,9 @@
  * call's other party the way `*70` does, through `parking.ts`'s `parkParty`, and
  * `GET /internal/parking` lists the occupied slots (`parkingView.ts`). `actions.ts` mounts both.
  */
-import type { ParkRequest } from '@zamfono/shared';
+import { HTTP_CONFLICT, type ParkRequest } from '@zamfono/shared';
 
-import { ActionError, HTTP_CONFLICT, notBridged } from './actionError.js';
+import { ActionError, notBridged } from './actionError.js';
 import type { Call } from './call.js';
 import { bridgedParty, channelOf } from './callLookup.js';
 import { parkParty } from './parking.js';

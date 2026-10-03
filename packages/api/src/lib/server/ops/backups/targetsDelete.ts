@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import { loadLiveTarget } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
 
 const inputSchema = z.object({ id: z.string() }).strict();
 
@@ -19,7 +19,7 @@ export const targetsDelete = defineOperation({
   run: async (ctx, input) => {
     const target = await loadLiveTarget(ctx.db, input.id);
     if (!target) {
-      throw new OpError(STATUS_NOT_FOUND, 'backups: target not found');
+      throw new OpError(HTTP_NOT_FOUND, 'backups: target not found');
     }
     await ctx.db
       .updateTable('backupTargets')

@@ -1,14 +1,12 @@
 import { z } from 'zod';
 
-import { newId } from '@zamfono/shared';
+import { HTTP_NOT_FOUND, newId } from '@zamfono/shared';
 
 import { queueRun } from '#lib/server/jobs/cron.js';
 
 import { afterCommit, setUndoable } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import { loadLiveTarget, runToWire, type BackupRunWire } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
 
 const inputSchema = z
   .object({
@@ -40,7 +38,7 @@ export const runsStart = defineOperation<Input, BackupRunWire>({
     setUndoable(ctx, false);
     const target = await loadLiveTarget(ctx.db, input.targetId);
     if (!target) {
-      throw new OpError(STATUS_NOT_FOUND, 'backups: target not found');
+      throw new OpError(HTTP_NOT_FOUND, 'backups: target not found');
     }
     const id = newId();
     await ctx.db

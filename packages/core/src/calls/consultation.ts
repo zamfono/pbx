@@ -8,10 +8,14 @@
  * conversation on with `parent_call_id` set to it. The consulted party leaving leaves the actor
  * with the party still held, to resume; the actor leaving ends it all.
  */
-import type { AttendedTransferRequest, ConsultRequest } from '@zamfono/shared';
+import {
+  HTTP_CONFLICT,
+  type AttendedTransferRequest,
+  type ConsultRequest
+} from '@zamfono/shared';
 
 import { ignoreGone, logFailure } from '../ari/failures.js';
-import { ActionError, HTTP_CONFLICT, notBridged } from './actionError.js';
+import { ActionError, notBridged } from './actionError.js';
 import { dialAddedLeg, newAddedLeg } from './addedParty.js';
 import { handOver } from './attendedTransfer.js';
 import type { Call } from './call.js';

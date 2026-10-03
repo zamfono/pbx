@@ -1,10 +1,9 @@
 import { z } from 'zod';
 
-import type { Db } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT, type Db } from '@zamfono/shared';
 
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
-import { STATUS_UNPROCESSABLE_ENTITY } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -73,7 +72,7 @@ export const setOrder = defineOperation<Input, Output>({
       sameSize && live.every(trunk => inputIds.has(trunk.id));
     if (!everyLiveTrunkNamed) {
       throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
+        HTTP_UNPROCESSABLE_CONTENT,
         'trunkIds must name every live trunk exactly once'
       );
     }

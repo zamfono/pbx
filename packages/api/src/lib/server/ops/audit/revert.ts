@@ -1,3 +1,5 @@
+import { HTTP_CONFLICT } from '@zamfono/shared';
+
 import { revertHoursSet } from '../hours/revert.js';
 import { revertMailTemplate } from '../mailTemplates/revert.js';
 import { revertParkingSet } from '../parking/revert.js';
@@ -14,8 +16,6 @@ import {
 import { LIST_REVERTS, type EntryRevert } from './_listReverts.js';
 import type { ChangeEntry } from './_shared.js';
 import { restoreProvisionedDevices } from './restoreProvisioning.js';
-
-const STATUS_CONFLICT = 409;
 
 /**
  * `<entityKind>.update`, the operation a plain field change replays through (§5.8, §10.3
@@ -97,7 +97,7 @@ export async function revertCreation(
   const opName = CREATION_DELETE_OPERATIONS[entityKind];
   if (!opName) {
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       `audit.undo: entity kind '${entityKind}' cannot be reverted`
     );
   }
@@ -119,7 +119,7 @@ async function revertField(
   const opName = FIELD_UPDATE_OPERATIONS[entityKind];
   if (!opName) {
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       `audit.undo: entity kind '${entityKind}' cannot be reverted`
     );
   }

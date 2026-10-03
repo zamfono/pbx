@@ -1,6 +1,8 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
+import { HTTP_CONFLICT } from '@zamfono/shared';
+
 import { errorMessage } from '#lib/server/errors.js';
 import {
   createRingotelClient,
@@ -18,7 +20,6 @@ import {
   followPackageMaxRegs,
   organizationParams,
   stackBranchAddress,
-  STATUS_CONFLICT,
   storeRingotelIds
 } from './ringotelConnection.js';
 import { assertOffered } from './ringotelOptions.js';
@@ -69,7 +70,7 @@ async function createOrganization(
       await client.call<{ id: string; domain: string }[]>('getOrganizations')
     ).find(org => org.domain === domain);
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       existing === undefined
         ? `provisioning: Ringotel refused domain ${domain} (${error.ringotelMessage}); choose another domain`
         : `provisioning: the Ringotel account already has an organization with domain ${domain}, id ${existing.id}; if it is this stack's, adopt it: provisioning.ringotelAdopt { orgId: '${existing.id}', domain: '${domain}' }`

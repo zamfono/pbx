@@ -1,8 +1,8 @@
+import { HTTP_CONFLICT } from '@zamfono/shared';
+
 import type { ChangeEntry } from '../audit/_shared.js';
 import { replayOperation } from '../runner.js';
 import { Conflict, OpError, type Context } from '../types.js';
-
-const STATUS_CONFLICT = 409;
 
 /**
  * Reverts one `trunks.setOrder` entry (§5.8) by replaying its recorded `from` order through
@@ -17,7 +17,7 @@ export async function revertTrunkOrder(
   const change = changes.find(candidate => candidate.field === 'trunkIds');
   if (!change) {
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       "audit.undo: the 'trunks.setOrder' entry records no 'trunkIds'"
     );
   }

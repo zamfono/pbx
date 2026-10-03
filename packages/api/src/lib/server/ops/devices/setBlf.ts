@@ -1,17 +1,13 @@
 import type { Transaction } from 'kysely';
 import { z } from 'zod';
 
-import type { DB } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT, type DB } from '@zamfono/shared';
 
 import { activeRingotelProvider } from '#lib/server/provisioning/index.js';
 
 import { recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
-import {
-  assertDeviceScope,
-  liveDevice,
-  STATUS_UNPROCESSABLE_ENTITY
-} from './_shared.js';
+import { assertDeviceScope, liveDevice } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -41,7 +37,7 @@ async function assertLiveExtensions(
   for (const key of keys) {
     if (!live.has(key)) {
       throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
+        HTTP_UNPROCESSABLE_CONTENT,
         `devices: '${key}' is not a live extension`
       );
     }
@@ -60,7 +56,7 @@ export const setBlf = defineOperation({
     assertDeviceScope(ctx.actor.role, ctx.actor.id, device);
     if (device.kind !== 'ringotel') {
       throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
+        HTTP_UNPROCESSABLE_CONTENT,
         'devices: BLF keys apply only to ringotel devices'
       );
     }

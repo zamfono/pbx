@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+
 import { defineOperation, OpError } from '../types.js';
 import {
   BUCKET_UNITS,
@@ -11,7 +13,6 @@ import {
   type StatsCallRow
 } from './_shared.js';
 
-const STATUS_UNPROCESSABLE_ENTITY = 422;
 // The widest series one request may ask for: a week at minute resolution, and so a year at hour
 // resolution. §10.3 states no bound, but every bucket is materialised in memory, so an unbounded
 // range (1970 to 2100 by minute, some 68 million buckets) would stall `api` for every caller.
@@ -81,7 +82,7 @@ export const query = defineOperation({
     const to = new Date(input.to).toISOString();
     if (bucketCount(from, to, input.bucket) > MAX_BUCKETS) {
       throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
+        HTTP_UNPROCESSABLE_CONTENT,
         `stats: more than ${MAX_BUCKETS} ${input.bucket} buckets requested; narrow the range or widen the bucket`
       );
     }

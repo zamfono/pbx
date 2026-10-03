@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import { kindSchema, languageSchema, loadOverride } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
 
 const inputSchema = z
   .object({ kind: kindSchema, language: languageSchema })
@@ -28,7 +28,7 @@ export const del = defineOperation({
   run: async (ctx, input) => {
     const before = await loadOverride(ctx.db, input.kind, input.language);
     if (!before) {
-      throw new OpError(STATUS_NOT_FOUND, 'mailTemplates: no override set');
+      throw new OpError(HTTP_NOT_FOUND, 'mailTemplates: no override set');
     }
     await ctx.db
       .deleteFrom('mailTemplates')

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { propagate, recordChange } from '../runner.js';
 import {
   recordLogLevelChanges,
@@ -15,7 +17,6 @@ import {
   mapTrunkRow,
   replaceTrunkHosts,
   scalarsFromRow,
-  STATUS_NOT_FOUND,
   type HostWire,
   type TrunkRow,
   type TrunkScalars,
@@ -158,7 +159,7 @@ export const update = defineOperation<Input, Output>({
   run: async (ctx, input) => {
     const row = await loadTrunkRow(ctx.db, input.id);
     if (!row) {
-      throw new OpError(STATUS_NOT_FOUND, 'trunk not found');
+      throw new OpError(HTTP_NOT_FOUND, 'trunk not found');
     }
     const before = scalarsFromRow(row);
     const merged = mergeScalars(row, input);

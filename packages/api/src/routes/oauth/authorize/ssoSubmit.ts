@@ -2,6 +2,12 @@ import { randomBytes } from 'node:crypto';
 import { error, redirect, type RequestEvent } from '@sveltejs/kit';
 import * as env from '$app/env/private';
 
+import {
+  HTTP_BAD_REQUEST,
+  HTTP_FOUND,
+  HTTP_SERVICE_UNAVAILABLE
+} from '@zamfono/shared';
+
 import { requiredOrigin } from '#lib/server/auth/authorizationResponse.js';
 import {
   paramsFromPayload,
@@ -18,9 +24,6 @@ import {
 import { getDb } from '#lib/server/db.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
-const STATUS_BAD_REQUEST = 400;
-const STATUS_FOUND = 302;
-const STATUS_SERVICE_UNAVAILABLE = 503;
 const RANDOM_TOKEN_BYTES = 32;
 
 /**
@@ -41,11 +44,11 @@ export async function ssoSubmit(
   const resolved = await resolveClient(kr, paramsFromPayload(payload));
   const cfg = await ssoConfigFromSettings(db, kr);
   if (cfg === null) {
-    error(STATUS_BAD_REQUEST, 'oauth/authorize: SSO is not configured');
+    error(HTTP_BAD_REQUEST, 'oauth/authorize: SSO is not configured');
   }
   const disc = await discover(cfg).catch(() => {
     error(
-      STATUS_SERVICE_UNAVAILABLE,
+      HTTP_SERVICE_UNAVAILABLE,
       'oauth/authorize: identity provider unreachable'
     );
   });
@@ -59,7 +62,7 @@ export async function ssoSubmit(
     authorizeParams: resolved?.authorize ?? null
   });
   redirect(
-    STATUS_FOUND,
+    HTTP_FOUND,
     startLogin(cfg, disc, origin, state, nonce, codeVerifier),
     { external: true }
   );

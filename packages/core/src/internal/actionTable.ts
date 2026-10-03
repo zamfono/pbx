@@ -3,26 +3,25 @@
  * request carries, the `CallActions` method it runs and what it answers. `actionRoutes.ts` serves
  * them.
  */
-import type {
-  AddPartyRequest,
-  AttendedTransferRequest,
-  ConsultRequest,
-  DeclineRequest,
-  HangupRequest,
-  HoldRequest,
-  OriginateRequest,
-  ParkRequest,
-  PickupRequest,
-  TransferRequest
+import {
+  HTTP_CONFLICT,
+  HTTP_CREATED,
+  HTTP_NO_CONTENT,
+  HTTP_OK,
+  type AddPartyRequest,
+  type AttendedTransferRequest,
+  type ConsultRequest,
+  type DeclineRequest,
+  type HangupRequest,
+  type HoldRequest,
+  type OriginateRequest,
+  type ParkRequest,
+  type PickupRequest,
+  type TransferRequest
 } from '@zamfono/shared';
 
 import { ActionError } from '../calls/actionError.js';
 import type { CallActions } from '../calls/actions.js';
-
-const HTTP_OK = 200;
-const HTTP_CREATED = 201;
-const HTTP_NO_CONTENT = 204;
-const HTTP_CONFLICT = 409;
 
 export type Body = Record<string, unknown>;
 type Answer = { status: number; body?: unknown };

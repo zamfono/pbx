@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_CONFLICT, HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { OUTCOME_OPERATIONS } from '../outcomeLog.js';
 import { registry } from '../registry.js';
 import { recordRevert } from '../runner.js';
@@ -9,8 +11,6 @@ import { ENTITY_TABLES, parseChanges, type ChangeEntry } from './_shared.js';
 import { refuseUniqueViolation } from './_uniqueViolation.js';
 import { revertCreation, revertEntry } from './revert.js';
 
-const STATUS_NOT_FOUND = 404;
-const STATUS_CONFLICT = 409;
 const CREATE_SUFFIX = '.create';
 
 /**
@@ -39,20 +39,20 @@ async function loadUndoableEntry(
     .where('id', '=', id)
     .executeTakeFirst();
   if (!original) {
-    throw new OpError(STATUS_NOT_FOUND, `audit entry '${id}' not found`);
+    throw new OpError(HTTP_NOT_FOUND, `audit entry '${id}' not found`);
   }
   if (original.undoneAt !== null) {
-    throw new OpError(STATUS_CONFLICT, 'audit entry has already been undone');
+    throw new OpError(HTTP_CONFLICT, 'audit entry has already been undone');
   }
   if (original.undoable !== 1) {
-    throw new OpError(STATUS_CONFLICT, 'audit entry is not undoable');
+    throw new OpError(HTTP_CONFLICT, 'audit entry is not undoable');
   }
   if (
     original.entityId === null &&
     !isTenantListOperation(original.operation)
   ) {
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       `audit.undo: entity kind '${original.entityKind}' has no single row to revert`
     );
   }
@@ -126,7 +126,7 @@ async function assertRowNotPurged(
   const table = ENTITY_TABLES[entry.entityKind];
   if (!table) {
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       `audit.undo: entity kind '${entry.entityKind}' has no soft-delete table`
     );
   }

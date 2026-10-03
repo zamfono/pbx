@@ -1,6 +1,6 @@
-import { OpError, type Context } from '../types.js';
+import { HTTP_FORBIDDEN } from '@zamfono/shared';
 
-const STATUS_FORBIDDEN = 403;
+import { OpError, type Context } from '../types.js';
 
 /** The label of a personal greeting's `audio_assets` row, the one `*96` gives a recorded one
  * (`core`'s `mailboxGreeting.ts`). */
@@ -11,7 +11,7 @@ export const GREETING_LABEL = 'Mailbox greeting';
 export function assertOwnGreeting(ctx: Context, userId: string): void {
   if (ctx.actor.role === 'user' && ctx.actor.id !== userId) {
     throw new OpError(
-      STATUS_FORBIDDEN,
+      HTTP_FORBIDDEN,
       'users: may set only your own voicemail greeting'
     );
   }

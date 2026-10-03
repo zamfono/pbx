@@ -1,4 +1,4 @@
-import type { Db } from '@zamfono/shared';
+import { HTTP_NOT_FOUND, HTTP_UNAUTHORIZED, type Db } from '@zamfono/shared';
 
 import { inputJsonSchema } from './ops/publishedSchema.js';
 import { runOperation } from './ops/runner.js';
@@ -62,8 +62,6 @@ function matchRoute(method: string, path: string): Matched | null {
   return null;
 }
 
-const UNAUTHORIZED_STATUS = 401;
-const NOT_FOUND_STATUS = 404;
 const API_PREFIX = '/api/v1';
 
 function requestPath(request: Request): string {
@@ -85,11 +83,11 @@ export async function handleRest(
   deps: RestDeps
 ): Promise<Response> {
   if (!actor) {
-    return problem(UNAUTHORIZED_STATUS, 'unauthorized');
+    return problem(HTTP_UNAUTHORIZED, 'unauthorized');
   }
   const matched = matchRoute(request.method, requestPath(request));
   if (!matched) {
-    return problem(NOT_FOUND_STATUS, 'no such endpoint');
+    return problem(HTTP_NOT_FOUND, 'no such endpoint');
   }
   const { route, queryKinds, match } = matched;
   try {

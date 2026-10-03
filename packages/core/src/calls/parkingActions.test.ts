@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import {
+  HTTP_BAD_REQUEST,
+  HTTP_NOT_FOUND,
+  HTTP_OK,
+  newId,
+  nowIso,
+  type Db
+} from '@zamfono/shared';
 
 import { type FakeAri } from '../ari/fake.js';
 import { isPlacement, placedCallerId } from '../ari/fakeDial.js';
@@ -24,10 +31,6 @@ import type { Pipeline } from './pipeline.js';
 // The live-call actions `api`'s parking, voicemail-deposit and per-call CLIR operations proxy to
 // (§10.2 "Call parking", §9.3 `*97<ext>`, §9.4 "Anonymous calls (CLIR)"), each through the code
 // path the phone's own feature code takes.
-
-const HTTP_OK = 200;
-const HTTP_BAD_REQUEST = 400;
-const HTTP_NOT_FOUND = 404;
 
 function traceOf(call: Call): Record<string, unknown>[] {
   return (call.log.finish().log ?? '')

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_FORBIDDEN, HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+
 import { assertAudioAvailable } from '../audio/_shared.js';
 import { pushRoster } from '../roster.js';
 import { propagate } from '../runner.js';
@@ -23,9 +25,6 @@ import {
   type UserOut,
   type UserRow
 } from './_shared.js';
-
-const STATUS_FORBIDDEN = 403;
-const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 /** §10.3 "Users": the self-service subset a `user` actor may `PATCH` on their own profile. */
 const SELF_SERVICE_FIELDS = new Set([
@@ -75,13 +74,13 @@ function assertAllowedFields(ctx: Context, input: Input): void {
   }
   if (ctx.actor.id !== input.id) {
     throw new OpError(
-      STATUS_FORBIDDEN,
+      HTTP_FORBIDDEN,
       'users: may update only your own profile'
     );
   }
   for (const key of Object.keys(input)) {
     if (key !== 'id' && !SELF_SERVICE_FIELDS.has(key)) {
-      throw new OpError(STATUS_FORBIDDEN, `users: '${key}' is admin-only`);
+      throw new OpError(HTTP_FORBIDDEN, `users: '${key}' is admin-only`);
     }
   }
 }
@@ -96,11 +95,11 @@ async function assertRoleChangeAllowed(
     return;
   }
   if (ctx.actor.role !== 'owner') {
-    throw new OpError(STATUS_FORBIDDEN, 'users: only owners change roles');
+    throw new OpError(HTTP_FORBIDDEN, 'users: only owners change roles');
   }
   if (input.role === 'owner' && before.passwordHash === null) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'users: an SSO-only user needs a password before becoming owner'
     );
   }

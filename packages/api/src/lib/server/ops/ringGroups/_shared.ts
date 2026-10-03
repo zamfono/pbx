@@ -1,6 +1,10 @@
 import type { Selectable, Transaction } from 'kysely';
 
-import type { DB } from '@zamfono/shared';
+import {
+  HTTP_NOT_FOUND,
+  HTTP_UNPROCESSABLE_CONTENT,
+  type DB
+} from '@zamfono/shared';
 
 import { assertAudioAvailable } from '../audio/_shared.js';
 import {
@@ -22,9 +26,6 @@ export {
 };
 export type { TargetSpec };
 
-const STATUS_NOT_FOUND = 404;
-const STATUS_UNPROCESSABLE_ENTITY = 422;
-
 /** A `ring_groups` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type RingGroupRow = Selectable<DB['ringGroups']>;
 
@@ -40,7 +41,7 @@ export async function liveRingGroup(
     .where('deletedAt', 'is', null)
     .executeTakeFirst();
   if (!row) {
-    throw new OpError(STATUS_NOT_FOUND, `ring group '${id}' not found`);
+    throw new OpError(HTTP_NOT_FOUND, `ring group '${id}' not found`);
   }
   return row;
 }
@@ -98,7 +99,7 @@ export async function nextExtension(db: Transaction<DB>): Promise<string> {
     }
   }
   throw new OpError(
-    STATUS_UNPROCESSABLE_ENTITY,
+    HTTP_UNPROCESSABLE_CONTENT,
     'no free extension left at the tenant extension length'
   );
 }

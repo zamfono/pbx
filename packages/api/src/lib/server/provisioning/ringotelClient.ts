@@ -1,12 +1,11 @@
 import pino from 'pino';
 
-import type { Db } from '@zamfono/shared';
+import { HTTP_BAD_GATEWAY, type Db } from '@zamfono/shared';
 
 import { OpError } from '../ops/types.js';
 import { decrypt, type Keyring } from '../secretbox.js';
 import type { SettingsRow } from './types.js';
 
-const STATUS_BAD_GATEWAY = 502;
 // One line per call: the method, how long it took and whether Ringotel refused it, never the
 // parameters, which carry SIP passwords.
 const log = pino({ name: 'ringotel' });
@@ -20,10 +19,7 @@ export class RingotelError extends OpError {
     public method: string,
     public ringotelMessage: string
   ) {
-    super(
-      STATUS_BAD_GATEWAY,
-      `ringotel: '${method}' failed: ${ringotelMessage}`
-    );
+    super(HTTP_BAD_GATEWAY, `ringotel: '${method}' failed: ${ringotelMessage}`);
     this.name = 'RingotelError';
   }
 }

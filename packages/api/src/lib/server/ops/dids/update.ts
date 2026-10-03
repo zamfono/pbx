@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import { createTarget, resolveTarget, targetInputSchema } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
 
 const inputSchema = z
   .object({
@@ -32,7 +32,7 @@ export const update = defineOperation({
       .where('deletedAt', 'is', null)
       .executeTakeFirst();
     if (!did) {
-      throw new OpError(STATUS_NOT_FOUND, 'dids: DID not found');
+      throw new OpError(HTTP_NOT_FOUND, 'dids: DID not found');
     }
     const before = await resolveTarget(ctx.db, did.targetId);
     const targetId = await createTarget(ctx, input.target);

@@ -1,4 +1,6 @@
 // In-process fake ARI server: HTTP + WebSocket, an in-memory channel/bridge model, for tests only.
+import { HTTP_CONFLICT, HTTP_NOT_FOUND, HTTP_OK } from '@zamfono/shared';
+
 import type { RtpQos } from '../qosFigures.js';
 import { routeBridge, type Bridge } from './fakeBridge.js';
 import {
@@ -22,10 +24,7 @@ const DEFAULT_ANSWER_AFTER_MS = 10;
 // `PlaybackFinished` (announce, voicemail's greeting, the menu greeting) be exercised for real
 // instead of racing a same-tick response, without slowing the suite down noticeably.
 const DEFAULT_PLAYBACK_FINISHED_AFTER_MS = 10;
-const HTTP_OK = 200;
 const DEFAULT_RECORDED_DURATION_S = 3;
-const HTTP_NOT_FOUND = 404;
-const HTTP_CONFLICT = 409;
 // Asterisk answers a snoop request before its channel enters Stasis; a short delay keeps every
 // recording test honest about waiting for the `StasisStart` before recording on it.
 const DEFAULT_SNOOP_STASIS_AFTER_MS = 5;

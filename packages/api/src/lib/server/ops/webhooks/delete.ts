@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import { loadLiveWebhook } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
 
 const inputSchema = z.object({ id: z.string() }).strict();
 
@@ -22,7 +22,7 @@ export const del = defineOperation({
   run: async (ctx, input) => {
     const webhook = await loadLiveWebhook(ctx.db, input.id);
     if (!webhook) {
-      throw new OpError(STATUS_NOT_FOUND, 'webhooks: webhook not found');
+      throw new OpError(HTTP_NOT_FOUND, 'webhooks: webhook not found');
     }
     await ctx.db
       .updateTable('webhooks')

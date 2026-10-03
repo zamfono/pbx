@@ -6,6 +6,7 @@
 import type http from 'node:http';
 
 import {
+  HTTP_NO_CONTENT,
   isMwiMailbox,
   parseMwiMailbox,
   type Db,
@@ -15,7 +16,6 @@ import {
 import type { AriClient } from '../ari/client.js';
 import { refreshMwi } from '../calls/voicemailStore.js';
 
-const HTTP_NO_CONTENT = 204;
 // The mailbox arrives as one path segment, percent-encoded or not (`user:<id>` and `user%3A<id>`
 // name the same mailbox), so the segment is decoded before it is matched.
 const MWI_ROUTE = /^\/internal\/mwi\/(?<segment>[^/]+)$/u;

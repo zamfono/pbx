@@ -1,3 +1,5 @@
+import { HTTP_FORBIDDEN } from '@zamfono/shared';
+
 import { findForwardTargetOwners } from './forwardTargetOwners.js';
 import {
   insertForwardTarget,
@@ -5,8 +7,6 @@ import {
   type TargetSpec
 } from './forwardTargetSpec.js';
 import { OpError, type Context } from './types.js';
-
-const STATUS_FORBIDDEN = 403;
 
 // `TargetSpec` (§11.2 `forward_targets`) is the wire union every area that owns a forwarding
 // rule, fallback or menu option accepts and returns; `targetSpecSchema` already validates it,
@@ -25,7 +25,7 @@ export type TargetInput = TargetSpec;
  */
 export function assertMayHoldTarget(ctx: Context, target: TargetInput): void {
   if (target.kind === 'sip' && ctx.actor.role === 'user') {
-    throw new OpError(STATUS_FORBIDDEN, 'a sip target is set by an admin');
+    throw new OpError(HTTP_FORBIDDEN, 'a sip target is set by an admin');
   }
 }
 

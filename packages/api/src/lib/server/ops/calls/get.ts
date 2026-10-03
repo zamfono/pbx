@@ -1,10 +1,9 @@
 import { z } from 'zod';
 
+import { HTTP_FORBIDDEN, HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { defineOperation, OpError } from '../types.js';
 import { isOwnCall, toCallDetailOut, type CallDetailOut } from './_shared.js';
-
-const STATUS_FORBIDDEN = 403;
-const STATUS_NOT_FOUND = 404;
 
 /**
  * `GET /calls/{id}` (§7, §10.3 "Call history"): one call of the history with the diagnostics it
@@ -27,13 +26,10 @@ export const get = defineOperation<{ id: string }, CallDetailOut>({
       .where('endedAt', 'is not', null)
       .executeTakeFirst();
     if (!row) {
-      throw new OpError(STATUS_NOT_FOUND, `call '${input.id}' not found`);
+      throw new OpError(HTTP_NOT_FOUND, `call '${input.id}' not found`);
     }
     if (ctx.actor.role === 'user' && !isOwnCall(ctx.actor.id, row)) {
-      throw new OpError(
-        STATUS_FORBIDDEN,
-        'calls: may read only your own calls'
-      );
+      throw new OpError(HTTP_FORBIDDEN, 'calls: may read only your own calls');
     }
     return toCallDetailOut(ctx.db, row);
   }

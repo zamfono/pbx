@@ -1,4 +1,4 @@
-import { nowIso, type Db } from '@zamfono/shared';
+import { HTTP_CONFLICT, nowIso, type Db } from '@zamfono/shared';
 
 import {
   runAfterCommit,
@@ -39,8 +39,6 @@ export type RunInput = {
   requestId: string;
   confirm?: boolean;
 };
-
-const STATUS_CONFLICT = 409;
 
 type AuditWrite = {
   ctx: Context;
@@ -204,14 +202,14 @@ export async function replayOperation(
   const op = registry.get(name);
   if (!op) {
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       `audit.undo: operation '${name}' is not registered`
     );
   }
   const parsed = op.input.safeParse(input);
   if (!parsed.success) {
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       `audit.undo: '${name}' cannot take this change back`,
       parsed.error.issues
     );

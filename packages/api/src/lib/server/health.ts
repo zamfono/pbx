@@ -1,6 +1,12 @@
 import { sql } from 'kysely';
 
-import { isDbOpen, pendingMigrations, type Db } from '@zamfono/shared';
+import {
+  HTTP_OK,
+  HTTP_SERVICE_UNAVAILABLE,
+  isDbOpen,
+  pendingMigrations,
+  type Db
+} from '@zamfono/shared';
 
 import { ENC_COLUMNS } from './jobs/keyRotation.js';
 import { updateNews } from './ops/system/_state.js';
@@ -8,9 +14,6 @@ import { hasEmergencyTrunk } from './ops/trunks/_shared.js';
 import { isPropagationPending } from './propagationPending.js';
 import { isProfilePending } from './provisioning/profilePending.js';
 import type { Keyring } from './secretbox.js';
-
-const HTTP_OK = 200;
-const HTTP_SERVICE_UNAVAILABLE = 503;
 
 /** `core`'s own reachability and ARI connection, as seen from `api` (§6.3 "Health"). */
 export type CoreReachability = { reachable: boolean; ari: boolean };

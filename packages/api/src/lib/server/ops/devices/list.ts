@@ -1,11 +1,12 @@
 import { z } from 'zod';
 
+import { HTTP_FORBIDDEN } from '@zamfono/shared';
+
 import { decodeCursor, encodeCursor } from '#lib/server/pagination.js';
 
 import { defineOperation, OpError } from '../types.js';
 import { toDeviceOut } from './_shared.js';
 
-const STATUS_FORBIDDEN = 403;
 const DEFAULT_LIMIT = 50;
 
 /** `GET /users/{id}/devices` (§10.3): a `user` actor lists only their own devices (§5.3). */
@@ -24,7 +25,7 @@ export const list = defineOperation({
   run: async (ctx, input) => {
     if (ctx.actor.role === 'user' && ctx.actor.id !== input.userId) {
       throw new OpError(
-        STATUS_FORBIDDEN,
+        HTTP_FORBIDDEN,
         'devices: may list only your own devices'
       );
     }

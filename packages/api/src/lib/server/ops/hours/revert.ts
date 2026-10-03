@@ -1,10 +1,10 @@
+import { HTTP_CONFLICT } from '@zamfono/shared';
+
 import type { ChangeEntry } from '../audit/_shared.js';
 import { resolveTarget } from '../dids/_shared.js';
 import { replayOperation } from '../runner.js';
 import { OpError, type Context } from '../types.js';
 import { loadIntervals, scopeFromColumns } from './_shared.js';
-
-const STATUS_CONFLICT = 409;
 
 /** The entry's recorded change to `field`, or `undefined` where it changed no such field. */
 function changeTo(
@@ -33,7 +33,7 @@ export async function revertHoursSet(
     .executeTakeFirst();
   if (!row) {
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       'audit.undo: the opening-hours schedule has been purged'
     );
   }

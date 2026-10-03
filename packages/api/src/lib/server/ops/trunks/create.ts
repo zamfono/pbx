@@ -1,7 +1,7 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { newId, type Db } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT, newId, type Db } from '@zamfono/shared';
 
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
@@ -13,7 +13,6 @@ import {
   loadTrunkRow,
   mapTrunkRow,
   replaceTrunkHosts,
-  STATUS_UNPROCESSABLE_ENTITY,
   type CallerIdHeader,
   type Transport,
   type TrunkWire
@@ -145,7 +144,7 @@ function assertNoStrayRegistrationFields(input: Input): void {
     (input.registerExpiryS !== undefined || input.registerRetryS !== undefined)
   ) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'registerExpiryS and registerRetryS are only accepted for registration auth'
     );
   }

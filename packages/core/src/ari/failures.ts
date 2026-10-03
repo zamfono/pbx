@@ -4,9 +4,9 @@
  * else is: every other failure either reaches the flow that made the request or, for a promise
  * nothing awaits, is logged with what failed.
  */
-import { AriError, type Logger } from './types.js';
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
-const HTTP_NOT_FOUND = 404;
+import { AriError, type Logger } from './types.js';
 
 /** Whether a rejected ARI request says its channel or bridge no longer exists: ARI answers 404
  * for a channel that has hung up or a bridge that has been destroyed. */

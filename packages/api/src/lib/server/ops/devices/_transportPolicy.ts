@@ -1,12 +1,10 @@
 import { isIP } from 'node:net';
 import * as env from '$app/env/private';
 
+import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+
 import { OpError } from '../types.js';
-import {
-  STATUS_UNPROCESSABLE_ENTITY,
-  type DeviceKind,
-  type Transport
-} from './_shared.js';
+import { type DeviceKind, type Transport } from './_shared.js';
 
 const MAX_IPV4_PREFIX = 32;
 const MAX_IPV6_PREFIX = 128;
@@ -43,7 +41,7 @@ function isValidIpOrCidr(value: string): boolean {
 export function assertNonEmptyIps(ips: string[]): void {
   if (ips.length === 0) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'devices: a plain device requires allowedIps'
     );
   }
@@ -54,7 +52,7 @@ export function assertValidIps(ips: string[]): void {
   for (const ip of ips) {
     if (!isValidIpOrCidr(ip)) {
       throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
+        HTTP_UNPROCESSABLE_CONTENT,
         `devices: invalid IP or CIDR '${ip}'`
       );
     }
@@ -67,7 +65,7 @@ export function assertPlainTransportEnabled(): void {
   const tcpDisabled = env.SIP_TCP_ENABLED === 'false';
   if (udpDisabled && tcpDisabled) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'devices: plain transport is disabled by this deployment'
     );
   }
@@ -80,7 +78,7 @@ export function assertKindTransport(
 ): void {
   if (kind === 'ringotel' && transport !== 'tls') {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'devices: a ringotel device must use the tls transport'
     );
   }

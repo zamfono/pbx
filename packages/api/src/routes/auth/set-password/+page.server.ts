@@ -1,13 +1,11 @@
 import { redirect } from '@sveltejs/kit';
 
-import { nowIso } from '@zamfono/shared';
+import { HTTP_FOUND, nowIso } from '@zamfono/shared';
 
 import { hashToken } from '#lib/server/auth/tokens.js';
 import { getDb } from '#lib/server/db.js';
 
 import type { PageServerLoad } from './$types.js';
-
-const STATUS_FOUND = 302;
 
 /**
  * `true` while `token` still redeems (unrevoked, unexpired `reset`-kind row), without consuming
@@ -40,7 +38,7 @@ export const load: PageServerLoad = async event => {
   }
   const token = event.url.searchParams.get('token');
   if (token === null || !(await tokenIsLive(token))) {
-    redirect(STATUS_FOUND, '/auth/error?reason=expired');
+    redirect(HTTP_FOUND, '/auth/error?reason=expired');
   }
   return { token, done: false };
 };

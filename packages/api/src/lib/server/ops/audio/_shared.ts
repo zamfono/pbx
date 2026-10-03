@@ -1,13 +1,11 @@
 import type { Selectable, Transaction } from 'kysely';
 
-import type { DB } from '@zamfono/shared';
+import { HTTP_NOT_FOUND, type DB } from '@zamfono/shared';
 
 import type { AudioKind } from '#lib/server/audio/types.js';
 
 import { findForwardTargetOwners } from '../forwardTargetOwners.js';
 import { OpError } from '../types.js';
-
-const STATUS_NOT_FOUND = 404;
 
 /** An `audio_assets` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type AudioAssetRow = Selectable<DB['audioAssets']>;
@@ -24,7 +22,7 @@ export async function liveAudioAsset(
     .where('deletedAt', 'is', null)
     .executeTakeFirst();
   if (!row) {
-    throw new OpError(STATUS_NOT_FOUND, `audio asset '${id}' not found`);
+    throw new OpError(HTTP_NOT_FOUND, `audio asset '${id}' not found`);
   }
   return row;
 }
@@ -128,6 +126,6 @@ export async function assertAudioAvailable(
     .where('deletedAt', 'is', null)
     .executeTakeFirst();
   if (!row) {
-    throw new OpError(STATUS_NOT_FOUND, `audio asset '${audioId}' not found`);
+    throw new OpError(HTTP_NOT_FOUND, `audio asset '${audioId}' not found`);
   }
 }

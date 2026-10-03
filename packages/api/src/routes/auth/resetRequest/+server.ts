@@ -1,12 +1,14 @@
 import type { RequestEvent } from '@sveltejs/kit';
 
+import {
+  HTTP_ACCEPTED,
+  HTTP_NOT_FOUND,
+  HTTP_TOO_MANY_REQUESTS
+} from '@zamfono/shared';
+
 import { requestPasswordReset } from '#lib/server/auth/passwordReset.js';
 import { getDb } from '#lib/server/db.js';
 import { problem } from '#lib/server/problem.js';
-
-const STATUS_NOT_FOUND = 404;
-const STATUS_ACCEPTED = 202;
-const STATUS_TOO_MANY_REQUESTS = 429;
 
 /**
  * `POST /auth/resetRequest` (§5.2, §5.5, §10.3): answers identically whether the address exists
@@ -19,12 +21,12 @@ export async function POST(event: RequestEvent): Promise<Response> {
     body: () => event.request.json().catch(() => null)
   });
   if (outcome.kind === 'noRelay') {
-    return problem(STATUS_NOT_FOUND, 'not found');
+    return problem(HTTP_NOT_FOUND, 'not found');
   }
   if (outcome.kind === 'limited') {
-    return problem(STATUS_TOO_MANY_REQUESTS, 'too many requests', undefined, {
+    return problem(HTTP_TOO_MANY_REQUESTS, 'too many requests', undefined, {
       'retry-after': String(outcome.retryAfterS)
     });
   }
-  return new Response(null, { status: STATUS_ACCEPTED });
+  return new Response(null, { status: HTTP_ACCEPTED });
 }

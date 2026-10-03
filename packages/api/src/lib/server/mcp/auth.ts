@@ -1,11 +1,10 @@
-import type { Db } from '@zamfono/shared';
+import { HTTP_UNAUTHORIZED, type Db } from '@zamfono/shared';
 
 import { authenticateRequest, type Authenticated } from '../auth/bearer.js';
 import { mcpResourceUri } from '../auth/resource.js';
 
 // §10.5 "Auth": an MCP request acts as the user its OAuth 2.1 bearer token names, and a mutating
 // tool call is audited under that user plus the MCP client's OAuth client id and name.
-const STATUS_UNAUTHORIZED = 401;
 
 /** What the MCP endpoint needs beyond the request itself. */
 export type McpDeps = { db: Db; jwtSecret: string; origin: string };
@@ -22,7 +21,7 @@ export function authenticate(
 /** The 401 an unauthenticated request gets, pointing the client at the resource metadata. */
 export function unauthorizedResponse(origin: string): Response {
   return new Response(null, {
-    status: STATUS_UNAUTHORIZED,
+    status: HTTP_UNAUTHORIZED,
     headers: {
       'www-authenticate': `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource"`
     }

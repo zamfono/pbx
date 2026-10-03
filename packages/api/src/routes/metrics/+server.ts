@@ -2,16 +2,18 @@ import { timingSafeEqual } from 'node:crypto';
 import type { RequestEvent } from '@sveltejs/kit';
 import * as env from '$app/env/private';
 
-import { resolveVersion } from '@zamfono/shared';
+import {
+  HTTP_NOT_FOUND,
+  HTTP_OK,
+  HTTP_UNAUTHORIZED,
+  resolveVersion
+} from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { getDb } from '#lib/server/db.js';
 import { certSyncStatus } from '#lib/server/jobs/certSync.js';
 import { renderMetrics } from '#lib/server/metrics.js';
 
-const STATUS_NOT_FOUND = 404;
-const STATUS_UNAUTHORIZED = 401;
-const STATUS_OK = 200;
 const BEARER_PREFIX = 'Bearer ';
 const PROMETHEUS_CONTENT_TYPE = 'text/plain; version=0.0.4';
 
@@ -36,11 +38,11 @@ function isValidBearer(authorization: string | null, token: string): boolean {
 export async function GET(event: RequestEvent): Promise<Response> {
   const token = env.METRICS_TOKEN;
   if (!token) {
-    return new Response(null, { status: STATUS_NOT_FOUND });
+    return new Response(null, { status: HTTP_NOT_FOUND });
   }
   const authorization = event.request.headers.get('authorization');
   if (!isValidBearer(authorization, token)) {
-    return new Response(null, { status: STATUS_UNAUTHORIZED });
+    return new Response(null, { status: HTTP_UNAUTHORIZED });
   }
   const body = await renderMetrics({
     db: getDb(),
@@ -51,7 +53,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     version: resolveVersion(env)
   });
   return new Response(body, {
-    status: STATUS_OK,
+    status: HTTP_OK,
     headers: { 'content-type': PROMETHEUS_CONTENT_TYPE }
   });
 }

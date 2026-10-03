@@ -1,14 +1,12 @@
 import type { ExpressionBuilder, Selectable, Transaction } from 'kysely';
 import { z } from 'zod';
 
-import type { DB } from '@zamfono/shared';
+import { HTTP_FORBIDDEN, type DB } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { coreRefusal } from '#lib/server/coreHttp.js';
 
 import { OpError, type Context } from '../types.js';
-
-const STATUS_FORBIDDEN = 403;
 
 /** A `calls` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type CallRow = Selectable<DB['calls']>;
@@ -153,7 +151,7 @@ export function resolveActingUserId(
 ): string {
   const effective = userId ?? ctx.actor.id;
   if (ctx.actor.role === 'user' && effective !== ctx.actor.id) {
-    throw new OpError(STATUS_FORBIDDEN, 'calls: may act only for yourself');
+    throw new OpError(HTTP_FORBIDDEN, 'calls: may act only for yourself');
   }
   return effective;
 }
@@ -175,7 +173,7 @@ export async function assertOwnLiveCall(
   const call = state.calls.find(candidate => candidate.callId === callId);
   if (!call?.connectedUserIds.includes(ctx.actor.id)) {
     throw new OpError(
-      STATUS_FORBIDDEN,
+      HTTP_FORBIDDEN,
       'calls: may act only on your own live call'
     );
   }

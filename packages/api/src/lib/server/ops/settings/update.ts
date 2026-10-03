@@ -1,6 +1,8 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
+import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+
 import { propagate } from '../runner.js';
 import { defineOperation, OpError, type Role } from '../types.js';
 import { settingsInputSchema } from './_input.js';
@@ -24,8 +26,6 @@ import {
 import { applySecretFields } from './secrets.js';
 import { assertSsoInvariants, maybeResetSsoSubjects } from './sso.js';
 
-const STATUS_UNPROCESSABLE_ENTITY = 422;
-
 const inputSchema = settingsInputSchema;
 
 type Input = z.infer<typeof inputSchema>;
@@ -40,7 +40,7 @@ function assertFieldRoles(input: Input, role: Role): void {
 function assertKnownCountry(country: Input['country']): void {
   if (country !== undefined && !isKnownCountry(country)) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `settings: unknown country '${country}'`
     );
   }
@@ -51,7 +51,7 @@ function assertCallLogLevel(level: Input['callLogLevel']): void {
   const hepEnabled = env.HEP_ENABLED !== 'false';
   if (level === 'sip' && !hepEnabled) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       "settings: callLogLevel 'sip' requires HEP_ENABLED"
     );
   }

@@ -1,4 +1,4 @@
-import { epochSeconds } from '@zamfono/shared';
+import { epochSeconds, HTTP_BAD_REQUEST, HTTP_OK } from '@zamfono/shared';
 
 import type { AuthCodeStore } from './codes.js';
 import { ACCESS_TOKEN_TTL_S, isRole } from './jwt.js';
@@ -8,8 +8,6 @@ import {
   GRANT_REFRESH_TOKEN,
   oauthError,
   readForm,
-  STATUS_BAD_REQUEST,
-  STATUS_OK,
   type BaseDeps
 } from './oauthHttp.js';
 import { requestedResourceAcceptable } from './resource.js';
@@ -35,7 +33,7 @@ function tokenResponse(accessToken: string, refreshToken: string): Response {
     }),
     /* eslint-enable camelcase -- RFC 6749 mandates these snake_case wire fields */
     {
-      status: STATUS_OK,
+      status: HTTP_OK,
       headers: {
         'content-type': 'application/json',
         'cache-control': 'no-store',
@@ -56,11 +54,11 @@ async function handleAuthorizationCode(
   // `redirect_uri` may be absent: `redeem` then accepts only a code whose authorization request
   // omitted it too (OAuth 2.1 §10.2).
   if (code === null || clientId === null || codeVerifier === null) {
-    return oauthError(STATUS_BAD_REQUEST, 'invalid_request');
+    return oauthError(HTTP_BAD_REQUEST, 'invalid_request');
   }
   const redeemed = deps.codes.redeem(code, codeVerifier, clientId, redirectUri);
   if (!redeemed) {
-    return oauthError(STATUS_BAD_REQUEST, 'invalid_grant');
+    return oauthError(HTTP_BAD_REQUEST, 'invalid_grant');
   }
   const user = await deps.db
     .selectFrom('users')
@@ -69,7 +67,7 @@ async function handleAuthorizationCode(
     .where('deletedAt', 'is', null)
     .executeTakeFirst();
   if (!user || !isRole(user.role)) {
-    return oauthError(STATUS_BAD_REQUEST, 'invalid_grant');
+    return oauthError(HTTP_BAD_REQUEST, 'invalid_grant');
   }
   const nowIso = deps.now();
   const nowS = epochSeconds(Date.parse(nowIso));
@@ -89,12 +87,12 @@ async function handleRefreshToken(
 ): Promise<Response> {
   const refreshToken = params.get('refresh_token');
   if (refreshToken === null) {
-    return oauthError(STATUS_BAD_REQUEST, 'invalid_request');
+    return oauthError(HTTP_BAD_REQUEST, 'invalid_request');
   }
   const nowIso = deps.now();
   const rotated = await rotateRefresh(deps.db, refreshToken, nowIso);
   if (!rotated.ok) {
-    return oauthError(STATUS_BAD_REQUEST, 'invalid_grant');
+    return oauthError(HTTP_BAD_REQUEST, 'invalid_grant');
   }
   const user = await deps.db
     .selectFrom('users')
@@ -103,7 +101,7 @@ async function handleRefreshToken(
     .where('deletedAt', 'is', null)
     .executeTakeFirst();
   if (!user || !isRole(user.role)) {
-    return oauthError(STATUS_BAD_REQUEST, 'invalid_grant');
+    return oauthError(HTTP_BAD_REQUEST, 'invalid_grant');
   }
   const nowS = epochSeconds(Date.parse(nowIso));
   const accessToken = await signAccessToken(
@@ -127,7 +125,7 @@ export async function tokenEndpoint(
 ): Promise<Response> {
   const params = await readForm(req);
   if (!requestedResourceAcceptable(deps.origin, params)) {
-    return oauthError(STATUS_BAD_REQUEST, 'invalid_target');
+    return oauthError(HTTP_BAD_REQUEST, 'invalid_target');
   }
   const grantType = params.get('grant_type');
   if (grantType === GRANT_AUTHORIZATION_CODE) {
@@ -136,5 +134,5 @@ export async function tokenEndpoint(
   if (grantType === GRANT_REFRESH_TOKEN) {
     return handleRefreshToken(deps, params);
   }
-  return oauthError(STATUS_BAD_REQUEST, 'unsupported_grant_type');
+  return oauthError(HTTP_BAD_REQUEST, 'unsupported_grant_type');
 }

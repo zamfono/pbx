@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { newId } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT, newId } from '@zamfono/shared';
 
 import { createTarget, type TargetInput } from '../dids/_shared.js';
 import { propagate, recordChange } from '../runner.js';
@@ -15,8 +15,6 @@ import {
   scopeInputSchema,
   type ScopeInput
 } from './_shared.js';
-
-const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 const inputSchema = z
   .object({ scope: scopeInputSchema, ...oooFields })
@@ -41,7 +39,7 @@ function assertExpiryAfterStart(
 ): void {
   if (startsAt !== null && expiresAt !== null && !(startsAt < expiresAt)) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'ooo: expiresAt must be after startsAt'
     );
   }
@@ -62,7 +60,7 @@ async function assertNoOverlap(
   );
   if (overlapping) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'ooo: active period overlaps an existing rule in this scope'
     );
   }

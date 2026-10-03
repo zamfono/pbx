@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_FORBIDDEN, HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError, type Context } from '../types.js';
 import {
@@ -14,9 +16,6 @@ import {
   liveUser,
   targetInputSchema
 } from './_shared.js';
-
-const STATUS_FORBIDDEN = 403;
-const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 const inputSchema = z
   .object({
@@ -79,7 +78,7 @@ export const setForwarding = defineOperation({
   run: async (ctx, input) => {
     if (ctx.actor.role === 'user' && ctx.actor.id !== input.id) {
       throw new OpError(
-        STATUS_FORBIDDEN,
+        HTTP_FORBIDDEN,
         'users: may set only your own forwarding'
       );
     }
@@ -88,7 +87,7 @@ export const setForwarding = defineOperation({
     for (const rule of input.rules) {
       if (seenConditions.has(rule.condition)) {
         throw new OpError(
-          STATUS_UNPROCESSABLE_ENTITY,
+          HTTP_UNPROCESSABLE_CONTENT,
           `users: duplicate forwarding condition '${rule.condition}'`
         );
       }

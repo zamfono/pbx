@@ -7,6 +7,9 @@ import http from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 
 import {
+  HTTP_NOT_FOUND,
+  HTTP_OK,
+  HTTP_SERVICE_UNAVAILABLE,
   isDbOpen,
   processStartedAtIso,
   resolveVersion,
@@ -33,10 +36,6 @@ import { EventBus } from './eventBus.js';
 import { handleMwiRoute } from './mwiRoute.js';
 import { ConfigCache } from './snapshot.js';
 import { StateStore } from './stateStore.js';
-
-const HTTP_OK = 200;
-const HTTP_NOT_FOUND = 404;
-const HTTP_SERVICE_UNAVAILABLE = 503;
 
 // When this process started, however late this module loads: `system.info` shows it (§10.3), so
 // a restart is visible.

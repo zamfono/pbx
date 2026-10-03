@@ -2,14 +2,13 @@ import { randomBytes } from 'node:crypto';
 import process from 'node:process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { CoreHealth } from '@zamfono/shared';
+import { HTTP_SERVICE_UNAVAILABLE, type CoreHealth } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { stubCoreClient } from '#lib/server/coreClientStub.js';
 
 import { GET } from './+server.js';
 
-const HTTP_SERVICE_UNAVAILABLE = 503;
 const KEY_BYTE_LENGTH = 32;
 
 // `getDb()` reads `DB_FILE` once per process, the route `SECRETBOX_KEY` per request; an

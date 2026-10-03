@@ -2,7 +2,7 @@
 import type { Transaction } from 'kysely';
 import type { z } from 'zod';
 
-import type { DB } from '@zamfono/shared';
+import { HTTP_CONFLICT, type DB } from '@zamfono/shared';
 
 import type { Effects } from './effects.js';
 
@@ -76,12 +76,10 @@ export class OpError extends Error {
   }
 }
 
-const STATUS_CONFLICT = 409;
-
 /** Raised by the runner when a `confirm`-guarded operation is called without confirmation (§10.3). */
 export class ConfirmationRequired extends OpError {
   constructor(public question: string) {
-    super(STATUS_CONFLICT, 'confirmation required', {
+    super(HTTP_CONFLICT, 'confirmation required', {
       confirmationRequired: true,
       question
     });
@@ -95,7 +93,7 @@ export class Conflict extends OpError {
     title: string,
     public references: { kind: string; id: string; label: string }[]
   ) {
-    super(STATUS_CONFLICT, title, { references });
+    super(HTTP_CONFLICT, title, { references });
     this.name = 'Conflict';
   }
 }

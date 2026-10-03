@@ -5,11 +5,11 @@
  * channel is in the app at once (its `StasisStart`, in state `Down`), and a dialled one answers
  * `answerAfterMs` later with a `ChannelStateChange` to `Up`.
  */
+import { HTTP_OK } from '@zamfono/shared';
+
 import { defaultChannel } from './fakeChannel.js';
 import type { RouteResult } from './fakeHttp.js';
 import type { AriEvent, Channel } from './types.js';
-
-const HTTP_OK = 200;
 
 /** The slice of `FakeAri` placing a channel reads and drives. */
 export type DialHost = {

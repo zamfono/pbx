@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  HTTP_CONFLICT,
+  HTTP_SERVICE_UNAVAILABLE,
   MS_PER_HOUR,
   MS_PER_MINUTE,
   newId,
@@ -32,8 +34,6 @@ const asOwner: RunInput = {
   requestId: 'req-1',
   confirm: true
 };
-const STATUS_CONFLICT = 409;
-const STATUS_UNAVAILABLE = 503;
 
 afterEach(() => {
   vi.mocked(updaterClient).mockReset();
@@ -140,7 +140,7 @@ describe('system.update', () => {
     vi.mocked(updaterClient).mockImplementation(() => updater);
 
     const error = await refusal(runOperation(db, 'system.update', {}, asOwner));
-    expect(error.status).toBe(STATUS_CONFLICT);
+    expect(error.status).toBe(HTTP_CONFLICT);
     expect(error.message).toContain('backups.runs.start');
     expect(updater.asked).toEqual([]);
   });
@@ -152,7 +152,7 @@ describe('system.update', () => {
       recordingUpdater(() =>
         Promise.reject(
           new UpdaterRefusal(
-            STATUS_CONFLICT,
+            HTTP_CONFLICT,
             '0.0.6 to 0.1.0 is a breaking update'
           )
         )
@@ -161,7 +161,7 @@ describe('system.update', () => {
     const error = await refusal(
       runOperation(db, 'system.update', { version: '0.1.0' }, asOwner)
     );
-    expect(error.status).toBe(STATUS_CONFLICT);
+    expect(error.status).toBe(HTTP_CONFLICT);
     expect(error.message).toContain('breaking');
   });
 
@@ -170,7 +170,7 @@ describe('system.update', () => {
     await backupFinished(db, MS_PER_MINUTE);
     vi.mocked(updaterClient).mockImplementation(() => undefined);
     const error = await refusal(runOperation(db, 'system.update', {}, asOwner));
-    expect(error.status).toBe(STATUS_UNAVAILABLE);
+    expect(error.status).toBe(HTTP_SERVICE_UNAVAILABLE);
     expect(error.message).toContain('update.sh');
   });
 
@@ -186,6 +186,6 @@ describe('system.update', () => {
     const unconfirmed = await refusal(
       runOperation(db, 'system.update', {}, { ...asOwner, confirm: false })
     );
-    expect(unconfirmed.status).toBe(STATUS_CONFLICT);
+    expect(unconfirmed.status).toBe(HTTP_CONFLICT);
   });
 });

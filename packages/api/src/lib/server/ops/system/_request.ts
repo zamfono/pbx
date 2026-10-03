@@ -1,4 +1,8 @@
 import {
+  HTTP_BAD_REQUEST,
+  HTTP_CONFLICT,
+  HTTP_NOT_FOUND,
+  HTTP_SERVICE_UNAVAILABLE,
   MS_PER_HOUR,
   type Db,
   type RunRequester,
@@ -10,10 +14,6 @@ import { errorMessage } from '#lib/server/errors.js';
 import { OpError } from '../types.js';
 import { updaterClient, UpdaterRefusal } from './_updater.js';
 
-const STATUS_BAD_REQUEST = 400;
-const STATUS_NOT_FOUND = 404;
-const STATUS_CONFLICT = 409;
-const STATUS_UNAVAILABLE = 503;
 /** How recent the backup an update needs must be (§6.3 "Updates"). */
 export const BACKUP_MAX_AGE_MS = MS_PER_HOUR;
 
@@ -21,15 +21,15 @@ export const BACKUP_MAX_AGE_MS = MS_PER_HOUR;
 function passOn(error: unknown): never {
   if (error instanceof UpdaterRefusal) {
     const status =
-      error.status === STATUS_BAD_REQUEST ||
-      error.status === STATUS_NOT_FOUND ||
-      error.status === STATUS_CONFLICT
+      error.status === HTTP_BAD_REQUEST ||
+      error.status === HTTP_NOT_FOUND ||
+      error.status === HTTP_CONFLICT
         ? error.status
-        : STATUS_UNAVAILABLE;
+        : HTTP_SERVICE_UNAVAILABLE;
     throw new OpError(status, `system.update: ${error.message}`);
   }
   throw new OpError(
-    STATUS_UNAVAILABLE,
+    HTTP_SERVICE_UNAVAILABLE,
     `system.update: the updater did not answer: ${errorMessage(error)}`
   );
 }
@@ -51,7 +51,7 @@ export async function requestUpdate(
   const client = updaterClient();
   if (client === undefined) {
     throw new OpError(
-      STATUS_UNAVAILABLE,
+      HTTP_SERVICE_UNAVAILABLE,
       'system.update: UPDATER_TOKEN is not set in .env; update with update.sh on the host (deploy/README.md, step 8)'
     );
   }
@@ -64,7 +64,7 @@ export async function requestUpdate(
     .executeTakeFirst();
   if (backup === undefined) {
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       'system.update: no backup finished ok within the last hour; start one with backups.runs.start, wait until backups.runs.get reports ok, then update'
     );
   }

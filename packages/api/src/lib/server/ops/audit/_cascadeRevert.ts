@@ -1,11 +1,9 @@
-import type { ReloadKind } from '@zamfono/shared';
+import { HTTP_CONFLICT, type ReloadKind } from '@zamfono/shared';
 
 import { propagate } from '../runner.js';
 import { Conflict, OpError, type Context } from '../types.js';
 import { guardReuseConflict } from './_reuseConflicts.js';
 import { ENTITY_TABLES } from './_shared.js';
-
-const STATUS_CONFLICT = 409;
 
 /**
  * The reload kinds an entity kind's own `create`/`delete` propagate (§3.1 config propagation),
@@ -104,7 +102,7 @@ export async function revertSoftDelete(
   const table = ENTITY_TABLES[entityKind];
   if (!table) {
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       `audit.undo: entity kind '${entityKind}' has no soft-delete table`
     );
   }

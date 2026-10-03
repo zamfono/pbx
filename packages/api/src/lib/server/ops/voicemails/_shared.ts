@@ -3,7 +3,13 @@ import path from 'node:path';
 import type { Selectable, Transaction } from 'kysely';
 import pino from 'pino';
 
-import { mwiMailboxOf, type DB, type MwiMailbox } from '@zamfono/shared';
+import {
+  HTTP_FORBIDDEN,
+  HTTP_NOT_FOUND,
+  mwiMailboxOf,
+  type DB,
+  type MwiMailbox
+} from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { mediaDirFromEnv } from '#lib/server/mediaDir.js';
@@ -13,9 +19,6 @@ import { afterCommit } from '../afterCommit.js';
 import { OpError, type Context, type Role } from '../types.js';
 
 const logger = pino({ name: 'voicemails' });
-
-const STATUS_NOT_FOUND = 404;
-const STATUS_FORBIDDEN = 403;
 
 /** A `voicemails` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type VoicemailRow = Selectable<DB['voicemails']>;
@@ -55,7 +58,7 @@ export async function loadVoicemail(
     .where('id', '=', id)
     .executeTakeFirst();
   if (!row) {
-    throw new OpError(STATUS_NOT_FOUND, `voicemail '${id}' not found`);
+    throw new OpError(HTTP_NOT_FOUND, `voicemail '${id}' not found`);
   }
   return row;
 }
@@ -88,7 +91,7 @@ export function assertVoicemailScope(
       ringGroupIds.includes(row.mailboxRingGroupId));
   if (!own) {
     throw new OpError(
-      STATUS_FORBIDDEN,
+      HTTP_FORBIDDEN,
       'voicemails: may act only on your own mailbox'
     );
   }

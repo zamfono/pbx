@@ -1,6 +1,6 @@
 import type { Selectable, Transaction } from 'kysely';
 
-import type { DB } from '@zamfono/shared';
+import { HTTP_FORBIDDEN, HTTP_NOT_FOUND, type DB } from '@zamfono/shared';
 
 import { Conflict, OpError, type Context } from '../types.js';
 
@@ -9,10 +9,6 @@ export type DeviceRow = Selectable<DB['devices']>;
 
 /** One `device_blf_keys` row, as an audit diff records the keys a removed extension drops. */
 export type DroppedBlfKey = { deviceId: string; ext: string; position: number };
-
-const STATUS_NOT_FOUND = 404;
-const STATUS_FORBIDDEN = 403;
-export const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 export const TRANSPORTS = ['tls', 'plain'] as const;
 export type Transport = (typeof TRANSPORTS)[number];
@@ -81,7 +77,7 @@ export async function liveDevice(
     .where('deletedAt', 'is', null)
     .executeTakeFirst();
   if (!row) {
-    throw new OpError(STATUS_NOT_FOUND, `device '${id}' not found`);
+    throw new OpError(HTTP_NOT_FOUND, `device '${id}' not found`);
   }
   return row;
 }
@@ -97,7 +93,7 @@ export function assertDeviceScope(
   }
   if (device.userId !== actorId || device.transport !== 'tls') {
     throw new OpError(
-      STATUS_FORBIDDEN,
+      HTTP_FORBIDDEN,
       'devices: may act only on your own tls device'
     );
   }
@@ -118,7 +114,7 @@ export function assertDeviceCreateScope(
   }
   if (userId !== actorId || transport !== 'tls') {
     throw new OpError(
-      STATUS_FORBIDDEN,
+      HTTP_FORBIDDEN,
       'devices: may create only your own tls device'
     );
   }

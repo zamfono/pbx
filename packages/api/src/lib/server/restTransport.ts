@@ -1,3 +1,5 @@
+import { HTTP_OK } from '@zamfono/shared';
+
 import { BinaryResult } from './binaryResult.js';
 import type { JsonSchema } from './ops/publishedSchema.js';
 
@@ -60,8 +62,6 @@ export function parseQuery(
   return out;
 }
 
-const OK_STATUS = 200;
-
 /** An operation's binary result (§10.3 `voicemails.audio`/`recordings.audio`): raw bytes plus the wire content type. */
 // `Buffer`/`Uint8Array` is typed over `ArrayBufferLike` (it may back onto a `SharedArrayBuffer`);
 // `Response`'s body type wants one backed by a plain `ArrayBuffer`, so the bytes are copied into a
@@ -82,7 +82,7 @@ function quoteFilename(filename: string): string {
 export function outputResponse(output: unknown): Response {
   if (output instanceof BinaryResult) {
     return new Response(toResponseBody(output.bytes), {
-      status: OK_STATUS,
+      status: HTTP_OK,
       headers: {
         'content-type': output.contentType,
         'content-disposition': `attachment; filename="${quoteFilename(output.filename)}"`
@@ -90,7 +90,7 @@ export function outputResponse(output: unknown): Response {
     });
   }
   return new Response(JSON.stringify(output), {
-    status: OK_STATUS,
+    status: HTTP_OK,
     headers: { 'content-type': 'application/json' }
   });
 }

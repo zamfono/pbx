@@ -1,7 +1,7 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { newId } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT, newId } from '@zamfono/shared';
 
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { newSipPassword } from '#lib/server/sip.js';
@@ -16,7 +16,6 @@ import {
   assertNoExistingRingotelDevice,
   DEVICE_KINDS,
   liveDevice,
-  STATUS_UNPROCESSABLE_ENTITY,
   toDeviceOut,
   TRANSPORTS
 } from './_shared.js';
@@ -88,7 +87,7 @@ export const create = defineOperation({
       assertValidIps(input.allowedIps ?? []);
     } else if (input.allowedIps !== undefined) {
       throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
+        HTTP_UNPROCESSABLE_CONTENT,
         'devices: allowedIps applies only to a plain device'
       );
     }

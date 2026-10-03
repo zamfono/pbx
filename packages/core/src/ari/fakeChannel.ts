@@ -4,11 +4,13 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import type { AriEvent, Channel } from './types.js';
+import {
+  HTTP_INTERNAL_SERVER_ERROR,
+  HTTP_NOT_FOUND,
+  HTTP_OK
+} from '@zamfono/shared';
 
-const HTTP_OK = 200;
-const HTTP_NOT_FOUND = 404;
-const HTTP_INTERNAL_SERVER_ERROR = 500;
+import type { AriEvent, Channel } from './types.js';
 
 type RouteResult = { status: number; body: unknown };
 

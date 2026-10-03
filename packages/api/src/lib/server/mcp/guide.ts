@@ -1,5 +1,7 @@
 import path from 'node:path';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { OpError } from '../ops/types.js';
 
 // The guide ships as `docs/guide/{*.md,recipes/*.md}` (§10.5). `import.meta.glob` bundles the
@@ -11,7 +13,6 @@ const GUIDE_MODULES = import.meta.glob<string>(
   { query: '?raw', import: 'default', eager: true }
 );
 const RECIPES_SEGMENT = '/recipes/';
-const STATUS_NOT_FOUND = 404;
 // A topic name clients guess for the table of contents; it lists the topics, as no topic does,
 // unless a guide file of that name exists.
 const INDEX_ALIAS = 'index';
@@ -74,7 +75,7 @@ export function callHelp(args: Record<string, unknown>): HelpOutput {
   if (content === undefined) {
     // The message is all a client sees of the error, so it carries the list itself.
     throw new OpError(
-      STATUS_NOT_FOUND,
+      HTTP_NOT_FOUND,
       `unknown help topic '${topic}'; call zamfono.help without a topic for the list: ${topics.join(', ')}`
     );
   }

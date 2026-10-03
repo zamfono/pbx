@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import {
+  HTTP_CREATED,
+  HTTP_NO_CONTENT,
+  HTTP_UNPROCESSABLE_CONTENT
+} from '@zamfono/shared';
+
 import { createCoreClient } from './coreClient.js';
 import { coreRefusal } from './coreHttp.js';
-
-const HTTP_CREATED = 201;
-const HTTP_NO_CONTENT = 204;
-const HTTP_UNPROCESSABLE = 422;
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -47,10 +49,10 @@ describe('createCoreClient call control', () => {
 
   it('rejects with core’s refusal, a 422 among them', async () => {
     const fetchFn = vi.fn().mockResolvedValue(
-      jsonResponse(HTTP_UNPROCESSABLE, {
+      jsonResponse(HTTP_UNPROCESSABLE_CONTENT, {
         type: 'about:blank',
         title: 'no party answers on this target',
-        status: HTTP_UNPROCESSABLE,
+        status: HTTP_UNPROCESSABLE_CONTENT,
         detail: 'invalidTarget'
       })
     );
@@ -59,7 +61,7 @@ describe('createCoreClient call control', () => {
       .addParty('c1', { target: '799', actorUserId: 'u1' })
       .catch((caught: unknown) => caught);
     expect(coreRefusal(error)).toEqual({
-      status: HTTP_UNPROCESSABLE,
+      status: HTTP_UNPROCESSABLE_CONTENT,
       title: 'no party answers on this target',
       detail: 'invalidTarget'
     });

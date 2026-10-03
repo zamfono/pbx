@@ -1,17 +1,19 @@
-import { validateFeatureCodes, type FeatureCodes } from '@zamfono/shared';
+import {
+  HTTP_UNPROCESSABLE_CONTENT,
+  validateFeatureCodes,
+  type FeatureCodes
+} from '@zamfono/shared';
 
 import { recordChange } from '../runner.js';
 import { OpError, type Context } from '../types.js';
 import type { SettingsRow } from './_shared.js';
-
-const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 function parseFeatureCodes(input: Record<string, string>): FeatureCodes {
   try {
     return validateFeatureCodes(input);
   } catch (err) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       err instanceof Error ? err.message : 'featureCodes: invalid'
     );
   }

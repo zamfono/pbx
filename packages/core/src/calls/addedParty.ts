@@ -7,10 +7,14 @@
  * (`Call.callerChannelId`): no forward or mailbox of the target's applies, since nobody would hear
  * them.
  */
-import { newId, type AddPartyRequest } from '@zamfono/shared';
+import {
+  HTTP_UNPROCESSABLE_CONTENT,
+  newId,
+  type AddPartyRequest
+} from '@zamfono/shared';
 
 import { logFailure } from '../ari/failures.js';
-import { ActionError, HTTP_UNPROCESSABLE, notBridged } from './actionError.js';
+import { ActionError, notBridged } from './actionError.js';
 import { dialAddPartyTarget } from './addParty.js';
 import { resolveAddedTarget } from './addPartyTarget.js';
 import { newCall, type Call } from './call.js';
@@ -43,7 +47,7 @@ export async function newAddedLeg(
       result: 'invalidTarget'
     });
     throw new ActionError(
-      HTTP_UNPROCESSABLE,
+      HTTP_UNPROCESSABLE_CONTENT,
       'invalidTarget',
       'no party answers on this target'
     );

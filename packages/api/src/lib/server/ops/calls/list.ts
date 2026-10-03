@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { LiveCall } from '@zamfono/shared';
+import { HTTP_FORBIDDEN, type LiveCall } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { decodeCursor, encodeCursor } from '#lib/server/pagination.js';
@@ -14,7 +14,6 @@ import {
   toCallOut
 } from './_shared.js';
 
-const STATUS_FORBIDDEN = 403;
 const DEFAULT_LIMIT = 50;
 
 const inputSchema = z
@@ -125,10 +124,7 @@ export const list = defineOperation({
       input.userId !== undefined &&
       input.userId !== ctx.actor.id
     ) {
-      throw new OpError(
-        STATUS_FORBIDDEN,
-        'calls: may list only your own calls'
-      );
+      throw new OpError(HTTP_FORBIDDEN, 'calls: may list only your own calls');
     }
     const ownUserId = ctx.actor.role === 'user' ? ctx.actor.id : null;
     if (input.live === true) {

@@ -7,7 +7,7 @@ import { parseVersion, type Version } from './version.js';
  */
 const API = 'https://api.github.com/repos/zamfono/pbx/releases';
 const CACHE_MS = 3_600_000;
-const STATUS_NOT_FOUND = 404;
+const HTTP_NOT_FOUND = 404;
 // Well inside api's own 10 s for the updater's answer, so a host that cannot reach GitHub still
 // gets its status, with the reason in `latestError`.
 const GITHUB_TIMEOUT_MS = 5000;
@@ -65,7 +65,7 @@ export function createReleases(
         ? new Error(`GitHub did not answer within ${GITHUB_TIMEOUT_MS} ms`)
         : error;
     });
-    if (response.status === STATUS_NOT_FOUND) {
+    if (response.status === HTTP_NOT_FOUND) {
       return undefined;
     }
     if (!response.ok) {

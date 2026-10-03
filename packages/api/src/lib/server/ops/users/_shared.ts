@@ -1,7 +1,13 @@
 import type { Selectable, Transaction } from 'kysely';
 import { z } from 'zod';
 
-import { isE164, type DB } from '@zamfono/shared';
+import {
+  HTTP_CONFLICT,
+  HTTP_NOT_FOUND,
+  HTTP_UNPROCESSABLE_CONTENT,
+  isE164,
+  type DB
+} from '@zamfono/shared';
 
 import { logLevelWire, type LogLevelColumns } from '../settings/logLevel.js';
 import { Conflict, OpError, type Role } from '../types.js';
@@ -17,10 +23,6 @@ export type { TargetInput } from '../forwardTargets.js';
 
 /** A `users` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type UserRow = Selectable<DB['users']>;
-
-const STATUS_NOT_FOUND = 404;
-const STATUS_CONFLICT = 409;
-export const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 export type FindMeLeg = { number: string; delayS: number };
 /** Shared by `users.create` and `users.update`: each leg dials out (§10.1), so its number is E.164. */
@@ -159,7 +161,7 @@ export async function assertNotLastOwner(
     .where('deletedAt', 'is', null)
     .execute();
   if (owners.length <= 1) {
-    throw new OpError(STATUS_CONFLICT, "cannot remove the tenant's last owner");
+    throw new OpError(HTTP_CONFLICT, "cannot remove the tenant's last owner");
   }
 }
 
@@ -176,13 +178,13 @@ export async function assertCallerIdDidValid(
     .executeTakeFirst();
   if (!did) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `unknown or deleted DID: ${id}`
     );
   }
   if (!isE164(did.number)) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `calleridDidId must be a numeric DID: ${id}`
     );
   }
@@ -222,7 +224,7 @@ export async function liveUser(
     .where('deletedAt', 'is', null)
     .executeTakeFirst();
   if (!row) {
-    throw new OpError(STATUS_NOT_FOUND, `user '${id}' not found`);
+    throw new OpError(HTTP_NOT_FOUND, `user '${id}' not found`);
   }
   return row;
 }

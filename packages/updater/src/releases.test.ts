@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { createReleases } from './releases.js';
 
 const HOUR_MS = 3_600_000;
-const STATUS_OK = 200;
-const STATUS_NOT_FOUND = 404;
+const HTTP_OK = 200;
+const HTTP_NOT_FOUND = 404;
 const STATUS_RATE_LIMITED = 403;
 
 function urlOf(input: URL | Request): string {
@@ -18,7 +18,7 @@ function answering(
   const fetchFn: typeof fetch = input => {
     const url = typeof input === 'string' ? input : urlOf(input);
     urls.push(url);
-    const answer = bodies[url] ?? { status: STATUS_NOT_FOUND };
+    const answer = bodies[url] ?? { status: HTTP_NOT_FOUND };
     return Promise.resolve(
       new Response(JSON.stringify(answer.body ?? {}), { status: answer.status })
     );
@@ -34,7 +34,7 @@ describe('createReleases', () => {
   it('reads the latest release and caches it for an hour', async () => {
     const { fetchFn, urls } = answering({
       [LATEST]: {
-        status: STATUS_OK,
+        status: HTTP_OK,
         body: { tag_name: 'v0.0.6', html_url: 'https://example/v0.0.6' }
       }
     });
@@ -52,7 +52,7 @@ describe('createReleases', () => {
   it('knows no release GitHub does not have, and no prerelease', async () => {
     const { fetchFn } = answering({
       [TAG]: {
-        status: STATUS_OK,
+        status: HTTP_OK,
         body: { tag_name: 'v0.0.6', prerelease: true }
       }
     });

@@ -1,6 +1,6 @@
-import { notifyCertSync } from '#lib/server/jobs/certSync.js';
+import { HTTP_ACCEPTED } from '@zamfono/shared';
 
-const STATUS_ACCEPTED = 202;
+import { notifyCertSync } from '#lib/server/jobs/certSync.js';
 
 /**
  * `POST /internal/certificate` (§3.1, §6.4 "TLS certificates"): the `proxy` image's
@@ -19,5 +19,5 @@ const STATUS_ACCEPTED = 202;
  */
 export function POST(): Response {
   notifyCertSync();
-  return new Response(null, { status: STATUS_ACCEPTED });
+  return new Response(null, { status: HTTP_ACCEPTED });
 }

@@ -5,11 +5,14 @@
  * call closes, and the transferee's conversation goes on as a call of its own linked through
  * `parent_call_id` (`onwardCall.ts`).
  */
-import type { TransferRequest } from '@zamfono/shared';
+import {
+  HTTP_UNPROCESSABLE_CONTENT,
+  type TransferRequest
+} from '@zamfono/shared';
 
 import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
-import { ActionError, HTTP_UNPROCESSABLE, notBridged } from './actionError.js';
+import { ActionError, notBridged } from './actionError.js';
 import { type Call, type Owner } from './call.js';
 import { toLogLevel } from './callLogLevel.js';
 import { bridgedParty, transferrerChannel } from './callLookup.js';
@@ -88,7 +91,7 @@ function onwardOf(snapshot: Snapshot, req: TransferRequest): Onward {
   const mailbox = ownerForExt(snapshot, target);
   if (mailbox === null) {
     throw new ActionError(
-      HTTP_UNPROCESSABLE,
+      HTTP_UNPROCESSABLE_CONTENT,
       'noMailbox',
       'the target owns no mailbox'
     );

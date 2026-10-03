@@ -3,6 +3,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 
 import {
+  HTTP_BAD_REQUEST,
+  HTTP_CONTENT_TOO_LARGE,
+  HTTP_NO_CONTENT,
+  HTTP_OK,
+  HTTP_SERVICE_UNAVAILABLE,
   newId,
   nowIso,
   openDb,
@@ -31,11 +36,6 @@ import { StateStore } from './stateStore.js';
 // Every server binds whatever port is free (`0`), never a fixed one another suite running on the
 // same host at the same time may already hold.
 const ANY_FREE_PORT = 0;
-const HTTP_OK = 200;
-const HTTP_NO_CONTENT = 204;
-const HTTP_BAD_REQUEST = 400;
-const HTTP_PAYLOAD_TOO_LARGE = 413;
-const HTTP_SERVICE_UNAVAILABLE = 503;
 // Over the internal server's 65536-byte cap (server.ts's `MAX_INTERNAL_BODY_BYTES`).
 const OVERSIZED_BODY_BYTES = 65537;
 // What the server under test logged at error, the message and its fields.
@@ -379,7 +379,7 @@ describe('startInternalServer', () => {
         body: 'x'.repeat(OVERSIZED_BODY_BYTES)
       }
     );
-    expect(response.status).toBe(HTTP_PAYLOAD_TOO_LARGE);
+    expect(response.status).toBe(HTTP_CONTENT_TOO_LARGE);
   });
 
   it('does not crash the process when a client sends a malformed WS frame', async () => {

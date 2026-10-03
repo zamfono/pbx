@@ -10,13 +10,13 @@ import type { UpdateVerdict } from './stack.js';
 import type { Version } from './version.js';
 
 const TOKEN = 'secret-token';
-const STATUS_OK = 200;
-const STATUS_ACCEPTED = 202;
-const STATUS_BAD_REQUEST = 400;
-const STATUS_UNAUTHORIZED = 401;
-const STATUS_NOT_FOUND = 404;
-const STATUS_CONFLICT = 409;
-const STATUS_UNAVAILABLE = 503;
+const HTTP_OK = 200;
+const HTTP_ACCEPTED = 202;
+const HTTP_BAD_REQUEST = 400;
+const HTTP_UNAUTHORIZED = 401;
+const HTTP_NOT_FOUND = 404;
+const HTTP_CONFLICT = 409;
+const HTTP_SERVICE_UNAVAILABLE = 503;
 
 function release(version: Version): Release {
   return {
@@ -110,17 +110,17 @@ describe('the updater API', () => {
     const base = await serve(deps());
     expect(
       (await call(base, 'GET', '/status', undefined, 'wrong')).status
-    ).toBe(STATUS_UNAUTHORIZED);
+    ).toBe(HTTP_UNAUTHORIZED);
     const unset = await serve(deps({ token: '' }));
     expect((await call(unset, 'GET', '/status', undefined, '')).status).toBe(
-      STATUS_UNAVAILABLE
+      HTTP_SERVICE_UNAVAILABLE
     );
   });
 
   it('reports the running and the latest release, and whether it can update', async () => {
     const base = await serve(deps());
     const { status, body } = await call(base, 'GET', '/status');
-    expect(status).toBe(STATUS_OK);
+    expect(status).toBe(HTTP_OK);
     expect(body).toMatchObject({
       current: '0.0.6',
       latest: { version: '0.0.7' },
@@ -142,11 +142,11 @@ describe('the updater API', () => {
     const runner = fakeRunner();
     const base = await serve(deps({ runner }));
     const { status, body } = await call(base, 'POST', '/update', {});
-    expect(status).toBe(STATUS_ACCEPTED);
+    expect(status).toBe(HTTP_ACCEPTED);
     expect(body).toMatchObject({ state: 'running', to: '0.0.7' });
     expect(runner.started).toEqual([['0.0.6', '0.0.7']]);
     expect((await call(base, 'POST', '/update', {})).status).toBe(
-      STATUS_CONFLICT
+      HTTP_CONFLICT
     );
   });
 
@@ -164,16 +164,16 @@ describe('the updater API', () => {
     );
     expect(
       (await call(base, 'POST', '/update', { version: '0.0.9' })).status
-    ).toBe(STATUS_NOT_FOUND);
+    ).toBe(HTTP_NOT_FOUND);
     expect(
       (await call(base, 'POST', '/update', { version: '0.0.5' })).status
-    ).toBe(STATUS_CONFLICT);
+    ).toBe(HTTP_CONFLICT);
     const breaking = await call(base, 'POST', '/update', { version: '0.1.0' });
-    expect(breaking.status).toBe(STATUS_CONFLICT);
+    expect(breaking.status).toBe(HTTP_CONFLICT);
     expect(String(breaking.body.error)).toContain('update.sh');
     expect(
       (await call(base, 'POST', '/update', { version: 'latest' })).status
-    ).toBe(STATUS_BAD_REQUEST);
+    ).toBe(HTTP_BAD_REQUEST);
   });
 
   it('records who asked for the run, and refuses a trigger it does not know', async () => {
@@ -181,17 +181,17 @@ describe('the updater API', () => {
     const base = await serve(deps({ runner }));
     expect(
       (await call(base, 'POST', '/update', { trigger: 'host' })).status
-    ).toBe(STATUS_BAD_REQUEST);
+    ).toBe(HTTP_BAD_REQUEST);
     expect(
       (await call(base, 'POST', '/update', { trigger: 'manual', by: 7 })).status
-    ).toBe(STATUS_BAD_REQUEST);
+    ).toBe(HTTP_BAD_REQUEST);
     expect(runner.started).toEqual([]);
 
     const { status, body } = await call(base, 'POST', '/update', {
       trigger: 'manual',
       by: 'Olga Owner'
     });
-    expect(status).toBe(STATUS_ACCEPTED);
+    expect(status).toBe(HTTP_ACCEPTED);
     expect(body).toMatchObject({ trigger: 'manual', by: 'Olga Owner' });
   });
 
@@ -200,7 +200,7 @@ describe('the updater API', () => {
       deps({ runner: undefined, unavailable: 'no labels' })
     );
     const { status, body } = await call(base, 'POST', '/update', {});
-    expect(status).toBe(STATUS_UNAVAILABLE);
+    expect(status).toBe(HTTP_SERVICE_UNAVAILABLE);
     expect(body.error).toBe('no labels');
     expect((await call(base, 'GET', '/status')).body).toMatchObject({
       updatable: false,

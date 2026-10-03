@@ -1,7 +1,7 @@
 import type { Selectable, Transaction } from 'kysely';
 import { z } from 'zod';
 
-import type { DB } from '@zamfono/shared';
+import { HTTP_NOT_FOUND, type DB } from '@zamfono/shared';
 
 import {
   deleteForwardTarget,
@@ -20,8 +20,6 @@ export {
 };
 export type { TargetSpec };
 
-const STATUS_NOT_FOUND = 404;
-
 /** A `menus` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type MenuRow = Selectable<DB['menus']>;
 
@@ -37,7 +35,7 @@ export async function liveMenu(
     .where('deletedAt', 'is', null)
     .executeTakeFirst();
   if (!row) {
-    throw new OpError(STATUS_NOT_FOUND, `menu '${id}' not found`);
+    throw new OpError(HTTP_NOT_FOUND, `menu '${id}' not found`);
   }
   return row;
 }
@@ -59,7 +57,7 @@ export async function assertAudioAvailable(
     .executeTakeFirst();
   if (!row) {
     throw new OpError(
-      STATUS_NOT_FOUND,
+      HTTP_NOT_FOUND,
       `announcement audio asset '${audioId}' not found`
     );
   }

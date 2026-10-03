@@ -3,19 +3,19 @@
  * `multipart: true` route's form. Separate from the route table and the handler so each one is
  * read on its own.
  */
+import { HTTP_BAD_REQUEST } from '@zamfono/shared';
+
 import { OpError } from './ops/types.js';
 import type { RouteEntry } from './restRoutes.js';
 import { parseQuery, type QueryFieldKinds } from './restTransport.js';
 
 type Fields = Record<string, unknown>;
 
-const BAD_REQUEST_STATUS = 400;
-
 function parseJsonOrThrow(text: string): unknown {
   try {
     return JSON.parse(text);
   } catch {
-    throw new OpError(BAD_REQUEST_STATUS, 'invalid JSON body');
+    throw new OpError(HTTP_BAD_REQUEST, 'invalid JSON body');
   }
 }
 async function parseJsonBody(request: Request): Promise<Fields> {
@@ -25,7 +25,7 @@ async function parseJsonBody(request: Request): Promise<Fields> {
   }
   const parsed = parseJsonOrThrow(text);
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new OpError(BAD_REQUEST_STATUS, 'request body must be a JSON object');
+    throw new OpError(HTTP_BAD_REQUEST, 'request body must be a JSON object');
   }
   return parsed as Fields;
 }

@@ -3,12 +3,13 @@
  * metadata document here, the token grants (`tokenEndpoint.ts`) and dynamic client registration
  * (`registerEndpoint.ts`) re-exported, so each route imports from one place.
  */
+import { HTTP_OK } from '@zamfono/shared';
+
 import {
   GRANT_AUTHORIZATION_CODE,
   GRANT_REFRESH_TOKEN,
   NO_AUTH_METHOD,
   readForm,
-  STATUS_OK,
   type BaseDeps
 } from './oauthHttp.js';
 import { hashToken } from './tokens.js';
@@ -33,7 +34,7 @@ export async function revokeEndpoint(
       .where('revokedAt', 'is', null)
       .execute();
   }
-  return new Response(null, { status: STATUS_OK });
+  return new Response(null, { status: HTTP_OK });
 }
 
 /** RFC 8414 authorization server metadata, also served as the OpenID discovery document. */

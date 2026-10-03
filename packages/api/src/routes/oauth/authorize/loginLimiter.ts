@@ -1,9 +1,9 @@
 import { error, type RequestEvent } from '@sveltejs/kit';
 
+import { HTTP_TOO_MANY_REQUESTS } from '@zamfono/shared';
+
 import { addressKey } from '#lib/server/addressKey.js';
 import { loginLimiter } from '#lib/server/limiter.js';
-
-const STATUS_TOO_MANY_REQUESTS = 429;
 
 /**
  * Counts one login submission against the client address (§5.5 "Login | client address | 60
@@ -17,6 +17,6 @@ export function checkLoginAddress(event: RequestEvent): void {
     addressKey(event.getClientAddress())
   );
   if (!limit.ok) {
-    error(STATUS_TOO_MANY_REQUESTS, 'too many login attempts');
+    error(HTTP_TOO_MANY_REQUESTS, 'too many login attempts');
   }
 }

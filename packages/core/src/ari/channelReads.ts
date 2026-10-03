@@ -3,10 +3,10 @@
  * variable that is not set (§7 level `sip`, reading `CHANNEL(pjsip,call-id)`). It takes the
  * client's own JSON request function so it needs none of the client's internals.
  */
+import { HTTP_INTERNAL_SERVER_ERROR, HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { AriError } from './types.js';
 
-const HTTP_NOT_FOUND = 404;
-const HTTP_INTERNAL_SERVER_ERROR = 500;
 // Asterisk's answers that mean "no value": 404 for an unset variable and for an unknown channel
 // alike, 500 ("Unable to read provided function") for a dialplan function with nothing to read,
 // such as `PJSIP_HEADER(read,Privacy)` of a request without that header.

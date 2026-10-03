@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db, type Envelope } from '@zamfono/shared';
+import {
+  HTTP_NO_CONTENT,
+  newId,
+  nowIso,
+  openDb,
+  type Db,
+  type Envelope
+} from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
@@ -20,7 +27,6 @@ import { ConfigCache } from './snapshot.js';
 import { StateStore } from './stateStore.js';
 
 const ANY_FREE_PORT = 0;
-const HTTP_NO_CONTENT = 204;
 
 /** The settings row, a user with extension 101 and one device, `e101-dabc`. */
 async function seedUserWithDevice(db: Db): Promise<string> {

@@ -10,7 +10,7 @@ export type ComposeProject = {
   workingDir: string;
 };
 
-const STATUS_OK = 200;
+const HTTP_OK = 200;
 
 function getJson(socketPath: string, requestPath: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -19,7 +19,7 @@ function getJson(socketPath: string, requestPath: string): Promise<unknown> {
       response.on('data', (chunk: Buffer) => chunks.push(chunk));
       response.on('end', () => {
         const text = Buffer.concat(chunks).toString('utf8');
-        if (response.statusCode !== STATUS_OK) {
+        if (response.statusCode !== HTTP_OK) {
           reject(
             new Error(
               `the runtime answered ${String(response.statusCode)} for ${requestPath}: ${text}`

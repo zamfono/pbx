@@ -1,5 +1,7 @@
 import * as env from '$app/env/private';
 
+import { HTTP_CONFLICT, HTTP_SERVICE_UNAVAILABLE } from '@zamfono/shared';
+
 import { buildBranchProvision } from '#lib/server/provisioning/ringotel.js';
 import type { RingotelClient } from '#lib/server/provisioning/ringotelClient.js';
 import { branchBlfEntries } from '#lib/server/provisioning/ringotelRoster.js';
@@ -18,9 +20,6 @@ import { OpError, type Context } from '../types.js';
 
 // §6.1 "One IP, two listeners": the fixed SIP-TLS port every client, Ringotel included, dials.
 const SIP_TLS_PORT = 5061;
-export const STATUS_CONFLICT = 409;
-export const STATUS_NOT_FOUND = 404;
-const STATUS_SERVICE_UNAVAILABLE = 503;
 
 /**
  * The stack's connection address, `<fqdn>:5061`, from `FQDN` (§6.3), the one hostname `api` is
@@ -31,7 +30,7 @@ export function stackBranchAddress(): string {
   const fqdn = stackDomain(env);
   if (fqdn === null) {
     throw new OpError(
-      STATUS_SERVICE_UNAVAILABLE,
+      HTTP_SERVICE_UNAVAILABLE,
       'provisioning: FQDN is not set'
     );
   }
@@ -43,7 +42,7 @@ export function stackBranchAddress(): string {
 export function assertNotSetUp(settings: SettingsRow): void {
   if (settings.ringotelOrgId !== null || settings.ringotelBranchId !== null) {
     throw new OpError(
-      STATUS_CONFLICT,
+      HTTP_CONFLICT,
       `provisioning: Ringotel is already set up (organization ${settings.ringotelOrgId ?? '-'}, connection ${settings.ringotelBranchId ?? '-'})`
     );
   }

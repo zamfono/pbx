@@ -1,10 +1,11 @@
+import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+
 import { OpError } from './ops/types.js';
 
 // §10.3 "Conventions": list endpoints paginate with `?limit=` and an opaque `?cursor=`, returning
 // `{ items, nextCursor }`. The cursor carries whatever position value the operation itself needs
 // to resume (a row id, a compound sort key, …); base64url just keeps the wire form opaque.
 const CURSOR_ENCODING = 'base64url';
-const INVALID_CURSOR_STATUS = 422;
 
 /** Encodes a list operation's resume position as an opaque `nextCursor` value. */
 export function encodeCursor(position: unknown): string {
@@ -21,7 +22,7 @@ export function decodeCursor(cursor: string): unknown {
   try {
     return JSON.parse(Buffer.from(cursor, CURSOR_ENCODING).toString('utf8'));
   } catch {
-    throw new OpError(INVALID_CURSOR_STATUS, 'invalid cursor');
+    throw new OpError(HTTP_UNPROCESSABLE_CONTENT, 'invalid cursor');
   }
 }
 
@@ -29,7 +30,7 @@ export function decodeCursor(cursor: string): unknown {
 export function decodeIdCursor(cursor: string): string {
   const position = decodeCursor(cursor) as { id?: unknown } | null;
   if (typeof position?.id !== 'string') {
-    throw new OpError(INVALID_CURSOR_STATUS, 'invalid cursor');
+    throw new OpError(HTTP_UNPROCESSABLE_CONTENT, 'invalid cursor');
   }
   return position.id;
 }

@@ -1,7 +1,9 @@
 import { isIPv4, isIPv6 } from 'node:net';
 
+import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+
 import { OpError } from '../types.js';
-import { STATUS_UNPROCESSABLE_ENTITY, type HostDirection } from './_shared.js';
+import { type HostDirection } from './_shared.js';
 
 // A CR/LF or a bracket could open a new PJSIP section when a host or outbound proxy is
 // interpolated into generated config (pjsip/shared.ts's `assertSafeConfigValue`); refused here,
@@ -44,7 +46,7 @@ function isValidCidr(value: string): boolean {
 export function assertValidHost(host: string, direction: HostDirection): void {
   if (UNSAFE_HOST_PATTERN.test(host)) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `host contains characters unsafe for generated config: ${host}`
     );
   }
@@ -54,7 +56,7 @@ export function assertValidHost(host: string, direction: HostDirection): void {
   if (direction === 'inbound' && isValidCidr(host)) {
     return;
   }
-  throw new OpError(STATUS_UNPROCESSABLE_ENTITY, `invalid host: ${host}`);
+  throw new OpError(HTTP_UNPROCESSABLE_CONTENT, `invalid host: ${host}`);
 }
 
 /** Throws 422 for any `host` in `hosts` that {@link assertValidHost} refuses. */
@@ -112,13 +114,13 @@ export function assertValidOutboundProxy(
   }
   if (UNSAFE_HOST_PATTERN.test(outboundProxy)) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `host contains characters unsafe for generated config: ${outboundProxy}`
     );
   }
   if (!isValidOutboundProxyUri(outboundProxy)) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `invalid outbound proxy: ${outboundProxy}`
     );
   }
@@ -151,7 +153,7 @@ function hasTrimmedEnd(value: string): boolean {
 export function assertValidUsername(username: string): void {
   if (UNSAFE_USERNAME_PATTERN.test(username) || hasTrimmedEnd(username)) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `username contains characters unsafe for generated config: ${username}`
     );
   }
@@ -164,13 +166,13 @@ export function assertValidUsername(username: string): void {
 export function assertValidPassword(password: string): void {
   if (UNSAFE_HOST_PATTERN.test(password)) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'password contains characters unsafe for generated config'
     );
   }
   if (hasTrimmedEnd(password)) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'password must not begin or end with whitespace or a control character'
     );
   }

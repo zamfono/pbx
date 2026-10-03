@@ -2,11 +2,10 @@ import { error } from '@sveltejs/kit';
 import { form, getRequestEvent } from '$app/server';
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND, HTTP_TOO_MANY_REQUESTS } from '@zamfono/shared';
+
 import { requestPasswordReset } from '#lib/server/auth/passwordReset.js';
 import { getDb } from '#lib/server/db.js';
-
-const STATUS_NOT_FOUND = 404;
-const STATUS_TOO_MANY_REQUESTS = 429;
 
 // Any submission reaches the handler: `requestPasswordReset` validates the address itself and
 // accepts a malformed one exactly like an unknown one (§5.5 "answers identically"), and it counts
@@ -29,10 +28,10 @@ export const requestReset = form(
       body: () => Promise.resolve({ email })
     });
     if (outcome.kind === 'noRelay') {
-      error(STATUS_NOT_FOUND, 'not found');
+      error(HTTP_NOT_FOUND, 'not found');
     }
     if (outcome.kind === 'limited') {
-      error(STATUS_TOO_MANY_REQUESTS, 'too many requests');
+      error(HTTP_TOO_MANY_REQUESTS, 'too many requests');
     }
     return { sent: true };
   }

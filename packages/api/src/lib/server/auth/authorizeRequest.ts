@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { z } from 'zod';
 
-import type { Db } from '@zamfono/shared';
+import { HTTP_BAD_REQUEST, type Db } from '@zamfono/shared';
 
 import type { Keyring } from '../secretbox.js';
 import {
@@ -17,7 +17,6 @@ import {
 import { requestedResourceAcceptable } from './resource.js';
 import { ssoConfigFromSettings, type PendingAuthorize } from './sso.js';
 
-const STATUS_BAD_REQUEST = 400;
 // §5.2 "Authentication pages": the server "implements the authorization-code grant with PKCE";
 // the discovery document advertises only these as supported (`oauth.ts`), so a request naming
 // anything else is refused before the person ever sees the login form, rather than only failing
@@ -127,12 +126,12 @@ export async function resolveClient(
   }
   const meta = await clientMetaFor(kr, clientId);
   if (meta === null) {
-    error(STATUS_BAD_REQUEST, 'oauth/authorize: unknown client');
+    error(HTTP_BAD_REQUEST, 'oauth/authorize: unknown client');
   }
   const redirect = validatedRedirectUri(meta, params);
   if (redirect === null) {
     error(
-      STATUS_BAD_REQUEST,
+      HTTP_BAD_REQUEST,
       params.has('redirect_uri')
         ? 'oauth/authorize: redirect_uri not allowed for this client'
         : 'oauth/authorize: missing redirect_uri'

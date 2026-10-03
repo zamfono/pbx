@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
+import {
+  HTTP_INTERNAL_SERVER_ERROR,
+  newId,
+  nowIso,
+  openDb,
+  type Db
+} from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
@@ -20,8 +26,6 @@ import { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
 
 /** A caller who hangs up inside a menu, and a greeting Asterisk refuses to play (§10.1 step 6). */
-
-const HTTP_SERVER_ERROR = 500;
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => {
@@ -257,7 +261,9 @@ describe('menu hangup and a refused greeting', () => {
     const channel = fakeAri.addChannel({});
     const call = makeCall(channel.id);
     vi.spyOn(ari.channels, 'play').mockRejectedValue(
-      new AriError(HTTP_SERVER_ERROR, { message: 'Internal Server Error' })
+      new AriError(HTTP_INTERNAL_SERVER_ERROR, {
+        message: 'Internal Server Error'
+      })
     );
 
     const played = playMenu(pipeline, call, menuId);

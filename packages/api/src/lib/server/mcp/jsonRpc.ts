@@ -1,11 +1,12 @@
 // The JSON-RPC 2.0 framing every MCP message travels in (§10.5): parsing an incoming request off
 // the Streamable HTTP body, and wrapping a result or an error back into a response.
+import { HTTP_OK } from '@zamfono/shared';
+
 export const JSONRPC_PARSE_ERROR = -32700;
 export const JSONRPC_INVALID_REQUEST = -32600;
 export const JSONRPC_METHOD_NOT_FOUND = -32601;
 export const JSONRPC_INVALID_PARAMS = -32602;
 export const JSONRPC_INTERNAL_ERROR = -32603;
-const STATUS_OK = 200;
 // 2026-07-28 carries the protocol version and the client's capabilities per request, in
 // `params._meta` under these keys (https://modelcontextprotocol.io/specification/2026-07-28/basic#meta).
 export const PROTOCOL_VERSION_META_KEY =
@@ -84,5 +85,5 @@ export function jsonRpcError(
   message: string,
   data?: unknown
 ): Response {
-  return jsonRpcErrorWithStatus(STATUS_OK, id, code, message, data);
+  return jsonRpcErrorWithStatus(HTTP_OK, id, code, message, data);
 }

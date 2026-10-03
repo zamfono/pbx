@@ -1,6 +1,6 @@
-import { OpError, type Context } from '../types.js';
+import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
-const STATUS_UNPROCESSABLE_ENTITY = 422;
+import { OpError, type Context } from '../types.js';
 
 /**
  * Throws `OpError(422)` when a number the tenant is adopting as an emergency number is already a
@@ -23,7 +23,7 @@ export async function assertNoExtensionCollision(
   if (taken.length > 0) {
     const list = taken.map(row => row.ext).join(', ');
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `already a live extension, so it cannot be an emergency number: ${list}`
     );
   }

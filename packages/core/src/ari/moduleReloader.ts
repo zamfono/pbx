@@ -16,9 +16,10 @@
  */
 import { setTimeout as sleep } from 'node:timers/promises';
 
+import { HTTP_CONFLICT } from '@zamfono/shared';
+
 import { AriError, type AsteriskModule } from './types.js';
 
-const HTTP_CONFLICT = 409;
 // A doubling pause from 100 ms, capped at 2 s, eleven times: roughly fifteen seconds in all, far
 // longer than a PJSIP reload of any real tenant, short enough that `api` hears of a reload
 // Asterisk keeps refusing.

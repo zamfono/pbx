@@ -4,12 +4,12 @@
  * names, the way `*8<ext>` takes the call it finds (`pickup.ts`). `pickup`'s own trace line on
  * that call names the actor.
  */
-import { newId, type PickupRequest } from '@zamfono/shared';
+import { HTTP_CONFLICT, newId, type PickupRequest } from '@zamfono/shared';
 
 import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { RelayedCallLog } from '../relayedCallLog.js';
-import { ActionError, HTTP_CONFLICT } from './actionError.js';
+import { ActionError } from './actionError.js';
 import { newCall, type Call } from './call.js';
 import { extensionOf } from './extensionOwner.js';
 import { ringOwnDevices, ringTimeoutOf } from './ownDevices.js';

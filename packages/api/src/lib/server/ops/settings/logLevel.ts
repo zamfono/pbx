@@ -1,12 +1,10 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { MS_PER_DAY } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT, MS_PER_DAY } from '@zamfono/shared';
 
 import { recordChange } from '../runner.js';
 import { OpError, type Context } from '../types.js';
-
-const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 /**
  * §7: an override set without an expiry gets one this far out, so diagnostics never stay on by
@@ -52,7 +50,7 @@ export type LogLevelInput = {
 function assertLevelAvailable(level: string): void {
   if (level === 'sip' && env.HEP_ENABLED === 'false') {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       "logLevel 'sip' requires HEP_ENABLED"
     );
   }
@@ -83,7 +81,7 @@ export function resolveLogLevel(
   const level = input.logLevel ?? before.logLevel;
   if (level === null) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'logLevelExpiresAt needs a logLevel to expire'
     );
   }

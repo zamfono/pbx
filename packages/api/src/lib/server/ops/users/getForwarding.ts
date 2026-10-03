@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
+import { HTTP_FORBIDDEN } from '@zamfono/shared';
+
 import { defineOperation, OpError } from '../types.js';
 import { storedForwardRules } from './_forwarding.js';
 import { liveUser } from './_shared.js';
-
-const STATUS_FORBIDDEN = 403;
 
 /**
  * `GET /users/{id}/forwarding` (§10.3 "Users"): reads a user's forwarding rules as `{ id, rules }`,
@@ -21,7 +21,7 @@ export const getForwarding = defineOperation({
   run: async (ctx, input) => {
     if (ctx.actor.role === 'user' && ctx.actor.id !== input.id) {
       throw new OpError(
-        STATUS_FORBIDDEN,
+        HTTP_FORBIDDEN,
         'users: may read only your own forwarding'
       );
     }

@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
+import { HTTP_FORBIDDEN } from '@zamfono/shared';
+
 import { propagate } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import { liveUser } from './_shared.js';
-
-const STATUS_FORBIDDEN = 403;
 
 /**
  * `PUT /users/{id}/presence` (§10.2 "Presence", §5.7): sets DND, outside the audit log. The
@@ -30,7 +30,7 @@ export const setPresence = defineOperation({
   run: async (ctx, input) => {
     if (ctx.actor.role === 'user' && ctx.actor.id !== input.id) {
       throw new OpError(
-        STATUS_FORBIDDEN,
+        HTTP_FORBIDDEN,
         'users: may set only your own presence'
       );
     }

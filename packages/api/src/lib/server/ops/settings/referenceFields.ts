@@ -1,3 +1,5 @@
+import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+
 import {
   createTarget,
   resolveOptionalTarget,
@@ -6,8 +8,6 @@ import {
 import { recordChange } from '../runner.js';
 import { OpError, type Context } from '../types.js';
 import type { SettingsRow } from './_shared.js';
-
-const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 /** The `+` and digits shape of a numeric DID (§9.4 "Caller-ID"): only such a DID may be presented. */
 const NUMERIC_NUMBER = /^\+[0-9]+$/u;
@@ -38,7 +38,7 @@ export async function applyMainDidId(
     .executeTakeFirst();
   if (!did || !NUMERIC_NUMBER.test(did.number)) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'settings: mainDidId must be a live numeric DID'
     );
   }
@@ -75,7 +75,7 @@ export async function applyHoldMohAudioId(
           .executeTakeFirst();
   if (input.holdMohAudioId !== null && !audio) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       "settings: holdMohAudioId must be a live 'moh' audio asset"
     );
   }

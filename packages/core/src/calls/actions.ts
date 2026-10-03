@@ -8,6 +8,7 @@
  * actor in the call's trace.
  */
 import {
+  HTTP_NOT_FOUND,
   type AddPartyRequest,
   type AttendedTransferRequest,
   type ConsultRequest,
@@ -22,7 +23,7 @@ import {
 } from '@zamfono/shared';
 
 import { logFailure } from '../ari/failures.js';
-import { ActionError, HTTP_NOT_FOUND } from './actionError.js';
+import { ActionError } from './actionError.js';
 import { addPartyOnRequest } from './addedParty.js';
 import type { Call } from './call.js';
 import { findLiveCall } from './callLookup.js';

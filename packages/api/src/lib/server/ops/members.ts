@@ -1,12 +1,13 @@
 import type { Transaction } from 'kysely';
 import { z } from 'zod';
 
-import type { DB } from '@zamfono/shared';
+import {
+  HTTP_NOT_FOUND,
+  HTTP_UNPROCESSABLE_CONTENT,
+  type DB
+} from '@zamfono/shared';
 
 import { OpError } from './types.js';
-
-const STATUS_NOT_FOUND = 404;
-const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 /** One member of a ring group or user group (§10.3): a user or a user group, by id. */
 export const memberSchema = z.object({
@@ -31,7 +32,7 @@ export async function assertMembersValid(
   for (const member of members) {
     if (seen[member.kind].has(member.id)) {
       throw new OpError(
-        STATUS_UNPROCESSABLE_ENTITY,
+        HTTP_UNPROCESSABLE_CONTENT,
         `${label}: duplicate ${member.kind} member '${member.id}'`
       );
     }
@@ -48,7 +49,7 @@ export async function assertMembersValid(
         .executeTakeFirst();
       if (!row) {
         throw new OpError(
-          STATUS_NOT_FOUND,
+          HTTP_NOT_FOUND,
           `${member.kind} '${member.id}' not found`
         );
       }

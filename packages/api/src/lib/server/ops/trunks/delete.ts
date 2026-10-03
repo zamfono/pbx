@@ -1,12 +1,14 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import {
   findForwardTargetOwners,
   type Reference
 } from '../forwardTargetOwners.js';
 import { propagate, recordChange } from '../runner.js';
 import { Conflict, defineOperation, OpError, type Context } from '../types.js';
-import { loadTrunkRow, STATUS_NOT_FOUND } from './_shared.js';
+import { loadTrunkRow } from './_shared.js';
 import { emergencyTrunkWarnings } from './_writeChecks.js';
 
 const inputSchema = z.object({ id: z.string().min(1) }).strict();
@@ -56,7 +58,7 @@ export const deleteTrunk = defineOperation<Input, Output>({
   run: async (ctx, input) => {
     const row = await loadTrunkRow(ctx.db, input.id);
     if (!row) {
-      throw new OpError(STATUS_NOT_FOUND, 'trunk not found');
+      throw new OpError(HTTP_NOT_FOUND, 'trunk not found');
     }
     const references = await trunkReferences(ctx, input.id);
     if (references.length > 0) {

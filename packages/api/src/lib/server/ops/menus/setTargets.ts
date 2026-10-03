@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import {
@@ -10,8 +12,6 @@ import {
   rowToTarget,
   targetSpecSchema
 } from './_shared.js';
-
-const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 export const setMenuTargetsInput = z
   .object({
@@ -37,7 +37,7 @@ export const setMenuTargets = defineOperation({
     for (const target of input.targets) {
       if (seenDigits.has(target.digits)) {
         throw new OpError(
-          STATUS_UNPROCESSABLE_ENTITY,
+          HTTP_UNPROCESSABLE_CONTENT,
           `menus: duplicate target digits '${target.digits}'`
         );
       }

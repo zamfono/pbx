@@ -10,10 +10,6 @@ export const GRANT_REFRESH_TOKEN = 'refresh_token';
 /** Registered clients are public clients: PKCE, no secret (§5.2). */
 export const NO_AUTH_METHOD = 'none';
 
-export const STATUS_OK = 200;
-export const STATUS_CREATED = 201;
-export const STATUS_BAD_REQUEST = 400;
-
 /** What every oauth request function needs beyond the request itself. */
 export type BaseDeps = {
   db: Db;

@@ -1,8 +1,8 @@
 import Database from 'better-sqlite3';
 
-import { OpError } from '../types.js';
+import { HTTP_CONFLICT } from '@zamfono/shared';
 
-const STATUS_CONFLICT = 409;
+import { OpError } from '../types.js';
 
 /** SQLite's extended result codes for a write that would duplicate a unique key (§11.2). */
 const UNIQUE_VIOLATION_CODES = new Set([
@@ -26,7 +26,7 @@ export async function refuseUniqueViolation(
       UNIQUE_VIOLATION_CODES.has(error.code)
     ) {
       throw new OpError(
-        STATUS_CONFLICT,
+        HTTP_CONFLICT,
         'audit.undo: the reverted state violates a uniqueness rule'
       );
     }

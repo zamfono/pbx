@@ -1,11 +1,12 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { defineOperation, OpError } from '../types.js';
 import {
   loadTrunkHosts,
   loadTrunkRow,
   mapTrunkRow,
-  STATUS_NOT_FOUND,
   type TrunkWire
 } from './_shared.js';
 import { getTrunkStatuses, UNKNOWN_STATUS } from './_status.js';
@@ -22,7 +23,7 @@ export const get = defineOperation<Input, TrunkWire>({
   run: async (ctx, input) => {
     const row = await loadTrunkRow(ctx.db, input.id);
     if (!row) {
-      throw new OpError(STATUS_NOT_FOUND, 'trunk not found');
+      throw new OpError(HTTP_NOT_FOUND, 'trunk not found');
     }
     const hosts = await loadTrunkHosts(ctx.db, input.id);
     const statuses = await getTrunkStatuses([input.id]);

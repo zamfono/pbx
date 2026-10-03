@@ -1,3 +1,9 @@
+import {
+  HTTP_FORBIDDEN,
+  HTTP_NOT_FOUND,
+  HTTP_UNPROCESSABLE_CONTENT
+} from '@zamfono/shared';
+
 import { registry, type ErasedOperation } from './registry.js';
 import {
   ConfirmationRequired,
@@ -7,17 +13,13 @@ import {
   type Role
 } from './types.js';
 
-const STATUS_NOT_FOUND = 404;
-const STATUS_FORBIDDEN = 403;
-const STATUS_UNPROCESSABLE_ENTITY = 422;
-
 /** Owner outranks admin outranks user (§5.3); a lower number is more privileged. */
 const ROLE_RANK: Record<Role, number> = { owner: 0, admin: 1, user: 2 };
 
 export function findOperation(name: string): ErasedOperation {
   const op = registry.get(name);
   if (!op) {
-    throw new OpError(STATUS_NOT_FOUND, `unknown operation '${name}'`);
+    throw new OpError(HTTP_NOT_FOUND, `unknown operation '${name}'`);
   }
   return op;
 }
@@ -26,7 +28,7 @@ export function parseInput(op: ErasedOperation, input: unknown): unknown {
   const parsed = op.input.safeParse(input);
   if (!parsed.success) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       'validation failed',
       parsed.error.issues
     );
@@ -39,7 +41,7 @@ export function parseInput(op: ErasedOperation, input: unknown): unknown {
 // inside its `run`.
 export function checkRole(op: ErasedOperation, actor: Actor): void {
   if (ROLE_RANK[actor.role] > ROLE_RANK[op.minRole]) {
-    throw new OpError(STATUS_FORBIDDEN, 'forbidden');
+    throw new OpError(HTTP_FORBIDDEN, 'forbidden');
   }
 }
 

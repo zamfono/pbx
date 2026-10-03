@@ -1,6 +1,8 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { orBefore } from '../patch.js';
@@ -15,8 +17,6 @@ import {
   webhookSecretSchema,
   type WebhookWire
 } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
 
 const inputSchema = z
   .object({
@@ -60,7 +60,7 @@ export const update = defineOperation<Input, WebhookWire>({
   run: async (ctx, input) => {
     const before = await loadLiveWebhook(ctx.db, input.id);
     if (!before) {
-      throw new OpError(STATUS_NOT_FOUND, 'webhooks: webhook not found');
+      throw new OpError(HTTP_NOT_FOUND, 'webhooks: webhook not found');
     }
     const url = orBefore(input.url, before.url);
     const active = orBefore(input.active, before.active === 1);

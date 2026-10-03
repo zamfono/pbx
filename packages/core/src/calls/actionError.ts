@@ -1,9 +1,7 @@
 /** The refusal the live-call actions of the internal API raise (`actions.ts`, §3), its own module
- * so the modules an action delegates to raise it too, with the statuses they refuse with. */
+ * so the modules an action delegates to raise it too. */
 
-export const HTTP_NOT_FOUND = 404;
-export const HTTP_CONFLICT = 409;
-export const HTTP_UNPROCESSABLE = 422;
+import { HTTP_CONFLICT } from '@zamfono/shared';
 
 /** A refused action, carried to the internal API as its HTTP status and problem `cause`. */
 export class ActionError extends Error {

@@ -3,10 +3,10 @@ import process from 'node:process';
 import type { RequestEvent } from '@sveltejs/kit';
 import { describe, expect, it } from 'vitest';
 
+import { HTTP_ACCEPTED, HTTP_BAD_REQUEST } from '@zamfono/shared';
+
 import { POST } from './+server.js';
 
-const STATUS_BAD_REQUEST = 400;
-const STATUS_ACCEPTED = 202;
 const KEY_BYTE_LENGTH = 32;
 
 // `getDb()` and `keyringFromEnv()` read these once per process; an in-memory database with no
@@ -38,7 +38,7 @@ describe('POST /internal/mail', () => {
     });
     // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
     const response = await POST(eventFor(request));
-    expect(response.status).toBe(STATUS_BAD_REQUEST);
+    expect(response.status).toBe(HTTP_BAD_REQUEST);
   });
 
   it('returns 202 for a request with no X-Forwarded-For', async () => {
@@ -57,6 +57,6 @@ describe('POST /internal/mail', () => {
     });
     // eslint-disable-next-line new-cap -- POST is the fixed SvelteKit route-handler export name
     const response = await POST(eventFor(request));
-    expect(response.status).toBe(STATUS_ACCEPTED);
+    expect(response.status).toBe(HTTP_ACCEPTED);
   });
 });

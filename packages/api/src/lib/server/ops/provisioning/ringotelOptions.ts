@@ -1,6 +1,8 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
+import { HTTP_BAD_REQUEST } from '@zamfono/shared';
+
 import {
   createRingotelClient,
   type RingotelClient
@@ -9,8 +11,6 @@ import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { loadSettings } from '../settings/_shared.js';
 import { defineOperation, OpError } from '../types.js';
-
-const STATUS_BAD_REQUEST = 400;
 
 /** A region an organization can be created in, as Ringotel names it (§10.4 "Organization"). */
 type Region = { id: string; name: string };
@@ -52,14 +52,14 @@ export async function assertOffered(
     items.map(item => `${item.id} (${item.name})`).join(', ');
   if (!offer.regions.some(item => item.id === region)) {
     throw new OpError(
-      STATUS_BAD_REQUEST,
+      HTTP_BAD_REQUEST,
       `provisioning: Ringotel offers no region ${region}; choose one of ${list(offer.regions)}`
     );
   }
   const chosen = offer.packages.find(item => item.id === packageid);
   if (chosen === undefined) {
     throw new OpError(
-      STATUS_BAD_REQUEST,
+      HTTP_BAD_REQUEST,
       `provisioning: Ringotel offers no package ${packageid}; choose one of ${list(offer.packages)}`
     );
   }

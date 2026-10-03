@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { defineOperation, OpError } from '../types.js';
 import { runToWire } from './_shared.js';
-
-const STATUS_NOT_FOUND = 404;
 
 const inputSchema = z.object({ id: z.string() }).strict();
 
@@ -21,7 +21,7 @@ export const runsGet = defineOperation({
       .where('id', '=', input.id)
       .executeTakeFirst();
     if (!row) {
-      throw new OpError(STATUS_NOT_FOUND, 'backups: run not found');
+      throw new OpError(HTTP_NOT_FOUND, 'backups: run not found');
     }
     return runToWire(row);
   }

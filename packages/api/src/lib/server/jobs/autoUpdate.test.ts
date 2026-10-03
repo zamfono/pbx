@@ -2,6 +2,7 @@ import { sql } from 'kysely';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  HTTP_CONFLICT,
   MS_PER_DAY,
   newId,
   nowIso,
@@ -41,7 +42,6 @@ vi.mock('../ops/system/_updater.js', async importOriginal => ({
   updaterClient: vi.fn()
 }));
 
-const STATUS_CONFLICT = 409;
 const STARTED_AT = '2026-10-01T03:00:00.000Z';
 const NOW = new Date('2026-10-01T03:00:00.000Z');
 const TOMORROW = new Date('2026-10-02T03:00:00.000Z');
@@ -444,7 +444,7 @@ describe('runAutoUpdatePass', () => {
     job.updaterAnswer.next = () =>
       Promise.reject(
         new UpdaterRefusal(
-          STATUS_CONFLICT,
+          HTTP_CONFLICT,
           'the stack directory pins no release; update it once with update.sh on the host'
         )
       );
@@ -473,7 +473,7 @@ describe('runAutoUpdatePass', () => {
       // update.sh on the host began between the job's look and its request.
       job.current.status = status({ last: byHand });
       return Promise.reject(
-        new UpdaterRefusal(STATUS_CONFLICT, 'an update is already running')
+        new UpdaterRefusal(HTTP_CONFLICT, 'an update is already running')
       );
     };
 

@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
+import { HTTP_CONFLICT } from '@zamfono/shared';
+
 import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { defineOperation, OpError } from '../types.js';
 import { resolveActingUserId } from './_shared.js';
-
-const STATUS_CONFLICT = 409;
 
 const inputSchema = z
   .object({
@@ -56,7 +56,7 @@ export const originate = defineOperation({
     if ('error' in outcome) {
       // A string `detail` is the problem's own RFC 9457 member, which names the cause (§10.2).
       throw new OpError(
-        STATUS_CONFLICT,
+        HTTP_CONFLICT,
         'no device is registered for this user',
         outcome.error
       );

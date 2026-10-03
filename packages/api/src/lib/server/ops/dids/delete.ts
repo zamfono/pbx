@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { propagate, recordChange } from '../runner.js';
 import { Conflict, defineOperation, OpError, type Context } from '../types.js';
-
-const STATUS_NOT_FOUND = 404;
 
 const inputSchema = z.object({ id: z.string() }).strict();
 
@@ -68,7 +68,7 @@ export const del = defineOperation({
       .where('deletedAt', 'is', null)
       .executeTakeFirst();
     if (!did) {
-      throw new OpError(STATUS_NOT_FOUND, 'dids: DID not found');
+      throw new OpError(HTTP_NOT_FOUND, 'dids: DID not found');
     }
     await guardDeletable(ctx, input.id);
     await ctx.db

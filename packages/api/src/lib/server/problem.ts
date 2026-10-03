@@ -1,9 +1,10 @@
 import pino from 'pino';
 
+import { HTTP_INTERNAL_SERVER_ERROR } from '@zamfono/shared';
+
 import { OpError } from './ops/types.js';
 
 const PROBLEM_CONTENT_TYPE = 'application/problem+json';
-const INTERNAL_SERVER_ERROR_STATUS = 500;
 const logger = pino({ name: 'rest' });
 
 /**
@@ -56,5 +57,5 @@ export function problemFromError(error: unknown): Response {
     return problem(error.status, error.title, error.detail);
   }
   logger.error({ err: error }, 'rest: operation failed');
-  return problem(INTERNAL_SERVER_ERROR_STATUS, 'internal server error');
+  return problem(HTTP_INTERNAL_SERVER_ERROR, 'internal server error');
 }

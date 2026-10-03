@@ -5,11 +5,11 @@
  * `noAnswer` rule (§10.1 step 4), and a ring-group batch drops the member and rings on, the
  * group's `allow_reject` deciding as for any decline (§10.1 step 5).
  */
-import type { DeclineRequest } from '@zamfono/shared';
+import { HTTP_CONFLICT, type DeclineRequest } from '@zamfono/shared';
 
 import { ignoreGone, logFailure } from '../ari/failures.js';
 import { AST_CAUSE_CALL_REJECTED } from '../sipCodes.js';
-import { ActionError, HTTP_CONFLICT } from './actionError.js';
+import { ActionError } from './actionError.js';
 import type { Call } from './call.js';
 import { activeBatchHasRingingLeg, declineInBatch } from './groupPickup.js';
 import type { Pipeline } from './pipeline.js';

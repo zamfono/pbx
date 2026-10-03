@@ -22,8 +22,8 @@ import type { TrunkLeg } from './provisional.js';
 import type { TrunkState } from './trunkState.js';
 import { outboundHosts } from './trunkStatus.js';
 
-const HTTP_5XX_LOW = 500;
-const HTTP_5XX_HIGH = 599;
+const SIP_5XX_LOW = 500;
+const SIP_5XX_HIGH = 599;
 const SIP_FINAL_LOW = 300;
 const SIP_FINAL_HIGH = 699;
 
@@ -120,8 +120,8 @@ export function retriesNextHost(failure: AttemptFailure): boolean {
   return (
     failure.kind === 'final' &&
     !failure.alerted &&
-    failure.code >= HTTP_5XX_LOW &&
-    failure.code <= HTTP_5XX_HIGH
+    failure.code >= SIP_5XX_LOW &&
+    failure.code <= SIP_5XX_HIGH
   );
 }
 

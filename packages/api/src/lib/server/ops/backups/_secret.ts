@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
+import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+
 import { decrypt, encrypt, type Keyring } from '#lib/server/secretbox.js';
 
 import { OpError } from '../types.js';
-
-const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 const CREDENTIALS = [
   'username',
@@ -50,7 +50,7 @@ export function assertSecretFitsKind(kind: string, secret: BackupSecret): void {
   );
   if (!fits) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `backups: the secret of a '${kind}' target is { ${['resticPassword', ...wanted].join(', ')} }`
     );
   }

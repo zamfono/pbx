@@ -2,7 +2,7 @@ import { redirect, type RequestEvent } from '@sveltejs/kit';
 import * as env from '$app/env/private';
 import pino from 'pino';
 
-import { nowIso, type Db } from '@zamfono/shared';
+import { HTTP_FOUND, nowIso, type Db } from '@zamfono/shared';
 
 import { requiredOrigin } from '#lib/server/auth/authorizationResponse.js';
 import { clientMetaFor } from '#lib/server/auth/authorizeRequest.js';
@@ -27,14 +27,13 @@ import { keyringFromEnv } from '#lib/server/secretbox.js';
 type FinishLoginResult = Awaited<ReturnType<typeof finishLogin>>;
 
 const logger = pino({ name: 'oauth-callback' });
-const STATUS_FOUND = 302;
 
 /** Redirects to the error page (§5.2 "Authentication pages": "a plain error page for … an
  *  expired link"), naming the refusal so the page can render an accurate message. */
 function toErrorPage(origin: string, reason: string): never {
   const url = new URL('/auth/error', origin);
   url.searchParams.set('reason', reason);
-  return redirect(STATUS_FOUND, url.toString(), { external: [origin] });
+  return redirect(HTTP_FOUND, url.toString(), { external: [origin] });
 }
 
 /** The reason shown on the error page: a `subMismatch` is reported as `noUser` there too, so an
@@ -132,7 +131,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
   }
   if (pending.authorizeParams === null) {
     redirect(
-      STATUS_FOUND,
+      HTTP_FOUND,
       loginRedirect(authCodeStore, result.userId, null, origin),
       { external: [origin] }
     );
@@ -148,7 +147,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
     clientName: meta.name,
     authorize: pending.authorizeParams
   });
-  redirect(STATUS_FOUND, new URL('/oauth/authorize', origin).toString(), {
+  redirect(HTTP_FOUND, new URL('/oauth/authorize', origin).toString(), {
     external: [origin]
   });
 }

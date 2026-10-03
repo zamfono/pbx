@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { Db } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT, type Db } from '@zamfono/shared';
 
 import {
   loadBuiltinTemplate,
@@ -93,15 +93,13 @@ export async function effectiveTemplate(
   };
 }
 
-const STATUS_UNPROCESSABLE_ENTITY = 422;
-
 /** Runs `compile`, turning the `Error` `compileTemplate` throws on an invalid template into a 422. */
 export function asValidationError<T>(compile: () => T): T {
   try {
     return compile();
   } catch (error) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       error instanceof Error ? error.message : 'template: invalid'
     );
   }

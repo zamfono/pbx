@@ -2,13 +2,11 @@ import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import type { Selectable, Transaction } from 'kysely';
 
-import type { DB } from '@zamfono/shared';
+import { HTTP_NOT_FOUND, type DB } from '@zamfono/shared';
 
 import { mediaDirFromEnv } from '#lib/server/mediaDir.js';
 
 import { OpError } from '../types.js';
-
-const STATUS_NOT_FOUND = 404;
 
 /** A `recordings` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type RecordingRow = Selectable<DB['recordings']>;
@@ -44,7 +42,7 @@ export async function loadRecording(
     .where('id', '=', id)
     .executeTakeFirst();
   if (!row) {
-    throw new OpError(STATUS_NOT_FOUND, `recording '${id}' not found`);
+    throw new OpError(HTTP_NOT_FOUND, `recording '${id}' not found`);
   }
   return row;
 }

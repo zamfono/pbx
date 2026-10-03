@@ -1,10 +1,8 @@
 import type { Transaction } from 'kysely';
 
-import type { DB } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT, type DB } from '@zamfono/shared';
 
 import { Conflict, OpError } from '../types.js';
-
-const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 /** The extension a live user owns (§11.2 `extensions`); every live user has exactly one. */
 export async function userExtension(
@@ -36,14 +34,14 @@ export async function assertValidExtension(
     .executeTakeFirstOrThrow();
   if (!/^[0-9]+$/u.test(ext) || ext.length !== settings.extLength) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `extension must be ${settings.extLength} digits`
     );
   }
   const emergency = JSON.parse(settings.emergencyNumbersJson) as string[];
   if (emergency.includes(ext)) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `${ext} is an emergency number and cannot be an extension`
     );
   }

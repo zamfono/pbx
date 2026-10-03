@@ -1,7 +1,12 @@
 import process from 'node:process';
 import { z } from 'zod';
 
-import { epochSeconds, nowIso, resolveVersion } from '@zamfono/shared';
+import {
+  epochSeconds,
+  HTTP_CONFLICT,
+  nowIso,
+  resolveVersion
+} from '@zamfono/shared';
 
 import { signAccessToken } from '../auth/jwtSigning.js';
 import { handleMcpRequest, type McpDeps } from '../mcp.js';
@@ -20,7 +25,6 @@ export const CLIENT_ID = 'client-1';
 const CLIENT_NAME = 'Ops Console';
 export const CURRENT = '2026-07-28';
 export const LEGACY = '2025-11-25';
-const STATUS_CONFLICT = 409;
 
 register(
   defineOperation<{ value: string }, { id: string; value: string }>({
@@ -185,7 +189,7 @@ export function currentToolResult(value: unknown, isError = false): object {
 export const confirmationProblem = (
   question: string
 ): Record<string, unknown> => ({
-  status: STATUS_CONFLICT,
+  status: HTTP_CONFLICT,
   title: 'confirmation required',
   confirmationRequired: true,
   question

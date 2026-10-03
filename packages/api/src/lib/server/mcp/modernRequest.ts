@@ -1,3 +1,5 @@
+import { HTTP_BAD_REQUEST } from '@zamfono/shared';
+
 import {
   CURRENT_PROTOCOL_VERSION,
   SUPPORTED_PROTOCOL_VERSIONS
@@ -23,7 +25,6 @@ import {
 // No tool here designates `x-mcp-header` parameters, so no `Mcp-Param-*` header is recognised.
 export const HEADER_MISMATCH = -32020;
 export const UNSUPPORTED_PROTOCOL_VERSION = -32022;
-const STATUS_BAD_REQUEST = 400;
 const PROTOCOL_VERSION_HEADER = 'mcp-protocol-version';
 const METHOD_HEADER = 'mcp-method';
 const NAME_HEADER = 'mcp-name';
@@ -45,13 +46,7 @@ function badRequest(
   message: string,
   data?: unknown
 ): Response {
-  return jsonRpcErrorWithStatus(
-    STATUS_BAD_REQUEST,
-    msg.id,
-    code,
-    message,
-    data
-  );
+  return jsonRpcErrorWithStatus(HTTP_BAD_REQUEST, msg.id, code, message, data);
 }
 
 function headerMismatch(msg: IncomingMessage, message: string): Response {

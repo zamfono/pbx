@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+
 import type { DroppedBlfKey } from '../devices/_shared.js';
 import { pushRoster } from '../roster.js';
 import { propagate, recordChange } from '../runner.js';
@@ -8,7 +10,6 @@ import { loadParkingSlots } from './_shared.js';
 
 /** An extension digit string, matching the `extensions.ext` CHECK (§11.2). */
 const EXT_PATTERN = /^[0-9]+$/u;
-const STATUS_UNPROCESSABLE_ENTITY = 422;
 
 const inputSchema = z
   .object({
@@ -42,7 +43,7 @@ async function guardExtLength(
   const wrongLength = additions.filter(ext => ext.length !== extLength);
   if (wrongLength.length > 0) {
     throw new OpError(
-      STATUS_UNPROCESSABLE_ENTITY,
+      HTTP_UNPROCESSABLE_CONTENT,
       `parking: slot must be ${extLength} digits long: ${wrongLength.join(', ')}`
     );
   }
