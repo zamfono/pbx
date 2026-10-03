@@ -11,11 +11,11 @@ import {
 } from '@zamfono/shared';
 
 import type { AriEvent } from '../ari/events.js';
-import { type FakeAri } from '../ari/fake.js';
-import { defaultChannel } from '../ari/fakeChannel.js';
-import { isPlacement, placedCallerId } from '../ari/fakeDial.js';
 import type { CdrWriter } from '../cdr.js';
 import { SIP_ADDRESS_INCOMPLETE } from '../sipCodes.js';
+import { type FakeAri } from '../testing/ari/fake.js';
+import { defaultChannel } from '../testing/ari/fakeChannel.js';
+import { isPlacement, placedCallerId } from '../testing/ari/fakeDial.js';
 import { eventually, flush } from '../testing/eventually.js';
 import {
   answeredCall,

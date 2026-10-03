@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { FakeAri } from '../testing/ari/fake.js';
 import { noopLogger } from '../testing/pipelineDeps.js';
 import { AriClient } from './client.js';
 import type { AriEvent } from './events.js';
-import { FakeAri } from './fake.js';
 import { AriError } from './types.js';
 
 const TEST_APP = 'zamfono';

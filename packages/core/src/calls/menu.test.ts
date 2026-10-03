@@ -10,9 +10,9 @@ import {
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
-import { defaultChannel } from '../ari/fakeChannel.js';
 import { MAX_HOPS } from '../routing/targets.js';
+import { FakeAri } from '../testing/ari/fake.js';
+import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { eventually } from '../testing/eventually.js';
 import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
 import { newCall, type Call } from './call.js';

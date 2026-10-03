@@ -7,8 +7,8 @@ import {
   type UserForwardCondition
 } from '@zamfono/shared';
 
-import { type FakeAri } from '../ari/fake.js';
-import { isPlacement } from '../ari/fakeDial.js';
+import { type FakeAri } from '../testing/ari/fake.js';
+import { isPlacement } from '../testing/ari/fakeDial.js';
 import { eventually } from '../testing/eventually.js';
 import { answeredCall, startRig, type Rig } from '../testing/pipelineRig.js';
 import {

@@ -14,8 +14,8 @@ import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
-import { defaultChannel } from '../ari/fakeChannel.js';
+import { FakeAri } from '../testing/ari/fake.js';
+import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { eventually } from '../testing/eventually.js';
 import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
 import { Pipeline } from './pipeline.js';

@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso } from '@zamfono/shared';
 
-import { defaultChannel } from '../ari/fakeChannel.js';
 import {
   AST_CAUSE_NORMAL_CLEARING,
   SIP_SERVICE_UNAVAILABLE
 } from '../sipCodes.js';
+import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { delivered } from '../testing/eventually.js';
 import {
   answeredCall,

@@ -16,12 +16,12 @@ import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
 import type { Logger } from '../ari/types.js';
 import { CdrWriter } from '../cdr.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
+import { FakeAri } from '../testing/ari/fake.js';
 import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
 import { callerChannel, newCall, type Call, type Leg } from './call.js';
 import { trackLeg } from './legs.js';

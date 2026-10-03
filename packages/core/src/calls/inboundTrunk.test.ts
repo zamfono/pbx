@@ -6,11 +6,11 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
 import type { AriEvent, AriEventOf } from '../ari/events.js';
-import { FakeAri } from '../ari/fake.js';
 import type { Channel } from '../ari/types.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
+import { FakeAri } from '../testing/ari/fake.js';
 import { eventually } from '../testing/eventually.js';
 import {
   noopCdr,

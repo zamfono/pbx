@@ -4,7 +4,7 @@ import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
+import { FakeAri } from '../testing/ari/fake.js';
 import {
   noopCdr,
   noopLogger,

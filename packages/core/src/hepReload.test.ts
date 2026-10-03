@@ -4,9 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HTTP_CONFLICT } from '@zamfono/shared';
 
 import { AriClient } from './ari/client.js';
-import { FakeAri } from './ari/fake.js';
 import { AriError, type Logger } from './ari/types.js';
 import { reloadHepOnConnect } from './hepReload.js';
+import { FakeAri } from './testing/ari/fake.js';
 
 type LogFn = Logger['info'];
 

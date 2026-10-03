@@ -14,14 +14,14 @@ import {
 } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
-import type { FakeAri } from '../ari/fake.js';
-import { defaultChannel } from '../ari/fakeChannel.js';
 import { MAX_INTERNAL_BODY_BYTES } from '../internal/http.js';
 import type { StateStore } from '../internal/stateStore.js';
 import {
   AST_CAUSE_CALL_REJECTED,
   AST_CAUSE_NORMAL_CLEARING
 } from '../sipCodes.js';
+import type { FakeAri } from '../testing/ari/fake.js';
+import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { eventually } from '../testing/eventually.js';
 import {
   answeredCall,

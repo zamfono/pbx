@@ -1,7 +1,9 @@
 // In-process fake ARI server: HTTP + WebSocket, an in-memory channel/bridge model, for tests only.
 import { HTTP_CONFLICT, HTTP_NOT_FOUND, HTTP_OK } from '@zamfono/shared';
 
-import type { RtpQos } from '../qosFigures.js';
+import type { Channel } from '#src/ari/types.js';
+import type { RtpQos } from '#src/qosFigures.js';
+
 import { routeBridge, type Bridge } from './fakeBridge.js';
 import {
   contactReachable,
@@ -22,7 +24,6 @@ import {
   type FakeRequest,
   type RequestHold
 } from './fakeTransport.js';
-import type { Channel } from './types.js';
 
 const DEFAULT_ANSWER_AFTER_MS = 10;
 // A real playback takes some time to reach the end; a fixed short delay lets code that awaits

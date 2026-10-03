@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newId } from '@zamfono/shared';
 
 import { AriClient } from './ari/client.js';
-import { FakeAri } from './ari/fake.js';
 import { newCall, type Call } from './calls/call.js';
 import { SipCapture, type SipMessage } from './sipCapture.js';
+import { FakeAri } from './testing/ari/fake.js';
 import { noopLogger } from './testing/pipelineDeps.js';
 
 /** §7 level `sip`: "the call's SIP messages", every dialog's, the INVITE and early responses

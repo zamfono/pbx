@@ -4,7 +4,8 @@ import { randomUUID } from 'node:crypto';
 
 import { HTTP_OK } from '@zamfono/shared';
 
-import type { AriEvent } from './events.js';
+import type { AriEvent } from '#src/ari/events.js';
+
 import type { RouteResult } from './fakeHttp.js';
 
 /** The slice of `FakeAri` a playback drives. */

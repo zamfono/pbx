@@ -9,8 +9,8 @@ import {
   type Db
 } from '@zamfono/shared';
 
-import { type FakeAri } from '../ari/fake.js';
-import { isPlacement, placedCallerId } from '../ari/fakeDial.js';
+import { type FakeAri } from '../testing/ari/fake.js';
+import { isPlacement, placedCallerId } from '../testing/ari/fakeDial.js';
 import { eventually } from '../testing/eventually.js';
 import {
   answeredCall,

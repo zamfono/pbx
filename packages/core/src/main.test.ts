@@ -7,14 +7,14 @@ import { newId, nowIso, openDb } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AmiClient } from './ami/client.js';
-import { FakeAmi } from './ami/fake.js';
 import { AriClient } from './ari/client.js';
-import { FakeAri } from './ari/fake.js';
-import { defaultChannel } from './ari/fakeChannel.js';
 import { Pipeline } from './calls/pipeline.js';
 import { main, reportFatalBoot } from './main.js';
 import { STOP_DRAIN_MS } from './stop.js';
 import { startSweep } from './sweep.js';
+import { FakeAmi } from './testing/ami/fake.js';
+import { FakeAri } from './testing/ari/fake.js';
+import { defaultChannel } from './testing/ari/fakeChannel.js';
 import { eventually, flush } from './testing/eventually.js';
 
 // `startInternalServer` binds the fixed port 3000 (Global Constraints), which a test cannot claim;

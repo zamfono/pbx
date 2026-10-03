@@ -10,8 +10,8 @@ import {
   HTTP_OK
 } from '@zamfono/shared';
 
-import type { AriEvent } from './events.js';
-import type { Channel } from './types.js';
+import type { AriEvent } from '#src/ari/events.js';
+import type { Channel } from '#src/ari/types.js';
 
 type RouteResult = { status: number; body: unknown };
 

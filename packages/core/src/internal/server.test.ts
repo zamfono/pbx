@@ -21,9 +21,9 @@ import {
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
 import type { Logger } from '../ari/types.js';
 import { newCall } from '../calls/call.js';
+import { FakeAri } from '../testing/ari/fake.js';
 import {
   idlePresence,
   idleRecorder,

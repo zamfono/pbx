@@ -5,8 +5,8 @@ import type { EventEmitter } from 'node:events';
 import { vi } from 'vitest';
 
 import type { AriEvent } from '../ari/events.js';
-import type { FakeAri } from '../ari/fake.js';
-import type { FakeRequest } from '../ari/fakeTransport.js';
+import type { FakeAri } from './ari/fake.js';
+import type { FakeRequest } from './ari/fakeTransport.js';
 
 // Well past a loaded run's slowest round trips, and still inside vitest's 5 s test timeout, so a
 // state that never arrives fails on its own assertion rather than on the test timeout.

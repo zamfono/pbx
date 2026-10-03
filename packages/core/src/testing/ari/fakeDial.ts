@@ -7,10 +7,11 @@
  */
 import { HTTP_OK } from '@zamfono/shared';
 
-import type { AriEvent } from './events.js';
+import type { AriEvent } from '#src/ari/events.js';
+import type { Channel } from '#src/ari/types.js';
+
 import { defaultChannel } from './fakeChannel.js';
 import type { RouteResult } from './fakeHttp.js';
-import type { Channel } from './types.js';
 
 /** The slice of `FakeAri` placing a channel reads and drives. */
 type DialHost = {

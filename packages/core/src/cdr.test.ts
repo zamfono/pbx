@@ -11,9 +11,6 @@ import {
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from './ari/client.js';
-import { FakeAri } from './ari/fake.js';
-import { defaultChannel } from './ari/fakeChannel.js';
-import { fakeRtpAudioQos } from './ari/fakeRtp.js';
 import type { Channel } from './ari/types.js';
 import { callerChannel, newCall, type Call } from './calls/call.js';
 import { CdrWriter } from './cdr.js';
@@ -21,6 +18,9 @@ import { EventBus } from './internal/eventBus.js';
 import { ConfigCache } from './internal/snapshot.js';
 import { StateStore } from './internal/stateStore.js';
 import { parseRtcpReport } from './rtcpReport.js';
+import { FakeAri } from './testing/ari/fake.js';
+import { defaultChannel } from './testing/ari/fakeChannel.js';
+import { fakeRtpAudioQos } from './testing/ari/fakeRtp.js';
 import { onEvents } from './testing/busEvents.js';
 import { eventually } from './testing/eventually.js';
 import { noopLogger } from './testing/pipelineDeps.js';

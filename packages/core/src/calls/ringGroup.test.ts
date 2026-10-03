@@ -12,11 +12,11 @@ import {
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
-import { defaultChannel } from '../ari/fakeChannel.js';
-import { isPlacement, placedCallerId } from '../ari/fakeDial.js';
 import type { Channel } from '../ari/types.js';
 import { AST_CAUSE_USER_BUSY } from '../sipCodes.js';
+import { FakeAri } from '../testing/ari/fake.js';
+import { defaultChannel } from '../testing/ari/fakeChannel.js';
+import { isPlacement, placedCallerId } from '../testing/ari/fakeDial.js';
 import { onEvents } from '../testing/busEvents.js';
 import { eventually, requestTo } from '../testing/eventually.js';
 import {

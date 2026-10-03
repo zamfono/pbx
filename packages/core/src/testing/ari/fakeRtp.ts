@@ -6,7 +6,7 @@
  * seconds with six decimals, and the fields nothing reads (SSRCs, MES) alongside the ones the
  * summary does, so a parser that picks the wrong field meets the string it would on a real stack.
  */
-import type { RtpQos } from '../qosFigures.js';
+import type { RtpQos } from '#src/qosFigures.js';
 
 const DEFAULT_RTP_QOS: RtpQos = {
   txcount: 1000,

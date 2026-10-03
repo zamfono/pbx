@@ -11,7 +11,6 @@ import {
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
 import type { CallActions } from '../calls/actions.js';
 import { newCall, type Call } from '../calls/call.js';
 import { Pipeline, type PipelineDeps } from '../calls/pipeline.js';
@@ -22,6 +21,7 @@ import { startInternalServer } from '../internal/server.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { Presence } from '../presence.js';
+import { FakeAri } from './ari/fake.js';
 import {
   idleRecorder,
   noopLogger,

@@ -2,7 +2,7 @@
 // row, users, devices, parking slots and an outbound route.
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import type { FakeAri } from '../ari/fake.js';
+import type { FakeAri } from './ari/fake.js';
 
 /** A throwaway forward-target/DID chain, just to satisfy `settings.main_did_id`'s FK. */
 export async function seedSettings(db: Db): Promise<void> {

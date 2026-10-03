@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { fakeRtpAudioQos } from './ari/fakeRtp.js';
 import { parseRtpAudioQos, qosFigures } from './qosFigures.js';
+import { fakeRtpAudioQos } from './testing/ari/fakeRtp.js';
 
 describe('parseRtpAudioQos (§7 level qos)', () => {
   it('reads a packet count of 0 as 0 and an absent or malformed one as null', () => {

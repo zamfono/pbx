@@ -7,7 +7,6 @@ import { nowIso, type Db } from '@zamfono/shared';
 
 import { AmiClient } from '../ami/client.js';
 import type { AriClient } from '../ari/client.js';
-import type { FakeAri } from '../ari/fake.js';
 import type { Logger } from '../ari/types.js';
 import { CallActions } from '../calls/actions.js';
 import { STASIS_WAIT_MS } from '../calls/legOriginate.js';
@@ -18,6 +17,7 @@ import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { Presence } from '../presence.js';
+import type { FakeAri } from './ari/fake.js';
 import { eventually } from './eventually.js';
 
 export const noopLogger: Logger = {

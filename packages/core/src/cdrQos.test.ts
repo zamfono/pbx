@@ -3,13 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newId, openDb, type CallLogLevel, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { defaultChannel } from './ari/fakeChannel.js';
-import { fakeRtpAudioQos } from './ari/fakeRtp.js';
 import type { Channel } from './ari/types.js';
 import { newCall, type Call } from './calls/call.js';
 import { QosRows } from './cdrQos.js';
 import { RtcpQos } from './rtcpQos.js';
 import { parseRtcpReport, type RtcpHepReport } from './rtcpReport.js';
+import { defaultChannel } from './testing/ari/fakeChannel.js';
+import { fakeRtpAudioQos } from './testing/ari/fakeRtp.js';
 import { noopLogger } from './testing/pipelineDeps.js';
 import { fixedPoint, ntpMiddle, rtcpPayload } from './testing/rtcpPayload.js';
 

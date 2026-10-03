@@ -6,9 +6,6 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
 import type { AriEventOf } from '../ari/events.js';
-import { FakeAri } from '../ari/fake.js';
-import { defaultChannel } from '../ari/fakeChannel.js';
-import { isPlacement } from '../ari/fakeDial.js';
 import type { Channel } from '../ari/types.js';
 import { CdrWriter } from '../cdr.js';
 import { EventBus } from '../internal/eventBus.js';
@@ -16,6 +13,9 @@ import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { Presence } from '../presence.js';
 import { defaultPrompt } from '../prompts.js';
+import { FakeAri } from '../testing/ari/fake.js';
+import { defaultChannel } from '../testing/ari/fakeChannel.js';
+import { isPlacement } from '../testing/ari/fakeDial.js';
 import { onEvents } from '../testing/busEvents.js';
 import {
   delivered,

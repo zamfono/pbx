@@ -4,8 +4,8 @@ import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
 import { MAX_HOPS } from '../routing/targets.js';
+import { FakeAri } from '../testing/ari/fake.js';
 import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
 import { newCall, type Call } from './call.js';
 import { enterTarget } from './inbound.js';

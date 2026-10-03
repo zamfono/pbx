@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
 import type { Logger } from '../ari/types.js';
+import { FakeAri } from '../testing/ari/fake.js';
 import { recordFormatFor } from './recordingRate.js';
 
 const NATIVE_FORMAT = 'CHANNEL(audionativeformat)';

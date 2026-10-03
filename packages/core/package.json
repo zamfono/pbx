@@ -14,5 +14,12 @@
   },
   "devDependencies": {
     "@types/ws": "^8.18.2"
+  },
+  "imports": {
+    "#src/*": {
+      "types": "./src/*",
+      "development": "./src/*",
+      "default": "./dist/*"
+    }
   }
 }

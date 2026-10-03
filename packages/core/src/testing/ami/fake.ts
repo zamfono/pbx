@@ -1,7 +1,7 @@
 // In-process fake AMI server: enough of the text protocol for AmiClient's tests.
 import { createServer, type Server, type Socket } from 'node:net';
 
-import { splitFrames, writeFrame, type AmiEvent } from './frame.js';
+import { splitFrames, writeFrame, type AmiEvent } from '#src/ami/frame.js';
 
 type Registration = {
   ObjectName: string;

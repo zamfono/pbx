@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type CallLogLevel } from '@zamfono/shared';
 
-import { defaultChannel } from '../ari/fakeChannel.js';
 import { AriError, type CreateParams } from '../ari/types.js';
+import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { noopLogger } from '../testing/pipelineDeps.js';
 import { newCall } from './call.js';
 import {

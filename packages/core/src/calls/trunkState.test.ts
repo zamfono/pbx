@@ -12,13 +12,13 @@ import {
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AmiClient } from '../ami/client.js';
-import { FakeAmi } from '../ami/fake.js';
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
-import type { FakeEndpoint } from '../ari/fakeChannel.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
+import { FakeAmi } from '../testing/ami/fake.js';
+import { FakeAri } from '../testing/ari/fake.js';
+import type { FakeEndpoint } from '../testing/ari/fakeChannel.js';
 import { onEvents } from '../testing/busEvents.js';
 import { eventually } from '../testing/eventually.js';
 import { noopLogger } from '../testing/pipelineDeps.js';

@@ -4,10 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoreStreamFrame } from '@zamfono/shared';
 
 import { AriClient } from './ari/client.js';
-import { FakeAri } from './ari/fake.js';
 import type { Logger } from './ari/types.js';
 import { announceAsteriskStartOnConnect } from './asteriskStarted.js';
 import { EventBus } from './internal/eventBus.js';
+import { FakeAri } from './testing/ari/fake.js';
 
 type LogFn = Logger['info'];
 

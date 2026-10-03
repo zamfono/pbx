@@ -4,9 +4,9 @@ import { newId, nowIso, openDb, type Db, type Language } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../ari/fake.js';
 import { SIT_DURATION_MS } from '../indications.js';
 import { PROMPTS } from '../prompts.js';
+import { FakeAri } from '../testing/ari/fake.js';
 import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
 import { newCall, type Call } from './call.js';
 import { concludeExhausted } from './conclude.js';

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { FakeAmi } from '../testing/ami/fake.js';
 import { noopLogger } from '../testing/pipelineDeps.js';
 import { AmiClient } from './client.js';
-import { FakeAmi } from './fake.js';
 import type { AmiEvent } from './frame.js';
 
 describe('AmiClient', () => {
