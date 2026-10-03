@@ -65,13 +65,12 @@ trap cleanup EXIT
 # 1. Host facts, then the stack itself (lib-stack.sh, shared with stress/).
 # ---------------------------------------------------------------------------
 stack_host_facts
-stack_write_env
 stack_up
 stack_token
 
-sipp_ip=$(dc exec -T sipp hostname -i | tr -d '\r' | awk '{print $1}')
-phone_ip=$(dc exec -T sipp-phone hostname -i | tr -d '\r' | awk '{print $1}')
-provider_ip=$(dc exec -T sipp-provider hostname -i | tr -d '\r' | awk '{print $1}')
+sipp_ip=$(container_ip sipp)
+phone_ip=$(container_ip sipp-phone)
+provider_ip=$(container_ip sipp-provider)
 phone_cidr="${phone_ip%.*}.0/24"
 log "sipp=$sipp_ip sipp-phone=$phone_ip sipp-provider=$provider_ip"
 

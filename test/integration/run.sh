@@ -58,6 +58,8 @@ SCENARIOS_DIR="$here/scenarios"
 # The pin compose.test.yaml's `proxy` service requires (`${PROXY_IMAGE:?…}`): built the same way
 # as the other four (docker-bake.hcl), so it defaults the same way ASTERISK_IMAGE etc. do below.
 PROXY_IMAGE=${PROXY_IMAGE:-zamfono/proxy:ci}
+# The api image setup.sh hashes the owner's password with: compose.test.yaml's own default.
+API_IMAGE=${API_IMAGE:-zamfono/api:ci}
 # cert-sync.sh's own Caddyfile (§6.4): an absolute path, for the same reason SCENARIOS_DIR is one.
 CERT_SYNC_CADDYFILE="$here/Caddyfile.local-ca"
 export API_PORT SCENARIOS_DIR PROXY_IMAGE CERT_SYNC_CADDYFILE FQDN
@@ -116,8 +118,6 @@ trap cleanup EXIT
 # have Docker at all, and Docker's client from v29 refuses the Docker-compatible API that Podman
 # before 6 serves.
 RUNTIME=${COMPOSE%% *}
-OWNER_PASSWORD='integration-secret'
-OWNER_EMAIL='owner@ci.test'
 
 # shellcheck source=only.sh
 . "$here/only.sh"
@@ -163,9 +163,7 @@ name_selected runtime-asserts && step_runtime_asserts
 name_selected prompts && step_prompts
 
 echo '== obtaining a bootstrap token =='
-token=$(bash "$here/bootstrap-token.sh" "$api_base" "$OWNER_EMAIL" "$OWNER_PASSWORD" "https://$FQDN") \
-  || fail "could not obtain an access token through the authorization-code flow"
-[ -n "$token" ] || fail "the token endpoint returned nothing"
+stack_token
 
 if [ -n "${UPGRADE_FROM:-}" ] && [ "$reused" = false ]; then
   upgrade_after=$run_dir/upgrade-after.tsv

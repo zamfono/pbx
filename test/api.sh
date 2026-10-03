@@ -1,7 +1,7 @@
 # shellcheck shell=bash
-# Sourced by the integration and load harnesses: how their scripts reach the REST API (§10.3).
-# Reads `api_base` (`http://127.0.0.1:<port>`, or `https://<FQDN>` through Caddy) and `token`,
-# and `compose` for `dc`.
+# Sourced by the integration and load harnesses: how their scripts reach the REST API (§10.3) and
+# the stack's containers. Reads `api_base` (`http://127.0.0.1:<port>`, or `https://<FQDN>` through
+# Caddy) and `token`, and `compose` for `dc` and `container_ip`.
 #
 # The api runs behind Caddy, which sets `X-Forwarded-For`; adapter-node is configured to require
 # it (`ADDRESS_HEADER`), so a request the harness sends the api directly carries it, as the
@@ -14,6 +14,13 @@ FWD=(-H 'X-Forwarded-For: 127.0.0.1')
 dc() {
   # shellcheck disable=SC2086 # `compose` is split into its words by design
   $compose "$@"
+}
+
+# A container's address on the stack's network.
+# `exec` hands the container its standard input, so it reads none here: a caller may expand this
+# in the arguments of a pipeline's reader, whose input it would otherwise take.
+container_ip() {
+  dc exec -T "$1" hostname -i </dev/null | tr -d '\r' | awk '{print $1}'
 }
 
 # `api <method> <path> [<json-body>]` prints the response body, and fails on a status other than

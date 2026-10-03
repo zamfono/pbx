@@ -13,13 +13,6 @@ print([u['id'] for u in json.load(sys.stdin)['items'] if u['extension'] == sys.a
 " "$1"
 }
 
-# A container's address on the stack's network.
-# `exec` hands the container its standard input, so it reads none here: a caller may expand this
-# in the arguments of a pipeline's reader, whose input it would otherwise take.
-container_ip() {
-  dc exec -T "$1" hostname -i </dev/null | tr -d '\r' | awk '{print $1}'
-}
-
 # Waits up to 10 s for UDP port `$2` in container `$1` to be bound: the sipp run started there
 # detached is up and answers on it.
 await_bound() {

@@ -5,19 +5,15 @@
 # `run_trunk_status_step`/`run_cert_sync_step`, called directly by run.sh).
 #
 # Reads and sets `run.sh`'s own compose, run_dir, here, api_base, API_PORT, FWD, RUNTIME,
-# OWNER_EMAIL, OWNER_PASSWORD, MAIN_DID, FQDN and fail; sets SIP_USERNAME and SIP_PASSWORD
-# for `run-scenarios.sh` to read.
+# MAIN_DID, FQDN and fail, and test/stack.sh's helpers; sets SIP_USERNAME and SIP_PASSWORD for
+# `run-scenarios.sh` to read.
 
 # The stack's `.env`, then the stack itself, started fresh or, with UPGRADE_FROM, upgraded from
-# a release (upgrade.sh), `assert_migrated`, and the TLS transport on its certificate
+# a release (upgrade.sh), migrate's exit checked, and the TLS transport on its certificate
 # (cert-sync.sh's `await_certificate_synced`). Skipped entirely under REUSE.
 bring_up_stack() {
-  # Checked before anything binds: a pre-existing listener would answer every probe below, and
-  # Docker reports the port as published either way, so the run would silently test another
-  # server.
-  if lsof -nP -iTCP:"$API_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-    fail "something already listens on 127.0.0.1:$API_PORT; set API_PORT to a free port"
-  fi
+  # Checked before anything binds.
+  stack_port_free "$API_PORT"
 
   # Stands alone, before the stack this run drives comes up: its own bring-up and tear-down of a
   # single service on a second, bridge-backed network (runtime-asserts.sh).
@@ -30,11 +26,7 @@ bring_up_stack() {
   # EXTERNAL_IPV4 is `asterisk`'s own fixed address on `internal` (compose.test.yaml), where the
   # sipp peers send their media.
   echo '== writing .env with setup.sh =='
-  ZAMFONO_MODE=ports ZAMFONO_RUNTIME=$RUNTIME ZAMFONO_API_IMAGE=${API_IMAGE:-zamfono/api:ci} \
-    EXTERNAL_IPV4=10.213.47.10 FQDN=$FQDN COMPANY_NAME=CI MAIN_DID=$MAIN_DID COUNTRY=DE \
-    EXT_LENGTH=3 TZ=UTC BOOTSTRAP_OWNER_NAME='CI Owner' BOOTSTRAP_OWNER_EMAIL=$OWNER_EMAIL \
-    OWNER_PASSWORD=$OWNER_PASSWORD stack_dir_env "$run_dir" \
-    || fail "setup.sh could not write the stack's .env: $(cat "$run_dir/setup.log")"
+  stack_write_env "$run_dir" CI 10.213.47.10
 
   if [ -n "${UPGRADE_FROM:-}" ]; then
     upgrade_from_release
@@ -42,20 +34,11 @@ bring_up_stack() {
     echo '== bringing the stack up =='
     stack_recreate
   fi
-  assert_migrated
-  await_certificate_synced
-}
-
-# The runtime-ordering prerequisite §6.3 names inline: migrate ran to completion, so api started
-# on the migrated database. api's and core's healthchecks, the other prerequisite of a tenant
-# driven over REST, are what `stack_recreate` waited for.
-assert_migrated() {
+  # api's and core's healthchecks, the other prerequisite of a tenant driven over REST, are what
+  # `stack_recreate` waited for.
   echo '== §6.3 Runtimes: migrate ran to completion before api started =='
-  local migrate_exit
-  migrate_exit=$(dc ps -a --format '{{.Service}} {{.ExitCode}}' \
-    | awk '$1 == "migrate" { print $2 }')
-  [ "$migrate_exit" = "0" ] \
-    || fail "the migrate service exited $migrate_exit; service_completed_successfully did not hold"
+  stack_assert_migrated
+  await_certificate_synced
 }
 
 # §6.3 Runtimes' own two ordering assertions (runtime-asserts.sh); selectable as `runtime-asserts`.
@@ -105,9 +88,8 @@ configure_tenant() {
   # Asterisk identifies a trunk by source address (§5.6), so the calling container's address
   # becomes the trunk's host and the answering container's subnet the device's allowlist.
   local trunk_ip phone_ip phone_cidr
-  trunk_ip=$(dc exec -T sipp hostname -i | tr -d '\r' | awk '{print $1}')
-  phone_ip=$(dc exec -T sipp-phone hostname -i | tr -d '\r' \
-    | awk '{print $1}')
+  trunk_ip=$(container_ip sipp)
+  phone_ip=$(container_ip sipp-phone)
   phone_cidr="${phone_ip%.*}.0/24"
   read -r SIP_USERNAME SIP_PASSWORD < <(
     bash "$here/configure.sh" "$api_base" "$token" "$trunk_ip" "$phone_cidr"

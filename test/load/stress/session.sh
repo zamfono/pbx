@@ -107,13 +107,12 @@ bash "$here/make_speech.sh" "$ASTERISK_IMAGE" "$LOAD_GEN_DIR" $((CALL_S + 40)) \
 cp "$here"/scenarios/stress-*.xml "$here/devices_ctrl.py" "$LOAD_GEN_DIR/"
 
 stack_host_facts
-stack_write_env
 stack_up
 stack_token
 
-trunk_ip=$(dc exec -T sipp hostname -i | tr -d '\r' | awk '{print $1}')
-provider_ip=$(dc exec -T sipp-provider hostname -i | tr -d '\r' | awk '{print $1}')
-devices_ip=$(dc exec -T devices hostname -i | tr -d '\r' | awk '{print $1}')
+trunk_ip=$(container_ip sipp)
+provider_ip=$(container_ip sipp-provider)
+devices_ip=$(container_ip devices)
 log "trunk sipp=$trunk_ip provider=$provider_ip devices=$devices_ip; configuring $DEVICES users"
 bash "$here/configure-stress.sh" "$api_base" "$token" "$trunk_ip" "$DEVICES" "$LOAD_GEN_DIR" \
   "$provider_ip" \

@@ -9,8 +9,8 @@
 # The release must be one the build under test upgrades from: 0.2.0 or later, since a 0.1.x stack
 # is not upgraded (installed anew instead).
 #
-# Reads and sets `run.sh`'s own compose, run_dir, here, api_base, RUNTIME,
-# OWNER_EMAIL, OWNER_PASSWORD, FQDN and fail.
+# Reads and sets `run.sh`'s own compose, run_dir, here, api_base, RUNTIME, FQDN and fail, and
+# test/stack.sh's helpers.
 
 UPGRADE_REPO=https://github.com/zamfono/pbx
 UPGRADE_REGISTRY=ghcr.io/zamfono
@@ -31,8 +31,7 @@ upgrade_version() {
 # The previous release's API, read with a token of its own, into one JSON document per path.
 upgrade_snapshot() {
   local out=$1 token path
-  token=$(bash "$here/bootstrap-token.sh" "$api_base" "$OWNER_EMAIL" "$OWNER_PASSWORD" "https://$FQDN") \
-    || fail "could not obtain an access token from the release upgraded from"
+  stack_token
   : >"$out"
   for path in "${UPGRADE_SNAPSHOT_PATHS[@]}"; do
     printf '%s\t' "$path" >>"$out"
@@ -122,7 +121,7 @@ PY
 }
 
 # The whole upgrade: the previous release up and ready, its data read, the upgrade, which leaves
-# the stack for `assert_migrated` to check as it checks a fresh one. Leaves the snapshot's path
+# the stack for `stack_assert_migrated` to check as it checks a fresh one. Leaves the snapshot's path
 # in UPGRADE_BEFORE for `upgrade_verify`, once `run.sh` has its own token.
 upgrade_from_release() {
   local version
@@ -130,7 +129,7 @@ upgrade_from_release() {
   [ -n "$version" ] || fail "UPGRADE_FROM=$UPGRADE_FROM names no release"
   UPGRADE_BEFORE=$run_dir/upgrade-before.tsv
   upgrade_start_previous "$version"
-  assert_migrated
+  stack_assert_migrated
   upgrade_snapshot "$UPGRADE_BEFORE"
   upgrade_to_build
 }

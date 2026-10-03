@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 # test/load: the stack bring-up shared by the load drivers (session.sh, stress/session.sh).
-# Sourced, not run. Mirrors test/integration/run.sh's own bring-up: a stack directory of the
-# session's own with the .env setup.sh writes (test/stack.sh), brought up the way update.sh brings
-# a stack up, which waits for its healthchecks, the migrate exit code, a bootstrap owner token.
+# Sourced, not run. test/stack.sh's bring-up, on a stack directory of the session's own.
 #
 # The caller sets, before sourcing: repo, OUT_DIR, COMPOSE, compose_args (array, relative to the
 # stack directory), api_base, FQDN, MAIN_DID, API_IMAGE; optionally METRICS_TOKEN (default empty =
 # /metrics off). Sourcing makes the stack directory, STACK_DIR, and changes into it, and sets
-# compose; it provides: dc, log, fail, test/api.sh's helpers, stack_write_env, stack_up,
-# stack_token, and sets STACK_UP=true once `compose up` ran (the caller's teardown trap keys
+# compose; it provides: log, fail, test/api.sh's and test/stack.sh's helpers, and stack_up, which
+# sets STACK_UP=true once `compose up` ran (the caller's teardown trap keys
 # `down -v` off it, and removes STACK_DIR).
 # RUNTIME (default: the first word of $COMPOSE, i.e. docker or podman) is the CLI used for the
 # plain container/volume commands, so they hit the same image and volume store as the stack
@@ -23,8 +21,6 @@ export RUNTIME
 # shellcheck source=../stack.sh
 . "$repo/test/stack.sh"
 STACK_UP=false
-OWNER_PASSWORD='load-secret'
-OWNER_EMAIL='owner@load.test'
 # What the load stack runs differently from compose.yaml's defaults, handed to Compose through
 # the environment, which it reads before .env: no HEP mirroring, and /metrics behind the token.
 HEP_ENABLED=false
@@ -46,33 +42,15 @@ fail() {
   exit 1
 }
 
-stack_write_env() {
-  ZAMFONO_MODE=ports ZAMFONO_RUNTIME=$RUNTIME ZAMFONO_API_IMAGE=$API_IMAGE \
-    EXTERNAL_IPV4=172.28.0.10 FQDN=$FQDN COMPANY_NAME=Load MAIN_DID=$MAIN_DID COUNTRY=DE \
-    EXT_LENGTH=3 TZ=UTC BOOTSTRAP_OWNER_NAME='Load Owner' BOOTSTRAP_OWNER_EMAIL=$OWNER_EMAIL \
-    OWNER_PASSWORD=$OWNER_PASSWORD stack_dir_env "$STACK_DIR" \
-    || fail "setup.sh could not write the stack's .env: $(cat "$STACK_DIR/setup.log")"
-}
-
+# The stack's .env, then the stack itself, up once healthy and migrated; EXTERNAL_IPV4 is
+# `asterisk`'s fixed address in compose.load.yaml.
 stack_up() {
-  local api_port=${api_base#*127.0.0.1:}
-  if lsof -nP -iTCP:"$api_port" -sTCP:LISTEN >/dev/null 2>&1; then
-    fail "something already listens on 127.0.0.1:$api_port; set API_PORT to a free port"
-  fi
+  stack_port_free "$API_PORT"
+  stack_write_env "$STACK_DIR" Load 172.28.0.10
   log "bringing the stack up"
   STACK_UP=true
   stack_recreate
-
-  local migrate_exit
-  migrate_exit=$(dc ps -a --format '{{.Service}} {{.ExitCode}}' | awk '$1 == "migrate" { print $2 }')
-  [ "$migrate_exit" = "0" ] || fail "migrate exited $migrate_exit"
-}
-
-stack_token() {
-  log "obtaining a bootstrap token"
-  token=$(bash "$repo/test/integration/bootstrap-token.sh" "$api_base" "$OWNER_EMAIL" \
-    "$OWNER_PASSWORD" "https://$FQDN") || fail "could not obtain an access token"
-  [ -n "$token" ] || fail "the token endpoint returned nothing"
+  stack_assert_migrated
 }
 
 # Host facts for the sizing record (docs/spec.md §6.6): nproc, CPU model, free -m, runtimes.
