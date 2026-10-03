@@ -20,8 +20,9 @@ fi
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
 files=(compose.yaml compose.ports.yaml compose.macvlan.yaml Caddyfile litestream.caddy .env.example README.md
-  setup.sh update.sh setup/ui.sh setup/checks.sh setup/envfile.sh setup/boot-unit.sh setup/versions.sh
-  setup/recreate.sh setup/outcome.sh setup/compose.sh)
+  setup.sh update.sh)
+# Every script setup.sh and update.sh source.
+for f in "$root"/deploy/setup/*.sh; do files+=("setup/${f##*/}"); done
 
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT

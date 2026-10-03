@@ -54,14 +54,23 @@ upgrade_start_previous() {
     PROXY_IMAGE=$UPGRADE_REGISTRY/proxy:$version stack_recreate
 }
 
-# The upgrade itself, as deploy/README.md step 8 gives it, by `update.sh`: the build under test's
-# files over the stack directory's, as unpacking its bundle puts them, then the stack recreated
-# the way update.sh recreates it (`stack_recreate`). The images are the build's own, already
-# loaded, so there is nothing to pull.
+# The upgrade itself, as deploy/README.md step 8 gives it: the stack directory's own `update.sh`,
+# release `$1`'s, updates it to the build under test, packed as the next patch release and served
+# as host-update.sh serves one. The images are the build's own, already loaded, so its `pull`
+# finds them present.
 upgrade_to_build() {
-  echo "== §6.3 Upgrades: upgrading to the build under test ($RUNTIME) =="
-  stack_dir_files "$run_dir"
-  stack_recreate
+  local target=${1%.*}.$((${1##*.} + 1))
+  echo "== §6.3 Upgrades: upgrading to the build under test, packed as $target ($RUNTIME) =="
+  host_update_work=$(mktemp -d "${TMPDIR:-/tmp}/zamfono-upgrade.XXXXXX")
+  # run.sh's `cleanup` on exit, after the web server is stopped should the update fail.
+  trap 'host_update_stop; cleanup' EXIT
+  host_update_publish "$target"
+  host_update "$target" \
+    || fail "update.sh $target failed: $(tail -n 40 "$host_update_work/update.log")"
+  host_update_stop
+  trap cleanup EXIT
+  rm -rf "$host_update_work"
+  host_update_work=
   upgrade_assert_images
 }
 
@@ -131,5 +140,5 @@ upgrade_from_release() {
   upgrade_start_previous "$version"
   stack_assert_migrated
   upgrade_snapshot "$UPGRADE_BEFORE"
-  upgrade_to_build
+  upgrade_to_build "$version"
 }

@@ -10,13 +10,14 @@
 # Compose reads this run's files and project from `COMPOSE_FILE` and `COMPOSE_PROJECT_NAME`, as
 # it does for any `docker compose` with no `-f`. The step puts the stack directory back as it
 # found it when it ends, passed or failed: whatever runs after it, in this run or a REUSE one,
-# sees the directory configure.sh's run left. Reads `run.sh`'s own run_dir, repo, RUNTIME, compose, api_base and fail, and api.sh's
-# helpers.
+# sees the directory configure.sh's run left. upgrade.sh upgrades a release's stack to the build
+# under test through the same `host_update_publish` and `host_update`. Reads `run.sh`'s own
+# run_dir, repo, RUNTIME, compose, api_base and fail, and api.sh's helpers.
 
 HOST_UPDATE_FROM=0.2.0
 HOST_UPDATE_TO=0.2.1
 
-# The web server's PID, for `host_update_restore`, and its base URL, for `host_update`.
+# The web server's PID, for `host_update_stop`, and its base URL, for `host_update`.
 host_update_server=
 host_update_repo=
 # The step's own directory, outside the stack's: the bundle served, `update.sh`'s output, and
@@ -26,14 +27,28 @@ host_update_work=
 # The web server stopped, and the stack directory as `run_host_update_step` found it: what the
 # update added removed, everything else back from the snapshot.
 host_update_restore() {
-  [ -z "$host_update_server" ] || kill "$host_update_server" 2>/dev/null || true
-  host_update_server=
+  host_update_stop
   [ -n "$host_update_work" ] || return 0
   (cd "$run_dir" && find . -mindepth 1 | sort) \
     | comm -13 "$host_update_work/files" - | sort -r | (cd "$run_dir" && xargs -r rm -rf --)
   tar -C "$run_dir" -xf "$host_update_work/dir.tar"
   rm -rf "$host_update_work"
   host_update_work=
+}
+
+# The web server stopped.
+host_update_stop() {
+  [ -z "$host_update_server" ] || kill "$host_update_server" 2>/dev/null || true
+  host_update_server=
+}
+
+# This checkout's deploy/ packed as release `$1` by .github/scripts/deploy-bundle.sh, under
+# `host_update_work`, and served the way GitHub serves release assets (`host_update_serve`).
+host_update_publish() {
+  local web=$host_update_work/web
+  bash "$repo/.github/scripts/deploy-bundle.sh" "$1" "$web/releases/download/v$1" >/dev/null \
+    || fail "deploy-bundle.sh could not pack $1"
+  host_update_serve "$web"
 }
 
 # Serves directory `$1` on a free port of 127.0.0.1, at `host_update_repo` once it answers.
@@ -62,12 +77,8 @@ run_host_update_step() {
   tar -C "$run_dir" -cf "$host_update_work/dir.tar" .
   # run.sh's `cleanup` on exit, after the directory is put back should a check fail.
   trap 'host_update_restore; cleanup' EXIT
-  local web=$host_update_work/web
-  bash "$repo/.github/scripts/deploy-bundle.sh" "$HOST_UPDATE_TO" \
-    "$web/releases/download/v$HOST_UPDATE_TO" >/dev/null \
-    || fail "deploy-bundle.sh could not pack $HOST_UPDATE_TO"
   echo "$HOST_UPDATE_FROM" >"$run_dir/VERSION"
-  host_update_serve "$web"
+  host_update_publish "$HOST_UPDATE_TO"
 
   host_update --check "$HOST_UPDATE_TO" || verdict=$?
   [ "$verdict" = 0 ] \
