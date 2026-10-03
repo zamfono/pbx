@@ -5,7 +5,13 @@
  */
 import type { AriClient } from '../ari/client.js';
 import { isGone, logUnlessGone } from '../ari/failures.js';
-import type { AriEvent, Channel } from '../ari/types.js';
+import type { Channel } from '../ari/types.js';
+import {
+  channelLeft,
+  playbackFinished,
+  waitForEvent,
+  type EventWait
+} from './ariWaits.js';
 
 // Asterisk emits a caller channel's StasisEnd and ChannelDestroyed exactly once each; a caller
 // channel already torn down before this wait's own listener was registered (an earlier
@@ -37,37 +43,20 @@ export function playAndWait(
   media: string,
   playbackId: string
 ): Promise<PlaybackEnd> {
-  return new Promise(resolve => {
-    const finish = (end: PlaybackEnd): void => {
-      // eslint-disable-next-line no-use-before-define -- finish, onEvent and timer all reference each other; each is declared below
-      ari.off('event', onEvent);
-      // eslint-disable-next-line no-use-before-define -- see above
-      clearTimeout(timer);
-      resolve(end);
-    };
-    function onEvent(ev: AriEvent): void {
-      const playback = ev.playback as { id?: string } | undefined;
-      if (ev.type === 'PlaybackFinished' && playback?.id === playbackId) {
-        finish('finished');
-        return;
-      }
-      const channel = ev.channel as Channel | undefined;
-      if (
-        channel?.id === channelId &&
-        (ev.type === 'ChannelDestroyed' || ev.type === 'StasisEnd')
-      ) {
-        finish('hangup');
-      }
+  const wait = waitForEvent<PlaybackEnd>(ari, (ev, waiting) => {
+    if (playbackFinished(ev, playbackId)) {
+      waiting.settle('finished');
+    } else if (channelLeft(ev, channelId)) {
+      waiting.settle('hangup');
     }
-    ari.on('event', onEvent);
-    const timer = setTimeout(() => {
-      finish('failed');
-    }, PLAYBACK_FALLBACK_MS);
-    timer.unref();
-    ari.channels.play(channelId, media, playbackId).catch((error: unknown) => {
-      finish(isGone(error) ? 'hangup' : 'failed');
-    });
   });
+  wait.arm(PLAYBACK_FALLBACK_MS, () => {
+    wait.settle('failed');
+  });
+  ari.channels.play(channelId, media, playbackId).catch((error: unknown) => {
+    wait.settle(isGone(error) ? 'hangup' : 'failed');
+  });
+  return wait.promise;
 }
 
 /**
@@ -85,35 +74,84 @@ export function playToneAndWait(
   playbackId: string,
   durationMs: number
 ): Promise<PlaybackEnd> {
-  return new Promise(resolve => {
-    const finish = (end: PlaybackEnd): void => {
-      // eslint-disable-next-line no-use-before-define -- finish, onEvent and timer all reference each other; each is declared below
-      ari.off('event', onEvent);
-      // eslint-disable-next-line no-use-before-define -- see above
-      clearTimeout(timer);
-      resolve(end);
-    };
-    function onEvent(ev: AriEvent): void {
-      const channel = ev.channel as Channel | undefined;
-      if (
-        channel?.id === channelId &&
-        (ev.type === 'ChannelDestroyed' || ev.type === 'StasisEnd')
-      ) {
-        finish('hangup');
-      }
+  const wait = waitForEvent<PlaybackEnd>(ari, (ev, waiting) => {
+    if (channelLeft(ev, channelId)) {
+      waiting.settle('hangup');
     }
-    ari.on('event', onEvent);
-    const timer = setTimeout(() => {
-      ari.playbacks
-        .stop(playbackId)
-        .catch(logUnlessGone(ari.log, 'tone stop'))
-        .finally(() => {
-          finish('finished');
-        });
-    }, durationMs);
-    timer.unref();
-    ari.channels.play(channelId, media, playbackId).catch((error: unknown) => {
-      finish(isGone(error) ? 'hangup' : 'failed');
-    });
   });
+  wait.arm(durationMs, () => {
+    ari.playbacks
+      .stop(playbackId)
+      .catch(logUnlessGone(ari.log, 'tone stop'))
+      .finally(() => {
+        wait.settle('finished');
+      });
+  });
+  ari.channels.play(channelId, media, playbackId).catch((error: unknown) => {
+    wait.settle(isGone(error) ? 'hangup' : 'failed');
+  });
+  return wait.promise;
+}
+
+/** How a play-then-key wait ends when the channel goes away. */
+export type KeyHangup = { kind: 'hangup' };
+
+/** What a play-then-key wait does with the media's end and the caller's keys. */
+export type KeyInput<T> = {
+  /** Runs once when the media ended without a key: played out, or its play request refused. */
+  mediaEnded: (wait: EventWait<T | KeyHangup>) => void;
+  /** Runs on every key; the first one has already stopped the media. */
+  digit: (digit: string, wait: EventWait<T | KeyHangup>) => void;
+};
+
+/**
+ * Plays `media` on `channelId` with barge-in and hands the caller's keys to `input`: a key while
+ * the media still plays stops it, so a caller who knows the menu never waits for it; otherwise
+ * `input.mediaEnded` runs once the media has played out, or at once when Asterisk refuses the
+ * play request, since no `PlaybackFinished` then follows. The channel going away (or being gone
+ * already, so the play is refused) resolves `hangup`. `playbackId` must be unique per call, since
+ * it is what the media's own `PlaybackFinished` is matched by.
+ */
+export function playForKeys<T>(
+  ari: AriClient,
+  prompt: {
+    channelId: string;
+    media: string | readonly string[];
+    playbackId: string;
+  },
+  input: KeyInput<T>
+): Promise<T | KeyHangup> {
+  const { channelId, media, playbackId } = prompt;
+  let playing = true;
+  const mediaEnded = (wait: EventWait<T | KeyHangup>): void => {
+    if (playing) {
+      playing = false;
+      input.mediaEnded(wait);
+    }
+  };
+  const wait = waitForEvent<T | KeyHangup>(ari, (ev, waiting) => {
+    if (playbackFinished(ev, playbackId)) {
+      mediaEnded(waiting);
+    } else if (channelLeft(ev, channelId)) {
+      waiting.settle({ kind: 'hangup' });
+    } else if (
+      ev.type === 'ChannelDtmfReceived' &&
+      (ev.channel as Channel | undefined)?.id === channelId &&
+      typeof ev.digit === 'string'
+    ) {
+      if (playing) {
+        playing = false;
+        stopPlayback(ari, playbackId);
+      }
+      input.digit(ev.digit, waiting);
+    }
+  });
+  ari.channels.play(channelId, media, playbackId).catch((error: unknown) => {
+    if (isGone(error)) {
+      wait.settle({ kind: 'hangup' });
+    } else {
+      mediaEnded(wait);
+    }
+  });
+  return wait.promise;
 }

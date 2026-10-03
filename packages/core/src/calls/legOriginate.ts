@@ -33,7 +33,8 @@
  * `ChannelDestroyed` can arrive.
  */
 import { logUnlessGone } from '../ari/failures.js';
-import type { AriEvent, Channel, OriginateParams } from '../ari/types.js';
+import type { Channel, OriginateParams } from '../ari/types.js';
+import { waitForStasisEntry } from './ariWaits.js';
 import type { Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 
@@ -52,45 +53,6 @@ export class PlacementError extends Error {
     this.name = 'PlacementError';
     this.step = step;
   }
-}
-
-type StasisResult = 'entered' | 'gone' | 'timeout';
-
-/** Resolves once `channelId` has entered the app, has gone, or `waitMs` has passed;
- * listening from before the create, since the `StasisStart` may precede the create's answer. */
-function stasisEntry(
-  ari: Pipeline['deps']['ari'],
-  channelId: string,
-  waitMs: number
-): { entered: Promise<StasisResult>; stop: () => void } {
-  const { promise, resolve } = Promise.withResolvers<StasisResult>();
-  const onEvent = (event: AriEvent): void => {
-    const channel = event.channel as Channel | undefined;
-    if (channel?.id !== channelId) {
-      return;
-    }
-    if (event.type === 'StasisStart') {
-      resolve('entered');
-    } else if (event.type === 'ChannelDestroyed') {
-      resolve('gone');
-    }
-  };
-  const timer = setTimeout(() => {
-    resolve('timeout');
-  }, waitMs);
-  timer.unref();
-  ari.on('event', onEvent);
-  const stop = (): void => {
-    clearTimeout(timer);
-    ari.off('event', onEvent);
-  };
-  return {
-    entered: promise.then(result => {
-      stop();
-      return result;
-    }),
-    stop
-  };
 }
 
 /** An originate's caller ID as the variables a created channel takes it in. */
@@ -121,21 +83,25 @@ export async function originateLeg(
   const { ari, cdr } = pipeline.deps;
   const { callerId, timeout, variables, ...placement } = params;
   const { channelId } = placement;
-  const stasis = stasisEntry(ari, channelId, pipeline.deps.legStasisWaitMs);
+  const stasis = waitForStasisEntry(
+    ari,
+    channelId,
+    pipeline.deps.legStasisWaitMs
+  );
   const channel = await ari.channels
     .create({
       ...placement,
       variables: { ...callerIdVariables(callerId), ...variables }
     })
     .catch((error: unknown) => {
-      stasis.stop();
+      stasis.settle('gone');
       throw new PlacementError('create', error);
     });
   const joined = cdr.joinLeg(call, channel.id);
   if (call.log.level === 'sip') {
     await joined;
   }
-  if ((await stasis.entered) !== 'entered') {
+  if ((await stasis.promise) !== 'entered') {
     await ari.channels.hangup(channel.id).catch(
       logUnlessGone(pipeline.deps.logger, 'unplaced leg hangup', {
         callId: call.id

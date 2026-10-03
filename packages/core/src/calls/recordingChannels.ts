@@ -10,7 +10,7 @@ import { newId } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import { logFailure, logUnlessGone } from '../ari/failures.js';
-import type { AriEvent, Channel } from '../ari/types.js';
+import { waitForRecording, waitForStasisEntry } from './ariWaits.js';
 import type { RecordFormat } from './recordingRate.js';
 
 // ARI's `record()` has no natural cap for a call recording (unlike voicemail's
@@ -24,69 +24,15 @@ const RECORDING_FINISHED_TIMEOUT_MS = 5000;
 // is taken to have failed, and the participation goes unrecorded (§10.2 "Best effort").
 const SNOOP_STASIS_TIMEOUT_MS = 2000;
 
-/** Waits for Asterisk's `RecordingFinished` event for the snoop recording named `name` (§10.2):
- * its file is closed, and the mix can read it. The event's own `duration` is not used — Asterisk
- * divides the samples by 8000 whatever the format, doubling a `wav16` recording's — the mix
- * measures the file instead (`recordingMix.ts`). */
-export function waitForRecordingFinished(
+/** Waits for the end of the snoop recording named `name` (§10.2): its file is closed, and the mix
+ * can read it. The event's own `duration` is not used — Asterisk divides the samples by 8000
+ * whatever the format, doubling a `wav16` recording's — the mix measures the file instead
+ * (`recordingMix.ts`). */
+export async function waitForRecordingFinished(
   ari: AriClient,
   name: string
 ): Promise<void> {
-  const { promise, resolve } = Promise.withResolvers<undefined>();
-  const onEvent = (ev: AriEvent): void => {
-    const recording = ev.recording as { name?: string } | undefined;
-    if (ev.type === 'RecordingFinished' && recording?.name === name) {
-      resolve(undefined);
-    }
-  };
-  ari.on('event', onEvent);
-  const timer = setTimeout(() => {
-    resolve(undefined);
-  }, RECORDING_FINISHED_TIMEOUT_MS);
-  timer.unref();
-  return promise.finally(() => {
-    ari.off('event', onEvent);
-    clearTimeout(timer);
-  });
-}
-
-/** A wait for a channel's `StasisStart`, and its cancellation for a channel never created. */
-type StasisWait = { entered: Promise<boolean>; cancel: () => void };
-
-/** Waits for the channel `channelId` to enter the Stasis application: `true` once it has,
- * `false` if it is destroyed first or `timeoutMs` passes. Subscribed before the channel exists,
- * so its `StasisStart` cannot slip past, however early Asterisk sends it. */
-function waitForStasisStart(
-  ari: AriClient,
-  channelId: string,
-  timeoutMs: number
-): StasisWait {
-  const { promise, resolve } = Promise.withResolvers<boolean>();
-  const onEvent = (ev: AriEvent): void => {
-    if ((ev.channel as Channel | undefined)?.id !== channelId) {
-      return;
-    }
-    if (ev.type === 'StasisStart') {
-      resolve(true);
-    } else if (ev.type === 'ChannelDestroyed') {
-      resolve(false);
-    }
-  };
-  ari.on('event', onEvent);
-  const timer = setTimeout(() => {
-    resolve(false);
-  }, timeoutMs);
-  timer.unref();
-  const entered = promise.finally(() => {
-    ari.off('event', onEvent);
-    clearTimeout(timer);
-  });
-  return {
-    entered,
-    cancel: () => {
-      resolve(false);
-    }
-  };
+  await waitForRecording(ari, name, RECORDING_FINISHED_TIMEOUT_MS);
 }
 
 // Asterisk's snoop `spy` direction is from the channel's own perspective: `in` is what
@@ -103,7 +49,7 @@ async function startSnoop(
   format: RecordFormat
 ): Promise<string> {
   const snoopId = newId();
-  const stasis = waitForStasisStart(ari, snoopId, SNOOP_STASIS_TIMEOUT_MS);
+  const stasis = waitForStasisEntry(ari, snoopId, SNOOP_STASIS_TIMEOUT_MS);
   try {
     await ari.channels.snoop(channelId, {
       spy,
@@ -113,11 +59,11 @@ async function startSnoop(
       snoopId
     });
   } catch (error) {
-    stasis.cancel();
+    stasis.settle('gone');
     throw error;
   }
   try {
-    if (!(await stasis.entered)) {
+    if ((await stasis.promise) !== 'entered') {
       throw new Error('snoop channel never entered Stasis');
     }
     await ari.channels.record(snoopId, {

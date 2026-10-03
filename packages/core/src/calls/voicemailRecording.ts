@@ -7,7 +7,8 @@ import { MS_PER_SECOND } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import { isGone } from '../ari/failures.js';
-import type { AriEvent, RecordParams } from '../ari/types.js';
+import type { RecordParams } from '../ari/types.js';
+import { channelLeft, recordingEnd, waitForEvent } from './ariWaits.js';
 
 // §10.2 "Voicemail": the silence stop is a fixed constant, not a per-tenant setting, since it has
 // to outlast a caller's pause for thought and stay short enough not to record dead air.
@@ -42,54 +43,29 @@ function recordAndWait(
   options: RecordParams,
   timeoutMs: number
 ): Promise<RecordingOutcome> {
-  const { name } = options;
-  return new Promise(resolve => {
-    // Rearmed when the caller's channel goes, so the two waits share one handle.
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const finish = (outcome: RecordingOutcome): void => {
-      // eslint-disable-next-line no-use-before-define -- finish and onEvent reference each other
-      ari.off('event', onEvent);
-      if (timer !== null) {
-        clearTimeout(timer);
-      }
-      resolve(outcome);
-    };
-    function onEvent(ev: AriEvent): void {
-      const channel = ev.channel as { id?: string } | undefined;
-      if (
-        (ev.type === 'ChannelDestroyed' || ev.type === 'StasisEnd') &&
-        channel?.id === channelId
-      ) {
-        if (timer !== null) {
-          clearTimeout(timer);
-        }
-        timer = setTimeout(() => {
-          finish({ kind: 'destroyed' });
-        }, RECORDING_AFTER_HANGUP_MS);
-        timer.unref();
-        return;
-      }
-      const recording = ev.recording as
-        { name?: string; duration?: number } | undefined;
-      if (recording?.name !== name) {
-        return;
-      }
-      if (ev.type === 'RecordingFinished') {
-        finish({ kind: 'finished', durationS: recording.duration ?? 0 });
-      } else if (ev.type === 'RecordingFailed') {
-        finish({ kind: 'failed' });
-      }
+  const wait = waitForEvent<RecordingOutcome>(ari, (ev, waiting) => {
+    if (channelLeft(ev, channelId)) {
+      // The grace replaces the safety net: the recording's own end is due within it.
+      waiting.arm(RECORDING_AFTER_HANGUP_MS, () => {
+        waiting.settle({ kind: 'destroyed' });
+      });
+      return;
     }
-    ari.on('event', onEvent);
-    timer = setTimeout(() => {
-      finish({ kind: 'failed' });
-    }, timeoutMs);
-    timer.unref();
-    // Requested once the listener is up, so no outcome of the recording can fire unseen.
-    ari.channels.record(channelId, options).catch((error: unknown) => {
-      finish({ kind: isGone(error) ? 'destroyed' : 'failed' });
-    });
+    const end = recordingEnd(ev, options.name);
+    if (end !== undefined) {
+      waiting.settle(
+        end === null ? { kind: 'failed' } : { kind: 'finished', durationS: end }
+      );
+    }
   });
+  wait.arm(timeoutMs, () => {
+    wait.settle({ kind: 'failed' });
+  });
+  // Requested once the listener is up, so no outcome of the recording can fire unseen.
+  ari.channels.record(channelId, options).catch((error: unknown) => {
+    wait.settle({ kind: isGone(error) ? 'destroyed' : 'failed' });
+  });
+  return wait.promise;
 }
 
 /** Records the caller as `name` (§10.2 "Voicemail": capped at `settings.voicemail_max_s`, a 5 s

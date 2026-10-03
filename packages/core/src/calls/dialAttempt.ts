@@ -8,7 +8,7 @@ import { newId } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import { logFailure, logUnlessGone } from '../ari/failures.js';
-import type { AriEvent, Channel } from '../ari/types.js';
+import type { Channel } from '../ari/types.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import {
   ATTEMPT_NO_RESPONSE_MS,
@@ -16,6 +16,7 @@ import {
   type Route
 } from '../routing/trunk.js';
 import { SIP_SERVER_ERROR } from '../sipCodes.js';
+import { waitForEvent } from './ariWaits.js';
 import type { Leg } from './call.js';
 import { callRinging } from './callState.js';
 import { alertsOn, provisionalArrived, type TrunkLeg } from './provisional.js';
@@ -55,41 +56,14 @@ type AttemptWatch = {
  * leg's placement returns.
  */
 function watchAttemptOutcome(ari: AriClient, channelId: string): AttemptWatch {
-  const { promise, resolve } = Promise.withResolvers<AttemptOutcome>();
   let alerted = false;
-  let settled = false;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  // Set right below, before `stop` can possibly run; a holder, so it needs no dummy initializer.
-  const listener: { onEvent: ((event: AriEvent) => void) | null } = {
-    onEvent: null
-  };
-  const stopBudget = (): void => {
-    if (timer !== null) {
-      clearTimeout(timer);
-      timer = null;
-    }
-  };
-  const stop = (): void => {
-    stopBudget();
-    if (listener.onEvent !== null) {
-      ari.off('event', listener.onEvent);
-    }
-  };
-  const finish = (outcome: AttemptOutcome): void => {
-    if (settled) {
-      return;
-    }
-    settled = true;
-    stop();
-    resolve(outcome);
-  };
-  listener.onEvent = event => {
+  const wait = waitForEvent<AttemptOutcome>(ari, (event, waiting) => {
     if (!alerted && alertsOn(event, channelId)) {
       // The no-response budget covers only the interval before the first provisional
       // response (§9.4 "Route fallthrough"); once the far end alerted, the attempt is final
       // only on answer or a terminal response, never on this timer.
       alerted = true;
-      stopBudget();
+      waiting.disarm();
       return;
     }
     const channel = event.channel as Channel | undefined;
@@ -97,34 +71,40 @@ function watchAttemptOutcome(ari: AriClient, channelId: string): AttemptWatch {
       return;
     }
     if (event.type === 'ChannelStateChange' && channel.state === 'Up') {
-      finish({ kind: 'answered', channelId });
+      waiting.settle({ kind: 'answered', channelId });
       return;
     }
     if (event.type === 'ChannelDestroyed') {
       const code = endedSipStatus(event);
-      finish({ kind: 'failure', failure: { kind: 'final', code, alerted } });
+      waiting.settle({
+        kind: 'failure',
+        failure: { kind: 'final', code, alerted }
+      });
     }
-  };
-  ari.on('event', listener.onEvent);
+  });
   const start = (leg: TrunkLeg, timeoutMs: number): void => {
-    if (settled || alerted) {
+    if (alerted) {
       return;
     }
-    timer = setTimeout(() => {
-      timer = null;
+    wait.arm(timeoutMs, () => {
       // A `100 Trying` ends the budget as any provisional response does, though no event says
       // so; the attempt then waits for its outcome like one that alerted.
       provisionalArrived(ari, leg)
         .then(arrived => {
           if (!arrived) {
-            finish({ kind: 'failure', failure: { kind: 'noResponse' } });
+            wait.settle({ kind: 'failure', failure: { kind: 'noResponse' } });
           }
         })
         .catch(logFailure(ari.log, 'provisional response read'));
-    }, timeoutMs);
-    timer.unref();
+    });
   };
-  return { outcome: promise, start, stop };
+  return {
+    outcome: wait.promise,
+    start,
+    stop: () => {
+      wait.settle({ kind: 'failure', failure: PLACEMENT_FAILED });
+    }
+  };
 }
 
 /** Decrements the trunk's active count once the answered leg's channel eventually ends. */
@@ -133,15 +113,14 @@ function watchAttemptChannelEnd(
   trunkState: TrunkState,
   channelId: string
 ): void {
-  const onEvent = (event: AriEvent): void => {
+  waitForEvent<undefined>(ari, (event, wait) => {
     const channel = event.channel as Channel | undefined;
     if (channel?.id !== channelId || event.type !== 'ChannelDestroyed') {
       return;
     }
-    ari.off('event', onEvent);
+    wait.settle(undefined);
     trunkState.noteAttemptEnded(channelId);
-  };
-  ari.on('event', onEvent);
+  });
 }
 
 export type AttemptCtx = TrunkLegCtx & { route: Route | null };

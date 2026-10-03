@@ -14,6 +14,7 @@ import type { AriEvent, Logger } from '../ari/types.js';
 import type { EventBus } from '../internal/eventBus.js';
 import type { ConfigCache } from '../internal/snapshot.js';
 import type { StateStore } from '../internal/stateStore.js';
+import { waitForEvent } from './ariWaits.js';
 import {
   contactEventStatus,
   endpointStatuses,
@@ -108,19 +109,18 @@ export class TrunkState {
    */
   watchInboundLeg(channelId: string): (trunkId: string | null) => void {
     let destroyed = false;
-    const onEvent = (event: AriEvent): void => {
+    const watch = waitForEvent<undefined>(this.deps.ari, (event, waiting) => {
       const channel = event.channel as { id?: string } | undefined;
       if (event.type !== 'ChannelDestroyed' || channel?.id !== channelId) {
         return;
       }
-      this.deps.ari.off('event', onEvent);
+      waiting.settle(undefined);
       destroyed = true;
       this.noteAttemptEnded(channelId);
-    };
-    this.deps.ari.on('event', onEvent);
+    });
     return trunkId => {
       if (trunkId === null) {
-        this.deps.ari.off('event', onEvent);
+        watch.settle(undefined);
         return;
       }
       // A leg already gone never occupies a channel.
