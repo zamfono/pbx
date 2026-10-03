@@ -20,9 +20,13 @@ networks:
       config:
         - subnet: 10.213.47.0/24
 
+# Every service's image is the build under test, or a third-party one pinned here, and the run
+# starts with them present: `pull_policy: missing` keeps a `pull` (update.sh's, host-update.sh)
+# from asking a registry for an image the run already holds or none publishes.
 services:
   asterisk:
     image: ${ASTERISK_IMAGE:-zamfono/asterisk:ci}
+    pull_policy: missing
     # Reachable by name from the sipp container without publishing anything to the runner. The
     # `zamfono` alias is the CN of the placeholder TLS certificate the entrypoint generates
     # (images/asterisk/entrypoint.sh), the way test/load/stress's own baresip devices still dial
@@ -42,15 +46,19 @@ services:
 
   migrate:
     image: ${MIGRATE_IMAGE:-zamfono/migrate:ci}
+    pull_policy: missing
 
   core:
     image: ${CORE_IMAGE:-zamfono/core:ci}
+    pull_policy: missing
 
   updater:
     image: ${UPDATER_IMAGE:-zamfono/updater:ci}
+    pull_policy: missing
 
   api:
     image: ${API_IMAGE:-zamfono/api:ci}
+    pull_policy: missing
     # The scenarios drive the REST surface directly rather than through Caddy, so a failure is the
     # stack's own and not TLS or the proxy's. The host port is the harness's own (`API_PORT`), not
     # a fixed 3000: a developer machine usually has something on 3000 already, and Docker reports
@@ -68,6 +76,7 @@ services:
   # (§8, cert-sync.sh).
   proxy:
     image: ${PROXY_IMAGE:?set by run.sh}
+    pull_policy: missing
     volumes:
       - ${CERT_SYNC_CADDYFILE:?set by run.sh}:/etc/caddy/global.d/local-certs.caddy:ro
 
@@ -76,6 +85,7 @@ services:
   # phone resolve to the trunk endpoint instead.
   sipp:
     image: *sipp-image
+    pull_policy: missing
     networks:
       - internal
     # An absolute path from `run.sh`: a relative one resolves against the project directory,
@@ -97,6 +107,7 @@ services:
 
   sipp-phone:
     image: *sipp-image
+    pull_policy: missing
     networks:
       - internal
     volumes:
@@ -115,6 +126,7 @@ services:
   # identification"), never by where they come from.
   sipp-provider:
     image: *sipp-image
+    pull_policy: missing
     networks:
       - internal
     volumes:
@@ -132,6 +144,7 @@ services:
   # are built from.
   sip-tls:
     image: ${TLS_FRONT_IMAGE:-node:26-slim}
+    pull_policy: missing
     networks:
       - internal
     volumes:
@@ -151,6 +164,7 @@ services:
   # test/load/stress/devices` (CI's `images` job does this for `DEVICES_IMAGE`).
   devices:
     image: ${DEVICES_IMAGE:-zamfono/test-devices:ci}
+    pull_policy: missing
     networks:
       - internal
     entrypoint: ['sleep', 'infinity']
