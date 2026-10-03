@@ -116,10 +116,9 @@ configure_tenant() {
   echo "   device $SIP_USERNAME, ring group extension $GROUP_EXT"
 }
 
-# §6.5 "Default target": the stack's start created a `local` target from BACKUP_PASSWORD (on the
-# upgrade shard, the start of the release under test on a database the old one wrote, which had
-# none), and a manual run against it creates the repository and backs up for real, through the
-# image's own restic. Selectable as `backups`; cheap enough to run on every shard. Leaves
+# §6.5 "Default target": the stack's start created a `local` target from BACKUP_PASSWORD, and a
+# manual run against it creates the repository and backs up for real, through the image's own
+# restic. Selectable as `backups`; cheap enough to run on every shard. Leaves
 # `backed_up` set for `step_updater`.
 step_backups() {
   echo '== backing up to the default local target =='

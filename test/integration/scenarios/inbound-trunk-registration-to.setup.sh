@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # §9.4 "Inbound identification", "Inbound number normalization": a `registration` trunk whose
 # provider addresses the INVITE to the contact the trunk registered, so its Request-URI user is the
-# account name, and carries the dialled number in `To` alone — mucpbx does, and its calls failed
-# with 404 until the boundary read `To`. No DID bears the account name here, so only the number in
-# `To` can route the call. The trunk registers at once (inbound-trunk-registration covers the
-# refused REGISTERs); the call is placed once it reports `registered` and the registrar holds the
-# `line` tag.
+# account name, and carries the dialled number in `To` alone, as mucpbx does. No DID bears the
+# account name here, so only the number in `To` can route the call. The trunk registers at once
+# (inbound-trunk-registration covers the refused REGISTERs); the call is placed once it reports
+# `registered` and the registrar holds the `line` tag.
 set -euo pipefail
 
 api_base=$1

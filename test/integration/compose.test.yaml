@@ -11,8 +11,8 @@ x-sipp-image: &sipp-image ${SIPP_IMAGE:-ctaloi/sipp:latest@sha256:c459f2340443dd
 # `internal` has a fixed subnet and `asterisk` a fixed address on it, which `.env` names as
 # `EXTERNAL_IPV4` (steps.sh): the ports mode writes that address into SIP and SDP (§9.1), and the
 # sipp containers are peers on `internal`, not clients on the host's network, so it has to be the
-# one they reach Asterisk at. With the host's own loopback there, as before, every peer sent its
-# RTP to its own loopback and no packet reached Asterisk; a leg's `call_qos` row read all null.
+# one they reach Asterisk at: a loopback address there would send every peer's RTP to its own
+# loopback.
 # Outside Docker's and Podman's default address pools, like test/load's own (`compose.load.yaml`).
 networks:
   internal:

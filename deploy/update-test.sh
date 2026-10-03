@@ -79,7 +79,7 @@ chmod 755 "$work/bin/systemctl"
 # No boot unit unless a case installs one.
 mkdir -p "$work/units"
 
-# A stack as 1.2.3 set it up, before update.sh existed to add the updater's settings.
+# A stack as 1.2.3 set it up.
 fresh_stack() {
   rm -rf "$work/stack"
   cp -a "$stack_src" "$work/stack"

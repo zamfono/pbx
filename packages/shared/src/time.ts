@@ -12,9 +12,6 @@ export const MS_PER_DAY = 86_400_000;
 
 export const MINUTES_PER_HOUR = 60;
 
-/** The days of a week, Monday to Sunday. */
-export const DAYS_PER_WEEK = 7;
-
 /** The current instant as an ISO 8601 UTC timestamp, the format stored in every `_at` column (§11.1). */
 export function nowIso(): string {
   return new Date().toISOString();

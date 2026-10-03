@@ -55,7 +55,7 @@ cleanup() {
   rm -rf "$STACK_DIR"
   rm -rf "$LOAD_GEN_DIR"
   for img in "$ASTERISK_IMAGE" "$MIGRATE_IMAGE" "$CORE_IMAGE" "$API_IMAGE"; do
-    docker rmi "$img" >>"$OUT_DIR/session.log" 2>&1 || true
+    "$RUNTIME" rmi "$img" >>"$OUT_DIR/session.log" 2>&1 || true
   done
   log "teardown complete"
 }

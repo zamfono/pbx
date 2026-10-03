@@ -52,7 +52,7 @@ src_crt="$storage_root/$cert_rel"
 src_key="$storage_root/$key_rel"
 
 if [ ! -r "$src_crt" ] || [ ! -r "$src_key" ]; then
-  log "'$src_crt' or '$src_key' is not readable yet; leaving it to the hourly api fallback"
+  log "'$src_crt' or '$src_key' is not readable yet; no copy made until the next issuance or a proxy restart"
   exit 0
 fi
 

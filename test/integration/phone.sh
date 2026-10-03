@@ -31,7 +31,7 @@ action=$2
 # shellcheck source=scenarios/_lib.sh
 . "$(dirname "$0")/scenarios/_lib.sh"
 PORT=${PHONE_PORT:-5070}
-# The first device's names stay what they always were; a second one's carry its port, and its
+# The first device's names carry no suffix; a second one's carry its port, and its
 # media ports are its own, clear of the 6000 onwards sipp takes by default.
 SUFFIX=${PHONE_PORT:+-$PHONE_PORT}
 MEDIA_ARGS=${PHONE_PORT:+-mp $((PHONE_PORT + 2000))}
