@@ -1,18 +1,6 @@
 type Env = Record<string, string | undefined>;
 
 /**
- * The stack's public hostname, the `FQDN` of `.env`, which every stack has (§6.1, §6.3
- * "Environment"); throws while it is unset, which `api`'s boot does first (`hooks.server.ts`).
- */
-export function stackDomain(env: Env): string {
-  // An empty value is unset: compose.yaml hands `${FQDN}` to `api` as is.
-  if (!env.FQDN) {
-    throw new Error('FQDN environment variable is required.');
-  }
-  return env.FQDN;
-}
-
-/**
  * The stack's public origin, `https://${fqdn}`: the OAuth issuer, the MCP resource and the base of
  * every absolute link `api` hands out (§5.2).
  */

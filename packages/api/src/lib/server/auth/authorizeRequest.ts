@@ -6,7 +6,7 @@ import { HTTP_BAD_REQUEST, type Db } from '@zamfono/shared';
 import type { Keyring } from '../secretbox.js';
 import {
   authorizationErrorRedirect,
-  requiredOrigin
+  originFromEnv
 } from './authorizationResponse.js';
 import {
   decodeMetadataClientId,
@@ -160,7 +160,7 @@ export async function resolveClient(
   }
   // RFC 8707 §2: a `resource` this server issues no tokens for is refused as `invalid_target`
   // before the person logs in; the token request checks it again (`tokenEndpoint.ts`).
-  if (!requestedResourceAcceptable(requiredOrigin(), params)) {
+  if (!requestedResourceAcceptable(originFromEnv(), params)) {
     authorizationErrorRedirect({ redirectUri, state }, 'invalid_target');
   }
   return {

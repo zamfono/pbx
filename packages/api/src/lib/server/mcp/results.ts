@@ -4,7 +4,7 @@ import { isRecord, resolveVersion } from '@zamfono/shared';
 
 import type { OpError } from '../ops/types.js';
 import { extensionMembers } from '../problem.js';
-import { stackDomain, stackOrigin } from '../stackAddress.js';
+import { stackOrigin } from '../stackAddress.js';
 import { SUPPORTED_PROTOCOL_VERSIONS } from './era.js';
 import type { PromptContent } from './prompts.js';
 
@@ -58,8 +58,10 @@ const ICONS = [
  * The `serverInfo` (`Implementation`) both eras send (§10.5); an icon's `src` is an absolute URI
  * on the stack's own origin.
  */
-export function serverInfo(env: NodeJS.ProcessEnv): Result {
-  const origin = stackOrigin(stackDomain(env));
+export function serverInfo(
+  env: Readonly<Record<string, string | undefined>> & { FQDN: string }
+): Result {
+  const origin = stackOrigin(env.FQDN);
   return {
     name: 'zamfono',
     title: 'Zamfono',

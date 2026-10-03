@@ -6,6 +6,7 @@ import {
   type Cookies,
   type RequestEvent
 } from '@sveltejs/kit';
+import * as privateEnv from '$app/env/private';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
@@ -36,7 +37,7 @@ process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')
 
 /** A dynamically-registered client id (§5.2), so tests never hit the network for a CIMD fetch. */
 function testClientId(redirectUri: string): string {
-  return encodeMetadataClientId(keyringFromEnv(process.env), {
+  return encodeMetadataClientId(keyringFromEnv(privateEnv), {
     name: 'Test Client',
     redirectUris: [redirectUri],
     applicationType: 'web'
@@ -398,7 +399,7 @@ describe('GET /oauth/authorize (load)', () => {
 
   it('renders the consent step for a pending `zamfono_consent` cookie, the same one the SSO callback sets', async () => {
     const cookies = cookieJar();
-    const kr = keyringFromEnv(process.env);
+    const kr = keyringFromEnv(privateEnv);
     setSealedCookie(cookies as unknown as Cookies, kr, CONSENT_COOKIE, {
       userId: 'user-1',
       clientName: 'Callback Client',
@@ -525,7 +526,7 @@ describe('GET /oauth/authorize (load)', () => {
   });
 
   it('refuses a request without redirect_uri, without redirecting, from a client with several', async () => {
-    const clientId = encodeMetadataClientId(keyringFromEnv(process.env), {
+    const clientId = encodeMetadataClientId(keyringFromEnv(privateEnv), {
       name: 'Two Callbacks',
       redirectUris: [
         'https://client.example.com/callback',

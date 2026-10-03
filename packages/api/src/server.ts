@@ -94,12 +94,13 @@ async function main(): Promise<void> {
     logger.error(timeZoneError);
   }
   const db = openDb(requireEnv('DB_FILE'));
-  const jwtSecret = requireEnv('JWT_SECRET');
   const hub = new EventHub(db);
   provideEventSink(envelope => {
     hub.publish(envelope);
   });
   const handler = await loadHandler();
+  // After the handler, whose load validates `src/env.ts` and names every required variable missing.
+  const jwtSecret = requireEnv('JWT_SECRET');
   const server = http.createServer(handler);
   const wss = new WebSocketServer({ noServer: true });
   wss.on('error', (error: unknown) => {

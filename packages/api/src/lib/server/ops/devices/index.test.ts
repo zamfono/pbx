@@ -1,3 +1,4 @@
+import * as privateEnv from '$app/env/private';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
@@ -73,7 +74,7 @@ async function enableRingotel(db: Db): Promise<void> {
     .set({
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(process.env), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
     })
     .where('id', '=', 1)
     .execute();

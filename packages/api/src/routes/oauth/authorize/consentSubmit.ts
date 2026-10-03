@@ -6,7 +6,7 @@ import { HTTP_BAD_REQUEST, HTTP_FOUND, nowIso } from '@zamfono/shared';
 
 import {
   authorizationErrorRedirect,
-  requiredOrigin
+  originFromEnv
 } from '#lib/server/auth/authorizationResponse.js';
 import {
   clientMetaFor,
@@ -114,7 +114,7 @@ export async function approveConsentSubmit(
       authCodeStore,
       pending.userId,
       pending.authorize,
-      requiredOrigin()
+      originFromEnv()
     ),
     { external: true }
   );

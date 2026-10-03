@@ -6,8 +6,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { epochSeconds, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { encodeDownloadToken } from '#lib/server/auth/jwt.js';
-import { signAccessToken } from '#lib/server/auth/jwtSigning.js';
+import { encodeDownloadToken, signAccessToken } from '#lib/server/auth/jwt.js';
 import { getDb } from '#lib/server/db.js';
 
 import { handle, init as initHooks } from './hooks.server.js';

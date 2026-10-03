@@ -56,12 +56,11 @@ function parseKeySpec(name: string, value: string): KeySpec {
 }
 
 /** Reads `SECRETBOX_KEY` and, if set, `SECRETBOX_KEY_PREVIOUS` into a `Keyring` (§5.4). */
-export function keyringFromEnv(env: NodeJS.ProcessEnv): Keyring {
-  const currentValue = env.SECRETBOX_KEY;
-  if (currentValue === undefined) {
-    throw new Error('secretbox: SECRETBOX_KEY is not set');
-  }
-  const current = parseKeySpec('SECRETBOX_KEY', currentValue);
+export function keyringFromEnv(env: {
+  SECRETBOX_KEY: string;
+  SECRETBOX_KEY_PREVIOUS?: string | undefined;
+}): Keyring {
+  const current = parseKeySpec('SECRETBOX_KEY', env.SECRETBOX_KEY);
   const previousValue = env.SECRETBOX_KEY_PREVIOUS;
   if (previousValue === undefined || previousValue === '') {
     return { current };

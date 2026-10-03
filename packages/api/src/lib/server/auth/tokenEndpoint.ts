@@ -1,8 +1,7 @@
 import { epochSeconds, HTTP_BAD_REQUEST, HTTP_OK } from '@zamfono/shared';
 
 import type { AuthCodeStore } from './codes.js';
-import { ACCESS_TOKEN_TTL_S, isRole } from './jwt.js';
-import { signAccessToken } from './jwtSigning.js';
+import { ACCESS_TOKEN_TTL_S, isRole, signAccessToken } from './jwt.js';
 import {
   GRANT_AUTHORIZATION_CODE,
   GRANT_REFRESH_TOKEN,

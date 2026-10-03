@@ -7,7 +7,6 @@ import {
   plainSipTransports,
   SIP_PLAIN_PORT,
   SIP_TLS_PORT,
-  stackDomain,
   type PlainSipTransport
 } from '#lib/server/stackAddress.js';
 
@@ -51,7 +50,7 @@ export async function connectionSettings(
   const user = await liveUser(db, device.userId);
   const extension = await userExtension(db, device.userId);
   const settings = await loadSettings(db);
-  const fqdn = stackDomain(env);
+  const fqdn = env.FQDN;
   const tls = device.transport === 'tls';
   return {
     server: fqdn,

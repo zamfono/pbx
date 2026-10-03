@@ -6,24 +6,6 @@ let processDb: Db | undefined;
 
 /** The process-wide database handle, opened once from `DB_FILE` (§6.3; default set by the image's `ENV`). */
 export function getDb(): Db {
-  if (!processDb) {
-    const file = env.DB_FILE;
-    if (!file) {
-      throw new Error('DB_FILE environment variable is required.');
-    }
-    processDb = openDb(file);
-  }
+  processDb ??= openDb(env.DB_FILE);
   return processDb;
-}
-
-/**
- * `MIGRATIONS_DIR`, the image's copy of db/migrations (set by `images/api/Dockerfile`): the build
- * bundles every module into server chunks, away from the repository layout.
- */
-export function migrationsDir(): string {
-  const dir = env.MIGRATIONS_DIR;
-  if (!dir) {
-    throw new Error('MIGRATIONS_DIR environment variable is required.');
-  }
-  return dir;
 }

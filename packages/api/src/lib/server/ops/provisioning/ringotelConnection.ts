@@ -6,7 +6,7 @@ import { buildBranchProvision } from '#lib/server/provisioning/ringotel.js';
 import type { RingotelClient } from '#lib/server/provisioning/ringotelClient.js';
 import { branchBlfEntries } from '#lib/server/provisioning/ringotelRoster.js';
 import { provisionExistingDevices } from '#lib/server/provisioning/ringotelUser.js';
-import { SIP_TLS_PORT, stackDomain } from '#lib/server/stackAddress.js';
+import { SIP_TLS_PORT } from '#lib/server/stackAddress.js';
 
 import { reportPush } from '../devices/_ringotelPush.js';
 import { loadParkingSlots } from '../parking/_shared.js';
@@ -20,7 +20,7 @@ import { OpError, type Context } from '../types.js';
 
 /** The stack's connection address, `<fqdn>:5061`, from `FQDN` (§6.3), the one hostname `api` is given. */
 export function stackBranchAddress(): string {
-  return `${stackDomain(env)}:${SIP_TLS_PORT}`;
+  return `${env.FQDN}:${SIP_TLS_PORT}`;
 }
 
 /** One organization and one connection per stack (§10.4): a stack already set up refuses a

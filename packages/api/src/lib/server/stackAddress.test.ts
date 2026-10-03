@@ -1,18 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { stackDomain, stackIpv4, stackOrigin } from './stackAddress.js';
-
-describe('stackDomain', () => {
-  it('reads FQDN', () => {
-    expect(stackDomain({ FQDN: 'pbx.example.com' })).toBe('pbx.example.com');
-  });
-
-  it('throws while FQDN is unset or empty, which stops the boot', () => {
-    expect(() => stackDomain({})).toThrow(/FQDN/u);
-    // Compose hands `${FQDN}` to `api` as an empty string while `.env` leaves it unset.
-    expect(() => stackDomain({ FQDN: '' })).toThrow(/FQDN/u);
-  });
-});
+import { stackIpv4, stackOrigin } from './stackAddress.js';
 
 describe('stackOrigin', () => {
   it('is the https origin of the FQDN', () => {

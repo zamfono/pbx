@@ -4,7 +4,7 @@ import pino from 'pino';
 
 import { HTTP_FOUND, nowIso, type Db } from '@zamfono/shared';
 
-import { requiredOrigin } from '#lib/server/auth/authorizationResponse.js';
+import { originFromEnv } from '#lib/server/auth/authorizationResponse.js';
 import { clientMetaFor } from '#lib/server/auth/authorizeRequest.js';
 import { authCodeStore } from '#lib/server/auth/codes.js';
 import { CONSENT_COOKIE } from '#lib/server/auth/consent.js';
@@ -94,7 +94,7 @@ async function finishLoginOrErrorPage(
  * the requesting client"); a sign-in without one goes straight to the post-login page.
  */
 export async function GET(event: RequestEvent): Promise<Response> {
-  const origin = requiredOrigin();
+  const origin = originFromEnv();
   const kr = keyringFromEnv(env);
   const state = event.url.searchParams.get('state');
   const code = event.url.searchParams.get('code');

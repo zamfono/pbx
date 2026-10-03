@@ -1,6 +1,6 @@
 import * as env from '$app/env/private';
 
-import { stackDomain, stackOrigin } from '#lib/server/stackAddress.js';
+import { stackOrigin } from '#lib/server/stackAddress.js';
 
 const SET_PASSWORD_PATH = '/auth/set-password';
 
@@ -9,5 +9,5 @@ const SET_PASSWORD_PATH = '/auth/set-password';
  * §10.2 "Mail"), the path the page is mounted at.
  */
 export function setupLinkFor(token: string): string {
-  return `${stackOrigin(stackDomain(env))}${SET_PASSWORD_PATH}?token=${token}`;
+  return `${stackOrigin(env.FQDN)}${SET_PASSWORD_PATH}?token=${token}`;
 }

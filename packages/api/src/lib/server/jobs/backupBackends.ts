@@ -108,11 +108,7 @@ async function rcloneRepository(
 // Next to the database on the `db` volume, so a host key accepted on first contact survives
 // restarts and upgrades and a later change is refused (§6.3: `/data` is api's persistent state).
 function sshKnownHostsFile(): string {
-  const dbFile = privateEnv.DB_FILE;
-  if (!dbFile) {
-    throw new Error('backup: DB_FILE is required for an sftp target');
-  }
-  return path.join(path.dirname(dbFile), 'ssh_known_hosts');
+  return path.join(path.dirname(privateEnv.DB_FILE), 'ssh_known_hosts');
 }
 
 /**

@@ -22,7 +22,6 @@ import {
 import { loadRenderInput } from './renderInput.js';
 import { keyringFromEnv } from './secretbox.js';
 
-const DEFAULT_ASTERISK_GEN_DIR = '/etc/asterisk/gen';
 // Every module the render feeds (§9.1): PJSIP, the dialplan's hints include, `res_musiconhold`.
 const ALL_RELOAD_KINDS: ReloadKind[] = ['pjsip', 'dialplan', 'moh'];
 // The retry of an owed propagation (§3.1): 5 s after the failure, doubling up to a minute.
@@ -31,11 +30,6 @@ const RETRY_MAX_MS = 60_000;
 const RETRY_BACKOFF_FACTOR = 2;
 
 const log = pino({ name: 'propagation' });
-
-/** `ASTERISK_GEN_DIR` (§6.3, fixed image path `/etc/asterisk/gen`). */
-export function asteriskGenDirFromEnv(): string {
-  return env.ASTERISK_GEN_DIR ?? DEFAULT_ASTERISK_GEN_DIR;
-}
 
 /** Writes `contents` to `filePath` via a same-directory temp file and `rename`, which POSIX and NTFS both make an atomic replace: a reader of `filePath` never observes a partial write. `mode`, when given, is the temp file's permission bits (e.g. a private key kept unreadable by other users of the shared volume). */
 export async function writeFileAtomically(
@@ -71,7 +65,7 @@ function serialized<T>(task: () => Promise<T>): Promise<T> {
 async function renderConfig(db: Db): Promise<void> {
   const input = await loadRenderInput(db, keyringFromEnv(env));
   const rendered = render(input);
-  const dir = asteriskGenDirFromEnv();
+  const dir = env.ASTERISK_GEN_DIR;
   await mkdir(dir, { recursive: true });
   await Promise.all(
     Object.entries(rendered).map(([filename, contents]) =>

@@ -7,7 +7,6 @@ import type { Db, MailRequest } from '@zamfono/shared';
 
 import { voicemailAttachment } from '../audio/transcode.js';
 import type { Keyring } from '../secretbox.js';
-import { stackDomain } from '../stackAddress.js';
 import { tenantTimeZone } from '../tenantTimeZone.js';
 import { resolveRecipients } from './recipients.js';
 import { createTransportFor, relayFromSettings } from './relay.js';
@@ -129,7 +128,7 @@ export async function sendMail(
     ...req.values,
     companyName: settings.companyName,
     recipientName: recipients.name,
-    fqdn: stackDomain(env)
+    fqdn: env.FQDN
   };
   const rendered = template.render(values, {
     language,

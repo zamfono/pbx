@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import * as privateEnv from '$app/env/private';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
@@ -30,7 +31,7 @@ import { makeTestDb, seedTenantTimeZone } from './testDb.js';
 vi.unmock('./propagation.js');
 
 process.env.SECRETBOX_KEY = `1:${Buffer.alloc(32, 7).toString('base64')}`;
-const kr = keyringFromEnv(process.env);
+const kr = keyringFromEnv(privateEnv);
 
 /** `core` as the test sets it: up or down, and every `configChanged` it was asked for. */
 const core = { up: true, reloads: [] as ReloadKind[][] };

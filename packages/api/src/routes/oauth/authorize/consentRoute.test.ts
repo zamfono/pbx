@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import process from 'node:process';
 import { isRedirect, type Cookies, type RequestEvent } from '@sveltejs/kit';
+import * as privateEnv from '$app/env/private';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { nowIso } from '@zamfono/shared';
@@ -26,7 +27,7 @@ process.env.FQDN = FQDN;
 process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
 
 function clientIdFor(name: string, redirectUri: string): string {
-  return encodeMetadataClientId(keyringFromEnv(process.env), {
+  return encodeMetadataClientId(keyringFromEnv(privateEnv), {
     name,
     redirectUris: [redirectUri],
     applicationType: 'web'
@@ -101,7 +102,7 @@ function sealConsent(
 ): void {
   setSealedCookie(
     jar as unknown as Cookies,
-    keyringFromEnv(process.env),
+    keyringFromEnv(privateEnv),
     CONSENT_COOKIE,
     {
       userId: 'user-1',

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { MS_PER_SECOND } from '@zamfono/shared';
 
 import type { Role } from '../ops/types.js';
+import { mcpResourceUri } from './resource.js';
 
 // §5.2: an access token lives 15 minutes; `api` is the only party that ever verifies it, so
 // there is no JWKS and no asymmetric key pair.
@@ -38,9 +39,7 @@ function keyFor(secret: string): Uint8Array {
 
 /**
  * Encodes `payload` as an HS256 access token signed with `secret`, its claims in `payload`'s own
- * order. `jwtSigning.ts` builds the payload and reads the secret from the environment, which this
- * module never does: `server.ts` verifies tokens through it outside the SvelteKit bundle, where
- * there is no `$app/env/private`.
+ * order.
  */
 export function encodeAccessToken(
   secret: string,
@@ -49,6 +48,26 @@ export function encodeAccessToken(
   return new SignJWT(payload)
     .setProtectedHeader({ alg: JWT_ALG, typ: JWT_TYP })
     .sign(keyFor(secret));
+}
+
+/**
+ * Signs an HS256 access token issued by `origin`, the stack's own (`originFromEnv()`), for its
+ * MCP server, the one resource it issues tokens for (`resource.ts`): `exp` is `nowS + 900` (§5.2,
+ * §6.3).
+ */
+export function signAccessToken(
+  secret: string,
+  claims: AccessClaims,
+  nowS: number,
+  origin: string
+): Promise<string> {
+  return encodeAccessToken(secret, {
+    ...claims,
+    iss: origin,
+    aud: mcpResourceUri(origin),
+    iat: nowS,
+    exp: nowS + ACCESS_TOKEN_TTL_S
+  });
 }
 
 /**

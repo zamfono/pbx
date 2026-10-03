@@ -17,7 +17,6 @@ import {
   authenticateRequest
 } from '#lib/server/auth/bearer.js';
 import { crossSiteFormRejection } from '#lib/server/auth/crossSiteForms.js';
-import { requiredJwtSecret } from '#lib/server/auth/jwtSigning.js';
 import { getDb } from '#lib/server/db.js';
 import { startBackgroundJobs } from '#lib/server/jobs/background.js';
 import { Limiter, type LimitKind } from '#lib/server/limiter.js';
@@ -25,7 +24,6 @@ import { recordApiRequestSeconds } from '#lib/server/metricsCounters.js';
 import { problem } from '#lib/server/problem.js';
 import { API_PREFIX } from '#lib/server/restRoutes.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
-import { stackDomain } from '#lib/server/stackAddress.js';
 
 const INTERNAL_PREFIX = '/internal';
 const jobsLogger = pino({ name: 'hooks' });
@@ -35,13 +33,11 @@ const jobsLogger = pino({ name: 'hooks' });
  * of the SvelteKit build that also builds `runOperation` and every route: a job started here
  * shares their module instance of every import, and an operation reaches it by a call, where
  * `server.ts` is a separate esbuild bundle with its own copy of every relative import. SvelteKit
- * runs it once, and serves no request before it resolves; a missing `FQDN`, `DB_FILE` or
- * `SECRETBOX_KEY` or a failure of the first-boot seed rejects it, which fails loading the handler
- * and so `api`'s boot. The jobs stop on `sveltekit:shutdown`, which `server.ts` emits on SIGTERM
+ * runs it once, after validating `src/env.ts`, and serves no request before it resolves; a
+ * failure of the first-boot seed rejects it, which fails loading the handler and so `api`'s boot. The jobs stop on `sveltekit:shutdown`, which `server.ts` emits on SIGTERM
  * and SIGINT.
  */
 export const init: ServerInit = async () => {
-  stackDomain(env);
   const jobs = await startBackgroundJobs(
     getDb(),
     keyringFromEnv(env),
@@ -113,7 +109,7 @@ const handleRequest: Handle = async ({ event, resolve }) => {
   }
   // `/api/v1/openapi.json` is inside this prefix and so requires a bearer token like every other
   // `/api/v1/*` endpoint; §10.3 lists no separate row for it, so it gets no separate exemption.
-  const deps = { db: getDb(), jwtSecret: requiredJwtSecret() };
+  const deps = { db: getDb(), jwtSecret: env.JWT_SECRET };
   const bearer = await authenticateRequest(deps, event.request);
   const link = bearer ? null : await authenticateDownloadLink(deps, event.url);
   const auth = bearer ?? link;

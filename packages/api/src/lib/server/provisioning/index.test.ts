@@ -1,3 +1,4 @@
+import * as privateEnv from '$app/env/private';
 import { describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
@@ -34,7 +35,7 @@ async function seedSettings(
       ringotelOrgId: ringotel?.orgId ?? null,
       ringotelBranchId: ringotel?.branchId ?? null,
       ringotelApiTokenEnc: ringotel
-        ? encrypt(keyringFromEnv(process.env), 'ringotel-key')
+        ? encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
         : null
     })
     .execute();

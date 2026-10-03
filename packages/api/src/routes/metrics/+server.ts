@@ -46,7 +46,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
   }
   const body = await renderMetrics({
     db: getDb(),
-    dbFile: env.DB_FILE ?? '',
+    dbFile: env.DB_FILE,
     checkAri,
     coreState: async () => getCoreClient().state(),
     certSyncStatus,

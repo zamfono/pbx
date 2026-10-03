@@ -10,12 +10,12 @@
 import { createHash, X509Certificate } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import * as env from '$app/env/private';
 import pino from 'pino';
 
 import type { Db } from '@zamfono/shared';
 
 import type { CoreClient } from '../coreClient.js';
-import { asteriskGenDirFromEnv } from '../propagation.js';
 import {
   caddyDataDirFromEnv,
   copyCertificate,
@@ -96,7 +96,7 @@ export class CertSync {
    */
   async run(): Promise<CertSyncStatus> {
     const deps = this.#deps;
-    const genDir = deps.genDir ?? asteriskGenDirFromEnv();
+    const genDir = deps.genDir ?? env.ASTERISK_GEN_DIR;
     const caddyDataDir = deps.caddyDataDir ?? caddyDataDirFromEnv();
     const source = await findCaddyCert(caddyDataDir);
     if (!source) {

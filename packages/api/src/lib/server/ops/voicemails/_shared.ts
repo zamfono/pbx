@@ -1,5 +1,6 @@
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
+import * as env from '$app/env/private';
 import type { Selectable, Transaction } from 'kysely';
 import pino from 'pino';
 
@@ -12,7 +13,6 @@ import {
 } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
-import { mediaDirFromEnv } from '#lib/server/mediaDir.js';
 import { ringGroupMemberships } from '#lib/server/ringGroupMembership.js';
 
 import { afterCommit } from '../afterCommit.js';
@@ -117,7 +117,7 @@ export const VOICEMAIL_SUBDIR = 'voicemail';
 /** Removes a voicemail's audio file from the media volume; missing files are not an error. */
 export async function deleteVoicemailFile(
   filename: string,
-  mediaDir: string = mediaDirFromEnv()
+  mediaDir: string = env.MEDIA_DIR
 ): Promise<void> {
   await rm(path.join(mediaDir, VOICEMAIL_SUBDIR, filename), { force: true });
 }

@@ -1,10 +1,10 @@
 import type { RequestEvent } from '@sveltejs/kit';
+import * as env from '$app/env/private';
 
 import { nowIso } from '@zamfono/shared';
 
-import { requiredOrigin } from '#lib/server/auth/authorizationResponse.js';
+import { originFromEnv } from '#lib/server/auth/authorizationResponse.js';
 import { authCodeStore } from '#lib/server/auth/codes.js';
-import { requiredJwtSecret } from '#lib/server/auth/jwtSigning.js';
 import { tokenEndpoint } from '#lib/server/auth/oauth.js';
 import { getDb } from '#lib/server/db.js';
 
@@ -13,9 +13,9 @@ export function POST(event: RequestEvent): Promise<Response> {
   return tokenEndpoint(
     {
       db: getDb(),
-      jwtSecret: requiredJwtSecret(),
+      jwtSecret: env.JWT_SECRET,
       codes: authCodeStore,
-      origin: requiredOrigin(),
+      origin: originFromEnv(),
       now: nowIso
     },
     event.request

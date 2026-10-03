@@ -68,12 +68,4 @@ describe('GET /healthz', () => {
     const response = await GET();
     expect(response.status).toBe(HTTP_SERVICE_UNAVAILABLE);
   });
-
-  it('fails without SECRETBOX_KEY, which api does not run without', async () => {
-    stubCoreHealthz({ ok: true, ari: true, db: true });
-    delete process.env.SECRETBOX_KEY;
-    vi.resetModules();
-    const { GET: freshGet } = await import('./+server.js');
-    await expect(freshGet()).rejects.toThrow(/SECRETBOX_KEY/u);
-  });
 });

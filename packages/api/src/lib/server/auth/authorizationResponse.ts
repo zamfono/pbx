@@ -9,7 +9,7 @@ import * as env from '$app/env/private';
 
 import { HTTP_FOUND } from '@zamfono/shared';
 
-import { stackDomain, stackOrigin } from '../stackAddress.js';
+import { stackOrigin } from '../stackAddress.js';
 
 /** The part of the authorization request its response echoes; `state` is `null` for a request
  *  that sent none (OAuth 2.1 §4.1.1: optional). */
@@ -37,8 +37,8 @@ export function authorizationResponseUrl(
 }
 
 /** The stack's own origin, the issuer every authorization response carries as `iss` (RFC 9207). */
-export function requiredOrigin(): string {
-  return stackOrigin(stackDomain(env));
+export function originFromEnv(): string {
+  return stackOrigin(env.FQDN);
 }
 
 /** The standard OAuth 2.1 error response (§4.1.2.1), delivered to the request's own validated
@@ -51,7 +51,7 @@ export function authorizationErrorRedirect(
 ): never {
   return redirect(
     HTTP_FOUND,
-    authorizationResponseUrl(request, requiredOrigin(), { error: code }),
+    authorizationResponseUrl(request, originFromEnv(), { error: code }),
     { external: true }
   );
 }

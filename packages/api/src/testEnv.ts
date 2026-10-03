@@ -7,9 +7,13 @@
  */
 import { vi } from 'vitest';
 
-// Every stack has its FQDN, which `src/env.ts` requires (§6.3 "Environment"); a suite that needs
-// a particular one sets it.
+// The variables `src/env.ts` requires that a stack always has, from `.env` (§6.3 "Environment"),
+// the image or Compose; a suite that needs a particular one, such as a media directory of its
+// own, sets it.
 process.env.FQDN ??= 'pbx.test';
+process.env.CORE_URL ??= 'http://core.test';
+process.env.MEDIA_DIR ??= '/nonexistent/media';
+process.env.ASTERISK_GEN_DIR ??= '/nonexistent/asterisk-gen';
 
 vi.mock('$app/env/private', async () => {
   const [{ env }, { variables }] = await Promise.all([

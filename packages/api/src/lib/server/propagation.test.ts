@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import * as privateEnv from '$app/env/private';
 import pino from 'pino';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -21,7 +22,7 @@ vi.unmock('./propagation.js');
 /** A fresh `SECRETBOX_KEY`, the keyring a propagation renders with. */
 function testKeyring(): Keyring {
   process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
-  return keyringFromEnv(process.env);
+  return keyringFromEnv(privateEnv);
 }
 
 /** Has the next propagation render into `genDir` and reach `core` through `coreClient`. */

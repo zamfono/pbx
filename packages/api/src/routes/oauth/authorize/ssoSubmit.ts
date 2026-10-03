@@ -8,7 +8,7 @@ import {
   HTTP_SERVICE_UNAVAILABLE
 } from '@zamfono/shared';
 
-import { requiredOrigin } from '#lib/server/auth/authorizationResponse.js';
+import { originFromEnv } from '#lib/server/auth/authorizationResponse.js';
 import {
   paramsFromPayload,
   resolveClient,
@@ -40,7 +40,7 @@ export async function ssoSubmit(
 ): Promise<never> {
   const db = getDb();
   const kr = keyringFromEnv(env);
-  const origin = requiredOrigin();
+  const origin = originFromEnv();
   const resolved = await resolveClient(kr, paramsFromPayload(payload));
   const cfg = await ssoConfigFromSettings(db, kr);
   if (cfg === null) {

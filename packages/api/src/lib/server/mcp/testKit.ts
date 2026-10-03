@@ -1,9 +1,9 @@
-import process from 'node:process';
+import * as privateEnv from '$app/env/private';
 import { z } from 'zod';
 
 import { epochSeconds, HTTP_CONFLICT, nowIso } from '@zamfono/shared';
 
-import { signAccessToken } from '../auth/jwtSigning.js';
+import { signAccessToken } from '../auth/jwt.js';
 import { handleMcpRequest, type McpDeps } from '../mcp.js';
 import { register } from '../ops/registry.js';
 import { defineOperation } from '../ops/types.js';
@@ -162,7 +162,7 @@ export async function rpc(deps: McpDeps, request: Request): Promise<RpcBody> {
 // `results.ts`'s own `SERVER_INFO`, from the test process's environment (`serverInfo` itself is
 // covered by `results.test.ts`).
 export const SERVER_INFO_META = {
-  'io.modelcontextprotocol/serverInfo': serverInfo(process.env)
+  'io.modelcontextprotocol/serverInfo': serverInfo(privateEnv)
 };
 
 /** A 2026-07-28 `CallToolResult` whose value is `value`, serialised and structured. */

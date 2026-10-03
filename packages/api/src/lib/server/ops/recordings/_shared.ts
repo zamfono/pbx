@@ -1,10 +1,9 @@
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
+import * as env from '$app/env/private';
 import type { Selectable, Transaction } from 'kysely';
 
 import { HTTP_NOT_FOUND, type DB } from '@zamfono/shared';
-
-import { mediaDirFromEnv } from '#lib/server/mediaDir.js';
 
 import { OpError } from '../types.js';
 
@@ -58,7 +57,7 @@ const RAW_SUFFIXES = ['-l.wav', '-r.wav', '-l.wav16', '-r.wav16'];
  */
 export async function deleteRecordingFile(
   filename: string,
-  mediaDir: string = mediaDirFromEnv()
+  mediaDir: string = env.MEDIA_DIR
 ): Promise<void> {
   const base = path.basename(filename, path.extname(filename));
   await Promise.all(

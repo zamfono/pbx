@@ -2,10 +2,10 @@ import { execFile } from 'node:child_process';
 import { copyFile, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import * as env from '$app/env/private';
 
 import { newId } from '@zamfono/shared';
 
-import { mediaDirFromEnv } from '../mediaDir.js';
 import { mohClassDir } from './mohLayout.js';
 import type { AudioKind, AudioUpload, StoredAudio } from './types.js';
 import { masterExtensionFor } from './uploadTypes.js';
@@ -65,7 +65,7 @@ async function transcodeToPlaybackWav(
 export async function storeAudio(
   kind: AudioKind,
   upload: AudioUpload,
-  mediaDir: string = mediaDirFromEnv()
+  mediaDir: string = env.MEDIA_DIR
 ): Promise<StoredAudio> {
   const extension = masterExtension(upload);
   const id = newId();
@@ -96,7 +96,7 @@ export async function storeAudio(
  */
 export async function deleteAudioFile(
   filename: string,
-  mediaDir: string = mediaDirFromEnv()
+  mediaDir: string = env.MEDIA_DIR
 ): Promise<void> {
   const id = path.basename(filename, path.extname(filename));
   const promptsDir = path.join(mediaDir, 'prompts');

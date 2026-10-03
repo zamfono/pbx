@@ -1,3 +1,4 @@
+import * as privateEnv from '$app/env/private';
 import { sql } from 'kysely';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -46,7 +47,7 @@ async function seedSettings(db: Db): Promise<void> {
       language: 'de',
       emergencyNumbersJson: '["112"]',
       mainDidId: didId,
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(process.env), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
     })
     .execute();
   await db

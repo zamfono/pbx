@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import process from 'node:process';
 import { isRedirect, type Cookies, type RequestEvent } from '@sveltejs/kit';
+import * as privateEnv from '$app/env/private';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { migrateForTest } from '@zamfono/shared/testDb.js';
@@ -63,7 +64,7 @@ function sealedLogin(pending: PendingLogin): string {
         value = sealed;
       }
     } as unknown as Cookies,
-    keyringFromEnv(process.env),
+    keyringFromEnv(privateEnv),
     SSO_COOKIE,
     pending
   );
@@ -144,7 +145,7 @@ describe('GET /oauth/callback', () => {
   });
 
   it('routes a successful SSO login for an outer client through the consent step instead of minting a code directly (§5.2 "Client rows", "Authentication pages")', async () => {
-    const kr = keyringFromEnv(process.env);
+    const kr = keyringFromEnv(privateEnv);
     const clientId = encodeMetadataClientId(kr, {
       name: 'SSO Test Client',
       redirectUris: ['https://client.example.com/callback'],
@@ -198,14 +199,14 @@ describe('GET /oauth/callback', () => {
     );
   });
 
-  it('fails as a server error, not as an expired link, while SECRETBOX_KEY is missing', async () => {
+  it('fails as a server error, not as an expired link, while SECRETBOX_KEY is malformed', async () => {
     const cookie = sealedLogin({
       state: 'state-1',
       nonce: 'nonce-1',
       codeVerifier: 'verifier-1',
       authorizeParams: null
     });
-    vi.stubEnv('SECRETBOX_KEY', '');
+    vi.stubEnv('SECRETBOX_KEY', 'not-a-key-spec');
     try {
       // eslint-disable-next-line new-cap -- GET is the fixed SvelteKit route-handler export name
       const err = await GET(

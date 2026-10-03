@@ -1,3 +1,4 @@
+import * as privateEnv from '$app/env/private';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
@@ -16,7 +17,7 @@ import { oweDevicePushesAtStart } from './_ringotelPush.js';
 import '../index.js';
 
 process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-const kr = keyringFromEnv(process.env);
+const kr = keyringFromEnv(privateEnv);
 
 const admin: RunInput = {
   actor: { id: 'admin', name: 'Admin', role: 'admin' },

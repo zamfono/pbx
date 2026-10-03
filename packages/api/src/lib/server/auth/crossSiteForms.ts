@@ -13,7 +13,7 @@
 import { HTTP_FORBIDDEN } from '@zamfono/shared';
 
 import { API_PREFIX } from '../restRoutes.js';
-import { requiredOrigin } from './authorizationResponse.js';
+import { originFromEnv } from './authorizationResponse.js';
 
 // The encodings an HTML form can submit cross-site without a CORS preflight, plus the one
 // SvelteKit's own enhanced forms use; the same list SvelteKit's check guards.
@@ -70,7 +70,7 @@ export function crossSiteFormRejection(
   }
   // `Origin` is serialised canonically (RFC 6454 §6.1), so it is compared with the stack's
   // origin in the same form, its host name lowercased as an operator may not have written it.
-  if (request.headers.get('origin') === new URL(requiredOrigin()).origin) {
+  if (request.headers.get('origin') === new URL(originFromEnv()).origin) {
     return null;
   }
   return new Response(

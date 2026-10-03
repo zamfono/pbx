@@ -1,8 +1,8 @@
 import path from 'node:path';
+import * as env from '$app/env/private';
 import { z } from 'zod';
 
 import { downloadAudio } from '#lib/server/audio/transcode.js';
-import { mediaDirFromEnv } from '#lib/server/mediaDir.js';
 
 import { defineOperation } from '../types.js';
 import {
@@ -43,7 +43,7 @@ export const audio = defineOperation({
         : [];
     assertVoicemailScope(ctx.actor.role, ctx.actor.id, row, ringGroupIds);
     return downloadAudio(
-      path.join(mediaDirFromEnv(), VOICEMAIL_SUBDIR, row.filename),
+      path.join(env.MEDIA_DIR, VOICEMAIL_SUBDIR, row.filename),
       input.format
     );
   }

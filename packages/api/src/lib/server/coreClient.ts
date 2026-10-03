@@ -35,7 +35,6 @@ import {
   throwIfNotOk
 } from './coreHttp.js';
 
-const DEFAULT_CORE_URL = 'http://core:3000';
 // `/healthz`, `/metrics` and `system.info` answer within this even while `core` hangs (§6.3
 // "Health", §7, §10.3), and a hung `core` holds up no re-registration check (§10.4).
 const CORE_HEALTH_TIMEOUT_MS = 3000;
@@ -66,11 +65,6 @@ export type CoreClient = {
   decline(callId: string, req: DeclineRequest): Promise<void>;
 };
 
-/** `CORE_URL` (§6.3, default `http://core:3000`). */
-export function coreUrlFromEnv(): string {
-  return env.CORE_URL ?? DEFAULT_CORE_URL;
-}
-
 /** Whether `body` is the problem whose `detail` names the `noRegisteredDevice` cause of a 409
  * (§10.2 "Click-to-dial", `internalApi.ts`). */
 function namesNoRegisteredDevice(body: unknown): boolean {
@@ -80,9 +74,9 @@ function namesNoRegisteredDevice(body: unknown): boolean {
   return (body as { detail?: unknown }).detail === 'noRegisteredDevice';
 }
 
-/** `core`'s internal API at `baseUrl` (default `coreUrlFromEnv()`). */
+/** `core`'s internal API at `baseUrl` (default `CORE_URL`). */
 export function createCoreClient(
-  baseUrl: string = coreUrlFromEnv(),
+  baseUrl: string = env.CORE_URL,
   fetchFn: typeof fetch = fetch
 ): CoreClient {
   const call = (callId: string, action: string): string =>

@@ -18,7 +18,7 @@ import {
   type MaintenanceWork
 } from '#lib/server/jobs/maintenanceGiveUp.js';
 import { isProfilePending } from '#lib/server/provisioning/profilePending.js';
-import { stackDomain, stackIpv4 } from '#lib/server/stackAddress.js';
+import { stackIpv4 } from '#lib/server/stackAddress.js';
 
 import { defineOperation } from '../types.js';
 import {
@@ -126,7 +126,7 @@ export const info = defineOperation<Record<string, never>, Output>({
       autoUpdate,
       maintenanceGate,
       ringotel: { profilePending },
-      stack: { domain: stackDomain(env), ipv4: stackIpv4(env) }
+      stack: { domain: env.FQDN, ipv4: stackIpv4(env) }
     };
   }
 });

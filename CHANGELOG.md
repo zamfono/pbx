@@ -87,8 +87,9 @@ why the specified behaviour changed; the commit history, how.
   (`srtp` or `none`), `codecs` and `voicemailCode`. `GET /devices/{id}/credentials` returns the
   same set for a `manual` device; a `ringotel` device's reveal is unchanged. Help topic
   `tested-softphones` maps the fields onto Groundwire and MicroSIP.
-- `api` refuses to start while `FQDN` is unset or empty in `.env`, which `setup.sh` always
-  writes; `GET /system/info` therefore always reports `stack.domain`.
+- `api` refuses to start while `FQDN`, `JWT_SECRET` or `SECRETBOX_KEY` is unset or empty in
+  `.env`, all of which `setup.sh` writes, and its log names every one that is missing at once;
+  `GET /system/info` therefore always reports `stack.domain`.
 - `proxy` likewise refuses to start while `FQDN` is unset or empty, and says so in its log.
 - On a DST night, an opening-hours edge or a maintenance hour at a local time the clock change
   skips or repeats now lies at the earlier of its two possible instants, as the time filters of

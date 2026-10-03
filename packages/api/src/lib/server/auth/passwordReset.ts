@@ -18,7 +18,7 @@ import { addressKey } from '../addressKey.js';
 import { Limiter } from '../limiter.js';
 import { sendMail } from '../mail/index.js';
 import { keyringFromEnv } from '../secretbox.js';
-import { requiredOrigin } from './authorizationResponse.js';
+import { originFromEnv } from './authorizationResponse.js';
 import { hashPassword } from './password.js';
 import {
   issueResetToken,
@@ -55,7 +55,7 @@ function sendResetMail(db: Db, userId: string): void {
         kind: 'reset',
         to: { userId },
         values: {
-          link: `${requiredOrigin()}${SET_PASSWORD_PATH}?token=${raw}`,
+          link: `${originFromEnv()}${SET_PASSWORD_PATH}?token=${raw}`,
           linkExpiresAt: expiresAt
         }
       })

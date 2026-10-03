@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { HTTP_FOUND } from '@zamfono/shared';
 
-import { requiredOrigin } from '#lib/server/auth/authorizationResponse.js';
+import { originFromEnv } from '#lib/server/auth/authorizationResponse.js';
 import {
   AuthorizePayloadSchema,
   lookupUser,
@@ -60,7 +60,7 @@ export async function loginSubmit(
 ): Promise<LoginResult> {
   const db = getDb();
   const kr = keyringFromEnv(env);
-  const origin = requiredOrigin();
+  const origin = originFromEnv();
   const resolved = await resolveClient(kr, paramsFromPayload(payload));
   const { dictionary } = await loadBranding(db);
   const refused = { message: dictionary.login.invalid, email: payload.email };

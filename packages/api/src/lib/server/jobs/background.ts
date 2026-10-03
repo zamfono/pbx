@@ -19,11 +19,10 @@ import type { Logger } from 'pino';
 
 import type { Db, Envelope } from '@zamfono/shared';
 
-import { coreUrlFromEnv, getCoreClient } from '../coreClient.js';
+import { getCoreClient } from '../coreClient.js';
 import { connectCoreEvents } from '../coreEvents.js';
 import { publishEvent } from '../eventSink.js';
 import { updateMailSender } from '../mail/owners.js';
-import { mediaDirFromEnv } from '../mediaDir.js';
 import { onceConfigPropagated } from '../ops/afterCommit.js';
 import { oweDevicePushesAtStart } from '../ops/devices/_ringotelPush.js';
 import { retryPendingProfile } from '../ops/settings/profilePush.js';
@@ -116,7 +115,7 @@ export async function runBootSteps(
   kr: Keyring,
   log: Logger
 ): Promise<void> {
-  const seeded = await seedIfEmpty(db, env, kr, mediaDirFromEnv(), log);
+  const seeded = await seedIfEmpty(db, env, kr, env.MEDIA_DIR, log);
   log.info({ seeded }, 'boot: first-boot seed');
   await seedBackupTarget(db, env, kr, log);
   await oweDevicePushesAtStart(db);
@@ -142,7 +141,7 @@ function relayCoreEvents(
       onceConfigPropagated(db, later => retryPendingProfile(later, trigger))
   });
   return connectCoreEvents({
-    url: coreEventsUrl(coreUrlFromEnv()),
+    url: coreEventsUrl(env.CORE_URL),
     onOpen: () => {
       rereg.streamConnected();
     },
@@ -190,7 +189,7 @@ export async function startBackgroundJobs(
   };
   const backupDeps: BackupJobDeps = {
     exec: execCommand,
-    mediaDir: mediaDirFromEnv(),
+    mediaDir: env.MEDIA_DIR,
     bus
   };
   const backups = scheduleBackups(db, kr, backupDeps);

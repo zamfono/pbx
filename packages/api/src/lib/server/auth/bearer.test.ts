@@ -5,7 +5,7 @@ import { epochSeconds, nowIso, type Db } from '@zamfono/shared';
 
 import { makeTestDb } from '../testDb.js';
 import { authenticateRequest, authenticateToken } from './bearer.js';
-import { signAccessToken } from './jwtSigning.js';
+import { signAccessToken } from './jwt.js';
 
 const JWT_SECRET = 'test-secret';
 const ORIGIN = 'https://pbx.example.com';
