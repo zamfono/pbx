@@ -1,9 +1,9 @@
 // The migrate image's entry point (spec §6.3 "Migrations"): applies db/migrations to the database
-// DB_FILE names with Kysely's Migrator and exits 0 once every migration is applied. A database
-// file another process briefly holds locked, which better-sqlite3 reports as SQLITE_BUSY or
-// SQLITE_LOCKED, is retried five times at 5 s intervals; a migration that fails on its own merits
-// exits 1 at once, so a broken release stops the deployment without running its failing migration
-// again. Node runs this file directly (type stripping).
+// DB_FILE names, by default the stack's, with Kysely's Migrator and exits 0 once every migration
+// is applied. A database file another process briefly holds locked, which better-sqlite3 reports
+// as SQLITE_BUSY or SQLITE_LOCKED, is retried five times at 5 s intervals; a migration that fails
+// on its own merits exits 1 at once, so a broken release stops the deployment without running its
+// failing migration again. Node runs this file directly (type stripping).
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -16,10 +16,13 @@ const RETRY_DELAY_MS = 5000;
 // The primary result codes and their extended forms, such as SQLITE_BUSY_RECOVERY.
 const LOCKED_CODE = /^SQLITE_(?:BUSY|LOCKED)(?:_|$)/u;
 
-const dbFile = process.env.DB_FILE;
-if (!dbFile) {
-  throw new Error('DB_FILE environment variable is required.');
-}
+// The stack's database file in the `db` volume, as compose.yaml mounts it: the same default as
+// @zamfono/shared's DEFAULT_DB_FILE, which api and core use and this image cannot import (§6.3).
+const DEFAULT_DB_FILE = '/data/zamfono.sqlite3';
+const dbFile =
+  process.env.DB_FILE === undefined || process.env.DB_FILE === ''
+    ? DEFAULT_DB_FILE
+    : process.env.DB_FILE;
 
 function isLocked(error: unknown): boolean {
   const code = (error as { code?: unknown } | undefined)?.code;

@@ -452,8 +452,6 @@ services:
     image: ghcr.io/zamfono/migrate:${ZAMFONO_VERSION:-latest}   # node:26-slim + Kysely + db/migrations; applies pending migrations, then exits
     networks:
       - internal
-    environment:
-      DB_FILE: /data/zamfono.sqlite3
     volumes:
       - db:/data
     restart: "no"                 # a container that exited 0 is the success api and core wait for

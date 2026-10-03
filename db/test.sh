@@ -29,10 +29,10 @@ if [ -z "${MIGRATE_IMAGE:-}" ]; then
 fi
 
 echo '== first run: applies the migration =='
-docker run --rm -v "$DATA_DIR:/data" -e DB_FILE=/data/zamfono.sqlite3 "$MIGRATE_IMAGE"
+docker run --rm -v "$DATA_DIR:/data" "$MIGRATE_IMAGE"
 
 echo '== second run: nothing pending =='
-second_output=$(docker run --rm -v "$DATA_DIR:/data" -e DB_FILE=/data/zamfono.sqlite3 "$MIGRATE_IMAGE" 2>&1)
+second_output=$(docker run --rm -v "$DATA_DIR:/data" "$MIGRATE_IMAGE" 2>&1)
 echo "$second_output"
 echo "$second_output" | grep -qi 'no new migrations' || {
   echo 'expected the idle run to report that no migration is pending' >&2
@@ -64,7 +64,7 @@ done
   echo 'the lock holder never took its lock' >&2
   exit 1
 }
-locked_output=$(docker run --rm -v "$LOCKED_DATA_DIR:/data" -e DB_FILE=/data/zamfono.sqlite3 "$MIGRATE_IMAGE" 2>&1) || {
+locked_output=$(docker run --rm -v "$LOCKED_DATA_DIR:/data" "$MIGRATE_IMAGE" 2>&1) || {
   echo "$locked_output"
   echo 'expected the migration to succeed once the lock was released' >&2
   exit 1
@@ -88,7 +88,6 @@ broken_status=0
 broken_output=$(docker run --rm \
   -v "$BROKEN_DATA_DIR:/data" \
   -v "$BROKEN_DIR:/app/db/migrations" \
-  -e DB_FILE=/data/zamfono.sqlite3 \
   "$MIGRATE_IMAGE" 2>&1) || broken_status=$?
 echo "$broken_output"
 [ "$broken_status" = 1 ] || {

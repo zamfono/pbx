@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-03 · §6.3 compose.yaml.** The `migrate` service gets no `DB_FILE`: `/data/zamfono.sqlite3` is its own default, as it is `api`'s and `core`'s.
+*Why:* product-owner decision on internal values: "sensible defaults" in code; compose repeated the path for `migrate` alone.
+
 **2026-10-03 · §6.3 Updates.** The updater learns the release the stack runs from `update.sh --current`, which prints it and exits 12 where the directory names none.
 *Why:* the updater parsed `.env` and `VERSION` with a copy of the script's rule.
 
