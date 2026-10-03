@@ -55,12 +55,12 @@ media_sizes() {
 }
 
 recordings_count() {
-  api GET '/recordings?limit=1000' 2>/dev/null \
+  api_all /recordings 2>/dev/null \
     | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["items"]))' 2>/dev/null || echo '?'
 }
 
 recordings_dump() {
-  api GET '/recordings?limit=1000' 2>/dev/null > "$1" || true
+  api_all /recordings 2>/dev/null > "$1" || true
 }
 
 mix_failures() {
