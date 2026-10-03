@@ -22,9 +22,7 @@ export function registeredDeviceCount(
 ): number {
   return snapshot.devices.filter(
     device =>
-      device.userId === userId &&
-      device.deletedAt === null &&
-      online.get(device.sipUsername) === true
+      device.userId === userId && online.get(device.sipUsername) === true
   ).length;
 }
 

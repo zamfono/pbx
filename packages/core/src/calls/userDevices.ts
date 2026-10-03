@@ -34,9 +34,7 @@ export function registeredDevices(
   const { presence } = pipeline.deps;
   return snapshot.devices.filter(
     device =>
-      device.userId === userId &&
-      device.deletedAt === null &&
-      presence.isRegistered(device.sipUsername)
+      device.userId === userId && presence.isRegistered(device.sipUsername)
   );
 }
 

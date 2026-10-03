@@ -41,9 +41,7 @@ export function liveTrunk(
   snapshot: Snapshot,
   trunkId: string
 ): TrunkRow | undefined {
-  return snapshot.trunks.find(
-    row => row.id === trunkId && row.deletedAt === null
-  );
+  return snapshot.trunks.find(row => row.id === trunkId);
 }
 
 /** `route`'s trunk, `undefined` once soft-deleted. */

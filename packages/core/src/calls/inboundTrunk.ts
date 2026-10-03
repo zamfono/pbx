@@ -68,8 +68,6 @@ const PJSIP_CHANNEL_NAME = /^PJSIP\/(?<endpoint>.+)-[0-9a-f]{8}$/u;
  * is its section `trunk-<id>` (§9.4 "Provisioning and status"); a call an `inbound_auth` trunk's
  * digest credential identified arrives on the endpoint named by that username instead, since
  * `identify_by = auth_username` finds the endpoint by that name (§9.4 "Inbound identification").
- * Deleted rows count too, since a call that arrived before the reload removed the section still
- * came in over that trunk; a live row wins over a deleted one holding the same username.
  */
 export function inboundTrunk(
   channel: Channel,
@@ -79,15 +77,11 @@ export function inboundTrunk(
   if (endpoint === undefined) {
     return null;
   }
-  const byUsername = snapshot.trunks
-    .filter(row => row.inboundAuth === 1 && row.username === endpoint)
-    .sort(
-      (left, right) =>
-        Number(left.deletedAt !== null) - Number(right.deletedAt !== null)
-    );
   return (
     snapshot.trunks.find(row => trunkSectionName(row.id) === endpoint) ??
-    byUsername.at(0) ??
+    snapshot.trunks.find(
+      row => row.inboundAuth === 1 && row.username === endpoint
+    ) ??
     null
   );
 }

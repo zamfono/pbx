@@ -25,26 +25,24 @@ export function toFor(action: DialAction, dialed: string): string {
 
 /** `outbound_routes` and their caller/number lists (§9.4 "Outbound routing") as `Route[]`. */
 export function buildRoutes(snapshot: Snapshot): Route[] {
-  return snapshot.outboundRoutes
-    .filter(row => row.deletedAt === null)
-    .map(row => ({
-      id: row.id,
-      priority: row.priority,
-      trunkId: row.trunkId,
-      calleridDidId: row.calleridDidId,
-      users: snapshot.outboundRouteUsers
-        .filter(user => user.routeId === row.id)
-        .map(user => user.userId),
-      userGroups: snapshot.outboundRouteUserGroups
-        .filter(group => group.routeId === row.id)
-        .map(group => group.userGroupId),
-      numbers: snapshot.outboundRouteNumbers
-        .filter(number => number.routeId === row.id)
-        .map(number => ({
-          number: number.number,
-          isPrefix: number.isPrefix === 1
-        }))
-    }));
+  return snapshot.outboundRoutes.map(row => ({
+    id: row.id,
+    priority: row.priority,
+    trunkId: row.trunkId,
+    calleridDidId: row.calleridDidId,
+    users: snapshot.outboundRouteUsers
+      .filter(user => user.routeId === row.id)
+      .map(user => user.userId),
+    userGroups: snapshot.outboundRouteUserGroups
+      .filter(group => group.routeId === row.id)
+      .map(group => group.userGroupId),
+    numbers: snapshot.outboundRouteNumbers
+      .filter(number => number.routeId === row.id)
+      .map(number => ({
+        number: number.number,
+        isPrefix: number.isPrefix === 1
+      }))
+  }));
 }
 
 /**
@@ -84,9 +82,10 @@ export function didTargetsByNumber(
   snapshot: Snapshot
 ): Map<string, { id: string; targetId: string }> {
   return new Map(
-    snapshot.dids
-      .filter(row => row.deletedAt === null)
-      .map(row => [row.number, { id: row.id, targetId: row.targetId }])
+    snapshot.dids.map(row => [
+      row.number,
+      { id: row.id, targetId: row.targetId }
+    ])
   );
 }
 
@@ -113,9 +112,7 @@ export function identifyCallerUserId(
   const resource = channel.name.replace(/^PJSIP\//u, '');
   const device = snapshot.devices.find(
     row =>
-      row.deletedAt === null &&
-      (resource === row.sipUsername ||
-        resource.startsWith(`${row.sipUsername}-`))
+      resource === row.sipUsername || resource.startsWith(`${row.sipUsername}-`)
   );
   return device?.userId ?? null;
 }

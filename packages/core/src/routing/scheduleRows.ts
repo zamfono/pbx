@@ -28,16 +28,14 @@ export function scopeFromRow(row: {
 
 /** `ooo_rules` rows as the `OooRule[]` `inEffectOoo` (§10.1 step 2) expects. */
 export function buildOooRules(rows: Snapshot['oooRules']): OooRule[] {
-  return rows
-    .filter(row => row.deletedAt === null)
-    .map(row => ({
-      id: row.id,
-      scope: scopeFromRow(row),
-      active: row.active === 1,
-      startsAt: row.startsAt,
-      expiresAt: row.expiresAt,
-      targetId: row.targetId
-    }));
+  return rows.map(row => ({
+    id: row.id,
+    scope: scopeFromRow(row),
+    active: row.active === 1,
+    startsAt: row.startsAt,
+    expiresAt: row.expiresAt,
+    targetId: row.targetId
+  }));
 }
 
 /** `opening_hours`/`opening_hours_intervals` rows as the `Schedule[]` `scheduleFor` (§10.1 step 3) expects. */
@@ -45,19 +43,17 @@ export function buildSchedules(
   rows: Snapshot['openingHours'],
   intervalRows: Snapshot['openingHoursIntervals']
 ): Schedule[] {
-  return rows
-    .filter(row => row.deletedAt === null)
-    .map(row => ({
-      id: row.id,
-      scope: scopeFromRow(row),
-      active: row.active === 1,
-      closedTargetId: row.closedTargetId,
-      intervals: intervalRows
-        .filter(interval => interval.openingHoursId === row.id)
-        .map(interval => ({
-          weekday: interval.weekday,
-          opens: interval.opens,
-          closes: interval.closes
-        }))
-    }));
+  return rows.map(row => ({
+    id: row.id,
+    scope: scopeFromRow(row),
+    active: row.active === 1,
+    closedTargetId: row.closedTargetId,
+    intervals: intervalRows
+      .filter(interval => interval.openingHoursId === row.id)
+      .map(interval => ({
+        weekday: interval.weekday,
+        opens: interval.opens,
+        closes: interval.closes
+      }))
+  }));
 }

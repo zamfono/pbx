@@ -64,9 +64,7 @@ export function groupMemberUserIds(
     list.push(row.childGroupId);
     userGroupGroups.set(row.parentGroupId, list);
   }
-  const liveUserIds = new Set(
-    snapshot.users.filter(user => user.deletedAt === null).map(user => user.id)
-  );
+  const liveUserIds = new Set(snapshot.users.map(user => user.id));
   const memberRows = snapshot.ringGroupMembers.filter(
     row => row.groupId === groupId
   );

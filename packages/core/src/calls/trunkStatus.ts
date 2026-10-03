@@ -37,12 +37,8 @@ const ENDPOINT_STATUS: Partial<Record<string, TrunkStatus>> = {
   offline: 'unreachable'
 };
 
-function liveTrunks(snapshot: Snapshot): Snapshot['trunks'] {
-  return snapshot.trunks.filter(trunk => trunk.deletedAt === null);
-}
-
 function ipTrunks(snapshot: Snapshot): Snapshot['trunks'] {
-  return liveTrunks(snapshot).filter(trunk => trunk.authMode === 'ip');
+  return snapshot.trunks.filter(trunk => trunk.authMode === 'ip');
 }
 
 /** An `ip` trunk whose contact Asterisk never probes (`qualify_frequency = 0`): its contact reads
@@ -74,7 +70,7 @@ export function outboundHosts(
 export function registrationTrunks(
   snapshot: Snapshot
 ): { id: string; clientUri: string; serverUri: string }[] {
-  return liveTrunks(snapshot)
+  return snapshot.trunks
     .filter(
       (trunk): trunk is Snapshot['trunks'][number] & { username: string } =>
         trunk.authMode === 'registration' && trunk.username !== null
@@ -173,7 +169,7 @@ export function monitoringStatuses(
   snapshot: Snapshot,
   current: (trunkId: string) => TrunkStatus | undefined
 ): StatusChange[] {
-  return liveTrunks(snapshot).flatMap(trunk => {
+  return snapshot.trunks.flatMap(trunk => {
     if (unprobed(trunk)) {
       return [[trunk.id, 'unmonitored'] as StatusChange];
     }

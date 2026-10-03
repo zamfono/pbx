@@ -125,43 +125,31 @@ const snapshot = {
       id: 'd-main',
       number: MAIN,
       targetId: 't-menu',
-      createdAt: '1',
-      deletedAt: null
+      createdAt: '1'
     },
     {
       id: 'd-bea',
       number: '+15551177',
       targetId: 't-bea',
-      createdAt: '1',
-      deletedAt: null
-    },
-    {
-      id: 'd-gone',
-      number: '+15551199',
-      targetId: 't-bea',
-      createdAt: '1',
-      deletedAt: 'x'
+      createdAt: '1'
     },
     {
       id: 'd-sales-2',
       number: '+15551302',
       targetId: 't-sales',
-      createdAt: '3',
-      deletedAt: null
+      createdAt: '3'
     },
     {
       id: 'd-sales-v',
       number: 'sales-verbatim',
       targetId: 't-sales',
-      createdAt: '1',
-      deletedAt: null
+      createdAt: '1'
     },
     {
       id: 'd-sales-1',
       number: '+15551301',
       targetId: 't-sales',
-      createdAt: '2',
-      deletedAt: null
+      createdAt: '2'
     }
   ],
   forwardTargets: [
@@ -222,7 +210,7 @@ describe('diversionNumber', () => {
       '+15551177'
     );
     expect(diversionNumber(snapshot, call(), { userId: 'u-ai' })).toBe(MAIN);
-    // A primary number since deleted counts as none.
+    // A primary number since deleted, absent from the snapshot, counts as none.
     expect(diversionNumber(snapshot, call(), { userId: 'u-left' })).toBe(MAIN);
   });
 

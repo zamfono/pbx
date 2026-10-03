@@ -55,19 +55,13 @@ type ScopeState = {
 function allScopes(snapshot: Snapshot): Scope[] {
   const scopes: Scope[] = ['tenant'];
   for (const user of snapshot.users) {
-    if (user.deletedAt === null) {
-      scopes.push(`user:${user.id}`);
-    }
+    scopes.push(`user:${user.id}`);
   }
   for (const ringGroup of snapshot.ringGroups) {
-    if (ringGroup.deletedAt === null) {
-      scopes.push(`ringGroup:${ringGroup.id}`);
-    }
+    scopes.push(`ringGroup:${ringGroup.id}`);
   }
   for (const menu of snapshot.menus) {
-    if (menu.deletedAt === null) {
-      scopes.push(`menu:${menu.id}`);
-    }
+    scopes.push(`menu:${menu.id}`);
   }
   return scopes;
 }

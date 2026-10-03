@@ -16,11 +16,7 @@ export type UserRow = Snapshot['users'][number];
 export type AttemptIdentity = { number: string; withhold: boolean };
 
 function didNumbersById(snapshot: Snapshot): Map<string, { number: string }> {
-  return new Map(
-    snapshot.dids
-      .filter(row => row.deletedAt === null)
-      .map(row => [row.id, { number: row.number }])
-  );
+  return new Map(snapshot.dids.map(row => [row.id, { number: row.number }]));
 }
 
 /** Caller-ID and CLIR, resolved per attempt since each route may override them (§9.4). */

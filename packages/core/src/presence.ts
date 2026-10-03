@@ -68,9 +68,8 @@ export class Presence {
    * once registered (`devices.last_registered_at` is an event's timestamp, §3.1). */
   async registeredDevices(): Promise<number> {
     const snapshot = await this.deps.cache.get();
-    return snapshot.devices.filter(
-      device =>
-        device.deletedAt === null && this.isRegistered(device.sipUsername)
+    return snapshot.devices.filter(device =>
+      this.isRegistered(device.sipUsername)
     ).length;
   }
 
@@ -113,9 +112,7 @@ export class Presence {
   async refreshAll(): Promise<void> {
     const snapshot = await this.deps.cache.get();
     await Promise.all(
-      snapshot.users
-        .filter(user => user.deletedAt === null)
-        .map(user => this.refreshUser(user.id, snapshot))
+      snapshot.users.map(user => this.refreshUser(user.id, snapshot))
     );
   }
 
@@ -124,9 +121,7 @@ export class Presence {
   ): Promise<void> {
     const info = event.contact_info;
     const snapshot = await this.deps.cache.get();
-    const device = snapshot.devices.find(
-      row => row.sipUsername === info.aor && row.deletedAt === null
-    );
+    const device = snapshot.devices.find(row => row.sipUsername === info.aor);
     if (device === undefined) {
       // Not one of ours: a trunk contact, matched instead by `TrunkState`.
       return;

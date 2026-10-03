@@ -47,8 +47,8 @@ const CONFIG_TABLES = [
 
 // The subset of CONFIG_TABLES carrying `deleted_at` (§11.1 "Soft delete"). A soft-deleted row
 // stays readable for the undo window (§5.8), so the snapshot the pipeline routes on excludes it
-// here: nothing downstream filters, and a deleted DID, user or blocklist entry would otherwise
-// keep routing and keep blocking until the purge hard-deletes it days later.
+// here and its row types drop `deletedAt`: every snapshot row is live, and a deleted DID, user or
+// blocklist entry would otherwise keep routing and keep blocking until the purge hard-deletes it.
 const SOFT_DELETED_TABLES = new Set<string>([
   'users',
   'devices',
@@ -66,21 +66,19 @@ const SOFT_DELETED_TABLES = new Set<string>([
 ]);
 
 type ConfigTable = (typeof CONFIG_TABLES)[number];
-type RawTableRows = { [K in ConfigTable]: Selectable<DB[K]>[] };
+type Row<K extends ConfigTable> = Omit<Selectable<DB[K]>, 'deletedAt'>;
+type RawTableRows = { [K in ConfigTable]: Row<K>[] };
 
-type ParsedUser = Omit<Selectable<DB['users']>, 'findMeJson'> & {
+type ParsedUser = Omit<Row<'users'>, 'findMeJson'> & {
   findMe: { number: string; delayS: number }[] | null;
 };
-type ParsedDevice = Omit<Selectable<DB['devices']>, 'allowedIpsJson'> & {
+type ParsedDevice = Omit<Row<'devices'>, 'allowedIpsJson'> & {
   allowedIps: string[] | null;
 };
-type ParsedTrunk = Omit<Selectable<DB['trunks']>, 'codecsJson'> & {
+type ParsedTrunk = Omit<Row<'trunks'>, 'codecsJson'> & {
   codecs: string[] | null;
 };
-type ParsedForwardTarget = Omit<
-  Selectable<DB['forwardTargets']>,
-  'sipHeadersJson'
-> & {
+type ParsedForwardTarget = Omit<Row<'forwardTargets'>, 'sipHeadersJson'> & {
   sipHeaders: SipHeaderTemplate[] | null;
 };
 type ParsedSettings = Omit<
@@ -130,7 +128,7 @@ function parseNullableJson(column: string, value: string | null): unknown {
   }
 }
 
-function parseUser(row: Selectable<DB['users']>): ParsedUser {
+function parseUser(row: Row<'users'>): ParsedUser {
   const { findMeJson, ...rest } = row;
   return {
     ...rest,
@@ -139,7 +137,7 @@ function parseUser(row: Selectable<DB['users']>): ParsedUser {
   };
 }
 
-function parseDevice(row: Selectable<DB['devices']>): ParsedDevice {
+function parseDevice(row: Row<'devices'>): ParsedDevice {
   const { allowedIpsJson, ...rest } = row;
   return {
     ...rest,
@@ -148,7 +146,7 @@ function parseDevice(row: Selectable<DB['devices']>): ParsedDevice {
   };
 }
 
-function parseTrunk(row: Selectable<DB['trunks']>): ParsedTrunk {
+function parseTrunk(row: Row<'trunks'>): ParsedTrunk {
   const { codecsJson, ...rest } = row;
   return {
     ...rest,
@@ -157,9 +155,7 @@ function parseTrunk(row: Selectable<DB['trunks']>): ParsedTrunk {
   };
 }
 
-function parseForwardTarget(
-  row: Selectable<DB['forwardTargets']>
-): ParsedForwardTarget {
+function parseForwardTarget(row: Row<'forwardTargets'>): ParsedForwardTarget {
   const { sipHeadersJson, ...rest } = row;
   return {
     ...rest,

@@ -41,9 +41,7 @@ function didNumber(snapshot: Snapshot, didId: string | null): string | null {
   if (didId === null) {
     return null;
   }
-  const did = snapshot.dids.find(
-    row => row.id === didId && row.deletedAt === null
-  );
+  const did = snapshot.dids.find(row => row.id === didId);
   return did?.number ?? null;
 }
 
@@ -56,12 +54,7 @@ function ringGroupDid(snapshot: Snapshot, ringGroupId: string): string | null {
       .map(row => row.id)
   );
   const dids = snapshot.dids
-    .filter(
-      row =>
-        row.deletedAt === null &&
-        targets.has(row.targetId) &&
-        isE164(row.number)
-    )
+    .filter(row => targets.has(row.targetId) && isE164(row.number))
     .sort(
       (left, right) =>
         left.createdAt.localeCompare(right.createdAt) ||

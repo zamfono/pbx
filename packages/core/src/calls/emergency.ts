@@ -78,7 +78,6 @@ function anyLiveEmergencyTrunk(
 ): boolean {
   return snapshot.trunks.some(
     row =>
-      row.deletedAt === null &&
       row.emergency === 1 &&
       pipeline.deps.state.trunks.get(row.id)?.status !== 'unreachable'
   );
@@ -101,14 +100,12 @@ export async function dialEmergency(
   const snapshot = await pipeline.deps.cache.get();
   const callerUser = userById(snapshot, asUser);
   const trunkIds = emergencyTrunks(
-    snapshot.trunks
-      .filter(row => row.deletedAt === null)
-      .map(row => ({
-        id: row.id,
-        priority: row.priority,
-        emergency: row.emergency === 1,
-        status: pipeline.deps.state.trunks.get(row.id)?.status ?? 'unknown'
-      }))
+    snapshot.trunks.map(row => ({
+      id: row.id,
+      priority: row.priority,
+      emergency: row.emergency === 1,
+      status: pipeline.deps.state.trunks.get(row.id)?.status ?? 'unknown'
+    }))
   );
   for (const trunkId of trunkIds) {
     // eslint-disable-next-line no-await-in-loop -- trunks are tried one at a time, in priority order, until one succeeds

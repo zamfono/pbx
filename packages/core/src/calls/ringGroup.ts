@@ -166,9 +166,7 @@ export async function ringGroup(
 ): Promise<void> {
   const snapshot = await pipeline.deps.cache.get();
   call.ringGroupId = groupId;
-  const group = snapshot.ringGroups.find(
-    row => row.id === groupId && row.deletedAt === null
-  );
+  const group = snapshot.ringGroups.find(row => row.id === groupId);
   if (group === undefined) {
     await release(pipeline, call, SIP_TEMPORARILY_UNAVAILABLE, 'failed');
     return;
