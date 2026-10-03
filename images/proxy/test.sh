@@ -58,6 +58,12 @@ run 'test -x /usr/local/bin/zamfono-proxy-entrypoint' \
   = '["caddy","run","--config","/etc/caddy/Caddyfile","--adapter","caddyfile"]' ] \
   || fail "the image's CMD is not upstream Caddy's own"
 
+echo "==> the entrypoint refuses to start without FQDN"
+if out=$(docker run --rm "$IMAGE_TAG" true 2>&1); then
+  fail "the entrypoint started without FQDN"
+fi
+grep -q 'FQDN is required' <<<"$out" || fail "the entrypoint failed without naming FQDN: $out"
+
 echo "==> the hook script is present and executable"
 run 'test -x /usr/local/bin/zamfono-cert-hook' \
   || fail "/usr/local/bin/zamfono-cert-hook is missing or not executable"

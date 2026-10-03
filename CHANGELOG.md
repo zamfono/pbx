@@ -89,6 +89,7 @@ why the specified behaviour changed; the commit history, how.
   `tested-softphones` maps the fields onto Groundwire and MicroSIP.
 - `api` refuses to start while `FQDN` is unset or empty in `.env`, which `setup.sh` always
   writes; `GET /system/info` therefore always reports `stack.domain`.
+- `proxy` likewise refuses to start while `FQDN` is unset or empty, and says so in its log.
 - On a DST night, an opening-hours edge or a maintenance hour at a local time the clock change
   skips or repeats now lies at the earlier of its two possible instants, as the time filters of
   `GET /calls`, `GET /audit` and `GET /presence/log` already read such a time: the `hours`

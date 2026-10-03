@@ -39,9 +39,10 @@ log() {
 cert_rel=${1:?usage: zamfono-cert-hook <certificate_path> <private_key_path> <identifier>}
 key_rel=${2:?usage: zamfono-cert-hook <certificate_path> <private_key_path> <identifier>}
 identifier=${3:-}
+: "${FQDN:?FQDN is required}"
 
-if [ "$identifier" != "${FQDN:-}" ]; then
-  log "ignoring the certificate for '$identifier' (stack FQDN is '${FQDN:-<unset>}')"
+if [ "$identifier" != "$FQDN" ]; then
+  log "ignoring the certificate for '$identifier' (stack FQDN is '$FQDN')"
   exit 0
 fi
 

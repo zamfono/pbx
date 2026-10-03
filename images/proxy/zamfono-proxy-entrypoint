@@ -11,6 +11,8 @@
 # schedule pass changes nothing for an unchanged certificate.
 set -eu
 
+: "${FQDN:?FQDN is required}"
+
 reconcile() {
   data_home=${XDG_DATA_HOME:-/data}
   storage_root="$data_home/caddy"
@@ -30,8 +32,6 @@ reconcile() {
   echo "zamfono-proxy-entrypoint: no certificate for '$FQDN' after 120s; leaving it to the event" >&2
 }
 
-if [ -n "${FQDN:-}" ]; then
-  reconcile &
-fi
+reconcile &
 
 exec "$@"
