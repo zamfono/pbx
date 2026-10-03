@@ -93,6 +93,14 @@ cert_sync_fail() {
   fail "$@"
 }
 
+# Whether Asterisk presents on 5061 the certificate Caddy stored, the two fingerprints left in
+# `caddy_fp` and `presented_fp`.
+cert_sync_presents_caddys() {
+  caddy_fp=$(cert_sync_caddy_fingerprint)
+  presented_fp=$(cert_sync_presented_fingerprint)
+  [ -n "$caddy_fp" ] && [ "$presented_fp" = "$caddy_fp" ]
+}
+
 # §6.4 "Fresh stack": "the first real certificate replaces the placeholder immediately". Waits
 # until Caddy has issued the FQDN's certificate and Asterisk presents it on 5061, which happens
 # once the hook's notification (or `api`'s start, if the certificate was there first) has synced
@@ -100,18 +108,18 @@ cert_sync_fail() {
 await_certificate_synced() {
   echo "== §6.4 cert sync: waiting for Asterisk to present Caddy's certificate for $FQDN =="
   local caddy_fp='' presented_fp=''
-  for _ in $(seq 1 $CERT_SYNC_WAIT_ATTEMPTS); do
-    caddy_fp=$(cert_sync_caddy_fingerprint)
-    presented_fp=$(cert_sync_presented_fingerprint)
-    [ -n "$caddy_fp" ] && [ "$presented_fp" = "$caddy_fp" ] && break
-    sleep 1
-  done
+  poll $CERT_SYNC_WAIT_ATTEMPTS 1 cert_sync_presents_caddys || true
   [ -n "$caddy_fp" ] \
     || cert_sync_fail "Caddy never stored a certificate for $FQDN within ${CERT_SYNC_WAIT_ATTEMPTS}s"
   [ "$presented_fp" = "$caddy_fp" ] \
     || cert_sync_fail "Asterisk presents ${presented_fp:-<none>} on 5061, never Caddy's $caddy_fp"
   ! cert_sync_presented_is_self_signed \
     || cert_sync_fail "the certificate Asterisk presents on 5061 is self-signed"
+}
+
+# Whether api has logged its sync's pjsip reload since `$1`.
+cert_sync_logged_since() {
+  dc logs --no-color --since "$1" api 2>&1 | grep 'certSync: triggered the pjsip reload' >/dev/null
 }
 
 run_cert_sync_step() {
@@ -138,19 +146,11 @@ run_cert_sync_step() {
     || cert_sync_fail "Asterisk does not present the placeholder after the reload"
 
   echo '== §6.4 cert sync: restarting api, the same sync that runs at api start =='
-  local restarted synced=false
+  local restarted
   restarted=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   dc restart api >/dev/null
   # The start's sync logs once it has copied the certificate and core has reloaded it.
-  for _ in $(seq 1 $CERT_SYNC_WAIT_ATTEMPTS); do
-    if dc logs --no-color --since "$restarted" api 2>&1 \
-      | grep 'certSync: triggered the pjsip reload' >/dev/null; then
-      synced=true
-      break
-    fi
-    sleep 1
-  done
-  [ "$synced" = true ] \
+  poll $CERT_SYNC_WAIT_ATTEMPTS 1 cert_sync_logged_since "$restarted" \
     || cert_sync_fail "api's start-of-process sync never replaced the placeholder (§6.4)"
   local presented_fp
   presented_fp=$(cert_sync_presented_fingerprint)

@@ -53,15 +53,7 @@ dc exec -T -d sipp-provider sh -c \
     -trace_msg -message_file /tmp/registrar-messages.log \
     asterisk:5060 > /tmp/registrar.log 2>&1'
 
-status=unknown
-for _ in $(seq 1 $ATTEMPTS); do
-  status=$(api GET "/trunks/$trunk_id" | jsonfield status)
-  # shellcheck disable=SC2086
-  if [ "$status" = registered ] \
-    && dc exec -T sipp-provider test -s /tmp/registrar-line.csv; then
-    exit 0
-  fi
-  sleep 1
-done
-echo "the registration trunk never registered after its refusals: status $status" >&2
-exit 1
+# shellcheck disable=SC2086
+await_trunk_status "$trunk_id" registered $ATTEMPTS \
+  && poll $ATTEMPTS 1 dc exec -T sipp-provider test -s /tmp/registrar-line.csv \
+  || { echo "the registration trunk never registered after its refusals" >&2; exit 1; }

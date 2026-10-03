@@ -7,12 +7,6 @@
 
 PROPAGATION_OWED_ATTEMPTS=150
 
-# `/healthz`'s `configPropagationPending`, as `True` or `False`.
-propagation_pending() {
-  curl -fsS "${FWD[@]}" "$api_base/healthz" \
-    | python3 -c 'import json, sys; print(json.load(sys.stdin)["configPropagationPending"])'
-}
-
 run_propagation_owed_step() {
   echo '== §3.1 a failed config propagation is owed and retried =='
   dc stop core >/dev/null
@@ -22,15 +16,10 @@ run_propagation_owed_step() {
   warning=$(printf '%s' "$created" | jsonfield warnings.0)
   [[ $warning == *'has not reached Asterisk'* ]] \
     || fail "the write without core carried no propagation warning: $created"
-  [ "$(propagation_pending)" = True ] \
+  reads True healthz_field configPropagationPending \
     || fail '/healthz did not show the owed propagation'
   dc start core >/dev/null
-  local pending=True
-  for _ in $(seq 1 $PROPAGATION_OWED_ATTEMPTS); do
-    pending=$(propagation_pending) || pending=True
-    [ "$pending" = False ] && break
-    sleep 1
-  done
-  [ "$pending" = False ] || fail 'the owed propagation was never retried successfully'
+  poll $PROPAGATION_OWED_ATTEMPTS 1 reads False healthz_field configPropagationPending \
+    || fail 'the owed propagation was never retried successfully'
   api_delete "/blockedNumbers/$id"
 }

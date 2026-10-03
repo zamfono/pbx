@@ -19,30 +19,21 @@ import json, sys
 print((json.load(sys.stdin)["core"] or {}).get("asteriskStartedAt") or "")'
 }
 
-# `/healthz`'s `ringotelProfilePending`, as `True` or `False`.
-ringotel_profile_pending() {
-  curl -fsS "${FWD[@]}" "$api_base/healthz" \
-    | python3 -c 'import json, sys; print(json.load(sys.stdin)["ringotelProfilePending"])'
-}
-
 run_asterisk_started_step() {
   echo '== §10.4 After a restart: Asterisk restarts alone, core tells api =='
-  local before after='' pending=True since
+  local before after='' since
   before=$(asterisk_started_at)
   [ -n "$before" ] || fail 'system.info reports no Asterisk start before the restart'
   dc exec -T api node -e "
 const { DatabaseSync } = require('node:sqlite');
 new DatabaseSync('/data/zamfono.sqlite3').exec('UPDATE settings SET ringotel_profile_pending = 1');
 " || fail 'could not seed the pending tenant profile'
-  [ "$(ringotel_profile_pending)" = True ] || fail '/healthz does not show the seeded pending profile'
+  reads True healthz_field ringotelProfilePending \
+    || fail '/healthz does not show the seeded pending profile'
   since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   dc restart asterisk >/dev/null || fail 'asterisk did not restart'
-  for _ in $(seq 1 $ASTERISK_STARTED_ATTEMPTS); do
-    pending=$(ringotel_profile_pending) || pending=True
-    [ "$pending" = False ] && break
-    sleep 1
-  done
-  [ "$pending" = False ] || fail "api never acted on the restart: the pending profile is still set"
+  poll $ASTERISK_STARTED_ATTEMPTS 1 reads False healthz_field ringotelProfilePending \
+    || fail "api never acted on the restart: the pending profile is still set"
   api GET "/audit?operation=ringotel.profile&from=$since" | python3 -c '
 import json, sys
 entries = json.load(sys.stdin)["items"]

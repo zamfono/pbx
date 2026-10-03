@@ -54,10 +54,6 @@ IDLE_ATTEMPTS=10
 FINISH_SECONDS=5
 SIPP_SERVICES=(sipp sipp-phone sipp-provider)
 
-asterisk_cli() {
-  dc exec -T asterisk asterisk -rx "$1"
-}
-
 # Every trunk's own AOR, `trunk-<id>`, as `pjsip show contacts` lists their contacts.
 trunk_aors() {
   local listing
@@ -109,13 +105,13 @@ start_trunk_side() {
 # stack never sent its BYE, left holding the line. The answering sides wait for exactly that BYE,
 # but nothing else reads their outcome, so the channels are counted where they would linger.
 assert_no_channels() {
-  for _ in $(seq 1 $IDLE_ATTEMPTS); do
-    if asterisk_cli 'core show channels count' | grep '^0 active channels' >/dev/null; then
-      return 0
-    fi
-    sleep 1
-  done
+  poll $IDLE_ATTEMPTS 1 no_channels && return
   fail "channels outlived the call in $1: $(asterisk_cli 'core show channels concise')"
+}
+
+# Whether Asterisk holds no channel.
+no_channels() {
+  asterisk_cli 'core show channels count' | grep '^0 active channels' >/dev/null
 }
 
 # A SIP dialog ends with its scenario: every sipp run the scenario started, on whichever side, is
@@ -133,13 +129,12 @@ finish_sipp_runs() {
 }
 
 # The phone's own call is up once both of its legs are: the phone's and the trunk's.
+phone_call_up() {
+  [ "$(asterisk_cli 'core show channels concise' | grep -c '!Up!')" -ge 2 ]
+}
+
 await_phone_call() {
-  for _ in $(seq 1 $IDLE_ATTEMPTS); do
-    if [ "$(asterisk_cli 'core show channels concise' | grep -c '!Up!')" -ge 2 ]; then
-      return 0
-    fi
-    sleep 1
-  done
+  poll $IDLE_ATTEMPTS 1 phone_call_up && return
   fail "the phone's own call never came up in $1: $(asterisk_cli 'core show channels concise')"
 }
 

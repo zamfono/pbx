@@ -13,13 +13,8 @@ compose=$3
 # The picker's own call (`uas/pickup-dial.sh`) ran beside the ringing device's; it hung up just
 # before the stack ended the caller's call, so its exit status follows within moments.
 code=''
-for _ in $(seq 1 10); do
-  if code=$(dc exec -T sipp-phone cat /tmp/pickup-dial.exit 2>/dev/null); then
-    break
-  fi
-  sleep 1
-done
-code=$(printf '%s' "$code" | tr -d '\r')
+poll 10 1 dc exec -T sipp-phone test -f /tmp/pickup-dial.exit \
+  && code=$(dc exec -T sipp-phone cat /tmp/pickup-dial.exit | tr -d '\r')
 if [ "$code" != 0 ]; then
   echo "the picker's own call did not complete (sipp exit '${code:-none}')" >&2
   exit 1

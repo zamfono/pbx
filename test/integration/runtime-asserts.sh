@@ -46,17 +46,16 @@ assert_shared_namespace() {
 # transport-tls-noverify included, since an outgoing connection leaves from its transport's
 # address. Polled for up to 30 s, as PJSIP loads a few seconds after the container starts.
 public_tls_transports_bound() {
-  local stack_ip=$1 transports _
-  for _ in $(seq 1 30); do
-    transports=$(STACK_IPV4=$stack_ip $COMPOSE "${macvlan_files[@]}" exec -T asterisk \
-      asterisk -rx 'pjsip show transports' 2>/dev/null || true)
-    if echo "$transports" | grep -q "transport-tls .*$stack_ip:5061" \
-      && echo "$transports" | grep -q "transport-tls-noverify .*$stack_ip:5062"; then
-      return 0
-    fi
-    sleep 1
-  done
-  return 1
+  poll 30 1 public_tls_transports_listed "$1"
+}
+
+# Whether `pjsip show transports` lists both TLS transports on stack address `$1`.
+public_tls_transports_listed() {
+  local transports
+  transports=$(STACK_IPV4=$1 $COMPOSE "${macvlan_files[@]}" exec -T asterisk \
+    asterisk -rx 'pjsip show transports' 2>/dev/null || true)
+  echo "$transports" | grep -q "transport-tls .*$1:5061" \
+    && echo "$transports" | grep -q "transport-tls-noverify .*$1:5062"
 }
 
 assert_public_network_address() {

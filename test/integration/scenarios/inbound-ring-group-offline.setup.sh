@@ -43,14 +43,9 @@ did_id=$(did_to_group +15551003 "$group_id")
 printf '%s %s %s %s\n' "$member_id" "$absent_id" "$group_id" "$did_id" \
   > "$(state_file offline)"
 
-status=unknown
-for _ in $(seq 1 $ATTEMPTS); do
-  status=$(api GET "/presence/log?at=9999-12-31T00:00:00.000Z&userId=$member_id" \
-    | jsonfield items.0.status)
-  if [ "$status" = offline ]; then
-    exit 0
-  fi
-  sleep 1
-done
-echo "101 never read offline: $status" >&2
-exit 1
+# 101's latest presence status.
+member_status() {
+  api GET "/presence/log?at=9999-12-31T00:00:00.000Z&userId=$member_id" | jsonfield items.0.status
+}
+poll $ATTEMPTS 1 reads offline member_status \
+  || { echo "101 never read offline: $last_read" >&2; exit 1; }

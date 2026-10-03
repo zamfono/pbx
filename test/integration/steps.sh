@@ -104,7 +104,7 @@ configure_tenant() {
 # `backed_up` set for `step_updater`.
 step_backups() {
   echo '== backing up to the default local target =='
-  local target_id run_id status='running' attempt
+  local target_id run_id status='running' started=$SECONDS
   target_id=$(api GET /backups/targets | python3 -c '
 import json, sys
 local = [t for t in json.load(sys.stdin)["items"]
@@ -115,14 +115,15 @@ print(local[0]["id"] if len(local) == 1 else "")
   run_id=$(api POST /backups/runs "{\"targetId\":\"$target_id\"}" | jsonfield id) \
     || fail "POST /backups/runs refused the default target"
   # The scheduler polls for queued runs; a first run also initializes the repository.
-  for attempt in $(seq 1 60); do
-    status=$(api GET "/backups/runs/$run_id" | jsonfield status)
-    [ "$status" = running ] || break
-    sleep 1
-  done
+  poll 60 1 backup_run_ended "$run_id" || true
   [ "$status" = ok ] || fail "the backup run ended $status: $(api GET "/backups/runs/$run_id")"
-  echo "   run $run_id ok after ${attempt}s"
+  echo "   run $run_id ok after $((SECONDS - started))s"
   backed_up=true
+}
+
+# Whether backup run `$1` has ended, its status left in `status`.
+backup_run_ended() {
+  status=$(api GET "/backups/runs/$1" | jsonfield status) && [ "$status" != running ]
 }
 
 # §6.3 "Updates": the updater found its own Compose project and the runtime's socket, so

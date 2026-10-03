@@ -18,15 +18,9 @@ print([u['id'] for u in json.load(sys.stdin)['items'] if u['extension'] == sys.a
 await_bound() {
   local port
   port=$(printf ':%04X' "$2")
-  for _ in $(seq 1 20); do
-    if dc exec -T "$1" awk -v port="$port" \
-      'substr($2, length($2) - 4) == port { found = 1 } END { exit !found }' /proc/net/udp; then
-      return 0
-    fi
-    sleep 0.5
-  done
-  echo "nothing bound UDP port $2 in $1 within 10 s" >&2
-  return 1
+  poll 20 0.5 dc exec -T "$1" awk -v port="$port" \
+    'substr($2, length($2) - 4) == port { found = 1 } END { exit !found }' /proc/net/udp \
+    || { echo "nothing bound UDP port $2 in $1 within 10 s" >&2; return 1; }
 }
 
 # The status `pjsip show contacts` gives the contact of AOR `$1`, a device's SIP username or a
@@ -37,25 +31,25 @@ contact_status() {
   local listing
   # Read whole before awk sees it: under pipefail, Podman's compose provider reports the CLI's
   # SIGPIPE as a failure.
-  listing=$(dc exec -T asterisk asterisk -rx 'pjsip show contacts')
+  listing=$(asterisk_cli 'pjsip show contacts')
   printf '%s\n' "$listing" \
     | awk -v aor="$1/" '$1 == "Contact:" && index($2, aor) == 1 { print $4 }'
+}
+
+# Whether the contact of AOR `$1` reads a status matching the extended regex `$2`, left in
+# `status`.
+contact_matches() {
+  status=$(contact_status "$1")
+  [[ $status =~ ^($2)$ ]]
 }
 
 # Waits up to 20 s for the contact of AOR `$1` to read a status matching the extended regex `$2`,
 # and prints it.
 await_contact_status() {
   local status=''
-  for _ in $(seq 1 40); do
-    status=$(contact_status "$1")
-    if [[ $status =~ ^($2)$ ]]; then
-      printf '%s\n' "$status"
-      return 0
-    fi
-    sleep 0.5
-  done
-  echo "the contact of $1 reads '${status:-none}', not $2, after 20 s" >&2
-  return 1
+  poll 40 0.5 contact_matches "$1" "$2" \
+    || { echo "the contact of $1 reads '${status:-none}', not $2, after 20 s" >&2; return 1; }
+  printf '%s\n' "$status"
 }
 
 # Probes the contact of AOR `$1` once and waits for it to read reachable, `Avail`, or a status
@@ -63,7 +57,7 @@ await_contact_status() {
 # must be up already (`await_bound`): a probe it does not answer times out, and that result,
 # applied whenever it lands, would mark the contact unreachable after a later probe's answer.
 await_contact_avail() {
-  dc exec -T asterisk asterisk -rx "pjsip qualify $1" >/dev/null
+  asterisk_cli "pjsip qualify $1" >/dev/null
   await_contact_status "$1" "${2:-Avail}" >/dev/null
 }
 
@@ -71,32 +65,24 @@ await_contact_avail() {
 # `unmonitored`, its qualify off (§9.4 "Provisioning and status"): the status a call's route
 # fallthrough reads, which follows Asterisk's contact status by an event.
 await_ip_trunks_reachable() {
-  local unready
-  for _ in $(seq 1 40); do
-    unready=$(api GET /trunks | python3 -c '
+  poll 40 0.5 reads '' ip_trunks_unready \
+    || { echo "ip trunks the core does not report reachable after 20 s: $last_read" >&2; return 1; }
+}
+
+# The `ip` trunks the core reports neither reachable nor unmonitored, as `<name>:<status>`.
+ip_trunks_unready() {
+  api GET /trunks | python3 -c '
 import json, sys
 print(" ".join("%s:%s" % (t["name"], t["status"]) for t in json.load(sys.stdin)["items"]
                if t["authMode"] == "ip" and t["status"] not in ("registered", "unmonitored")))
-')
-    [ -n "$unready" ] || return 0
-    sleep 0.5
-  done
-  echo "ip trunks the core does not report reachable after 20 s: $unready" >&2
-  return 1
+'
 }
 
 # Waits up to `$3` seconds for the sipp run tagged `$2` in container `$1` (`_sipp-run.sh`) to
 # end, which it says by writing its exit status.
 await_sipp_run() {
-  local attempt
-  for attempt in $(seq 1 "$3"); do
-    if dc exec -T "$1" test -f "/tmp/sipp-runs/$2.exit"; then
-      return 0
-    fi
-    sleep 1
-  done
-  echo "the sipp run $2 in $1 did not end within $attempt s" >&2
-  return 1
+  poll "$3" 1 dc exec -T "$1" test -f "/tmp/sipp-runs/$2.exit" \
+    || { echo "the sipp run $2 in $1 did not end within $3 s" >&2; return 1; }
 }
 
 # The ring group every trunk scenario's DID points at: the one `configure.sh` created.
@@ -131,6 +117,17 @@ trunk_named() {
 import json, sys
 print([t['id'] for t in json.load(sys.stdin)['items'] if t['name'] == sys.argv[1]][0])
 " "$1"
+}
+
+# The status of trunk `$1` as `api` serves it from the core (§9.4 "Provisioning and status").
+trunk_status() {
+  api GET "/trunks/$1" | jsonfield status
+}
+
+# Waits up to `$3` seconds for trunk `$1` to read status `$2`.
+await_trunk_status() {
+  poll "$3" 1 reads "$2" trunk_status "$1" \
+    || { echo "trunk $1 reads '${last_read:-none}', not $2, after $3 s" >&2; return 1; }
 }
 
 # Live trunk `$1` as `GET /trunks` lists it, without the live status the core merges in (§9.4
@@ -232,15 +229,8 @@ remove_colleague() {
 # Waits up to `$2` seconds for call `$1` to reach the history, which lists a call once it has
 # ended, and prints it with its trace.
 await_ended_call() {
-  local attempt
-  for attempt in $(seq 1 "$2"); do
-    if api GET "/calls/$1" 2>/dev/null; then
-      return 0
-    fi
-    sleep 1
-  done
-  echo "call $1 never ended within $attempt s" >&2
-  return 1
+  poll "$2" 1 api GET "/calls/$1" 2>/dev/null \
+    || { echo "call $1 never ended within $2 s" >&2; return 1; }
 }
 
 # Prints sipp message trace `$2` in container `$1`. The run that wrote it has ended, as every
@@ -263,17 +253,15 @@ print(items[0]["id"] if items else "")
 # Waits up to `$2` seconds for a call newer than call `$1` (`newest_call_id`) to reach the
 # history, which lists a call once it has ended and its trace is written (§7), and prints its id.
 await_new_call() {
-  local attempt id
-  for attempt in $(seq 1 "$2"); do
-    id=$(newest_call_id)
-    if [ "$id" != "$1" ]; then
-      printf '%s\n' "$id"
-      return 0
-    fi
-    sleep 1
-  done
-  echo "no call newer than $1 reached the history within $attempt s" >&2
-  return 1
+  local id
+  poll "$2" 1 newer_call "$1" \
+    || { echo "no call newer than $1 reached the history within $2 s" >&2; return 1; }
+  printf '%s\n' "$id"
+}
+
+# Whether the newest call in the history is another than call `$1`, left in `id`.
+newer_call() {
+  id=$(newest_call_id) && [ "$id" != "$1" ]
 }
 
 # Waits up to 30 s for a call in progress in state `$1` (`ringing`, or `up` once answered and
@@ -282,8 +270,13 @@ await_new_call() {
 # CRM's button acts on the call it shows (`_api-control.sh`).
 await_live_call() {
   local id
-  for _ in $(seq 1 150); do
-    id=$(api GET '/calls?live=true' | python3 -c '
+  poll 150 0.2 live_call "$@" || { echo "no live call in state $1 within 30 s" >&2; return 1; }
+  printf '%s\n' "$id"
+}
+
+# Whether a call `await_live_call` waits for is in progress, its id left in `id`.
+live_call() {
+  id=$(api GET '/calls?live=true' | python3 -c '
 import json, sys
 state, wanted, user = sys.argv[1:4]
 for call in json.load(sys.stdin)["items"]:
@@ -297,13 +290,5 @@ for call in json.load(sys.stdin)["items"]:
         continue
     print(call["callId"])
     break
-' "$1" "${2:-}" "${3:-}")
-    if [ -n "$id" ]; then
-      printf '%s\n' "$id"
-      return 0
-    fi
-    sleep 0.2
-  done
-  echo "no live call in state $1 within 30 s" >&2
-  return 1
+' "$1" "${2:-}" "${3:-}") && [ -n "$id" ]
 }

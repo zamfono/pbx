@@ -72,25 +72,12 @@ api PUT "/users/$agent/forwarding" "{\"rules\":[{\"condition\":\"unconditional\"
 printf '%s %s %s %s\n' "$trunk_id" "$forwarder" "$agent" "$did_id" \
   > "$(state_file inbound-forward-sip)"
 
-# The trunk's status as `api` serves it from the core (§9.4 "Provisioning and status").
-trunk_status() {
-  api GET "/trunks/$trunk_id" | jsonfield status
-}
-
 # Nothing listens on the front's port yet, so the trunk's probe fails: the core skips the trunk
 # without an INVITE (§9.4 "Route fallthrough"), as it would skip one whose endpoint ignores OPTIONS.
 # The probe's result lands once it times out.
 # shellcheck disable=SC2086
-dc exec -T asterisk asterisk -rx "pjsip qualify trunk-$trunk_id" >/dev/null
-unreachable=
-for _ in $(seq 1 30); do
-  if [ "$(trunk_status)" = unreachable ]; then
-    unreachable=1
-    break
-  fi
-  sleep 1
-done
-if [ -z "$unreachable" ]; then
+asterisk_cli "pjsip qualify trunk-$trunk_id" >/dev/null
+if ! poll 30 1 reads unreachable trunk_status "$trunk_id"; then
   echo "the TLS trunk trunk-$trunk_id never turned unreachable with its front down" >&2
   exit 1
 fi
@@ -99,7 +86,7 @@ fi
 # trunk `unmonitored` once the PATCH answered, which no pre-check skips, whatever the contact still
 # says. The contact's own status, `NonQual` for one never probed, is printed for the run's log.
 api PATCH "/trunks/$trunk_id" '{"qualify":false}' >/dev/null
-status=$(trunk_status)
+status=$(trunk_status "$trunk_id")
 if [ "$status" != unmonitored ]; then
   echo "trunk-$trunk_id with qualify off reads status '$status', not unmonitored" >&2
   exit 1
@@ -124,12 +111,6 @@ dc exec -T -d sip-tls node -e "
 "
 
 # The call waits for the front to listen, which it says by writing its pid.
-for _ in $(seq 1 30); do
-  # shellcheck disable=SC2086
-  if dc exec -T sip-tls test -s /tmp/sip-target-tls/front.pid; then
-    exit 0
-  fi
-  sleep 1
-done
-echo "the TLS front for trunk-$trunk_id never listened" >&2
-exit 1
+# shellcheck disable=SC2086
+poll 30 1 dc exec -T sip-tls test -s /tmp/sip-target-tls/front.pid \
+  || { echo "the TLS front for trunk-$trunk_id never listened" >&2; exit 1; }

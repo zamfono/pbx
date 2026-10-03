@@ -113,16 +113,10 @@ case $action in
     await_reachable "$4"
     ;;
   wait-call)
-    for _ in $(seq 1 $CALL_ATTEMPTS); do
-      if code=$(dc exec -T sipp-phone cat "$CALL_EXIT" 2>/dev/null); then
-        [ "$(printf '%s' "$code" | tr -d '\r')" = 0 ] && exit 0
-        echo "the phone's own call ended with sipp exit $code" >&2
-        exit 1
-      fi
-      sleep 1
-    done
-    echo "the phone's own call never ended" >&2
-    exit 1
+    poll $CALL_ATTEMPTS 1 dc exec -T sipp-phone test -f "$CALL_EXIT" \
+      || { echo "the phone's own call never ended" >&2; exit 1; }
+    code=$(dc exec -T sipp-phone cat "$CALL_EXIT" | tr -d '\r')
+    [ "$code" = 0 ] || { echo "the phone's own call ended with sipp exit $code" >&2; exit 1; }
     ;;
   invites)
     # sipp heads each traced message with a line naming its direction; a received INVITE is one

@@ -101,17 +101,30 @@ stress_step() {
   cat "$STEP_DIR/summary.txt" "$STEP_DIR/aggregate.txt" | tee -a "$OUT_DIR/summary.txt" >&2
 }
 
+# Whether at least `$1` PJSIP legs are up, their count left in `up`.
+legs_up() {
+  up=$(pjsip_channels)
+  [ "${up:-0}" -ge "$1" ]
+}
+
+# Whether no PJSIP leg is left.
+no_legs() {
+  [ "$(pjsip_channels)" = 0 ]
+}
+
+# Whether at least `$1` recordings exist, their count left in `have`.
+recordings_reach() {
+  have=$(recordings_count)
+  [ "${have:-0}" -ge "$1" ] 2>/dev/null
+}
+
 step_run_calls() {
   local step=$1 n_in=$2 n_out=$3 side=$4 target=$(( ($2 + $3) * 2 ))
   step_phase ramp
   local up=0 reached=false t_ramp
   t_ramp=$(date +%s)
   calls_start "$step" "$n_in" "$n_out" "$side"
-  for _ in $(seq 1 $(( (n_in + n_out) / RATE + 60 ))); do
-    up=$(pjsip_channels)
-    [ "${up:-0}" -ge "$target" ] && { reached=true; break; }
-    sleep 1
-  done
+  poll $(( (n_in + n_out) / RATE + 60 )) 1 legs_up "$target" && reached=true
   echo "ramp_reached=$reached pjsip_legs=$up target=$target ramp_s=$(( $(date +%s) - t_ramp ))" \
     >> "$STEP_DIR/summary.txt"
 
@@ -134,19 +147,12 @@ step_run_calls() {
   echo "plateau_s=$(( $(date +%s) - t_plateau + 10 )) plateau_min_legs=$min" >> "$STEP_DIR/summary.txt"
 
   step_phase drain
-  for _ in $(seq 1 240); do
-    [ "$(pjsip_channels)" = 0 ] && break
-    sleep 1
-  done
+  poll 240 1 no_legs || true
   echo "drained_legs=$(pjsip_channels) snoops_left=$(snoop_channels)" >> "$STEP_DIR/summary.txt"
 
   step_phase tail
   local want=$(( rec_before + expected )) have
-  for _ in $(seq 1 "$TAIL_S"); do
-    have=$(recordings_count)
-    [ "${have:-0}" -ge "$want" ] 2>/dev/null && break
-    sleep 1
-  done
+  poll "$TAIL_S" 1 recordings_reach "$want" || true
   sleep 5
   calls_collect "$step" "$n_in" "$n_out"
 }

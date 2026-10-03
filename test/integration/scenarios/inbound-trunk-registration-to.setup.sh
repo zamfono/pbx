@@ -38,15 +38,7 @@ trunk_id=$(api POST /trunks "{
 did_id=$(did_to_group +15551077 "$(ci_group)")
 printf '%s %s\n' "$trunk_id" "$did_id" > "$(state_file registration-to)"
 
-status=unknown
-for _ in $(seq 1 $ATTEMPTS); do
-  status=$(api GET "/trunks/$trunk_id" | jsonfield status)
-  # shellcheck disable=SC2086
-  if [ "$status" = registered ] \
-    && dc exec -T sipp-provider test -s /tmp/registrar-line.csv; then
-    exit 0
-  fi
-  sleep 1
-done
-echo "the registration trunk never registered: status $status" >&2
-exit 1
+# shellcheck disable=SC2086
+await_trunk_status "$trunk_id" registered $ATTEMPTS \
+  && poll $ATTEMPTS 1 dc exec -T sipp-provider test -s /tmp/registrar-line.csv \
+  || { echo "the registration trunk never registered" >&2; exit 1; }

@@ -25,21 +25,24 @@ devices_start() {
 
 # Contacts of this tenant's devices that Asterisk currently reads as reachable.
 devices_available() {
-  dc exec -T asterisk asterisk -rx 'pjsip show contacts' 2>/dev/null \
+  asterisk_cli 'pjsip show contacts' 2>/dev/null \
     | awk '$1 == "Contact:" && $2 ~ /^e[0-9]+-d/ && /Avail/' | wc -l
+}
+
+# Whether `$1` devices are reachable, the count left in `n`; else qualifies the first `$1`'s AORs
+# now, sparing their own qualify interval, the way phone.sh does (one exec for all of them).
+devices_reachable() {
+  n=$(devices_available)
+  [ "$n" -ge "$1" ] && return
+  dc exec -T asterisk sh -c \
+    "for u in $users; do asterisk -rx \"pjsip qualify \$u\"; done" >/dev/null 2>&1 || true
+  return 1
 }
 
 devices_await() {
   local count=$1 n=0 users
   users=$(head -n "$count" "$LOAD_GEN_DIR/creds.csv" | cut -d, -f1 | tr '\n' ' ')
-  for _ in $(seq 1 60); do
-    n=$(devices_available)
-    [ "$n" -ge "$count" ] && break
-    # Spare the AORs' own qualify interval, the way phone.sh does (one exec for all of them).
-    dc exec -T asterisk sh -c \
-      "for u in $users; do asterisk -rx \"pjsip qualify \$u\"; done" >/dev/null 2>&1 || true
-    sleep 3
-  done
+  poll 60 3 devices_reachable "$count" || true
   log "devices reachable: $n/$count"
   [ "$n" -ge "$count" ] || fail "only $n of $count devices became reachable"
 }

@@ -11,6 +11,11 @@
 
 STATUS_ATTEMPTS=60
 
+# `core`'s health as Compose reports it.
+core_health() {
+  dc ps --format '{{.Service}} {{.Health}}' | awk '$1 == "core" { print $2 }'
+}
+
 run_trunk_status_step() {
   echo '== §9.4 trunk status resyncs at boot =='
   local aor
@@ -24,21 +29,10 @@ run_trunk_status_step() {
   fi
 
   dc restart core >/dev/null
-  local health=''
-  for _ in $(seq 1 $STATUS_ATTEMPTS); do
-    health=$(dc ps --format '{{.Service}} {{.Health}}' \
-      | awk '$1 == "core" { print $2 }')
-    [ "$health" = healthy ] && break
-    sleep 1
-  done
-  [ "$health" = healthy ] || fail "core never reported healthy after its restart"
-  local trunk_status
-  trunk_status=$(api GET /trunks | python3 -c "
-import json, sys
-print([t['status'] for t in json.load(sys.stdin)['items'] if t['name'] == 'ci-trunk'][0])
-")
-  [ "$trunk_status" = registered ] \
-    || fail "after a core restart the reachable ip trunk reads '$trunk_status', not registered"
+  poll $STATUS_ATTEMPTS 1 reads healthy core_health \
+    || fail "core never reported healthy after its restart"
+  reads registered trunk_status "${aor#trunk-}" \
+    || fail "after a core restart the reachable ip trunk reads '$last_read', not registered"
   dc exec -T sipp sh /scenarios/_sipp-finish.sh "$FINISH_SECONDS" \
     || fail "the trunk side's run did not end"
   echo '   the ip trunk reads registered after the restart'

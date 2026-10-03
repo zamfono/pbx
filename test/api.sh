@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # Sourced by the integration and load harnesses: how their scripts reach the REST API (§10.3) and
 # the stack's containers. Reads `api_base` (`http://127.0.0.1:<port>`, or `https://<FQDN>` through
-# Caddy) and `token`, and `compose` for `dc` and `container_ip`.
+# Caddy) and `token`, and `compose` for `dc`, `container_ip` and `asterisk_cli`.
 #
 # The api runs behind Caddy, which sets `X-Forwarded-For`; adapter-node is configured to require
 # it (`ADDRESS_HEADER`), so a request the harness sends the api directly carries it, as the
@@ -21,6 +21,30 @@ dc() {
 # in the arguments of a pipeline's reader, whose input it would otherwise take.
 container_ip() {
   dc exec -T "$1" hostname -i </dev/null | tr -d '\r' | awk '{print $1}'
+}
+
+# `asterisk_cli <command>` runs one Asterisk CLI command in `asterisk`, printing its output.
+asterisk_cli() {
+  dc exec -T asterisk asterisk -rx "$1"
+}
+
+# `poll <tries> <interval_s> <cmd…>` runs the command until it succeeds, at most `tries` times,
+# `interval_s` apart, and fails when it never did; the caller says what never happened. The
+# command runs in this shell, so a variable it sets is the caller's to read.
+poll() {
+  local tries=$1 interval=$2 try
+  shift 2
+  for ((try = 1; ; try++)); do
+    "$@" && return 0
+    [ "$try" -lt "$tries" ] || return 1
+    sleep "$interval"
+  done
+}
+
+# `reads <value> <cmd…>` succeeds when the command succeeds and prints exactly `value`; what it
+# printed is left in `last_read`, for the caller's failure message.
+reads() {
+  last_read=$("${@:2}") && [ "$last_read" = "$1" ]
 }
 
 # `api <method> <path> [<json-body>]` prints the response body, and fails on a status other than
@@ -45,6 +69,11 @@ api_status() {
 # A delete asks for confirmation (§10.3), which the REST body gives as `confirm`.
 api_delete() {
   api DELETE "$1" '{"confirm":true}' >/dev/null
+}
+
+# `/healthz`'s field `$1`, as `jsonfield` prints it: `True` or `False` for a flag.
+healthz_field() {
+  curl -fsS "${FWD[@]}" "$api_base/healthz" | jsonfield "$1"
 }
 
 # One field out of a JSON object on stdin, by a dotted path (`user.id`, `items.0.id`).

@@ -35,16 +35,11 @@ for r in json.load(sys.stdin)["items"]:
 ' "$call_id"
 }
 # Asterisk names a raw file `<recording-id>-l.<format>` or `-r.` (packages/core/src/calls).
-mixed=false
-for _ in $(seq 1 30); do
-  files=$(dc exec -T core ls /media/recordings)
-  if ! printf '%s\n' "$files" | grep -q -- '-[lr]\.'; then
-    mixed=true
-    break
-  fi
-  sleep 1
-done
-[ "$mixed" = true ] || {
+raw_files_gone() {
+  local files
+  files=$(dc exec -T core ls /media/recordings) && ! printf '%s\n' "$files" | grep -q -- '-[lr]\.'
+}
+poll 30 1 raw_files_gone || {
   echo "call $call_id's recordings were never mixed: raw files are left in media/recordings" >&2
   exit 1
 }

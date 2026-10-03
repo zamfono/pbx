@@ -75,15 +75,6 @@ print(json.dumps({"trunkIds": sys.argv[1:4] + json.loads(sys.argv[4])}))
 for id in "$refuse_id" "$plain_id" "$answer_id"; do
   await_contact_avail "trunk-$id"
 done
-for attempt in $(seq 1 $STATUS_ATTEMPTS); do
-  if api GET /trunks | python3 -c '
-import json, sys
-status = {t["id"]: t["status"] for t in json.load(sys.stdin)["items"]}
-sys.exit(0 if all(status.get(id) == "registered" for id in sys.argv[1:]) else 1)
-' "$refuse_id" "$plain_id" "$answer_id"; then
-    exit 0
-  fi
-  sleep 1
+for id in "$refuse_id" "$plain_id" "$answer_id"; do
+  await_trunk_status "$id" registered $STATUS_ATTEMPTS || exit 1
 done
-echo "the emergency scenario's trunks never read registered after $attempt attempts" >&2
-exit 1

@@ -39,13 +39,14 @@ stats_csv="$out_dir/stats.csv"
 net_csv="$out_dir/net.csv"
 step_log="$out_dir/$step.log"
 
-asterisk_cli() {
-  dc exec -T asterisk asterisk -rx "$1"
-}
-
 channels_up() {
   asterisk_cli 'core show channels count' 2>/dev/null \
     | awk '/active channels/ { print $1; found=1 } END { if (!found) print 0 }'
+}
+
+# Whether at least `$1` channels are up.
+channels_reach() {
+  [ "$(channels_up)" -ge "$1" ]
 }
 
 echo "== $step: concurrency=$concurrency rate=$rate/s hold=${hold_seconds}s provider=$provider_xml ==" \
@@ -88,14 +89,7 @@ if [ "$concurrency" -gt 0 ]; then
   target=$((concurrency * 2))
   ramp_timeout=$(( concurrency / (rate > 0 ? rate : 1) + 30 ))
   reached=false
-  for _ in $(seq 1 "$ramp_timeout"); do
-    up=$(channels_up)
-    if [ "${up:-0}" -ge "$target" ]; then
-      reached=true
-      break
-    fi
-    sleep 1
-  done
+  poll "$ramp_timeout" 1 channels_reach "$target" && reached=true
   up=$(channels_up)
   echo "-- ramp finished: $up/$target channels up (reached=$reached)" | tee -a "$step_log" >&2
   echo "ramp_reached=$reached ramp_channels=$up ramp_target=$target" >> "$out_dir/$step-summary.txt"
@@ -132,25 +126,15 @@ echo "-- plateau end: $final_channels channels up" | tee -a "$step_log" >&2
 
 if [ "$concurrency" -gt 0 ]; then
   echo '-- waiting for the caller run to finish (drain)' >&2
-  for _ in $(seq 1 240); do
-    if code=$(dc exec -T sipp cat "/tmp/caller-$step.exit" 2>/dev/null); then
-      echo "   caller sipp exit: $(printf '%s' "$code" | tr -d '\r')" | tee -a "$step_log" >&2
-      break
-    fi
-    sleep 1
-  done
+  if poll 240 1 dc exec -T sipp test -f "/tmp/caller-$step.exit"; then
+    code=$(dc exec -T sipp cat "/tmp/caller-$step.exit" | tr -d '\r')
+    echo "   caller sipp exit: $code" | tee -a "$step_log" >&2
+  fi
 fi
 
 echo '-- waiting for channels to drain to 0' >&2
 drained=false
-for _ in $(seq 1 60); do
-  n=$(channels_up)
-  if [ "${n:-1}" = 0 ]; then
-    drained=true
-    break
-  fi
-  sleep 1
-done
+poll 60 1 reads 0 channels_up && drained=true
 echo "drained=$drained" >> "$out_dir/$step-summary.txt"
 [ "$drained" = true ] || echo "WARNING: channels did not drain to 0 after $step" | tee -a "$step_log" >&2
 

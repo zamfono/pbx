@@ -20,14 +20,14 @@ compose=$3
 # the time this runs, but the PlaybackFinished line can still be on its way, so this polls rather
 # than reading once.
 tone_log=''
-for _ in $(seq 1 10); do
+# Whether the verbose log names the tone, the log left in `tone_log`.
+tone_logged() {
   tone_log=$(dc exec -T asterisk sh -c 'cat /var/log/asterisk/ci-tone 2>/dev/null || true' \
     | tr -d '\r')
-  printf '%s\n' "$tone_log" | grep -q 'tone:info;tonezone=itu' && break
-  sleep 1
-done
+  printf '%s\n' "$tone_log" | grep -q 'tone:info;tonezone=itu'
+}
 
-if ! printf '%s\n' "$tone_log" | grep -q 'tone:info;tonezone=itu'; then
+if ! poll 10 1 tone_logged; then
   echo "the verbose log never named the special information tone: ${tone_log:-empty}" >&2
   exit 1
 fi

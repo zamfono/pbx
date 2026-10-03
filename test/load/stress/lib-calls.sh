@@ -60,19 +60,21 @@ calls_start() {
 # Asterisk qualifies the trunk's outbound host, and the stack does not route a call to a host it
 # last saw unreachable (between outbound steps nothing answers there). So once the UAS listens,
 # qualify it on demand and wait for the contact to read Avail before any device dials.
+calls_trunk_qualified() {
+  ast "pjsip qualify $1" > /dev/null
+  sleep 1
+  ast 'pjsip show contacts' | grep -E "Contact: +$1/" | grep -q Avail
+}
+
 calls_trunk_reachable() {
-  local ep i
+  local ep started=$SECONDS
   ep=$(ast 'pjsip show endpoints' | awk '$1 == "Endpoint:" && $2 ~ /^trunk-/ { print $2; exit }')
   ep=${ep%%/*}
-  for i in $(seq 1 20); do
-    ast "pjsip qualify $ep" > /dev/null
-    sleep 1
-    if ast 'pjsip show contacts' | grep -E "Contact: +$ep/" | grep -q Avail; then
-      echo "trunk $ep reachable after ${i}s" >> "$STEP_DIR/summary.txt"
-      sleep 2
-      return 0
-    fi
-  done
+  if poll 20 0 calls_trunk_qualified "$ep"; then
+    echo "trunk $ep reachable after $((SECONDS - started))s" >> "$STEP_DIR/summary.txt"
+    sleep 2
+    return 0
+  fi
   echo "trunk $ep NOT reachable: $(ast 'pjsip show contacts' | grep -E "Contact: +$ep/")" \
     >> "$STEP_DIR/summary.txt"
 }

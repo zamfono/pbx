@@ -28,14 +28,14 @@ fail() {
 # `pjsip show contacts`' own table truncates the contact URI at a fixed column width, cutting off
 # exactly the `;transport=` parameter this checks; the AOR's own `contact` field (`pjsip show
 # aor`) is the same URI in full.
-aor=$(dc exec -T asterisk asterisk -rx "pjsip show aor $sip_username")
+aor=$(asterisk_cli "pjsip show aor $sip_username")
 contact_line=$(printf '%s' "$aor" | grep '^ contact ' || true)
 [ -n "$contact_line" ] || fail "no contact for AOR $sip_username: $aor"
 printf '%s' "$contact_line" | grep -i 'transport=tls' >/dev/null \
   || fail "the device's contact isn't transport=tls: $contact_line"
 
 # shellcheck disable=SC2086
-endpoint=$(dc exec -T asterisk asterisk -rx "pjsip show endpoint $sip_username")
+endpoint=$(asterisk_cli "pjsip show endpoint $sip_username")
 media_encryption_line=$(printf '%s' "$endpoint" | grep media_encryption || true)
 printf '%s' "$media_encryption_line" | grep 'sdes' >/dev/null \
   || fail "endpoint $sip_username isn't media_encryption=sdes: $media_encryption_line"

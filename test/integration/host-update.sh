@@ -42,10 +42,7 @@ host_update_serve() {
   port=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
   python3 -m http.server --bind 127.0.0.1 --directory "$1" "$port" >/dev/null 2>&1 &
   host_update_server=$!
-  for _ in $(seq 1 50); do
-    curl -fs "http://127.0.0.1:$port/" >/dev/null && break
-    sleep 0.1
-  done
+  poll 50 0.1 curl -fs "http://127.0.0.1:$port/" >/dev/null || true
   host_update_repo=http://127.0.0.1:$port
 }
 

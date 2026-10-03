@@ -45,7 +45,7 @@ result=$(state_file api-control)
 # it, whether or not a name column comes between; the listing goes to the log as it was.
 bridge_channels() {
   local listing
-  listing=$(dc exec -T asterisk asterisk -rx 'bridge show all' 2>&1 | tr -d '\r')
+  listing=$(asterisk_cli 'bridge show all' 2>&1 | tr -d '\r')
   printf '%s\n' "$listing" >&2
   printf '%s\n' "$listing" | awk '
     $1 ~ /^[0-9a-f-]+$/ && length($1) == 36 {

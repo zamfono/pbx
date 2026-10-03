@@ -6,7 +6,7 @@
 
 MEDIA_REC_DIR=${MEDIA_REC_DIR:-}
 
-ast() { dc exec -T asterisk asterisk -rx "$1" 2>/dev/null | tr -d '\r'; }
+ast() { asterisk_cli "$1" 2>/dev/null | tr -d '\r'; }
 
 # Bridged call legs only: Snoop/ channels (two per recorded participation, §10.2) and any
 # Local/ helpers are counted separately.
