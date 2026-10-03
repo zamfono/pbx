@@ -12,8 +12,7 @@ compose=$3
 # shellcheck source=_lib.sh
 . "$(dirname "$0")/_lib.sh"
 
-# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-$compose exec -T -d sipp-provider sh -c \
+dc exec -T -d sipp-provider sh -c \
   'sh /scenarios/_sipp-run.sh provider-answer-progress \
     -sf /scenarios/uas/answer-progress.xml -p 5060 -aa -nostdin asterisk:5060 \
     > /tmp/answer-progress.log 2>&1'

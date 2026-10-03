@@ -20,8 +20,7 @@ api_delete "/users/$forwarder"
 api_delete "/users/$agent"
 api_delete "/dids/$did_id"
 api_delete "/trunks/$trunk_id"
-# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-$compose exec -T sip-tls sh -c 'kill "$(cat /tmp/sip-target-tls/front.pid)"; rm -rf /tmp/sip-target-tls'
+dc exec -T sip-tls sh -c 'kill "$(cat /tmp/sip-target-tls/front.pid)"; rm -rf /tmp/sip-target-tls'
 # shellcheck disable=SC2086
-$compose exec -T sipp rm -f /tmp/sip-target-messages.log
+dc exec -T sipp rm -f /tmp/sip-target-messages.log
 rm -f "$state"

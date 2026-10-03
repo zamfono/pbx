@@ -1,6 +1,6 @@
 # Sourced by `run.sh`: the two of §6.3 "Runtimes" four guarded features that are not asserted
 # inline there (the namespace share and the migrate exit code are, right where the stack comes
-# up). Reads `run.sh`'s own `COMPOSE`, `compose_args`, `run_dir`, `RUNTIME`, `here` and `fail`,
+# up). Reads `run.sh`'s own `COMPOSE`, `compose`, `run_dir`, `RUNTIME`, `here` and `fail`,
 # and runs with `run.sh`'s own working directory, the stack directory, so `compose.yaml` resolves
 # as a relative path.
 
@@ -12,9 +12,9 @@
 assert_runtime_ordering() {
   echo '== §6.3 Runtimes: depends_on ordered api/core after migrate, core after api healthy =='
   local migrate_id api_id core_id
-  migrate_id=$($COMPOSE "${compose_args[@]}" ps -a -q migrate)
-  api_id=$($COMPOSE "${compose_args[@]}" ps -q api)
-  core_id=$($COMPOSE "${compose_args[@]}" ps -q core)
+  migrate_id=$(dc ps -a -q migrate)
+  api_id=$(dc ps -q api)
+  core_id=$(dc ps -q core)
   [ -n "$migrate_id" ] && [ -n "$api_id" ] && [ -n "$core_id" ] \
     || fail "could not resolve the migrate/api/core container ids for the ordering assertion"
 
@@ -30,8 +30,8 @@ assert_runtime_ordering() {
 assert_shared_namespace() {
   echo '== §6.3 Runtimes: proxy shares the asterisk network namespace =='
   local proxy_ns asterisk_ns
-  proxy_ns=$($COMPOSE "${compose_args[@]}" exec -T proxy readlink /proc/self/ns/net)
-  asterisk_ns=$($COMPOSE "${compose_args[@]}" exec -T asterisk readlink /proc/self/ns/net)
+  proxy_ns=$(dc exec -T proxy readlink /proc/self/ns/net)
+  asterisk_ns=$(dc exec -T asterisk readlink /proc/self/ns/net)
   [ -n "$proxy_ns" ] && [ "$proxy_ns" = "$asterisk_ns" ] \
     || fail "proxy and asterisk do not share a network namespace (network_mode: service:)"
 }

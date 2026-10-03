@@ -71,18 +71,16 @@ MAIN_DID=+15551000
 . "$here/scenarios/_lib.sh"
 
 # The stack runs from directory `$1` (test/stack.sh), as the Compose project of its name, which
-# `compose_cmd` (and `compose`, for scenarios/_lib.sh's helpers) drives as one string. Its files are
-# an operator's, compose.yaml and the compose.override.yaml link setup.sh makes for the mode, plus
-# compose.test.yaml; Compose reads the first two by itself only when no `-f` is given, so the
-# test overlay's `-f` names them too. The run's
-# state lives there too: REUSE's (reuse.sh's `save_state`) and the scenarios' (`STATE_DIR`,
+# `compose` drives as one string (test/api.sh's `dc`). Its files are an operator's, compose.yaml
+# and the compose.override.yaml link setup.sh makes for the mode, plus compose.test.yaml; Compose
+# reads the first two by itself only when no `-f` is given, so the test overlay's `-f` names them
+# too. The run's state lives there too: REUSE's (reuse.sh's `save_state`) and the scenarios' (`STATE_DIR`,
 # scenarios/_lib.sh's `state_file`).
 use_run_dir() {
   run_dir=$1
   compose_args=(-p "$(stack_project "$run_dir")" -f "$run_dir/compose.yaml"
     -f "$run_dir/compose.override.yaml" -f "$here/compose.test.yaml")
-  compose_cmd="$COMPOSE ${compose_args[*]}"
-  compose=$compose_cmd
+  compose="$COMPOSE ${compose_args[*]}"
   STATE_FILE=$run_dir/integration-state
   STATE_DIR=$run_dir/state
   export STATE_DIR
@@ -109,7 +107,7 @@ cleanup() {
       "\`$COMPOSE -p $(stack_project "$run_dir") down -v && rm -rf $run_dir\`" >&2
     return
   fi
-  $COMPOSE "${compose_args[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+  dc down -v --remove-orphans >/dev/null 2>&1 || true
   rm -rf "$run_dir"
 }
 trap cleanup EXIT

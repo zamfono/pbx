@@ -10,7 +10,6 @@ compose=$3
 # shellcheck source=_lib.sh
 . "$(dirname "$0")/_lib.sh"
 
-# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
 printf 'SEQUENTIAL\ntrunk-%s;\n' "$(trunk_named ci-trunk)" \
-  | $compose exec -T sipp-phone sh -c 'cat > /tmp/spoof.csv'
+  | dc exec -T sipp-phone sh -c 'cat > /tmp/spoof.csv'
 api GET /calls | jsonfield items.0.id > "$(state_file spoof)"

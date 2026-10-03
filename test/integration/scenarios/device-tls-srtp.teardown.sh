@@ -12,8 +12,7 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 read -r user_id did_id _ _ < "$(state_file tls-srtp)"
 
-# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-$compose exec -T devices sh -c 'pkill baresip || true'
+dc exec -T devices sh -c 'pkill baresip || true'
 # Creating the DID made it the user's own caller-ID (a `kind: user` target's own side effect),
 # and the DID's own target is this same user: each refuses to delete while the other still
 # references it (§5.9), so the caller-ID reference is cleared first to break the cycle.

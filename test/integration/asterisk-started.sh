@@ -8,7 +8,7 @@
 # `system.info` dates the new start (`core.asteriskStartedAt`).
 #
 # Compose restarts `proxy` along with `asterisk`, whose network namespace it shares (§6.3).
-# Reads `run.sh`'s own COMPOSE, compose_args, api_base and fail, and api.sh's helpers.
+# Reads `run.sh`'s own compose, api_base and fail, and api.sh's helpers.
 
 ASTERISK_STARTED_ATTEMPTS=90
 
@@ -30,13 +30,13 @@ run_asterisk_started_step() {
   local before after='' pending=True since
   before=$(asterisk_started_at)
   [ -n "$before" ] || fail 'system.info reports no Asterisk start before the restart'
-  $COMPOSE "${compose_args[@]}" exec -T api node -e "
+  dc exec -T api node -e "
 const { DatabaseSync } = require('node:sqlite');
 new DatabaseSync('/data/zamfono.sqlite3').exec('UPDATE settings SET ringotel_profile_pending = 1');
 " || fail 'could not seed the pending tenant profile'
   [ "$(ringotel_profile_pending)" = True ] || fail '/healthz does not show the seeded pending profile'
   since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-  $COMPOSE "${compose_args[@]}" restart asterisk >/dev/null || fail 'asterisk did not restart'
+  dc restart asterisk >/dev/null || fail 'asterisk did not restart'
   for _ in $(seq 1 $ASTERISK_STARTED_ATTEMPTS); do
     pending=$(ringotel_profile_pending) || pending=True
     [ "$pending" = False ] && break

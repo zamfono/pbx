@@ -12,13 +12,11 @@ compose=$3
 api PATCH /settings '{"holdMohAudioId": null}' >/dev/null
 member_id=$(user_with_ext 101)
 sip_username=$(api GET "/users/$member_id/devices" | jsonfield items.0.sipUsername)
-# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-endpoint=$($compose exec -T asterisk asterisk -rx "pjsip show endpoint $sip_username")
+endpoint=$(dc exec -T asterisk asterisk -rx "pjsip show endpoint $sip_username")
 printf '%s\n' "$endpoint" | grep -Eq 'moh_suggest +: +default' || {
   echo "endpoint $sip_username does not suggest the default class once the PATCH answered" >&2
   exit 1
 }
-# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-$compose exec -T asterisk sh -c \
+dc exec -T asterisk sh -c \
   "asterisk -rx 'logger remove channel ci-hold' >/dev/null; rm -f /var/log/asterisk/ci-hold"
 rm -f "$(state_file hold)"

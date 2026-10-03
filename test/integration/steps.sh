@@ -4,9 +4,9 @@
 # and `updater`; `trunk-status` and `cert-sync` wrap their own files' bodies as
 # `run_trunk_status_step`/`run_cert_sync_step`, called directly by run.sh).
 #
-# Reads and sets `run.sh`'s own COMPOSE, compose_args, run_dir, here, compose_cmd, api_base,
-# API_PORT, FWD, RUNTIME, OWNER_EMAIL, OWNER_PASSWORD, MAIN_DID, FQDN and fail; sets SIP_USERNAME
-# and SIP_PASSWORD for `run-scenarios.sh` to read.
+# Reads and sets `run.sh`'s own compose, run_dir, here, api_base, API_PORT, FWD, RUNTIME,
+# OWNER_EMAIL, OWNER_PASSWORD, MAIN_DID, FQDN and fail; sets SIP_USERNAME and SIP_PASSWORD
+# for `run-scenarios.sh` to read.
 
 # The stack's `.env`, then the stack itself, started fresh or, with UPGRADE_FROM, upgraded from
 # a release (upgrade.sh), `assert_migrated`, and the TLS transport on its certificate
@@ -52,7 +52,7 @@ bring_up_stack() {
 assert_migrated() {
   echo '== §6.3 Runtimes: migrate ran to completion before api started =='
   local migrate_exit
-  migrate_exit=$($COMPOSE "${compose_args[@]}" ps -a --format '{{.Service}} {{.ExitCode}}' \
+  migrate_exit=$(dc ps -a --format '{{.Service}} {{.ExitCode}}' \
     | awk '$1 == "migrate" { print $2 }')
   [ "$migrate_exit" = "0" ] \
     || fail "the migrate service exited $migrate_exit; service_completed_successfully did not hold"
@@ -66,7 +66,7 @@ step_runtime_asserts() {
 
 # §9.1: every prompt the core plays ships in the asterisk image; selectable as `prompts`.
 step_prompts() {
-  bash "$here/prompts.sh" "$compose_cmd" \
+  bash "$here/prompts.sh" "$compose" \
     || fail "a prompt the core plays is missing from the asterisk image"
 }
 
@@ -84,7 +84,7 @@ step_caddy() {
   local -x CURL_HOME=$run_dir/caddy-client
   local api_base=https://$FQDN token
   mkdir -p "$CURL_HOME"
-  $COMPOSE "${compose_args[@]}" exec -T proxy cat /data/caddy/pki/authorities/local/root.crt \
+  dc exec -T proxy cat /data/caddy/pki/authorities/local/root.crt \
     >"$CURL_HOME/root.crt" || fail "Caddy's local CA has no root certificate"
   printf 'resolve = %s:443:127.0.0.1\ncacert = %s\n' "$FQDN" "$CURL_HOME/root.crt" \
     >"$CURL_HOME/.curlrc"
@@ -105,8 +105,8 @@ configure_tenant() {
   # Asterisk identifies a trunk by source address (§5.6), so the calling container's address
   # becomes the trunk's host and the answering container's subnet the device's allowlist.
   local trunk_ip phone_ip phone_cidr
-  trunk_ip=$($COMPOSE "${compose_args[@]}" exec -T sipp hostname -i | tr -d '\r' | awk '{print $1}')
-  phone_ip=$($COMPOSE "${compose_args[@]}" exec -T sipp-phone hostname -i | tr -d '\r' \
+  trunk_ip=$(dc exec -T sipp hostname -i | tr -d '\r' | awk '{print $1}')
+  phone_ip=$(dc exec -T sipp-phone hostname -i | tr -d '\r' \
     | awk '{print $1}')
   phone_cidr="${phone_ip%.*}.0/24"
   read -r SIP_USERNAME SIP_PASSWORD < <(

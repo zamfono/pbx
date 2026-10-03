@@ -4,7 +4,7 @@
 # them, the device credentials it prints, so a REUSE run need not reconfigure the tenant just to
 # learn them again.
 #
-# Reads `run.sh`'s own COMPOSE, compose_args, run_dir, STATE_FILE and fail.
+# Reads `run.sh`'s own compose, run_dir, STATE_FILE and fail.
 
 # The four services a fresh bring-up starts, still running, and the `.env` it wrote still next to
 # them: a reasonable proxy for "the tenant this run would otherwise configure is already live".
@@ -14,7 +14,7 @@ stack_is_up() {
   [ -f "$run_dir/.env" ] || return 1
   local svc state
   for svc in api core asterisk proxy; do
-    state=$($COMPOSE "${compose_args[@]}" ps --format '{{.Service}} {{.State}}' 2>/dev/null \
+    state=$(dc ps --format '{{.Service}} {{.State}}' 2>/dev/null \
       | awk -v s="$svc" '$1 == s { print $2 }')
     [ "$state" = running ] || return 1
   done

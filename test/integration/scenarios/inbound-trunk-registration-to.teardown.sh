@@ -15,10 +15,9 @@ compose=$3
 ATTEMPTS=15
 TRACE=/tmp/unregister-messages.log
 
-# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-$compose exec -T sipp-provider rm -f "$TRACE"
+dc exec -T sipp-provider rm -f "$TRACE"
 # shellcheck disable=SC2086
-$compose exec -T -d sipp-provider sh -c \
+dc exec -T -d sipp-provider sh -c \
   "sh /scenarios/_sipp-run.sh provider-unregister \
     -sf /scenarios/uas/registrar.xml -p 5060 -m 1 -nostdin -trace_msg -message_file $TRACE \
     asterisk:5060 > /tmp/unregister.log 2>&1"
@@ -31,9 +30,9 @@ rm -f "$(state_file registration-to)"
 # `-m 1`: the run answers that one REGISTER and ends by itself, so nothing is left on the port.
 # shellcheck disable=SC2086
 if ! await_sipp_run sipp-provider provider-unregister $ATTEMPTS \
-  || ! $compose exec -T sipp-provider grep -qiE '^Expires: *0' "$TRACE"; then
+  || ! dc exec -T sipp-provider grep -qiE '^Expires: *0' "$TRACE"; then
   # shellcheck disable=SC2086
-  $compose exec -T sipp-provider sh /scenarios/_sipp-finish.sh 5 >/dev/null 2>&1 || true
+  dc exec -T sipp-provider sh /scenarios/_sipp-finish.sh 5 >/dev/null 2>&1 || true
   echo "the deleted trunk's de-registration never reached the provider" >&2
   exit 1
 fi

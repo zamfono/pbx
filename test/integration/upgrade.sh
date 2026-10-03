@@ -9,7 +9,7 @@
 # The release must be one the build under test upgrades from: 0.2.0 or later, since a 0.1.x stack
 # is not upgraded (installed anew instead).
 #
-# Reads and sets `run.sh`'s own COMPOSE, compose_args, run_dir, here, api_base, RUNTIME,
+# Reads and sets `run.sh`'s own compose, run_dir, here, api_base, RUNTIME,
 # OWNER_EMAIL, OWNER_PASSWORD, FQDN and fail.
 
 UPGRADE_REPO=https://github.com/zamfono/pbx
@@ -78,7 +78,7 @@ upgrade_assert_images() {
       api) expected=${API_IMAGE:-zamfono/api:ci} ;;
       proxy) expected=$PROXY_IMAGE ;;
     esac
-    running=$($COMPOSE "${compose_args[@]}" ps -a --format '{{.Service}} {{.Image}}' \
+    running=$(dc ps -a --format '{{.Service}} {{.Image}}' \
       | awk -v s="$service" '$1 == s { print $2 }' | sed -E 's#^(localhost|docker\.io)/##')
     [ "$running" = "${expected#docker.io/}" ] \
       || fail "after the upgrade $service runs '${running:-nothing}', not the build's $expected"

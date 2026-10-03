@@ -37,8 +37,7 @@ for r in json.load(sys.stdin)["items"]:
 # Asterisk names a raw file `<recording-id>-l.<format>` or `-r.` (packages/core/src/calls).
 mixed=false
 for _ in $(seq 1 30); do
-  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-  files=$($compose exec -T core ls /media/recordings)
+  files=$(dc exec -T core ls /media/recordings)
   if ! printf '%s\n' "$files" | grep -q -- '-[lr]\.'; then
     mixed=true
     break

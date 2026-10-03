@@ -4,7 +4,7 @@
 # deploy/setup.sh writes from the answers in the caller's environment, without a terminal. The
 # harness runs it as a Compose project of its own, so a stack a developer runs from deploy/ itself
 # is never touched, and brings it up the way update.sh does (deploy/setup/recreate.sh). Reads
-# `repo`, and `COMPOSE`, `compose_args`, `RUNTIME` and `fail` for `stack_recreate`.
+# `repo`, and `compose`, `RUNTIME` and `fail` for `stack_recreate`.
 
 # shellcheck source=../deploy/setup/recreate.sh
 . "$repo/deploy/setup/recreate.sh"
@@ -24,12 +24,11 @@ stack_dir_env() {
 # The stack (re)created on the images the environment names and up once healthy, as update.sh
 # recreates an operator's: `up -d --wait` where this Compose has it, on Podman after `down`.
 # recreate.sh's `compose` is the whole command, this stack's project and files included.
-# shellcheck disable=SC2153 # RUNTIME and COMPOSE are the caller's, runtime and compose recreate.sh's
+# shellcheck disable=SC2153 # RUNTIME is the caller's, runtime and compose recreate.sh's
 stack_recreate() {
-  local runtime=$RUNTIME unit='' updater='' WAIT_SECONDS=180
+  local runtime=$RUNTIME unit='' updater='' WAIT_SECONDS=180 whole=$compose
   local -a compose services=()
-  read -ra compose <<<"$COMPOSE"
-  compose+=("${compose_args[@]}")
+  read -ra compose <<<"$whole"
   recreate_stack
 }
 

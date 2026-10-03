@@ -86,7 +86,7 @@ read -r SIP_USERNAME SIP_PASSWORD < <(
 # probes, so core's Presence keeps the member registered and the ring group rings it, though its
 # unconditional forwarding rule means it is never dialled itself.
 log "registering and serving the one answering device"
-bash "$repo/test/integration/phone.sh" "$compose_cmd" answer answer "$SIP_USERNAME" \
+bash "$repo/test/integration/phone.sh" "$compose" answer answer "$SIP_USERNAME" \
   "$SIP_PASSWORD" >/dev/null || fail "the device never became reachable"
 
 log "generating the ulaw transcoding pcap"
@@ -121,7 +121,7 @@ containers=(
 # ---------------------------------------------------------------------------
 # 4. Idle step: stack up, tenant configured, one device registered, no calls.
 # ---------------------------------------------------------------------------
-bash "$here/run-load-step.sh" "$compose_cmd" "$OUT_DIR" idle 0 0 load-provider.xml 15 "$MAIN_DID" \
+bash "$here/run-load-step.sh" "$compose" "$OUT_DIR" idle 0 0 load-provider.xml 15 "$MAIN_DID" \
   "${containers[@]}" 2>&1 | tee -a "$OUT_DIR/session.log"
 
 # ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ bash "$here/run-load-step.sh" "$compose_cmd" "$OUT_DIR" idle 0 0 load-provider.x
 #    call; raise both where that budget is no constraint.
 # ---------------------------------------------------------------------------
 for n in 10 25 50; do
-  bash "$here/run-load-step.sh" "$compose_cmd" "$OUT_DIR" "calls-$n" "$n" 5 load-provider.xml 30 \
+  bash "$here/run-load-step.sh" "$compose" "$OUT_DIR" "calls-$n" "$n" 5 load-provider.xml 30 \
     "$MAIN_DID" "${containers[@]}" 2>&1 | tee -a "$OUT_DIR/session.log"
 done
 
@@ -142,7 +142,7 @@ done
 #    Asterisk to transcode on the bridge (docs/spec.md §6.6's baseline is alaw/alaw, no
 #    transcoding, which the calls-25 step above already measures).
 # ---------------------------------------------------------------------------
-bash "$here/run-load-step.sh" "$compose_cmd" "$OUT_DIR" calls-25-transcode 25 5 \
+bash "$here/run-load-step.sh" "$compose" "$OUT_DIR" calls-25-transcode 25 5 \
   load-provider-ulaw.xml 30 "$MAIN_DID" "${containers[@]}" 2>&1 | tee -a "$OUT_DIR/session.log"
 
 # ---------------------------------------------------------------------------
@@ -150,7 +150,7 @@ bash "$here/run-load-step.sh" "$compose_cmd" "$OUT_DIR" calls-25-transcode 25 5 
 #    idle RAM with that many endpoints configured.
 # ---------------------------------------------------------------------------
 log "creating 200 users/devices and timing the reload"
-bash "$here/bulk-users-reload.sh" "$api_base" "$token" "$phone_cidr" "$compose_cmd" "$OUT_DIR" 200 200 \
+bash "$here/bulk-users-reload.sh" "$api_base" "$token" "$phone_cidr" "$compose" "$OUT_DIR" 200 200 \
   2>&1 | tee -a "$OUT_DIR/session.log"
 
 log "sampling idle RAM with ~200 endpoints configured"

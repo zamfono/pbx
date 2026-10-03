@@ -26,7 +26,7 @@
 # either. That restart is also why REUSE warns before selecting this step: it briefly repeats
 # that outage against a stack other REUSE scenarios may still be relying on staying up.
 #
-# Reads `run.sh`'s own COMPOSE, compose_args, FQDN, api_base, FWD and fail.
+# Reads `run.sh`'s own compose, FQDN, api_base, FWD and fail.
 
 CERT_SYNC_WAIT_ATTEMPTS=60
 # Where Asterisk reads its TLS pair (images/asterisk/entrypoint.sh, certSyncFiles.ts).
@@ -40,7 +40,7 @@ cert_sync_presented() {
   # Captured before `openssl x509` reads it: x509 stops at the first PEM block, and under
   # pipefail Podman's compose provider reports the unread rest's SIGPIPE as a failure.
   local handshake
-  handshake=$($COMPOSE "${compose_args[@]}" exec -T asterisk sh -c \
+  handshake=$(dc exec -T asterisk sh -c \
     "echo | openssl s_client -connect 127.0.0.1:5061 -servername $FQDN 2>/dev/null" || true)
   printf '%s\n' "$handshake" | openssl x509 "$@" 2>/dev/null
 }
@@ -62,12 +62,12 @@ cert_sync_presented_is_self_signed() {
 # The fingerprint of the certificate Caddy stored for the FQDN, once it has; empty before.
 cert_sync_caddy_fingerprint() {
   local path pem
-  path=$($COMPOSE "${compose_args[@]}" exec -T proxy sh -c \
+  path=$(dc exec -T proxy sh -c \
     "find /data/caddy/certificates -type f -name '$FQDN.crt' 2>/dev/null | head -1" | tr -d '\r')
   [ -n "$path" ] || return 0
   # Captured first, for the same SIGPIPE reason as `cert_sync_presented`: Caddy's .crt carries
   # the chain, and x509 reads only the leaf.
-  pem=$($COMPOSE "${compose_args[@]}" exec -T proxy cat "$path")
+  pem=$(dc exec -T proxy cat "$path")
   printf '%s\n' "$pem" | openssl x509 -noout -fingerprint -sha256 2>/dev/null | cut -d= -f2
 }
 
@@ -75,17 +75,17 @@ cert_sync_caddy_fingerprint() {
 # reads or writes, since Caddy's on-disk layout is exactly the thing this exists to pin down.
 cert_sync_dump_extra_diagnostics() {
   echo '-- caddy-data certificates tree --' >&2
-  $COMPOSE "${compose_args[@]}" exec -T proxy find /data/caddy/certificates >&2 2>&1 || true
+  dc exec -T proxy find /data/caddy/certificates >&2 2>&1 || true
   echo '-- caddy-data zamfono/ (the hook copy, §6.4) --' >&2
-  $COMPOSE "${compose_args[@]}" exec -T proxy ls -la /data/zamfono >&2 2>&1 || true
+  dc exec -T proxy ls -la /data/zamfono >&2 2>&1 || true
   echo '-- proxy log lines from the hook --' >&2
-  $COMPOSE "${compose_args[@]}" logs --no-color proxy 2>&1 | grep zamfono-cert-hook >&2 || true
+  dc logs --no-color proxy 2>&1 | grep zamfono-cert-hook >&2 || true
   echo '-- api healthz body --' >&2
   curl -fsS "${FWD[@]}" "$api_base/healthz" >&2 2>&1 || true
   echo '-- api log lines mentioning "cert" --' >&2
-  $COMPOSE "${compose_args[@]}" logs --no-color api 2>&1 | grep -i cert >&2 || true
+  dc logs --no-color api 2>&1 | grep -i cert >&2 || true
   echo '-- asterisk-config tls dir --' >&2
-  $COMPOSE "${compose_args[@]}" exec -T asterisk ls -la "$CERT_SYNC_TLS_DIR" >&2 2>&1 || true
+  dc exec -T asterisk ls -la "$CERT_SYNC_TLS_DIR" >&2 2>&1 || true
 }
 
 cert_sync_fail() {
@@ -119,7 +119,7 @@ run_cert_sync_step() {
   # `/internal/certificate` must have been answered 2xx, or a real issuance waits for the hourly
   # sync.
   echo '== §6.4 cert sync: the hook notified api =='
-  $COMPOSE "${compose_args[@]}" logs --no-color proxy 2>&1 \
+  dc logs --no-color proxy 2>&1 \
     | grep 'zamfono-cert-hook: api notified' >/dev/null \
     || cert_sync_fail "the cert_obtained hook never notified api (POST /internal/certificate refused or unreachable)"
   local caddy_fp
@@ -128,7 +128,7 @@ run_cert_sync_step() {
   # A self-signed pair on asterisk-config in place of the synced one, made the way the entrypoint
   # makes the fresh stack's placeholder, and loaded the way core reloads a synced certificate.
   echo '== §6.4 cert sync: a placeholder in place of the synced certificate =='
-  $COMPOSE "${compose_args[@]}" exec -T asterisk sh -c "
+  dc exec -T asterisk sh -c "
     openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=zamfono \
       -keyout $CERT_SYNC_TLS_DIR/privkey.pem -out $CERT_SYNC_TLS_DIR/cert.pem 2>/dev/null \
       && chown asterisk:asterisk $CERT_SYNC_TLS_DIR/privkey.pem $CERT_SYNC_TLS_DIR/cert.pem \
@@ -140,10 +140,10 @@ run_cert_sync_step() {
   echo '== §6.4 cert sync: restarting api, the same sync that runs at api start =='
   local restarted synced=false
   restarted=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-  $COMPOSE "${compose_args[@]}" restart api >/dev/null
+  dc restart api >/dev/null
   # The start's sync logs once it has copied the certificate and core has reloaded it.
   for _ in $(seq 1 $CERT_SYNC_WAIT_ATTEMPTS); do
-    if $COMPOSE "${compose_args[@]}" logs --no-color --since "$restarted" api 2>&1 \
+    if dc logs --no-color --since "$restarted" api 2>&1 \
       | grep 'certSync: triggered the pjsip reload' >/dev/null; then
       synced=true
       break

@@ -23,19 +23,18 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 tls_dir=$(mktemp -d)
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=sip-tls' \
   -keyout "$tls_dir/key.pem" -out "$tls_dir/cert.pem" >/dev/null 2>&1
-# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-$compose exec -T sip-tls mkdir -p /tmp/sip-target-tls
+dc exec -T sip-tls mkdir -p /tmp/sip-target-tls
 # shellcheck disable=SC2086
-$compose cp "$tls_dir/cert.pem" sip-tls:/tmp/sip-target-tls/cert.pem >&2
+dc cp "$tls_dir/cert.pem" sip-tls:/tmp/sip-target-tls/cert.pem >&2
 # shellcheck disable=SC2086
-$compose cp "$tls_dir/key.pem" sip-tls:/tmp/sip-target-tls/key.pem >&2
+dc cp "$tls_dir/key.pem" sip-tls:/tmp/sip-target-tls/key.pem >&2
 rm -rf "$tls_dir"
 
 # The UAS's Contact names the front, so Asterisk's BYE takes the TLS connection back through it.
 # shellcheck disable=SC2086
-$compose exec -T sipp rm -f /tmp/sip-target-messages.log
+dc exec -T sipp rm -f /tmp/sip-target-messages.log
 # shellcheck disable=SC2086
-$compose exec -T -d sipp sh -c \
+dc exec -T -d sipp sh -c \
   "sh /scenarios/_sipp-run.sh trunk-sip-target -sf /scenarios/uas/answer-sip-target.xml \
     -t t1 -p 5063 -key front $(container_ip sip-tls) -aa -nostdin \
     -trace_msg -message_file /tmp/sip-target-messages.log > /tmp/answer-sip-target.log 2>&1"
@@ -82,7 +81,7 @@ trunk_status() {
 # without an INVITE (§9.4 "Route fallthrough"), as it would skip one whose endpoint ignores OPTIONS.
 # The probe's result lands once it times out.
 # shellcheck disable=SC2086
-$compose exec -T asterisk asterisk -rx "pjsip qualify trunk-$trunk_id" >/dev/null
+dc exec -T asterisk asterisk -rx "pjsip qualify trunk-$trunk_id" >/dev/null
 unreachable=
 for _ in $(seq 1 30); do
   if [ "$(trunk_status)" = unreachable ]; then
@@ -111,7 +110,7 @@ echo "trunk-$trunk_id with qualify off: contact '$(contact_status "trunk-$trunk_
 # The TLS front: every TLS connection Asterisk opens to 5061 is relayed byte for byte to the UAS
 # over TCP, with the pid written where the teardown stops it.
 # shellcheck disable=SC2086
-$compose exec -T -d sip-tls node -e "
+dc exec -T -d sip-tls node -e "
   const fs = require('node:fs');
   const dir = '/tmp/sip-target-tls';
   const options = { cert: fs.readFileSync(dir + '/cert.pem'), key: fs.readFileSync(dir + '/key.pem') };
@@ -127,7 +126,7 @@ $compose exec -T -d sip-tls node -e "
 # The call waits for the front to listen, which it says by writing its pid.
 for _ in $(seq 1 30); do
   # shellcheck disable=SC2086
-  if $compose exec -T sip-tls test -s /tmp/sip-target-tls/front.pid; then
+  if dc exec -T sip-tls test -s /tmp/sip-target-tls/front.pid; then
     exit 0
   fi
   sleep 1

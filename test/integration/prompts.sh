@@ -12,11 +12,8 @@ set -euo pipefail
 
 compose=$1
 LANGUAGES='de en es fr it ru'
-
-dc() {
-  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-  $compose "$@"
-}
+# shellcheck source=../api.sh
+. "$(dirname "$0")/../api.sh"
 
 names=$(dc exec -T core node --input-type=module -e "
 const { PROMPTS } = await import('/app/packages/core/dist/prompts.js');

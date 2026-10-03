@@ -22,14 +22,13 @@ member_id=$(user_with_ext 101)
 sip_username=$(api GET "/users/$member_id/devices" | jsonfield items.0.sipUsername)
 # Read whole before matching: under pipefail, Podman's compose provider reports the SIGPIPE an
 # early-exiting `grep -q` leaves the CLI as a failure.
-# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-endpoint=$($compose exec -T asterisk asterisk -rx "pjsip show endpoint $sip_username")
+endpoint=$(dc exec -T asterisk asterisk -rx "pjsip show endpoint $sip_username")
 printf '%s\n' "$endpoint" | grep -Eq "moh_suggest +: +$moh_id" || {
   echo "endpoint $sip_username does not suggest hold class $moh_id once the PATCH answered" >&2
   exit 1
 }
 
 # shellcheck disable=SC2086 # see above
-$compose exec -T asterisk sh -c \
+dc exec -T asterisk sh -c \
   "asterisk -rx 'logger add channel ci-hold verbose(3)' >/dev/null"
 printf '%s\n' "$moh_id" > "$(state_file hold)"

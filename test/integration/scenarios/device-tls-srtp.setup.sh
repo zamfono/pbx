@@ -57,12 +57,11 @@ capem=$(mktemp)
 baresip_config=$(mktemp)
 baresip_accounts=$(mktemp)
 trap 'rm -f "$capem" "$baresip_config" "$baresip_accounts"' EXIT
-# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-$compose exec -T proxy cat /data/caddy/pki/authorities/local/root.crt > "$capem"
+dc exec -T proxy cat /data/caddy/pki/authorities/local/root.crt > "$capem"
 # shellcheck disable=SC2086
-$compose exec -T devices mkdir -p /root/.baresip
+dc exec -T devices mkdir -p /root/.baresip
 # shellcheck disable=SC2086
-$compose cp "$capem" devices:/root/.baresip/asterisk-ca.pem
+dc cp "$capem" devices:/root/.baresip/asterisk-ca.pem
 
 cat > "$baresip_config" <<CONFIG
 poll_method		epoll
@@ -95,14 +94,14 @@ cat > "$baresip_accounts" <<ACCOUNTS
 <sip:$sip_username@$FQDN:5061;transport=tls>;auth_pass=$sip_password;answermode=auto;mediaenc=srtp-mand;regint=600;ptime=20
 ACCOUNTS
 # shellcheck disable=SC2086
-$compose cp "$baresip_config" devices:/root/.baresip/config
+dc cp "$baresip_config" devices:/root/.baresip/config
 # shellcheck disable=SC2086
-$compose cp "$baresip_accounts" devices:/root/.baresip/accounts
+dc cp "$baresip_accounts" devices:/root/.baresip/accounts
 # shellcheck disable=SC2086
-$compose exec -T devices sh -c ': > /root/.baresip/contacts'
+dc exec -T devices sh -c ': > /root/.baresip/contacts'
 
 # shellcheck disable=SC2086
-$compose exec -T -d devices sh -c \
+dc exec -T -d devices sh -c \
   'baresip -f /root/.baresip -s > /root/.baresip/baresip.log 2>&1'
 
 # The contact is reachable once baresip has registered and answered the probe Asterisk sends a

@@ -10,7 +10,7 @@
 # Compose reads this run's files and project from `COMPOSE_FILE` and `COMPOSE_PROJECT_NAME`, as
 # it does for any `docker compose` with no `-f`. The step puts the stack directory back as it
 # found it when it ends, passed or failed: whatever runs after it, in this run or a REUSE one,
-# sees the directory configure.sh's run left. Reads `run.sh`'s own run_dir, repo, RUNTIME, compose_args, api_base and fail, and api.sh's
+# sees the directory configure.sh's run left. Reads `run.sh`'s own run_dir, repo, RUNTIME, compose, api_base and fail, and api.sh's
 # helpers.
 
 HOST_UPDATE_FROM=0.2.0

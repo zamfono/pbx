@@ -20,12 +20,11 @@ compose=$3
 
 STATUS_ATTEMPTS=30
 
-# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-$compose exec -T sipp-provider sh -c 'rm -f /tmp/emergency-*.log'
+dc exec -T sipp-provider sh -c 'rm -f /tmp/emergency-*.log'
 for side in 1:5061:refuse-503 2:5062:answer-outbound 3:5063:answer-outbound; do
   IFS=: read -r n port uas <<<"$side"
   # shellcheck disable=SC2086
-  $compose exec -T -d sipp-provider sh -c \
+  dc exec -T -d sipp-provider sh -c \
     "sh /scenarios/_sipp-run.sh provider-emergency-$n -sf /scenarios/uas/$uas.xml -p $port -aa \
       -nostdin -trace_msg -message_file /tmp/emergency-$n-messages.log asterisk:5060 \
       > /tmp/emergency-$n.log 2>&1"

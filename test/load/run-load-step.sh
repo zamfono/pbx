@@ -6,7 +6,7 @@
 # Asterisk channels and, at rtcp_mux off (images/asterisk/conf/rtp.conf.tmpl does not enable it),
 # up to 4N RTP/RTCP ports against the RTP_PORT_START..RTP_PORT_END range in .env.
 #
-# Usage: run-load-step.sh <compose_cmd> <out_dir> <step_name> <concurrency> <rate_per_s> \
+# Usage: run-load-step.sh <compose> <out_dir> <step_name> <concurrency> <rate_per_s> \
 #          <provider_scenario.xml> <hold_seconds> <main_did> <container-id=label> ...
 #
 # Deliberately not `set -e`: a transient `docker exec` hiccup under a heavy plateau (asterisk busy
@@ -15,7 +15,7 @@
 # <step>-summary.txt) rather than assuming success.
 set -uo pipefail
 
-compose_cmd=$1; shift
+compose=$1; shift
 out_dir=$1; shift
 step=$1; shift
 concurrency=$1; shift
@@ -32,18 +32,12 @@ done
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # The contact waits the integration harness's scenarios use, on this step's stack.
-compose=$compose_cmd
 # shellcheck source=../integration/scenarios/_lib.sh
 . "$here/../integration/scenarios/_lib.sh"
 mkdir -p "$out_dir"
 stats_csv="$out_dir/stats.csv"
 net_csv="$out_dir/net.csv"
 step_log="$out_dir/$step.log"
-
-dc() {
-  # shellcheck disable=SC2086 # $compose_cmd carries the runtime's own multi-word command
-  $compose_cmd "$@"
-}
 
 asterisk_cli() {
   dc exec -T asterisk asterisk -rx "$1"

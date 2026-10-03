@@ -17,8 +17,7 @@ print([u['id'] for u in json.load(sys.stdin)['items'] if u['extension'] == sys.a
 # `exec` hands the container its standard input, so it reads none here: a caller may expand this
 # in the arguments of a pipeline's reader, whose input it would otherwise take.
 container_ip() {
-  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-  $compose exec -T "$1" hostname -i </dev/null | tr -d '\r' | awk '{print $1}'
+  dc exec -T "$1" hostname -i </dev/null | tr -d '\r' | awk '{print $1}'
 }
 
 # Waits up to 10 s for UDP port `$2` in container `$1` to be bound: the sipp run started there
@@ -27,8 +26,7 @@ await_bound() {
   local port
   port=$(printf ':%04X' "$2")
   for _ in $(seq 1 20); do
-    # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-    if $compose exec -T "$1" awk -v port="$port" \
+    if dc exec -T "$1" awk -v port="$port" \
       'substr($2, length($2) - 4) == port { found = 1 } END { exit !found }' /proc/net/udp; then
       return 0
     fi
@@ -46,8 +44,7 @@ contact_status() {
   local listing
   # Read whole before awk sees it: under pipefail, Podman's compose provider reports the CLI's
   # SIGPIPE as a failure.
-  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-  listing=$($compose exec -T asterisk asterisk -rx 'pjsip show contacts')
+  listing=$(dc exec -T asterisk asterisk -rx 'pjsip show contacts')
   printf '%s\n' "$listing" \
     | awk -v aor="$1/" '$1 == "Contact:" && index($2, aor) == 1 { print $4 }'
 }
@@ -73,8 +70,7 @@ await_contact_status() {
 # must be up already (`await_bound`): a probe it does not answer times out, and that result,
 # applied whenever it lands, would mark the contact unreachable after a later probe's answer.
 await_contact_avail() {
-  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-  $compose exec -T asterisk asterisk -rx "pjsip qualify $1" >/dev/null
+  dc exec -T asterisk asterisk -rx "pjsip qualify $1" >/dev/null
   await_contact_status "$1" "${2:-Avail}" >/dev/null
 }
 
@@ -101,8 +97,7 @@ print(" ".join("%s:%s" % (t["name"], t["status"]) for t in json.load(sys.stdin)[
 await_sipp_run() {
   local attempt
   for attempt in $(seq 1 "$3"); do
-    # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-    if $compose exec -T "$1" test -f "/tmp/sipp-runs/$2.exit"; then
+    if dc exec -T "$1" test -f "/tmp/sipp-runs/$2.exit"; then
       return 0
     fi
     sleep 1
@@ -259,8 +254,7 @@ await_ended_call() {
 # sipp run of a scenario has by the time its check runs (`run-scenarios.sh`'s
 # `finish_sipp_runs`), so the trace is whole.
 sipp_trace() {
-  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-  $compose exec -T "$1" cat "$2"
+  dc exec -T "$1" cat "$2"
 }
 
 # The id of the newest call in the history, empty while it holds none: what a setup notes before

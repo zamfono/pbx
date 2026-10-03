@@ -7,7 +7,7 @@
 # The caller sets, before sourcing: repo, OUT_DIR, COMPOSE, compose_args (array, relative to the
 # stack directory), api_base, FQDN, MAIN_DID, API_IMAGE; optionally METRICS_TOKEN (default empty =
 # /metrics off). Sourcing makes the stack directory, STACK_DIR, and changes into it, and sets
-# compose_cmd; it provides: dc, log, fail, test/api.sh's helpers, stack_write_env, stack_up,
+# compose; it provides: dc, log, fail, test/api.sh's helpers, stack_write_env, stack_up,
 # stack_token, and sets STACK_UP=true once `compose up` ran (the caller's teardown trap keys
 # `down -v` off it, and removes STACK_DIR).
 # RUNTIME (default: the first word of $COMPOSE, i.e. docker or podman) is the CLI used for the
@@ -34,14 +34,8 @@ export HEP_ENABLED METRICS_TOKEN
 STACK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/zamfono-load.XXXXXX")
 stack_dir_files "$STACK_DIR"
 compose_args=(-p "$(stack_project "$STACK_DIR")" "${compose_args[@]}")
-# shellcheck disable=SC2034 # the callers' compose command for the scripts they run
-compose_cmd="$COMPOSE ${compose_args[*]}"
+compose="$COMPOSE ${compose_args[*]}"
 cd "$STACK_DIR" || exit 1
-
-dc() {
-  # shellcheck disable=SC2086 # $COMPOSE carries the runtime's own multi-word command
-  $COMPOSE "${compose_args[@]}" "$@"
-}
 
 log() { echo "== $* ==" | tee -a "$OUT_DIR/session.log" >&2; }
 

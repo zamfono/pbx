@@ -1,11 +1,20 @@
 # shellcheck shell=bash
 # Sourced by the integration and load harnesses: how their scripts reach the REST API (§10.3).
-# Reads `api_base` (`http://127.0.0.1:<port>`, or `https://<FQDN>` through Caddy) and `token`.
+# Reads `api_base` (`http://127.0.0.1:<port>`, or `https://<FQDN>` through Caddy) and `token`,
+# and `compose` for `dc`.
 #
 # The api runs behind Caddy, which sets `X-Forwarded-For`; adapter-node is configured to require
 # it (`ADDRESS_HEADER`), so a request the harness sends the api directly carries it, as the
 # proxy's would. Caddy itself trusts no client's, and sets its own in its place.
 FWD=(-H 'X-Forwarded-For: 127.0.0.1')
+
+# `dc <args>` runs Compose on the stack: `compose` is the whole command as one string, the
+# runtime's own multi-word command and the stack's project and files included, the form a child
+# script is handed it in.
+dc() {
+  # shellcheck disable=SC2086 # `compose` is split into its words by design
+  $compose "$@"
+}
 
 # `api <method> <path> [<json-body>]` prints the response body, and fails on a status other than
 # 2xx.

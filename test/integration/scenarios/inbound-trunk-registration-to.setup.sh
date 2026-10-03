@@ -15,10 +15,9 @@ compose=$3
 
 ATTEMPTS=45
 
-# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-$compose exec -T sipp-provider rm -f /tmp/registrar-line.csv /tmp/registrar-messages.log
+dc exec -T sipp-provider rm -f /tmp/registrar-line.csv /tmp/registrar-messages.log
 # shellcheck disable=SC2086
-$compose exec -T -d sipp-provider sh -c \
+dc exec -T -d sipp-provider sh -c \
   'sh /scenarios/_sipp-run.sh provider-registrar \
     -sf /scenarios/uas/registrar.xml -p 5060 -aa -nostdin \
     -trace_msg -message_file /tmp/registrar-messages.log \
@@ -44,7 +43,7 @@ for _ in $(seq 1 $ATTEMPTS); do
   status=$(api GET "/trunks/$trunk_id" | jsonfield status)
   # shellcheck disable=SC2086
   if [ "$status" = registered ] \
-    && $compose exec -T sipp-provider test -s /tmp/registrar-line.csv; then
+    && dc exec -T sipp-provider test -s /tmp/registrar-line.csv; then
     exit 0
   fi
   sleep 1

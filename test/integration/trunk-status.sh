@@ -5,7 +5,7 @@
 # then restarts, and no `ContactStatusChange` follows, since the contact's state never changes.
 # `GET /trunks` must still report the trunk `registered` from the boot resync, which `core`
 # finishes before it serves anything (packages/core/src/main.ts), so before it reports healthy.
-# Reads `run.sh`'s own COMPOSE, compose_args, compose and fail, scenarios/_lib.sh's helpers and
+# Reads `run.sh`'s own compose and fail, scenarios/_lib.sh's helpers and
 # run-scenarios.sh's `end_trunk_idle`. Self-contained and idempotent: it starts and ends its own
 # trunk-side sipp run in place of the idle one, the way a scenario does, and touches no tenant state, so REUSE may select it freely, same as a fresh run.
 
@@ -16,17 +16,17 @@ run_trunk_status_step() {
   local aor
   aor=trunk-$(trunk_named ci-trunk)
   end_trunk_idle
-  $COMPOSE "${compose_args[@]}" exec -T -d sipp sh -c \
+  dc exec -T -d sipp sh -c \
     'sh /scenarios/_sipp-run.sh trunk-status -sf /scenarios/uas/answer-outbound.xml -p 5060 -aa \
       -nostdin asterisk:5060 > /tmp/status.log 2>&1'
   if ! await_bound sipp 5060 || ! await_contact_avail "$aor"; then
     fail "the trunk's contact never became reachable before the restart"
   fi
 
-  $COMPOSE "${compose_args[@]}" restart core >/dev/null
+  dc restart core >/dev/null
   local health=''
   for _ in $(seq 1 $STATUS_ATTEMPTS); do
-    health=$($COMPOSE "${compose_args[@]}" ps --format '{{.Service}} {{.Health}}' \
+    health=$(dc ps --format '{{.Service}} {{.Health}}' \
       | awk '$1 == "core" { print $2 }')
     [ "$health" = healthy ] && break
     sleep 1
@@ -39,7 +39,7 @@ print([t['status'] for t in json.load(sys.stdin)['items'] if t['name'] == 'ci-tr
 ")
   [ "$trunk_status" = registered ] \
     || fail "after a core restart the reachable ip trunk reads '$trunk_status', not registered"
-  $COMPOSE "${compose_args[@]}" exec -T sipp sh /scenarios/_sipp-finish.sh "$FINISH_SECONDS" \
+  dc exec -T sipp sh /scenarios/_sipp-finish.sh "$FINISH_SECONDS" \
     || fail "the trunk side's run did not end"
   echo '   the ip trunk reads registered after the restart'
 }

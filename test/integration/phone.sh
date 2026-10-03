@@ -39,11 +39,6 @@ CALL_ATTEMPTS=90
 MESSAGES=/tmp/phone$SUFFIX-messages.log
 CALL_EXIT=/tmp/phone$SUFFIX-call.exit
 
-dc() {
-  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-  $compose "$@"
-}
-
 # Clears the previous run's trace. The run itself has already ended: the previous scenario's own
 # end waited for it (`run-scenarios.sh`'s `finish_sipp_runs`).
 clear_phone_trace() {

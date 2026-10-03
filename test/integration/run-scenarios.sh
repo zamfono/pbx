@@ -3,8 +3,8 @@
 # scenario it expects (`<name>.roles`, below), and checks after each one that Asterisk holds no
 # channel any more, that every sipp run the scenario started ended with its calls and, where the
 # scenario has a `<name>.check.sh`, that the history records what the spec says the call leaves
-# behind. Reads `run.sh`'s own `COMPOSE`, `compose_args`, `compose_cmd`, `here`, `api_base`,
-# `token`, `SIP_USERNAME`, `SIP_PASSWORD`, `MAIN_DID` and `fail`, and `only.sh`'s `name_selected`.
+# behind. Reads `run.sh`'s own `compose`, `here`, `api_base`, `token`, `SIP_USERNAME`,
+# `SIP_PASSWORD`, `MAIN_DID` and `fail`, and `only.sh`'s `name_selected`.
 #
 # A scenario's setup, check and teardown are called with the api base, the token and the compose
 # command, so they can drive the containers too.
@@ -55,7 +55,7 @@ FINISH_SECONDS=5
 SIPP_SERVICES=(sipp sipp-phone sipp-provider)
 
 asterisk_cli() {
-  $COMPOSE "${compose_args[@]}" exec -T asterisk asterisk -rx "$1"
+  dc exec -T asterisk asterisk -rx "$1"
 }
 
 # Every trunk's own AOR, `trunk-<id>`, as `pjsip show contacts` lists their contacts.
@@ -72,7 +72,7 @@ trunk_aors() {
 # out `qualify_timeout` later and is applied when it lands, after a later probe's answer too,
 # leaving the trunk unreachable for a call (§9.4 "Provisioning and status").
 start_trunk_idle() {
-  $COMPOSE "${compose_args[@]}" exec -T -d sipp sh -c \
+  dc exec -T -d sipp sh -c \
     'sh /scenarios/_sipp-run.sh trunk-idle -sf /scenarios/uas/refuse-403.xml -p 5060 -aa \
       -nostdin asterisk:5060 > /tmp/trunk-idle.log 2>&1'
   await_bound sipp 5060 || fail "the trunk's host did not start answering"
@@ -81,7 +81,7 @@ start_trunk_idle() {
 # Ends the idle run of `start_trunk_idle` (`_sipp-finish.sh`), for a run of a scenario's own to
 # take the port over; the probe a gap of a moment may miss is answered by its retransmission.
 end_trunk_idle() {
-  $COMPOSE "${compose_args[@]}" exec -T sipp sh /scenarios/_sipp-finish.sh "$FINISH_SECONDS" \
+  dc exec -T sipp sh /scenarios/_sipp-finish.sh "$FINISH_SECONDS" \
     || fail "the trunk's idle host did not end"
 }
 
@@ -93,8 +93,8 @@ end_trunk_idle() {
 # `ip` trunk reachable, or unmonitored where its qualify is off.
 start_trunk_side() {
   end_trunk_idle
-  $COMPOSE "${compose_args[@]}" exec -T sipp rm -f /tmp/trunk-messages.log
-  $COMPOSE "${compose_args[@]}" exec -T -d sipp sh -c \
+  dc exec -T sipp rm -f /tmp/trunk-messages.log
+  dc exec -T -d sipp sh -c \
     "sh /scenarios/_sipp-run.sh trunk-$1 -sf /scenarios/uas/$1.xml -p 5060 -aa -nostdin \
       -trace_msg -message_file /tmp/trunk-messages.log asterisk:5060 > /tmp/$1.log 2>&1"
   await_bound sipp 5060 || fail "the trunk side did not start"
@@ -125,7 +125,7 @@ assert_no_channels() {
 finish_sipp_runs() {
   local service report leftovers=''
   for service in "${SIPP_SERVICES[@]}"; do
-    report=$($COMPOSE "${compose_args[@]}" exec -T "$service" \
+    report=$(dc exec -T "$service" \
       sh /scenarios/_sipp-finish.sh "$FINISH_SECONDS" 2>&1) \
       || leftovers="$leftovers"$'\n'"$service: $report"
   done
@@ -151,11 +151,11 @@ start_phone_side() {
   registered=''
   case $PHONE_MODE in
     listen)
-      bash "$here/phone.sh" "$compose_cmd" listen "$UAS" \
+      bash "$here/phone.sh" "$compose" listen "$UAS" \
         || fail "the phone side could not listen for $name"
       ;;
     call)
-      bash "$here/phone.sh" "$compose_cmd" call "$UAS" \
+      bash "$here/phone.sh" "$compose" call "$UAS" \
         "$account_user" "$account_password" \
         || fail "the phone could not place its own call for $name"
       registered="$account_user $account_password"
@@ -166,7 +166,7 @@ start_phone_side() {
       # its own (a real device, not a sipp UAS), and it stays up until the scenario's teardown.
       ;;
     *)
-      bash "$here/phone.sh" "$compose_cmd" answer "$UAS" "$SIP_USERNAME" \
+      bash "$here/phone.sh" "$compose" answer "$UAS" "$SIP_USERNAME" \
         "$SIP_PASSWORD" "$account_user" "$account_password" \
         || fail "the answering device was not reachable for $name"
       registered="$SIP_USERNAME $SIP_PASSWORD"
@@ -178,7 +178,7 @@ echo '== running the sipp scenarios =='
 # A stack a `KEEP=1` run left up (run.sh's `REUSE`) may still hold the sipp runs of the scenario
 # that run failed in; from here on, every scenario finds its sides idle (`finish_sipp_runs`).
 for service in "${SIPP_SERVICES[@]}"; do
-  $COMPOSE "${compose_args[@]}" exec -T "$service" \
+  dc exec -T "$service" \
     sh -c 'pkill -9 -x sipp; rm -rf /tmp/sipp-runs' || true
 done
 start_trunk_idle
@@ -201,7 +201,7 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
   # a colleague's device rather than the answering one.
   phone_account="$SIP_USERNAME $SIP_PASSWORD"
   if [ -f "$setup" ]; then
-    account=$(bash "$setup" "$api_base" "$token" "$compose_cmd") \
+    account=$(bash "$setup" "$api_base" "$token" "$compose") \
       || fail "the setup for $name failed"
     phone_account=${account:-$phone_account}
   fi
@@ -214,13 +214,13 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
     dials=(-inf "/scenarios/$DIALS")
   fi
   if [ "$scenario" = "$here/scenarios/$name.call.sh" ]; then
-    bash "$scenario" "$api_base" "$token" "$compose_cmd" || fail "the API call of $name did not complete"
+    bash "$scenario" "$api_base" "$token" "$compose" || fail "the API call of $name did not complete"
   else
     # `-timeout_error` makes the scenario's budget a bound: with `-timeout` alone, sipp reaching it
     # only stops placing calls and waits for the open ones to end, which a call stuck in its
     # scenario never does. Every sipp run that has a budget sets both.
     # shellcheck disable=SC2086 # the extra arguments are separate words by design
-    $COMPOSE "${compose_args[@]}" exec -T "$CALLER" \
+    dc exec -T "$CALLER" \
       sipp -sf "/scenarios/$name.xml" -s "$MAIN_DID" -m "$calls" -l 1 \
         -p "$CALLER_PORT" -timeout 90s -timeout_error \
         $CALLER_ARGS "${dials[@]}" -nostdin asterisk:5060 \
@@ -229,20 +229,20 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
   # The device's contact goes while its run still answers, so no probe is ever left to it.
   if [ -n "$registered" ]; then
     # shellcheck disable=SC2086 # the username and password, two words by design
-    bash "$here/phone.sh" "$compose_cmd" unregister $registered \
+    bash "$here/phone.sh" "$compose" unregister $registered \
       || fail "the device could not unregister after $name"
   fi
   if [ "$PHONE_MODE" = call ]; then
-    bash "$here/phone.sh" "$compose_cmd" wait-call || fail "the phone's own call failed in $name"
+    bash "$here/phone.sh" "$compose" wait-call || fail "the phone's own call failed in $name"
   fi
   assert_no_channels "$name"
   finish_sipp_runs "$name"
   start_trunk_idle
   check="$here/scenarios/$name.check.sh"
   if [ -f "$check" ]; then
-    bash "$check" "$api_base" "$token" "$compose_cmd" || fail "the history check for $name failed"
+    bash "$check" "$api_base" "$token" "$compose" || fail "the history check for $name failed"
   fi
   if [ -f "$teardown" ]; then
-    bash "$teardown" "$api_base" "$token" "$compose_cmd" || fail "the teardown for $name failed"
+    bash "$teardown" "$api_base" "$token" "$compose" || fail "the teardown for $name failed"
   fi
 done

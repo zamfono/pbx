@@ -21,8 +21,7 @@ compose=$3
 # than reading once.
 tone_log=''
 for _ in $(seq 1 10); do
-  # shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-  tone_log=$($compose exec -T asterisk sh -c 'cat /var/log/asterisk/ci-tone 2>/dev/null || true' \
+  tone_log=$(dc exec -T asterisk sh -c 'cat /var/log/asterisk/ci-tone 2>/dev/null || true' \
     | tr -d '\r')
   printf '%s\n' "$tone_log" | grep -q 'tone:info;tonezone=itu' && break
   sleep 1

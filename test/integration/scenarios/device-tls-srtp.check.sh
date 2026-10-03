@@ -28,15 +28,14 @@ fail() {
 # `pjsip show contacts`' own table truncates the contact URI at a fixed column width, cutting off
 # exactly the `;transport=` parameter this checks; the AOR's own `contact` field (`pjsip show
 # aor`) is the same URI in full.
-# shellcheck disable=SC2086 # `$compose` carries the runtime's own multi-word command
-aor=$($compose exec -T asterisk asterisk -rx "pjsip show aor $sip_username")
+aor=$(dc exec -T asterisk asterisk -rx "pjsip show aor $sip_username")
 contact_line=$(printf '%s' "$aor" | grep '^ contact ' || true)
 [ -n "$contact_line" ] || fail "no contact for AOR $sip_username: $aor"
 printf '%s' "$contact_line" | grep -i 'transport=tls' >/dev/null \
   || fail "the device's contact isn't transport=tls: $contact_line"
 
 # shellcheck disable=SC2086
-endpoint=$($compose exec -T asterisk asterisk -rx "pjsip show endpoint $sip_username")
+endpoint=$(dc exec -T asterisk asterisk -rx "pjsip show endpoint $sip_username")
 media_encryption_line=$(printf '%s' "$endpoint" | grep media_encryption || true)
 printf '%s' "$media_encryption_line" | grep 'sdes' >/dev/null \
   || fail "endpoint $sip_username isn't media_encryption=sdes: $media_encryption_line"
@@ -46,7 +45,7 @@ printf '%s' "$media_encryption_line" | grep 'sdes' >/dev/null \
 # attribute is SDES-SRTP actually negotiated, not merely configured, and an `opus` rtpmap is the
 # codec the bridge carried on this leg (the device offers/accepts nothing else).
 # shellcheck disable=SC2086
-trace=$($compose exec -T devices sh -c 'cat /root/.baresip/baresip.log')
+trace=$(dc exec -T devices sh -c 'cat /root/.baresip/baresip.log')
 printf '%s' "$trace" | grep 'RTP/SAVP' >/dev/null \
   || fail "the device's trace never shows RTP/SAVP: $(printf '%s' "$trace" | tail -c 800)"
 printf '%s' "$trace" | grep 'a=crypto:' >/dev/null \
