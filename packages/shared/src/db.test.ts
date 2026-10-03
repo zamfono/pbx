@@ -5,7 +5,7 @@ import { migrateForTest } from './testDb.js';
 
 test('migrates and enforces the schema', async () => {
   const db = openDb(':memory:');
-  expect(await pendingMigrations(db)).toHaveLength(15);
+  expect(await pendingMigrations(db)).toHaveLength(1);
   await migrateForTest(db);
   expect(await pendingMigrations(db)).toEqual([]);
 
@@ -74,7 +74,7 @@ test('migrates and enforces the schema', async () => {
       .execute()
   ).rejects.toThrow(/NOT NULL constraint failed: trunks\.emergency/u);
 
-  // foreign keys on, also after the trunks rebuild switched them off for its own run
+  // foreign keys on
   await expect(
     db
       .insertInto('devices')

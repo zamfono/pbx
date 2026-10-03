@@ -289,14 +289,11 @@ why the specified behaviour changed; the commit history, how.
 
 ### Upgrade notes
 
-- **After updating from 0.1.0**, run `./update.sh` once more in the stack directory: 0.1.0's own
-  `update.sh` installs this release without the `compose.override.yaml` link, and the second run,
-  which finds the stack already on this release, makes it. Until then, run Compose with
-  `-f compose.yaml -f <overlay>` as before.
-- **Re-enter every backup target's secret** after updating: run `backups.targets.update` with
-  `secret` in its new form for each target `backups.targets.list` shows, the default `local` one
-  included (`{ "resticPassword": "<BACKUP_PASSWORD from .env>" }`). Until then, its backup runs
-  fail.
+- **0.2.0 is a fresh start: install it anew** (deploy/README.md) on a new stack directory and
+  data volumes. There is no upgrade from 0.1.x or earlier: nothing of an older release's
+  database, files, tokens or client state carries over, and its `update.sh` and the updater do
+  not install 0.2.0. The database schema starts again from a single migration; `migrate` fails
+  on a 0.1.x database.
 
 ## [0.1.0] - 2026-09-30
 

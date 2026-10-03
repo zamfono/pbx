@@ -2,10 +2,7 @@ import { sql } from 'kysely';
 import { expect, test } from 'vitest';
 
 import { openDb, type Db } from './db.js';
-import { DEFAULT_SIP_HEADERS } from './sipHeaders.js';
 import { migrateForTest } from './testDb.js';
-
-const BEFORE = '1790770935482_forward_target_sip';
 
 async function seed(db: Db): Promise<void> {
   await sql`INSERT INTO users (id, name, email, created_at) VALUES ('u1', 'Anna', 'a@x.test', 't')`.execute(
@@ -27,37 +24,7 @@ async function seed(db: Db): Promise<void> {
   );
 }
 
-// The forward_target_sip_headers migration (§9.4 "Header templates", §11.2) on a database that
-// holds a sip target and two others: the sip row gets the default headers, the fixed ones it sent
-// before, and every other row none.
-test('an existing sip target gets the default headers, every other row none', async () => {
-  const db = openDb(':memory:');
-  await migrateForTest(db, BEFORE);
-  await seed(db);
-
-  await migrateForTest(db);
-
-  const { rows } = await sql<{
-    id: string;
-    sipHeadersJson: string | null;
-  }>`SELECT id, sip_headers_json FROM forward_targets ORDER BY id`.execute(db);
-  expect(
-    rows.map(row => ({
-      id: row.id,
-      headers:
-        row.sipHeadersJson === null
-          ? null
-          : (JSON.parse(row.sipHeadersJson) as unknown)
-    }))
-  ).toEqual([
-    { id: 'ft-ext', headers: null },
-    { id: 'ft-sip', headers: DEFAULT_SIP_HEADERS },
-    { id: 'ft-user', headers: null }
-  ]);
-  const { rows: dangling } = await sql`PRAGMA foreign_key_check`.execute(db);
-  expect(dangling).toEqual([]);
-});
-
+// forward_targets.sip_headers_json (§9.4 "Header templates", §11.2).
 test('headers are refused on a row that is no sip target, and must be a JSON array', async () => {
   const db = openDb(':memory:');
   await migrateForTest(db);
@@ -77,14 +44,4 @@ test('headers are refused on a row that is no sip target, and must be a JSON arr
   await sql`UPDATE forward_targets SET sip_headers_json = '[]' WHERE id = 'ft-sip'`.execute(
     db
   );
-});
-
-test('down drops the column again', async () => {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
-  await migrateForTest(db, BEFORE);
-  const { rows } = await sql<{
-    name: string;
-  }>`SELECT name FROM pragma_table_info('forward_targets')`.execute(db);
-  expect(rows.map(row => row.name)).not.toContain('sip_headers_json');
 });

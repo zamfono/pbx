@@ -39,6 +39,7 @@ const TABLE_NAMES = [
   'oauth_clients',
   'tokens',
   'webhooks',
+  'webhook_deliveries',
   'backup_targets',
   'backup_runs',
   'audit_log',
@@ -46,7 +47,9 @@ const TABLE_NAMES = [
   'call_qos',
   'voicemails',
   'recordings',
-  'presence_log'
+  'presence_log',
+  'update_state',
+  'maintenance_gate'
 ] as const;
 
 // Named §11.4 defaults: `no-magic-numbers` requires every meaningful literal to carry a name.
@@ -215,6 +218,37 @@ async function createDeviceBlfKeysTable(db: Db): Promise<void> {
 }
 
 // trunks — PSTN connectivity.
+// The trunk's media encryption, certificate check, OPTIONS probe and `Diversion` header (§9.4).
+function addTrunksSignalingColumns<TB extends string, C extends string>(
+  builder: CreateTableBuilder<TB, C>
+) {
+  return builder
+    .addColumn('srtp', 'integer', col =>
+      col
+        .notNull()
+        .defaultTo(0)
+        .check(sql`srtp in (0,1) and (srtp = 0 or transport = 'tls')`)
+    )
+    .addColumn('tls_verify', 'integer', col =>
+      col
+        .notNull()
+        .defaultTo(1)
+        .check(sql`tls_verify in (0,1)`)
+    )
+    .addColumn('qualify', 'integer', col =>
+      col
+        .notNull()
+        .defaultTo(1)
+        .check(sql`qualify in (0,1)`)
+    )
+    .addColumn('diversion', 'text', col =>
+      col
+        .notNull()
+        .defaultTo('off')
+        .check(sql`diversion in ('off','last','all')`)
+    );
+}
+
 async function createTrunksTable(db: Db): Promise<void> {
   await db.schema
     .createTable('trunks')
@@ -222,6 +256,9 @@ async function createTrunksTable(db: Db): Promise<void> {
     .addColumn('name', 'text', col => col.notNull())
     .addColumn('priority', 'integer', col =>
       col.notNull().check(sql`priority >= 1`)
+    )
+    .addColumn('emergency', 'integer', col =>
+      col.notNull().check(sql`emergency in (0,1)`)
     )
     .addColumn('auth_mode', 'text', col =>
       col.notNull().check(sql`auth_mode in ('registration','ip')`)
@@ -272,6 +309,7 @@ async function createTrunksTable(db: Db): Promise<void> {
     .addColumn('log_level_expires_at', 'text')
     .addColumn('created_at', 'text', col => col.notNull())
     .addColumn('deleted_at', 'text')
+    .$call(addTrunksSignalingColumns)
     .addCheckConstraint(
       'trunks_auth_credentials',
       sql`(auth_mode = 'registration' or inbound_auth = 1) = (username is not null and password_enc is not null)`
@@ -636,6 +674,14 @@ async function createForwardTargetsTable(db: Db): Promise<void> {
         sql`external is null or (external glob '+[0-9]*' and substr(external, 2) not glob '*[^0-9]*')`
       )
     )
+    .addColumn('sip_trunk_id', 'text', col =>
+      col.references('trunks.id').onDelete('restrict')
+    )
+    .addColumn('sip_user', 'text', col =>
+      col.check(
+        sql`sip_user is null or (length(sip_user) between 1 and 64 and sip_user not glob '*[^A-Za-z0-9._~+-]*')`
+      )
+    )
     .addColumn('mailbox_user_id', 'text', col =>
       col.references('users.id').onDelete('restrict')
     )
@@ -648,11 +694,21 @@ async function createForwardTargetsTable(db: Db): Promise<void> {
     .addColumn('menu_id', 'text', col =>
       col.references('menus.id').onDelete('restrict')
     )
+    .addColumn('sip_headers_json', 'text', col =>
+      col.check(
+        sql`sip_headers_json is null or (sip_trunk_id is not null and json_valid(sip_headers_json) and json_type(sip_headers_json) = 'array')`
+      )
+    )
+    .addCheckConstraint(
+      'forward_targets_sip_pair',
+      sql`(sip_trunk_id is null) = (sip_user is null)`
+    )
     .addCheckConstraint(
       'forward_targets_one_kind',
       sql`(user_id is not null) + (ring_group_id is not null) + (external is not null) +
-             (mailbox_user_id is not null) + (mailbox_ring_group_id is not null) +
-             (announcement_audio_id is not null) + (menu_id is not null) = 1`
+             (sip_trunk_id is not null) + (mailbox_user_id is not null) +
+             (mailbox_ring_group_id is not null) + (announcement_audio_id is not null) +
+             (menu_id is not null) = 1`
     )
     .execute();
 }
@@ -914,7 +970,13 @@ function addSettingsRingotelColumns<TB extends string, C extends string>(
         .defaultTo(DEFAULT_RINGOTEL_MAX_REGS)
         .check(sql`ringotel_max_regs > 0`)
     )
-    .addColumn('ringotel_api_token_enc', 'blob');
+    .addColumn('ringotel_api_token_enc', 'blob')
+    .addColumn('ringotel_profile_pending', 'integer', col =>
+      col
+        .notNull()
+        .defaultTo(0)
+        .check(sql`ringotel_profile_pending in (0,1)`)
+    );
 }
 
 async function createSettingsTable(db: Db): Promise<void> {
@@ -927,6 +989,18 @@ async function createSettingsTable(db: Db): Promise<void> {
     .$call(addSettingsRetentionColumns)
     .$call(addSettingsSsoColumns)
     .$call(addSettingsRingotelColumns)
+    .addColumn('auto_update', 'integer', col =>
+      col
+        .notNull()
+        .defaultTo(0)
+        .check(sql`auto_update in (0,1)`)
+    )
+    .addColumn('config_propagation_pending', 'integer', col =>
+      col
+        .notNull()
+        .defaultTo(0)
+        .check(sql`config_propagation_pending in (0,1)`)
+    )
     .addCheckConstraint(
       'settings_sso_provider_needs_client_id',
       sql`sso_provider is null or sso_client_id is not null`
@@ -1125,7 +1199,9 @@ async function createMailTemplatesTable(db: Db): Promise<void> {
     .addColumn('kind', 'text', col =>
       col
         .notNull()
-        .check(sql`kind in ('voicemail','missedCall','setup','reset')`)
+        .check(
+          sql`kind in ('voicemail','missedCall','setup','reset','updateFailed','breakingUpdate')`
+        )
     )
     .addColumn('language', 'text', col =>
       col.notNull().check(sql`language in ('de','en','es','fr','it','ru')`)
@@ -1221,6 +1297,42 @@ async function createWebhooksTable(db: Db): Promise<void> {
     .addColumn('last_delivery_at', 'text')
     .addColumn('created_at', 'text', col => col.notNull())
     .addColumn('deleted_at', 'text')
+    .addColumn('last_error', 'text')
+    .addColumn('last_error_at', 'text')
+    .addColumn('failing_since', 'text')
+    .addColumn('last_logged_at', 'text')
+    .addColumn('failed_deliveries', 'integer', col =>
+      col
+        .notNull()
+        .defaultTo(0)
+        .check(sql`failed_deliveries >= 0`)
+    )
+    .execute();
+}
+
+// webhook_deliveries — the webhook outbox (§10.6), one row per hook and event until delivered or
+// given up, so a queued or retrying delivery survives an `api` restart.
+async function createWebhookDeliveriesTable(db: Db): Promise<void> {
+  await db.schema
+    .createTable('webhook_deliveries')
+    .addColumn('id', 'text', col => col.primaryKey().notNull())
+    .addColumn('webhook_id', 'text', col =>
+      col.notNull().references('webhooks.id').onDelete('cascade')
+    )
+    .addColumn('body_json', 'text', col => col.notNull())
+    .addColumn('attempts', 'integer', col =>
+      col
+        .notNull()
+        .defaultTo(0)
+        .check(sql`attempts >= 0`)
+    )
+    .addColumn('next_attempt_at', 'text', col => col.notNull())
+    .addColumn('created_at', 'text', col => col.notNull())
+    .execute();
+  await db.schema
+    .createIndex('webhook_deliveries_webhook')
+    .on('webhook_deliveries')
+    .column('webhook_id')
     .execute();
 }
 
@@ -1258,10 +1370,11 @@ async function createBackupRunsTable(db: Db): Promise<void> {
       col.notNull().check(sql`status in ('running','ok','failed')`)
     )
     .addColumn('snapshot_id', 'text')
-    .addColumn('bytes', 'integer')
+    .addColumn('bytes_added', 'integer')
     .addColumn('error', 'text')
     .addColumn('started_at', 'text', col => col.notNull())
     .addColumn('finished_at', 'text')
+    .addColumn('bytes_total', 'integer')
     .execute();
 }
 
@@ -1347,6 +1460,8 @@ async function createCallQosTable(db: Db): Promise<void> {
     .addColumn('jitter_ms', 'real')
     .addColumn('loss_pct', 'real')
     .addColumn('rtt_ms', 'real')
+    .addColumn('rx_packets', 'integer', col => col.check(sql`rx_packets >= 0`))
+    .addColumn('tx_packets', 'integer', col => col.check(sql`tx_packets >= 0`))
     .addPrimaryKeyConstraint('call_qos_pk', ['call_id', 'channel_id'])
     .execute();
 }
@@ -1409,6 +1524,60 @@ async function createPresenceLogTable(db: Db): Promise<void> {
       col.references('ring_groups.id').onDelete('set null')
     )
     .addColumn('since', 'text', col => col.notNull())
+    .execute();
+}
+
+// update_state — the one row of what `api` knows about updates beyond the updater's own record
+// (§6.3 "Updates"), created with its row so readers need no seed.
+async function createUpdateStateTable(db: Db): Promise<void> {
+  await db.schema
+    .createTable('update_state')
+    .addColumn('id', 'integer', col => col.primaryKey().check(sql`id = 1`))
+    .addColumn('run_trigger', 'text', col =>
+      col.check(sql`run_trigger in ('manual','automatic')`)
+    )
+    .addColumn('run_actor_name', 'text')
+    .addColumn('run_started_at', 'text')
+    .addColumn('run_outcome_pending', 'integer', col =>
+      col
+        .notNull()
+        .defaultTo(0)
+        .check(sql`run_outcome_pending in (0,1)`)
+    )
+    .addColumn('auto_failed_version', 'text')
+    .addColumn('auto_failure', 'text')
+    .addColumn('auto_failed_at', 'text')
+    .addColumn('auto_failed_attempts', 'integer', col =>
+      col.notNull().defaultTo(0)
+    )
+    .addColumn('breaking_version', 'text')
+    .addColumn('breaking_announced', 'text')
+    .addCheckConstraint(
+      'update_state_auto_failure',
+      sql`(auto_failed_version IS NULL) = (auto_failure IS NULL) AND (auto_failure IS NULL) = (auto_failed_at IS NULL) AND (auto_failed_at IS NULL) = (auto_failed_attempts = 0)`
+    )
+    .execute();
+  await db.insertInto('update_state').values({ id: 1 }).execute();
+}
+
+// maintenance_gate — the maintenance gate's last give-up per piece of work it holds (§6.4).
+async function createMaintenanceGateTable(db: Db): Promise<void> {
+  await db.schema
+    .createTable('maintenance_gate')
+    .addColumn('work', 'text', col =>
+      col
+        .primaryKey()
+        .notNull()
+        .check(sql`work in ('certSync','autoUpdate')`)
+    )
+    .addColumn('gave_up_at', 'text', col => col.notNull())
+    .addColumn('reason', 'text', col => col.notNull())
+    .addColumn('consecutive_give_ups', 'integer', col =>
+      col
+        .notNull()
+        .defaultTo(0)
+        .check(sql`consecutive_give_ups >= 0`)
+    )
     .execute();
 }
 
@@ -1601,6 +1770,7 @@ export async function up(db: Db): Promise<void> {
   await createOauthClientsTable(db);
   await createTokensTable(db);
   await createWebhooksTable(db);
+  await createWebhookDeliveriesTable(db);
   await createBackupTargetsTable(db);
   await createBackupRunsTable(db);
   await createAuditLogTable(db);
@@ -1609,6 +1779,8 @@ export async function up(db: Db): Promise<void> {
   await createVoicemailsTable(db);
   await createRecordingsTable(db);
   await createPresenceLogTable(db);
+  await createUpdateStateTable(db);
+  await createMaintenanceGateTable(db);
   await createCallIndexes(db);
   await createRemainingHotPathIndexes(db);
   await createDidBlockGuardTriggers(db);

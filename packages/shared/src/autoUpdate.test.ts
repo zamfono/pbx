@@ -4,26 +4,11 @@ import { expect, test } from 'vitest';
 import { openDb } from './db.js';
 import { migrateForTest } from './testDb.js';
 
-// The auto_update migration (§6.3 "Updates", §11.2): a tenant's mail template overrides survive
-// the mail_templates rebuild, the two new kinds are admitted, settings.auto_update starts off,
-// and update_state holds its one row from the start.
-test('keeps the template overrides, admits the new kinds, starts with auto-update off', async () => {
+// Automatic updates (§6.3 "Updates", §11.2): mail_templates admits the two update mails, and
+// update_state holds its one row from the start.
+test('admits the update mail kinds and starts update_state with its one row', async () => {
   const db = openDb(':memory:');
-  await migrateForTest(db, '1790780978051_trunk_diversion');
-  await sql`INSERT INTO mail_templates (kind, language, subject, body_text, body_html, updated_at)
-            VALUES ('missedCall', 'de', 'Verpasst', 'Text', NULL, 't')`.execute(
-    db
-  );
-  await expect(
-    sql`INSERT INTO mail_templates (kind, language, subject, body_text, updated_at)
-        VALUES ('updateFailed', 'de', 's', 'b', 't')`.execute(db)
-  ).rejects.toThrow(/CHECK/u);
-
   await migrateForTest(db);
-
-  await expect(
-    db.selectFrom('mailTemplates').select(['kind', 'subject']).execute()
-  ).resolves.toEqual([{ kind: 'missedCall', subject: 'Verpasst' }]);
   await sql`INSERT INTO mail_templates (kind, language, subject, body_text, updated_at)
             VALUES ('updateFailed', 'de', 's', 'b', 't'),
                    ('breakingUpdate', 'de', 's', 'b', 't')`.execute(db);

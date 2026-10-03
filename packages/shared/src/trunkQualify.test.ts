@@ -4,33 +4,20 @@ import { expect, test } from 'vitest';
 import { openDb } from './db.js';
 import { migrateForTest } from './testDb.js';
 
-// The trunk_qualify migration (§9.4 "Provisioning and status", §11.2) on a database that already
-// holds trunks: every existing trunk keeps its OPTIONS probe (`qualify` 1), as does a new one
-// written without the column, and a value other than 0 or 1 is refused.
-test('existing trunks and a new one get qualify 1', async () => {
+// trunks.qualify (§9.4 "Provisioning and status", §11.2): a trunk written without the column
+// keeps its OPTIONS probe (`qualify` 1), and a value other than 0 or 1 is refused.
+test('a new trunk gets qualify 1', async () => {
   const db = openDb(':memory:');
-  await migrateForTest(db, '1790775089942_forward_target_sip_headers');
-  await sql`INSERT INTO trunks (id, name, priority, emergency, auth_mode, transport, created_at)
-            VALUES ('t-ip', 'A', 1, 1, 'ip', 'udp', 't')`.execute(db);
-  await sql`INSERT INTO trunks (id, name, priority, emergency, auth_mode, username, password_enc, created_at)
-            VALUES ('t-reg', 'B', 2, 1, 'registration', 'u', x'00', 't')`.execute(
-    db
-  );
-
   await migrateForTest(db);
   await sql`INSERT INTO trunks (id, name, priority, emergency, auth_mode, created_at)
-            VALUES ('t-new', 'C', 3, 1, 'ip', 't')`.execute(db);
+            VALUES ('t-ip', 'A', 1, 1, 'ip', 't')`.execute(db);
 
   const rows = await db
     .selectFrom('trunks')
     .select(['id', 'qualify'])
     .orderBy('id')
     .execute();
-  expect(rows).toEqual([
-    { id: 't-ip', qualify: 1 },
-    { id: 't-new', qualify: 1 },
-    { id: 't-reg', qualify: 1 }
-  ]);
+  expect(rows).toEqual([{ id: 't-ip', qualify: 1 }]);
   await expect(
     db
       .updateTable('trunks')
