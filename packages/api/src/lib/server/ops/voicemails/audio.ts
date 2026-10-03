@@ -26,11 +26,12 @@ const inputSchema = z
 
 /**
  * `GET /voicemails/{id}/audio` (§10.3, §11.6): the voicemail's recorded audio, as the stored WAV
- * or, with `format`, transcoded for download.
+ * or, with `format`, transcoded for download; over MCP, a link to this endpoint (§10.5).
  */
 export const audio = defineOperation({
   name: 'voicemails.audio',
-  description: "Returns a voicemail's recorded audio.",
+  description:
+    "Returns a voicemail's recorded audio; over MCP, a download link that opens for five minutes.",
   input: inputSchema,
   minRole: 'user',
   readOnly: true,

@@ -5,6 +5,7 @@ import {
   type JsonSchema
 } from './ops/publishedSchema.js';
 import {
+  API_PREFIX,
   captureField,
   routeOperation,
   routes,
@@ -47,7 +48,6 @@ export type OpenApiDocument = {
 
 const OPENAPI_VERSION = '3.1.0';
 const API_VERSION = 'v1';
-const API_BASE_PATH = '/api/v1';
 const JSON_CONTENT_TYPE = 'application/json';
 const MULTIPART_CONTENT_TYPE = 'multipart/form-data';
 const PROBLEM_CONTENT_TYPE = 'application/problem+json';
@@ -190,7 +190,7 @@ export function buildOpenApiDocument(): OpenApiDocument {
   return {
     openapi: OPENAPI_VERSION,
     info: { title: 'Zamfono API', version: API_VERSION },
-    servers: [{ url: API_BASE_PATH }],
+    servers: [{ url: API_PREFIX }],
     paths,
     components: {
       schemas: { Problem: PROBLEM_SCHEMA },

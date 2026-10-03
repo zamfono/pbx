@@ -12,7 +12,10 @@ import {
 } from '@zamfono/shared';
 
 import { addressKey } from '#lib/server/addressKey.js';
-import { authenticateRequest } from '#lib/server/auth/bearer.js';
+import {
+  authenticateDownloadLink,
+  authenticateRequest
+} from '#lib/server/auth/bearer.js';
 import { crossSiteFormRejection } from '#lib/server/auth/crossSiteForms.js';
 import { requiredJwtSecret } from '#lib/server/auth/jwtSigning.js';
 import { getDb } from '#lib/server/db.js';
@@ -20,9 +23,9 @@ import { startBackgroundJobs } from '#lib/server/jobs/background.js';
 import { Limiter, type LimitKind } from '#lib/server/limiter.js';
 import { recordApiRequestSeconds } from '#lib/server/metricsCounters.js';
 import { problem } from '#lib/server/problem.js';
+import { API_PREFIX } from '#lib/server/restRoutes.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
-const API_PREFIX = '/api/v1';
 const INTERNAL_PREFIX = '/internal';
 const jobsLogger = pino({ name: 'hooks' });
 
@@ -79,7 +82,8 @@ function rateLimitResponse(
 
 /**
  * Refuses a cross-site form submission to a browser-served page (`crossSiteFormRejection`);
- * resolves `/api/v1/*`'s bearer token into `event.locals.auth`, 401 problem+json without one;
+ * resolves `/api/v1/*`'s bearer token, or a download link's token (§10.5), into
+ * `event.locals.auth`, 401 problem+json without one;
  * refuses `/internal/*` when the request carries `X-Forwarded-For`, since only the proxy hop sets
  * it and that path is reachable from the internal network alone (§3.1); answers 429 problem+json
  * once a client address exceeds the §5.5 limit of the auth endpoint it called.
@@ -106,16 +110,22 @@ const handleRequest: Handle = async ({ event, resolve }) => {
   }
   // `/api/v1/openapi.json` is inside this prefix and so requires a bearer token like every other
   // `/api/v1/*` endpoint; §10.3 lists no separate row for it, so it gets no separate exemption.
-  const auth = await authenticateRequest(
-    { db: getDb(), jwtSecret: requiredJwtSecret() },
-    event.request
-  );
+  const deps = { db: getDb(), jwtSecret: requiredJwtSecret() };
+  const bearer = await authenticateRequest(deps, event.request);
+  const link = bearer ? null : await authenticateDownloadLink(deps, event.url);
+  const auth = bearer ?? link;
   if (!auth) {
     return problem(HTTP_UNAUTHORIZED, 'unauthorized');
   }
   // eslint-disable-next-line require-atomic-updates -- `event` is this call's own local object, never mutated concurrently
   event.locals.auth = auth;
-  return resolve(event);
+  if (!link) {
+    return resolve(event);
+  }
+  // RFC 6750 §2.3: a response to a request whose token is in the URI is kept from shared caches.
+  const response = await resolve(event);
+  response.headers.set('cache-control', 'private');
+  return response;
 };
 
 /**

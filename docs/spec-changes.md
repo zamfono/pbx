@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-03 · §10.5 MCP interface, §10.3 Voicemail and Recordings, §10.2 Attachments.** Over MCP, `voicemails.audio` and `recordings.audio` return a download link, `{ url, expiresAt }`, instead of the file: the REST endpoint with an `access_token` query parameter, a JWT of `typ` `download+jwt` for that one path, the tool caller's user and client, expiring after five minutes, its response marked `Cache-Control: private`. REST still answers with the file.
+*Why:* product-owner decision: MCP clients (Claude, ChatGPT) do nothing with audio content, so the bytes were of no use to them.
+
 **2026-10-02 · §10.4 Device provisioning, §10.3 Devices, §12, §10 layout.** A `manual` device has no provider; creating one, and revealing its credentials, returns its full connection settings: server and domain (the FQDN), transport and port, username (also the authentication username) and password, extension and display name, media encryption, codecs and the own-voicemail feature code. Specified, not yet implemented: the response carries only the username and password so far.
 *Why:* requested by the product owner: an admin setting up an external phone needs every value it asks for in one place, not only a username and password.
 

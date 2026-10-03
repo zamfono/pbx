@@ -56,22 +56,20 @@ export type DownloadFormat = 'opus' | 'mp3';
  * The audio file at `filePath` for download (§10.3, §11.6): the stored WAV as-is with no
  * `format`, or transcoded, named after the source with the format's extension.
  */
-export async function downloadAudio(
+export function downloadAudio(
   filePath: string,
   format: DownloadFormat | undefined
-): Promise<BinaryResult> {
+): BinaryResult {
   if (format === undefined) {
-    return new BinaryResult(
-      await readFile(filePath),
-      'audio/wav',
-      path.basename(filePath)
+    return new BinaryResult('audio/wav', path.basename(filePath), () =>
+      readFile(filePath)
     );
   }
   const base = path.basename(filePath, path.extname(filePath));
   return new BinaryResult(
-    await transcodeForDownload(filePath, format),
     CONTENT_TYPE_BY_FORMAT[format],
-    `${base}.${format}`
+    `${base}.${format}`,
+    () => transcodeForDownload(filePath, format)
   );
 }
 
@@ -83,8 +81,6 @@ const VOICEMAIL_ATTACHMENT_FORMAT = 'mp3';
  * The compressed attachment for a voicemail e-mail (§10.2 "Attachments"): the audio file at
  * `voicemailPath`, transcoded, named after it, with the matching content type.
  */
-export async function voicemailAttachment(
-  voicemailPath: string
-): Promise<BinaryResult> {
+export function voicemailAttachment(voicemailPath: string): BinaryResult {
   return downloadAudio(voicemailPath, VOICEMAIL_ATTACHMENT_FORMAT);
 }

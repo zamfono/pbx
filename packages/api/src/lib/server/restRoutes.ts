@@ -8,6 +8,9 @@ import './ops/index.js';
 
 import { registry, type ErasedOperation } from './ops/registry.js';
 
+/** The base path of every REST endpoint (§10.3). */
+export const API_PREFIX = '/api/v1';
+
 export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
 /** The scopes §10.3's Out of Office and Opening hours rows attach OOO rules and hours to. */

@@ -43,11 +43,11 @@ async function attachmentsFor(req: {
     return undefined;
   }
   try {
-    const attachment = await voicemailAttachment(req.attachmentPath);
+    const attachment = voicemailAttachment(req.attachmentPath);
     return [
       {
         filename: attachment.filename,
-        content: attachment.bytes,
+        content: await attachment.read(),
         contentType: attachment.contentType
       }
     ];

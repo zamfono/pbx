@@ -1,6 +1,7 @@
 import { newId } from '@zamfono/shared';
 
 import type { Authenticated } from '../auth/bearer.js';
+import { BinaryResult } from '../binaryResult.js';
 // Side-effect import: fills the registry (§10.3) with every operation a tool call runs.
 import '../ops/index.js';
 
@@ -9,6 +10,7 @@ import { runOperation, type RunInput } from '../ops/runner.js';
 import { ConfirmationRequired, OpError } from '../ops/types.js';
 import type { McpDeps } from './auth.js';
 import { CONFIRM_KEY, confirmElicitation, isAffirmative } from './confirm.js';
+import { downloadLink } from './downloadLink.js';
 import type { Era } from './era.js';
 import { callHelp, HELP_TOOL_NAME } from './guide.js';
 import {
@@ -50,7 +52,8 @@ function helpResult(legacy: boolean, args: Record<string, unknown>): object {
 }
 
 /**
- * `tools/call` (§10.5): the help tool, or an operation run through the runner with channel `mcp`.
+ * `tools/call` (§10.5): the help tool, or an operation run through the runner with channel `mcp`,
+ * a file it returns answered as a download link.
  * A `confirm`-guarded operation called unconfirmed asks through elicitation where the client can
  * answer it — inline as `input_required` (2026-07-28) or as a server-initiated request on a
  * legacy session — and otherwise, or once the person declines, mirrors the REST contract: the
@@ -99,7 +102,11 @@ export async function handleToolsCall(
   };
   try {
     const output = await runOperation(deps.db, name, args, run);
-    return jsonRpcResult(msg.id, toolResult(era.legacy, output));
+    const value =
+      output instanceof BinaryResult
+        ? await downloadLink(deps, auth, name, args)
+        : output;
+    return jsonRpcResult(msg.id, toolResult(era.legacy, value));
   } catch (error) {
     if (!(error instanceof OpError)) {
       throw error;

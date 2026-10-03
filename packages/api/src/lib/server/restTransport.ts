@@ -1,5 +1,6 @@
 import { HTTP_OK } from '@zamfono/shared';
 
+import { ACCESS_TOKEN_PARAM } from './auth/bearer.js';
 import { BinaryResult } from './binaryResult.js';
 import type { JsonSchema } from './ops/publishedSchema.js';
 
@@ -49,13 +50,16 @@ function coerceTyped(
   return raw === '' ? raw : Number(raw);
 }
 
-/** Query values are coerced only where the matched operation's own schema says `number`/`boolean` (§10.3); every other value, `cursor` included, stays the wire string. */
+/** Query values are coerced only where the matched operation's own schema says `number`/`boolean` (§10.3); every other value, `cursor` included, stays the wire string. A download link's `access_token` authenticates the request (`bearer.ts`) and is no input. */
 export function parseQuery(
   request: Request,
   kinds: QueryFieldKinds
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of new URL(request.url).searchParams) {
+    if (key === ACCESS_TOKEN_PARAM) {
+      continue;
+    }
     const kind = kinds.get(key);
     out[key] = kind ? coerceTyped(value, kind) : value;
   }
@@ -79,9 +83,9 @@ function quoteFilename(filename: string): string {
 }
 
 /** Every operation's result is JSON, except a `BinaryResult`, answered as its own bytes so a download route never gets JSON-wrapped. */
-export function outputResponse(output: unknown): Response {
+export async function outputResponse(output: unknown): Promise<Response> {
   if (output instanceof BinaryResult) {
-    return new Response(toResponseBody(output.bytes), {
+    return new Response(toResponseBody(await output.read()), {
       status: HTTP_OK,
       headers: {
         'content-type': output.contentType,

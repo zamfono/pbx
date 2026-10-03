@@ -17,13 +17,11 @@ const KEY_BYTE_LENGTH = 32;
 // The real transcode shells out to `ffmpeg`; these tests assert which bytes reach the relay,
 // so the transcode stands in as a stub that records the path it was handed.
 vi.mock('../audio/transcode.js', () => ({
-  voicemailAttachment: vi.fn((source: string) =>
-    Promise.resolve({
-      filename: `${path.basename(source, path.extname(source))}.mp3`,
-      bytes: Buffer.from('fake-mp3'),
-      contentType: 'audio/mpeg'
-    })
-  )
+  voicemailAttachment: vi.fn((source: string) => ({
+    filename: `${path.basename(source, path.extname(source))}.mp3`,
+    read: () => Promise.resolve(Buffer.from('fake-mp3')),
+    contentType: 'audio/mpeg'
+  }))
 }));
 
 // The send's own warnings, so a test can read what a failed send logged (§7: a line about a call
@@ -188,9 +186,11 @@ describe('sendMail', () => {
     await insertSettings(db, { smtpHost: 'smtp.example.test' });
     await insertUser(db, 'u1', 'user@example.test');
     const { transport, sent } = fakeTransport();
-    vi.mocked(voicemailAttachment).mockRejectedValueOnce(
-      new Error('ffmpeg: exit 1')
-    );
+    vi.mocked(voicemailAttachment).mockReturnValueOnce({
+      filename: 'vm1.mp3',
+      read: () => Promise.reject(new Error('ffmpeg: exit 1')),
+      contentType: 'audio/mpeg'
+    });
 
     const req: MailRequest = {
       kind: 'voicemail',

@@ -6,6 +6,7 @@ import { type Actor } from './ops/types.js';
 import { problem, problemFromError } from './problem.js';
 import { readBody } from './restBody.js';
 import {
+  API_PREFIX,
   pathInput,
   routeOperation,
   routes,
@@ -62,8 +63,6 @@ function matchRoute(method: string, path: string): Matched | null {
   return null;
 }
 
-const API_PREFIX = '/api/v1';
-
 function requestPath(request: Request): string {
   const { pathname } = new URL(request.url);
   return pathname.startsWith(API_PREFIX)
@@ -101,7 +100,7 @@ export async function handleRest(
       requestId: deps.requestId,
       confirm: confirm === true
     });
-    return outputResponse(output);
+    return await outputResponse(output);
   } catch (error) {
     return problemFromError(error);
   }

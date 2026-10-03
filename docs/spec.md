@@ -1152,7 +1152,7 @@ Mail is optional. The relay is `settings.smtp_host`, `smtp_port`, `smtp_security
 
 **Sender.** `settings.mail_from`, seeded at first boot from `MAIL_FROM` in `.env` (§6.3) and editable by owners afterwards like the relay itself, with `settings.company_name` as display name. It is NULL while no relay is configured. The operator seeds an address the relay is authorized to send for, such as `no-reply@<operator-domain>`, since a small company's own domain rarely authorizes the relay under SPF, DKIM and DMARC. An owner who changes it to the company's domain must have that authorization in place.
 
-**Attachments.** Voicemail audio is attached as a compressed transcode, MP3 or Opus, never as WAV; at the default 180 s cap that is roughly 1.5 MB. A link is no alternative, since `GET /voicemails/{id}/audio` requires a bearer token and would not open from a mail client.
+**Attachments.** Voicemail audio is attached as a compressed transcode, MP3 or Opus, never as WAV; at the default 180 s cap that is roughly 1.5 MB. A link is no alternative, since `GET /voicemails/{id}/audio` requires a bearer token, or a download link that opens for five minutes only (§10.5), and would not open from a mail client later.
 
 **Failure.** A relay outage never affects a call. The notification is a courtesy next to MWI and the `voicemail.new` event, so a send is retried a few times over some minutes in process, then logged as a warning and dropped. There is no persistent mail queue.
 
@@ -1275,9 +1275,9 @@ A `sip` target's `headers` is a list of `{ name, value }` (§9.4 Header template
 
 **Audio** (min. role: admin) — `GET/POST /audio` (kinds `greeting`, `moh`, `vmGreeting`, `announcement`), `PATCH /audio/{id}` (label), `DELETE /audio/{id}`
 
-**Voicemail** (min. role: user) — `GET /voicemails` (own: the personal mailbox plus the mailboxes of ring groups the user belongs to; all for admin), `GET /voicemails/{id}/audio`, `DELETE`, `PATCH` (mark read)
+**Voicemail** (min. role: user) — `GET /voicemails` (own: the personal mailbox plus the mailboxes of ring groups the user belongs to; all for admin), `GET /voicemails/{id}/audio` (the file; over MCP a download link, §10.5), `DELETE`, `PATCH` (mark read)
 
-**Recordings** (min. role: admin) — `GET /recordings`, `GET /recordings/{id}/audio`, `DELETE`
+**Recordings** (min. role: admin) — `GET /recordings`, `GET /recordings/{id}/audio` (the file; over MCP a download link, §10.5), `DELETE`
 
 **Call history** (min. role: user (own: caller, callee or answerer) / admin (all)) — `GET /calls?direction=&from=&to=&userId=&ringGroupId=&status=`, `GET /calls/{id}` (one ended call with its `log` and its `qos` rows, §7: each leg's `channelId`, `role`, `jitterMs`, `lossPct`, `rttMs`, `rxPackets` and `txPackets`, §11.2 `call_qos`)
 
@@ -1423,6 +1423,8 @@ Everything longer sits behind the read-only tool `zamfono.help(topic)`, which re
 **Prompts.** The recipes are also published as MCP prompts through `prompts/list`, one per recipe with its parameters, for clients that surface prompts in their UI.
 
 **Tools** derive from the operation registry (§10.3): the operation's `name` is the tool name, its `description` the tool description, its `input` schema exported as JSON Schema the tool input schema, `readOnly` the tool's `readOnlyHint`, and the presence of `confirm` its `destructiveHint`. Tool handlers invoke the operation itself, so validation, RBAC and auditing behave exactly as for REST. Coverage: read tools for active calls, call history, trunk and registration status, voicemails and config inspection, and mutating tools for the full configuration surface.
+
+**Audio.** `voicemails.audio` and `recordings.audio` return `{ url, expiresAt }` over MCP, not the file: MCP clients do nothing with audio content. `url` is the operation's REST endpoint with the call's `format`, if any, and an `access_token` query parameter (RFC 6750 §2.3), so it opens without the session's bearer token, in a browser or a player. The token is an HS256 JWT signed with `JWT_SECRET`, its `typ` `download+jwt` setting it apart from an access token, so neither is accepted in place of the other; it names the tool call's user and OAuth client, its `aud` is the endpoint's path, the one file it opens, and it expires five minutes after the call (`expiresAt`). The download acts as that user, with the role they hold at that moment (§5.3), and its response carries `Cache-Control: private`, as RFC 6750 §2.3 asks of a token in the URI.
 
 **Confirmation over MCP.** A tool with `confirm` pauses before running and asks the person through elicitation: the call returns an `input_required` result whose `inputRequests` carry one boolean field with the question, the client answers with `inputResponses`, and the tool runs only on an affirmative answer; on a legacy 2025-11-25 session the same payload travels as a server-initiated `elicitation/create` request. Claude Code, Cursor and VS Code offer the capability; Codex advertises it but declines every request at the time of writing. With a client that lacks it, among them Claude Desktop and claude.ai connectors at the time of writing, and whenever a client declines the elicitation, the tool mirrors the REST contract: the first call returns the question and `confirmationRequired`, the second must carry `confirm: true` in its input. On such clients the human gate is the client's own permission prompt for tools marked destructive, which is why the hint is set even though it is advisory; the guard there is as strong as a REST call with `confirm: true`, and no stronger.
 

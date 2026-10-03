@@ -21,11 +21,13 @@ const inputSchema = z
 
 /**
  * `GET /recordings/{id}/audio` (§5.3, §11.6): a recording's mixed stereo audio, as the stored
- * WAV or, with `format`, transcoded for download; `admin`/`owner` only.
+ * WAV or, with `format`, transcoded for download, over MCP a link to this endpoint (§10.5);
+ * `admin`/`owner` only.
  */
 export const audio = defineOperation({
   name: 'recordings.audio',
-  description: "Returns a recording's mixed audio.",
+  description:
+    "Returns a recording's mixed audio; over MCP, a download link that opens for five minutes.",
   input: inputSchema,
   minRole: 'admin',
   readOnly: true,

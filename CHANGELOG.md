@@ -170,6 +170,10 @@ why the specified behaviour changed; the commit history, how.
   now logs a warning with it.
 - The OpenAPI document no longer lists a `501` response for every endpoint: every REST endpoint
   runs its operation, so none answers `501`.
+- **Breaking:** the MCP tools `voicemails.audio` and `recordings.audio` return a download link,
+  `{ url, expiresAt }`, instead of the audio itself, which MCP clients could not play: the link
+  opens the file without a token, in a browser or a player, for five minutes. The REST endpoints
+  `GET /voicemails/{id}/audio` and `GET /recordings/{id}/audio` still answer with the file.
 - **Breaking:** a backup target's `secret` in `backups.targets.create` and
   `backups.targets.update` is an object, no longer a string: `{ "resticPassword": … }` for
   `local`, plus `username` and `password` for `sftp`, `ftp`, `ftps` and `webdav`, or

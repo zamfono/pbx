@@ -54,9 +54,11 @@ describe('transcodeForDownload', () => {
       wavPath,
       sourcePath
     ]);
-    const attachment = await voicemailAttachment(sourcePath);
+    const attachment = voicemailAttachment(sourcePath);
     expect(attachment.filename).toBe('vm-1.mp3');
     expect(attachment.contentType).toBe('audio/mpeg');
-    expect(attachment.bytes.subarray(0, 3).toString('ascii')).toBe('ID3');
+    expect((await attachment.read()).subarray(0, 3).toString('ascii')).toBe(
+      'ID3'
+    );
   });
 });

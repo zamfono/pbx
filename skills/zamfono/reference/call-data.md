@@ -37,7 +37,9 @@ every mailbox.
 - `voicemails.list` (`GET /voicemails`) lists them newest first, paginated, each with its mailbox
   (`mailboxUserId` or `mailboxRingGroupId`), `caller`, `durationS`, `read` and `createdAt`.
 - `voicemails.audio` (`GET /voicemails/{id}/audio`) returns the recording, the stored WAV, or
-  with `format` `mp3` or `opus` a compressed transcode.
+  with `format` `mp3` or `opus` a compressed transcode. As an MCP tool it returns
+  `{ url, expiresAt }` instead: a link to that endpoint that opens without a token for five
+  minutes, to hand to whatever plays or downloads the file. `recordings.audio` does the same.
 - `voicemails.markRead` (`PATCH /voicemails/{id}`) with `{ "read": true }`, or `false` to mark it
   unread again; the MWI follows. Read flags are not audited.
 - `voicemails.delete` (`DELETE /voicemails/{id}`) removes the message and its audio for good:

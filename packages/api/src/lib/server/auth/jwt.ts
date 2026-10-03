@@ -52,6 +52,64 @@ export function encodeAccessToken(
 }
 
 /**
+ * A download link's token (§10.5): the user and client a `voicemails.audio` or `recordings.audio`
+ * tool call ran as, `aud` the one REST path it opens. Its `typ` sets it apart from an access token
+ * (RFC 8725 §3.11), so it never authenticates as one.
+ */
+export type DownloadPayload = {
+  sub: string;
+  cid: string | null;
+  aud: string;
+  iat: number;
+  exp: number;
+};
+
+const DownloadPayloadSchema = z.object({
+  sub: z.string(),
+  cid: z.string().nullable(),
+  aud: z.string(),
+  iat: z.number(),
+  exp: z.number()
+});
+
+const DOWNLOAD_TYP = 'download+jwt';
+
+/** Encodes `payload` as an HS256 download-link token signed with `secret`. */
+export function encodeDownloadToken(
+  secret: string,
+  payload: DownloadPayload
+): Promise<string> {
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg: JWT_ALG, typ: DOWNLOAD_TYP })
+    .sign(keyFor(secret));
+}
+
+/** The payload of `token` once its signature, algorithm, `typ`, expiry against `nowS` and, given
+ *  an `audience`, its `aud` hold; `null` for any token that fails. */
+async function verifiedPayload<T>(
+  secret: string,
+  token: string,
+  nowS: number,
+  check: { typ: string; audience?: string; schema: z.ZodType<T> }
+): Promise<T | null> {
+  try {
+    const { payload } = await jwtVerify(token, keyFor(secret), {
+      algorithms: [JWT_ALG],
+      typ: check.typ,
+      audience: check.audience,
+      currentDate: new Date(nowS * MS_PER_SECOND)
+    });
+    const parsed = check.schema.safeParse(payload);
+    return parsed.success ? parsed.data : null;
+  } catch (error) {
+    if (error instanceof joseErrors.JOSEError) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
  * Verifies an access token's signature, algorithm and expiry against `nowS`, and, given an
  * `audience`, that the token was issued for it (RFC 8707: the MCP endpoint passes its own
  * resource, §10.5). Returns its claims, or `null` for any token that fails.
@@ -62,22 +120,26 @@ export async function verifyAccessToken(
   nowS: number,
   audience?: string
 ): Promise<AccessClaims | null> {
-  try {
-    const { payload } = await jwtVerify(token, keyFor(secret), {
-      algorithms: [JWT_ALG],
-      audience,
-      currentDate: new Date(nowS * MS_PER_SECOND)
-    });
-    const parsed = AccessPayloadSchema.safeParse(payload);
-    if (!parsed.success) {
-      return null;
-    }
-    const { sub, role, cid } = parsed.data;
-    return { sub, role, cid };
-  } catch (error) {
-    if (error instanceof joseErrors.JOSEError) {
-      return null;
-    }
-    throw error;
-  }
+  const payload = await verifiedPayload(secret, token, nowS, {
+    typ: JWT_TYP,
+    audience,
+    schema: AccessPayloadSchema
+  });
+  return payload && { sub: payload.sub, role: payload.role, cid: payload.cid };
+}
+
+/** The user and client of download-link token `token`, verified like an access token and opening
+ *  `path` alone; `null` for any token that fails. */
+export async function verifyDownloadToken(
+  secret: string,
+  token: string,
+  nowS: number,
+  path: string
+): Promise<{ sub: string; cid: string | null } | null> {
+  const payload = await verifiedPayload(secret, token, nowS, {
+    typ: DOWNLOAD_TYP,
+    audience: path,
+    schema: DownloadPayloadSchema
+  });
+  return payload && { sub: payload.sub, cid: payload.cid };
 }

@@ -12,6 +12,7 @@
  */
 import { HTTP_FORBIDDEN } from '@zamfono/shared';
 
+import { API_PREFIX } from '../restRoutes.js';
 import { requiredOrigin } from './authorizationResponse.js';
 
 // The encodings an HTML form can submit cross-site without a CORS preflight, plus the one
@@ -34,7 +35,7 @@ const CLIENT_PATHS = new Set([
   '/oauth/register',
   '/mcp'
 ]);
-const CLIENT_PREFIX = '/api/v1/';
+const CLIENT_PREFIX = `${API_PREFIX}/`;
 // The stack's own callers (§3.1): the `proxy` image's certificate hook posts to
 // `/internal/certificate` with BusyBox `wget --post-data`, which sends a form content type and
 // no `Origin`. Nothing there reads a cookie, and Caddy answers 404 for the whole prefix, so no

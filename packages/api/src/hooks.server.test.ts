@@ -6,6 +6,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { epochSeconds, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
+import { encodeDownloadToken } from '#lib/server/auth/jwt.js';
 import { signAccessToken } from '#lib/server/auth/jwtSigning.js';
 import { getDb } from '#lib/server/db.js';
 
@@ -192,5 +193,37 @@ describe('hooks handle', () => {
       clientId: 'client1',
       clientName: 'Ops Console'
     });
+  });
+
+  it('marks a response to a download link private, and one to a bearer token not', async () => {
+    const nowS = epochSeconds(Date.now());
+    const path = '/api/v1/voicemails/vm1/audio';
+    const linkToken = await encodeDownloadToken(JWT_SECRET, {
+      sub: 'admin1',
+      cid: null,
+      aud: path,
+      iat: nowS,
+      exp: nowS + 300
+    });
+    const linked = eventFor(`http://internal${path}?access_token=${linkToken}`);
+    const viaLink = await handle({
+      event: linked,
+      resolve: resolvePassThrough
+    });
+    expect(linked.locals.auth?.actor.id).toBe('admin1');
+    expect(viaLink.headers.get('cache-control')).toBe('private');
+    const bearerToken = await signAccessToken(
+      JWT_SECRET,
+      { sub: 'admin1', role: 'admin', cid: null },
+      nowS,
+      'https://pbx.example.com'
+    );
+    const viaBearer = await handle({
+      event: eventFor(`http://internal${path}`, {
+        headers: { authorization: `Bearer ${bearerToken}` }
+      }),
+      resolve: resolvePassThrough
+    });
+    expect(viaBearer.headers.get('cache-control')).toBeNull();
   });
 });

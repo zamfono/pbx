@@ -77,7 +77,7 @@
 | `provisioning.ringotelAdopt` | `POST /provisioning/ringotel/adopt` | Adopts an existing, empty Ringotel organization (by id and domain) and one of its connections, or a new one, instead of creating them. | owner | yes |
 | `provisioning.ringotelOptions` | `GET /provisioning/ringotel/options` | Lists the Ringotel regions and packages the account offers, the choices provisioning.ringotelSetup takes. | owner | no |
 | `provisioning.ringotelSetup` | `POST /provisioning/ringotel/setup` | Creates the Ringotel organization and connection, and stores their ids; provisioning.ringotelOptions lists the regions and packages it takes. | owner | no |
-| `recordings.audio` | `GET /recordings/{id}/audio` | Returns a recording's mixed audio. | admin | no |
+| `recordings.audio` | `GET /recordings/{id}/audio` | Returns a recording's mixed audio; over MCP, a download link that opens for five minutes. | admin | no |
 | `recordings.delete` | `DELETE /recordings/{id}` | Permanently deletes a call recording and its audio file. | admin | yes |
 | `recordings.list` | `GET /recordings` | Lists call recordings, newest first: one per recorded user and call (see zamfono.help recording-consent). | admin | no |
 | `ringGroups.create` | `POST /ringGroups` | Creates a ring group and assigns it a tenant extension. | admin | no |
@@ -115,7 +115,7 @@
 | `users.setPresence` | `PUT /users/{id}/presence` | Sets a user's do-not-disturb state. | user | no |
 | `users.setVoicemailGreeting` | `PUT /users/{id}/voicemailGreeting` | Sets a user's personal voicemail greeting from a WAV or MP3 upload, as recording it on *96 does. | user | no |
 | `users.update` | `PATCH /users/{id}` | Updates a user's profile; admins write every field, a user only their self-service subset. | user | no |
-| `voicemails.audio` | `GET /voicemails/{id}/audio` | Returns a voicemail's recorded audio. | user | no |
+| `voicemails.audio` | `GET /voicemails/{id}/audio` | Returns a voicemail's recorded audio; over MCP, a download link that opens for five minutes. | user | no |
 | `voicemails.delete` | `DELETE /voicemails/{id}` | Permanently deletes a voicemail and its audio file. | user | yes |
 | `voicemails.list` | `GET /voicemails` | Lists voicemails newest first: a user's own mailbox and their ring groups', every mailbox for an admin. | user | no |
 | `voicemails.markRead` | `PATCH /voicemails/{id}` | Marks a voicemail read or unread. | user | no |
