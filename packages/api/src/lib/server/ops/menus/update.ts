@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-import { recordChange } from '../audit.js';
+import {
+  recordChange,
+  recordFieldChanges,
+  type WireColumns
+} from '../audit.js';
 import {
   deleteForwardTarget,
   insertForwardTarget,
@@ -42,30 +46,9 @@ function resolvedFields(
 }
 
 /** `allowExtensionDialing` is stored as 0/1 and taken as a `boolean` (§11.2, §10.3). */
-function wireValue(
-  field: string,
-  value: number | string
-): boolean | number | string {
-  return field === 'allowExtensionDialing' ? Boolean(value) : value;
-}
-
-/** Records each changed column under this operation's own input field name and wire type, so
- * `audit.undo` replays the diff straight back through `menus.update` (§5.8). */
-function recordFieldChanges(
-  ctx: Context,
-  before: MenuRow,
-  after: ReturnType<typeof resolvedFields>
-): void {
-  for (const field of Object.keys(after) as (keyof typeof after)[]) {
-    if (after[field] !== before[field]) {
-      recordChange(ctx, {
-        field,
-        from: wireValue(field, before[field]),
-        to: wireValue(field, after[field])
-      });
-    }
-  }
-}
+const WIRE_COLUMNS: WireColumns<MenuRow> = {
+  allowExtensionDialing: { decode: Boolean }
+};
 
 /**
  * Inserts the menu's new fallback target when `fallbackTarget` is given, returning its id. The
@@ -114,7 +97,7 @@ export const updateMenu = defineOperation({
       await assertAudioAvailable(ctx.db, input.audioId);
     }
     const after = resolvedFields(before, input);
-    recordFieldChanges(ctx, before, after);
+    recordFieldChanges(ctx, before, after, WIRE_COLUMNS);
     const fallbackTargetId = await resolvedFallbackTargetId(
       ctx,
       before,

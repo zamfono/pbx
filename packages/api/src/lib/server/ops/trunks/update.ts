@@ -1,4 +1,7 @@
+import type { Updateable } from 'kysely';
 import { z } from 'zod';
+
+import type { DB } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { propagate } from '../propagate.js';
@@ -99,7 +102,7 @@ async function assertUpdateAllowed(
 function trunkColumns(
   merged: Merged,
   logLevel: LogLevelColumns | undefined
-): Record<string, unknown> {
+): Updateable<DB['trunks']> {
   return {
     name: merged.name,
     emergency: merged.emergency ? 1 : 0,
@@ -167,7 +170,7 @@ export const update = defineOperation<Input, Output>({
 
     await ctx.db
       .updateTable('trunks')
-      .set(trunkColumns(merged, logLevel) as unknown as TrunkRow)
+      .set(trunkColumns(merged, logLevel))
       .where('id', '=', input.id)
       .execute();
     if (input.hosts) {

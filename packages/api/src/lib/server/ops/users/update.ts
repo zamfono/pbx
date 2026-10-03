@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { HTTP_FORBIDDEN, HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
 import { assertAudioAvailable } from '../audio/_shared.js';
+import { recordFieldChanges } from '../audit.js';
 import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
 import {
@@ -11,7 +12,6 @@ import {
   resolveLogLevel
 } from '../settings/logLevel.js';
 import { defineOperation, OpError, type Context } from '../types.js';
-import { recordFieldChanges } from './_fieldChanges.js';
 import { maybeRenameExtension, type AffectedDevice } from './_rename.js';
 import {
   assertCallerIdDidValid,
@@ -25,6 +25,7 @@ import {
   type UserOut,
   type UserRow
 } from './_shared.js';
+import { USER_WIRE_COLUMNS } from './_wireColumns.js';
 
 /** §10.3 "Users": the self-service subset a `user` actor may `PATCH` on their own profile. */
 const SELF_SERVICE_FIELDS = new Set([
@@ -120,10 +121,7 @@ function nextNullableFlag(
 }
 
 /** `input`'s scalar column values, `before`'s own where `input` omits the field. */
-function resolvedFields(
-  before: UserRow,
-  input: Input
-): Record<string, unknown> {
+function resolvedFields(before: UserRow, input: Input): Partial<UserRow> {
   return {
     name: input.name ?? before.name,
     email: input.email ?? before.email,
@@ -202,7 +200,7 @@ export const update = defineOperation({
     const affectedDevices = await maybeRenameExtension(ctx, input);
     const after = resolvedFields(before, input);
     const logLevel = resolveLogLevel(ctx, before, input);
-    recordFieldChanges(ctx, before, after);
+    recordFieldChanges(ctx, before, after, USER_WIRE_COLUMNS);
     if (logLevel) {
       recordLogLevelChanges(ctx, before, logLevel);
     }

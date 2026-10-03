@@ -4,11 +4,13 @@ import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { recordChange } from '../audit.js';
 import type { Context } from '../types.js';
+import type { SettingsInput } from './_input.js';
+import type { SettingsColumns } from './_shared.js';
 
 type SecretField = 'smtpPassword' | 'ssoClientSecret' | 'ringotelApiToken';
 
 /** The column `secretbox` encrypts each wire secret field into (§5.4, §11.4). */
-const SECRET_COLUMNS: Record<SecretField, string> = {
+const SECRET_COLUMNS: Record<SecretField, keyof SettingsColumns> = {
   smtpPassword: 'smtpPasswordEnc',
   ssoClientSecret: 'ssoClientSecretEnc',
   ringotelApiToken: 'ringotelApiTokenEnc'
@@ -17,8 +19,8 @@ const SECRET_COLUMNS: Record<SecretField, string> = {
 /** Encrypts every `SECRET_COLUMNS` field present in `input`; masked in the audit diff (§5.4). */
 export function applySecretFields(
   ctx: Context,
-  input: Record<string, unknown>,
-  columns: Record<string, unknown>
+  input: SettingsInput,
+  columns: SettingsColumns
 ): void {
   const present = (Object.keys(SECRET_COLUMNS) as SecretField[]).filter(
     field => field in input
@@ -28,9 +30,10 @@ export function applySecretFields(
   }
   const keyring = keyringFromEnv(env);
   for (const field of present) {
-    const value = input[field] as string | null;
+    const value = input[field] ?? null;
     recordChange(ctx, { field, from: null, to: value });
-    columns[SECRET_COLUMNS[field]] =
-      value === null ? null : encrypt(keyring, value);
+    Object.assign(columns, {
+      [SECRET_COLUMNS[field]]: value === null ? null : encrypt(keyring, value)
+    });
   }
 }

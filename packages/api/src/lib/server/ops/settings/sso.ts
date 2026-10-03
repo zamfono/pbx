@@ -2,6 +2,7 @@ import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { OpError, type Context } from '../types.js';
+import type { SettingsInput } from './_input.js';
 import type { SettingsRow } from './_shared.js';
 
 /** A `settings.sso_*` binding field: changing any of these invalidates every `users.sso_subject`. */
@@ -29,13 +30,12 @@ type SsoCheckField = (typeof SSO_CHECK_FIELDS)[number];
  */
 export function assertSsoInvariants(
   before: SettingsRow,
-  input: Record<string, unknown>
+  input: SettingsInput
 ): void {
-  const beforeRecord = before as unknown as Record<string, unknown>;
   const merged = Object.fromEntries(
     SSO_CHECK_FIELDS.map(field => [
       field,
-      field in input ? input[field] : beforeRecord[field]
+      field in input ? input[field] : before[field]
     ])
   ) as Record<SsoCheckField, unknown>;
   if (merged.ssoProvider !== null && merged.ssoClientId === null) {
@@ -75,8 +75,8 @@ export type SsoBinding = { userId: string; ssoSubject: string };
  */
 export async function maybeResetSsoSubjects(
   ctx: Context,
-  before: Record<string, unknown>,
-  input: Record<string, unknown>
+  before: SettingsRow,
+  input: SettingsInput
 ): Promise<void> {
   const changed = SSO_RESET_FIELDS.some(
     field => field in input && input[field] !== before[field]

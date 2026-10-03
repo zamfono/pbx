@@ -246,3 +246,6 @@ export const settingsInputSchema = z
       )
   })
   .strict();
+
+/** A `PATCH /settings` body as `settingsInputSchema` parses it. */
+export type SettingsInput = z.infer<typeof settingsInputSchema>;

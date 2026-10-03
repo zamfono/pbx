@@ -1,16 +1,15 @@
 import * as env from '$app/env/private';
-import { z } from 'zod';
 
 import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
 import { propagate } from '../propagate.js';
 import { defineOperation, OpError, type Role } from '../types.js';
-import { settingsInputSchema } from './_input.js';
+import { settingsInputSchema, type SettingsInput } from './_input.js';
 import {
   checkFieldRole,
   loadSettings,
   rowToWire,
-  type SettingsRow,
+  type SettingsColumns,
   type SettingsWire
 } from './_shared.js';
 import { maybePushTenantProfile, reloadKindsFor } from './changeEffects.js';
@@ -28,16 +27,14 @@ import { assertSsoInvariants, maybeResetSsoSubjects } from './sso.js';
 
 const inputSchema = settingsInputSchema;
 
-type Input = z.infer<typeof inputSchema>;
-
-function assertFieldRoles(input: Input, role: Role): void {
+function assertFieldRoles(input: SettingsInput, role: Role): void {
   for (const field of Object.keys(input) as (keyof SettingsWire)[]) {
     checkFieldRole(field, role);
   }
 }
 
 /** Refuses a `country` outside the ISO 3166-1 alpha-2 set libphonenumber knows (§11.4). */
-function assertKnownCountry(country: Input['country']): void {
+function assertKnownCountry(country: SettingsInput['country']): void {
   if (country !== undefined && !isKnownCountry(country)) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
@@ -47,7 +44,7 @@ function assertKnownCountry(country: Input['country']): void {
 }
 
 /** Refuses `callLogLevel: 'sip'` while the deployment mirrors no SIP traffic (§7, §11.4). */
-function assertCallLogLevel(level: Input['callLogLevel']): void {
+function assertCallLogLevel(level: SettingsInput['callLogLevel']): void {
   if (level === 'sip' && !env.HEP_ENABLED) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
@@ -61,7 +58,7 @@ function assertCallLogLevel(level: Input['callLogLevel']): void {
  * are enforced by `checkFieldRole`; the three read-only columns (`extLength`, `ringotelOrgId`,
  * `ringotelBranchId`) are absent from the schema, so submitting them is a plain 422.
  */
-export const update = defineOperation<Input, SettingsWire>({
+export const update = defineOperation<SettingsInput, SettingsWire>({
   name: 'settings.update',
   description:
     'Updates tenant-wide settings: main number, fallback, country, language, mail relay, feature codes, retention, SSO and more; owner-only fields say so',
@@ -74,21 +71,19 @@ export const update = defineOperation<Input, SettingsWire>({
     assertKnownCountry(input.country);
     await assertNoExtensionCollision(ctx, input.emergencyNumbers);
     assertCallLogLevel(input.callLogLevel);
-    const beforeRecord = before as unknown as Record<string, unknown>;
-    const inputRecord = input as unknown as Record<string, unknown>;
-    assertSsoInvariants(before, inputRecord);
-    const columns: Record<string, unknown> = {};
-    applyPlainFields(ctx, beforeRecord, inputRecord, columns);
+    assertSsoInvariants(before, input);
+    const columns: SettingsColumns = {};
+    applyPlainFields(ctx, before, input, columns);
     applyFeatureCodes(ctx, before, input.featureCodes, columns);
-    applySecretFields(ctx, inputRecord, columns);
+    applySecretFields(ctx, input, columns);
     await applyMainDidId(ctx, before, input, columns);
     await applyHoldMohAudioId(ctx, before, input, columns);
     await applyFallbackTarget(ctx, before, input, columns);
-    await maybeResetSsoSubjects(ctx, beforeRecord, inputRecord);
+    await maybeResetSsoSubjects(ctx, before, input);
     if (Object.keys(columns).length > 0) {
       await ctx.db
         .updateTable('settings')
-        .set(columns as unknown as SettingsRow)
+        .set(columns)
         .where('id', '=', 1)
         .execute();
       // §3.1 "Config propagation": every written column is configuration `core` reads (even a

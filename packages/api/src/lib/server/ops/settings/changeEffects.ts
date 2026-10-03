@@ -1,11 +1,10 @@
 import type { Context } from '../types.js';
+import type { SettingsColumns } from './_shared.js';
 import { pushProfileAfterCommit } from './profilePush.js';
 
 /** The reload kinds a changed set of columns requires (§3.1): `pjsip` and/or `moh`. The hold
  * music is each device endpoint's `moh_suggest` (§10.2 "Hold music"), so it moves PJSIP too. */
-export function reloadKindsFor(
-  columns: Record<string, unknown>
-): ('pjsip' | 'moh')[] {
+export function reloadKindsFor(columns: SettingsColumns): ('pjsip' | 'moh')[] {
   const kinds: ('pjsip' | 'moh')[] = [];
   if (
     'codecsJson' in columns ||
@@ -43,7 +42,7 @@ const TENANT_PROFILE_COLUMNS = new Set([
  */
 export async function maybePushTenantProfile(
   ctx: Context,
-  columns: Record<string, unknown>
+  columns: SettingsColumns
 ): Promise<void> {
   const changed = Object.keys(columns).some(key =>
     TENANT_PROFILE_COLUMNS.has(key)

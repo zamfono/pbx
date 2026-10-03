@@ -6,7 +6,7 @@ import {
 
 import { recordChange } from '../audit.js';
 import { OpError, type Context } from '../types.js';
-import type { SettingsRow } from './_shared.js';
+import type { SettingsColumns, SettingsRow } from './_shared.js';
 
 function parseFeatureCodes(input: Record<string, string>): FeatureCodes {
   try {
@@ -24,7 +24,7 @@ export function applyFeatureCodes(
   ctx: Context,
   before: SettingsRow,
   featureCodes: Record<string, string> | undefined,
-  columns: Record<string, unknown>
+  columns: SettingsColumns
 ): void {
   if (featureCodes === undefined) {
     return;

@@ -37,17 +37,45 @@ export function recordChange(ctx: Context, change: ChangeEntry): void {
   state.changes.push(change);
 }
 
-/** Records one field change per field of `after` whose resolved value differs from `before`'s. */
-export function recordFieldChanges<Fields extends object>(
+/**
+ * How one column appears in the audit diff where it differs from its row: the wire field it maps
+ * to and how its stored value decodes to the wire value (§10.3 "Conventions": storage suffixes
+ * never cross the boundary). A column absent here is its own wire field, with its stored value.
+ */
+export type WireColumns<Row> = {
+  [Column in keyof Row]?: {
+    field?: string;
+    decode?: (stored: Row[Column]) => unknown;
+  };
+};
+
+/**
+ * Records one field change per column of `after` whose value differs from `before`'s, under its
+ * wire field name and value (`wire`), so `audit.undo` replays the diff straight back through the
+ * operation's own input (§5.8). Returns the changed columns.
+ */
+export function recordFieldChanges<Row extends object>(
   ctx: Context,
-  before: Fields,
-  after: Fields
-): void {
-  for (const field of Object.keys(after) as (keyof Fields & string)[]) {
-    if (after[field] !== before[field]) {
-      recordChange(ctx, { field, from: before[field], to: after[field] });
+  before: Row,
+  after: Partial<Row>,
+  wire: WireColumns<Row> = {}
+): Partial<Row> {
+  const changed: Partial<Row> = {};
+  for (const column of Object.keys(after) as (keyof Row & string)[]) {
+    const value = after[column] as Row[typeof column];
+    if (value === before[column]) {
+      continue;
     }
+    const { field = column, decode = (stored: unknown) => stored } =
+      wire[column] ?? {};
+    recordChange(ctx, {
+      field,
+      from: decode(before[column]),
+      to: decode(value)
+    });
+    changed[column] = value;
   }
+  return changed;
 }
 
 /**

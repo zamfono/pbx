@@ -1,85 +1,82 @@
-import { recordChange } from '../audit.js';
+import { recordFieldChanges } from '../audit.js';
 import type { Context } from '../types.js';
-import type { SettingsWire } from './_shared.js';
+import type { SettingsInput } from './_input.js';
+import type { SettingsColumns, SettingsRow } from './_shared.js';
 
-type FieldTransform = {
-  column: string;
-  encode?: (value: unknown) => unknown;
-  decode?: (raw: unknown) => unknown;
-};
-
-const identity = (value: unknown): unknown => value;
-const toBit = (value: unknown): unknown => (value ? 1 : 0);
-const fromBit = (raw: unknown): unknown => raw === 1;
-const toJson = (value: unknown): unknown => JSON.stringify(value);
-const fromJson = (raw: unknown): unknown =>
-  JSON.parse(raw as string) as unknown;
+const toBit = (value: unknown): number => (value ? 1 : 0);
+const fromBit = (stored: number): boolean => stored === 1;
+const toJson = (value: unknown): string => JSON.stringify(value);
+const fromJson = (stored: string): unknown => JSON.parse(stored);
 
 /**
- * Every plain settings field: its column, and, where the wire and column representations differ,
- * how to encode a write and decode the stored value back for the audit diff (§10.3, §11.4).
+ * Every plain settings column: where the wire and column representations differ, the wire field
+ * it is written from, how to encode a write and how to decode the stored value back for the audit
+ * diff (§10.3, §11.4). A column with neither is its own wire field and value.
  */
-const FIELD_TRANSFORMS: Partial<Record<keyof SettingsWire, FieldTransform>> = {
-  companyName: { column: 'companyName' },
-  country: { column: 'country' },
-  timezone: { column: 'timezone' },
-  language: { column: 'language' },
-  smtpHost: { column: 'smtpHost' },
-  smtpPort: { column: 'smtpPort' },
-  smtpSecurity: { column: 'smtpSecurity' },
-  smtpUser: { column: 'smtpUser' },
-  mailFrom: { column: 'mailFrom' },
-  voicemailMaxS: { column: 'voicemailMaxS' },
-  parkingTimeoutS: { column: 'parkingTimeoutS' },
-  recordingRetentionDays: { column: 'recordingRetentionDays' },
-  softDeleteRetentionDays: { column: 'softDeleteRetentionDays' },
-  auditRetentionDays: { column: 'auditRetentionDays' },
-  backupCron: { column: 'backupCron' },
-  tlsReloadHour: { column: 'tlsReloadHour' },
-  callLogLevel: { column: 'callLogLevel' },
-  ssoProvider: { column: 'ssoProvider' },
-  ssoLabel: { column: 'ssoLabel' },
-  ssoIssuer: { column: 'ssoIssuer' },
-  ssoClientId: { column: 'ssoClientId' },
-  ssoTenantId: { column: 'ssoTenantId' },
-  ssoAllowedDomain: { column: 'ssoAllowedDomain' },
-  ringotelMaxRegs: { column: 'ringotelMaxRegs' },
-  clir: { column: 'clir', encode: toBit, decode: fromBit },
-  rejectAnonymous: {
-    column: 'rejectAnonymous',
-    encode: toBit,
-    decode: fromBit
-  },
-  autoUpdate: { column: 'autoUpdate', encode: toBit, decode: fromBit },
-  emergencyNumbers: {
-    column: 'emergencyNumbersJson',
+const PLAIN_COLUMNS: {
+  [Column in keyof SettingsRow]?: {
+    field?: keyof SettingsInput;
+    encode?: (value: unknown) => SettingsRow[Column];
+    decode?: (stored: SettingsRow[Column]) => unknown;
+  };
+} = {
+  companyName: {},
+  country: {},
+  timezone: {},
+  language: {},
+  smtpHost: {},
+  smtpPort: {},
+  smtpSecurity: {},
+  smtpUser: {},
+  mailFrom: {},
+  voicemailMaxS: {},
+  parkingTimeoutS: {},
+  recordingRetentionDays: {},
+  softDeleteRetentionDays: {},
+  auditRetentionDays: {},
+  backupCron: {},
+  tlsReloadHour: {},
+  callLogLevel: {},
+  ssoProvider: {},
+  ssoLabel: {},
+  ssoIssuer: {},
+  ssoClientId: {},
+  ssoTenantId: {},
+  ssoAllowedDomain: {},
+  ringotelMaxRegs: {},
+  clir: { encode: toBit, decode: fromBit },
+  rejectAnonymous: { encode: toBit, decode: fromBit },
+  autoUpdate: { encode: toBit, decode: fromBit },
+  emergencyNumbersJson: {
+    field: 'emergencyNumbers',
     encode: toJson,
     decode: fromJson
   },
-  codecs: { column: 'codecsJson', encode: toJson, decode: fromJson }
+  codecsJson: { field: 'codecs', encode: toJson, decode: fromJson }
 };
 
-/** Applies every `FIELD_TRANSFORMS` field present in `input` whose encoded value changed. */
+/** Applies every `PLAIN_COLUMNS` column whose wire field is present in `input` and whose encoded
+ * value changed. */
 export function applyPlainFields(
   ctx: Context,
-  before: Record<string, unknown>,
-  input: Record<string, unknown>,
-  columns: Record<string, unknown>
+  before: SettingsRow,
+  input: SettingsInput,
+  columns: SettingsColumns
 ): void {
-  for (const [field, transform] of Object.entries(FIELD_TRANSFORMS)) {
-    if (!(field in input)) {
-      continue;
-    }
-    const encode = transform.encode ?? identity;
-    const decode = transform.decode ?? identity;
-    const encoded = encode(input[field]);
-    if (encoded !== before[transform.column]) {
-      recordChange(ctx, {
-        field,
-        from: decode(before[transform.column]),
-        to: input[field]
-      });
-      columns[transform.column] = encoded;
+  const after: Record<string, unknown> = {};
+  for (const [column, plain] of Object.entries(PLAIN_COLUMNS)) {
+    const field = plain.field ?? (column as keyof SettingsInput);
+    if (field in input) {
+      after[column] = plain.encode ? plain.encode(input[field]) : input[field];
     }
   }
+  Object.assign(
+    columns,
+    recordFieldChanges(
+      ctx,
+      before,
+      after as Partial<SettingsRow>,
+      PLAIN_COLUMNS
+    )
+  );
 }

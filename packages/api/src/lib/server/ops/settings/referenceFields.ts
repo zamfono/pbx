@@ -5,7 +5,7 @@ import { createTarget } from '../forwardTargets.js';
 import { type TargetSpec } from '../forwardTargetSchema.js';
 import { resolveOptionalTarget } from '../forwardTargetSpec.js';
 import { OpError, type Context } from '../types.js';
-import type { SettingsRow } from './_shared.js';
+import type { SettingsColumns, SettingsRow } from './_shared.js';
 
 /** The `+` and digits shape of a numeric DID (§9.4 "Caller-ID"): only such a DID may be presented. */
 const NUMERIC_NUMBER = /^\+[0-9]+$/u;
@@ -23,7 +23,7 @@ export async function applyMainDidId(
   ctx: Context,
   before: SettingsRow,
   input: ReferenceFieldInput,
-  columns: Record<string, unknown>
+  columns: SettingsColumns
 ): Promise<void> {
   if (input.mainDidId === undefined || input.mainDidId === before.mainDidId) {
     return;
@@ -53,7 +53,7 @@ export async function applyHoldMohAudioId(
   ctx: Context,
   before: SettingsRow,
   input: ReferenceFieldInput,
-  columns: Record<string, unknown>
+  columns: SettingsColumns
 ): Promise<void> {
   if (
     input.holdMohAudioId === undefined ||
@@ -90,7 +90,7 @@ export async function applyFallbackTarget(
   ctx: Context,
   before: SettingsRow,
   input: ReferenceFieldInput,
-  columns: Record<string, unknown>
+  columns: SettingsColumns
 ): Promise<void> {
   if (input.fallbackTarget === undefined) {
     return;

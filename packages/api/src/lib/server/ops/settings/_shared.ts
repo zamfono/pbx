@@ -1,4 +1,4 @@
-import type { Selectable } from 'kysely';
+import type { Selectable, Updateable } from 'kysely';
 
 import {
   HTTP_FORBIDDEN,
@@ -13,6 +13,8 @@ import type { Codec } from '../trunks/_shared.js';
 import { OpError, type Role } from '../types.js';
 
 export type SettingsRow = Selectable<DB['settings']>;
+/** The `settings` columns one `PATCH /settings` writes. */
+export type SettingsColumns = Updateable<DB['settings']>;
 
 export const LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'ru'] as const;
 export type Language = (typeof LANGUAGES)[number];
