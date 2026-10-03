@@ -8,7 +8,7 @@ import { epochSeconds, type Db } from '@zamfono/shared';
 import type { Actor } from '../ops/types.js';
 import { isRole, verifyAccessToken, verifyDownloadToken } from './jwt.js';
 
-const BEARER_PREFIX = 'Bearer ';
+export const BEARER_PREFIX = 'Bearer ';
 /** The query parameter a download link carries its token in (RFC 6750 §2.3, §10.5). */
 export const ACCESS_TOKEN_PARAM = 'access_token';
 

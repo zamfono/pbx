@@ -1,7 +1,12 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { HTTP_UNPROCESSABLE_CONTENT, MS_PER_DAY } from '@zamfono/shared';
+import {
+  addMsIso,
+  HTTP_UNPROCESSABLE_CONTENT,
+  MS_PER_DAY,
+  type LogLevelColumns
+} from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { OpError, type Context } from '../types.js';
@@ -18,12 +23,6 @@ const DEFAULT_OVERRIDE_DAYS = 7;
  */
 export const LOG_LEVEL_OVERRIDES = ['events', 'qos', 'sip'] as const;
 export type LogLevelOverride = (typeof LOG_LEVEL_OVERRIDES)[number];
-
-/** The `log_level` and `log_level_expires_at` pair an entity carries (§7, §11.2). */
-export type LogLevelColumns = {
-  logLevel: string | null;
-  logLevelExpiresAt: string | null;
-};
 
 /** The two override fields `users.update`, `trunks.update` and `ringGroups.update` accept (§7). */
 export const logLevelInputFields = {
@@ -57,9 +56,7 @@ function assertLevelAvailable(level: string): void {
 }
 
 function defaultExpiry(now: string): string {
-  return new Date(
-    Date.parse(now) + DEFAULT_OVERRIDE_DAYS * MS_PER_DAY
-  ).toISOString();
+  return addMsIso(now, DEFAULT_OVERRIDE_DAYS * MS_PER_DAY);
 }
 
 /**

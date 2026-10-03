@@ -9,12 +9,12 @@ import {
   resolveVersion
 } from '@zamfono/shared';
 
+import { BEARER_PREFIX } from '#lib/server/auth/bearer.js';
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { getDb } from '#lib/server/db.js';
 import { certSyncStatus } from '#lib/server/jobs/certSync.js';
 import { renderMetrics } from '#lib/server/metrics.js';
 
-const BEARER_PREFIX = 'Bearer ';
 const PROMETHEUS_CONTENT_TYPE = 'text/plain; version=0.0.4';
 
 /** `core`'s own ARI connection state (§7), read the same way `/healthz` reads it. */

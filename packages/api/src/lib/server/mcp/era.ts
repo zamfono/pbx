@@ -24,7 +24,7 @@ export const SUPPORTED_PROTOCOL_VERSIONS = [
   LEGACY_PROTOCOL_VERSION
 ];
 export const SESSION_ID_HEADER = 'mcp-session-id';
-const PROTOCOL_VERSION_HEADER = 'mcp-protocol-version';
+export const PROTOCOL_VERSION_HEADER = 'mcp-protocol-version';
 /** The legacy revisions `initialize` can negotiate: the one §10.5 names. */
 const LEGACY_PROTOCOL_VERSIONS: readonly string[] = [LEGACY_PROTOCOL_VERSION];
 

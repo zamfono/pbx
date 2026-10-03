@@ -2,6 +2,8 @@
  * The per-call diagnostics level (§7): validating `settings.call_log_level` into its `LogLevel`
  * and raising a call's level by the overrides of the user, trunk and ring group that route it.
  */
+import type { LogLevelColumns } from '@zamfono/shared';
+
 import { effectiveLevel, type CallLog, type LogLevel } from '../callLog.js';
 
 const LOG_LEVELS: ReadonlySet<LogLevel> = new Set([
@@ -23,12 +25,6 @@ export function toLogLevel(raw: string): LogLevel {
 // default (§7).
 const OVERRIDE_LEVELS: ReadonlySet<string> = new Set(['events', 'qos', 'sip']);
 
-/** A `users`, `trunks` or `ring_groups` row's diagnostics override (§7, §11.2). */
-type LevelOverrideRow = {
-  logLevel: string | null;
-  logLevelExpiresAt: string | null;
-};
-
 /**
  * Raises `log`'s level to `row`'s override when it is set, unexpired and higher (§7: the level is
  * "the maximum of the tenant default and the overrides of the user, the trunk and the ring group
@@ -36,7 +32,7 @@ type LevelOverrideRow = {
  */
 export function raiseLogLevel(
   log: CallLog,
-  row: LevelOverrideRow | undefined,
+  row: LogLevelColumns | undefined,
   nowIso: string
 ): void {
   const override = row?.logLevel ?? null;

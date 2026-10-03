@@ -8,7 +8,6 @@ import {
   HTTP_SERVICE_UNAVAILABLE
 } from '@zamfono/shared';
 
-import { originFromEnv } from '#lib/server/auth/authorizationResponse.js';
 import {
   paramsFromPayload,
   resolveClient,
@@ -20,6 +19,7 @@ import { SSO_COOKIE } from '#lib/server/auth/ssoCookie.js';
 import { ssoConfigFromSettings } from '#lib/server/auth/ssoSettings.js';
 import { getDb } from '#lib/server/db.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
+import { originFromEnv } from '#lib/server/stackAddress.js';
 
 const RANDOM_TOKEN_BYTES = 32;
 

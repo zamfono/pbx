@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
-import { newId } from '@zamfono/shared';
-
+import { insertRunningRun } from '#lib/server/jobs/backup.js';
 import { queueRun } from '#lib/server/jobs/cron.js';
 
 import { afterCommit } from '../afterCommit.js';
@@ -44,26 +43,7 @@ export const runsStart = defineOperation<Input, BackupRunWire>({
       input.targetId,
       'backups: target not found'
     );
-    const id = newId();
-    await ctx.db
-      .insertInto('backupRuns')
-      .values({
-        id,
-        targetId: target.id,
-        status: 'running',
-        snapshotId: null,
-        bytesAdded: null,
-        bytesTotal: null,
-        error: null,
-        startedAt: ctx.now,
-        finishedAt: null
-      })
-      .execute();
-    const row = await ctx.db
-      .selectFrom('backupRuns')
-      .selectAll()
-      .where('id', '=', id)
-      .executeTakeFirstOrThrow();
+    const row = await insertRunningRun(ctx.db, target.id, ctx.now);
     // After the commit: the scheduler reads the row outside this transaction.
     afterCommit(ctx, () =>
       Promise.resolve(

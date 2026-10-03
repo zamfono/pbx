@@ -2,10 +2,12 @@ import path from 'node:path';
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
+import { RECORDINGS_SUBDIR } from '@zamfono/shared';
+
 import { downloadAudio } from '#lib/server/audio/transcode.js';
 
 import { defineOperation } from '../types.js';
-import { loadRecording, RECORDINGS_SUBDIR } from './_shared.js';
+import { loadRecording } from './_shared.js';
 
 const inputSchema = z
   .object({

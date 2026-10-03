@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { MS_PER_DAY, MS_PER_HOUR, type Db } from '@zamfono/shared';
 
+import { sha256Hex } from '../hash.js';
 import { makeTestDb } from '../testDb.js';
 import { upsertClient } from './clients.js';
 import {
-  hashToken,
   issueRefresh,
   issueResetToken,
   redeemResetToken,
@@ -34,9 +34,9 @@ async function seedClient(db: Db, clientId: string): Promise<void> {
   );
 }
 
-describe('hashToken', () => {
+describe('sha256Hex', () => {
   it('is the sha256 hex digest of the raw token', () => {
-    expect(hashToken('raw')).toMatch(/^[0-9a-f]{64}$/u);
+    expect(sha256Hex('raw')).toMatch(/^[0-9a-f]{64}$/u);
   });
 });
 
@@ -92,7 +92,7 @@ describe('issueRefresh / rotateRefresh', () => {
     const secondRow = await db
       .selectFrom('tokens')
       .select('revokedAt')
-      .where('tokenHash', '=', hashToken(second.raw))
+      .where('tokenHash', '=', sha256Hex(second.raw))
       .executeTakeFirstOrThrow();
     expect(secondRow.revokedAt).not.toBeNull();
   });
@@ -115,7 +115,7 @@ describe('issueRefresh / rotateRefresh', () => {
     const nextRow = await db
       .selectFrom('tokens')
       .select('revokedAt')
-      .where('tokenHash', '=', hashToken(rotated.next.raw))
+      .where('tokenHash', '=', sha256Hex(rotated.next.raw))
       .executeTakeFirstOrThrow();
     expect(nextRow.revokedAt).toBeNull();
   });
@@ -132,12 +132,12 @@ describe('revokeUserTokens', () => {
     const rowA = await db
       .selectFrom('tokens')
       .select('revokedAt')
-      .where('tokenHash', '=', hashToken(forA.raw))
+      .where('tokenHash', '=', sha256Hex(forA.raw))
       .executeTakeFirstOrThrow();
     const rowB = await db
       .selectFrom('tokens')
       .select('revokedAt')
-      .where('tokenHash', '=', hashToken(forB.raw))
+      .where('tokenHash', '=', sha256Hex(forB.raw))
       .executeTakeFirstOrThrow();
     expect(rowA.revokedAt).not.toBeNull();
     expect(rowB.revokedAt).toBeNull();

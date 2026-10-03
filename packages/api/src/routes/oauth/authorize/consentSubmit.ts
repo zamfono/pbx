@@ -4,10 +4,7 @@ import pino from 'pino';
 
 import { HTTP_BAD_REQUEST, HTTP_FOUND, nowIso } from '@zamfono/shared';
 
-import {
-  authorizationErrorRedirect,
-  originFromEnv
-} from '#lib/server/auth/authorizationResponse.js';
+import { authorizationErrorRedirect } from '#lib/server/auth/authorizationResponse.js';
 import {
   clientMetaFor,
   requestState
@@ -22,6 +19,7 @@ import { loginRedirect } from '#lib/server/auth/loginRedirect.js';
 import { unsealCookie } from '#lib/server/auth/sealedCookie.js';
 import { getDb } from '#lib/server/db.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
+import { originFromEnv } from '#lib/server/stackAddress.js';
 
 const ACCESS_DENIED = 'access_denied';
 const SERVER_ERROR = 'server_error';

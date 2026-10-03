@@ -7,7 +7,7 @@
  * reload through `core`. Runs on a poll, and can be run early by `notifyCertSync()` when the
  * hook's own `POST /internal/certificate` reaches `api` (routes/internal/certificate/+server.ts).
  */
-import { createHash, X509Certificate } from 'node:crypto';
+import { X509Certificate } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import * as env from '$app/env/private';
@@ -16,6 +16,7 @@ import pino from 'pino';
 import type { Db } from '@zamfono/shared';
 
 import type { CoreClient } from '../coreClient.js';
+import { sha256Hex } from '../hash.js';
 import {
   copyCertificate,
   findCaddyCert,
@@ -40,10 +41,6 @@ export type CertSyncDeps = {
   caddyDataDir?: string;
   now?: () => Date;
 };
-
-function sha256(data: Buffer): string {
-  return createHash('sha256').update(data).digest('hex');
-}
 
 /** Whether `certPem` is self-signed (its own issuer, §6.4 "Fresh stack" placeholder), or unparsable. */
 function isSelfSigned(certPem: Buffer): boolean {
@@ -116,8 +113,9 @@ export class CertSync {
       );
       return 'ok';
     }
-    const sourceHash = sha256(sourceCrt);
-    const upToDate = currentCrt !== null && sha256(currentCrt) === sourceHash;
+    const sourceHash = sha256Hex(sourceCrt);
+    const upToDate =
+      currentCrt !== null && sha256Hex(currentCrt) === sourceHash;
     if (upToDate && this.#reloadPendingHash !== sourceHash) {
       this.#pending = undefined;
       return 'ok';

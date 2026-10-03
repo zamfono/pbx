@@ -1,12 +1,18 @@
 import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
-import type { Db, DB, DiversionPolicy, TrunkStatus } from '@zamfono/shared';
+import type {
+  Db,
+  DB,
+  DiversionPolicy,
+  LogLevelColumns,
+  TrunkStatus
+} from '@zamfono/shared';
 
 import { liveRow } from '../rows.js';
-import { logLevelWire, type LogLevelColumns } from '../settings/logLevel.js';
+import { logLevelWire } from '../settings/logLevel.js';
 
-/** The highest TCP/UDP port number, shared by create's and update's host schemas. */
+/** The highest TCP/UDP port number: a trunk host's and the mail relay's. */
 export const MAX_PORT = 65535;
 
 /** The trunk offer codecs a client or trunk list may name (§9.1, §9.4); the image ships no others. */

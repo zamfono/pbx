@@ -17,9 +17,14 @@ export function nowIso(): string {
   return new Date().toISOString();
 }
 
+/** The ISO instant `ms` milliseconds after `iso` (before it for a negative `ms`). */
+export function addMsIso(iso: string, ms: number): string {
+  return new Date(Date.parse(iso) + ms).toISOString();
+}
+
 /** `now`, `days` earlier, as the ISO instant every retention window compares its `_at` column against. */
 export function cutoffIso(now: string, days: number): string {
-  return new Date(Date.parse(now) - days * MS_PER_DAY).toISOString();
+  return addMsIso(now, -days * MS_PER_DAY);
 }
 
 /** The instant `ms` in whole seconds since the epoch, the unit JWT and sealed-cookie expiries count in. */

@@ -4,7 +4,6 @@ import { z } from 'zod';
 
 import { HTTP_FOUND } from '@zamfono/shared';
 
-import { originFromEnv } from '#lib/server/auth/authorizationResponse.js';
 import {
   AuthorizePayloadSchema,
   lookupUser,
@@ -21,6 +20,7 @@ import { getDb } from '#lib/server/db.js';
 import { limiter } from '#lib/server/limiter.js';
 import { accountLockKey } from '#lib/server/ops/users/_accountLock.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
+import { originFromEnv } from '#lib/server/stackAddress.js';
 
 /** The login form's own fields, on top of the outer request's client parameters (§5.2). The
  *  leading underscore keeps the password out of the re-rendered page: SvelteKit repopulates a

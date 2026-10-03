@@ -1,11 +1,15 @@
 import type { Selectable, Transaction } from 'kysely';
 
-import { HTTP_UNPROCESSABLE_CONTENT, type DB } from '@zamfono/shared';
+import {
+  HTTP_UNPROCESSABLE_CONTENT,
+  type DB,
+  type LogLevelColumns
+} from '@zamfono/shared';
 
 import { assertAudioAvailable } from '../audio/_shared.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { liveRow } from '../rows.js';
-import { logLevelWire, type LogLevelColumns } from '../settings/logLevel.js';
+import { logLevelWire } from '../settings/logLevel.js';
 import { OpError } from '../types.js';
 import { ringGroupMembers, type RingGroupMemberOut } from './_members.js';
 

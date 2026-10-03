@@ -16,3 +16,6 @@ export const HTTP_TOO_MANY_REQUESTS = 429;
 export const HTTP_INTERNAL_SERVER_ERROR = 500;
 export const HTTP_BAD_GATEWAY = 502;
 export const HTTP_SERVICE_UNAVAILABLE = 503;
+
+/** The media type of an RFC 9457 problem details body. */
+export const PROBLEM_CONTENT_TYPE = 'application/problem+json';

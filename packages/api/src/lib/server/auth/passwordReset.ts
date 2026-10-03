@@ -17,8 +17,8 @@ import { MIN_PASSWORD_LENGTH } from '#lib/auth/passwordPolicy.js';
 import { addressKey } from '../addressKey.js';
 import { limiter } from '../limiter.js';
 import { sendMail } from '../mail/index.js';
+import { setupLinkFor } from '../ops/users/_setupMail.js';
 import { keyringFromEnv } from '../secretbox.js';
-import { originFromEnv } from './authorizationResponse.js';
 import { hashPassword } from './password.js';
 import {
   issueResetToken,
@@ -29,7 +29,6 @@ import {
 const logger = pino({ name: 'auth-reset-request' });
 // Where `src/routes/auth/set-password` is mounted; a self-service reset mail's link opens this
 // page directly (§5.2 "Set password", §10.2 "Mail").
-const SET_PASSWORD_PATH = '/auth/set-password';
 
 /** `true` while `settings.smtp_host` is set (§10.2 "Without a relay"). */
 export async function relayConfigured(db: Db): Promise<boolean> {
@@ -50,7 +49,7 @@ function sendResetMail(db: Db, userId: string): void {
         kind: 'reset',
         to: { userId },
         values: {
-          link: `${originFromEnv()}${SET_PASSWORD_PATH}?token=${raw}`,
+          link: setupLinkFor(raw),
           linkExpiresAt: expiresAt
         }
       })

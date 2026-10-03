@@ -1,10 +1,13 @@
 import pino from 'pino';
 
-import { HTTP_INTERNAL_SERVER_ERROR, isRecord } from '@zamfono/shared';
+import {
+  HTTP_INTERNAL_SERVER_ERROR,
+  isRecord,
+  PROBLEM_CONTENT_TYPE
+} from '@zamfono/shared';
 
 import { OpError } from './ops/types.js';
 
-const PROBLEM_CONTENT_TYPE = 'application/problem+json';
 const logger = pino({ name: 'rest' });
 
 /**

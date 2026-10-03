@@ -6,7 +6,11 @@
  */
 import type http from 'node:http';
 
-import { HTTP_BAD_REQUEST, HTTP_OK } from '@zamfono/shared';
+import {
+  HTTP_BAD_REQUEST,
+  HTTP_OK,
+  PROBLEM_CONTENT_TYPE
+} from '@zamfono/shared';
 
 import { ActionError } from '../calls/actionError.js';
 import type { CallActions } from '../calls/actions.js';
@@ -18,7 +22,6 @@ import {
 } from './actionTable.js';
 import { readJsonBody, respondJson } from './configChanged.js';
 
-const PROBLEM_CONTENT_TYPE = 'application/problem+json';
 // Action bodies are a few ids and a dial string; this only bounds a request from the internal
 // network's one client (§3.1).
 const MAX_ACTION_BODY_BYTES = 65536;

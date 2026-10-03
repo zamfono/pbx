@@ -7,8 +7,9 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { MIN_PASSWORD_LENGTH } from '#lib/auth/passwordPolicy.js';
 import { verifyPassword } from '#lib/server/auth/password.js';
-import { hashToken, issueResetToken } from '#lib/server/auth/tokens.js';
+import { issueResetToken } from '#lib/server/auth/tokens.js';
 import { getDb } from '#lib/server/db.js';
+import { sha256Hex } from '#lib/server/hash.js';
 
 import { POST } from '../reset/+server.js';
 import { load } from './+page.server.js';
@@ -68,7 +69,7 @@ async function tokenRevoked(raw: string): Promise<boolean> {
   const row = await getDb()
     .selectFrom('tokens')
     .select('revokedAt')
-    .where('tokenHash', '=', hashToken(raw))
+    .where('tokenHash', '=', sha256Hex(raw))
     .executeTakeFirstOrThrow();
   return row.revokedAt !== null;
 }

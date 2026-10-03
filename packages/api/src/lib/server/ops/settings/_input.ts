@@ -5,7 +5,7 @@ import { isIanaTimeZone } from '@zamfono/shared';
 import { isCronExpression } from '#lib/server/jobs/cronExpression.js';
 
 import { targetSpecSchema } from '../forwardTargetSchema.js';
-import { CODECS } from '../trunks/_shared.js';
+import { CODECS, MAX_PORT } from '../trunks/_shared.js';
 import {
   CALL_LOG_LEVELS,
   LANGUAGES,
@@ -13,7 +13,6 @@ import {
   SSO_PROVIDERS
 } from './_shared.js';
 
-const MAX_SMTP_PORT = 65535;
 const MAX_TLS_RELOAD_HOUR = 23;
 const MIN_AUDIT_RETENTION_DAYS = 30;
 const COUNTRY_CODE_LENGTH = 2;
@@ -61,7 +60,7 @@ export const settingsInputSchema = z
       .number()
       .int()
       .min(1)
-      .max(MAX_SMTP_PORT)
+      .max(MAX_PORT)
       .optional()
       .describe('The mail relay port, 465 by default. Owner-only.'),
     smtpSecurity: z

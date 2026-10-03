@@ -1,4 +1,4 @@
-import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT, isE164 } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { createTarget } from '../forwardTargets.js';
@@ -7,8 +7,6 @@ import { resolveOptionalTarget } from '../forwardTargetSpec.js';
 import { OpError, type Context } from '../types.js';
 import type { SettingsColumns, SettingsRow } from './_shared.js';
 
-/** The `+` and digits shape of a numeric DID (§9.4 "Caller-ID"): only such a DID may be presented. */
-const NUMERIC_NUMBER = /^\+[0-9]+$/u;
 const MOH_KIND = 'moh';
 
 /** The `settings.update` fields that name another row, as the helpers below read them. */
@@ -34,7 +32,7 @@ export async function applyMainDidId(
     .where('id', '=', input.mainDidId)
     .where('deletedAt', 'is', null)
     .executeTakeFirst();
-  if (!did || !NUMERIC_NUMBER.test(did.number)) {
+  if (!did || !isE164(did.number)) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
       'settings: mainDidId must be a live numeric DID'

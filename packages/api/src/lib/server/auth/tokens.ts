@@ -1,6 +1,8 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 
-import { MS_PER_DAY, MS_PER_HOUR, type Db } from '@zamfono/shared';
+import { addMsIso, MS_PER_DAY, MS_PER_HOUR, type Db } from '@zamfono/shared';
+
+import { sha256Hex } from '../hash.js';
 
 // §11.2 `tokens`: refresh tokens rotate every 30 days, a setup link is valid 7 days, a
 // self-requested reset link 1 hour.
@@ -11,17 +13,8 @@ const REFRESH_TOKEN_TTL_MS = REFRESH_TOKEN_TTL_DAYS * MS_PER_DAY;
 const SETUP_TOKEN_TTL_MS = SETUP_TOKEN_TTL_DAYS * MS_PER_DAY;
 const RESET_TOKEN_TTL_MS = MS_PER_HOUR;
 
-/** SHA-256 hex of `raw`; the only form a refresh or reset token is ever stored in (§5.2, §11.2). */
-export function hashToken(raw: string): string {
-  return createHash('sha256').update(raw).digest('hex');
-}
-
 function generateRawToken(): string {
   return randomBytes(RAW_TOKEN_BYTES).toString('base64url');
-}
-
-function addMs(iso: string, ms: number): string {
-  return new Date(new Date(iso).getTime() + ms).toISOString();
 }
 
 /** Issues a 30-day refresh token for `userId`/`clientId`, returning the raw value once. */
@@ -32,11 +25,11 @@ export async function issueRefresh(
   now: string
 ): Promise<{ raw: string; expiresAt: string }> {
   const raw = generateRawToken();
-  const expiresAt = addMs(now, REFRESH_TOKEN_TTL_MS);
+  const expiresAt = addMsIso(now, REFRESH_TOKEN_TTL_MS);
   await db
     .insertInto('tokens')
     .values({
-      tokenHash: hashToken(raw),
+      tokenHash: sha256Hex(raw),
       userId,
       kind: 'refresh',
       clientId,
@@ -86,7 +79,7 @@ export async function rotateRefresh(
     }
   | { ok: false; reason: 'unknown' | 'expired' | 'replayed' }
 > {
-  const tokenHash = hashToken(raw);
+  const tokenHash = sha256Hex(raw);
   const row = await db
     .selectFrom('tokens')
     .select(['userId', 'clientId', 'expiresAt', 'revokedAt'])
@@ -127,11 +120,11 @@ export async function issueResetToken(
 ): Promise<{ raw: string; expiresAt: string }> {
   const ttlMs = kind === 'setup' ? SETUP_TOKEN_TTL_MS : RESET_TOKEN_TTL_MS;
   const raw = generateRawToken();
-  const expiresAt = addMs(now, ttlMs);
+  const expiresAt = addMsIso(now, ttlMs);
   await db
     .insertInto('tokens')
     .values({
-      tokenHash: hashToken(raw),
+      tokenHash: sha256Hex(raw),
       userId,
       kind: 'reset',
       clientId: null,
@@ -143,29 +136,37 @@ export async function issueResetToken(
   return { raw, expiresAt };
 }
 
+/** The user a set-password token redeems for, `null` for a redeemed, expired or unknown one. */
+export async function liveResetTokenUser(
+  db: Db,
+  raw: string,
+  now: string
+): Promise<string | null> {
+  const row = await db
+    .selectFrom('tokens')
+    .select('userId')
+    .where('tokenHash', '=', sha256Hex(raw))
+    .where('kind', '=', 'reset')
+    .where('revokedAt', 'is', null)
+    .where('expiresAt', '>', now)
+    .executeTakeFirst();
+  return row?.userId ?? null;
+}
+
 /** Redeems a set-password token: a redeemed, expired or unknown token fails; success revokes it. */
 export async function redeemResetToken(
   db: Db,
   raw: string,
   now: string
 ): Promise<{ ok: true; userId: string } | { ok: false }> {
-  const tokenHash = hashToken(raw);
-  const row = await db
-    .selectFrom('tokens')
-    .select(['userId', 'expiresAt', 'revokedAt'])
-    .where('tokenHash', '=', tokenHash)
-    .where('kind', '=', 'reset')
-    .executeTakeFirst();
-  if (!row) {
-    return { ok: false };
-  }
-  if (row.revokedAt !== null || row.expiresAt <= now) {
+  const userId = await liveResetTokenUser(db, raw, now);
+  if (userId === null) {
     return { ok: false };
   }
   await db
     .updateTable('tokens')
     .set({ revokedAt: now })
-    .where('tokenHash', '=', tokenHash)
+    .where('tokenHash', '=', sha256Hex(raw))
     .execute();
-  return { ok: true, userId: row.userId };
+  return { ok: true, userId };
 }

@@ -8,6 +8,13 @@ import type { DB } from './generated/db.js';
 
 export type Db = Kysely<DB>;
 
+/** The `log_level` and `log_level_expires_at` pair a `users`, `trunks` or `ring_groups` row
+ * carries: its diagnostics override (§7, §11.2). */
+export type LogLevelColumns = {
+  logLevel: string | null;
+  logLevelExpiresAt: string | null;
+};
+
 // journal_mode/foreign_keys/busy_timeout/synchronous mirror the deployed stack (§3.1, §6.6);
 // setting them on ':memory:' is a harmless no-op, so `openDb(':memory:')` stays test-friendly.
 export function openDb(file: string): Db {

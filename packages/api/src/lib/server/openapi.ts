@@ -1,3 +1,5 @@
+import { PROBLEM_CONTENT_TYPE } from '@zamfono/shared';
+
 import { operationIds, pathParamNames } from './openapiRouteFields.js';
 import {
   inputJsonSchema,
@@ -50,7 +52,6 @@ const OPENAPI_VERSION = '3.1.0';
 const API_VERSION = 'v1';
 const JSON_CONTENT_TYPE = 'application/json';
 const MULTIPART_CONTENT_TYPE = 'multipart/form-data';
-const PROBLEM_CONTENT_TYPE = 'application/problem+json';
 
 const PROBLEM_SCHEMA: JsonSchema = {
   type: 'object',

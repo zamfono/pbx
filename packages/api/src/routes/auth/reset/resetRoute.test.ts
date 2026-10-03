@@ -5,12 +5,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { newId, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import {
-  hashToken,
-  issueRefresh,
-  issueResetToken
-} from '#lib/server/auth/tokens.js';
+import { issueRefresh, issueResetToken } from '#lib/server/auth/tokens.js';
 import { getDb } from '#lib/server/db.js';
+import { sha256Hex } from '#lib/server/hash.js';
 
 import { POST } from './+server.js';
 
@@ -84,7 +81,7 @@ describe('POST /auth/reset', () => {
     await db
       .insertInto('tokens')
       .values({
-        tokenHash: hashToken(rawResetToken),
+        tokenHash: sha256Hex(rawResetToken),
         userId,
         kind: 'reset',
         clientId: null,
@@ -110,7 +107,7 @@ describe('POST /auth/reset', () => {
     const refreshRow = await db
       .selectFrom('tokens')
       .select('revokedAt')
-      .where('tokenHash', '=', hashToken(refresh.raw))
+      .where('tokenHash', '=', sha256Hex(refresh.raw))
       .executeTakeFirstOrThrow();
     expect(refreshRow.revokedAt).not.toBeNull();
   });

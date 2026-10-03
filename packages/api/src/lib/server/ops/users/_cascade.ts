@@ -18,8 +18,6 @@ type DeviceSnapshot = {
   sipUsername: string;
 };
 
-const RINGOTEL_KIND = 'ringotel';
-
 async function loadLiveDevices(
   ctx: Context,
   userId: string
@@ -53,7 +51,7 @@ async function releaseProvisionedDevices(
   ctx: Context,
   devices: DeviceRow[]
 ): Promise<void> {
-  const provisioned = devices.filter(device => device.kind === RINGOTEL_KIND);
+  const provisioned = devices.filter(device => device.kind === 'ringotel');
   if (provisioned.length === 0) {
     return;
   }

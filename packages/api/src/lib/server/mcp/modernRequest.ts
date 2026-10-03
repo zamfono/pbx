@@ -2,6 +2,7 @@ import { HTTP_BAD_REQUEST } from '@zamfono/shared';
 
 import {
   CURRENT_PROTOCOL_VERSION,
+  PROTOCOL_VERSION_HEADER,
   SUPPORTED_PROTOCOL_VERSIONS
 } from './era.js';
 import {
@@ -25,7 +26,6 @@ import {
 // No tool here designates `x-mcp-header` parameters, so no `Mcp-Param-*` header is recognised.
 export const HEADER_MISMATCH = -32020;
 export const UNSUPPORTED_PROTOCOL_VERSION = -32022;
-const PROTOCOL_VERSION_HEADER = 'mcp-protocol-version';
 const METHOD_HEADER = 'mcp-method';
 const NAME_HEADER = 'mcp-name';
 // Header values are visible ASCII, space and tab (RFC 9110 §5.5); anything else travels in the

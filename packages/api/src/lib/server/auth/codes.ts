@@ -1,5 +1,6 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 
+import { pkceS256 } from '../hash.js';
 import { TtlMap } from '../ttlMap.js';
 
 // §5.2: authorization codes live in `api`'s memory for 60 seconds, single-use.
@@ -59,9 +60,7 @@ export class AuthCodeStore {
     if (record.clientId !== clientId || !redirectUriMatches) {
       return null;
     }
-    const computedChallenge = createHash('sha256')
-      .update(codeVerifier)
-      .digest('base64url');
+    const computedChallenge = pkceS256(codeVerifier);
     if (computedChallenge !== record.codeChallenge) {
       return null;
     }

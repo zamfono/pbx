@@ -4,7 +4,6 @@ import pino from 'pino';
 
 import { HTTP_FOUND, nowIso, type Db } from '@zamfono/shared';
 
-import { originFromEnv } from '#lib/server/auth/authorizationResponse.js';
 import { clientMetaFor } from '#lib/server/auth/authorizeRequest.js';
 import { authCodeStore } from '#lib/server/auth/codes.js';
 import { CONSENT_COOKIE } from '#lib/server/auth/consent.js';
@@ -18,11 +17,12 @@ import {
   setSealedCookie,
   unsealCookie
 } from '#lib/server/auth/sealedCookie.js';
-import { finishLogin } from '#lib/server/auth/sso.js';
+import { finishLogin, type FinishLoginParams } from '#lib/server/auth/sso.js';
 import { SSO_COOKIE } from '#lib/server/auth/ssoCookie.js';
 import { ssoConfigFromSettings } from '#lib/server/auth/ssoSettings.js';
 import { getDb } from '#lib/server/db.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
+import { originFromEnv } from '#lib/server/stackAddress.js';
 
 type FinishLoginResult = Awaited<ReturnType<typeof finishLogin>>;
 
@@ -65,13 +65,7 @@ async function finishLoginOrErrorPage(
   db: Db,
   cfg: SsoConfig,
   disc: Discovery,
-  params: {
-    code: string;
-    codeVerifier: string;
-    nonce: string;
-    origin: string;
-    now: string;
-  },
+  params: FinishLoginParams,
   origin: string
 ): Promise<FinishLoginResult> {
   try {

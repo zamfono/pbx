@@ -1,4 +1,3 @@
-import * as privateEnv from '$app/env/private';
 import { z } from 'zod';
 
 import { epochSeconds, HTTP_CONFLICT, nowIso } from '@zamfono/shared';
@@ -159,10 +158,10 @@ export async function rpc(deps: McpDeps, request: Request): Promise<RpcBody> {
   return (await (await handleMcpRequest(deps, request)).json()) as RpcBody;
 }
 
-// `results.ts`'s own `SERVER_INFO`, from the test process's environment (`serverInfo` itself is
+// The `serverInfo` every result carries in its `_meta`, from the test process's environment (`serverInfo` itself is
 // covered by `results.test.ts`).
 export const SERVER_INFO_META = {
-  'io.modelcontextprotocol/serverInfo': serverInfo(privateEnv)
+  'io.modelcontextprotocol/serverInfo': serverInfo()
 };
 
 /** A 2026-07-28 `CallToolResult` whose value is `value`, serialised and structured. */

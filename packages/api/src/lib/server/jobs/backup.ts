@@ -161,6 +161,27 @@ export async function performBackup(
   }
 }
 
+/** Inserts a `running` `backup_runs` row for `targetId` started at `startedAt` (§6.5) and returns it. */
+export async function insertRunningRun(
+  db: Db,
+  targetId: string,
+  startedAt: string
+): Promise<BackupRunRow> {
+  const run: BackupRunRow = {
+    id: newId(),
+    targetId,
+    status: 'running',
+    snapshotId: null,
+    bytesAdded: null,
+    bytesTotal: null,
+    error: null,
+    startedAt,
+    finishedAt: null
+  };
+  await db.insertInto('backupRuns').values(run).execute();
+  return run;
+}
+
 /**
  * Opens a `running` `backup_runs` row for `targetId` (§6.5) and returns it with its live target,
  * ready for `performBackup`. The caller sees the run's id before the backup starts, which is what
@@ -175,18 +196,7 @@ export async function createBackupRun(
   if (!target) {
     throw new Error(`backup: target '${targetId}' not found`);
   }
-  const run: BackupRunRow = {
-    id: newId(),
-    targetId: target.id,
-    status: 'running',
-    snapshotId: null,
-    bytesAdded: null,
-    bytesTotal: null,
-    error: null,
-    startedAt: (deps.now ?? nowIso)(),
-    finishedAt: null
-  };
-  await db.insertInto('backupRuns').values(run).execute();
+  const run = await insertRunningRun(db, target.id, (deps.now ?? nowIso)());
   return { run, target };
 }
 

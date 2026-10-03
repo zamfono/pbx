@@ -1,4 +1,5 @@
 import {
+  addMsIso,
   HTTP_BAD_REQUEST,
   HTTP_CONFLICT,
   HTTP_NOT_FOUND,
@@ -54,7 +55,7 @@ export async function requestUpdate(
       'system.update: UPDATER_TOKEN is not set in .env; update with update.sh on the host (deploy/README.md, step 8)'
     );
   }
-  const since = new Date(Date.parse(now) - BACKUP_MAX_AGE_MS).toISOString();
+  const since = addMsIso(now, -BACKUP_MAX_AGE_MS);
   const backup = await db
     .selectFrom('backupRuns')
     .select('id')

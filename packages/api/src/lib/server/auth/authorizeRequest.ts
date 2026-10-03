@@ -4,10 +4,8 @@ import { z } from 'zod';
 import { HTTP_BAD_REQUEST, type Db } from '@zamfono/shared';
 
 import type { Keyring } from '../secretbox.js';
-import {
-  authorizationErrorRedirect,
-  originFromEnv
-} from './authorizationResponse.js';
+import { originFromEnv } from '../stackAddress.js';
+import { authorizationErrorRedirect } from './authorizationResponse.js';
 import {
   decodeMetadataClientId,
   fetchCimd,

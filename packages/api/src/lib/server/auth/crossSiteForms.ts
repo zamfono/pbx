@@ -13,7 +13,7 @@
 import { HTTP_FORBIDDEN } from '@zamfono/shared';
 
 import { API_PREFIX } from '../restRoutes.js';
-import { originFromEnv } from './authorizationResponse.js';
+import { originFromEnv } from '../stackAddress.js';
 
 // The encodings an HTML form can submit cross-site without a CORS preflight, plus the one
 // SvelteKit's own enhanced forms use; the same list SvelteKit's check guards.
@@ -40,7 +40,7 @@ const CLIENT_PREFIX = `${API_PREFIX}/`;
 // `/internal/certificate` with BusyBox `wget --post-data`, which sends a form content type and
 // no `Origin`. Nothing there reads a cookie, and Caddy answers 404 for the whole prefix, so no
 // browser reaches it.
-const INTERNAL_PREFIX = '/internal/';
+export const INTERNAL_PREFIX = '/internal/';
 
 function isClientEndpoint(pathname: string): boolean {
   return (

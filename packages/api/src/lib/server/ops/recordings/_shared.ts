@@ -3,7 +3,12 @@ import path from 'node:path';
 import * as env from '$app/env/private';
 import type { Selectable, Transaction } from 'kysely';
 
-import { HTTP_NOT_FOUND, type DB } from '@zamfono/shared';
+import {
+  HTTP_NOT_FOUND,
+  recordingFileNames,
+  RECORDINGS_SUBDIR,
+  type DB
+} from '@zamfono/shared';
 
 import { OpError } from '../types.js';
 
@@ -46,10 +51,6 @@ export async function loadRecording(
   return row;
 }
 
-export const RECORDINGS_SUBDIR = 'recordings';
-// The raw pair's names beside `<id>.wav`: Asterisk's 8 kHz `.wav` or 16 kHz `.wav16`.
-const RAW_SUFFIXES = ['-l.wav', '-r.wav', '-l.wav16', '-r.wav16'];
-
 /**
  * Removes a recording's mixed audio file from the media volume, with the raw per-leg pair
  * (`<id>-l.wav`, `<id>-r.wav`, §11.6, or `.wav16` at 16 kHz, §10.2 "Sample rate") it was mixed
@@ -59,9 +60,8 @@ export async function deleteRecordingFile(
   filename: string,
   mediaDir: string = env.MEDIA_DIR
 ): Promise<void> {
-  const base = path.basename(filename, path.extname(filename));
   await Promise.all(
-    [filename, ...RAW_SUFFIXES.map(suffix => `${base}${suffix}`)].map(name =>
+    recordingFileNames(filename).map(name =>
       rm(path.join(mediaDir, RECORDINGS_SUBDIR, name), { force: true })
     )
   );

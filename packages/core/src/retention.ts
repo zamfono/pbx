@@ -8,17 +8,22 @@
 import { readdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 
-import { cutoffIso, MS_PER_DAY, repeat, type Db } from '@zamfono/shared';
+import {
+  cutoffIso,
+  MS_PER_DAY,
+  recordingFileNames,
+  RECORDINGS_SUBDIR,
+  repeat,
+  type Db
+} from '@zamfono/shared';
 
 import { logFailure } from './ari/failures.js';
 import type { Logger } from './ari/types.js';
 import { ignoreMissing } from './fsFailures.js';
 
-const RECORDINGS_DIR_NAME = 'recordings';
 // A participation's raw pair, `<id>-l.wav` and `<id>-r.wav` (§11.6 "raw per-leg call recordings"),
 // or `.wav16` for a 16 kHz recording (§10.2 "Sample rate").
 const RAW_FILE = /-[lr]\.wav(?:16)?$/u;
-const RAW_SUFFIXES = ['-l.wav', '-r.wav', '-l.wav16', '-r.wav16'];
 
 export type RetentionDeps = {
   db: Db;
@@ -40,9 +45,8 @@ async function removeRecordingFiles(
   dir: string,
   filename: string
 ): Promise<void> {
-  const base = path.basename(filename, path.extname(filename));
   await Promise.all(
-    [filename, ...RAW_SUFFIXES.map(suffix => `${base}${suffix}`)].map(name =>
+    recordingFileNames(filename).map(name =>
       rm(path.join(dir, name), { force: true })
     )
   );
@@ -95,7 +99,7 @@ export async function runRetention(
     .select(['id', 'filename'])
     .where('createdAt', '<', before)
     .execute();
-  const recordingsDir = path.join(mediaDir, RECORDINGS_DIR_NAME);
+  const recordingsDir = path.join(mediaDir, RECORDINGS_SUBDIR);
   for (const row of stale) {
     // eslint-disable-next-line no-await-in-loop -- one file at a time; the sweep is not latency-bound
     await removeRecordingFiles(recordingsDir, row.filename);

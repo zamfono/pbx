@@ -1,9 +1,12 @@
+import * as privateEnv from '$app/env/private';
+
 /**
- * The stack's public origin, `https://${fqdn}`: the OAuth issuer, the MCP resource and the base of
- * every absolute link `api` hands out (§5.2).
+ * The stack's public origin, `https://<FQDN>`: the OAuth issuer every authorization response
+ * carries as `iss` (RFC 9207), the MCP resource and the base of every absolute link `api` hands
+ * out (§5.2).
  */
-export function stackOrigin(fqdn: string): string {
-  return `https://${fqdn}`;
+export function originFromEnv(): string {
+  return `https://${privateEnv.FQDN}`;
 }
 
 /**

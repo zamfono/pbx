@@ -13,8 +13,6 @@ import { decrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { pushToRingotel } from '../devices/_ringotelPush.js';
 import type { Context } from '../types.js';
 
-const RINGOTEL_KIND = 'ringotel';
-
 /** The devices a restored entity brings back: a device's own row, or every device of a user. */
 async function restoredDevices(
   ctx: Context,
@@ -54,7 +52,7 @@ export async function restoreProvisionedDevices(
   entityId: string
 ): Promise<void> {
   const devices = (await restoredDevices(ctx, entityKind, entityId)).filter(
-    device => device.kind === RINGOTEL_KIND
+    device => device.kind === 'ringotel'
   );
   for (const device of devices) {
     pushToRingotel(ctx, {

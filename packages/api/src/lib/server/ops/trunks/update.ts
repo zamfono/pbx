@@ -1,14 +1,13 @@
 import type { Updateable } from 'kysely';
 import { z } from 'zod';
 
-import type { DB } from '@zamfono/shared';
+import type { DB, LogLevelColumns } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { propagate } from '../propagate.js';
 import {
   recordLogLevelChanges,
-  resolveLogLevel,
-  type LogLevelColumns
+  resolveLogLevel
 } from '../settings/logLevel.js';
 import { defineOperation, type Context } from '../types.js';
 import { updateInputSchema } from './_inputs.js';

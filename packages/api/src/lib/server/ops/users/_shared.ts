@@ -5,12 +5,13 @@ import {
   HTTP_CONFLICT,
   HTTP_UNPROCESSABLE_CONTENT,
   isE164,
-  type DB
+  type DB,
+  type LogLevelColumns
 } from '@zamfono/shared';
 
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { liveRow } from '../rows.js';
-import { logLevelWire, type LogLevelColumns } from '../settings/logLevel.js';
+import { logLevelWire } from '../settings/logLevel.js';
 import { OpError, type Role } from '../types.js';
 import { accountLockedUntil } from './_accountLock.js';
 import { userExtension } from './_extensions.js';

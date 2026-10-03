@@ -68,6 +68,15 @@ function checkClaims(
   return { email, sub };
 }
 
+/** What the SSO callback hands `finishLogin`: the upstream code and the login's own values. */
+export type FinishLoginParams = {
+  code: string;
+  codeVerifier: string;
+  nonce: string;
+  origin: string;
+  now: string;
+};
+
 /**
  * Completes an SSO login: exchanges `params.code`, validates the `id_token` and binds or matches
  * the user (§5.2 "SSO rules", every bullet).
@@ -76,13 +85,7 @@ export async function finishLogin(
   db: Db,
   cfg: SsoConfig,
   disc: Discovery,
-  params: {
-    code: string;
-    codeVerifier: string;
-    nonce: string;
-    origin: string;
-    now: string;
-  },
+  params: FinishLoginParams,
   fetchImpl: typeof fetch = fetch
 ): Promise<FinishLoginResult> {
   const idToken = await exchangeIdToken(cfg, disc, params, fetchImpl);

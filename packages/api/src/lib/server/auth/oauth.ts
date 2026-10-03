@@ -5,6 +5,7 @@
  */
 import { HTTP_OK } from '@zamfono/shared';
 
+import { sha256Hex } from '../hash.js';
 import {
   GRANT_AUTHORIZATION_CODE,
   GRANT_REFRESH_TOKEN,
@@ -12,7 +13,6 @@ import {
   readForm,
   type BaseDeps
 } from './oauthHttp.js';
-import { hashToken } from './tokens.js';
 
 export type RevokeDeps = BaseDeps;
 
@@ -27,7 +27,7 @@ export async function revokeEndpoint(
     await deps.db
       .updateTable('tokens')
       .set({ revokedAt: deps.now() })
-      .where('tokenHash', '=', hashToken(token))
+      .where('tokenHash', '=', sha256Hex(token))
       .where('revokedAt', 'is', null)
       .execute();
   }

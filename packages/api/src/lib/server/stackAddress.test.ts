@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { stackIpv4, stackOrigin } from './stackAddress.js';
+import { originFromEnv, stackIpv4 } from './stackAddress.js';
 
-describe('stackOrigin', () => {
+describe('originFromEnv', () => {
   it('is the https origin of the FQDN', () => {
-    expect(stackOrigin('pbx.example.com')).toBe('https://pbx.example.com');
+    expect(originFromEnv()).toBe('https://pbx.test');
   });
 });
 

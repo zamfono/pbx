@@ -7,15 +7,15 @@ import { z } from 'zod';
 
 import { isE164 } from '@zamfono/shared';
 
+import { settingsInputSchema } from './ops/settings/_input.js';
 import { isKnownCountry } from './ops/settings/country.js';
+import { MAX_PORT } from './ops/trunks/_shared.js';
 
 // The extension length's floor (§11.4 `ext_length >= 2`) is what leaves room for the nine parking
 // slots `seedExtensions.ts` numbers.
 const EXT_LENGTH_FLOOR = 2;
 const DEFAULT_EXT_LENGTH = 3;
 const DEFAULT_SMTP_PORT = 465;
-const MIN_SMTP_PORT = 1;
-const MAX_SMTP_PORT = 65535;
 const DEFAULT_SMTP_SECURITY = 'tls';
 
 type PrivateEnv = typeof privateEnv;
@@ -109,34 +109,35 @@ export function mainDidFrom(env: SeedEnv): string {
   return value;
 }
 
-/** `SMTP_SECURITY`, `tls` when unset, else one of the column's `CHECK` values (§10.2 "Transport"). */
+/** `SMTP_SECURITY`, `tls` when unset, else a value `settings.update` accepts (§10.2 "Transport"). */
 export function smtpSecurityFrom(env: SeedEnv): 'tls' | 'starttls' {
   const value = env.SMTP_SECURITY;
   if (value === undefined) {
     return DEFAULT_SMTP_SECURITY;
   }
-  if (value !== 'tls' && value !== 'starttls') {
+  const parsed = settingsInputSchema.shape.smtpSecurity
+    .unwrap()
+    .safeParse(value);
+  if (!parsed.success) {
     throw new Error(
       `seed: SMTP_SECURITY must be tls or starttls, got ${value}`
     );
   }
-  return value;
+  return parsed.data;
 }
 
-/** `SMTP_PORT`, parsed and range-checked against the column's `CHECK (BETWEEN 1 AND 65535)`. */
+/** `SMTP_PORT`, parsed and range-checked as `settings.update` checks it. */
 export function smtpPortFrom(env: SeedEnv): number {
   if (env.SMTP_PORT === undefined) {
     return DEFAULT_SMTP_PORT;
   }
-  const parsed = Number(env.SMTP_PORT);
-  if (
-    !Number.isInteger(parsed) ||
-    parsed < MIN_SMTP_PORT ||
-    parsed > MAX_SMTP_PORT
-  ) {
+  const parsed = settingsInputSchema.shape.smtpPort
+    .unwrap()
+    .safeParse(Number(env.SMTP_PORT));
+  if (!parsed.success) {
     throw new Error(
-      `seed: SMTP_PORT must be an integer between ${MIN_SMTP_PORT} and ${MAX_SMTP_PORT}`
+      `seed: SMTP_PORT must be an integer between 1 and ${MAX_PORT}`
     );
   }
-  return parsed;
+  return parsed.data;
 }

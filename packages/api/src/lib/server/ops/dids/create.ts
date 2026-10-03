@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { newId, normalizeInbound } from '@zamfono/shared';
+import { isE164, newId, normalizeInbound } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { createTarget } from '../forwardTargets.js';
@@ -8,9 +8,6 @@ import { targetSpecSchema, type TargetSpec } from '../forwardTargetSchema.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, type Context } from '../types.js';
-
-/** The `+` and digits shape of a numeric DID (§9.4 "Caller-ID"): only such a DID may be presented. */
-const NUMERIC_NUMBER = /^\+[0-9]+$/u;
 
 const inputSchema = z
   .object({
@@ -52,7 +49,7 @@ async function setCallerIdIfUnset(
     .where('id', '=', userId)
     .where('deletedAt', 'is', null)
     .executeTakeFirst();
-  if (user?.calleridDidId === null && NUMERIC_NUMBER.test(number)) {
+  if (user?.calleridDidId === null && isE164(number)) {
     await ctx.db
       .updateTable('users')
       .set({ calleridDidId: didId })

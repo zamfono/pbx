@@ -4,7 +4,7 @@ import { isRecord, resolveVersion } from '@zamfono/shared';
 
 import type { OpError } from '../ops/types.js';
 import { extensionMembers } from '../problem.js';
-import { stackOrigin } from '../stackAddress.js';
+import { originFromEnv } from '../stackAddress.js';
 import { SUPPORTED_PROTOCOL_VERSIONS } from './era.js';
 import type { PromptContent } from './prompts.js';
 
@@ -58,14 +58,12 @@ const ICONS = [
  * The `serverInfo` (`Implementation`) both eras send (§10.5); an icon's `src` is an absolute URI
  * on the stack's own origin.
  */
-export function serverInfo(
-  env: Parameters<typeof resolveVersion>[0] & { FQDN: string }
-): Result {
-  const origin = stackOrigin(env.FQDN);
+export function serverInfo(): Result {
+  const origin = originFromEnv();
   return {
     name: 'zamfono',
     title: 'Zamfono',
-    version: resolveVersion(env).display,
+    version: resolveVersion(privateEnv).display,
     websiteUrl: WEBSITE_URL,
     icons: ICONS.map(({ path, ...icon }) => ({
       src: `${origin}${path}`,
@@ -79,7 +77,7 @@ function complete(fields: Result): Result {
   return {
     resultType: 'complete',
     ...fields,
-    _meta: { [SERVER_INFO_META_KEY]: serverInfo(privateEnv) }
+    _meta: { [SERVER_INFO_META_KEY]: serverInfo() }
   };
 }
 
@@ -95,7 +93,7 @@ export function initializeResult(
   return {
     protocolVersion,
     capabilities: CAPABILITIES,
-    serverInfo: serverInfo(privateEnv),
+    serverInfo: serverInfo(),
     instructions
   };
 }
@@ -171,6 +169,6 @@ export function inputRequiredResult(key: string, elicitation: Result): Result {
     inputRequests: {
       [key]: { method: 'elicitation/create', params: elicitation }
     },
-    _meta: { [SERVER_INFO_META_KEY]: serverInfo(privateEnv) }
+    _meta: { [SERVER_INFO_META_KEY]: serverInfo() }
   };
 }

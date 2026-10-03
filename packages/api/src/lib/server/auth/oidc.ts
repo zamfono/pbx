@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import {
   createLocalJWKSet,
   errors as joseErrors,
@@ -10,6 +9,7 @@ import { z } from 'zod';
 
 import { MS_PER_HOUR } from '@zamfono/shared';
 
+import { pkceS256 } from '../hash.js';
 import { TtlMap } from '../ttlMap.js';
 
 const DISCOVERY_PATH = '/.well-known/openid-configuration';
@@ -82,11 +82,6 @@ export async function discover(
   return doc;
 }
 
-/** RFC 7636 S256: `BASE64URL(SHA256(verifier))`. */
-function s256(verifier: string): string {
-  return createHash('sha256').update(verifier).digest('base64url');
-}
-
 /** The upstream authorization URL for `state`, `nonce` and `codeVerifier`'s S256 challenge; the
  *  caller seals the three into the `zamfono_sso` cookie the callback redeems them from. */
 // eslint-disable-next-line max-params -- the authorization request's own parameters (§5.2 "Login and SSO")
@@ -105,7 +100,7 @@ export function startLogin(
   url.searchParams.set('scope', AUTHORIZATION_SCOPE);
   url.searchParams.set('state', state);
   url.searchParams.set('nonce', nonce);
-  url.searchParams.set('code_challenge', s256(codeVerifier));
+  url.searchParams.set('code_challenge', pkceS256(codeVerifier));
   url.searchParams.set('code_challenge_method', CODE_CHALLENGE_METHOD);
   return url.toString();
 }

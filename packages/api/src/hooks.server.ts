@@ -17,7 +17,10 @@ import {
   authenticateDownloadLink,
   authenticateRequest
 } from '#lib/server/auth/bearer.js';
-import { crossSiteFormRejection } from '#lib/server/auth/crossSiteForms.js';
+import {
+  crossSiteFormRejection,
+  INTERNAL_PREFIX
+} from '#lib/server/auth/crossSiteForms.js';
 import { getDb } from '#lib/server/db.js';
 import { startBackgroundJobs } from '#lib/server/jobs/background.js';
 import { limiter, type LimitKind } from '#lib/server/limiter.js';
@@ -26,7 +29,6 @@ import { problem } from '#lib/server/problem.js';
 import { API_PREFIX } from '#lib/server/restRoutes.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
-const INTERNAL_PREFIX = '/internal';
 const jobsLogger = pino({ name: 'hooks' });
 
 /**

@@ -4,7 +4,7 @@
  */
 import type { Transaction } from 'kysely';
 
-import { cutoffIso, type DB } from '@zamfono/shared';
+import { addMsIso, cutoffIso, type DB } from '@zamfono/shared';
 
 import { CODE_TTL_MS } from '../auth/codes.js';
 
@@ -45,7 +45,7 @@ export async function purgeOauthClients(
   trx: Transaction<DB>,
   now: string
 ): Promise<void> {
-  const inFlightCutoff = new Date(Date.parse(now) - CODE_TTL_MS).toISOString();
+  const inFlightCutoff = addMsIso(now, -CODE_TTL_MS);
   await trx
     .deleteFrom('oauthClients')
     .where('lastLoginAt', '<', inFlightCutoff)
