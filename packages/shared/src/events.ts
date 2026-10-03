@@ -3,7 +3,8 @@
  * event also carries `id` (uuid v7) and `at` (ISO), added by the emitter, as `Envelope`.
  */
 
-import type { MwiMailbox } from './internalApi.js';
+import type { PresenceStatus } from './columnValues.js';
+import type { MwiMailbox, TrunkStatus } from './internalApi.js';
 
 export type Scope =
   'tenant' | `user:${string}` | `ringGroup:${string}` | `menu:${string}`;
@@ -12,7 +13,7 @@ export type Event =
   | {
       type: 'presence';
       userId: string;
-      status: 'available' | 'busy' | 'offline' | 'dnd';
+      status: PresenceStatus;
       peer: string | null;
       ringGroupId: string | null;
     }
@@ -54,7 +55,7 @@ export type Event =
   | {
       type: 'trunk.status';
       trunkId: string;
-      status: 'registered' | 'unreachable' | 'unmonitored' | 'unknown';
+      status: TrunkStatus['status'];
     }
   | { type: 'history.appended'; callId: string }
   | { type: 'backup.started'; targetId: string; runId: string }
@@ -72,10 +73,10 @@ export type Event =
 export type Envelope = Event & { id: string; at: string };
 
 /** An `Envelope` as `/events` subscribers and webhooks receive it (§10.6): without the internal
- * routing field `call.state` carries on `core`'s stream. */
+ * routing fields `call.state` carries on `core`'s stream. */
 export type PublicEnvelope =
   | Exclude<Envelope, { type: 'call.state' }>
-  | Omit<Extract<Envelope, { type: 'call.state' }>, 'userIds'>;
+  | Omit<Extract<Envelope, { type: 'call.state' }>, 'userIds' | 'usersOnly'>;
 
 export function publicEnvelope(envelope: Envelope): PublicEnvelope {
   if (envelope.type !== 'call.state') {

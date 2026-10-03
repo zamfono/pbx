@@ -2,7 +2,9 @@
  * The core↔api internal API (§3, §3.1). `core` serves these on its internal HTTP+WS port; `api`
  * serves `/internal/mail`.
  */
+import type { CallDirection, PresenceStatus } from './columnValues.js';
 import type { Envelope } from './events.js';
+import type { MailboxOwner } from './mwiMailbox.js';
 import type { ZamfonoVersion } from './version.js';
 
 export type ReloadKind = 'pjsip' | 'dialplan' | 'moh';
@@ -18,7 +20,7 @@ export type TrunkStatus = {
 
 export type LiveCall = {
   callId: string;
-  direction: 'inbound' | 'outbound' | 'internal';
+  direction: CallDirection;
   from: string;
   to: string;
   state: 'ringing' | 'up';
@@ -33,7 +35,7 @@ export type LiveCall = {
 };
 
 export type Presence = {
-  status: 'available' | 'busy' | 'offline' | 'dnd';
+  status: PresenceStatus;
   peer: string | null;
   ringGroupId: string | null;
   since: string;
@@ -167,7 +169,7 @@ export type MailRequest =
       kind: 'voicemail';
       /** The call the mail is about, for the log lines of its send (§7); absent for a test mail. */
       callId?: string;
-      to: { userId: string } | { ringGroupId: string };
+      to: MailboxOwner;
       values: {
         callerNumber: string;
         callerName: string;

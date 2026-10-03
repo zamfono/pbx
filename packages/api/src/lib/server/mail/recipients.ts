@@ -1,4 +1,4 @@
-import type { Db } from '@zamfono/shared';
+import type { Db, MailboxOwner } from '@zamfono/shared';
 
 import { ringGroupMemberships } from '../ringGroupMembership.js';
 
@@ -6,7 +6,7 @@ export type Recipients = { emails: string[]; name: string };
 
 export async function resolveRecipients(
   db: Db,
-  to: { userId: string } | { ringGroupId: string }
+  to: MailboxOwner
 ): Promise<Recipients> {
   if ('userId' in to) {
     const user = await db
