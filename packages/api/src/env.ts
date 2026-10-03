@@ -29,6 +29,7 @@ export const variables = defineEnvVars({
   MAIN_DID: optional,
   MEDIA_DIR: optional,
   METRICS_TOKEN: optional,
+  MIGRATIONS_DIR: optional,
   MOH_SOURCE_DIR: optional,
   SECRETBOX_KEY: optional,
   SECRETBOX_KEY_PREVIOUS: optional,

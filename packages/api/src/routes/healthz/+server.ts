@@ -1,7 +1,7 @@
 import * as env from '$app/env/private';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
-import { getDb } from '#lib/server/db.js';
+import { getDb, migrationsDir } from '#lib/server/db.js';
 import {
   apiHealth,
   healthStatus,
@@ -32,6 +32,7 @@ async function checkCore(): Promise<CoreReachability> {
 export async function GET(): Promise<Response> {
   const health = await apiHealth({
     db: getDb(),
+    migrationsDir: migrationsDir(),
     checkCore,
     keyring: keyringFromEnv(env),
     certificateSync: certSyncStatus()

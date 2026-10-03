@@ -2,6 +2,7 @@ import { sql } from 'kysely';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { nowIso, openDb, type Db } from '@zamfono/shared';
+import { MIGRATIONS_DIR } from '@zamfono/shared/testDb.js';
 
 import { apiHealth, type ApiHealth } from './health.js';
 import { updateNews } from './ops/system/_state.js';
@@ -28,6 +29,7 @@ const kr = keyringFromEnv({
 async function healthOf(db: Db): Promise<ApiHealth> {
   return apiHealth({
     db,
+    migrationsDir: MIGRATIONS_DIR,
     checkCore: () => Promise.resolve({ reachable: true, ari: true }),
     keyring: kr,
     certificateSync: 'ok'

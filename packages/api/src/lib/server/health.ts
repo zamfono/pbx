@@ -53,6 +53,7 @@ export type ApiHealth = {
 /** What `apiHealth` needs to compute a body; a caller resolves each check its own way. */
 export type ApiHealthDeps = {
   db: Db;
+  migrationsDir: string;
   checkCore: () => Promise<CoreReachability>;
   keyring: Keyring;
   certificateSync: 'ok' | 'missing' | 'unknown';
@@ -152,7 +153,9 @@ async function tableChecks(db: Db, kr: Keyring): Promise<TableChecks> {
  */
 export async function apiHealth(deps: ApiHealthDeps): Promise<ApiHealth> {
   const dbOpen = await isDbOpen(deps.db);
-  const migrated = dbOpen && (await pendingMigrations(deps.db)).length === 0;
+  const migrated =
+    dbOpen &&
+    (await pendingMigrations(deps.db, deps.migrationsDir)).length === 0;
   const checks = migrated
     ? await tableChecks(deps.db, deps.keyring)
     : UNMIGRATED_CHECKS;

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import type { Db, ReloadKind } from '@zamfono/shared';
+import { MIGRATIONS_DIR } from '@zamfono/shared/testDb.js';
 
 import { getCoreClient, type CoreClient } from './coreClient.js';
 import { stubCoreClient } from './coreClientStub.js';
@@ -82,6 +83,7 @@ describe('an owed config propagation', () => {
     expect(await isPropagationPending(db)).toBe(true);
     const health = await apiHealth({
       db,
+      migrationsDir: MIGRATIONS_DIR,
       checkCore: () => Promise.resolve({ reachable: false, ari: false }),
       keyring: kr,
       certificateSync: 'unknown'

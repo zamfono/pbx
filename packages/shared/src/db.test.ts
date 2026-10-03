@@ -1,13 +1,13 @@
 import { expect, test } from 'vitest';
 
 import { isDbOpen, openDb, pendingMigrations } from './db.js';
-import { migrateForTest } from './testDb.js';
+import { migrateForTest, MIGRATIONS_DIR } from './testDb.js';
 
 test('migrates and enforces the schema', async () => {
   const db = openDb(':memory:');
-  expect(await pendingMigrations(db)).toHaveLength(1);
+  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(1);
   await migrateForTest(db);
-  expect(await pendingMigrations(db)).toEqual([]);
+  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toEqual([]);
 
   const tables = (await db.introspection.getTables())
     .map(table => table.name)

@@ -20,7 +20,7 @@ import {
   openDb,
   type Db
 } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { migrateForTest, MIGRATIONS_DIR } from '@zamfono/shared/testDb.js';
 
 import {
   apiHealth,
@@ -614,6 +614,7 @@ describe('apiHealth', () => {
     const db = openDb(':memory:');
     const health = await apiHealth({
       db,
+      migrationsDir: MIGRATIONS_DIR,
       checkCore: () => Promise.resolve({ reachable: false, ari: false }),
       keyring: testKeyring(),
       certificateSync: 'unknown'
@@ -638,6 +639,7 @@ describe('apiHealth', () => {
     const db = await migratedDb();
     const health = await apiHealth({
       db,
+      migrationsDir: MIGRATIONS_DIR,
       checkCore: () => Promise.resolve({ reachable: true, ari: true }),
       keyring: testKeyring(),
       certificateSync: 'ok'

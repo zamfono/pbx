@@ -3,6 +3,7 @@ import process from 'node:process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { HTTP_SERVICE_UNAVAILABLE, type CoreHealth } from '@zamfono/shared';
+import { MIGRATIONS_DIR } from '@zamfono/shared/testDb.js';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { stubCoreClient } from '#lib/server/coreClientStub.js';
@@ -11,10 +12,11 @@ import { GET } from './+server.js';
 
 const KEY_BYTE_LENGTH = 32;
 
-// `getDb()` reads `DB_FILE` once per process, the route `SECRETBOX_KEY` per request; an
-// in-memory, unmigrated database is enough since these tests only care about the `core` field
-// the route derives.
+// `getDb()` reads `DB_FILE` once per process, the route `MIGRATIONS_DIR` and `SECRETBOX_KEY` per
+// request; an in-memory, unmigrated database is enough since these tests only care about the
+// `core` field the route derives.
 process.env.DB_FILE = ':memory:';
+process.env.MIGRATIONS_DIR = MIGRATIONS_DIR;
 process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
 
 // Set above, so always defined; restored after the one test that deletes it.
