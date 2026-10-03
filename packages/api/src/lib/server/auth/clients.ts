@@ -2,6 +2,7 @@ import { isRecord, MS_PER_SECOND, type Db } from '@zamfono/shared';
 
 import { attempt } from '../errors.js';
 import { decrypt, encrypt, type Keyring } from '../secretbox.js';
+import { TtlMap } from '../ttlMap.js';
 
 // §5.2 "Client registration": the client-id-metadata-document fetch is cached in memory per the
 // document's own Cache-Control max-age; a document without one is fetched every time.
@@ -28,9 +29,7 @@ export type ClientMeta = {
   applicationType: 'native' | 'web';
 };
 
-type CacheEntry = { meta: ClientMeta; expiresAtMs: number };
-
-const cimdCache = new Map<string, CacheEntry>();
+const cimdCache = new TtlMap<string, ClientMeta>();
 
 /** Encodes `meta` as a `client_id`: the JSON metadata, secretbox-encrypted and base64url'd. */
 export function encodeMetadataClientId(
@@ -120,8 +119,8 @@ export async function fetchCimd(
     return null;
   }
   const cached = cimdCache.get(clientIdUrl);
-  if (cached && cached.expiresAtMs > Date.now()) {
-    return cached.meta;
+  if (cached) {
+    return cached;
   }
   const response = await fetchImpl(clientIdUrl);
   if (!response.ok) {
@@ -133,7 +132,7 @@ export async function fetchCimd(
   }
   const ttlMs = cacheTtlMs(response.headers);
   if (ttlMs !== null) {
-    cimdCache.set(clientIdUrl, { meta, expiresAtMs: Date.now() + ttlMs });
+    cimdCache.set(clientIdUrl, meta, Date.now() + ttlMs);
   }
   return meta;
 }

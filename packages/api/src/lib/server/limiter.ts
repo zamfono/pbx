@@ -2,6 +2,8 @@ import pino from 'pino';
 
 import { MS_PER_HOUR, MS_PER_MINUTE, MS_PER_SECOND } from '@zamfono/shared';
 
+import { TtlMap } from './ttlMap.js';
+
 // §5.5: lockouts and limit hits are logged with the account or address.
 const logger = pino({ name: 'limiter' });
 
@@ -19,36 +21,20 @@ const ACCOUNT_LOCK_MS = 900_000;
 // §5.5 forgot-password: at most this many requests per account per hour.
 const RESET_ACCOUNT_LIMIT = 3;
 
-// The maps below are swept for expired entries only once they grow past this size.
-const SWEEP_THRESHOLD = 1000;
-
-export type LimitKind = 'loginAddress' | 'token' | 'resetAddress' | 'register';
+export type LimitKind =
+  'loginAddress' | 'token' | 'resetAddress' | 'resetAccount' | 'register';
 
 const CHECK_LIMITS: Record<LimitKind, { max: number; windowMs: number }> = {
   loginAddress: { max: LOGIN_ADDRESS_LIMIT, windowMs: MS_PER_MINUTE },
   token: { max: TOKEN_LIMIT, windowMs: MS_PER_MINUTE },
   resetAddress: { max: RESET_ADDRESS_LIMIT, windowMs: MS_PER_HOUR },
+  resetAccount: { max: RESET_ACCOUNT_LIMIT, windowMs: MS_PER_HOUR },
   register: { max: REGISTER_LIMIT, windowMs: MS_PER_MINUTE }
 };
 
-type FixedWindow = { start: number; count: number; windowMs: number };
+type FixedWindow = { start: number; count: number };
 
 type LoginFailureState = { failures: number[]; lockedUntil: number | null };
-
-/** Deletes `map`'s expired entries once it holds more than `SWEEP_THRESHOLD`. */
-function sweepExpired<K, V>(
-  map: Map<K, V>,
-  isExpired: (value: V, key: K) => boolean
-): void {
-  if (map.size <= SWEEP_THRESHOLD) {
-    return;
-  }
-  for (const [key, value] of map) {
-    if (isExpired(value, key)) {
-      map.delete(key);
-    }
-  }
-}
 
 /**
  * In-memory rate limiter and account lock (§5.5). Counters and locks live only in this
@@ -56,12 +42,13 @@ function sweepExpired<K, V>(
  */
 export class Limiter {
   readonly #now: () => number;
-  readonly #windows = new Map<string, FixedWindow>();
-  readonly #loginFailures = new Map<string, LoginFailureState>();
-  readonly #resetRequests = new Map<string, FixedWindow>();
+  readonly #windows: TtlMap<string, FixedWindow>;
+  readonly #loginFailures: TtlMap<string, LoginFailureState>;
 
   constructor(now: () => number = Date.now) {
     this.#now = now;
+    this.#windows = new TtlMap(now);
+    this.#loginFailures = new TtlMap(now);
   }
 
   /**
@@ -75,14 +62,9 @@ export class Limiter {
     const { max, windowMs } = CHECK_LIMITS[kind];
     const mapKey = `${kind}:${key}`;
     const now = this.#now();
-    sweepExpired(this.#windows, win => now - win.start >= win.windowMs);
-    const current = this.#windows.get(mapKey);
-    const win =
-      current && now - current.start < windowMs
-        ? current
-        : { start: now, count: 0, windowMs };
+    const win = this.#windows.get(mapKey) ?? { start: now, count: 0 };
     win.count += 1;
-    this.#windows.set(mapKey, win);
+    this.#windows.set(mapKey, win, win.start + windowMs);
     if (win.count > max) {
       const retryAfterMs = win.start + windowMs - now;
       const retryAfterS = Math.ceil(retryAfterMs / MS_PER_SECOND);
@@ -98,16 +80,11 @@ export class Limiter {
    */
   loginFailed(account: string): void {
     const now = this.#now();
-    sweepExpired(this.#loginFailures, state => {
-      const locked = state.lockedUntil !== null && state.lockedUntil > now;
-      const cutoff = now - LOGIN_FAILURE_WINDOW_MS;
-      return !locked && !state.failures.some(failedAt => failedAt > cutoff);
-    });
     const state = this.#loginFailures.get(account) ?? {
       failures: [],
       lockedUntil: null
     };
-    if (state.lockedUntil !== null && state.lockedUntil > now) {
+    if (state.lockedUntil !== null) {
       return;
     }
     const cutoff = now - LOGIN_FAILURE_WINDOW_MS;
@@ -117,10 +94,12 @@ export class Limiter {
     ];
     const locking = failures.length >= LOGIN_FAILURE_LIMIT;
     const lockedUntil = locking ? now + ACCOUNT_LOCK_MS : null;
-    this.#loginFailures.set(account, {
-      failures: locking ? [] : failures,
-      lockedUntil
-    });
+    // Kept while it locks the account or its latest failure still counts.
+    this.#loginFailures.set(
+      account,
+      { failures: locking ? [] : failures, lockedUntil },
+      lockedUntil ?? now + LOGIN_FAILURE_WINDOW_MS
+    );
     if (locking) {
       logger.warn({ account, lockedUntil }, 'account locked');
     }
@@ -135,37 +114,12 @@ export class Limiter {
   isLocked(
     account: string
   ): { locked: false } | { locked: true; until: number } {
-    const state = this.#loginFailures.get(account);
-    const now = this.#now();
-    if (
-      state?.lockedUntil !== null &&
-      state?.lockedUntil !== undefined &&
-      state.lockedUntil > now
-    ) {
-      return { locked: true, until: state.lockedUntil };
-    }
-    return { locked: false };
-  }
-
-  /**
-   * Counts a forgot-password request for `account`. Reports `true` (send the mail) for
-   * up to 3 requests per hour, `false` (drop it silently) beyond that.
-   */
-  resetRequested(account: string): boolean {
-    const now = this.#now();
-    sweepExpired(this.#resetRequests, win => now - win.start >= win.windowMs);
-    const current = this.#resetRequests.get(account);
-    const win =
-      current && now - current.start < MS_PER_HOUR
-        ? current
-        : { start: now, count: 0, windowMs: MS_PER_HOUR };
-    win.count += 1;
-    this.#resetRequests.set(account, win);
-    return win.count <= RESET_ACCOUNT_LIMIT;
+    const until = this.#loginFailures.get(account)?.lockedUntil ?? null;
+    return until === null ? { locked: false } : { locked: true, until };
   }
 }
 
-/** The login's limiter (§5.5), one for the process's lifetime: counters reset on an `api`
- *  restart. It holds both of the login's counters, the per-address volume limit and the
- *  per-account lock, which the login form counts and the user record reports. */
-export const loginLimiter = new Limiter();
+/** The limiter (§5.5), one for the process's lifetime: counters reset on an `api` restart. Every
+ *  limit counts against it under its own `LimitKind`, and it holds the per-account login lock
+ *  the login form counts and the user record reports. */
+export const limiter = new Limiter();

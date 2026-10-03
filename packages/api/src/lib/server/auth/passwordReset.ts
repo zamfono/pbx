@@ -2,7 +2,7 @@
  * The two password-reset steps (§5.2 "Authentication pages", §5.5 "Forgot password", §10.3
  * `POST /auth/resetRequest` and `POST /auth/reset`), shared by the REST endpoints API clients
  * call and the remote forms the forgot-password and set-password pages submit. Both callers go
- * through these functions and the one limiter below, so validation, rate limits, token checks
+ * through these functions and the one limiter, so validation, rate limits, token checks
  * and outcomes are the same whichever path a request takes; each caller only maps the outcome
  * onto its own response (problem+json, or a re-rendered page).
  */
@@ -15,7 +15,7 @@ import { nowIso, type Db } from '@zamfono/shared';
 import { MIN_PASSWORD_LENGTH } from '#lib/auth/passwordPolicy.js';
 
 import { addressKey } from '../addressKey.js';
-import { Limiter } from '../limiter.js';
+import { limiter } from '../limiter.js';
 import { sendMail } from '../mail/index.js';
 import { keyringFromEnv } from '../secretbox.js';
 import { originFromEnv } from './authorizationResponse.js';
@@ -30,11 +30,6 @@ const logger = pino({ name: 'auth-reset-request' });
 // Where `src/routes/auth/set-password` is mounted; a self-service reset mail's link opens this
 // page directly (§5.2 "Set password", §10.2 "Mail").
 const SET_PASSWORD_PATH = '/auth/set-password';
-
-// One limiter for the process's lifetime (§5.5): counters reset on an `api` restart. The REST
-// endpoint and the forgot-password form both count against it, so neither path gets a budget of
-// its own.
-const limiter = new Limiter();
 
 /** `true` while `settings.smtp_host` is set (§10.2 "Without a relay"). */
 export async function relayConfigured(db: Db): Promise<boolean> {
@@ -103,7 +98,7 @@ export async function requestPasswordReset(
   // normalized form, or varying the address's case gives a fresh 3-per-hour budget per variant.
   if (
     parsed.success &&
-    limiter.resetRequested(parsed.data.email.toLowerCase())
+    limiter.check('resetAccount', parsed.data.email.toLowerCase()).ok
   ) {
     const user = await db
       .selectFrom('users')

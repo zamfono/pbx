@@ -3,7 +3,7 @@ import { error, type RequestEvent } from '@sveltejs/kit';
 import { HTTP_TOO_MANY_REQUESTS } from '@zamfono/shared';
 
 import { addressKey } from '#lib/server/addressKey.js';
-import { loginLimiter } from '#lib/server/limiter.js';
+import { limiter } from '#lib/server/limiter.js';
 
 /**
  * Counts one login submission against the client address (§5.5 "Login | client address | 60
@@ -12,7 +12,7 @@ import { loginLimiter } from '#lib/server/limiter.js';
  * do not, which is why it lives here rather than in the server hooks' per-path limits.
  */
 export function checkLoginAddress(event: RequestEvent): void {
-  const limit = loginLimiter.check(
+  const limit = limiter.check(
     'loginAddress',
     addressKey(event.getClientAddress())
   );

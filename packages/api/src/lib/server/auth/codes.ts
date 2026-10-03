@@ -1,11 +1,10 @@
 import { createHash, randomBytes } from 'node:crypto';
 
+import { TtlMap } from '../ttlMap.js';
+
 // §5.2: authorization codes live in `api`'s memory for 60 seconds, single-use.
 export const CODE_TTL_MS = 60_000;
 const CODE_BYTES = 32;
-// The store is swept for expired codes only once it grows past this size, since an abandoned
-// code (issued, never redeemed) would otherwise sit until it is looked up.
-const SWEEP_THRESHOLD = 1000;
 
 type IssueParams = {
   userId: string;
@@ -18,29 +17,20 @@ type IssueParams = {
   scope: string;
 };
 
-type CodeRecord = IssueParams & { expiresAtMs: number };
-
 /** In-memory, single-use PKCE authorization codes (§5.2); an `api` restart voids every code. */
 export class AuthCodeStore {
   readonly #now: () => number;
-  readonly #codes = new Map<string, CodeRecord>();
+  readonly #codes: TtlMap<string, IssueParams>;
 
   constructor(now: () => number) {
     this.#now = now;
+    this.#codes = new TtlMap(now);
   }
 
   /** Issues a code for `params`, valid for 60 seconds. */
   issue(params: IssueParams): string {
-    const nowMs = this.#now();
-    if (this.#codes.size > SWEEP_THRESHOLD) {
-      for (const [code, record] of this.#codes) {
-        if (record.expiresAtMs <= nowMs) {
-          this.#codes.delete(code);
-        }
-      }
-    }
     const code = randomBytes(CODE_BYTES).toString('base64url');
-    this.#codes.set(code, { ...params, expiresAtMs: nowMs + CODE_TTL_MS });
+    this.#codes.set(code, params, this.#now() + CODE_TTL_MS);
     return code;
   }
 
@@ -59,7 +49,7 @@ export class AuthCodeStore {
   ): { userId: string } | null {
     const record = this.#codes.get(code);
     this.#codes.delete(code);
-    if (!record || record.expiresAtMs <= this.#now()) {
+    if (!record) {
       return null;
     }
     const redirectUriMatches =

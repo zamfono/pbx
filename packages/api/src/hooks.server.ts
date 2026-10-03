@@ -20,7 +20,7 @@ import {
 import { crossSiteFormRejection } from '#lib/server/auth/crossSiteForms.js';
 import { getDb } from '#lib/server/db.js';
 import { startBackgroundJobs } from '#lib/server/jobs/background.js';
-import { Limiter, type LimitKind } from '#lib/server/limiter.js';
+import { limiter, type LimitKind } from '#lib/server/limiter.js';
 import { recordApiRequestSeconds } from '#lib/server/metricsCounters.js';
 import { problem } from '#lib/server/problem.js';
 import { API_PREFIX } from '#lib/server/restRoutes.js';
@@ -53,9 +53,6 @@ export const init: ServerInit = async () => {
     jobs.stop();
   });
 };
-
-// One limiter for the process's lifetime (§5.5): counters reset on an `api` restart.
-const limiter = new Limiter();
 
 // §5.5's per-address limit for the two endpoints it can be applied to by pathname alone. The
 // login and forgot-password limits key on the account the request body names, and the login's

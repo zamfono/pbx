@@ -10,6 +10,8 @@ import { z } from 'zod';
 
 import { MS_PER_HOUR } from '@zamfono/shared';
 
+import { TtlMap } from '../ttlMap.js';
+
 const DISCOVERY_PATH = '/.well-known/openid-configuration';
 // Discovery documents are cached for 1 hour (§5.2 "SSO", `discover`).
 const DISCOVERY_CACHE_TTL_MS = MS_PER_HOUR;
@@ -40,8 +42,7 @@ export type Discovery = {
   issuer: string;
 };
 
-type DiscoveryCacheEntry = { doc: Discovery; expiresAtMs: number };
-const discoveryCache = new Map<string, DiscoveryCacheEntry>();
+const discoveryCache = new TtlMap<string, Discovery>();
 
 /* eslint-disable camelcase -- RFC 8414/OIDC discovery mandates these snake_case wire fields */
 const DiscoveryDocumentSchema = z.object({
@@ -59,8 +60,8 @@ export async function discover(
 ): Promise<Discovery> {
   const nowMs = Date.now();
   const cached = discoveryCache.get(cfg.issuer);
-  if (cached !== undefined && cached.expiresAtMs > nowMs) {
-    return cached.doc;
+  if (cached !== undefined) {
+    return cached;
   }
   const response = await fetchImpl(`${cfg.issuer}${DISCOVERY_PATH}`);
   if (!response.ok) {
@@ -77,10 +78,7 @@ export async function discover(
     jwksUri: parsed.jwks_uri,
     issuer: parsed.issuer
   };
-  discoveryCache.set(cfg.issuer, {
-    doc,
-    expiresAtMs: nowMs + DISCOVERY_CACHE_TTL_MS
-  });
+  discoveryCache.set(cfg.issuer, doc, nowMs + DISCOVERY_CACHE_TTL_MS);
   return doc;
 }
 

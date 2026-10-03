@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { loginLimiter } from '#lib/server/limiter.js';
+import { limiter } from '#lib/server/limiter.js';
 import { sendMail } from '#lib/server/mail/index.js';
 import { propagateConfig } from '#lib/server/propagation.js';
 import { installRingotelFake } from '#lib/server/provisioning/ringotelFake.js';
@@ -1121,9 +1121,9 @@ describe('users', () => {
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     const lockThreshold = 5;
     for (let attempt = 0; attempt < lockThreshold; attempt += 1) {
-      loginLimiter.loginFailed('anna@x.test');
+      limiter.loginFailed('anna@x.test');
     }
-    const locked = loginLimiter.isLocked('anna@x.test');
+    const locked = limiter.isLocked('anna@x.test');
 
     try {
       const read = (await runOperation(
@@ -1137,7 +1137,7 @@ describe('users', () => {
         locked.locked ? new Date(locked.until).toISOString() : null
       );
     } finally {
-      loginLimiter.loginSucceeded('anna@x.test');
+      limiter.loginSucceeded('anna@x.test');
     }
   });
 

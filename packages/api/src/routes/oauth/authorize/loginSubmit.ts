@@ -18,7 +18,7 @@ import { loginRedirect } from '#lib/server/auth/loginRedirect.js';
 import { verifyPassword } from '#lib/server/auth/password.js';
 import { setSealedCookie } from '#lib/server/auth/sealedCookie.js';
 import { getDb } from '#lib/server/db.js';
-import { loginLimiter } from '#lib/server/limiter.js';
+import { limiter } from '#lib/server/limiter.js';
 import { accountLockKey } from '#lib/server/ops/users/_accountLock.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
@@ -73,7 +73,7 @@ export async function loginSubmit(
   // form, or varying the address's case gives an attacker a fresh 5-attempt budget per variant,
   // and the user record must read it back under that same form (`accountLockKey`).
   const account = accountLockKey(email);
-  const locked = loginLimiter.isLocked(account);
+  const locked = limiter.isLocked(account);
   if (locked.locked) {
     // Costs the same Argon2id pass a wrong-password response costs (`verifyPassword`'s own dummy
     // hash), so a locked account's response time matches a wrong password's (§5.5).
@@ -83,10 +83,10 @@ export async function loginSubmit(
   const user = await lookupUser(db, email);
   const verified = await verifyPassword(user?.passwordHash ?? null, password);
   if (!verified || !user) {
-    loginLimiter.loginFailed(account);
+    limiter.loginFailed(account);
     return refused;
   }
-  loginLimiter.loginSucceeded(account);
+  limiter.loginSucceeded(account);
   if (!resolved) {
     redirect(HTTP_FOUND, loginRedirect(authCodeStore, user.id, null, origin), {
       external: [origin]

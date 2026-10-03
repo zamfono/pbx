@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { loginLimiter } from '#lib/server/limiter.js';
+import { limiter } from '#lib/server/limiter.js';
 
 import { accountLockedUntil, accountLockKey } from './_accountLock.js';
 
@@ -8,14 +8,14 @@ const LOCK_THRESHOLD = 5;
 
 function lock(account: string): void {
   for (let attempt = 0; attempt < LOCK_THRESHOLD; attempt += 1) {
-    loginLimiter.loginFailed(account);
+    limiter.loginFailed(account);
   }
 }
 
 describe('accountLockedUntil', () => {
   afterEach(() => {
-    loginLimiter.loginSucceeded('a@x.test');
-    loginLimiter.loginSucceeded('anna@x.test');
+    limiter.loginSucceeded('a@x.test');
+    limiter.loginSucceeded('anna@x.test');
   });
 
   it("reports the login limiter's own lock as an ISO instant (§5.5)", () => {

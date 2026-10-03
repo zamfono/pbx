@@ -109,13 +109,13 @@ describe('Limiter account lock', () => {
   });
 });
 
-describe('Limiter.resetRequested', () => {
-  it('allows three requests per hour and drops the fourth', () => {
+describe("Limiter.check 'resetAccount'", () => {
+  it('allows three requests per hour and refuses the fourth', () => {
     const limiter = new Limiter(() => 0);
     const account = 'reset@example.com';
-    expect(limiter.resetRequested(account)).toBe(true);
-    expect(limiter.resetRequested(account)).toBe(true);
-    expect(limiter.resetRequested(account)).toBe(true);
-    expect(limiter.resetRequested(account)).toBe(false);
+    expect(limiter.check('resetAccount', account).ok).toBe(true);
+    expect(limiter.check('resetAccount', account).ok).toBe(true);
+    expect(limiter.check('resetAccount', account).ok).toBe(true);
+    expect(limiter.check('resetAccount', account).ok).toBe(false);
   });
 });

@@ -2,7 +2,7 @@
  * The §5.5 account lock, as the user record reports it ("an active lock is visible to admins on
  * the user record"). The lock lives in the login limiter's memory, not in a column.
  */
-import { loginLimiter } from '#lib/server/limiter.js';
+import { limiter } from '#lib/server/limiter.js';
 
 /**
  * The key the §5.5 account lock is counted and looked up under: the e-mail, lower-cased.
@@ -16,6 +16,6 @@ export function accountLockKey(email: string): string {
 
 /** The ISO instant `email`'s lock expires at, or `null` while the account is not locked (§5.5). */
 export function accountLockedUntil(email: string): string | null {
-  const lock = loginLimiter.isLocked(accountLockKey(email));
+  const lock = limiter.isLocked(accountLockKey(email));
   return lock.locked ? new Date(lock.until).toISOString() : null;
 }
