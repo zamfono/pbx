@@ -183,6 +183,14 @@ why the specified behaviour changed; the commit history, how.
   same way. A backup target created before this release can no longer be read, and its runs fail
   until it is re-entered: set its secret again with `backups.targets.update`.
 
+### Removed
+
+- `update.sh` no longer fills in `BACKUP_PASSWORD`, `UPDATER_TOKEN` or `CONTAINER_SOCKET` where
+  `.env` lacks one, and no longer links `compose.override.yaml` for a stack without it: it lists
+  a setting a newer `.env.example` names, and `setup.sh` writes all of them and the link. It
+  reads the release a stack runs from `.env`'s `ZAMFONO_VERSION` or the bundle's `VERSION` only,
+  not from `compose.yaml`.
+
 ### Fixed
 
 - REST and `/events` accepted the access token of a user whose stored role is none of `owner`,

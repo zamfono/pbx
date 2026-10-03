@@ -61,8 +61,8 @@ fi
 STUB
 chmod 755 "$work/bin/docker"
 cp "$work/bin/docker" "$work/bin/podman"
-# The stub systemctl, for the boot unit's path, over the units in $STUB_UNIT_DIR: it lists them,
-# shows one's WorkingDirectory and `cat`s one; the rest is recorded.
+# The stub systemctl, for the boot unit's path, over the units in $STUB_UNIT_DIR: it lists them
+# and shows one's WorkingDirectory; the rest is recorded.
 cat >"$work/bin/systemctl" <<'STUB'
 #!/usr/bin/env bash
 case $1 in
@@ -72,7 +72,6 @@ case $1 in
     done
     ;;
   show) sed -n 's/^WorkingDirectory=//p' "$STUB_UNIT_DIR/${*: -1}" ;;
-  cat) cat "$STUB_UNIT_DIR/$2" ;;
   *) echo "systemctl $*" >>"$STUB_LOG" ;;
 esac
 STUB
@@ -84,7 +83,6 @@ mkdir -p "$work/units"
 fresh_stack() {
   rm -rf "$work/stack"
   cp -a "$stack_src" "$work/stack"
-  sed -i -E '/^(BACKUP_PASSWORD|UPDATER_TOKEN|CONTAINER_SOCKET)=/d' "$work/stack/.env"
   : >"$work/runtime.log"
   rm -f "$work/runtime.log.state"
 }
@@ -136,12 +134,13 @@ pin() {
 echo "  - to a newer release"
 fresh_stack
 key=$(grep '^SECRETBOX_KEY=' "$work/stack/.env")
+# A setting .env.example names and .env lacks is listed for the operator, not filled in.
+sed -i '/^UPDATER_TOKEN=/d' "$work/stack/.env"
 update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update to 1.2.4 failed"; }
 [[ $(pin) == '1.2.4 ZAMFONO_VERSION:-1.2.4' ]] || fail "the stack pins $(pin), not 1.2.4"
 [[ $(grep '^SECRETBOX_KEY=' "$work/stack/.env") == "$key" ]] || fail "the update changed SECRETBOX_KEY"
-grep -qE "^BACKUP_PASSWORD='[0-9a-f]{48}'$" "$work/stack/.env" || fail "no BACKUP_PASSWORD added"
-grep -qE "^UPDATER_TOKEN='[0-9a-f]{48}'$" "$work/stack/.env" || fail "no UPDATER_TOKEN added"
-grep -qx "CONTAINER_SOCKET='/var/run/docker.sock'" "$work/stack/.env" || fail "no CONTAINER_SOCKET added"
+grep -q 'new setting UPDATER_TOKEN, unset' "$work/out" || fail "UPDATER_TOKEN was not listed as new"
+grep -q '^UPDATER_TOKEN=' "$work/stack/.env" && fail "the update filled in UPDATER_TOKEN"
 [[ $(stat -c %a "$work/stack/.env") == 600 ]] || fail ".env is no longer private"
 grep -qx 'compose pull' "$work/runtime.log" ||
   fail "no pull of the whole stack: $(cat "$work/runtime.log")"
@@ -152,45 +151,6 @@ grep -q 'Updated 1.2.3 -> 1.2.4' "$work/out" || fail "no report of the update"
 echo "  - recorded in .update/state.json: running while it runs, then succeeded"
 record_is "$work/runtime.log.state" running 1.2.3 1.2.4
 record_is "$work/stack/.update/state.json" succeeded 1.2.3 1.2.4
-
-echo "  - from a bundle without VERSION: the release compose.yaml pins"
-fresh_stack
-rm "$work/stack/VERSION"
-[[ $(update --check 1.2.4) == '1.2.3 -> 1.2.4 (update)' ]] ||
-  fail "a stack without VERSION was not read as 1.2.3"
-update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update without VERSION failed"; }
-[[ $(pin) == '1.2.4 ZAMFONO_VERSION:-1.2.4' ]] || fail "the stack pins $(pin), not 1.2.4"
-
-echo "  - a stack set up without compose.override.yaml gets it, its overlay derived once"
-# overlay_after_update [podman] — the overlay the link names after an update of a stack without one.
-overlay_after_update() {
-  rm "$work/stack/compose.override.yaml"
-  update --check 1.2.4 >/dev/null 2>&1
-  [[ ! -e $work/stack/compose.override.yaml ]] || fail "--check linked compose.override.yaml"
-  if [[ ${1:-} == podman ]]; then
-    podman_update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update without a link failed"; }
-  else
-    update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update without a link failed"; }
-  fi
-  readlink "$work/stack/compose.override.yaml"
-}
-fresh_stack
-[[ $(overlay_after_update) == compose.ports.yaml ]] || fail "a ports stack was not linked to compose.ports.yaml"
-fresh_stack
-sed -i "s/^STACK_IPV4=.*/STACK_IPV4='203.0.113.34'/" "$work/stack/.env"
-[[ $(overlay_after_update) == compose.macvlan.yaml ]] ||
-  fail "a stack with a STACK_IPV4 was not linked to compose.macvlan.yaml"
-# A boot unit setup.sh wrote with the overlay in its command line names it, whatever .env says.
-fresh_stack
-cat >"$work/units/zamfono-test.service" <<UNIT
-[Service]
-WorkingDirectory=$work/stack
-ExecStart=/usr/bin/podman compose -f compose.yaml -f compose.macvlan.yaml up -d
-ExecStop=/usr/bin/podman compose -f compose.yaml -f compose.macvlan.yaml down
-UNIT
-[[ $(overlay_after_update podman) == compose.macvlan.yaml ]] ||
-  fail "the boot unit's overlay was not the one linked"
-rm "$work/units/zamfono-test.service"
 
 echo "  - a stack with compose.dr.yaml runs Compose on it, after compose.yaml and the link"
 fresh_stack
@@ -223,8 +183,6 @@ grep -qx 'compose up -d' "$work/runtime.log" ||
 echo "  - on Podman without a boot unit"
 fresh_stack
 podman_update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update on Podman failed"; }
-grep -qx "CONTAINER_SOCKET='/run/podman/podman.sock'" "$work/stack/.env" ||
-  fail "no Podman CONTAINER_SOCKET added"
 # Podman will not replace asterisk while proxy shares its network namespace (§6.3): down, then up.
 [[ $(grep -E ' (down|up -d|rm)' "$work/runtime.log") == "compose down
 compose up -d --wait --wait-timeout 180" ]] ||
@@ -362,10 +320,9 @@ echo 1.2.3 >"$work/stack/.update-pending"
 [[ $(check_status 1.2.3 1.2.3 ZAMFONO_UPDATER=1) == 11 ]] ||
   fail "--check on an unfinished update did not exit 11: $(cat "$work/out")"
 rm "$work/stack/.update-pending"
-# A directory that names no release: no .env pin, no VERSION, compose.yaml at latest.
+# A directory that names no release: no .env pin, no VERSION.
 sed -i '/^ZAMFONO_VERSION=/d' "$work/stack/.env"
 rm "$work/stack/VERSION"
-sed -i 's/ZAMFONO_VERSION:-1\.2\.3}/ZAMFONO_VERSION:-latest}/' "$work/stack/compose.yaml"
 status=0
 (cd "$work/stack" && ZAMFONO_UPDATER=1 ZAMFONO_REPO_URL="http://127.0.0.1:$port" \
   ./update.sh --check 1.2.4 </dev/null >"$work/out" 2>&1) || status=$?
@@ -392,6 +349,5 @@ grep -qx 'compose rm -sf proxy' "$work/runtime.log" ||
   fail "the updater did not remove proxy first"
 grep -qx 'compose up -d --wait --wait-timeout 180 asterisk'\
 ' migrate core api proxy' "$work/runtime.log" || fail "the updater recreated more than the stack"
-grep -q '^CONTAINER_SOCKET=' "$work/stack/.env" && fail "the updater guessed a CONTAINER_SOCKET"
 [[ ! -e $work/stack/.update ]] || fail "the updater's run wrote the record the updater keeps itself"
 echo "  update.sh OK"

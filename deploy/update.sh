@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Updates this stack to a newer release (README.md, step 8): downloads that release's bundle,
 # checks it against the release's SHA256SUMS, unpacks it over this directory (never touching
-# .env), adds the settings a newer .env.example introduced that update.sh can fill in itself,
-# pulls the images and recreates the stack. The `updater` service runs this same script for
+# .env), lists the settings a newer .env.example introduced, pulls the images and recreates the
+# stack. The `updater` service runs this same script for
 # `system.update` (§6.3 "Updates"). Compose reads compose.yaml and compose.override.yaml, the link
-# to the mode's overlay setup.sh makes, which update.sh makes too where it is missing, and
-# compose.dr.yaml where the stack directory holds one (§6.5).
+# to the mode's overlay setup.sh makes, and compose.dr.yaml where the stack directory holds one
+# (§6.5).
 #
 #   ./update.sh [--yes] [--check] [VERSION]
 #
@@ -77,19 +77,12 @@ on_exit() {
 trap on_exit EXIT
 
 # The release this directory runs: .env's ZAMFONO_VERSION when set, else the bundle's VERSION.
-# A bundle without a VERSION file (0.1.0's and older) names its release only in compose.yaml's
-# `${ZAMFONO_VERSION:-X.Y.Z}` defaults, which are read instead.
 current_version() {
   local pinned
   pinned=$(sed -nE 's/^ZAMFONO_VERSION=["'\'']?([0-9]+\.[0-9]+\.[0-9]+)["'\'']?$/\1/p' .env | tail -n1)
   [[ -n $pinned || ! -f VERSION ]] || pinned=$(<VERSION)
-  if [[ -z $pinned ]]; then
-    pinned=$(grep -oE '\$\{ZAMFONO_VERSION:-[0-9]+\.[0-9]+\.[0-9]+\}' compose.yaml | head -n1 |
-      sed -E 's/.*:-(.*)\}/\1/')
-  fi
-  [[ -n $pinned ]] || fail "cannot tell which release runs here: there is no VERSION, compose.yaml" \
-    "pins none and .env sets no ZAMFONO_VERSION (a stack from before 0.0.2 upgrades by hand once," \
-    "README.md step 8)"
+  [[ -n $pinned ]] || fail "cannot tell which release runs here: there is no VERSION and .env sets" \
+    "no ZAMFONO_VERSION"
   echo "$pinned"
 }
 
@@ -131,19 +124,10 @@ set_env() {
   echo "  .env: set $name"
 }
 
-# The settings a newer .env.example added that update.sh fills in itself: the generated secrets,
-# and the socket the updater drives the runtime through. Every other new name is only listed.
+# A pinned ZAMFONO_VERSION moves to the new release; the settings a newer .env.example added are
+# listed, for the operator to set.
 update_env() {
   local name
-  grep -qE '^BACKUP_PASSWORD=' .env || set_env BACKUP_PASSWORD "$(random_hex)"
-  grep -qE '^UPDATER_TOKEN=' .env || set_env UPDATER_TOKEN "$(random_hex)"
-  if ! grep -qE '^CONTAINER_SOCKET=' .env && [[ -z $updater ]]; then
-    if [[ $runtime == podman ]]; then
-      set_env CONTAINER_SOCKET /run/podman/podman.sock
-    else
-      set_env CONTAINER_SOCKET /var/run/docker.sock
-    fi
-  fi
   if grep -qE "^ZAMFONO_VERSION=[\"']?[^\"' ]" .env; then
     set_env ZAMFONO_VERSION "$target"
   fi
@@ -171,25 +155,6 @@ release_notes() {
   ' "$1"
 }
 
-# compose.override.yaml, the link to the mode's overlay that setup.sh makes and Compose reads
-# beside compose.yaml. A stack setup.sh set up before it made one (0.1.0 and older) has none:
-# its overlay is derived here, once, and only here, from the boot unit's ExecStart, else from
-# whether .env holds a STACK_IPV4 (macvlan) or not (ports).
-link_overlay() {
-  local overlay=
-  [[ ! -e compose.override.yaml ]] || return 0
-  [[ -z $unit ]] || overlay=$(systemctl cat "$unit" | grep -oE 'compose\.(ports|macvlan)\.yaml' | head -n1)
-  if [[ -z $overlay ]]; then
-    if grep -qE "^STACK_IPV4=[\"']?[0-9]" .env; then
-      overlay=compose.macvlan.yaml
-    else
-      overlay=compose.ports.yaml
-    fi
-  fi
-  ln -s "$overlay" compose.override.yaml
-  echo "  linked compose.override.yaml to $overlay"
-}
-
 main() {
   [[ -f .env ]] || fail "there is no .env here; install with setup.sh first (README.md, step 5)"
   if [[ -n $updater ]]; then
@@ -200,7 +165,6 @@ main() {
   fi
   add_stack_files
   unit=$(find_unit)
-  [[ -n $check_only ]] || link_overlay
   # The services `pull` and `up` name: all of them, but for the updater's run.
   services=()
   [[ -z $updater ]] || services=("${STACK_SERVICES[@]}")

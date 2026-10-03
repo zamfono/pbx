@@ -320,34 +320,24 @@ Run a backup first (`backups.runs.start`, `POST /backups/runs`). Then, in the st
 
 ```bash
 cd /srv/zamfono
-./update.sh            # the latest release; ./update.sh 0.0.7 for one in particular
+./update.sh            # the latest release; ./update.sh 0.2.1 for one in particular
 ./update.sh --check    # only say what an update would do
 ```
 
 It downloads the release's bundle, checks it against the release's `SHA256SUMS`, unpacks it over
-the stack directory (never touching `.env`), adds the settings a newer `.env.example` introduced
-that it can generate, and lists the others, pulls the images and recreates the stack: on Podman
+the stack directory (never touching `.env`), lists the settings a newer `.env.example`
+introduced, pulls the images and recreates the stack: on Podman
 through the boot unit of step 7 if there is one, otherwise taking the stack `down` first. It then
 waits up to three minutes for every service to report healthy; an update that stopped before
 that, a failed `up` or an unhealthy service, is finished by running `update.sh` again once the
 cause is fixed. It refuses an older release. A breaking one (a new minor while 0.x, a new major from 1.0.0 on) shows the release
 notes in between and asks first; `--yes` answers for a run without a terminal.
 
-A stack from `v0.0.5` or earlier has no `update.sh` yet. Take it, and its helpers, from the newest
-bundle once, then run it:
-
-```bash
-curl -fsSL https://github.com/zamfono/pbx/releases/latest/download/zamfono-deploy.tar.gz \
-  | tar xz --strip-components=1 zamfono/update.sh zamfono/setup
-./update.sh
-```
-
 **From an MCP client or the API**, the owner updates without a shell: `system.info` shows the
 latest release, whether it can be installed this way, and how the last update went, run either
 way, and `system.update` installs it. It runs the same `update.sh` in the `updater` service, only to a newer
 release that is not breaking, and only once a backup run finished `ok` within the last hour. The
-updater needs `UPDATER_TOKEN` and `CONTAINER_SOCKET` in `.env`, which `setup.sh` and `update.sh`
-write. With the owner's setting `autoUpdate` on (off by default), the stack installs such a
+updater needs `UPDATER_TOKEN` and `CONTAINER_SOCKET` in `.env`, which `setup.sh` writes. With the owner's setting `autoUpdate` on (off by default), the stack installs such a
 release on its own, after a backup, at a quiet moment with no call in progress, and mails the
 owners when that fails or when a breaking release needs `update.sh` (`zamfono.help update-stack`).
 
@@ -371,16 +361,10 @@ podman compose pull
 systemctl restart zamfono.service    # or: podman compose ... down && podman compose ... up -d
 ```
 
-A unit installed by `v0.0.3` or earlier stops with `stop` rather than `down`; switch it once:
-
-```bash
-sed -i 's/ stop$/ down/' /etc/systemd/system/zamfono.service && systemctl daemon-reload
-```
-
 Read the new release's **Upgrade notes** in `CHANGELOG.md`, which the bundle holds and the release
 page shows: anything an upgrade needs beyond these commands is there. Compare the new
 `.env.example` with your `.env`: a release that adds a setting adds it there, and `update.sh`
-names the ones it did not fill in. If you set `ZAMFONO_VERSION` in `.env`, `update.sh` changes it
+names the ones `.env` lacks. If you set `ZAMFONO_VERSION` in `.env`, `update.sh` changes it
 to the new release; by hand, change it yourself.
 
 Migrations only go forward. A bad release is undone by restoring the snapshot the upgrade began

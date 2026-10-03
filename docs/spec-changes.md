@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-03 · §6.3 Updates, Attachment overlays.** `update.sh` no longer fills in `BACKUP_PASSWORD`, `UPDATER_TOKEN` and `CONTAINER_SOCKET` where `.env` lacks them, nor makes the `compose.override.yaml` link for a stack without one; it lists the settings a newer `.env.example` introduced, and reads the release a stack runs from `.env`'s `ZAMFONO_VERSION` or the bundle's `VERSION` only.
+*Why:* product-owner decision: 0.2.0 is a fresh start without any backwards compatibility; `setup.sh` writes all three settings and the link, so only stacks of older releases lacked them.
+
 **2026-10-03 · §10.5 MCP interface, §10.3 Voicemail and Recordings, §10.2 Attachments.** Over MCP, `voicemails.audio` and `recordings.audio` return a download link, `{ url, expiresAt }`, instead of the file: the REST endpoint with an `access_token` query parameter, a JWT of `typ` `download+jwt` for that one path, the tool caller's user and client, expiring after five minutes, its response marked `Cache-Control: private`. REST still answers with the file.
 *Why:* product-owner decision: MCP clients (Claude, ChatGPT) do nothing with audio content, so the bytes were of no use to them.
 
