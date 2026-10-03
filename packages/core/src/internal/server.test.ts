@@ -1,3 +1,4 @@
+import { once } from 'node:events';
 import net from 'node:net';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
@@ -426,10 +427,10 @@ describe('startInternalServer', () => {
       });
       // FIN=1, RSV1=1 (unnegotiated), opcode=binary: a protocol violation `ws` reports as
       // a socket `'error'` rather than a parsed frame.
+      // `ws` answers it with a close frame, emitting that `'error'` in the same tick.
+      const closeFrame = once(socket, 'data');
       socket.write(Buffer.from([0xc2, 0x00]));
-      await new Promise(resolve => {
-        setTimeout(resolve, 50);
-      });
+      await closeFrame;
       expect(uncaughtErrors).toEqual([]);
       socket.destroy();
     } finally {

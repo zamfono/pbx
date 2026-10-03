@@ -118,15 +118,19 @@ const PARAMS = {
 describe('originateLeg (§7 level sip)', () => {
   it('joins the SIP dialog of a sip-level call before the INVITE leaves', async () => {
     const { pipeline, steps, releaseJoin, dialling } = stubPipeline();
-    const placing = originateLeg(pipeline, callAt('sip'), PARAMS, dialling);
-    await new Promise(resolve => {
-      setTimeout(resolve, 10);
-    });
-    // Created, in the app and joining, but not dialled while the join is still reading the Call-ID.
-    expect(steps).toEqual(['create', 'join leg-1', 'stasisStart']);
+    vi.useFakeTimers();
+    try {
+      const placing = originateLeg(pipeline, callAt('sip'), PARAMS, dialling);
+      await vi.advanceTimersByTimeAsync(0);
+      // Created, in the app and joining, but not dialled while the join is still reading the
+      // Call-ID.
+      expect(steps).toEqual(['create', 'join leg-1', 'stasisStart']);
 
-    releaseJoin();
-    await placing;
+      releaseJoin();
+      await placing;
+    } finally {
+      vi.useRealTimers();
+    }
 
     expect(steps).toEqual([
       'create',

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, openDb, type Db, type Envelope } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
@@ -10,15 +10,12 @@ import { onEvents } from './testing/busEvents.js';
 import { noopLogger } from './testing/pipelineDeps.js';
 
 const SWEEP_INTERVAL_MS = 5;
-// Real-timer waits around a 5 ms sweep interval: generous enough for several ticks to have run
-// without making the suite slow.
+// A dozen sweep intervals: a transition is picked up, and a repeated emission would show.
 const SETTLE_MS = 60;
 
-/** Waits for `ms` of real time, so a few `SWEEP_INTERVAL_MS` sweep ticks get to run. */
-function settle(ms: number = SETTLE_MS): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
+/** Runs the sweep's faked timers `SETTLE_MS` on, every tick that sets off included. */
+async function settle(): Promise<void> {
+  await vi.advanceTimersByTimeAsync(SETTLE_MS);
 }
 
 /** Seeds the settings row and the user/forward-target chain its FKs require. */
@@ -68,9 +65,14 @@ async function seedTenant(
 describe('startSweep', () => {
   let sweep: { stop: () => void } | undefined;
 
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  });
+
   afterEach(() => {
     sweep?.stop();
     sweep = undefined;
+    vi.useRealTimers();
   });
 
   it("emits an ooo transition only at the tick after the rule's scheduled start", async () => {

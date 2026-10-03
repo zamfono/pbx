@@ -28,7 +28,7 @@ import type { ParticipationRecorder } from './recordParticipation.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { TrunkState } from './trunkState.js';
 
-const SETTLE_DELAY_MS = 60;
+const LEG_STASIS_WAIT_MS = 60;
 
 async function seedSettings(
   db: Db,
@@ -289,12 +289,6 @@ function traceEvents(call: Call): string[] {
     .split('\n')
     .filter(Boolean)
     .map(line => String((JSON.parse(line) as { event?: string }).event));
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
 }
 
 /** Whether the core set `channelId`'s language to `language` (§9.1). */
@@ -678,7 +672,7 @@ describe('outbound dialing', () => {
     const trunkId = await seedTrunk(db, 1);
     await seedRoute(db, 1, trunkId);
     fakeAri.createdEntersStasis = false;
-    pipeline.deps.legStasisWaitMs = SETTLE_DELAY_MS;
+    pipeline.deps.legStasisWaitMs = LEG_STASIS_WAIT_MS;
 
     const call = await dial('+498912345');
 
@@ -812,7 +806,6 @@ describe('outbound dialing', () => {
     const { call, finished } = await startDial('+498912345');
     const leg = await ringingLeg(call);
     emitState(fakeAri, leg.channelId, 'Ringing');
-    await sleep(SETTLE_DELAY_MS);
     // Q.850 cause 111, protocol error -> SIP 500.
     emitDestroyed(fakeAri, leg.channelId, 111);
     await finished;

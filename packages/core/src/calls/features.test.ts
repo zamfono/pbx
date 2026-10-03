@@ -17,7 +17,9 @@ import { Presence } from '../presence.js';
 import { defaultPrompt } from '../prompts.js';
 import { onEvents } from '../testing/busEvents.js';
 import {
+  eventHandled,
   eventually,
+  flush,
   nextSubscription,
   requestTo
 } from '../testing/eventually.js';
@@ -40,18 +42,10 @@ import { ringUser } from './ringUser.js';
 import { TrunkState } from './trunkState.js';
 import type { MailSender } from './voicemail.js';
 
-// How long a check that something does NOT happen gives the flow to do it anyway.
-const SETTLE_MS = 50;
 // A parking slot's timeout in the ring-back tests (`setUp`'s `parkingTimeoutS`), and how long past
 // it the ring-back's outcome is waited for.
 const PARKING_TIMEOUT_S = 1;
 const RINGBACK_WAIT_MS = 5000;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
-}
 
 function traceEvents(call: Call): string[] {
   return (call.log.finish().log ?? '')
@@ -1055,7 +1049,7 @@ describe('features', () => {
       'addParty',
       '+15551234567'
     );
-    await sleep(SETTLE_MS);
+    await flush();
     // §11.2 `calls.ended_at`: the added party is still in the three-way bridge.
     expect((await callsRow(addPartyCall.id)).endedAt).toBeNull();
     expect(pipeline.deps.state.calls.get(addPartyCall.id)?.state).toBe('up');
@@ -1557,6 +1551,7 @@ describe('features', () => {
       addedId
     );
 
+    const handled = eventHandled(pipeline, 'ChannelDestroyed', addedId);
     fakeAri.emit({
       type: 'ChannelDestroyed',
       timestamp: nowIso(),
@@ -1564,7 +1559,7 @@ describe('features', () => {
       channel: defaultChannel({ id: addedId }),
       cause: 16
     });
-    await sleep(SETTLE_MS);
+    await handled;
 
     expect(hungUpChannel(customerId)).toBe(false);
     expect(hungUpChannel(initiatorId)).toBe(false);
@@ -1832,8 +1827,13 @@ describe('features', () => {
 
     // Asterisk answers the feature channel's own hangup with `ChannelDestroyed`; the added
     // party is still bridged (§10.2 "Three-way calls"), so their hint stays.
+    const handled = eventHandled(
+      pipeline,
+      'ChannelDestroyed',
+      addPartyChannel.id
+    );
     channelDestroyed(addPartyChannel.id);
-    await sleep(SETTLE_MS);
+    await handled;
     expect(hintPutsFor('300').at(-1)).toEqual({ deviceState: 'INUSE' });
     // §11.2 `calls.ended_at`: the added leg's own row ends as the added party leaves, not here.
     expect((await callsRow(addPartyCall.id)).endedAt).toBeNull();

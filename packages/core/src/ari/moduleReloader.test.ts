@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { flush } from '../testing/eventually.js';
 import { isReloadInProgress, ModuleReloader } from './moduleReloader.js';
 import { AriError, type AsteriskModule } from './types.js';
 
@@ -41,13 +42,6 @@ function fakeAsterisk(): {
       current?.open();
     }
   };
-}
-
-/** Lets pending promise callbacks run. */
-function flush(): Promise<void> {
-  return new Promise(resolve => {
-    setImmediate(resolve);
-  });
 }
 
 describe('ModuleReloader (§3.1 config propagation)', () => {

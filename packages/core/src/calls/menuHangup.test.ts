@@ -27,20 +27,6 @@ import { playAndWait } from './playback.js';
 
 /** A caller who hangs up inside a menu, and a greeting Asterisk refuses to play (§10.1 step 6). */
 
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
-}
-
-/** `promise`'s value, or `'pending'` if it has not settled within `ms`. */
-async function within<T>(
-  promise: Promise<T>,
-  ms: number
-): Promise<T | 'pending'> {
-  return Promise.race([promise, sleep(ms).then(() => 'pending' as const)]);
-}
-
 async function seedSettings(db: Db): Promise<void> {
   const targetId = newId();
   await db
@@ -199,7 +185,7 @@ describe('menu hangup and a refused greeting', () => {
     await requestTo(fakeAri, 'POST', `channels/${channel.id}/play`);
     await hangUp(channel.id);
 
-    expect(await within(played, 1000)).toBeUndefined();
+    await expect(played).resolves.toBeUndefined();
     expect(originates()).toBe(0);
     expect(traceEvents(call)).not.toContain('menuFallback');
     expect(traceEvents(call)).toContain('menuHangup');
@@ -215,7 +201,7 @@ describe('menu hangup and a refused greeting', () => {
     await requestTo(fakeAri, 'POST', `channels/${channel.id}/play`);
     await hangUp(channel.id);
 
-    expect(await within(played, 1000)).toBeUndefined();
+    await expect(played).resolves.toBeUndefined();
     const plays = fakeAri.calls.filter(
       entry =>
         entry.method === 'POST' && entry.path === `channels/${channel.id}/play`
@@ -243,7 +229,7 @@ describe('menu hangup and a refused greeting', () => {
       requests.indexOf(`POST channels/${channel.id}/play`)
     );
     await hangUp(channel.id);
-    await within(played, 1000);
+    await played;
   });
 
   it('returns at once from a playback on a channel that is already gone', async () => {
@@ -252,7 +238,7 @@ describe('menu hangup and a refused greeting', () => {
 
     const end = playAndWait(ari, channel.id, 'sound:beep', `${channel.id}:p`);
 
-    expect(await within(end, 500)).toBe('hangup');
+    expect(await end).toBe('hangup');
   });
 
   it('starts the silence timer when Asterisk refuses to play the greeting', async () => {
@@ -274,6 +260,6 @@ describe('menu hangup and a refused greeting', () => {
       expect(originates()).toBe(1);
     });
     await hangUp(channel.id);
-    await within(played, 1000);
+    await played;
   });
 });

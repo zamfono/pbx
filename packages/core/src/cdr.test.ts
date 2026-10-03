@@ -16,6 +16,7 @@ import { ConfigCache } from './internal/snapshot.js';
 import { StateStore } from './internal/stateStore.js';
 import { parseRtcpReport } from './rtcpReport.js';
 import { onEvents } from './testing/busEvents.js';
+import { eventually } from './testing/eventually.js';
 import { noopLogger } from './testing/pipelineDeps.js';
 import { fixedPoint, ntpMiddle, rtcpPayload } from './testing/rtcpPayload.js';
 
@@ -71,21 +72,6 @@ async function seedSettings(db: Db, callLogLevel: string): Promise<void> {
       callLogLevel
     })
     .execute();
-}
-
-function waitFor(done: () => boolean, timeoutMs = 2000): Promise<void> {
-  const POLL_MS = 5;
-  const deadline = Date.now() + timeoutMs;
-  return new Promise<void>(resolve => {
-    const tick = (): void => {
-      if (done() || Date.now() > deadline) {
-        resolve();
-        return;
-      }
-      setTimeout(tick, POLL_MS).unref();
-    };
-    tick();
-  });
 }
 
 // A driver may run a statement any number of ticks after `execute()` returns (Kysely's SQLite one
@@ -350,7 +336,9 @@ describe('CdrWriter', () => {
     );
 
     await cdr.open(call);
-    await waitFor(() => cdr.knowsCallId('call-id-abc@10.0.0.1'));
+    await eventually(() => {
+      expect(cdr.knowsCallId('call-id-abc@10.0.0.1')).toBe(true);
+    });
     cdr.sipMessage({
       callId: 'call-id-abc@10.0.0.1',
       at: '2026-01-01T00:00:01.000Z',
@@ -444,7 +432,9 @@ describe('CdrWriter', () => {
       'call-id-rtcp@10.0.0.1'
     );
     await cdr.open(call);
-    await waitFor(() => cdr.knowsCallId('call-id-rtcp@10.0.0.1'));
+    await eventually(() => {
+      expect(cdr.knowsCallId('call-id-rtcp@10.0.0.1')).toBe(true);
+    });
     const sentAt = 1_790_000_000_000;
     const report = parseRtcpReport(
       rtcpPayload({

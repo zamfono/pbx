@@ -289,7 +289,7 @@ describe('Presence', () => {
     // The RINGING PUT travels on a slow connection: Asterisk applies it only well after the
     // idle refresh that follows it has been computed and sent.
     let ringingHeld = false;
-    fakeAri.requestDelayMs = request => {
+    fakeAri.holdRequest = request => {
       const body = request.body as { deviceState?: string } | undefined;
       if (
         !ringingHeld &&

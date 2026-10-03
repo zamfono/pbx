@@ -16,7 +16,11 @@ import { fakeCreate, fakeDial, fakeOriginate } from './fakeDial.js';
 import { splitResource, type RouteResult } from './fakeHttp.js';
 import { FakePlaybacks } from './fakePlayback.js';
 import { fakeChannelVars } from './fakeRtp.js';
-import { FakeAriTransport, type FakeRequest } from './fakeTransport.js';
+import {
+  FakeAriTransport,
+  type FakeRequest,
+  type RequestHold
+} from './fakeTransport.js';
 import type { AriEvent, Channel } from './types.js';
 
 const DEFAULT_ANSWER_AFTER_MS = 10;
@@ -82,11 +86,12 @@ export class FakeAri {
    */
   onOriginate: ((channel: Channel) => void) | null = null;
   /**
-   * How long to hold `request` before handling it (and recording it in `calls`), or `null` to
-   * handle every request at once: a request on a slow connection reaches Asterisk after one sent
-   * later on another, which is what a test of request ordering needs to reproduce.
+   * How long to hold `request` before handling it (and recording it in `calls`): that many ms, or
+   * until the promise settles; `null` handles every request at once. A request on a slow
+   * connection reaches Asterisk after one sent later on another, which is what a test of request
+   * ordering needs to reproduce.
    */
-  requestDelayMs: ((request: FakeRequest) => number) | null = null;
+  holdRequest: ((request: FakeRequest) => RequestHold) | null = null;
   /** How long a snoop channel takes to enter Stasis after its creation, `null` for never. */
   snoopStasisAfterMs: number | null = DEFAULT_SNOOP_STASIS_AFTER_MS;
   private readonly snoopsOutsideStasis = new Set<string>();
@@ -98,7 +103,7 @@ export class FakeAri {
       this.calls.push(request);
       return this.route(request.method, request.path, request.body, request.qs);
     },
-    request => this.requestDelayMs?.(request) ?? 0
+    request => this.holdRequest?.(request) ?? 0
   );
 
   listen(): Promise<{ url: string }> {

@@ -24,15 +24,6 @@ import { eventually } from '../testing/eventually.js';
 import { noopLogger } from '../testing/pipelineDeps.js';
 import { TrunkState } from './trunkState.js';
 
-// How long an event that must change nothing is given to not change it.
-const SETTLE_MS = 50;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
-}
-
 /** `ConfigCache` always loads `settings` too (§3.1), so every test needs a minimal row. */
 async function seedSettings(db: Db): Promise<void> {
   const targetId = newId();
@@ -191,7 +182,7 @@ describe('TrunkState', () => {
   /**
    * Asterisk's `ContactStatusChange` for the contact of AOR `aor` (§9.4, via PJSIP `qualify`).
    * `TrunkState` handles it off the WebSocket, so a test waits for the status it expects; one
-   * that expects nothing to change gives the event `SETTLE_MS` to not change it.
+   * that expects nothing to change sends one that does after it, and waits for that.
    */
   function contactStatus(aor: string, status: string): void {
     fakeAri.emit({
@@ -256,10 +247,21 @@ describe('TrunkState', () => {
       Domain: 'sip:unknown.example.com',
       Status: 'Rejected'
     });
-    await sleep(SETTLE_MS);
+    // Handled in the order they arrive: the stranger's has been judged once this one's landed.
+    fakeAmi.emit({
+      Event: 'Registry',
+      Username: clientUri,
+      Domain: serverUri,
+      Status: 'Registered'
+    });
+    await eventually(() => {
+      expect(state.trunks.get(trunkId)?.status).toBe('registered');
+    });
 
-    expect(state.trunks.get(trunkId)?.status).toBe('unreachable');
-    expect(emitted).toHaveLength(1);
+    expect(emitted).toMatchObject([
+      { trunkId, status: 'unreachable' },
+      { trunkId, status: 'registered' }
+    ]);
     unsubscribe();
   });
 
@@ -340,11 +342,20 @@ describe('TrunkState', () => {
       expect(state.trunks.get(trunkId)?.status).toBe('registered');
     });
 
+    const emitted: Envelope[] = [];
+    const unsubscribe = onEvents(bus, envelope => {
+      emitted.push(envelope);
+    });
     contactStatus(trunkSectionName(trunkId), 'Created');
     contactStatus(trunkSectionName(trunkId), 'Removed');
-    await sleep(SETTLE_MS);
+    // Handled in the order they arrive: the two before have been judged once this one's landed.
+    contactStatus(trunkSectionName(trunkId), 'Unreachable');
+    await eventually(() => {
+      expect(state.trunks.get(trunkId)?.status).toBe('unreachable');
+    });
 
-    expect(state.trunks.get(trunkId)?.status).toBe('registered');
+    expect(emitted).toMatchObject([{ trunkId, status: 'unreachable' }]);
+    unsubscribe();
   });
 
   it('ignores ContactStatusChange for a registration trunk, a deleted ip trunk and a device', async () => {
@@ -355,6 +366,7 @@ describe('TrunkState', () => {
       'sip.example.com'
     );
     const deletedId = await seedIpTrunk(db, 'gone', 2, nowIso());
+    const probedId = await seedIpTrunk(db, 'carrier', 3);
     const emitted: Envelope[] = [];
     const unsubscribe = onEvents(bus, envelope => {
       emitted.push(envelope);
@@ -365,10 +377,14 @@ describe('TrunkState', () => {
     contactStatus(trunkSectionName(deletedId), 'Reachable');
     // A device's own AOR is its SIP username, never a trunk section (§9.3).
     contactStatus('e101-d1', 'Reachable');
-    await sleep(SETTLE_MS);
+    // Handled in the order they arrive: the three before have been judged once this one's landed.
+    contactStatus(trunkSectionName(probedId), 'Reachable');
+    await eventually(() => {
+      expect(state.trunks.get(probedId)?.status).toBe('registered');
+    });
 
-    expect(state.trunks.size).toBe(0);
-    expect(emitted).toHaveLength(0);
+    expect([...state.trunks.keys()]).toEqual([probedId]);
+    expect(emitted).toMatchObject([{ trunkId: probedId }]);
     unsubscribe();
   });
 
@@ -405,6 +421,7 @@ describe('TrunkState', () => {
     it('stays unmonitored on any ContactStatusChange, with one trunk.status event', async () => {
       await seedSettings(db);
       const trunkId = await seedIpTrunk(db, 'agent', 1, null, 0);
+      const probedId = await seedIpTrunk(db, 'carrier', 2);
       const emitted: Envelope[] = [];
       const unsubscribe = onEvents(bus, envelope => {
         emitted.push(envelope);
@@ -416,15 +433,17 @@ describe('TrunkState', () => {
       });
       // A probe result from before the switch, which a reload can still deliver.
       contactStatus(trunkSectionName(trunkId), 'Unreachable');
-      await sleep(SETTLE_MS);
+      // Handled in the order they arrive: the one before has been judged once this one's landed.
+      contactStatus(trunkSectionName(probedId), 'Reachable');
+      await eventually(() => {
+        expect(state.trunks.get(probedId)?.status).toBe('registered');
+      });
 
       expect(state.trunks.get(trunkId)?.status).toBe('unmonitored');
-      expect(emitted).toHaveLength(1);
-      expect(emitted[0]).toMatchObject({
-        type: 'trunk.status',
-        trunkId,
-        status: 'unmonitored'
-      });
+      expect(emitted).toMatchObject([
+        { type: 'trunk.status', trunkId, status: 'unmonitored' },
+        { type: 'trunk.status', trunkId: probedId, status: 'registered' }
+      ]);
       unsubscribe();
     });
 

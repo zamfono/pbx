@@ -13,9 +13,10 @@ import {
 import { type FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../ari/fakeDial.js';
+import type { AriEvent } from '../ari/types.js';
 import type { CdrWriter } from '../cdr.js';
 import { SIP_ADDRESS_INCOMPLETE } from '../sipCodes.js';
-import { eventually } from '../testing/eventually.js';
+import { eventually, flush } from '../testing/eventually.js';
 import {
   answeredCall,
   languageSet,
@@ -199,30 +200,39 @@ describe('CallActions', () => {
     const calleeId = await seedUser(db, '102');
     await seedDevice(rig, calleeId, 'e102-a');
     await rig.devicesUp();
-    const endpointOf = (channelId: string): string | undefined =>
+    // Read from the create itself: the dials complete out of order here.
+    const channelOf = (endpoint: string): string =>
       (
         fakeAri.calls.find(
           entry =>
             entry.path === 'channels/create' &&
-            (entry.body as { channelId?: string }).channelId === channelId
-        )?.body as { endpoint?: string } | undefined
-      )?.endpoint;
-    fakeAri.requestDelayMs = request => {
+            (entry.body as { endpoint?: string }).endpoint === endpoint
+        )?.body as { channelId?: string } | undefined
+      )?.channelId ?? '';
+    const answerArrived = Promise.withResolvers<undefined>();
+    const targetRinging = Promise.withResolvers<undefined>();
+    const targetDialAnswered = Promise.withResolvers<undefined>();
+    const firstId = (): string => channelOf('PJSIP/e101-a');
+    rig.ari.on('event', (event: AriEvent) => {
+      if (
+        event.type === 'ChannelStateChange' &&
+        (event.channel as { id?: string } | undefined)?.id === firstId()
+      ) {
+        answerArrived.resolve(undefined);
+      }
+    });
+    fakeAri.holdRequest = request => {
       const created = request.body as { endpoint?: string } | undefined;
       if (
         request.path === 'channels/create' &&
         created?.endpoint === 'PJSIP/e101-b'
       ) {
-        // Still being placed once the target's ring has begun, and its dial refused then.
-        setTimeout(() => {
-          fakeAri.failDial = { status: 409, count: 1 };
-        }, 250);
-        return 300;
+        // Still being placed once the target's ring has begun.
+        return targetRinging.promise;
       }
-      const dial = /^channels\/(?<id>[^/]+)\/dial$/u.exec(request.path);
-      const channelId = dial?.groups?.id ?? '';
-      const endpoint = endpointOf(channelId);
-      if (endpoint === 'PJSIP/e101-a') {
+      const dialled = /^channels\/(?<id>[^/]+)\/dial$/u.exec(request.path);
+      const channelId = dialled?.groups?.id ?? '';
+      if (channelId === firstId()) {
         // Answered while its dial's response is still on the way.
         fakeAri.emit({
           type: 'ChannelStateChange',
@@ -230,44 +240,58 @@ describe('CallActions', () => {
           application: 'zamfono',
           channel: defaultChannel({ id: channelId, state: 'Up' })
         });
-        return 50;
+        return answerArrived.promise;
       }
-      return endpoint === 'PJSIP/e102-a' ? 600 : 0;
+      if (channelId !== '' && channelId === channelOf('PJSIP/e102-a')) {
+        // The target's ring has begun; the still-placing phone's dial is refused, and the
+        // target's own dial answers only once that refusal has been handled.
+        fakeAri.failDial = { status: 409, count: 1 };
+        targetRinging.resolve(undefined);
+        return targetDialAnswered.promise;
+      }
+      return 0;
     };
+    const dial = vi.spyOn(rig.ari.channels, 'dial');
+    const hangup = vi.spyOn(rig.ari.channels, 'hangup');
+    // A dial's own promise, wrapped so a wait ends at the dial's start rather than its response.
+    const dialOf = (
+      endpoint: string
+    ): Promise<{ dialling: Promise<unknown> }> =>
+      eventually(() => {
+        const index = dial.mock.calls.findIndex(
+          ([channelId]) => channelId === channelOf(endpoint)
+        );
+        expect(index).toBeGreaterThanOrEqual(0);
+        return {
+          dialling: dial.mock.results[index]?.value as Promise<unknown>
+        };
+      });
 
-    const result = await actions.originate({
+    const originated = actions.originate({
       userId: callerId,
       target: '102',
       actorUserId: newId(),
       requestId: 'req-1'
     });
-    const callId = 'callId' in result ? result.callId : '';
-    // Read from the create itself: the dials complete out of order here.
-    const targetId = (): string =>
-      (
-        fakeAri.calls.find(
-          entry =>
-            entry.path === 'channels/create' &&
-            (entry.body as { endpoint?: string }).endpoint === 'PJSIP/e102-a'
-        )?.body as { channelId?: string } | undefined
-      )?.channelId ?? '';
-    await eventually(() => {
-      expect(
-        fakeAri.calls.some(
-          entry => entry.path === `channels/${targetId()}/dial`
-        )
-      ).toBe(true);
-    });
+    const refused = await dialOf('PJSIP/e101-b');
+    await expect(refused.dialling).rejects.toMatchObject({ status: 409 });
+    await flush();
+    targetDialAnswered.resolve(undefined);
     // Past the dial's response, where a ring already over hangs the target's phone up.
-    await new Promise(resolve => {
-      setTimeout(resolve, 200);
-    });
+    await (
+      await dialOf('PJSIP/e102-a')
+    ).dialling;
+    await flush();
 
+    const result = await originated;
+    const callId = 'callId' in result ? result.callId : '';
+    const targetId = channelOf('PJSIP/e102-a');
     const live = [...pipeline.callByChannel.values()].find(
       call => call.id === callId
     );
     expect(live?.log.finish().log ?? '').not.toContain('ringOutcome');
-    expect(rig.hungUp(targetId())).toBe(false);
+    expect(hangup).not.toHaveBeenCalledWith(targetId);
+    expect(rig.hungUp(targetId)).toBe(false);
     await actions.hangup(callId, { actorUserId: newId() });
   });
 
@@ -890,9 +914,7 @@ describe('CallActions', () => {
       actorUserId: pickerId
     });
     // The ring's outcome settles in promise callbacks after the placement; let them run.
-    await new Promise(resolve => {
-      setImmediate(resolve);
-    });
+    await flush();
     clearTimeout(pipeline.pendingRing.get(ringing.id)?.timer);
     ringing.status = 'missed';
     await cdr.finish(ringing);

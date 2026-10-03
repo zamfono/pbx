@@ -308,7 +308,7 @@ describe('user step against registration', () => {
         pipeline.deps.legStasisWaitMs = 20;
       } else {
         fakeAri.createdEntersStasis = false;
-        fakeAri.requestDelayMs = request => {
+        fakeAri.holdRequest = request => {
           const channelId = (request.body as { channelId?: string } | undefined)
             ?.channelId;
           if (request.path === 'channels/create' && channelId !== undefined) {
@@ -488,7 +488,7 @@ describe('user step against registration', () => {
     const userId = await seedUser(db, ['e101-da']);
     await seedAnnouncementRule(db, userId, 'noAnswer', 'noanswer.wav');
     await register('e101-da');
-    fakeAri.requestDelayMs = request => {
+    fakeAri.holdRequest = request => {
       const dial = /^channels\/(?<id>[^/]+)\/dial$/u.exec(request.path);
       if (dial?.groups?.id === undefined) {
         return 0;
@@ -513,7 +513,7 @@ describe('user step against registration', () => {
     await register('e101-da');
     await register('e101-db');
     // The answer's bridge is slow to come, so the decline lands while it is still being bridged.
-    fakeAri.requestDelayMs = request =>
+    fakeAri.holdRequest = request =>
       request.method === 'POST' && request.path === 'bridges' ? 200 : 0;
 
     const step = runUserStep(

@@ -6,6 +6,8 @@ import { vi } from 'vitest';
 
 import type { FakeAri } from '../ari/fake.js';
 import type { FakeRequest } from '../ari/fakeTransport.js';
+import type { AriEvent, Channel } from '../ari/types.js';
+import type { Pipeline } from '../calls/pipeline.js';
 
 // Well past a loaded run's slowest round trips, and still inside vitest's 5 s test timeout, so a
 // state that never arrives fails on its own assertion rather than on the test timeout.
@@ -61,5 +63,43 @@ export function nextSubscription(
       }
     };
     emitter.on('newListener', onNewListener);
+  });
+}
+
+/** Resolves once every promise callback already queued has run: whatever a step set off without
+ * waiting on I/O has happened by then. */
+export function flush(): Promise<void> {
+  return new Promise(resolve => {
+    setImmediate(resolve);
+  });
+}
+
+/**
+ * Resolves once `pipeline` has handled the next `type` event for channel `channelId`, every step
+ * its handling awaits included: the point a test expecting that event to change nothing checks
+ * at. Call it before the step that emits the event.
+ */
+export function eventHandled(
+  pipeline: Pipeline,
+  type: string,
+  channelId: string
+): Promise<void> {
+  // The pipeline's `ari` listener hands each event to its private `routeEvent`.
+  const router = pipeline as unknown as {
+    routeEvent: (event: AriEvent) => Promise<void>;
+  };
+  const route = router.routeEvent;
+  return new Promise((resolve, reject) => {
+    const spy = vi.spyOn(router, 'routeEvent').mockImplementation(event => {
+      const handled = route.call(pipeline, event);
+      if (
+        event.type === type &&
+        (event.channel as Channel | undefined)?.id === channelId
+      ) {
+        spy.mockRestore();
+        handled.then(resolve, reject);
+      }
+      return handled;
+    });
   });
 }

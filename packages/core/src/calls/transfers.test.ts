@@ -7,7 +7,7 @@ import { type FakeAri } from '../ari/fake.js';
 import { isPlacement } from '../ari/fakeDial.js';
 import type { LogLevel } from '../callLog.js';
 import type { CdrWriter } from '../cdr.js';
-import { eventually } from '../testing/eventually.js';
+import { eventHandled, eventually } from '../testing/eventually.js';
 import { noopLogger } from '../testing/pipelineDeps.js';
 import {
   answeredCall,
@@ -25,15 +25,6 @@ import { fromOf, userOfChannel } from './onwardCall.js';
 import type { Pipeline } from './pipeline.js';
 import { Recorder } from './recording.js';
 import { transferCall } from './transfers.js';
-
-// How long a check that something does NOT happen gives the flow to do it anyway.
-const SETTLE_MS = 50;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
-}
 
 /** A trunk plus an outbound route restricted to `userId`, so only their calls match it (§9.4). */
 async function seedTrunkWithRoute(db: Db, userId: string): Promise<string> {
@@ -758,8 +749,9 @@ describe('transfers', () => {
     });
     await transferFollowed(original.legId);
     // Asterisk ends the transferrer's second channel itself; that ends nothing else.
+    const handled = eventHandled(pipeline, 'ChannelDestroyed', secondId);
     destroyed(secondId);
-    await sleep(SETTLE_MS);
+    await handled;
     expect(await endedAt(consultation.id)).toBeNull();
 
     destroyed(original.callerId);

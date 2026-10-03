@@ -538,10 +538,6 @@ describe('playMenu', () => {
         channel: defaultChannel({ id: channel.id }),
         digit
       });
-      // eslint-disable-next-line no-await-in-loop -- digits are sent one at a time, in order
-      await new Promise(resolve => {
-        setTimeout(resolve, 10);
-      });
     }
     await done;
 

@@ -14,7 +14,7 @@ import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { ATTEMPT_NO_RESPONSE_MS } from '../routing/trunk.js';
 import { AST_CAUSE_CALL_REJECTED, AST_CAUSE_USER_BUSY } from '../sipCodes.js';
-import { eventually } from '../testing/eventually.js';
+import { eventually, flush } from '../testing/eventually.js';
 import {
   noopLogger,
   registerDevice,
@@ -27,6 +27,8 @@ import { ringGroup } from './ringGroup.js';
 import { ringUser } from './ringUser.js';
 import { TrunkState } from './trunkState.js';
 
+// How long the fake Asterisk takes to answer the read of a channel's hangup-cause hash.
+const SLOW_READ_MS = 600;
 // Q.850 causes as ARI's `ChannelDestroyed` carries them: 41 temporary failure (SIP 503), 17 user
 // busy (SIP 486).
 const AST_CAUSE_TEMPORARY_FAILURE = 41;
@@ -228,12 +230,6 @@ async function channelTo(ari: AriClient, endpoint: string): Promise<Channel> {
     throw new Error(`no channel originated to ${endpoint}`);
   }
   return channel;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
 }
 
 function traceEvents(call: Call): string[] {
@@ -489,38 +485,55 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
 
     // §9.4 "Route fallthrough": the budget covers only the wait for a first response. An answer
     // landing while its end-of-budget read is still under way is the race's, never hung up.
-    // The budget runs out on a real clock here: the slow read is the fake Asterisk's own timer,
-    // which the answer has to land inside.
-    it(
-      'keeps an attempt answered while its 8 s budget read is still under way',
-      async () => {
-        const forwarding = await seedUser(db);
-        await seedExternalForward(db, forwarding, '+15557777');
-        await seedDevice(db, forwarding, 'member-forwarding');
-        await registerDevice(fakeAri, pipeline, 'member-forwarding');
-        const trunk1 = await seedTrunk(db, 1);
-        await seedRoute(db, 1, trunk1);
-        const groupId = await seedRingGroup(db, [forwarding]);
-        // The read of the channel's hangup-cause hash is slow to answer.
-        fakeAri.requestDelayMs = request =>
-          request.method === 'GET' && request.path.endsWith('/variable')
-            ? 600
-            : 0;
+    it('keeps an attempt answered while its 8 s budget read is still under way', async () => {
+      const forwarding = await seedUser(db);
+      await seedExternalForward(db, forwarding, '+15557777');
+      await seedDevice(db, forwarding, 'member-forwarding');
+      await registerDevice(fakeAri, pipeline, 'member-forwarding');
+      const trunk1 = await seedTrunk(db, 1);
+      await seedRoute(db, 1, trunk1);
+      const groupId = await seedRingGroup(db, [forwarding]);
+      // The read of the channel's hangup-cause hash is slow to answer.
+      fakeAri.holdRequest = request =>
+        request.method === 'GET' &&
+        request.path.endsWith('/variable') &&
+        request.qs.includes('HANGUPCAUSE')
+          ? SLOW_READ_MS
+          : 0;
+      const getVariable = vi.spyOn(ari.channels, 'getVariable');
+      const hangup = vi.spyOn(ari.channels, 'hangup');
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout'],
+        shouldAdvanceTime: true
+      });
 
-        const finished = ringGroup(pipeline, call, groupId);
-        await membersRinging(call, 1);
-        const first = await channelTo(ari, `PJSIP/+15557777@trunk-${trunk1}`);
-        await sleep(ATTEMPT_NO_RESPONSE_MS + 200);
-        emit('ChannelStateChange', first.id, { state: 'Up' });
-        await finished;
-        // Past the read's own answer, which reports no provisional response.
-        await sleep(800);
+      const finished = ringGroup(pipeline, call, groupId);
+      await membersRinging(call, 1);
+      const endpoint = `PJSIP/+15557777@trunk-${trunk1}`;
+      const first = await channelTo(ari, endpoint);
+      await vi.advanceTimersByTimeAsync(ATTEMPT_NO_RESPONSE_MS);
+      // Wrapped, so the wait ends at the read's start rather than its answer.
+      const { read } = await eventually(() => {
+        const index = getVariable.mock.calls.findIndex(
+          ([channelId, name]) =>
+            channelId === first.id && name === `HANGUPCAUSE(${endpoint},tech)`
+        );
+        expect(index).toBeGreaterThanOrEqual(0);
+        return {
+          read: getVariable.mock.results[index]?.value as Promise<unknown>
+        };
+      });
+      emit('ChannelStateChange', first.id, { state: 'Up' });
+      await finished;
+      // Past the read's own answer, which reports no provisional response.
+      await vi.advanceTimersByTimeAsync(SLOW_READ_MS);
+      await read;
+      await flush();
 
-        expect(call.status).toBe('answered');
-        expect(hangups(fakeAri, first.id)).toBe(0);
-      },
-      ATTEMPT_NO_RESPONSE_MS + 5000
-    );
+      expect(call.status).toBe('answered');
+      expect(hangup).not.toHaveBeenCalledWith(first.id);
+      expect(hangups(fakeAri, first.id)).toBe(0);
+    });
 
     it('falls through to the next route on a 403, which only tech_cause tells from a 603', async () => {
       const forwarding = await seedUser(db);

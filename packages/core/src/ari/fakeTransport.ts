@@ -14,20 +14,23 @@ export type FakeRequest = {
   body: unknown;
 };
 
+/** How long a request is held before it is handled: that many ms, or until the promise settles. */
+export type RequestHold = number | Promise<void>;
+
 export class FakeAriTransport {
   private readonly handle: (request: FakeRequest) => RouteResult;
-  private readonly delayFor: (request: FakeRequest) => number;
+  private readonly holdFor: (request: FakeRequest) => RequestHold;
   private server: http.Server | null = null;
   private wss: WebSocketServer | null = null;
   private client: WebSocket | null = null;
 
-  /** `delayFor` holds a request that long before it is handled, as a slow connection would. */
+  /** `holdFor` holds a request before it is handled, as a slow connection would. */
   constructor(
     handle: (request: FakeRequest) => RouteResult,
-    delayFor: (request: FakeRequest) => number = () => 0
+    holdFor: (request: FakeRequest) => RequestHold = () => 0
   ) {
     this.handle = handle;
-    this.delayFor = delayFor;
+    this.holdFor = holdFor;
   }
 
   listen(): Promise<{ url: string }> {
@@ -103,14 +106,17 @@ export class FakeAriTransport {
       const pathAndQuery = (request.url ?? '/').replace(/^\/ari\//u, '');
       const [path = '', qs = ''] = pathAndQuery.split('?');
       const fakeRequest = { method, path, qs, body: parseBody(chunks) };
-      const delayMs = this.delayFor(fakeRequest);
-      if (delayMs <= 0) {
+      const hold = this.holdFor(fakeRequest);
+      const respond = (): void => {
         sendResult(response, this.handle(fakeRequest));
-        return;
+      };
+      if (typeof hold !== 'number') {
+        hold.then(respond, respond);
+      } else if (hold <= 0) {
+        respond();
+      } else {
+        setTimeout(respond, hold);
       }
-      setTimeout(() => {
-        sendResult(response, this.handle(fakeRequest));
-      }, delayMs);
     });
   }
 }

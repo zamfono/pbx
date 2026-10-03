@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  MS_PER_SECOND,
   newId,
   nowIso,
   openDb,
@@ -30,14 +31,6 @@ import { Pipeline } from './pipeline.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';
-
-// Asterisk's Q.850 mapping of SIP 486 Busy Here (matches ringGroup.ts's own constant).
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
-}
 
 /** A `settings` row plus the `dids` row its `mainDidId` FK requires; no DID is dialed in these tests. */
 async function seedSettings(db: Db): Promise<void> {
@@ -530,7 +523,7 @@ describe('ringGroup', () => {
     await seedMember(db, groupId, 0, userA);
     await seedMember(db, groupId, 1, userB);
     // The winner's bridge comes only after the batch's one-second timeout.
-    fakeAri.requestDelayMs = request =>
+    fakeAri.holdRequest = request =>
       request.method === 'POST' && request.path === 'bridges' ? 1500 : 0;
 
     const finished = ringGroup(pipeline, call, groupId);
@@ -577,7 +570,7 @@ describe('ringGroup', () => {
       'PJSIP/late-1': 1500,
       'PJSIP/late-2': 2500
     };
-    fakeAri.requestDelayMs = request => {
+    fakeAri.holdRequest = request => {
       const endpoint = (request.body as { endpoint?: string } | undefined)
         ?.endpoint;
       return request.path === 'channels/create'
@@ -847,9 +840,10 @@ describe('ringGroup', () => {
   });
 
   it('a member declining with allow_reject cleared keeps ringing until the timeout', async () => {
+    const RING_TIMEOUT_S = 1;
     const groupId = await seedRingGroup(db, {
       strategy: 'sequential',
-      ringTimeoutS: 1,
+      ringTimeoutS: RING_TIMEOUT_S,
       allowReject: false
     });
     const userA = await seedUser(db);
@@ -862,6 +856,7 @@ describe('ringGroup', () => {
     await seedMember(db, groupId, 0, userA);
     await seedMember(db, groupId, 1, userB);
 
+    const ringStarted = performance.now();
     const finished = ringGroup(pipeline, call, groupId);
     await membersRinging(call, 1);
     expect(originates(fakeAri)).toHaveLength(1);
@@ -883,12 +878,13 @@ describe('ringGroup', () => {
     });
 
     // The decline alone must not settle the batch early; only the timeout may.
-    await sleep(200);
-    expect(originates(fakeAri)).toHaveLength(1);
-
     await eventually(() => {
       expect(originates(fakeAri)).toHaveLength(2);
     });
+    // Node arms a timer on its millisecond loop clock, which can trail this one by up to 1 ms.
+    expect(performance.now() - ringStarted).toBeGreaterThan(
+      RING_TIMEOUT_S * MS_PER_SECOND - 1
+    );
 
     await finished;
   }, 10_000);
