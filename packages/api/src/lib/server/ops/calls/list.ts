@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { LiveCall } from '@zamfono/shared';
+import { CALL_DIRECTIONS, CALL_STATUSES, type LiveCall } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import {
@@ -12,12 +12,7 @@ import {
 import { assertSelfOrAdmin } from '../gates.js';
 import { instantInput, tenantInstantReader } from '../instantInput.js';
 import { defineOperation } from '../types.js';
-import {
-  CALL_DIRECTIONS,
-  CALL_STATUSES,
-  ownCallWhere,
-  toCallOut
-} from './_shared.js';
+import { ownCallWhere, toCallOut } from './_shared.js';
 
 const inputSchema = z
   .object({

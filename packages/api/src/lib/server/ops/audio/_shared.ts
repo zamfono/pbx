@@ -1,8 +1,6 @@
 import type { Selectable, Transaction } from 'kysely';
 
-import { type DB } from '@zamfono/shared';
-
-import type { AudioKind } from '#lib/server/audio/types.js';
+import { type AudioKind, type DB } from '@zamfono/shared';
 
 import { findForwardTargetOwners } from '../forwardTargetOwners.js';
 import { liveRow } from '../rows.js';
@@ -30,7 +28,7 @@ export function toAudioAssetOut(row: AudioAssetRow): AudioAssetOut {
   return {
     id: row.id,
     label: row.label,
-    kind: row.kind as AudioKind,
+    kind: row.kind,
     filename: row.filename,
     createdAt: row.createdAt
   };

@@ -81,11 +81,7 @@ describe('authenticateToken', () => {
     const deps = await depsWith(async db => {
       // The `users.role` CHECK (§11.2) keeps such a row out; the refusal must not rely on it.
       await sql`PRAGMA ignore_check_constraints = ON`.execute(db);
-      await db
-        .updateTable('users')
-        .set({ role: 'root' })
-        .where('id', '=', 'owner')
-        .execute();
+      await sql`update users set role = 'root' where id = 'owner'`.execute(db);
     });
     expect(await authenticateToken(deps, await tokenFor('owner'))).toBeNull();
   });

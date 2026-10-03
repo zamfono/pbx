@@ -18,7 +18,6 @@ import {
   release,
   type Call
 } from './call.js';
-import { toLogLevel } from './callLogLevel.js';
 import { dialEmergency, emergencyLogLevel } from './emergency.js';
 import { handleFeature } from './features.js';
 import { enterTarget } from './inbound.js';
@@ -55,7 +54,7 @@ export function logLevelFor(
   action: DialAction,
   nowIso: string
 ): LogLevel {
-  const configured = toLogLevel(snapshot.settings.callLogLevel);
+  const configured = snapshot.settings.callLogLevel;
   return action.kind === 'emergency'
     ? emergencyLogLevel(configured, nowIso)
     : configured;

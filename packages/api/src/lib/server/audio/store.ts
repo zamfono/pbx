@@ -4,10 +4,10 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import * as env from '$app/env/private';
 
-import { newId } from '@zamfono/shared';
+import { newId, type AudioKind } from '@zamfono/shared';
 
 import { mohClassDir } from './mohLayout.js';
-import type { AudioKind, AudioUpload, StoredAudio } from './types.js';
+import type { AudioUpload, StoredAudio } from './types.js';
 import { masterExtensionFor } from './uploadTypes.js';
 
 const execFileAsync = promisify(execFile);

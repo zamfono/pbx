@@ -1,4 +1,4 @@
-import { newId, type Db } from '@zamfono/shared';
+import { newId, type CallStatus, type Db } from '@zamfono/shared';
 
 import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
@@ -28,7 +28,7 @@ export async function insertCall(
     startedAt: string;
     answeredAt?: string | null;
     endedAt?: string | null;
-    status: string;
+    status: CallStatus;
   }
 ): Promise<void> {
   await db

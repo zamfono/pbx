@@ -14,7 +14,6 @@ import { logUnlessGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { ActionError, notBridged } from './actionError.js';
 import { type Call, type Owner } from './call.js';
-import { toLogLevel } from './callLogLevel.js';
 import { bridgedParty, transferrerChannel } from './callLookup.js';
 import { ownerForExt } from './extensionOwner.js';
 import { endHold } from './hold.js';
@@ -58,7 +57,7 @@ async function startTransfereeCall(
     direction: dial?.direction ?? 'internal',
     logLevel:
       dial === null
-        ? toLogLevel(snapshot.settings.callLogLevel)
+        ? snapshot.settings.callLogLevel
         : logLevelFor(snapshot, dial.action, pipeline.deps.now()),
     asUserId: transferrerUserId,
     trace:

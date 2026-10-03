@@ -7,12 +7,7 @@
 import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { assetMedia } from '../prompts.js';
-import {
-  groupFallback,
-  ringable,
-  ringPlan,
-  type Strategy
-} from '../routing/ringGroup.js';
+import { groupFallback, ringable, ringPlan } from '../routing/ringGroup.js';
 import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { release, type Call } from './call.js';
 import { raiseLogLevel } from './callLogLevel.js';
@@ -213,7 +208,7 @@ export async function ringGroup(
 
   const plan = ringPlan(
     legs,
-    group.strategy as Strategy,
+    group.strategy,
     group.ringTimeoutS,
     group.ringTotalS,
     rng

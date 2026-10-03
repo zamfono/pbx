@@ -1,14 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { nowIso, openDb, type Db } from '@zamfono/shared';
+import { nowIso, openDb, type Db, type Language } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { compileTemplate, resolveTemplate } from './render.js';
-import {
-  loadBuiltinTemplate,
-  type Language,
-  type TemplateKind
-} from './templates.js';
+import { loadBuiltinTemplate, type TemplateKind } from './templates.js';
 
 const BUILTIN_KINDS: TemplateKind[] = [
   'voicemail',

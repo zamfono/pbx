@@ -1,7 +1,12 @@
 import type { ExpressionBuilder, Selectable, Transaction } from 'kysely';
 import { z } from 'zod';
 
-import { HTTP_FORBIDDEN, type DB } from '@zamfono/shared';
+import {
+  HTTP_FORBIDDEN,
+  type CallDirection,
+  type CallStatus,
+  type DB
+} from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { coreRefusal } from '#lib/server/coreHttp.js';
@@ -11,19 +16,6 @@ import { OpError, type Context } from '../types.js';
 
 /** A `calls` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type CallRow = Selectable<DB['calls']>;
-
-export const CALL_DIRECTIONS = ['inbound', 'outbound', 'internal'] as const;
-export type CallDirection = (typeof CALL_DIRECTIONS)[number];
-export const CALL_STATUSES = [
-  'answered',
-  'missed',
-  'busy',
-  'failed',
-  'voicemail',
-  'blocked',
-  'interrupted'
-] as const;
-export type CallStatus = (typeof CALL_STATUSES)[number];
 
 /** The `id` input of an action on a live call (§10.3 "Live calls"). */
 export const liveCallIdInput = z
@@ -81,7 +73,7 @@ export function toCallOut(row: CallRow): CallOut {
   return {
     id: row.id,
     parentCallId: row.parentCallId,
-    direction: row.direction as CallDirection,
+    direction: row.direction,
     fromUri: row.fromUri,
     toUri: row.toUri,
     didId: row.didId,
@@ -89,7 +81,7 @@ export function toCallOut(row: CallRow): CallOut {
     calleeUserId: row.calleeUserId,
     ringGroupId: row.ringGroupId,
     answeredByUserId: row.answeredByUserId,
-    status: row.status as CallStatus,
+    status: row.status,
     startedAt: row.startedAt,
     answeredAt: row.answeredAt,
     endedAt: row.endedAt

@@ -2,7 +2,7 @@
  * routing cursor; SQLite holds durable outcomes alone, via the CDR writer. */
 import type { Selectable } from 'kysely';
 
-import type { DB, Scope } from '@zamfono/shared';
+import type { DB, Scope, UserForwardCondition } from '@zamfono/shared';
 
 import { logUnlessGone } from '../ari/failures.js';
 import { CallLog, type LogLevel } from '../callLog.js';
@@ -165,23 +165,17 @@ export function findForwardTarget(
   return targetFromRow(row);
 }
 
-type EntryOrOutcomeCondition =
-  'unconditional' | 'dnd' | 'busy' | 'noAnswer' | 'offline';
-
 /** `user_forward_rules` for `userId`, keyed by condition, resolved to their `ForwardTarget`s. */
 export function buildUserRules(
   snapshot: Snapshot,
   userId: string
-): Partial<Record<EntryOrOutcomeCondition, ForwardTarget>> {
-  const rules: Partial<Record<EntryOrOutcomeCondition, ForwardTarget>> = {};
+): Partial<Record<UserForwardCondition, ForwardTarget>> {
+  const rules: Partial<Record<UserForwardCondition, ForwardTarget>> = {};
   for (const row of snapshot.userForwardRules) {
     if (row.userId !== userId) {
       continue;
     }
-    rules[row.condition as EntryOrOutcomeCondition] = findForwardTarget(
-      snapshot,
-      row.targetId
-    );
+    rules[row.condition] = findForwardTarget(snapshot, row.targetId);
   }
   return rules;
 }

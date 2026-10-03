@@ -2,25 +2,24 @@
 import type { Transaction } from 'kysely';
 import type { z } from 'zod';
 
-import { HTTP_CONFLICT, type DB } from '@zamfono/shared';
+import {
+  HTTP_CONFLICT,
+  type AuditChannel,
+  type DB,
+  type UserRole
+} from '@zamfono/shared';
 
 import type { Effects } from './effects.js';
 
-/** RBAC roles, ordered most to least privileged (§5.3). */
-export type Role = 'owner' | 'admin' | 'user';
-
-/** How an operation call reached the runner; recorded in `audit_log.channel` (§5.7). */
-export type Channel = 'rest' | 'mcp' | 'ui' | 'undo' | 'job';
-
 /** The authenticated caller of an operation. */
-export type Actor = { id: string; name: string; role: Role };
+export type Actor = { id: string; name: string; role: UserRole };
 
 /** Built by the runner for every call; `run` holds only what differs between operations (§10.3). */
 export type Context = {
   actor: Actor;
   db: Transaction<DB>;
   now: string;
-  channel: Channel;
+  channel: AuditChannel;
   clientId?: string;
   clientName?: string;
   requestId: string;
@@ -36,7 +35,7 @@ export type Operation<In, Out> = {
   name: string;
   description: string;
   input: z.ZodType<In>;
-  minRole: Role;
+  minRole: UserRole;
   readOnly?: boolean;
   confirm?: (input: In) => string;
   /** `false` opts a write out of the audit log: presence, read flags, live-call actions (§5.7). */

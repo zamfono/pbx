@@ -4,8 +4,10 @@ import { z } from 'zod';
 import {
   addMsIso,
   HTTP_UNPROCESSABLE_CONTENT,
+  LOG_LEVEL_OVERRIDES,
   MS_PER_DAY,
-  type LogLevelColumns
+  type LogLevelColumns,
+  type LogLevelOverride
 } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
@@ -16,13 +18,6 @@ import { OpError, type Context } from '../types.js';
  * oversight.
  */
 const DEFAULT_OVERRIDE_DAYS = 7;
-
-/**
- * The levels a per-user, per-trunk or per-ring-group override may raise a call to (§7). An
- * override only raises the level, so `none` belongs to the tenant default alone.
- */
-export const LOG_LEVEL_OVERRIDES = ['events', 'qos', 'sip'] as const;
-export type LogLevelOverride = (typeof LOG_LEVEL_OVERRIDES)[number];
 
 /** The two override fields `users.update`, `trunks.update` and `ringGroups.update` accept (§7). */
 export const logLevelInputFields = {

@@ -5,7 +5,7 @@
 import type * as privateEnv from '$app/env/private';
 import { z } from 'zod';
 
-import { isE164 } from '@zamfono/shared';
+import { isE164, type SmtpSecurity } from '@zamfono/shared';
 
 import { settingsInputSchema } from './ops/settings/_input.js';
 import { isKnownCountry } from './ops/settings/country.js';
@@ -110,7 +110,7 @@ export function mainDidFrom(env: SeedEnv): string {
 }
 
 /** `SMTP_SECURITY`, `tls` when unset, else a value `settings.update` accepts (§10.2 "Transport"). */
-export function smtpSecurityFrom(env: SeedEnv): 'tls' | 'starttls' {
+export function smtpSecurityFrom(env: SeedEnv): SmtpSecurity {
   const value = env.SMTP_SECURITY;
   if (value === undefined) {
     return DEFAULT_SMTP_SECURITY;

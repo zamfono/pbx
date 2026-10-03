@@ -3,7 +3,8 @@ import type { Selectable, Transaction } from 'kysely';
 import {
   HTTP_UNPROCESSABLE_CONTENT,
   type DB,
-  type LogLevelColumns
+  type LogLevelColumns,
+  type RingStrategy
 } from '@zamfono/shared';
 
 import { assertAudioAvailable } from '../audio/_shared.js';
@@ -100,7 +101,7 @@ export type RingGroupOut = LogLevelColumns & {
   id: string;
   name: string;
   ext: string;
-  strategy: 'simultaneous' | 'sequential' | 'random';
+  strategy: RingStrategy;
   ringTimeoutS: number;
   ringTotalS: number | null;
   skipBusy: boolean;
@@ -139,7 +140,7 @@ export async function toRingGroupOut(
     id: row.id,
     name: row.name,
     ext,
-    strategy: row.strategy as RingGroupOut['strategy'],
+    strategy: row.strategy,
     ringTimeoutS: row.ringTimeoutS,
     ringTotalS: row.ringTotalS,
     skipBusy: row.skipBusy === 1,

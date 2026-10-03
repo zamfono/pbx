@@ -1,16 +1,15 @@
 import { z } from 'zod';
 
-import { DIVERSION_POLICIES } from '@zamfono/shared';
+import {
+  CALLERID_HEADERS,
+  DIVERSION_POLICIES,
+  NUMBER_FORMATS,
+  TRUNK_AUTH_MODES,
+  TRUNK_TRANSPORTS
+} from '@zamfono/shared';
 
 import { logLevelInputFields } from '../settings/logLevel.js';
-import {
-  AUTH_MODES,
-  CALLERID_HEADERS,
-  CODECS,
-  hostInputSchema,
-  NUMBER_FORMATS,
-  TRANSPORTS
-} from './_shared.js';
+import { CODECS, hostInputSchema } from './_shared.js';
 
 /**
  * What each trunk field means (§9.4), one sentence each, which `trunks.create` and
@@ -60,11 +59,11 @@ export const createInputSchema = z
     name: z.string().min(1),
     // Required, so every trunk carries the admin's explicit choice (§9.4 "Emergency trunks").
     emergency: z.boolean().describe(FIELD.emergency),
-    authMode: z.enum(AUTH_MODES).describe(FIELD.authMode),
+    authMode: z.enum(TRUNK_AUTH_MODES).describe(FIELD.authMode),
     username: z.string().min(1).optional().describe(FIELD.username),
     password: z.string().min(1).optional().describe(FIELD.password),
     inboundAuth: z.boolean().optional().describe(FIELD.inboundAuth),
-    transport: z.enum(TRANSPORTS).optional().describe(FIELD.transport),
+    transport: z.enum(TRUNK_TRANSPORTS).optional().describe(FIELD.transport),
     srtp: z.boolean().optional().describe(FIELD.srtp),
     // Default true: a new TLS trunk checks the provider's certificate (§9.4 "Signaling").
     tlsVerify: z.boolean().optional().describe(FIELD.tlsVerify),
@@ -117,11 +116,11 @@ export const updateInputSchema = z
     id: z.string().min(1),
     name: z.string().min(1).optional(),
     emergency: z.boolean().optional().describe(FIELD.emergency),
-    authMode: z.enum(AUTH_MODES).optional().describe(FIELD.authMode),
+    authMode: z.enum(TRUNK_AUTH_MODES).optional().describe(FIELD.authMode),
     username: z.string().min(1).nullable().optional().describe(FIELD.username),
     password: z.string().min(1).optional().describe(FIELD.password),
     inboundAuth: z.boolean().optional().describe(FIELD.inboundAuth),
-    transport: z.enum(TRANSPORTS).optional().describe(FIELD.transport),
+    transport: z.enum(TRUNK_TRANSPORTS).optional().describe(FIELD.transport),
     srtp: z.boolean().optional().describe(FIELD.srtp),
     tlsVerify: z.boolean().optional().describe(FIELD.tlsVerify),
     qualify: z.boolean().optional().describe(FIELD.qualify),

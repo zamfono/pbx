@@ -99,7 +99,7 @@ export function settleHealth(
   const webhookId = hook.id;
   const wasFailing = hook.lastStatus === 'failing';
   if (failure === null) {
-    const update = {
+    const update: HealthUpdate = {
       lastStatus: 'ok',
       lastDeliveryAt: at,
       failingSince: null,
@@ -127,7 +127,7 @@ export function settleHealth(
     failure,
     at
   );
-  const update = {
+  const update: HealthUpdate = {
     lastStatus: 'failing',
     lastDeliveryAt: at,
     lastError: failure,

@@ -1,29 +1,24 @@
 import type { Transaction } from 'kysely';
 
-import type { DB, SipHeaderTemplate } from '@zamfono/shared';
+import {
+  USER_FORWARD_CONDITIONS,
+  type DB,
+  type SipHeaderTemplate,
+  type UserForwardCondition
+} from '@zamfono/shared';
 
 import { type TargetSpec } from '../forwardTargetSchema.js';
 import { rowToTarget } from '../forwardTargetSpec.js';
 
-/** §11.2 `user_forward_rules` CHECK: the classic CFU/CFB/CFNR conditions plus presence-aware ones. */
-export const CONDITIONS = [
-  'unconditional',
-  'busy',
-  'noAnswer',
-  'dnd',
-  'offline'
-] as const;
-export type Condition = (typeof CONDITIONS)[number];
-
 /** One stored rule: the wire rule `users.getForwarding` returns, plus the target row it owns. */
 export type StoredForwardRule = {
-  condition: Condition;
+  condition: UserForwardCondition;
   target: TargetSpec;
   targetId: string;
 };
 
 /**
- * A user's stored forwarding rules in `CONDITIONS` order, each target as the wire returns it
+ * A user's stored forwarding rules in `USER_FORWARD_CONDITIONS` order, each target as the wire returns it
  * (§10.3 "Forward targets"), so a read is exactly what `users.setForwarding` takes back.
  */
 export async function storedForwardRules(
@@ -41,11 +36,11 @@ export async function storedForwardRules(
     .select(['userForwardRules.condition', 'userForwardRules.targetId'])
     .where('userForwardRules.userId', '=', userId)
     .execute();
-  const byCondition = (rule: { condition: string }): number =>
-    CONDITIONS.indexOf(rule.condition as Condition);
+  const byCondition = (rule: { condition: UserForwardCondition }): number =>
+    USER_FORWARD_CONDITIONS.indexOf(rule.condition);
   return rows
     .map(row => ({
-      condition: row.condition as Condition,
+      condition: row.condition,
       target: rowToTarget(row),
       targetId: row.targetId
     }))

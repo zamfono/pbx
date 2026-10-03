@@ -52,8 +52,8 @@ export function resolveAttemptIdentity(params: {
     withhold,
     number: presented,
     trunk: {
-      callerIdHeader: trunk.calleridHeader as 'from' | 'pai' | 'both',
-      callerIdFormat: trunk.calleridFormat as 'e164' | 'national'
+      callerIdHeader: trunk.calleridHeader,
+      callerIdFormat: trunk.calleridFormat
     },
     country: snapshot.settings.country
   });

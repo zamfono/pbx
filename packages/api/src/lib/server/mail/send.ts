@@ -11,7 +11,6 @@ import { tenantTimeZone } from '../tenantTimeZone.js';
 import { resolveRecipients } from './recipients.js';
 import { createTransportFor, relayFromSettings } from './relay.js';
 import { resolveTemplate } from './render.js';
-import type { Language } from './templates.js';
 
 const logger = pino({ name: 'mail' });
 
@@ -122,7 +121,7 @@ export async function sendMail(
     .select(['companyName', 'language', 'timezone'])
     .where('id', '=', 1)
     .executeTakeFirstOrThrow();
-  const language = settings.language as Language;
+  const { language } = settings;
   const template = await resolveTemplate(db, req.kind, language);
   const values = {
     ...req.values,

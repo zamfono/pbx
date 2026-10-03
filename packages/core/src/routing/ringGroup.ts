@@ -4,6 +4,8 @@
  * ring plan and the group's fallback (§11.2 `ring_group_forward_rules`).
  */
 
+import type { RingStrategy } from '@zamfono/shared';
+
 import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import type { ForwardTarget } from './targets.js';
 
@@ -139,8 +141,6 @@ export function ringable(
   return legs;
 }
 
-export type Strategy = 'simultaneous' | 'sequential' | 'random';
-
 /** A Fisher-Yates shuffle driven by the injected `rng` (`[0, 1)`), for a deterministic `random` plan. */
 function shuffle<T>(items: T[], rng: () => number): T[] {
   const shuffled = [...items];
@@ -166,7 +166,7 @@ function shuffle<T>(items: T[], rng: () => number): T[] {
  */
 export function ringPlan(
   legs: MemberLeg[],
-  strategy: Strategy,
+  strategy: RingStrategy,
   ringTimeoutS: number,
   ringTotalS: number | null,
   rng: () => number

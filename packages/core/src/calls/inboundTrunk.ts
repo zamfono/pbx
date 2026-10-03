@@ -8,7 +8,7 @@ import {
   isInboundNumber,
   normalizeInbound,
   trunkSectionName,
-  type InboundNumberFormat
+  type NumberFormat
 } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
@@ -16,7 +16,7 @@ import type { Channel } from '../ari/types.js';
 import type { Snapshot } from '../internal/snapshot.js';
 
 /** `trunks.inbound_number_format`'s column default, for a call no trunk row accounts for. */
-const DEFAULT_FORMAT: InboundNumberFormat = 'e164';
+const DEFAULT_FORMAT: NumberFormat = 'e164';
 
 export type InboundBoundary = {
   /** The trunk that identified the call, or `null` when no trunk row matches its endpoint. */
@@ -139,9 +139,7 @@ export async function inboundBoundary(
     'PJSIP_HEADER(read,Privacy)'
   );
   const trunk = inboundTrunk(channel, snapshot);
-  const format = trunk
-    ? (trunk.inboundNumberFormat as InboundNumberFormat)
-    : DEFAULT_FORMAT;
+  const format = trunk ? trunk.inboundNumberFormat : DEFAULT_FORMAT;
   const country = snapshot.settings.country;
   const { called, fromTo } = await calledParty(ari, channel, calledRaw);
   return {

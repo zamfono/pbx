@@ -1,7 +1,7 @@
-import { newId, type Db } from '@zamfono/shared';
+import { newId, type AuditChannel, type Db } from '@zamfono/shared';
 
 import type { ChangeEntry, RevertedEntry } from './effects.js';
-import type { Actor, Channel, Context } from './types.js';
+import type { Actor, Context } from './types.js';
 
 /**
  * Fields whose value is a secret: masked in `changes_json` and never revertible, since there is
@@ -123,7 +123,7 @@ export function recordRevert(
 /** Who an `audit_log` entry is attributed to: the actor, the channel and, for a token, the client. */
 export type AuditCaller = {
   actor: Pick<Actor, 'id' | 'name'>;
-  channel: Channel;
+  channel: AuditChannel;
   clientId?: string;
   clientName?: string;
 };

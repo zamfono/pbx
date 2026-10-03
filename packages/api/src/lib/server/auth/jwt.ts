@@ -1,9 +1,8 @@
 import { errors as joseErrors, jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
 
-import { MS_PER_SECOND } from '@zamfono/shared';
+import { MS_PER_SECOND, type UserRole } from '@zamfono/shared';
 
-import type { Role } from '../ops/types.js';
 import { mcpResourceUri } from './resource.js';
 
 // §5.2: an access token lives 15 minutes; `api` is the only party that ever verifies it, so
@@ -13,17 +12,17 @@ const JWT_ALG = 'HS256';
 const JWT_TYP = 'JWT';
 
 /** The identity an access token carries: the user, their role and the OAuth client, if any. */
-export type AccessClaims = { sub: string; role: Role; cid: string | null };
+export type AccessClaims = { sub: string; role: UserRole; cid: string | null };
 
 /** Type guard for the RBAC roles a JWT `role` claim (or a `users.role` column) may hold. */
-export function isRole(value: unknown): value is Role {
+export function isRole(value: unknown): value is UserRole {
   return value === 'owner' || value === 'admin' || value === 'user';
 }
 
 /** The claims as signed: `aud` is the RFC 8707 resource the token was issued for (`resource.ts`). */
 const AccessPayloadSchema = z.object({
   sub: z.string(),
-  role: z.custom<Role>(isRole),
+  role: z.custom<UserRole>(isRole),
   cid: z.string().nullable(),
   iss: z.string(),
   aud: z.string(),

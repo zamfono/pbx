@@ -1,11 +1,10 @@
 import Handlebars from 'handlebars';
 
-import type { Db } from '@zamfono/shared';
+import type { Db, Language } from '@zamfono/shared';
 
 import {
   loadBuiltinTemplate,
   PLACEHOLDERS,
-  type Language,
   type TemplateKind
 } from './templates.js';
 import { usedPlaceholders } from './templateSyntax.js';

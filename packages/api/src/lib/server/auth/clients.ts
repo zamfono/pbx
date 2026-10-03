@@ -1,4 +1,9 @@
-import { isRecord, MS_PER_SECOND, type Db } from '@zamfono/shared';
+import {
+  isRecord,
+  MS_PER_SECOND,
+  type Db,
+  type OAuthClientKind
+} from '@zamfono/shared';
 
 import { attempt } from '../errors.js';
 import { decrypt, encrypt, type Keyring } from '../secretbox.js';
@@ -23,7 +28,7 @@ const DEFAULT_APPLICATION_TYPE = 'web';
 /** An OAuth client, however it registered (§5.2). */
 export type ClientMeta = {
   clientId: string;
-  kind: 'metadata' | 'cimd';
+  kind: OAuthClientKind;
   name: string;
   redirectUris: string[];
   applicationType: 'native' | 'web';

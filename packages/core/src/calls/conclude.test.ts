@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
+import { newId, nowIso, openDb, type Db, type Language } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
@@ -15,7 +15,7 @@ import { Pipeline } from './pipeline.js';
 /** A throwaway forward-target/DID chain, just to satisfy `settings.main_did_id`'s FK. */
 async function seedSettings(
   db: Db,
-  overrides: { language?: string } = {}
+  overrides: { language?: Language } = {}
 ): Promise<void> {
   const targetId = newId();
   await db

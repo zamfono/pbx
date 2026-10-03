@@ -2,26 +2,24 @@ import type { Selectable, Updateable } from 'kysely';
 
 import {
   HTTP_FORBIDDEN,
+  type CallLogLevel,
   type Db,
   type DB,
-  type FeatureCodes
+  type FeatureCodes,
+  type Language,
+  type SmtpSecurity,
+  type SsoProvider,
+  type UserRole
 } from '@zamfono/shared';
 
 import { type TargetSpec } from '../forwardTargetSchema.js';
 import { resolveOptionalTarget } from '../forwardTargetSpec.js';
 import type { Codec } from '../trunks/_shared.js';
-import { OpError, type Role } from '../types.js';
+import { OpError } from '../types.js';
 
 export type SettingsRow = Selectable<DB['settings']>;
 /** The `settings` columns one `PATCH /settings` writes. */
 export type SettingsColumns = Updateable<DB['settings']>;
-
-export const LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'ru'] as const;
-export type Language = (typeof LANGUAGES)[number];
-
-export const SMTP_SECURITIES = ['tls', 'starttls'] as const;
-export const CALL_LOG_LEVELS = ['none', 'events', 'qos', 'sip'] as const;
-export const SSO_PROVIDERS = ['microsoft', 'google', 'oidc'] as const;
 
 const MASKED = '***';
 
@@ -34,7 +32,7 @@ export type SettingsWire = {
   language: Language;
   smtpHost: string | null;
   smtpPort: number;
-  smtpSecurity: (typeof SMTP_SECURITIES)[number];
+  smtpSecurity: SmtpSecurity;
   smtpUser: string | null;
   smtpPassword: string | null;
   mailFrom: string | null;
@@ -48,14 +46,14 @@ export type SettingsWire = {
   holdMohAudioId: string | null;
   voicemailMaxS: number;
   parkingTimeoutS: number;
-  callLogLevel: (typeof CALL_LOG_LEVELS)[number];
+  callLogLevel: CallLogLevel;
   recordingRetentionDays: number;
   softDeleteRetentionDays: number;
   auditRetentionDays: number | null;
   backupCron: string;
   tlsReloadHour: number | null;
   autoUpdate: boolean;
-  ssoProvider: (typeof SSO_PROVIDERS)[number] | null;
+  ssoProvider: SsoProvider | null;
   ssoLabel: string | null;
   ssoIssuer: string | null;
   ssoClientId: string | null;
@@ -91,7 +89,10 @@ export const OWNER_FIELDS: ReadonlySet<keyof SettingsWire> = new Set([
 ]);
 
 /** Throws 403 when `role` may not write `field` (owner-only fields, §11.4). */
-export function checkFieldRole(field: keyof SettingsWire, role: Role): void {
+export function checkFieldRole(
+  field: keyof SettingsWire,
+  role: UserRole
+): void {
   if (OWNER_FIELDS.has(field) && role !== 'owner') {
     throw new OpError(HTTP_FORBIDDEN, `settings: '${field}' is owner-only`);
   }
@@ -120,10 +121,10 @@ export async function rowToWire(
     mainDidId: row.mainDidId,
     country: row.country,
     timezone: row.timezone,
-    language: row.language as Language,
+    language: row.language,
     smtpHost: row.smtpHost,
     smtpPort: row.smtpPort,
-    smtpSecurity: row.smtpSecurity as (typeof SMTP_SECURITIES)[number],
+    smtpSecurity: row.smtpSecurity,
     smtpUser: row.smtpUser,
     smtpPassword: maskSecret(row.smtpPasswordEnc),
     mailFrom: row.mailFrom,
@@ -137,7 +138,7 @@ export async function rowToWire(
     holdMohAudioId: row.holdMohAudioId,
     voicemailMaxS: row.voicemailMaxS,
     parkingTimeoutS: row.parkingTimeoutS,
-    callLogLevel: row.callLogLevel as (typeof CALL_LOG_LEVELS)[number],
+    callLogLevel: row.callLogLevel,
     recordingRetentionDays: row.recordingRetentionDays,
     softDeleteRetentionDays: row.softDeleteRetentionDays,
     auditRetentionDays: row.auditRetentionDays,

@@ -15,7 +15,7 @@ import { targetFromRow, type ForwardTarget } from '../routing/targets.js';
 import { SIP_DECLINE, SIP_SERVER_ERROR } from '../sipCodes.js';
 import { announce } from './announce.js';
 import { endTargetOwner, newCall, release, type Call } from './call.js';
-import { raiseLogLevel, toLogLevel } from './callLogLevel.js';
+import { raiseLogLevel } from './callLogLevel.js';
 import { dialForwardTarget } from './forwardDial.js';
 import { applyOooAndHours, targetIdentity } from './inboundSchedule.js';
 import { inboundBoundary } from './inboundTrunk.js';
@@ -139,7 +139,7 @@ export async function handleInboundStart(
     from,
     to: called,
     startedAt: pipeline.deps.now(),
-    logLevel: toLogLevel(snapshot.settings.callLogLevel),
+    logLevel: snapshot.settings.callLogLevel,
     callLogMaxBytes: pipeline.deps.callLogMaxBytes
   });
   // §7: the delivering trunk's diagnostics override counts toward the call's level.

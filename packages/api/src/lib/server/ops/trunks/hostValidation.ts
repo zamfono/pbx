@@ -1,9 +1,11 @@
 import { isIPv4, isIPv6 } from 'node:net';
 
-import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+import {
+  HTTP_UNPROCESSABLE_CONTENT,
+  type HostDirection
+} from '@zamfono/shared';
 
 import { OpError } from '../types.js';
-import { type HostDirection } from './_shared.js';
 
 // A CR/LF or a bracket could open a new PJSIP section when a host or outbound proxy is
 // interpolated into generated config (pjsip/shared.ts's `assertSafeConfigValue`); refused here,

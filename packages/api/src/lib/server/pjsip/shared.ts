@@ -1,6 +1,15 @@
 // Types and helpers common to the users and trunks renderers (`render.ts`, `trunks.ts`), kept
 // in their own module so neither renderer depends on the other.
 
+import type {
+  CallerIdHeader,
+  DeviceKind,
+  DeviceTransport,
+  HostDirection,
+  TrunkAuthMode,
+  TrunkTransport
+} from '@zamfono/shared';
+
 export type RenderInput = {
   // holdMohClass: the MoH class a party hears while a device holds them (§10.2 "Hold music"):
   // the class of `settings.hold_moh_audio_id`, else Asterisk's static `default`.
@@ -17,8 +26,8 @@ export type RenderInput = {
   devices: {
     id: string;
     userId: string;
-    kind: 'manual' | 'ringotel';
-    transport: 'tls' | 'plain';
+    kind: DeviceKind;
+    transport: DeviceTransport;
     allowedIps: string[] | null;
     sipUsername: string;
     sipPassword: string;
@@ -28,24 +37,24 @@ export type RenderInput = {
   trunks: {
     id: string;
     name: string;
-    authMode: 'registration' | 'ip';
+    authMode: TrunkAuthMode;
     username: string | null;
     password: string | null;
     inboundAuth: boolean;
-    transport: 'udp' | 'tcp' | 'tls';
+    transport: TrunkTransport;
     srtp: boolean;
     tlsVerify: boolean;
     qualify: boolean;
     outboundProxy: string | null;
     registerExpiryS: number | null;
     registerRetryS: number | null;
-    callerIdHeader: 'from' | 'pai' | 'both';
+    callerIdHeader: CallerIdHeader;
     codecs: string[] | null;
     hosts: {
       priority: number;
       host: string;
       port: number | null;
-      direction: 'both' | 'outbound' | 'inbound';
+      direction: HostDirection;
     }[];
   }[];
   moh: { id: string; filename: string }[];

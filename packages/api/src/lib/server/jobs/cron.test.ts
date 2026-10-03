@@ -57,7 +57,7 @@ async function insertRun(
   const run = {
     id: newId(),
     targetId,
-    status: 'running',
+    status: 'running' as const,
     snapshotId: null,
     bytesAdded: null,
     bytesTotal: null,

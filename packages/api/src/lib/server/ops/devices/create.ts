@@ -1,7 +1,12 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { HTTP_UNPROCESSABLE_CONTENT, newId } from '@zamfono/shared';
+import {
+  DEVICE_KINDS,
+  DEVICE_TRANSPORTS,
+  HTTP_UNPROCESSABLE_CONTENT,
+  newId
+} from '@zamfono/shared';
 
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { newSipPassword } from '#lib/server/sip.js';
@@ -19,10 +24,8 @@ import { pushToRingotel } from './_ringotelPush.js';
 import {
   assertDeviceCreateScope,
   assertNoExistingRingotelDevice,
-  DEVICE_KINDS,
   liveDevice,
-  toDeviceOut,
-  TRANSPORTS
+  toDeviceOut
 } from './_shared.js';
 import { uniqueSipUsername } from './_sipUsername.js';
 import {
@@ -42,7 +45,7 @@ const inputSchema = z
         "manual: a softphone or desk phone set up by hand from the returned connection settings; ringotel: the user's Ringotel app account, at most one per user (see zamfono.help ringotel-setup)."
       ),
     transport: z
-      .enum(TRANSPORTS)
+      .enum(DEVICE_TRANSPORTS)
       .optional()
       .describe(
         'tls (the default): SIP over TLS from anywhere; plain: UDP or TCP from allowedIps only, manual devices alone (see zamfono.help remote-workers).'

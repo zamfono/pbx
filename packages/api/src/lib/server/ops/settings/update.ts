@@ -1,9 +1,9 @@
 import * as env from '$app/env/private';
 
-import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT, type UserRole } from '@zamfono/shared';
 
 import { propagate } from '../propagate.js';
-import { defineOperation, OpError, type Role } from '../types.js';
+import { defineOperation, OpError } from '../types.js';
 import { settingsInputSchema, type SettingsInput } from './_input.js';
 import {
   checkFieldRole,
@@ -27,7 +27,7 @@ import { assertSsoInvariants, maybeResetSsoSubjects } from './sso.js';
 
 const inputSchema = settingsInputSchema;
 
-function assertFieldRoles(input: SettingsInput, role: Role): void {
+function assertFieldRoles(input: SettingsInput, role: UserRole): void {
   for (const field of Object.keys(input) as (keyof SettingsWire)[]) {
     checkFieldRole(field, role);
   }

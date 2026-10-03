@@ -58,10 +58,7 @@ export function buildGroupRules(
     if (row.groupId !== groupId) {
       continue;
     }
-    rules[row.condition as GroupOutcome] = findForwardTarget(
-      snapshot,
-      row.targetId
-    );
+    rules[row.condition] = findForwardTarget(snapshot, row.targetId);
   }
   return rules;
 }

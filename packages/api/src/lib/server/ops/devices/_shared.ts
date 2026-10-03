@@ -1,6 +1,11 @@
 import type { Selectable, Transaction } from 'kysely';
 
-import { HTTP_FORBIDDEN, type DB } from '@zamfono/shared';
+import {
+  HTTP_FORBIDDEN,
+  type DB,
+  type DeviceKind,
+  type DeviceTransport
+} from '@zamfono/shared';
 
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { liveRow } from '../rows.js';
@@ -11,11 +16,6 @@ export type DeviceRow = Selectable<DB['devices']>;
 
 /** One `device_blf_keys` row, as an audit diff records the keys a removed extension drops. */
 export type DroppedBlfKey = { deviceId: string; ext: string; position: number };
-
-export const TRANSPORTS = ['tls', 'plain'] as const;
-export type Transport = (typeof TRANSPORTS)[number];
-export const DEVICE_KINDS = ['manual', 'ringotel'] as const;
-export type DeviceKind = (typeof DEVICE_KINDS)[number];
 
 /** Throws 409 while `userId` already has a live `ringotel` device (`devices_one_ringotel_per_user`). */
 export async function assertNoExistingRingotelDevice(
@@ -35,7 +35,7 @@ export type DeviceOut = {
   userId: string;
   label: string;
   kind: DeviceKind;
-  transport: Transport;
+  transport: DeviceTransport;
   allowedIps: string[] | null;
   sipUsername: string;
   /** When the device last became reachable (§11 `devices.last_registered_at`), not its latest
@@ -50,8 +50,8 @@ export function toDeviceOut(row: DeviceRow): DeviceOut {
     id: row.id,
     userId: row.userId,
     label: row.label,
-    kind: row.kind as DeviceKind,
-    transport: row.transport as Transport,
+    kind: row.kind,
+    transport: row.transport,
     allowedIps: row.allowedIpsJson
       ? (JSON.parse(row.allowedIpsJson) as string[])
       : null,
@@ -94,7 +94,7 @@ export function assertDeviceCreateScope(
   actorRole: string,
   actorId: string,
   userId: string,
-  transport: Transport
+  transport: DeviceTransport
 ): void {
   if (actorRole !== 'user') {
     return;

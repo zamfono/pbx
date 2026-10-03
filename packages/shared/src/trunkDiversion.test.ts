@@ -24,10 +24,6 @@ test("a new trunk gets diversion 'off'", async () => {
     .where('id', '=', 't-ip')
     .execute();
   await expect(
-    db
-      .updateTable('trunks')
-      .set({ diversion: 'first' })
-      .where('id', '=', 't-ip')
-      .execute()
+    sql`update trunks set diversion = 'first' where id = 't-ip'`.execute(db)
   ).rejects.toThrow(/CHECK constraint failed/u);
 });

@@ -6,6 +6,7 @@ import {
   resolveVersion,
   type CoreVersionResponse,
   type Db,
+  type MaintenanceWork,
   type UpdaterStatus,
   type ZamfonoVersion
 } from '@zamfono/shared';
@@ -14,8 +15,7 @@ import { getCoreClient } from '#lib/server/coreClient.js';
 import { errorMessage } from '#lib/server/errors.js';
 import {
   lastGiveUps,
-  type LastGiveUp,
-  type MaintenanceWork
+  type LastGiveUp
 } from '#lib/server/jobs/maintenanceGiveUp.js';
 import { isProfilePending } from '#lib/server/provisioning/profilePending.js';
 import { stackIpv4 } from '#lib/server/stackAddress.js';

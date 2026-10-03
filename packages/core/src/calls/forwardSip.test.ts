@@ -111,8 +111,8 @@ async function seedSipTrunk(db: Db, hosts = 2, priority = 1): Promise<string> {
     })
     .execute();
   const rows = [
-    { host: 'sip.api.openai.com', port: 5061, direction: 'outbound' },
-    { host: 'sip2.api.openai.com', port: null, direction: 'both' }
+    { host: 'sip.api.openai.com', port: 5061, direction: 'outbound' as const },
+    { host: 'sip2.api.openai.com', port: null, direction: 'both' as const }
   ].slice(0, hosts);
   await db
     .insertInto('trunkHosts')

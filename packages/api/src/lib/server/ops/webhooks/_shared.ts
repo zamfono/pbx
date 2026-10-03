@@ -1,7 +1,7 @@
 import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
-import type { Db, DB, Event } from '@zamfono/shared';
+import type { Db, DB, Event, WebhookStatus } from '@zamfono/shared';
 
 import { liveRow } from '../rows.js';
 
@@ -57,7 +57,7 @@ export type WebhookWire = {
   url: string;
   eventTypes: EventType[] | null;
   active: boolean;
-  lastStatus: 'failing' | 'ok' | null;
+  lastStatus: WebhookStatus | null;
   lastDeliveryAt: string | null;
   /** When the hook turned `failing`, and the deliveries failed since; `null` and 0 while not. */
   failingSince: string | null;
@@ -75,7 +75,7 @@ export function toWire(row: WebhookRow): WebhookWire {
     url: row.url,
     eventTypes: parseEventTypesJson(row.eventTypesJson),
     active: row.active === 1,
-    lastStatus: row.lastStatus as 'failing' | 'ok' | null,
+    lastStatus: row.lastStatus,
     lastDeliveryAt: row.lastDeliveryAt,
     failingSince: row.failingSince,
     failedDeliveries: row.failedDeliveries,

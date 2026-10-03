@@ -1,4 +1,9 @@
-import { HTTP_CONFLICT, nowIso, type Db } from '@zamfono/shared';
+import {
+  HTTP_CONFLICT,
+  nowIso,
+  type AuditChannel,
+  type Db
+} from '@zamfono/shared';
 
 import {
   runAfterCommit,
@@ -17,12 +22,12 @@ import {
 import { notifyPropagation } from './propagate.js';
 import { registry, type ErasedOperation } from './registry.js';
 import { runRollbackHooks } from './rollbackHooks.js';
-import { OpError, type Actor, type Channel, type Context } from './types.js';
+import { OpError, type Actor, type Context } from './types.js';
 
 /** What the runner needs beyond the operation's own input to build a `Context` (§10.3). */
 export type RunInput = {
   actor: Actor;
-  channel: Channel;
+  channel: AuditChannel;
   clientId?: string;
   clientName?: string;
   requestId: string;

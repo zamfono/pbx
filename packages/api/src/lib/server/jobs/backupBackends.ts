@@ -58,8 +58,6 @@ export type RepositoryAndEnv = {
   // restic's `-o key=value` backend options, passed to every restic command of the run.
   options: string[];
 };
-type TargetKind = 'ftp' | 'ftps' | 'local' | 's3' | 'sftp' | 'webdav';
-
 // rclone treats a backend password as obscured (its own reversible transform) and rejects a
 // plain one, so every rclone credential is run through `rclone obscure` before export. Given no
 // argument, `rclone obscure` reads the password from stdin, keeping it out of argv.
@@ -144,7 +142,7 @@ export async function repositoryAndEnv(
   exec: ExecFn
 ): Promise<RepositoryAndEnv> {
   const params = loadParams(target);
-  const kind = target.kind as TargetKind;
+  const { kind } = target;
   switch (kind) {
     case 'local':
       return { repository: str(params, 'path'), env: {}, options: [] };

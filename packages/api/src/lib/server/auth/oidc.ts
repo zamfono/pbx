@@ -7,7 +7,7 @@ import {
 } from 'jose';
 import { z } from 'zod';
 
-import { MS_PER_HOUR } from '@zamfono/shared';
+import { MS_PER_HOUR, type SsoProvider } from '@zamfono/shared';
 
 import { pkceS256 } from '../hash.js';
 import { TtlMap } from '../ttlMap.js';
@@ -25,7 +25,7 @@ export const SSO_CALLBACK_PATH = '/oauth/callback';
 
 /** A tenant's upstream OpenID Connect provider (§5.2, §11.4 `sso_*` columns). */
 export type SsoConfig = {
-  provider: 'microsoft' | 'google' | 'oidc';
+  provider: SsoProvider;
   issuer: string;
   clientId: string;
   clientSecret: string | null;

@@ -1,10 +1,14 @@
 import { z } from 'zod';
 
-import { HTTP_UNPROCESSABLE_CONTENT, type Db } from '@zamfono/shared';
+import {
+  HTTP_UNPROCESSABLE_CONTENT,
+  LANGUAGES,
+  type Db,
+  type Language
+} from '@zamfono/shared';
 
 import {
   loadBuiltinTemplate,
-  type Language,
   type TemplateKind,
   type TemplateSource
 } from '#lib/server/mail/index.js';
@@ -20,16 +24,6 @@ export const TEMPLATE_KINDS = [
   'updateFailed',
   'breakingUpdate'
 ] as const satisfies readonly TemplateKind[];
-
-/** The six tenant languages (§9.1, §10.2, §11.2). */
-export const LANGUAGES = [
-  'de',
-  'en',
-  'es',
-  'fr',
-  'it',
-  'ru'
-] as const satisfies readonly Language[];
 
 export const kindSchema = z
   .enum(TEMPLATE_KINDS)
@@ -112,5 +106,5 @@ export async function tenantLanguage(db: Db): Promise<Language> {
     .select('language')
     .where('id', '=', 1)
     .executeTakeFirstOrThrow();
-  return settings.language as Language;
+  return settings.language;
 }

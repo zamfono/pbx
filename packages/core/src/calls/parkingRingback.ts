@@ -10,7 +10,6 @@ import type { Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import { SIP_NOT_FOUND } from '../sipCodes.js';
 import { findForwardTarget, newCall, release, type Call } from './call.js';
-import { toLogLevel } from './callLogLevel.js';
 import { extensionOf } from './extensionOwner.js';
 import { endHold } from './hold.js';
 import { trackLeg } from './legs.js';
@@ -144,7 +143,7 @@ async function routeParkedParty(
   const entry: OnwardEntry = {
     to: onward.to,
     direction: 'internal',
-    logLevel: toLogLevel(snapshot.settings.callLogLevel),
+    logLevel: snapshot.settings.callLogLevel,
     asUserId: undone === null ? null : ctx.parkerUserId,
     trace: { parkingTimeout: result }
   };
@@ -195,7 +194,7 @@ export async function ringParkerBack(
     from: parked.from,
     to: parkerExt,
     startedAt: pipeline.deps.now(),
-    logLevel: toLogLevel(snapshot.settings.callLogLevel),
+    logLevel: snapshot.settings.callLogLevel,
     callLogMaxBytes: pipeline.deps.callLogMaxBytes
   });
   ringback.calleeUserId = parkerUserId;

@@ -1,22 +1,18 @@
 import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
-import type { Db, DB } from '@zamfono/shared';
+import {
+  BACKUP_TARGET_KINDS,
+  type BackupRunStatus,
+  type BackupTargetKind,
+  type Db,
+  type DB
+} from '@zamfono/shared';
 
 import { targetSecretSchema } from './_secret.js';
 
 export type BackupTargetRow = Selectable<DB['backupTargets']>;
 export type BackupRunRow = Selectable<DB['backupRuns']>;
-
-/** Restic backend kinds a `backup_targets` row may name (§6.5 "Backups"). */
-export const TARGET_KINDS = [
-  'local',
-  'ftp',
-  'ftps',
-  'sftp',
-  's3',
-  'webdav'
-] as const;
 
 /**
  * The fields `backups.targets.create` takes and `backups.targets.update` takes each optionally
@@ -25,7 +21,7 @@ export const TARGET_KINDS = [
  */
 export const targetFields = {
   kind: z
-    .enum(TARGET_KINDS)
+    .enum(BACKUP_TARGET_KINDS)
     .describe(
       'The restic backend: local (a host path or volume), ftp, ftps, sftp, s3 or webdav.'
     ),
@@ -61,7 +57,7 @@ export function withDefaultForgetPolicy(
 
 export type BackupTargetWire = {
   id: string;
-  kind: (typeof TARGET_KINDS)[number];
+  kind: BackupTargetKind;
   params: Record<string, unknown>;
   enabled: boolean;
   createdAt: string;
@@ -71,7 +67,7 @@ export type BackupTargetWire = {
 export function targetToWire(row: BackupTargetRow): BackupTargetWire {
   return {
     id: row.id,
-    kind: row.kind as (typeof TARGET_KINDS)[number],
+    kind: row.kind,
     params: JSON.parse(row.paramsJson) as Record<string, unknown>,
     enabled: row.enabled === 1,
     createdAt: row.createdAt
@@ -94,7 +90,7 @@ export async function loadLiveTarget(
 export type BackupRunWire = {
   id: string;
   targetId: string;
-  status: 'failed' | 'ok' | 'running';
+  status: BackupRunStatus;
   snapshotId: string | null;
   // §6.5: what the run uploaded after deduplication, and the snapshot's full size.
   bytesAdded: number | null;
@@ -108,7 +104,7 @@ export function runToWire(row: BackupRunRow): BackupRunWire {
   return {
     id: row.id,
     targetId: row.targetId,
-    status: row.status as 'failed' | 'ok' | 'running',
+    status: row.status,
     snapshotId: row.snapshotId,
     bytesAdded: row.bytesAdded,
     bytesTotal: row.bytesTotal,

@@ -1,7 +1,13 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { HTTP_UNPROCESSABLE_CONTENT, newId, type Db } from '@zamfono/shared';
+import {
+  HTTP_UNPROCESSABLE_CONTENT,
+  newId,
+  type CallerIdHeader,
+  type Db,
+  type TrunkTransport
+} from '@zamfono/shared';
 
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
@@ -14,8 +20,6 @@ import {
   loadTrunkHosts,
   mapTrunkRow,
   replaceTrunkHosts,
-  type CallerIdHeader,
-  type Transport,
   type TrunkWire
 } from './_shared.js';
 import {
@@ -52,7 +56,7 @@ function nextPriority(liveTrunks: { priority: number }[]): number {
 type ResolvedCreate = {
   id: string;
   priority: number;
-  transport: Transport;
+  transport: TrunkTransport;
   callerIdHeader: CallerIdHeader;
   /** Whether this auth mode carries credentials at all (§9.4 "Auth mode"); false nulls them out. */
   credentialsRequired: boolean;

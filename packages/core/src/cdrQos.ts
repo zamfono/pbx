@@ -25,7 +25,7 @@
  * summary winning every figure it measured: both come from the same reports, and the summary is
  * the one Asterisk kept to the end of the leg.
  */
-import type { Db } from '@zamfono/shared';
+import type { Db, QosRole } from '@zamfono/shared';
 
 import { logFailure } from './ari/failures.js';
 import type { Channel, ChannelsApi, Logger } from './ari/types.js';
@@ -37,7 +37,7 @@ import {
   RTP_AUDIO_QOS_VARIABLE,
   type QosFigures
 } from './qosFigures.js';
-import { qosTargets, type QosTarget, type Role } from './qosTargets.js';
+import { qosTargets, type QosTarget } from './qosTargets.js';
 import { RtcpQos, withRtcp } from './rtcpQos.js';
 
 // §7: `call_qos` is written at diagnostics level `qos` and `sip`, never at `none`/`events`.
@@ -56,7 +56,7 @@ type QosRow = QosTarget & QosFigures & { callId: string };
  * before the call was written, and whether it was. */
 type Tracked = {
   call: Call;
-  roles: Map<string, Role>;
+  roles: Map<string, QosRole>;
   ended: Set<string>;
   held: QosRow[];
   written: boolean;
@@ -110,7 +110,7 @@ export class QosRows {
     }
     const tracked = this.calls.get(call.id) ?? {
       call,
-      roles: new Map<string, Role>(),
+      roles: new Map<string, QosRole>(),
       ended: new Set<string>(),
       held: [],
       written: false

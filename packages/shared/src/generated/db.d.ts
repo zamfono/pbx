@@ -3,6 +3,8 @@
  * Please do not edit it manually.
  */
 
+import type { AudioKind, AuditChannel, BackupRunStatus, BackupTargetKind, CallDirection, CallerIdHeader, CallLogLevel, CallStatus, DeviceKind, DeviceTransport, DiversionPolicy, HostDirection, Language, LogLevelOverride, MaintenanceWork, NumberFormat, OAuthClientKind, PresenceStatus, QosRole, RingGroupForwardCondition, RingStrategy, SmtpSecurity, SsoProvider, TokenKind, TrunkAuthMode, TrunkTransport, UserForwardCondition, UserRole, WebhookStatus } from "../columnValues.js";
+import type { MailKind } from "../internalApi.js";
 import type { ColumnType } from "kysely";
 
 export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
@@ -14,7 +16,7 @@ export interface AudioAssets {
   deletedAt: string | null;
   filename: string;
   id: string;
-  kind: string;
+  kind: AudioKind;
   label: string;
   uploadedBy: string | null;
 }
@@ -23,7 +25,7 @@ export interface AuditLog {
   actorUserId: string;
   actorUserName: string;
   changesJson: string;
-  channel: string;
+  channel: AuditChannel;
   clientId: string | null;
   clientName: string | null;
   createdAt: string;
@@ -44,7 +46,7 @@ export interface BackupRuns {
   id: string;
   snapshotId: string | null;
   startedAt: string;
-  status: string;
+  status: BackupRunStatus;
   targetId: string;
 }
 
@@ -53,7 +55,7 @@ export interface BackupTargets {
   deletedAt: string | null;
   enabled: Generated<number>;
   id: string;
-  kind: string;
+  kind: BackupTargetKind;
   paramsJson: string;
   secretEnc: Buffer;
 }
@@ -73,7 +75,7 @@ export interface CallQos {
   channelId: string;
   jitterMs: number | null;
   lossPct: number | null;
-  role: string;
+  role: QosRole;
   rttMs: number | null;
   rxPackets: number | null;
   txPackets: number | null;
@@ -85,7 +87,7 @@ export interface Calls {
   calleeUserId: string | null;
   callerUserId: string | null;
   didId: string | null;
-  direction: string;
+  direction: CallDirection;
   endedAt: string | null;
   fromUri: string;
   id: string;
@@ -93,7 +95,7 @@ export interface Calls {
   parentCallId: string | null;
   ringGroupId: string | null;
   startedAt: string;
-  status: string;
+  status: CallStatus;
   toUri: string;
 }
 
@@ -124,12 +126,12 @@ export interface Devices {
   createdAt: string;
   deletedAt: string | null;
   id: string;
-  kind: string;
+  kind: DeviceKind;
   label: string;
   lastRegisteredAt: string | null;
   sipPasswordEnc: Buffer;
   sipUsername: string;
-  transport: Generated<string>;
+  transport: Generated<DeviceTransport>;
   userId: string;
 }
 
@@ -176,8 +178,8 @@ export interface ForwardTargets {
 export interface MailTemplates {
   bodyHtml: string | null;
   bodyText: string;
-  kind: string;
-  language: string;
+  kind: MailKind;
+  language: Language;
   subject: string;
   updatedAt: string;
 }
@@ -186,7 +188,7 @@ export interface MaintenanceGate {
   consecutiveGiveUps: Generated<number>;
   gaveUpAt: string;
   reason: string;
-  work: string;
+  work: MaintenanceWork;
 }
 
 export interface Menus {
@@ -210,7 +212,7 @@ export interface MenuTargets {
 export interface OauthClients {
   clientId: string;
   createdAt: string;
-  kind: string;
+  kind: OAuthClientKind;
   lastLoginAt: string;
   name: string;
   redirectUrisJson: string;
@@ -277,7 +279,7 @@ export interface PresenceLog {
   peer: string | null;
   ringGroupId: string | null;
   since: string;
-  status: string;
+  status: PresenceStatus;
   userId: string;
 }
 
@@ -291,7 +293,7 @@ export interface Recordings {
 }
 
 export interface RingGroupForwardRules {
-  condition: string;
+  condition: RingGroupForwardCondition;
   groupId: string;
   targetId: string;
 }
@@ -309,7 +311,7 @@ export interface RingGroups {
   deletedAt: string | null;
   greetingAudioId: string | null;
   id: string;
-  logLevel: string | null;
+  logLevel: LogLevelOverride | null;
   logLevelExpiresAt: string | null;
   mailboxAudioId: string | null;
   mailboxEnabled: Generated<number>;
@@ -319,14 +321,14 @@ export interface RingGroups {
   ringTimeoutS: Generated<number>;
   ringTotalS: number | null;
   skipBusy: Generated<number>;
-  strategy: string;
+  strategy: RingStrategy;
 }
 
 export interface Settings {
   auditRetentionDays: number | null;
   autoUpdate: Generated<number>;
   backupCron: Generated<string>;
-  callLogLevel: Generated<string>;
+  callLogLevel: Generated<CallLogLevel>;
   clir: Generated<number>;
   codecsJson: Generated<string>;
   companyName: string;
@@ -338,7 +340,7 @@ export interface Settings {
   featureCodesJson: Generated<string>;
   holdMohAudioId: string | null;
   id: Generated<number | null>;
-  language: Generated<string>;
+  language: Generated<Language>;
   mailFrom: string | null;
   mainDidId: string;
   parkingTimeoutS: Generated<number>;
@@ -352,7 +354,7 @@ export interface Settings {
   smtpHost: string | null;
   smtpPasswordEnc: Buffer | null;
   smtpPort: Generated<number>;
-  smtpSecurity: Generated<string>;
+  smtpSecurity: Generated<SmtpSecurity>;
   smtpUser: string | null;
   softDeleteRetentionDays: Generated<number>;
   ssoAllowedDomain: string | null;
@@ -360,7 +362,7 @@ export interface Settings {
   ssoClientSecretEnc: Buffer | null;
   ssoIssuer: string | null;
   ssoLabel: string | null;
-  ssoProvider: 'google' | 'microsoft' | 'oidc' | null;
+  ssoProvider: SsoProvider | null;
   ssoTenantId: string | null;
   timezone: string | null;
   tlsReloadHour: number | null;
@@ -371,14 +373,14 @@ export interface Tokens {
   clientId: string | null;
   createdAt: string;
   expiresAt: string;
-  kind: string;
+  kind: TokenKind;
   revokedAt: string | null;
   tokenHash: string;
   userId: string;
 }
 
 export interface TrunkHosts {
-  direction: Generated<string>;
+  direction: Generated<HostDirection>;
   host: string;
   port: number | null;
   priority: number;
@@ -386,19 +388,19 @@ export interface TrunkHosts {
 }
 
 export interface Trunks {
-  authMode: string;
-  calleridFormat: Generated<string>;
-  calleridHeader: Generated<string>;
+  authMode: TrunkAuthMode;
+  calleridFormat: Generated<NumberFormat>;
+  calleridHeader: Generated<CallerIdHeader>;
   clir: number | null;
   codecsJson: string | null;
   createdAt: string;
   deletedAt: string | null;
-  diversion: Generated<string>;
+  diversion: Generated<DiversionPolicy>;
   emergency: number;
   id: string;
   inboundAuth: Generated<number>;
-  inboundNumberFormat: Generated<string>;
-  logLevel: string | null;
+  inboundNumberFormat: Generated<NumberFormat>;
+  logLevel: LogLevelOverride | null;
   logLevelExpiresAt: string | null;
   maxChannels: number | null;
   name: string;
@@ -410,7 +412,7 @@ export interface Trunks {
   registerRetryS: number | null;
   srtp: Generated<number>;
   tlsVerify: Generated<number>;
-  transport: Generated<string>;
+  transport: Generated<TrunkTransport>;
   username: string | null;
 }
 
@@ -427,7 +429,7 @@ export interface UpdateState {
 }
 
 export interface UserForwardRules {
-  condition: string;
+  condition: UserForwardCondition;
   targetId: string;
   userId: string;
 }
@@ -458,7 +460,7 @@ export interface Users {
   email: string;
   findMeJson: string | null;
   id: string;
-  logLevel: string | null;
+  logLevel: LogLevelOverride | null;
   logLevelExpiresAt: string | null;
   mailboxAudioId: string | null;
   mailboxEnabled: Generated<number>;
@@ -468,7 +470,7 @@ export interface Users {
   recordCalls: Generated<number>;
   rejectAnonymous: number | null;
   ringTimeoutS: Generated<number>;
-  role: Generated<string>;
+  role: Generated<UserRole>;
   ssoSubject: string | null;
 }
 
@@ -504,7 +506,7 @@ export interface Webhooks {
   lastError: string | null;
   lastErrorAt: string | null;
   lastLoggedAt: string | null;
-  lastStatus: string | null;
+  lastStatus: WebhookStatus | null;
   secretEnc: Buffer;
   url: string;
 }

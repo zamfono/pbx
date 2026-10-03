@@ -1,12 +1,18 @@
 import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
-import type {
-  Db,
-  DB,
-  DiversionPolicy,
-  LogLevelColumns,
-  TrunkStatus
+import {
+  HOST_DIRECTIONS,
+  type CallerIdHeader,
+  type Db,
+  type DB,
+  type DiversionPolicy,
+  type HostDirection,
+  type LogLevelColumns,
+  type NumberFormat,
+  type TrunkAuthMode,
+  type TrunkStatus,
+  type TrunkTransport
 } from '@zamfono/shared';
 
 import { liveRow } from '../rows.js';
@@ -18,21 +24,6 @@ export const MAX_PORT = 65535;
 /** The trunk offer codecs a client or trunk list may name (§9.1, §9.4); the image ships no others. */
 export const CODECS = ['opus', 'g722', 'amrwb', 'amr', 'alaw', 'ulaw'] as const;
 export type Codec = (typeof CODECS)[number];
-
-export const TRANSPORTS = ['udp', 'tcp', 'tls'] as const;
-export type Transport = (typeof TRANSPORTS)[number];
-
-export const HOST_DIRECTIONS = ['both', 'outbound', 'inbound'] as const;
-export type HostDirection = (typeof HOST_DIRECTIONS)[number];
-
-export const NUMBER_FORMATS = ['e164', 'national'] as const;
-export type NumberFormat = (typeof NUMBER_FORMATS)[number];
-
-export const CALLERID_HEADERS = ['from', 'pai', 'both'] as const;
-export type CallerIdHeader = (typeof CALLERID_HEADERS)[number];
-
-export const AUTH_MODES = ['registration', 'ip'] as const;
-export type AuthMode = (typeof AUTH_MODES)[number];
 
 export type TrunkRow = Selectable<DB['trunks']>;
 export type TrunkHostRow = Selectable<DB['trunkHosts']>;
@@ -82,10 +73,10 @@ export type TrunkScalars = {
   name: string;
   /** `trunks.emergency`: only these trunks carry emergency calls (§9.4 "Emergency trunks"). */
   emergency: boolean;
-  authMode: AuthMode;
+  authMode: TrunkAuthMode;
   username: string | null;
   inboundAuth: boolean;
-  transport: Transport;
+  transport: TrunkTransport;
   /** `trunks.srtp`: SDES-SRTP media, `tls` trunks only (§9.4 "Signaling"). */
   srtp: boolean;
   /** `trunks.tls_verify`: the provider's certificate is checked; applies while `transport` is `tls`. */
@@ -171,20 +162,20 @@ export function scalarsFromRow(row: TrunkRow): TrunkScalars {
   return {
     name: row.name,
     emergency: row.emergency === 1,
-    authMode: row.authMode as AuthMode,
+    authMode: row.authMode,
     username: row.username,
     inboundAuth: row.inboundAuth === 1,
-    transport: row.transport as Transport,
+    transport: row.transport,
     srtp: row.srtp === 1,
     tlsVerify: row.tlsVerify === 1,
     qualify: row.qualify === 1,
-    diversion: row.diversion as DiversionPolicy,
+    diversion: row.diversion,
     outboundProxy: row.outboundProxy,
     registerExpiryS: row.registerExpiryS,
     registerRetryS: row.registerRetryS,
-    inboundNumberFormat: row.inboundNumberFormat as NumberFormat,
-    callerIdFormat: row.calleridFormat as NumberFormat,
-    callerIdHeader: row.calleridHeader as CallerIdHeader,
+    inboundNumberFormat: row.inboundNumberFormat,
+    callerIdFormat: row.calleridFormat,
+    callerIdHeader: row.calleridHeader,
     clir: row.clir === null ? null : row.clir === 1,
     codecs:
       row.codecsJson === null ? null : (JSON.parse(row.codecsJson) as Codec[]),
@@ -198,7 +189,7 @@ export function hostsToWire(hosts: TrunkHostRow[]): HostWire[] {
     .map(host => ({
       host: host.host,
       port: host.port,
-      direction: host.direction as HostDirection
+      direction: host.direction
     }));
 }
 

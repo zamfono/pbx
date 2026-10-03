@@ -1,7 +1,6 @@
 export {
   PLACEHOLDERS,
   loadBuiltinTemplate,
-  type Language,
   type TemplateKind,
   type TemplateSource
 } from './templates.js';

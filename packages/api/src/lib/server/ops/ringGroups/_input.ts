@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { RING_STRATEGIES } from '@zamfono/shared';
+
 import { memberSchema } from '../members.js';
 
 /**
@@ -9,7 +11,7 @@ import { memberSchema } from '../members.js';
 export const ringGroupFields = {
   name: z.string().min(1),
   strategy: z
-    .enum(['simultaneous', 'sequential', 'random'])
+    .enum(RING_STRATEGIES)
     .describe(
       'simultaneous rings every ringable member at once; sequential one at a time in member order; random one at a time in a shuffled order.'
     ),

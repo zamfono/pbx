@@ -4,7 +4,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, openDb, type Db, type Envelope } from '@zamfono/shared';
+import {
+  newId,
+  nowIso,
+  openDb,
+  type BackupTargetKind,
+  type Db,
+  type Envelope
+} from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { sealTargetSecret, type BackupSecret } from '../ops/backups/_secret.js';
@@ -34,7 +41,7 @@ async function migratedDb(): Promise<Db> {
 async function insertTarget(
   db: Db,
   kr: Keyring,
-  kind: string,
+  kind: BackupTargetKind,
   params: Record<string, unknown>,
   secret: BackupSecret
 ): Promise<string> {

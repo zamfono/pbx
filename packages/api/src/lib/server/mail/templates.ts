@@ -1,11 +1,8 @@
 /// <reference types="vite/client" />
-import type { MailKind } from '@zamfono/shared';
+import type { Language, MailKind } from '@zamfono/shared';
 
 /** §10.2 "Templates": the mail kinds `api` renders, one shipped template per kind and language. */
 export type TemplateKind = MailKind;
-
-/** The six tenant languages (§9.1, §10.2, §11.2). */
-export type Language = 'de' | 'en' | 'es' | 'fr' | 'it' | 'ru';
 
 /** A shipped or tenant-authored template row before compilation (§11.2 `mail_templates`). */
 export type TemplateSource = {

@@ -1,6 +1,3 @@
-/** Audio kinds accepted by an upload (§11.2 `audio_assets.kind`). */
-export type AudioKind = 'greeting' | 'moh' | 'vmGreeting' | 'announcement';
-
 /** A parsed multipart upload, as the REST layer hands it to the audio operations. */
 export type AudioUpload = { filename: string; mimeType: string; data: Buffer };
 

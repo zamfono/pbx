@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db, type Envelope } from '@zamfono/shared';
+import {
+  newId,
+  nowIso,
+  openDb,
+  type CallLogLevel,
+  type Db,
+  type Envelope
+} from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from './ari/client.js';
@@ -57,7 +64,7 @@ async function seedDid(db: Db, targetId: string): Promise<string> {
 }
 
 /** Settings plus the DID it references, at the given call-log level (§7). */
-async function seedSettings(db: Db, callLogLevel: string): Promise<void> {
+async function seedSettings(db: Db, callLogLevel: CallLogLevel): Promise<void> {
   const userId = await seedUser(db);
   const targetId = await seedForwardTargetUser(db, userId);
   const didId = await seedDid(db, targetId);

@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+import {
+  HTTP_UNPROCESSABLE_CONTENT,
+  USER_FORWARD_CONDITIONS,
+  type UserForwardCondition
+} from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { createTarget, deleteTargetIfOrphan } from '../forwardTargets.js';
@@ -9,7 +13,6 @@ import { assertSelfOrAdmin } from '../gates.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, OpError, type Context } from '../types.js';
 import {
-  CONDITIONS,
   isSameSipTarget,
   storedForwardRules,
   type StoredForwardRule
@@ -23,7 +26,7 @@ const inputSchema = z
       .array(
         z.object({
           condition: z
-            .enum(CONDITIONS)
+            .enum(USER_FORWARD_CONDITIONS)
             .describe(
               'unconditional: every call; busy: every device busy; noAnswer: nobody answers within ringTimeoutS; dnd: DND on; offline: no registered device, falling to noAnswer without this rule.'
             ),
@@ -105,7 +108,11 @@ export const setForwarding = defineOperation({
         await deleteTargetIfOrphan(ctx, rule.targetId);
       }
     }
-    const rows: { userId: string; condition: string; targetId: string }[] = [];
+    const rows: {
+      userId: string;
+      condition: UserForwardCondition;
+      targetId: string;
+    }[] = [];
     for (const rule of input.rules) {
       const targetId =
         kept.get(rule.condition) ??

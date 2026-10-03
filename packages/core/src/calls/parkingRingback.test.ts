@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import {
+  newId,
+  nowIso,
+  type Db,
+  type UserForwardCondition
+} from '@zamfono/shared';
 
 import { type FakeAri } from '../ari/fake.js';
 import { isPlacement } from '../ari/fakeDial.js';
@@ -80,7 +85,7 @@ describe('parking ring-back', () => {
   /** Gives `userId` a forward rule for `condition` to the target of `values`. */
   async function seedRule(
     userId: string,
-    condition: string,
+    condition: UserForwardCondition,
     values: Record<string, string>
   ): Promise<void> {
     await db

@@ -1,20 +1,16 @@
 import {
   HTTP_FORBIDDEN,
   HTTP_NOT_FOUND,
-  HTTP_UNPROCESSABLE_CONTENT
+  HTTP_UNPROCESSABLE_CONTENT,
+  type AuditChannel,
+  type UserRole
 } from '@zamfono/shared';
 
 import { registry, type ErasedOperation } from './registry.js';
-import {
-  ConfirmationRequired,
-  OpError,
-  type Actor,
-  type Channel,
-  type Role
-} from './types.js';
+import { ConfirmationRequired, OpError, type Actor } from './types.js';
 
 /** Owner outranks admin outranks user (§5.3); a lower number is more privileged. */
-const ROLE_RANK: Record<Role, number> = { owner: 0, admin: 1, user: 2 };
+const ROLE_RANK: Record<UserRole, number> = { owner: 0, admin: 1, user: 2 };
 
 export function findOperation(name: string): ErasedOperation {
   const op = registry.get(name);
@@ -67,7 +63,7 @@ export function assertSelfOrAdmin(
 /** MCP elicitation, the REST `confirm: true` body field and the UI dialog share this gate (§10.3); undo and jobs never ask. */
 export function checkConfirmation(
   op: ErasedOperation,
-  run: { channel: Channel; confirm?: boolean },
+  run: { channel: AuditChannel; confirm?: boolean },
   input: unknown
 ): void {
   const alwaysConfirmed = run.channel === 'undo' || run.channel === 'job';

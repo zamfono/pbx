@@ -6,13 +6,14 @@ import {
   HTTP_UNPROCESSABLE_CONTENT,
   isE164,
   type DB,
-  type LogLevelColumns
+  type LogLevelColumns,
+  type UserRole
 } from '@zamfono/shared';
 
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { liveRow } from '../rows.js';
 import { logLevelWire } from '../settings/logLevel.js';
-import { OpError, type Role } from '../types.js';
+import { OpError } from '../types.js';
 import { accountLockedUntil } from './_accountLock.js';
 import { userExtension } from './_extensions.js';
 
@@ -91,7 +92,7 @@ export type UserOut = LogLevelColumns & {
   id: string;
   name: string;
   email: string;
-  role: Role;
+  role: UserRole;
   extension: string;
   ringTimeoutS: number;
   dnd: boolean;
@@ -117,7 +118,7 @@ export async function toUserOut(
     id: row.id,
     name: row.name,
     email: row.email,
-    role: row.role as Role,
+    role: row.role,
     extension: await userExtension(db, row.id),
     ringTimeoutS: row.ringTimeoutS,
     dnd: row.dnd === 1,

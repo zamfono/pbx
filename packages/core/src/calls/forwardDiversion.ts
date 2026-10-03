@@ -129,9 +129,9 @@ export function diversionTrunk(
       ? firstHost
       : (stackSipHost ?? firstHost);
   return {
-    policy: trunk.diversion as DiversionPolicy,
+    policy: trunk.diversion,
     host,
-    format: trunk.calleridFormat as 'e164' | 'national',
+    format: trunk.calleridFormat,
     country: snapshot.settings.country
   };
 }

@@ -6,14 +6,18 @@
  * `IDLE_RECHECK_MS`, and `IDLE_WAIT_MS` after the moment it gives up until the moment after,
  * reporting what kept the system busy (`maintenanceGiveUp.ts`).
  */
-import { MS_PER_HOUR, MS_PER_MINUTE, type Db } from '@zamfono/shared';
+import {
+  MS_PER_HOUR,
+  MS_PER_MINUTE,
+  type Db,
+  type MaintenanceWork
+} from '@zamfono/shared';
 
 import {
   clearGiveUpsInARow,
   recordGiveUp,
   type Busy,
-  type GiveUp,
-  type MaintenanceWork
+  type GiveUp
 } from './maintenanceGiveUp.js';
 import { nextMaintenanceMoment } from './reloadTiming.js';
 

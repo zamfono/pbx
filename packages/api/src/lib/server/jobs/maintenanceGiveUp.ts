@@ -6,7 +6,7 @@
  */
 import pino from 'pino';
 
-import type { Db, StateResponse } from '@zamfono/shared';
+import type { Db, MaintenanceWork, StateResponse } from '@zamfono/shared';
 
 import { errorMessage } from '#lib/server/errors.js';
 
@@ -18,9 +18,6 @@ import {
 } from '../ops/outcomeLog.js';
 
 const logger = pino({ name: 'maintenanceGate' });
-
-/** The work a gate holds back: the certificate swap (`certSync.ts`) or the automatic update. */
-export type MaintenanceWork = 'certSync' | 'autoUpdate';
 
 const WORK_LABELS: Record<MaintenanceWork, string> = {
   certSync: 'the certificate swap',

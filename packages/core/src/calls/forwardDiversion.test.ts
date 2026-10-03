@@ -277,7 +277,7 @@ describe('diversionTrunk', () => {
   });
 
   it("names a pai trunk's from_domain, its first outbound host, as its From does", () => {
-    const pai = { ...trunk, calleridHeader: 'pai', username: 'acct' };
+    const pai = { ...trunk, calleridHeader: 'pai' as const, username: 'acct' };
     expect(diversionTrunk(pai, snapshot, '203.0.113.34').host).toBe(
       'sip.provider.example'
     );

@@ -1,11 +1,9 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import {
-  sendMail,
-  type AnyMailRequest,
-  type Language
-} from '#lib/server/mail/index.js';
+import type { Language } from '@zamfono/shared';
+
+import { sendMail, type AnyMailRequest } from '#lib/server/mail/index.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { setUndoable } from '../audit.js';

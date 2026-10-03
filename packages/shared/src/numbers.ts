@@ -1,12 +1,12 @@
 import { getCountryCallingCode, type CountryCode } from 'libphonenumber-js';
 
+import type { NumberFormat } from './columnValues.js';
+
 /** International prefix `00`, the digit form of a leading `+` (§9.4 "Inbound number normalization"). */
 const INTERNATIONAL_PREFIX = '00';
 
 /** A string made only of digits with an optional leading `+`, the shape the trunk boundary can normalize. */
 const DIGITS_WITH_OPTIONAL_PLUS = /^\+?[0-9]+$/u;
-
-export type InboundNumberFormat = 'e164' | 'national';
 
 /** Whether `raw` is a number the trunk boundary normalizes, digits with an optional leading `+`
  *  (§9.4 "Inbound number normalization"), rather than a string it passes verbatim. */
@@ -28,7 +28,7 @@ export function callingCode(country: string): string {
  */
 export function normalizeInbound(
   raw: string,
-  format: InboundNumberFormat,
+  format: NumberFormat,
   country: string
 ): string {
   if (!DIGITS_WITH_OPTIONAL_PLUS.test(raw)) {

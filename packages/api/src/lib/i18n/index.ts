@@ -1,12 +1,11 @@
+import type { Language } from '@zamfono/shared';
+
 import de from './de.json' with { type: 'json' };
 import en from './en.json' with { type: 'json' };
 import es from './es.json' with { type: 'json' };
 import fr from './fr.json' with { type: 'json' };
 import it from './it.json' with { type: 'json' };
 import ru from './ru.json' with { type: 'json' };
-
-/** The six tenant languages the authentication pages render in (§5.2, §9.1). */
-export type Language = 'de' | 'en' | 'es' | 'fr' | 'it' | 'ru';
 
 /** One dictionary section per authentication page (§5.2 "Authentication pages" table). */
 export type Dictionary = {

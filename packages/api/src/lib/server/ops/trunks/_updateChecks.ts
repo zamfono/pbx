@@ -1,7 +1,9 @@
-import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+import {
+  HTTP_UNPROCESSABLE_CONTENT,
+  type TrunkAuthMode
+} from '@zamfono/shared';
 
 import { OpError } from '../types.js';
-import { type AuthMode } from './_shared.js';
 import { assertValidPassword, assertValidUsername } from './hostValidation.js';
 
 /** The credential and registration fields of a `trunks.update` request these checks read. */
@@ -36,7 +38,7 @@ export function assertNoStrayCredentials(
  * merged trunk whose auth mode is `ip`, mirroring the `trunks` CHECK constraint of §11.2.
  */
 export function assertNoStrayRegistrationFields(
-  authMode: AuthMode,
+  authMode: TrunkAuthMode,
   input: CredentialInput
 ): void {
   const expiryGiven =

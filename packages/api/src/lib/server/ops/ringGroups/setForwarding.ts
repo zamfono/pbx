@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+import {
+  HTTP_UNPROCESSABLE_CONTENT,
+  RING_GROUP_FORWARD_CONDITIONS,
+  type RingGroupForwardCondition
+} from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { targetSpecSchema } from '../forwardTargetSchema.js';
@@ -15,7 +19,7 @@ import { liveRingGroup } from './_shared.js';
 
 const forwardingRuleSchema = z.object({
   condition: z
-    .enum(['unanswered', 'unavailable'])
+    .enum(RING_GROUP_FORWARD_CONDITIONS)
     .describe(
       'unanswered: rang and nobody answered; unavailable: no ringable member, fires without ringing and falls to unanswered without this rule.'
     ),
@@ -78,7 +82,11 @@ export const setRingGroupForwarding = defineOperation({
       // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; deletes must serialize
       await deleteForwardTarget(ctx.db, rule.targetId);
     }
-    const rows: { groupId: string; condition: string; targetId: string }[] = [];
+    const rows: {
+      groupId: string;
+      condition: RingGroupForwardCondition;
+      targetId: string;
+    }[] = [];
     for (const rule of input.rules) {
       // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; inserts must serialize
       const targetId = await insertForwardTarget(ctx, rule.target);

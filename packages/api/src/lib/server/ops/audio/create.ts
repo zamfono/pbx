@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { AUDIO_KINDS } from '@zamfono/shared';
+
 import { deleteAudioFile, storeAudio } from '#lib/server/audio/store.js';
 import { isAcceptedUploadType } from '#lib/server/audio/uploadTypes.js';
 
@@ -21,7 +23,7 @@ export const uploadSchema = z.object({
 export const createAudioAssetInput = z
   .object({
     kind: z
-      .enum(['greeting', 'moh', 'vmGreeting', 'announcement'])
+      .enum(AUDIO_KINDS)
       .describe(
         "What the asset is for: a menu greeting, hold or ringing music (moh, see zamfono.help music-licensing), a mailbox greeting, or an announcement target's audio."
       ),

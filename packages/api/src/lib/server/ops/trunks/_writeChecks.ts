@@ -3,7 +3,9 @@ import * as env from '$app/env/private';
 import {
   HTTP_UNPROCESSABLE_CONTENT,
   TRUNK_SECTION_PREFIX,
-  type Db
+  type CallerIdHeader,
+  type Db,
+  type TrunkTransport
 } from '@zamfono/shared';
 
 import { plainSipTransports } from '#lib/server/stackAddress.js';
@@ -11,15 +13,10 @@ import { plainSipTransports } from '#lib/server/stackAddress.js';
 import { endpointNameHolder } from '../devices/_sipUsername.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { Conflict, OpError } from '../types.js';
-import {
-  hasEmergencyTrunk,
-  type CallerIdHeader,
-  type HostInput,
-  type Transport
-} from './_shared.js';
+import { hasEmergencyTrunk, type HostInput } from './_shared.js';
 
 /** Throws 422 when `transport` is switched off by its `.env` flag (§9.1, §9.4 "Signaling"). */
-export function assertTransportEnabled(transport: Transport): void {
+export function assertTransportEnabled(transport: TrunkTransport): void {
   if (transport !== 'tls' && !plainSipTransports(env).includes(transport)) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
@@ -33,7 +30,10 @@ export function assertTransportEnabled(transport: Transport): void {
  * constraint of §11.2: SDES carries the media keys in the SDP, which only TLS keeps private
  * (§9.4 "Signaling").
  */
-export function assertSrtpNeedsTls(srtp: boolean, transport: Transport): void {
+export function assertSrtpNeedsTls(
+  srtp: boolean,
+  transport: TrunkTransport
+): void {
   if (srtp && transport !== 'tls') {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,

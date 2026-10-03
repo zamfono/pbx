@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
+import {
+  newId,
+  nowIso,
+  openDb,
+  type Db,
+  type LogLevelOverride
+} from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AmiClient } from '../ami/client.js';
@@ -79,7 +85,10 @@ async function seedDid(db: Db, number: string): Promise<string> {
 }
 
 /** The caller's diagnostics override (§7), unset by default. */
-type CallerOverrides = { logLevel?: string; logLevelExpiresAt?: string };
+type CallerOverrides = {
+  logLevel?: LogLevelOverride;
+  logLevelExpiresAt?: string;
+};
 
 async function seedCaller(
   db: Db,

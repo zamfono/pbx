@@ -4,10 +4,12 @@
  * call end; the buffer never touches the database itself.
  */
 
+import type { LogLevelOverride } from '@zamfono/shared';
+
 export type LogLevel = 'none' | 'events' | 'qos' | 'sip';
 
 type LevelOverride = {
-  level: 'events' | 'qos' | 'sip' | null;
+  level: LogLevelOverride | null;
   expiresAt: string | null;
 };
 

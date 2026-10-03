@@ -55,8 +55,8 @@ async function loadDevices(
   return rows.map(row => ({
     id: row.id,
     userId: row.userId,
-    kind: row.kind as 'manual' | 'ringotel',
-    transport: row.transport as 'plain' | 'tls',
+    kind: row.kind,
+    transport: row.transport,
     allowedIps:
       row.allowedIpsJson === null
         ? null
@@ -94,28 +94,28 @@ async function loadTrunks(db: Db, kr: Keyring): Promise<RenderInput['trunks']> {
       priority: host.priority,
       host: host.host,
       port: host.port,
-      direction: host.direction as 'both' | 'inbound' | 'outbound'
+      direction: host.direction
     });
     hostsByTrunk.set(host.trunkId, list);
   }
   return trunkRows.map(row => ({
     id: row.id,
     name: row.name,
-    authMode: row.authMode as 'ip' | 'registration',
+    authMode: row.authMode,
     username: row.username,
     password:
       row.passwordEnc === null
         ? null
         : decrypt(kr, row.passwordEnc).toString('utf8'),
     inboundAuth: row.inboundAuth === 1,
-    transport: row.transport as 'tcp' | 'tls' | 'udp',
+    transport: row.transport,
     srtp: row.srtp === 1,
     tlsVerify: row.tlsVerify === 1,
     qualify: row.qualify === 1,
     outboundProxy: row.outboundProxy,
     registerExpiryS: row.registerExpiryS,
     registerRetryS: row.registerRetryS,
-    callerIdHeader: row.calleridHeader as 'both' | 'from' | 'pai',
+    callerIdHeader: row.calleridHeader,
     codecs:
       row.codecsJson === null ? null : (JSON.parse(row.codecsJson) as string[]),
     hosts: hostsByTrunk.get(row.id) ?? []

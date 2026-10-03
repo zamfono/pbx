@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import { CamelCasePlugin, Kysely, sql, SqliteDialect } from 'kysely';
 import { FileMigrationProvider, Migrator } from 'kysely/migration';
 
+import type { LogLevelOverride } from './columnValues.js';
 import type { DB } from './generated/db.js';
 
 export type Db = Kysely<DB>;
@@ -11,7 +12,7 @@ export type Db = Kysely<DB>;
 /** The `log_level` and `log_level_expires_at` pair a `users`, `trunks` or `ring_groups` row
  * carries: its diagnostics override (§7, §11.2). */
 export type LogLevelColumns = {
-  logLevel: string | null;
+  logLevel: LogLevelOverride | null;
   logLevelExpiresAt: string | null;
 };
 

@@ -1,12 +1,15 @@
 import { isIP } from 'node:net';
 import * as env from '$app/env/private';
 
-import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+import {
+  HTTP_UNPROCESSABLE_CONTENT,
+  type DeviceKind,
+  type DeviceTransport
+} from '@zamfono/shared';
 
 import { plainSipTransports } from '#lib/server/stackAddress.js';
 
 import { OpError } from '../types.js';
-import { type DeviceKind, type Transport } from './_shared.js';
 
 const MAX_IPV4_PREFIX = 32;
 const MAX_IPV6_PREFIX = 128;
@@ -74,7 +77,7 @@ export function assertPlainTransportEnabled(): void {
 /** Throws 422 for a `ringotel` device on `plain` transport (§11.2 `devices` CHECK). */
 export function assertKindTransport(
   kind: DeviceKind,
-  transport: Transport
+  transport: DeviceTransport
 ): void {
   if (kind === 'ringotel' && transport !== 'tls') {
     throw new OpError(

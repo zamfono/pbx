@@ -1,13 +1,13 @@
 import nodemailer, { type Transporter } from 'nodemailer';
 
-import type { Db } from '@zamfono/shared';
+import type { Db, SmtpSecurity } from '@zamfono/shared';
 
 import { decrypt, type Keyring } from '../secretbox.js';
 
 export type RelayConfig = {
   host: string;
   port: number;
-  security: 'tls' | 'starttls';
+  security: SmtpSecurity;
   user: string | null;
   password: string | null;
   from: string;
@@ -32,7 +32,7 @@ export async function relayFromSettings(
   return {
     host: settings.smtpHost,
     port: settings.smtpPort,
-    security: settings.smtpSecurity as 'starttls' | 'tls',
+    security: settings.smtpSecurity,
     user: settings.smtpUser,
     password:
       settings.smtpPasswordEnc === null
