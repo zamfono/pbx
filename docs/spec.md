@@ -1285,7 +1285,7 @@ A `sip` target's `headers` is a list of `{ name, value }` (§9.4 Header template
 
 The time filters of these reads, `from` and `to` of `GET /audit` and `GET /calls` and `at` of `GET /presence/log`, take an ISO 8601 date-time with an offset or `Z` as the instant it names, and one without an offset, or a date alone (its midnight), as a local time in the tenant's time zone (§11.4 `timezone`), a local time that a DST change skips or repeats as the earlier of its two possible instants.
 
-**Statistics** (min. role: admin) — `GET /stats?metric=&from=&to=&bucket=&ringGroupId=` — metrics: `answerRate`, `ringToAnswer`, `avgCallLength`, `callVolume`; bucket: `minute`|`hour`|`day`|`week`; computed on demand from `calls` (no rollup tables at this scale)
+**Statistics** (min. role: admin) — `GET /stats?metric=&from=&to=&bucket=&ringGroupId=` — metrics: `answerRate`, `ringToAnswer`, `avgCallLength`, `callVolume`; bucket: `minute`|`hour`|`day`|`week`, aligned to the tenant clock (§11.4 `timezone`): the local hour, local midnight, local Monday midnight (ISO week), so a day across a DST change lasts 23 or 25 hours; a minute is the same in every zone; computed on demand from `calls` (no rollup tables at this scale)
 
 **Phone book** (min. role: user read, admin write) — `GET/POST /contacts`, `GET/PATCH/DELETE /contacts/{id}`; a contact carries `phones: [{ label, number }]`, and a `PATCH` that includes `phones` replaces the set
 

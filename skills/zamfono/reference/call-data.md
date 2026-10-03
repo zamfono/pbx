@@ -80,8 +80,11 @@ over the finished calls of the history, on demand; there are no precomputed tota
 
 - `from` (inclusive) and `to` (exclusive) are ISO 8601 timestamps with an offset; a call counts
   by its start time.
-- `bucket` is `minute`, `hour`, `day` or `week`, aligned in UTC (a week starts on Monday, a day
-  at midnight UTC), so the first bucket can start before `from`. At most 10080 buckets per
+- `bucket` is `minute`, `hour`, `day` or `week`, aligned to the tenant time zone
+  (`settings.timezone`): an hour starts on the local hour, a day at local midnight, a week at
+  local Monday midnight, so a day across a daylight-saving change lasts 23 or 25 hours, and the
+  first bucket can start before `from`. Changing the time zone re-buckets every call on the next
+  query. At most 10080 buckets per
   request, a week by minute or about a year by hour; a wider range is refused with 422.
 - `ringGroupId` limits the calls to those that group routed.
 

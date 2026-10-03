@@ -1,10 +1,4 @@
-import {
-  DAYS_PER_WEEK,
-  MS_PER_DAY,
-  MS_PER_HOUR,
-  MS_PER_MINUTE,
-  MS_PER_SECOND
-} from '@zamfono/shared';
+import { MS_PER_SECOND } from '@zamfono/shared';
 
 export const METRICS = [
   'answerRate',
@@ -17,84 +11,69 @@ export type Metric = (typeof METRICS)[number];
 export const BUCKET_UNITS = ['minute', 'hour', 'day', 'week'] as const;
 export type BucketUnit = (typeof BUCKET_UNITS)[number];
 
-const MS_PER_WEEK = DAYS_PER_WEEK * MS_PER_DAY;
-
-const STEP_MS_BY_UNIT: Record<BucketUnit, number> = {
-  minute: MS_PER_MINUTE,
-  hour: MS_PER_HOUR,
-  day: MS_PER_DAY,
-  week: MS_PER_WEEK
-};
-
-// ISO weekday numbering (1 = Monday .. 7 = Sunday), the week-bucket's own start-of-week boundary.
-const MONDAY_ISO_WEEKDAY = 1;
-const SUNDAY_JS_WEEKDAY = 0;
-
-/** `date` floored to its bucket's own boundary in UTC: the minute, hour, midnight or Monday. */
-function alignedStart(date: Date, unit: BucketUnit): Date {
-  const aligned = new Date(date);
-  aligned.setUTCMilliseconds(0);
-  aligned.setUTCSeconds(0);
-  if (unit === 'minute') {
-    return aligned;
-  }
-  aligned.setUTCMinutes(0);
-  if (unit === 'hour') {
-    return aligned;
-  }
-  aligned.setUTCHours(0, 0, 0, 0);
-  if (unit === 'day') {
-    return aligned;
-  }
-  const jsWeekday = aligned.getUTCDay();
-  const isoWeekday =
-    jsWeekday === SUNDAY_JS_WEEKDAY ? DAYS_PER_WEEK : jsWeekday;
-  aligned.setUTCDate(aligned.getUTCDate() - (isoWeekday - MONDAY_ISO_WEEKDAY));
-  return aligned;
-}
-
-export type BucketPlan = {
-  starts: string[];
-  stepMs: number;
-  alignedStartMs: number;
+const ONE_BUCKET: Record<BucketUnit, Temporal.DurationLike> = {
+  minute: { minutes: 1 },
+  hour: { hours: 1 },
+  day: { days: 1 },
+  week: { weeks: 1 }
 };
 
 /**
- * How many `unit` buckets `planBuckets` would lay over `[from, to)`, computed without building
- * them, so a caller can refuse a range too wide to materialise.
+ * The start of the `unit` bucket `at` falls into, on the tenant clock `at` carries: the local
+ * hour, local midnight or local Monday midnight (ISO week). A minute is the same in every zone.
  */
-export function bucketCount(
-  from: string,
-  to: string,
+function bucketStart(
+  at: Temporal.ZonedDateTime,
   unit: BucketUnit
-): number {
-  const stepMs = STEP_MS_BY_UNIT[unit];
-  const alignedStartMs = alignedStart(new Date(from), unit).getTime();
-  const endMs = new Date(to).getTime();
-  return Math.max(0, Math.ceil((endMs - alignedStartMs) / stepMs));
-}
-
-/** Fixed-width `unit` buckets covering `[from, to)`, aligned to the unit's own UTC boundary. */
-export function planBuckets(
-  from: string,
-  to: string,
-  unit: BucketUnit
-): BucketPlan {
-  const stepMs = STEP_MS_BY_UNIT[unit];
-  const alignedStartMs = alignedStart(new Date(from), unit).getTime();
-  const endMs = new Date(to).getTime();
-  const starts: string[] = [];
-  for (let timeMs = alignedStartMs; timeMs < endMs; timeMs += stepMs) {
-    starts.push(new Date(timeMs).toISOString());
+): Temporal.ZonedDateTime {
+  if (unit === 'minute') {
+    return at
+      .toInstant()
+      .round({ smallestUnit: 'minute', roundingMode: 'floor' })
+      .toZonedDateTimeISO(at.timeZoneId);
   }
-  return { starts, stepMs, alignedStartMs };
+  if (unit === 'hour') {
+    return at.round({ smallestUnit: 'hour', roundingMode: 'floor' });
+  }
+  const midnight = at.startOfDay();
+  return unit === 'day'
+    ? midnight
+    : midnight.subtract({ days: midnight.dayOfWeek - 1 }).startOfDay();
 }
 
-/** The index into `plan.starts` that `timestamp` falls into, which may be out of range. */
-export function bucketIndex(plan: BucketPlan, timestamp: string): number {
-  return Math.floor(
-    (Date.parse(timestamp) - plan.alignedStartMs) / plan.stepMs
+/** The epoch milliseconds of the `unit` bucket start `instant` falls into in `timeZone`. */
+export function bucketStartMs(
+  instant: string,
+  unit: BucketUnit,
+  timeZone: string
+): number {
+  const at = Temporal.Instant.from(instant).toZonedDateTimeISO(timeZone);
+  return bucketStart(at, unit).epochMilliseconds;
+}
+
+/**
+ * The epoch milliseconds of each `unit` bucket start covering `[from, to)` in `timeZone`, the
+ * first at or before `from`; at most `limit + 1` of them, so a caller can tell a range too wide
+ * to materialise without laying it all out.
+ */
+export function bucketStarts(
+  from: string,
+  to: string,
+  unit: BucketUnit,
+  timeZone: string,
+  limit: number
+): number[] {
+  const endMs = Date.parse(to);
+  const starts: number[] = [];
+  let cursor = bucketStart(
+    Temporal.Instant.from(from).toZonedDateTimeISO(timeZone),
+    unit
   );
+  while (cursor.epochMilliseconds < endMs && starts.length <= limit) {
+    starts.push(cursor.epochMilliseconds);
+    cursor = bucketStart(cursor.add(ONE_BUCKET[unit]), unit);
+  }
+  return starts;
 }
 
 export type StatsCallRow = {

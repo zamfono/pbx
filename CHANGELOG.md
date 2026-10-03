@@ -75,6 +75,10 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
+- Breaking: `GET /stats` (`stats.query`) aligns `hour`, `day` and `week` buckets to the tenant
+  time zone (`settings.timezone`) instead of UTC: an hour starts on the local hour, a day at local
+  midnight, a week at local Monday midnight, so a day across a daylight-saving change lasts 23 or
+  25 hours; `minute` buckets are unchanged.
 - Breaking: creating a `manual` device (`POST /users/{id}/devices`, `devices.create`) returns
   `connectionSettings`, everything a phone set up by hand asks for, instead of `sipUsername` and
   `sipPassword`: `server` and `domain` (the stack's FQDN), `transport` and `port` (TLS on 5061 for

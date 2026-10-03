@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import type { Db } from '@zamfono/shared';
 
-import { tenantTimeZone } from '../tenantTimeZone.js';
+import { readTenantTimeZone } from '../tenantTimeZone.js';
 
 /**
  * An instant that a read filters stored timestamps by: an ISO 8601 date-time with any offset,
@@ -34,11 +34,6 @@ export function toStoredInstant(value: string, timeZone: string): string {
 export async function tenantInstantReader(
   db: Db
 ): Promise<(value: string) => string> {
-  const row = await db
-    .selectFrom('settings')
-    .select('timezone')
-    .where('id', '=', 1)
-    .executeTakeFirstOrThrow();
-  const timeZone = tenantTimeZone(row.timezone);
+  const timeZone = await readTenantTimeZone(db);
   return value => toStoredInstant(value, timeZone);
 }

@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-03 · §10.3 Statistics.** `GET /stats` aligns `hour`, `day` and `week` buckets to the tenant clock: the local hour, local midnight and local Monday midnight; `minute` buckets are the same in every zone.
+*Why:* product-owner decision: "I'd align the buckets to the tenant's time zone."
+
 **2026-10-03 · §10.3 System.** `system.info`'s `stack.domain` is always the `FQDN`; only `stack.ipv4` is `null`, while neither `EXTERNAL_IPV4` nor `STACK_IPV4` is set.
 *Why:* §6.3 "Environment" requires `FQDN`, and `api` refuses to start without it, so the domain is never unset.
 

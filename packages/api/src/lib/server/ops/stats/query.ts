@@ -2,14 +2,16 @@ import { z } from 'zod';
 
 import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
+import { readTenantTimeZone } from '#lib/server/tenantTimeZone.js';
+
 import { defineOperation, OpError } from '../types.js';
 import {
   BUCKET_UNITS,
-  bucketCount,
-  bucketIndex,
+  bucketStartMs,
+  bucketStarts,
   METRICS,
   metricValue,
-  planBuckets,
+  type BucketUnit,
   type StatsCallRow
 } from './_shared.js';
 
@@ -34,7 +36,7 @@ const inputSchema = z
     bucket: z
       .enum(BUCKET_UNITS)
       .describe(
-        'Bucket width, aligned in UTC (a week starts on Monday); at most 10080 buckets per request.'
+        'Bucket width, aligned to the tenant time zone (settings.timezone): the local hour, midnight or Monday; at most 10080 buckets per request.'
       ),
     ringGroupId: z
       .string()
@@ -43,22 +45,20 @@ const inputSchema = z
   })
   .strict();
 
-/** Groups `rows` by the `plan` bucket their `startedAt` falls into, dropping any out of range. */
+/** Groups `rows` by the epoch milliseconds of the bucket start their `startedAt` falls into. */
 function groupByBucket(
-  plan: ReturnType<typeof planBuckets>,
-  rows: StatsCallRow[]
+  rows: StatsCallRow[],
+  unit: BucketUnit,
+  timeZone: string
 ): Map<number, StatsCallRow[]> {
   const byBucket = new Map<number, StatsCallRow[]>();
   for (const row of rows) {
-    const index = bucketIndex(plan, row.startedAt);
-    if (index < 0 || index >= plan.starts.length) {
-      continue;
-    }
-    const bucketRows = byBucket.get(index);
+    const startMs = bucketStartMs(row.startedAt, unit, timeZone);
+    const bucketRows = byBucket.get(startMs);
     if (bucketRows) {
       bucketRows.push(row);
     } else {
-      byBucket.set(index, [row]);
+      byBucket.set(startMs, [row]);
     }
   }
   return byBucket;
@@ -80,13 +80,14 @@ export const query = defineOperation({
     // carrying an offset is brought to the same form first.
     const from = new Date(input.from).toISOString();
     const to = new Date(input.to).toISOString();
-    if (bucketCount(from, to, input.bucket) > MAX_BUCKETS) {
+    const timeZone = await readTenantTimeZone(ctx.db);
+    const starts = bucketStarts(from, to, input.bucket, timeZone, MAX_BUCKETS);
+    if (starts.length > MAX_BUCKETS) {
       throw new OpError(
         HTTP_UNPROCESSABLE_CONTENT,
         `stats: more than ${MAX_BUCKETS} ${input.bucket} buckets requested; narrow the range or widen the bucket`
       );
     }
-    const plan = planBuckets(from, to, input.bucket);
     let callsQuery = ctx.db
       .selectFrom('calls')
       .select(['startedAt', 'answeredAt', 'endedAt', 'status'])
@@ -98,10 +99,10 @@ export const query = defineOperation({
       callsQuery = callsQuery.where('ringGroupId', '=', input.ringGroupId);
     }
     const rows = await callsQuery.execute();
-    const byBucket = groupByBucket(plan, rows);
-    const buckets = plan.starts.map((start, index) => ({
-      start,
-      value: metricValue(byBucket.get(index) ?? [], input.metric)
+    const byBucket = groupByBucket(rows, input.bucket, timeZone);
+    const buckets = starts.map(startMs => ({
+      start: new Date(startMs).toISOString(),
+      value: metricValue(byBucket.get(startMs) ?? [], input.metric)
     }));
     return { buckets };
   }

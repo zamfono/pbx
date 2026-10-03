@@ -1,6 +1,6 @@
 import * as env from '$app/env/private';
 
-import { resolveTenantTimeZone } from '@zamfono/shared';
+import { resolveTenantTimeZone, type Db } from '@zamfono/shared';
 
 /**
  * The tenant clock as `api` resolves it (§11.4 `timezone`, §6.4 "All hours resolve in the
@@ -9,4 +9,14 @@ import { resolveTenantTimeZone } from '@zamfono/shared';
  */
 export function tenantTimeZone(settingsTimezone: string | null): string {
   return resolveTenantTimeZone(settingsTimezone, env.TZ);
+}
+
+/** `tenantTimeZone` of the stored `settings.timezone`, for a reader that needs only the zone. */
+export async function readTenantTimeZone(db: Db): Promise<string> {
+  const row = await db
+    .selectFrom('settings')
+    .select('timezone')
+    .where('id', '=', 1)
+    .executeTakeFirstOrThrow();
+  return tenantTimeZone(row.timezone);
 }
