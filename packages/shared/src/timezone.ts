@@ -57,3 +57,15 @@ export function stackTimeZoneError(
   }
   return `TZ=${stackTz} names no IANA time zone; a tenant without settings.timezone runs on UTC`;
 }
+
+/**
+ * The instant, in epoch milliseconds, of the wall-clock `dateTime` in `timeZone`. A wall-clock
+ * time that a DST change skips or repeats is taken at the earlier of its instants.
+ */
+export function wallClockMs(
+  dateTime: Temporal.PlainDateTime,
+  timeZone: string
+): number {
+  return dateTime.toZonedDateTime(timeZone, { disambiguation: 'earlier' })
+    .epochMilliseconds;
+}

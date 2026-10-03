@@ -2,9 +2,9 @@
  * The closed periods of a weekly opening-hours schedule over a window of days, for §6.4 step 2's
  * midpoint-of-longest-closed-period search (`packages/api/src/lib/server/jobs/reloadTiming.ts`)
  * and for core's OOO/hours sweep, which wakes at the next edge of one (`packages/core/src/sweep.ts`).
- * A wall-clock time that a DST change skips or repeats is taken at the earlier of its instants.
  */
 import { MINUTES_PER_HOUR, MS_PER_DAY } from './time.js';
+import { wallClockMs } from './timezone.js';
 
 /** One `opening_hours_intervals` row: open from `opens` to `closes` (`'HH:MM'`) on ISO `weekday`. */
 export type OpeningInterval = {
@@ -35,11 +35,10 @@ export function closedPeriods(
     .toZonedDateTimeISO(timezone)
     .toPlainDate();
   const instantAt = (date: Temporal.PlainDate, time: string): number =>
-    date
-      .toPlainDateTime()
-      .add({ minutes: parseTimeOfDay(time) })
-      .toZonedDateTime(timezone, { disambiguation: 'earlier' })
-      .epochMilliseconds;
+    wallClockMs(
+      date.toPlainDateTime().add({ minutes: parseTimeOfDay(time) }),
+      timezone
+    );
 
   const openIntervals: { start: number; end: number }[] = [];
   // One extra day on each side of the range so an open interval that starts before `from` or

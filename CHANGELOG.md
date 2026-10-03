@@ -224,6 +224,9 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- A dialled number starting with `0` or `00` but carrying `*` or `#` after it went to the trunk
+  as an E.164 number with those characters in it; it is now refused with 484 address incomplete,
+  as the national number rules leave it incomplete.
 - A certificate Caddy had just stored but whose files were not readable yet was never copied for
   SIP-TLS: the hook gave up at once and Asterisk kept the previous certificate until the next
   renewal or a `proxy` restart. The hook now waits up to a minute for the files, and if they stay

@@ -23,7 +23,8 @@ describe('normalizeDialed', () => {
     ['+4989123', { kind: 'e164', number: '+4989123' }],
     ['004989123', { kind: 'e164', number: '+4989123' }],
     ['089123', { kind: 'e164', number: '+4989123' }],
-    ['89123', { kind: 'incomplete' }]
+    ['89123', { kind: 'incomplete' }],
+    ['0*1', { kind: 'incomplete' }]
   ] as const)('normalizeDialed(%s)', (raw, out) => {
     expect(normalizeDialed(raw, 'DE')).toEqual(out);
   });

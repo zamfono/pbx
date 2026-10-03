@@ -5,7 +5,7 @@
 
 import * as env from '$app/env/private';
 
-import { MS_PER_DAY, type Db } from '@zamfono/shared';
+import { MS_PER_DAY, wallClockMs, type Db } from '@zamfono/shared';
 
 import { loadIntervals, loadSchedule } from '../ops/hours/_shared.js';
 import { liveOooRulesInScope } from '../ops/ooo/_shared.js';
@@ -85,10 +85,7 @@ function nextHourOccurrenceMs(
     .toZonedDateTimeISO(timezone)
     .toPlainDate();
   const occurrenceMs = (date: Temporal.PlainDate): number =>
-    date
-      .toPlainDateTime({ hour })
-      .toZonedDateTime(timezone, { disambiguation: 'earlier' })
-      .epochMilliseconds;
+    wallClockMs(date.toPlainDateTime({ hour }), timezone);
   const todayMs = occurrenceMs(today);
   return todayMs > fromMs ? todayMs : occurrenceMs(today.add({ days: 1 }));
 }

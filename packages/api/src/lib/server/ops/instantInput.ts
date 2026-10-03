@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { Db } from '@zamfono/shared';
+import { wallClockMs, type Db } from '@zamfono/shared';
 
 import { readTenantTimeZone } from '../tenantTimeZone.js';
 
@@ -24,10 +24,9 @@ export function toStoredInstant(value: string, timeZone: string): string {
   if (HAS_OFFSET.test(value)) {
     return new Date(value).toISOString();
   }
-  const { epochMilliseconds } = Temporal.PlainDateTime.from(
-    value
-  ).toZonedDateTime(timeZone, { disambiguation: 'earlier' });
-  return new Date(epochMilliseconds).toISOString();
+  return new Date(
+    wallClockMs(Temporal.PlainDateTime.from(value), timeZone)
+  ).toISOString();
 }
 
 /** `toStoredInstant` bound to the tenant's time zone as `api` resolves it (§11.4 `timezone`). */

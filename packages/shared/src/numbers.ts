@@ -48,26 +48,16 @@ export function normalizeInbound(
 
 /**
  * Normalizes a dialled string to E.164 with the rules of `inbound_number_format = 'national'`
- * (§10.1 Outbound step 4): `+` or `00` is international, a leading `0` is national under `country`'s
- * calling code, and digits without either are incomplete.
+ * (§10.1 Outbound step 4): what those rules leave without a leading `+` is incomplete.
  */
 export function normalizeDialed(
   raw: string,
   country: string
 ): { kind: 'e164'; number: string } | { kind: 'incomplete' } {
-  if (raw.startsWith('+')) {
-    return { kind: 'e164', number: raw };
-  }
-  if (raw.startsWith(INTERNATIONAL_PREFIX)) {
-    return {
-      kind: 'e164',
-      number: `+${raw.slice(INTERNATIONAL_PREFIX.length)}`
-    };
-  }
-  if (raw.startsWith('0')) {
-    return { kind: 'e164', number: `+${callingCode(country)}${raw.slice(1)}` };
-  }
-  return { kind: 'incomplete' };
+  const number = normalizeInbound(raw, 'national', country);
+  return number.startsWith('+')
+    ? { kind: 'e164', number }
+    : { kind: 'incomplete' };
 }
 
 export function isE164(value: string): boolean {
