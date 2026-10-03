@@ -8,8 +8,9 @@ that failed is explained where it was asked for.
 Usage: _api-pickup-check.py <picker-id> <outcome>
 
 `outcome` is `answered` (the picker's phone answered and took the call: the row names the picker
-as its answerer) or `unanswered` (it rang out: the call went on to the group's mailbox, and the
-trace says the pickup went unanswered).
+as its answerer), `unanswered` (it rang out: the call went on to the group's mailbox, and the
+trace says the pickup went unanswered) or `declined` (it refused at once: the call rang on and
+went to the group's mailbox the same way, and the trace also says the picker's phone declined).
 """
 
 import json
@@ -56,6 +57,11 @@ else:
         problems.append("the call names the picker as its answerer")
     if not having("pickup", userId=picker, result="unanswered"):
         problems.append("the trace does not say the pickup went unanswered")
+
+if outcome == "declined":
+    rung = having("pickupRing", step="rungDevice", userId=picker)
+    if not having("pickupRing", step="declined", channelId=rung and rung[0]["channelId"]):
+        problems.append("the trace does not say the picker's phone declined")
 
 if problems:
     sys.exit("; ".join(problems) + ": " + json.dumps(call)[:2000])
