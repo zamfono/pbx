@@ -5,12 +5,17 @@ import { decrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { setUndoable } from '../runner.js';
 import { defineOperation } from '../types.js';
+import { connectionSettings } from './_connectionSettings.js';
 import { liveDevice } from './_shared.js';
 
-/** `GET /devices/{id}/credentials` (§5.2): reveals a device's SIP credentials, audited, never undoable. */
+/**
+ * `GET /devices/{id}/credentials` (§5.2): reveals a device's SIP credentials, audited, never
+ * undoable; a `manual` device's as its full connection settings (§10.4 "`manual`").
+ */
 export const revealCredentials = defineOperation({
   name: 'devices.revealCredentials',
-  description: "Reveals a device's SIP credentials.",
+  description:
+    "Reveals a device's SIP credentials; a manual device's as its full connection settings.",
   input: z.object({ id: z.string() }).strict(),
   minRole: 'admin',
   pureAction: true,
@@ -18,11 +23,12 @@ export const revealCredentials = defineOperation({
   run: async (ctx, input) => {
     const row = await liveDevice(ctx.db, input.id);
     setUndoable(ctx, false);
-    return {
-      sipUsername: row.sipUsername,
-      sipPassword: decrypt(keyringFromEnv(env), row.sipPasswordEnc).toString(
-        'utf8'
-      )
-    };
+    const password = decrypt(keyringFromEnv(env), row.sipPasswordEnc).toString(
+      'utf8'
+    );
+    if (row.kind === 'manual') {
+      return connectionSettings(ctx.db, row, password);
+    }
+    return { sipUsername: row.sipUsername, sipPassword: password };
   }
 });

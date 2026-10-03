@@ -7,6 +7,8 @@ import {
   type Db
 } from '@zamfono/shared';
 
+import { plainSipTransports } from '#lib/server/stackAddress.js';
+
 import { OpError } from '../types.js';
 import {
   hasEmergencyTrunk,
@@ -17,10 +19,7 @@ import {
 
 /** Throws 422 when `transport` is switched off by its `.env` flag (§9.1, §9.4 "Signaling"). */
 export function assertTransportEnabled(transport: Transport): void {
-  const disabled =
-    (transport === 'udp' && env.SIP_UDP_ENABLED === 'false') ||
-    (transport === 'tcp' && env.SIP_TCP_ENABLED === 'false');
-  if (disabled) {
+  if (transport !== 'tls' && !plainSipTransports(env).includes(transport)) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
       `transport '${transport}' is disabled by this deployment`

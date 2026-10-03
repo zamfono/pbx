@@ -18,10 +18,11 @@ arguments:
    `extension`. The response carries a one-time set-password link; with no mail relay configured,
    pass that link on to the employee yourself.
 2. Create their first device: `devices.create` (`POST /users/{id}/devices`).
-   - With the `manual` provisioning provider, the response carries the SIP credentials once — record
-     them now, or use `devices.revealCredentials` (`GET /devices/{id}/credentials`) later, which is
-     audited as a reveal — and hand them to the employee for their softphone (see
-     `tested-softphones`) or desk phone.
+   - With the `manual` provisioning provider, the response carries the device's
+     `connectionSettings` (server, transport and port, SIP username and password, and the rest a
+     phone asks for) once — record them now, or use `devices.revealCredentials`
+     (`GET /devices/{id}/credentials`) later, which is audited as a reveal — and hand them to the
+     employee for their softphone (see `tested-softphones`) or desk phone.
    - With `ringotel`, the credentials are pushed to Ringotel instead of returned, and the device
      onboards through Ringotel's own activation e-mail and QR code; no credentials need to be
      typed in by hand. The stack must be connected to Ringotel first (`ringotel-setup`). A

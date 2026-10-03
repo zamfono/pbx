@@ -26,8 +26,8 @@ user_id=$(api POST /users \
 # a TLS device would need the stack certificate inside the sipp container.
 device=$(api POST "/users/$user_id/devices" \
   "{\"kind\":\"manual\",\"label\":\"ci-phone\",\"transport\":\"plain\",\"allowedIps\":[\"$phone_cidr\"]}")
-sip_username=$(printf '%s' "$device" | jsonfield sipUsername)
-sip_password=$(printf '%s' "$device" | jsonfield sipPassword)
+sip_username=$(printf '%s' "$device" | jsonfield connectionSettings.username)
+sip_password=$(printf '%s' "$device" | jsonfield connectionSettings.password)
 
 # A short ring timeout keeps the unanswered scenarios quick, and the group's own mailbox is what
 # an unanswered call falls through to (§10.1 "Ring group").

@@ -31,3 +31,23 @@ export function stackIpv4(env: Env): string | null {
   }
   return null;
 }
+
+/** §6.1 "One IP, two listeners": the fixed SIP-TLS port every client, Ringotel included, dials. */
+export const SIP_TLS_PORT = 5061;
+
+/** §9.1: the fixed port of the plain SIP transports, UDP and TCP alike. */
+export const SIP_PLAIN_PORT = 5060;
+
+export type PlainSipTransport = 'udp' | 'tcp';
+
+/** The plain SIP transports `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED` leave on (§9.1), both by default. */
+export function plainSipTransports(env: Env): PlainSipTransport[] {
+  const enabled: PlainSipTransport[] = [];
+  if (env.SIP_UDP_ENABLED !== 'false') {
+    enabled.push('udp');
+  }
+  if (env.SIP_TCP_ENABLED !== 'false') {
+    enabled.push('tcp');
+  }
+  return enabled;
+}

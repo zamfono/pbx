@@ -33,11 +33,11 @@
 | `contacts.get` | `GET /contacts/{id}` | Reads one live contact by id. | user | no |
 | `contacts.list` | `GET /contacts` | Lists the tenant's live phone-book contacts. | user | no |
 | `contacts.update` | `PATCH /contacts/{id}` | Updates a contact's details; `phones` replaces the number set as a whole. | admin | no |
-| `devices.create` | `POST /users/{id}/devices` | Creates a SIP device for a user; a manual device's credentials are returned once. | user | no |
+| `devices.create` | `POST /users/{id}/devices` | Creates a SIP device for a user; a manual device's connection settings are returned once. | user | no |
 | `devices.delete` | `DELETE /devices/{id}` | Soft-deletes a device. | user | yes |
 | `devices.getBlf` | `GET /devices/{id}/blf` | Reads a ringotel device's BLF panel. | user | no |
 | `devices.list` | `GET /users/{id}/devices` | Lists a user's live devices, paginated. | user | no |
-| `devices.revealCredentials` | `GET /devices/{id}/credentials` | Reveals a device's SIP credentials. | admin | no |
+| `devices.revealCredentials` | `GET /devices/{id}/credentials` | Reveals a device's SIP credentials; a manual device's as its full connection settings. | admin | no |
 | `devices.rotate` | `POST /devices/{id}/rotate` | Rotates a device's SIP password. | admin | yes |
 | `devices.setBlf` | `PUT /devices/{id}/blf` | Replaces a ringotel device's BLF panel as a whole. | user | no |
 | `devices.update` | `PATCH /devices/{id}` | Updates a device's label or, for a plain device, its IP allowlist. | user | no |

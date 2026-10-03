@@ -43,8 +43,8 @@ user_id=$(api POST /users \
 
 device=$(api POST "/users/$user_id/devices" \
   "{\"kind\":\"manual\",\"label\":\"load-phone\",\"transport\":\"plain\",\"allowedIps\":[\"$phone_cidr\"]}")
-sip_username=$(printf '%s' "$device" | jsonfield sipUsername)
-sip_password=$(printf '%s' "$device" | jsonfield sipPassword)
+sip_username=$(printf '%s' "$device" | jsonfield connectionSettings.username)
+sip_password=$(printf '%s' "$device" | jsonfield connectionSettings.password)
 
 group=$(api POST /ringGroups "{
   \"name\": \"load-group\",

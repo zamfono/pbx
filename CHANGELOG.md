@@ -75,6 +75,15 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
+- Breaking: creating a `manual` device (`POST /users/{id}/devices`, `devices.create`) returns
+  `connectionSettings`, everything a phone set up by hand asks for, instead of `sipUsername` and
+  `sipPassword`: `server` and `domain` (the stack's FQDN), `transport` and `port` (TLS on 5061 for
+  a `tls` device; UDP and/or TCP on 5060, as `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED` allow, for a
+  `plain` one), `username` and `password`, `extension` and `displayName`, `mediaEncryption`
+  (`srtp` or `none`), `codecs` and `voicemailCode`. `GET /devices/{id}/credentials` returns the
+  same set for a `manual` device; a `ringotel` device's reveal is unchanged. Creating or revealing
+  a `manual` device answers 503 while `FQDN` is not set. Help topic `tested-softphones` maps the
+  fields onto Groundwire and MicroSIP.
 - On a DST night, an opening-hours edge or a maintenance hour at a local time the clock change
   skips or repeats now lies at the earlier of its two possible instants, as the time filters of
   `GET /calls`, `GET /audit` and `GET /presence/log` already read such a time: the `hours`

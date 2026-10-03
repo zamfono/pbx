@@ -3,6 +3,8 @@ import * as env from '$app/env/private';
 
 import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
+import { plainSipTransports } from '#lib/server/stackAddress.js';
+
 import { OpError } from '../types.js';
 import { type DeviceKind, type Transport } from './_shared.js';
 
@@ -61,9 +63,7 @@ export function assertValidIps(ips: string[]): void {
 
 /** Throws 422 for a `plain` device while both plain transports are disabled (§9.1, §9.3). */
 export function assertPlainTransportEnabled(): void {
-  const udpDisabled = env.SIP_UDP_ENABLED === 'false';
-  const tcpDisabled = env.SIP_TCP_ENABLED === 'false';
-  if (udpDisabled && tcpDisabled) {
+  if (plainSipTransports(env).length === 0) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
       'devices: plain transport is disabled by this deployment'

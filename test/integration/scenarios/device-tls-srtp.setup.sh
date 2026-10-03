@@ -39,8 +39,8 @@ user_id=$(api POST /users \
 api PATCH "/users/$user_id" '{"recordCalls": true}' >/dev/null
 device=$(api POST "/users/$user_id/devices" \
   '{"kind":"manual","label":"ci-tls-device","transport":"tls"}')
-sip_username=$(printf '%s' "$device" | jsonfield sipUsername)
-sip_password=$(printf '%s' "$device" | jsonfield sipPassword)
+sip_username=$(printf '%s' "$device" | jsonfield connectionSettings.username)
+sip_password=$(printf '%s' "$device" | jsonfield connectionSettings.password)
 did_id=$(api POST /dids \
   "{\"number\":\"$DID\",\"target\":{\"kind\":\"user\",\"userId\":\"$user_id\"}}" | jsonfield id)
 

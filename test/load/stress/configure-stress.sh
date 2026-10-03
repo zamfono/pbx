@@ -47,8 +47,8 @@ for i in $(seq 1 "$count"); do
   echo "$user_id" >> "$out_dir/users.txt"
   device=$(api POST "/users/$user_id/devices" \
     "{\"kind\":\"manual\",\"label\":\"stress-$i\",\"transport\":\"tls\"}")
-  printf '%s,%s\n' "$(printf '%s' "$device" | jsonfield sipUsername)" \
-    "$(printf '%s' "$device" | jsonfield sipPassword)" >> "$out_dir/creds.csv"
+  printf '%s,%s\n' "$(printf '%s' "$device" | jsonfield connectionSettings.username)" \
+    "$(printf '%s' "$device" | jsonfield connectionSettings.password)" >> "$out_dir/creds.csv"
   api POST /dids "{\"number\":\"$did\",\"target\":{\"kind\":\"user\",\"userId\":\"$user_id\"}}" \
     >/dev/null
   if [ $((i % 3)) -ne 0 ]; then

@@ -386,8 +386,8 @@ describe('users', () => {
       'devices.create',
       { userId: user.user.id, label: 'Desk', kind: 'manual' },
       asRun()
-    )) as { sipUsername: string };
-    expect(device.sipUsername.startsWith('e101-d')).toBe(true);
+    )) as { device: { sipUsername: string } };
+    expect(device.device.sipUsername.startsWith('e101-d')).toBe(true);
     const result = (await runOperation(
       db,
       'users.update',
@@ -478,11 +478,14 @@ describe('users', () => {
       'devices.create',
       { userId: userA.user.id, label: 'Desk', kind: 'manual' },
       asRun()
-    )) as { sipUsername: string };
+    )) as { device: { sipUsername: string } };
     // Another live device already holds the exact sip_username userA's device would naively take
     // on by keeping its own slug and adopting the target ext '999' (unused, so the rename itself
     // is otherwise unconstrained); users.update must fall back to a fresh slug instead of erroring.
-    const collidingUsername = deviceA.sipUsername.replace('e101-', 'e999-');
+    const collidingUsername = deviceA.device.sipUsername.replace(
+      'e101-',
+      'e999-'
+    );
     await db
       .insertInto('devices')
       .values({

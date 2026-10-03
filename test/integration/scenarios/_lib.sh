@@ -211,8 +211,8 @@ print(json.dumps(json.load(sys.stdin)['items'][0]['allowedIps']))
     "{\"kind\":\"manual\",\"label\":\"ci-colleague\",\"transport\":\"plain\",\"allowedIps\":$allowed}" \
     | python3 -c "
 import json, sys
-device = json.load(sys.stdin)
-print(device['sipUsername'], device['sipPassword'])
+settings = json.load(sys.stdin)['connectionSettings']
+print(settings['username'], settings['password'])
 ")
   printf '%s %s %s\n' "$user_id" "$sip_username" "$sip_password" > "$(state_file "$state")"
 }

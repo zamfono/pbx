@@ -10,6 +10,10 @@ import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import { userExtension } from '../users/_extensions.js';
 import { liveUser } from '../users/_shared.js';
+import {
+  connectionSettings,
+  type ConnectionSettings
+} from './_connectionSettings.js';
 import { pushToRingotel } from './_ringotelPush.js';
 import {
   assertDeviceCreateScope,
@@ -34,7 +38,7 @@ const inputSchema = z
     kind: z
       .enum(DEVICE_KINDS)
       .describe(
-        "manual: a softphone or desk phone configured by hand with the returned credentials; ringotel: the user's Ringotel app account, at most one per user (see zamfono.help ringotel-setup)."
+        "manual: a softphone or desk phone set up by hand from the returned connection settings; ringotel: the user's Ringotel app account, at most one per user (see zamfono.help ringotel-setup)."
       ),
     transport: z
       .enum(TRANSPORTS)
@@ -51,23 +55,22 @@ const inputSchema = z
   })
   .strict();
 /**
- * "The response that creates a `manual` device returns the SIP credentials; for a provisioned
- * device they are pushed to the provider" (§5.2): a `ringotel` device's response carries only the
- * device, and an admin reveals its credentials later through `devices.revealCredentials`.
+ * A `manual` device's response carries its connection settings (§10.4 "`manual`"); a `ringotel`
+ * device's credentials are pushed to Ringotel, so its response carries only the device, and an
+ * admin reveals them later through `devices.revealCredentials` (§5.2).
  */
 type Output = {
   device: ReturnType<typeof toDeviceOut>;
-  sipUsername?: string;
-  sipPassword?: string;
+  connectionSettings?: ConnectionSettings;
   /** A `ringotel` device Ringotel refused, or no Ringotel setup: the device stands, and this says why (§10.4). */
   warnings?: string[];
 };
 
-/** `POST /users/{id}/devices` (§10.3, §9.3): creates a SIP device, returning a manual one's credentials once. */
+/** `POST /users/{id}/devices` (§10.3, §9.3): creates a SIP device, returning a manual one's connection settings once. */
 export const create = defineOperation({
   name: 'devices.create',
   description:
-    "Creates a SIP device for a user; a manual device's credentials are returned once.",
+    "Creates a SIP device for a user; a manual device's connection settings are returned once.",
   input: inputSchema,
   minRole: 'user',
   entity: (_input, out: Output) => ({ kind: 'device', id: out.device.id }),
@@ -132,8 +135,7 @@ export const create = defineOperation({
     }
     return {
       device: toDeviceOut(row),
-      sipUsername: username,
-      sipPassword: password
+      connectionSettings: await connectionSettings(ctx.db, row, password)
     };
   }
 });

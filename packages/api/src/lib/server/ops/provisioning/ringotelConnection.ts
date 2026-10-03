@@ -6,7 +6,7 @@ import { buildBranchProvision } from '#lib/server/provisioning/ringotel.js';
 import type { RingotelClient } from '#lib/server/provisioning/ringotelClient.js';
 import { branchBlfEntries } from '#lib/server/provisioning/ringotelRoster.js';
 import { provisionExistingDevices } from '#lib/server/provisioning/ringotelUser.js';
-import { stackDomain } from '#lib/server/stackAddress.js';
+import { SIP_TLS_PORT, stackDomain } from '#lib/server/stackAddress.js';
 
 import { reportPush } from '../devices/_ringotelPush.js';
 import { loadParkingSlots } from '../parking/_shared.js';
@@ -17,9 +17,6 @@ import { OpError, type Context } from '../types.js';
 // What `provisioning.ringotelSetup` and `provisioning.ringotelAdopt` share (§10.3, §10.4): the
 // stack's own connection address and profile, the organization's `params`, and the one way the
 // two ids reach `settings`.
-
-// §6.1 "One IP, two listeners": the fixed SIP-TLS port every client, Ringotel included, dials.
-const SIP_TLS_PORT = 5061;
 
 /**
  * The stack's connection address, `<fqdn>:5061`, from `FQDN` (§6.3), the one hostname `api` is

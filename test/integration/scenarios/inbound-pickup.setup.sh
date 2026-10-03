@@ -27,7 +27,7 @@ read -r sip_username sip_password < <(api POST "/users/$picker_id/devices" \
   "{\"kind\":\"manual\",\"label\":\"ci-picker\",\"transport\":\"plain\",\"allowedIps\":$allowed}" \
   | python3 -c "
 import json, sys
-device = json.load(sys.stdin)
-print(device['sipUsername'], device['sipPassword'])
+settings = json.load(sys.stdin)['connectionSettings']
+print(settings['username'], settings['password'])
 ")
 printf '%s %s\n' "$sip_username" "$sip_password"

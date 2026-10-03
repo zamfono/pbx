@@ -11,6 +11,7 @@ import { type Actor } from '../types.js';
 import './index.js';
 
 process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
+process.env.FQDN ??= 'pbx.example.com';
 
 const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 
@@ -63,8 +64,7 @@ async function seedUser(db: Db): Promise<string> {
 
 type CreateOutput = {
   device: { id: string; sipUsername: string };
-  sipUsername: string;
-  sipPassword: string;
+  connectionSettings: { password: string };
 };
 
 /** Marks the tenant as already provisioned with Ringotel, so `activeRingotelProvider` pushes. */
@@ -152,7 +152,7 @@ describe('devices.create/delete/rotate/setBlf: provisioning wiring (§10.4)', ()
       'devices.revealCredentials',
       { id: (created.device as { id: string }).id },
       asRun()
-    )) as CreateOutput;
+    )) as { sipPassword: string };
     expect(revealed.sipPassword).toBe(calls[0]?.params?.password);
   });
 
@@ -267,7 +267,7 @@ describe('devices', () => {
       { userId, label: 'Desk', kind: 'manual' },
       asRun()
     )) as CreateOutput;
-    expect(result.sipPassword).toMatch(/^[A-Za-z0-9]{24}$/u);
+    expect(result.connectionSettings.password).toMatch(/^[A-Za-z0-9]{24}$/u);
     const row = await db
       .selectFrom('devices')
       .select('sipPasswordEnc')
@@ -275,7 +275,7 @@ describe('devices', () => {
       .executeTakeFirstOrThrow();
     expect(Buffer.isBuffer(row.sipPasswordEnc)).toBe(true);
     expect(row.sipPasswordEnc.toString('utf8')).not.toContain(
-      result.sipPassword
+      result.connectionSettings.password
     );
   });
 
