@@ -9,6 +9,7 @@ import {
 } from '@zamfono/shared';
 
 import { targetInputSchema } from '../dids/_shared.js';
+import { liveRow } from '../rows.js';
 import { OpError, type Actor } from '../types.js';
 
 export type OooRuleRow = Selectable<DB['oooRules']>;
@@ -156,17 +157,9 @@ export function rangesOverlap(
   return aStartsBeforeBEnds && bStartsBeforeAEnds;
 }
 
-/** Loads a live `ooo_rules` row by id, or `undefined` when absent or soft-deleted. */
-export async function loadLiveOooRule(
-  db: Db,
-  id: string
-): Promise<OooRuleRow | undefined> {
-  return db
-    .selectFrom('oooRules')
-    .selectAll()
-    .where('id', '=', id)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
+/** The live `ooo_rules` row with `id`, or `OpError(404)`. */
+export async function liveOooRule(db: Db, id: string): Promise<OooRuleRow> {
+  return liveRow(db, 'oooRules', id, 'ooo: rule not found');
 }
 
 /**

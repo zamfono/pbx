@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { propagate, recordChange } from '../runner.js';
+import { softDelete } from '../rows.js';
+import { propagate } from '../runner.js';
 import { defineOperation } from '../types.js';
 import { liveUserGroup } from './_shared.js';
 
@@ -19,12 +20,7 @@ export const deleteUserGroup = defineOperation({
   entity: input => ({ kind: 'userGroup', id: input.id }),
   run: async (ctx, input) => {
     await liveUserGroup(ctx.db, input.id);
-    await ctx.db
-      .updateTable('userGroups')
-      .set({ deletedAt: ctx.now })
-      .where('id', '=', input.id)
-      .execute();
-    recordChange(ctx, { field: 'deletedAt', from: null, to: ctx.now });
+    await softDelete(ctx, 'userGroups', input.id);
     // A group's membership decides who a ring group rings, and the endpoints rendered for
     // them, so this matches `create` and `update` (§9.3).
     propagate(ctx, ['pjsip']);

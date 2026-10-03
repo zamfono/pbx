@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
-import { propagate, recordChange } from '../runner.js';
+import { softDelete } from '../rows.js';
+import { propagate } from '../runner.js';
 import { defineOperation, OpError } from '../types.js';
 import {
   assertOwnScopeOrAdmin,
@@ -35,12 +36,7 @@ export const del = defineOperation({
         'hours: no schedule set for this scope'
       );
     }
-    await ctx.db
-      .updateTable('openingHours')
-      .set({ deletedAt: ctx.now })
-      .where('id', '=', schedule.id)
-      .execute();
-    recordChange(ctx, { field: 'deletedAt', from: null, to: ctx.now });
+    await softDelete(ctx, 'openingHours', schedule.id);
     // Read by the routing pipeline (§3.1), and nothing in it reaches Asterisk's own
     // configuration, so this drops `core`'s config cache without a reload.
     propagate(ctx, []);

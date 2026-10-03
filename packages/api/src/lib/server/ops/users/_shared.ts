@@ -3,13 +3,13 @@ import { z } from 'zod';
 
 import {
   HTTP_CONFLICT,
-  HTTP_NOT_FOUND,
   HTTP_UNPROCESSABLE_CONTENT,
   isE164,
   type DB
 } from '@zamfono/shared';
 
 import { assertNoLiveHolder } from '../liveHolder.js';
+import { liveRow } from '../rows.js';
 import { logLevelWire, type LogLevelColumns } from '../settings/logLevel.js';
 import { OpError, type Role } from '../types.js';
 import { accountLockedUntil } from './_accountLock.js';
@@ -210,14 +210,5 @@ export async function liveUser(
   db: Transaction<DB>,
   id: string
 ): Promise<UserRow> {
-  const row = await db
-    .selectFrom('users')
-    .selectAll()
-    .where('id', '=', id)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!row) {
-    throw new OpError(HTTP_NOT_FOUND, `user '${id}' not found`);
-  }
-  return row;
+  return liveRow(db, 'users', id, `user '${id}' not found`);
 }

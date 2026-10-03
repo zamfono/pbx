@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { propagate, recordChange } from '../runner.js';
+import { softDelete } from '../rows.js';
+import { propagate } from '../runner.js';
 import { Conflict, defineOperation } from '../types.js';
 import { findMenuReferences } from './_references.js';
 import { liveMenu } from './_shared.js';
@@ -19,12 +20,7 @@ export const deleteMenu = defineOperation({
     if (references.length > 0) {
       throw new Conflict('menu is still in use', references);
     }
-    await ctx.db
-      .updateTable('menus')
-      .set({ deletedAt: ctx.now })
-      .where('id', '=', input.id)
-      .execute();
-    recordChange(ctx, { field: 'deletedAt', from: null, to: ctx.now });
+    await softDelete(ctx, 'menus', input.id);
     // Read by the routing pipeline (§3.1), and nothing in it reaches Asterisk's own
     // configuration, so this drops `core`'s config cache without a reload.
     propagate(ctx, []);

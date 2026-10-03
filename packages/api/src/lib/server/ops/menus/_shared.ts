@@ -11,6 +11,7 @@ import {
   type TargetSpec
 } from '../forwardTargetSpec.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
+import { liveRow } from '../rows.js';
 import { OpError } from '../types.js';
 
 export {
@@ -29,16 +30,7 @@ export async function liveMenu(
   db: Transaction<DB>,
   id: string
 ): Promise<MenuRow> {
-  const row = await db
-    .selectFrom('menus')
-    .selectAll()
-    .where('id', '=', id)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!row) {
-    throw new OpError(HTTP_NOT_FOUND, `menu '${id}' not found`);
-  }
-  return row;
+  return liveRow(db, 'menus', id, `menu '${id}' not found`);
 }
 
 /**

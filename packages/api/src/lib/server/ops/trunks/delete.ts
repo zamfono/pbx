@@ -1,14 +1,13 @@
 import { z } from 'zod';
 
-import { HTTP_NOT_FOUND } from '@zamfono/shared';
-
 import {
   findForwardTargetOwners,
   type Reference
 } from '../forwardTargetOwners.js';
-import { propagate, recordChange } from '../runner.js';
-import { Conflict, defineOperation, OpError, type Context } from '../types.js';
-import { loadTrunkRow } from './_shared.js';
+import { softDelete } from '../rows.js';
+import { propagate } from '../runner.js';
+import { Conflict, defineOperation, type Context } from '../types.js';
+import { liveTrunk } from './_shared.js';
 import { emergencyTrunkWarnings } from './_writeChecks.js';
 
 const inputSchema = z.object({ id: z.string().min(1) }).strict();
@@ -56,10 +55,7 @@ export const deleteTrunk = defineOperation<Input, Output>({
   confirm: () => 'Delete this trunk? The deletion can be undone for 30 days.',
   entity: input => ({ kind: 'trunk', id: input.id }),
   run: async (ctx, input) => {
-    const row = await loadTrunkRow(ctx.db, input.id);
-    if (!row) {
-      throw new OpError(HTTP_NOT_FOUND, 'trunk not found');
-    }
+    await liveTrunk(ctx.db, input.id);
     const references = await trunkReferences(ctx, input.id);
     if (references.length > 0) {
       throw new Conflict(
@@ -67,12 +63,7 @@ export const deleteTrunk = defineOperation<Input, Output>({
         references
       );
     }
-    await ctx.db
-      .updateTable('trunks')
-      .set({ deletedAt: ctx.now })
-      .where('id', '=', input.id)
-      .execute();
-    recordChange(ctx, { field: 'deletedAt', from: null, to: ctx.now });
+    await softDelete(ctx, 'trunks', input.id);
     propagate(ctx, ['pjsip']);
     return { id: input.id, warnings: await emergencyTrunkWarnings(ctx.db) };
   }

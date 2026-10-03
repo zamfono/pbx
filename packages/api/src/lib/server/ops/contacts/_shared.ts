@@ -2,12 +2,12 @@ import type { Selectable, Transaction } from 'kysely';
 import { z } from 'zod';
 
 import {
-  HTTP_NOT_FOUND,
   HTTP_UNPROCESSABLE_CONTENT,
   normalizeDialed,
   type DB
 } from '@zamfono/shared';
 
+import { liveRow } from '../rows.js';
 import { OpError } from '../types.js';
 
 /** A `contacts` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
@@ -19,16 +19,7 @@ export async function liveContact(
   db: Transaction<DB>,
   id: string
 ): Promise<ContactRow> {
-  const row = await db
-    .selectFrom('contacts')
-    .selectAll()
-    .where('id', '=', id)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!row) {
-    throw new OpError(HTTP_NOT_FOUND, `contact '${id}' not found`);
-  }
-  return row;
+  return liveRow(db, 'contacts', id, `contact '${id}' not found`);
 }
 
 export const phoneSchema = z.object({

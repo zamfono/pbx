@@ -1,7 +1,5 @@
 import { z } from 'zod';
 
-import { HTTP_NOT_FOUND } from '@zamfono/shared';
-
 import {
   createTarget,
   resolveOptionalTarget,
@@ -9,11 +7,11 @@ import {
 } from '../dids/_shared.js';
 import { orBefore } from '../patch.js';
 import { propagate, recordChange } from '../runner.js';
-import { defineOperation, OpError, type Context } from '../types.js';
+import { defineOperation, type Context } from '../types.js';
 import {
   DIGITS_SCHEMA,
   FALLBACK_TARGET_SCHEMA,
-  loadLiveDidBlock
+  liveDidBlock
 } from './_shared.js';
 
 const inputSchema = z
@@ -66,10 +64,7 @@ export const update = defineOperation<Input, UpdateOutput>({
   minRole: 'admin',
   entity: input => ({ kind: 'didBlock', id: input.id }),
   run: async (ctx, input) => {
-    const before = await loadLiveDidBlock(ctx.db, input.id);
-    if (!before) {
-      throw new OpError(HTTP_NOT_FOUND, 'didBlocks: block not found');
-    }
+    const before = await liveDidBlock(ctx.db, input.id);
     const label = orBefore(input.label, before.label);
     const digits = orBefore(input.digits, before.digits);
     const fallbackTargetId = await resolveFallbackTargetId(

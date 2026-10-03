@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { loadDroppedBlfKeys } from '../devices/_shared.js';
 import { pushRoster } from '../roster.js';
+import { softDelete } from '../rows.js';
 import { propagate, recordChange } from '../runner.js';
 import { Conflict, defineOperation } from '../types.js';
 import { findRingGroupReferences } from './_references.js';
@@ -23,16 +24,11 @@ export const deleteRingGroup = defineOperation({
     }
     const ext = await ringGroupExtension(ctx.db, input.id);
     const droppedBlfKeys = await loadDroppedBlfKeys(ctx, ext);
-    await ctx.db
-      .updateTable('ringGroups')
-      .set({ deletedAt: ctx.now })
-      .where('id', '=', input.id)
-      .execute();
+    await softDelete(ctx, 'ringGroups', input.id);
     await ctx.db
       .deleteFrom('extensions')
       .where('ringGroupId', '=', input.id)
       .execute();
-    recordChange(ctx, { field: 'deletedAt', from: null, to: ctx.now });
     recordChange(ctx, { field: 'ext', from: ext, to: null });
     if (droppedBlfKeys.length > 0) {
       recordChange(ctx, {

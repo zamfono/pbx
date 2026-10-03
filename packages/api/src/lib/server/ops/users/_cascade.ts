@@ -4,6 +4,7 @@ import type { DeviceRow } from '#lib/server/provisioning/types.js';
 
 import { loadDroppedBlfKeys } from '../devices/_shared.js';
 import { pushRoster } from '../roster.js';
+import { softDelete } from '../rows.js';
 import { propagate, recordChange } from '../runner.js';
 import type { Context } from '../types.js';
 import { userExtension } from './_extensions.js';
@@ -79,11 +80,7 @@ export async function cascadeSoftDeleteUser(
     loadLiveDevices(ctx, userId),
     loadDroppedBlfKeys(ctx, ext)
   ]);
-  await ctx.db
-    .updateTable('users')
-    .set({ deletedAt: ctx.now })
-    .where('id', '=', userId)
-    .execute();
+  await softDelete(ctx, 'users', userId);
   await ctx.db
     .updateTable('devices')
     .set({ deletedAt: ctx.now })
@@ -94,7 +91,6 @@ export async function cascadeSoftDeleteUser(
   await ctx.db.deleteFrom('extensions').where('userId', '=', userId).execute();
   await pushRoster(ctx);
   await revokeUserTokens(ctx.db, userId, ctx.now);
-  recordChange(ctx, { field: 'deletedAt', from: null, to: ctx.now });
   // Recorded under `ext`, the field name `audit.undo` special-cases to re-insert the dropped
   // `extensions` row (§5.9); `users.update`'s own rename field is `extension` (§10.3).
   recordChange(ctx, { field: 'ext', from: ext, to: null });

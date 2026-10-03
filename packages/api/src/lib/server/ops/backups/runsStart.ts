@@ -1,12 +1,13 @@
 import { z } from 'zod';
 
-import { HTTP_NOT_FOUND, newId } from '@zamfono/shared';
+import { newId } from '@zamfono/shared';
 
 import { queueRun } from '#lib/server/jobs/cron.js';
 
+import { liveRow } from '../rows.js';
 import { afterCommit, setUndoable } from '../runner.js';
-import { defineOperation, OpError } from '../types.js';
-import { loadLiveTarget, runToWire, type BackupRunWire } from './_shared.js';
+import { defineOperation } from '../types.js';
+import { runToWire, type BackupRunWire } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -36,10 +37,12 @@ export const runsStart = defineOperation<Input, BackupRunWire>({
   run: async (ctx, input) => {
     // A manual run is a pure action on no prior state: nothing to revert (§5.8).
     setUndoable(ctx, false);
-    const target = await loadLiveTarget(ctx.db, input.targetId);
-    if (!target) {
-      throw new OpError(HTTP_NOT_FOUND, 'backups: target not found');
-    }
+    const target = await liveRow(
+      ctx.db,
+      'backupTargets',
+      input.targetId,
+      'backups: target not found'
+    );
     const id = newId();
     await ctx.db
       .insertInto('backupRuns')

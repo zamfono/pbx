@@ -1,10 +1,10 @@
 import type { Selectable, Transaction } from 'kysely';
 
-import { HTTP_NOT_FOUND, type DB } from '@zamfono/shared';
+import { type DB } from '@zamfono/shared';
 
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { assertMembersValid, type MemberSpec } from '../members.js';
-import { OpError } from '../types.js';
+import { liveRow } from '../rows.js';
 import { assertNoCycle, loadEdgesExcludingParent } from './_nesting.js';
 
 /** A `user_groups` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
@@ -16,16 +16,7 @@ export async function liveUserGroup(
   db: Transaction<DB>,
   id: string
 ): Promise<UserGroupRow> {
-  const row = await db
-    .selectFrom('userGroups')
-    .selectAll()
-    .where('id', '=', id)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!row) {
-    throw new OpError(HTTP_NOT_FOUND, `user group '${id}' not found`);
-  }
-  return row;
+  return liveRow(db, 'userGroups', id, `user group '${id}' not found`);
 }
 
 /** Throws 409 when `name` is already used by another live user group (`user_groups_name` partial UNIQUE, §11.2). */

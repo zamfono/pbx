@@ -1,12 +1,9 @@
 import type { Transaction } from 'kysely';
 import { z } from 'zod';
 
-import {
-  HTTP_NOT_FOUND,
-  HTTP_UNPROCESSABLE_CONTENT,
-  type DB
-} from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT, type DB } from '@zamfono/shared';
 
+import { liveRow } from './rows.js';
 import { OpError } from './types.js';
 
 /** One member of a ring group or user group (§10.3): a user or a user group, by id. */
@@ -41,18 +38,12 @@ export async function assertMembersValid(
   await Promise.all(
     members.map(async member => {
       const table = member.kind === 'user' ? 'users' : 'userGroups';
-      const row = await db
-        .selectFrom(table)
-        .select('id')
-        .where('id', '=', member.id)
-        .where('deletedAt', 'is', null)
-        .executeTakeFirst();
-      if (!row) {
-        throw new OpError(
-          HTTP_NOT_FOUND,
-          `${member.kind} '${member.id}' not found`
-        );
-      }
+      await liveRow(
+        db,
+        table,
+        member.id,
+        `${member.kind} '${member.id}' not found`
+      );
     })
   );
 }

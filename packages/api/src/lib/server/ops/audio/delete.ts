@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { propagate, recordChange } from '../runner.js';
+import { softDelete } from '../rows.js';
+import { propagate } from '../runner.js';
 import { Conflict, defineOperation } from '../types.js';
 import { findAudioAssetReferences, liveAudioAsset } from './_shared.js';
 
@@ -22,12 +23,7 @@ export const deleteAudioAsset = defineOperation({
     if (references.length > 0) {
       throw new Conflict('audio asset is still in use', references);
     }
-    await ctx.db
-      .updateTable('audioAssets')
-      .set({ deletedAt: ctx.now })
-      .where('id', '=', input.id)
-      .execute();
-    recordChange(ctx, { field: 'deletedAt', from: null, to: ctx.now });
+    await softDelete(ctx, 'audioAssets', input.id);
     if (before.kind === 'moh') {
       propagate(ctx, ['moh']);
     }

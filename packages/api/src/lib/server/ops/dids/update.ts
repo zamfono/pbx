@@ -1,9 +1,8 @@
 import { z } from 'zod';
 
-import { HTTP_NOT_FOUND } from '@zamfono/shared';
-
+import { liveRow } from '../rows.js';
 import { propagate, recordChange } from '../runner.js';
-import { defineOperation, OpError } from '../types.js';
+import { defineOperation } from '../types.js';
 import { createTarget, resolveTarget, targetInputSchema } from './_shared.js';
 
 const inputSchema = z
@@ -25,15 +24,7 @@ export const update = defineOperation({
   minRole: 'admin',
   entity: input => ({ kind: 'did', id: input.id }),
   run: async (ctx, input) => {
-    const did = await ctx.db
-      .selectFrom('dids')
-      .selectAll()
-      .where('id', '=', input.id)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (!did) {
-      throw new OpError(HTTP_NOT_FOUND, 'dids: DID not found');
-    }
+    const did = await liveRow(ctx.db, 'dids', input.id, 'dids: DID not found');
     const before = await resolveTarget(ctx.db, did.targetId);
     const targetId = await createTarget(ctx, input.target);
     await ctx.db

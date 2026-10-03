@@ -1,16 +1,12 @@
 import type { Transaction } from 'kysely';
 
-import {
-  HTTP_NOT_FOUND,
-  newId,
-  type DB,
-  type SipHeaderTemplate
-} from '@zamfono/shared';
+import { newId, type DB, type SipHeaderTemplate } from '@zamfono/shared';
 
 import { noteWarning } from './afterCommit.js';
 import { targetSpecSchema, type TargetSpec } from './forwardTargetSchema.js';
+import { liveRow } from './rows.js';
 import { udpHeadersWarning } from './sipHeaders.js';
-import { OpError, type Context } from './types.js';
+import { type Context } from './types.js';
 
 // The wire union and its type live beside this module, which maps them onto `forward_targets`;
 // every area keeps importing both from here.
@@ -102,15 +98,7 @@ async function assertLiveRow(
   id: string,
   label: string
 ): Promise<void> {
-  const row = await db
-    .selectFrom(table)
-    .select('id')
-    .where('id', '=', id)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!row) {
-    throw new OpError(HTTP_NOT_FOUND, `${label} '${id}' not found`);
-  }
+  await liveRow(db, table, id, `${label} '${id}' not found`);
 }
 
 /**

@@ -1,17 +1,15 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { HTTP_NOT_FOUND } from '@zamfono/shared';
-
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { orBefore } from '../patch.js';
 import { recordChange } from '../runner.js';
-import { defineOperation, OpError } from '../types.js';
+import { defineOperation } from '../types.js';
 import {
   eventTypesSchema,
   httpUrlSchema,
-  loadLiveWebhook,
+  liveWebhook,
   parseEventTypesJson,
   toWire,
   webhookSecretSchema,
@@ -58,10 +56,7 @@ export const update = defineOperation<Input, WebhookWire>({
   minRole: 'admin',
   entity: input => ({ kind: 'webhook', id: input.id }),
   run: async (ctx, input) => {
-    const before = await loadLiveWebhook(ctx.db, input.id);
-    if (!before) {
-      throw new OpError(HTTP_NOT_FOUND, 'webhooks: webhook not found');
-    }
+    const before = await liveWebhook(ctx.db, input.id);
     const url = orBefore(input.url, before.url);
     const active = orBefore(input.active, before.active === 1);
     const eventTypesJson = nextEventTypesJson(

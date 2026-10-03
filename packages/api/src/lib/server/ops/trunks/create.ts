@@ -9,8 +9,8 @@ import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError, type Context } from '../types.js';
 import { createInputSchema } from './_inputs.js';
 import {
+  liveTrunk,
   loadTrunkHosts,
-  loadTrunkRow,
   mapTrunkRow,
   replaceTrunkHosts,
   type CallerIdHeader,
@@ -217,10 +217,7 @@ export const create = defineOperation<Input, Output>({
     recordCreateChanges(ctx, input);
     propagate(ctx, ['pjsip']);
 
-    const row = await loadTrunkRow(ctx.db, id);
-    if (!row) {
-      throw new Error('trunks.create: trunk vanished after insert');
-    }
+    const row = await liveTrunk(ctx.db, id);
     const hosts = await loadTrunkHosts(ctx.db, id);
     const trunk = mapTrunkRow(row, hosts, {
       status: 'unknown',

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { recordChange } from '../runner.js';
+import { softDelete } from '../rows.js';
 import { defineOperation } from '../types.js';
 import { liveContact } from './_shared.js';
 
@@ -18,12 +18,7 @@ export const deleteContact = defineOperation({
   entity: input => ({ kind: 'contact', id: input.id }),
   run: async (ctx, input) => {
     await liveContact(ctx.db, input.id);
-    await ctx.db
-      .updateTable('contacts')
-      .set({ deletedAt: ctx.now })
-      .where('id', '=', input.id)
-      .execute();
-    recordChange(ctx, { field: 'deletedAt', from: null, to: ctx.now });
+    await softDelete(ctx, 'contacts', input.id);
     return { id: input.id };
   }
 });

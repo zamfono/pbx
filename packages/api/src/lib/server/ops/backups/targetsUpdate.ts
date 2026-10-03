@@ -1,20 +1,18 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { HTTP_NOT_FOUND } from '@zamfono/shared';
-
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { orBefore } from '../patch.js';
+import { liveRow } from '../rows.js';
 import { recordChange } from '../runner.js';
-import { defineOperation, OpError } from '../types.js';
+import { defineOperation } from '../types.js';
 import {
   assertSecretFitsKind,
   openTargetSecret,
   sealTargetSecret
 } from './_secret.js';
 import {
-  loadLiveTarget,
   targetFields,
   targetToWire,
   withDefaultForgetPolicy,
@@ -36,10 +34,12 @@ export const targetsUpdate = defineOperation<Input, BackupTargetWire>({
   minRole: 'admin',
   entity: input => ({ kind: 'backupTarget', id: input.id }),
   run: async (ctx, input) => {
-    const before = await loadLiveTarget(ctx.db, input.id);
-    if (!before) {
-      throw new OpError(HTTP_NOT_FOUND, 'backups: target not found');
-    }
+    const before = await liveRow(
+      ctx.db,
+      'backupTargets',
+      input.id,
+      'backups: target not found'
+    );
     const kind = orBefore(input.kind, before.kind);
     const enabled = orBefore(input.enabled, before.enabled === 1);
     const paramsJson =

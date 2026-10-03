@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import type { Db, DB, DiversionPolicy, TrunkStatus } from '@zamfono/shared';
 
+import { liveRow } from '../rows.js';
 import { logLevelWire, type LogLevelColumns } from '../settings/logLevel.js';
 
 /** The highest TCP/UDP port number, shared by create's and update's host schemas. */
@@ -109,16 +110,8 @@ export type TrunkWire = TrunkScalars &
     statusChangedAt: string | null;
   };
 
-export async function loadTrunkRow(
-  db: Db,
-  id: string
-): Promise<TrunkRow | undefined> {
-  return db
-    .selectFrom('trunks')
-    .selectAll()
-    .where('id', '=', id)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
+export async function liveTrunk(db: Db, id: string): Promise<TrunkRow> {
+  return liveRow(db, 'trunks', id, 'trunk not found');
 }
 
 /** Whether any live trunk has `trunks.emergency` set (§9.4 "Emergency trunks"). */

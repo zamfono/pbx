@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Db, DB } from '@zamfono/shared';
 
 import { targetInputSchema } from '../dids/_shared.js';
+import { liveRow } from '../rows.js';
 
 export type DidBlockRow = Selectable<DB['didBlocks']>;
 
@@ -26,17 +27,9 @@ export const FALLBACK_TARGET_SCHEMA = targetInputSchema
     'Where a call for a number in the block that no DID holds goes; null: the tenant-wide settings.fallbackTarget, else 404. The digits behind the base are never read as an extension.'
   );
 
-/** Loads a live `did_blocks` row by id, or `undefined` when absent or soft-deleted. */
-export async function loadLiveDidBlock(
-  db: Db,
-  id: string
-): Promise<DidBlockRow | undefined> {
-  return db
-    .selectFrom('didBlocks')
-    .selectAll()
-    .where('id', '=', id)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
+/** The live `did_blocks` row with `id`, or `OpError(404)`. */
+export async function liveDidBlock(db: Db, id: string): Promise<DidBlockRow> {
+  return liveRow(db, 'didBlocks', id, 'didBlocks: block not found');
 }
 
 /**

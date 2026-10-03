@@ -1,10 +1,6 @@
 import type { Selectable, Transaction } from 'kysely';
 
-import {
-  HTTP_NOT_FOUND,
-  HTTP_UNPROCESSABLE_CONTENT,
-  type DB
-} from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT, type DB } from '@zamfono/shared';
 
 import { assertAudioAvailable } from '../audio/_shared.js';
 import {
@@ -15,6 +11,7 @@ import {
   type TargetSpec
 } from '../forwardTargetSpec.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
+import { liveRow } from '../rows.js';
 import { logLevelWire, type LogLevelColumns } from '../settings/logLevel.js';
 import { OpError } from '../types.js';
 import { ringGroupMembers, type RingGroupMemberOut } from './_members.js';
@@ -35,16 +32,7 @@ export async function liveRingGroup(
   db: Transaction<DB>,
   id: string
 ): Promise<RingGroupRow> {
-  const row = await db
-    .selectFrom('ringGroups')
-    .selectAll()
-    .where('id', '=', id)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!row) {
-    throw new OpError(HTTP_NOT_FOUND, `ring group '${id}' not found`);
-  }
-  return row;
+  return liveRow(db, 'ringGroups', id, `ring group '${id}' not found`);
 }
 
 const DECIMAL_BASE = 10;

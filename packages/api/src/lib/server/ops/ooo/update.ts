@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { HTTP_NOT_FOUND, HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
 import {
   createTarget,
@@ -13,6 +13,7 @@ import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError, type Context } from '../types.js';
 import {
   assertVisibleScope,
+  liveOooRule,
   liveOooRulesInScope,
   normalizeIsoOrNull,
   oooFields,
@@ -94,15 +95,7 @@ export const update = defineOperation<Input, Output>({
   minRole: 'user',
   entity: input => ({ kind: 'oooRule', id: input.id }),
   run: async (ctx, input) => {
-    const before = await ctx.db
-      .selectFrom('oooRules')
-      .selectAll()
-      .where('id', '=', input.id)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (!before) {
-      throw new OpError(HTTP_NOT_FOUND, 'ooo: rule not found');
-    }
+    const before = await liveOooRule(ctx.db, input.id);
     const scope = scopeFromColumns(before);
     assertVisibleScope(ctx.actor, scope, 'ooo: rule not found');
     const active = orBefore(input.active, before.active === 1);

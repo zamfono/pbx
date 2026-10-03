@@ -1,19 +1,17 @@
 import { z } from 'zod';
 
-import { HTTP_NOT_FOUND } from '@zamfono/shared';
-
 import { propagate, recordChange } from '../runner.js';
 import {
   recordLogLevelChanges,
   resolveLogLevel,
   type LogLevelColumns
 } from '../settings/logLevel.js';
-import { defineOperation, OpError, type Context } from '../types.js';
+import { defineOperation, type Context } from '../types.js';
 import { updateInputSchema } from './_inputs.js';
 import {
   hostsToWire,
+  liveTrunk,
   loadTrunkHosts,
-  loadTrunkRow,
   mapTrunkRow,
   replaceTrunkHosts,
   scalarsFromRow,
@@ -157,10 +155,7 @@ export const update = defineOperation<Input, Output>({
   minRole: 'admin',
   entity: input => ({ kind: 'trunk', id: input.id }),
   run: async (ctx, input) => {
-    const row = await loadTrunkRow(ctx.db, input.id);
-    if (!row) {
-      throw new OpError(HTTP_NOT_FOUND, 'trunk not found');
-    }
+    const row = await liveTrunk(ctx.db, input.id);
     const before = scalarsFromRow(row);
     const merged = mergeScalars(row, input);
     await assertUpdateAllowed(ctx, merged, input);
@@ -188,10 +183,7 @@ export const update = defineOperation<Input, Output>({
     }
     propagate(ctx, ['pjsip']);
 
-    const updatedRow = await loadTrunkRow(ctx.db, input.id);
-    if (!updatedRow) {
-      throw new Error('trunks.update: trunk vanished after update');
-    }
+    const updatedRow = await liveTrunk(ctx.db, input.id);
     const hosts = await loadTrunkHosts(ctx.db, input.id);
     const trunk = mapTrunkRow(updatedRow, hosts, {
       status: 'unknown',

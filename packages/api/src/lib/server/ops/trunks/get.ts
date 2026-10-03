@@ -1,11 +1,9 @@
 import { z } from 'zod';
 
-import { HTTP_NOT_FOUND } from '@zamfono/shared';
-
-import { defineOperation, OpError } from '../types.js';
+import { defineOperation } from '../types.js';
 import {
+  liveTrunk,
   loadTrunkHosts,
-  loadTrunkRow,
   mapTrunkRow,
   type TrunkWire
 } from './_shared.js';
@@ -21,10 +19,7 @@ export const get = defineOperation<Input, TrunkWire>({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const row = await loadTrunkRow(ctx.db, input.id);
-    if (!row) {
-      throw new OpError(HTTP_NOT_FOUND, 'trunk not found');
-    }
+    const row = await liveTrunk(ctx.db, input.id);
     const hosts = await loadTrunkHosts(ctx.db, input.id);
     const statuses = await getTrunkStatuses([input.id]);
     return mapTrunkRow(row, hosts, statuses[input.id] ?? UNKNOWN_STATUS);

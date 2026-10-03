@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 import { activeRingotelProvider } from '#lib/server/provisioning/index.js';
 
-import { propagate, recordChange } from '../runner.js';
+import { softDelete } from '../rows.js';
+import { propagate } from '../runner.js';
 import { defineOperation } from '../types.js';
 import { assertDeviceScope, liveDevice } from './_shared.js';
 
@@ -17,12 +18,7 @@ export const deleteDevice = defineOperation({
   run: async (ctx, input) => {
     const before = await liveDevice(ctx.db, input.id);
     assertDeviceScope(ctx.actor.role, ctx.actor.id, before);
-    await ctx.db
-      .updateTable('devices')
-      .set({ deletedAt: ctx.now })
-      .where('id', '=', input.id)
-      .execute();
-    recordChange(ctx, { field: 'deletedAt', from: null, to: ctx.now });
+    await softDelete(ctx, 'devices', input.id);
     propagate(ctx, ['pjsip']);
     if (before.kind === 'ringotel') {
       const provider = await activeRingotelProvider(ctx.db);

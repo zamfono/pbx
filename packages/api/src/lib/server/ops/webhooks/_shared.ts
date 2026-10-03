@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 import type { Db, DB, Event } from '@zamfono/shared';
 
+import { liveRow } from '../rows.js';
+
 export type WebhookRow = Selectable<DB['webhooks']>;
 
 /** Every `Event.type` a webhook's `event_types_json` filter may name (§10.6). */
@@ -83,15 +85,7 @@ export function toWire(row: WebhookRow): WebhookWire {
   };
 }
 
-/** Loads a live `webhooks` row by id, or `undefined` when absent or soft-deleted. */
-export async function loadLiveWebhook(
-  db: Db,
-  id: string
-): Promise<WebhookRow | undefined> {
-  return db
-    .selectFrom('webhooks')
-    .selectAll()
-    .where('id', '=', id)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
+/** The live `webhooks` row with `id`, or `OpError(404)`. */
+export async function liveWebhook(db: Db, id: string): Promise<WebhookRow> {
+  return liveRow(db, 'webhooks', id, 'webhooks: webhook not found');
 }

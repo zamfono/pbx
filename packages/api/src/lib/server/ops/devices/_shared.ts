@@ -1,8 +1,9 @@
 import type { Selectable, Transaction } from 'kysely';
 
-import { HTTP_FORBIDDEN, HTTP_NOT_FOUND, type DB } from '@zamfono/shared';
+import { HTTP_FORBIDDEN, type DB } from '@zamfono/shared';
 
 import { assertNoLiveHolder } from '../liveHolder.js';
+import { liveRow } from '../rows.js';
 import { OpError, type Context } from '../types.js';
 
 /** A `devices` row as Kysely's `CamelCasePlugin` maps it (§11.2); never carries the raw password. */
@@ -65,16 +66,7 @@ export async function liveDevice(
   db: Transaction<DB>,
   id: string
 ): Promise<DeviceRow> {
-  const row = await db
-    .selectFrom('devices')
-    .selectAll()
-    .where('id', '=', id)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!row) {
-    throw new OpError(HTTP_NOT_FOUND, `device '${id}' not found`);
-  }
-  return row;
+  return liveRow(db, 'devices', id, `device '${id}' not found`);
 }
 
 /** Throws 403 unless `ctx.actor` may act on `device`: its own `tls` device, or an admin (§10.3). */

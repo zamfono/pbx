@@ -1,9 +1,8 @@
 import { z } from 'zod';
 
-import { HTTP_NOT_FOUND } from '@zamfono/shared';
-
-import { propagate, recordChange } from '../runner.js';
-import { Conflict, defineOperation, OpError, type Context } from '../types.js';
+import { liveRow, softDelete } from '../rows.js';
+import { propagate } from '../runner.js';
+import { Conflict, defineOperation, type Context } from '../types.js';
 
 const inputSchema = z.object({ id: z.string() }).strict();
 
@@ -61,22 +60,9 @@ export const del = defineOperation({
   confirm: input => `Delete DID ${input.id}?`,
   entity: input => ({ kind: 'did', id: input.id }),
   run: async (ctx, input) => {
-    const did = await ctx.db
-      .selectFrom('dids')
-      .select('id')
-      .where('id', '=', input.id)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (!did) {
-      throw new OpError(HTTP_NOT_FOUND, 'dids: DID not found');
-    }
+    await liveRow(ctx.db, 'dids', input.id, 'dids: DID not found');
     await guardDeletable(ctx, input.id);
-    await ctx.db
-      .updateTable('dids')
-      .set({ deletedAt: ctx.now })
-      .where('id', '=', input.id)
-      .execute();
-    recordChange(ctx, { field: 'deletedAt', from: null, to: ctx.now });
+    await softDelete(ctx, 'dids', input.id);
     // Read by the routing pipeline (§3.1), and nothing in it reaches Asterisk's own
     // configuration, so this drops `core`'s config cache without a reload.
     propagate(ctx, []);
