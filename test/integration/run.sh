@@ -9,9 +9,9 @@
 # Usage:
 #   bash test/integration/run.sh
 #     A full run: every prerequisite (bring-up, tenant configuration), every named step
-#     (steps.sh, trunk-status.sh, propagation-owed.sh, host-update.sh, cert-sync.sh) and every
-#     scenario under scenarios/, in the same order this file always ran them in. cert-sync always
-#     runs last.
+#     (steps.sh, trunk-status.sh, propagation-owed.sh, asterisk-started.sh, host-update.sh,
+#     cert-sync.sh) and every scenario under scenarios/, in the same order this file always ran
+#     them in. cert-sync always runs last.
 #
 #   ONLY=<glob>[,<glob>...] bash test/integration/run.sh
 #     Only the scenarios and named steps whose name matches one of the (comma-separated) globs —
@@ -133,6 +133,8 @@ OWNER_EMAIL='owner@ci.test'
 . "$here/trunk-status.sh"
 # shellcheck source=propagation-owed.sh
 . "$here/propagation-owed.sh"
+# shellcheck source=asterisk-started.sh
+. "$here/asterisk-started.sh"
 # shellcheck source=host-update.sh
 . "$here/host-update.sh"
 # shellcheck source=cert-sync.sh
@@ -194,6 +196,10 @@ fi
 
 if shard_owns_steps && name_selected propagation-owed; then
   run_propagation_owed_step
+fi
+
+if shard_owns_steps && name_selected asterisk-started; then
+  run_asterisk_started_step
 fi
 
 if shard_owns_steps && name_selected host-update; then
