@@ -4,12 +4,13 @@ import { newId, nowIso, type Db } from '@zamfono/shared';
 
 import { makeTestDb } from '#lib/server/testDb.js';
 
-import type { TargetSpec } from '../forwardTargetSpec.js';
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';
 
 import '../settings/index.js';
 import './index.js';
+
+import { type TargetSpec } from '../forwardTargetSchema.js';
 
 process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
 

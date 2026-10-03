@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
+import { recordChange, recordFieldChanges } from '../audit.js';
 import type { MemberSpec } from '../members.js';
+import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
-import { propagate, recordChange, recordFieldChanges } from '../runner.js';
 import {
   logLevelInputFields,
   recordLogLevelChanges,

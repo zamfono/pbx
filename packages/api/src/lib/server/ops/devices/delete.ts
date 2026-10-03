@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 import { activeRingotelProvider } from '#lib/server/provisioning/index.js';
 
+import { propagate } from '../propagate.js';
 import { softDelete } from '../rows.js';
-import { propagate } from '../runner.js';
 import { defineOperation } from '../types.js';
 import { assertDeviceScope, liveDevice } from './_shared.js';
 

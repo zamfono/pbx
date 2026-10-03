@@ -8,8 +8,10 @@ import { issueResetToken } from '#lib/server/auth/tokens.js';
 import { sendMail } from '#lib/server/mail/index.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
+import { afterCommit } from '../afterCommit.js';
+import { recordChange } from '../audit.js';
+import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
-import { afterCommit, propagate, recordChange } from '../runner.js';
 import { defineOperation, type Context } from '../types.js';
 import {
   assertExtensionAvailable,

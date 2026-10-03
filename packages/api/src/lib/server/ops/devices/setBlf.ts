@@ -5,7 +5,7 @@ import { HTTP_UNPROCESSABLE_CONTENT, type DB } from '@zamfono/shared';
 
 import { activeRingotelProvider } from '#lib/server/provisioning/index.js';
 
-import { recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
 import { defineOperation, OpError } from '../types.js';
 import { assertDeviceScope, liveDevice } from './_shared.js';
 

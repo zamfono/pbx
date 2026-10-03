@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { propagate } from '../runner.js';
+import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
 import { assertOwnGreeting } from './_greeting.js';
 import { liveUser } from './_shared.js';

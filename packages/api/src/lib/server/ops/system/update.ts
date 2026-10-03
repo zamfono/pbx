@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import type { UpdateState } from '@zamfono/shared';
 
-import { setUndoable } from '../runner.js';
+import { setUndoable } from '../audit.js';
 import { defineOperation } from '../types.js';
 import { requestUpdate } from './_request.js';
 

@@ -1,7 +1,8 @@
 import { sql } from 'kysely';
 
+import { recordChange } from '../audit.js';
 import { sipUsernameOrFresh } from '../devices/_sipUsername.js';
-import { propagate, recordChange } from '../runner.js';
+import { propagate } from '../propagate.js';
 import type { Context } from '../types.js';
 import {
   assertExtensionAvailable,

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
-import { recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
 import { defineOperation } from '../types.js';
 import {
   contactFields,

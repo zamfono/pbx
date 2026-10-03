@@ -1,16 +1,17 @@
 import type { Transaction } from 'kysely';
 
-import { newId, type DB, type SipHeaderTemplate } from '@zamfono/shared';
+import {
+  newId,
+  type Db,
+  type DB,
+  type SipHeaderTemplate
+} from '@zamfono/shared';
 
 import { noteWarning } from './afterCommit.js';
-import { targetSpecSchema, type TargetSpec } from './forwardTargetSchema.js';
+import type { TargetSpec } from './forwardTargetSchema.js';
 import { liveRow } from './rows.js';
 import { udpHeadersWarning } from './sipHeaders.js';
 import { type Context } from './types.js';
-
-// The wire union and its type live beside this module, which maps them onto `forward_targets`;
-// every area keeps importing both from here.
-export { targetSpecSchema, type TargetSpec };
 
 /** The one column `spec` sets on its `forward_targets` row; every other column stays `null`. */
 function forwardTargetColumns(spec: TargetSpec): Record<string, string> {
@@ -89,6 +90,27 @@ export function rowToTarget(row: ForwardTargetColumns): TargetSpec {
     return { kind: 'menu', menuId: row.menuId };
   }
   throw new Error('forwardTargets: row has no owner column set');
+}
+
+/** Loads and converts the `forward_targets` row `targetId` points at; `targetId` is never NULL. */
+export async function resolveTarget(
+  db: Db,
+  targetId: string
+): Promise<TargetSpec> {
+  const row = await db
+    .selectFrom('forwardTargets')
+    .selectAll()
+    .where('id', '=', targetId)
+    .executeTakeFirstOrThrow();
+  return rowToTarget(row);
+}
+
+/** `resolveTarget`, but for a nullable FK such as `did_blocks.fallback_target_id`. */
+export async function resolveOptionalTarget(
+  db: Db,
+  targetId: string | null
+): Promise<TargetSpec | null> {
+  return targetId === null ? null : resolveTarget(db, targetId);
 }
 
 /** Throws 404 when `id` names no live row of `table` (a `forward_targets` column's `RESTRICT` FK). */

@@ -3,26 +3,11 @@ import type { Selectable, Transaction } from 'kysely';
 import { HTTP_UNPROCESSABLE_CONTENT, type DB } from '@zamfono/shared';
 
 import { assertAudioAvailable } from '../audio/_shared.js';
-import {
-  deleteForwardTarget,
-  insertForwardTarget,
-  rowToTarget,
-  targetSpecSchema,
-  type TargetSpec
-} from '../forwardTargetSpec.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { liveRow } from '../rows.js';
 import { logLevelWire, type LogLevelColumns } from '../settings/logLevel.js';
 import { OpError } from '../types.js';
 import { ringGroupMembers, type RingGroupMemberOut } from './_members.js';
-
-export {
-  targetSpecSchema,
-  insertForwardTarget,
-  deleteForwardTarget,
-  rowToTarget
-};
-export type { TargetSpec };
 
 /** A `ring_groups` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type RingGroupRow = Selectable<DB['ringGroups']>;

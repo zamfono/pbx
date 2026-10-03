@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
-import { render, type RenderInput } from './render.js';
+import { render } from './render.js';
+import type { RenderInput } from './shared.js';
 
 function fixture(name: string): string {
   const path = fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));

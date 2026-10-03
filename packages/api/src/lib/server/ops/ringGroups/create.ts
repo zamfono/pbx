@@ -2,8 +2,9 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
+import { recordChange } from '../audit.js';
+import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
-import { propagate, recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
 import { ringGroupFields } from './_input.js';
 import { replaceMembers } from './_members.js';

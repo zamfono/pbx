@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
-import { render, type RenderInput } from './render.js';
-import type { Trunk } from './shared.js';
+import { render } from './render.js';
+import type { RenderInput, Trunk } from './shared.js';
 
 /**
  * The value Asterisk's config parser (main/config.c) reads from `<key> = <value>` in `conf`:

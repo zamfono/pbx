@@ -2,10 +2,11 @@ import { revokeUserTokens } from '#lib/server/auth/tokens.js';
 import { activeRingotelProvider } from '#lib/server/provisioning/index.js';
 import type { DeviceRow } from '#lib/server/provisioning/types.js';
 
+import { recordChange } from '../audit.js';
 import { loadDroppedBlfKeys } from '../devices/_shared.js';
+import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
 import { softDelete } from '../rows.js';
-import { propagate, recordChange } from '../runner.js';
 import type { Context } from '../types.js';
 import { userExtension } from './_extensions.js';
 

@@ -2,8 +2,11 @@ import { z } from 'zod';
 
 import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
+import { recordChange } from '../audit.js';
+import { createTarget, deleteTargetIfOrphan } from '../forwardTargets.js';
+import { targetSpecSchema } from '../forwardTargetSchema.js';
 import { assertSelfOrAdmin } from '../gates.js';
-import { propagate, recordChange } from '../runner.js';
+import { propagate } from '../propagate.js';
 import { defineOperation, OpError, type Context } from '../types.js';
 import {
   CONDITIONS,
@@ -11,12 +14,7 @@ import {
   storedForwardRules,
   type StoredForwardRule
 } from './_forwarding.js';
-import {
-  createTarget,
-  deleteTargetIfOrphan,
-  liveUser,
-  targetInputSchema
-} from './_shared.js';
+import { liveUser } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -29,7 +27,7 @@ const inputSchema = z
             .describe(
               'unconditional: every call; busy: every device busy; noAnswer: nobody answers within ringTimeoutS; dnd: DND on; offline: no registered device, falling to noAnswer without this rule.'
             ),
-          target: targetInputSchema
+          target: targetSpecSchema
         })
       )
       .describe(

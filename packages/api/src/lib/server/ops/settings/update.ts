@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
-import { propagate } from '../runner.js';
+import { propagate } from '../propagate.js';
 import { defineOperation, OpError, type Role } from '../types.js';
 import { settingsInputSchema } from './_input.js';
 import {

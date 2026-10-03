@@ -15,8 +15,6 @@ import {
 } from './shared.js';
 import { renderTrunksConf } from './trunks.js';
 
-export type { RenderInput, Rendered };
-
 function assertSafeDevice(device: Device, ringGroupIds: string[]): void {
   assertSafeConfigValue(device.userId, 'device.userId');
   assertSafeConfigValue(device.sipUsername, 'device.sipUsername');

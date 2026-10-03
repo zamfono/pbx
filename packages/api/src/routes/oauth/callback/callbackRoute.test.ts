@@ -8,14 +8,11 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { encodeMetadataClientId } from '#lib/server/auth/clients.js';
 import { CONSENT_COOKIE } from '#lib/server/auth/consent.js';
+import { discover } from '#lib/server/auth/oidc.js';
 import { setSealedCookie } from '#lib/server/auth/sealedCookie.js';
-import {
-  discover,
-  finishLogin,
-  SSO_COOKIE,
-  ssoConfigFromSettings,
-  type PendingLogin
-} from '#lib/server/auth/sso.js';
+import { finishLogin } from '#lib/server/auth/sso.js';
+import { SSO_COOKIE, type PendingLogin } from '#lib/server/auth/ssoCookie.js';
+import { ssoConfigFromSettings } from '#lib/server/auth/ssoSettings.js';
 import { getDb } from '#lib/server/db.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
@@ -27,16 +24,17 @@ process.env.DB_FILE = ':memory:';
 process.env.FQDN = 'pbx.example.com';
 process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
 
-vi.mock('#lib/server/auth/sso.js', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('#lib/server/auth/sso.js')>();
-  return {
-    ...actual,
-    ssoConfigFromSettings: vi.fn(),
-    discover: vi.fn(),
-    finishLogin: vi.fn()
-  };
-});
+vi.mock('#lib/server/auth/oidc.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('#lib/server/auth/oidc.js')>()),
+  discover: vi.fn()
+}));
+vi.mock('#lib/server/auth/sso.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('#lib/server/auth/sso.js')>()),
+  finishLogin: vi.fn()
+}));
+vi.mock('#lib/server/auth/ssoSettings.js', () => ({
+  ssoConfigFromSettings: vi.fn()
+}));
 
 const ssoConfigFromSettingsMock = vi.mocked(ssoConfigFromSettings);
 const discoverMock = vi.mocked(discover);

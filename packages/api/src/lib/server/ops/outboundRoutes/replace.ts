@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 import { newId, type Db } from '@zamfono/shared';
 
-import { propagate, recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
+import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
 import {
   assertCallerIdsNumeric,

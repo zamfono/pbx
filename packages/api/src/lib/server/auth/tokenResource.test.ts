@@ -6,7 +6,7 @@ import { epochSeconds } from '@zamfono/shared';
 import { makeTestDb } from '../testDb.js';
 import { AuthCodeStore } from './codes.js';
 import { verifyAccessToken } from './jwt.js';
-import { tokenEndpoint, type TokenDeps } from './oauth.js';
+import { tokenEndpoint, type TokenDeps } from './tokenEndpoint.js';
 import { issueRefresh } from './tokens.js';
 
 // RFC 8707 at the token endpoint (`resource.ts`): the one resource tokens are issued for is this

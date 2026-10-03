@@ -2,15 +2,16 @@ import { z } from 'zod';
 
 import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
-import { propagate, recordChange } from '../runner.js';
-import { defineOperation, OpError } from '../types.js';
+import { recordChange } from '../audit.js';
+import { targetSpecSchema } from '../forwardTargetSchema.js';
 import {
   deleteForwardTarget,
   insertForwardTarget,
-  liveRingGroup,
-  rowToTarget,
-  targetSpecSchema
-} from './_shared.js';
+  rowToTarget
+} from '../forwardTargetSpec.js';
+import { propagate } from '../propagate.js';
+import { defineOperation, OpError } from '../types.js';
+import { liveRingGroup } from './_shared.js';
 
 const forwardingRuleSchema = z.object({
   condition: z

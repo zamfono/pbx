@@ -1,6 +1,6 @@
 import { HTTP_CONFLICT, type ReloadKind } from '@zamfono/shared';
 
-import { propagate } from '../runner.js';
+import { propagate } from '../propagate.js';
 import { Conflict, OpError, type Context } from '../types.js';
 import { guardReuseConflict } from './_reuseConflicts.js';
 import { ENTITY_TABLES } from './_shared.js';

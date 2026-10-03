@@ -6,7 +6,7 @@ import type { Db } from '@zamfono/shared';
 
 import { loadParkingSlots } from './ops/parking/_shared.js';
 import { loadSettings } from './ops/settings/_shared.js';
-import type { RenderInput } from './pjsip/render.js';
+import type { RenderInput } from './pjsip/shared.js';
 import { ringGroupMemberships } from './ringGroupMembership.js';
 import { decrypt, type Keyring } from './secretbox.js';
 

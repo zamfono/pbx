@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { recordChange, recordFieldChanges } from '../runner.js';
+import { recordChange, recordFieldChanges } from '../audit.js';
 import { defineOperation } from '../types.js';
 import {
   contactFields,

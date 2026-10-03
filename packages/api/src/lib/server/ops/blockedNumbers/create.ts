@@ -2,8 +2,9 @@ import { z } from 'zod';
 
 import { isE164, newId } from '@zamfono/shared';
 
+import { recordChange } from '../audit.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
-import { propagate, recordChange } from '../runner.js';
+import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
 
 const inputSchema = z

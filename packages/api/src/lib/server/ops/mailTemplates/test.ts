@@ -8,7 +8,7 @@ import {
 } from '#lib/server/mail/index.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
-import { setUndoable } from '../runner.js';
+import { setUndoable } from '../audit.js';
 import { defineOperation } from '../types.js';
 import { kindSchema, tenantLanguage } from './_shared.js';
 

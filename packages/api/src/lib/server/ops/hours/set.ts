@@ -2,19 +2,20 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
-import {
-  createTarget,
-  resolveTarget,
-  targetInputSchema
-} from '../dids/_shared.js';
-import { propagate, recordChange } from '../runner.js';
-import { defineOperation, type Context } from '../types.js';
+import { recordChange } from '../audit.js';
+import { createTarget } from '../forwardTargets.js';
+import { targetSpecSchema } from '../forwardTargetSchema.js';
+import { resolveTarget } from '../forwardTargetSpec.js';
+import { propagate } from '../propagate.js';
 import {
   assertOwnScopeOrAdmin,
+  scopeColumns,
+  scopeInputSchema
+} from '../scope.js';
+import { defineOperation, type Context } from '../types.js';
+import {
   loadIntervals,
   loadSchedule,
-  scopeColumns,
-  scopeInputSchema,
   validateIntervals,
   type IntervalInput
 } from './_shared.js';
@@ -31,7 +32,7 @@ const inputSchema = z
       .describe(
         "Whether the schedule applies (on by default); off, it is kept and the scope follows the tenant's."
       ),
-    closedTarget: targetInputSchema.describe(
+    closedTarget: targetSpecSchema.describe(
       'Where inbound and forwarded calls go outside every open interval; internal calls ignore opening hours.'
     ),
     intervals: z

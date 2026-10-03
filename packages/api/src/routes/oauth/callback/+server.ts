@@ -10,17 +10,17 @@ import { authCodeStore } from '#lib/server/auth/codes.js';
 import { CONSENT_COOKIE } from '#lib/server/auth/consent.js';
 import { loginRedirect } from '#lib/server/auth/loginRedirect.js';
 import {
+  discover,
+  type Discovery,
+  type SsoConfig
+} from '#lib/server/auth/oidc.js';
+import {
   setSealedCookie,
   unsealCookie
 } from '#lib/server/auth/sealedCookie.js';
-import {
-  discover,
-  finishLogin,
-  SSO_COOKIE,
-  ssoConfigFromSettings,
-  type Discovery,
-  type SsoConfig
-} from '#lib/server/auth/sso.js';
+import { finishLogin } from '#lib/server/auth/sso.js';
+import { SSO_COOKIE } from '#lib/server/auth/ssoCookie.js';
+import { ssoConfigFromSettings } from '#lib/server/auth/ssoSettings.js';
 import { getDb } from '#lib/server/db.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 

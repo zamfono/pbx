@@ -3,8 +3,8 @@ import { z } from 'zod';
 
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
+import { recordChange } from '../audit.js';
 import { orBefore } from '../patch.js';
-import { recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
 import {
   eventTypesSchema,

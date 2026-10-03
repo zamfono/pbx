@@ -6,7 +6,8 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { sealTargetSecret } from '../ops/backups/_secret.js';
 import { keyringFromEnv, type Keyring } from '../secretbox.js';
-import { type Bus, type ExecFn } from './backup.js';
+import type { Bus } from './backup.js';
+import type { ExecFn } from './backupBackends.js';
 import { queueRun, scheduleBackups } from './cron.js';
 
 const KEY_BYTE_LENGTH = 32;

@@ -35,8 +35,6 @@ import {
   RESTIC_BIN
 } from './backupRestic.js';
 
-export type { ExecFn } from './backupBackends.js';
-
 // 0700: the snapshot is a full-database VACUUM, secrets and password hashes included.
 const SNAPSHOT_DIR_MODE = 0o700;
 

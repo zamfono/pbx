@@ -9,7 +9,8 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { sealTargetSecret, type BackupSecret } from '../ops/backups/_secret.js';
 import { keyringFromEnv, type Keyring } from '../secretbox.js';
-import { failBackupRun, runBackup, type Bus, type ExecFn } from './backup.js';
+import { failBackupRun, runBackup, type Bus } from './backup.js';
+import type { ExecFn } from './backupBackends.js';
 import { markInterruptedRuns } from './cron.js';
 import { nextRun } from './cronExpression.js';
 

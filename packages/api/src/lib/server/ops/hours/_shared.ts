@@ -2,16 +2,8 @@ import type { Selectable } from 'kysely';
 
 import { HTTP_UNPROCESSABLE_CONTENT, type DB, type Db } from '@zamfono/shared';
 
-import { scopeColumns, type ScopeInput } from '../ooo/_shared.js';
+import { scopeColumns, type ScopeInput } from '../scope.js';
 import { OpError } from '../types.js';
-
-export {
-  assertOwnScopeOrAdmin,
-  scopeColumns,
-  scopeFromColumns,
-  scopeInputSchema,
-  type ScopeInput
-} from '../ooo/_shared.js';
 
 export type OpeningHoursRow = Selectable<DB['openingHours']>;
 export type IntervalRow = Selectable<DB['openingHoursIntervals']>;

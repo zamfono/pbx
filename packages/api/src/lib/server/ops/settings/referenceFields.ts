@@ -1,11 +1,9 @@
 import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
-import {
-  createTarget,
-  resolveOptionalTarget,
-  type TargetInput
-} from '../dids/_shared.js';
-import { recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
+import { createTarget } from '../forwardTargets.js';
+import { type TargetSpec } from '../forwardTargetSchema.js';
+import { resolveOptionalTarget } from '../forwardTargetSpec.js';
 import { OpError, type Context } from '../types.js';
 import type { SettingsRow } from './_shared.js';
 
@@ -17,7 +15,7 @@ const MOH_KIND = 'moh';
 type ReferenceFieldInput = {
   mainDidId?: string;
   holdMohAudioId?: string | null;
-  fallbackTarget?: TargetInput | null;
+  fallbackTarget?: TargetSpec | null;
 };
 
 /** Validates `mainDidId` is a live, numeric DID (§9.4 "Caller-ID") before applying it. */

@@ -3,24 +3,11 @@ import { z } from 'zod';
 
 import { HTTP_NOT_FOUND, type DB } from '@zamfono/shared';
 
-import {
-  deleteForwardTarget,
-  insertForwardTarget,
-  rowToTarget,
-  targetSpecSchema,
-  type TargetSpec
-} from '../forwardTargetSpec.js';
+import { targetSpecSchema, type TargetSpec } from '../forwardTargetSchema.js';
+import { rowToTarget } from '../forwardTargetSpec.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { liveRow } from '../rows.js';
 import { OpError } from '../types.js';
-
-export {
-  targetSpecSchema,
-  insertForwardTarget,
-  deleteForwardTarget,
-  rowToTarget
-};
-export type { TargetSpec };
 
 /** A `menus` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type MenuRow = Selectable<DB['menus']>;

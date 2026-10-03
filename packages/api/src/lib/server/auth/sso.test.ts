@@ -8,12 +8,12 @@ import { encrypt, keyringFromEnv, type Keyring } from '../secretbox.js';
 import { makeTestDb } from '../testDb.js';
 import {
   discover,
-  finishLogin,
-  ssoConfigFromSettings,
   startLogin,
   type Discovery,
   type SsoConfig
-} from './sso.js';
+} from './oidc.js';
+import { finishLogin } from './sso.js';
+import { ssoConfigFromSettings } from './ssoSettings.js';
 
 const NOW = '2026-01-01T00:00:00.000Z';
 const NOW_S = epochSeconds(Date.parse(NOW));

@@ -7,7 +7,8 @@ import {
   type FeatureCodes
 } from '@zamfono/shared';
 
-import { resolveOptionalTarget, type TargetInput } from '../dids/_shared.js';
+import { type TargetSpec } from '../forwardTargetSchema.js';
+import { resolveOptionalTarget } from '../forwardTargetSpec.js';
 import type { Codec } from '../trunks/_shared.js';
 import { OpError, type Role } from '../types.js';
 
@@ -38,7 +39,7 @@ export type SettingsWire = {
   extLength: number;
   emergencyNumbers: string[];
   featureCodes: FeatureCodes;
-  fallbackTarget: TargetInput | null;
+  fallbackTarget: TargetSpec | null;
   codecs: Codec[];
   clir: boolean;
   rejectAnonymous: boolean;

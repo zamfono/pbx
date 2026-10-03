@@ -1,12 +1,11 @@
 import { z } from 'zod';
 
-import {
-  createTarget,
-  resolveOptionalTarget,
-  type TargetInput
-} from '../dids/_shared.js';
+import { recordChange } from '../audit.js';
+import { createTarget } from '../forwardTargets.js';
+import { type TargetSpec } from '../forwardTargetSchema.js';
+import { resolveOptionalTarget } from '../forwardTargetSpec.js';
 import { orBefore } from '../patch.js';
-import { propagate, recordChange } from '../runner.js';
+import { propagate } from '../propagate.js';
 import { defineOperation, type Context } from '../types.js';
 import {
   DIGITS_SCHEMA,
@@ -30,7 +29,7 @@ type UpdateOutput = {
   base: string;
   label: string | null;
   digits: number | null;
-  fallbackTarget: TargetInput | null;
+  fallbackTarget: TargetSpec | null;
   createdAt: string;
 };
 
@@ -41,7 +40,7 @@ type UpdateOutput = {
 async function resolveFallbackTargetId(
   ctx: Context,
   before: string | null,
-  fallbackTarget: TargetInput | null | undefined
+  fallbackTarget: TargetSpec | null | undefined
 ): Promise<string | null> {
   if (fallbackTarget === undefined) {
     return before;

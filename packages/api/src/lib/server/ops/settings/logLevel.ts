@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { HTTP_UNPROCESSABLE_CONTENT, MS_PER_DAY } from '@zamfono/shared';
 
-import { recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
 import { OpError, type Context } from '../types.js';
 
 /**

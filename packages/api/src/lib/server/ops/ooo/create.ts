@@ -2,18 +2,22 @@ import { z } from 'zod';
 
 import { HTTP_UNPROCESSABLE_CONTENT, newId } from '@zamfono/shared';
 
-import { createTarget, type TargetInput } from '../dids/_shared.js';
-import { propagate, recordChange } from '../runner.js';
-import { defineOperation, OpError, type Context } from '../types.js';
+import { recordChange } from '../audit.js';
+import { createTarget } from '../forwardTargets.js';
+import { type TargetSpec } from '../forwardTargetSchema.js';
+import { propagate } from '../propagate.js';
 import {
   assertOwnScopeOrAdmin,
-  liveOooRulesInScope,
-  normalizeIsoOrNull,
-  oooFields,
-  rangesOverlap,
   scopeColumns,
   scopeInputSchema,
   type ScopeInput
+} from '../scope.js';
+import { defineOperation, OpError, type Context } from '../types.js';
+import {
+  liveOooRulesInScope,
+  normalizeIsoOrNull,
+  oooFields,
+  rangesOverlap
 } from './_shared.js';
 
 const inputSchema = z
@@ -28,7 +32,7 @@ type Output = {
   active: boolean;
   startsAt: string | null;
   expiresAt: string | null;
-  target: TargetInput;
+  target: TargetSpec;
   createdAt: string;
 };
 

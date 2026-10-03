@@ -2,12 +2,13 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
-import { propagate, recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
+import { insertForwardTarget } from '../forwardTargetSpec.js';
+import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
 import {
   assertAudioAvailable,
   assertNameAvailable,
-  insertForwardTarget,
   menuFields,
   toMenuOut,
   type MenuOut

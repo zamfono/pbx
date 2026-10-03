@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
+import { propagate } from '../propagate.js';
 import { softDelete } from '../rows.js';
-import { propagate } from '../runner.js';
 import { defineOperation } from '../types.js';
 import { liveUserGroup } from './_shared.js';
 

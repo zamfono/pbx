@@ -15,13 +15,6 @@ import { OpError, type Role } from '../types.js';
 import { accountLockedUntil } from './_accountLock.js';
 import { userExtension } from './_extensions.js';
 
-export {
-  createTarget,
-  deleteTargetIfOrphan,
-  targetInputSchema
-} from '../forwardTargets.js';
-export type { TargetInput } from '../forwardTargets.js';
-
 /** A `users` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type UserRow = Selectable<DB['users']>;
 

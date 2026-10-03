@@ -2,9 +2,9 @@ import { z } from 'zod';
 
 import { HTTP_CONFLICT, HTTP_NOT_FOUND } from '@zamfono/shared';
 
+import { recordRevert } from '../audit.js';
 import { OUTCOME_OPERATIONS } from '../outcomeLog.js';
 import { registry } from '../registry.js';
-import { recordRevert } from '../runner.js';
 import { Conflict, defineOperation, OpError, type Context } from '../types.js';
 import { isTenantListOperation, revertTenantList } from './_listReverts.js';
 import { ENTITY_TABLES, parseChanges, type ChangeEntry } from './_shared.js';

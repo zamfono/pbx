@@ -1,15 +1,18 @@
 import { z } from 'zod';
 
-import { propagate, recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
+import {
+  deleteForwardTarget,
+  insertForwardTarget,
+  rowToTarget
+} from '../forwardTargetSpec.js';
+import { propagate } from '../propagate.js';
 import { defineOperation, type Context } from '../types.js';
 import {
   assertAudioAvailable,
   assertNameAvailable,
-  deleteForwardTarget,
-  insertForwardTarget,
   liveMenu,
   menuFields,
-  rowToTarget,
   toMenuOut,
   type MenuRow
 } from './_shared.js';

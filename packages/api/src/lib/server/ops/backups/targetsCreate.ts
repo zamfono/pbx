@@ -5,7 +5,7 @@ import { newId } from '@zamfono/shared';
 
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
-import { recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
 import { defineOperation } from '../types.js';
 import { assertSecretFitsKind, sealTargetSecret } from './_secret.js';
 import {

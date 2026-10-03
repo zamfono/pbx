@@ -11,7 +11,7 @@ import {
 } from '#lib/server/provisioning/ringotelClient.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
-import { onRollback } from '../runner.js';
+import { onRollback } from '../rollbackHooks.js';
 import { loadSettings } from '../settings/_shared.js';
 import { defineOperation, OpError } from '../types.js';
 import {

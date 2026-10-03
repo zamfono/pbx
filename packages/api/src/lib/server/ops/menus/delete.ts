@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
+import { propagate } from '../propagate.js';
 import { softDelete } from '../rows.js';
-import { propagate } from '../runner.js';
 import { Conflict, defineOperation } from '../types.js';
 import { findMenuReferences } from './_references.js';
 import { liveMenu } from './_shared.js';

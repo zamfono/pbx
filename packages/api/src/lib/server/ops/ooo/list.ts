@@ -6,13 +6,10 @@ import {
   pageInput
 } from '#lib/server/pagination.js';
 
-import { resolveTarget } from '../dids/_shared.js';
+import { resolveTarget } from '../forwardTargetSpec.js';
+import { assertOwnScopeOrAdmin, scopeInputSchema } from '../scope.js';
 import { defineOperation } from '../types.js';
-import {
-  assertOwnScopeOrAdmin,
-  liveOooRulesInScope,
-  scopeInputSchema
-} from './_shared.js';
+import { liveOooRulesInScope } from './_shared.js';
 
 const inputSchema = z
   .object({

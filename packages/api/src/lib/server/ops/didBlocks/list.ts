@@ -4,7 +4,7 @@ import {
   pageInput
 } from '#lib/server/pagination.js';
 
-import { resolveOptionalTarget } from '../dids/_shared.js';
+import { resolveOptionalTarget } from '../forwardTargetSpec.js';
 import { defineOperation } from '../types.js';
 
 const inputSchema = pageInput.strict();

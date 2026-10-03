@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { decrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
-import { setUndoable } from '../runner.js';
+import { setUndoable } from '../audit.js';
 import { defineOperation } from '../types.js';
 import { connectionSettings } from './_connectionSettings.js';
 import { liveDevice } from './_shared.js';

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
 
-import { storeAudio } from './audio/types.js';
+import { storeAudio } from './audio/store.js';
 import { getCoreClient } from './coreClient.js';
 import { stubCoreClient } from './coreClientStub.js';
 import { buildOpenApiDocument, type OpenApiDocument } from './openapi.js';
@@ -17,7 +17,7 @@ import { routes } from './restRoutes.js';
 import { makeTestDb, seedTenantTimeZone } from './testDb.js';
 
 // The upload is the REST transport's to parse; transcoding it is `audio.create`'s own concern.
-vi.mock('./audio/types.js', () => ({
+vi.mock('./audio/store.js', () => ({
   storeAudio: vi.fn(async () =>
     Promise.resolve({ id: newId(), filename: 'welcome.wav' })
   ),

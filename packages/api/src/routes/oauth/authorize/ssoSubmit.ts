@@ -14,13 +14,10 @@ import {
   resolveClient,
   type AuthorizePayload
 } from '#lib/server/auth/authorizeRequest.js';
+import { discover, startLogin } from '#lib/server/auth/oidc.js';
 import { setSealedCookie } from '#lib/server/auth/sealedCookie.js';
-import {
-  discover,
-  SSO_COOKIE,
-  ssoConfigFromSettings,
-  startLogin
-} from '#lib/server/auth/sso.js';
+import { SSO_COOKIE } from '#lib/server/auth/ssoCookie.js';
+import { ssoConfigFromSettings } from '#lib/server/auth/ssoSettings.js';
 import { getDb } from '#lib/server/db.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 

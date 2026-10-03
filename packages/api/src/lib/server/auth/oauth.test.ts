@@ -4,12 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { keyringFromEnv } from '../secretbox.js';
 import { makeTestDb } from '../testDb.js';
 import { AuthCodeStore } from './codes.js';
-import {
-  registerEndpoint,
-  tokenEndpoint,
-  type RegisterDeps,
-  type TokenDeps
-} from './oauth.js';
+import { registerEndpoint, type RegisterDeps } from './registerEndpoint.js';
+import { tokenEndpoint, type TokenDeps } from './tokenEndpoint.js';
 
 const NOW = '2026-01-01T00:00:00.000Z';
 const ORIGIN = 'https://pbx.example.com';

@@ -15,7 +15,11 @@ import {
   storedCredentials
 } from '#lib/server/provisioning/ringotelUser.js';
 
-import { oweRestartPush } from '../afterCommit.js';
+import {
+  afterCommit,
+  afterPropagation,
+  oweRestartPush
+} from '../afterCommit.js';
 import type { AuditCaller } from '../audit.js';
 import {
   callerOf,
@@ -23,7 +27,6 @@ import {
   outcomeChanges,
   recordOutcome
 } from '../outcomeLog.js';
-import { afterCommit, afterPropagation } from '../runner.js';
 import type { Context } from '../types.js';
 
 const log = pino({ name: 'ringotel' });

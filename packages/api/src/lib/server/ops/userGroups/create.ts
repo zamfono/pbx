@@ -2,8 +2,9 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
+import { recordChange } from '../audit.js';
 import { memberSchema } from '../members.js';
-import { propagate, recordChange } from '../runner.js';
+import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
 import {
   assertNameAvailable,

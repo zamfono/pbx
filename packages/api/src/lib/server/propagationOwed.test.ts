@@ -12,15 +12,16 @@ import { getCoreClient, type CoreClient } from './coreClient.js';
 import { stubCoreClient } from './coreClientStub.js';
 import { apiHealth } from './health.js';
 import { renderMetrics } from './metrics.js';
-import { onceConfigPropagated, runAfterCommit } from './ops/afterCommit.js';
-import { newEffects } from './ops/effects.js';
-import { register } from './ops/registry.js';
 import {
   afterCommit,
   afterPropagation,
-  propagate,
-  runOperation
-} from './ops/runner.js';
+  onceConfigPropagated,
+  runAfterCommit
+} from './ops/afterCommit.js';
+import { newEffects } from './ops/effects.js';
+import { propagate } from './ops/propagate.js';
+import { register } from './ops/registry.js';
+import { runOperation } from './ops/runner.js';
 import { defineOperation } from './ops/types.js';
 import { propagateConfig } from './propagation.js';
 import { isPropagationPending } from './propagationPending.js';

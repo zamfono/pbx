@@ -1,18 +1,9 @@
 import { HTTP_FORBIDDEN } from '@zamfono/shared';
 
 import { findForwardTargetOwners } from './forwardTargetOwners.js';
-import {
-  insertForwardTarget,
-  targetSpecSchema,
-  type TargetSpec
-} from './forwardTargetSpec.js';
+import type { TargetSpec } from './forwardTargetSchema.js';
+import { insertForwardTarget } from './forwardTargetSpec.js';
 import { OpError, type Context } from './types.js';
-
-// `TargetSpec` (§11.2 `forward_targets`) is the wire union every area that owns a forwarding
-// rule, fallback or menu option accepts and returns; `targetSpecSchema` already validates it,
-// `external` as E.164, so this module reuses both rather than re-deriving them.
-export { targetSpecSchema as targetInputSchema };
-export type TargetInput = TargetSpec;
 
 /**
  * §10.3 "Forward targets": a `sip` target is set or kept by an `admin` or `owner` alone, since it
@@ -23,7 +14,7 @@ export type TargetInput = TargetSpec;
  * already holds. The admin-only operations need it only through `createTarget`, where it always
  * passes.
  */
-export function assertMayHoldTarget(ctx: Context, target: TargetInput): void {
+export function assertMayHoldTarget(ctx: Context, target: TargetSpec): void {
   if (target.kind === 'sip' && ctx.actor.role === 'user') {
     throw new OpError(HTTP_FORBIDDEN, 'a sip target is set by an admin');
   }
@@ -36,7 +27,7 @@ export function assertMayHoldTarget(ctx: Context, target: TargetInput): void {
  */
 export async function createTarget(
   ctx: Context,
-  input: TargetInput
+  input: TargetSpec
 ): Promise<string> {
   assertMayHoldTarget(ctx, input);
   return insertForwardTarget(ctx, input);

@@ -1,4 +1,4 @@
-import { recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
 import type { Context } from '../types.js';
 import type { SettingsWire } from './_shared.js';
 

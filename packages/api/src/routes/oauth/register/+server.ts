@@ -3,7 +3,7 @@ import * as env from '$app/env/private';
 
 import { nowIso } from '@zamfono/shared';
 
-import { registerEndpoint } from '#lib/server/auth/oauth.js';
+import { registerEndpoint } from '#lib/server/auth/registerEndpoint.js';
 import { getDb } from '#lib/server/db.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 

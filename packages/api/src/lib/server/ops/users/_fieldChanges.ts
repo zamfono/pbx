@@ -2,7 +2,7 @@ import type { Selectable } from 'kysely';
 
 import type { DB } from '@zamfono/shared';
 
-import { recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
 import type { Context } from '../types.js';
 
 /** A `users` row as Kysely's `CamelCasePlugin` maps it (§11.2). */

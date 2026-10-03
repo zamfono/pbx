@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { maskContent } from '../runner.js';
+import { maskContent } from '../audit.js';
 import { Conflict, defineOperation } from '../types.js';
 import { cascadeSoftDeleteUser } from './_cascade.js';
 import { findUserReferences } from './_references.js';

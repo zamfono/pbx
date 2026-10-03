@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
-import { recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
 import { defineOperation, OpError } from '../types.js';
 import { kindSchema, languageSchema, loadOverride } from './_shared.js';
 

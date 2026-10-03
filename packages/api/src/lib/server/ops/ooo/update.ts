@@ -2,24 +2,24 @@ import { z } from 'zod';
 
 import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
-import {
-  createTarget,
-  resolveTarget,
-  type TargetInput
-} from '../dids/_shared.js';
-import { assertMayHoldTarget } from '../forwardTargets.js';
+import { recordChange } from '../audit.js';
+import { assertMayHoldTarget, createTarget } from '../forwardTargets.js';
+import { type TargetSpec } from '../forwardTargetSchema.js';
+import { resolveTarget } from '../forwardTargetSpec.js';
 import { orBefore } from '../patch.js';
-import { propagate, recordChange } from '../runner.js';
-import { defineOperation, OpError, type Context } from '../types.js';
+import { propagate } from '../propagate.js';
 import {
   assertVisibleScope,
+  scopeFromColumns,
+  type ScopeInput
+} from '../scope.js';
+import { defineOperation, OpError, type Context } from '../types.js';
+import {
   liveOooRule,
   liveOooRulesInScope,
   normalizeIsoOrNull,
   oooFields,
-  rangesOverlap,
-  scopeFromColumns,
-  type ScopeInput
+  rangesOverlap
 } from './_shared.js';
 
 const inputSchema = z
@@ -34,7 +34,7 @@ type Output = {
   active: boolean;
   startsAt: string | null;
   expiresAt: string | null;
-  target: TargetInput;
+  target: TargetSpec;
   createdAt: string;
 };
 

@@ -24,9 +24,6 @@ import type {
   SipCredentials
 } from './types.js';
 
-export { buildBranchProvision } from './branchProvision.js';
-export type { RingotelProviderDeps } from './ringotelClient.js';
-
 // Ringotel's recoverDeletedUser (§10.4) accepts a deletion only within this window; after it,
 // onDeviceCreated falls back to a fresh createUser.
 const RECOVER_WINDOW_MS = MS_PER_DAY;

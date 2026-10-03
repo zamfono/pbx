@@ -1,15 +1,14 @@
 import { z } from 'zod';
 
-import { resolveTarget, type TargetInput } from '../dids/_shared.js';
-import { defineOperation } from '../types.js';
+import { type TargetSpec } from '../forwardTargetSchema.js';
+import { resolveTarget } from '../forwardTargetSpec.js';
 import {
   assertOwnScopeOrAdmin,
-  loadIntervals,
-  loadSchedule,
   scopeInputSchema,
-  type IntervalInput,
   type ScopeInput
-} from './_shared.js';
+} from '../scope.js';
+import { defineOperation } from '../types.js';
+import { loadIntervals, loadSchedule, type IntervalInput } from './_shared.js';
 
 const inputSchema = z.object({ scope: scopeInputSchema }).strict();
 
@@ -17,7 +16,7 @@ export type HoursWire = {
   id: string;
   scope: ScopeInput;
   active: boolean;
-  closedTarget: TargetInput;
+  closedTarget: TargetSpec;
   intervals: IntervalInput[];
 };
 

@@ -8,12 +8,6 @@ import { createRingotelProvider } from './ringotel.js';
 import { createRingotelClient } from './ringotelClient.js';
 import type { ProvisioningProvider } from './types.js';
 
-export { createRingotelClient, type RingotelClient } from './ringotelClient.js';
-export {
-  buildBranchProvision,
-  createRingotelProvider,
-  type RingotelProviderDeps
-} from './ringotel.js';
 export * from './types.js';
 
 /**

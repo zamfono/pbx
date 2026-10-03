@@ -2,14 +2,12 @@ import { z } from 'zod';
 
 import { newId, normalizeInbound } from '@zamfono/shared';
 
+import { recordChange } from '../audit.js';
+import { createTarget } from '../forwardTargets.js';
+import { targetSpecSchema, type TargetSpec } from '../forwardTargetSchema.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
-import { propagate, recordChange } from '../runner.js';
+import { propagate } from '../propagate.js';
 import { defineOperation, type Context } from '../types.js';
-import {
-  createTarget,
-  targetInputSchema,
-  type TargetInput
-} from './_shared.js';
 
 /** The `+` and digits shape of a numeric DID (§9.4 "Caller-ID"): only such a DID may be presented. */
 const NUMERIC_NUMBER = /^\+[0-9]+$/u;
@@ -24,7 +22,7 @@ const inputSchema = z
         "The called number: E.164 such as +4989123456, or national such as 089123456, normalized with settings.country; anything else, such as a provider's account name, is matched verbatim."
       ),
     label: z.string().nullable().optional(),
-    target: targetInputSchema.describe(
+    target: targetSpecSchema.describe(
       'Where a call to this number goes; a numeric DID for a user with no caller ID of their own becomes it.'
     )
   })
@@ -34,7 +32,7 @@ type CreateOutput = {
   id: string;
   number: string;
   label: string | null;
-  target: TargetInput;
+  target: TargetSpec;
   createdAt: string;
 };
 

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
+import { propagate } from '../propagate.js';
 import { liveRow, softDelete } from '../rows.js';
-import { propagate } from '../runner.js';
 import { defineOperation } from '../types.js';
 
 const inputSchema = z.object({ id: z.string() }).strict();

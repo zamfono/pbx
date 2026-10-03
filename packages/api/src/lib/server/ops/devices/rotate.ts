@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { newSipPassword } from '#lib/server/sip.js';
 
-import { propagate, recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
+import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
 import { pushToRingotel } from './_ringotelPush.js';
 import { liveDevice } from './_shared.js';

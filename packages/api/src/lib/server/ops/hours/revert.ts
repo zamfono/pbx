@@ -1,10 +1,11 @@
 import { HTTP_CONFLICT } from '@zamfono/shared';
 
 import type { ChangeEntry } from '../audit/_shared.js';
-import { resolveTarget } from '../dids/_shared.js';
+import { resolveTarget } from '../forwardTargetSpec.js';
 import { replayOperation } from '../runner.js';
+import { scopeFromColumns } from '../scope.js';
 import { OpError, type Context } from '../types.js';
-import { loadIntervals, scopeFromColumns } from './_shared.js';
+import { loadIntervals } from './_shared.js';
 
 /** The entry's recorded change to `field`, or `undefined` where it changed no such field. */
 function changeTo(

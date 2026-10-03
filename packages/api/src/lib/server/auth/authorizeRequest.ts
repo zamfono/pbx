@@ -15,7 +15,8 @@ import {
   type ClientMeta
 } from './clients.js';
 import { requestedResourceAcceptable } from './resource.js';
-import { ssoConfigFromSettings, type PendingAuthorize } from './sso.js';
+import type { PendingAuthorize } from './ssoCookie.js';
+import { ssoConfigFromSettings } from './ssoSettings.js';
 
 // §5.2 "Authentication pages": the server "implements the authorization-code grant with PKCE";
 // the discovery document advertises only these as supported (`oauth.ts`), so a request naming

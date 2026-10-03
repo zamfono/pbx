@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { propagate, recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
+import { propagate } from '../propagate.js';
 import {
   recordLogLevelChanges,
   resolveLogLevel,

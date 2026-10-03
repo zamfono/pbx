@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { afterCommit } from '../afterCommit.js';
-import { setUndoable } from '../runner.js';
+import { setUndoable } from '../audit.js';
 import { defineOperation } from '../types.js';
 import { deleteRecordingFile, loadRecording } from './_shared.js';
 

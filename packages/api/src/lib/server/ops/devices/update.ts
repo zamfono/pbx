@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
-import { propagate, recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
+import { propagate } from '../propagate.js';
 import { defineOperation, OpError } from '../types.js';
 import { assertDeviceScope, liveDevice, toDeviceOut } from './_shared.js';
 import { assertNonEmptyIps, assertValidIps } from './_transportPolicy.js';

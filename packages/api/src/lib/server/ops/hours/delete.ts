@@ -2,14 +2,11 @@ import { z } from 'zod';
 
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
+import { propagate } from '../propagate.js';
 import { softDelete } from '../rows.js';
-import { propagate } from '../runner.js';
+import { assertOwnScopeOrAdmin, scopeInputSchema } from '../scope.js';
 import { defineOperation, OpError } from '../types.js';
-import {
-  assertOwnScopeOrAdmin,
-  loadSchedule,
-  scopeInputSchema
-} from './_shared.js';
+import { loadSchedule } from './_shared.js';
 
 const inputSchema = z.object({ scope: scopeInputSchema }).strict();
 

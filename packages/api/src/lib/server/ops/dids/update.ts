@@ -1,14 +1,17 @@
 import { z } from 'zod';
 
+import { recordChange } from '../audit.js';
+import { createTarget } from '../forwardTargets.js';
+import { targetSpecSchema } from '../forwardTargetSchema.js';
+import { resolveTarget } from '../forwardTargetSpec.js';
+import { propagate } from '../propagate.js';
 import { liveRow } from '../rows.js';
-import { propagate, recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
-import { createTarget, resolveTarget, targetInputSchema } from './_shared.js';
 
 const inputSchema = z
   .object({
     id: z.string(),
-    target: targetInputSchema.describe('Where a call to this number goes.')
+    target: targetSpecSchema.describe('Where a call to this number goes.')
   })
   .strict();
 

@@ -2,7 +2,7 @@ import * as env from '$app/env/private';
 
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
-import { recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
 import type { Context } from '../types.js';
 
 type SecretField = 'smtpPassword' | 'ssoClientSecret' | 'ringotelApiToken';

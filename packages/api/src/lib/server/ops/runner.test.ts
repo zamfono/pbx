@@ -4,13 +4,10 @@ import { z } from 'zod';
 import { propagateConfig } from '#lib/server/propagation.js';
 
 import { makeTestDb } from '../testDb.js';
+import { recordChange } from './audit.js';
+import { propagate } from './propagate.js';
 import { register } from './registry.js';
-import {
-  propagate,
-  recordChange,
-  runOperation,
-  type RunInput
-} from './runner.js';
+import { runOperation, type RunInput } from './runner.js';
 import { ConfirmationRequired, defineOperation, type Actor } from './types.js';
 
 const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { assertSelfOrAdmin } from '../gates.js';
-import { propagate } from '../runner.js';
+import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
 import { liveUser } from './_shared.js';
 

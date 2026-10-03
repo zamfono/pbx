@@ -6,7 +6,8 @@ import { issueResetToken } from '#lib/server/auth/tokens.js';
 import { sendMail } from '#lib/server/mail/index.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
-import { afterCommit, setUndoable } from '../runner.js';
+import { afterCommit } from '../afterCommit.js';
+import { setUndoable } from '../audit.js';
 import { defineOperation } from '../types.js';
 import { setupLinkFor } from './_setupMail.js';
 import { liveUser } from './_shared.js';

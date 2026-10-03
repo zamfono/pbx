@@ -2,8 +2,8 @@ import type { Transaction } from 'kysely';
 
 import type { DB, SipHeaderTemplate } from '@zamfono/shared';
 
+import { type TargetSpec } from '../forwardTargetSchema.js';
 import { rowToTarget } from '../forwardTargetSpec.js';
-import type { TargetInput } from './_shared.js';
 
 /** §11.2 `user_forward_rules` CHECK: the classic CFU/CFB/CFNR conditions plus presence-aware ones. */
 export const CONDITIONS = [
@@ -18,7 +18,7 @@ export type Condition = (typeof CONDITIONS)[number];
 /** One stored rule: the wire rule `users.getForwarding` returns, plus the target row it owns. */
 export type StoredForwardRule = {
   condition: Condition;
-  target: TargetInput;
+  target: TargetSpec;
   targetId: string;
 };
 
@@ -63,8 +63,8 @@ function headerPairs(headers: SipHeaderTemplate[]): string {
  * through `rowToTarget`, so its headers are the parsed JSON the wire returns.
  */
 export function isSameSipTarget(
-  stored: TargetInput,
-  input: TargetInput
+  stored: TargetSpec,
+  input: TargetSpec
 ): boolean {
   if (stored.kind !== 'sip' || input.kind !== 'sip') {
     return false;

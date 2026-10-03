@@ -2,9 +2,11 @@ import { z } from 'zod';
 
 import { newId, normalizeInbound } from '@zamfono/shared';
 
-import { createTarget, type TargetInput } from '../dids/_shared.js';
+import { recordChange } from '../audit.js';
+import { createTarget } from '../forwardTargets.js';
+import { type TargetSpec } from '../forwardTargetSchema.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
-import { propagate, recordChange } from '../runner.js';
+import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
 import { DIGITS_SCHEMA, FALLBACK_TARGET_SCHEMA } from './_shared.js';
 
@@ -43,7 +45,7 @@ type CreateOutput = {
   base: string;
   label: string | null;
   digits: number | null;
-  fallbackTarget: TargetInput | null;
+  fallbackTarget: TargetSpec | null;
   createdAt: string;
 };
 

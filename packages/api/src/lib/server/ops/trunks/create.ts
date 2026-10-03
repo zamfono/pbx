@@ -5,7 +5,8 @@ import { HTTP_UNPROCESSABLE_CONTENT, newId, type Db } from '@zamfono/shared';
 
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
-import { propagate, recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
+import { propagate } from '../propagate.js';
 import { defineOperation, OpError, type Context } from '../types.js';
 import { createInputSchema } from './_inputs.js';
 import {

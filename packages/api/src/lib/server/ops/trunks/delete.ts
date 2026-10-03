@@ -4,8 +4,8 @@ import {
   findForwardTargetOwners,
   type Reference
 } from '../forwardTargetOwners.js';
+import { propagate } from '../propagate.js';
 import { softDelete } from '../rows.js';
-import { propagate } from '../runner.js';
 import { Conflict, defineOperation, type Context } from '../types.js';
 import { liveTrunk } from './_shared.js';
 import { emergencyTrunkWarnings } from './_writeChecks.js';

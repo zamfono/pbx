@@ -3,9 +3,9 @@ import { z } from 'zod';
 
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
+import { recordChange } from '../audit.js';
 import { orBefore } from '../patch.js';
 import { liveRow } from '../rows.js';
-import { recordChange } from '../runner.js';
 import { defineOperation } from '../types.js';
 import {
   assertSecretFitsKind,

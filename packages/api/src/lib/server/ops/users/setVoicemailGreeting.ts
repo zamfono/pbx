@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
-import { deleteAudioFile, storeAudio } from '#lib/server/audio/types.js';
+import { deleteAudioFile, storeAudio } from '#lib/server/audio/store.js';
 
 import { uploadSchema } from '../audio/create.js';
-import { propagate } from '../runner.js';
+import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
 import { assertOwnGreeting, GREETING_LABEL } from './_greeting.js';
 import { liveUser } from './_shared.js';

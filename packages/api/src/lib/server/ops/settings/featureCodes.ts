@@ -4,7 +4,7 @@ import {
   type FeatureCodes
 } from '@zamfono/shared';
 
-import { recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
 import { OpError, type Context } from '../types.js';
 import type { SettingsRow } from './_shared.js';
 

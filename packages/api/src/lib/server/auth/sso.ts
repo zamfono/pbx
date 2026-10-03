@@ -1,9 +1,8 @@
 /**
  * The SSO login as the routes see it (§5.2 "Login and SSO"): `finishLogin` checks the upstream
- * `id_token`'s claims and resolves the account, and this module re-exports the rest of the flow —
- * discovery and the upstream request (`oidc.ts`), the `zamfono_sso` cookie (`ssoCookie.ts`) and
- * the tenant's configuration (`ssoSettings.ts`) — so the callback route and its tests have one
- * module to import and mock.
+ * `id_token`'s claims and resolves the account. The rest of the flow lives beside it: discovery
+ * and the upstream request (`oidc.ts`), the `zamfono_sso` cookie (`ssoCookie.ts`) and the
+ * tenant's configuration (`ssoSettings.ts`).
  */
 import type { JWTPayload } from 'jose';
 
@@ -17,19 +16,6 @@ import {
   type SsoConfig
 } from './oidc.js';
 import { matchSsoAccount } from './ssoAccount.js';
-
-export {
-  discover,
-  startLogin,
-  type Discovery,
-  type SsoConfig
-} from './oidc.js';
-export {
-  SSO_COOKIE,
-  type PendingAuthorize,
-  type PendingLogin
-} from './ssoCookie.js';
-export { ssoConfigFromSettings } from './ssoSettings.js';
 
 type FinishLoginFailure =
   | 'issuer'

@@ -1,7 +1,7 @@
 /**
- * The OAuth 2.1 authorization server's JSON endpoints (§5.2): revocation and the RFC 8414
- * metadata document here, the token grants (`tokenEndpoint.ts`) and dynamic client registration
- * (`registerEndpoint.ts`) re-exported, so each route imports from one place.
+ * The OAuth 2.1 authorization server's revocation endpoint and RFC 8414 metadata document (§5.2);
+ * the token grants live in `tokenEndpoint.ts`, dynamic client registration in
+ * `registerEndpoint.ts`.
  */
 import { HTTP_OK } from '@zamfono/shared';
 
@@ -13,9 +13,6 @@ import {
   type BaseDeps
 } from './oauthHttp.js';
 import { hashToken } from './tokens.js';
-
-export { registerEndpoint, type RegisterDeps } from './registerEndpoint.js';
-export { tokenEndpoint, type TokenDeps } from './tokenEndpoint.js';
 
 export type RevokeDeps = BaseDeps;
 

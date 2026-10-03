@@ -2,9 +2,10 @@ import { z } from 'zod';
 
 import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
+import { recordChange } from '../audit.js';
 import type { DroppedBlfKey } from '../devices/_shared.js';
+import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
-import { propagate, recordChange } from '../runner.js';
 import { Conflict, defineOperation, OpError, type Context } from '../types.js';
 import { loadParkingSlots } from './_shared.js';
 

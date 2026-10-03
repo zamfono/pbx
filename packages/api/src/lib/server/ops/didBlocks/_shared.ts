@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import type { Db, DB } from '@zamfono/shared';
 
-import { targetInputSchema } from '../dids/_shared.js';
+import { targetSpecSchema } from '../forwardTargetSchema.js';
 import { liveRow } from '../rows.js';
 
 export type DidBlockRow = Selectable<DB['didBlocks']>;
@@ -20,7 +20,7 @@ export const DIGITS_SCHEMA = z
   );
 
 /** A block's own fallback (§11.3), for its numbers that no `dids` row holds. */
-export const FALLBACK_TARGET_SCHEMA = targetInputSchema
+export const FALLBACK_TARGET_SCHEMA = targetSpecSchema
   .nullable()
   .optional()
   .describe(

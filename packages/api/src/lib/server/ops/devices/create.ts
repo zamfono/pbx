@@ -6,7 +6,8 @@ import { HTTP_UNPROCESSABLE_CONTENT, newId } from '@zamfono/shared';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { newSipPassword } from '#lib/server/sip.js';
 
-import { propagate, recordChange } from '../runner.js';
+import { recordChange } from '../audit.js';
+import { propagate } from '../propagate.js';
 import { defineOperation, OpError } from '../types.js';
 import { userExtension } from '../users/_extensions.js';
 import { liveUser } from '../users/_shared.js';

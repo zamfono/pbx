@@ -4,7 +4,7 @@ import { isIanaTimeZone } from '@zamfono/shared';
 
 import { isCronExpression } from '#lib/server/jobs/cronExpression.js';
 
-import { targetInputSchema } from '../dids/_shared.js';
+import { targetSpecSchema } from '../forwardTargetSchema.js';
 import { CODECS } from '../trunks/_shared.js';
 import {
   CALL_LOG_LEVELS,
@@ -96,7 +96,7 @@ export const settingsInputSchema = z
       .describe(
         'Dialled prefixes for the ten keys pickup, dndOn, dndOff, mailbox, ownVoicemail, deposit, addParty, clirOn, clirOff and park, all sent together; each starts with * or # and none is a prefix of another.'
       ),
-    fallbackTarget: targetInputSchema
+    fallbackTarget: targetSpecSchema
       .nullable()
       .optional()
       .describe(

@@ -1,13 +1,10 @@
 import { z } from 'zod';
 
+import { propagate } from '../propagate.js';
 import { softDelete } from '../rows.js';
-import { propagate } from '../runner.js';
+import { assertVisibleScope, scopeFromColumns } from '../scope.js';
 import { defineOperation } from '../types.js';
-import {
-  assertVisibleScope,
-  liveOooRule,
-  scopeFromColumns
-} from './_shared.js';
+import { liveOooRule } from './_shared.js';
 
 const inputSchema = z.object({ id: z.string() }).strict();
 

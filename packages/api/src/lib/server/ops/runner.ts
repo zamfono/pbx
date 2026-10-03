@@ -19,17 +19,6 @@ import { registry, type ErasedOperation } from './registry.js';
 import { runRollbackHooks } from './rollbackHooks.js';
 import { OpError, type Actor, type Channel, type Context } from './types.js';
 
-export {
-  maskContent,
-  recordChange,
-  recordFieldChanges,
-  recordRevert,
-  setUndoable
-} from './audit.js';
-export { propagate } from './propagate.js';
-export { afterCommit, afterPropagation } from './afterCommit.js';
-export { onRollback } from './rollbackHooks.js';
-
 /** What the runner needs beyond the operation's own input to build a `Context` (§10.3). */
 export type RunInput = {
   actor: Actor;
