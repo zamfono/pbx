@@ -70,6 +70,20 @@ run 'test -x /usr/local/bin/zamfono-cert-hook' \
 run '/usr/local/bin/zamfono-cert-hook 2>&1; test $? -ne 0' >/dev/null \
   || fail "the hook did not reject a call with missing arguments"
 
+echo "==> the hook waits for a source pair that is not readable yet, then copies it"
+run 'export FQDN=x; src=/data/caddy/certificates/i/x
+  (sleep 3; mkdir -p $src; echo crt > $src/x.crt; echo key > $src/x.key) &
+  zamfono-cert-hook certificates/i/x/x.crt certificates/i/x/x.key x 2>/dev/null &
+  for _ in $(seq 1 20); do [ -s /data/zamfono/privkey.pem ] && break; sleep 1; done
+  [ "$(cat /data/zamfono/cert.pem /data/zamfono/privkey.pem)" = "crt
+key" ]' || fail "the hook did not copy a source pair that became readable after it started"
+
+echo "==> the hook fails loudly on a source pair that stays unreadable"
+if out=$(run 'FQDN=x zamfono-cert-hook certificates/i/x/x.crt certificates/i/x/x.key x 2>&1'); then
+  fail "the hook exited 0 without a readable source pair"
+fi
+grep -q 'still not readable' <<<"$out" || fail "the hook failed without naming the unreadable source: $out"
+
 echo "==> the shipped Caddyfile validates (production shape: no global.d snippet)"
 docker run --rm -e FQDN=x -v "$repo_root/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" "$IMAGE_TAG" \
   caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 \

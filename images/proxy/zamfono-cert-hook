@@ -27,9 +27,10 @@
 # certificate issuance; each step below still logs one line to stderr, which lands in the
 # container's own logs (§7 "Logs").
 #
-# A failed notification to `api` is not fatal (§6.4: hourly poll plus the sync at `api` start
-# are the fallback), so this hook never exits non-zero past argument validation — there is
-# nothing for Caddy to retry that retrying would fix.
+# A source pair that stays unreadable is fatal: `api` reads only this hook's copy, and Caddy emits
+# no second event for the same certificate, so the hook waits a minute for it and then exits
+# non-zero with the reason in the container's logs. A failed notification to `api` is not fatal
+# (§6.4: hourly poll plus the sync at `api` start are the fallback): the copy is in place by then.
 set -eu
 
 log() {
@@ -51,9 +52,17 @@ storage_root="$data_home/caddy"
 src_crt="$storage_root/$cert_rel"
 src_key="$storage_root/$key_rel"
 
-if [ ! -r "$src_crt" ] || [ ! -r "$src_key" ]; then
-  log "'$src_crt' or '$src_key' is not readable yet; no copy made until the next issuance or a proxy restart"
-  exit 0
+readable=false
+for _ in $(seq 1 30); do
+  if [ -r "$src_crt" ] && [ -r "$src_key" ]; then
+    readable=true
+    break
+  fi
+  sleep 2
+done
+if [ "$readable" = false ]; then
+  log "'$src_crt' or '$src_key' is still not readable after a minute; no copy made, api keeps the previous certificate"
+  exit 1
 fi
 
 dest_dir="$data_home/zamfono"

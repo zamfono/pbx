@@ -218,6 +218,10 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- A certificate Caddy had just stored but whose files were not readable yet was never copied for
+  SIP-TLS: the hook gave up at once and Asterisk kept the previous certificate until the next
+  renewal or a `proxy` restart. The hook now waits up to a minute for the files, and if they stay
+  unreadable it fails with the reason in the `proxy` logs.
 - A trunk refused for a name another trunk already has, or for an inbound-auth username a device
   or another trunk already uses as its SIP name, answered a bare 409; the 409 now names that
   device or trunk in `references`, as every other refused duplicate does.
