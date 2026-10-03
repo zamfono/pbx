@@ -7,6 +7,7 @@
 import { newId } from '@zamfono/shared';
 
 import type { AriEvent, Channel } from '../ari/types.js';
+import { userById } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import type { DialAction } from '../routing/outbound.js';
 import { newCall, type Call } from './call.js';
@@ -79,11 +80,7 @@ export async function handleOutbound(
   const asUser =
     transfer === null ? call.callerUserId : transfer.transferrerUserId;
   // §7: the call is routed as `asUser`'s, so their diagnostics override counts toward its level.
-  raiseLogLevel(
-    call.log,
-    snapshot.users.find(row => row.id === asUser),
-    pipeline.deps.now()
-  );
+  raiseLogLevel(call.log, userById(snapshot, asUser), pipeline.deps.now());
   await pipeline.deps.cdr.open(call);
   pipeline.registerCall(call);
   // §9.1: every channel's language is the tenant's, so the prompts this call plays follow it.

@@ -4,7 +4,7 @@
  * time an attempt fails before alerting. A SIP target's leg walks its own trunk's hosts alone,
  * with no route (§9.4 "SIP targets"). Pre-checks and caller identity are `routeSelection.ts`'s.
  */
-import type { Snapshot } from '../internal/snapshot.js';
+import { userById, type Snapshot } from '../internal/snapshot.js';
 import {
   shouldFallThrough,
   type AttemptFailure,
@@ -69,10 +69,7 @@ export function openCursor(
       : [{ route: null, trunk: liveTrunk(snapshot, target.trunkId) }];
   return {
     ...ctx,
-    callerUser:
-      target.asUser === null
-        ? null
-        : (snapshot.users.find(row => row.id === target.asUser) ?? null),
+    callerUser: userById(snapshot, target.asUser),
     routes,
     current: null,
     endpoints: [],

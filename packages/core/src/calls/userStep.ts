@@ -4,7 +4,7 @@
  * busy or noAnswer outcome. A forward is the user's own rule, so an external target is dialled as
  * their call (§10.1 step 7).
  */
-import type { Snapshot } from '../internal/snapshot.js';
+import { userById, type Snapshot } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import {
   userEntryCondition,
@@ -121,8 +121,8 @@ export async function runUserStep(
   snapshot: Snapshot,
   userId: string
 ): Promise<UnappliedDecision | null> {
-  const user = snapshot.users.find(row => row.id === userId);
-  if (user === undefined) {
+  const user = userById(snapshot, userId);
+  if (user === null) {
     await release(pipeline, call, SIP_TEMPORARILY_UNAVAILABLE, 'failed');
     return null;
   }

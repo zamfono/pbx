@@ -18,7 +18,11 @@ import { logFailure } from './ari/failures.js';
 import type { AriEvent, DeviceState, Logger } from './ari/types.js';
 import { extensionOf } from './calls/extensionOwner.js';
 import type { EventBus } from './internal/eventBus.js';
-import type { ConfigCache, Snapshot } from './internal/snapshot.js';
+import {
+  userById,
+  type ConfigCache,
+  type Snapshot
+} from './internal/snapshot.js';
 import type { StateStore } from './internal/stateStore.js';
 import { HintPusher } from './presenceHints.js';
 import {
@@ -192,8 +196,8 @@ export class Presence {
   /** Recomputes `userId`'s hint and status; `presence_log`/`/events` fire only on a real transition. */
   async refreshUser(userId: string, snapshotArg?: Snapshot): Promise<void> {
     const snapshot = snapshotArg ?? (await this.deps.cache.get());
-    const user = snapshot.users.find(row => row.id === userId);
-    if (user === undefined) {
+    const user = userById(snapshot, userId);
+    if (user === null) {
       return;
     }
     const flags = this.effectiveFlags(userId);

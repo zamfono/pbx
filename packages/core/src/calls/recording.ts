@@ -9,7 +9,11 @@ import { newId, type Db } from '@zamfono/shared';
 import type { AriClient } from '../ari/client.js';
 import { logUnlessGone } from '../ari/failures.js';
 import type { Logger } from '../ari/types.js';
-import type { ConfigCache, Snapshot } from '../internal/snapshot.js';
+import {
+  userById,
+  type ConfigCache,
+  type Snapshot
+} from '../internal/snapshot.js';
 import type { Call, Leg } from './call.js';
 import {
   startSnoopPair,
@@ -53,7 +57,7 @@ function recordingEnabled(snapshot: Snapshot, call: Call, leg: Leg): boolean {
   if (leg.userId === null) {
     return false;
   }
-  const user = snapshot.users.find(row => row.id === leg.userId);
+  const user = userById(snapshot, leg.userId);
   const group =
     call.ringGroupId === null
       ? undefined
@@ -136,7 +140,7 @@ export class Recorder {
       return;
     }
     const snapshot = await this.deps.cache.get();
-    const user = snapshot.users.find(row => row.id === userId);
+    const user = userById(snapshot, userId);
     if (user?.recordCalls !== 1) {
       return;
     }

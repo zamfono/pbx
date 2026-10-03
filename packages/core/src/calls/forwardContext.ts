@@ -4,7 +4,7 @@
  * them: the `REDIRECTING` data, the `Diversion` its trunk's policy sends, written by
  * `forwardDiversion.ts`, and a `sip` target's headers, rendered by `forwardHeaders.ts`.
  */
-import type { Snapshot } from '../internal/snapshot.js';
+import { userById, type Snapshot } from '../internal/snapshot.js';
 import type { Call } from './call.js';
 import { extensionOf } from './extensionOwner.js';
 import {
@@ -54,9 +54,9 @@ export const CONDITION_REASONS = {
 
 /** A user's number as `REDIRECTING` names it: their primary number, else their extension. */
 function userNumber(snapshot: Snapshot, userId: string): string | null {
-  const user = snapshot.users.find(row => row.id === userId);
+  const user = userById(snapshot, userId);
   const did =
-    user?.calleridDidId === null || user === undefined
+    user?.calleridDidId === null || user === null
       ? undefined
       : snapshot.dids.find(row => row.id === user.calleridDidId);
   return did?.number ?? extensionOf(snapshot, { userId });
@@ -79,7 +79,7 @@ function partyIdentity(
   if ('userId' in party) {
     return {
       number: userNumber(snapshot, party.userId),
-      name: snapshot.users.find(row => row.id === party.userId)?.name ?? null,
+      name: userById(snapshot, party.userId)?.name ?? null,
       party: 'user',
       extension: extensionOf(snapshot, { userId: party.userId })
     };

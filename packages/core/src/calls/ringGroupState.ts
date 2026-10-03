@@ -3,7 +3,7 @@
  * flattened into the `MemberState`s `ringable` expects — DND, registration, in a call, OOO and
  * an unconditional forward — and its `ring_group_forward_rules`, for `ringGroup.ts`.
  */
-import type { Snapshot } from '../internal/snapshot.js';
+import { userById, type Snapshot } from '../internal/snapshot.js';
 import type { MemberState } from '../routing/ringGroup.js';
 import { ownInEffectOoo } from '../routing/schedule.js';
 import { buildOooRules } from '../routing/scheduleRows.js';
@@ -33,7 +33,7 @@ export function buildMemberStates(
     const devices = registeredDevices(pipeline, snapshot, userId);
     return {
       userId,
-      dnd: snapshot.users.find(row => row.id === userId)?.dnd === 1,
+      dnd: userById(snapshot, userId)?.dnd === 1,
       registeredDevices: devices.length,
       inCall: isUserInCall(pipeline, userId),
       idleDevices: devices.filter(device => !busy.has(device.sipUsername))

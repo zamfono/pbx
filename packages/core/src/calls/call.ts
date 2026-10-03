@@ -6,7 +6,7 @@ import type { DB, Scope } from '@zamfono/shared';
 
 import { logUnlessGone } from '../ari/failures.js';
 import { CallLog, type LogLevel } from '../callLog.js';
-import type { Snapshot } from '../internal/snapshot.js';
+import { userById, type Snapshot } from '../internal/snapshot.js';
 import { targetFromRow, type ForwardTarget } from '../routing/targets.js';
 import type { Diversion } from './forwardContext.js';
 import type { GroupLeg } from './groupLegs.js';
@@ -230,7 +230,7 @@ export type Owner = { userId: string } | { ringGroupId: string };
 
 function ownerMailboxEnabled(owner: Owner, snapshot: Snapshot): boolean {
   return 'userId' in owner
-    ? snapshot.users.find(row => row.id === owner.userId)?.mailboxEnabled === 1
+    ? userById(snapshot, owner.userId)?.mailboxEnabled === 1
     : snapshot.ringGroups.find(row => row.id === owner.ringGroupId)
         ?.mailboxEnabled === 1;
 }

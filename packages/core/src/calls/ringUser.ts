@@ -5,6 +5,7 @@
 import { MS_PER_SECOND, newId } from '@zamfono/shared';
 
 import { ignoreGone } from '../ari/failures.js';
+import { userById } from '../internal/snapshot.js';
 import { channelLanguageVariable } from '../prompts.js';
 import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { release, takeJoinBridge, type Call, type Leg } from './call.js';
@@ -112,8 +113,8 @@ export async function ringUser(
   existingBridgeId: string | null = null
 ): Promise<UnappliedDecision | null> {
   const snapshot = await pipeline.deps.cache.get();
-  const user = snapshot.users.find(row => row.id === userId);
-  if (user === undefined) {
+  const user = userById(snapshot, userId);
+  if (user === null) {
     await release(pipeline, call, SIP_TEMPORARILY_UNAVAILABLE, 'failed');
     return null;
   }

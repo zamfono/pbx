@@ -32,7 +32,7 @@ const OVERRIDE_LEVELS: ReadonlySet<string> = new Set(['events', 'qos', 'sip']);
  */
 export function raiseLogLevel(
   log: CallLog,
-  row: LogLevelColumns | undefined,
+  row: LogLevelColumns | null,
   nowIso: string
 ): void {
   const override = row?.logLevel ?? null;

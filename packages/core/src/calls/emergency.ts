@@ -1,7 +1,7 @@
 /** Emergency calls (§10.1 "Emergency calls"): the tenant's emergency trunks in priority order,
  * bypassing outbound routing entirely. */
 import { effectiveLevel, type LogLevel } from '../callLog.js';
-import type { Snapshot } from '../internal/snapshot.js';
+import { userById, type Snapshot } from '../internal/snapshot.js';
 import { emergencyTrunks } from '../routing/trunk.js';
 import { SIP_SERVICE_UNAVAILABLE } from '../sipCodes.js';
 import { settleAnswered } from './answer.js';
@@ -99,10 +99,7 @@ export async function dialEmergency(
   asUser: string | null
 ): Promise<void> {
   const snapshot = await pipeline.deps.cache.get();
-  const callerUser =
-    asUser === null
-      ? null
-      : (snapshot.users.find(row => row.id === asUser) ?? null);
+  const callerUser = userById(snapshot, asUser);
   const trunkIds = emergencyTrunks(
     snapshot.trunks
       .filter(row => row.deletedAt === null)

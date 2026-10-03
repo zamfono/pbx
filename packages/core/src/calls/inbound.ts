@@ -4,6 +4,7 @@
 import { newId } from '@zamfono/shared';
 
 import type { AriEvent, Channel } from '../ari/types.js';
+import { userById } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import {
   isBlocked,
@@ -72,8 +73,7 @@ export async function enterTarget(
   const tenantDefault = snapshot.settings.rejectAnonymous === 1;
   const ownRejectAnonymous =
     target.kind === 'user'
-      ? (snapshot.users.find(row => row.id === target.userId)
-          ?.rejectAnonymous ?? null)
+      ? (userById(snapshot, target.userId)?.rejectAnonymous ?? null)
       : null;
   const rejectOverride =
     ownRejectAnonymous === null ? null : ownRejectAnonymous === 1;
@@ -145,7 +145,7 @@ export async function handleInboundStart(
   // §7: the delivering trunk's diagnostics override counts toward the call's level.
   raiseLogLevel(
     call.log,
-    snapshot.trunks.find(row => row.id === trunkId),
+    snapshot.trunks.find(row => row.id === trunkId) ?? null,
     call.startedAt
   );
   await pipeline.deps.cdr.open(call);

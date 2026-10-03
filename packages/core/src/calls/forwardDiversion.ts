@@ -7,7 +7,7 @@
  */
 import { isE164, type DiversionPolicy } from '@zamfono/shared';
 
-import type { Snapshot } from '../internal/snapshot.js';
+import { userById, type Snapshot } from '../internal/snapshot.js';
 import { formatCallerId } from '../routing/trunk.js';
 import type { Call } from './call.js';
 import type {
@@ -78,7 +78,7 @@ function partyDid(
   party: DivertingParty
 ): string | null {
   if ('userId' in party) {
-    const user = snapshot.users.find(row => row.id === party.userId);
+    const user = userById(snapshot, party.userId);
     return didNumber(snapshot, user?.calleridDidId ?? null);
   }
   if ('ringGroupId' in party) {

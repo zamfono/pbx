@@ -6,7 +6,7 @@
  * `addParty` for `*5` to an external number (§10.2 "Three-way calls"). The route match and each
  * route's pre-checks are `routeSelection.ts`'s.
  */
-import type { Snapshot } from '../internal/snapshot.js';
+import { userById, type Snapshot } from '../internal/snapshot.js';
 import {
   shouldFallThrough,
   type AttemptFailure,
@@ -39,10 +39,7 @@ async function tryRoute(params: {
 }): Promise<AttemptOutcome> {
   const { pipeline, trunkState, call, route, trunk, number, asUser, snapshot } =
     params;
-  const callerUser =
-    asUser === null
-      ? null
-      : (snapshot.users.find(row => row.id === asUser) ?? null);
+  const callerUser = userById(snapshot, asUser);
   const prepared = prepareRoute({ ...params, callerUser });
   if (!prepared.ok) {
     return { kind: 'failure', failure: prepared.failure };

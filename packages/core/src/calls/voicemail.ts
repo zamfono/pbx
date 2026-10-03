@@ -8,7 +8,7 @@ import { newId } from '@zamfono/shared';
 
 import type { ApiClient } from '../apiClient.js';
 import { ignoreGone } from '../ari/failures.js';
-import type { Snapshot } from '../internal/snapshot.js';
+import { userById, type Snapshot } from '../internal/snapshot.js';
 import { assetMedia, defaultPrompt } from '../prompts.js';
 import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { callerChannel, release, type Call, type Owner } from './call.js';
@@ -49,11 +49,11 @@ function findOwner(
 ): { name: string; mailboxAudioId: string | null } {
   const row =
     'userId' in mailbox
-      ? snapshot.users.find(candidate => candidate.id === mailbox.userId)
-      : snapshot.ringGroups.find(
+      ? userById(snapshot, mailbox.userId)
+      : (snapshot.ringGroups.find(
           candidate => candidate.id === mailbox.ringGroupId
-        );
-  if (row === undefined) {
+        ) ?? null);
+  if (row === null) {
     throw new Error(
       'voicemail: mailbox owner missing from the config snapshot'
     );

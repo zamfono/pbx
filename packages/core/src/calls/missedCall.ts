@@ -6,6 +6,7 @@
 import type { MailRequest } from '@zamfono/shared';
 
 import { logFailure } from '../ari/failures.js';
+import { userById } from '../internal/snapshot.js';
 import type { Call } from './call.js';
 import { contactName } from './contactName.js';
 import type { Pipeline } from './pipeline.js';
@@ -26,7 +27,7 @@ export async function notifyMissedCall(
     return;
   }
   const snapshot = await pipeline.deps.cache.get();
-  const user = snapshot.users.find(row => row.id === userId);
+  const user = userById(snapshot, userId);
   if (user?.notifyMissedCalls !== 1) {
     return;
   }

@@ -7,7 +7,7 @@
 import { newId, type OriginateRequest } from '@zamfono/shared';
 
 import type { Channel } from '../ari/types.js';
-import type { Snapshot } from '../internal/snapshot.js';
+import { userById, type Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import { withClir, type DialAction } from '../routing/outbound.js';
 import { newCall, type Call } from './call.js';
@@ -55,11 +55,7 @@ export function newOriginatedCall(
   });
   call.callerUserId = req.userId;
   // §7: the call is routed as the user's own, so their diagnostics override counts toward its level.
-  raiseLogLevel(
-    call.log,
-    snapshot.users.find(row => row.id === req.userId),
-    startedAt
-  );
+  raiseLogLevel(call.log, userById(snapshot, req.userId), startedAt);
   call.log.event({
     event: 'originate',
     actorUserId: req.actorUserId,

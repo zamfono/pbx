@@ -9,7 +9,7 @@ import { newId } from '@zamfono/shared';
 
 import { logFailure } from '../ari/failures.js';
 import type { LogLevel } from '../callLog.js';
-import type { Snapshot } from '../internal/snapshot.js';
+import { userById, type Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import { newCall, type Call } from './call.js';
 import { raiseLogLevel } from './callLogLevel.js';
@@ -98,11 +98,7 @@ export async function startOnwardCall(
   child.parentCallId = parent.id;
   child.callerUserId = userOfChannel(parent, transferee);
   child.didId = inherited.didId;
-  raiseLogLevel(
-    child.log,
-    snapshot.users.find(row => row.id === entry.asUserId),
-    startedAt
-  );
+  raiseLogLevel(child.log, userById(snapshot, entry.asUserId), startedAt);
   await pipeline.deps.cdr.open(child);
   pipeline.registerCall(child);
   // §9.1: every channel's language is the tenant's; the transferee may be a leg the core

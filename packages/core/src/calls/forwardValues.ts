@@ -6,7 +6,7 @@
 import { ANONYMOUS, isE164 } from '@zamfono/shared';
 
 import { logFailure } from '../ari/failures.js';
-import type { Snapshot } from '../internal/snapshot.js';
+import { userById, type Snapshot } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import type { Call } from './call.js';
 import { contactName } from './contactName.js';
@@ -79,9 +79,7 @@ async function callerNameOf(
   if (contact !== '') {
     return contact;
   }
-  return call.callerUserId === null
-    ? ''
-    : (snapshot.users.find(row => row.id === call.callerUserId)?.name ?? '');
+  return userById(snapshot, call.callerUserId)?.name ?? '';
 }
 
 /** The headers a leg to `target` sends after `diversions` (§9.4 "Header templates"). */

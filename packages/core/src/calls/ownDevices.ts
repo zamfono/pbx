@@ -11,7 +11,7 @@
 import { MS_PER_SECOND, newId } from '@zamfono/shared';
 
 import type { Channel } from '../ari/types.js';
-import type { Snapshot } from '../internal/snapshot.js';
+import { userById, type Snapshot } from '../internal/snapshot.js';
 import { channelLanguageVariable } from '../prompts.js';
 import type { Call, Leg } from './call.js';
 import { callPartiesChanged } from './callState.js';
@@ -33,7 +33,7 @@ const DEFAULT_RING_TIMEOUT_S = 25;
 
 /** `users.ring_timeout_s` (§11.2): the user's own, or the column's default for an unknown user. */
 export function ringTimeoutOf(snapshot: Snapshot, userId: string): number {
-  const user = snapshot.users.find(row => row.id === userId);
+  const user = userById(snapshot, userId);
   return user?.ringTimeoutS ?? DEFAULT_RING_TIMEOUT_S;
 }
 

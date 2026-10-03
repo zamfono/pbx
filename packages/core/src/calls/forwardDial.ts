@@ -4,7 +4,7 @@
  * no route to match (§9.4 "SIP targets"). Either leg carries the call's forwarding context (§9.4
  * "Forwarded calls").
  */
-import type { Snapshot } from '../internal/snapshot.js';
+import { userById, type Snapshot } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import { shouldFallThrough } from '../routing/trunk.js';
 import { SIP_SERVICE_UNAVAILABLE } from '../sipCodes.js';
@@ -59,10 +59,7 @@ async function dialSipTarget(
     await release(pipeline, call, SIP_SERVICE_UNAVAILABLE, 'failed');
     return;
   }
-  const callerUser =
-    asUser === null
-      ? null
-      : (snapshot.users.find(row => row.id === asUser) ?? null);
+  const callerUser = userById(snapshot, asUser);
   const prepared = prepareRoute({
     pipeline,
     trunkState,

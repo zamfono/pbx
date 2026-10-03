@@ -105,6 +105,16 @@ type TableRows = Omit<
 /** Every config table the routing pipeline reads, loaded in one transaction (§3.1). */
 export type Snapshot = TableRows & { settings: ParsedSettings };
 
+/** The live user `id`; `null` for none, or a user deleted or gone. */
+export function userById(
+  snapshot: Snapshot,
+  id: string | null
+): Snapshot['users'][number] | null {
+  return id === null
+    ? null
+    : (snapshot.users.find(row => row.id === id) ?? null);
+}
+
 /** Parses one `*Json` column; `null` passes through unchanged. */
 function parseNullableJson(column: string, value: string | null): unknown {
   if (value === null) {
