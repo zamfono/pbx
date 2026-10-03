@@ -1,7 +1,8 @@
 import * as privateEnv from '$app/env/private';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { DEFAULT_FEATURE_CODES, type Db } from '@zamfono/shared';
+import type { Db } from '@zamfono/shared';
+import { defaultFeatureCodes } from '@zamfono/shared/testDb.js';
 
 import { propagateConfig } from '#lib/server/propagation.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
@@ -141,6 +142,19 @@ describe('settings', () => {
     ).resolves.toMatchObject({ autoUpdate: true });
   });
 
+  it('refuses feature codes where one is a prefix of another, with 422', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    await expect(
+      runOperation(
+        db,
+        'settings.update',
+        { featureCodes: { ...(await defaultFeatureCodes()), park: '*9' } },
+        asRun()
+      )
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
   it('rejects the read-only extLength field', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
@@ -260,7 +274,7 @@ describe('settings', () => {
       'settings.update',
       {
         featureCodes: {
-          ...DEFAULT_FEATURE_CODES,
+          ...(await defaultFeatureCodes()),
           dndOn: '*78',
           ownVoicemail: '*76',
           park: '*60'

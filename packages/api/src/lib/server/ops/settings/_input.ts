@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import {
   CALL_LOG_LEVELS,
+  featureCodesSchema,
   isIanaTimeZone,
   LANGUAGES,
   SMTP_SECURITIES,
@@ -89,8 +90,7 @@ export const settingsInputSchema = z
       .describe(
         'Digit strings always dialled out as emergency calls and never valid as extensions (see zamfono.help emergency-calls). Owner-only.'
       ),
-    featureCodes: z
-      .record(z.string(), z.string())
+    featureCodes: featureCodesSchema
       .optional()
       .describe(
         'Dialled prefixes for the ten keys pickup, dndOn, dndOff, mailbox, ownVoicemail, deposit, addParty, clirOn, clirOff and park, all sent together; each starts with * or # and none is a prefix of another.'

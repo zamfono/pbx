@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_FEATURE_CODES } from '@zamfono/shared';
+import { defaultFeatureCodes } from '@zamfono/shared/testDb.js';
 
 import { resolveDialed, type ResolveDialedContext } from './outbound.js';
+
+const FEATURE_CODES = await defaultFeatureCodes();
 
 const baseCtx = (
   overrides: Partial<ResolveDialedContext> = {}
 ): ResolveDialedContext => ({
-  featureCodes: DEFAULT_FEATURE_CODES,
+  featureCodes: FEATURE_CODES,
   emergencyNumbers: ['112', '110'],
   country: 'DE',
   extLength: 3,

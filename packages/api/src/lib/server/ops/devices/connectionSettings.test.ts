@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { DEFAULT_FEATURE_CODES, newId, nowIso, type Db } from '@zamfono/shared';
+import { newId, nowIso, type Db } from '@zamfono/shared';
+import { defaultFeatureCodes } from '@zamfono/shared/testDb.js';
 
 import { makeTestDb, owner, seedSettings } from '#lib/server/testDb.js';
 
@@ -23,7 +24,7 @@ async function seedUser(db: Db): Promise<string> {
   await seedSettings(db, {
     codecsJson: '["g722","alaw"]',
     featureCodesJson: JSON.stringify({
-      ...DEFAULT_FEATURE_CODES,
+      ...(await defaultFeatureCodes()),
       ownVoicemail: '*86'
     })
   });

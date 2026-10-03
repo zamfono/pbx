@@ -5,7 +5,7 @@
 import type { Selectable, Transaction } from 'kysely';
 
 import {
-  validateFeatureCodes,
+  featureCodesSchema,
   type Db,
   type DB,
   type FeatureCodes,
@@ -179,7 +179,7 @@ function parseSettings(row: Selectable<DB['settings']>): ParsedSettings {
       'settings.emergencyNumbersJson',
       emergencyNumbersJson
     ) as string[],
-    featureCodes: validateFeatureCodes(
+    featureCodes: featureCodesSchema.parse(
       parseNullableJson('settings.featureCodesJson', featureCodesJson)
     )
   };

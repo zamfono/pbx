@@ -75,6 +75,9 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
+- Breaking: `PATCH /settings` (`settings.update`) refuses a `featureCodes` object with a key
+  other than the ten feature codes with 422, instead of ignoring it; the OpenAPI description and
+  the MCP tool now list the ten keys and the rules each code follows.
 - Breaking: `GET /stats` (`stats.query`) aligns `hour`, `day` and `week` buckets to the tenant
   time zone (`settings.timezone`) instead of UTC: an hour starts on the local hour, a day at local
   midnight, a week at local Monday midnight, so a day across a daylight-saving change lasts 23 or

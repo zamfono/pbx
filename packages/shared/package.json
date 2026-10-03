@@ -96,7 +96,8 @@
     "better-sqlite3": "^13.0.3",
     "kysely": "^0.29.6",
     "libphonenumber-js": "^1.13.14",
-    "uuid": "^14.0.2"
+    "uuid": "^14.0.2",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",

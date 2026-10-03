@@ -1,4 +1,4 @@
-import { validateFeatureCodes, type FeatureCodes } from '@zamfono/shared';
+import { featureCodesSchema } from '@zamfono/shared';
 
 import type { SettingsRow } from './types.js';
 
@@ -86,7 +86,7 @@ export function buildBranchProvision(
       codec: RINGOTEL_CODEC_NAMES[codec],
       frame: CODEC_FRAME_MS
     }));
-  const featureCodes: FeatureCodes = validateFeatureCodes(
+  const featureCodes = featureCodesSchema.parse(
     JSON.parse(settings.featureCodesJson)
   );
   return {
