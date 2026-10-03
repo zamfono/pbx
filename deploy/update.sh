@@ -109,27 +109,13 @@ find_unit() {
   done
 }
 
-# set_env NAME VALUE — replaces NAME's line in .env, or appends one; .env stays private.
-set_env() {
-  local name=$1 value tmp
-  value=$(dotenv_quote "$2")
-  tmp=$(mktemp .env.XXXXXX)
-  awk -v name="$1" -v line="$1=$value" '
-    $0 ~ "^" name "=" { print line; done = 1; next }
-    { print }
-    END { if (!done) print line }
-  ' .env >"$tmp"
-  chmod 600 "$tmp"
-  mv "$tmp" .env
-  echo "  .env: set $name"
-}
-
 # A pinned ZAMFONO_VERSION moves to the new release; the settings a newer .env.example added are
 # listed, for the operator to set.
 update_env() {
   local name
   if grep -qE "^ZAMFONO_VERSION=[\"']?[^\"' ]" .env; then
-    set_env ZAMFONO_VERSION "$target"
+    set_env_line .env ZAMFONO_VERSION "$target"
+    echo "  .env: set ZAMFONO_VERSION"
   fi
   sed -nE 's/^([A-Z_][A-Z0-9_]*)=.*/\1/p' .env.example | while read -r name; do
     grep -qE "^$name=" .env || echo "  .env: new setting $name, unset (see .env.example)"
