@@ -1,8 +1,8 @@
 import { sql } from 'kysely';
 import { expect, test } from 'vitest';
 
-import { openDb, type Db } from './db.js';
-import { migrateForTest } from './testDb.js';
+import { type Db } from './db.js';
+import { migratedTestDb } from './testDb.js';
 
 async function seed(db: Db): Promise<void> {
   await sql`INSERT INTO users (id, name, email, created_at) VALUES ('u1', 'Anna', 'a@x.test', 't')`.execute(
@@ -26,8 +26,7 @@ async function seed(db: Db): Promise<void> {
 
 // forward_targets.sip_headers_json (§9.4 "Header templates", §11.2).
 test('headers are refused on a row that is no sip target, and must be a JSON array', async () => {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   await seed(db);
   const refused = [
     sql`INSERT INTO forward_targets (id, external, sip_headers_json) VALUES ('x1', '+431', '[]')`,

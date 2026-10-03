@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from './ari/client.js';
 import { EventBus } from './internal/eventBus.js';
@@ -52,8 +52,7 @@ describe('Presence', () => {
   let presence: Presence;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
+    db = await migratedTestDb();
     await seedSettings(db);
     fakeAri = new FakeAri();
     const { url } = await fakeAri.listen();

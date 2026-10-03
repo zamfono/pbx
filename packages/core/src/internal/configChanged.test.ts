@@ -4,12 +4,11 @@ import {
   HTTP_NO_CONTENT,
   newId,
   nowIso,
-  openDb,
   resolveVersion,
   type Db,
   type Envelope
 } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
 import { Presence } from '../presence.js';
@@ -56,8 +55,7 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
   let close: () => Promise<void>;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
+    db = await migratedTestDb();
     fakeAri = new FakeAri();
     const { url } = await fakeAri.listen();
     ari = new AriClient({

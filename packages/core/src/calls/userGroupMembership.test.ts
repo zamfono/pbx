@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { nowIso, type Db } from '@zamfono/shared';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { ConfigCache, type Snapshot } from '../internal/snapshot.js';
 import { seedSettings, seedUser } from '../testing/seedRows.js';
@@ -13,8 +13,7 @@ import { callerGroupIds } from './outboundLookup.js';
  * `u1`; `deleted` names the user groups soft-deleted (§5.9: their rows stay, and they are skipped).
  */
 async function snapshotWith(deleted: string[]): Promise<Snapshot> {
-  const db: Db = openDb(':memory:');
-  await migrateForTest(db);
+  const db: Db = await migratedTestDb();
   const createdAt = nowIso();
   await seedSettings(db);
   await seedUser(db, { id: 'u1', name: 'Member', email: 'u1@x', createdAt });

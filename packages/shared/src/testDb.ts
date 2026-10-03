@@ -20,11 +20,17 @@ export async function migrateForTest(db: Db): Promise<void> {
   }
 }
 
+/** A fresh in-memory database with every migration applied. */
+export async function migratedTestDb(): Promise<Db> {
+  const db = openDb(':memory:');
+  await migrateForTest(db);
+  return db;
+}
+
 /** The `settings.feature_codes_json` column default, as a migrated database declares it. */
 export async function defaultFeatureCodes(): Promise<FeatureCodes> {
-  const db = openDb(':memory:');
+  const db = await migratedTestDb();
   try {
-    await migrateForTest(db);
     const column = await sql<{ literal: string }>`
       select dflt_value as literal from pragma_table_info('settings')
       where name = 'feature_codes_json'`.execute(db);

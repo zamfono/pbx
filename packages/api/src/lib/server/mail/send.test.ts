@@ -4,8 +4,8 @@ import process from 'node:process';
 import type { Transporter } from 'nodemailer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { nowIso, openDb, type Db, type MailRequest } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { nowIso, type Db, type MailRequest } from '@zamfono/shared';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { voicemailAttachment } from '../audio/transcode.js';
 import { keyringFromEnv, type Keyring } from '../secretbox.js';
@@ -46,8 +46,7 @@ function testKeyring(): Keyring {
 
 /** A migrated in-memory database. */
 async function migratedDb(): Promise<Db> {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   return db;
 }
 

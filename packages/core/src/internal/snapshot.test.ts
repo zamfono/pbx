@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { seedSettings } from '../testing/seedRows.js';
 import { ConfigCache } from './snapshot.js';
@@ -10,8 +10,7 @@ describe('ConfigCache snapshot', () => {
   let db: Db;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
+    db = await migratedTestDb();
     await seedSettings(db);
   });
 

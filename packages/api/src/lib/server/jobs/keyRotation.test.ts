@@ -3,8 +3,8 @@ import { sql } from 'kysely';
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
 
-import { openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { type Db } from '@zamfono/shared';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { decrypt, encrypt, keyringFromEnv } from '../secretbox.js';
 import { reencryptSweep } from './keyRotation.js';
@@ -19,8 +19,7 @@ function keySpec(generation: number): string {
 }
 
 async function migratedDb(): Promise<Db> {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   return db;
 }
 

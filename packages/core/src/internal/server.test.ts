@@ -11,14 +11,13 @@ import {
   HTTP_SERVICE_UNAVAILABLE,
   newId,
   nowIso,
-  openDb,
   rawDataToString,
   resolveVersion,
   type Db,
   type Presence,
   type TrunkStatus
 } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
 import type { Logger } from '../ari/types.js';
@@ -67,8 +66,7 @@ describe('startInternalServer', () => {
   let port: number;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
+    db = await migratedTestDb();
     await seedSettings(db);
     fakeAri = new FakeAri();
     const { url } = await fakeAri.listen();

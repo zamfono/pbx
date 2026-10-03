@@ -1,13 +1,11 @@
 import { sql } from 'kysely';
 import { expect, test } from 'vitest';
 
-import { openDb } from './db.js';
-import { migrateForTest } from './testDb.js';
+import { migratedTestDb } from './testDb.js';
 
 // call_qos.rx_packets and tx_packets (§11.2).
 test('takes a count of 0 and refuses a negative one', async () => {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   await sql`INSERT INTO calls (id, direction, from_uri, to_uri, status, started_at)
             VALUES ('c1', 'internal', '100', '101', 'answered', 't')`.execute(
     db

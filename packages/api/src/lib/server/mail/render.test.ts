@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { nowIso, openDb, type Db, type Language } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { nowIso, type Db, type Language } from '@zamfono/shared';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { compileTemplate, resolveTemplate } from './render.js';
 import { loadBuiltinTemplate, type TemplateKind } from './templates.js';
@@ -17,8 +17,7 @@ const BUILTIN_KINDS: TemplateKind[] = [
 const BUILTIN_LANGUAGES: Language[] = ['de', 'en', 'es', 'fr', 'it', 'ru'];
 
 async function migratedDb(): Promise<Db> {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   return db;
 }
 

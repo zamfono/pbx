@@ -8,10 +8,9 @@ import {
   MS_PER_HOUR,
   newId,
   nowIso,
-  openDb,
   type Db
 } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { runOperation } from '../ops/runner.js';
 import { runPurge } from './purge.js';
@@ -71,8 +70,7 @@ async function clientIdsOf(db: Db): Promise<string[]> {
 }
 
 async function migratedDb(): Promise<Db> {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   return db;
 }
 

@@ -12,8 +12,8 @@ import {
   vi
 } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
 import type { Logger } from '../ari/types.js';
@@ -122,8 +122,7 @@ describe('Recorder', () => {
   let cdr: CdrWriter;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
+    db = await migratedTestDb();
     fakeAri = new FakeAri();
     const { url } = await fakeAri.listen();
     ari = new AriClient({

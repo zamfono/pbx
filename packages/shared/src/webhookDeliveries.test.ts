@@ -1,14 +1,12 @@
 import { sql } from 'kysely';
 import { expect, test } from 'vitest';
 
-import { openDb } from './db.js';
-import { migrateForTest } from './testDb.js';
+import { migratedTestDb } from './testDb.js';
 
 // webhook_deliveries (§10.6 "Webhooks", §11.2): the outbox starts empty, a delivery starts at
 // attempt 0, and a hook's purge takes its pending deliveries with it.
 test('starts an empty outbox that a purged hook empties', async () => {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   await sql`INSERT INTO webhooks (id, url, active, secret_enc, created_at)
             VALUES ('h1', 'https://example.test/hook', 1, x'00', 't')`.execute(
     db

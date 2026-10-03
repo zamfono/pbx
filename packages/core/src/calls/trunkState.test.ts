@@ -3,13 +3,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   newId,
   nowIso,
-  openDb,
   registrationUris,
   trunkSectionName,
   type Db,
   type Envelope
 } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
@@ -105,8 +104,7 @@ describe('TrunkState', () => {
   let trunkState: TrunkState;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
+    db = await migratedTestDb();
     fakeAri = new FakeAri();
     const { url } = await fakeAri.listen();
     ari = new AriClient({

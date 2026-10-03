@@ -5,11 +5,10 @@ import {
   MS_PER_DAY,
   MS_PER_HOUR,
   nowIso,
-  openDb,
   type Db,
   type Envelope
 } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { encrypt, keyringFromEnv, type Keyring } from './secretbox.js';
 import { errorReason, SECRET_UNREADABLE } from './webhookFailure.js';
@@ -67,8 +66,7 @@ async function setUp(secretKeyring?: Keyring): Promise<{
   posts: { count: number };
 }> {
   logged.length = 0;
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   const kr = testKeyring();
   await db
     .insertInto('webhooks')

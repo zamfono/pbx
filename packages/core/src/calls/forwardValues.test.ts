@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import type { Snapshot } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
@@ -152,8 +152,7 @@ describe('sipForwardLeg', () => {
   let db: Db;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
+    db = await migratedTestDb();
     const contactId = newId();
     await db
       .insertInto('contacts')

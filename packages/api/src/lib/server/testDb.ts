@@ -1,7 +1,7 @@
 import type { Insertable } from 'kysely';
 
-import { newId, nowIso, openDb, type DB, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type DB, type Db } from '@zamfono/shared';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import type { RunInput } from './ops/runner.js';
 import type { Actor } from './ops/types.js';
@@ -21,8 +21,7 @@ export function asConfirmedRun(overrides: Partial<RunInput> = {}): RunInput {
 
 /** An in-memory, migrated database seeded with one `owner` user, for operation tests. */
 export async function makeTestDb(): Promise<Db> {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   await db
     .insertInto('users')
     .values({

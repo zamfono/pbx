@@ -7,12 +7,11 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   newId,
   nowIso,
-  openDb,
   type BackupTargetKind,
   type Db,
   type Envelope
 } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { sealTargetSecret, type BackupSecret } from '../ops/backups/_secret.js';
 import { keyringFromEnv, type Keyring } from '../secretbox.js';
@@ -32,8 +31,7 @@ function testKeyring(): Keyring {
 }
 
 async function migratedDb(): Promise<Db> {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   return db;
 }
 

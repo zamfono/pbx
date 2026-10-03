@@ -2,8 +2,8 @@ import { randomBytes } from 'node:crypto';
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { openTargetSecret, sealTargetSecret } from './ops/backups/_secret.js';
 import { keyringFromEnv } from './secretbox.js';
@@ -19,8 +19,7 @@ const kr = keyringFromEnv({
 });
 
 async function migratedDb(): Promise<Db> {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   return db;
 }
 

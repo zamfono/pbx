@@ -2,12 +2,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   newId,
-  openDb,
   type CallLogLevel,
   type Db,
   type Envelope
 } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from './ari/client.js';
 import type { Channel } from './ari/types.js';
@@ -92,8 +91,7 @@ describe('CdrWriter', () => {
   let cdr: CdrWriter;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
+    db = await migratedTestDb();
     fakeAri = new FakeAri();
     const { url } = await fakeAri.listen();
     ari = new AriClient({

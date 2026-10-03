@@ -9,11 +9,10 @@ import {
   MS_PER_MINUTE,
   newId,
   nowIso,
-  openDb,
   type Db,
   type Envelope
 } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { EventBus } from './internal/eventBus.js';
 import { ConfigCache } from './internal/snapshot.js';
@@ -78,8 +77,7 @@ describe('startSweep timing', () => {
   let seen: Seen[] = [];
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
+    db = await migratedTestDb();
     cache = new ConfigCache(db);
     seen = [];
   });

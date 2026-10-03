@@ -14,13 +14,8 @@ import {
   vi
 } from 'vitest';
 
-import {
-  HTTP_OK,
-  HTTP_SERVICE_UNAVAILABLE,
-  openDb,
-  type Db
-} from '@zamfono/shared';
-import { migrateForTest, MIGRATIONS_DIR } from '@zamfono/shared/testDb.js';
+import { HTTP_OK, HTTP_SERVICE_UNAVAILABLE, openDb } from '@zamfono/shared';
+import { migratedTestDb, MIGRATIONS_DIR } from '@zamfono/shared/testDb.js';
 
 import {
   apiHealth,
@@ -69,12 +64,6 @@ function testKeyring(): Keyring {
   return keyringFromEnv({
     SECRETBOX_KEY: `1:${randomBytes(KEY_BYTES).toString('base64')}`
   });
-}
-
-async function migratedDb(): Promise<Db> {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
-  return db;
 }
 
 async function tempDir(prefix: string): Promise<string> {
@@ -132,7 +121,7 @@ function baseEnv(overrides: Partial<SeedEnv> = {}): SeedEnv {
 
 describe('seedIfEmpty', () => {
   it('seeds an empty database from .env', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     const result = await seedIfEmpty(
       db,
@@ -199,7 +188,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('lays out each MoH asset the PJSIP renderer and storeAudio read (§10.2)', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     await seedIfEmpty(db, baseEnv(), testKeyring(), mediaDir, silentLogger);
     const moh = await db
@@ -232,7 +221,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('refuses to seed when the hold-music source directory is absent', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     const missingSourceDir = path.join(
       await tempDir('zamfono-moh-missing-'),
@@ -255,7 +244,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('seeds the settings row from the SMTP_* env', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     const kr = testKeyring();
     await seedIfEmpty(
@@ -290,7 +279,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('gives the owner the highest extension less one, leaving all-nines free', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     await seedIfEmpty(db, baseEnv(), testKeyring(), mediaDir, silentLogger);
     const owner = await db
@@ -309,7 +298,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('numbers the owner `98` for a two-digit extension length', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     await seedIfEmpty(
       db,
@@ -327,7 +316,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('numbers parking slots 71 to 79 for a two-digit extension length', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     await seedIfEmpty(
       db,
@@ -356,7 +345,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('rejects a non-numeric EXT_LENGTH', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     await expect(
       seedIfEmpty(
@@ -370,7 +359,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('rejects an EXT_LENGTH below the floor of 2', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     await expect(
       seedIfEmpty(
@@ -384,7 +373,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('rejects an SMTP_SECURITY other than tls or starttls', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     await expect(
       seedIfEmpty(
@@ -398,7 +387,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('seeds smtp_security tls when SMTP_SECURITY is unset', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedIfEmpty(
       db,
       baseEnv(),
@@ -414,7 +403,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('rejects a non-numeric SMTP_PORT', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     await expect(
       seedIfEmpty(
@@ -428,7 +417,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('rejects an out-of-range SMTP_PORT', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     await expect(
       seedIfEmpty(
@@ -442,7 +431,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('rejects a MAIN_DID that is not E.164', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     await expect(
       seedIfEmpty(
@@ -458,7 +447,7 @@ describe('seedIfEmpty', () => {
   // §6.3 "First boot": a malformed seed value stops `api` before it serves a request; `UK` is
   // not ISO 3166-1 (`GB` is), so it has no calling code and every normalization would throw.
   it('throws for a COUNTRY that names no calling code, and seeds nothing', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     await expect(
       seedIfEmpty(
@@ -474,7 +463,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('skips a database that already holds a user', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     const kr = testKeyring();
     await seedIfEmpty(db, baseEnv(), kr, mediaDir, silentLogger);
@@ -483,7 +472,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('falls back to ["112"] for a country without an entry', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     await seedIfEmpty(
       db,
@@ -500,7 +489,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('logs a warning naming the country when it has no emergency-number entry (§6.3)', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     const logger = pino({ level: 'silent' });
     const warnSpy = vi.spyOn(logger, 'warn');
@@ -517,7 +506,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('throws when SMTP_HOST is set without MAIL_FROM', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     await expect(
       seedIfEmpty(
@@ -531,7 +520,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('throws when SMTP_HOST is set with a malformed MAIL_FROM', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     await expect(
       seedIfEmpty(
@@ -545,7 +534,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('throws with neither a password hash nor a mail relay', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     const env = baseEnv({ BOOTSTRAP_OWNER_PASSWORD_HASH: undefined });
     await expect(
@@ -554,7 +543,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('sends the setup mail and issues a token when no hash is seeded', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     sentMail.messages.length = 0;
     const env = baseEnv({
@@ -592,7 +581,7 @@ describe('seedIfEmpty', () => {
   });
 
   it('leaves the database empty for a retry when the setup mail fails to send', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();
     vi.mocked(sendMail).mockResolvedValueOnce('failed');
     const env = baseEnv({
@@ -636,7 +625,7 @@ describe('apiHealth', () => {
   });
 
   it('reports ok once the database is open and migrated', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const health = await apiHealth({
       db,
       migrationsDir: MIGRATIONS_DIR,
@@ -651,7 +640,7 @@ describe('apiHealth', () => {
 
 describe('countKeyRotationRemaining', () => {
   it('counts zero when every *_enc blob matches the current generation', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     await sql`
       INSERT INTO webhooks (id, url, secret_enc, created_at)
@@ -661,7 +650,7 @@ describe('countKeyRotationRemaining', () => {
   });
 
   it('counts a blob written under a previous key generation as remaining (§5.4)', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const previousGenerationKeyring = keyringFromEnv({
       SECRETBOX_KEY: `1:${randomBytes(KEY_BYTES).toString('base64')}`
     });

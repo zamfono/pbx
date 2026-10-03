@@ -10,8 +10,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { beforeEach, describe, expect, it, onTestFinished } from 'vitest';
 
-import { newId, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, type Db } from '@zamfono/shared';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { runRetention } from './retention.js';
 import { noopLogger } from './testing/pipelineDeps.js';
@@ -66,8 +66,7 @@ describe('runRetention', () => {
   let mediaDir: string;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
+    db = await migratedTestDb();
     await seedSettings(db, { recordingRetentionDays: 90 });
     mediaDir = await mkdtemp(path.join(tmpdir(), 'zamfono-retention-'));
     onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));

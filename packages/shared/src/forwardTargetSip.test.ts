@@ -1,13 +1,11 @@
 import { sql } from 'kysely';
 import { expect, test } from 'vitest';
 
-import { openDb } from './db.js';
-import { migrateForTest } from './testDb.js';
+import { migratedTestDb } from './testDb.js';
 
 // The sip target kind of forward_targets (§9.4 "SIP targets", §11.2).
 test('a sip target sets both columns, names a trunk it keeps, and a safe user part', async () => {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   await sql`INSERT INTO trunks (id, name, priority, emergency, auth_mode, transport, created_at)
             VALUES ('t1', 'T', 1, 1, 'ip', 'tls', 't')`.execute(db);
   await sql`INSERT INTO forward_targets (id, sip_trunk_id, sip_user) VALUES ('ft-sip', 't1', 'proj_Ab.c~1+2-3')`.execute(

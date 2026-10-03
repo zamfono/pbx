@@ -1,14 +1,12 @@
 import { sql } from 'kysely';
 import { expect, test } from 'vitest';
 
-import { openDb } from './db.js';
-import { migrateForTest } from './testDb.js';
+import { migratedTestDb } from './testDb.js';
 
 // trunks.diversion (§9.4 "Forwarded calls", §11.2): a trunk written without the column sends no
 // `Diversion` (`diversion` 'off'), and a value outside the three is refused.
 test("a new trunk gets diversion 'off'", async () => {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   await sql`INSERT INTO trunks (id, name, priority, emergency, auth_mode, created_at)
             VALUES ('t-ip', 'A', 1, 1, 'ip', 't')`.execute(db);
 

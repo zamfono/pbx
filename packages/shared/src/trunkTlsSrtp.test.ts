@@ -1,13 +1,11 @@
 import { sql } from 'kysely';
 import { expect, test } from 'vitest';
 
-import { openDb } from './db.js';
-import { migrateForTest } from './testDb.js';
+import { migratedTestDb } from './testDb.js';
 
 // trunks.srtp (§9.4 "Signaling", §11.2).
 test('srtp is refused on a trunk whose transport is not tls', async () => {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   await sql`INSERT INTO trunks (id, name, priority, emergency, auth_mode, transport, srtp, created_at)
             VALUES ('t-tls', 'A', 1, 1, 'ip', 'tls', 1, 't')`.execute(db);
   await expect(

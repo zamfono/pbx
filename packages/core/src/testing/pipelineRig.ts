@@ -1,14 +1,8 @@
 // Test-only: the call-control suites' shared rig, a Pipeline over a fake Asterisk, an in-memory
 // database and the collaborators `main.ts` wires it with, and the calls those suites start from;
 // the rows they seed are `seedRows.ts`'s.
-import {
-  newId,
-  nowIso,
-  openDb,
-  resolveVersion,
-  type Db
-} from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, resolveVersion, type Db } from '@zamfono/shared';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
 import type { CallActions } from '../calls/actions.js';
@@ -75,8 +69,7 @@ async function connectFakeAri(): Promise<{ fakeAri: FakeAri; ari: AriClient }> {
 export async function startRig(
   overrides: Partial<PipelineDeps> = {}
 ): Promise<Rig> {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   await seedSettings(db);
   const { fakeAri, ari } = await connectFakeAri();
   const cache = new ConfigCache(db);

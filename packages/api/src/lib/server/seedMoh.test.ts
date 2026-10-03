@@ -4,8 +4,8 @@ import path from 'node:path';
 import pino from 'pino';
 import { describe, expect, it, onTestFinished } from 'vitest';
 
-import { nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { nowIso, type Db } from '@zamfono/shared';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import {
   createMohAssets,
@@ -17,8 +17,7 @@ import {
 const logger = pino({ level: 'silent' });
 
 async function migratedDb(): Promise<Db> {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   return db;
 }
 

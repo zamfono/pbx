@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, openDb, type Db, type Envelope } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db, type Envelope } from '@zamfono/shared';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { EventBus } from './internal/eventBus.js';
 import { ConfigCache } from './internal/snapshot.js';
@@ -54,8 +54,7 @@ describe('startSweep', () => {
   });
 
   it("emits an ooo transition only at the tick after the rule's scheduled start", async () => {
-    const db = openDb(':memory:');
-    await migrateForTest(db);
+    const db = await migratedTestDb();
     const { forwardTargetId } = await seedTenant(db, { timezone: 'UTC' });
     const start = new Date('2026-01-01T00:00:00.000Z');
     const startsAt = new Date('2026-01-01T00:01:00.000Z');
@@ -108,8 +107,7 @@ describe('startSweep', () => {
   });
 
   it('emits an hours transition once when a schedule closes', async () => {
-    const db = openDb(':memory:');
-    await migrateForTest(db);
+    const db = await migratedTestDb();
     const { forwardTargetId } = await seedTenant(db, { timezone: 'UTC' });
     const openingHoursId = newId();
     await db
@@ -161,8 +159,7 @@ describe('startSweep', () => {
   });
 
   it('evaluates hours in UTC when the stored timezone is no zone Intl knows, instead of skipping every tick', async () => {
-    const db = openDb(':memory:');
-    await migrateForTest(db);
+    const db = await migratedTestDb();
     const { forwardTargetId } = await seedTenant(db, {
       timezone: 'Mars/Olympus'
     });
@@ -205,8 +202,7 @@ describe('startSweep', () => {
   });
 
   it("evaluates hours in the stack's TZ while settings.timezone is NULL (§11.4)", async () => {
-    const db = openDb(':memory:');
-    await migrateForTest(db);
+    const db = await migratedTestDb();
     const { forwardTargetId } = await seedTenant(db, { timezone: null });
     const openingHoursId = newId();
     await db
@@ -248,8 +244,7 @@ describe('startSweep', () => {
 
   // §10.6 `ooo` carries the rule's window: subscribers showing "away until …" must see it move.
   it('emits an ooo event when the running rule is edited or handed over to the next back to back', async () => {
-    const db = openDb(':memory:');
-    await migrateForTest(db);
+    const db = await migratedTestDb();
     const { forwardTargetId } = await seedTenant(db, { timezone: 'UTC' });
     const ruleId = newId();
     await db

@@ -1,14 +1,12 @@
 import { sql } from 'kysely';
 import { expect, test } from 'vitest';
 
-import { openDb } from './db.js';
-import { migrateForTest } from './testDb.js';
+import { migratedTestDb } from './testDb.js';
 
 // Automatic updates (§6.3 "Updates", §11.2): mail_templates admits the two update mails, and
 // update_state holds its one row from the start.
 test('admits the update mail kinds and starts update_state with its one row', async () => {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   await sql`INSERT INTO mail_templates (kind, language, subject, body_text, updated_at)
             VALUES ('updateFailed', 'de', 's', 'b', 't'),
                    ('breakingUpdate', 'de', 's', 'b', 't')`.execute(db);

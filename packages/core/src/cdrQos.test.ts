@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, openDb, type CallLogLevel, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, type CallLogLevel, type Db } from '@zamfono/shared';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import type { Channel } from './ari/types.js';
 import { newCall, type Call } from './calls/call.js';
@@ -100,8 +100,7 @@ describe('QosRows (§7 level qos)', () => {
   let db: Db;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
+    db = await migratedTestDb();
   });
 
   afterEach(async () => {

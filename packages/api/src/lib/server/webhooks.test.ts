@@ -3,8 +3,8 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { nowIso, openDb, type Db, type Envelope } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { nowIso, type Db, type Envelope } from '@zamfono/shared';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { encrypt, keyringFromEnv, type Keyring } from './secretbox.js';
 import { WebhookDispatcher } from './webhooks.js';
@@ -74,8 +74,7 @@ async function startStub(): Promise<{
 }
 
 async function migratedDb(): Promise<Db> {
-  const db = openDb(':memory:');
-  await migrateForTest(db);
+  const db = await migratedTestDb();
   return db;
 }
 

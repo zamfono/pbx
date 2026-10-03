@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { ConfigCache } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
@@ -89,8 +89,7 @@ describe('applyOooAndHours', () => {
   let db: Db;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
+    db = await migratedTestDb();
   });
 
   afterEach(async () => {
