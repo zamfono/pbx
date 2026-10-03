@@ -5,28 +5,21 @@
  */
 import { logFailure } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
-import type { Call } from './call.js';
+import { findLiveCall } from './callLookup.js';
 import type { Pipeline } from './pipeline.js';
 
 /** §10.1 step 5 "already in a call": presence's own in-call view (§9.3 `INUSE`), which counts a
- * call the member placed as well as one they answered, or any of the member's legs bridged in. */
+ * call the member placed as well as one they answered, or any of the member's legs bridged in;
+ * and an answered leg of theirs on any live call, which is up before its join flags them. */
 export function isUserInCall(pipeline: Pipeline, userId: string): boolean {
-  if (pipeline.deps.presence.isInCall(userId)) {
-    return true;
-  }
-  const seen = new Set<Call>();
-  for (const call of pipeline.callByChannel.values()) {
-    if (seen.has(call)) {
-      continue;
-    }
-    seen.add(call);
-    for (const leg of call.legs.values()) {
-      if (leg.userId === userId && leg.state === 'up') {
-        return true;
-      }
-    }
-  }
-  return false;
+  return (
+    pipeline.deps.presence.isInCall(userId) ||
+    findLiveCall(pipeline, call =>
+      [...call.legs.values()].some(
+        leg => leg.userId === userId && leg.state === 'up'
+      )
+    ) !== null
+  );
 }
 
 /** `userId`'s devices that can ring (§10.1 steps 4 and 5 "offline"; §10.2 "Click-to-dial"

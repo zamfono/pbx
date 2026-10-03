@@ -222,6 +222,9 @@ why the specified behaviour changed; the commit history, how.
   SIP-TLS: the hook gave up at once and Asterisk kept the previous certificate until the next
   renewal or a `proxy` restart. The hook now waits up to a minute for the files, and if they stay
   unreadable it fails with the reason in the `proxy` logs.
+- A ring group with `skip_busy` could still ring a member who had just answered as a party added
+  to a call through the API, or as the ring-back of a call they parked, in the moment before
+  their phone joined the conversation. Such a member now counts as busy from the answer on.
 - A trunk refused for a name another trunk already has, or for an inbound-auth username a device
   or another trunk already uses as its SIP name, answered a bare 409; the 409 now names that
   device or trunk in `references`, as every other refused duplicate does.

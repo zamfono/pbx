@@ -319,6 +319,39 @@ describe('ring-group ringability and fallback rules', () => {
     expect(originatedEndpoints(fakeAri)).toEqual(['PJSIP/e102-db']);
   });
 
+  it('skips a member whose answer on a party api added is still joining while skip_busy is set', async () => {
+    const groupId = await seedRingGroup(db);
+    const busyId = await seedMemberUser(db, groupId, 0, ['e101-da']);
+    await seedMemberUser(db, groupId, 1, ['e102-db']);
+    await register('e101-da');
+    await register('e102-db');
+    // An added party's call (`addedParty.ts`) has no caller channel; its leg is up from the
+    // answer on, before the join that flags the member in a call.
+    const added = newCall({
+      id: newId(),
+      direction: 'internal',
+      callerChannelId: null,
+      from: '101',
+      to: '102',
+      startedAt: nowIso(),
+      logLevel: 'events',
+      callLogMaxBytes: 1_048_576
+    });
+    const legChannel = fakeAri.addChannel({ caller: { number: '', name: '' } });
+    added.legs.set(legChannel.id, {
+      channelId: legChannel.id,
+      kind: 'device',
+      userId: busyId,
+      state: 'up',
+      endCause: null
+    });
+    pipeline.registerCall(added);
+
+    await ringGroup(pipeline, call, groupId);
+
+    expect(originatedEndpoints(fakeAri)).toEqual(['PJSIP/e102-db']);
+  });
+
   it('rings a member on a call they placed as call waiting while skip_busy is cleared', async () => {
     const groupId = await seedRingGroup(db, { skipBusy: false });
     const busyId = await seedMemberUser(db, groupId, 0, ['e101-da']);
