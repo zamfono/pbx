@@ -1,17 +1,19 @@
-/** The feature-code dial's own call (§9.3 "Feature codes"): the release codes a feature refuses
- * with, and the two ways a feature closes that call out with a real outcome (§11.2
- * `calls.status`). Shared by `features.ts`, `mailbox.ts`, `parking.ts`, `parkingRingback.ts` and
+/** The feature-code dial's own call (§9.3 "Feature codes"): the two ways a feature closes that
+ * call out with a real outcome (§11.2 `calls.status`). Shared by `features.ts`, `mailbox.ts`, `parking.ts`, `parkingRingback.ts` and
  * `addParty.ts`; its coverage lives in `features.test.ts` alongside theirs. */
-import { ignoreGone, logFailure } from '../ari/failures.js';
-import { callerChannel, type Call, type CallsRow } from './call.js';
+import { endCall, type Call, type CallsRow } from './call.js';
 import type { Pipeline } from './pipeline.js';
 
 /** `answeredAt` for a feature call closing out `answered` (§10.2 "Call history": renders "Ben
  * joined at 14:02"), stamped here rather than at each call site's own point of answer, so every
  * feature shares one instant for it. Left untouched when already set, so this never overwrites a
  * call whose own `answeredAt` a caller stamped earlier for its own reasons. */
-function stampAnsweredAt(pipeline: Pipeline, call: Call): void {
-  if (call.status === 'answered' && call.answeredAt === null) {
+function stampAnsweredAt(
+  pipeline: Pipeline,
+  call: Call,
+  status: CallsRow['status']
+): void {
+  if (status === 'answered' && call.answeredAt === null) {
     call.answeredAt = pipeline.deps.now();
   }
 }
@@ -24,15 +26,8 @@ export async function concludeFeature(
   call: Call,
   status: CallsRow['status']
 ): Promise<void> {
-  call.status = status;
-  stampAnsweredAt(pipeline, call);
-  await pipeline.deps.ari.channels
-    .hangup(callerChannel(call))
-    .catch(ignoreGone)
-    .catch(
-      logFailure(pipeline.deps.logger, 'caller hangup', { callId: call.id })
-    );
-  await pipeline.finishCall(call);
+  stampAnsweredAt(pipeline, call, status);
+  await endCall(pipeline, call, status);
 }
 
 /** Closes the feature-code dial's own CDR entry without hanging up its channel: pickup and
@@ -44,6 +39,6 @@ export async function closeFeatureCall(
   status: CallsRow['status']
 ): Promise<void> {
   call.status = status;
-  stampAnsweredAt(pipeline, call);
+  stampAnsweredAt(pipeline, call, status);
   await pipeline.finishCall(call);
 }

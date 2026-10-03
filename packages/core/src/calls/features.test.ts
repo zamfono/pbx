@@ -720,6 +720,45 @@ describe('features', () => {
     expect(hint?.body).toEqual({ deviceState: 'BUSY' });
   });
 
+  it("*90 at level qos writes the feature call's call_qos row from its channel's hangup (§7)", async () => {
+    await setUp();
+    const userId = await seedUser(db);
+    await seedExtension(db, '201', { userId });
+    const channel = fakeAri.addChannel({});
+    fakeAri.rtpQos.set(channel.id, { txjitter: 0.004, rxjitter: 0 });
+    const call = newCall({
+      id: newId(),
+      direction: 'internal',
+      callerChannelId: channel.id,
+      from: 'e201',
+      to: '*90',
+      startedAt: nowIso(),
+      logLevel: 'qos',
+      callLogMaxBytes: 1_048_576
+    });
+    call.callerUserId = userId;
+    pipeline.registerCall(call);
+    await cdr.open(call);
+
+    await handleFeature(pipeline, presence, call, 'dndOn', '');
+    fakeAri.emit({
+      type: 'ChannelDestroyed',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: { id: channel.id, name: '' },
+      cause: 16
+    });
+
+    await eventually(async () => {
+      const rows = await db
+        .selectFrom('callQos')
+        .select(['channelId', 'jitterMs'])
+        .where('callId', '=', call.id)
+        .execute();
+      expect(rows).toEqual([{ channelId: channel.id, jitterMs: 4 }]);
+    });
+  });
+
   it('*90 dialled from a registered device sets dnd, hint BUSY and presence dnd', async () => {
     await setUp();
     pipeline.deps.trunkState = trunkStateForTests();

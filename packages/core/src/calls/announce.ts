@@ -4,9 +4,9 @@
  * first, since without early media the caller hears nothing before that, and hung up only once
  * the announcement has actually played to the end.
  */
-import { ignoreGone, logFailure } from '../ari/failures.js';
+import { ignoreGone } from '../ari/failures.js';
 import { assetMedia } from '../prompts.js';
-import { callerChannel, type Call } from './call.js';
+import { callerChannel, endCall, type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
 
@@ -28,15 +28,5 @@ export async function announce(
   );
   // eslint-disable-next-line require-atomic-updates -- this call's only writer is this function
   call.answeredAt = pipeline.deps.now();
-  // eslint-disable-next-line require-atomic-updates -- this call's only writer is this function
-  call.status = 'answered';
-  // §7: the channel whose `call_qos` row this call has is noted before it goes.
-  pipeline.deps.cdr.noteQosLegs(call);
-  await pipeline.deps.ari.channels
-    .hangup(channelId)
-    .catch(ignoreGone)
-    .catch(
-      logFailure(pipeline.deps.logger, 'caller hangup', { callId: call.id })
-    );
-  await pipeline.finishCall(call);
+  await endCall(pipeline, call, 'answered');
 }

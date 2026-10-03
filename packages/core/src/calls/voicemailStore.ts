@@ -7,8 +7,8 @@
 import { mwiMailboxOf, type Db, type MailRequest } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
-import { ignoreGone, logFailure } from '../ari/failures.js';
-import { callerChannel, type Call, type Owner } from './call.js';
+import { logFailure } from '../ari/failures.js';
+import { endCall, type Call, type Owner } from './call.js';
 import { contactName } from './contactName.js';
 import type { Pipeline } from './pipeline.js';
 import type { MailSender } from './voicemail.js';
@@ -108,13 +108,5 @@ export async function persistVoicemail(ctx: DepositContext): Promise<void> {
       logFailure(pipeline.deps.logger, 'voicemail mail', { callId: call.id })
     );
 
-  call.status = 'voicemail';
-  pipeline.deps.cdr.noteQosLegs(call);
-  await pipeline.deps.ari.channels
-    .hangup(callerChannel(call))
-    .catch(ignoreGone)
-    .catch(
-      logFailure(pipeline.deps.logger, 'caller hangup', { callId: call.id })
-    );
-  await pipeline.finishCall(call);
+  await endCall(pipeline, call, 'voicemail');
 }

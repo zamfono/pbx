@@ -186,6 +186,31 @@ export function buildUserRules(
   return rules;
 }
 
+/**
+ * Closes out a call that ends with its caller's channel alone (§11.2 `calls.status`): records
+ * `status`, hangs the caller up, with the Q.850 `reasonCode` where one is given, and writes the
+ * call's history entry.
+ */
+export async function endCall(
+  pipeline: Pipeline,
+  call: Call,
+  status: CallsRow['status'],
+  reasonCode?: number
+): Promise<void> {
+  call.status = status;
+  // §7: the channel whose `call_qos` row this call has is noted before it goes.
+  pipeline.deps.cdr.noteQosLegs(call);
+  if (call.callerChannelId !== null) {
+    await pipeline.deps.ari.channels
+      .hangup(call.callerChannelId, { reasonCode })
+      .catch(ignoreGone)
+      .catch(
+        logFailure(pipeline.deps.logger, 'caller hangup', { callId: call.id })
+      );
+  }
+  await pipeline.finishCall(call);
+}
+
 /** Hangs up the caller with SIP response `code`, records `status`, and closes the call's CDR entry. */
 export async function release(
   pipeline: Pipeline,
@@ -194,21 +219,10 @@ export async function release(
   status: CallsRow['status']
 ): Promise<void> {
   call.log.event({ event: 'release', code });
-  call.status = status;
   if (status === 'missed') {
     await notifyMissedCall(pipeline, call);
   }
-  // §7: the channel whose `call_qos` row this call has is noted before it goes.
-  pipeline.deps.cdr.noteQosLegs(call);
-  if (call.callerChannelId !== null) {
-    await pipeline.deps.ari.channels
-      .hangup(call.callerChannelId, { reasonCode: sipToHangupCause(code) })
-      .catch(ignoreGone)
-      .catch(
-        logFailure(pipeline.deps.logger, 'caller release', { callId: call.id })
-      );
-  }
-  await pipeline.finishCall(call);
+  await endCall(pipeline, call, status, sipToHangupCause(code));
 }
 /** A user's or a ring group's mailbox, the two owners a target can end into. */
 export type Owner = { userId: string } | { ringGroupId: string };
