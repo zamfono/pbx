@@ -19,7 +19,8 @@ import { startRig, type Rig } from '../testing/pipelineRig.js';
 import { seedDid, seedUser } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
 import { liveView } from './callState.js';
-import type { Pipeline, PipelineDeps } from './pipeline.js';
+import type { Pipeline } from './pipeline.js';
+import type { PipelineDeps } from './pipelineDeps.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { runUserStep } from './userStep.js';
 

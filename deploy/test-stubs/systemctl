@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# update-test.sh's stub systemctl, for the boot unit's path, over the units in $STUB_UNIT_DIR: it
+# lists them and shows one's WorkingDirectory; the rest is recorded.
+case $1 in
+  list-unit-files)
+    for unit in "$STUB_UNIT_DIR"/*.service; do
+      [[ ! -e $unit ]] || echo "$(basename "$unit") enabled enabled"
+    done
+    ;;
+  show) sed -n 's/^WorkingDirectory=//p' "$STUB_UNIT_DIR/${*: -1}" ;;
+  *) echo "systemctl $*" >>"$STUB_LOG" ;;
+esac

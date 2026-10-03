@@ -10,7 +10,8 @@ import { eventually } from '../testing/eventually.js';
 import { noopCdr } from '../testing/pipelineDeps.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
 import type { Call } from './call.js';
-import type { Pipeline, PipelineDeps } from './pipeline.js';
+import type { Pipeline } from './pipeline.js';
+import type { PipelineDeps } from './pipelineDeps.js';
 
 function fakeCdr(): PipelineDeps['cdr'] & { opened: Call[] } {
   const opened: Call[] = [];

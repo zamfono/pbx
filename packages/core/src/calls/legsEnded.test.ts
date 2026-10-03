@@ -14,7 +14,8 @@ import { newCall, type Call, type Leg } from './call.js';
 import { noteHangupRequest } from './callEnd.js';
 import { trackLeg, type RingOutcome } from './legs.js';
 import { handleChannelEnded } from './legsEnded.js';
-import type { Pipeline, PipelineDeps } from './pipeline.js';
+import type { Pipeline } from './pipeline.js';
+import type { PipelineDeps } from './pipelineDeps.js';
 import { endRingingLeg } from './ringConclusion.js';
 
 const CALLER_CHANNEL = 'caller-1';

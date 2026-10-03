@@ -10,8 +10,8 @@ api_base=$1
 token=$2
 outcome=$3
 here=$(dirname "$0")
-# shellcheck source=_lib.sh
-. "$here/_lib.sh"
+# shellcheck source=_colleague.sh
+. "$here/_colleague.sh"
 
 accepted=$(bash "$here/_api-control-check.sh" 1)
 read -r call_id <<<"$accepted"

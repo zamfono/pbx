@@ -5,8 +5,8 @@ set -euo pipefail
 
 api_base=$1
 token=$2
-# shellcheck source=_lib.sh
-. "$(dirname "$0")/_lib.sh"
+# shellcheck source=_colleague.sh
+. "$(dirname "$0")/_colleague.sh"
 
 api GET "/calls/$(cat "$(state_file originated)")" \
   | python3 "$(dirname "$0")/_originate-check.py" "$(user_with_ext 101)" 102 answered \

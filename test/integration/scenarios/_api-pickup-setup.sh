@@ -15,8 +15,8 @@ compose=$3
 uas=$4
 ring_timeout_s=${5:-}
 here=$(dirname "$0")
-# shellcheck source=_lib.sh
-. "$here/_lib.sh"
+# shellcheck source=_colleague.sh
+. "$here/_colleague.sh"
 
 group_id=$(ci_group)
 api GET "/ringGroups/$group_id" | jsonfield ringTimeoutS > "$(state_file api-pickup-group)"

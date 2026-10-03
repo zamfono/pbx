@@ -7,8 +7,8 @@ set -euo pipefail
 
 api_base=$1
 token=$2
-# shellcheck source=_lib.sh
-. "$(dirname "$0")/_lib.sh"
+# shellcheck source=_colleague.sh
+. "$(dirname "$0")/_colleague.sh"
 
 accepted=$(bash "$(dirname "$0")/_api-control-check.sh" 2)
 read -r call_id consultation <<<"$accepted"

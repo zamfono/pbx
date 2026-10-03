@@ -35,8 +35,8 @@ token=$2
 compose=$3
 mode=$4
 user_id=${5:-}
-# shellcheck source=_lib.sh
-. "$(dirname "$0")/_lib.sh"
+# shellcheck source=_colleague.sh
+. "$(dirname "$0")/_colleague.sh"
 
 result=$(state_file api-control)
 

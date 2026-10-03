@@ -5,8 +5,8 @@ set -euo pipefail
 
 api_base=$1
 token=$2
-# shellcheck source=_lib.sh
-. "$(dirname "$0")/_lib.sh"
+# shellcheck source=_colleague.sh
+. "$(dirname "$0")/_colleague.sh"
 
 api PATCH "/ringGroups/$(ci_group)" "$(python3 -c '
 import json, sys

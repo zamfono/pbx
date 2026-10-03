@@ -15,7 +15,8 @@ import { seedUser } from '../testing/seedRows.js';
 import { callerChannel, newCall, type Call, type Leg } from './call.js';
 import type { RingOutcome } from './legs.js';
 import { closeCall } from './liveCall.js';
-import type { Pipeline, PipelineDeps } from './pipeline.js';
+import type { Pipeline } from './pipeline.js';
+import type { PipelineDeps } from './pipelineDeps.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 
 describe('closeCall', () => {

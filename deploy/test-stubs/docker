@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# update-test.sh's stub runtime: `docker compose version` answers, `up --help` names --wait unless
+# STUB_PODMAN_COMPOSE, which also has no `rm`, as podman-compose has neither; everything else is
+# recorded and succeeds, `ps -q` naming two containers, which `inspect` reports healthy and
+# without a healthcheck, bar a pull under STUB_FAIL_PULL and an `up` under STUB_FAIL_UP. A pull
+# copies the update's record, .update/state.json, to $STUB_LOG.state, as it stands mid-run.
+if [[ $* == compose*' up --help' ]]; then
+  [[ -n ${STUB_PODMAN_COMPOSE:-} ]] || echo '      --wait    Wait for services to be running|healthy.'
+  exit 0
+fi
+echo "$*" >>"$STUB_LOG"
+case $* in
+  compose*' ps -q') printf 'api-1\nmigrate-1\n' && exit 0 ;;
+  inspect\ *) printf 'healthy\n\n' && exit 0 ;;
+esac
+[[ $* != *' pull'*|| ! -e .update/state.json ]] || cp .update/state.json "$STUB_LOG.state"
+if [[ -n ${STUB_PODMAN_COMPOSE:-} && $* == *' rm '* ]]; then
+  echo "podman-compose: error: argument command: invalid choice: 'rm'" >&2
+  exit 2
+fi
+[[ -z ${STUB_FAIL_PULL:-} || $* != *' pull'* ]] && [[ -z ${STUB_FAIL_UP:-} || $* != *' up -d'* ]]
