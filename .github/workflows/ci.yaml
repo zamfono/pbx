@@ -166,23 +166,15 @@ jobs:
           IMAGE_TAG="$UPDATER_IMAGE" bash images/updater/test.sh
 
   compose-docker:
-    name: compose-docker (${{ matrix.install }})
+    name: compose-docker (${{ matrix.shard }})
     needs: images
     runs-on: ubuntu-latest
-    # Two runs of their own stacks, in parallel, each playing half the sipp scenarios (run.sh's
-    # SHARD): one on a fresh install, the path a new operator takes, and one on a stack started as
-    # the latest release and upgraded to this build the way deploy/README.md step 8 upgrades one
-    # (UPGRADE_FROM, test/integration/upgrade.sh). The fresh one also runs the named steps.
+    # Two fresh installs, the path a new operator takes, in parallel, each playing half the sipp
+    # scenarios (run.sh's SHARD); the last one also runs the named steps.
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - install: fresh
-            shard: 2/2
-            upgrade-from: ''
-          - install: upgrade
-            shard: 1/2
-            upgrade-from: latest
+        shard: [1/2, 2/2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -195,37 +187,29 @@ jobs:
         env:
           COMPOSE: docker compose
           SHARD: ${{ matrix.shard }}
-          UPGRADE_FROM: ${{ matrix.upgrade-from }}
           # run.sh collects everything there on a failure (test/integration/diagnostics.sh).
           DIAG_DIR: ${{ runner.temp }}/diagnostics
       - name: Keep the failure's diagnostics
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: diagnostics-docker-${{ matrix.install }}
+          name: diagnostics-docker-${{ strategy.job-index }}
           path: ${{ runner.temp }}/diagnostics
           if-no-files-found: ignore
 
   compose-podman:
-    name: compose-podman (${{ matrix.install }})
+    name: compose-podman (${{ matrix.shard }})
     needs: images
     # Podman runs healthchecks and restart policies through systemd (§6.3 "Runtimes"), so the
     # runner has to be a systemd host rather than a container. §4 asks for Podman ≥ 5: Ubuntu
     # 24.04, which `ubuntu-latest` still names, ships 4.9, while the 26.04 image carries 5.7 from
     # its own archive. The label is pinned so the move of `ubuntu-latest` cannot change it.
     runs-on: ubuntu-26.04
-    # The same two runs as compose-docker's; the upgrade one is the only place Podman's own upgrade
-    # path (`down` before `up -d`) is exercised.
+    # The same two runs as compose-docker's.
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - install: fresh
-            shard: 2/2
-            upgrade-from: ''
-          - install: upgrade
-            shard: 1/2
-            upgrade-from: latest
+        shard: [1/2, 2/2]
     env:
       # §6.3 documents Podman rootful, so everything below runs as root. `podman compose` hands the
       # file to the docker-compose plugin and points it at `$DOCKER_HOST`; naming the rootful
@@ -271,17 +255,16 @@ jobs:
             API_IMAGE="$API_IMAGE" PROXY_IMAGE="$PROXY_IMAGE" UPDATER_IMAGE="$UPDATER_IMAGE" \
             DEVICES_IMAGE="$DEVICES_IMAGE" \
             SIPP_IMAGE="$SIPP_IMAGE" \
-            DIAG_DIR="$DIAG_DIR" SHARD="$SHARD" UPGRADE_FROM="$UPGRADE_FROM" \
+            DIAG_DIR="$DIAG_DIR" SHARD="$SHARD" \
             bash test/integration/run.sh
         env:
           COMPOSE: podman compose
           SHARD: ${{ matrix.shard }}
-          UPGRADE_FROM: ${{ matrix.upgrade-from }}
           DIAG_DIR: ${{ runner.temp }}/diagnostics
       - name: Keep the failure's diagnostics
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: diagnostics-podman-${{ matrix.install }}
+          name: diagnostics-podman-${{ strategy.job-index }}
           path: ${{ runner.temp }}/diagnostics
           if-no-files-found: ignore

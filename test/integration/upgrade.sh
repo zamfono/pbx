@@ -4,7 +4,10 @@
 # boot seeded is read through its API before the upgrade and must read the same after it.
 #
 #   UPGRADE_FROM=latest   the newest vX.Y.Z tag of the repository
-#   UPGRADE_FROM=0.0.4    that release
+#   UPGRADE_FROM=X.Y.Z    that release
+#
+# The release must be one the build under test upgrades from: 0.2.0 or later, since a 0.1.x stack
+# is not upgraded (installed anew instead).
 #
 # Reads and sets `run.sh`'s own COMPOSE, compose_args, run_dir, here, api_base, RUNTIME,
 # OWNER_EMAIL, OWNER_PASSWORD, FQDN and fail.

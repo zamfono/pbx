@@ -38,7 +38,7 @@
 #   UPGRADE_FROM=latest|<X.Y.Z> bash test/integration/run.sh
 #     Starts the stack as that release, from its published bundle and images, and upgrades it to
 #     the build under test the way deploy/README.md step 8 does before anything else runs; what
-#     that release seeded must survive (upgrade.sh).
+#     that release seeded must survive (upgrade.sh). The release is 0.2.0 or later.
 #
 # Examples:
 #   ONLY=inbound-hold bash test/integration/run.sh

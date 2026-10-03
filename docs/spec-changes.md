@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-03 · §8 Testing Strategy.** CI's integration runs are both fresh installs; the upgrade from the latest release is a harness option CI does not run while no earlier release of the same breaking line exists.
+*Why:* product-owner decision: 0.2.0 is a fresh start without any backwards compatibility, so there is no earlier release it upgrades from.
+
 **2026-10-03 · §6.3 Updates, Attachment overlays.** `update.sh` no longer fills in `BACKUP_PASSWORD`, `UPDATER_TOKEN` and `CONTAINER_SOCKET` where `.env` lacks them, nor makes the `compose.override.yaml` link for a stack without one; it lists the settings a newer `.env.example` introduced, and reads the release a stack runs from `.env`'s `ZAMFONO_VERSION` or the bundle's `VERSION` only.
 *Why:* product-owner decision: 0.2.0 is a fresh start without any backwards compatibility; `setup.sh` writes all three settings and the link, so only stacks of older releases lacked them.
 
