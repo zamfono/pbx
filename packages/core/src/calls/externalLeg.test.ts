@@ -1,31 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { AmiClient } from '../ami/client.js';
-import { AriClient } from '../ari/client.js';
+import type { AriClient } from '../ari/client.js';
 import type { Channel } from '../ari/types.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
 import { ATTEMPT_NO_RESPONSE_MS } from '../routing/trunk.js';
 import { AST_CAUSE_CALL_REJECTED, AST_CAUSE_USER_BUSY } from '../sipCodes.js';
-import { FakeAri } from '../testing/ari/fake.js';
+import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../testing/ari/fakeDial.js';
 import { eventually, flush } from '../testing/eventually.js';
-import {
-  noopLogger,
-  registerDevice,
-  testPipelineDeps
-} from '../testing/pipelineDeps.js';
+import { registerDevice } from '../testing/pipelineDeps.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
+import { seedDid, seedUser } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
-import { Pipeline } from './pipeline.js';
+import type { Pipeline } from './pipeline.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';
 import { ringUser } from './ringUser.js';
-import { TrunkState } from './trunkState.js';
+import type { TrunkState } from './trunkState.js';
 
 // How long the fake Asterisk takes to answer the read of a channel's hangup-cause hash.
 const SLOW_READ_MS = 600;
@@ -34,57 +27,13 @@ const SLOW_READ_MS = 600;
 const AST_CAUSE_TEMPORARY_FAILURE = 41;
 // Q.850 21, call rejected: what chan_pjsip maps 401, 403, 407 and 603 alike to.
 
-async function seedDid(db: Db, number: string): Promise<string> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const id = newId();
-  await db
-    .insertInto('dids')
-    .values({ id, number, targetId, createdAt: nowIso() })
-    .execute();
-  return id;
-}
-
-async function seedSettings(db: Db): Promise<void> {
-  const mainDidId = await seedDid(db, '+491110000');
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-}
-
-async function seedUser(
-  db: Db,
-  overrides: {
-    calleridDidId?: string;
-    findMe?: { number: string; delayS: number }[];
-  } = {}
-): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id,
-      name: 'Member',
-      email: `${id}@example.com`,
-      createdAt: nowIso(),
-      mailboxEnabled: 0,
-      ringTimeoutS: 30,
-      calleridDidId: overrides.calleridDidId ?? null,
-      findMeJson: overrides.findMe ? JSON.stringify(overrides.findMe) : null
-    })
-    .execute();
-  return id;
-}
+/** A ring-race member: no mailbox, rung for 30 s. */
+const MEMBER = { mailboxEnabled: 0, ringTimeoutS: 30 };
+/** A member whose find-me list rings one external number at once. */
+const FINDS_ME = {
+  ...MEMBER,
+  findMeJson: JSON.stringify([{ number: '+15557000', delayS: 0 }])
+};
 
 async function seedDevice(
   db: Db,
@@ -253,6 +202,7 @@ function membersRinging(call: Call, count: number): Promise<void> {
 }
 
 describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
+  let rig: Rig;
   let db: Db;
   let fakeAri: FakeAri;
   let ari: AriClient;
@@ -290,37 +240,14 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
   }
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    await seedSettings(db);
-    fakeAri = new FakeAri();
+    rig = await startRig();
+    ({ db, fakeAri, ari, pipeline } = rig);
+    trunkState = pipeline.deps.trunkState;
     fakeAri.answerAfterMs = 60_000;
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
-    const state = new StateStore();
-    trunkState = new TrunkState({
-      log: noopLogger,
-      ari,
-      ami: new AmiClient({
-        host: '127.0.0.1',
-        port: 1,
-        username: 'zamfono',
-        password: 'secret',
-        log: noopLogger
-      }),
-      cache: new ConfigCache(db),
-      state,
-      bus: new EventBus(),
-      now: nowIso
-    });
-    pipeline = new Pipeline(testPipelineDeps(ari, db, { state, trunkState }));
+    await db
+      .updateTable('settings')
+      .set({ mainDidId: await seedDid(db, '+491110000') })
+      .execute();
     callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
     });
@@ -339,20 +266,21 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
 
   afterEach(async () => {
     vi.useRealTimers();
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   describe("a ring-group member's external forward", () => {
     it("rings over the route's trunk as the member's own call, alongside the other members, and is hung up when another member answers", async () => {
       const memberDidId = await seedDid(db, '+491230000');
-      const forwarding = await seedUser(db, { calleridDidId: memberDidId });
+      const forwarding = await seedUser(db, {
+        ...MEMBER,
+        calleridDidId: memberDidId
+      });
       await seedExternalForward(db, forwarding, '+15557777');
       // A member who forwards is still skipped while offline (§10.1 step 5).
       await seedDevice(db, forwarding, 'member-forwarding');
       await registerDevice(fakeAri, pipeline, 'member-forwarding');
-      const other = await seedUser(db);
+      const other = await seedUser(db, MEMBER);
       await seedDevice(db, other, 'member-other');
       await registerDevice(fakeAri, pipeline, 'member-other');
       const trunkId = await seedTrunk(db, 1, 'ip');
@@ -388,7 +316,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
     });
 
     it('wins the batch when the external party answers', async () => {
-      const forwarding = await seedUser(db);
+      const forwarding = await seedUser(db, MEMBER);
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
       await registerDevice(fakeAri, pipeline, 'member-forwarding');
@@ -413,7 +341,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
     });
 
     it('falls through to the next route on a 503 before alerting, without the batch counting the leg ended', async () => {
-      const forwarding = await seedUser(db);
+      const forwarding = await seedUser(db, MEMBER);
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
       await registerDevice(fakeAri, pipeline, 'member-forwarding');
@@ -451,7 +379,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
     });
 
     it('keeps ringing past 8s once the far end sent only 100 Trying, which no event reports', async () => {
-      const forwarding = await seedUser(db);
+      const forwarding = await seedUser(db, MEMBER);
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
       await registerDevice(fakeAri, pipeline, 'member-forwarding');
@@ -486,7 +414,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
     // §9.4 "Route fallthrough": the budget covers only the wait for a first response. An answer
     // landing while its end-of-budget read is still under way is the race's, never hung up.
     it('keeps an attempt answered while its 8 s budget read is still under way', async () => {
-      const forwarding = await seedUser(db);
+      const forwarding = await seedUser(db, MEMBER);
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
       await registerDevice(fakeAri, pipeline, 'member-forwarding');
@@ -536,7 +464,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
     });
 
     it('falls through to the next route on a 403, which only tech_cause tells from a 603', async () => {
-      const forwarding = await seedUser(db);
+      const forwarding = await seedUser(db, MEMBER);
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
       await registerDevice(fakeAri, pipeline, 'member-forwarding');
@@ -562,7 +490,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
     });
 
     it('falls through to the next route on a 403 that ended the channel before its originate returned', async () => {
-      const forwarding = await seedUser(db);
+      const forwarding = await seedUser(db, MEMBER);
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
       await registerDevice(fakeAri, pipeline, 'member-forwarding');
@@ -583,7 +511,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
     });
 
     it('is hung up when the caller hangs up while it rings', async () => {
-      const forwarding = await seedUser(db);
+      const forwarding = await seedUser(db, MEMBER);
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
       await registerDevice(fakeAri, pipeline, 'member-forwarding');
@@ -604,11 +532,11 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
     });
 
     it('is not rung when no route carries the member, and the group falls back', async () => {
-      const forwarding = await seedUser(db);
+      const forwarding = await seedUser(db, MEMBER);
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
       await registerDevice(fakeAri, pipeline, 'member-forwarding');
-      const someoneElse = await seedUser(db);
+      const someoneElse = await seedUser(db, MEMBER);
       const trunkId = await seedTrunk(db, 1);
       await seedRoute(db, 1, trunkId, someoneElse);
       const groupId = await seedRingGroup(db, [forwarding]);
@@ -634,10 +562,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
 
     it("rings over the route's trunk as the user's own call alongside their device, and is hung up when the device answers", async () => {
       const didId = await seedDid(db, '+491230000');
-      const userId = await seedUser(db, {
-        calleridDidId: didId,
-        findMe: [{ number: '+15557000', delayS: 0 }]
-      });
+      const userId = await seedUser(db, { ...FINDS_ME, calleridDidId: didId });
       await seedDevice(db, userId, 'e101-d1');
       await registerDevice(fakeAri, pipeline, 'e101-d1');
       const trunkId = await seedTrunk(db, 1);
@@ -672,9 +597,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
     // §9.1 "every channel's language": the external party hears the accept prompt in it.
     it('is originated with the tenant’s language', async () => {
       await db.updateTable('settings').set({ language: 'de' }).execute();
-      const userId = await seedUser(db, {
-        findMe: [{ number: '+15557000', delayS: 0 }]
-      });
+      const userId = await seedUser(db, FINDS_ME);
       const trunkId = await seedTrunk(db, 1);
       await seedRoute(db, 1, trunkId);
 
@@ -697,9 +620,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       channelId: string;
       finished: Promise<unknown>;
     }> {
-      const userId = await seedUser(db, {
-        findMe: [{ number: '+15557000', delayS: 0 }]
-      });
+      const userId = await seedUser(db, FINDS_ME);
       const trunkId = await seedTrunk(db, 1);
       await seedRoute(db, 1, trunkId);
       const finished = ringUser(pipeline, call, userId);
@@ -758,9 +679,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
     });
 
     it('is hung up when the caller hangs up while it rings', async () => {
-      const userId = await seedUser(db, {
-        findMe: [{ number: '+15557000', delayS: 0 }]
-      });
+      const userId = await seedUser(db, FINDS_ME);
       await seedDevice(db, userId, 'e101-d1');
       await registerDevice(fakeAri, pipeline, 'e101-d1');
       const trunkId = await seedTrunk(db, 1);
@@ -783,9 +702,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
     });
 
     it("falls through to the next route before alerting, keeping the ring race open, and ends it on the callee's busy", async () => {
-      const userId = await seedUser(db, {
-        findMe: [{ number: '+15557000', delayS: 0 }]
-      });
+      const userId = await seedUser(db, FINDS_ME);
       const trunk1 = await seedTrunk(db, 1);
       const trunk2 = await seedTrunk(db, 2);
       await seedRoute(db, 1, trunk1);
@@ -832,9 +749,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
     });
 
     it("ends the ring race on the callee's busy that ended the channel before its originate returned", async () => {
-      const userId = await seedUser(db, {
-        findMe: [{ number: '+15557000', delayS: 0 }]
-      });
+      const userId = await seedUser(db, FINDS_ME);
       const trunkId = await seedTrunk(db, 1);
       await seedRoute(db, 1, trunkId);
       refuseFirstOriginate({ cause: AST_CAUSE_USER_BUSY });
@@ -846,12 +761,10 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
     });
 
     it('is not rung when no route carries the user, and the device rings on', async () => {
-      const userId = await seedUser(db, {
-        findMe: [{ number: '+15557000', delayS: 0 }]
-      });
+      const userId = await seedUser(db, FINDS_ME);
       await seedDevice(db, userId, 'e101-d1');
       await registerDevice(fakeAri, pipeline, 'e101-d1');
-      const someoneElse = await seedUser(db);
+      const someoneElse = await seedUser(db, MEMBER);
       const trunkId = await seedTrunk(db, 1);
       await seedRoute(db, 1, trunkId, someoneElse);
 

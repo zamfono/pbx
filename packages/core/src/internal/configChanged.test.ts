@@ -22,6 +22,7 @@ import {
   noopLogger,
   testActions
 } from '../testing/pipelineDeps.js';
+import { seedSettings, seedUser } from '../testing/seedRows.js';
 import { EventBus } from './eventBus.js';
 import { startInternalServer } from './server.js';
 import { ConfigCache } from './snapshot.js';
@@ -31,37 +32,8 @@ const ANY_FREE_PORT = 0;
 
 /** The settings row, a user with extension 101 and one device, `e101-dabc`. */
 async function seedUserWithDevice(db: Db): Promise<string> {
-  const userId = newId();
-  const targetId = newId();
-  const didId = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id: userId,
-      name: 'Anna',
-      email: 'anna@example.com',
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, userId })
-    .execute();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+15550001', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-  await db.insertInto('extensions').values({ ext: '101', userId }).execute();
+  await seedSettings(db);
+  const userId = await seedUser(db, { name: 'Anna', ext: '101' });
   await db
     .insertInto('devices')
     .values({

@@ -1,46 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, openDb, type Db, type Language } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { AriClient } from '../ari/client.js';
 import { SIT_DURATION_MS } from '../indications.js';
 import { PROMPTS } from '../prompts.js';
-import { FakeAri } from '../testing/ari/fake.js';
-import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
+import type { FakeAri } from '../testing/ari/fake.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
 import { newCall, type Call } from './call.js';
 import { concludeExhausted } from './conclude.js';
-import { Pipeline } from './pipeline.js';
-
-/** A throwaway forward-target/DID chain, just to satisfy `settings.main_did_id`'s FK. */
-async function seedSettings(
-  db: Db,
-  overrides: { language?: Language } = {}
-): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+15551000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      ...(overrides.language === undefined
-        ? {}
-        : { language: overrides.language }),
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-}
+import type { Pipeline } from './pipeline.js';
 
 function playedMedia(fakeAri: FakeAri, channelId: string): string | undefined {
   const played = fakeAri.calls.find(
@@ -78,31 +46,18 @@ function skipSitWait(): () => void {
 }
 
 describe('concludeExhausted — failed-call announcement vs. special information tone (§9.4)', () => {
+  let rig: Rig;
   let db: Db;
   let fakeAri: FakeAri;
-  let ari: AriClient;
   let pipeline: Pipeline;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    fakeAri = new FakeAri();
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
-    pipeline = new Pipeline(testPipelineDeps(ari, db));
+    rig = await startRig();
+    ({ db, fakeAri, pipeline } = rig);
   });
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   function makeCall(channelId: string): Call {
@@ -119,7 +74,7 @@ describe('concludeExhausted — failed-call announcement vs. special information
   }
 
   it("plays the failed-call announcement's sound for a language whose prompt set has it", async () => {
-    await seedSettings(db, { language: 'en' });
+    await db.updateTable('settings').set({ language: 'en' }).execute();
     const channel = fakeAri.addChannel({});
     const call = makeCall(channel.id);
 
@@ -134,7 +89,7 @@ describe('concludeExhausted — failed-call announcement vs. special information
   it("plays ITU-T E.180's special information tone for a language whose prompt set lacks the failed-call announcement", async () => {
     const restore = skipSitWait();
     try {
-      await seedSettings(db, { language: 'de' });
+      await db.updateTable('settings').set({ language: 'de' }).execute();
       const channel = fakeAri.addChannel({});
       const call = makeCall(channel.id);
 
@@ -155,7 +110,7 @@ describe('concludeExhausted — failed-call announcement vs. special information
   it('plays the same special information tone for another language whose prompt set lacks it', async () => {
     const restore = skipSitWait();
     try {
-      await seedSettings(db, { language: 'ru' });
+      await db.updateTable('settings').set({ language: 'ru' }).execute();
       const channel = fakeAri.addChannel({});
       const call = makeCall(channel.id);
 

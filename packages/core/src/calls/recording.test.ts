@@ -23,6 +23,7 @@ import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { FakeAri } from '../testing/ari/fake.js';
 import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
+import { seedDid, seedSettings, seedUser } from '../testing/seedRows.js';
 import { callerChannel, newCall, type Call, type Leg } from './call.js';
 import { trackLeg } from './legs.js';
 import { handleChannelEnded } from './legsEnded.js';
@@ -70,43 +71,6 @@ function fakeLogger(): Logger & { errors: unknown[][] } {
 async function seedForwardTargetUser(db: Db, userId: string): Promise<string> {
   const id = newId();
   await db.insertInto('forwardTargets').values({ id, userId }).execute();
-  return id;
-}
-
-async function seedDid(db: Db, targetId: string): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('dids')
-    .values({ id, number: '+15551000', targetId, createdAt: nowIso() })
-    .execute();
-  return id;
-}
-
-async function seedSettings(db: Db, mainDidId: string): Promise<void> {
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-}
-
-async function seedUser(db: Db, recordCalls: boolean): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id,
-      name: 'Test User',
-      email: `${id}@example.com`,
-      createdAt: nowIso(),
-      recordCalls: recordCalls ? 1 : 0
-    })
-    .execute();
   return id;
 }
 
@@ -217,11 +181,11 @@ describe('Recorder', () => {
   }
 
   it('records when the user is off but the routing ring group is on (OR-resolution)', async () => {
-    const userId = await seedUser(db, false);
+    const userId = await seedUser(db, { recordCalls: 0 });
     const groupId = await seedRingGroup(db, true);
     const targetId = await seedForwardTargetUser(db, userId);
-    const didId = await seedDid(db, targetId);
-    await seedSettings(db, didId);
+    const didId = await seedDid(db, '+15551000', targetId);
+    await seedSettings(db, { mainDidId: didId });
     const recorder = new Recorder({
       ari,
       cache,
@@ -253,11 +217,11 @@ describe('Recorder', () => {
   });
 
   it("starts no snoop for a trunk leg, no user's participation, even when the routing group records", async () => {
-    const userId = await seedUser(db, false);
+    const userId = await seedUser(db, { recordCalls: 0 });
     const groupId = await seedRingGroup(db, true);
     const targetId = await seedForwardTargetUser(db, userId);
-    const didId = await seedDid(db, targetId);
-    await seedSettings(db, didId);
+    const didId = await seedDid(db, '+15551000', targetId);
+    await seedSettings(db, { mainDidId: didId });
     const recorder = new Recorder({
       ari,
       cache,
@@ -278,10 +242,10 @@ describe('Recorder', () => {
   });
 
   it('starts no snoop for a direct call whose user has recording off', async () => {
-    const userId = await seedUser(db, false);
+    const userId = await seedUser(db, { recordCalls: 0 });
     const targetId = await seedForwardTargetUser(db, userId);
-    const didId = await seedDid(db, targetId);
-    await seedSettings(db, didId);
+    const didId = await seedDid(db, '+15551000', targetId);
+    await seedSettings(db, { mainDidId: didId });
     const recorder = new Recorder({
       ari,
       cache,
@@ -300,10 +264,10 @@ describe('Recorder', () => {
   });
 
   it('yields spy in + spy out and, after the leg ends, one recordings row', async () => {
-    const userId = await seedUser(db, true);
+    const userId = await seedUser(db, { recordCalls: 1 });
     const targetId = await seedForwardTargetUser(db, userId);
-    const didId = await seedDid(db, targetId);
-    await seedSettings(db, didId);
+    const didId = await seedDid(db, '+15551000', targetId);
+    await seedSettings(db, { mainDidId: didId });
     const mixed: [string, string, string][] = [];
     const recorder = new Recorder({
       ari,
@@ -354,10 +318,10 @@ describe('Recorder', () => {
   });
 
   it('carries a participation over to the call its leg moved to, whose row then names it (§10.2 "Call parking")', async () => {
-    const userId = await seedUser(db, true);
+    const userId = await seedUser(db, { recordCalls: 1 });
     const targetId = await seedForwardTargetUser(db, userId);
-    const didId = await seedDid(db, targetId);
-    await seedSettings(db, didId);
+    const didId = await seedDid(db, '+15551000', targetId);
+    await seedSettings(db, { mainDidId: didId });
     const recorder = new Recorder({
       ari,
       cache,
@@ -393,10 +357,10 @@ describe('Recorder', () => {
   });
 
   it('records a wideband bridge at 16 kHz: both snoops `wav16`, the mix reading `.wav16` (§10.2 "Sample rate")', async () => {
-    const userId = await seedUser(db, true);
+    const userId = await seedUser(db, { recordCalls: 1 });
     const targetId = await seedForwardTargetUser(db, userId);
-    const didId = await seedDid(db, targetId);
-    await seedSettings(db, didId);
+    const didId = await seedDid(db, '+15551000', targetId);
+    await seedSettings(db, { mainDidId: didId });
     const mixed: [string, string, string][] = [];
     const recorder = new Recorder({
       ari,
@@ -459,10 +423,10 @@ describe('Recorder', () => {
   });
 
   it('removes the raw pair after a successful mix, and keeps it after a failed one (§10.2)', async () => {
-    const userId = await seedUser(db, true);
+    const userId = await seedUser(db, { recordCalls: 1 });
     const targetId = await seedForwardTargetUser(db, userId);
-    const didId = await seedDid(db, targetId);
-    await seedSettings(db, didId);
+    const didId = await seedDid(db, '+15551000', targetId);
+    await seedSettings(db, { mainDidId: didId });
     const mediaDir = await mkdtemp(path.join(tmpdir(), 'zamfono-recording-'));
     onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));
     await mkdir(path.join(mediaDir, 'recordings'));
@@ -511,10 +475,10 @@ describe('Recorder', () => {
   });
 
   it('a snoop that cannot start logs an error and never fails the call (§10.2 "Best effort")', async () => {
-    const userId = await seedUser(db, true);
+    const userId = await seedUser(db, { recordCalls: 1 });
     const targetId = await seedForwardTargetUser(db, userId);
-    const didId = await seedDid(db, targetId);
-    await seedSettings(db, didId);
+    const didId = await seedDid(db, '+15551000', targetId);
+    await seedSettings(db, { mainDidId: didId });
     const log = fakeLogger();
     const recorder = new Recorder({
       ari,
@@ -544,10 +508,10 @@ describe('Recorder', () => {
   });
 
   it('leaves no recordings row and logs when the mix fails', async () => {
-    const userId = await seedUser(db, true);
+    const userId = await seedUser(db, { recordCalls: 1 });
     const targetId = await seedForwardTargetUser(db, userId);
-    const didId = await seedDid(db, targetId);
-    await seedSettings(db, didId);
+    const didId = await seedDid(db, '+15551000', targetId);
+    await seedSettings(db, { mainDidId: didId });
     const log = fakeLogger();
     const recorder = new Recorder({
       ari,
@@ -582,10 +546,10 @@ describe('Recorder', () => {
   });
 
   it('counts a participation in progress from its start until its mix is stored (§6.4)', async () => {
-    const userId = await seedUser(db, true);
+    const userId = await seedUser(db, { recordCalls: 1 });
     const targetId = await seedForwardTargetUser(db, userId);
-    const didId = await seedDid(db, targetId);
-    await seedSettings(db, didId);
+    const didId = await seedDid(db, '+15551000', targetId);
+    await seedSettings(db, { mainDidId: didId });
     const mixing = Promise.withResolvers<number>();
     const mixStarted = Promise.withResolvers<undefined>();
     const recorder = new Recorder({
@@ -622,11 +586,11 @@ describe('Recorder', () => {
   });
 
   it('records both participations of an internal call between two flagged users', async () => {
-    const calleeId = await seedUser(db, true);
-    const callerId = await seedUser(db, true);
+    const calleeId = await seedUser(db, { recordCalls: 1 });
+    const callerId = await seedUser(db, { recordCalls: 1 });
     const targetId = await seedForwardTargetUser(db, calleeId);
-    const didId = await seedDid(db, targetId);
-    await seedSettings(db, didId);
+    const didId = await seedDid(db, '+15551000', targetId);
+    await seedSettings(db, { mainDidId: didId });
     const recorder = new Recorder({
       ari,
       cache,
@@ -684,9 +648,11 @@ describe('Recorder', () => {
   }
 
   async function seedRecordingUser(): Promise<string> {
-    const userId = await seedUser(db, true);
+    const userId = await seedUser(db, { recordCalls: 1 });
     const targetId = await seedForwardTargetUser(db, userId);
-    await seedSettings(db, await seedDid(db, targetId));
+    await seedSettings(db, {
+      mainDidId: await seedDid(db, '+15551000', targetId)
+    });
     return userId;
   }
 
@@ -886,10 +852,10 @@ describe('Recorder', () => {
 
   describe('with the real ffmpeg mixer', () => {
     it('two header-only raw files: no row, raw files kept, mix failure counted (§10.2 "Best effort")', async () => {
-      const userId = await seedUser(db, true);
+      const userId = await seedUser(db, { recordCalls: 1 });
       const targetId = await seedForwardTargetUser(db, userId);
-      const didId = await seedDid(db, targetId);
-      await seedSettings(db, didId);
+      const didId = await seedDid(db, '+15551000', targetId);
+      await seedSettings(db, { mainDidId: didId });
       const mediaDir = await mkdtemp(
         path.join(tmpdir(), 'zamfono-recording-mix-')
       );

@@ -8,6 +8,7 @@ import { ConfigCache } from './internal/snapshot.js';
 import { startSweep } from './sweep.js';
 import { onEvents } from './testing/busEvents.js';
 import { noopLogger } from './testing/pipelineDeps.js';
+import { seedDid, seedSettings, seedUser } from './testing/seedRows.js';
 
 const SWEEP_INTERVAL_MS = 5;
 // A dozen sweep intervals: a transition is picked up, and a repeated emission would show.
@@ -23,42 +24,19 @@ async function seedTenant(
   db: Db,
   options: { timezone: string | null }
 ): Promise<{ forwardTargetId: string }> {
-  const userId = newId();
+  const userId = await seedUser(db, {
+    name: 'Owner',
+    email: 'owner@example.com'
+  });
   const forwardTargetId = newId();
-  const didId = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id: userId,
-      name: 'Owner',
-      email: 'owner@example.com',
-      createdAt: nowIso()
-    })
-    .execute();
   await db
     .insertInto('forwardTargets')
     .values({ id: forwardTargetId, userId })
     .execute();
-  await db
-    .insertInto('dids')
-    .values({
-      id: didId,
-      number: '+15550001',
-      targetId: forwardTargetId,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      timezone: options.timezone,
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
+  await seedSettings(db, {
+    mainDidId: await seedDid(db, '+15550001', forwardTargetId),
+    timezone: options.timezone
+  });
   return { forwardTargetId };
 }
 

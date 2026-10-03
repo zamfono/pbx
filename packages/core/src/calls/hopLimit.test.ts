@@ -1,12 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { AriClient } from '../ari/client.js';
 import { MAX_HOPS } from '../routing/targets.js';
-import { FakeAri } from '../testing/ari/fake.js';
-import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
+import { seedUser } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
 import { enterTarget } from './inbound.js';
 import { Pipeline } from './pipeline.js';
@@ -19,45 +17,6 @@ vi.mock('./voicemail.js', async importOriginal => ({
   ...(await importOriginal<typeof import('./voicemail.js')>()),
   deposit
 }));
-
-/** A throwaway forward-target/DID chain, just to satisfy `settings.main_did_id`'s FK. */
-async function seedSettings(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+15551000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-}
-
-async function seedUser(db: Db): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id,
-      name: 'Test User',
-      email: `${id}@example.com`,
-      mailboxEnabled: 1,
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
-}
 
 async function seedRingGroup(db: Db): Promise<string> {
   const id = newId();
@@ -75,34 +34,19 @@ async function seedRingGroup(db: Db): Promise<string> {
 }
 
 describe('hop limit (§10.1 step 7)', () => {
+  let rig: Rig;
   let db: Db;
-  let fakeAri: FakeAri;
-  let ari: AriClient;
   let pipeline: Pipeline;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    await seedSettings(db);
-    fakeAri = new FakeAri();
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
-    pipeline = new Pipeline(testPipelineDeps(ari, db));
+    rig = await startRig();
+    ({ db, pipeline } = rig);
     deposit.mockReset();
     deposit.mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   function makeCall(): Call {
@@ -119,8 +63,8 @@ describe('hop limit (§10.1 step 7)', () => {
   }
 
   it("ends in the last target's mailbox: a ring group reached after a user, whose callee is cleared", async () => {
-    const firstUser = await seedUser(db);
-    const nextUser = await seedUser(db);
+    const firstUser = await seedUser(db, { mailboxEnabled: 1 });
+    const nextUser = await seedUser(db, { mailboxEnabled: 1 });
     const groupId = await seedRingGroup(db);
     const nextTargetId = newId();
     await db

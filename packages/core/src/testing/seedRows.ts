@@ -1,49 +1,79 @@
 // Test-only: the configuration rows the call-control suites seed (`pipelineRig.ts`): the settings
-// row, users, devices, parking slots and an outbound route.
-import { newId, nowIso, type Db } from '@zamfono/shared';
+// row, DIDs, users, devices, parking slots and an outbound route.
+import type { Insertable } from 'kysely';
+
+import { newId, nowIso, type DB, type Db } from '@zamfono/shared';
 
 import type { FakeAri } from './ari/fake.js';
 
-/** A throwaway forward-target/DID chain, just to satisfy `settings.main_did_id`'s FK. */
-export async function seedSettings(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const didId = newId();
+type Row<Table extends keyof DB> = Partial<Insertable<DB[Table]>>;
+
+/** A DID `number` routed to `targetId`, or to a forward target of its own that forwards to an
+ * external number. Returns its id. */
+export async function seedDid(
+  db: Db,
+  number: string,
+  targetId?: string
+): Promise<string> {
+  let didTargetId = targetId;
+  if (didTargetId === undefined) {
+    didTargetId = newId();
+    await db
+      .insertInto('forwardTargets')
+      .values({ id: didTargetId, external: '+15550000' })
+      .execute();
+  }
+  const id = newId();
   await db
     .insertInto('dids')
-    .values({ id: didId, number: '+15551234', targetId, createdAt: nowIso() })
+    .values({ id, number, targetId: didTargetId, createdAt: nowIso() })
     .execute();
+  return id;
+}
+
+/** The `settings` singleton, `settings` on top. Unless `settings.mainDidId` names one, the main
+ * DID is `+15551234`, forwarding to an external number. Returns the main DID's id. */
+export async function seedSettings(
+  db: Db,
+  settings: Row<'settings'> = {}
+): Promise<string> {
+  const mainDidId = settings.mainDidId ?? (await seedDid(db, '+15551234'));
   await db
     .insertInto('settings')
     .values({
       id: 1,
       companyName: 'Zamfono',
-      mainDidId: didId,
       country: 'DE',
-      emergencyNumbersJson: '["112"]'
+      emergencyNumbersJson: '["112"]',
+      ...settings,
+      mainDidId
     })
     .execute();
+  return mainDidId;
 }
 
-/** A user at extension `ext`, without a device. */
-export async function seedUser(db: Db, ext: string): Promise<string> {
-  const id = newId();
+/** A user without a device, `user` on top, at extension `ext` if one is given. Returns its id. */
+export async function seedUser(
+  db: Db,
+  { ext, ...user }: Row<'users'> & { ext?: string } = {}
+): Promise<string> {
+  const id = user.id ?? newId();
   await db
     .insertInto('users')
     .values({
-      id,
-      name: `User ${ext}`,
+      name: 'Test User',
       email: `${id}@example.com`,
-      createdAt: nowIso()
+      createdAt: nowIso(),
+      ...user,
+      id
     })
     .execute();
-  await db
-    .insertInto('extensions')
-    .values({ ext, userId: id, ringGroupId: null, isParkingSlot: 0 })
-    .execute();
+  if (ext !== undefined) {
+    await db
+      .insertInto('extensions')
+      .values({ ext, userId: id, ringGroupId: null, isParkingSlot: 0 })
+      .execute();
+  }
   return id;
 }
 

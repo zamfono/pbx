@@ -5,6 +5,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { ConfigCache } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
+import { seedDid, seedSettings, seedUser } from '../testing/seedRows.js';
 import { newCall } from './call.js';
 import { applyOooAndHours } from './inboundSchedule.js';
 import type { Pipeline } from './pipeline.js';
@@ -23,42 +24,19 @@ async function seedTenantHours(
   db: Db,
   timezone: string | null
 ): Promise<string> {
-  const userId = newId();
+  const userId = await seedUser(db, {
+    name: 'Owner',
+    email: 'owner@example.com'
+  });
   const closedTargetId = newId();
-  const didId = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id: userId,
-      name: 'Owner',
-      email: 'owner@example.com',
-      createdAt: nowIso()
-    })
-    .execute();
   await db
     .insertInto('forwardTargets')
     .values({ id: closedTargetId, userId })
     .execute();
-  await db
-    .insertInto('dids')
-    .values({
-      id: didId,
-      number: '+15550001',
-      targetId: closedTargetId,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      timezone,
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
+  await seedSettings(db, {
+    mainDidId: await seedDid(db, '+15550001', closedTargetId),
+    timezone
+  });
   const openingHoursId = newId();
   await db
     .insertInto('openingHours')

@@ -30,6 +30,7 @@ import {
   noopLogger,
   testActions
 } from '../testing/pipelineDeps.js';
+import { seedSettings } from '../testing/seedRows.js';
 import { EventBus } from './eventBus.js';
 import { MAX_INTERNAL_BODY_BYTES } from './http.js';
 import { startInternalServer } from './server.js';
@@ -54,45 +55,6 @@ const serverLogger: Logger = {
   }
 };
 
-/** Seeds the one settings row (and the DID/forward-target/user chain its FK requires). */
-async function seedMinimalConfig(db: Db): Promise<void> {
-  const userId = newId();
-  const forwardTargetId = newId();
-  const didId = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id: userId,
-      name: 'Owner',
-      email: 'owner@example.com',
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: forwardTargetId, userId })
-    .execute();
-  await db
-    .insertInto('dids')
-    .values({
-      id: didId,
-      number: '+15550001',
-      targetId: forwardTargetId,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-}
-
 describe('startInternalServer', () => {
   let db: Db;
   let fakeAri: FakeAri;
@@ -107,7 +69,7 @@ describe('startInternalServer', () => {
   beforeEach(async () => {
     db = openDb(':memory:');
     await migrateForTest(db);
-    await seedMinimalConfig(db);
+    await seedSettings(db);
     fakeAri = new FakeAri();
     const { url } = await fakeAri.listen();
     ari = new AriClient({

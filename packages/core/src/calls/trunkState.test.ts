@@ -22,46 +22,8 @@ import type { FakeEndpoint } from '../testing/ari/fakeChannel.js';
 import { onEvents } from '../testing/busEvents.js';
 import { eventually } from '../testing/eventually.js';
 import { noopLogger } from '../testing/pipelineDeps.js';
+import { seedSettings } from '../testing/seedRows.js';
 import { TrunkState } from './trunkState.js';
-
-/** `ConfigCache` always loads `settings` too (§3.1), so every test needs a minimal row. */
-async function seedSettings(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({
-      id: targetId,
-      userId: null,
-      ringGroupId: null,
-      external: '+15550000',
-      mailboxUserId: null,
-      mailboxRingGroupId: null,
-      announcementAudioId: null,
-      menuId: null
-    })
-    .execute();
-  const mainDidId = newId();
-  await db
-    .insertInto('dids')
-    .values({
-      id: mainDidId,
-      number: '+491110000',
-      label: null,
-      targetId,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-}
 
 async function seedRegistrationTrunk(
   db: Db,

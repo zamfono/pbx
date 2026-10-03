@@ -61,7 +61,7 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
   it('parks the other party as *70 does, returning the slot, and lists it for everyone', async () => {
     await setUp();
     await seedSlot(db, '701');
-    const anna = await seedUser(db, '101');
+    const anna = await seedUser(db, { ext: '101' });
     const call = await answeredCall(rig, anna);
     const actorUserId = newId();
 
@@ -97,7 +97,7 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
   it('lists a parked caller who withheld their number without one (§9.4)', async () => {
     await setUp();
     await seedSlot(db, '701');
-    const anna = await seedUser(db, '101');
+    const anna = await seedUser(db, { ext: '101' });
     const call = await answeredCall(rig, anna, { from: 'anonymous' });
 
     await actions.park(call.id, { userId: anna, actorUserId: anna });
@@ -109,8 +109,8 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
   it('refuses a park by a user not in the call, of an unbridged call, or with every slot taken', async () => {
     await setUp();
     await seedSlot(db, '701');
-    const anna = await seedUser(db, '101');
-    const ben = await seedUser(db, '102');
+    const anna = await seedUser(db, { ext: '101' });
+    const ben = await seedUser(db, { ext: '102' });
     const first = await answeredCall(rig, anna);
     await expect(
       actions.park(first.id, { userId: ben, actorUserId: ben })
@@ -156,8 +156,8 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
   it('a click-to-dial to the slot retrieves the parked call, as dialling it from the phone does', async () => {
     await setUp();
     await seedSlot(db, '701');
-    const anna = await seedUser(db, '101');
-    const ben = await seedUser(db, '102');
+    const anna = await seedUser(db, { ext: '101' });
+    const ben = await seedUser(db, { ext: '102' });
     await seedDevice(rig, ben, 'e102-a');
     await rig.devicesUp();
     const call = await answeredCall(rig, anna);
@@ -181,8 +181,8 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
 
   it('transfers to voicemail, depositing in that mailbox without ringing it, as *97<ext> does', async () => {
     await setUp();
-    const anna = await seedUser(db, '101');
-    const ben = await seedUser(db, '102');
+    const anna = await seedUser(db, { ext: '101' });
+    const ben = await seedUser(db, { ext: '102' });
     await seedDevice(rig, ben, 'e102-a');
     await rig.devicesUp();
     const call = await answeredCall(rig, anna);
@@ -221,7 +221,7 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
   it('refuses a voicemail transfer to an extension with no mailbox with 422, leaving the call as it was', async () => {
     await setUp();
     await seedSlot(db, '701');
-    const anna = await seedUser(db, '101');
+    const anna = await seedUser(db, { ext: '101' });
     const call = await answeredCall(rig, anna);
 
     for (const target of ['999', '701']) {
@@ -241,7 +241,7 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
     await setUp();
     pipeline.deps.trunkState = rig.trunkState();
     await seedExternalRoute(db, 'both');
-    const anna = await seedUser(db, '101');
+    const anna = await seedUser(db, { ext: '101' });
     await seedDevice(rig, anna, 'e101-a');
     await rig.devicesUp();
 
@@ -295,7 +295,7 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
   it('serves the park route with 200 and the slot, the parking read, and refuses a malformed flag', async () => {
     await setUp();
     await seedSlot(db, '701');
-    const anna = await seedUser(db, '101');
+    const anna = await seedUser(db, { ext: '101' });
     const call = await answeredCall(rig, anna);
     const baseUrl = await rig.startServer(actions);
     const post = (path: string, body: unknown): Promise<Response> =>

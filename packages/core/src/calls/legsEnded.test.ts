@@ -1,24 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso } from '@zamfono/shared';
 
-import { AriClient } from '../ari/client.js';
+import type { AriClient } from '../ari/client.js';
 import type { AriEventOf } from '../ari/events.js';
-import { FakeAri } from '../testing/ari/fake.js';
+import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { eventually } from '../testing/eventually.js';
-import {
-  noopCdr,
-  noopLogger,
-  testPipelineDeps
-} from '../testing/pipelineDeps.js';
+import { noopCdr } from '../testing/pipelineDeps.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
 import { settleAnswered } from './answer.js';
 import { newCall, type Call, type Leg } from './call.js';
 import { noteHangupRequest } from './callEnd.js';
 import { trackLeg, type RingOutcome } from './legs.js';
 import { handleChannelEnded } from './legsEnded.js';
-import { Pipeline, type PipelineDeps } from './pipeline.js';
+import type { Pipeline, PipelineDeps } from './pipeline.js';
 import { endRingingLeg } from './ringConclusion.js';
 
 const CALLER_CHANNEL = 'caller-1';
@@ -45,7 +41,7 @@ function destroyed(
 }
 
 describe('handleChannelEnded, the caller channel', () => {
-  let db: Db;
+  let rig: Rig;
   let pipeline: Pipeline;
   let call: Call;
   let finished: Call[];
@@ -53,8 +49,6 @@ describe('handleChannelEnded, the caller channel', () => {
   let ari: AriClient;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
     finished = [];
     const cdr: PipelineDeps['cdr'] = {
       ...noopCdr(),
@@ -64,17 +58,8 @@ describe('handleChannelEnded, the caller channel', () => {
         return Promise.resolve();
       }
     };
-    fakeAri = new FakeAri();
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
-    pipeline = new Pipeline(testPipelineDeps(ari, db, { cdr }));
+    rig = await startRig({ cdr });
+    ({ fakeAri, ari, pipeline } = rig);
     call = newCall({
       id: newId(),
       direction: 'inbound',
@@ -89,9 +74,7 @@ describe('handleChannelEnded, the caller channel', () => {
   });
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   /** The `ChannelDestroyed` Asterisk sends for the caller's own channel. */

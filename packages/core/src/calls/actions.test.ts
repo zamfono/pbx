@@ -115,11 +115,11 @@ describe('CallActions', () => {
 
   it('rings the user devices first, then dials the extension as that device would, with the actor in the trace', async () => {
     await setUp();
-    const callerId = await seedUser(db, '101');
+    const callerId = await seedUser(db, { ext: '101' });
     await seedDevice(rig, callerId, 'e101-a');
     await seedDevice(rig, callerId, 'e101-b');
     await rig.devicesUp();
-    const calleeId = await seedUser(db, '102');
+    const calleeId = await seedUser(db, { ext: '102' });
     await seedDevice(rig, calleeId, 'e102-a');
     await rig.devicesUp();
     const actorUserId = newId();
@@ -194,11 +194,11 @@ describe('CallActions', () => {
   it("a device still being placed once another answered never concludes the target's ring", async () => {
     await setUp();
     fakeAri.answerAfterMs = 60_000;
-    const callerId = await seedUser(db, '101');
+    const callerId = await seedUser(db, { ext: '101' });
     await seedDevice(rig, callerId, 'e101-a');
     await seedDevice(rig, callerId, 'e101-b');
     await rig.devicesUp();
-    const calleeId = await seedUser(db, '102');
+    const calleeId = await seedUser(db, { ext: '102' });
     await seedDevice(rig, calleeId, 'e102-a');
     await rig.devicesUp();
     // Read from the create itself: the dials complete out of order here.
@@ -300,7 +300,7 @@ describe('CallActions', () => {
     await setUp();
     pipeline.deps.trunkState = rig.trunkState();
     const trunkId = await seedExternalRoute(db);
-    const callerId = await seedUser(db, '101');
+    const callerId = await seedUser(db, { ext: '101' });
     await seedDevice(rig, callerId, 'e101-a');
     await rig.devicesUp();
 
@@ -334,7 +334,7 @@ describe('CallActions', () => {
     await setUp();
     pipeline.deps.trunkState = rig.trunkState();
     await seedExternalRoute(db, 'both');
-    const callerId = await seedUser(db, '101');
+    const callerId = await seedUser(db, { ext: '101' });
     await seedDevice(rig, callerId, 'e101-a');
     await rig.devicesUp();
 
@@ -368,7 +368,7 @@ describe('CallActions', () => {
       .set({ callLogLevel: 'none' })
       .where('id', '=', 1)
       .execute();
-    const callerId = await seedUser(db, '101');
+    const callerId = await seedUser(db, { ext: '101' });
     await seedDevice(rig, callerId, 'e101-a');
     await rig.devicesUp();
 
@@ -408,7 +408,7 @@ describe('CallActions', () => {
       .set({ callLogLevel: 'none' })
       .where('id', '=', 1)
       .execute();
-    const callerId = await seedUser(db, '101');
+    const callerId = await seedUser(db, { ext: '101' });
     await db
       .updateTable('users')
       .set({
@@ -442,7 +442,7 @@ describe('CallActions', () => {
   // of them exists, so each is joined once originated.
   it('joins every device it rings for an originate to the call’s SIP capture', async () => {
     await setUp();
-    const callerId = await seedUser(db, '101');
+    const callerId = await seedUser(db, { ext: '101' });
     await seedDevice(rig, callerId, 'e101-a');
     await seedDevice(rig, callerId, 'e101-b');
     await rig.devicesUp();
@@ -469,7 +469,7 @@ describe('CallActions', () => {
   it('sets the answered device channel’s language from the tenant setting', async () => {
     await setUp();
     await db.updateTable('settings').set({ language: 'de' }).execute();
-    const callerId = await seedUser(db, '101');
+    const callerId = await seedUser(db, { ext: '101' });
     await seedDevice(rig, callerId, 'e101-a');
     await rig.devicesUp();
 
@@ -492,7 +492,7 @@ describe('CallActions', () => {
   it('originates every device leg with the tenant’s language', async () => {
     await setUp();
     await db.updateTable('settings').set({ language: 'de' }).execute();
-    const callerId = await seedUser(db, '101');
+    const callerId = await seedUser(db, { ext: '101' });
     await seedDevice(rig, callerId, 'e101-a');
     await seedDevice(rig, callerId, 'e101-b');
     await rig.devicesUp();
@@ -518,7 +518,7 @@ describe('CallActions', () => {
   it('joins a device that refuses at once to the SIP capture before it is dialled, and ends the call unanswered', async () => {
     await setUp();
     fakeAri.answerAfterMs = 60_000;
-    const callerId = await seedUser(db, '101');
+    const callerId = await seedUser(db, { ext: '101' });
     await seedDevice(rig, callerId, 'e101-a');
     await rig.devicesUp();
     const trail: string[] = [];
@@ -568,7 +568,7 @@ describe('CallActions', () => {
   it('ends a click-to-dial unanswered at once when its phone cannot be placed', async () => {
     await setUp();
     fakeAri.failDial = { status: 409 };
-    const callerId = await seedUser(db, '101');
+    const callerId = await seedUser(db, { ext: '101' });
     await seedDevice(rig, callerId, 'e101-a');
     await rig.devicesUp();
 
@@ -598,7 +598,7 @@ describe('CallActions', () => {
   it('keeps a click-to-dial reachable by its id while its phones ring, and lets go of it on a REST hangup', async () => {
     await setUp();
     fakeAri.answerAfterMs = 60_000;
-    const callerId = await seedUser(db, '101');
+    const callerId = await seedUser(db, { ext: '101' });
     await seedDevice(rig, callerId, 'e101-a');
     await rig.devicesUp();
 
@@ -627,7 +627,7 @@ describe('CallActions', () => {
 
   it('answers 409 noRegisteredDevice when the user has devices but none is registered', async () => {
     await setUp();
-    const userId = await seedUser(db, '101');
+    const userId = await seedUser(db, { ext: '101' });
     // A configured device that has never REGISTERed: §10.2 "Click-to-dial" turns on whether a
     // device can be rung, which a `devices` row alone does not settle.
     await seedDevice(rig, userId, 'e101-a', false);
@@ -646,7 +646,7 @@ describe('CallActions', () => {
 
   it('answers 409 noRegisteredDevice over HTTP for a user without a device and records the attempt', async () => {
     await setUp();
-    const userId = await seedUser(db, '101');
+    const userId = await seedUser(db, { ext: '101' });
     const actorUserId = newId();
     const baseUrl = await rig.startServer(actions);
 
@@ -685,7 +685,7 @@ describe('CallActions', () => {
 
   it('ends the call on a REST hangup, with the actor in the trace, and answers 404 for an unknown call', async () => {
     await setUp();
-    const userId = await seedUser(db, '101');
+    const userId = await seedUser(db, { ext: '101' });
     const call = await answeredCall(rig, userId);
     const actorUserId = newId();
     const baseUrl = await rig.startServer(actions);
@@ -726,7 +726,7 @@ describe('CallActions', () => {
 
   it('releases an incomplete address with 484 once the device answers, as a device dial would (§10.1 Outbound step 4)', async () => {
     await setUp();
-    const callerId = await seedUser(db, '101');
+    const callerId = await seedUser(db, { ext: '101' });
     await seedDevice(rig, callerId, 'e101-a');
     await rig.devicesUp();
 
@@ -764,8 +764,8 @@ describe('CallActions', () => {
 
   it('picks up a ringing call by ringing the picker devices, the one that answers taking it, and refuses 409 notRinging otherwise', async () => {
     await setUp();
-    const calleeId = await seedUser(db, '101');
-    const pickerId = await seedUser(db, '102');
+    const calleeId = await seedUser(db, { ext: '101' });
+    const pickerId = await seedUser(db, { ext: '102' });
     await seedDevice(rig, pickerId, 'e102-a');
     await seedDevice(rig, pickerId, 'e102-b');
     await rig.devicesUp();
@@ -793,7 +793,7 @@ describe('CallActions', () => {
     await expect(
       actions.pickup(answered.id, { userId: pickerId, actorUserId })
     ).rejects.toMatchObject({ status: HTTP_CONFLICT, reason: 'notRinging' });
-    const nobodyId = await seedUser(db, '103');
+    const nobodyId = await seedUser(db, { ext: '103' });
     const stillRinging = ringingCall(calleeId);
     await expect(
       actions.pickup(stillRinging.id, { userId: nobodyId, actorUserId })
@@ -815,8 +815,8 @@ describe('CallActions', () => {
 
   it('picks up the call it names while another call rings the same user (call waiting)', async () => {
     await setUp();
-    const calleeId = await seedUser(db, '101');
-    const pickerId = await seedUser(db, '102');
+    const calleeId = await seedUser(db, { ext: '101' });
+    const pickerId = await seedUser(db, { ext: '102' });
     await seedDevice(rig, pickerId, 'e102-a');
     await rig.devicesUp();
     const waiting = ringingCall(calleeId);
@@ -839,8 +839,8 @@ describe('CallActions', () => {
   it('hangs up the answered phone of a pickup whose call stopped ringing meanwhile, and says so in its trace', async () => {
     await setUp();
     fakeAri.answerAfterMs = 60_000;
-    const calleeId = await seedUser(db, '101');
-    const pickerId = await seedUser(db, '102');
+    const calleeId = await seedUser(db, { ext: '101' });
+    const pickerId = await seedUser(db, { ext: '102' });
     await seedDevice(rig, pickerId, 'e102-a');
     await rig.devicesUp();
     const ringing = ringingCall(calleeId);
@@ -878,8 +878,8 @@ describe('CallActions', () => {
   // §7 level `sip`: the picker's devices ring for the picked-up call, so their dialogs are its.
   it('joins every device it rings for a pickup to the picked-up call’s SIP capture', async () => {
     await setUp();
-    const calleeId = await seedUser(db, '101');
-    const pickerId = await seedUser(db, '102');
+    const calleeId = await seedUser(db, { ext: '101' });
+    const pickerId = await seedUser(db, { ext: '102' });
     await seedDevice(rig, pickerId, 'e102-a');
     await seedDevice(rig, pickerId, 'e102-b');
     await rig.devicesUp();
@@ -904,8 +904,8 @@ describe('CallActions', () => {
   it('writes the trace of a pickup ring that never rang into the picked-up call, each line attributed to it', async () => {
     await setUp();
     fakeAri.failOriginate = { status: 500 };
-    const calleeId = await seedUser(db, '101');
-    const pickerId = await seedUser(db, '102');
+    const calleeId = await seedUser(db, { ext: '101' });
+    const pickerId = await seedUser(db, { ext: '102' });
     await seedDevice(rig, pickerId, 'e102-a');
     await rig.devicesUp();
     const ringing = ringingCall(calleeId);
@@ -970,7 +970,7 @@ describe('CallActions', () => {
   it('shows the user ringing while an originate rings their devices, and not once none answered (§9.3)', async () => {
     await setUp();
     fakeAri.answerAfterMs = 60_000;
-    const callerId = await seedUser(db, '101');
+    const callerId = await seedUser(db, { ext: '101' });
     await seedDevice(rig, callerId, 'e101-a');
     await rig.devicesUp();
 
@@ -995,8 +995,8 @@ describe('CallActions', () => {
   it('shows the picker ringing while a pickup rings their devices, and not once none answered (§9.3)', async () => {
     await setUp();
     fakeAri.answerAfterMs = 60_000;
-    const calleeId = await seedUser(db, '101');
-    const pickerId = await seedUser(db, '102');
+    const calleeId = await seedUser(db, { ext: '101' });
+    const pickerId = await seedUser(db, { ext: '102' });
     await seedDevice(rig, pickerId, 'e102-a');
     await rig.devicesUp();
     const ringing = ringingCall(calleeId);
@@ -1020,7 +1020,7 @@ describe('CallActions', () => {
 
   it('serves the originate route with 201 and the MWI trigger with 204', async () => {
     await setUp();
-    const userId = await seedUser(db, '101');
+    const userId = await seedUser(db, { ext: '101' });
     await seedDevice(rig, userId, 'e101-a');
     await rig.devicesUp();
     const baseUrl = await rig.startServer(actions);

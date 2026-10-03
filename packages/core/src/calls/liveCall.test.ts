@@ -1,34 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import {
-  newId,
-  nowIso,
-  openDb,
-  type Db,
-  type MailRequest
-} from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db, type MailRequest } from '@zamfono/shared';
 
-import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../testing/ari/fake.js';
+import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { eventually } from '../testing/eventually.js';
 import {
   noopCdr,
-  noopLogger,
   noopRecorder,
-  testPipelineDeps
+  stubMailSender
 } from '../testing/pipelineDeps.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
+import { seedUser } from '../testing/seedRows.js';
 import { callerChannel, newCall, type Call, type Leg } from './call.js';
 import type { RingOutcome } from './legs.js';
 import { closeCall } from './liveCall.js';
-import { Pipeline, type PipelineDeps } from './pipeline.js';
+import type { Pipeline, PipelineDeps } from './pipeline.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 
 describe('closeCall', () => {
-  let db: Db;
+  let rig: Rig;
   let fakeAri: FakeAri;
-  let ari: AriClient;
   let pipeline: Pipeline;
   let call: Call;
   /** What happened, in order: each QoS capture, recorder end and finish, with the hangups so far. */
@@ -41,19 +33,7 @@ describe('closeCall', () => {
   }
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
     trail = [];
-    fakeAri = new FakeAri();
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
     const cdr: PipelineDeps['cdr'] = {
       ...noopCdr(),
       open: () => Promise.resolve(),
@@ -81,7 +61,8 @@ describe('closeCall', () => {
         return Promise.resolve();
       }
     };
-    pipeline = new Pipeline(testPipelineDeps(ari, db, { cdr, recorder }));
+    rig = await startRig({ cdr, recorder });
+    ({ fakeAri, pipeline } = rig);
     const caller = fakeAri.addChannel({ name: 'PJSIP/trunk-1-00000001' });
     const leg = fakeAri.addChannel({ name: 'PJSIP/e101-a-00000002' });
     call = newCall({
@@ -107,9 +88,7 @@ describe('closeCall', () => {
   });
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   it('notes the QoS legs and ends each recorded participation of a call hung up over the API (§7, §10.2)', async () => {
@@ -136,84 +115,35 @@ describe('closeCall', () => {
 });
 
 describe('closeCall, on a call not yet answered', () => {
+  let rig: Rig;
   let db: Db;
   let fakeAri: FakeAri;
-  let ari: AriClient;
   let pipeline: Pipeline;
   let finished: (Call['status'] | null)[];
   let mails: MailRequest[];
   let userId: string;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    const targetId = newId();
-    await db
-      .insertInto('forwardTargets')
-      .values({ id: targetId, external: '+15550000' })
-      .execute();
-    const didId = newId();
-    await db
-      .insertInto('dids')
-      .values({ id: didId, number: '+15551000', targetId, createdAt: nowIso() })
-      .execute();
-    await db
-      .insertInto('settings')
-      .values({
-        id: 1,
-        companyName: 'Zamfono',
-        mainDidId: didId,
-        country: 'DE',
-        emergencyNumbersJson: '["112"]'
-      })
-      .execute();
-    userId = newId();
-    await db
-      .insertInto('users')
-      .values({
-        id: userId,
-        name: 'Anna Huber',
-        email: `${userId}@example.com`,
-        createdAt: nowIso(),
-        notifyMissedCalls: 1
-      })
-      .execute();
-    fakeAri = new FakeAri();
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
     finished = [];
-    mails = [];
-    pipeline = new Pipeline(
-      testPipelineDeps(ari, db, {
-        cdr: {
-          ...noopCdr(),
-          open: () => Promise.resolve(),
-          finish: (ended: Call) => {
-            finished.push(ended.status);
-            return Promise.resolve();
-          }
-        },
-        apiClient: {
-          mail: request => {
-            mails.push(request);
-            return Promise.resolve();
-          }
+    const apiClient = stubMailSender();
+    mails = apiClient.sent;
+    rig = await startRig({
+      cdr: {
+        ...noopCdr(),
+        open: () => Promise.resolve(),
+        finish: (ended: Call) => {
+          finished.push(ended.status);
+          return Promise.resolve();
         }
-      })
-    );
+      },
+      apiClient
+    });
+    ({ db, fakeAri, pipeline } = rig);
+    userId = await seedUser(db, { name: 'Anna Huber', notifyMissedCalls: 1 });
   });
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   function inboundCall(): Call {

@@ -1,22 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { AriClient } from '../ari/client.js';
 import type { Channel } from '../ari/types.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
-import { Presence } from '../presence.js';
+import type { Presence } from '../presence.js';
 import { AST_CAUSE_USER_BUSY } from '../sipCodes.js';
-import { FakeAri } from '../testing/ari/fake.js';
+import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { isPlacement } from '../testing/ari/fakeDial.js';
 import { eventually } from '../testing/eventually.js';
-import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
+import { seedDevice, seedUser } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
-import { Pipeline } from './pipeline.js';
+import type { Pipeline } from './pipeline.js';
 import { runUserStep } from './userStep.js';
 
 /** Step 4 "Target user" against registration (§10.1): a user whose phones are all off meets the
@@ -25,56 +21,16 @@ import { runUserStep } from './userStep.js';
 
 // Asterisk's Q.850 mapping of SIP 486 Busy Here.
 
-async function seedSettings(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+15551234', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-}
-
-/** A user with one device per `sipUsernames` entry and a one-second ring timeout. */
-async function seedUser(db: Db, sipUsernames: string[]): Promise<string> {
-  const userId = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id: userId,
-      name: 'Anna',
-      email: `${userId}@example.com`,
-      ringTimeoutS: 1,
-      createdAt: nowIso()
-    })
-    .execute();
+/** A user with one device per `sipUsernames` entry, none registered, and a one-second ring
+ * timeout. */
+async function seedUserWithDevices(
+  rig: Rig,
+  sipUsernames: string[]
+): Promise<string> {
+  const userId = await seedUser(rig.db, { name: 'Anna', ringTimeoutS: 1 });
   for (const sipUsername of sipUsernames) {
     // eslint-disable-next-line no-await-in-loop -- a user has one or two devices
-    await db
-      .insertInto('devices')
-      .values({
-        id: newId(),
-        userId,
-        label: sipUsername,
-        kind: 'manual',
-        sipUsername,
-        sipPasswordEnc: Buffer.from('secret'),
-        createdAt: nowIso()
-      })
-      .execute();
+    await seedDevice(rig, userId, sipUsername, false);
   }
   return userId;
 }
@@ -139,51 +95,19 @@ function playedMedia(fakeAri: FakeAri, channelId: string): string[] {
 }
 
 describe('user step against registration', () => {
+  let rig: Rig;
   let db: Db;
   let fakeAri: FakeAri;
-  let ari: AriClient;
   let presence: Presence;
   let pipeline: Pipeline;
   let callerChannel: Channel;
   let call: Call;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    await seedSettings(db);
-    fakeAri = new FakeAri();
+    rig = await startRig();
+    ({ db, fakeAri, presence, pipeline } = rig);
     fakeAri.answerAfterMs = 60_000;
     fakeAri.recordingFinishedAfterMs = 5;
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
-    const cache = new ConfigCache(db);
-    const state = new StateStore();
-    const bus = new EventBus();
-    presence = new Presence({
-      log: noopLogger,
-      ari,
-      cache,
-      state,
-      bus,
-      db,
-      now: nowIso
-    });
-    pipeline = new Pipeline(
-      testPipelineDeps(ari, db, {
-        cache,
-        state,
-        bus,
-        apiClient: { mail: () => Promise.resolve() },
-        presence
-      })
-    );
     callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
     });
@@ -201,9 +125,7 @@ describe('user step against registration', () => {
   });
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   /** Registers `sipUsername` the way a phone's REGISTER reaches `Presence`. */
@@ -236,7 +158,7 @@ describe('user step against registration', () => {
   }
 
   it('applies the offline rule at once, ringing nothing, when every phone of the user is off', async () => {
-    const userId = await seedUser(db, ['e101-da', 'e101-db']);
+    const userId = await seedUserWithDevices(rig, ['e101-da', 'e101-db']);
     await seedAnnouncementRule(db, userId, 'offline', 'offline.wav');
     await seedAnnouncementRule(db, userId, 'noAnswer', 'noanswer.wav');
 
@@ -252,7 +174,7 @@ describe('user step against registration', () => {
   });
 
   it('traces why the user step sent the call to the mailbox (§7 "fallback taken")', async () => {
-    const userId = await seedUser(db, ['e101-da']);
+    const userId = await seedUserWithDevices(rig, ['e101-da']);
 
     await runUserStep(pipeline, call, await pipeline.deps.cache.get(), userId);
 
@@ -273,7 +195,7 @@ describe('user step against registration', () => {
   });
 
   it('rings the registered phone, then applies the noAnswer rule on timeout', async () => {
-    const userId = await seedUser(db, ['e101-da', 'e101-db']);
+    const userId = await seedUserWithDevices(rig, ['e101-da', 'e101-db']);
     await seedAnnouncementRule(db, userId, 'offline', 'offline.wav');
     await seedAnnouncementRule(db, userId, 'noAnswer', 'noanswer.wav');
     await register('e101-db');
@@ -296,7 +218,7 @@ describe('user step against registration', () => {
   ] as const)(
     'applies the noAnswer rule at once when the only phone cannot be placed: %s',
     async refusal => {
-      const userId = await seedUser(db, ['e101-da']);
+      const userId = await seedUserWithDevices(rig, ['e101-da']);
       await seedAnnouncementRule(db, userId, 'noAnswer', 'noanswer.wav');
       await register('e101-da');
       if (refusal === 'its create is refused') {
@@ -345,7 +267,7 @@ describe('user step against registration', () => {
   );
 
   it('rings a user already in a call on their other devices only', async () => {
-    const userId = await seedUser(db, ['e101-da', 'e101-db']);
+    const userId = await seedUserWithDevices(rig, ['e101-da', 'e101-db']);
     await register('e101-da');
     await register('e101-db');
     // The call the user placed from e101-da, as Asterisk names its channel.
@@ -358,7 +280,7 @@ describe('user step against registration', () => {
   });
 
   it('applies the busy rule at once when the only registered device carries a call', async () => {
-    const userId = await seedUser(db, ['e101-da']);
+    const userId = await seedUserWithDevices(rig, ['e101-da']);
     await seedAnnouncementRule(db, userId, 'busy', 'busy.wav');
     await seedAnnouncementRule(db, userId, 'noAnswer', 'noanswer.wav');
     await register('e101-da');
@@ -379,7 +301,7 @@ describe('user step against registration', () => {
   // §9.1 "every channel's language": a device leg carries it from its creation.
   it('originates every device leg with the tenant’s language', async () => {
     await db.updateTable('settings').set({ language: 'de' }).execute();
-    const userId = await seedUser(db, ['e101-da', 'e101-db']);
+    const userId = await seedUserWithDevices(rig, ['e101-da', 'e101-db']);
     await register('e101-da');
     await register('e101-db');
 
@@ -398,7 +320,7 @@ describe('user step against registration', () => {
 
   // §7: the target user's diagnostics override counts toward the call's level.
   it('raises the call to the target user’s diagnostics override', async () => {
-    const userId = await seedUser(db, ['e101-da']);
+    const userId = await seedUserWithDevices(rig, ['e101-da']);
     await db
       .updateTable('users')
       .set({ logLevel: 'sip', logLevelExpiresAt: '2999-01-01T00:00:00.000Z' })
@@ -413,7 +335,7 @@ describe('user step against registration', () => {
 
   // §7 level `sip`: every leg's dialog is part of the call's SIP log.
   it('joins every device leg it rings to the call’s SIP capture', async () => {
-    const userId = await seedUser(db, ['e101-da', 'e101-db']);
+    const userId = await seedUserWithDevices(rig, ['e101-da', 'e101-db']);
     await register('e101-da');
     await register('e101-db');
     const joined: string[] = [];
@@ -436,7 +358,7 @@ describe('user step against registration', () => {
   // §9.3 "One endpoint per device": the core dials a user's devices in parallel, so no device
   // waits for another's create, `StasisStart` and SIP join before it rings.
   it('places every device at once, none waiting for another to be dialled', async () => {
-    const userId = await seedUser(db, ['e101-da', 'e101-db']);
+    const userId = await seedUserWithDevices(rig, ['e101-da', 'e101-db']);
     // Level `sip`, where each leg's dial waits for its dialog's join.
     await db
       .updateTable('users')
@@ -468,7 +390,7 @@ describe('user step against registration', () => {
   // §10.1 step 4: `users.ring_timeout_s` governs how long the devices ring, however long it is;
   // Asterisk's own dial timeout would cut every ring at 30 s.
   it("dials every device leg with no timeout of Asterisk's", async () => {
-    const userId = await seedUser(db, ['e101-da', 'e101-db']);
+    const userId = await seedUserWithDevices(rig, ['e101-da', 'e101-db']);
     await register('e101-da');
     await register('e101-db');
 
@@ -485,7 +407,7 @@ describe('user step against registration', () => {
   // the leg is tracked, was still being bridged when the ring found no leg ringing and concluded
   // it unanswered: the call went to voicemail and the answered phone stayed up, bridged to nobody.
   it('bridges a phone that answered before its own dial returned, never concluding the ring unanswered', async () => {
-    const userId = await seedUser(db, ['e101-da']);
+    const userId = await seedUserWithDevices(rig, ['e101-da']);
     await seedAnnouncementRule(db, userId, 'noAnswer', 'noanswer.wav');
     await register('e101-da');
     fakeAri.holdRequest = request => {
@@ -508,7 +430,7 @@ describe('user step against registration', () => {
   });
 
   it('bridges the phone that answered though the other phone declines while the answer is still being bridged', async () => {
-    const userId = await seedUser(db, ['e101-da', 'e101-db']);
+    const userId = await seedUserWithDevices(rig, ['e101-da', 'e101-db']);
     await seedAnnouncementRule(db, userId, 'noAnswer', 'noanswer.wav');
     await register('e101-da');
     await register('e101-db');
@@ -547,7 +469,7 @@ describe('user step against registration', () => {
   // The other order: the ring timed out first, so a phone answering afterwards is not bridged
   // with a caller already on their way to the noAnswer rule; its leg is hung up, never left up.
   it('hangs up, never bridges, a phone answering after its ring timed out', async () => {
-    const userId = await seedUser(db, ['e101-da']);
+    const userId = await seedUserWithDevices(rig, ['e101-da']);
     await seedAnnouncementRule(db, userId, 'noAnswer', 'noanswer.wav');
     await register('e101-da');
 

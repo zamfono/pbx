@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   newId,
-  nowIso,
   openDb,
   type CallLogLevel,
   type Db,
@@ -25,59 +24,13 @@ import { onEvents } from './testing/busEvents.js';
 import { eventually } from './testing/eventually.js';
 import { noopLogger } from './testing/pipelineDeps.js';
 import { fixedPoint, ntpMiddle, rtcpPayload } from './testing/rtcpPayload.js';
+import { seedSettings } from './testing/seedRows.js';
 
 const NOW = '2026-01-01T00:05:00.000Z';
 
 /** `id`'s `ChannelDestroyed` channel, carrying the `RTPAUDIOQOS` Asterisk set as it hung up. */
 function endedChannel(id: string, rtpAudioQos = fakeRtpAudioQos()): Channel {
   return defaultChannel({ id, channelvars: { RTPAUDIOQOS: rtpAudioQos } });
-}
-
-async function seedForwardTargetUser(db: Db, userId: string): Promise<string> {
-  const id = newId();
-  await db.insertInto('forwardTargets').values({ id, userId }).execute();
-  return id;
-}
-
-async function seedUser(db: Db): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id,
-      name: 'Test User',
-      email: `${id}@example.com`,
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
-}
-
-async function seedDid(db: Db, targetId: string): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('dids')
-    .values({ id, number: '+15551000', targetId, createdAt: nowIso() })
-    .execute();
-  return id;
-}
-
-/** Settings plus the DID it references, at the given call-log level (§7). */
-async function seedSettings(db: Db, callLogLevel: CallLogLevel): Promise<void> {
-  const userId = await seedUser(db);
-  const targetId = await seedForwardTargetUser(db, userId);
-  const didId = await seedDid(db, targetId);
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      callLogLevel
-    })
-    .execute();
 }
 
 // A driver may run a statement any number of ticks after `execute()` returns (Kysely's SQLite one
@@ -170,7 +123,7 @@ describe('CdrWriter', () => {
   });
 
   it('writes one calls row with status, answeredAt and endedAt at finish', async () => {
-    await seedSettings(db, 'events');
+    await seedSettings(db, { callLogLevel: 'events' });
     const call = buildCall();
     call.status = 'answered';
     call.answeredAt = '2026-01-01T00:00:02.000Z';
@@ -189,7 +142,7 @@ describe('CdrWriter', () => {
   });
 
   it('emits history.appended carrying the call id', async () => {
-    await seedSettings(db, 'events');
+    await seedSettings(db, { callLogLevel: 'events' });
     const call = buildCall();
     call.status = 'missed';
     const received: Envelope[] = [];
@@ -207,7 +160,7 @@ describe('CdrWriter', () => {
   });
 
   it('marks a capped log truncated with a trailing marker line', async () => {
-    await seedSettings(db, 'events');
+    await seedSettings(db, { callLogLevel: 'events' });
     const call = newCall({
       id: newId(),
       direction: 'inbound',
@@ -233,7 +186,7 @@ describe('CdrWriter', () => {
   });
 
   it('writes a call_qos row per channel at the resolved level qos and above', async () => {
-    await seedSettings(db, 'events');
+    await seedSettings(db, { callLogLevel: 'events' });
     // §7: `call_qos` is gated on this call's own resolved level, independent of the tenant
     // default seeded above — an override from the user, trunk or ring group that routed this
     // call can raise it past the tenant's own setting.
@@ -275,7 +228,7 @@ describe('CdrWriter', () => {
   });
 
   it('writes no call_qos row below the resolved level qos', async () => {
-    await seedSettings(db, 'events');
+    await seedSettings(db, { callLogLevel: 'events' });
     const call = buildCall('events');
     call.status = 'answered';
     cdr.noteQosLegs(call);
@@ -294,7 +247,7 @@ describe('CdrWriter', () => {
   it('gates call_qos on the resolved level, not the tenant default', async () => {
     // §7: the resolved level is the max of the tenant default and this call's own overrides; a
     // high tenant default alone, with no override on this particular call, keeps it at `events`.
-    await seedSettings(db, 'qos');
+    await seedSettings(db, { callLogLevel: 'qos' });
     const call = buildCall('events');
     call.status = 'answered';
     cdr.noteQosLegs(call);
@@ -310,7 +263,7 @@ describe('CdrWriter', () => {
     expect(rows).toHaveLength(0);
   });
   it('has the placeholder calls row written once open() resolves, however late the driver runs it', async () => {
-    await seedSettings(db, 'events');
+    await seedSettings(db, { callLogLevel: 'events' });
     const call = buildCall();
     cdr = new CdrWriter({
       log: noopLogger,
@@ -333,7 +286,7 @@ describe('CdrWriter', () => {
   });
 
   it('routes a HEP message to the call whose SIP Call-ID it carries (§7 level sip)', async () => {
-    await seedSettings(db, 'sip');
+    await seedSettings(db, { callLogLevel: 'sip' });
     const call = buildCall('sip');
     fakeAri.addChannel({ id: callerChannel(call) });
     fakeAri.channelVariables.set(
@@ -359,7 +312,7 @@ describe('CdrWriter', () => {
   it('records the dialog of a call released at once, its final response included (§7 level sip)', async () => {
     // next.app.zamfono.com on 2026-09-29: a DID that matched nothing released the call 12 ms in,
     // before its Call-ID was read, and Asterisk's 404 left after the log had been written.
-    await seedSettings(db, 'sip');
+    await seedSettings(db, { callLogLevel: 'sip' });
     const call = buildCall('sip');
     fakeAri.addChannel({ id: callerChannel(call) });
     fakeAri.channelVariables.set(
@@ -409,7 +362,7 @@ describe('CdrWriter', () => {
     expect(call.log.finish().log ?? '').not.toContain('OPTIONS');
   });
   it('writes the call_qos row of a channel that ends after the call is written (§7)', async () => {
-    await seedSettings(db, 'qos');
+    await seedSettings(db, { callLogLevel: 'qos' });
     const call = buildCall('qos');
     await cdr.open(call);
     call.answeredAt = '2026-01-01T00:00:01.000Z';
@@ -430,7 +383,7 @@ describe('CdrWriter', () => {
   });
 
   it('takes a leg’s RTCP reports, joined by its Call-ID, into its call_qos row (§7 level qos)', async () => {
-    await seedSettings(db, 'qos');
+    await seedSettings(db, { callLogLevel: 'qos' });
     const call = buildCall('qos');
     fakeAri.addChannel({ id: callerChannel(call) });
     fakeAri.channelVariables.set(

@@ -1,18 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../testing/ari/fake.js';
-import {
-  noopCdr,
-  noopLogger,
-  testPipelineDeps
-} from '../testing/pipelineDeps.js';
+import type { FakeAri } from '../testing/ari/fake.js';
+import { noopCdr } from '../testing/pipelineDeps.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
 import { announce } from './announce.js';
 import { newCall, type Call } from './call.js';
-import { Pipeline, type PipelineDeps } from './pipeline.js';
+import type { Pipeline, PipelineDeps } from './pipeline.js';
 
 function fakeCdr(): PipelineDeps['cdr'] & { finished: Call[] } {
   const finished: Call[] = [];
@@ -25,30 +20,6 @@ function fakeCdr(): PipelineDeps['cdr'] & { finished: Call[] } {
       return Promise.resolve();
     }
   };
-}
-
-/** A throwaway forward-target/DID chain, just to satisfy `settings.main_did_id`'s FK. */
-async function seedSettings(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+15551000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
 }
 
 async function seedAudioAsset(db: Db, filename: string): Promise<string> {
@@ -67,34 +38,20 @@ async function seedAudioAsset(db: Db, filename: string): Promise<string> {
 }
 
 describe('announce', () => {
+  let rig: Rig;
   let db: Db;
   let fakeAri: FakeAri;
-  let ari: AriClient;
   let cdr: PipelineDeps['cdr'] & { finished: Call[] };
   let pipeline: Pipeline;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    await seedSettings(db);
-    fakeAri = new FakeAri();
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
     cdr = fakeCdr();
-    pipeline = new Pipeline(testPipelineDeps(ari, db, { cdr }));
+    rig = await startRig({ cdr });
+    ({ db, fakeAri, pipeline } = rig);
   });
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   it('answers, plays the announcement, then hangs up and finishes the call', async () => {

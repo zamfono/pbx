@@ -3,32 +3,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
+import { seedSettings } from '../testing/seedRows.js';
 import { ConfigCache } from './snapshot.js';
-
-/** The minimum a snapshot needs: `settings` and the main DID its FK points at. */
-async function seedSettings(db: Db): Promise<{ didId: string }> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+15551234', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-  return { didId };
-}
 
 describe('ConfigCache snapshot', () => {
   let db: Db;

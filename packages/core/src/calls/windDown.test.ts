@@ -53,7 +53,7 @@ describe('winding calls down as core stops', () => {
   it('releases a ringing caller with 503, hangs up its ringing legs and closes its row', async () => {
     rig = await startRig();
     const { fakeAri, pipeline, cdr } = rig;
-    const userId = await seedUser(rig.db, '101');
+    const userId = await seedUser(rig.db, { ext: '101' });
     const caller = fakeAri.addChannel({});
     const ringing = fakeAri.addChannel({});
     const call = newCall({
@@ -100,7 +100,7 @@ describe('winding calls down as core stops', () => {
 
   it('hangs up an answered call with normal clearing and closes its row', async () => {
     rig = await startRig();
-    const userId = await seedUser(rig.db, '101');
+    const userId = await seedUser(rig.db, { ext: '101' });
     const call = await answeredCall(rig, userId);
 
     await rig.pipeline.drain();
@@ -125,7 +125,7 @@ describe('winding calls down as core stops', () => {
       onLegMoved: vi.fn()
     };
     rig = await startRig({ recorder });
-    const userId = await seedUser(rig.db, '101');
+    const userId = await seedUser(rig.db, { ext: '101' });
     const call = await answeredCall(rig, userId);
     const [leg] = call.legs.values();
 

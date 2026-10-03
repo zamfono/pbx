@@ -4,6 +4,7 @@ import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { ConfigCache } from '../internal/snapshot.js';
+import { seedSettings, seedUser } from '../testing/seedRows.js';
 import type { Pipeline } from './pipeline.js';
 import { buildMemberStates } from './ringGroupState.js';
 
@@ -13,44 +14,6 @@ const idlePipeline = {
   callByChannel: new Map(),
   channelless: new Map()
 } as unknown as Pipeline;
-
-async function seedUser(db: Db): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id,
-      name: 'Member',
-      email: `${id}@example.com`,
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
-}
-
-/** A `settings` row plus the `dids` row its `mainDidId` FK requires; the snapshot needs one. */
-async function seedSettings(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+15551234', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-}
 
 async function seedOoo(db: Db, scopeUserId: string | null): Promise<void> {
   const targetId = newId();

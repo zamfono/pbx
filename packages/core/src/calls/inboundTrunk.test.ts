@@ -1,25 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { AmiClient } from '../ami/client.js';
-import { AriClient } from '../ari/client.js';
+import type { AriClient } from '../ari/client.js';
 import type { AriEvent, AriEventOf } from '../ari/events.js';
 import type { Channel } from '../ari/types.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
-import { FakeAri } from '../testing/ari/fake.js';
+import type { FakeAri } from '../testing/ari/fake.js';
 import { eventually } from '../testing/eventually.js';
-import {
-  noopCdr,
-  noopLogger,
-  testPipelineDeps
-} from '../testing/pipelineDeps.js';
+import { noopCdr } from '../testing/pipelineDeps.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
 import type { Call } from './call.js';
-import { Pipeline, type PipelineDeps } from './pipeline.js';
-import { TrunkState } from './trunkState.js';
+import type { Pipeline, PipelineDeps } from './pipeline.js';
 
 function fakeCdr(): PipelineDeps['cdr'] & { opened: Call[] } {
   const opened: Call[] = [];
@@ -107,6 +98,7 @@ function traceEvents(call: Call | undefined): Record<string, unknown>[] {
 }
 
 describe('inbound number normalization at the trunk boundary (§9.4)', () => {
+  let rig: Rig;
   let db: Db;
   let fakeAri: FakeAri;
   let ari: AriClient;
@@ -115,37 +107,15 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   let mainDidId: string;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    mainDidId = await seedAnnouncementDid(db, '+4930123456');
-    await db
-      .insertInto('settings')
-      .values({
-        id: 1,
-        companyName: 'Zamfono',
-        mainDidId,
-        country: 'DE',
-        emergencyNumbersJson: '["112"]'
-      })
-      .execute();
-    fakeAri = new FakeAri();
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
     cdr = fakeCdr();
-    pipeline = new Pipeline(testPipelineDeps(ari, db, { cdr }));
+    rig = await startRig({ cdr });
+    ({ db, fakeAri, ari, pipeline } = rig);
+    mainDidId = await seedAnnouncementDid(db, '+4930123456');
+    await db.updateTable('settings').set({ mainDidId }).execute();
   });
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   async function arrive(
@@ -410,25 +380,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
 
   it('counts the call among the delivering trunk’s channels in use until its channel is destroyed', async () => {
     const trunkId = await seedTrunk(db, 'national');
-    const state = new StateStore();
-    // An AMI client that never connects: inbound counting reads nothing from it.
-    const ami = new AmiClient({
-      host: '127.0.0.1',
-      port: 1,
-      username: 'zamfono',
-      password: 'secret',
-      log: noopLogger
-    });
-    const trunkState = new TrunkState({
-      log: noopLogger,
-      ari,
-      ami,
-      cache: new ConfigCache(db),
-      state,
-      bus: new EventBus(),
-      now: nowIso
-    });
-    pipeline.deps.trunkState = trunkState;
+    const { state, trunkState } = pipeline.deps;
 
     const call = await arrive(trunkId, '030123456', '08912345');
 
@@ -449,22 +401,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
 
   it('does not count a call whose channel is destroyed during the config read that names its trunk', async () => {
     const trunkId = await seedTrunk(db, 'national');
-    const trunkState = new TrunkState({
-      log: noopLogger,
-      ari,
-      ami: new AmiClient({
-        host: '127.0.0.1',
-        port: 1,
-        username: 'zamfono',
-        password: 'secret',
-        log: noopLogger
-      }),
-      cache: new ConfigCache(db),
-      state: new StateStore(),
-      bus: new EventBus(),
-      now: nowIso
-    });
-    pipeline.deps.trunkState = trunkState;
+    const { trunkState } = pipeline.deps;
     // The inbound entry's config read is held until the caller's hangup has been delivered.
     const { cache } = pipeline.deps;
     const readConfig = cache.get.bind(cache);

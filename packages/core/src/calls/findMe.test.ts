@@ -1,86 +1,32 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { AmiClient } from '../ami/client.js';
-import { AriClient } from '../ari/client.js';
+import type { AriClient } from '../ari/client.js';
 import type { Channel } from '../ari/types.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
 import { AST_CAUSE_NORMAL_CLEARING } from '../sipCodes.js';
-import { FakeAri } from '../testing/ari/fake.js';
+import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { eventually } from '../testing/eventually.js';
-import {
-  noopLogger,
-  registerDevice,
-  testPipelineDeps
-} from '../testing/pipelineDeps.js';
+import { registerDevice } from '../testing/pipelineDeps.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
+import { seedDevice, seedUser } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
-import { Pipeline } from './pipeline.js';
+import type { Pipeline } from './pipeline.js';
 import { ringUser } from './ringUser.js';
-import { TrunkState } from './trunkState.js';
 
 // Q.850 normal clearing, as ARI's `ChannelDestroyed` carries it.
 const FIND_ME_NUMBER = '+15557000';
 
-async function seedSettings(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const mainDidId = newId();
-  await db
-    .insertInto('dids')
-    .values({
-      id: mainDidId,
-      number: '+491110000',
-      targetId,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-}
-
-/** A user with one device and one find-me entry `delayS` seconds into the ring. */
-async function seedUser(db: Db, delayS: number): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id,
-      name: 'Member',
-      email: `${id}@example.com`,
-      createdAt: nowIso(),
-      mailboxEnabled: 0,
-      ringTimeoutS: 30,
-      findMeJson: JSON.stringify([{ number: FIND_ME_NUMBER, delayS }])
-    })
-    .execute();
-  await db
-    .insertInto('devices')
-    .values({
-      id: newId(),
-      userId: id,
-      label: 'e101-d1',
-      kind: 'manual',
-      sipUsername: 'e101-d1',
-      sipPasswordEnc: Buffer.from('secret'),
-      createdAt: nowIso()
-    })
-    .execute();
+/** A user with one device, unregistered, and one find-me entry `delayS` seconds into the ring. */
+async function seedFindMeUser(rig: Rig, delayS: number): Promise<string> {
+  const id = await seedUser(rig.db, {
+    name: 'Member',
+    mailboxEnabled: 0,
+    ringTimeoutS: 30,
+    findMeJson: JSON.stringify([{ number: FIND_ME_NUMBER, delayS }])
+  });
+  await seedDevice(rig, id, 'e101-d1', false);
   return id;
 }
 
@@ -121,6 +67,7 @@ async function seedRoute(db: Db): Promise<string> {
 }
 
 describe('a find-me leg still to come (§10.1 step 4)', () => {
+  let rig: Rig;
   let db: Db;
   let fakeAri: FakeAri;
   let ari: AriClient;
@@ -150,37 +97,9 @@ describe('a find-me leg still to come (§10.1 step 4)', () => {
   }
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    await seedSettings(db);
-    fakeAri = new FakeAri();
+    rig = await startRig();
+    ({ db, fakeAri, ari, pipeline } = rig);
     fakeAri.answerAfterMs = 60_000;
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
-    const state = new StateStore();
-    const trunkState = new TrunkState({
-      log: noopLogger,
-      ari,
-      ami: new AmiClient({
-        host: '127.0.0.1',
-        port: 1,
-        username: 'zamfono',
-        password: 'secret',
-        log: noopLogger
-      }),
-      cache: new ConfigCache(db),
-      state,
-      bus: new EventBus(),
-      now: nowIso
-    });
-    pipeline = new Pipeline(testPipelineDeps(ari, db, { state, trunkState }));
     callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
     });
@@ -198,13 +117,11 @@ describe('a find-me leg still to come (§10.1 step 4)', () => {
   });
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   it('keeps the race open after the last device leg ends, and still rings the find-me number', async () => {
-    const userId = await seedUser(db, 1);
+    const userId = await seedFindMeUser(rig, 1);
     await registerDevice(fakeAri, pipeline, 'e101-d1');
     const trunkId = await seedRoute(db);
 
@@ -227,7 +144,7 @@ describe('a find-me leg still to come (§10.1 step 4)', () => {
   });
 
   it('settles the race once a find-me leg that could not be routed was the last one to come', async () => {
-    const userId = await seedUser(db, 1);
+    const userId = await seedFindMeUser(rig, 1);
     await registerDevice(fakeAri, pipeline, 'e101-d1');
 
     const finished = ringUser(pipeline, call, userId);

@@ -1,19 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { AmiClient } from '../ami/client.js';
-import { AriClient } from '../ari/client.js';
+import type { AriClient } from '../ari/client.js';
 import type { AriEventOf } from '../ari/events.js';
 import type { Channel } from '../ari/types.js';
-import { CdrWriter } from '../cdr.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
-import { Presence } from '../presence.js';
+import type { CdrWriter } from '../cdr.js';
+import type { Presence } from '../presence.js';
 import { defaultPrompt } from '../prompts.js';
-import { FakeAri } from '../testing/ari/fake.js';
+import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { isPlacement } from '../testing/ari/fakeDial.js';
 import { onEvents } from '../testing/busEvents.js';
@@ -24,24 +19,20 @@ import {
   nextSubscription,
   requestTo
 } from '../testing/eventually.js';
-import {
-  noopLogger,
-  noopRecorder,
-  testPipelineDeps
-} from '../testing/pipelineDeps.js';
+import { noopRecorder } from '../testing/pipelineDeps.js';
+import { languageSet, startRig, type Rig } from '../testing/pipelineRig.js';
+import { seedExternalRoute, seedUser } from '../testing/seedRows.js';
 import { newCall, type Call, type Leg } from './call.js';
 import { channelOf, otherChannelIn } from './callLookup.js';
 import { callUp, liveView } from './callState.js';
 import { handleFeature } from './features.js';
 import { handleOutbound } from './outbound.js';
 import { retrieveParkedCall } from './parkingRetrieval.js';
-import { Pipeline } from './pipeline.js';
+import type { Pipeline } from './pipeline.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';
 import { ringUser } from './ringUser.js';
-import { TrunkState } from './trunkState.js';
-import type { MailSender } from './voicemail.js';
 
 // A parking slot's timeout in the ring-back tests (`setUp`'s `parkingTimeoutS`), and how long past
 // it the ring-back's outcome is waited for.
@@ -63,45 +54,6 @@ function memberRinging(call: Call): Promise<void> {
   return eventually(() => {
     expect(traceEvents(call)).toContain('ringGroupMember');
   });
-}
-
-/** A throwaway forward-target/DID chain, just to satisfy `settings.main_did_id`'s FK. */
-async function seedSettings(db: Db, parkingTimeoutS?: number): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+15551234', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      parkingTimeoutS
-    })
-    .execute();
-}
-
-async function seedUser(db: Db): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id,
-      name: 'Test User',
-      email: `${id}@example.com`,
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
 }
 
 async function seedDevice(
@@ -137,54 +89,6 @@ async function seedExtension(
       isParkingSlot: opts.isParkingSlot === true ? 1 : 0
     })
     .execute();
-}
-
-function stubMailSender(): MailSender {
-  return { mail: () => Promise.resolve() };
-}
-
-/** One `ip`-mode trunk with a single host and a catch-all route, for `*5<number>`'s external
- * target (§10.1 Outbound step 6). */
-async function seedExternalRoute(db: Db): Promise<string> {
-  const trunkId = newId();
-  await db
-    .insertInto('trunks')
-    .values({
-      id: trunkId,
-      name: 'trunk-1',
-      priority: 1,
-      emergency: 1,
-      authMode: 'ip',
-      username: null,
-      passwordEnc: null,
-      inboundAuth: 0,
-      transport: 'udp',
-      calleridHeader: 'from',
-      maxChannels: null,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('trunkHosts')
-    .values({
-      trunkId,
-      priority: 1,
-      host: 'sip.example.com',
-      port: null,
-      direction: 'both'
-    })
-    .execute();
-  await db
-    .insertInto('outboundRoutes')
-    .values({
-      id: newId(),
-      priority: 1,
-      trunkId,
-      calleridDidId: null,
-      createdAt: nowIso()
-    })
-    .execute();
-  return trunkId;
 }
 
 /** A `ring_groups` row plus its single member (§10.1 step 5), for `*8<ext>` on a group member. */
@@ -251,22 +155,8 @@ function newInternalCall(channelId: string, from: string, to: string): Call {
   });
 }
 
-/** Whether the core set `channelId`'s language to `language` (§9.1). */
-function languageSet(
-  fakeAri: FakeAri,
-  channelId: string,
-  language: string
-): boolean {
-  return fakeAri.calls.some(
-    entry =>
-      entry.method === 'POST' &&
-      entry.path === `channels/${channelId}/variable` &&
-      (entry.body as { variable?: string }).variable === 'CHANNEL(language)' &&
-      (entry.body as { value?: string }).value === language
-  );
-}
-
 describe('features', () => {
+  let rig: Rig;
   let db: Db;
   let fakeAri: FakeAri;
   let ari: AriClient;
@@ -275,75 +165,14 @@ describe('features', () => {
   let presence: Presence;
 
   async function setUp(parkingTimeoutS?: number): Promise<void> {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    await seedSettings(db, parkingTimeoutS);
-    fakeAri = new FakeAri();
+    rig = await startRig();
+    ({ db, fakeAri, ari, pipeline, cdr, presence } = rig);
     fakeAri.answerAfterMs = 60_000;
     // A deposit reached from a feature waits for Asterisk to end its recording (§10.2).
     fakeAri.recordingFinishedAfterMs = 5;
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
-    const cache = new ConfigCache(db);
-    const state = new StateStore();
-    const bus = new EventBus();
-    cdr = new CdrWriter({
-      log: noopLogger,
-      db,
-      ari,
-      cache,
-      bus,
-      state: new StateStore(),
-      now: nowIso
-    });
-    presence = new Presence({
-      log: noopLogger,
-      ari,
-      cache,
-      state,
-      bus,
-      db,
-      now: nowIso
-    });
-    // Wired the way `main.ts` does it, so the ring/answer/end points reach `presence`; a test
-    // that dials externally sets `trunkState` itself.
-    pipeline = new Pipeline(
-      testPipelineDeps(ari, db, {
-        cache,
-        state,
-        bus,
-        cdr,
-        apiClient: stubMailSender(),
-        presence
-      })
-    );
-  }
-
-  /** A `TrunkState` over an AMI client that never connects, enough for route selection. */
-  function trunkStateForTests(): TrunkState {
-    const ami = new AmiClient({
-      host: '127.0.0.1',
-      port: 1,
-      username: 'zamfono',
-      password: 'secret',
-      log: noopLogger
-    });
-    return new TrunkState({
-      log: noopLogger,
-      ari,
-      ami,
-      cache: new ConfigCache(db),
-      state: new StateStore(),
-      bus: new EventBus(),
-      now: nowIso
-    });
+    if (parkingTimeoutS !== undefined) {
+      await db.updateTable('settings').set({ parkingTimeoutS }).execute();
+    }
   }
 
   /** Marks `sipUsername` registered through the same ARI event `main.ts`'s `Presence` consumes. */
@@ -421,9 +250,7 @@ describe('features', () => {
   }
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   it('*8101 while 101 rings answers the picker and records them as answerer', async () => {
@@ -765,7 +592,7 @@ describe('features', () => {
 
   it('*90 dialled from a registered device sets dnd, hint BUSY and presence dnd', async () => {
     await setUp();
-    pipeline.deps.trunkState = trunkStateForTests();
+    pipeline.deps.trunkState = rig.trunkState();
     const userId = await seedUser(db);
     await seedExtension(db, '201', { userId });
     await seedDevice(db, userId, 'e201-dabc');
@@ -888,7 +715,7 @@ describe('features', () => {
   it('*5 to an external number dials it through the normal outbound resolution', async () => {
     await setUp();
     await seedExternalRoute(db);
-    pipeline.deps.trunkState = trunkStateForTests();
+    pipeline.deps.trunkState = rig.trunkState();
 
     const userA = await seedUser(db);
     const customerChannel = fakeAri.addChannel({
@@ -971,7 +798,7 @@ describe('features', () => {
     userA: string;
   }> {
     await seedExternalRoute(db);
-    pipeline.deps.trunkState = trunkStateForTests();
+    pipeline.deps.trunkState = rig.trunkState();
     const userA = await seedUser(db);
     const customerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
@@ -1677,7 +1504,7 @@ describe('features', () => {
 
   it('dialling a colleague marks the dialling user INUSE and the callee RINGING then INUSE, and ends both on hangup', async () => {
     await setUp();
-    pipeline.deps.trunkState = trunkStateForTests();
+    pipeline.deps.trunkState = rig.trunkState();
     const callerUserId = await seedUser(db);
     await seedExtension(db, '100', { userId: callerUserId });
     await seedDevice(db, callerUserId, 'e100-dabc');
@@ -2057,7 +1884,7 @@ describe('features', () => {
   /** The retriever's own user, extension and device, added after `setUpParkedCall` warmed the
    * config snapshot; the invalidation stands in for the api's `/internal/configChanged`. */
   async function seedRetriever(): Promise<string> {
-    pipeline.deps.trunkState = trunkStateForTests();
+    pipeline.deps.trunkState = rig.trunkState();
     const retrieverUserId = await seedUser(db);
     await seedExtension(db, '200', { userId: retrieverUserId });
     await seedDevice(db, retrieverUserId, 'e200-dabc');

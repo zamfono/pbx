@@ -20,7 +20,7 @@ describe('stopOnSignal', () => {
 
   it('stops after STOP_DRAIN_MS when a wind-down hangup never confirms, naming the call', async () => {
     rig = await startRig();
-    const userId = await seedUser(rig.db, '101');
+    const userId = await seedUser(rig.db, { ext: '101' });
     const call = await answeredCall(rig, userId);
     rig.fakeAri.holdRequest = request =>
       request.method === 'DELETE' ? unconfirmed.promise : 0;

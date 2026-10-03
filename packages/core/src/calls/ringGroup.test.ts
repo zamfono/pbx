@@ -4,71 +4,28 @@ import {
   MS_PER_SECOND,
   newId,
   nowIso,
-  openDb,
   type Db,
   type Envelope,
   type LiveCall
 } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { AriClient } from '../ari/client.js';
+import type { AriClient } from '../ari/client.js';
 import type { Channel } from '../ari/types.js';
 import { AST_CAUSE_USER_BUSY } from '../sipCodes.js';
-import { FakeAri } from '../testing/ari/fake.js';
+import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../testing/ari/fakeDial.js';
 import { onEvents } from '../testing/busEvents.js';
 import { eventually, requestTo } from '../testing/eventually.js';
-import {
-  noopLogger,
-  noopRecorder,
-  registerDevice,
-  testPipelineDeps
-} from '../testing/pipelineDeps.js';
+import { noopRecorder, registerDevice } from '../testing/pipelineDeps.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
+import { seedUser } from '../testing/seedRows.js';
 import { newCall, type Call, type Leg } from './call.js';
 import { liveView } from './callState.js';
-import { Pipeline } from './pipeline.js';
+import type { Pipeline } from './pipeline.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';
-
-/** A `settings` row plus the `dids` row its `mainDidId` FK requires; no DID is dialed in these tests. */
-async function seedSettings(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+15551234', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-}
-
-async function seedUser(db: Db): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id,
-      name: 'Member',
-      email: `${id}@example.com`,
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
-}
 
 async function seedDevice(
   db: Db,
@@ -204,6 +161,7 @@ function hangups(fakeAri: FakeAri, channelId: string): number {
 }
 
 describe('ringGroup', () => {
+  let rig: Rig;
   let db: Db;
   let fakeAri: FakeAri;
   let ari: AriClient;
@@ -212,21 +170,8 @@ describe('ringGroup', () => {
   let call: Call;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    await seedSettings(db);
-    fakeAri = new FakeAri();
-    fakeAri.answerAfterMs = 5;
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
-    pipeline = new Pipeline(testPipelineDeps(ari, db));
+    rig = await startRig();
+    ({ db, fakeAri, ari, pipeline } = rig);
     callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
     });
@@ -244,9 +189,7 @@ describe('ringGroup', () => {
   });
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   it('simultaneous with three members originates three legs, the first Up wins, the others are hung up', async () => {
@@ -410,7 +353,6 @@ describe('ringGroup', () => {
   });
 
   it("names a phone-book caller on the member legs: the contact's display name is the caller-ID name (§10.2)", async () => {
-    pipeline.deps.db = db;
     const contactId = newId();
     await db
       .insertInto('contacts')
@@ -426,7 +368,10 @@ describe('ringGroup', () => {
       .values({ contactId, number: '+15559999', label: 'office' })
       .execute();
     const groupId = await seedRingGroup(db, { strategy: 'simultaneous' });
-    const userIds = await Promise.all([seedUser(db), seedUser(db)]);
+    const userIds = await Promise.all([
+      seedUser(db),
+      seedUser(db, { name: 'Member' })
+    ]);
     await Promise.all(
       userIds.map(async (userId, index) => {
         await seedDevice(db, userId, `member-${index}`);
@@ -555,7 +500,11 @@ describe('ringGroup', () => {
       strategy: 'simultaneous',
       ringTimeoutS: 1
     });
-    const users = [await seedUser(db), await seedUser(db), await seedUser(db)];
+    const users = [
+      await seedUser(db),
+      await seedUser(db, { name: 'Member' }),
+      await seedUser(db, { name: 'Member' })
+    ];
     fakeAri.answerAfterMs = 60_000;
     for (const [index, userId] of users.entries()) {
       // eslint-disable-next-line no-await-in-loop -- members keep their positions in order

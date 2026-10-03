@@ -3,26 +3,22 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   newId,
   nowIso,
-  openDb,
   type Db,
   type Envelope,
   type MailRequest
 } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { AriClient } from '../ari/client.js';
-import { EventBus } from '../internal/eventBus.js';
-import { FakeAri } from '../testing/ari/fake.js';
+import type { AriClient } from '../ari/client.js';
+import type { EventBus } from '../internal/eventBus.js';
+import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { onEvents } from '../testing/busEvents.js';
 import { eventually, requestTo } from '../testing/eventually.js';
-import {
-  noopCdr,
-  noopLogger,
-  testPipelineDeps
-} from '../testing/pipelineDeps.js';
+import { noopCdr, stubMailSender } from '../testing/pipelineDeps.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
+import { seedUser } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
-import { Pipeline, type PipelineDeps } from './pipeline.js';
+import type { Pipeline, PipelineDeps } from './pipeline.js';
 import { deposit, type MailSender } from './voicemail.js';
 
 const VOICEMAIL_MAX_S = 120;
@@ -54,65 +50,6 @@ function fakeCdr(): FakeCdr {
   };
 }
 
-function stubApiClient(): MailSender & { sent: MailRequest[] } {
-  const sent: MailRequest[] = [];
-  return {
-    sent,
-    mail: req => {
-      sent.push(req);
-      return Promise.resolve();
-    }
-  };
-}
-
-/** A throwaway forward-target/DID chain, just to satisfy `settings.main_did_id`'s FK. */
-async function seedSettings(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+15551000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      voicemailMaxS: VOICEMAIL_MAX_S
-    })
-    .execute();
-}
-
-async function seedUser(
-  db: Db,
-  overrides: {
-    name?: string;
-    mailboxAudioId?: string;
-    notifyMissedCalls?: boolean;
-  } = {}
-): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id,
-      name: overrides.name ?? 'Anna Huber',
-      email: `${id}@example.com`,
-      createdAt: nowIso(),
-      mailboxAudioId: overrides.mailboxAudioId ?? null,
-      notifyMissedCalls: overrides.notifyMissedCalls === true ? 1 : 0
-    })
-    .execute();
-  return id;
-}
-
 async function seedAudioAsset(db: Db): Promise<string> {
   const id = newId();
   await db
@@ -129,6 +66,7 @@ async function seedAudioAsset(db: Db): Promise<string> {
 }
 
 describe('deposit', () => {
+  let rig: Rig;
   let db: Db;
   let fakeAri: FakeAri;
   let ari: AriClient;
@@ -138,29 +76,18 @@ describe('deposit', () => {
   let pipeline: Pipeline;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    await seedSettings(db);
-    fakeAri = new FakeAri();
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
     cdr = fakeCdr();
-    bus = new EventBus();
-    apiClient = stubApiClient();
-    pipeline = new Pipeline(testPipelineDeps(ari, db, { bus, cdr, apiClient }));
+    apiClient = stubMailSender();
+    rig = await startRig({ cdr, apiClient });
+    ({ db, fakeAri, ari, bus, pipeline } = rig);
+    await db
+      .updateTable('settings')
+      .set({ voicemailMaxS: VOICEMAIL_MAX_S })
+      .execute();
   });
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   it('keeps a message the caller ended by hanging up', async () => {
@@ -497,7 +424,7 @@ describe('deposit', () => {
   }
 
   it('closes a call whose caller hung up to end the message as voicemail, with the voicemail mail only (§10.2 "Mail")', async () => {
-    const userId = await seedUser(db, { notifyMissedCalls: true });
+    const userId = await seedUser(db, { notifyMissedCalls: 1 });
     const channel = fakeAri.addChannel({});
     const call = registeredCall(channel.id, userId);
 
@@ -536,7 +463,7 @@ describe('deposit', () => {
   });
 
   it('closes a registered call whose caller hung up without a message as missed, with the missed-call mail', async () => {
-    const userId = await seedUser(db, { notifyMissedCalls: true });
+    const userId = await seedUser(db, { notifyMissedCalls: 1 });
     const channel = fakeAri.addChannel({});
     const call = registeredCall(channel.id, userId);
 
@@ -568,7 +495,7 @@ describe('deposit', () => {
   });
 
   it('closes a call whose caller hung up during the greeting at once, as missed', async () => {
-    const userId = await seedUser(db, { notifyMissedCalls: true });
+    const userId = await seedUser(db, { notifyMissedCalls: 1 });
     const channel = fakeAri.addChannel({});
     const call = registeredCall(channel.id, userId);
 

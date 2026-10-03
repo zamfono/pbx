@@ -3,7 +3,7 @@
 // no-op where it would reach outside the process.
 import { expect } from 'vitest';
 
-import { nowIso, type Db } from '@zamfono/shared';
+import { nowIso, type Db, type MailRequest } from '@zamfono/shared';
 
 import { AmiClient } from '../ami/client.js';
 import type { AriClient } from '../ari/client.js';
@@ -13,6 +13,7 @@ import { STASIS_WAIT_MS } from '../calls/legOriginate.js';
 import { Pipeline, type PipelineDeps } from '../calls/pipeline.js';
 import type { ParticipationRecorder } from '../calls/recordParticipation.js';
 import { TrunkState } from '../calls/trunkState.js';
+import type { MailSender } from '../calls/voicemail.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
@@ -36,6 +37,18 @@ export function noopCdr(): PipelineDeps['cdr'] {
     channelEnded: () => Promise.resolve(),
     registerLeg: () => undefined,
     joinLeg: () => Promise.resolve()
+  };
+}
+
+/** A mail sender that sends nothing and keeps every request in `sent`. */
+export function stubMailSender(): MailSender & { sent: MailRequest[] } {
+  const sent: MailRequest[] = [];
+  return {
+    sent,
+    mail: request => {
+      sent.push(request);
+      return Promise.resolve();
+    }
   };
 }
 

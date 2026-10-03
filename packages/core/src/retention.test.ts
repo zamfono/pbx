@@ -15,34 +15,11 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { runRetention } from './retention.js';
 import { noopLogger } from './testing/pipelineDeps.js';
+import { seedSettings } from './testing/seedRows.js';
 
 const NOW = '2026-06-01T00:00:00.000Z';
 const LONG_AGO = '2026-01-01T00:00:00.000Z';
 const YESTERDAY = '2026-05-31T00:00:00.000Z';
-
-async function seedSettings(db: Db, retentionDays: number): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+15551234', targetId, createdAt: NOW })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      recordingRetentionDays: retentionDays
-    })
-    .execute();
-}
 
 /** One call with its log, a QoS row, a recording and a presence entry, all stamped `at`. */
 async function seedCall(db: Db, at: string, filename: string): Promise<string> {
@@ -91,7 +68,7 @@ describe('runRetention', () => {
   beforeEach(async () => {
     db = openDb(':memory:');
     await migrateForTest(db);
-    await seedSettings(db, 90);
+    await seedSettings(db, { recordingRetentionDays: 90 });
     mediaDir = await mkdtemp(path.join(tmpdir(), 'zamfono-retention-'));
     onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));
   });

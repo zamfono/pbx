@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
-import { newId, nowIso, openDb } from '@zamfono/shared';
+import { nowIso, openDb } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AmiClient } from './ami/client.js';
@@ -16,6 +16,7 @@ import { FakeAmi } from './testing/ami/fake.js';
 import { FakeAri } from './testing/ari/fake.js';
 import { defaultChannel } from './testing/ari/fakeChannel.js';
 import { eventually, flush } from './testing/eventually.js';
+import { seedSettings } from './testing/seedRows.js';
 
 // `startInternalServer` binds the fixed port 3000 (Global Constraints), which a test cannot claim;
 // the real `ConfigCache`, `EventBus` and `StateStore` from the same module are kept.
@@ -64,26 +65,7 @@ async function migratedDbFile(): Promise<string> {
   const file = path.join(dir, 'zamfono.sqlite3');
   const db = openDb(file);
   await migrateForTest(db);
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+15551234', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
+  await seedSettings(db);
   await db.destroy();
   return file;
 }

@@ -1,47 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { AriClient } from '../ari/client.js';
 import type { Channel } from '../ari/types.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
-import { Presence } from '../presence.js';
-import { FakeAri } from '../testing/ari/fake.js';
+import type { Presence } from '../presence.js';
+import type { FakeAri } from '../testing/ari/fake.js';
 import { isPlacement } from '../testing/ari/fakeDial.js';
 import { eventually } from '../testing/eventually.js';
-import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
+import { seedUser } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
-import { Pipeline } from './pipeline.js';
+import type { Pipeline } from './pipeline.js';
 import { ringGroup } from './ringGroup.js';
 
 /** Who is ringable (registration, busy) and which of the group's own rules fires when nobody
  * rings or answers (§10.1 step 5): `unavailable`, `unanswered`, and the group mailbox default. */
-
-async function seedSettings(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+15551234', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-}
 
 /** A member user with one device per `sipUsernames` entry. */
 async function seedMemberUser(
@@ -50,16 +23,7 @@ async function seedMemberUser(
   position: number,
   sipUsernames: string[]
 ): Promise<string> {
-  const userId = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id: userId,
-      name: 'Member',
-      email: `${userId}@example.com`,
-      createdAt: nowIso()
-    })
-    .execute();
+  const userId = await seedUser(db, { name: 'Member' });
   for (const sipUsername of sipUsernames) {
     // eslint-disable-next-line no-await-in-loop -- a member has one or two devices
     await db
@@ -170,51 +134,19 @@ function playedMedia(fakeAri: FakeAri, channelId: string): string[] {
 }
 
 describe('ring-group ringability and fallback rules', () => {
+  let rig: Rig;
   let db: Db;
   let fakeAri: FakeAri;
-  let ari: AriClient;
   let presence: Presence;
   let pipeline: Pipeline;
   let callerChannel: Channel;
   let call: Call;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    await seedSettings(db);
-    fakeAri = new FakeAri();
+    rig = await startRig();
+    ({ db, fakeAri, presence, pipeline } = rig);
     fakeAri.answerAfterMs = 60_000;
     fakeAri.recordingFinishedAfterMs = 5;
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
-    const cache = new ConfigCache(db);
-    const state = new StateStore();
-    const bus = new EventBus();
-    presence = new Presence({
-      log: noopLogger,
-      ari,
-      cache,
-      state,
-      bus,
-      db,
-      now: nowIso
-    });
-    pipeline = new Pipeline(
-      testPipelineDeps(ari, db, {
-        cache,
-        state,
-        bus,
-        apiClient: { mail: () => Promise.resolve() },
-        presence
-      })
-    );
     callerChannel = fakeAri.addChannel({
       caller: { number: '+15559999', name: '' }
     });
@@ -232,9 +164,7 @@ describe('ring-group ringability and fallback rules', () => {
   });
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   /** Registers `sipUsername` the way a phone's REGISTER reaches `Presence`. */

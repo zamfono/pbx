@@ -1,32 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { AmiClient } from '../ami/client.js';
-import { AriClient } from '../ari/client.js';
+import type { AriClient } from '../ari/client.js';
 import type { Channel } from '../ari/types.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
 import { AST_CAUSE_USER_BUSY } from '../sipCodes.js';
-import { FakeAri } from '../testing/ari/fake.js';
+import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../testing/ari/fakeDial.js';
 import { eventually } from '../testing/eventually.js';
-import {
-  noopLogger,
-  registerDevice,
-  testPipelineDeps
-} from '../testing/pipelineDeps.js';
+import { registerDevice } from '../testing/pipelineDeps.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
+import { seedDid, seedUser } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
 import { enterTarget } from './inbound.js';
 import { playMenu } from './menu.js';
 import { dispatchAction } from './outboundDispatch.js';
-import { Pipeline } from './pipeline.js';
+import type { Pipeline } from './pipeline.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';
-import { TrunkState } from './trunkState.js';
 
 // §10.1 step 7 with §9.4 "Outbound routing": an external forward target is dialled "as the
 // forwarding user's call, or without a caller when a DID, menu, ring group or tenant rule
@@ -49,60 +41,19 @@ async function seedTarget(
   return id;
 }
 
-async function seedDid(
-  db: Db,
-  number: string,
-  targetId?: string
-): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('dids')
-    .values({
-      id,
-      number,
-      targetId: targetId ?? (await seedTarget(db, { external: '+15550000' })),
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
-}
-
-async function seedSettings(db: Db): Promise<void> {
-  const mainDidId = await seedDid(db, MAIN_NUMBER);
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-}
-
 /** A user presenting `number` as their own DID, with `clir` as their CLIR level. */
-async function seedUser(
+async function seedNumberedUser(
   db: Db,
   opts: { number?: string; clir?: 0 | 1 } = {}
 ): Promise<string> {
-  const calleridDidId =
-    opts.number === undefined ? null : await seedDid(db, opts.number);
-  const id = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id,
-      name: 'User',
-      email: `${id}@example.com`,
-      createdAt: nowIso(),
-      mailboxEnabled: 0,
-      ringTimeoutS: 30,
-      calleridDidId,
-      clir: opts.clir ?? null
-    })
-    .execute();
-  return id;
+  return seedUser(db, {
+    name: 'User',
+    mailboxEnabled: 0,
+    ringTimeoutS: 30,
+    calleridDidId:
+      opts.number === undefined ? null : await seedDid(db, opts.number),
+    clir: opts.clir ?? null
+  });
 }
 
 async function seedDevice(
@@ -215,6 +166,7 @@ function trunkOriginates(fakeAri: FakeAri): Originate[] {
 }
 
 describe('an external forward target is dialled as the forwarding user (§10.1 step 7, §9.4)', () => {
+  let rig: Rig;
   let db: Db;
   let fakeAri: FakeAri;
   let ari: AriClient;
@@ -254,54 +206,28 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
   }
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    await seedSettings(db);
-    fakeAri = new FakeAri();
+    rig = await startRig();
+    ({ db, fakeAri, ari, pipeline } = rig);
     fakeAri.answerAfterMs = 60_000;
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
-    const state = new StateStore();
-    const trunkState = new TrunkState({
-      log: noopLogger,
-      ari,
-      ami: new AmiClient({
-        host: '127.0.0.1',
-        port: 1,
-        username: 'zamfono',
-        password: 'secret',
-        log: noopLogger
-      }),
-      cache: new ConfigCache(db),
-      state,
-      bus: new EventBus(),
-      now: nowIso
-    });
-    pipeline = new Pipeline(testPipelineDeps(ari, db, { state, trunkState }));
+    await db
+      .updateTable('settings')
+      .set({ mainDidId: await seedDid(db, MAIN_NUMBER) })
+      .execute();
     callerChannel = fakeAri.addChannel({
       caller: { number: '101', name: '' }
     });
     // The caller has a number, a CLIR level and a route of their own, all unlike the forwarder's.
-    caller = await seedUser(db, { number: '+491110101', clir: 0 });
+    caller = await seedNumberedUser(db, { number: '+491110101', clir: 0 });
     call = newCallFrom(caller);
   });
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   describe("a user's own forward", () => {
     it("an unconditional forward leaves over the forwarder's route with their number, not the caller's", async () => {
-      const forwarder = await seedUser(db, { number: '+491110202' });
+      const forwarder = await seedNumberedUser(db, { number: '+491110202' });
       await seedUserRule(db, forwarder, 'unconditional');
       await seedTrunkRoute(db, 1, caller);
       const forwarderTrunk = await seedTrunkRoute(db, 2, forwarder);
@@ -325,7 +251,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
     // routes on write; the forward is refused at call time as their own dial would be, with 503
     // and a `noRoute` trace line (§9.4 "Outbound routing"), even where the caller has a route.
     it("refuses a forward to a number the forwarder's routes do not carry, though the caller's do", async () => {
-      const forwarder = await seedUser(db, { number: '+491110202' });
+      const forwarder = await seedNumberedUser(db, { number: '+491110202' });
       await seedUserRule(db, forwarder, 'unconditional');
       await seedTrunkRoute(db, 1, caller);
 
@@ -352,7 +278,10 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
     });
 
     it("withholds the number under the forwarder's CLIR though the caller shows theirs", async () => {
-      const forwarder = await seedUser(db, { number: '+491110202', clir: 1 });
+      const forwarder = await seedNumberedUser(db, {
+        number: '+491110202',
+        clir: 1
+      });
       await seedUserRule(db, forwarder, 'unconditional');
       await seedTrunkRoute(db, 1, null, 'both');
 
@@ -371,8 +300,14 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
     });
 
     it("shows the forwarder's number when the caller withholds theirs", async () => {
-      const withholding = await seedUser(db, { number: '+491110303', clir: 1 });
-      const forwarder = await seedUser(db, { number: '+491110202', clir: 0 });
+      const withholding = await seedNumberedUser(db, {
+        number: '+491110303',
+        clir: 1
+      });
+      const forwarder = await seedNumberedUser(db, {
+        number: '+491110202',
+        clir: 0
+      });
       await seedUserRule(db, forwarder, 'unconditional');
       await seedTrunkRoute(db, 1, null, 'both');
 
@@ -391,7 +326,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
     });
 
     it("an offline forward is the forwarder's call", async () => {
-      const forwarder = await seedUser(db, { number: '+491110202' });
+      const forwarder = await seedNumberedUser(db, { number: '+491110202' });
       await seedUserRule(db, forwarder, 'offline');
       await seedTrunkRoute(db, 1, caller);
       const forwarderTrunk = await seedTrunkRoute(db, 2, forwarder);
@@ -411,7 +346,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
     });
 
     it("a busy forward, applied once the forwarder's device answers 486, is the forwarder's call", async () => {
-      const forwarder = await seedUser(db, { number: '+491110202' });
+      const forwarder = await seedNumberedUser(db, { number: '+491110202' });
       await seedDevice(db, forwarder, 'e102-d1');
       await registerDevice(fakeAri, pipeline, 'e102-d1');
       await seedUserRule(db, forwarder, 'busy');
@@ -449,7 +384,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
     });
 
     it("the forwarder's own OOO rule is the forwarder's call", async () => {
-      const forwarder = await seedUser(db, { number: '+491110202' });
+      const forwarder = await seedNumberedUser(db, { number: '+491110202' });
       await seedOoo(db, forwarder);
       await seedTrunkRoute(db, 1, caller);
       const forwarderTrunk = await seedTrunkRoute(db, 2, forwarder);
@@ -470,7 +405,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
     });
 
     it("the forwarder's own closed hours are the forwarder's call, for an inbound caller with no user", async () => {
-      const forwarder = await seedUser(db, { number: '+491110202' });
+      const forwarder = await seedNumberedUser(db, { number: '+491110202' });
       // A schedule without open intervals is closed around the clock.
       await db
         .insertInto('openingHours')
@@ -509,7 +444,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
     }
 
     it('a tenant OOO rule presents the main number over a caller-less route', async () => {
-      const callee = await seedUser(db, { number: '+491110202' });
+      const callee = await seedNumberedUser(db, { number: '+491110202' });
       await seedOoo(db, null);
       const openTrunk = await seedRoutes();
 
@@ -624,7 +559,10 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
   });
 
   it('a transfer to an external number presents the transferrer\'s number and CLIR, not the transferee\'s (§10.1 "Transfers and pickup")', async () => {
-    const transferrer = await seedUser(db, { number: '+491110202', clir: 1 });
+    const transferrer = await seedNumberedUser(db, {
+      number: '+491110202',
+      clir: 1
+    });
     await seedTrunkRoute(db, 1, caller, 'both');
     const transferrerTrunk = await seedTrunkRoute(db, 2, transferrer, 'both');
 

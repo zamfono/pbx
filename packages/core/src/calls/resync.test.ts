@@ -10,30 +10,17 @@ import {
   onTestFinished
 } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../testing/ari/fake.js';
+import type { AriClient } from '../ari/client.js';
+import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { eventually } from '../testing/eventually.js';
-import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
-import { Pipeline } from './pipeline.js';
+import { noopLogger } from '../testing/pipelineDeps.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
+import { seedUser } from '../testing/seedRows.js';
+import type { Pipeline } from './pipeline.js';
 import { resyncOnBoot } from './resync.js';
-
-async function seedUser(db: Db): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id,
-      name: 'User',
-      email: `${id}@example.com`,
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
-}
 
 /** A `calls` row still open, the way `CdrWriter.open` leaves one while its call is live. */
 async function seedOpenCall(
@@ -59,29 +46,19 @@ async function seedOpenCall(
 }
 
 describe('resyncOnBoot', () => {
+  let rig: Rig;
   let db: Db;
   let fakeAri: FakeAri;
   let ari: AriClient;
+  let pipeline: Pipeline;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    fakeAri = new FakeAri();
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
+    rig = await startRig();
+    ({ db, fakeAri, ari, pipeline } = rig);
   });
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   function hungUp(channelId: string): boolean {
@@ -106,7 +83,7 @@ describe('resyncOnBoot', () => {
       db,
       ari,
       now: nowIso,
-      pipeline: new Pipeline(testPipelineDeps(ari, db)),
+      pipeline,
       log: noopLogger
     });
 
@@ -135,7 +112,7 @@ describe('resyncOnBoot', () => {
       db,
       ari,
       now: nowIso,
-      pipeline: new Pipeline(testPipelineDeps(ari, db)),
+      pipeline,
       log: noopLogger
     });
     expect(hungUp(caller.id)).toBe(false);
@@ -164,7 +141,7 @@ describe('resyncOnBoot', () => {
       db,
       ari,
       now: nowIso,
-      pipeline: new Pipeline(testPipelineDeps(ari, db)),
+      pipeline,
       log: noopLogger
     });
 
@@ -195,11 +172,12 @@ describe('resyncOnBoot', () => {
       })
       .execute();
 
+    pipeline.deps.mediaDir = mediaDir;
     await resyncOnBoot({
       db,
       ari,
       now: nowIso,
-      pipeline: new Pipeline(testPipelineDeps(ari, db, { mediaDir })),
+      pipeline,
       log: noopLogger
     });
 

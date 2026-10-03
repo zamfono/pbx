@@ -67,7 +67,7 @@ async function seedTrunkWithRoute(db: Db, userId: string): Promise<string> {
 
 /** A user at `ext` with one registered device. */
 async function seedUserWithDevice(rig: Rig, ext: string): Promise<string> {
-  const id = await seedUser(rig.db, ext);
+  const id = await seedUser(rig.db, { ext });
   await seedDevice(rig, id, `e${ext}-a`);
   return id;
 }

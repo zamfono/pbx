@@ -5,33 +5,23 @@ import {
   DEFAULT_SIP_HEADERS,
   newId,
   nowIso,
-  openDb,
   type Db,
   type SipHeaderTemplate
 } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { AmiClient } from '../ami/client.js';
-import { AriClient } from '../ari/client.js';
 import type { Channel } from '../ari/types.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
 import type { ForwardTarget } from '../routing/targets.js';
-import { FakeAri } from '../testing/ari/fake.js';
+import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { isPlacement } from '../testing/ari/fakeDial.js';
 import { eventually } from '../testing/eventually.js';
-import {
-  noopLogger,
-  registerDevice,
-  testPipelineDeps
-} from '../testing/pipelineDeps.js';
+import { registerDevice } from '../testing/pipelineDeps.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
+import { seedDid, seedUser } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
 import { enterTarget } from './inbound.js';
-import { Pipeline } from './pipeline.js';
+import type { Pipeline } from './pipeline.js';
 import { ringGroup } from './ringGroup.js';
-import { TrunkState } from './trunkState.js';
 
 // §9.4 "SIP targets" and "Forwarded calls", §10.1 steps 2, 5 and 7: a `sip` target dials its user
 // part over its own trunk's hosts, bypassing `outbound_routes`, and every forwarded trunk leg,
@@ -52,46 +42,6 @@ async function seedTarget(
     .insertInto('forwardTargets')
     .values({ id, ...values })
     .execute();
-  return id;
-}
-
-async function seedSettings(db: Db): Promise<void> {
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({
-      id: didId,
-      number: '+15551000',
-      targetId: await seedTarget(db, { external: '+15550000' }),
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-}
-
-/** A user named `name` on extension `ext`, without devices or a number of their own. */
-async function seedUser(db: Db, name: string, ext: string): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id,
-      name,
-      email: `${id}@example.com`,
-      createdAt: nowIso(),
-      mailboxEnabled: 0
-    })
-    .execute();
-  await db.insertInto('extensions').values({ ext, userId: id }).execute();
   return id;
 }
 
@@ -193,9 +143,9 @@ function traceEvents(call: Call): Record<string, unknown>[] {
 }
 
 describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)', () => {
+  let rig: Rig;
   let db: Db;
   let fakeAri: FakeAri;
-  let ari: AriClient;
   let pipeline: Pipeline;
   let callerChannel: Channel;
 
@@ -226,46 +176,20 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
   }
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    await seedSettings(db);
-    fakeAri = new FakeAri();
+    rig = await startRig();
+    ({ db, fakeAri, pipeline } = rig);
     fakeAri.answerAfterMs = 60_000;
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
-    const state = new StateStore();
-    const trunkState = new TrunkState({
-      log: noopLogger,
-      ari,
-      ami: new AmiClient({
-        host: '127.0.0.1',
-        port: 1,
-        username: 'zamfono',
-        password: 'secret',
-        log: noopLogger
-      }),
-      cache: new ConfigCache(db),
-      state,
-      bus: new EventBus(),
-      now: nowIso
-    });
-    pipeline = new Pipeline(testPipelineDeps(ari, db, { state, trunkState }));
+    await db
+      .updateTable('settings')
+      .set({ mainDidId: await seedDid(db, '+15551000') })
+      .execute();
     callerChannel = fakeAri.addChannel({
       caller: { number: CALLER, name: '' }
     });
   });
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   it('dials the user part at the first outbound host with no route, carrying caller and DID but no diversion', async () => {
@@ -318,8 +242,16 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
 
   it('carries both hops of OOO to a user who forwards unconditionally, the last as the Diversion', async () => {
     const trunkId = await seedSipTrunk(db);
-    const bea = await seedUser(db, 'Bea', '177');
-    const ai = await seedUser(db, 'AI Agent', '178');
+    const bea = await seedUser(db, {
+      name: 'Bea',
+      ext: '177',
+      mailboxEnabled: 0
+    });
+    const ai = await seedUser(db, {
+      name: 'AI Agent',
+      ext: '178',
+      mailboxEnabled: 0
+    });
     await db
       .insertInto('oooRules')
       .values({
@@ -354,8 +286,16 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
 
   it("sends each hop's Diversion by its own number or the main number under the trunk's policy", async () => {
     const trunkId = await seedSipTrunk(db);
-    const bea = await seedUser(db, 'Bea', '177');
-    const ai = await seedUser(db, 'AI Agent', '178');
+    const bea = await seedUser(db, {
+      name: 'Bea',
+      ext: '177',
+      mailboxEnabled: 0
+    });
+    const ai = await seedUser(db, {
+      name: 'AI Agent',
+      ext: '178',
+      mailboxEnabled: 0
+    });
     const beaDid = newId();
     await db
       .insertInto('dids')
@@ -414,8 +354,16 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
 
   it("renders a target's templated headers: the called user, the last forwarder and its reason", async () => {
     const trunkId = await seedSipTrunk(db);
-    const bea = await seedUser(db, 'Bea', '177');
-    const ai = await seedUser(db, 'AI Agent', '178');
+    const bea = await seedUser(db, {
+      name: 'Bea',
+      ext: '177',
+      mailboxEnabled: 0
+    });
+    const ai = await seedUser(db, {
+      name: 'AI Agent',
+      ext: '178',
+      mailboxEnabled: 0
+    });
     await db
       .insertInto('oooRules')
       .values({
@@ -466,7 +414,11 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
 
   it('omits X-Zamfono-Caller for a withheld caller and names a user by their own number', async () => {
     const trunkId = await seedSipTrunk(db);
-    const ai = await seedUser(db, 'AI Agent', '178');
+    const ai = await seedUser(db, {
+      name: 'AI Agent',
+      ext: '178',
+      mailboxEnabled: 0
+    });
     const didId = newId();
     await db
       .insertInto('dids')
@@ -529,7 +481,11 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
       .insertInto('outboundRoutes')
       .values({ id: newId(), priority: 1, trunkId, createdAt: nowIso() })
       .execute();
-    const bea = await seedUser(db, 'Bea', '177');
+    const bea = await seedUser(db, {
+      name: 'Bea',
+      ext: '177',
+      mailboxEnabled: 0
+    });
     await seedRule(
       db,
       bea,
@@ -558,7 +514,11 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
 
   it("rings a ring-group member's unconditional sip forward as the member's leg, the member its last hop", async () => {
     const trunkId = await seedSipTrunk(db);
-    const member = await seedUser(db, 'Bea', '177');
+    const member = await seedUser(db, {
+      name: 'Bea',
+      ext: '177',
+      mailboxEnabled: 0
+    });
     await db
       .insertInto('devices')
       .values({
@@ -634,9 +594,17 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
   });
   it("maps an offline rule to unavailable, a closed schedule to time_of_day and a group's fallback to its outcome", async () => {
     const trunkId = await seedSipTrunk(db);
-    const offline = await seedUser(db, 'Bea', '177');
+    const offline = await seedUser(db, {
+      name: 'Bea',
+      ext: '177',
+      mailboxEnabled: 0
+    });
     await seedRule(db, offline, 'offline', await sipTargetId(db, trunkId));
-    const closed = await seedUser(db, 'Carl', '179');
+    const closed = await seedUser(db, {
+      name: 'Carl',
+      ext: '179',
+      mailboxEnabled: 0
+    });
     // A schedule without intervals is never open.
     await db
       .insertInto('openingHours')

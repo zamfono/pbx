@@ -57,7 +57,7 @@ describe('parking ring-back', () => {
 
   /** Anna, without a phone or a mailbox, so her ring-back goes unanswered at once. */
   async function seedParker(): Promise<string> {
-    const anna = await seedUser(db, '101');
+    const anna = await seedUser(db, { ext: '101' });
     await db
       .updateTable('users')
       .set({ mailboxEnabled: 0 })
@@ -96,7 +96,7 @@ describe('parking ring-back', () => {
 
   /** Ben at 102, with a registered phone that answers. */
   async function seedBen(): Promise<string> {
-    const ben = await seedUser(db, '102');
+    const ben = await seedUser(db, { ext: '102' });
     await seedDevice(rig, ben, 'e102-a');
     return ben;
   }
@@ -267,7 +267,7 @@ describe('parking ring-back', () => {
     await setUp();
     const anna = await seedParker();
     const ben = await seedBen();
-    const carl = await seedUser(db, '103');
+    const carl = await seedUser(db, { ext: '103' });
     await seedDevice(rig, carl, 'e103-a');
     await seedFallback({ userId: carl });
     // Anna has no phone registered, so her `offline` rule decides the ring-back.
@@ -303,7 +303,7 @@ describe('parking ring-back', () => {
     // A deposit waits for Asterisk to end its recording (§10.2 "Voicemail").
     fakeAri.recordingFinishedAfterMs = 5;
     // Anna has her mailbox and no phone registered: `offline`'s implicit default.
-    const anna = await seedUser(db, '101');
+    const anna = await seedUser(db, { ext: '101' });
     const ben = await seedBen();
     await seedFallback({ userId: ben });
     const parked = await parkFor(anna);

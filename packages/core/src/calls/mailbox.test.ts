@@ -1,66 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { AriClient } from '../ari/client.js';
-import { CdrWriter } from '../cdr.js';
-import { EventBus } from '../internal/eventBus.js';
-import { ConfigCache } from '../internal/snapshot.js';
-import { StateStore } from '../internal/stateStore.js';
-import { FakeAri } from '../testing/ari/fake.js';
+import type { CdrWriter } from '../cdr.js';
+import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { eventually, requestTo } from '../testing/eventually.js';
-import { noopLogger, testPipelineDeps } from '../testing/pipelineDeps.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
+import { seedUser } from '../testing/seedRows.js';
 import { callerChannel, newCall, type Call } from './call.js';
 import { ownVoicemail } from './mailbox.js';
 import { introMedia, mainMenuMedia } from './mailboxPrompts.js';
-import { Pipeline } from './pipeline.js';
+import type { Pipeline } from './pipeline.js';
 
 // A prompt "plays" until the test barges in with a key or ends it itself, so every step of the
 // menu waits on exactly what the test does next.
 const NEVER_MS = 600_000;
 
 type Play = { media: string | string[]; playbackId: string };
-
-async function seedOwner(db: Db): Promise<string> {
-  const didTargetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: didTargetId, external: '+15550000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({
-      id: didId,
-      number: '+15551234',
-      targetId: didTargetId,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-  const id = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id,
-      name: 'Owner',
-      email: `${id}@example.com`,
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
-}
 
 /** A message in `ownerId`'s mailbox, `minutesAgo` old; its file is named after its id. */
 async function seedMessage(
@@ -87,9 +44,9 @@ async function seedMessage(
 }
 
 describe('mailbox menu (§10.2 "Mailbox access")', () => {
+  let rig: Rig;
   let db: Db;
   let fakeAri: FakeAri;
-  let ari: AriClient;
   let pipeline: Pipeline;
   let cdr: CdrWriter;
   let ownerId: string;
@@ -97,32 +54,10 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
   let playsSeen = 0;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    ownerId = await seedOwner(db);
-    fakeAri = new FakeAri();
+    rig = await startRig();
+    ({ db, fakeAri, pipeline, cdr } = rig);
     fakeAri.playbackFinishedAfterMs = NEVER_MS;
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
-    const cache = new ConfigCache(db);
-    const bus = new EventBus();
-    cdr = new CdrWriter({
-      log: noopLogger,
-      db,
-      ari,
-      cache,
-      bus,
-      state: new StateStore(),
-      now: nowIso
-    });
-    pipeline = new Pipeline(testPipelineDeps(ari, db, { cache, bus, cdr }));
+    ownerId = await seedUser(db, { name: 'Owner' });
     const channel = fakeAri.addChannel({});
     call = newCall({
       id: newId(),
@@ -141,9 +76,7 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
   });
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   /** The menu's next playback on the caller's channel, once it has been requested. */

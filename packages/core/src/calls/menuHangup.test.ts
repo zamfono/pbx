@@ -4,51 +4,24 @@ import {
   HTTP_INTERNAL_SERVER_ERROR,
   newId,
   nowIso,
-  openDb,
   type Db
 } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { AriClient } from '../ari/client.js';
+import type { AriClient } from '../ari/client.js';
 import { AriError } from '../ari/types.js';
-import { FakeAri } from '../testing/ari/fake.js';
+import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { isPlacement } from '../testing/ari/fakeDial.js';
 import { eventually, requestTo } from '../testing/eventually.js';
-import {
-  noopLogger,
-  registerDevice,
-  testPipelineDeps
-} from '../testing/pipelineDeps.js';
+import { registerDevice } from '../testing/pipelineDeps.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
+import { seedUser } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
 import { playMenu } from './menu.js';
-import { Pipeline } from './pipeline.js';
+import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
 
 /** A caller who hangs up inside a menu, and a greeting Asterisk refuses to play (§10.1 step 6). */
-
-async function seedSettings(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+15551000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-}
 
 /** A menu whose fallback is a user: applying it would ring that user's phones. */
 async function seedMenu(db: Db, maxAttempts: number): Promise<string> {
@@ -63,16 +36,7 @@ async function seedMenu(db: Db, maxAttempts: number): Promise<string> {
       createdAt: nowIso()
     })
     .execute();
-  const userId = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id: userId,
-      name: 'Reception',
-      email: `${userId}@example.com`,
-      createdAt: nowIso()
-    })
-    .execute();
+  const userId = await seedUser(db, { name: 'Reception' });
   await db
     .insertInto('devices')
     .values({
@@ -113,36 +77,23 @@ function traceEvents(call: Call): string[] {
 }
 
 describe('menu hangup and a refused greeting', () => {
+  let rig: Rig;
   let db: Db;
   let fakeAri: FakeAri;
   let ari: AriClient;
   let pipeline: Pipeline;
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    await seedSettings(db);
-    fakeAri = new FakeAri();
+    rig = await startRig();
+    ({ db, fakeAri, ari, pipeline } = rig);
     fakeAri.answerAfterMs = 60_000;
     // The greeting plays longer than the tests take, so the caller hangs up while it plays.
     fakeAri.playbackFinishedAfterMs = 200;
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
-    pipeline = new Pipeline(testPipelineDeps(ari, db));
   });
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   function makeCall(channelId: string): Call {

@@ -1,69 +1,48 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { newId, nowIso } from '@zamfono/shared';
 
-import { AriClient } from '../ari/client.js';
-import { FakeAri } from '../testing/ari/fake.js';
+import type { FakeAri } from '../testing/ari/fake.js';
 import { eventually } from '../testing/eventually.js';
-import {
-  noopCdr,
-  noopLogger,
-  testPipelineDeps
-} from '../testing/pipelineDeps.js';
+import { noopCdr, noopLogger } from '../testing/pipelineDeps.js';
+import { startRig, type Rig } from '../testing/pipelineRig.js';
 import { newCall } from './call.js';
-import { Pipeline } from './pipeline.js';
+import type { Pipeline } from './pipeline.js';
 
 /** §7: "Every call-related line carries the per-call correlation id", the pipeline's own account
  * of a routing failure included. */
 
 describe('pipeline routing-failure log line', () => {
-  let db: Db;
+  let rig: Rig;
   let fakeAri: FakeAri;
-  let ari: AriClient;
   let pipeline: Pipeline;
   let errors: Record<string, unknown>[] = [];
 
   beforeEach(async () => {
-    db = openDb(':memory:');
-    await migrateForTest(db);
-    fakeAri = new FakeAri();
-    const { url } = await fakeAri.listen();
-    ari = new AriClient({
-      url,
-      user: 'zamfono',
-      password: 'secret',
-      app: 'zamfono',
-      log: noopLogger
-    });
-    await ari.connect();
     errors = [];
-    pipeline = new Pipeline(
-      testPipelineDeps(ari, db, {
-        cdr: {
-          ...noopCdr(),
-          open: () => Promise.resolve(),
-          finish: () => Promise.resolve(),
-          noteQosLegs: () => {
-            throw new Error('noting the QoS legs failed');
-          }
-        },
-        logger: {
-          ...noopLogger,
-          error: fields => {
-            if (typeof fields !== 'string') {
-              errors.push(fields);
-            }
+    rig = await startRig({
+      cdr: {
+        ...noopCdr(),
+        open: () => Promise.resolve(),
+        finish: () => Promise.resolve(),
+        noteQosLegs: () => {
+          throw new Error('noting the QoS legs failed');
+        }
+      },
+      logger: {
+        ...noopLogger,
+        error: fields => {
+          if (typeof fields !== 'string') {
+            errors.push(fields);
           }
         }
-      })
-    );
+      }
+    });
+    ({ fakeAri, pipeline } = rig);
   });
 
   afterEach(async () => {
-    await ari.close();
-    await fakeAri.close();
-    await db.destroy();
+    await rig.stop();
   });
 
   it('names the call whose channel event failed to route', async () => {

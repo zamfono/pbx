@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
+import { nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { ConfigCache, type Snapshot } from '../internal/snapshot.js';
+import { seedSettings, seedUser } from '../testing/seedRows.js';
 import { groupMemberUserIds } from './extensionOwner.js';
 import { callerGroupIds } from './outboundLookup.js';
 
@@ -15,30 +16,8 @@ async function snapshotWith(deleted: string[]): Promise<Snapshot> {
   const db: Db = openDb(':memory:');
   await migrateForTest(db);
   const createdAt = nowIso();
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+15550000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+15551234', targetId, createdAt })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      mainDidId: didId,
-      country: 'DE',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
-  await db
-    .insertInto('users')
-    .values({ id: 'u1', name: 'Member', email: 'u1@x', createdAt })
-    .execute();
+  await seedSettings(db);
+  await seedUser(db, { id: 'u1', name: 'Member', email: 'u1@x', createdAt });
   await db
     .insertInto('userGroups')
     .values(
