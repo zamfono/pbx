@@ -7,115 +7,32 @@
 import type http from 'node:http';
 
 import {
-  HTTP_BAD_REQUEST,
-  HTTP_CONTENT_TOO_LARGE,
   HTTP_NO_CONTENT,
+  isRecord,
   type ConfigChangedRequest,
   type ReloadKind
 } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import type { AsteriskModule } from '../ari/types.js';
+import { readJsonBody, respondInvalidBody } from './http.js';
 import type { ConfigCache } from './snapshot.js';
 
-// `configChanged` bodies are a short list of reload kinds; this only bounds a request from the
-// internal network's one client (§3.1), not a size any real body approaches.
-const MAX_INTERNAL_BODY_BYTES = 65536;
-
-export const RELOAD_MODULES: Record<ReloadKind, AsteriskModule> = {
+const RELOAD_MODULES: Record<ReloadKind, AsteriskModule> = {
   pjsip: 'res_pjsip',
   dialplan: 'pbx_config',
   moh: 'res_musiconhold'
 };
 
-export function respondJson(
-  response: http.ServerResponse,
-  status: number,
-  body: unknown
-): void {
-  response.writeHead(status, { 'Content-Type': 'application/json' });
-  response.end(JSON.stringify(body));
-}
-
-/** A request body past its route's size limit. */
-export class BodyTooLarge extends Error {
-  constructor() {
-    super('request body too large');
-    this.name = 'BodyTooLarge';
-  }
-}
-
-/** The request's JSON body, `undefined` for an empty one; rejects with `BodyTooLarge` past
- * `maxBytes`, or with the parse error of a malformed one. */
-export function readJsonBody(
-  request: http.IncomingMessage,
-  maxBytes: number
-): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    let receivedBytes = 0;
-    let tooLarge = false;
-    request.on('data', (chunk: Buffer) => {
-      receivedBytes += chunk.length;
-      if (receivedBytes > maxBytes) {
-        // Keep draining so 'end' still fires and a response can be written on this connection,
-        // but stop buffering: the request is already rejected once it finishes.
-        tooLarge = true;
-        return;
-      }
-      chunks.push(chunk);
-    });
-    request.on('end', () => {
-      if (tooLarge) {
-        reject(new BodyTooLarge());
-        return;
-      }
-      const text = Buffer.concat(chunks).toString('utf8');
-      if (text === '') {
-        resolve(undefined);
-        return;
-      }
-      try {
-        resolve(JSON.parse(text) as unknown);
-      } catch (error) {
-        reject(error instanceof Error ? error : new Error('invalid JSON body'));
-      }
-    });
-    request.on('error', reject);
-  });
-}
-
 function isConfigChangedRequest(body: unknown): body is ConfigChangedRequest {
-  if (typeof body !== 'object' || body === null) {
-    return false;
-  }
-  const { reload } = body as { reload?: unknown };
   return (
-    Array.isArray(reload) &&
-    reload.every(
+    isRecord(body) &&
+    Array.isArray(body.reload) &&
+    body.reload.every(
       (kind: unknown) =>
         typeof kind === 'string' && Object.hasOwn(RELOAD_MODULES, kind)
     )
   );
-}
-
-/** Reads and JSON-parses the request body, reporting a malformed or oversized one. */
-async function readConfigChangedBody(
-  request: http.IncomingMessage
-): Promise<
-  { ok: true; body: unknown } | { ok: false; reason: 'malformed' | 'tooLarge' }
-> {
-  try {
-    return {
-      ok: true,
-      body: await readJsonBody(request, MAX_INTERNAL_BODY_BYTES)
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      reason: error instanceof BodyTooLarge ? 'tooLarge' : 'malformed'
-    };
-  }
 }
 
 /** `presence.ts`'s `Presence`, as far as a config change needs it. */
@@ -151,25 +68,18 @@ export async function reloadAllModules(ari: AriClient): Promise<void> {
 
 export async function handleConfigChanged(
   deps: ConfigChangedDeps,
-  request: http.IncomingMessage,
-  response: http.ServerResponse
+  response: http.ServerResponse,
+  request: http.IncomingMessage
 ): Promise<void> {
-  const parsed = await readConfigChangedBody(request);
-  if (!parsed.ok) {
-    if (parsed.reason === 'tooLarge') {
-      respondJson(response, HTTP_CONTENT_TOO_LARGE, {
-        message: 'body too large'
-      });
-      return;
-    }
-    respondJson(response, HTTP_BAD_REQUEST, { message: 'invalid body' });
-    return;
-  }
-  if (!isConfigChangedRequest(parsed.body)) {
-    respondJson(response, HTTP_BAD_REQUEST, { message: 'invalid body' });
+  const parsed = await readJsonBody(request, response);
+  if (parsed === null) {
     return;
   }
   const { body } = parsed;
+  if (!isConfigChangedRequest(body)) {
+    respondInvalidBody(response);
+    return;
+  }
   deps.cache.invalidate();
   await Promise.all(
     body.reload.map(kind =>

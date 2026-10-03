@@ -31,6 +31,7 @@ import {
   testActions
 } from '../testing/pipelineDeps.js';
 import { EventBus } from './eventBus.js';
+import { MAX_INTERNAL_BODY_BYTES } from './http.js';
 import { startInternalServer } from './server.js';
 import { ConfigCache } from './snapshot.js';
 import { StateStore } from './stateStore.js';
@@ -44,8 +45,6 @@ const VERSION = resolveVersion({
 // Every server binds whatever port is free (`0`), never a fixed one another suite running on the
 // same host at the same time may already hold.
 const ANY_FREE_PORT = 0;
-// Over the internal server's 65536-byte cap (server.ts's `MAX_INTERNAL_BODY_BYTES`).
-const OVERSIZED_BODY_BYTES = 65537;
 // What the server under test logged at error, the message and its fields.
 const errorsLogged: { fields: unknown; msg: unknown }[] = [];
 const serverLogger: Logger = {
@@ -315,6 +314,11 @@ describe('startInternalServer', () => {
       }
     );
     expect(response.status).toBe(HTTP_BAD_REQUEST);
+    expect(await response.json()).toEqual({
+      type: 'about:blank',
+      title: 'invalid body',
+      status: HTTP_BAD_REQUEST
+    });
   });
 
   it('parses the *Json config columns into the Snapshot', async () => {
@@ -415,7 +419,7 @@ describe('startInternalServer', () => {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: 'x'.repeat(OVERSIZED_BODY_BYTES)
+        body: 'x'.repeat(MAX_INTERNAL_BODY_BYTES + 1)
       }
     );
     expect(response.status).toBe(HTTP_CONTENT_TOO_LARGE);

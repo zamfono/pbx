@@ -4,7 +4,6 @@
  * the internal network is the trust boundary.
  */
 import http from 'node:http';
-import { WebSocket, WebSocketServer } from 'ws';
 
 import {
   HTTP_NOT_FOUND,
@@ -28,11 +27,12 @@ import type { Presence } from '../presence.js';
 import { handleActionRoute, handleParkingRead } from './actionRoutes.js';
 import {
   handleConfigChanged,
-  respondJson,
   type PresenceRefresh,
   type TrunkMonitoringRefresh
 } from './configChanged.js';
 import { EventBus } from './eventBus.js';
+import { attachEventStream } from './eventStream.js';
+import { respondJson, respondProblem } from './http.js';
 import { handleMwiRoute } from './mwiRoute.js';
 import { ConfigCache } from './snapshot.js';
 import { StateStore } from './stateStore.js';
@@ -79,7 +79,8 @@ async function handleHealthz(
  * `GET /internal/version` (§7 "Version"): what this `core` runs and since when, and when the
  * Asterisk it is connected to started, `null` while ARI is down or does not say; `api` reads the
  * latter each time its event stream (re)connects, to re-register the Ringotel apps after an
- * Asterisk restart it did not hear of (§10.4 "After a restart", `asteriskStarted.ts`).
+ * Asterisk restart it did not hear of (§10.4 "After a restart", `asteriskStarted.ts`). During an
+ * upgrade, or with one container left on an old image, it can differ from `api`'s own.
  */
 async function handleVersion(
   deps: InternalDeps,
@@ -125,91 +126,55 @@ async function handleState(
   respondJson(response, HTTP_OK, body);
 }
 
-async function routeRequest(
+/** Serves the request when `pathname` names this route; `null` when it names another. */
+type Route = (
+  deps: InternalDeps,
+  pathname: string,
+  response: http.ServerResponse,
+  request: http.IncomingMessage
+) => Promise<void> | null;
+
+/** The route on the one path `path`. */
+function at(
+  path: string,
+  serve: (
+    deps: InternalDeps,
+    response: http.ServerResponse,
+    request: http.IncomingMessage
+  ) => Promise<void>
+): Route {
+  return (deps, pathname, response, request) =>
+    pathname === path ? serve(deps, response, request) : null;
+}
+
+const ROUTES: Partial<Record<string, Route[]>> = {
+  GET: [
+    at('/healthz', handleHealthz),
+    at('/internal/state', handleState),
+    at('/internal/version', handleVersion),
+    at('/internal/parking', handleParkingRead)
+  ],
+  POST: [
+    at('/internal/configChanged', handleConfigChanged),
+    handleMwiRoute,
+    handleActionRoute
+  ]
+};
+
+function routeRequest(
   deps: InternalDeps,
   request: http.IncomingMessage,
   response: http.ServerResponse
 ): Promise<void> {
-  const url = new URL(request.url ?? '/', 'http://internal');
-  if (request.method === 'GET' && url.pathname === '/healthz') {
-    await handleHealthz(deps, response);
-    return;
-  }
-  if (request.method === 'POST' && url.pathname === '/internal/configChanged') {
-    await handleConfigChanged(deps, request, response);
-    return;
-  }
-  if (request.method === 'GET' && url.pathname === '/internal/state') {
-    await handleState(deps, response);
-    return;
-  }
-  // The version this `core` runs (§7 "Version"), for `api`'s `system.info`: during an upgrade, or
-  // with one container left on an old image, it can differ from `api`'s own.
-  if (request.method === 'GET' && url.pathname === '/internal/version') {
-    await handleVersion(deps, response);
-    return;
-  }
-  if (
-    request.method === 'GET' &&
-    (await handleParkingRead(deps.actions, url.pathname, response))
-  ) {
-    return;
-  }
-  if (
-    request.method === 'POST' &&
-    ((await handleMwiRoute(deps, url.pathname, response)) ||
-      (await handleActionRoute(deps.actions, url.pathname, request, response)))
-  ) {
-    return;
-  }
-  respondJson(response, HTTP_NOT_FOUND, { message: 'not found' });
-}
-
-/**
- * `ws` reports a receiver protocol violation or a broken pipe as an `'error'` event, which Node
- * throws when no listener is attached; the server, every accepted socket and every send carry
- * one, so a single bad frame or peer never takes core's Stasis app down with it (§3.1
- * "Independence").
- */
-function attachEventStream(
-  server: http.Server,
-  deps: Pick<InternalDeps, 'bus' | 'log'>
-): WebSocketServer {
-  const { bus, log } = deps;
-  const wss = new WebSocketServer({ noServer: true });
-  wss.on('error', (error: Error) => {
-    log.warn({ err: error }, 'internal event stream failed');
-  });
-  wss.on('connection', (socket: WebSocket) => {
-    const unsubscribe = bus.subscribeStream(frame => {
-      if (socket.readyState !== WebSocket.OPEN) {
-        return;
-      }
-      // The send callback receives the failure, keeping it off the socket's `'error'` channel.
-      socket.send(JSON.stringify(frame), error => {
-        if (error) {
-          unsubscribe();
-        }
-      });
-    });
-    socket.on('error', () => {
-      unsubscribe();
-      socket.terminate();
-    });
-    socket.on('close', () => {
-      unsubscribe();
-    });
-  });
-  server.on('upgrade', (request, socket, head) => {
-    if (request.url === '/internal/events') {
-      wss.handleUpgrade(request, socket, head, upgraded => {
-        wss.emit('connection', upgraded);
-      });
-    } else {
-      socket.destroy();
+  const { pathname } = new URL(request.url ?? '/', 'http://internal');
+  for (const route of ROUTES[request.method ?? ''] ?? []) {
+    const served = route(deps, pathname, response, request);
+    if (served !== null) {
+      return served;
     }
-  });
-  return wss;
+  }
+  respondProblem(response, HTTP_NOT_FOUND, 'not found');
+  return Promise.resolve();
 }
 
 /**
@@ -226,9 +191,7 @@ export function startInternalServer(
         { err: error, method: request.method, path: request.url },
         'internal API request failed'
       );
-      respondJson(response, HTTP_SERVICE_UNAVAILABLE, {
-        message: 'internal error'
-      });
+      respondProblem(response, HTTP_SERVICE_UNAVAILABLE, 'internal error');
     });
   });
   const wss = attachEventStream(server, deps);

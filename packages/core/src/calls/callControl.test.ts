@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   HTTP_BAD_REQUEST,
   HTTP_CONFLICT,
+  HTTP_CONTENT_TOO_LARGE,
   HTTP_CREATED,
   HTTP_NO_CONTENT,
   HTTP_NOT_FOUND,
@@ -15,6 +16,7 @@ import {
 import type { AriClient } from '../ari/client.js';
 import type { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
+import { MAX_INTERNAL_BODY_BYTES } from '../internal/http.js';
 import type { StateStore } from '../internal/stateStore.js';
 import {
   AST_CAUSE_CALL_REJECTED,
@@ -34,8 +36,6 @@ import { liveView } from './callState.js';
 import type { GroupLeg } from './groupLegs.js';
 import type { Pipeline } from './pipeline.js';
 
-// Over the action routes' 65536-byte body cap (actionRoutes.ts's `MAX_ACTION_BODY_BYTES`).
-const OVERSIZED_BODY_BYTES = 65537;
 const RING_TIMER_MS = 60_000;
 
 /** A user at `ext` with one device, reported registered. */
@@ -588,9 +588,9 @@ describe('call control', () => {
     expect(missing.status).toBe(HTTP_BAD_REQUEST);
     const oversized = await post(`${call.id}/hold`, {
       actorUserId: memberId,
-      pad: 'x'.repeat(OVERSIZED_BODY_BYTES)
+      pad: 'x'.repeat(MAX_INTERNAL_BODY_BYTES + 1)
     });
-    expect(oversized.status).toBe(HTTP_BAD_REQUEST);
+    expect(oversized.status).toBe(HTTP_CONTENT_TOO_LARGE);
     await eventually(async () => {
       const resumed = await post(`${call.id}/resume`, {
         actorUserId: memberId

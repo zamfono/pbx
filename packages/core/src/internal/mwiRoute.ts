@@ -36,18 +36,22 @@ function matchMwiRoute(pathname: string): MwiMailbox | null {
   }
 }
 
-/** Serves the MWI trigger `POST`; `false` when `pathname` names no mailbox on its route. */
-export async function handleMwiRoute(
+async function serveMwi(
   deps: { db: Db; ari: AriClient },
-  pathname: string,
+  mailbox: MwiMailbox,
   response: http.ServerResponse
-): Promise<boolean> {
-  const mailbox = matchMwiRoute(pathname);
-  if (mailbox === null) {
-    return false;
-  }
+): Promise<void> {
   await refreshMwi(deps, parseMwiMailbox(mailbox));
   response.writeHead(HTTP_NO_CONTENT);
   response.end();
-  return true;
+}
+
+/** Serves the MWI trigger `POST`; `null` when `pathname` names no mailbox on its route. */
+export function handleMwiRoute(
+  deps: { db: Db; ari: AriClient },
+  pathname: string,
+  response: http.ServerResponse
+): Promise<void> | null {
+  const mailbox = matchMwiRoute(pathname);
+  return mailbox === null ? null : serveMwi(deps, mailbox, response);
 }

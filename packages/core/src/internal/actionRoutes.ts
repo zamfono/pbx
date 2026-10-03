@@ -6,11 +6,7 @@
  */
 import type http from 'node:http';
 
-import {
-  HTTP_BAD_REQUEST,
-  HTTP_OK,
-  PROBLEM_CONTENT_TYPE
-} from '@zamfono/shared';
+import { HTTP_OK, isRecord } from '@zamfono/shared';
 
 import { ActionError } from '../calls/actionError.js';
 import type { CallActions } from '../calls/actions.js';
@@ -20,25 +16,15 @@ import {
   type ActionRoute,
   type Body
 } from './actionTable.js';
-import { readJsonBody, respondJson } from './configChanged.js';
+import {
+  readJsonBody,
+  respondInvalidBody,
+  respondJson,
+  respondProblem
+} from './http.js';
 
-// Action bodies are a few ids and a dial string; this only bounds a request from the internal
-// network's one client (§3.1).
-const MAX_ACTION_BODY_BYTES = 65536;
 const CALL_ACTION_ROUTE =
   /^\/internal\/calls\/(?<callId>[^/]+)\/(?<action>[^/]+)$/u;
-
-/** The JSON object body of an action request, `{}` for an empty one; `null` for a malformed,
- * non-object or oversized one. */
-async function readActionBody(
-  request: http.IncomingMessage
-): Promise<Body | null> {
-  const parsed = await readJsonBody(request, MAX_ACTION_BODY_BYTES).catch(
-    () => null
-  );
-  const body = parsed === undefined ? {} : parsed;
-  return typeof body === 'object' && body !== null ? (body as Body) : null;
-}
 
 /** The route `pathname` names, a call action's run bound to its call; `null` off every action
  * route. */
@@ -72,36 +58,26 @@ function bodyValid(route: ActionRoute, body: Body): boolean {
   );
 }
 
-/** An RFC 9457 problem, the shape `api` answers its own errors in (§10.3): `detail` names the
- * cause (§10.2 `noRegisteredDevice`). */
-function respondProblem(
-  response: http.ServerResponse,
-  status: number,
-  title: string,
-  detail: string
-): void {
-  response.writeHead(status, { 'Content-Type': PROBLEM_CONTENT_TYPE });
-  response.end(JSON.stringify({ type: 'about:blank', title, status, detail }));
-}
-
 /**
- * Serves one action `POST`; `false` when `pathname` names no action route. A refused action (`ActionError`) answers its status as a problem whose `detail` is
- * the cause, where `api`'s core client reads it (§10.2 `noRegisteredDevice`).
+ * Serves one action `POST` with `route`'s body. A refused action (`ActionError`) answers its
+ * status as a problem whose `detail` is the cause, where `api`'s core client reads it (§10.2
+ * `noRegisteredDevice`).
  */
-export async function handleActionRoute(
+async function serveAction(
   actions: CallActions,
-  pathname: string,
-  request: http.IncomingMessage,
-  response: http.ServerResponse
-): Promise<boolean> {
-  const route = matchActionRoute(pathname);
-  if (route === null) {
-    return false;
+  route: ActionRoute,
+  response: http.ServerResponse,
+  request: http.IncomingMessage
+): Promise<void> {
+  const parsed = await readJsonBody(request, response);
+  if (parsed === null) {
+    return;
   }
-  const body = await readActionBody(request);
-  if (body === null || !bodyValid(route, body)) {
-    respondJson(response, HTTP_BAD_REQUEST, { message: 'invalid body' });
-    return true;
+  // An empty body is an action with no fields.
+  const body = parsed.body === undefined ? {} : parsed.body;
+  if (!isRecord(body) || !bodyValid(route, body)) {
+    respondInvalidBody(response);
+    return;
   }
   try {
     const answer = await route.run(actions, body);
@@ -117,18 +93,23 @@ export async function handleActionRoute(
     }
     respondProblem(response, error.status, error.message, error.reason);
   }
-  return true;
 }
 
-/** `GET /internal/parking` (§10.2 "Call parking"): the occupied slots; `false` off that path. */
-export async function handleParkingRead(
-  actions: CallActions,
+/** Serves an action `POST`; `null` when `pathname` names no action route. */
+export function handleActionRoute(
+  { actions }: { actions: CallActions },
   pathname: string,
+  response: http.ServerResponse,
+  request: http.IncomingMessage
+): Promise<void> | null {
+  const route = matchActionRoute(pathname);
+  return route === null ? null : serveAction(actions, route, response, request);
+}
+
+/** `GET /internal/parking` (§10.2 "Call parking"): the occupied slots. */
+export async function handleParkingRead(
+  { actions }: { actions: CallActions },
   response: http.ServerResponse
-): Promise<boolean> {
-  if (pathname !== '/internal/parking') {
-    return false;
-  }
+): Promise<void> {
   respondJson(response, HTTP_OK, await actions.parked());
-  return true;
 }
