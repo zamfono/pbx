@@ -66,7 +66,7 @@ arguments:
      address (`10.…`, `172.16–31.…`, `192.168.…`) behind NAT is the classic cause. A leg whose
      figures are all null but whose `rxPackets` is above 0 received audio; only its far end sends
      no RTCP. `rxPackets` null means the count is unknown (a row from RTCP reports alone, or one
-     written before the counts existed), not 0.
+     whose summary named no count), not 0.
    - The opposite case, Asterisk's audio not reaching the device, is not visible in these counts:
      `txPackets` counts what Asterisk sent, not what arrived. The far end hears nothing while its
      own leg reads a healthy `txPackets`; ask the person on that side, or read the other leg's
