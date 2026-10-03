@@ -9,8 +9,9 @@ import {
   type DB
 } from '@zamfono/shared';
 
+import { assertNoLiveHolder } from '../liveHolder.js';
 import { logLevelWire, type LogLevelColumns } from '../settings/logLevel.js';
-import { Conflict, OpError, type Role } from '../types.js';
+import { OpError, type Role } from '../types.js';
 import { accountLockedUntil } from './_accountLock.js';
 import { userExtension } from './_extensions.js';
 
@@ -196,20 +197,12 @@ export async function assertEmailAvailable(
   email: string,
   excludeId?: string
 ): Promise<void> {
-  let query = db
-    .selectFrom('users')
-    .select(['id', 'email'])
-    .where('email', '=', email)
-    .where('deletedAt', 'is', null);
-  if (excludeId !== undefined) {
-    query = query.where('id', '!=', excludeId);
-  }
-  const existing = await query.executeTakeFirst();
-  if (existing) {
-    throw new Conflict('users: e-mail already in use', [
-      { kind: 'user', id: existing.id, label: existing.email }
-    ]);
-  }
+  await assertNoLiveHolder(
+    db,
+    'users: e-mail already in use',
+    { table: 'users', kind: 'user', label: 'email', values: { email } },
+    excludeId
+  );
 }
 
 /** Loads a live user by id, or throws `OpError(404)`. */

@@ -2,8 +2,9 @@ import { z } from 'zod';
 
 import { newId, normalizeInbound } from '@zamfono/shared';
 
+import { assertNoLiveHolder } from '../liveHolder.js';
 import { propagate, recordChange } from '../runner.js';
-import { Conflict, defineOperation, type Context } from '../types.js';
+import { defineOperation, type Context } from '../types.js';
 import {
   createTarget,
   targetInputSchema,
@@ -77,17 +78,12 @@ export const create = defineOperation({
       .select('country')
       .executeTakeFirstOrThrow();
     const number = normalizeInbound(input.number, 'national', settings.country);
-    const existing = await ctx.db
-      .selectFrom('dids')
-      .select('id')
-      .where('number', '=', number)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (existing) {
-      throw new Conflict('dids: number already in use', [
-        { kind: 'did', id: existing.id, label: number }
-      ]);
-    }
+    await assertNoLiveHolder(ctx.db, 'dids: number already in use', {
+      table: 'dids',
+      kind: 'did',
+      label: 'number',
+      values: { number }
+    });
     const targetId = await createTarget(ctx, input.target);
     const id = newId();
     const label = input.label ?? null;

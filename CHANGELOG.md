@@ -213,6 +213,9 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- A trunk refused for a name another trunk already has, or for an inbound-auth username a device
+  or another trunk already uses as its SIP name, answered a bare 409; the 409 now names that
+  device or trunk in `references`, as every other refused duplicate does.
 - `core` ignored the stop signal, so every `docker compose stop`, restart and update waited out
   the 10 s grace period and then killed it, and the calls it left running died with Asterisk,
   their history entries marked `interrupted` at the next start. `core` now stops on SIGTERM and

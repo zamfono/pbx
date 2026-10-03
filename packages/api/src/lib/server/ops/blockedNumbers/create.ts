@@ -2,8 +2,9 @@ import { z } from 'zod';
 
 import { isE164, newId } from '@zamfono/shared';
 
+import { assertNoLiveHolder } from '../liveHolder.js';
 import { propagate, recordChange } from '../runner.js';
-import { Conflict, defineOperation } from '../types.js';
+import { defineOperation } from '../types.js';
 
 const inputSchema = z
   .object({
@@ -44,18 +45,12 @@ export const create = defineOperation<Input, CreateOutput>({
   }),
   run: async (ctx, input) => {
     const isPrefix = input.isPrefix ?? false;
-    const existing = await ctx.db
-      .selectFrom('blockedNumbers')
-      .select('id')
-      .where('number', '=', input.number)
-      .where('isPrefix', '=', isPrefix ? 1 : 0)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (existing) {
-      throw new Conflict('blockedNumbers: already blocked', [
-        { kind: 'blockedNumber', id: existing.id, label: input.number }
-      ]);
-    }
+    await assertNoLiveHolder(ctx.db, 'blockedNumbers: already blocked', {
+      table: 'blockedNumbers',
+      kind: 'blockedNumber',
+      label: 'number',
+      values: { number: input.number, isPrefix: isPrefix ? 1 : 0 }
+    });
     const id = newId();
     const label = input.label ?? null;
     await ctx.db

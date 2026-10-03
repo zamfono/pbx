@@ -1,7 +1,6 @@
 import * as env from '$app/env/private';
 
 import {
-  HTTP_CONFLICT,
   HTTP_UNPROCESSABLE_CONTENT,
   TRUNK_SECTION_PREFIX,
   type Db
@@ -9,7 +8,9 @@ import {
 
 import { plainSipTransports } from '#lib/server/stackAddress.js';
 
-import { OpError } from '../types.js';
+import { endpointNameHolder } from '../devices/_sipUsername.js';
+import { assertNoLiveHolder } from '../liveHolder.js';
+import { Conflict, OpError } from '../types.js';
 import {
   hasEmergencyTrunk,
   type CallerIdHeader,
@@ -100,18 +101,12 @@ export async function assertNameAvailable(
   name: string,
   excludeId?: string
 ): Promise<void> {
-  let query = db
-    .selectFrom('trunks')
-    .select('id')
-    .where('name', '=', name)
-    .where('deletedAt', 'is', null);
-  if (excludeId !== undefined) {
-    query = query.where('id', '!=', excludeId);
-  }
-  const existing = await query.executeTakeFirst();
-  if (existing) {
-    throw new OpError(HTTP_CONFLICT, `trunk name already in use: ${name}`);
-  }
+  await assertNoLiveHolder(
+    db,
+    'trunks: name already in use',
+    { table: 'trunks', kind: 'trunk', label: 'name', values: { name } },
+    excludeId
+  );
 }
 
 /**
@@ -132,26 +127,13 @@ export async function assertInboundAuthUsernameFree(
       `username cannot name an inbound-auth endpoint: ${username}`
     );
   }
-  let trunks = db
-    .selectFrom('trunks')
-    .select('id')
-    .where('username', '=', username)
-    .where('inboundAuth', '=', 1)
-    .where('deletedAt', 'is', null);
-  if (excludeId !== undefined) {
-    trunks = trunks.where('id', '!=', excludeId);
-  }
-  const device = await db
-    .selectFrom('devices')
-    .select('id')
-    .where('sipUsername', '=', username)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (device !== undefined || (await trunks.executeTakeFirst()) !== undefined) {
-    throw new OpError(
-      HTTP_CONFLICT,
-      `username already names a SIP endpoint: ${username}`
-    );
+  const holder = await endpointNameHolder(db, username, {
+    trunkId: excludeId
+  });
+  if (holder) {
+    throw new Conflict('trunks: username already names a SIP endpoint', [
+      holder
+    ]);
   }
 }
 

@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { newId, normalizeInbound } from '@zamfono/shared';
 
 import { createTarget, type TargetInput } from '../dids/_shared.js';
+import { assertNoLiveHolder } from '../liveHolder.js';
 import { propagate, recordChange } from '../runner.js';
-import { Conflict, defineOperation } from '../types.js';
+import { defineOperation } from '../types.js';
 import { DIGITS_SCHEMA, FALLBACK_TARGET_SCHEMA } from './_shared.js';
 
 /**
@@ -65,17 +66,12 @@ export const create = defineOperation<Input, CreateOutput>({
     // A block covers the DIDs whose number begins with its base (§11.3), so base and number are
     // stored in the same international form `dids.create` normalizes a number to.
     const base = normalizeInbound(input.base, 'national', settings.country);
-    const existing = await ctx.db
-      .selectFrom('didBlocks')
-      .select('id')
-      .where('base', '=', base)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-    if (existing) {
-      throw new Conflict('didBlocks: base already in use', [
-        { kind: 'didBlock', id: existing.id, label: base }
-      ]);
-    }
+    await assertNoLiveHolder(ctx.db, 'didBlocks: base already in use', {
+      table: 'didBlocks',
+      kind: 'didBlock',
+      label: 'base',
+      values: { base }
+    });
     const fallbackTargetId = input.fallbackTarget
       ? await createTarget(ctx, input.fallbackTarget)
       : null;

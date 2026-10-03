@@ -14,8 +14,9 @@ import {
   targetSpecSchema,
   type TargetSpec
 } from '../forwardTargetSpec.js';
+import { assertNoLiveHolder } from '../liveHolder.js';
 import { logLevelWire, type LogLevelColumns } from '../settings/logLevel.js';
-import { Conflict, OpError } from '../types.js';
+import { OpError } from '../types.js';
 import { ringGroupMembers, type RingGroupMemberOut } from './_members.js';
 
 export {
@@ -110,20 +111,12 @@ export async function assertNameAvailable(
   name: string,
   excludeId?: string
 ): Promise<void> {
-  let query = db
-    .selectFrom('ringGroups')
-    .select(['id', 'name'])
-    .where('name', '=', name)
-    .where('deletedAt', 'is', null);
-  if (excludeId !== undefined) {
-    query = query.where('id', '!=', excludeId);
-  }
-  const existing = await query.executeTakeFirst();
-  if (existing) {
-    throw new Conflict('ringGroups: name already in use', [
-      { kind: 'ringGroup', id: existing.id, label: existing.name }
-    ]);
-  }
+  await assertNoLiveHolder(
+    db,
+    'ringGroups: name already in use',
+    { table: 'ringGroups', kind: 'ringGroup', label: 'name', values: { name } },
+    excludeId
+  );
 }
 
 export type RingGroupOut = LogLevelColumns & {

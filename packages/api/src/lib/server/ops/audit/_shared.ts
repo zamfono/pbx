@@ -72,6 +72,3 @@ export function toAuditEntryOut(row: AuditLogRow): AuditEntryOut {
     createdAt: row.createdAt
   };
 }
-
-/** A live row that already holds a value a reverted row would bring back into use (§5.8). */
-export type Collision = { kind: string; id: string; label: string };

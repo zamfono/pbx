@@ -10,7 +10,8 @@ import {
   targetSpecSchema,
   type TargetSpec
 } from '../forwardTargetSpec.js';
-import { Conflict, OpError } from '../types.js';
+import { assertNoLiveHolder } from '../liveHolder.js';
+import { OpError } from '../types.js';
 
 export {
   targetSpecSchema,
@@ -69,20 +70,12 @@ export async function assertNameAvailable(
   name: string,
   excludeId?: string
 ): Promise<void> {
-  let query = db
-    .selectFrom('menus')
-    .select(['id', 'name'])
-    .where('name', '=', name)
-    .where('deletedAt', 'is', null);
-  if (excludeId !== undefined) {
-    query = query.where('id', '!=', excludeId);
-  }
-  const existing = await query.executeTakeFirst();
-  if (existing) {
-    throw new Conflict('menus: name already in use', [
-      { kind: 'menu', id: existing.id, label: existing.name }
-    ]);
-  }
+  await assertNoLiveHolder(
+    db,
+    'menus: name already in use',
+    { table: 'menus', kind: 'menu', label: 'name', values: { name } },
+    excludeId
+  );
 }
 
 /** The digit strings `menu_targets.digits` accepts: one or more of `0-9 * #` (§11.2). */

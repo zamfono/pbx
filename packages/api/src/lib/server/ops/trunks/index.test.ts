@@ -222,11 +222,14 @@ describe('trunks operations', () => {
     ]);
   });
 
-  it('refuses a duplicate trunk name', async () => {
+  it('refuses a duplicate trunk name, naming the trunk holding it', async () => {
     const db = await makeTestDb();
-    await createTrunk(db, { name: 'Provider A' });
+    const { trunk: holder } = await createTrunk(db, { name: 'Provider A' });
     await expect(createTrunk(db, { name: 'Provider A' })).rejects.toMatchObject(
-      { status: 409 }
+      {
+        status: 409,
+        references: [{ kind: 'trunk', id: holder.id, label: 'Provider A' }]
+      }
     );
   });
 
@@ -437,10 +440,16 @@ describe('trunks operations', () => {
       username: 'acct-4711',
       password: 'secret-4711'
     };
-    await createTrunk(db, { name: 'Provider A', ...inboundAuth });
+    const { trunk: holder } = await createTrunk(db, {
+      name: 'Provider A',
+      ...inboundAuth
+    });
     await expect(
       createTrunk(db, { name: 'Provider B', ...inboundAuth })
-    ).rejects.toMatchObject({ status: 409 });
+    ).rejects.toMatchObject({
+      status: 409,
+      references: [{ kind: 'trunk', id: holder.id, label: 'Provider A' }]
+    });
     await expect(
       createTrunk(db, {
         name: 'Provider C',

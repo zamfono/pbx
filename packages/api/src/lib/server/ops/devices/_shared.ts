@@ -2,7 +2,8 @@ import type { Selectable, Transaction } from 'kysely';
 
 import { HTTP_FORBIDDEN, HTTP_NOT_FOUND, type DB } from '@zamfono/shared';
 
-import { Conflict, OpError, type Context } from '../types.js';
+import { assertNoLiveHolder } from '../liveHolder.js';
+import { OpError, type Context } from '../types.js';
 
 /** A `devices` row as Kysely's `CamelCasePlugin` maps it (§11.2); never carries the raw password. */
 export type DeviceRow = Selectable<DB['devices']>;
@@ -20,18 +21,12 @@ export async function assertNoExistingRingotelDevice(
   db: Transaction<DB>,
   userId: string
 ): Promise<void> {
-  const existing = await db
-    .selectFrom('devices')
-    .select(['id', 'label'])
-    .where('userId', '=', userId)
-    .where('kind', '=', 'ringotel')
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (existing) {
-    throw new Conflict('users: already has a ringotel device', [
-      { kind: 'device', id: existing.id, label: existing.label }
-    ]);
-  }
+  await assertNoLiveHolder(db, 'users: already has a ringotel device', {
+    table: 'devices',
+    kind: 'device',
+    label: 'label',
+    values: { userId, kind: 'ringotel' }
+  });
 }
 
 export type DeviceOut = {

@@ -2,8 +2,9 @@ import type { Selectable, Transaction } from 'kysely';
 
 import { HTTP_NOT_FOUND, type DB } from '@zamfono/shared';
 
+import { assertNoLiveHolder } from '../liveHolder.js';
 import { assertMembersValid, type MemberSpec } from '../members.js';
-import { Conflict, OpError } from '../types.js';
+import { OpError } from '../types.js';
 import { assertNoCycle, loadEdgesExcludingParent } from './_nesting.js';
 
 /** A `user_groups` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
@@ -33,20 +34,12 @@ export async function assertNameAvailable(
   name: string,
   excludeId?: string
 ): Promise<void> {
-  let query = db
-    .selectFrom('userGroups')
-    .select(['id', 'name'])
-    .where('name', '=', name)
-    .where('deletedAt', 'is', null);
-  if (excludeId !== undefined) {
-    query = query.where('id', '!=', excludeId);
-  }
-  const existing = await query.executeTakeFirst();
-  if (existing) {
-    throw new Conflict('userGroups: name already in use', [
-      { kind: 'userGroup', id: existing.id, label: existing.name }
-    ]);
-  }
+  await assertNoLiveHolder(
+    db,
+    'userGroups: name already in use',
+    { table: 'userGroups', kind: 'userGroup', label: 'name', values: { name } },
+    excludeId
+  );
 }
 
 export type UserGroupMemberOut = { kind: 'user' | 'userGroup'; id: string };

@@ -1,8 +1,10 @@
 import type { Transaction } from 'kysely';
 
-import type { DB } from '@zamfono/shared';
+import type { DB, Db } from '@zamfono/shared';
 
 import { newSlug, sipUsername } from '#lib/server/sip.js';
+
+import { liveHolder, type Collision } from '../liveHolder.js';
 
 // §11.2 `devices_sip_username` (unique among live devices): a 5-character slug drawn from 36
 // characters gives ~60M combinations per extension, so a handful of retries clears the rare
@@ -10,33 +12,36 @@ import { newSlug, sipUsername } from '#lib/server/sip.js';
 const MAX_USERNAME_ATTEMPTS = 5;
 
 /**
- * Whether `candidate` already names a SIP endpoint other than device `excludeId`'s: a live device
- * (§11.2 `devices_sip_username`), or a live `inbound_auth` trunk, whose inbound endpoint is named
- * by its username (§9.4 "Inbound identification", `identify_by = auth_username`). The trunk side
- * refuses a username a device holds (`trunks/_writeChecks.ts`); this is the reverse guard.
+ * The live row already naming the SIP endpoint `name`: a device (§11.2 `devices_sip_username`),
+ * or an `inbound_auth` trunk, whose inbound endpoint is named by its username (§9.4 "Inbound
+ * identification", `identify_by = auth_username`). `exclude` is the row being written.
  */
-async function endpointNameTaken(
-  db: Transaction<DB>,
-  candidate: string,
-  excludeId?: string
-): Promise<boolean> {
-  let devices = db
-    .selectFrom('devices')
-    .select('id')
-    .where('sipUsername', '=', candidate)
-    .where('deletedAt', 'is', null);
-  if (excludeId !== undefined) {
-    devices = devices.where('id', '!=', excludeId);
-  }
-  const trunk = await db
-    .selectFrom('trunks')
-    .select('id')
-    .where('username', '=', candidate)
-    .where('inboundAuth', '=', 1)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
+export async function endpointNameHolder(
+  db: Db,
+  name: string,
+  exclude: { deviceId?: string; trunkId?: string } = {}
+): Promise<Collision | null> {
   return (
-    trunk !== undefined || (await devices.executeTakeFirst()) !== undefined
+    (await liveHolder(
+      db,
+      {
+        table: 'devices',
+        kind: 'device',
+        label: 'label',
+        values: { sipUsername: name }
+      },
+      exclude.deviceId
+    )) ??
+    (await liveHolder(
+      db,
+      {
+        table: 'trunks',
+        kind: 'trunk',
+        label: 'name',
+        values: { username: name, inboundAuth: 1 }
+      },
+      exclude.trunkId
+    ))
   );
 }
 
@@ -53,7 +58,10 @@ export async function uniqueSipUsername(
   for (let attempt = 0; attempt < MAX_USERNAME_ATTEMPTS; attempt += 1) {
     const candidate = sipUsername(ext, newSlug());
     // eslint-disable-next-line no-await-in-loop -- each retry must see the previous candidate's outcome
-    if (!(await endpointNameTaken(db, candidate, excludeId))) {
+    const holder = await endpointNameHolder(db, candidate, {
+      deviceId: excludeId
+    });
+    if (holder === null) {
       return candidate;
     }
   }
@@ -71,7 +79,7 @@ export async function sipUsernameOrFresh(
   deviceId: string,
   preferred: string
 ): Promise<string> {
-  return (await endpointNameTaken(db, preferred, deviceId))
-    ? uniqueSipUsername(db, ext, deviceId)
-    : preferred;
+  return (await endpointNameHolder(db, preferred, { deviceId })) === null
+    ? preferred
+    : uniqueSipUsername(db, ext, deviceId);
 }
