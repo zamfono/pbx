@@ -3,6 +3,7 @@ import http from 'node:http';
 
 import type { RunRequester, UpdaterStatus, UpdateState } from '@zamfono/shared';
 
+import { errorMessage } from './errors.js';
 import type { Release, Releases } from './releases.js';
 import type { Runner } from './runner.js';
 import type { UpdateVerdict } from './stack.js';
@@ -25,7 +26,8 @@ const PINS_NO_RELEASE =
   'the stack directory pins no release; update it once with update.sh on the host';
 
 export type ServerDeps = {
-  token: string;
+  /** `undefined` while `UPDATER_TOKEN` is not set, which refuses every request. */
+  token: string | undefined;
   releases: Releases;
   /** The version the stack directory runs, read afresh on every request. */
   currentVersion: () => Promise<Version | undefined>;
@@ -87,7 +89,7 @@ async function describeStatus(deps: ServerDeps): Promise<UpdaterStatus> {
     return {
       ...base,
       latest: null,
-      latestError: error instanceof Error ? error.message : String(error),
+      latestError: errorMessage(error),
       updatable: false,
       breaking: false
     };
@@ -199,7 +201,7 @@ async function route(
   deps: ServerDeps,
   request: http.IncomingMessage
 ): Promise<[number, unknown]> {
-  if (deps.token === '') {
+  if (deps.token === undefined) {
     throw new HttpError(HTTP_SERVICE_UNAVAILABLE, 'UPDATER_TOKEN is not set');
   }
   if (!authorized(request.headers.authorization, deps.token)) {
@@ -227,7 +229,7 @@ export function createServer(deps: ServerDeps): http.Server {
           return;
         }
         send(response, HTTP_SERVICE_UNAVAILABLE, {
-          error: error instanceof Error ? error.message : String(error)
+          error: errorMessage(error)
         });
       }
     );

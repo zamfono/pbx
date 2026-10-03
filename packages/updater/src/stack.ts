@@ -20,7 +20,19 @@ const VERDICTS = new Map<number, UpdateVerdict>([
 
 type ScriptResult = { status: number; stdout: string; stderr: string };
 
-/** `update.sh <args>` in the stack directory as the updater's run (`ZAMFONO_UPDATER=1`). */
+/** The environment `update.sh` runs in as the updater's run (`ZAMFONO_UPDATER=1`), plus `extra`. */
+export function scriptEnv(
+  extra: Record<string, string> = {}
+): NodeJS.ProcessEnv {
+  return {
+    PATH: process.env.PATH,
+    HOME: process.env.HOME,
+    ZAMFONO_UPDATER: '1',
+    ...extra
+  };
+}
+
+/** `update.sh <args>` in the stack directory, as the updater's run. */
 async function runScript(
   stackDir: string,
   args: readonly string[]
@@ -31,11 +43,7 @@ async function runScript(
       [path.join(stackDir, 'update.sh'), ...args],
       {
         cwd: stackDir,
-        env: {
-          PATH: process.env.PATH,
-          HOME: process.env.HOME,
-          ZAMFONO_UPDATER: '1'
-        }
+        env: scriptEnv()
       },
       (error, stdout, stderr) => {
         if (error !== null && typeof error.code !== 'number') {

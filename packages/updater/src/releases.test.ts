@@ -35,7 +35,11 @@ describe('createReleases', () => {
     const { fetchFn, urls } = answering({
       [LATEST]: {
         status: HTTP_OK,
-        body: { tag_name: 'v0.0.6', html_url: 'https://example/v0.0.6' }
+        body: {
+          tag_name: 'v0.0.6',
+          html_url: 'https://example/v0.0.6',
+          published_at: '2026-10-01T10:00:00Z'
+        }
       }
     });
     const clock = { now: 0 };
@@ -59,6 +63,13 @@ describe('createReleases', () => {
     const releases = createReleases(fetchFn);
     expect(await releases.byVersion('0.0.6')).toBeUndefined();
     expect(await releases.byVersion('9.9.9')).toBeUndefined();
+  });
+
+  it('knows no release GitHub describes without its page or date', async () => {
+    const { fetchFn } = answering({
+      [TAG]: { status: HTTP_OK, body: { tag_name: 'v0.0.6' } }
+    });
+    expect(await createReleases(fetchFn).byVersion('0.0.6')).toBeUndefined();
   });
 
   it('gives up on a GitHub that does not answer, and keeps that for ten minutes', async () => {

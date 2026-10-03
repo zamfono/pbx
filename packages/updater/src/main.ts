@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { inspectProject, type ComposeProject } from './docker.js';
+import { errorMessage } from './errors.js';
 import { createReleases } from './releases.js';
 import { createRunner, type Runner } from './runner.js';
 import { createServer } from './server.js';
@@ -16,7 +17,8 @@ import { checkUpdate, stackVersion } from './stack.js';
  */
 const STACK_DIR = '/stack';
 const SOCKET = '/var/run/docker.sock';
-const DEFAULT_PORT = 8080;
+/** The internal port `api` reaches the updater on. */
+const PORT = 8080;
 
 function log(message: string, fields: Record<string, unknown> = {}): void {
   process.stdout.write(
@@ -70,15 +72,17 @@ async function prepare(): Promise<{ runner?: Runner; unavailable?: string }> {
       })
     };
   } catch (error) {
-    const unavailable = error instanceof Error ? error.message : String(error);
+    const unavailable = errorMessage(error);
     log('updater cannot update', { error: unavailable });
     return { unavailable };
   }
 }
 
 const { runner, unavailable } = await prepare();
-const token = process.env.UPDATER_TOKEN ?? '';
-if (token === '') {
+// Compose hands an unset UPDATER_TOKEN over empty, which counts as unset.
+const token =
+  process.env.UPDATER_TOKEN === '' ? undefined : process.env.UPDATER_TOKEN;
+if (token === undefined) {
   log('UPDATER_TOKEN is not set: every request is refused');
 }
 createServer({
@@ -88,4 +92,4 @@ createServer({
   checkUpdate: async version => checkUpdate(STACK_DIR, version),
   runner,
   ...(unavailable === undefined ? {} : { unavailable })
-}).listen(Number(process.env.PORT ?? DEFAULT_PORT));
+}).listen(PORT);

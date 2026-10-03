@@ -112,7 +112,7 @@ describe('the updater API', () => {
     expect(
       (await call(base, 'GET', '/status', undefined, 'wrong')).status
     ).toBe(HTTP_UNAUTHORIZED);
-    const unset = await serve(deps({ token: '' }));
+    const unset = await serve(deps({ token: undefined }));
     expect((await call(unset, 'GET', '/status', undefined, '')).status).toBe(
       HTTP_SERVICE_UNAVAILABLE
     );

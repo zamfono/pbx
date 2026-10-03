@@ -7,6 +7,7 @@ import path from 'node:path';
 import type { RunRequester, UpdateState } from '@zamfono/shared';
 
 import type { ComposeProject } from './docker.js';
+import { scriptEnv } from './stack.js';
 
 const LOG_TAIL_LINES = 20;
 const JSON_INDENT = 2;
@@ -42,6 +43,10 @@ export type RunnerOptions = {
   now?: () => string;
 };
 
+function isoNow(): string {
+  return new Date().toISOString();
+}
+
 function stateFile(stackDir: string): string {
   return path.join(stackDir, '.update', 'state.json');
 }
@@ -62,16 +67,19 @@ async function persist(stackDir: string, state: UpdateState): Promise<void> {
 /**
  * `state`, with a `running` run that cannot still be running marked failed: the updater's own,
  * since the updater never restarts itself, so a stop or a reboot of the host cut it off; or a run
- * of `update.sh` on the host started `HOST_RUN_STALE_MS` ago or longer. A younger host run is left
- * as it is: it recreates the updater while it runs, and writes its own end once it ends.
+ * of `update.sh` on the host started `HOST_RUN_STALE_MS` ago or longer, or at no recorded time. A
+ * younger host run is left as it is: it recreates the updater while it runs, and writes its own
+ * end once it ends.
  */
 function settle(state: UpdateState, now: string): UpdateState {
   if (state.state !== 'running') {
     return state;
   }
   if (state.trigger === 'host') {
-    const startedMs = Date.parse(state.startedAt ?? '');
-    if (Date.parse(now) - startedMs < HOST_RUN_STALE_MS) {
+    if (
+      state.startedAt !== undefined &&
+      Date.parse(now) - Date.parse(state.startedAt) < HOST_RUN_STALE_MS
+    ) {
       return state;
     }
     return {
@@ -92,7 +100,7 @@ function settle(state: UpdateState, now: string): UpdateState {
 /** The state `.update/state.json` holds, `settle`d, and written back when that changed it. */
 export async function loadState(
   stackDir: string,
-  now: () => string = () => new Date().toISOString()
+  now: () => string = isoNow
 ): Promise<UpdateState> {
   let state: UpdateState = { state: 'idle' };
   try {
@@ -148,19 +156,16 @@ function spawnUpdate(
     // The host's path, which main.ts links to the mounted stack directory: Compose resolves the
     // files' relative paths (./Caddyfile) against it, and the runtime reads them there.
     cwd: options.project.workingDir,
-    env: {
-      PATH: process.env.PATH,
-      HOME: process.env.HOME,
-      ZAMFONO_UPDATER: '1',
+    env: scriptEnv({
       COMPOSE_PROJECT_NAME: options.project.name,
       DOCKER_HOST: `unix://${options.socketPath}`
-    },
+    }),
     stdio: ['ignore', logFd, logFd]
   });
 }
 
 export async function createRunner(options: RunnerOptions): Promise<Runner> {
-  const now = options.now ?? (() => new Date().toISOString());
+  const now = options.now ?? isoNow;
   let state = await loadState(options.stackDir, now);
   const logFile = path.join(options.stackDir, '.update', 'update.log');
   const script = path.join(options.project.workingDir, 'update.sh');

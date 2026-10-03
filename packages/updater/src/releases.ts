@@ -25,20 +25,21 @@ type GitHubRelease = {
   prerelease?: unknown;
 };
 
+/** A published release GitHub describes in full; anything else is none the updater installs. */
 function toRelease(body: GitHubRelease): Release | undefined {
   if (body.draft === true || body.prerelease === true) {
     return undefined;
   }
   const version =
     typeof body.tag_name === 'string' ? parseVersion(body.tag_name) : undefined;
-  if (version === undefined) {
+  if (
+    version === undefined ||
+    typeof body.html_url !== 'string' ||
+    typeof body.published_at !== 'string'
+  ) {
     return undefined;
   }
-  return {
-    version,
-    url: typeof body.html_url === 'string' ? body.html_url : '',
-    publishedAt: typeof body.published_at === 'string' ? body.published_at : ''
-  };
+  return { version, url: body.html_url, publishedAt: body.published_at };
 }
 
 export type Releases = {

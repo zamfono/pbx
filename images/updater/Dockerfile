@@ -22,7 +22,6 @@ COPY packages/updater/package.json package.json
 COPY --from=build /app/packages/updater/dist dist
 # Root, deliberately: the socket it drives belongs to root, and it links the host's stack path
 # inside its own filesystem at start (main.ts).
-ENV PORT=8080
 
 ARG ZAMFONO_REVISION
 LABEL org.opencontainers.image.revision=$ZAMFONO_REVISION
