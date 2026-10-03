@@ -4,7 +4,7 @@
 #
 # The four features §6.3 "Runtimes" says differ between Docker and Podman are what this guards, so
 # it asserts each of them explicitly rather than inferring them from a call that happened to work.
-# Local run: build `DEVICES_IMAGE` first (see compose.test.yaml's `devices` service for how).
+# Local run: build the images first (`docker buildx bake --load`, docker-bake.hcl).
 #
 # Usage:
 #   bash test/integration/run.sh
@@ -55,14 +55,13 @@ COMPOSE=${COMPOSE:-docker compose}
 FQDN=pbx.ci.test
 API_PORT=${API_PORT:-8130}
 SCENARIOS_DIR="$here/scenarios"
-# The pin compose.test.yaml's `proxy` service requires (`${PROXY_IMAGE:?…}`): built the same way
-# as the other four (docker-bake.hcl), so it defaults the same way ASTERISK_IMAGE etc. do below.
-PROXY_IMAGE=${PROXY_IMAGE:-zamfono/proxy:ci}
-# The api image setup.sh hashes the owner's password with: compose.test.yaml's own default.
-API_IMAGE=${API_IMAGE:-zamfono/api:ci}
+# The images compose.test.yaml requires (the *_IMAGE variables), as docker-bake.hcl tags them:
+# zamfono/<name>:ci unless the environment names others.
+# shellcheck disable=SC2046 # NAME=value words, no spaces
+export $("$repo/scripts/image-env.sh")
 # cert-sync.sh's own Caddyfile (§6.4): an absolute path, for the same reason SCENARIOS_DIR is one.
 CERT_SYNC_CADDYFILE="$here/Caddyfile.local-ca"
-export API_PORT SCENARIOS_DIR PROXY_IMAGE CERT_SYNC_CADDYFILE FQDN
+export API_PORT SCENARIOS_DIR CERT_SYNC_CADDYFILE FQDN
 api_base=http://127.0.0.1:$API_PORT
 MAIN_DID=+15551000
 # shellcheck source=../api.sh

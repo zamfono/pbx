@@ -33,12 +33,9 @@ export SCENARIOS_DIR="$repo/test/integration/scenarios"
 export LOAD_SCENARIOS_DIR="$here/scenarios"
 export LOAD_GEN_DIR
 
-ASTERISK_IMAGE=${ASTERISK_IMAGE:-zamfono/asterisk:load}
-MIGRATE_IMAGE=${MIGRATE_IMAGE:-zamfono/migrate:load}
-CORE_IMAGE=${CORE_IMAGE:-zamfono/core:load}
-API_IMAGE=${API_IMAGE:-zamfono/api:load}
-PROXY_IMAGE=${PROXY_IMAGE:-zamfono/proxy:load}
-export ASTERISK_IMAGE MIGRATE_IMAGE CORE_IMAGE API_IMAGE PROXY_IMAGE
+# The :load images (`TAG=load docker buildx bake --load`), unless the environment names others.
+# shellcheck disable=SC2046 # NAME=value words, no spaces
+export $(TAG=${TAG:-load} "$repo/scripts/image-env.sh")
 
 # compose.override.yaml is the ports overlay setup.sh links; with a `-f` for the load overlay,
 # Compose reads it only when named.

@@ -149,7 +149,6 @@ share, the retention period (§11.6) and the per-minute figure above.
 ## Reproducing
 
 - G.711 baseline: `flock /root/pbx-harness.lock bash test/load/session.sh` (see its header).
-- Stress profile: build the images and `docker build -t zamfono/load-devices:<tag> test/load/stress/devices`,
-  then `OUT_DIR=… flock <lock> bash test/load/stress/session.sh` (knobs in its header: `STEPS`
+- Stress profile: build the images with `TAG=stress docker buildx bake --load`, then `OUT_DIR=… flock <lock> bash test/load/stress/session.sh` (knobs in its header: `STEPS`
   with `in:`/`out:`/`mix:` tokens, `HANGUP_SIDE`, `CALL_S`, `RUNTIME=podman`, image variables).
   Long sessions should run in the background; each session tears its stack down itself.

@@ -18,23 +18,6 @@ on:
 permissions:
   contents: read
 
-env:
-  # The image tags the compose overlay expects; built once, loaded into each job after `images`.
-  ASTERISK_IMAGE: zamfono/asterisk:ci
-  MIGRATE_IMAGE: zamfono/migrate:ci
-  CORE_IMAGE: zamfono/core:ci
-  API_IMAGE: zamfono/api:ci
-  PROXY_IMAGE: zamfono/proxy:ci
-  UPDATER_IMAGE: zamfono/updater:ci
-  # test/integration/scenarios/device-tls-srtp's baresip device (test/load/stress's own image,
-  # test/load/stress/devices/Dockerfile), which compose.test.yaml's `devices` service names.
-  DEVICES_IMAGE: zamfono/test-devices:ci
-  # The upstream sipp image compose.test.yaml runs, by the exact name it asks the runtime for: its
-  # pinned SIPp 3.5.1 (`x-sipp-image`). `images` pulls it into the archive, so no later job pulls
-  # from Docker Hub and both runtimes bring up the same bytes. main.yaml pushes only the six
-  # zamfono/ images, so this stays unpublished.
-  SIPP_IMAGE: ctaloi/sipp:latest@sha256:c459f2340443ddcc159227efc798217dbdaad0dbe88b76b78b1a876aa271986a
-
 jobs:
   unit:
     runs-on: ubuntu-latest
@@ -67,6 +50,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The images' names as docker-bake.hcl tags them (zamfono/<name>:ci), plus SIPP_IMAGE, the
+      # upstream sipp compose.test.yaml pins: `images` pulls it into the archive, so no later job
+      # pulls from Docker Hub and both runtimes bring up the same bytes. main.yaml pushes only the
+      # six zamfono/ images, so it and test-devices stay unpublished.
+      - name: The image names, from docker-bake.hcl
+        run: scripts/image-env.sh >>"$GITHUB_ENV"
       # `use: false` leaves the runner's own builder the default, so the plain `docker build` of
       # the label step below still sees the images bake loaded into the daemon; only bake runs on
       # this one, a docker-container builder, which the gha cache needs.
@@ -78,7 +67,7 @@ jobs:
           cleanup: false
       - name: Build the six images, plus the TLS/SRTP scenario's baresip device
         # docker-bake.hcl names the six targets, with the Dockerfiles and contexts they always
-        # had, and takes their tags from the env block above; bake builds them in parallel, and
+        # had, and their tags; bake builds them in parallel, and
         # `load` puts them in the local daemon. `source: .` builds this checkout, not a fetch of
         # the ref.
         #
@@ -130,10 +119,8 @@ jobs:
           docker buildx rm "${{ steps.buildx.outputs.name }}"
           df -h /
       - name: Save the images for the jobs below
-        run: |
-          docker save -o /tmp/images.tar \
-            "$MIGRATE_IMAGE" "$CORE_IMAGE" "$API_IMAGE" "$ASTERISK_IMAGE" "$PROXY_IMAGE" \
-            "$UPDATER_IMAGE" "$DEVICES_IMAGE" "${SIPP_IMAGE%@*}"
+        # Every image scripts/image-env.sh names, sipp by the tag the step above gave it.
+        run: docker save -o /tmp/images.tar $(scripts/image-env.sh | sed 's/^[^=]*=//; s/@.*//')
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: images
@@ -150,11 +137,13 @@ jobs:
           name: images
           path: /tmp
       - run: docker load -i /tmp/images.tar
+      - name: The image names, from docker-bake.hcl
+        run: scripts/image-env.sh >>"$GITHUB_ENV"
       - name: Exercise each image's own checks
         # db/test.sh, deploy/test.sh and the four images/*/test.sh each default to their own
         # :test tag and build it themselves when run standalone; here they're pointed at the
-        # images the `images` job built, via IMAGE/IMAGE_TAG and via PROXY_IMAGE from the env
-        # block above, so nothing is built twice and what is checked is the archive main.yaml
+        # images the `images` job built, via IMAGE/IMAGE_TAG and via PROXY_IMAGE from the step
+        # above, so nothing is built twice and what is checked is the archive main.yaml
         # publishes, asterisk with its label. `publish` there needs this whole workflow, this job
         # included, so a failed check stops the push as a failed build does.
         run: |
@@ -221,6 +210,9 @@ jobs:
         with:
           name: images
           path: /tmp
+      # Read while Docker still runs; with every one set, run.sh's own image-env.sh asks no bake.
+      - name: The image names, from docker-bake.hcl
+        run: scripts/image-env.sh >>"$GITHUB_ENV"
       - name: Install Podman 5
         run: |
           sudo apt-get update
@@ -247,15 +239,11 @@ jobs:
           fi
       - run: sudo podman load -i /tmp/images.tar
       - name: Bring the stack up and run the sipp scenarios
-        # `env` carries the image tags and every other variable run.sh reads across sudo; the
-        # runner's sudo-rs ignores `-E`.
+        # `env` carries every variable run.sh reads across sudo, the image names as image-env.sh
+        # printed them above; the runner's sudo-rs ignores `-E`.
         run: |
-          sudo env COMPOSE="$COMPOSE" DOCKER_HOST="$DOCKER_HOST" \
-            ASTERISK_IMAGE="$ASTERISK_IMAGE" MIGRATE_IMAGE="$MIGRATE_IMAGE" CORE_IMAGE="$CORE_IMAGE" \
-            API_IMAGE="$API_IMAGE" PROXY_IMAGE="$PROXY_IMAGE" UPDATER_IMAGE="$UPDATER_IMAGE" \
-            DEVICES_IMAGE="$DEVICES_IMAGE" \
-            SIPP_IMAGE="$SIPP_IMAGE" \
-            DIAG_DIR="$DIAG_DIR" SHARD="$SHARD" \
+          sudo env $(scripts/image-env.sh) \
+            COMPOSE="$COMPOSE" DOCKER_HOST="$DOCKER_HOST" DIAG_DIR="$DIAG_DIR" SHARD="$SHARD" \
             bash test/integration/run.sh
         env:
           COMPOSE: podman compose

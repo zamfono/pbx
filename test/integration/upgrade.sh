@@ -77,15 +77,10 @@ upgrade_to_build() {
 # Every one of the stack's five services now runs the build's own image, not the release's.
 # Podman names a local image `localhost/…` and a Hub one `docker.io/…`; neither prefix counts.
 upgrade_assert_images() {
-  local service expected running
+  local service var expected running
   for service in asterisk migrate core api proxy; do
-    case $service in
-      asterisk) expected=${ASTERISK_IMAGE:-zamfono/asterisk:ci} ;;
-      migrate) expected=${MIGRATE_IMAGE:-zamfono/migrate:ci} ;;
-      core) expected=${CORE_IMAGE:-zamfono/core:ci} ;;
-      api) expected=${API_IMAGE:-zamfono/api:ci} ;;
-      proxy) expected=$PROXY_IMAGE ;;
-    esac
+    var=${service^^}_IMAGE
+    expected=${!var}
     running=$(dc ps -a --format '{{.Service}} {{.Image}}' \
       | awk -v s="$service" '$1 == s { print $2 }' | sed -E 's#^(localhost|docker\.io)/##')
     [ "$running" = "${expected#docker.io/}" ] \

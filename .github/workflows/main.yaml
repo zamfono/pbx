@@ -54,7 +54,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Push the six images as edge and sha-<short sha>
-        # zamfono/<name>:ci is what ci.yaml's env block tags them; the test-devices image in the
+        # zamfono/<name>:ci is what docker-bake.hcl tags them; the test-devices image in the
         # same archive is a test fixture, and the sipp image there is upstream's, so both stay
         # unpublished. The short sha is the name `promote` looks the build up by when this
         # commit is released.

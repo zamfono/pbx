@@ -6,7 +6,8 @@
 # The harness's sipp: SIPp 3.5.1, the build `ctaloi/sipp` has published since 2017, pinned by
 # digest, since the harness depends on what that release does (no TLS Asterisk's transports
 # accept, `-aa` probes counted against `-m`, `play_pcap_audio` played asynchronously).
-x-sipp-image: &sipp-image ${SIPP_IMAGE:-ctaloi/sipp:latest@sha256:c459f2340443ddcc159227efc798217dbdaad0dbe88b76b78b1a876aa271986a}
+# The one pin of it: scripts/image-env.sh reads it from here for CI and test/load.
+x-sipp-image: &sipp-image ctaloi/sipp:latest@sha256:c459f2340443ddcc159227efc798217dbdaad0dbe88b76b78b1a876aa271986a
 
 # `internal` has a fixed subnet and `asterisk` a fixed address on it, which `.env` names as
 # `EXTERNAL_IPV4` (steps.sh): the ports mode writes that address into SIP and SDP (§9.1), and the
@@ -25,7 +26,7 @@ networks:
 # from asking a registry for an image the run already holds or none publishes.
 services:
   asterisk:
-    image: ${ASTERISK_IMAGE:-zamfono/asterisk:ci}
+    image: ${ASTERISK_IMAGE:?set by run.sh}
     pull_policy: missing
     # Reachable by name from the sipp container without publishing anything to the runner. The
     # `zamfono` alias is the CN of the placeholder TLS certificate the entrypoint generates
@@ -45,19 +46,19 @@ services:
           - ${FQDN:?set by run.sh}
 
   migrate:
-    image: ${MIGRATE_IMAGE:-zamfono/migrate:ci}
+    image: ${MIGRATE_IMAGE:?set by run.sh}
     pull_policy: missing
 
   core:
-    image: ${CORE_IMAGE:-zamfono/core:ci}
+    image: ${CORE_IMAGE:?set by run.sh}
     pull_policy: missing
 
   updater:
-    image: ${UPDATER_IMAGE:-zamfono/updater:ci}
+    image: ${UPDATER_IMAGE:?set by run.sh}
     pull_policy: missing
 
   api:
-    image: ${API_IMAGE:-zamfono/api:ci}
+    image: ${API_IMAGE:?set by run.sh}
     pull_policy: missing
     # The scenarios drive the REST surface directly rather than through Caddy, so a failure is the
     # stack's own and not TLS or the proxy's. The host port is the harness's own (`API_PORT`), not
@@ -66,14 +67,13 @@ services:
     ports:
       - '127.0.0.1:${API_PORT:-8130}:3000'
 
-  # The same `proxy` image the stack ships (built by docker-bake.hcl's `proxy` target, like the
-  # other four; PROXY_IMAGE exists only to try another build). It runs the shipped, unmodified
-  # deploy/Caddyfile as-is (still mounted read-only at /etc/caddy/Caddyfile by compose.yaml, and
-  # still the image's own default command), with one addition: Caddyfile.local-ca mounted into
-  # /etc/caddy/global.d/, the directory deploy/Caddyfile's global options block imports, adding
-  # `local_certs` there — switching automatic HTTPS to Caddy's own internal CA, so cert-sync.sh
-  # can prove §6.4's certificate sync against a real Caddy issuance with no internet reachable
-  # (§8, cert-sync.sh).
+  # The same `proxy` image the stack ships (docker-bake.hcl's `proxy` target). It runs the shipped,
+  # unmodified deploy/Caddyfile as-is (still mounted read-only at /etc/caddy/Caddyfile by
+  # compose.yaml, and still the image's own default command), with one addition: Caddyfile.local-ca
+  # mounted into /etc/caddy/global.d/, the directory deploy/Caddyfile's global options block
+  # imports, adding `local_certs` there — switching automatic HTTPS to Caddy's own internal CA, so
+  # cert-sync.sh can prove §6.4's certificate sync against a real Caddy issuance with no internet
+  # reachable (§8, cert-sync.sh).
   proxy:
     image: ${PROXY_IMAGE:?set by run.sh}
     pull_policy: missing
@@ -159,11 +159,10 @@ services:
   # stand-ins from (test/load/stress/devices/Dockerfile), registering over TLS with SDES-SRTP,
   # Opus (§3, §9.1 transport-tls, §9.3/§10.4). Idle like the sipp containers; the scenario's own
   # setup writes its config and starts it (`compose exec -d`), the way `phone.sh` drives
-  # `sipp-phone`. No `NET_RAW`: unlike the sipp containers it plays no pcap. Local build: `docker
-  # build -f test/load/stress/devices/Dockerfile -t zamfono/test-devices:ci
-  # test/load/stress/devices` (CI's `images` job does this for `DEVICES_IMAGE`).
+  # `sipp-phone`. No `NET_RAW`: unlike the sipp containers it plays no pcap. docker-bake.hcl's
+  # `test-devices` target builds it.
   devices:
-    image: ${DEVICES_IMAGE:-zamfono/test-devices:ci}
+    image: ${DEVICES_IMAGE:?set by run.sh}
     pull_policy: missing
     networks:
       - internal

@@ -2,20 +2,23 @@
 # is the one list of, plus the TLS/SRTP scenario's baresip device, built in parallel by `docker
 # buildx bake` from ci.yaml's `images` job. The workflows that publish, promote or prune the
 # stack's images read the names from that group (.github/scripts/stack-images.sh). Each target's
-# tag is the variable of the same name, which ci.yaml's env block sets for its later steps.
+# tag is the *_IMAGE variable of the same name; scripts/image-env.sh prints them for ci.yaml and
+# the harnesses, so the names and tags below are the only place either is written.
 #
 # Local run, no cache and no registry involved:
 #   docker buildx bake --load
-# which tags the images zamfono/<name>:ci, as CI does. Point the *_IMAGE variables elsewhere to
-# keep a set of :ci images already loaded, e.g. `MIGRATE_IMAGE=zamfono/migrate:mine …`.
+# which tags the images zamfono/<name>:ci, as CI does. TAG picks another tag for all of them
+# (test/load runs TAG=load, test/load/stress TAG=stress); a *_IMAGE variable names one image
+# outright, e.g. `MIGRATE_IMAGE=zamfono/migrate:mine …`.
 
-variable "MIGRATE_IMAGE" { default = "zamfono/migrate:ci" }
-variable "CORE_IMAGE" { default = "zamfono/core:ci" }
-variable "API_IMAGE" { default = "zamfono/api:ci" }
-variable "ASTERISK_IMAGE" { default = "zamfono/asterisk:ci" }
-variable "PROXY_IMAGE" { default = "zamfono/proxy:ci" }
-variable "UPDATER_IMAGE" { default = "zamfono/updater:ci" }
-variable "DEVICES_IMAGE" { default = "zamfono/test-devices:ci" }
+variable "TAG" { default = "ci" }
+variable "MIGRATE_IMAGE" { default = "zamfono/migrate:${TAG}" }
+variable "CORE_IMAGE" { default = "zamfono/core:${TAG}" }
+variable "API_IMAGE" { default = "zamfono/api:${TAG}" }
+variable "ASTERISK_IMAGE" { default = "zamfono/asterisk:${TAG}" }
+variable "PROXY_IMAGE" { default = "zamfono/proxy:${TAG}" }
+variable "UPDATER_IMAGE" { default = "zamfono/updater:${TAG}" }
+variable "DEVICES_IMAGE" { default = "zamfono/test-devices:${TAG}" }
 
 # `gha` reads (CACHE_FROM) or writes (CACHE_TO) the GitHub Actions layer cache, one scope per
 # target; empty, the default, means no cache at all, which is what a local run gets. ci.yaml

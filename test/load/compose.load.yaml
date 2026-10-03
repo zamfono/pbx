@@ -7,7 +7,7 @@
 #
 # Differences from compose.test.yaml, both driven by needing real bidirectional RTP under many
 # concurrent calls rather than one scripted call:
-#   - images default to the :load tag this harness builds itself, kept apart from :ci
+#   - images are the :load set (`TAG=load docker buildx bake --load`), kept apart from :ci
 #   - sipp-provider also gets NET_RAW (compose.test.yaml only grants it to sipp), since
 #     load-provider.xml/load-provider-ulaw.xml call play_pcap_audio too
 #   - an extra read-only mount, /load-scenarios, carries this directory's own scenario XML;
@@ -30,8 +30,8 @@
 # Asterisk's actual local RTP port range still comes from RTP_PORT_START/END in .env regardless of
 # this address -- unrelated to which address gets advertised in SDP.
 
-# The same pinned sipp as compose.test.yaml's `x-sipp-image`.
-x-sipp-image: &sipp-image ${SIPP_IMAGE:-ctaloi/sipp:latest@sha256:c459f2340443ddcc159227efc798217dbdaad0dbe88b76b78b1a876aa271986a}
+# The same pinned sipp as compose.test.yaml's `x-sipp-image`, which session.sh reads.
+x-sipp-image: &sipp-image ${SIPP_IMAGE:?set by session.sh}
 
 networks:
   internal:
@@ -41,7 +41,7 @@ networks:
 
 services:
   asterisk:
-    image: ${ASTERISK_IMAGE:-zamfono/asterisk:load}
+    image: ${ASTERISK_IMAGE:?set by session.sh}
     environment:
       SIP_UDP_ENABLED: 'true'
       SIP_TCP_ENABLED: 'true'
@@ -50,18 +50,17 @@ services:
         ipv4_address: 172.28.0.10
 
   migrate:
-    image: ${MIGRATE_IMAGE:-zamfono/migrate:load}
+    image: ${MIGRATE_IMAGE:?set by session.sh}
 
   core:
-    image: ${CORE_IMAGE:-zamfono/core:load}
+    image: ${CORE_IMAGE:?set by session.sh}
 
   api:
-    image: ${API_IMAGE:-zamfono/api:load}
+    image: ${API_IMAGE:?set by session.sh}
     ports:
       - '127.0.0.1:${API_PORT:-8140}:3000'
 
-  # The same `proxy` image the stack ships (docker-bake.hcl's `proxy` target, like the other
-  # four); PROXY_IMAGE exists only to try another build.
+  # The same `proxy` image the stack ships (docker-bake.hcl's `proxy` target).
   proxy:
     image: ${PROXY_IMAGE:?set by session.sh}
 

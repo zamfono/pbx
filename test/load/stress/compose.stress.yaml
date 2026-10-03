@@ -21,7 +21,7 @@ services:
       - ${LOAD_GEN_DIR:?set by the stress session}:/load-gen
 
   devices:
-    image: ${DEVICES_IMAGE:-zamfono/load-devices:stress}
+    image: ${DEVICES_IMAGE:?set by the stress session}
     networks:
       - internal
     volumes:

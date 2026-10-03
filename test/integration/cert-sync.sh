@@ -1,5 +1,5 @@
 # Sourced by `run.sh`: §6.4's certificate sync end to end against the real `proxy` image the stack
-# ships (built by docker-bake.hcl's `proxy` target, like the other four) — the `cert_obtained`
+# ships (built by docker-bake.hcl's `proxy` target, like the other five) — the `cert_obtained`
 # hook's copy onto caddy-data is the only thing that makes a Dependabot PR bumping Caddy
 # (images/proxy/Dockerfile) a real test of `packages/api/src/lib/server/jobs/certSync*.ts`, the
 # only code that depends on it.

@@ -18,7 +18,7 @@
 # that), CALL_S (90), RATE (5 calls/s per direction), TAIL_S (90), IDLE_S (60), *_IMAGE,
 # HANGUP_SIDE (for bare <n> tokens: device or trunk, lib-calls.sh), COMPOSE ("docker compose" or
 # "podman compose"; RUNTIME, the plain CLI, follows it).
-# Images are neither built nor removed here (build them once, tagged :stress, see ci.yaml).
+# Images are neither built nor removed here (build them once: `TAG=stress docker buildx bake --load`).
 set -uo pipefail
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -43,12 +43,8 @@ LOAD_GEN_DIR=$(mktemp -d "${TMPDIR:-/tmp}/zamfono-stress-gen.XXXXXX")
 chmod 777 "$LOAD_GEN_DIR"
 export SCENARIOS_DIR="$repo/test/integration/scenarios" LOAD_SCENARIOS_DIR="$load/scenarios"
 export LOAD_GEN_DIR
-export ASTERISK_IMAGE=${ASTERISK_IMAGE:-zamfono/asterisk:stress}
-export MIGRATE_IMAGE=${MIGRATE_IMAGE:-zamfono/migrate:stress}
-export CORE_IMAGE=${CORE_IMAGE:-zamfono/core:stress}
-export API_IMAGE=${API_IMAGE:-zamfono/api:stress}
-export DEVICES_IMAGE=${DEVICES_IMAGE:-zamfono/load-devices:stress}
-export PROXY_IMAGE=${PROXY_IMAGE:-zamfono/proxy:stress}
+# shellcheck disable=SC2046 # NAME=value words, no spaces
+export $(TAG=${TAG:-stress} "$repo/scripts/image-env.sh")
 METRICS_TOKEN=$(openssl rand -hex 16)
 export METRICS_TOKEN
 
