@@ -21,12 +21,8 @@ async function ringGroupIdsByUser(db: Db): Promise<Map<string, string[]>> {
   return byUser;
 }
 
-type UserExtRow = { id: string; ext: string; name: string };
-
 /** Live users with their extension (§11.2 `extensions`) and the live ring groups they belong to. */
-async function loadUsers(
-  db: Db
-): Promise<{ rows: UserExtRow[]; users: RenderInput['users'] }> {
+async function loadUsers(db: Db): Promise<RenderInput['users']> {
   const rows = await db
     .selectFrom('users')
     .innerJoin('extensions', 'extensions.userId', 'users.id')
@@ -34,30 +30,31 @@ async function loadUsers(
     .where('users.deletedAt', 'is', null)
     .execute();
   const groupsByUser = await ringGroupIdsByUser(db);
-  const users = rows.map(row => ({
+  return rows.map(row => ({
     id: row.id,
     ext: row.ext,
     name: row.name,
     ringGroupIds: groupsByUser.get(row.id) ?? []
   }));
-  return { rows, users };
 }
 
-/** Live devices (§11.2 `devices`), their SIP password decrypted and owner extension attached. */
+/** Live devices (§11.2 `devices`) of live users holding an extension, their SIP password
+ * decrypted. */
 async function loadDevices(
   db: Db,
-  kr: Keyring,
-  extByUser: Map<string, string>
+  kr: Keyring
 ): Promise<RenderInput['devices']> {
   const rows = await db
     .selectFrom('devices')
-    .selectAll()
-    .where('deletedAt', 'is', null)
+    .innerJoin('users', 'users.id', 'devices.userId')
+    .innerJoin('extensions', 'extensions.userId', 'devices.userId')
+    .selectAll('devices')
+    .where('devices.deletedAt', 'is', null)
+    .where('users.deletedAt', 'is', null)
     .execute();
   return rows.map(row => ({
     id: row.id,
     userId: row.userId,
-    ext: extByUser.get(row.userId) ?? '',
     kind: row.kind as 'manual' | 'ringotel',
     transport: row.transport as 'plain' | 'tls',
     allowedIps:
@@ -156,15 +153,15 @@ export async function loadRenderInput(
   kr: Keyring
 ): Promise<RenderInput> {
   const settings = await loadSettings(db);
-  const { rows: userRows, users } = await loadUsers(db);
-  const extByUser = new Map(userRows.map(row => [row.id, row.ext]));
-  const [devices, ringGroups, parkingSlots, trunks, moh] = await Promise.all([
-    loadDevices(db, kr, extByUser),
-    loadRingGroups(db),
-    loadParkingSlots(db),
-    loadTrunks(db, kr),
-    loadMoh(db)
-  ]);
+  const [users, devices, ringGroups, parkingSlots, trunks, moh] =
+    await Promise.all([
+      loadUsers(db),
+      loadDevices(db, kr),
+      loadRingGroups(db),
+      loadParkingSlots(db),
+      loadTrunks(db, kr),
+      loadMoh(db)
+    ]);
   return {
     settings: {
       codecs: JSON.parse(settings.codecsJson) as string[],

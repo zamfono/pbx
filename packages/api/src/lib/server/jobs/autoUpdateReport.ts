@@ -83,7 +83,7 @@ export async function reportFailure(
 /**
  * The outcome of the automatic run `api` started, once the updater reports it ended; `true` while
  * it still runs, so the job looks again soon. A run the updater does not report, its record lost
- * with its `.update/`, leaves nothing to follow up.
+ * with its `.update/` or kept without its versions, leaves nothing to follow up.
  */
 export async function followUpRun(
   deps: ReportDeps,
@@ -102,10 +102,15 @@ export async function followUpRun(
     .set({ runOutcomePending: 0 })
     .where('id', '=', 1)
     .execute();
-  if (last.startedAt !== row.runStartedAt) {
+  const { from, to } = last;
+  if (
+    last.startedAt !== row.runStartedAt ||
+    from === undefined ||
+    to === undefined
+  ) {
     return false;
   }
-  const attempt = { from: last.from ?? '', to: last.to ?? '' };
+  const attempt = { from, to };
   if (last.state === 'succeeded') {
     await audit(deps.db, { ...attempt, outcome: 'succeeded' });
     return false;
@@ -144,7 +149,8 @@ export async function clearFailureAfterSuccess(
 export async function announceBreaking(
   deps: ReportDeps,
   row: UpdateStateRow,
-  status: UpdaterStatus
+  status: UpdaterStatus,
+  currentVersion: string
 ): Promise<void> {
   if (status.latestError !== undefined) {
     return;
@@ -170,7 +176,7 @@ export async function announceBreaking(
     kind: 'breakingUpdate',
     to: { userId },
     values: {
-      currentVersion: status.current ?? '',
+      currentVersion,
       version: latest.version,
       releaseUrl: latest.url,
       publishedAt: latest.publishedAt

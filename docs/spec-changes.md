@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-03 · §6.3 Automatic updates.** While the updater knows no current release, there is neither an attempt nor a report of a breaking release, and `api` logs once why.
+*Why:* product-owner decision: "Skip the attempt"; the attempt's audit entry and the mails carried an empty version.
+
 **2026-10-03 · §6.3 Compose stack, Attachment overlays, Environment.** Compose hands `api` and `core` only what the operator gives: no internal URL, host or path (`ARI_URL`, `AMI_HOST`, `CORE_URL`), and every optional value as `${VAR:-}`, so the default of `TZ`, `HEP_ENABLED`, `SIP_UDP_ENABLED`, `SIP_TCP_ENABLED`, `CALL_LOG_MAX_BYTES`, `SMTP_PORT`, `SMTP_SECURITY` and `EXT_LENGTH` is the service's own, an empty value counting as unset. The public address moves from `compose.yaml` into the overlay of its mode, which requires it: `compose.ports.yaml` passes `EXTERNAL_IPV4`, `compose.macvlan.yaml` `STACK_IPV4`, to `asterisk`, `core` and `api`.
 *Why:* product-owner decision: "Require values, that actually require the owner's input (like FQDN or the public IP) and use sensible defaults (possibly "unset"!) for the other variables (internal IPs and the like)"; each default stood in Compose and in the code, and only the overlay knows the mode whose address it needs.
 

@@ -104,7 +104,7 @@ function formatCallerId(name: string, ext: string): string {
 // `moh_suggest` is the class a party this device puts on hold hears (§10.2 "Hold music").
 function renderDeviceEndpoint(
   device: Device,
-  ownerName: string,
+  owner: RenderInput['users'][number],
   settings: RenderInput['settings']
 ): string {
   const lines = [
@@ -115,9 +115,7 @@ function renderDeviceEndpoint(
     `aors = ${device.sipUsername}`,
     `auth = ${device.sipUsername}`,
     'identify_by = auth_username',
-    // A user always holds an extension (§11.2); a device whose owner lost theirs keeps the
-    // SIP username in `From` rather than failing the whole render.
-    ...(device.ext === '' ? [] : [formatCallerId(ownerName, device.ext)]),
+    formatCallerId(owner.name, owner.ext),
     `moh_suggest = ${settings.holdMohClass}`,
     'rewrite_contact = yes',
     'rtp_symmetric = yes',
@@ -140,12 +138,20 @@ function renderUsersConf(input: RenderInput): string {
   assertSafeId(input.settings.holdMohClass, 'settings.holdMohClass');
   const sections = devices.flatMap(device => {
     const owner = usersById.get(device.userId);
-    const ringGroupIds = owner?.ringGroupIds ?? [];
-    assertSafeDevice(device, ringGroupIds);
+    if (owner === undefined) {
+      throw new Error(
+        `render: device ${device.id} has no owner among the users`
+      );
+    }
+    assertSafeDevice(device, owner.ringGroupIds);
     return [
-      renderDeviceAor(device, input.settings.ringotelMaxRegs, ringGroupIds),
+      renderDeviceAor(
+        device,
+        input.settings.ringotelMaxRegs,
+        owner.ringGroupIds
+      ),
       renderDeviceAuth(device),
-      renderDeviceEndpoint(device, owner?.name ?? '', input.settings)
+      renderDeviceEndpoint(device, owner, input.settings)
     ];
   });
   return joinSections(sections);

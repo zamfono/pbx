@@ -26,7 +26,6 @@ const input: RenderInput = {
     {
       id: 'd1',
       userId: 'u1',
-      ext: '101',
       kind: 'manual',
       transport: 'plain',
       allowedIps: ['10.0.0.0/8'],
@@ -36,7 +35,6 @@ const input: RenderInput = {
     {
       id: 'd2',
       userId: 'u1',
-      ext: '101',
       kind: 'ringotel',
       transport: 'tls',
       allowedIps: null,
@@ -576,11 +574,8 @@ describe('render', () => {
     expect(lines.filter(line => line.startsWith('['))).toHaveLength(1);
   });
 
-  test('a device whose owner holds no extension keeps the SIP username rather than failing the render', () => {
-    const lines = firstEndpoint({
-      devices: [{ ...deviceA, ext: '' }]
-    });
-    expect(lines.some(line => line.startsWith('callerid'))).toBe(false);
+  test('render refuses a device whose owner is not among the users', () => {
+    expect(() => render({ ...input, users: [] })).toThrow(/no owner/u);
   });
 
   test('a held party hears the hold class every device endpoint suggests (§10.2 "Hold music")', () => {

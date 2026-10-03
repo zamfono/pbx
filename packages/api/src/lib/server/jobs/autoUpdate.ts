@@ -152,18 +152,32 @@ async function reportGiveUps(
   attempt: Attempt,
   verdict: GateCheck
 ): Promise<boolean> {
-  if (verdict.open || (verdict.gaveUp?.inARow ?? 0) < GIVE_UPS_PER_ATTEMPT) {
+  const gaveUp = verdict.open ? undefined : verdict.gaveUp;
+  if (gaveUp === undefined || gaveUp.inARow < GIVE_UPS_PER_ATTEMPT) {
     return false;
   }
-  const reason = `the system was busy at ${String(GIVE_UPS_PER_ATTEMPT)} maintenance moments in a row, at the last ${verdict.gaveUp?.reason ?? ''}`;
+  const reason = `the system was busy at ${String(GIVE_UPS_PER_ATTEMPT)} maintenance moments in a row, at the last ${gaveUp.reason}`;
   await reportFailure(deps, { ...attempt, outcome: 'busy', reason });
   await deps.gate.reset();
   return true;
 }
 
+// Whether the updater's unknown current release was logged since it was last known.
+let unknownCurrentLogged = false;
+
+/** Logs once, until the updater knows the current release again, why a pass does nothing. */
+function logUnknownCurrentOnce(): void {
+  if (!unknownCurrentLogged) {
+    logger.warn(
+      'autoUpdate: the updater knows no current release, so nothing is attempted or reported'
+    );
+    unknownCurrentLogged = true;
+  }
+}
+
 /**
  * One pass: follows up the automatic run `api` started, reports a breaking release, and installs
- * a wanted release once the gate opens. Resolves to when the job is worth running again sooner
+ * a wanted release once the gate opens; nothing while the updater knows no current release. Resolves to when the job is worth running again sooner
  * than its hourly poll, `null` for no sooner.
  */
 export async function runAutoUpdatePass(
@@ -175,20 +189,26 @@ export async function runAutoUpdatePass(
     return null;
   }
   const status = await client.status();
+  const from = status.current;
+  if (from === null) {
+    logUnknownCurrentOnce();
+    return null;
+  }
+  unknownCurrentLogged = false;
   const now = (deps.now ?? (() => new Date()))();
   const soon = new Date(now.getTime() + IDLE_RECHECK_MS);
   if (await followUpRun(deps, row, status)) {
     return soon;
   }
   await clearFailureAfterSuccess(deps.db, row, status);
-  await announceBreaking(deps, row, status);
+  await announceBreaking(deps, row, status, from);
   const fresh = (await loadUpdateState(deps.db)) ?? row;
   const to = await wantedRelease(deps.db, fresh, status, now);
   if (to === null) {
     await deps.gate.reset();
     return null;
   }
-  const attempt = { from: status.current ?? '', to };
+  const attempt = { from, to };
   const verdict = await deps.gate.check(now);
   if (await reportGiveUps(deps, attempt, verdict)) {
     return null;

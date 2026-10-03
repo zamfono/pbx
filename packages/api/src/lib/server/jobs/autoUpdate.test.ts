@@ -216,6 +216,19 @@ describe('runAutoUpdatePass', () => {
     expect(asked).toEqual([]);
   });
 
+  it('attempts and reports nothing while the updater knows no current release', async () => {
+    const db = await makeTestDb();
+    await seed(db, true);
+    const job = harness(db);
+    job.current.status = status({ current: null, breaking: true });
+
+    await expect(runAutoUpdatePass(job.deps)).resolves.toBeNull();
+    expect(job.gateChecks.count).toBe(0);
+    expect(job.backups.count).toBe(0);
+    expect(job.mails).toEqual([]);
+    expect(await auditOutcomes(db)).toEqual([]);
+  });
+
   it('waits for the gate, then backs up and asks the updater as system.update does', async () => {
     const db = await makeTestDb();
     await seed(db, true);

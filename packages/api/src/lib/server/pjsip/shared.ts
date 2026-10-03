@@ -17,7 +17,6 @@ export type RenderInput = {
   devices: {
     id: string;
     userId: string;
-    ext: string;
     kind: 'manual' | 'ringotel';
     transport: 'tls' | 'plain';
     allowedIps: string[] | null;
