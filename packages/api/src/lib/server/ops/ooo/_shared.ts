@@ -1,13 +1,25 @@
 import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
-import type { Db, DB } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT, type Db, type DB } from '@zamfono/shared';
 
-import { targetSpecSchema } from '../forwardTargetSchema.js';
+import { targetSpecSchema, type TargetSpec } from '../forwardTargetSchema.js';
 import { liveRow } from '../rows.js';
-import { scopeColumns, type ScopeInput } from '../scope.js';
+import { inScope, type ScopeInput } from '../scope.js';
+import { OpError, type Context } from '../types.js';
 
 export type OooRuleRow = Selectable<DB['oooRules']>;
+
+/** An out-of-office rule as `ooo.create` and `ooo.update` return it (§10.2 "Out of office"). */
+export type OooRuleOut = {
+  id: string;
+  scope: ScopeInput;
+  active: boolean;
+  startsAt: string | null;
+  expiresAt: string | null;
+  target: TargetSpec;
+  createdAt: string;
+};
 
 /**
  * `startsAt`/`expiresAt` on input: ISO-8601, any offset (clients send local time), normalized to
@@ -59,7 +71,7 @@ export function normalizeIsoOrNull(
  * for the unbounded side (§11.2 `ooo_rules`: NULL `starts_at` = immediately, NULL `expires_at` =
  * until deactivated). An open-ended period therefore overlaps every later period.
  */
-export function rangesOverlap(
+function rangesOverlap(
   aStart: string | null,
   aEnd: string | null,
   bStart: string | null,
@@ -83,27 +95,51 @@ export async function liveOooRulesInScope(
   db: Db,
   scope: ScopeInput
 ): Promise<OooRuleRow[]> {
-  const columns = scopeColumns(scope);
   return db
     .selectFrom('oooRules')
     .selectAll()
-    .where(
-      'scopeUserId',
-      columns.scopeUserId === null ? 'is' : '=',
-      columns.scopeUserId
-    )
-    .where(
-      'scopeRingGroupId',
-      columns.scopeRingGroupId === null ? 'is' : '=',
-      columns.scopeRingGroupId
-    )
-    .where(
-      'scopeMenuId',
-      columns.scopeMenuId === null ? 'is' : '=',
-      columns.scopeMenuId
-    )
+    .where(inScope(scope))
     .where('deletedAt', 'is', null)
     .orderBy('startsAt')
     .orderBy('id')
     .execute();
+}
+
+/** `expires_at` after `starts_at`, mirroring the table's own `CHECK` (§11.2 `ooo_rules`). */
+export function assertExpiryAfterStart(
+  startsAt: string | null,
+  expiresAt: string | null
+): void {
+  if (startsAt !== null && expiresAt !== null && !(startsAt < expiresAt)) {
+    throw new OpError(
+      HTTP_UNPROCESSABLE_CONTENT,
+      'ooo: expiresAt must be after startsAt'
+    );
+  }
+}
+
+/**
+ * Refuses an active period overlapping another active rule live in `scope` (§10.2 "Out of
+ * office"); `excludeId` names the rule being updated, which never overlaps itself.
+ */
+export async function assertNoOverlap(
+  ctx: Context,
+  scope: ScopeInput,
+  startsAt: string | null,
+  expiresAt: string | null,
+  excludeId?: string
+): Promise<void> {
+  const existing = await liveOooRulesInScope(ctx.db, scope);
+  const overlapping = existing.some(
+    rule =>
+      rule.id !== excludeId &&
+      rule.active === 1 &&
+      rangesOverlap(startsAt, expiresAt, rule.startsAt, rule.expiresAt)
+  );
+  if (overlapping) {
+    throw new OpError(
+      HTTP_UNPROCESSABLE_CONTENT,
+      'ooo: active period overlaps an existing rule in this scope'
+    );
+  }
 }

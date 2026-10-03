@@ -10,7 +10,8 @@ import { defineOperation, type Context } from '../types.js';
 import {
   DIGITS_SCHEMA,
   FALLBACK_TARGET_SCHEMA,
-  liveDidBlock
+  liveDidBlock,
+  type DidBlockOut
 } from './_shared.js';
 
 const inputSchema = z
@@ -23,15 +24,6 @@ const inputSchema = z
   .strict();
 
 type Input = z.infer<typeof inputSchema>;
-
-type UpdateOutput = {
-  id: string;
-  base: string;
-  label: string | null;
-  digits: number | null;
-  fallbackTarget: TargetSpec | null;
-  createdAt: string;
-};
 
 /**
  * The block's next `fallback_target_id`: unchanged while `fallbackTarget` is absent, cleared on
@@ -55,7 +47,7 @@ async function resolveFallbackTargetId(
  * `PATCH /didBlocks/{id}` (§10.3 "Extensions & DIDs"): label, digit count and fallback target are
  * editable; `base` is immutable, since the DIDs inside are matched by it.
  */
-export const update = defineOperation<Input, UpdateOutput>({
+export const update = defineOperation<Input, DidBlockOut>({
   name: 'didBlocks.update',
   description:
     "Changes a number block's label, digit count or fallback target; the base is immutable",

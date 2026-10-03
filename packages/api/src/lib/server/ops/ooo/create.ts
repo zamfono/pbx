@@ -1,23 +1,22 @@
 import { z } from 'zod';
 
-import { HTTP_UNPROCESSABLE_CONTENT, newId } from '@zamfono/shared';
+import { newId } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { createTarget } from '../forwardTargets.js';
-import { type TargetSpec } from '../forwardTargetSchema.js';
 import { propagate } from '../propagate.js';
 import {
   assertOwnScopeOrAdmin,
   scopeColumns,
-  scopeInputSchema,
-  type ScopeInput
+  scopeInputSchema
 } from '../scope.js';
-import { defineOperation, OpError, type Context } from '../types.js';
+import { defineOperation } from '../types.js';
 import {
-  liveOooRulesInScope,
+  assertExpiryAfterStart,
+  assertNoOverlap,
   normalizeIsoOrNull,
   oooFields,
-  rangesOverlap
+  type OooRuleOut
 } from './_shared.js';
 
 const inputSchema = z
@@ -26,61 +25,17 @@ const inputSchema = z
 
 type Input = z.infer<typeof inputSchema>;
 
-type Output = {
-  id: string;
-  scope: ScopeInput;
-  active: boolean;
-  startsAt: string | null;
-  expiresAt: string | null;
-  target: TargetSpec;
-  createdAt: string;
-};
-
-/** `expires_at` after `starts_at`, mirroring the table's own `CHECK` (§11.2 `ooo_rules`). */
-function assertExpiryAfterStart(
-  startsAt: string | null,
-  expiresAt: string | null
-): void {
-  if (startsAt !== null && expiresAt !== null && !(startsAt < expiresAt)) {
-    throw new OpError(
-      HTTP_UNPROCESSABLE_CONTENT,
-      'ooo: expiresAt must be after startsAt'
-    );
-  }
-}
-
-/** Refuses a period overlapping another active rule already live in `scope` (§10.2 "Out of office"). */
-async function assertNoOverlap(
-  ctx: Context,
-  scope: ScopeInput,
-  startsAt: string | null,
-  expiresAt: string | null
-): Promise<void> {
-  const existing = await liveOooRulesInScope(ctx.db, scope);
-  const overlapping = existing.some(
-    rule =>
-      rule.active === 1 &&
-      rangesOverlap(startsAt, expiresAt, rule.startsAt, rule.expiresAt)
-  );
-  if (overlapping) {
-    throw new OpError(
-      HTTP_UNPROCESSABLE_CONTENT,
-      'ooo: active period overlaps an existing rule in this scope'
-    );
-  }
-}
-
 /**
  * `POST /users/{id}/ooo`, `/ringGroups/{id}/ooo`, `/menus/{id}/ooo`, `/tenant/ooo` (§10.2 "Out of
  * office"): a scheduled absence and the forward target it applies while in effect.
  */
-export const create = defineOperation<Input, Output>({
+export const create = defineOperation<Input, OooRuleOut>({
   name: 'ooo.create',
   description:
     "Adds an out-of-office rule to a scope: while in effect, its calls go to the rule's target, ahead of opening hours",
   input: inputSchema,
   minRole: 'user',
-  entity: (_input, output: Output) => ({ kind: 'oooRule', id: output.id }),
+  entity: (_input, output: OooRuleOut) => ({ kind: 'oooRule', id: output.id }),
   run: async (ctx, input) => {
     assertOwnScopeOrAdmin(ctx.actor, input.scope);
     const active = input.active ?? true;

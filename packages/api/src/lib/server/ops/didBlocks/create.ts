@@ -4,11 +4,14 @@ import { newId, normalizeInbound } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { createTarget } from '../forwardTargets.js';
-import { type TargetSpec } from '../forwardTargetSchema.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
-import { DIGITS_SCHEMA, FALLBACK_TARGET_SCHEMA } from './_shared.js';
+import {
+  DIGITS_SCHEMA,
+  FALLBACK_TARGET_SCHEMA,
+  type DidBlockOut
+} from './_shared.js';
 
 /**
  * The characters SQLite's `GLOB` reads as wildcards. The `did_blocks` soft-delete guard matches a
@@ -40,23 +43,14 @@ const inputSchema = z
 
 type Input = z.infer<typeof inputSchema>;
 
-type CreateOutput = {
-  id: string;
-  base: string;
-  label: string | null;
-  digits: number | null;
-  fallbackTarget: TargetSpec | null;
-  createdAt: string;
-};
-
 /** `POST /didBlocks` (§10.3 "Extensions & DIDs", §11.3): a number block and its fallback target. */
-export const create = defineOperation<Input, CreateOutput>({
+export const create = defineOperation<Input, DidBlockOut>({
   name: 'didBlocks.create',
   description:
     'Adds a number block: a base and a fixed digit count, or open-ended; groups DIDs and gives unassigned numbers in it a fallback (zamfono.help numbers)',
   input: inputSchema,
   minRole: 'admin',
-  entity: (_input, output: CreateOutput) => ({
+  entity: (_input, output: DidBlockOut) => ({
     kind: 'didBlock',
     id: output.id
   }),

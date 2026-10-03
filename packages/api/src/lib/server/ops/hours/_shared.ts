@@ -2,7 +2,7 @@ import type { Selectable } from 'kysely';
 
 import { HTTP_UNPROCESSABLE_CONTENT, type DB, type Db } from '@zamfono/shared';
 
-import { scopeColumns, type ScopeInput } from '../scope.js';
+import { inScope, type ScopeInput } from '../scope.js';
 import { OpError } from '../types.js';
 
 export type OpeningHoursRow = Selectable<DB['openingHours']>;
@@ -61,25 +61,10 @@ export async function loadSchedule(
   db: Db,
   scope: ScopeInput
 ): Promise<OpeningHoursRow | undefined> {
-  const columns = scopeColumns(scope);
   return db
     .selectFrom('openingHours')
     .selectAll()
-    .where(
-      'scopeUserId',
-      columns.scopeUserId === null ? 'is' : '=',
-      columns.scopeUserId
-    )
-    .where(
-      'scopeRingGroupId',
-      columns.scopeRingGroupId === null ? 'is' : '=',
-      columns.scopeRingGroupId
-    )
-    .where(
-      'scopeMenuId',
-      columns.scopeMenuId === null ? 'is' : '=',
-      columns.scopeMenuId
-    )
+    .where(inScope(scope))
     .where('deletedAt', 'is', null)
     .executeTakeFirst();
 }

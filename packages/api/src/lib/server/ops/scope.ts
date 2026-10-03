@@ -1,6 +1,7 @@
+import { expressionBuilder, type Expression, type SqlBool } from 'kysely';
 import { z } from 'zod';
 
-import { HTTP_FORBIDDEN, HTTP_NOT_FOUND } from '@zamfono/shared';
+import { HTTP_FORBIDDEN, HTTP_NOT_FOUND, type DB } from '@zamfono/shared';
 
 import { isSelfOrAdmin } from './gates.js';
 import { OpError, type Actor } from './types.js';
@@ -36,6 +37,29 @@ export function scopeColumns(scope: ScopeInput): ScopeColumns {
     scopeRingGroupId: scope.kind === 'ringGroup' ? scope.id : null,
     scopeMenuId: scope.kind === 'menu' ? scope.id : null
   };
+}
+
+/** The filter matching the rows of `scope`: a NULL scope column matches NULL, the tenant's all three. */
+export function inScope(scope: ScopeInput): Expression<SqlBool> {
+  const eb = expressionBuilder<DB, 'oooRules' | 'openingHours'>();
+  const columns = scopeColumns(scope);
+  return eb.and([
+    eb(
+      'scopeUserId',
+      columns.scopeUserId === null ? 'is' : '=',
+      columns.scopeUserId
+    ),
+    eb(
+      'scopeRingGroupId',
+      columns.scopeRingGroupId === null ? 'is' : '=',
+      columns.scopeRingGroupId
+    ),
+    eb(
+      'scopeMenuId',
+      columns.scopeMenuId === null ? 'is' : '=',
+      columns.scopeMenuId
+    )
+  ]);
 }
 
 /** The inverse of `scopeColumns`: a row's scope columns back to the wire `ScopeInput`. */

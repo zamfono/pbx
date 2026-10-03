@@ -1,25 +1,19 @@
 import { z } from 'zod';
 
-import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
-
 import { recordChange } from '../audit.js';
 import { assertMayHoldTarget, createTarget } from '../forwardTargets.js';
-import { type TargetSpec } from '../forwardTargetSchema.js';
 import { resolveTarget } from '../forwardTargetSpec.js';
 import { orBefore } from '../patch.js';
 import { propagate } from '../propagate.js';
+import { assertVisibleScope, scopeFromColumns } from '../scope.js';
+import { defineOperation } from '../types.js';
 import {
-  assertVisibleScope,
-  scopeFromColumns,
-  type ScopeInput
-} from '../scope.js';
-import { defineOperation, OpError, type Context } from '../types.js';
-import {
+  assertExpiryAfterStart,
+  assertNoOverlap,
   liveOooRule,
-  liveOooRulesInScope,
   normalizeIsoOrNull,
   oooFields,
-  rangesOverlap
+  type OooRuleOut
 } from './_shared.js';
 
 const inputSchema = z
@@ -27,16 +21,6 @@ const inputSchema = z
   .strict();
 
 type Input = z.infer<typeof inputSchema>;
-
-type Output = {
-  id: string;
-  scope: ScopeInput;
-  active: boolean;
-  startsAt: string | null;
-  expiresAt: string | null;
-  target: TargetSpec;
-  createdAt: string;
-};
 
 /**
  * The next `startsAt`/`expiresAt`, normalized to UTC and defaulted to `before`'s where `input`
@@ -54,40 +38,12 @@ function resolveSchedule(
     normalizeIsoOrNull(input.expiresAt),
     before.expiresAt
   );
-  if (startsAt !== null && expiresAt !== null && !(startsAt < expiresAt)) {
-    throw new OpError(
-      HTTP_UNPROCESSABLE_CONTENT,
-      'ooo: expiresAt must be after startsAt'
-    );
-  }
+  assertExpiryAfterStart(startsAt, expiresAt);
   return { startsAt, expiresAt };
 }
 
-/** Refuses a next active period overlapping another active rule in `scope`, `id` excluded. */
-async function assertNoOverlap(
-  ctx: Context,
-  scope: ScopeInput,
-  id: string,
-  startsAt: string | null,
-  expiresAt: string | null
-): Promise<void> {
-  const existing = await liveOooRulesInScope(ctx.db, scope);
-  const overlapping = existing.some(
-    rule =>
-      rule.id !== id &&
-      rule.active === 1 &&
-      rangesOverlap(startsAt, expiresAt, rule.startsAt, rule.expiresAt)
-  );
-  if (overlapping) {
-    throw new OpError(
-      HTTP_UNPROCESSABLE_CONTENT,
-      'ooo: active period overlaps an existing rule in this scope'
-    );
-  }
-}
-
 /** `PATCH /ooo/{id}` (§10.2 "Out of office"): active flag, schedule and target are editable. */
-export const update = defineOperation<Input, Output>({
+export const update = defineOperation<Input, OooRuleOut>({
   name: 'ooo.update',
   description:
     "Changes an out-of-office rule's activity, start, expiry or target",
@@ -101,7 +57,7 @@ export const update = defineOperation<Input, Output>({
     const active = orBefore(input.active, before.active === 1);
     const { startsAt, expiresAt } = resolveSchedule(input, before);
     if (active) {
-      await assertNoOverlap(ctx, scope, input.id, startsAt, expiresAt);
+      await assertNoOverlap(ctx, scope, startsAt, expiresAt, input.id);
     }
     const beforeTarget = await resolveTarget(ctx.db, before.targetId);
     if (input.target === undefined) {
