@@ -105,7 +105,6 @@ describe('Presence', () => {
       type: 'ContactStatusChange',
       timestamp: nowIso(),
       application: 'zamfono',
-      // eslint-disable-next-line camelcase -- ARI's own event field names (§9.3 ContactStatusChange)
       contact_info: { aor: 'e101-dabc', contact_status: 'Reachable' }
     });
 
@@ -134,7 +133,6 @@ describe('Presence', () => {
       type: 'ContactStatusChange',
       timestamp: nowIso(),
       application: 'zamfono',
-      // eslint-disable-next-line camelcase -- ARI's own event field names (§9.3 ContactStatusChange)
       contact_info: { aor: 'e102-dabc', contact_status: 'Reachable' }
     });
     await eventually(() => {
@@ -195,7 +193,6 @@ describe('Presence', () => {
       type: 'ContactStatusChange',
       timestamp: nowIso(),
       application: 'zamfono',
-      // eslint-disable-next-line camelcase -- ARI's own event field names (§9.3 ContactStatusChange)
       contact_info: { aor: 'e103-dabc', contact_status: 'Reachable' }
     });
     await eventually(() => {
@@ -241,7 +238,6 @@ describe('Presence', () => {
       type: 'ContactStatusChange',
       timestamp: nowIso(),
       application: 'zamfono',
-      // eslint-disable-next-line camelcase -- ARI's own event field names (§9.3 ContactStatusChange)
       contact_info: { aor: 'e105-dabc', contact_status: 'Reachable' }
     });
     await eventually(() => {
@@ -289,7 +285,6 @@ describe('Presence', () => {
         type: 'ContactStatusChange',
         timestamp: nowIso(),
         application: 'zamfono',
-        // eslint-disable-next-line camelcase -- ARI's own event field names (§9.3 ContactStatusChange)
         contact_info: { aor, contact_status: status }
       });
     }

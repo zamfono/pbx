@@ -229,7 +229,6 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
       application: 'zamfono',
       channel: defaultChannel({ id: first?.channelId ?? '' }),
       cause: AST_CAUSE_NETWORK_OUT_OF_ORDER,
-      // eslint-disable-next-line camelcase -- ARI's own field name
       tech_cause: 503
     });
 

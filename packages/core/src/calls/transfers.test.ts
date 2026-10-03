@@ -139,7 +139,6 @@ describe('transfers', () => {
       exten: '102',
       context: 'from-users',
       result: 'Success',
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       is_external: false
     });
 
@@ -231,7 +230,6 @@ describe('transfers', () => {
       exten: '+15557777',
       context: 'from-users',
       result: 'Success',
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       is_external: false
     });
     await transferFollowed(legId);
@@ -289,7 +287,6 @@ describe('transfers', () => {
       exten: '+15557777',
       context: 'from-users',
       result: 'Success',
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       is_external: false
     });
     await transferFollowed(callerId);
@@ -359,12 +356,10 @@ describe('transfers', () => {
       application: 'zamfono',
       channel: { id: legId, name: 'PJSIP/e101-a-00000002' },
       transferee: { id: callerId, name: 'PJSIP/trunk-1-00000001' },
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       replace_channel: { id: localOne.id, name: localOne.name },
       exten: '+15557777',
       context: 'from-users',
       result: 'Success',
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       is_external: true
     });
 
@@ -419,12 +414,10 @@ describe('transfers', () => {
       application: 'zamfono',
       channel: { id: legId, name: 'PJSIP/e101-a-00000002' },
       transferee: { id: callerId, name: 'PJSIP/trunk-1-00000001' },
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       replace_channel: { id: localOne.id, name: localOne.name },
       exten: '102',
       context: 'from-users',
       result: 'Success',
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       is_external: true
     });
     await transferFollowed(legId);
@@ -675,14 +668,10 @@ describe('transfers', () => {
       type: 'BridgeAttendedTransfer',
       timestamp: nowIso(),
       application: 'zamfono',
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       transferer_first_leg: { id: original.legId },
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       transferer_second_leg: { id: secondId },
       transferee: { id: original.callerId },
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       destination_type: 'bridge',
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       destination_bridge: bridge2,
       result: 'Success'
     });
@@ -735,14 +724,10 @@ describe('transfers', () => {
       type: 'BridgeAttendedTransfer',
       timestamp: nowIso(),
       application: 'zamfono',
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       transferer_first_leg: { id: original.legId },
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       transferer_second_leg: { id: secondId },
       transferee: { id: original.callerId },
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       destination_type: 'bridge',
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       destination_bridge: bridge2,
       result: 'Success'
     });
@@ -799,14 +784,10 @@ describe('transfers', () => {
       type: 'BridgeAttendedTransfer',
       timestamp: nowIso(),
       application: 'zamfono',
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       transferer_first_leg: { id: original.legId },
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       transferer_second_leg: { id: secondId },
       transferee: { id: original.callerId },
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       destination_type: 'bridge',
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       destination_bridge: bridge2,
       result: 'Success'
     });
@@ -888,14 +869,10 @@ describe('transfers', () => {
       type: 'BridgeAttendedTransfer',
       timestamp: nowIso(),
       application: 'zamfono',
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       transferer_first_leg: { id: original.legId },
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       transferer_second_leg: { id: secondId },
       transferee: { id: original.callerId },
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       destination_type: 'bridge',
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       destination_bridge: bridge2,
       result: 'Success'
     });
@@ -952,22 +929,14 @@ describe('transfers', () => {
       type: 'BridgeAttendedTransfer',
       timestamp: nowIso(),
       application: 'zamfono',
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       transferer_first_leg: { id: original.legId },
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       transferer_second_leg: { id: secondId },
       transferee: { id: original.callerId },
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       transfer_target: { id: targetLegId },
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       transferer_first_leg_bridge: { id: bridge1 },
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       transferer_second_leg_bridge: { id: bridge2 },
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       destination_type: 'link',
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       destination_link_first_leg: { id: localOne.id },
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       destination_link_second_leg: { id: localTwo.id },
       result: 'Success'
     });

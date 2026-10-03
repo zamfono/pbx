@@ -2,7 +2,6 @@
 // the way Asterisk 22's `rtcp_report_to_json` (main/rtp_engine.c) and `ast_json_dump_string` do:
 // compact JSON in the key order Asterisk packs, `lsr` and the NTP timestamps as strings, a
 // receiver report's `sender_information` null.
-/* eslint-disable camelcase -- the keys are Asterisk's own JSON field names */
 
 import { MS_PER_SECOND } from '@zamfono/shared';
 

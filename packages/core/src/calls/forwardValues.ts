@@ -25,7 +25,6 @@ import type { Pipeline } from './pipeline.js';
 /** A hop's `REDIRECTING` reason as `{{forwardReason}}` names it, in the wire's camelCase. */
 const FORWARD_REASONS = {
   away: 'outOfOffice',
-  // eslint-disable-next-line camelcase -- Asterisk's own REDIRECTING reason
   time_of_day: 'closed',
   cfu: 'unconditional',
   cfb: 'busy',

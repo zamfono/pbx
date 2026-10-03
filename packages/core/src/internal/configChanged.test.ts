@@ -94,7 +94,6 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
       type: 'ContactStatusChange',
       timestamp: nowIso(),
       application: 'zamfono',
-      // eslint-disable-next-line camelcase -- ARI's own event field names (§9.3 ContactStatusChange)
       contact_info: { aor: 'e101-dabc', contact_status: 'Reachable' }
     });
     await eventually(() => {

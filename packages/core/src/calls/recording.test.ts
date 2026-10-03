@@ -825,7 +825,6 @@ describe('Recorder', () => {
       application: 'zamfono',
       channel: caller,
       cause: 16,
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       cause_txt: 'Normal Clearing'
     });
     // The participation's snoops are stopped by the recorder, whose `RecordingFinished` wait is

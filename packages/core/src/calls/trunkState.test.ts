@@ -149,7 +149,6 @@ describe('TrunkState', () => {
       type: 'ContactStatusChange',
       timestamp: nowIso(),
       application: 'zamfono',
-      // eslint-disable-next-line camelcase -- ARI's own event field names
       contact_info: { aor, contact_status: status }
     });
   }
@@ -274,7 +273,6 @@ describe('TrunkState', () => {
       technology: 'PJSIP',
       resource,
       state: reported as FakeEndpoint['state'],
-      // eslint-disable-next-line camelcase -- ARI's own field name
       channel_ids: []
     });
     // Asterisk qualified these contacts before this process started, so no event is coming.
@@ -369,7 +367,6 @@ describe('TrunkState', () => {
         technology: 'PJSIP',
         resource: trunkSectionName(trunkId),
         state: 'offline',
-        // eslint-disable-next-line camelcase -- ARI's own field name
         channel_ids: []
       });
 

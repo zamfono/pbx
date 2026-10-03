@@ -180,7 +180,6 @@ function emitDestroyed(
     application: 'zamfono',
     channel: defaultChannel({ id: channelId }),
     cause,
-    // eslint-disable-next-line camelcase -- ARI's own field name
     ...(techCause === undefined ? {} : { tech_cause: techCause })
   });
 }

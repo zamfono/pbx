@@ -81,7 +81,6 @@ export function fakeEndpoint(sipUsername: string): FakeEndpoint {
     technology: 'PJSIP',
     resource: sipUsername,
     state: 'online',
-    // eslint-disable-next-line camelcase -- ARI's own field name on the endpoints resource
     channel_ids: []
   };
 }
@@ -114,7 +113,6 @@ export function routeMisc(
   if (path === 'asterisk/info' && method === 'GET') {
     return {
       status: HTTP_OK,
-      // eslint-disable-next-line camelcase -- ARI's own field name
       body: { status: { startup_time: FAKE_ASTERISK_STARTUP_TIME } }
     };
   }
@@ -127,7 +125,6 @@ export function contactReachable(sipUsername: string): AriEvent {
     type: 'ContactStatusChange',
     timestamp: new Date().toISOString(),
     application: 'zamfono',
-    // eslint-disable-next-line camelcase -- ARI's own field names on the contact_info payload
     contact_info: { aor: sipUsername, contact_status: 'Reachable' }
   };
 }

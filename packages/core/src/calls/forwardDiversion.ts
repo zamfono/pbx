@@ -21,7 +21,6 @@ import { outboundHosts } from './trunkStatus.js';
 /** The `reason` RFC 5806 §4 names for each hop's `REDIRECTING` reason. */
 const DIVERSION_REASONS = {
   away: 'away',
-  // eslint-disable-next-line camelcase -- Asterisk's own REDIRECTING reason
   time_of_day: 'time-of-day',
   cfu: 'unconditional',
   cfb: 'user-busy',

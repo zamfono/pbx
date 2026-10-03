@@ -220,7 +220,6 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       application: 'zamfono',
       channel: defaultChannel({ id: channelId, state: extra.state ?? 'Down' }),
       ...(extra.cause === undefined ? {} : { cause: extra.cause }),
-      // eslint-disable-next-line camelcase -- ARI's own field name
       ...(extra.techCause === undefined ? {} : { tech_cause: extra.techCause })
     });
   }

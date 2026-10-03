@@ -34,7 +34,6 @@ function destroyed(
     application: 'zamfono',
     channel: defaultChannel({ id: channelId }),
     cause: NORMAL_CLEARING,
-    // eslint-disable-next-line camelcase -- ARI's own event field name
     cause_txt: 'Normal Clearing',
     ...fields
   };
@@ -269,7 +268,6 @@ describe('handleChannelEnded, the caller channel', () => {
     noteHangupRequest(call, hangupRequest(MEMBER_CHANNEL));
     await handleChannelEnded(
       pipeline,
-      // eslint-disable-next-line camelcase -- ARI's own event field name
       destroyed(MEMBER_CHANNEL, { tech_cause: 200 })
     );
     // The core then hangs the caller up: its own, soft, request, which changes nothing.

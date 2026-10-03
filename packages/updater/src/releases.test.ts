@@ -28,8 +28,6 @@ function answering(
 
 const LATEST = 'https://api.github.com/repos/zamfono/pbx/releases/latest';
 const TAG = 'https://api.github.com/repos/zamfono/pbx/releases/tags/v0.0.6';
-
-/* eslint-disable camelcase -- GitHub's own field names */
 describe('createReleases', () => {
   it('reads the latest release and caches it for an hour', async () => {
     const { fetchFn, urls } = answering({
@@ -116,4 +114,3 @@ describe('createReleases', () => {
     await expect(createReleases(fetchFn).latest()).rejects.toThrow('403');
   });
 });
-/* eslint-enable camelcase -- GitHub's own field names */

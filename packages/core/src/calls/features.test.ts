@@ -186,7 +186,6 @@ describe('features', () => {
       type: 'ContactStatusChange',
       timestamp: nowIso(),
       application: 'zamfono',
-      // eslint-disable-next-line camelcase -- ARI's own event field names (§9.3 ContactStatusChange)
       contact_info: { aor: sipUsername, contact_status: 'Reachable' }
     });
     // `Presence` handles the event off the WebSocket; its refresh PUTs the hint and then logs the

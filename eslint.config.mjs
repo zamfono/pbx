@@ -94,6 +94,42 @@ export default tseslint.config(
             'percent_done',
             'snapshot_id',
             'total_bytes_processed',
+            // ARI's event and resource fields
+            'cause_txt',
+            'channel_ids',
+            'contact_info',
+            'contact_status',
+            'destination_bridge',
+            'destination_link_first_leg',
+            'destination_link_second_leg',
+            'destination_type',
+            'is_external',
+            'replace_channel',
+            'startup_time',
+            'tech_cause',
+            'transfer_target',
+            'transferer_first_leg',
+            'transferer_first_leg_bridge',
+            'transferer_second_leg',
+            'transferer_second_leg_bridge',
+            // Asterisk's REDIRECTING reasons
+            'time_of_day',
+            // Asterisk's RTCP report JSON (res_hep_rtcp)
+            'fraction_lost',
+            'highest_seq_no',
+            'ia_jitter',
+            'ntp_timestamp_sec',
+            'ntp_timestamp_usec',
+            'packets_lost',
+            'report_blocks',
+            'report_count',
+            'rtp_timestamp',
+            'sender_information',
+            'source_ssrc',
+            // GitHub's releases API
+            'html_url',
+            'published_at',
+            'tag_name',
             // Table names
             'backup_targets'
           ]

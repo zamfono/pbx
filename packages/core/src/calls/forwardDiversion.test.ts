@@ -75,7 +75,6 @@ describe('diversionHeader', () => {
   it("names each REDIRECTING reason by RFC 5806's reason", () => {
     const reasons = {
       away: 'away',
-      // eslint-disable-next-line camelcase -- Asterisk's own REDIRECTING reason
       time_of_day: 'time-of-day',
       cfu: 'unconditional',
       cfb: 'user-busy',
