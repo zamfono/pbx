@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   newId,
@@ -20,7 +20,7 @@ import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { onEvents } from '../testing/busEvents.js';
-import { eventually } from '../testing/eventually.js';
+import { delivered, eventually, flush } from '../testing/eventually.js';
 import {
   noopCdr,
   noopLogger,
@@ -993,5 +993,44 @@ describe('Pipeline', () => {
         entry.method === 'DELETE' && entry.path === `channels/${leg.channelId}`
     );
     expect(legHungUp).toBe(true);
+  });
+
+  it('drains: starts no further call, still routes the events of the calls in progress, and waits for their handling', async () => {
+    const { promise: io, resolve: finishIo } =
+      Promise.withResolvers<undefined>();
+    const started: string[] = [];
+    vi.spyOn(pipeline, 'handleStasisStart').mockImplementation(async ev => {
+      started.push((ev.channel as Channel).id);
+      await io;
+    });
+    fakeAri.emit(inboundEvent(defaultChannel({ id: 'caller' }), '100'));
+    await eventually(() => {
+      expect(started).toEqual(['caller']);
+    });
+
+    let drained = false;
+    const draining = pipeline.drain().then(() => {
+      drained = true;
+    });
+    const newCall = delivered(ari, 'StasisStart', 'next-caller');
+    fakeAri.emit(inboundEvent(defaultChannel({ id: 'next-caller' }), '100'));
+    await newCall;
+    fakeAri.emit({
+      type: 'StasisStart',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      args: ['leg', 'call-1'],
+      channel: defaultChannel({ id: 'leg', state: 'Up' })
+    });
+    await eventually(() => {
+      expect(started).toEqual(['caller', 'leg']);
+    });
+    expect(pipeline.handling).toHaveLength(2);
+    await flush();
+    expect(drained).toBe(false);
+
+    finishIo(undefined);
+    await draining;
+    expect(pipeline.handling).toEqual([]);
   });
 });

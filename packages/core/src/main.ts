@@ -1,6 +1,6 @@
 /**
  * `core`'s entry point: reads the boot environment, opens the database, connects ARI and AMI,
- * then serves the internal HTTP+WS API (§3, §3.1, §6.3).
+ * then serves the internal HTTP+WS API until SIGTERM or SIGINT (§3, §3.1, §6.3).
  */
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -35,6 +35,7 @@ import { startInternalServer } from './internal/server.js';
 import { ConfigCache } from './internal/snapshot.js';
 import { StateStore } from './internal/stateStore.js';
 import { Presence } from './presence.js';
+import { stopOnSignal } from './stop.js';
 
 const CORE_INTERNAL_PORT = 3000;
 // Fixed by the Asterisk image's ari.conf and manager.conf (§9.1); not configurable per stack.
@@ -124,7 +125,8 @@ async function startLiveState(deps: {
  * OOO/hours sweep. On any failure it closes both clients before rethrowing, so neither leaves a
  * reconnect timer running: an unclosed `AriClient`/`AmiClient` keeps Node's event loop alive on a
  * rejected connect, which would otherwise turn a fatal boot into a process that never exits. The
- * returned handle releases everything the boot started, in the reverse order.
+ * returned handle releases everything the boot started, which SIGTERM and SIGINT also do before the
+ * process exits (`stop.ts`).
  */
 export async function main(): Promise<{ close: () => Promise<void> }> {
   const env = readEnv(process.env);
@@ -194,14 +196,7 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
       { port: CORE_INTERNAL_PORT, hepEnabled: env.hepEnabled },
       'core internal server listening'
     );
-    return {
-      async close(): Promise<void> {
-        jobs.stop();
-        hep?.close();
-        await server.close();
-        await Promise.allSettled([ari.close(), ami.close()]);
-      }
-    };
+    return stopOnSignal({ jobs, hep, server, pipeline, ari, ami, log });
   } catch (error) {
     await Promise.allSettled([ari.close(), ami.close()]);
     throw error;

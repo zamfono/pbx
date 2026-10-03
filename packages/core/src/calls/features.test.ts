@@ -17,7 +17,7 @@ import { Presence } from '../presence.js';
 import { defaultPrompt } from '../prompts.js';
 import { onEvents } from '../testing/busEvents.js';
 import {
-  eventHandled,
+  delivered,
   eventually,
   flush,
   nextSubscription,
@@ -1551,7 +1551,7 @@ describe('features', () => {
       addedId
     );
 
-    const handled = eventHandled(pipeline, 'ChannelDestroyed', addedId);
+    const arrived = delivered(ari, 'ChannelDestroyed', addedId);
     fakeAri.emit({
       type: 'ChannelDestroyed',
       timestamp: nowIso(),
@@ -1559,7 +1559,8 @@ describe('features', () => {
       channel: defaultChannel({ id: addedId }),
       cause: 16
     });
-    await handled;
+    await arrived;
+    await pipeline.idle();
 
     expect(hungUpChannel(customerId)).toBe(false);
     expect(hungUpChannel(initiatorId)).toBe(false);
@@ -1827,13 +1828,10 @@ describe('features', () => {
 
     // Asterisk answers the feature channel's own hangup with `ChannelDestroyed`; the added
     // party is still bridged (§10.2 "Three-way calls"), so their hint stays.
-    const handled = eventHandled(
-      pipeline,
-      'ChannelDestroyed',
-      addPartyChannel.id
-    );
+    const arrived = delivered(ari, 'ChannelDestroyed', addPartyChannel.id);
     channelDestroyed(addPartyChannel.id);
-    await handled;
+    await arrived;
+    await pipeline.idle();
     expect(hintPutsFor('300').at(-1)).toEqual({ deviceState: 'INUSE' });
     // §11.2 `calls.ended_at`: the added leg's own row ends as the added party leaves, not here.
     expect((await callsRow(addPartyCall.id)).endedAt).toBeNull();

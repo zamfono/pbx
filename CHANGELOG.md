@@ -209,6 +209,10 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- `core` ignored the stop signal, so every `docker compose stop`, restart and update waited out
+  the 10 s grace period and then killed it, cutting off whatever it was doing for a call. `core`
+  now stops on SIGTERM and SIGINT: it takes no new call, lets the calls' event handling in
+  progress finish for up to 8 s, then closes its connections to Asterisk and exits.
 - REST and `/events` accepted the access token of a user whose stored role is none of `owner`,
   `admin` and `user`, acting with the role the token was issued with, while MCP refused it. Such a
   token is now refused everywhere, with 401 on REST and MCP and a closed socket on `/events`.

@@ -10,8 +10,12 @@ import { AmiClient } from './ami/client.js';
 import { FakeAmi } from './ami/fake.js';
 import { AriClient } from './ari/client.js';
 import { FakeAri } from './ari/fake.js';
+import { defaultChannel } from './ari/fakeChannel.js';
+import { Pipeline } from './calls/pipeline.js';
 import { main, reportFatalBoot } from './main.js';
+import { STOP_DRAIN_MS } from './stop.js';
 import { startSweep } from './sweep.js';
+import { eventually, flush } from './testing/eventually.js';
 
 // `startInternalServer` binds the fixed port 3000 (Global Constraints), which a test cannot claim;
 // the real `ConfigCache`, `EventBus` and `StateStore` from the same module are kept.
@@ -20,6 +24,19 @@ vi.mock('./internal/server.js', async importOriginal => ({
   startInternalServer: vi.fn(() =>
     Promise.resolve({ close: () => Promise.resolve() })
   )
+}));
+
+const logged = vi.hoisted(() => [] as { level: string; args: unknown[] }[]);
+vi.mock('pino', () => ({
+  default: () =>
+    Object.fromEntries(
+      ['debug', 'info', 'warn', 'error'].map(level => [
+        level,
+        (...args: unknown[]) => {
+          logged.push({ level, args });
+        }
+      ])
+    )
 }));
 
 vi.mock('./sweep.js', async importOriginal => ({
@@ -155,6 +172,147 @@ describe('main', () => {
     await fakeAmi.close();
 
     expect(stop).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('stopping on SIGTERM or SIGINT', () => {
+  const savedEnv = Object.fromEntries(
+    ENV_KEYS.map(key => [key, process.env[key]])
+  );
+  let fakeAri: FakeAri;
+  let fakeAmi: FakeAmi;
+  let listenersBefore = new Set<unknown>();
+
+  /** Boots `main` against fakes, with one inbound call's handling stalled on `io`. */
+  async function bootWithStalledCall(io: Promise<void>): Promise<void> {
+    fakeAri = new FakeAri();
+    fakeAmi = new FakeAmi();
+    const ari = await fakeAri.listen();
+    const ami = await fakeAmi.listen();
+    process.env.ARI_URL = ari.url;
+    process.env.ARI_PASSWORD = 'ari-secret';
+    process.env.AMI_HOST = `${ami.host}:${ami.port}`;
+    process.env.AMI_PASSWORD = 'ami-secret';
+    process.env.DB_FILE = await migratedDbFile();
+    process.env.HEP_ENABLED = 'false';
+    listenersBefore = new Set([
+      ...process.listeners('SIGTERM'),
+      ...process.listeners('SIGINT')
+    ]);
+    await main();
+    const handleStasisStart = vi
+      .spyOn(Pipeline.prototype, 'handleStasisStart')
+      .mockReturnValue(io);
+    fakeAri.emit({
+      type: 'StasisStart',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      args: ['inbound', '+15551234'],
+      channel: defaultChannel({ id: 'caller' })
+    });
+    await eventually(() => {
+      expect(handleStasisStart).toHaveBeenCalledTimes(1);
+    });
+  }
+
+  /** The `name` handlers `main` added, leaving out the test runner's own. */
+  function handlersOf(name: 'SIGTERM' | 'SIGINT') {
+    return process
+      .listeners(name)
+      .filter(listener => !listenersBefore.has(listener));
+  }
+
+  function signal(name: 'SIGTERM' | 'SIGINT'): void {
+    for (const listener of handlersOf(name)) {
+      listener(name);
+    }
+  }
+
+  afterEach(async () => {
+    for (const name of ['SIGTERM', 'SIGINT'] as const) {
+      for (const listener of handlersOf(name)) {
+        process.off(name, listener);
+      }
+    }
+    for (const key of ENV_KEYS) {
+      if (savedEnv[key] === undefined) {
+        Reflect.deleteProperty(process.env, key);
+      } else {
+        process.env[key] = savedEnv[key];
+      }
+    }
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    logged.length = 0;
+    await fakeAri.close();
+    await fakeAmi.close();
+  });
+
+  it('closes ARI only once the event handling in progress has finished, then exits 0', async () => {
+    const { promise: io, resolve: finishIo } =
+      Promise.withResolvers<undefined>();
+    await bootWithStalledCall(io);
+    const ariClose = vi.spyOn(AriClient.prototype, 'close');
+    const exit = vi.spyOn(process, 'exit').mockReturnValue(undefined as never);
+
+    signal('SIGTERM');
+    await flush();
+    expect(ariClose).not.toHaveBeenCalled();
+
+    finishIo(undefined);
+    await eventually(() => {
+      expect(exit).toHaveBeenCalledWith(0);
+    });
+    expect(ariClose).toHaveBeenCalledTimes(1);
+    expect(logged.map(entry => entry.args.at(-1))).toEqual(
+      expect.arrayContaining(['core stopping', 'core stopped'])
+    );
+  });
+
+  it('a second signal during the stop starts no second one', async () => {
+    const { promise: io, resolve: finishIo } =
+      Promise.withResolvers<undefined>();
+    await bootWithStalledCall(io);
+    const ariClose = vi.spyOn(AriClient.prototype, 'close');
+    const exit = vi.spyOn(process, 'exit').mockReturnValue(undefined as never);
+
+    signal('SIGTERM');
+    signal('SIGINT');
+    finishIo(undefined);
+    await eventually(() => {
+      expect(exit).toHaveBeenCalledWith(0);
+    });
+    await flush();
+
+    expect(ariClose).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(
+      logged.filter(entry => entry.args.at(-1) === 'core stopping')
+    ).toHaveLength(1);
+  });
+
+  it('logs the handling still in progress after STOP_DRAIN_MS and exits', async () => {
+    await bootWithStalledCall(Promise.withResolvers<undefined>().promise);
+    const exit = vi.spyOn(process, 'exit').mockReturnValue(undefined as never);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+    signal('SIGTERM');
+    await vi.advanceTimersByTimeAsync(STOP_DRAIN_MS);
+    vi.useRealTimers();
+
+    await eventually(() => {
+      expect(exit).toHaveBeenCalledWith(0);
+    });
+    expect(logged).toContainEqual({
+      level: 'warn',
+      args: [
+        {
+          handling: [{ event: 'StasisStart', callId: null }],
+          waitedMs: STOP_DRAIN_MS
+        },
+        "core stopping before the calls' event handling finished"
+      ]
+    });
   });
 });
 

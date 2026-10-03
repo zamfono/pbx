@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-03 · §3.1 Process split.** On SIGTERM or SIGINT `core` takes no new call, lets the event handling of the calls in progress finish within a bound below the container's stop grace period, then closes its ARI and AMI connections and exits.
+*Why:* product-owner decision: "I agree: shutdown should wait for pending events"; `core` had no signal handler, so every stop ended in Docker's kill after the grace period.
+
 **2026-10-03 · §10.3 Statistics.** `GET /stats` aligns `hour`, `day` and `week` buckets to the tenant clock: the local hour, local midnight and local Monday midnight; `minute` buckets are the same in every zone.
 *Why:* product-owner decision: "I'd align the buckets to the tenant's time zone."
 

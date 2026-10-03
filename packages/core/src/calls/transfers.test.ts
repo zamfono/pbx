@@ -7,7 +7,7 @@ import { type FakeAri } from '../ari/fake.js';
 import { isPlacement } from '../ari/fakeDial.js';
 import type { LogLevel } from '../callLog.js';
 import type { CdrWriter } from '../cdr.js';
-import { eventHandled, eventually } from '../testing/eventually.js';
+import { delivered, eventually } from '../testing/eventually.js';
 import { noopLogger } from '../testing/pipelineDeps.js';
 import {
   answeredCall,
@@ -749,9 +749,10 @@ describe('transfers', () => {
     });
     await transferFollowed(original.legId);
     // Asterisk ends the transferrer's second channel itself; that ends nothing else.
-    const handled = eventHandled(pipeline, 'ChannelDestroyed', secondId);
+    const arrived = delivered(ari, 'ChannelDestroyed', secondId);
     destroyed(secondId);
-    await handled;
+    await arrived;
+    await pipeline.idle();
     expect(await endedAt(consultation.id)).toBeNull();
 
     destroyed(original.callerId);

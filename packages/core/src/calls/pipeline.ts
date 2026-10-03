@@ -76,6 +76,15 @@ export type PipelineDeps = {
   presence: Presence;
 };
 
+/** A caller's `StasisStart` (§9.2 `inbound,<exten>`, `outbound,<exten>`): the event each call
+ * starts with. */
+function startsCall(ev: AriEvent): boolean {
+  const [kind] = (ev.args as (string | undefined)[] | undefined) ?? [];
+  return (
+    ev.type === 'StasisStart' && (kind === 'inbound' || kind === 'outbound')
+  );
+}
+
 // One Pipeline per `core` process, wired directly to its `AriClient`'s event stream so
 // constructing it is the only wiring a caller needs to do, the transfers Asterisk executes on SIP
 // `REFER` included. The live state below is public so the call modules' functions, taking the
@@ -103,21 +112,62 @@ export class Pipeline {
     waiters: new Map()
   };
 
+  /** The events whose handling is in progress, by the promise that settles as it ends. */
+  private readonly handlingInProgress = new Map<Promise<void>, AriEvent>();
+  /** Set by `drain`: a call's first event starts no handling. */
+  private draining = false;
+
   constructor(deps: PipelineDeps) {
     this.deps = deps;
     this.deps.ari.on('event', (ev: AriEvent) => {
+      if (this.draining && startsCall(ev)) {
+        return;
+      }
       // A rejection here is a fault in the routing of one call, never a reason to stop handling
       // the stream. The call's own trace stops where the throw happened and says nothing about
       // it, so the log line is the only account of what went wrong.
-      this.routeEvent(ev).catch((error: unknown) => {
-        // §7: a call-related line carries the call's correlation id.
-        this.deps.logger.error(
-          { err: error, event: ev.type, callId: this.callIdOf(ev) },
-          'pipeline: routing failed'
-        );
-      });
+      const handled = this.routeEvent(ev)
+        .catch((error: unknown) => {
+          // §7: a call-related line carries the call's correlation id.
+          this.deps.logger.error(
+            { err: error, event: ev.type, callId: this.callIdOf(ev) },
+            'pipeline: routing failed'
+          );
+        })
+        .finally(() => {
+          this.handlingInProgress.delete(handled);
+        });
+      this.handlingInProgress.set(handled, ev);
     });
     followTransfers(this);
+  }
+
+  /** The events whose handling is in progress, with the call each belongs to. */
+  get handling(): { event: string; callId: string | null }[] {
+    return [...this.handlingInProgress.values()].map(ev => ({
+      event: ev.type,
+      callId: this.callIdOf(ev)
+    }));
+  }
+
+  /** Resolves once no event's handling is in progress, handling that starts while it waits
+   * included. */
+  async idle(): Promise<void> {
+    if (this.handlingInProgress.size === 0) {
+      return;
+    }
+    await Promise.all(this.handlingInProgress.keys());
+    await this.idle();
+  }
+
+  /**
+   * Starts no further calls and resolves once the event handling in progress has finished. The
+   * events of the calls already handled are still routed: a ring or a transfer in progress
+   * finishes on them.
+   */
+  drain(): Promise<void> {
+    this.draining = true;
+    return this.idle();
   }
 
   /** The call `ev` belongs to, by its channel or, for a leg channel that has not

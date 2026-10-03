@@ -371,6 +371,41 @@ describe('startInternalServer', () => {
     }
   });
 
+  it('closes while an /internal/events subscriber is still connected, ending its socket', async () => {
+    const started = await startInternalServer(
+      {
+        db,
+        ari,
+        log: noopLogger,
+        cache: new ConfigCache(db),
+        state: new StateStore(),
+        bus: new EventBus(),
+        actions: testActions(ari, db),
+        presence: idlePresence(),
+        recorder: idleRecorder,
+        trunks: { refreshMonitoring: () => Promise.resolve() }
+      },
+      ANY_FREE_PORT
+    );
+    const socket = new WebSocket(
+      `ws://127.0.0.1:${started.port}/internal/events`
+    );
+    await new Promise<void>((resolve, reject) => {
+      socket.once('open', () => {
+        resolve();
+      });
+      socket.once('error', reject);
+    });
+    const socketClosed = new Promise<void>(resolve => {
+      socket.once('close', () => {
+        resolve();
+      });
+    });
+
+    await started.close();
+    await socketClosed;
+  });
+
   it('answers 413 for a configChanged body over the size cap', async () => {
     const response = await fetch(
       `http://127.0.0.1:${port}/internal/configChanged`,

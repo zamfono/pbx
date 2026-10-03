@@ -93,7 +93,7 @@ Three long-running application services run per stack, plus the TLS proxy and a 
 
 **Events.** `core` produces all call, presence, OOO and opening-hours events. Its sweep for OOO and opening hours writes nothing; it evaluates and emits. It runs at the next instant any scope's OOO rule starts or expires or its opening hours open or close, at once after a config change, and at least hourly. `api` produces the `backup.*` events of its own jobs, subscribes to `core` over the internal WebSocket, and fans both streams out to authenticated `/events` clients and to webhooks (§10.6).
 
-**Independence.** Either process can restart on its own. An `api` restart never affects live calls.
+**Independence.** Either process can restart on its own. An `api` restart never affects live calls. On SIGTERM or SIGINT `core` takes no new call, lets the event handling of the calls in progress finish for a bounded time below the container's stop grace period, then closes its ARI and AMI connections and exits.
 
 ### 3.2 Design rules
 
@@ -986,7 +986,7 @@ Two long-running processes plus the one-shot migration container — a monorepo 
 packages/
 ├── core/                # container 1: ARI call handling
 │   └── src/
-│       ├── main.ts      # boot: env, openDb, ARI and AMI connect, internal server
+│       ├── main.ts      # boot: env, openDb, ARI and AMI connect, internal server; stops on SIGTERM
 │       ├── ari/         # thin ARI client (WebSocket events + REST) and its in-process fake for tests
 │       ├── ami/         # AMI client for outbound registration state (§9.4) and its fake
 │       ├── routing/     # pure decision functions: schedules, entry, user step, ring groups, menus, dialed strings, trunks; no ARI, no database

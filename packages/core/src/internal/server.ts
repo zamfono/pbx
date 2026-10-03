@@ -239,6 +239,10 @@ export function startInternalServer(
           address !== null && typeof address === 'object' ? address.port : port,
         close: () =>
           new Promise<void>(resolveClose => {
+            // `server.close` waits for every socket to end, the event stream's upgraded ones too.
+            for (const client of wss.clients) {
+              client.terminate();
+            }
             wss.close();
             server.close(() => {
               resolveClose();
