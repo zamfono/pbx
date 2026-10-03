@@ -90,9 +90,8 @@ export const update = defineOperation<SettingsInput, SettingsWire>({
       // field with no reload kind of its own, `language` among them, §11.4), so `core`'s config
       // cache must drop whether or not Asterisk itself needs a reload — the same unconditional
       // `propagate()` every other operation that writes core-relevant configuration makes
-      // (`dids/update.ts`, `ooo/update.ts`, `outboundRoutes/replace.ts`, …). Gating this call
-      // itself on `reloadKinds` left `core` serving a stale snapshot after a write that changed
-      // no PJSIP/MOH column.
+      // (`dids/update.ts`, `ooo/update.ts`, `outboundRoutes/replace.ts`, …); `reloadKinds` only
+      // decides which Asterisk modules reload.
       propagate(ctx, reloadKindsFor(columns));
     }
     await maybePushTenantProfile(ctx, columns);

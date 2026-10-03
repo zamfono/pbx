@@ -1,14 +1,13 @@
 /**
  * The CSRF origin check for the browser-served pages (§5.2 "Authentication pages"), which
  * `hooks.server.ts` applies in place of SvelteKit's built-in one (`vite.config.ts` turns that
- * off). SvelteKit's check covers every route alike, so it also refused the endpoints the spec
- * defines for non-browser clients, which send no `Origin` at all: the form-encoded
- * `/oauth/token` and `/oauth/revoke` (RFC 6749 §3.2, RFC 7009 §2.1), and a bearer-authenticated
- * multipart upload such as `POST /api/v1/audio` (§10.3). This check is SvelteKit's own rule with
- * those endpoints left out, so the remote forms of the login, consent, forgot-password and
- * set-password pages stay exactly as protected as before, whether a submission posts to the page
- * itself (no JavaScript; the login and consent submissions carry the `zamfono_consent` cookie)
- * or to SvelteKit's `/_app/remote/…` endpoint.
+ * off). It is SvelteKit's own rule with the endpoints the spec defines for non-browser clients
+ * left out, which send no `Origin` at all: the form-encoded `/oauth/token` and `/oauth/revoke`
+ * (RFC 6749 §3.2, RFC 7009 §2.1), and a bearer-authenticated multipart upload such as
+ * `POST /api/v1/audio` (§10.3). The remote forms of the login, consent, forgot-password and
+ * set-password pages are covered by it, whether a submission posts to the page itself (no
+ * JavaScript; the login and consent submissions carry the `zamfono_consent` cookie) or to
+ * SvelteKit's `/_app/remote/…` endpoint.
  */
 import { HTTP_FORBIDDEN } from '@zamfono/shared';
 

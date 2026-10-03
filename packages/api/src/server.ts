@@ -24,7 +24,7 @@ import { EventHub } from '#lib/server/events.js';
 import { authenticateEventsSocket } from '#lib/server/eventsAuth.js';
 import { provideEventSink } from '#lib/server/eventSink.js';
 
-// Global Constraints "Fixed internal ports": api's port is never configurable per stack.
+// A fixed internal port, never configurable per stack (§6.3 "Compose stack").
 const API_INTERNAL_PORT = 3000;
 const EVENTS_PATH = '/events';
 const logger = pino({ name: 'server' });

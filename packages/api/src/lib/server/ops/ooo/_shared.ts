@@ -23,8 +23,8 @@ export type OooRuleOut = {
 
 /**
  * `startsAt`/`expiresAt` on input: ISO-8601, any offset (clients send local time), normalized to
- * UTC via `toUtcIso` before it reaches the overlap check or the `_at` column (Global Constraints:
- * "Timestamps TEXT ISO 8601 UTC").
+ * UTC via `toUtcIso` before it reaches the overlap check or the `_at` column (§11.1 "Column
+ * types": timestamps are ISO 8601 UTC).
  */
 export const isoDatetimeInput = z.iso.datetime({ offset: true });
 
