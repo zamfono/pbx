@@ -17,6 +17,7 @@ const HTTP_UNAUTHORIZED = 401;
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
 const HTTP_SERVICE_UNAVAILABLE = 503;
+const MANUAL = { trigger: 'manual' };
 
 function release(version: Version): Release {
   return {
@@ -141,11 +142,11 @@ describe('the updater API', () => {
   it('starts an update to the latest release and answers at once', async () => {
     const runner = fakeRunner();
     const base = await serve(deps({ runner }));
-    const { status, body } = await call(base, 'POST', '/update', {});
+    const { status, body } = await call(base, 'POST', '/update', MANUAL);
     expect(status).toBe(HTTP_ACCEPTED);
     expect(body).toMatchObject({ state: 'running', to: '0.0.7' });
     expect(runner.started).toEqual([['0.0.6', '0.0.7']]);
-    expect((await call(base, 'POST', '/update', {})).status).toBe(
+    expect((await call(base, 'POST', '/update', MANUAL)).status).toBe(
       HTTP_CONFLICT
     );
   });
@@ -163,22 +164,31 @@ describe('the updater API', () => {
       })
     );
     expect(
-      (await call(base, 'POST', '/update', { version: '0.0.9' })).status
+      (await call(base, 'POST', '/update', { ...MANUAL, version: '0.0.9' }))
+        .status
     ).toBe(HTTP_NOT_FOUND);
     expect(
-      (await call(base, 'POST', '/update', { version: '0.0.5' })).status
+      (await call(base, 'POST', '/update', { ...MANUAL, version: '0.0.5' }))
+        .status
     ).toBe(HTTP_CONFLICT);
-    const breaking = await call(base, 'POST', '/update', { version: '0.1.0' });
+    const breaking = await call(base, 'POST', '/update', {
+      ...MANUAL,
+      version: '0.1.0'
+    });
     expect(breaking.status).toBe(HTTP_CONFLICT);
     expect(String(breaking.body.error)).toContain('update.sh');
     expect(
-      (await call(base, 'POST', '/update', { version: 'latest' })).status
+      (await call(base, 'POST', '/update', { ...MANUAL, version: 'latest' }))
+        .status
     ).toBe(HTTP_BAD_REQUEST);
   });
 
   it('records who asked for the run, and refuses a trigger it does not know', async () => {
     const runner = fakeRunner();
     const base = await serve(deps({ runner }));
+    expect((await call(base, 'POST', '/update', {})).status).toBe(
+      HTTP_BAD_REQUEST
+    );
     expect(
       (await call(base, 'POST', '/update', { trigger: 'host' })).status
     ).toBe(HTTP_BAD_REQUEST);

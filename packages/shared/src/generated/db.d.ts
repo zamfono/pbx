@@ -422,10 +422,8 @@ export interface UpdateState {
   breakingAnnounced: string | null;
   breakingVersion: string | null;
   id: Generated<number | null>;
-  runActorName: string | null;
   runOutcomePending: Generated<number>;
   runStartedAt: string | null;
-  runTrigger: string | null;
 }
 
 export interface UserForwardRules {

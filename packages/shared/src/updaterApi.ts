@@ -12,7 +12,7 @@ export type UpdateState = {
   from?: string;
   to?: string;
   /** Who asked: an owner through `system.update` (`by` names them), the automatic update, or
-   * `update.sh` run on the host. Absent from a record written before it was kept. */
+   * `update.sh` run on the host. Absent while no run is recorded. */
   trigger?: 'manual' | 'automatic' | 'host';
   by?: string;
   startedAt?: string;
@@ -36,5 +36,5 @@ export type UpdaterStatus = {
 };
 
 /** Who asks for a run in `POST /update`'s body, recorded with it: `api`, for an owner or for its
- * automatic update. The updater takes a body without `by`. */
+ * automatic update. `by` is optional. */
 export type RunRequester = { trigger: 'manual' | 'automatic'; by?: string };

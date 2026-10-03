@@ -141,48 +141,6 @@ describe('system.info', () => {
     });
   });
 
-  it('names who asked for the last run: the record, else the run api started (§6.3)', async () => {
-    const db = await makeTestDb();
-    const last = {
-      state: 'succeeded' as const,
-      from: '0.1.0',
-      to: '0.1.1',
-      startedAt: '2026-10-01T03:00:00.000Z',
-      finishedAt: '2026-10-01T03:04:00.000Z'
-    };
-    const reporting = (state: typeof last & { trigger?: 'host' }) => () => ({
-      status: () =>
-        Promise.resolve({
-          current: '0.1.1',
-          latest: null,
-          updatable: false,
-          breaking: false,
-          last: state
-        }),
-      update: () => Promise.reject(new Error('unused'))
-    });
-    vi.mocked(updaterClient).mockImplementation(
-      reporting({ ...last, trigger: 'host' })
-    );
-    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
-      update: { last: { trigger: 'host' } }
-    });
-
-    // An updater that keeps no trigger: the run api started, as update_state recorded it.
-    await db
-      .updateTable('updateState')
-      .set({
-        runTrigger: 'automatic',
-        runActorName: 'Zamfono',
-        runStartedAt: last.startedAt
-      })
-      .execute();
-    vi.mocked(updaterClient).mockImplementation(reporting(last));
-    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
-      update: { last: { ...last, trigger: 'automatic', by: 'Zamfono' } }
-    });
-  });
-
   it('reports whether automatic updates are on, why the last one failed and how often (§6.3)', async () => {
     const db = await makeTestDb();
     await sql`PRAGMA foreign_keys = OFF`.execute(db);

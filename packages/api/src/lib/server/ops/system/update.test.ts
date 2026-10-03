@@ -112,20 +112,12 @@ describe('system.update', () => {
       await runOperation(db, 'system.update', { version: '0.0.7' }, asOwner)
     ).toEqual(started);
     expect(updater.asked).toEqual(['0.0.7']);
-    // Who asked, for system.info to report next to the run.
     await expect(
       db
         .selectFrom('updateState')
-        .select([
-          'runTrigger',
-          'runActorName',
-          'runStartedAt',
-          'runOutcomePending'
-        ])
+        .select(['runStartedAt', 'runOutcomePending'])
         .executeTakeFirst()
     ).resolves.toEqual({
-      runTrigger: 'manual',
-      runActorName: 'Owner',
       runStartedAt: started.startedAt,
       runOutcomePending: 0
     });

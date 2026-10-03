@@ -31,7 +31,7 @@ export type Runner = {
   start: (
     from: string,
     to: string,
-    requester?: RunRequester
+    requester: RunRequester
   ) => Promise<{ finished: Promise<void> }>;
 };
 

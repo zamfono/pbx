@@ -17,8 +17,6 @@ test('admits the update mail kinds and starts update_state with its one row', as
   ).resolves.toEqual([
     {
       id: 1,
-      runTrigger: null,
-      runActorName: null,
       runStartedAt: null,
       runOutcomePending: 0,
       autoFailedVersion: null,

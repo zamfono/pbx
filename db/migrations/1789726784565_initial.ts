@@ -1533,10 +1533,6 @@ async function createUpdateStateTable(db: Db): Promise<void> {
   await db.schema
     .createTable('update_state')
     .addColumn('id', 'integer', col => col.primaryKey().check(sql`id = 1`))
-    .addColumn('run_trigger', 'text', col =>
-      col.check(sql`run_trigger in ('manual','automatic')`)
-    )
-    .addColumn('run_actor_name', 'text')
     .addColumn('run_started_at', 'text')
     .addColumn('run_outcome_pending', 'integer', col =>
       col

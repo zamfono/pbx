@@ -233,7 +233,6 @@ describe('runAutoUpdatePass', () => {
       { version: '0.1.2', requester: { trigger: 'automatic', by: 'Zamfono' } }
     ]);
     expect(await loadUpdateState(db)).toMatchObject({
-      runTrigger: 'automatic',
       runStartedAt: STARTED_AT,
       runOutcomePending: 1
     });

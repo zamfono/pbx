@@ -22,7 +22,6 @@ import { stackDomain, stackIpv4 } from '#lib/server/stackAddress.js';
 
 import { defineOperation } from '../types.js';
 import {
-  attributeStatus,
   autoUpdateEnabled,
   autoUpdateFailure,
   loadUpdateState,
@@ -70,7 +69,7 @@ type Output = {
   stack: { domain: string | null; ipv4: string | null };
 };
 
-async function updateStatus(db: Db): Promise<Output['update']> {
+async function updateStatus(): Promise<Output['update']> {
   const client = updaterClient();
   if (client === undefined) {
     return {
@@ -79,11 +78,7 @@ async function updateStatus(db: Db): Promise<Output['update']> {
     };
   }
   try {
-    const [status, row] = await Promise.all([
-      client.status(),
-      loadUpdateState(db)
-    ]);
-    return attributeStatus(status, row);
+    return await client.status();
   } catch (error) {
     return {
       unavailable: `the updater did not answer: ${errorMessage(error)}`
@@ -119,7 +114,7 @@ export const info = defineOperation<Record<string, never>, Output>({
         getCoreClient()
           .version()
           .catch(() => null),
-        updateStatus(ctx.db),
+        updateStatus(),
         autoUpdateStatus(ctx.db),
         lastGiveUps(ctx.db),
         isProfilePending(ctx.db)

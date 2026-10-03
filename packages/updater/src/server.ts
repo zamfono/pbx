@@ -120,12 +120,9 @@ function refusal(
   }[verdict];
 }
 
-/** Who `body` says asks for the run, recorded with it; `undefined` when it says nothing. */
-function requesterOf(body: unknown): RunRequester | undefined {
+/** Who `body` says asks for the run, recorded with it. */
+function requesterOf(body: unknown): RunRequester {
   const { trigger, by } = body as { trigger?: unknown; by?: unknown };
-  if (trigger === undefined && by === undefined) {
-    return undefined;
-  }
   if (trigger !== 'manual' && trigger !== 'automatic') {
     throw new HttpError(
       HTTP_BAD_REQUEST,

@@ -38,9 +38,8 @@ function passOn(error: unknown): never {
  * Hands an update to the updater (§6.3 "Updates"), the one path `system.update` and the
  * automatic update (`jobs/autoUpdate.ts`) share: the latest release, or `version`. Refused
  * unless `.env` sets `UPDATER_TOKEN` and a backup run finished `ok` within the last hour, so the
- * update begins from a restorable point. The updater records who asked with the run; so does
- * `update_state` once the updater has begun, for an updater that keeps no such record, and so the
- * automatic update can follow its own run up.
+ * update begins from a restorable point. The updater records who asked with the run;
+ * `update_state` keeps when it began, so the automatic update can follow its own run up.
  */
 export async function requestUpdate(
   db: Db,
@@ -72,8 +71,6 @@ export async function requestUpdate(
   await db
     .updateTable('updateState')
     .set({
-      runTrigger: requester.trigger,
-      runActorName: requester.by,
       runStartedAt: state.startedAt ?? now,
       runOutcomePending: requester.trigger === 'automatic' ? 1 : 0
     })

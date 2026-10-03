@@ -35,7 +35,9 @@ describe('createRunner', () => {
       socketPath: '/var/run/docker.sock'
     });
     await fakeScript(stackDir, 0);
-    const { finished } = await runner.start('0.0.6', '0.0.7');
+    const { finished } = await runner.start('0.0.6', '0.0.7', {
+      trigger: 'manual'
+    });
     expect(runner.current()).toMatchObject({ state: 'running', to: '0.0.7' });
     await finished;
     expect(runner.current()).toMatchObject({
@@ -81,7 +83,9 @@ describe('createRunner', () => {
       socketPath: '/s'
     });
     await fakeScript(stackDir, 1);
-    const { finished } = await runner.start('0.0.6', '0.0.7');
+    const { finished } = await runner.start('0.0.6', '0.0.7', {
+      trigger: 'manual'
+    });
     await finished;
     expect(runner.current().state).toBe('failed');
     expect(runner.current().error).toContain('args=0.0.7');
@@ -95,7 +99,9 @@ describe('createRunner', () => {
       socketPath: '/s'
     });
     await fakeScript(stackDir, 0);
-    const { finished } = await runner.start('0.0.6', '0.0.7');
+    const { finished } = await runner.start('0.0.6', '0.0.7', {
+      trigger: 'manual'
+    });
     await finished;
     const hostRun = {
       state: 'succeeded',
@@ -122,7 +128,9 @@ describe('loadState', () => {
       socketPath: '/s'
     });
     await fakeScript(stackDir, 0);
-    const { finished } = await runner.start('0.0.6', '0.0.7');
+    const { finished } = await runner.start('0.0.6', '0.0.7', {
+      trigger: 'manual'
+    });
     // Read back before the child ends, as a restarted updater would find it.
     const state = await loadState(stackDir);
     expect(state).toMatchObject({ state: 'failed', to: '0.0.7' });
