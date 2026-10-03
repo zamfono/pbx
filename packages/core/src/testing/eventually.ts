@@ -4,9 +4,9 @@
 import type { EventEmitter } from 'node:events';
 import { vi } from 'vitest';
 
+import type { AriEvent } from '../ari/events.js';
 import type { FakeAri } from '../ari/fake.js';
 import type { FakeRequest } from '../ari/fakeTransport.js';
-import type { AriEvent, Channel } from '../ari/types.js';
 
 // Well past a loaded run's slowest round trips, and still inside vitest's 5 s test timeout, so a
 // state that never arrives fails on its own assertion rather than on the test timeout.
@@ -86,10 +86,7 @@ export function delivered(
 ): Promise<void> {
   return new Promise(resolve => {
     const onEvent = (event: AriEvent): void => {
-      if (
-        event.type === type &&
-        (event.channel as Channel | undefined)?.id === channelId
-      ) {
+      if (event.type === type && event.channel?.id === channelId) {
         ari.off('event', onEvent);
         resolve();
       }

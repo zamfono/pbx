@@ -10,8 +10,8 @@
  * then moves the transferee into the consultation's bridge and ends the pair, so the conversation
  * is one bridge of two parties again and ends like any other when either of them leaves.
  */
+import type { AriEventOf } from '../ari/events.js';
 import { ignoreGone, logFailure } from '../ari/failures.js';
-import type { AriEvent } from '../ari/types.js';
 import type { Call } from './call.js';
 import { otherChannelIn, presentCallerUserId } from './callLookup.js';
 import { callPartiesChanged } from './callState.js';
@@ -20,7 +20,7 @@ import { closeCall } from './liveCall.js';
 import { userOfChannel } from './onwardCall.js';
 import type { Pipeline } from './pipeline.js';
 
-type Named = { id: string } | undefined;
+type AttendedTransfer = AriEventOf<'BridgeAttendedTransfer'>;
 
 /**
  * The consultation carries on without the transferrer's `secondLeg` and with the transferee in
@@ -89,12 +89,12 @@ export function handOver(
 /** A `link` join: the transferee moves into the consultation's bridge and the Local pair ends. */
 async function collapseLink(
   pipeline: Pipeline,
-  ev: AriEvent,
+  ev: AttendedTransfer,
   transfereeId: string,
   consultationBridgeId: string
 ): Promise<void> {
   const { ari } = pipeline.deps;
-  const firstBridge = (ev.transferer_first_leg_bridge as Named)?.id;
+  const firstBridge = ev.transferer_first_leg_bridge?.id;
   if (firstBridge !== undefined) {
     await ari.bridges
       .removeChannel(firstBridge, transfereeId)
@@ -104,8 +104,8 @@ async function collapseLink(
     .addChannel(consultationBridgeId, transfereeId)
     .catch(ignoreGone);
   const halves = [
-    ev.destination_link_first_leg as Named,
-    ev.destination_link_second_leg as Named
+    ev.destination_link_first_leg,
+    ev.destination_link_second_leg
   ].flatMap(half => (half === undefined ? [] : [half.id]));
   await Promise.all(
     halves.map(id => ari.channels.hangup(id).catch(ignoreGone))
@@ -118,7 +118,7 @@ async function collapseLink(
 /** The consultation's own side of the transfer: its parent, the hand-over and its bridge. */
 async function carryOn(
   pipeline: Pipeline,
-  ev: AriEvent,
+  ev: AttendedTransfer,
   consultation: Call,
   parent: { call: Call; secondLeg: string; transfereeId: string }
 ): Promise<void> {
@@ -129,9 +129,8 @@ async function carryOn(
     userId: userOfChannel(original, transfereeId)
   };
   handOver(pipeline, consultation, secondLeg, transferee);
-  const destination = ev.destination_bridge;
-  if (ev.destination_type === 'bridge' && typeof destination === 'string') {
-    consultation.bridgeId = destination;
+  if (ev.destination_type === 'bridge' && ev.destination_bridge !== undefined) {
+    consultation.bridgeId = ev.destination_bridge;
   }
   if (ev.destination_type === 'link' && consultation.bridgeId !== null) {
     await collapseLink(pipeline, ev, transfereeId, consultation.bridgeId);
@@ -148,34 +147,23 @@ async function carryOn(
 /** `BridgeAttendedTransfer` (§10.1 "Transfers and pickup"), as the file comment describes. */
 export async function onAttendedTransfer(
   pipeline: Pipeline,
-  ev: AriEvent
+  ev: AttendedTransfer
 ): Promise<void> {
-  const first = ev.transferer_first_leg as Named;
-  const second = ev.transferer_second_leg as Named;
-  const original =
-    first === undefined ? undefined : pipeline.callByChannel.get(first.id);
-  const consultation =
-    second === undefined ? undefined : pipeline.callByChannel.get(second.id);
+  const first = ev.transferer_first_leg;
+  const second = ev.transferer_second_leg;
+  const original = pipeline.callByChannel.get(first.id);
+  const consultation = pipeline.callByChannel.get(second.id);
   original?.log.event({ event: 'attendedTransfer', result: ev.result });
   consultation?.log.event({
     event: 'attendedTransfer',
     result: ev.result,
     parentCallId: original?.id ?? null
   });
-  if (
-    ev.result !== 'Success' ||
-    original === undefined ||
-    first === undefined
-  ) {
+  if (ev.result !== 'Success' || original === undefined) {
     return;
   }
-  const transfereeId =
-    (ev.transferee as Named)?.id ?? otherChannelIn(original, first.id);
-  if (
-    consultation !== undefined &&
-    second !== undefined &&
-    transfereeId !== null
-  ) {
+  const transfereeId = ev.transferee?.id ?? otherChannelIn(original, first.id);
+  if (consultation !== undefined && transfereeId !== null) {
     const heldIn = original.bridgeId;
     await carryOn(pipeline, ev, consultation, {
       call: original,

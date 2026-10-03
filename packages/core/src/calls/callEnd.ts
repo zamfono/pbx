@@ -5,7 +5,7 @@
  * bridge the first party left) are soft requests, `system`. The line is written once per call,
  * as the first party's channel is destroyed, with the cause Asterisk reports for it.
  */
-import type { AriEvent, Channel } from '../ari/types.js';
+import type { AriEventOf } from '../ari/events.js';
 import type { Call } from './call.js';
 
 type Party = 'caller' | 'callee';
@@ -20,11 +20,14 @@ function partyOf(call: Call, channelId: string): Party | null {
 }
 
 /** A `ChannelHangupRequest` on one of `call`'s channels: the first one names who ends the call. */
-export function noteHangupRequest(call: Call, ev: AriEvent): void {
+export function noteHangupRequest(
+  call: Call,
+  ev: AriEventOf<'ChannelHangupRequest'>
+): void {
   if (call.ending !== undefined) {
     return;
   }
-  const channelId = (ev.channel as Channel).id;
+  const channelId = ev.channel.id;
   const party = partyOf(call, channelId);
   if (party === null) {
     return;
@@ -39,8 +42,11 @@ export function noteHangupRequest(call: Call, ev: AriEvent): void {
 /** A `ChannelDestroyed` on one of `call`'s channels: the first party's writes the `ended` line,
  * with the channel's Q.850 cause and, for a PJSIP channel, the SIP response that ended it. Runs
  * before the channel's leg is marked ended. */
-export function traceChannelEnded(call: Call, ev: AriEvent): void {
-  const channelId = (ev.channel as Channel).id;
+export function traceChannelEnded(
+  call: Call,
+  ev: AriEventOf<'ChannelDestroyed'>
+): void {
+  const channelId = ev.channel.id;
   const party = partyOf(call, channelId);
   if (party === null) {
     return;

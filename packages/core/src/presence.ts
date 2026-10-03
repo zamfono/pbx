@@ -14,8 +14,9 @@ import {
 } from '@zamfono/shared';
 
 import type { AriClient } from './ari/client.js';
+import { isEvent, type AriEvent, type AriEventOf } from './ari/events.js';
 import { logFailure } from './ari/failures.js';
-import type { AriEvent, DeviceState, Logger } from './ari/types.js';
+import type { DeviceState, Logger } from './ari/types.js';
 import { extensionOf } from './calls/extensionOwner.js';
 import type { EventBus } from './internal/eventBus.js';
 import {
@@ -43,7 +44,6 @@ export type PresenceDeps = {
   now: () => string;
 };
 
-type ContactInfo = { aor?: string; contact_status?: string };
 // `setCallState`'s own key when its caller has no call id to hand it (mainly direct callers such
 // as tests): every such call shares this one slot, matching a single flat flag's own behaviour.
 const DIRECT_CALL_KEY = '__direct__';
@@ -89,7 +89,7 @@ export class Presence {
     this.deps = deps;
     this.hints = new HintPusher(deps.ari);
     this.deps.ari.on('event', (event: AriEvent) => {
-      if (event.type === 'ContactStatusChange') {
+      if (isEvent(event, 'ContactStatusChange')) {
         this.handleContactStatusChange(event).catch(
           logFailure(this.deps.log, 'presence contact status change')
         );
@@ -119,11 +119,10 @@ export class Presence {
     );
   }
 
-  private async handleContactStatusChange(event: AriEvent): Promise<void> {
-    const info = event.contact_info as ContactInfo | undefined;
-    if (info?.aor === undefined || info.contact_status === undefined) {
-      return;
-    }
+  private async handleContactStatusChange(
+    event: AriEventOf<'ContactStatusChange'>
+  ): Promise<void> {
+    const info = event.contact_info;
     const snapshot = await this.deps.cache.get();
     const device = snapshot.devices.find(
       row => row.sipUsername === info.aor && row.deletedAt === null

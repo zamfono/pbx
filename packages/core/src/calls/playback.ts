@@ -4,8 +4,8 @@
  * once the media has played to the end, never right after the play request is merely accepted.
  */
 import type { AriClient } from '../ari/client.js';
+import { isEvent } from '../ari/events.js';
 import { isGone, logUnlessGone } from '../ari/failures.js';
-import type { Channel } from '../ari/types.js';
 import {
   channelLeft,
   playbackFinished,
@@ -135,9 +135,8 @@ export function playForKeys<T>(
     } else if (channelLeft(ev, channelId)) {
       waiting.settle({ kind: 'hangup' });
     } else if (
-      ev.type === 'ChannelDtmfReceived' &&
-      (ev.channel as Channel | undefined)?.id === channelId &&
-      typeof ev.digit === 'string'
+      isEvent(ev, 'ChannelDtmfReceived') &&
+      ev.channel.id === channelId
     ) {
       if (playing) {
         playing = false;

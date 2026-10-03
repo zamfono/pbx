@@ -3,8 +3,8 @@
  * ending; its own module so `legs.ts` stays under the repository's `max-lines` lint rule. A ring
  * race concluding without an answer is `ringConclusion.ts`'s.
  */
+import type { AriEventOf } from '../ari/events.js';
 import { logFailure, logUnlessGone } from '../ari/failures.js';
-import type { AriEvent, Channel } from '../ari/types.js';
 import type { Call } from './call.js';
 import { traceChannelEnded } from './callEnd.js';
 import { clearFindMeTimers } from './findMe.js';
@@ -174,9 +174,9 @@ async function endCallerCall(
 /** A leg's `ChannelDestroyed` ends the ring race once none is still ringing; the caller's own channel ending abandons the call (§10.1 step 4). */
 export async function handleChannelEnded(
   pipeline: Pipeline,
-  ev: AriEvent
+  ev: AriEventOf<'ChannelDestroyed' | 'StasisEnd'>
 ): Promise<void> {
-  const channelId = (ev.channel as Channel).id;
+  const channelId = ev.channel.id;
   // The parked party's own channel ending while waiting releases its slot and hint (§9.3 "a
   // parking slot: INUSE while a call is parked there"); this call aggregate's own cleanup below
   // still runs exactly as it would for any other ended channel.
@@ -233,6 +233,5 @@ export async function handleChannelEnded(
   if (leg.kind === 'findMe') {
     return;
   }
-  const cause = typeof ev.cause === 'number' ? ev.cause : null;
-  endRingingLeg(pipeline, call, leg, cause);
+  endRingingLeg(pipeline, call, leg, ev.cause);
 }

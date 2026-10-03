@@ -2,8 +2,8 @@
 // winning, and the ARI events that answer a leg (a device picking up, find-me's accept key).
 // `ringUser.ts` starts the race; `ringConclusion.ts` settles it when legs end without an answer.
 
+import type { AriEventOf } from '../ari/events.js';
 import { ignoreGone, logFailure } from '../ari/failures.js';
-import type { AriEvent, Channel } from '../ari/types.js';
 import { bridgeAnswered, claimAnswer } from './answer.js';
 import type { Call, Leg } from './call.js';
 import { callPartiesChanged } from './callState.js';
@@ -169,8 +169,11 @@ export async function legWentUp(
 
 /** A DTMF key on a find-me leg awaiting its accept: `1` wins the race for it, `2` drops the leg
  * as the prompt offers (§10.1 step 4). */
-export function handleDtmf(pipeline: Pipeline, ev: AriEvent): void {
-  const channelId = (ev.channel as Channel).id;
+export function handleDtmf(
+  pipeline: Pipeline,
+  ev: AriEventOf<'ChannelDtmfReceived'>
+): void {
+  const channelId = ev.channel.id;
   const pending = pipeline.pendingFindMeAccept.get(channelId);
   if (
     pending === undefined ||

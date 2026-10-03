@@ -9,8 +9,9 @@
  */
 import type { AmiClient, AmiEvent } from '../ami/client.js';
 import type { AriClient } from '../ari/client.js';
+import { isEvent, type AriEvent, type AriEventOf } from '../ari/events.js';
 import { logFailure } from '../ari/failures.js';
-import type { AriEvent, Logger } from '../ari/types.js';
+import type { Logger } from '../ari/types.js';
 import type { EventBus } from '../internal/eventBus.js';
 import type { ConfigCache } from '../internal/snapshot.js';
 import type { StateStore } from '../internal/stateStore.js';
@@ -45,7 +46,7 @@ export class TrunkState {
   constructor(deps: TrunkStateDeps) {
     this.deps = deps;
     this.deps.ari.on('event', (event: AriEvent) => {
-      if (event.type === 'ContactStatusChange') {
+      if (isEvent(event, 'ContactStatusChange')) {
         this.handleContactStatusChange(event).catch(
           logFailure(this.deps.log, 'trunk contact status change')
         );
@@ -110,7 +111,7 @@ export class TrunkState {
   watchInboundLeg(channelId: string): (trunkId: string | null) => void {
     let destroyed = false;
     const watch = waitForEvent<undefined>(this.deps.ari, (event, waiting) => {
-      const channel = event.channel as { id?: string } | undefined;
+      const channel = event.channel;
       if (event.type !== 'ChannelDestroyed' || channel?.id !== channelId) {
         return;
       }
@@ -198,7 +199,9 @@ export class TrunkState {
     this.apply([registryEventStatus(snapshot, event)]);
   }
 
-  private async handleContactStatusChange(event: AriEvent): Promise<void> {
+  private async handleContactStatusChange(
+    event: AriEventOf<'ContactStatusChange'>
+  ): Promise<void> {
     const snapshot = await this.deps.cache.get();
     this.apply([contactEventStatus(snapshot, event)]);
   }

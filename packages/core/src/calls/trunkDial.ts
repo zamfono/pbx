@@ -6,7 +6,7 @@
  */
 import { sipHostUri, trunkSectionName } from '@zamfono/shared';
 
-import type { AriEvent } from '../ari/types.js';
+import type { AriEventOf } from '../ari/events.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { channelLanguageVariable } from '../prompts.js';
 import type { AttemptFailure } from '../routing/trunk.js';
@@ -62,11 +62,9 @@ const CAUSE_TO_SIP_STATUS: Readonly<Record<number, number>> = {
   127: 500
 };
 
-/** The SIP status a `ChannelDestroyed` cause stands for; an absent cause reads as 500. */
-function causeToSipStatus(cause: unknown): number {
-  return typeof cause === 'number'
-    ? (CAUSE_TO_SIP_STATUS[cause] ?? SIP_SERVER_ERROR)
-    : SIP_SERVER_ERROR;
+/** The SIP status a `ChannelDestroyed` cause stands for; a cause with no mapping reads as 500. */
+function causeToSipStatus(cause: number): number {
+  return CAUSE_TO_SIP_STATUS[cause] ?? SIP_SERVER_ERROR;
 }
 
 /**
@@ -76,9 +74,9 @@ function causeToSipStatus(cause: unknown): number {
  * rejected". A channel that ended on no SIP response (hung up here, or by a transport failure
  * Asterisk records no code for) falls back to translating the Q.850 cause.
  */
-export function endedSipStatus(event: AriEvent): number {
+export function endedSipStatus(event: AriEventOf<'ChannelDestroyed'>): number {
   const techCause = event.tech_cause;
-  return typeof techCause === 'number' &&
+  return techCause !== undefined &&
     techCause >= SIP_FINAL_LOW &&
     techCause <= SIP_FINAL_HIGH
     ? techCause

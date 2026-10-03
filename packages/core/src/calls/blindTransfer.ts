@@ -10,8 +10,8 @@
  * line to the onward call: when either end of it goes, the other is hung up, as it would be if
  * the transferee's own channel had re-entered.
  */
+import { isEvent, type AriEvent, type AriEventOf } from '../ari/events.js';
 import { ignoreGone, logFailure } from '../ari/failures.js';
-import type { AriEvent, Channel } from '../ari/types.js';
 import { closeCall } from './liveCall.js';
 import { fromOf, transfereeEntry, userOfChannel } from './onwardCall.js';
 import {
@@ -36,9 +36,9 @@ type BlindState = { lines: Map<string, LocalLine> };
 async function onBlindTransfer(
   pipeline: Pipeline,
   state: BlindState,
-  ev: AriEvent
+  ev: AriEventOf<'BridgeBlindTransfer'>
 ): Promise<void> {
-  const transferrer = ev.channel as Channel;
+  const transferrer = ev.channel;
   const call = pipeline.callByChannel.get(transferrer.id);
   if (call === undefined) {
     return;
@@ -52,8 +52,8 @@ async function onBlindTransfer(
   if (ev.result !== 'Success') {
     return;
   }
-  const transferee = ev.transferee as Channel | undefined;
-  const replacement = ev.replace_channel as Channel | undefined;
+  const transferee = ev.transferee;
+  const replacement = ev.replace_channel;
   const bridgeId = call.bridgeId;
   if (transferee !== undefined) {
     const snapshot = await pipeline.deps.cache.get();
@@ -112,13 +112,13 @@ async function endLocalLine(
 export function followBlindTransfers(pipeline: Pipeline): void {
   const state: BlindState = { lines: new Map() };
   pipeline.deps.ari.on('event', (ev: AriEvent) => {
-    if (ev.type === 'BridgeBlindTransfer') {
+    if (isEvent(ev, 'BridgeBlindTransfer')) {
       onBlindTransfer(pipeline, state, ev).catch(
         logFailure(pipeline.deps.logger, 'blind transfer')
       );
       return;
     }
-    const channel = ev.channel as Channel | undefined;
+    const channel = ev.channel;
     if (channel === undefined) {
       return;
     }

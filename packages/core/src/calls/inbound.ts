@@ -3,7 +3,7 @@
  * reject-anonymous, and each target kind's dispatch; hop counting is `runTarget.ts`'s. */
 import { newId } from '@zamfono/shared';
 
-import type { AriEvent, Channel } from '../ari/types.js';
+import type { AriEventOf } from '../ari/events.js';
 import { userById } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import {
@@ -116,10 +116,9 @@ export async function enterTarget(
  * `inbound_number_format` (§9.4 "Inbound number normalization"), then Entry. */
 export async function handleInboundStart(
   pipeline: Pipeline,
-  ev: AriEvent
+  ev: AriEventOf<'StasisStart'>
 ): Promise<void> {
-  const channel = ev.channel as Channel;
-  const args = (ev.args as string[] | undefined) ?? [];
+  const channel = ev.channel;
   // §9.4 "Channels": the leg occupies one of the delivering trunk's channels for its lifetime,
   // watched from here so a hangup during the config read below is not missed.
   const countInboundLeg = pipeline.deps.trunkState.watchInboundLeg(channel.id);
@@ -127,7 +126,7 @@ export async function handleInboundStart(
   const { trunkId, called, calledFromTo, from } = await inboundBoundary(
     pipeline.deps.ari,
     channel,
-    args[1] ?? '',
+    ev.args[1] ?? '',
     snapshot
   );
   countInboundLeg(trunkId);

@@ -4,7 +4,10 @@ import http from 'node:http';
 import WebSocket, { WebSocketServer } from 'ws';
 
 import { parseBody, sendResult, type RouteResult } from './fakeHttp.js';
-import type { AriEvent } from './types.js';
+
+/** One frame of the events stream as the fake sends it: any fields, so a test can send an event
+ * with only the fields it is about, or one core does not know. */
+export type AriFrame = { type: string; [key: string]: unknown };
 
 /** One REST request, its path relative to `/ari/` and its raw query string (`''` when absent). */
 export type FakeRequest = {
@@ -89,7 +92,7 @@ export class FakeAriTransport {
   }
 
   /** Sends `event` to the connected client; dropped when none is connected, as Asterisk does. */
-  send(event: AriEvent): void {
+  send(event: AriFrame): void {
     this.client?.send(JSON.stringify(event));
   }
 

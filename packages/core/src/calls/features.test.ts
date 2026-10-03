@@ -5,10 +5,11 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
+import type { AriEventOf } from '../ari/events.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
 import { isPlacement } from '../ari/fakeDial.js';
-import type { AriEvent, Channel } from '../ari/types.js';
+import type { Channel } from '../ari/types.js';
 import { CdrWriter } from '../cdr.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
@@ -2061,7 +2062,10 @@ describe('features', () => {
     return retrieverUserId;
   }
 
-  function outboundEvent(channel: Channel, dialed: string): AriEvent {
+  function outboundEvent(
+    channel: Channel,
+    dialed: string
+  ): AriEventOf<'StasisStart'> {
     return {
       type: 'StasisStart',
       timestamp: nowIso(),

@@ -15,7 +15,8 @@ import {
 } from '@zamfono/shared';
 
 import type { AmiEvent } from '../ami/client.js';
-import type { AriEvent, Endpoint } from '../ari/types.js';
+import type { AriEventOf } from '../ari/events.js';
+import type { Endpoint } from '../ari/types.js';
 import type { Snapshot } from '../internal/snapshot.js';
 
 export type TrunkStatus = TrunkStatusWire['status'];
@@ -123,12 +124,11 @@ export function registryEventStatus(
 /** The `ip` trunk whose contact a `ContactStatusChange` reports on, when it says reachable or not. */
 export function contactEventStatus(
   snapshot: Snapshot,
-  event: AriEvent
+  event: AriEventOf<'ContactStatusChange'>
 ): StatusChange | null {
-  const info = event.contact_info as
-    { aor?: string; contact_status?: string } | undefined;
+  const info = event.contact_info;
   const trunk = ipTrunks(snapshot).find(
-    row => trunkSectionName(row.id) === info?.aor
+    row => trunkSectionName(row.id) === info.aor
   );
   if (trunk === undefined) {
     return null;
@@ -138,10 +138,10 @@ export function contactEventStatus(
   if (unprobed(trunk)) {
     return [trunk.id, 'unmonitored'];
   }
-  if (info?.contact_status === 'Reachable') {
+  if (info.contact_status === 'Reachable') {
     return [trunk.id, 'registered'];
   }
-  return info?.contact_status === 'Unreachable'
+  return info.contact_status === 'Unreachable'
     ? [trunk.id, 'unreachable']
     : null;
 }

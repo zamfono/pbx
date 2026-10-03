@@ -10,10 +10,10 @@ import {
   type Db
 } from '@zamfono/shared';
 
+import type { AriEvent } from '../ari/events.js';
 import { type FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../ari/fakeDial.js';
-import type { AriEvent } from '../ari/types.js';
 import type { CdrWriter } from '../cdr.js';
 import { SIP_ADDRESS_INCOMPLETE } from '../sipCodes.js';
 import { eventually, flush } from '../testing/eventually.js';
@@ -216,7 +216,7 @@ describe('CallActions', () => {
     rig.ari.on('event', (event: AriEvent) => {
       if (
         event.type === 'ChannelStateChange' &&
-        (event.channel as { id?: string } | undefined)?.id === firstId()
+        event.channel?.id === firstId()
       ) {
         answerArrived.resolve(undefined);
       }

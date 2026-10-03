@@ -17,7 +17,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
 import { FakeAri } from '../ari/fake.js';
-import type { AriEvent, Logger } from '../ari/types.js';
+import type { Logger } from '../ari/types.js';
 import { CdrWriter } from '../cdr.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
@@ -747,7 +747,7 @@ describe('Recorder', () => {
       timestamp: nowIso(),
       application: 'zamfono',
       channel: { id: snoopId }
-    } as unknown as AriEvent);
+    });
     await started;
 
     expect(log.errors).toHaveLength(1);
@@ -789,7 +789,7 @@ describe('Recorder', () => {
       application: 'zamfono',
       args: ['snoop', 'leg-channel'],
       channel: { id: leftSnoop }
-    } as unknown as AriEvent);
+    });
     await vi.waitFor(() => {
       expect(recordCalls()).toHaveLength(1);
     });
@@ -806,7 +806,7 @@ describe('Recorder', () => {
       timestamp: nowIso(),
       application: 'zamfono',
       channel: { id: rightSnoop }
-    } as unknown as AriEvent);
+    });
     await started;
     expect(hungUp(leftSnoop)).toBe(true);
     emitRecordingFinished(leftName, 1);
@@ -840,7 +840,7 @@ describe('Recorder', () => {
     const call = buildCall(null);
     await cdr.open(call);
     pipeline.registerCall(call);
-    fakeAri.addChannel({ id: callerChannel(call) });
+    const caller = fakeAri.addChannel({ id: callerChannel(call) });
     fakeAri.addChannel({ id: 'leg-channel' });
     const leg = buildLeg({ channelId: 'leg-channel', userId });
     trackLeg(pipeline, call, leg);
@@ -858,8 +858,11 @@ describe('Recorder', () => {
       type: 'ChannelDestroyed',
       timestamp: nowIso(),
       application: 'zamfono',
-      channel: { id: call.callerChannelId }
-    } as unknown as AriEvent);
+      channel: caller,
+      cause: 16,
+      // eslint-disable-next-line camelcase -- ARI's own event field name
+      cause_txt: 'Normal Clearing'
+    });
     // The participation's snoops are stopped by the recorder, whose `RecordingFinished` wait is
     // what Asterisk then answers.
     await vi.waitFor(() => {

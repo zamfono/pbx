@@ -6,8 +6,8 @@
  * race still rings fails over to its next attempt or ends (`onFailed`), any other channel had
  * been hung up by the race or had answered.
  */
+import { isEvent, type AriEvent, type AriEventOf } from '../ari/events.js';
 import { logFailure, logUnlessGone } from '../ari/failures.js';
-import type { AriEvent, Channel } from '../ari/types.js';
 import {
   ATTEMPT_NO_RESPONSE_MS,
   type AttemptFailure
@@ -81,7 +81,10 @@ function stopBudget(attempt: Attempt): void {
  * (§9.4 "Route fallthrough": no response within the budget, else the final status and whether it
  * had alerted) is handed on; any other channel had been hung up by the race, or had answered.
  */
-function attemptEnded(attempt: Attempt, destroyed: AriEvent): void {
+function attemptEnded(
+  attempt: Attempt,
+  destroyed: AriEventOf<'ChannelDestroyed'>
+): void {
   if (!attempt.leg.owner.ringing(attempt.channelId)) {
     logAttempt(attempt, 'hungUp');
     closeAttempt(attempt);
@@ -96,10 +99,7 @@ function attemptEnded(attempt: Attempt, destroyed: AriEvent): void {
       };
   logAttempt(attempt, failure.kind === 'final' ? failure.code : failure.kind);
   closeAttempt(attempt);
-  attempt.onFailed(
-    failure,
-    typeof destroyed.cause === 'number' ? destroyed.cause : null
-  );
+  attempt.onFailed(failure, destroyed.cause);
 }
 
 function onAttemptEvent(attempt: Attempt, event: AriEvent): void {
@@ -112,7 +112,7 @@ function onAttemptEvent(attempt: Attempt, event: AriEvent): void {
     stopBudget(attempt);
     return;
   }
-  const channel = event.channel as Channel | undefined;
+  const channel = event.channel;
   if (channel?.id !== attempt.channelId) {
     return;
   }
@@ -122,7 +122,7 @@ function onAttemptEvent(attempt: Attempt, event: AriEvent): void {
     logAttempt(attempt, 'answered');
     return;
   }
-  if (event.type === 'ChannelDestroyed') {
+  if (isEvent(event, 'ChannelDestroyed')) {
     attemptEnded(attempt, event);
   }
 }

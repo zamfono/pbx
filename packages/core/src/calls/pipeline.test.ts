@@ -12,10 +12,11 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { AmiClient } from '../ami/client.js';
 import { FakeAmi } from '../ami/fake.js';
 import { AriClient } from '../ari/client.js';
+import type { AriEventOf } from '../ari/events.js';
 import { FakeAri } from '../ari/fake.js';
 import { defaultChannel } from '../ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../ari/fakeDial.js';
-import type { AriEvent, Channel } from '../ari/types.js';
+import type { Channel } from '../ari/types.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
@@ -255,7 +256,10 @@ async function seedClosedOpeningHours(
     .execute();
 }
 
-function inboundEvent(channel: Channel, exten: string): AriEvent {
+function inboundEvent(
+  channel: Channel,
+  exten: string
+): AriEventOf<'StasisStart'> {
   return {
     type: 'StasisStart',
     timestamp: nowIso(),
@@ -1000,7 +1004,7 @@ describe('Pipeline', () => {
       Promise.withResolvers<undefined>();
     const started: string[] = [];
     vi.spyOn(pipeline, 'handleStasisStart').mockImplementation(async ev => {
-      started.push((ev.channel as Channel).id);
+      started.push(ev.channel.id);
       await io;
     });
     fakeAri.emit(inboundEvent(defaultChannel({ id: 'caller' }), '100'));

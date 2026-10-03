@@ -5,8 +5,9 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
+import type { AriEvent, AriEventOf } from '../ari/events.js';
 import { FakeAri } from '../ari/fake.js';
-import type { AriEvent, Channel } from '../ari/types.js';
+import type { Channel } from '../ari/types.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
@@ -85,7 +86,10 @@ async function seedTrunk(
 }
 
 /** A `from-trunk` StasisStart for a channel chan_pjsip named after the trunk's endpoint. */
-function inboundEvent(channel: Channel, exten: string): AriEvent {
+function inboundEvent(
+  channel: Channel,
+  exten: string
+): AriEventOf<'StasisStart'> {
   return {
     type: 'StasisStart',
     timestamp: nowIso(),

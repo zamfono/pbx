@@ -18,10 +18,11 @@ import { FakePlaybacks } from './fakePlayback.js';
 import { fakeChannelVars } from './fakeRtp.js';
 import {
   FakeAriTransport,
+  type AriFrame,
   type FakeRequest,
   type RequestHold
 } from './fakeTransport.js';
-import type { AriEvent, Channel } from './types.js';
+import type { Channel } from './types.js';
 
 const DEFAULT_ANSWER_AFTER_MS = 10;
 // A real playback takes some time to reach the end; a fixed short delay lets code that awaits
@@ -122,7 +123,7 @@ export class FakeAri {
 
   /** Sends `event`, its channel carrying `channelvars` as a stack whose ari.conf names
    * `RTPAUDIOQOS` sends them, unless the test gave its own. */
-  emit(event: AriEvent): void {
+  emit(event: AriFrame): void {
     const channel = event.channel as Partial<Channel> | undefined;
     if (event.type === 'StasisStart') {
       this.snoopsOutsideStasis.delete(channel?.id ?? '');

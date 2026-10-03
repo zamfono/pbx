@@ -8,7 +8,7 @@
  * latest as `SIP 100 Trying`).
  */
 import type { AriClient } from '../ari/client.js';
-import type { AriEvent, Channel } from '../ari/types.js';
+import { isEvent, type AriEvent } from '../ari/events.js';
 
 /** The `Dial` statuses of the far end alerting: `180 Ringing` and `183 Session Progress`. */
 const ALERTING_DIAL_STATUSES = new Set(['RINGING', 'PROGRESS']);
@@ -21,18 +21,16 @@ export type TrunkLeg = { id: string; name: string };
 
 /** Whether `event` is the far end of `channelId` alerting, with a 180 or a 183 (§9.4). */
 export function alertsOn(event: AriEvent, channelId: string): boolean {
-  if (event.type === 'Dial') {
-    const peer = event.peer as Channel | undefined;
+  if (isEvent(event, 'Dial')) {
     return (
-      peer?.id === channelId &&
-      ALERTING_DIAL_STATUSES.has(String(event.dialstatus))
+      event.peer.id === channelId &&
+      ALERTING_DIAL_STATUSES.has(event.dialstatus)
     );
   }
-  const channel = event.channel as Channel | undefined;
   return (
     event.type === 'ChannelStateChange' &&
-    channel?.id === channelId &&
-    channel.state === 'Ringing'
+    event.channel?.id === channelId &&
+    event.channel.state === 'Ringing'
   );
 }
 

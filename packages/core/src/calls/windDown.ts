@@ -5,8 +5,9 @@
  * (`closeCall`): its legs hung up, its recordings and a voicemail deposit in progress saved, its
  * history entry written.
  */
+import { isEvent, type AriEvent, type AriEventOf } from '../ari/events.js';
 import { ignoreGone } from '../ari/failures.js';
-import type { AriEvent, Channel } from '../ari/types.js';
+import type { Channel } from '../ari/types.js';
 import {
   AST_CAUSE_NORMAL_CLEARING,
   SIP_SERVICE_UNAVAILABLE
@@ -22,10 +23,10 @@ const STOPPING_CAUSE = sipToHangupCause(SIP_SERVICE_UNAVAILABLE);
 
 /** A caller's `StasisStart` (§9.2 `inbound,<exten>`, `outbound,<exten>`): the event each call
  * starts with. */
-export function startsCall(ev: AriEvent): boolean {
-  const [kind] = (ev.args as (string | undefined)[] | undefined) ?? [];
+export function startsCall(ev: AriEvent): ev is AriEventOf<'StasisStart'> {
   return (
-    ev.type === 'StasisStart' && (kind === 'inbound' || kind === 'outbound')
+    isEvent(ev, 'StasisStart') &&
+    (ev.args[0] === 'inbound' || ev.args[0] === 'outbound')
   );
 }
 

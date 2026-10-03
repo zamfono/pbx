@@ -6,7 +6,7 @@
  */
 import { newId } from '@zamfono/shared';
 
-import type { AriEvent, Channel } from '../ari/types.js';
+import type { AriEventOf } from '../ari/events.js';
 import { userById } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import type { DialAction } from '../routing/outbound.js';
@@ -49,11 +49,10 @@ function markCallerInCall(
 /** `outbound,<exten>` Stasis entry (§9.2): resolves the dialled string and dispatches it. */
 export async function handleOutbound(
   pipeline: Pipeline,
-  ev: AriEvent
+  ev: AriEventOf<'StasisStart'>
 ): Promise<void> {
-  const channel = ev.channel as Channel;
-  const args = (ev.args as string[] | undefined) ?? [];
-  const dialed = args[1] ?? '';
+  const channel = ev.channel;
+  const dialed = ev.args[1] ?? '';
   const snapshot = await pipeline.deps.cache.get();
   const { action, direction, to } = resolveTarget(snapshot, dialed);
   // §10.1 "Transfers and pickup": a blind transfer's onward call is routed as the transferrer's,

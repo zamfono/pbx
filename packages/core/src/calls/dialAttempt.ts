@@ -7,8 +7,8 @@
 import { newId } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
+import { isEvent } from '../ari/events.js';
 import { logFailure, logUnlessGone } from '../ari/failures.js';
-import type { Channel } from '../ari/types.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import {
   ATTEMPT_NO_RESPONSE_MS,
@@ -66,7 +66,7 @@ function watchAttemptOutcome(ari: AriClient, channelId: string): AttemptWatch {
       waiting.disarm();
       return;
     }
-    const channel = event.channel as Channel | undefined;
+    const channel = event.channel;
     if (channel?.id !== channelId) {
       return;
     }
@@ -74,7 +74,7 @@ function watchAttemptOutcome(ari: AriClient, channelId: string): AttemptWatch {
       waiting.settle({ kind: 'answered', channelId });
       return;
     }
-    if (event.type === 'ChannelDestroyed') {
+    if (isEvent(event, 'ChannelDestroyed')) {
       const code = endedSipStatus(event);
       waiting.settle({
         kind: 'failure',
@@ -114,7 +114,7 @@ function watchAttemptChannelEnd(
   channelId: string
 ): void {
   waitForEvent<undefined>(ari, (event, wait) => {
-    const channel = event.channel as Channel | undefined;
+    const channel = event.channel;
     if (channel?.id !== channelId || event.type !== 'ChannelDestroyed') {
       return;
     }

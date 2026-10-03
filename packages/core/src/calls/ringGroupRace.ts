@@ -5,8 +5,8 @@
  * the batch settled is hung up. Its own module so `ringGroupDial.ts`, which places the batch and
  * waits on this race, stays under the repository's `max-lines` lint rule.
  */
+import { isEvent, type AriEvent } from '../ari/events.js';
 import { logFailure, logUnlessGone } from '../ari/failures.js';
-import type { AriEvent, Channel } from '../ari/types.js';
 import { AST_CAUSE_CALL_REJECTED, AST_CAUSE_USER_BUSY } from '../sipCodes.js';
 import type { Call } from './call.js';
 import { callPartiesChanged } from './callState.js';
@@ -59,10 +59,10 @@ function handleDecline(
 /** The batch's own `AriClient` event handler: the caller abandoning, a member leg winning, or a
  * member leg ending early. */
 function handleBatchEvent(ctx: RaceContext, ev: AriEvent): void {
-  if (ev.type !== 'ChannelStateChange' && ev.type !== 'ChannelDestroyed') {
+  if (!isEvent(ev, 'ChannelStateChange', 'ChannelDestroyed')) {
     return;
   }
-  const channel = ev.channel as Channel;
+  const channel = ev.channel;
   if (channel.id === ctx.call.callerChannelId) {
     if (ev.type === 'ChannelDestroyed') {
       ctx.settle('abandoned');
@@ -98,8 +98,7 @@ function handleBatchEvent(ctx: RaceContext, ev: AriEvent): void {
   if (leg.external === true) {
     return;
   }
-  const cause = typeof ev.cause === 'number' ? ev.cause : null;
-  handleDecline(ctx, leg, cause);
+  handleDecline(ctx, leg, ev.cause);
 }
 
 /** The batch race's mutable state and its `AriClient` event handler, factored out so `ringBatch`

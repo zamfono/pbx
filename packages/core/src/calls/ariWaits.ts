@@ -1,7 +1,7 @@
 /** Waiting on ARI's event stream with a timeout: `waitForEvent` is the one primitive (subscribe,
  * settle once, unsubscribe), and the waits more than one flow shares are built on it. */
 import type { AriClient } from '../ari/client.js';
-import type { AriEvent, Channel } from '../ari/types.js';
+import { isEvent, type AriEvent } from '../ari/events.js';
 
 /**
  * One wait on the event stream: every event goes to its handler until the wait settles, and the
@@ -67,16 +67,13 @@ export function waitForEvent<T>(
 export function channelLeft(ev: AriEvent, channelId: string): boolean {
   return (
     (ev.type === 'ChannelDestroyed' || ev.type === 'StasisEnd') &&
-    (ev.channel as Channel | undefined)?.id === channelId
+    ev.channel?.id === channelId
   );
 }
 
 /** Whether `ev` is the `PlaybackFinished` of `playbackId`. */
 export function playbackFinished(ev: AriEvent, playbackId: string): boolean {
-  return (
-    ev.type === 'PlaybackFinished' &&
-    (ev.playback as { id?: string } | undefined)?.id === playbackId
-  );
+  return isEvent(ev, 'PlaybackFinished') && ev.playback.id === playbackId;
 }
 
 /** The end of the recording `name` that `ev` reports: its duration in seconds once finished,
@@ -85,15 +82,13 @@ export function recordingEnd(
   ev: AriEvent,
   name: string
 ): number | null | undefined {
-  const recording = ev.recording as
-    { name?: string; duration?: number } | undefined;
-  if (recording?.name !== name) {
+  if (
+    !isEvent(ev, 'RecordingFinished', 'RecordingFailed') ||
+    ev.recording.name !== name
+  ) {
     return undefined;
   }
-  if (ev.type === 'RecordingFinished') {
-    return recording.duration ?? 0;
-  }
-  return ev.type === 'RecordingFailed' ? null : undefined;
+  return ev.type === 'RecordingFinished' ? (ev.recording.duration ?? 0) : null;
 }
 
 /** Waits for the recording named `name` to end: its reported duration, or `null` once it failed
@@ -128,7 +123,7 @@ export function waitForStasisEntry(
   timeoutMs: number
 ): EventWait<StasisEntry> {
   const wait = waitForEvent<StasisEntry>(ari, (ev, waiting) => {
-    if ((ev.channel as Channel | undefined)?.id !== channelId) {
+    if (ev.channel?.id !== channelId) {
       return;
     }
     if (ev.type === 'StasisStart') {

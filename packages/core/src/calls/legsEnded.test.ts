@@ -4,8 +4,9 @@ import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
+import type { AriEventOf } from '../ari/events.js';
 import { FakeAri } from '../ari/fake.js';
-import type { AriEvent } from '../ari/types.js';
+import { defaultChannel } from '../ari/fakeChannel.js';
 import { eventually } from '../testing/eventually.js';
 import {
   noopCdr,
@@ -23,6 +24,25 @@ import { endRingingLeg } from './ringConclusion.js';
 const CALLER_CHANNEL = 'caller-1';
 const MEMBER_CHANNEL = 'member-1';
 const MEMBER_USER = 'user-1';
+const NORMAL_CLEARING = 16;
+
+/** The `ChannelDestroyed` Asterisk sends for `channelId`, a normal clearing unless `fields` say
+ * otherwise. */
+function destroyed(
+  channelId: string,
+  fields: Partial<AriEventOf<'ChannelDestroyed'>> = {}
+): AriEventOf<'ChannelDestroyed'> {
+  return {
+    type: 'ChannelDestroyed',
+    timestamp: nowIso(),
+    application: 'zamfono',
+    channel: defaultChannel({ id: channelId }),
+    cause: NORMAL_CLEARING,
+    // eslint-disable-next-line camelcase -- ARI's own event field name
+    cause_txt: 'Normal Clearing',
+    ...fields
+  };
+}
 
 describe('handleChannelEnded, the caller channel', () => {
   let db: Db;
@@ -75,11 +95,8 @@ describe('handleChannelEnded, the caller channel', () => {
   });
 
   /** The `ChannelDestroyed` Asterisk sends for the caller's own channel. */
-  function callerDestroyed(): AriEvent {
-    return {
-      type: 'ChannelDestroyed',
-      channel: { id: CALLER_CHANNEL }
-    } as unknown as AriEvent;
+  function callerDestroyed(): AriEventOf<'ChannelDestroyed'> {
+    return destroyed(CALLER_CHANNEL);
   }
 
   /** An answered member leg, the state a ring group leaves behind once someone picks up. */
@@ -130,14 +147,6 @@ describe('handleChannelEnded, the caller channel', () => {
     }
     call.bridgeId = bridge.id;
     return bridge.id;
-  }
-
-  /** The `ChannelDestroyed` Asterisk sends for a leg's own channel. */
-  function destroyed(channelId: string): AriEvent {
-    return {
-      type: 'ChannelDestroyed',
-      channel: { id: channelId }
-    } as unknown as AriEvent;
   }
 
   /** Whether the core asked Asterisk to hang up `channelId`. */
@@ -254,13 +263,18 @@ describe('handleChannelEnded, the caller channel', () => {
       .map(line => JSON.parse(line) as Record<string, unknown>);
   }
 
-  function hangupRequest(channelId: string, soft = false): AriEvent {
+  function hangupRequest(
+    channelId: string,
+    soft = false
+  ): AriEventOf<'ChannelHangupRequest'> {
     return {
       type: 'ChannelHangupRequest',
-      channel: { id: channelId },
-      cause: 16,
-      ...(soft ? { soft: true } : {})
-    } as unknown as AriEvent;
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: defaultChannel({ id: channelId }),
+      cause: NORMAL_CLEARING,
+      soft
+    };
   }
 
   it('traces the callee who hung up an answered call, with the cause, once (§7)', async () => {
@@ -269,15 +283,11 @@ describe('handleChannelEnded, the caller channel', () => {
     fakeAri.addChannel({ id: CALLER_CHANNEL });
 
     noteHangupRequest(call, hangupRequest(MEMBER_CHANNEL));
-    await handleChannelEnded(pipeline, {
-      type: 'ChannelDestroyed',
-      channel: { id: MEMBER_CHANNEL },
-      cause: 16,
+    await handleChannelEnded(
+      pipeline,
       // eslint-disable-next-line camelcase -- ARI's own event field name
-      cause_txt: 'Normal Clearing',
-      // eslint-disable-next-line camelcase -- ARI's own event field name
-      tech_cause: 200
-    } as unknown as AriEvent);
+      destroyed(MEMBER_CHANNEL, { tech_cause: 200 })
+    );
     // The core then hangs the caller up: its own, soft, request, which changes nothing.
     noteHangupRequest(call, hangupRequest(CALLER_CHANNEL, true));
     await handleChannelEnded(pipeline, callerDestroyed());

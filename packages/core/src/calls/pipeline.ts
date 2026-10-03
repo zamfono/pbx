@@ -4,7 +4,8 @@
 import type { Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
-import type { AriEvent, Channel, Logger } from '../ari/types.js';
+import { isEvent, type AriEvent, type AriEventOf } from '../ari/events.js';
+import type { Channel, Logger } from '../ari/types.js';
 import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
@@ -120,7 +121,7 @@ export class Pipeline {
       // it, so the log line is the only account of what went wrong.
       const handled = (
         this.draining && startsCall(ev)
-          ? refuseCall(this, ev.channel as Channel)
+          ? refuseCall(this, ev.channel)
           : this.routeEvent(ev)
       )
         .catch((error: unknown) => {
@@ -184,14 +185,16 @@ export class Pipeline {
   /** The call `ev` belongs to, by its channel or, for a leg channel that has not
    * been tracked yet, by the call id its Stasis arguments carry; `null` before any call exists. */
   private callIdOf(ev: AriEvent): string | null {
-    const channel = ev.channel as Channel | undefined;
+    const channel = ev.channel;
     const tracked =
       channel === undefined ? undefined : this.callByChannel.get(channel.id);
     if (tracked !== undefined) {
       return tracked.id;
     }
-    const [kind, callId] =
-      (ev.args as (string | undefined)[] | undefined) ?? [];
+    if (!isEvent(ev, 'StasisStart')) {
+      return null;
+    }
+    const [kind, callId] = ev.args;
     return kind === 'leg' && callId !== undefined ? callId : null;
   }
 
@@ -202,7 +205,7 @@ export class Pipeline {
    * `RTPAUDIOQOS` it carries once that note is taken.
    */
   private async routeEvent(ev: AriEvent): Promise<void> {
-    const channel = ev.channel as Channel | undefined;
+    const channel = ev.channel;
     const before =
       channel === undefined ? undefined : this.callByChannel.get(channel.id);
     if (before !== undefined) {
@@ -223,36 +226,35 @@ export class Pipeline {
   }
 
   private async dispatch(ev: AriEvent): Promise<void> {
-    if (ev.type === 'StasisStart') {
+    if (isEvent(ev, 'StasisStart')) {
       await this.handleStasisStart(ev);
       return;
     }
-    if (ev.type === 'ChannelStateChange') {
-      const channel = ev.channel as Channel;
+    if (isEvent(ev, 'ChannelStateChange')) {
+      const channel = ev.channel;
       if (channel.state === 'Up') {
         await legWentUp(this, channel.id);
       }
       return;
     }
-    if (ev.type === 'ChannelDtmfReceived') {
+    if (isEvent(ev, 'ChannelDtmfReceived')) {
       handleDtmf(this, ev);
       return;
     }
-    if (ev.type === 'ChannelHangupRequest') {
-      const call = this.callByChannel.get((ev.channel as Channel).id);
+    if (isEvent(ev, 'ChannelHangupRequest')) {
+      const call = this.callByChannel.get(ev.channel.id);
       if (call !== undefined) {
         noteHangupRequest(call, ev);
       }
       return;
     }
-    if (ev.type === 'ChannelDestroyed' || ev.type === 'StasisEnd') {
+    if (isEvent(ev, 'ChannelDestroyed', 'StasisEnd')) {
       await handleChannelEnded(this, ev);
     }
   }
 
-  async handleStasisStart(ev: AriEvent): Promise<void> {
-    const args = (ev.args as string[] | undefined) ?? [];
-    const kind = args[0];
+  async handleStasisStart(ev: AriEventOf<'StasisStart'>): Promise<void> {
+    const kind = ev.args[0];
     if (kind === 'inbound') {
       await handleInboundStart(this, ev);
       return;
@@ -263,7 +265,7 @@ export class Pipeline {
     }
     // An originated leg enters the app as it answers; a created one (`legOriginate.ts`) as it is
     // created, before it is dialled, and its answer is the `ChannelStateChange` to `Up`.
-    const channel = ev.channel as Channel;
+    const channel = ev.channel;
     if (kind === 'leg' && channel.state === 'Up') {
       await legWentUp(this, channel.id);
     }

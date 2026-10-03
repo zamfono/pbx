@@ -8,10 +8,10 @@ import {
   reconnectBackoff,
   type ReconnectBackoff
 } from '../reconnectBackoff.js';
+import { tryParseAriEvent } from './events.js';
 import { buildRestApi } from './restApi.js';
 import { ariRequests, authHeaders } from './restTransport.js';
 import {
-  tryParseAriEvent,
   type AsteriskApi,
   type BridgesApi,
   type ChannelsApi,

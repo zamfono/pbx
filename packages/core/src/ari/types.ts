@@ -8,14 +8,6 @@ export type Logger = {
   error: (msgOrFields: string | Record<string, unknown>, msg?: string) => void;
 };
 
-/** One frame of the ARI events WebSocket stream; StasisStart carries `args` and `channel`. */
-export type AriEvent = {
-  type: string;
-  timestamp: string;
-  application: 'zamfono';
-  [key: string]: unknown;
-};
-
 export type Channel = {
   id: string;
   name: string;
@@ -151,16 +143,6 @@ export type AsteriskApi = {
   /** `GET /asterisk/info?only=status`: when this Asterisk started, as ISO 8601 UTC. */
   startupTime: () => Promise<string>;
 };
-
-/** Parses one ARI event frame, logging and returning `null` on malformed JSON instead of throwing. */
-export function tryParseAriEvent(raw: string, log: Logger): AriEvent | null {
-  try {
-    return JSON.parse(raw) as AriEvent;
-  } catch (error) {
-    log.error({ raw, error }, 'received a malformed ARI event');
-    return null;
-  }
-}
 
 /** Reads an ARI error response's body as JSON, falling back to plain text. */
 export async function parseErrorBody(response: Response): Promise<unknown> {

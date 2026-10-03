@@ -13,8 +13,9 @@ import path from 'node:path';
 import type { Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
+import type { AriEvent } from '../ari/events.js';
 import { ignoreGone, logFailure } from '../ari/failures.js';
-import type { AriEvent, Channel, Logger } from '../ari/types.js';
+import type { Logger } from '../ari/types.js';
 import { ignoreMissing } from '../fsFailures.js';
 import { VOICEMAIL_DIR_NAME } from './mailboxStore.js';
 import type { Pipeline } from './pipeline.js';
@@ -69,7 +70,7 @@ function watchBridges(ari: AriClient, bridges: AdoptedBridge[]): void {
       ev.type === 'ChannelDestroyed' ||
       ev.type === 'ChannelLeftBridge' ||
       ev.type === 'StasisEnd';
-    const channel = ev.channel as Channel | undefined;
+    const channel = ev.channel;
     const bridge =
       channel === undefined ? undefined : byChannel.get(channel.id);
     if (!leaving || channel === undefined || bridge === undefined) {
