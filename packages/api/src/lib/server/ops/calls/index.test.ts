@@ -11,19 +11,14 @@ import {
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { stubCoreClient } from '#lib/server/coreClientStub.js';
 import { handleRest } from '#lib/server/rest.js';
-import { makeTestDb, seedTenantTimeZone } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
+import { runOperation } from '../runner.js';
 import { type Actor } from '../types.js';
 
 import './index.js';
 
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 const anna: Actor = { id: 'u1', name: 'Anna', role: 'user' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
 
 async function seedUser(db: Db, id: string): Promise<void> {
   await db
@@ -70,7 +65,7 @@ async function seedCall(
 describe('calls', () => {
   it("calls.list as user excludes other users' calls", async () => {
     const db = await makeTestDb();
-    await seedTenantTimeZone(db, null);
+    await seedSettings(db);
     await seedUser(db, 'u1');
     await seedUser(db, 'u2');
     await seedUser(db, 'u3');
@@ -92,7 +87,7 @@ describe('calls', () => {
 
   it('calls.list and calls.get leave out a call still in progress (§10.1 "Call aggregate")', async () => {
     const db = await makeTestDb();
-    await seedTenantTimeZone(db, null);
+    await seedSettings(db);
     const ended = await seedCall(db, {});
     const live = await seedCall(db, { inProgress: true });
 
@@ -107,7 +102,7 @@ describe('calls', () => {
 
   it('calls.list compares `from` with an offset as the instant it names, and `to` without one in the tenant zone', async () => {
     const db = await makeTestDb();
-    await seedTenantTimeZone(db, 'Europe/Berlin');
+    await seedSettings(db, { timezone: 'Europe/Berlin' });
     const ids = [newId(), newId(), newId()];
     const starts = [
       '2026-10-01T09:59:59.999Z',

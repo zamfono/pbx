@@ -24,7 +24,7 @@ import {
   UpdaterRefusal,
   type UpdaterClient
 } from '../ops/system/_updater.js';
-import { makeTestDb } from '../testDb.js';
+import { makeTestDb, seedSettings } from '../testDb.js';
 import {
   GIVE_UPS_PER_ATTEMPT,
   runAutoUpdatePass,
@@ -50,17 +50,7 @@ const TOMORROW = new Date('2026-10-02T03:00:00.000Z');
  * test database's own owner `owner`. */
 async function seed(db: Db, autoUpdate: boolean): Promise<void> {
   await sql`PRAGMA foreign_keys = OFF`.execute(db);
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: 'did-1',
-      autoUpdate: autoUpdate ? 1 : 0
-    })
-    .execute();
+  await seedSettings(db, { autoUpdate: autoUpdate ? 1 : 0 });
   for (const [id, role] of [
     ['o2', 'owner'],
     ['a1', 'admin']

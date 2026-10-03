@@ -4,49 +4,15 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import { makeTestDb } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
-import { type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
 
 import './index.js';
 
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
-
 /** Seeds the tenant `settings` singleton and one live user with extension `101`. */
 async function seedUser(db: Db): Promise<string> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({
-      id: didId,
-      number: '+490000000',
-      label: null,
-      targetId,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId
-    })
-    .execute();
+  await seedSettings(db);
   const userId = newId();
   await db
     .insertInto('users')

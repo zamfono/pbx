@@ -3,11 +3,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
 import { propagateConfig } from '#lib/server/propagation.js';
-import { makeTestDb, seedTenantTimeZone } from '#lib/server/testDb.js';
+import {
+  asConfirmedRun,
+  makeTestDb,
+  seedSettings
+} from '#lib/server/testDb.js';
 
 import type { HoursWire } from '../hours/get.js';
-import { runOperation, type RunInput } from '../runner.js';
-import { type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
 
 import '../blockedNumbers/index.js';
 import '../devices/index.js';
@@ -20,51 +23,6 @@ import '../settings/index.js';
 import '../users/index.js';
 import './index.js';
 
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-process.env.FQDN ??= 'pbx.example.test';
-
-const admin: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return {
-    actor: admin,
-    channel: 'rest',
-    requestId: 'req-1',
-    confirm: true,
-    ...overrides
-  };
-}
-
-/** Seeds the tenant `settings` singleton, required by extension and phone-number checks. */
-async function seedTenant(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({
-      id: didId,
-      number: '+490000000',
-      label: null,
-      targetId,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId
-    })
-    .execute();
-}
-
 async function createUser(
   db: Db,
   name: string,
@@ -75,7 +33,7 @@ async function createUser(
     db,
     'users.create',
     { name, email, extension },
-    asRun()
+    asConfirmedRun()
   )) as { user: { id: string } };
   return result.user;
 }
@@ -96,13 +54,13 @@ async function latestAuditEntry(
 describe('audit.undo', () => {
   it('restores a plain field change and writes the undo row', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     await runOperation(
       db,
       'users.update',
       { id: user.id, name: 'Anna Berger' },
-      asRun()
+      asConfirmedRun()
     );
     const entry = await latestAuditEntry(db, user.id);
 
@@ -110,7 +68,7 @@ describe('audit.undo', () => {
       db,
       'audit.undo',
       { id: entry.id },
-      asRun()
+      asConfirmedRun()
     )) as { id: string };
     expect(result.id).toBe(entry.id);
 
@@ -141,13 +99,13 @@ describe('audit.undo', () => {
 
   it("leaves the undo row's client columns NULL, even when a client calls it", async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     await runOperation(
       db,
       'users.update',
       { id: user.id, name: 'Anna Berger' },
-      asRun()
+      asConfirmedRun()
     );
     const entry = await latestAuditEntry(db, user.id);
 
@@ -155,7 +113,11 @@ describe('audit.undo', () => {
       db,
       'audit.undo',
       { id: entry.id },
-      asRun({ channel: 'mcp', clientId: 'client-1', clientName: 'Assistant' })
+      asConfirmedRun({
+        channel: 'mcp',
+        clientId: 'client-1',
+        clientName: 'Assistant'
+      })
     );
 
     const undoEntry = await db
@@ -168,25 +130,25 @@ describe('audit.undo', () => {
 
   it('refuses undo with 409 while a later live change exists for the entity', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     await runOperation(
       db,
       'users.update',
       { id: user.id, name: 'Anna Berger' },
-      asRun()
+      asConfirmedRun()
     );
     const first = await latestAuditEntry(db, user.id);
     await runOperation(
       db,
       'users.update',
       { id: user.id, name: 'Anna Carell' },
-      asRun()
+      asConfirmedRun()
     );
     const second = await latestAuditEntry(db, user.id);
 
     await expect(
-      runOperation(db, 'audit.undo', { id: first.id }, asRun())
+      runOperation(db, 'audit.undo', { id: first.id }, asConfirmedRun())
     ).rejects.toMatchObject({
       status: 409,
       detail: { references: [{ kind: 'auditLog', id: second.id }] }
@@ -195,18 +157,18 @@ describe('audit.undo', () => {
 
   it('re-inserts the extension and devices an undone user deletion had dropped', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     const device = (await runOperation(
       db,
       'devices.create',
       { userId: user.id, label: 'Desk phone', kind: 'manual' },
-      asRun()
+      asConfirmedRun()
     )) as { device: { id: string } };
-    await runOperation(db, 'users.delete', { id: user.id }, asRun());
+    await runOperation(db, 'users.delete', { id: user.id }, asConfirmedRun());
     const entry = await latestAuditEntry(db, user.id);
 
-    await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+    await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 
     const userRow = await db
       .selectFrom('users')
@@ -230,13 +192,13 @@ describe('audit.undo', () => {
 
   it('notifies pjsip/dialplan propagation when undoing a user deletion', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
-    await runOperation(db, 'users.delete', { id: user.id }, asRun());
+    await runOperation(db, 'users.delete', { id: user.id }, asConfirmedRun());
     const entry = await latestAuditEntry(db, user.id);
     vi.mocked(propagateConfig).mockClear();
 
-    await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+    await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 
     expect(vi.mocked(propagateConfig).mock.calls).toEqual([
       [db, ['pjsip', 'dialplan']]
@@ -245,14 +207,14 @@ describe('audit.undo', () => {
 
   it('refuses undo with 409 once another user has taken the freed e-mail', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
-    await runOperation(db, 'users.delete', { id: user.id }, asRun());
+    await runOperation(db, 'users.delete', { id: user.id }, asConfirmedRun());
     const entry = await latestAuditEntry(db, user.id);
     const other = await createUser(db, 'Bea Nolte', 'anna@x.test', '102');
 
     await expect(
-      runOperation(db, 'audit.undo', { id: entry.id }, asRun())
+      runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun())
     ).rejects.toMatchObject({
       status: 409,
       detail: { references: [{ kind: 'user', id: other.id }] }
@@ -261,14 +223,14 @@ describe('audit.undo', () => {
 
   it('refuses undo with 409 once another user has taken the freed extension', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
-    await runOperation(db, 'users.delete', { id: user.id }, asRun());
+    await runOperation(db, 'users.delete', { id: user.id }, asConfirmedRun());
     const entry = await latestAuditEntry(db, user.id);
     await createUser(db, 'Bea Nolte', 'bea@x.test', '101');
 
     await expect(
-      runOperation(db, 'audit.undo', { id: entry.id }, asRun())
+      runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun())
     ).rejects.toMatchObject({
       status: 409,
       detail: { references: [{ kind: 'extension', id: '101' }] }
@@ -277,11 +239,11 @@ describe('audit.undo', () => {
 
   it('reverts a creation entry by deleting the row it created', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     const entry = await latestAuditEntry(db, user.id);
 
-    await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+    await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 
     const row = await db
       .selectFrom('users')
@@ -293,11 +255,16 @@ describe('audit.undo', () => {
 
   it('reverts a plain settings field change', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
-    await runOperation(db, 'settings.update', { voicemailMaxS: 240 }, asRun());
+    await seedSettings(db);
+    await runOperation(
+      db,
+      'settings.update',
+      { voicemailMaxS: 240 },
+      asConfirmedRun()
+    );
     const entry = await latestAuditEntry(db, 'settings');
 
-    await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+    await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 
     const row = await db
       .selectFrom('settings')
@@ -309,22 +276,22 @@ describe('audit.undo', () => {
 
   it('reverts a blocklist entry deletion', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const blocked = (await runOperation(
       db,
       'blockedNumbers.create',
       { number: '+491234567' },
-      asRun()
+      asConfirmedRun()
     )) as { id: string };
     await runOperation(
       db,
       'blockedNumbers.delete',
       { id: blocked.id },
-      asRun()
+      asConfirmedRun()
     );
     const entry = await latestAuditEntry(db, blocked.id);
 
-    await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+    await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 
     const row = await db
       .selectFrom('blockedNumbers')
@@ -336,19 +303,24 @@ describe('audit.undo', () => {
 
   it('refuses undo of a masked, secret-bearing change', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     const device = (await runOperation(
       db,
       'devices.create',
       { userId: user.id, label: 'Desk phone', kind: 'manual' },
-      asRun()
+      asConfirmedRun()
     )) as { device: { id: string } };
-    await runOperation(db, 'devices.rotate', { id: device.device.id }, asRun());
+    await runOperation(
+      db,
+      'devices.rotate',
+      { id: device.device.id },
+      asConfirmedRun()
+    );
     const entry = await latestAuditEntry(db, device.device.id);
 
     await expect(
-      runOperation(db, 'audit.undo', { id: entry.id }, asRun())
+      runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun())
     ).rejects.toMatchObject({
       status: 409,
       title: 'audit entry is not undoable'
@@ -359,23 +331,23 @@ describe('audit.undo', () => {
 describe('audit.list', () => {
   it('filters by entity and hides undone entries by default', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     await createUser(db, 'Bea Nolte', 'bea@x.test', '102');
     await runOperation(
       db,
       'users.update',
       { id: user.id, name: 'Anna Berger' },
-      asRun()
+      asConfirmedRun()
     );
     const entry = await latestAuditEntry(db, user.id);
-    await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+    await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 
     const live = (await runOperation(
       db,
       'audit.list',
       { entityKind: 'user', entityId: user.id },
-      asRun()
+      asConfirmedRun()
     )) as { items: { entityId: string | null; operation: string }[] };
     expect(live.items.map(item => item.operation)).toEqual([
       'audit.undo',
@@ -386,7 +358,7 @@ describe('audit.list', () => {
       db,
       'audit.list',
       { entityKind: 'user', entityId: user.id, state: 'all' },
-      asRun()
+      asConfirmedRun()
     )) as { items: { operation: string }[] };
     expect(all.items.map(item => item.operation)).toEqual([
       'audit.undo',
@@ -399,7 +371,7 @@ describe('audit.list', () => {
 describe('audit.list time range', () => {
   it('compares `from` and `to` with an offset as the instants they name, and refuses a non-instant', async () => {
     const db = await makeTestDb();
-    await seedTenantTimeZone(db, null);
+    await seedSettings(db);
     const createdAts = [
       '2026-10-01T09:59:59.999Z',
       '2026-10-01T10:00:00.000Z',
@@ -429,9 +401,14 @@ describe('audit.list time range', () => {
       db,
       'audit.list',
       { from: '2026-10-01T12:00:00+02:00', to: '2026-10-01T10:00:00Z' },
-      asRun()
+      asConfirmedRun()
     )) as { items: { operation: string }[] };
-    const attempt = runOperation(db, 'audit.list', { from: '1 Oct' }, asRun());
+    const attempt = runOperation(
+      db,
+      'audit.list',
+      { from: '1 Oct' },
+      asConfirmedRun()
+    );
 
     expect(result.items.map(item => item.operation)).toEqual(['op.1']);
     await expect(attempt).rejects.toMatchObject({ status: 422 });
@@ -439,7 +416,7 @@ describe('audit.list time range', () => {
 
   it('reads a `from` and `to` without an offset, and a date alone, in the tenant zone', async () => {
     const db = await makeTestDb();
-    await seedTenantTimeZone(db, 'Europe/Berlin');
+    await seedSettings(db, { timezone: 'Europe/Berlin' });
     const createdAts = [
       '2026-09-30T21:59:59.999Z',
       '2026-09-30T22:00:00.000Z',
@@ -470,7 +447,7 @@ describe('audit.list time range', () => {
       db,
       'audit.list',
       { from: '2026-10-01', to: '2026-10-01T12:00:00' },
-      asRun()
+      asConfirmedRun()
     )) as { items: { operation: string }[] };
 
     expect(result.items.map(item => item.operation).sort()).toEqual([
@@ -509,7 +486,7 @@ async function externalOf(db: Db, targetId: string): Promise<string | null> {
 describe('audit.undo of a forward-target change', () => {
   it('restores the DID target a retarget replaced', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const did = (await runOperation(
       db,
       'dids.create',
@@ -517,17 +494,17 @@ describe('audit.undo of a forward-target change', () => {
         number: '+4989000001',
         target: { kind: 'external', external: '+491111111' }
       },
-      asRun()
+      asConfirmedRun()
     )) as { id: string };
     await runOperation(
       db,
       'dids.update',
       { id: did.id, target: { kind: 'external', external: '+492222222' } },
-      asRun()
+      asConfirmedRun()
     );
     const entry = await latestAuditEntry(db, did.id);
 
-    await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+    await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 
     const row = await db
       .selectFrom('dids')
@@ -539,7 +516,7 @@ describe('audit.undo of a forward-target change', () => {
 
   it('restores the out-of-office target a retarget replaced', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const rule = (await runOperation(
       db,
       'ooo.create',
@@ -547,17 +524,17 @@ describe('audit.undo of a forward-target change', () => {
         scope: { kind: 'tenant' },
         target: { kind: 'external', external: '+491111111' }
       },
-      asRun()
+      asConfirmedRun()
     )) as { id: string };
     await runOperation(
       db,
       'ooo.update',
       { id: rule.id, target: { kind: 'external', external: '+492222222' } },
-      asRun()
+      asConfirmedRun()
     );
     const entry = await latestAuditEntry(db, rule.id);
 
-    await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+    await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 
     const row = await db
       .selectFrom('oooRules')
@@ -569,7 +546,7 @@ describe('audit.undo of a forward-target change', () => {
 
   it('restores the number block fallback target a retarget replaced', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const block = (await runOperation(
       db,
       'didBlocks.create',
@@ -577,7 +554,7 @@ describe('audit.undo of a forward-target change', () => {
         base: '+498912',
         fallbackTarget: { kind: 'external', external: '+491111111' }
       },
-      asRun()
+      asConfirmedRun()
     )) as { id: string };
     await runOperation(
       db,
@@ -586,11 +563,11 @@ describe('audit.undo of a forward-target change', () => {
         id: block.id,
         fallbackTarget: { kind: 'external', external: '+492222222' }
       },
-      asRun()
+      asConfirmedRun()
     );
     const entry = await latestAuditEntry(db, block.id);
 
-    await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+    await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 
     const row = await db
       .selectFrom('didBlocks')
@@ -602,7 +579,7 @@ describe('audit.undo of a forward-target change', () => {
 
   it('restores the menu fallback target a retarget replaced', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const audioId = await seedAnnouncement(db);
     const menu = (await runOperation(
       db,
@@ -612,7 +589,7 @@ describe('audit.undo of a forward-target change', () => {
         audioId,
         fallbackTarget: { kind: 'external', external: '+491111111' }
       },
-      asRun()
+      asConfirmedRun()
     )) as { id: string };
     await runOperation(
       db,
@@ -621,11 +598,11 @@ describe('audit.undo of a forward-target change', () => {
         id: menu.id,
         fallbackTarget: { kind: 'external', external: '+492222222' }
       },
-      asRun()
+      asConfirmedRun()
     );
     const entry = await latestAuditEntry(db, menu.id);
 
-    await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+    await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 
     const row = await db
       .selectFrom('menus')
@@ -639,7 +616,7 @@ describe('audit.undo of a forward-target change', () => {
 describe('audit.undo of an entry it cannot replay', () => {
   it('refuses with 409 and leaves the entry live', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     const id = newId();
     await db
@@ -667,7 +644,7 @@ describe('audit.undo of an entry it cannot replay', () => {
       .execute();
 
     await expect(
-      runOperation(db, 'audit.undo', { id }, asRun())
+      runOperation(db, 'audit.undo', { id }, asConfirmedRun())
     ).rejects.toMatchObject({ status: 409 });
 
     const row = await db
@@ -680,14 +657,14 @@ describe('audit.undo of an entry it cannot replay', () => {
 
   it('refuses with 409 once another user has taken the freed SSO subject', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     await db
       .updateTable('users')
       .set({ ssoSubject: 'subject-1' })
       .where('id', '=', user.id)
       .execute();
-    await runOperation(db, 'users.delete', { id: user.id }, asRun());
+    await runOperation(db, 'users.delete', { id: user.id }, asConfirmedRun());
     const entry = await latestAuditEntry(db, user.id);
     const other = await createUser(db, 'Bea Nolte', 'bea@x.test', '102');
     await db
@@ -697,7 +674,7 @@ describe('audit.undo of an entry it cannot replay', () => {
       .execute();
 
     await expect(
-      runOperation(db, 'audit.undo', { id: entry.id }, asRun())
+      runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun())
     ).rejects.toMatchObject({
       status: 409,
       detail: { references: [{ kind: 'user', id: other.id }] }
@@ -708,7 +685,7 @@ describe('audit.undo of an entry it cannot replay', () => {
 describe('audit.undo of an opening-hours change', () => {
   it('restores the schedule the previous set replaced', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const first = (await runOperation(
       db,
       'hours.set',
@@ -717,7 +694,7 @@ describe('audit.undo of an opening-hours change', () => {
         closedTarget: { kind: 'external', external: '+491111111' },
         intervals: [{ weekday: 1, opens: '09:00', closes: '17:00' }]
       },
-      asRun()
+      asConfirmedRun()
     )) as HoursWire;
     await runOperation(
       db,
@@ -728,17 +705,17 @@ describe('audit.undo of an opening-hours change', () => {
         closedTarget: { kind: 'external', external: '+492222222' },
         intervals: [{ weekday: 2, opens: '10:00', closes: '12:00' }]
       },
-      asRun()
+      asConfirmedRun()
     );
     const entry = await latestAuditEntry(db, first.id);
 
-    await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+    await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 
     const read = (await runOperation(
       db,
       'hours.get',
       { scope: { kind: 'tenant' } },
-      asRun()
+      asConfirmedRun()
     )) as { schedule: HoursWire | null };
     expect(read.schedule).toMatchObject({
       active: true,
@@ -749,7 +726,7 @@ describe('audit.undo of an opening-hours change', () => {
 
   it('removes the schedule when undoing the entry that first set it', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const set = (await runOperation(
       db,
       'hours.set',
@@ -758,17 +735,17 @@ describe('audit.undo of an opening-hours change', () => {
         closedTarget: { kind: 'external', external: '+491111111' },
         intervals: [{ weekday: 1, opens: '09:00', closes: '17:00' }]
       },
-      asRun()
+      asConfirmedRun()
     )) as HoursWire;
     const entry = await latestAuditEntry(db, set.id);
 
-    await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+    await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 
     const read = (await runOperation(
       db,
       'hours.get',
       { scope: { kind: 'tenant' } },
-      asRun()
+      asConfirmedRun()
     )) as { schedule: HoursWire | null };
     expect(read.schedule).toBeNull();
   });

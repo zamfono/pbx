@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '#lib/server/testDb.js';
+import {
+  asConfirmedRun,
+  makeTestDb,
+  seedSettings
+} from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
-import { type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
 
 import '../devices/index.js';
 import '../menus/index.js';
@@ -13,51 +16,12 @@ import '../ringGroups/index.js';
 import '../users/index.js';
 import './index.js';
 
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-process.env.FQDN ??= 'pbx.example.test';
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return {
-    actor: owner,
-    channel: 'rest',
-    requestId: 'req-1',
-    confirm: true,
-    ...overrides
-  };
-}
-
-/** Seeds the tenant `settings` singleton, required by extension assignment. */
-async function seedTenant(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId
-    })
-    .execute();
-}
-
 async function createUser(db: Db, name: string, ext: string): Promise<string> {
   const result = (await runOperation(
     db,
     'users.create',
     { name, email: `${name.toLowerCase()}@x.test`, extension: ext },
-    asRun()
+    asConfirmedRun()
   )) as { user: { id: string } };
   return result.user.id;
 }
@@ -75,7 +39,7 @@ async function undoLatest(
     .where('entityId', '=', entityId)
     .orderBy('id', 'desc')
     .executeTakeFirstOrThrow();
-  await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+  await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 }
 
 function external(number: string): { kind: 'external'; external: string } {
@@ -85,20 +49,20 @@ function external(number: string): { kind: 'external'; external: string } {
 describe('audit.undo of a whole-list replace', () => {
   it("restores a user's forwarding rules", async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const anna = await createUser(db, 'Anna', '101');
     const first = [{ condition: 'unconditional', target: external('+4911') }];
     await runOperation(
       db,
       'users.setForwarding',
       { id: anna, rules: first },
-      asRun()
+      asConfirmedRun()
     );
     await runOperation(
       db,
       'users.setForwarding',
       { id: anna, rules: [{ condition: 'busy', target: external('+4922') }] },
-      asRun()
+      asConfirmedRun()
     );
 
     await undoLatest(db, 'users.setForwarding', anna);
@@ -114,12 +78,12 @@ describe('audit.undo of a whole-list replace', () => {
 
   it("restores a ring group's forwarding rules", async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Support', strategy: 'simultaneous' },
-      asRun()
+      asConfirmedRun()
     )) as { id: string };
     await runOperation(
       db,
@@ -128,13 +92,13 @@ describe('audit.undo of a whole-list replace', () => {
         id: group.id,
         rules: [{ condition: 'unanswered', target: external('+4911') }]
       },
-      asRun()
+      asConfirmedRun()
     );
     await runOperation(
       db,
       'ringGroups.setForwarding',
       { id: group.id, rules: [] },
-      asRun()
+      asConfirmedRun()
     );
 
     await undoLatest(db, 'ringGroups.setForwarding', group.id);
@@ -150,7 +114,7 @@ describe('audit.undo of a whole-list replace', () => {
 
   it("restores a menu's DTMF map", async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const audioId = newId();
     await db
       .insertInto('audioAssets')
@@ -166,20 +130,20 @@ describe('audit.undo of a whole-list replace', () => {
       db,
       'menus.create',
       { name: 'Main menu', audioId, fallbackTarget: external('+4900') },
-      asRun()
+      asConfirmedRun()
     )) as { id: string };
     const first = [{ digits: '1', target: external('+4911') }];
     await runOperation(
       db,
       'menus.setTargets',
       { id: menu.id, targets: first },
-      asRun()
+      asConfirmedRun()
     );
     await runOperation(
       db,
       'menus.setTargets',
       { id: menu.id, targets: [{ digits: '2', target: external('+4922') }] },
-      asRun()
+      asConfirmedRun()
     );
 
     await undoLatest(db, 'menus.setTargets', menu.id);
@@ -188,29 +152,34 @@ describe('audit.undo of a whole-list replace', () => {
       db,
       'menus.get',
       { id: menu.id },
-      asRun()
+      asConfirmedRun()
     )) as { targets: unknown[] };
     expect(read.targets).toEqual(first);
   });
 
   it("restores a ringotel device's BLF panel", async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const anna = await createUser(db, 'Anna', '101');
     await createUser(db, 'Ben', '102');
     const device = (await runOperation(
       db,
       'devices.create',
       { userId: anna, label: 'App', kind: 'ringotel' },
-      asRun()
+      asConfirmedRun()
     )) as { device: { id: string } };
     const { id } = device.device;
-    await runOperation(db, 'devices.setBlf', { id, keys: ['102'] }, asRun());
+    await runOperation(
+      db,
+      'devices.setBlf',
+      { id, keys: ['102'] },
+      asConfirmedRun()
+    );
     await runOperation(
       db,
       'devices.setBlf',
       { id, keys: ['101', '102'] },
-      asRun()
+      asConfirmedRun()
     );
 
     await undoLatest(db, 'devices.setBlf', id);
@@ -219,7 +188,7 @@ describe('audit.undo of a whole-list replace', () => {
       db,
       'devices.getBlf',
       { id },
-      asRun()
+      asConfirmedRun()
     )) as { keys: string[] };
     expect(read.keys).toEqual(['102']);
   });

@@ -1,56 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '#lib/server/testDb.js';
+import {
+  asConfirmedRun,
+  makeTestDb,
+  seedSettings
+} from '#lib/server/testDb.js';
 
 import type { MailTemplateWire } from '../mailTemplates/_shared.js';
-import { runOperation, type RunInput } from '../runner.js';
-import { type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
 
 import '../devices/index.js';
 import '../mailTemplates/index.js';
 import '../users/index.js';
 import './index.js';
-
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-process.env.FQDN ??= 'pbx.example.test';
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return {
-    actor: owner,
-    channel: 'rest',
-    requestId: 'req-1',
-    confirm: true,
-    ...overrides
-  };
-}
-
-/** Seeds the tenant `settings` singleton, required by extension assignment and test sends. */
-async function seedTenant(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId
-    })
-    .execute();
-}
 
 /** The latest `operation` entry, the one an undo of that operation reverts. */
 async function latestEntry(db: Db, operation: string): Promise<string> {
@@ -64,7 +28,7 @@ async function latestEntry(db: Db, operation: string): Promise<string> {
 }
 
 async function undo(db: Db, id: string): Promise<void> {
-  await runOperation(db, 'audit.undo', { id }, asRun());
+  await runOperation(db, 'audit.undo', { id }, asConfirmedRun());
 }
 
 const RESET_EN = { kind: 'reset', language: 'en' } as const;
@@ -74,7 +38,7 @@ async function putResetTemplate(db: Db, subject: string): Promise<void> {
     db,
     'mailTemplates.put',
     { ...RESET_EN, subject, bodyText: 'Use {{link}}.', bodyHtml: null },
-    asRun()
+    asConfirmedRun()
   );
 }
 
@@ -84,19 +48,19 @@ async function relabelledDevice(db: Db): Promise<string> {
     db,
     'users.create',
     { name: 'Anna Huber', email: 'anna@x.test', extension: '101' },
-    asRun()
+    asConfirmedRun()
   )) as { user: { id: string } };
   const { device } = (await runOperation(
     db,
     'devices.create',
     { userId: user.id, label: 'Desk phone', kind: 'manual' },
-    asRun()
+    asConfirmedRun()
   )) as { device: { id: string } };
   await runOperation(
     db,
     'devices.update',
     { id: device.id, label: 'Reception' },
-    asRun()
+    asConfirmedRun()
   );
   return device.id;
 }
@@ -113,10 +77,15 @@ async function deviceLabel(db: Db, id: string): Promise<string | null> {
 describe('audit.undo past pure actions (§5.8)', () => {
   it('undoes a template put that a later test send followed', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     await putResetTemplate(db, 'Reset your password');
     const put = await latestEntry(db, 'mailTemplates.put');
-    await runOperation(db, 'mailTemplates.test', { kind: 'reset' }, asRun());
+    await runOperation(
+      db,
+      'mailTemplates.test',
+      { kind: 'reset' },
+      asConfirmedRun()
+    );
 
     await undo(db, put);
 
@@ -124,17 +93,22 @@ describe('audit.undo past pure actions (§5.8)', () => {
       db,
       'mailTemplates.get',
       RESET_EN,
-      asRun()
+      asConfirmedRun()
     )) as MailTemplateWire;
     expect(read.source).toBe('builtin');
   });
 
   it('still refuses behind a later put, naming it and not the test send', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     await putResetTemplate(db, 'First');
     const first = await latestEntry(db, 'mailTemplates.put');
-    await runOperation(db, 'mailTemplates.test', { kind: 'reset' }, asRun());
+    await runOperation(
+      db,
+      'mailTemplates.test',
+      { kind: 'reset' },
+      asConfirmedRun()
+    );
     await putResetTemplate(db, 'Second');
     const second = await latestEntry(db, 'mailTemplates.put');
 
@@ -146,14 +120,14 @@ describe('audit.undo past pure actions (§5.8)', () => {
 
   it('undoes a device change that a later credential reveal followed', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const deviceId = await relabelledDevice(db);
     const update = await latestEntry(db, 'devices.update');
     await runOperation(
       db,
       'devices.revealCredentials',
       { id: deviceId },
-      asRun()
+      asConfirmedRun()
     );
 
     await undo(db, update);
@@ -163,21 +137,26 @@ describe('audit.undo past pure actions (§5.8)', () => {
 
   it('undoes a user change that a later password-reset mail followed', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const { user } = (await runOperation(
       db,
       'users.create',
       { name: 'Anna Huber', email: 'anna@x.test', extension: '101' },
-      asRun()
+      asConfirmedRun()
     )) as { user: { id: string } };
     await runOperation(
       db,
       'users.update',
       { id: user.id, name: 'Anna Berger' },
-      asRun()
+      asConfirmedRun()
     );
     const update = await latestEntry(db, 'users.update');
-    await runOperation(db, 'users.resetPassword', { id: user.id }, asRun());
+    await runOperation(
+      db,
+      'users.resetPassword',
+      { id: user.id },
+      asConfirmedRun()
+    );
 
     await undo(db, update);
 
@@ -191,10 +170,15 @@ describe('audit.undo past pure actions (§5.8)', () => {
 
   it('still refuses behind a later secret rotation, a non-undoable change', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const deviceId = await relabelledDevice(db);
     const update = await latestEntry(db, 'devices.update');
-    await runOperation(db, 'devices.rotate', { id: deviceId }, asRun());
+    await runOperation(
+      db,
+      'devices.rotate',
+      { id: deviceId },
+      asConfirmedRun()
+    );
     const rotate = await latestEntry(db, 'devices.rotate');
 
     await expect(undo(db, update)).rejects.toMatchObject({

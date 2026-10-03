@@ -1,21 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { makeTestDb } from '#lib/server/testDb.js';
+import { asRun, makeTestDb } from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
-import { type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
 import type { WebhookWire } from './_shared.js';
 
 import './index.js';
-
-// webhooks.create/update encrypt `secret` via secretbox (§5.4), which needs a key.
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
 
 describe('webhooks', () => {
   it('creates a webhook inactive, never returning the secret', async () => {

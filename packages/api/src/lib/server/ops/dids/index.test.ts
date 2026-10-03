@@ -2,18 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
-import { Conflict, type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
+import { Conflict } from '../types.js';
 
 import './index.js';
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
 
 /** Inserts a live `dids` row targeting an external number, returning its id. */
 async function insertDid(db: Db, number: string): Promise<string> {
@@ -39,25 +33,10 @@ async function insertDid(db: Db, number: string): Promise<string> {
   return id;
 }
 
-/** Seeds the tenant `settings` singleton with `mainDidId`, required by every DID operation. */
-async function seedTenant(db: Db, mainDidId: string): Promise<void> {
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId
-    })
-    .execute();
-}
-
 describe('dids', () => {
   it('create normalizes a national number to e164 with the tenant country', async () => {
     const db = await makeTestDb();
-    const mainDidId = await insertDid(db, '+490000000');
-    await seedTenant(db, mainDidId);
+    await seedSettings(db);
     const created = (await runOperation(
       db,
       'dids.create',
@@ -75,8 +54,7 @@ describe('dids', () => {
 
   it('does not set a verbatim (non-numeric) DID as a user caller-ID', async () => {
     const db = await makeTestDb();
-    const mainDidId = await insertDid(db, '+490000000');
-    await seedTenant(db, mainDidId);
+    await seedSettings(db);
     const created = (await runOperation(
       db,
       'dids.create',
@@ -94,8 +72,7 @@ describe('dids', () => {
 
   it('refuses whitespace in a DID number', async () => {
     const db = await makeTestDb();
-    const mainDidId = await insertDid(db, '+490000000');
-    await seedTenant(db, mainDidId);
+    await seedSettings(db);
     await expect(
       runOperation(
         db,
@@ -108,8 +85,7 @@ describe('dids', () => {
 
   it('refuses a duplicate live DID number as a conflict', async () => {
     const db = await makeTestDb();
-    const mainDidId = await insertDid(db, '+490000000');
-    await seedTenant(db, mainDidId);
+    await seedSettings(db);
     await insertDid(db, '+4930000009');
     await expect(
       runOperation(
@@ -123,8 +99,7 @@ describe('dids', () => {
 
   it('refuses to delete a DID a live user presents as caller-ID', async () => {
     const db = await makeTestDb();
-    const mainDidId = await insertDid(db, '+490000000');
-    await seedTenant(db, mainDidId);
+    await seedSettings(db);
     const presentedId = await insertDid(db, '+4930000001');
     await db
       .updateTable('users')
@@ -143,8 +118,7 @@ describe('dids', () => {
 
   it('refuses to delete the tenant main number', async () => {
     const db = await makeTestDb();
-    const mainDidId = await insertDid(db, '+490000000');
-    await seedTenant(db, mainDidId);
+    const mainDidId = await seedSettings(db);
     await expect(
       runOperation(
         db,
@@ -156,8 +130,7 @@ describe('dids', () => {
   });
   it('refuses a target whose external number is not E.164', async () => {
     const db = await makeTestDb();
-    const mainDidId = await insertDid(db, '+490000000');
-    await seedTenant(db, mainDidId);
+    await seedSettings(db);
     await expect(
       runOperation(
         db,
@@ -173,8 +146,7 @@ describe('dids', () => {
 
   it('refuses a target pointing at a soft-deleted user', async () => {
     const db = await makeTestDb();
-    const mainDidId = await insertDid(db, '+490000000');
-    await seedTenant(db, mainDidId);
+    await seedSettings(db);
     await db
       .updateTable('users')
       .set({ deletedAt: nowIso() })

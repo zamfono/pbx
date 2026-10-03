@@ -6,6 +6,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { sealTargetSecret } from '../ops/backups/_secret.js';
 import { keyringFromEnv, type Keyring } from '../secretbox.js';
+import { seedSettings } from '../testDb.js';
 import type { Bus } from './backup.js';
 import type { ExecFn } from './backupBackends.js';
 import { queueRun, scheduleBackups } from './cron.js';
@@ -25,36 +26,6 @@ async function migratedDb(): Promise<Db> {
   const db = openDb(':memory:');
   await migrateForTest(db);
   return db;
-}
-
-/** The tenant `settings` singleton the schedule loop reads `backup_cron` from. */
-async function seedTenant(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({
-      id: didId,
-      number: '+490000000',
-      label: null,
-      targetId,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId
-    })
-    .execute();
 }
 
 async function insertTarget(db: Db, kr: Keyring): Promise<string> {
@@ -157,7 +128,7 @@ async function waitForRun(db: Db, runId: string): Promise<string> {
 describe('scheduleBackups: the manual runs handed over', () => {
   it('executes a run backups.runs.start hands over', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const kr = testKeyring();
     const targetId = await insertTarget(db, kr);
     const { bus, published } = fakeBus();
@@ -187,7 +158,7 @@ describe('scheduleBackups: the manual runs handed over', () => {
 
   it('fails a queued run whose target has been deleted', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const kr = testKeyring();
     const targetId = await insertTarget(db, kr);
     await db
@@ -217,7 +188,7 @@ describe('scheduleBackups: the manual runs handed over', () => {
 
   it('runs a handed-over run once', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const kr = testKeyring();
     const targetId = await insertTarget(db, kr);
     const { bus, published } = fakeBus();
@@ -238,7 +209,7 @@ describe('scheduleBackups: the manual runs handed over', () => {
 
   it('leaves a run an earlier process left behind to the boot sweep', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const kr = testKeyring();
     const targetId = await insertTarget(db, kr);
     const staleRunId = await insertRun(
@@ -269,7 +240,7 @@ describe('scheduleBackups: the manual runs handed over', () => {
 
   it('takes no run once stopped, and none without a scheduler', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const kr = testKeyring();
     const targetId = await insertTarget(db, kr);
     const { bus } = fakeBus();

@@ -21,6 +21,7 @@ import { tokenEndpoint } from '#lib/server/auth/tokenEndpoint.js';
 import { getDb } from '#lib/server/db.js';
 import { accountLockedUntil } from '#lib/server/ops/users/_accountLock.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
+import { seedSettings } from '#lib/server/testDb.js';
 
 import { load } from './+page.server.js';
 import { approveConsentSubmit, denyConsentSubmit } from './consentSubmit.js';
@@ -63,30 +64,8 @@ async function seedUser(db: Db, email: string): Promise<string> {
 beforeAll(async () => {
   const db = getDb();
   await migrateForTest(db);
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: 'ft1', userId: await seedUser(db, 'owner@example.com') })
-    .execute();
-  await db
-    .insertInto('dids')
-    .values({
-      id: 'did1',
-      number: '+491234567',
-      targetId: 'ft1',
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Acme',
-      mainDidId: 'did1',
-      country: 'DE',
-      language: 'en',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
+  await seedUser(db, 'owner@example.com');
+  await seedSettings(db, { companyName: 'Acme', language: 'en' });
 });
 
 /** An in-memory `event.cookies` a test can share across two calls (login, then approve/deny), the

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_SIP_HEADERS, type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '#lib/server/testDb.js';
+import { makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
 import type { Actor } from '../types.js';
 import {
@@ -10,7 +10,6 @@ import {
   createTrunk,
   createUser,
   getForwarding,
-  seedTenant,
   setForwarding,
   storedConditions,
   storedTargetIds,
@@ -21,7 +20,8 @@ type Fixture = { db: Db; anna: Actor; sipRule: Rule };
 
 /** Anna, with an admin-set `noAnswer` rule to a `sip` target and a `busy` rule of her own. */
 async function withAdminSipRule(): Promise<Fixture> {
-  const db = await seedTenant(await makeTestDb());
+  const db = await makeTestDb();
+  await seedSettings(db);
   const anna = await createUser(db, 'Anna Huber', '101');
   const trunkId = await createTrunk(db);
   const sipRule: Rule = {
@@ -97,7 +97,8 @@ describe('users.setForwarding, an admin-set sip rule', () => {
   });
 
   it('keeps a sip rule sent without headers when it holds the defaults, as the wire returns it', async () => {
-    const db = await seedTenant(await makeTestDb());
+    const db = await makeTestDb();
+    await seedSettings(db);
     const anna = await createUser(db, 'Anna Huber', '101');
     const trunkId = await createTrunk(db);
     const bare: Rule = {

@@ -1,56 +1,32 @@
 import * as privateEnv from '$app/env/private';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { type Db } from '@zamfono/shared';
 
 import { installRingotelFake } from '#lib/server/provisioning/ringotelFake.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import { makeTestDb } from '#lib/server/testDb.js';
+import {
+  asConfirmedRun,
+  makeTestDb,
+  seedSettings
+} from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
-import { type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
 
 import '../devices/index.js';
 import '../users/index.js';
 import './index.js';
 
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-process.env.FQDN ??= 'pbx.example.com';
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', confirm: true };
-}
-
 /** Seeds `settings` with a Ringotel API token, then runs the Ringotel setup. */
 async function seedRingotel(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId,
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
-    })
-    .execute();
+  await seedSettings(db, {
+    ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+  });
   await runOperation(
     db,
     'provisioning.ringotelSetup',
     { domain: 'testco', region: '3', packageid: 1 },
-    asRun()
+    asConfirmedRun()
   );
 }
 
@@ -63,7 +39,7 @@ async function createUser(
     db,
     'users.create',
     { name, email: `${name.toLowerCase()}@x.test`, extension },
-    asRun()
+    asConfirmedRun()
   )) as { user: { id: string } };
   return user.id;
 }
@@ -85,20 +61,20 @@ describe('the Ringotel roster push re-renders the per-user panels (§10.4)', () 
       db,
       'devices.create',
       { userId: bob, label: 'App', kind: 'ringotel' },
-      asRun()
+      asConfirmedRun()
     )) as { device: { id: string } };
     await runOperation(
       db,
       'devices.setBlf',
       { id: device.id, keys: ['101'] },
-      asRun()
+      asConfirmedRun()
     );
 
     await runOperation(
       db,
       'users.update',
       { id: anna, extension: '105', name: 'Anna Huber' },
-      asRun()
+      asConfirmedRun()
     );
 
     const bobRemote = ringotel.users.find(user => user.extension === '102');

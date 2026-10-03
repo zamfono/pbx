@@ -1,64 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { newId, nowIso } from '@zamfono/shared';
 
 import { propagateConfig } from '#lib/server/propagation.js';
-import { makeTestDb } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
-import { Conflict, type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
+import { Conflict } from '../types.js';
 
 import './index.js';
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
-
-/** Seeds the tenant `settings` singleton and its main DID, both required by extension assignment. */
-async function seedTenant(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({
-      id: targetId,
-      userId: null,
-      ringGroupId: null,
-      external: '+490000000',
-      mailboxUserId: null,
-      mailboxRingGroupId: null,
-      announcementAudioId: null,
-      menuId: null
-    })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({
-      id: didId,
-      number: '+490000000',
-      label: null,
-      targetId,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId
-    })
-    .execute();
-}
 
 describe('ringGroups', () => {
   it('create assigns the lowest free extension and propagates pjsip and dialplan', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     vi.mocked(propagateConfig).mockClear();
     const created = (await runOperation(
       db,
@@ -80,7 +35,7 @@ describe('ringGroups', () => {
 
   it('refuses to create a ring group whose name is already used by another live group', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     await runOperation(
       db,
       'ringGroups.create',
@@ -99,7 +54,7 @@ describe('ringGroups', () => {
 
   it('refuses a malformed external forwarding target with a validation error', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const group = (await runOperation(
       db,
       'ringGroups.create',
@@ -125,7 +80,7 @@ describe('ringGroups', () => {
 
   it('update replaces members as a whole and propagates pjsip', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const group = (await runOperation(
       db,
       'ringGroups.create',
@@ -154,7 +109,7 @@ describe('ringGroups', () => {
 
   it('update of a routing field alone tells core, without an Asterisk reload (§3.1, §7)', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const group = (await runOperation(
       db,
       'ringGroups.create',
@@ -177,7 +132,7 @@ describe('ringGroups', () => {
 
   it('reads without a since-soft-deleted member and updates unchanged without a 404', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const memberId = newId();
     await db
       .insertInto('users')
@@ -230,7 +185,7 @@ describe('ringGroups', () => {
 
   it('rejects an unknown field on create, setForwarding and delete (.strict())', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const createAttempt = runOperation(
       db,
       'ringGroups.create',
@@ -262,7 +217,7 @@ describe('ringGroups', () => {
 
   it('refuses to delete a ring group a DID still targets, with a Conflict listing it', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const group = (await runOperation(
       db,
       'ringGroups.create',
@@ -309,7 +264,7 @@ describe('ringGroups', () => {
 
   it('allows deleting a ring group whose own opening-hours schedule closes to its own mailbox', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const group = (await runOperation(
       db,
       'ringGroups.create',
@@ -353,7 +308,7 @@ describe('ringGroups', () => {
 
   it('delete records the removed extension and BLF keys in the audit diff', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const group = (await runOperation(
       db,
       'ringGroups.create',
@@ -416,7 +371,7 @@ describe('ringGroups', () => {
 
   it('setForwarding replaces the unanswered and unavailable rules as a whole', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const group = (await runOperation(
       db,
       'ringGroups.create',
@@ -454,7 +409,7 @@ describe('ringGroups', () => {
 
   it('setForwarding refuses two rules with the same condition, with a 422', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const group = (await runOperation(
       db,
       'ringGroups.create',
@@ -484,7 +439,7 @@ describe('ringGroups', () => {
 
   it('update refuses two members naming the same user, with a 422', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const group = (await runOperation(
       db,
       'ringGroups.create',
@@ -519,7 +474,7 @@ describe('ringGroups', () => {
 
   it('setForwarding refuses a soft-deleted ring group with a 404', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const group = (await runOperation(
       db,
       'ringGroups.create',
@@ -543,7 +498,7 @@ describe('ringGroups', () => {
 
   it('setForwarding refuses a rule targeting a soft-deleted ring group, with a 404', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const group = (await runOperation(
       db,
       'ringGroups.create',
@@ -587,7 +542,7 @@ describe('ringGroups', () => {
 
   it('setForwarding refuses a rule targeting an unknown user id, with a 404 rather than a raw DB error', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const group = (await runOperation(
       db,
       'ringGroups.create',
@@ -610,7 +565,7 @@ describe('ringGroups', () => {
 
   it('refuses to create a ring group with an unknown greeting audio id, with a 404', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const attempt = runOperation(
       db,
       'ringGroups.create',
@@ -626,7 +581,7 @@ describe('ringGroups', () => {
 
   it('refuses to create a ring group with an unknown member id, with a 404', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const attempt = runOperation(
       db,
       'ringGroups.create',
@@ -641,7 +596,7 @@ describe('ringGroups', () => {
   });
   it('sets a diagnostics override and gives it a 7-day expiry (§7)', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const group = (await runOperation(
       db,
       'ringGroups.create',
@@ -677,7 +632,7 @@ describe('ringGroups', () => {
 
   it('keeps an explicit override expiry and clears the override on null (§7)', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const group = (await runOperation(
       db,
       'ringGroups.create',

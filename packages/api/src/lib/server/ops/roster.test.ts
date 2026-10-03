@@ -1,57 +1,20 @@
 import * as privateEnv from '$app/env/private';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { type Db } from '@zamfono/shared';
 
 import {
   installRingotelFake,
   type RingotelFake
 } from '../provisioning/ringotelFake.js';
 import { encrypt, keyringFromEnv } from '../secretbox.js';
-import { makeTestDb } from '../testDb.js';
-import { runOperation, type RunInput } from './runner.js';
-import { type Actor } from './types.js';
+import { asConfirmedRun, makeTestDb, seedSettings } from '../testDb.js';
+import { runOperation } from './runner.js';
 
 import './audit/index.js';
 import './parking/index.js';
 import './ringGroups/index.js';
 import './users/index.js';
-
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-process.env.FQDN ??= 'pbx.example.test';
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', confirm: true };
-}
-
-/** Seeds `settings` already provisioned with Ringotel (`org-1`/`branch-1`, §10.4). */
-async function seedTenant(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId,
-      ringotelOrgId: 'org-1',
-      ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
-    })
-    .execute();
-}
 
 /** The branch's colleague roster as Ringotel last received it (§10.4 "Colleague presence"). */
 function roster(ringotel: RingotelFake): { number: string; title: string }[] {
@@ -69,7 +32,7 @@ async function undoLatest(db: Db, operation: string): Promise<void> {
     .where('undoneAt', 'is', null)
     .orderBy('createdAt', 'desc')
     .executeTakeFirstOrThrow();
-  await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+  await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 }
 
 const realFetch = globalThis.fetch;
@@ -81,18 +44,27 @@ afterEach(() => {
 describe('the Ringotel roster follows every user and extension change (§10.4)', () => {
   it('users.create, users.delete and its undo', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db, {
+      ringotelOrgId: 'org-1',
+      ringotelBranchId: 'branch-1',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const ringotel = installRingotelFake();
 
     const created = (await runOperation(
       db,
       'users.create',
       { name: 'Anna Huber', email: 'anna@x.test', extension: '101' },
-      asRun()
+      asConfirmedRun()
     )) as { user: { id: string } };
     expect(roster(ringotel)).toEqual([{ number: '101', title: 'Anna Huber' }]);
 
-    await runOperation(db, 'users.delete', { id: created.user.id }, asRun());
+    await runOperation(
+      db,
+      'users.delete',
+      { id: created.user.id },
+      asConfirmedRun()
+    );
     expect(roster(ringotel)).toEqual([]);
 
     await undoLatest(db, 'users.delete');
@@ -105,14 +77,18 @@ describe('the Ringotel roster follows every user and extension change (§10.4)',
 
   it('ringGroups.create, a rename, ringGroups.delete and its undo', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db, {
+      ringotelOrgId: 'org-1',
+      ringotelBranchId: 'branch-1',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const ringotel = installRingotelFake();
 
     const group = (await runOperation(
       db,
       'ringGroups.create',
       { name: 'Sales', strategy: 'simultaneous' },
-      asRun()
+      asConfirmedRun()
     )) as { id: string; ext: string };
     expect(roster(ringotel)).toEqual([{ number: group.ext, title: 'Sales' }]);
 
@@ -120,13 +96,18 @@ describe('the Ringotel roster follows every user and extension change (§10.4)',
       db,
       'ringGroups.update',
       { id: group.id, name: 'Sales DE' },
-      asRun()
+      asConfirmedRun()
     );
     expect(roster(ringotel)).toEqual([
       { number: group.ext, title: 'Sales DE' }
     ]);
 
-    await runOperation(db, 'ringGroups.delete', { id: group.id }, asRun());
+    await runOperation(
+      db,
+      'ringGroups.delete',
+      { id: group.id },
+      asConfirmedRun()
+    );
     expect(roster(ringotel)).toEqual([]);
 
     await undoLatest(db, 'ringGroups.delete');
@@ -137,10 +118,19 @@ describe('the Ringotel roster follows every user and extension change (§10.4)',
 
   it('parking.set moves the slots, which the roster leaves to callpark.slots', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db, {
+      ringotelOrgId: 'org-1',
+      ringotelBranchId: 'branch-1',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const ringotel = installRingotelFake();
 
-    await runOperation(db, 'parking.set', { slots: ['701', '702'] }, asRun());
+    await runOperation(
+      db,
+      'parking.set',
+      { slots: ['701', '702'] },
+      asConfirmedRun()
+    );
 
     // The branch `blfs` list is every user and group extension (§11.2 `device_blf_keys`).
     expect(roster(ringotel)).toEqual([]);

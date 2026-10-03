@@ -9,13 +9,12 @@ import {
   type RingotelFake
 } from '#lib/server/provisioning/ringotelFake.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import { makeTestDb } from '#lib/server/testDb.js';
+import { makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 
 import '../index.js';
 
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
 process.env.FQDN = 'pbx.example.com';
 
 const admin: RunInput = {
@@ -55,30 +54,12 @@ afterEach(() => {
 
 /** A stack set up with Ringotel (`org-1`, the fake's), and user 998 with an e-mail address. */
 async function seed(db: Db): Promise<string> {
-  const targetId = newId();
-  const didId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      language: 'de',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId,
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key'),
-      ringotelOrgId: 'org-1',
-      ringotelBranchId: 'branch-1'
-    })
-    .execute();
+  await seedSettings(db, {
+    language: 'de',
+    ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key'),
+    ringotelOrgId: 'org-1',
+    ringotelBranchId: 'branch-1'
+  });
   const userId = newId();
   await db
     .insertInto('users')

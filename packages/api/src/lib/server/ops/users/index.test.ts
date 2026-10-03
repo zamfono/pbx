@@ -8,15 +8,13 @@ import { sendMail } from '#lib/server/mail/index.js';
 import { propagateConfig } from '#lib/server/propagation.js';
 import { installRingotelFake } from '#lib/server/provisioning/ringotelFake.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import { makeTestDb } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
+import { runOperation } from '../runner.js';
 import { type Actor } from '../types.js';
 
 import '../devices/index.js';
 import './index.js';
-
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
 
 vi.mock('#lib/server/mail/index.js', async importOriginal => {
   const actual =
@@ -25,42 +23,6 @@ vi.mock('#lib/server/mail/index.js', async importOriginal => {
 });
 
 const sendMailMock = vi.mocked(sendMail);
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
-
-/** Seeds the tenant `settings` singleton, required by extension and phone-number checks. */
-async function seedTenant(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({
-      id: didId,
-      number: '+490000000',
-      label: null,
-      targetId,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId
-    })
-    .execute();
-}
 
 type CreateOutput = {
   user: { id: string; extension: string };
@@ -130,7 +92,7 @@ afterEach(() => {
 describe('users', () => {
   it('create assigns an extension row and returns a setup link', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const result = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     expect(result.user.extension).toBe('101');
     expect(result.setupLink).toContain('token=');
@@ -144,7 +106,7 @@ describe('users', () => {
 
   it('create sends the setup mail once committed, on the database outside the transaction', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const result = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     expect(sendMailMock).toHaveBeenCalledOnce();
     const [mailDb, , request] = sendMailMock.mock.calls[0] ?? [];
@@ -158,7 +120,7 @@ describe('users', () => {
 
   it('create sends no setup mail when its transaction rolls back', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     await enableRingotel(db);
     // Ringotel cannot be reached for the roster push, which rolls the new user back (§10.4).
     globalThis.fetch = () => Promise.reject(new Error('unreachable'));
@@ -170,7 +132,7 @@ describe('users', () => {
 
   it('resetPassword sends the reset mail once committed, on the database outside the transaction', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const created = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     sendMailMock.mockClear();
     const result = (await runOperation(
@@ -191,7 +153,7 @@ describe('users', () => {
 
   it('refuses a duplicate extension with 409', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     await expect(
       createUser(db, 'Ben Roth', 'ben@x.test', '101')
@@ -202,7 +164,7 @@ describe('users', () => {
 
   it('refuses an extension that is one of the tenant emergency numbers', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     // Dialling resolves an emergency number before any extension (§9.4 "Dial-plan resolution"),
     // so such a user would never be reachable on it.
     await expect(
@@ -212,7 +174,7 @@ describe('users', () => {
 
   it('refuses to delete a user another user still forwards to, listing that user', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const userA = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     const userB = await createUser(db, 'Ben Roth', 'ben@x.test', '102');
     await runOperation(
@@ -243,7 +205,7 @@ describe('users', () => {
 
   it('setForwarding records the replaced rules and targets, undoable', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const userA = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     const userB = await createUser(db, 'Ben Roth', 'ben@x.test', '102');
     await runOperation(
@@ -287,7 +249,7 @@ describe('users', () => {
 
   it('delete cascades devices, the extension and tokens, recording all three in the audit diff', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     const device = (await runOperation(
       db,
@@ -359,7 +321,7 @@ describe('users', () => {
 
   it('refuses a self-service update that carries an admin-only field, with 403', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(
       db,
       'Anna Huber',
@@ -379,7 +341,7 @@ describe('users', () => {
 
   it('extension change renames every device sip_username and returns them', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     const device = (await runOperation(
       db,
@@ -430,7 +392,7 @@ describe('users', () => {
 
   it('extension change moves the Ringotel user to the new extension and SIP username (§10.4)', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     await enableRingotel(db);
     const ringotel = installRingotelFake();
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
@@ -470,7 +432,7 @@ describe('users', () => {
 
   it('extension rename regenerates a device slug that would collide with another live device', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const userA = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     const userB = await createUser(db, 'Ben Roth', 'ben@x.test', '102');
     const deviceA = (await runOperation(
@@ -519,7 +481,7 @@ describe('users', () => {
 
   it('records boolean field changes as wire booleans, not storage 0/1', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     await runOperation(
       db,
@@ -548,7 +510,7 @@ describe('users', () => {
 
   it('refuses a calleridDidId that names no live DID, and accepts a live numeric one', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     await expect(
       runOperation(
@@ -574,7 +536,7 @@ describe('users', () => {
 
   it('refuses a calleridDidId naming a soft-deleted DID', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     const deletedDidId = newId();
     const targetId = newId();
@@ -605,7 +567,7 @@ describe('users', () => {
 
   it('refuses a mailboxAudioId that names no live audio asset', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     await expect(
       runOperation(
@@ -638,7 +600,7 @@ describe('users', () => {
 
   it('refuses a findMe leg whose number is not E.164', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     await expect(
       runOperation(
@@ -652,7 +614,7 @@ describe('users', () => {
 
   it('erases a non-owner and scrubs their name, email and findMe from the audit diff', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(
       db,
       'Anna Huber',
@@ -702,7 +664,7 @@ describe('users', () => {
 
   it("scrubs the external numbers of the user's forward rules from the audit diff", async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(
       db,
       'Anna Huber',
@@ -747,7 +709,7 @@ describe('users', () => {
   // §5.10: "The erase call is itself audited, content-masked, `undoable=0`."
   it("masks the erase call's own audit entry, cascade included", async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     await runOperation(
       db,
@@ -783,7 +745,7 @@ describe('users', () => {
 
   it('refuses to erase a user another user still forwards to, listing that user', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const userA = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     const userB = await createUser(db, 'Ben Roth', 'ben@x.test', '102');
     await runOperation(
@@ -814,7 +776,7 @@ describe('users', () => {
 
   it("refuses to erase the tenant's last live owner, with 409", async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const owningUser = await createUser(
       db,
       'Own Er',
@@ -851,7 +813,7 @@ describe('users', () => {
 
   it('setPresence writes no audit row', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     await runOperation(
       db,
@@ -875,7 +837,7 @@ describe('users', () => {
 
   it('renaming the person re-renders PJSIP, whose endpoints carry the name as caller ID (§9.3)', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     vi.mocked(propagateConfig).mockClear();
     await runOperation(
@@ -898,7 +860,7 @@ describe('users', () => {
 
   it("setPresence propagates, so core recomputes the user's presence (§3.1, §10.2)", async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     vi.mocked(propagateConfig).mockClear();
     await runOperation(
@@ -911,7 +873,7 @@ describe('users', () => {
   });
   it('delete frees the Ringotel user of a ringotel device (§10.4 lifecycle)', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     await enableRingotel(db);
     const calls = stubFetch({ getUsers: [{ id: 'ru-1', extension: '101' }] });
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
@@ -938,7 +900,7 @@ describe('users', () => {
 
   it('erase frees the Ringotel user of a ringotel device (§10.4 lifecycle)', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     await enableRingotel(db);
     const calls = stubFetch({ getUsers: [{ id: 'ru-2', extension: '101' }] });
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
@@ -965,7 +927,7 @@ describe('users', () => {
 
   it('the setup link points at the set-password page', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const result = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     expect(result.setupLink).toMatch(
       /^https:\/\/pbx\.test\/auth\/set-password\?token=/u
@@ -973,7 +935,7 @@ describe('users', () => {
   });
   it('a name change re-pushes the roster with the stored display name (§10.4)', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     await enableRingotel(db);
     const calls = stubFetch({ getUsers: [{ id: 'ru-1', extension: '105' }] });
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
@@ -1003,7 +965,7 @@ describe('users', () => {
 
   it('a rename without an extension change still re-pushes the roster (§10.4)', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     await enableRingotel(db);
     const calls = stubFetch({ getUsers: [{ id: 'ru-1', extension: '101' }] });
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
@@ -1032,7 +994,7 @@ describe('users', () => {
   });
   it("a soft-deleted user's own OOO rule leaves another user's delete free (§5.9)", async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const anna = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     const ben = await createUser(db, 'Ben Roth', 'ben@x.test', '102');
     const targetId = newId();
@@ -1075,7 +1037,7 @@ describe('users', () => {
 
   it("a soft-deleted user's own opening hours leave another user's delete free (§5.9)", async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const anna = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     const ben = await createUser(db, 'Ben Roth', 'ben@x.test', '102');
     const targetId = newId();
@@ -1117,7 +1079,7 @@ describe('users', () => {
   });
   it('carries an active account lock on the user record (§5.5)', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     const lockThreshold = 5;
     for (let attempt = 0; attempt < lockThreshold; attempt += 1) {
@@ -1143,7 +1105,7 @@ describe('users', () => {
 
   it('reports no lock on the user record while the account is unlocked (§5.5)', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
 
     const read = (await runOperation(
@@ -1157,7 +1119,7 @@ describe('users', () => {
   });
   it('sets a diagnostics override on a user and gives it a 7-day expiry (§7)', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
 
     const out = (await runOperation(
@@ -1178,7 +1140,7 @@ describe('users', () => {
 
   it('refuses a diagnostics override for a user actor, admin-only (§5.3)', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const user = await createUser(
       db,
       'Anna Huber',

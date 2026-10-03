@@ -1,62 +1,24 @@
 import * as privateEnv from '$app/env/private';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  MS_PER_DAY,
-  MS_PER_HOUR,
-  newId,
-  nowIso,
-  type Db
-} from '@zamfono/shared';
+import { MS_PER_DAY, MS_PER_HOUR, type Db } from '@zamfono/shared';
 
 import { propagateConfig } from '#lib/server/propagation.js';
 import { installRingotelFake } from '#lib/server/provisioning/ringotelFake.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import { makeTestDb } from '#lib/server/testDb.js';
+import {
+  asConfirmedRun,
+  makeTestDb,
+  seedSettings
+} from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
-import { type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
 
 import '../devices/index.js';
 import '../users/index.js';
 import './index.js';
 
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-process.env.FQDN ??= 'pbx.example.test';
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 const START = new Date('2026-06-01T12:00:00.000Z');
-
-function asRun(): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', confirm: true };
-}
-
-/** Seeds `settings` already provisioned with Ringotel (`org-1`/`branch-1`, §10.4). */
-async function seedTenant(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId,
-      ringotelOrgId: 'org-1',
-      ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
-    })
-    .execute();
-}
 
 /** A user at `extension` with one `ringotel` device, created through the real operations. */
 async function userWithRingotelDevice(
@@ -68,13 +30,13 @@ async function userWithRingotelDevice(
     db,
     'users.create',
     { name: `User ${extension}`, email, extension },
-    asRun()
+    asConfirmedRun()
   )) as { user: { id: string } };
   const device = (await runOperation(
     db,
     'devices.create',
     { userId: created.user.id, label: 'App', kind: 'ringotel' },
-    asRun()
+    asConfirmedRun()
   )) as { device: { id: string } };
   return { userId: created.user.id, deviceId: device.device.id };
 }
@@ -91,7 +53,12 @@ async function undoLatest(
     .where('undoneAt', 'is', null)
     .orderBy('createdAt', 'desc')
     .executeTakeFirstOrThrow();
-  return (await runOperation(db, 'audit.undo', { id: entry.id }, asRun())) as {
+  return (await runOperation(
+    db,
+    'audit.undo',
+    { id: entry.id },
+    asConfirmedRun()
+  )) as {
     warnings?: string[];
   };
 }
@@ -123,13 +90,17 @@ afterEach(() => {
 describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
   it('recovers the Ringotel user when a users.delete is undone within 24 hours', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db, {
+      ringotelOrgId: 'org-1',
+      ringotelBranchId: 'branch-1',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const ringotel = installRingotelFake();
     await userWithRingotelDevice(db, 'ben@x.test', '102');
     const { userId } = await userWithRingotelDevice(db, 'anna@x.test', '101');
     const remoteId = ringotel.users.find(user => user.extension === '101')?.id;
 
-    await runOperation(db, 'users.delete', { id: userId }, asRun());
+    await runOperation(db, 'users.delete', { id: userId }, asConfirmedRun());
     expect(ringotel.users.map(user => user.extension)).toEqual(['102']);
     advance(MS_PER_HOUR);
     const callsBeforeUndo = ringotel.calls.length;
@@ -149,11 +120,20 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
 
   it("recovers the tenant's only Ringotel user, with the organization's own domain", async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db, {
+      ringotelOrgId: 'org-1',
+      ringotelBranchId: 'branch-1',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const ringotel = installRingotelFake();
     const { deviceId } = await userWithRingotelDevice(db, 'anna@x.test', '101');
 
-    await runOperation(db, 'devices.delete', { id: deviceId }, asRun());
+    await runOperation(
+      db,
+      'devices.delete',
+      { id: deviceId },
+      asConfirmedRun()
+    );
     expect(ringotel.users).toEqual([]);
     advance(MS_PER_HOUR);
     await undoLatest(db, 'devices.delete');
@@ -167,12 +147,21 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
 
   it('creates a fresh Ringotel user when the deletion is undone after 24 hours', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db, {
+      ringotelOrgId: 'org-1',
+      ringotelBranchId: 'branch-1',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const ringotel = installRingotelFake();
     const { deviceId } = await userWithRingotelDevice(db, 'anna@x.test', '101');
     const remoteId = ringotel.users[0]?.id;
 
-    await runOperation(db, 'devices.delete', { id: deviceId }, asRun());
+    await runOperation(
+      db,
+      'devices.delete',
+      { id: deviceId },
+      asConfirmedRun()
+    );
     advance(MS_PER_DAY + MS_PER_HOUR);
     const callsBeforeUndo = ringotel.calls.length;
     await undoLatest(db, 'devices.delete');
@@ -189,15 +178,24 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
 
   it("creates, never recovers, a device added after its owner's deletion was undone", async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db, {
+      ringotelOrgId: 'org-1',
+      ringotelBranchId: 'branch-1',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const ringotel = installRingotelFake();
     const created = (await runOperation(
       db,
       'users.create',
       { name: 'Anna Huber', email: 'anna@x.test', extension: '101' },
-      asRun()
+      asConfirmedRun()
     )) as { user: { id: string } };
-    await runOperation(db, 'users.delete', { id: created.user.id }, asRun());
+    await runOperation(
+      db,
+      'users.delete',
+      { id: created.user.id },
+      asConfirmedRun()
+    );
     await undoLatest(db, 'users.delete');
     advance(MS_PER_HOUR);
 
@@ -205,7 +203,7 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
       db,
       'devices.create',
       { userId: created.user.id, label: 'App', kind: 'ringotel' },
-      asRun()
+      asConfirmedRun()
     );
 
     expect(ringotel.calls.map(call => call.method)).toContain('createUser');
@@ -213,10 +211,19 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
   });
   it('pushes the restored device once the undo propagated, auditing it as audit.undo', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db, {
+      ringotelOrgId: 'org-1',
+      ringotelBranchId: 'branch-1',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const ringotel = installRingotelFake();
     const { deviceId } = await userWithRingotelDevice(db, 'anna@x.test', '101');
-    await runOperation(db, 'devices.delete', { id: deviceId }, asRun());
+    await runOperation(
+      db,
+      'devices.delete',
+      { id: deviceId },
+      asConfirmedRun()
+    );
     advance(MS_PER_HOUR);
     propagated = false;
     const fakeFetch = globalThis.fetch;

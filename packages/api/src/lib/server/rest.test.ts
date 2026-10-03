@@ -11,10 +11,9 @@ import { getCoreClient } from './coreClient.js';
 import { stubCoreClient } from './coreClientStub.js';
 import { buildOpenApiDocument, type OpenApiDocument } from './openapi.js';
 import { registry } from './ops/registry.js';
-import { type Actor } from './ops/types.js';
 import { handleRest, type RestDeps } from './rest.js';
 import { routes } from './restRoutes.js';
-import { makeTestDb, seedTenantTimeZone } from './testDb.js';
+import { makeTestDb, owner, seedSettings } from './testDb.js';
 
 // The upload is the REST transport's to parse; transcoding it is `audio.create`'s own concern.
 vi.mock('./audio/store.js', () => ({
@@ -24,7 +23,6 @@ vi.mock('./audio/store.js', () => ({
   deleteAudioFile: vi.fn(async () => Promise.resolve())
 }));
 
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 const USER_IDS = ['u0', 'u1', 'u2', 'u3'];
 
 /** A fresh in-memory database per test, so the tests never share mutable state. */
@@ -153,7 +151,7 @@ describe('handleRest', () => {
     const deps = await testDeps();
     await seedUsers(deps.db);
     // Deleting a user re-pushes the provisioning roster, which reads the tenant settings.
-    await seedTenantTimeZone(deps.db, null);
+    await seedSettings(deps.db);
     const response = await rest(deps, '/users/u1', {
       method: 'DELETE',
       body: JSON.stringify({ confirm: true })

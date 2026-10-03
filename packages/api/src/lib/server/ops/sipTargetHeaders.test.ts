@@ -1,48 +1,14 @@
 /* eslint-disable no-template-curly-in-string -- a literal ${…} is what these tests send and expect back */
 import { describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '../testDb.js';
-import { runOperation, type RunInput } from './runner.js';
-import type { Actor } from './types.js';
+import { asRun, makeTestDb, seedSettings } from '../testDb.js';
+import { runOperation } from './runner.js';
 
 import './dids/index.js';
 import './trunks/index.js';
 import './users/index.js';
-
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1' };
-}
-
-/** Seeds the tenant `settings` singleton, which the DID operations read. */
-async function seedTenant(db: Db): Promise<Db> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId
-    })
-    .execute();
-  return db;
-}
 
 /** A trunk named `name` on `transport`, the first one taking the catch-all route. */
 async function createTrunk(
@@ -105,7 +71,8 @@ function nameHeader(name: string, copies: number): Header {
 // §9.4 "Header templates", §10.3 "Forward targets": a sip target's configurable headers.
 describe('sip target headers', () => {
   it('stores the headers given, none for an empty list, and returns them on reads', async () => {
-    const db = await seedTenant(await makeTestDb());
+    const db = await makeTestDb();
+    await seedSettings(db);
     const trunkId = await createTrunk(db, 'OpenAI', 'tls');
     const headers = [
       { name: 'X-Called', value: '{{calledExtension}}' },
@@ -122,7 +89,8 @@ describe('sip target headers', () => {
   });
 
   it('refuses bad names, duplicates, bad values and oversized headers with 422', async () => {
-    const db = await seedTenant(await makeTestDb());
+    const db = await makeTestDb();
+    await seedSettings(db);
     const trunkId = await createTrunk(db, 'OpenAI', 'tls');
     const refused: Header[][] = [
       [{ name: 'Diversion', value: 'a' }],
@@ -151,7 +119,8 @@ describe('sip target headers', () => {
   });
 
   it('limits the size, not the count', async () => {
-    const db = await seedTenant(await makeTestDb());
+    const db = await makeTestDb();
+    await seedSettings(db);
     const trunkId = await createTrunk(db, 'OpenAI', 'tls');
     // 7 × 266 = 1862 bytes, under 2048.
     await createDid(
@@ -171,7 +140,8 @@ describe('sip target headers', () => {
   });
 
   it('warns for headers too large for an INVITE over a UDP trunk, and writes them', async () => {
-    const db = await seedTenant(await makeTestDb());
+    const db = await makeTestDb();
+    await seedSettings(db);
     const udpId = await createTrunk(db, 'Carrier', 'udp');
     const tlsId = await createTrunk(db, 'OpenAI', 'tls');
     const large = [nameHeader('X-Caller-Name', 3)];

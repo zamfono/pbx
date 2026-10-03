@@ -1,10 +1,9 @@
 import process from 'node:process';
-import { sql } from 'kysely';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { stubCoreClient } from '#lib/server/coreClientStub.js';
-import { makeTestDb } from '#lib/server/testDb.js';
+import { makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 
@@ -143,18 +142,7 @@ describe('system.info', () => {
 
   it('reports whether automatic updates are on, why the last one failed and how often (§6.3)', async () => {
     const db = await makeTestDb();
-    await sql`PRAGMA foreign_keys = OFF`.execute(db);
-    await db
-      .insertInto('settings')
-      .values({
-        id: 1,
-        companyName: 'Test Co',
-        country: 'DE',
-        emergencyNumbersJson: '["112"]',
-        mainDidId: 'did-1',
-        autoUpdate: 1
-      })
-      .execute();
+    await seedSettings(db, { autoUpdate: 1 });
     const failed = {
       version: '0.1.2',
       reason: 'the backup to target t1 failed: no space left',
@@ -209,18 +197,7 @@ describe('system.info', () => {
 
   it('reports a tenant profile change that has not reached Ringotel yet (§10.4)', async () => {
     const db = await makeTestDb();
-    await sql`PRAGMA foreign_keys = OFF`.execute(db);
-    await db
-      .insertInto('settings')
-      .values({
-        id: 1,
-        companyName: 'Test Co',
-        country: 'DE',
-        emergencyNumbersJson: '["112"]',
-        mainDidId: 'did-1',
-        ringotelProfilePending: 1
-      })
-      .execute();
+    await seedSettings(db, { ringotelProfilePending: 1 });
 
     expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
       ringotel: { profilePending: true }

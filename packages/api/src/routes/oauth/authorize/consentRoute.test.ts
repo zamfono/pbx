@@ -12,6 +12,7 @@ import { CONSENT_COOKIE } from '#lib/server/auth/consent.js';
 import { setSealedCookie } from '#lib/server/auth/sealedCookie.js';
 import { getDb } from '#lib/server/db.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
+import { seedSettings } from '#lib/server/testDb.js';
 
 import { load } from './+page.server.js';
 import { approveConsentSubmit } from './consentSubmit.js';
@@ -48,30 +49,7 @@ beforeAll(async () => {
       createdAt: nowIso()
     })
     .execute();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: 'ft1', userId: 'user-1' })
-    .execute();
-  await db
-    .insertInto('dids')
-    .values({
-      id: 'did1',
-      number: '+491234567',
-      targetId: 'ft1',
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Acme',
-      mainDidId: 'did1',
-      country: 'DE',
-      language: 'en',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
+  await seedSettings(db, { companyName: 'Acme', language: 'en' });
 });
 
 /** An in-memory `event.cookies`, the way a browser carries `zamfono_consent` between requests. */

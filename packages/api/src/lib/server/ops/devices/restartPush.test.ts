@@ -9,14 +9,13 @@ import {
   type RingotelFake
 } from '#lib/server/provisioning/ringotelFake.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import { makeTestDb } from '#lib/server/testDb.js';
+import { makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 import { oweDevicePushesAtStart } from './_ringotelPush.js';
 
 import '../index.js';
 
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
 const kr = keyringFromEnv(privateEnv);
 
 const admin: RunInput = {
@@ -70,29 +69,11 @@ async function seedUser(db: Db, ext: string, device = true): Promise<string> {
  * in the `api` before this one.
  */
 async function seed(db: Db): Promise<RingotelFake> {
-  const targetId = newId();
-  const didId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId,
-      ringotelApiTokenEnc: encrypt(kr, 'ringotel-key'),
-      ringotelOrgId: 'org-1',
-      ringotelBranchId: 'branch-1'
-    })
-    .execute();
+  await seedSettings(db, {
+    ringotelApiTokenEnc: encrypt(kr, 'ringotel-key'),
+    ringotelOrgId: 'org-1',
+    ringotelBranchId: 'branch-1'
+  });
   await seedUser(db, '998');
   await seedUser(db, '997');
   const fake = installRingotelFake();

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '../testDb.js';
+import { makeTestDb, seedSettings } from '../testDb.js';
 import { nextMaintenanceMoment } from './reloadTiming.js';
 
 // A Wednesday.
@@ -25,41 +25,6 @@ async function insertForwardTarget(db: Db): Promise<string> {
     })
     .execute();
   return id;
-}
-
-async function insertDid(db: Db, targetId: string): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('dids')
-    .values({
-      id,
-      number: '+490000000',
-      label: null,
-      targetId,
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
-}
-
-async function seedSettings(
-  db: Db,
-  overrides: { timezone?: string; tlsReloadHour?: number } = {}
-): Promise<void> {
-  const targetId = await insertForwardTarget(db);
-  const mainDidId = await insertDid(db, targetId);
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId,
-      timezone: overrides.timezone ?? null,
-      tlsReloadHour: overrides.tlsReloadHour ?? null
-    })
-    .execute();
 }
 
 async function seedTenantOoo(

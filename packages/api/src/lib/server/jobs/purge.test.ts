@@ -13,30 +13,17 @@ import {
 } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { runOperation, type RunInput } from '../ops/runner.js';
-import { type Actor } from '../ops/types.js';
+import { runOperation } from '../ops/runner.js';
 import { runPurge } from './purge.js';
 
 import '../ops/ooo/index.js';
 import '../ops/users/index.js';
 
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-process.env.FQDN ??= 'pbx.example.test';
+import { asConfirmedRun, seedSettings } from '../testDb.js';
 
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 const DAYS_PAST_DEFAULT_RETENTION = 31;
 const DAYS_WITHIN_DEFAULT_RETENTION = 5;
 const BLOCK_DIGITS = 3;
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return {
-    actor: owner,
-    channel: 'rest',
-    requestId: 'req-1',
-    confirm: true,
-    ...overrides
-  };
-}
 
 function daysAfter(iso: string, days: number): string {
   return new Date(Date.parse(iso) + days * MS_PER_DAY).toISOString();
@@ -87,36 +74,6 @@ async function migratedDb(): Promise<Db> {
   const db = openDb(':memory:');
   await migrateForTest(db);
   return db;
-}
-
-/** Seeds the tenant `settings` singleton (default retention days), required by `runPurge`. */
-async function seedTenant(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({
-      id: didId,
-      number: '+490000000',
-      label: null,
-      targetId,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId
-    })
-    .execute();
 }
 
 /** A `did_blocks` row; `digits` NULL means "any number starting with `base`" (§5.9). */
@@ -173,7 +130,7 @@ async function createUser(db: Db, extension: string): Promise<string> {
     db,
     'users.create',
     { name: 'Anna Huber', email: `${extension}@x.test`, extension },
-    asRun()
+    asConfirmedRun()
   )) as { user: { id: string } };
   return result.user.id;
 }
@@ -181,7 +138,7 @@ async function createUser(db: Db, extension: string): Promise<string> {
 describe('runPurge', () => {
   it('purges a user whose own rule targets their own mailbox, with no FK error, and clears the orphaned target', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const userId = await createUser(db, '101');
     await runOperation(
       db,
@@ -190,14 +147,14 @@ describe('runPurge', () => {
         id: userId,
         rules: [{ condition: 'busy', target: { kind: 'mailboxUser', userId } }]
       },
-      asRun()
+      asConfirmedRun()
     );
     const rule = await db
       .selectFrom('userForwardRules')
       .select('targetId')
       .where('userId', '=', userId)
       .executeTakeFirstOrThrow();
-    await runOperation(db, 'users.delete', { id: userId }, asRun());
+    await runOperation(db, 'users.delete', { id: userId }, asConfirmedRun());
     const { deletedAt } = await db
       .selectFrom('users')
       .select('deletedAt')
@@ -233,7 +190,7 @@ describe('runPurge', () => {
 
   it('purges a soft-deleted DID whose target is a soft-deleted user, with no FK error', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const userId = await createUser(db, '105');
     const targetId = newId();
     await db
@@ -267,7 +224,7 @@ describe('runPurge', () => {
       .set({ deletedAt: nowIso() })
       .where('id', '=', didId)
       .execute();
-    await runOperation(db, 'users.delete', { id: userId }, asRun());
+    await runOperation(db, 'users.delete', { id: userId }, asConfirmedRun());
     const { deletedAt } = await db
       .selectFrom('users')
       .select('deletedAt')
@@ -303,7 +260,7 @@ describe('runPurge', () => {
 
   it('purges a soft-deleted DID whose target is a soft-deleted announcement asset, with no FK error', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const audioId = newId();
     await db
       .insertInto('audioAssets')
@@ -371,7 +328,7 @@ describe('runPurge', () => {
 
   it('purges a user whose own OOO rule targets their own mailbox, with no FK error', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const userId = await createUser(db, '104');
     await runOperation(
       db,
@@ -380,14 +337,14 @@ describe('runPurge', () => {
         scope: { kind: 'user', id: userId },
         target: { kind: 'mailboxUser', userId }
       },
-      asRun()
+      asConfirmedRun()
     );
     const rule = await db
       .selectFrom('oooRules')
       .select('targetId')
       .where('scopeUserId', '=', userId)
       .executeTakeFirstOrThrow();
-    await runOperation(db, 'users.delete', { id: userId }, asRun());
+    await runOperation(db, 'users.delete', { id: userId }, asConfirmedRun());
     const { deletedAt } = await db
       .selectFrom('users')
       .select('deletedAt')
@@ -423,9 +380,9 @@ describe('runPurge', () => {
 
   it('leaves a soft-deleted row younger than the retention window untouched', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const userId = await createUser(db, '102');
-    await runOperation(db, 'users.delete', { id: userId }, asRun());
+    await runOperation(db, 'users.delete', { id: userId }, asConfirmedRun());
     const before = await db
       .selectFrom('users')
       .select('deletedAt')
@@ -450,7 +407,7 @@ describe('runPurge', () => {
 
   it('purges expired tokens and audit_log entries beyond audit_retention_days', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const userId = await createUser(db, '103');
     const now = nowIso();
     await db
@@ -531,7 +488,7 @@ describe('runPurge', () => {
 
   it('purges backup_runs older than recording_retention_days and keeps the younger ones', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const now = nowIso();
     await db
       .updateTable('settings')
@@ -576,7 +533,7 @@ describe('runPurge', () => {
 
   it('purges an oauth_clients row only once its last token expired more than 30 days ago', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const userId = await createUser(db, '104');
     const now = nowIso();
     const clients = [
@@ -626,7 +583,7 @@ describe('runPurge', () => {
 
   it('keeps a client that kept refreshing until 30 days after its last token expired', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const userId = await createUser(db, '105');
     const now = nowIso();
     // Logged in once 120 days ago and refreshed ever since; a refresh never touches
@@ -651,7 +608,7 @@ describe('runPurge', () => {
 
   it('purges a client no token references, unless it was authorized within the code lifetime', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const now = nowIso();
     // Authorized a moment ago: its code may not have been redeemed for a token yet (§5.2).
     await insertClient(db, 'in-flight', now);
@@ -669,7 +626,7 @@ describe('runPurge', () => {
 
   it('keeps a due DID block that still holds a live DID, and purges the rest of the pass', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const now = nowIso();
     const deletedAt = daysAfter(now, -DAYS_PAST_DEFAULT_RETENTION);
     const heldBlockId = await insertDidBlock(db, '+4989', null, deletedAt);
@@ -687,7 +644,7 @@ describe('runPurge', () => {
 
   it('purges a due DID block whose only DIDs inside it are soft-deleted', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const now = nowIso();
     const deletedAt = daysAfter(now, -DAYS_PAST_DEFAULT_RETENTION);
     const blockId = await insertDidBlock(db, '+4989', null, deletedAt);
@@ -705,7 +662,7 @@ describe('runPurge', () => {
 
   it('keeps a due digits block only while a live DID matches its digit count', async () => {
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const now = nowIso();
     const deletedAt = daysAfter(now, -DAYS_PAST_DEFAULT_RETENTION);
     const blockId = await insertDidBlock(db, '+4989', BLOCK_DIGITS, deletedAt);
@@ -769,10 +726,15 @@ describe('runPurge: voicemail files', () => {
     await mkdir(path.join(mediaDir, 'voicemail'), { recursive: true });
     process.env.MEDIA_DIR = mediaDir;
     const db = await migratedDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const deletedUser = await createUser(db, '101');
     const liveUser = await createUser(db, '102');
-    await runOperation(db, 'users.delete', { id: deletedUser }, asRun());
+    await runOperation(
+      db,
+      'users.delete',
+      { id: deletedUser },
+      asConfirmedRun()
+    );
     const { deletedAt } = await db
       .selectFrom('users')
       .select('deletedAt')

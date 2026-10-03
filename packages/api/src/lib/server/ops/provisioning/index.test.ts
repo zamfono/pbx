@@ -2,7 +2,7 @@ import * as privateEnv from '$app/env/private';
 import { sql } from 'kysely';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { type Db } from '@zamfono/shared';
 
 import { installRingotelFake } from '#lib/server/provisioning/ringotelFake.js';
 import {
@@ -10,46 +10,20 @@ import {
   FAKE_REGIONS
 } from '#lib/server/provisioning/ringotelFakeHandlers.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import { makeTestDb } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
-import { type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
 
 import './index.js';
 
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
 process.env.FQDN = 'pbx.example.com';
 
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
-
 /** Seeds `settings` with a Ringotel API token and no organization/connection yet. */
-async function seedSettings(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      language: 'de',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId,
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
-    })
-    .execute();
+async function seedTenant(db: Db): Promise<void> {
+  await seedSettings(db, {
+    language: 'de',
+    ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+  });
   await db
     .insertInto('extensions')
     .values({ ext: '701', isParkingSlot: 1 })
@@ -89,7 +63,7 @@ afterEach(() => {
 describe('provisioning.ringotelSetup', () => {
   it('creates the organization then the connection, and stores both ids', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedTenant(db);
     const calls = stubFetch({
       createOrganization: { id: 'org-1' },
       createBranch: { id: 'branch-1' }
@@ -165,7 +139,7 @@ describe('provisioning.ringotelSetup', () => {
 
   it('records its entry non-undoable, since no operation writes the ids back', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedTenant(db);
     stubFetch({
       createOrganization: { id: 'org-1' },
       createBranch: { id: 'branch-1' }
@@ -188,7 +162,7 @@ describe('provisioning.ringotelSetup', () => {
 
   it('refuses a second run with 409, creating no second organization', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedTenant(db);
     const ringotel = installRingotelFake([]);
     const first = { domain: 'testco', region: '3', packageid: 1 };
     await runOperation(db, 'provisioning.ringotelSetup', first, asRun());
@@ -209,7 +183,7 @@ describe('provisioning.ringotelSetup', () => {
 
   it('is refused below owner', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedTenant(db);
     stubFetch({});
 
     await expect(
@@ -224,7 +198,7 @@ describe('provisioning.ringotelSetup', () => {
 
   it('deletes the organization again when the connection fails, so a retry succeeds', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedTenant(db);
     const ringotel = installRingotelFake([]);
     ringotel.failing.add('createBranch');
 
@@ -253,7 +227,7 @@ describe('provisioning.ringotelSetup', () => {
 
   it('deletes the organization again when the write after the connection fails', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedTenant(db);
     const ringotel = installRingotelFake([]);
     // The audit row is written after `run` returns, just before the commit.
     await sql`CREATE TRIGGER refuse_setup_audit BEFORE INSERT ON audit_log
@@ -289,7 +263,7 @@ describe('provisioning.ringotelSetup', () => {
 
   it('names the organization it could not delete after a failed connection', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedTenant(db);
     const ringotel = installRingotelFake([]);
     ringotel.failing.add('createBranch');
     ringotel.failing.add('deleteOrganization');

@@ -3,19 +3,14 @@ import { z } from 'zod';
 
 import { propagateConfig } from '#lib/server/propagation.js';
 
-import { makeTestDb } from '../testDb.js';
+import { asRun, makeTestDb, owner } from '../testDb.js';
 import { recordChange } from './audit.js';
 import { propagate } from './propagate.js';
 import { register } from './registry.js';
-import { runOperation, type RunInput } from './runner.js';
+import { runOperation } from './runner.js';
 import { ConfirmationRequired, defineOperation, type Actor } from './types.js';
 
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 const plainUser: Actor = { id: 'u1', name: 'A User', role: 'user' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
 
 describe('runOperation', () => {
   it('rejects input that fails the operation schema with a 422 OpError', async () => {

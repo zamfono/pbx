@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '#lib/server/testDb.js';
+import {
+  asConfirmedRun,
+  makeTestDb,
+  seedSettings
+} from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
-import { type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
 
 import '../devices/index.js';
 import '../mailTemplates/index.js';
@@ -14,45 +17,6 @@ import '../parking/index.js';
 import '../trunks/index.js';
 import '../users/index.js';
 import './index.js';
-
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-process.env.FQDN ??= 'pbx.example.test';
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return {
-    actor: owner,
-    channel: 'rest',
-    requestId: 'req-1',
-    confirm: true,
-    ...overrides
-  };
-}
-
-/** Seeds the tenant `settings` singleton, required by extension assignment. */
-async function seedTenant(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId
-    })
-    .execute();
-}
 
 /** The latest `operation` entry, the one an undo of that operation reverts. */
 async function latestEntry(db: Db, operation: string): Promise<string> {
@@ -67,7 +31,7 @@ async function latestEntry(db: Db, operation: string): Promise<string> {
 
 async function undoLatest(db: Db, operation: string): Promise<void> {
   const id = await latestEntry(db, operation);
-  await runOperation(db, 'audit.undo', { id }, asRun());
+  await runOperation(db, 'audit.undo', { id }, asConfirmedRun());
 }
 
 async function createTrunk(db: Db, name: string): Promise<string> {
@@ -80,7 +44,7 @@ async function createTrunk(db: Db, name: string): Promise<string> {
       authMode: 'ip',
       hosts: [{ host: 'sip.provider.example' }]
     },
-    asRun()
+    asConfirmedRun()
   )) as { trunk: { id: string } };
   return trunk.id;
 }
@@ -105,7 +69,7 @@ describe('audit.undo of a tenant-wide list replace', () => {
       db,
       'outboundRoutes.list',
       {},
-      asRun()
+      asConfirmedRun()
     )) as Routes;
     await runOperation(
       db,
@@ -120,7 +84,7 @@ describe('audit.undo of a tenant-wide list replace', () => {
           }
         ]
       },
-      asRun()
+      asConfirmedRun()
     );
 
     await undoLatest(db, 'outboundRoutes.replace');
@@ -129,7 +93,7 @@ describe('audit.undo of a tenant-wide list replace', () => {
       db,
       'outboundRoutes.list',
       {},
-      asRun()
+      asConfirmedRun()
     )) as Routes;
     expect(after.items).toEqual(before.items);
   });
@@ -142,7 +106,7 @@ describe('audit.undo of a tenant-wide list replace', () => {
       db,
       'trunks.setOrder',
       { trunkIds: [second, first] },
-      asRun()
+      asConfirmedRun()
     );
 
     await undoLatest(db, 'trunks.setOrder');
@@ -158,13 +122,13 @@ describe('audit.undo of a tenant-wide list replace', () => {
       db,
       'trunks.setOrder',
       { trunkIds: [second, first] },
-      asRun()
+      asConfirmedRun()
     );
     const third = await createTrunk(db, 'Provider C');
     const id = await latestEntry(db, 'trunks.setOrder');
 
     await expect(
-      runOperation(db, 'audit.undo', { id }, asRun())
+      runOperation(db, 'audit.undo', { id }, asConfirmedRun())
     ).rejects.toMatchObject({
       status: 409,
       references: [{ kind: 'trunk', id: third, label: 'Provider C' }]
@@ -176,31 +140,36 @@ describe('audit.undo of a tenant-wide list replace', () => {
 describe('audit.undo of a parking or mail-template change', () => {
   it('restores a removed parking slot and the BLF key its removal dropped', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
-    await runOperation(db, 'parking.set', { slots: ['701'] }, asRun());
+    await seedSettings(db);
+    await runOperation(db, 'parking.set', { slots: ['701'] }, asConfirmedRun());
     const { user } = (await runOperation(
       db,
       'users.create',
       { name: 'Anna', email: 'anna@x.test', extension: '101' },
-      asRun()
+      asConfirmedRun()
     )) as { user: { id: string } };
     const { device } = (await runOperation(
       db,
       'devices.create',
       { userId: user.id, label: 'App', kind: 'ringotel' },
-      asRun()
+      asConfirmedRun()
     )) as { device: { id: string } };
     await runOperation(
       db,
       'devices.setBlf',
       { id: device.id, keys: ['701'] },
-      asRun()
+      asConfirmedRun()
     );
-    await runOperation(db, 'parking.set', { slots: [] }, asRun());
+    await runOperation(db, 'parking.set', { slots: [] }, asConfirmedRun());
 
     await undoLatest(db, 'parking.set');
 
-    const slots = (await runOperation(db, 'parking.get', {}, asRun())) as {
+    const slots = (await runOperation(
+      db,
+      'parking.get',
+      {},
+      asConfirmedRun()
+    )) as {
       slots: string[];
     };
     expect(slots.slots).toEqual(['701']);
@@ -208,7 +177,7 @@ describe('audit.undo of a parking or mail-template change', () => {
       db,
       'devices.getBlf',
       { id: device.id },
-      asRun()
+      asConfirmedRun()
     )) as { keys: string[] };
     expect(blf.keys).toEqual(['701']);
   });
@@ -217,12 +186,17 @@ describe('audit.undo of a parking or mail-template change', () => {
     const db = await makeTestDb();
     const key = { kind: 'reset', language: 'en' };
     const first = { subject: 'First', bodyText: 'Reset: {{link}}' };
-    await runOperation(db, 'mailTemplates.put', { ...key, ...first }, asRun());
+    await runOperation(
+      db,
+      'mailTemplates.put',
+      { ...key, ...first },
+      asConfirmedRun()
+    );
     await runOperation(
       db,
       'mailTemplates.put',
       { ...key, subject: 'Second', bodyText: 'Again: {{link}}' },
-      asRun()
+      asConfirmedRun()
     );
 
     await undoLatest(db, 'mailTemplates.put');
@@ -230,7 +204,7 @@ describe('audit.undo of a parking or mail-template change', () => {
       db,
       'mailTemplates.get',
       key,
-      asRun()
+      asConfirmedRun()
     )) as { source: string };
     expect(restored).toMatchObject({ ...first, source: 'tenant' });
 
@@ -241,12 +215,12 @@ describe('audit.undo of a parking or mail-template change', () => {
       .where('operation', '=', 'mailTemplates.put')
       .where('undoneAt', 'is', null)
       .executeTakeFirstOrThrow();
-    await runOperation(db, 'audit.undo', { id: firstPut.id }, asRun());
+    await runOperation(db, 'audit.undo', { id: firstPut.id }, asConfirmedRun());
     const builtin = (await runOperation(
       db,
       'mailTemplates.get',
       key,
-      asRun()
+      asConfirmedRun()
     )) as { source: string };
     expect(builtin.source).toBe('builtin');
   });
@@ -259,9 +233,9 @@ describe('audit.undo of a parking or mail-template change', () => {
       db,
       'mailTemplates.put',
       { ...key, ...override },
-      asRun()
+      asConfirmedRun()
     );
-    await runOperation(db, 'mailTemplates.delete', key, asRun());
+    await runOperation(db, 'mailTemplates.delete', key, asConfirmedRun());
 
     await undoLatest(db, 'mailTemplates.delete');
 
@@ -269,7 +243,7 @@ describe('audit.undo of a parking or mail-template change', () => {
       db,
       'mailTemplates.get',
       key,
-      asRun()
+      asConfirmedRun()
     )) as { source: string };
     expect(read).toMatchObject({ ...override, source: 'tenant' });
   });

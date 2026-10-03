@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '../testDb.js';
+import { makeTestDb, seedSettings } from '../testDb.js';
 import { buildBranchProvision } from './branchProvision.js';
 import { createRingotelProvider } from './ringotel.js';
 import type { RingotelClient } from './ringotelClient.js';
@@ -37,29 +37,11 @@ function fakeClient(overrides: Record<string, unknown> = {}): {
 /** Seeds `settings` (already provisioned with Ringotel ids), one user with extension `101` and
  *  one parking slot at `701`. */
 async function seed(db: Db): Promise<{ userId: string }> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId,
-      ringotelOrgId: 'org-1',
-      ringotelBranchId: 'branch-1',
-      ringotelMaxRegs: 3
-    })
-    .execute();
+  await seedSettings(db, {
+    ringotelOrgId: 'org-1',
+    ringotelBranchId: 'branch-1',
+    ringotelMaxRegs: 3
+  });
   const userId = newId();
   await db
     .insertInto('users')

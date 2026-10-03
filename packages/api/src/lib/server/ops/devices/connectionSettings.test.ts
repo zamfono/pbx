@@ -2,17 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_FEATURE_CODES, newId, nowIso, type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '#lib/server/testDb.js';
+import { makeTestDb, owner, seedSettings } from '#lib/server/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
-import { type Actor } from '../types.js';
 import type { ConnectionSettings } from './_connectionSettings.js';
 
 import './index.js';
 
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 const run: RunInput = { actor: owner, channel: 'rest', requestId: 'req-1' };
 beforeEach(() => {
   vi.stubEnv('FQDN', 'pbx.example.com');
@@ -24,31 +20,13 @@ afterEach(() => {
 
 /** The `settings` singleton with non-default codecs and voicemail code, and user `Anna Huber` on 205. */
 async function seedUser(db: Db): Promise<string> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId,
-      codecsJson: '["g722","alaw"]',
-      featureCodesJson: JSON.stringify({
-        ...DEFAULT_FEATURE_CODES,
-        ownVoicemail: '*86'
-      })
+  await seedSettings(db, {
+    codecsJson: '["g722","alaw"]',
+    featureCodesJson: JSON.stringify({
+      ...DEFAULT_FEATURE_CODES,
+      ownVoicemail: '*86'
     })
-    .execute();
+  });
   const userId = newId();
   await db
     .insertInto('users')

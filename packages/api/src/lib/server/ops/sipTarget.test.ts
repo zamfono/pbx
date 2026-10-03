@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_SIP_HEADERS, newId, nowIso, type Db } from '@zamfono/shared';
+import { DEFAULT_SIP_HEADERS, nowIso, type Db } from '@zamfono/shared';
 
 import { runPurge } from '../jobs/purge.js';
-import { makeTestDb } from '../testDb.js';
-import { runOperation, type RunInput } from './runner.js';
+import { asRun, makeTestDb, seedSettings } from '../testDb.js';
+import { runOperation } from './runner.js';
 import type { Actor } from './types.js';
 
 import './dids/index.js';
@@ -13,40 +13,8 @@ import './ooo/index.js';
 import './trunks/index.js';
 import './users/index.js';
 
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 // The seeded user acting as a self-service `user` on their own scope, as `ooo`'s tests do.
 const self: Actor = { id: 'owner', name: 'Owner', role: 'user' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
-
-/** Seeds the tenant `settings` singleton, which the DID operations read, as `users`' tests do. */
-async function seedTenant(db: Db): Promise<Db> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId
-    })
-    .execute();
-  return db;
-}
 
 /** The OpenAI trunk, behind a carrier trunk that takes the catch-all route the first trunk gets
  * (§9.4 "Outbound routing"), so no route holds the one under test. */
@@ -101,7 +69,8 @@ async function deleteTrunk(db: Db, id: string): Promise<unknown> {
 // §9.4 "SIP targets", §10.3 "Forward targets", §11.2 `forward_targets`.
 describe('sip forward targets', () => {
   it('stores a sip target in its column pair and reads it back in the wire shape', async () => {
-    const db = await seedTenant(await makeTestDb());
+    const db = await makeTestDb();
+    await seedSettings(db);
     const trunkId = await createTrunk(db);
     const did = await createDid(db, sipTarget(trunkId));
     // A write without headers gets the defaults, which every read returns (§10.3).
@@ -129,7 +98,8 @@ describe('sip forward targets', () => {
   });
 
   it('refuses a user part outside the safe subset, and a trunk that is not live', async () => {
-    const db = await seedTenant(await makeTestDb());
+    const db = await makeTestDb();
+    await seedSettings(db);
     const trunkId = await createTrunk(db);
     for (const user of ['', 'a@b', 'a/b', 'a;b', 'a b', 'x'.repeat(65)]) {
       // eslint-disable-next-line no-await-in-loop -- each user part is refused on its own
@@ -147,7 +117,8 @@ describe('sip forward targets', () => {
   });
 
   it('lets an admin set a sip target on a user, and refuses a user who sets or keeps one', async () => {
-    const db = await seedTenant(await makeTestDb());
+    const db = await makeTestDb();
+    await seedSettings(db);
     const trunkId = await createTrunk(db);
     await runOperation(
       db,
@@ -213,7 +184,8 @@ describe('sip forward targets', () => {
   });
 
   it('refuses to delete a trunk a live sip target dials over, listing its owners, until retargeted', async () => {
-    const db = await seedTenant(await makeTestDb());
+    const db = await makeTestDb();
+    await seedSettings(db);
     const trunkId = await createTrunk(db);
     const did = await createDid(db, sipTarget(trunkId));
     await runOperation(
@@ -256,7 +228,8 @@ describe('sip forward targets', () => {
   });
 
   it('keeps a soft-deleted trunk from the purge while a soft-deleted owner’s sip target names it', async () => {
-    const db = await seedTenant(await makeTestDb());
+    const db = await makeTestDb();
+    await seedSettings(db);
     const trunkId = await createTrunk(db);
     await db
       .insertInto('users')

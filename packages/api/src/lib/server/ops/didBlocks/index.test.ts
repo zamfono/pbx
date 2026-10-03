@@ -2,18 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
-import { Conflict, type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
+import { Conflict } from '../types.js';
 
 import './index.js';
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
 
 /** Inserts a live `dids` row targeting an external number, returning its id. */
 async function insertLiveDid(db: Db, number: string): Promise<string> {
@@ -39,25 +33,10 @@ async function insertLiveDid(db: Db, number: string): Promise<string> {
   return id;
 }
 
-/** Seeds the tenant `settings` singleton, whose country normalizes a national block base. */
-async function seedTenant(db: Db): Promise<void> {
-  const mainDidId = await insertLiveDid(db, '+490000000');
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId
-    })
-    .execute();
-}
-
 describe('didBlocks', () => {
   it('creates, lists and updates a block', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const created = (await runOperation(
       db,
       'didBlocks.create',
@@ -79,7 +58,7 @@ describe('didBlocks', () => {
 
   it('refuses to change the immutable base', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const created = (await runOperation(
       db,
       'didBlocks.create',
@@ -98,7 +77,7 @@ describe('didBlocks', () => {
 
   it('refuses to delete a block with a live DID inside it', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const created = (await runOperation(
       db,
       'didBlocks.create',
@@ -118,7 +97,7 @@ describe('didBlocks', () => {
 
   it('the soft-delete guard trigger holds when the operation check is bypassed', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const created = (await runOperation(
       db,
       'didBlocks.create',
@@ -137,7 +116,7 @@ describe('didBlocks', () => {
 
   it('normalizes a national base to the international form', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const created = (await runOperation(
       db,
       'didBlocks.create',
@@ -149,7 +128,7 @@ describe('didBlocks', () => {
 
   it('refuses a base carrying whitespace', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     await expect(
       runOperation(db, 'didBlocks.create', { base: '+4989 12' }, asRun())
     ).rejects.toMatchObject({ status: 422 });
@@ -157,7 +136,7 @@ describe('didBlocks', () => {
 
   it('refuses a base carrying a GLOB metacharacter', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     await expect(
       runOperation(db, 'didBlocks.create', { base: '+4989*' }, asRun())
     ).rejects.toMatchObject({ status: 422 });

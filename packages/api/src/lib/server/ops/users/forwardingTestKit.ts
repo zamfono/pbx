@@ -1,6 +1,8 @@
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import type { Db } from '@zamfono/shared';
 
-import { runOperation, type RunInput } from '../runner.js';
+import { asRun, owner } from '#lib/server/testDb.js';
+
+import { runOperation } from '../runner.js';
 import type { Actor } from '../types.js';
 
 import '../audit/index.js';
@@ -8,44 +10,9 @@ import '../trunks/index.js';
 import './index.js';
 
 // Fixtures the forwarding tests share (`setForwarding.test.ts`, `setForwardingSip.test.ts`,
-// `getForwarding.test.ts`): a seeded tenant, `user`-role accounts, a trunk a `sip` target dials
+// `getForwarding.test.ts`): an `admin` actor, `user`-role accounts, a trunk a `sip` target dials
 // over, and the two operations called as a given actor. Importing it registers the operations.
-// A fixed 32-byte test key, as the other operations' tests set one.
-const SECRETBOX_KEY_BYTES = 32;
-const SECRETBOX_KEY_FILL = 7;
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(SECRETBOX_KEY_BYTES, SECRETBOX_KEY_FILL).toString('base64')}`;
-
-export const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 export const admin: Actor = { id: 'admin-1', name: 'Admin', role: 'admin' };
-
-export function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
-
-/** Seeds the tenant `settings` singleton, required by extension and phone-number checks. */
-export async function seedTenant(db: Db): Promise<Db> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId
-    })
-    .execute();
-  return db;
-}
 
 /** A `user`-role account, returned as the actor it signs in as. */
 export async function createUser(

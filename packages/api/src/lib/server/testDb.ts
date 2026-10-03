@@ -1,5 +1,23 @@
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
+import type { Insertable } from 'kysely';
+
+import { newId, nowIso, openDb, type DB, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
+
+import type { RunInput } from './ops/runner.js';
+import type { Actor } from './ops/types.js';
+
+/** The `owner` user `makeTestDb` seeds, as the actor operations run as. */
+export const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
+
+/** A run of an operation by `owner` over REST, with `overrides` on top. */
+export function asRun(overrides: Partial<RunInput> = {}): RunInput {
+  return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
+}
+
+/** `asRun` with the confirmation a confirm-gated operation asks for already given. */
+export function asConfirmedRun(overrides: Partial<RunInput> = {}): RunInput {
+  return asRun({ confirm: true, ...overrides });
+}
 
 /** An in-memory, migrated database seeded with one `owner` user, for operation tests. */
 export async function makeTestDb(): Promise<Db> {
@@ -8,10 +26,10 @@ export async function makeTestDb(): Promise<Db> {
   await db
     .insertInto('users')
     .values({
-      id: 'owner',
-      name: 'Owner',
+      id: owner.id,
+      name: owner.name,
       email: 'owner@x',
-      role: 'owner',
+      role: owner.role,
       passwordHash: 'x',
       createdAt: nowIso()
     })
@@ -19,31 +37,32 @@ export async function makeTestDb(): Promise<Db> {
   return db;
 }
 
-/** Adds the `settings` row, with a main DID, its clock in `timezone` (`null`: unset), for a test
- * that reads it. */
-export async function seedTenantTimeZone(
+/** Adds the tenant `settings` singleton, `settings` on top of a main DID `+490000000` that
+ * forwards to the same external number; returns the main DID's id. */
+export async function seedSettings(
   db: Db,
-  timezone: string | null
-): Promise<void> {
+  settings: Partial<Insertable<DB['settings']>> = {}
+): Promise<string> {
   const targetId = newId();
   await db
     .insertInto('forwardTargets')
-    .values({ id: targetId, userId: 'owner' })
+    .values({ id: targetId, external: '+490000000' })
     .execute();
   const didId = newId();
   await db
     .insertInto('dids')
-    .values({ id: didId, number: '+491234567', targetId, createdAt: nowIso() })
+    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
     .execute();
   await db
     .insertInto('settings')
     .values({
       id: 1,
-      companyName: 'Test',
-      mainDidId: didId,
+      companyName: 'Test Co',
       country: 'DE',
-      timezone,
-      emergencyNumbersJson: '["112"]'
+      emergencyNumbersJson: '["112"]',
+      mainDidId: didId,
+      ...settings
     })
     .execute();
+  return didId;
 }

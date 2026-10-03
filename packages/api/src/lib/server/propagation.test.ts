@@ -6,13 +6,13 @@ import * as privateEnv from '$app/env/private';
 import pino from 'pino';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { nowIso, type Db } from '@zamfono/shared';
 
 import { getCoreClient, type CoreClient } from './coreClient.js';
 import { stubCoreClient } from './coreClientStub.js';
 import { propagateAtBoot, propagateConfig } from './propagation.js';
 import { encrypt, keyringFromEnv, type Keyring } from './secretbox.js';
-import { makeTestDb } from './testDb.js';
+import { makeTestDb, seedSettings } from './testDb.js';
 
 const KEY_BYTE_LENGTH = 32;
 
@@ -36,44 +36,6 @@ afterEach(() => {
   delete process.env.ASTERISK_GEN_DIR;
   vi.mocked(getCoreClient).mockReset();
 });
-
-/** Inserts a live `dids` row targeting an external number, returning its id. */
-async function insertDid(db: Db, number: string): Promise<string> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({
-      id: targetId,
-      userId: null,
-      ringGroupId: null,
-      external: number,
-      mailboxUserId: null,
-      mailboxRingGroupId: null,
-      announcementAudioId: null,
-      menuId: null
-    })
-    .execute();
-  const id = newId();
-  await db
-    .insertInto('dids')
-    .values({ id, number, label: null, targetId, createdAt: nowIso() })
-    .execute();
-  return id;
-}
-
-async function seedSettings(db: Db): Promise<void> {
-  const mainDidId = await insertDid(db, '+490000000');
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId
-    })
-    .execute();
-}
 
 /** A user with a `1xx` extension and one manual device on it. */
 async function seedUserWithDevice(db: Db, kr: Keyring): Promise<void> {

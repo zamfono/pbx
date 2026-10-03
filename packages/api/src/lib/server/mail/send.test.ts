@@ -9,6 +9,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { voicemailAttachment } from '../audio/transcode.js';
 import { keyringFromEnv, type Keyring } from '../secretbox.js';
+import { seedSettings } from '../testDb.js';
 import { relayFromSettings } from './relay.js';
 import { sendMail, type SetupOrResetRequest } from './send.js';
 
@@ -43,23 +44,10 @@ function testKeyring(): Keyring {
   });
 }
 
-/** A migrated in-memory database with a settings row and a `main_did_id` it can reference. */
+/** A migrated in-memory database. */
 async function migratedDb(): Promise<Db> {
   const db = openDb(':memory:');
   await migrateForTest(db);
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: 'ft-main', external: '+491234567' })
-    .execute();
-  await db
-    .insertInto('dids')
-    .values({
-      id: 'did-main',
-      number: '+491234567',
-      targetId: 'ft-main',
-      createdAt: nowIso()
-    })
-    .execute();
   return db;
 }
 
@@ -68,18 +56,11 @@ async function insertSettings(
   db: Db,
   overrides: { smtpHost: string | null }
 ): Promise<void> {
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Acme',
-      mainDidId: 'did-main',
-      country: 'DE',
-      emergencyNumbersJson: '[]',
-      smtpHost: overrides.smtpHost,
-      mailFrom: overrides.smtpHost === null ? null : 'no-reply@example.test'
-    })
-    .execute();
+  await seedSettings(db, {
+    companyName: 'Acme',
+    smtpHost: overrides.smtpHost,
+    mailFrom: overrides.smtpHost === null ? null : 'no-reply@example.test'
+  });
 }
 
 async function insertUser(db: Db, id: string, email: string): Promise<void> {

@@ -7,10 +7,11 @@
  */
 import { vi } from 'vitest';
 
-// `FQDN`, which `src/env.ts` requires and `.env` always has (§6.3 "Environment"), and the
-// directories no suite may write to the host's real ones of; a suite that needs a particular
-// one, such as a media directory of its own, sets it.
+// `FQDN` and `SECRETBOX_KEY` (a fixed 32-byte test key), which `src/env.ts` requires and `.env`
+// always has (§6.3 "Environment"), and the directories no suite may write to the host's real
+// ones of; a suite that needs a particular one, such as a media directory of its own, sets it.
 process.env.FQDN ??= 'pbx.test';
+process.env.SECRETBOX_KEY ??= '1:BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=';
 process.env.MEDIA_DIR ??= '/nonexistent/media';
 process.env.ASTERISK_GEN_DIR ??= '/nonexistent/asterisk-gen';
 

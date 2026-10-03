@@ -2,18 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { newId } from '@zamfono/shared';
 
-import { makeTestDb, seedTenantTimeZone } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
-import { type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
 
 import './index.js';
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
 
 type SnapshotItem = {
   userId: string;
@@ -26,7 +19,7 @@ type SnapshotItem = {
 describe('presenceLog.snapshot', () => {
   it("picks each user's latest `since` <= `at` and ignores rows recorded later", async () => {
     const db = await makeTestDb();
-    await seedTenantTimeZone(db, null);
+    await seedSettings(db);
     await db
       .insertInto('presenceLog')
       .values([
@@ -77,7 +70,7 @@ describe('presenceLog.snapshot', () => {
 
   it('scopes to `userId` when given', async () => {
     const db = await makeTestDb();
-    await seedTenantTimeZone(db, null);
+    await seedSettings(db);
     await db
       .insertInto('users')
       .values({
@@ -127,7 +120,7 @@ describe('presenceLog.snapshot', () => {
     ['Z with milliseconds', '2026-01-01T00:15:00.000Z']
   ])('compares an `at` with %s as the instant it names', async (_form, at) => {
     const db = await makeTestDb();
-    await seedTenantTimeZone(db, 'Europe/Berlin');
+    await seedSettings(db, { timezone: 'Europe/Berlin' });
     await db
       .insertInto('presenceLog')
       .values([

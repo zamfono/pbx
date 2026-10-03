@@ -1,59 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { newId, nowIso } from '@zamfono/shared';
 
-import { makeTestDb } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
-import { Conflict, type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
+import { Conflict } from '../types.js';
 
 import './index.js';
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
-
-/** Inserts a live `dids` row and the `settings` singleton, with `extLength` when given (default 3). */
-async function seedSettings(db: Db, extLength?: number): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({
-      id: targetId,
-      userId: null,
-      ringGroupId: null,
-      external: '+490000000',
-      mailboxUserId: null,
-      mailboxRingGroupId: null,
-      announcementAudioId: null,
-      menuId: null
-    })
-    .execute();
-  const mainDidId = newId();
-  await db
-    .insertInto('dids')
-    .values({
-      id: mainDidId,
-      number: '+490000000',
-      label: null,
-      targetId,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId,
-      ...(extLength === undefined ? {} : { extLength })
-    })
-    .execute();
-}
 
 describe('parking', () => {
   it('replaces the slot set as a whole', async () => {
@@ -74,7 +28,7 @@ describe('parking', () => {
 
   it('refuses a slot whose length does not match settings.ext_length', async () => {
     const db = await makeTestDb();
-    await seedSettings(db, 4);
+    await seedSettings(db, { extLength: 4 });
     await expect(
       runOperation(db, 'parking.set', { slots: ['701'] }, asRun())
     ).rejects.toMatchObject({ status: 422 });

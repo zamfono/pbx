@@ -3,11 +3,14 @@ import { describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '#lib/server/testDb.js';
+import {
+  asConfirmedRun,
+  makeTestDb,
+  seedSettings
+} from '#lib/server/testDb.js';
 
 import type { HoursWire } from '../hours/get.js';
-import { runOperation, type RunInput } from '../runner.js';
-import { type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
 import { refuseUniqueViolation } from './_uniqueViolation.js';
 
 import '../devices/index.js';
@@ -15,45 +18,6 @@ import '../hours/index.js';
 import '../trunks/index.js';
 import '../users/index.js';
 import './index.js';
-
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-process.env.FQDN ??= 'pbx.example.test';
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return {
-    actor: owner,
-    channel: 'rest',
-    requestId: 'req-1',
-    confirm: true,
-    ...overrides
-  };
-}
-
-/** Seeds the tenant `settings` singleton, required by extension assignment. */
-async function seedTenant(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId
-    })
-    .execute();
-}
 
 /** The latest `operation` entry, the one an undo of that operation reverts. */
 async function latestEntry(db: Db, operation: string): Promise<string> {
@@ -67,7 +31,7 @@ async function latestEntry(db: Db, operation: string): Promise<string> {
 }
 
 function undo(db: Db, id: string): Promise<unknown> {
-  return runOperation(db, 'audit.undo', { id }, asRun());
+  return runOperation(db, 'audit.undo', { id }, asConfirmedRun());
 }
 
 async function createTrunk(db: Db, name: string): Promise<string> {
@@ -80,7 +44,7 @@ async function createTrunk(db: Db, name: string): Promise<string> {
       authMode: 'ip',
       hosts: [{ host: 'sip.provider.example' }]
     },
-    asRun()
+    asConfirmedRun()
   )) as { trunk: { id: string } };
   return trunk.id;
 }
@@ -90,7 +54,7 @@ async function createUser(db: Db, email: string, ext: string): Promise<string> {
     db,
     'users.create',
     { name: 'Anna Huber', email, extension: ext },
-    asRun()
+    asConfirmedRun()
   )) as { user: { id: string } };
   return user.id;
 }
@@ -105,7 +69,7 @@ async function createDevice(
     db,
     'devices.create',
     { userId, label, kind },
-    asRun()
+    asConfirmedRun()
   )) as { device: { id: string; sipUsername: string } };
   return device;
 }
@@ -119,7 +83,7 @@ async function setHours(db: Db, scope: unknown): Promise<string> {
       closedTarget: { kind: 'external', external: '+491234567' },
       intervals: [{ weekday: 1, opens: '09:00', closes: '17:00' }]
     },
-    asRun()
+    asConfirmedRun()
   )) as HoursWire;
   return hours.id;
 }
@@ -129,7 +93,7 @@ describe('audit.undo refuses a revival that would break a uniqueness rule (§5.8
     const db = await makeTestDb();
     await createTrunk(db, 'Provider A');
     const second = await createTrunk(db, 'Provider B');
-    await runOperation(db, 'trunks.delete', { id: second }, asRun());
+    await runOperation(db, 'trunks.delete', { id: second }, asConfirmedRun());
     const deletion = await latestEntry(db, 'trunks.delete');
     const third = await createTrunk(db, 'Provider C');
 
@@ -144,13 +108,13 @@ describe('audit.undo refuses a revival that would break a uniqueness rule (§5.8
     const first = await createTrunk(db, 'Provider A');
     const second = await createTrunk(db, 'Provider B');
     const third = await createTrunk(db, 'Provider C');
-    await runOperation(db, 'trunks.delete', { id: second }, asRun());
+    await runOperation(db, 'trunks.delete', { id: second }, asConfirmedRun());
     const deletion = await latestEntry(db, 'trunks.delete');
     await runOperation(
       db,
       'trunks.setOrder',
       { trunkIds: [third, first] },
-      asRun()
+      asConfirmedRun()
     );
 
     await expect(undo(db, deletion)).rejects.toMatchObject({
@@ -166,7 +130,7 @@ describe('audit.undo refuses a revival that would break a uniqueness rule (§5.8
       db,
       'hours.delete',
       { scope: { kind: 'tenant' } },
-      asRun()
+      asConfirmedRun()
     );
     const deletion = await latestEntry(db, 'hours.delete');
     const newer = await setHours(db, { kind: 'tenant' });
@@ -179,11 +143,11 @@ describe('audit.undo refuses a revival that would break a uniqueness rule (§5.8
 
   it("names the user's schedule set since the deleted one", async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const userId = await createUser(db, 'anna@x.test', '101');
     const scope = { kind: 'user', id: userId };
     await setHours(db, scope);
-    await runOperation(db, 'hours.delete', { scope }, asRun());
+    await runOperation(db, 'hours.delete', { scope }, asConfirmedRun());
     const deletion = await latestEntry(db, 'hours.delete');
     const newer = await setHours(db, scope);
 
@@ -195,10 +159,10 @@ describe('audit.undo refuses a revival that would break a uniqueness rule (§5.8
 
   it("names the user's Ringotel device created since the deleted one", async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const userId = await createUser(db, 'anna@x.test', '101');
     const old = await createDevice(db, userId, 'App', 'ringotel');
-    await runOperation(db, 'devices.delete', { id: old.id }, asRun());
+    await runOperation(db, 'devices.delete', { id: old.id }, asConfirmedRun());
     const deletion = await latestEntry(db, 'devices.delete');
     const newer = await createDevice(db, userId, 'New App', 'ringotel');
 
@@ -210,10 +174,10 @@ describe('audit.undo refuses a revival that would break a uniqueness rule (§5.8
 
   it("names the live device holding a revived user's device's SIP username", async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const userId = await createUser(db, 'anna@x.test', '101');
     const device = await createDevice(db, userId, 'Desk', 'manual');
-    await runOperation(db, 'users.delete', { id: userId }, asRun());
+    await runOperation(db, 'users.delete', { id: userId }, asConfirmedRun());
     const deletion = await latestEntry(db, 'users.delete');
     const otherUser = await createUser(db, 'bea@x.test', '102');
     const taker = newId();

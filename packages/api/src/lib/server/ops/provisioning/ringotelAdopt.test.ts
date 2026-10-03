@@ -1,7 +1,7 @@
 import * as privateEnv from '$app/env/private';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { type Db } from '@zamfono/shared';
 
 import {
   installRingotelFake,
@@ -12,24 +12,18 @@ import {
   FAKE_REGIONS
 } from '#lib/server/provisioning/ringotelFakeHandlers.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import { makeTestDb } from '#lib/server/testDb.js';
+import {
+  asConfirmedRun,
+  makeTestDb,
+  seedSettings
+} from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
-import { type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
 
 import '../settings/index.js';
 import './index.js';
 
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
 process.env.FQDN = 'pbx.example.com';
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-const confirmed: RunInput = {
-  actor: owner,
-  channel: 'rest',
-  requestId: 'req-1',
-  confirm: true
-};
 
 // The account holds another customer's organization beside the one to adopt, as the live one
 // does: adoption must never reach it.
@@ -44,32 +38,6 @@ const WRITES = [
   'createUser',
   'updateUser'
 ];
-
-/** Seeds `settings` with a Ringotel API token and no organization or connection yet. */
-async function seedSettings(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      language: 'de',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId,
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
-    })
-    .execute();
-}
 
 async function storedIds(
   db: Db
@@ -104,14 +72,17 @@ afterEach(() => {
 describe('provisioning.ringotelAdopt', () => {
   it('points the named connection at this stack and stores both ids', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedSettings(db, {
+      language: 'de',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const fake = install([OTHER_CUSTOMER, TARGET], [SHELL_BRANCH]);
 
     const output = await runOperation(
       db,
       'provisioning.ringotelAdopt',
       { orgId: 'org-9', domain: 'zamfono-test', branchId: 'branch-default' },
-      confirmed
+      asConfirmedRun()
     );
 
     expect(output).toEqual({
@@ -133,14 +104,17 @@ describe('provisioning.ringotelAdopt', () => {
 
   it('creates a connection of its own when none is named', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedSettings(db, {
+      language: 'de',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const fake = install([TARGET]);
 
     const output = (await runOperation(
       db,
       'provisioning.ringotelAdopt',
       { orgId: 'org-9', domain: 'zamfono-test' },
-      confirmed
+      asConfirmedRun()
     )) as { ringotelBranchId: string };
 
     expect(fake.branches).toEqual([
@@ -158,7 +132,10 @@ describe('provisioning.ringotelAdopt', () => {
 
   it("refuses an id whose domain differs, even another customer's, writing nothing", async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedSettings(db, {
+      language: 'de',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const fake = install([OTHER_CUSTOMER, TARGET]);
 
     await expect(
@@ -166,7 +143,7 @@ describe('provisioning.ringotelAdopt', () => {
         db,
         'provisioning.ringotelAdopt',
         { orgId: 'org-7', domain: 'zamfono-test' },
-        confirmed
+        asConfirmedRun()
       )
     ).rejects.toMatchObject({ status: 404 });
     expect(writesMade(fake)).toEqual([]);
@@ -178,7 +155,10 @@ describe('provisioning.ringotelAdopt', () => {
 
   it('refuses an organization that already has users', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedSettings(db, {
+      language: 'de',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const fake = install([TARGET]);
     fake.users.push({
       id: 'ru-1',
@@ -195,7 +175,7 @@ describe('provisioning.ringotelAdopt', () => {
         db,
         'provisioning.ringotelAdopt',
         { orgId: 'org-9', domain: 'zamfono-test' },
-        confirmed
+        asConfirmedRun()
       )
     ).rejects.toMatchObject({ status: 409 });
     expect(writesMade(fake)).toEqual([]);
@@ -203,7 +183,10 @@ describe('provisioning.ringotelAdopt', () => {
 
   it('refuses a connection the organization does not have', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedSettings(db, {
+      language: 'de',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const fake = install([TARGET], [SHELL_BRANCH]);
 
     await expect(
@@ -211,7 +194,7 @@ describe('provisioning.ringotelAdopt', () => {
         db,
         'provisioning.ringotelAdopt',
         { orgId: 'org-9', domain: 'zamfono-test', branchId: 'branch-x' },
-        confirmed
+        asConfirmedRun()
       )
     ).rejects.toMatchObject({ status: 404 });
     expect(writesMade(fake)).toEqual([]);
@@ -219,7 +202,10 @@ describe('provisioning.ringotelAdopt', () => {
 
   it('refuses a stack that is already set up', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedSettings(db, {
+      language: 'de',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     await db
       .updateTable('settings')
       .set({ ringotelOrgId: 'org-1', ringotelBranchId: 'branch-1' })
@@ -231,7 +217,7 @@ describe('provisioning.ringotelAdopt', () => {
         db,
         'provisioning.ringotelAdopt',
         { orgId: 'org-9', domain: 'zamfono-test' },
-        confirmed
+        asConfirmedRun()
       )
     ).rejects.toMatchObject({ status: 409 });
     expect(fake.calls).toEqual([]);
@@ -239,7 +225,10 @@ describe('provisioning.ringotelAdopt', () => {
 
   it('deletes the connection it created when a later step fails', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedSettings(db, {
+      language: 'de',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const fake = install([TARGET]);
     fake.failing.add('updateOrganization');
 
@@ -248,7 +237,7 @@ describe('provisioning.ringotelAdopt', () => {
         db,
         'provisioning.ringotelAdopt',
         { orgId: 'org-9', domain: 'zamfono-test' },
-        confirmed
+        asConfirmedRun()
       )
     ).rejects.toThrow();
     expect(fake.branches).toEqual([]);
@@ -262,11 +251,19 @@ describe('provisioning.ringotelAdopt', () => {
 describe('provisioning.ringotelOptions', () => {
   it('lists the regions and packages the account offers', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedSettings(db, {
+      language: 'de',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     install();
 
     expect(
-      await runOperation(db, 'provisioning.ringotelOptions', {}, confirmed)
+      await runOperation(
+        db,
+        'provisioning.ringotelOptions',
+        {},
+        asConfirmedRun()
+      )
     ).toEqual({ regions: FAKE_REGIONS, packages: FAKE_PACKAGES });
   });
 });
@@ -274,7 +271,10 @@ describe('provisioning.ringotelOptions', () => {
 describe('provisioning.ringotelSetup with a region the account does not offer', () => {
   it('is refused before anything is created, naming the regions offered', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedSettings(db, {
+      language: 'de',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const fake = install([]);
 
     await expect(
@@ -282,7 +282,7 @@ describe('provisioning.ringotelSetup with a region the account does not offer', 
         db,
         'provisioning.ringotelSetup',
         { domain: 'testco', region: 'Europe Frankfurt', packageid: 2 },
-        confirmed
+        asConfirmedRun()
       )
     ).rejects.toThrow(/choose one of 3 \(Europe \(Frankfurt\)\)/u);
     expect(fake.organizations).toEqual([]);
@@ -301,14 +301,17 @@ describe('the registrations per user follow the package (§10.4, §11.4)', () =>
 
   it("setup takes the chosen package's, Pro's 6", async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedSettings(db, {
+      language: 'de',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     install([]);
 
     await runOperation(
       db,
       'provisioning.ringotelSetup',
       { domain: 'testco', region: '3', packageid: 2 },
-      confirmed
+      asConfirmedRun()
     );
 
     expect(await maxRegs(db)).toBe(6);
@@ -316,14 +319,17 @@ describe('the registrations per user follow the package (§10.4, §11.4)', () =>
 
   it("adopt takes the adopted organization's package's", async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedSettings(db, {
+      language: 'de',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     install([{ ...TARGET, packageid: 2 }]);
 
     await runOperation(
       db,
       'provisioning.ringotelAdopt',
       { orgId: 'org-9', domain: 'zamfono-test' },
-      confirmed
+      asConfirmedRun()
     );
 
     expect(await maxRegs(db)).toBe(6);
@@ -331,7 +337,10 @@ describe('the registrations per user follow the package (§10.4, §11.4)', () =>
 
   it('leaves a value an owner set alone', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedSettings(db, {
+      language: 'de',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     await db.updateTable('settings').set({ ringotelMaxRegs: 4 }).execute();
     install([]);
 
@@ -339,7 +348,7 @@ describe('the registrations per user follow the package (§10.4, §11.4)', () =>
       db,
       'provisioning.ringotelSetup',
       { domain: 'testco', region: '3', packageid: 2 },
-      confirmed
+      asConfirmedRun()
     );
 
     expect(await maxRegs(db)).toBe(4);
@@ -349,7 +358,10 @@ describe('the registrations per user follow the package (§10.4, §11.4)', () =>
 describe('provisioning.ringotelSetup with a domain the account already has', () => {
   it('answers 409 naming the organization and the adoption that takes it over', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedSettings(db, {
+      language: 'de',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const fake = install([TARGET]);
 
     await expect(
@@ -357,7 +369,7 @@ describe('provisioning.ringotelSetup with a domain the account already has', () 
         db,
         'provisioning.ringotelSetup',
         { domain: 'zamfono-test', region: '3', packageid: 2 },
-        confirmed
+        asConfirmedRun()
       )
     ).rejects.toMatchObject({ status: 409 });
     await expect(
@@ -365,7 +377,7 @@ describe('provisioning.ringotelSetup with a domain the account already has', () 
         db,
         'provisioning.ringotelSetup',
         { domain: 'zamfono-test', region: '3', packageid: 2 },
-        confirmed
+        asConfirmedRun()
       )
     ).rejects.toThrow(
       "provisioning.ringotelAdopt { orgId: 'org-9', domain: 'zamfono-test' }"
@@ -377,20 +389,28 @@ describe('provisioning.ringotelSetup with a domain the account already has', () 
 describe("the connection carries the tenant's country (§10.4)", () => {
   it('is created with it, and pushed again when the country changes', async () => {
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedSettings(db, {
+      language: 'de',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const fake = install([]);
 
     await runOperation(
       db,
       'provisioning.ringotelSetup',
       { domain: 'testco', region: '3', packageid: 2 },
-      confirmed
+      asConfirmedRun()
     );
     const created = fake.calls.find(call => call.method === 'createBranch');
     expect(created?.params.country).toBe('DE');
 
     fake.calls.length = 0;
-    await runOperation(db, 'settings.update', { country: 'AT' }, confirmed);
+    await runOperation(
+      db,
+      'settings.update',
+      { country: 'AT' },
+      asConfirmedRun()
+    );
     const pushed = fake.calls.find(call => call.method === 'updateBranch');
     expect(pushed?.params.country).toBe('AT');
   });

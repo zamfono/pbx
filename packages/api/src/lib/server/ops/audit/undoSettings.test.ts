@@ -2,59 +2,24 @@ import { describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '#lib/server/testDb.js';
+import {
+  asConfirmedRun,
+  makeTestDb,
+  seedSettings
+} from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
-import { type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
 
 import '../settings/index.js';
 import './index.js';
 
 import { type TargetSpec } from '../forwardTargetSchema.js';
 
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return {
-    actor: owner,
-    channel: 'rest',
-    requestId: 'req-1',
-    confirm: true,
-    ...overrides
-  };
-}
-
-/** Seeds the tenant `settings` singleton `settings.update` reads. */
-async function seedTenant(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId
-    })
-    .execute();
-}
-
 async function updateSettings(
   db: Db,
   input: Record<string, unknown>
 ): Promise<void> {
-  await runOperation(db, 'settings.update', input, asRun());
+  await runOperation(db, 'settings.update', input, asConfirmedRun());
 }
 
 /** Undoes the latest live `settings.update` entry. */
@@ -66,11 +31,16 @@ async function undoLatestSettingsUpdate(db: Db): Promise<void> {
     .where('undoneAt', 'is', null)
     .orderBy('id', 'desc')
     .executeTakeFirstOrThrow();
-  await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+  await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 }
 
 async function fallbackTarget(db: Db): Promise<TargetSpec | null> {
-  const settings = (await runOperation(db, 'settings.get', {}, asRun())) as {
+  const settings = (await runOperation(
+    db,
+    'settings.get',
+    {},
+    asConfirmedRun()
+  )) as {
     fallbackTarget: TargetSpec | null;
   };
   return settings.fallbackTarget;
@@ -115,7 +85,7 @@ const OIDC = {
 describe('audit.undo of a settings.update', () => {
   it('restores the tenant fallback target a change replaced (§5.8)', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const first: TargetSpec = { kind: 'external', external: '+491111111' };
     await updateSettings(db, { fallbackTarget: first });
     await updateSettings(db, {
@@ -131,7 +101,7 @@ describe('audit.undo of a settings.update', () => {
 
   it('restores the SSO provider and the sso_subject bindings the change cleared (§5.2)', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const annaId = await seedBoundUsers(db);
     await updateSettings(db, OIDC);
     // A login under the new issuer re-binds by e-mail (§5.2); the undo clears that binding too.
@@ -162,7 +132,7 @@ describe('audit.undo of a settings.update', () => {
 
   it('restores a switched-off microsoft preset with its jointly required fields', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     await updateSettings(db, {
       ssoProvider: 'microsoft',
       ssoClientId: 'client-1',
@@ -195,7 +165,7 @@ describe('audit.undo of a settings.update', () => {
 
   it('records the undo as the reverse diff, bindings included', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     await seedBoundUsers(db);
     await updateSettings(db, OIDC);
 

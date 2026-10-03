@@ -3,10 +3,11 @@ import process from 'node:process';
 import { isHttpError, type RequestEvent } from '@sveltejs/kit';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso } from '@zamfono/shared';
+import { nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { getDb } from '#lib/server/db.js';
+import { seedSettings } from '#lib/server/testDb.js';
 
 import { POST } from '../resetRequest/+server.js';
 import { requestReset } from './forgot.remote.js';
@@ -94,28 +95,11 @@ beforeAll(async () => {
       createdAt: nowIso()
     })
     .execute();
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, userId: 'owner' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+491234567', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Acme',
-      mainDidId: didId,
-      country: 'DE',
-      language: 'en',
-      emergencyNumbersJson: '["112"]',
-      smtpHost: 'smtp.example.com'
-    })
-    .execute();
+  await seedSettings(db, {
+    companyName: 'Acme',
+    language: 'en',
+    smtpHost: 'smtp.example.com'
+  });
 });
 
 describe('the forgot-password form', () => {

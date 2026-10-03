@@ -1,17 +1,14 @@
 import { newId, type Db } from '@zamfono/shared';
 
-import { makeTestDb, seedTenantTimeZone } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
 import { runOperation } from '../runner.js';
-import { type Actor } from '../types.js';
 
 import './index.js';
 
 // Fixtures the statistics tests share (`index.test.ts`, `tenantClock.test.ts`): a tenant on a
 // given clock, call rows, and `stats.query` called as the owner. Importing it registers the
 // operation.
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 
 export type QueryOutput = {
   buckets: { start: string; value: number | null }[];
@@ -20,7 +17,7 @@ export type QueryOutput = {
 /** A test database whose tenant clock is `timezone`. */
 export async function makeStatsDb(timezone = 'UTC'): Promise<Db> {
   const db = await makeTestDb();
-  await seedTenantTimeZone(db, timezone);
+  await seedSettings(db, { timezone });
   return db;
 }
 
@@ -54,9 +51,5 @@ export async function queryStats(
   db: Db,
   input: Record<string, unknown>
 ): Promise<QueryOutput> {
-  return (await runOperation(db, 'stats.query', input, {
-    actor: owner,
-    channel: 'rest',
-    requestId: 'req-1'
-  })) as QueryOutput;
+  return (await runOperation(db, 'stats.query', input, asRun())) as QueryOutput;
 }

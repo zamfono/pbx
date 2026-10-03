@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { makeTestDb, seedTenantTimeZone } from '#lib/server/testDb.js';
+import { makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
 import {
   instantInput,
@@ -76,9 +76,9 @@ describe('tenantInstantReader', () => {
   it("reads in settings.timezone, and in UTC while it and the stack's TZ are unset", async () => {
     vi.stubEnv('TZ', undefined);
     const unsetDb = await makeTestDb();
-    await seedTenantTimeZone(unsetDb, null);
+    await seedSettings(unsetDb);
     const viennaDb = await makeTestDb();
-    await seedTenantTimeZone(viennaDb, 'Europe/Vienna');
+    await seedSettings(viennaDb, { timezone: 'Europe/Vienna' });
 
     const unset = await tenantInstantReader(unsetDb);
     const vienna = await tenantInstantReader(viennaDb);

@@ -2,13 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createCoreClient, getCoreClient } from '#lib/server/coreClient.js';
 import { handleRest } from '#lib/server/rest.js';
-import { makeTestDb } from '#lib/server/testDb.js';
-
-import { type Actor } from '../types.js';
+import { makeTestDb, owner } from '#lib/server/testDb.js';
 
 import './index.js';
 
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 const CALL_ID = 'call-1';
 
 /** A real `CoreClient` over a `fetch` that answers every request as `core` refusing it does

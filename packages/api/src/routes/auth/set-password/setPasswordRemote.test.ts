@@ -10,6 +10,7 @@ import { verifyPassword } from '#lib/server/auth/password.js';
 import { issueResetToken } from '#lib/server/auth/tokens.js';
 import { getDb } from '#lib/server/db.js';
 import { sha256Hex } from '#lib/server/hash.js';
+import { seedSettings } from '#lib/server/testDb.js';
 
 import { POST } from '../reset/+server.js';
 import { load } from './+page.server.js';
@@ -83,28 +84,8 @@ function pageEvent(search: string): Parameters<typeof load>[0] {
 beforeAll(async () => {
   const db = getDb();
   await migrateForTest(db);
-  const ownerId = await newUser('owner@example.com');
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, userId: ownerId })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+491234567', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Acme',
-      mainDidId: didId,
-      country: 'DE',
-      language: 'en',
-      emergencyNumbersJson: '["112"]'
-    })
-    .execute();
+  await newUser('owner@example.com');
+  await seedSettings(db, { companyName: 'Acme', language: 'en' });
 });
 
 describe('the set-password form', () => {

@@ -8,19 +8,14 @@ import { newId, nowIso, type Db } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { stubCoreClient } from '#lib/server/coreClientStub.js';
-import { makeTestDb } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, owner } from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
+import { runOperation } from '../runner.js';
 import { type Actor } from '../types.js';
 
 import './index.js';
 
 const anna: Actor = { id: 'u1', name: 'Anna', role: 'user' };
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
 
 async function seedUser(db: Db, id: string, name: string): Promise<void> {
   await db

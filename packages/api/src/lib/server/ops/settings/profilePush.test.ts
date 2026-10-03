@@ -1,64 +1,19 @@
 import * as privateEnv from '$app/env/private';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  newId,
-  nowIso,
-  type CoreVersionResponse,
-  type Db
-} from '@zamfono/shared';
+import { nowIso, type CoreVersionResponse, type Db } from '@zamfono/shared';
 
 import { watchAsteriskRestarts } from '#lib/server/jobs/ringotelRereg.js';
 import { propagateConfig } from '#lib/server/propagation.js';
 import { isProfilePending } from '#lib/server/provisioning/profilePending.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import { makeTestDb } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
+import { runOperation } from '../runner.js';
 
 import './index.js';
 
 import { retryPendingProfile } from './profilePush.js';
-
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-
-const owner: RunInput = {
-  actor: { id: 'owner', name: 'Owner', role: 'owner' },
-  channel: 'rest',
-  requestId: 'req-1'
-};
-
-/** The tenant row, set up with Ringotel, its main DID an external target. */
-async function seedTenant(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const mainDidId = newId();
-  await db
-    .insertInto('dids')
-    .values({
-      id: mainDidId,
-      number: '+490000000',
-      targetId,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId,
-      ringotelOrgId: 'org-1',
-      ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
-    })
-    .execute();
-}
 
 type Ringotel = { up: boolean; methods: string[] };
 
@@ -116,7 +71,7 @@ async function changeDuringOutage(db: Db): Promise<unknown> {
     db,
     'settings.update',
     { emergencyNumbers: ['112', '110'] },
-    owner
+    asRun()
   );
 }
 
@@ -134,7 +89,11 @@ function core(asteriskStartedAt: string): () => Promise<CoreVersionResponse> {
 describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile push")', () => {
   it('stores and propagates emergency numbers while Ringotel is down, warns, records the refusal and marks it pending', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db, {
+      ringotelOrgId: 'org-1',
+      ringotelBranchId: 'branch-1',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const ringotel = stubRingotel(false);
     // How many Ringotel calls had been made when the write propagated: none, since the push
     // waits for the commit and the propagation.
@@ -148,7 +107,7 @@ describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile 
       db,
       'settings.update',
       { emergencyNumbers: ['112', '110'] },
-      owner
+      asRun()
     )) as { emergencyNumbers: string[]; warnings?: string[] };
 
     expect(result.emergencyNumbers).toEqual(['112', '110']);
@@ -182,14 +141,18 @@ describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile 
 
   it('records a push Ringotel takes and leaves nothing pending', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db, {
+      ringotelOrgId: 'org-1',
+      ringotelBranchId: 'branch-1',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const ringotel = stubRingotel(true);
 
     const result = (await runOperation(
       db,
       'settings.update',
       { emergencyNumbers: ['112', '110'] },
-      owner
+      asRun()
     )) as { warnings?: string[] };
 
     expect(result.warnings).toBeUndefined();
@@ -202,7 +165,11 @@ describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile 
 
   it('retries once at api start and clears the marker when Ringotel takes it', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db, {
+      ringotelOrgId: 'org-1',
+      ringotelBranchId: 'branch-1',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     await changeDuringOutage(db);
     const ringotel = stubRingotel(true);
 
@@ -224,7 +191,11 @@ describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile 
 
   it('retries on asterisk.started ahead of the re-registration, once, and never loops on a refusal', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db, {
+      ringotelOrgId: 'org-1',
+      ringotelBranchId: 'branch-1',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     await changeDuringOutage(db);
     const ringotel = stubRingotel(false);
     const watcher = watchAsteriskRestarts({
@@ -262,7 +233,11 @@ describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile 
 
   it('sends nothing on a retry while nothing is pending', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db, {
+      ringotelOrgId: 'org-1',
+      ringotelBranchId: 'branch-1',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
     const ringotel = stubRingotel(true);
 
     await retryPendingProfile(db, 'api.start');

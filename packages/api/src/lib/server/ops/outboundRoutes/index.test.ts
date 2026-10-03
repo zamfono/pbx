@@ -2,19 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import type { Db } from '@zamfono/shared';
 
-import { makeTestDb } from '#lib/server/testDb.js';
+import { asRun, makeTestDb } from '#lib/server/testDb.js';
 
 import { runOperation } from '../runner.js';
-import type { Actor } from '../types.js';
 
 import '../trunks/index.js';
 import './index.js';
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(): { actor: Actor; channel: 'rest'; requestId: string } {
-  return { actor: owner, channel: 'rest', requestId: 'req-1' };
-}
 
 type TrunkOutput = { trunk: { id: string } };
 type RouteWire = {

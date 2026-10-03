@@ -1,17 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { makeTestDb } from '#lib/server/testDb.js';
+import { asRun, makeTestDb } from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
-import { Conflict, type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
+import { Conflict } from '../types.js';
 
 import './index.js';
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
 
 describe('blockedNumbers', () => {
   it('creates, lists and deletes a blocked number', async () => {

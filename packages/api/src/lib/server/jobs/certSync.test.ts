@@ -15,7 +15,7 @@ import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
 
 import type { CoreClient } from '../coreClient.js';
 import { stubCoreClient } from '../coreClientStub.js';
-import { makeTestDb } from '../testDb.js';
+import { makeTestDb, seedSettings } from '../testDb.js';
 import {
   CertSync,
   certSyncStatus,
@@ -203,44 +203,6 @@ async function seedFarOoo(db: Db): Promise<void> {
       expiresAt: new Date(Date.now() + 7 * DAY_MS).toISOString(),
       targetId,
       createdAt: nowIso()
-    })
-    .execute();
-}
-
-async function seedSettings(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({
-      id: targetId,
-      userId: null,
-      ringGroupId: null,
-      external: '+490000000',
-      mailboxUserId: null,
-      mailboxRingGroupId: null,
-      announcementAudioId: null,
-      menuId: null
-    })
-    .execute();
-  const mainDidId = newId();
-  await db
-    .insertInto('dids')
-    .values({
-      id: mainDidId,
-      number: '+490000000',
-      label: null,
-      targetId,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId
     })
     .execute();
 }

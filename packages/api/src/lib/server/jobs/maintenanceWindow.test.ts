@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '../testDb.js';
+import { makeTestDb, seedSettings } from '../testDb.js';
 import type { Busy } from './maintenanceGiveUp.js';
 import {
   createMaintenanceGate,
@@ -18,47 +18,6 @@ const BUSY: Busy = {
 const BUSY_REASON =
   'live calls 2, Asterisk channels 3, recordings in progress 1';
 
-/** The settings row with the 03:00 quiet hour, the only moment these tests need. */
-async function seedSettings(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({
-      id: targetId,
-      userId: null,
-      ringGroupId: null,
-      external: '+490000000',
-      mailboxUserId: null,
-      mailboxRingGroupId: null,
-      announcementAudioId: null,
-      menuId: null
-    })
-    .execute();
-  const mainDidId = newId();
-  await db
-    .insertInto('dids')
-    .values({
-      id: mainDidId,
-      number: '+490000000',
-      label: null,
-      targetId,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId,
-      timezone: 'UTC',
-      tlsReloadHour: 3
-    })
-    .execute();
-}
-
 describe('createMaintenanceGate', () => {
   const saved = { reloadHour: process.env.TLS_RELOAD_HOUR };
   const state: { db?: Db; idle: boolean; asked: number } = {
@@ -71,7 +30,7 @@ describe('createMaintenanceGate', () => {
     state.idle = true;
     state.asked = 0;
     const db = await makeTestDb();
-    await seedSettings(db);
+    await seedSettings(db, { timezone: 'UTC', tlsReloadHour: 3 });
     state.db = db;
   });
 

@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { makeTestDb } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
 import { runOperation } from '../runner.js';
 import {
   admin,
-  asRun,
   createTrunk,
   createUser,
-  seedTenant,
   setForwarding,
   storedConditions,
   type Rule
@@ -17,7 +15,8 @@ import {
 // §10.3 "Users": `PUT /users/{id}/forwarding` is self-service on the user's own id.
 describe('users.setForwarding, self-service', () => {
   it('lets a user set their own rules to every non-sip kind, attributed to them in the audit log (§5.7)', async () => {
-    const db = await seedTenant(await makeTestDb());
+    const db = await makeTestDb();
+    await seedSettings(db);
     const anna = await createUser(db, 'Anna Huber', '101');
     const ben = await createUser(db, 'Ben Roth', '102');
     const rules: Rule[] = [
@@ -50,7 +49,8 @@ describe('users.setForwarding, self-service', () => {
   });
 
   it("refuses a user setting another user's forwarding with 403, as users.update does, and lets an admin", async () => {
-    const db = await seedTenant(await makeTestDb());
+    const db = await makeTestDb();
+    await seedSettings(db);
     const anna = await createUser(db, 'Anna Huber', '101');
     const ben = await createUser(db, 'Ben Roth', '102');
     const rules: Rule[] = [
@@ -65,7 +65,8 @@ describe('users.setForwarding, self-service', () => {
   });
 
   it('refuses a sip target in a user’s own forwarding with 403 (§10.3 "Forward targets")', async () => {
-    const db = await seedTenant(await makeTestDb());
+    const db = await makeTestDb();
+    await seedSettings(db);
     const anna = await createUser(db, 'Anna Huber', '101');
     const trunkId = await createTrunk(db);
     const attempt = setForwarding(
@@ -84,7 +85,8 @@ describe('users.setForwarding, self-service', () => {
   });
 
   it("lets an admin undo a user's own forwarding change, restoring the rules it replaced (§5.8)", async () => {
-    const db = await seedTenant(await makeTestDb());
+    const db = await makeTestDb();
+    await seedSettings(db);
     const anna = await createUser(db, 'Anna Huber', '101');
     const trunkId = await createTrunk(db);
     await setForwarding(db, anna.id, [

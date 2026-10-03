@@ -1,66 +1,18 @@
 import * as privateEnv from '$app/env/private';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { DEFAULT_FEATURE_CODES, newId, nowIso, type Db } from '@zamfono/shared';
+import { DEFAULT_FEATURE_CODES, type Db } from '@zamfono/shared';
 
 import { propagateConfig } from '#lib/server/propagation.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import { makeTestDb } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, owner, seedSettings } from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
+import { runOperation } from '../runner.js';
 import { type Actor } from '../types.js';
 
 import './index.js';
 
-// settings.update encrypts smtpPassword/ssoClientSecret/ringotelApiToken via secretbox (§5.4),
-// which needs a key even for the fields these tests never set.
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
 const admin: Actor = { id: 'admin-1', name: 'Admin', role: 'admin' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return { actor: owner, channel: 'rest', requestId: 'req-1', ...overrides };
-}
-
-/** Inserts a live `dids` row targeting an external number, returning its id. */
-async function insertDid(db: Db, number: string): Promise<string> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({
-      id: targetId,
-      userId: null,
-      ringGroupId: null,
-      external: number,
-      mailboxUserId: null,
-      mailboxRingGroupId: null,
-      announcementAudioId: null,
-      menuId: null
-    })
-    .execute();
-  const id = newId();
-  await db
-    .insertInto('dids')
-    .values({ id, number, label: null, targetId, createdAt: nowIso() })
-    .execute();
-  return id;
-}
-
-/** Seeds the tenant `settings` singleton, required by every settings operation. */
-async function seedSettings(db: Db): Promise<void> {
-  const mainDidId = await insertDid(db, '+490000000');
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId
-    })
-    .execute();
-}
 
 /** Marks the tenant as already provisioned with Ringotel, so `activeRingotelProvider` pushes. */
 async function enableRingotel(db: Db): Promise<void> {

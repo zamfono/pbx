@@ -7,7 +7,7 @@ import { nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { getDb } from '#lib/server/db.js';
-import { seedTenantTimeZone } from '#lib/server/testDb.js';
+import { seedSettings } from '#lib/server/testDb.js';
 
 import { login } from './authorize.remote.js';
 
@@ -70,7 +70,7 @@ beforeAll(async () => {
       createdAt: nowIso()
     })
     .execute();
-  await seedTenantTimeZone(db, 'Europe/Berlin');
+  await seedSettings(db, { timezone: 'Europe/Berlin' });
 });
 
 describe('the login form', () => {

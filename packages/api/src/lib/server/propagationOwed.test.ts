@@ -26,7 +26,7 @@ import { defineOperation } from './ops/types.js';
 import { propagateConfig } from './propagation.js';
 import { isPropagationPending } from './propagationPending.js';
 import { keyringFromEnv } from './secretbox.js';
-import { makeTestDb, seedTenantTimeZone } from './testDb.js';
+import { asRun, makeTestDb, seedSettings } from './testDb.js';
 
 // The propagation under test, not the setup file's stand-in for it.
 vi.unmock('./propagation.js');
@@ -53,7 +53,7 @@ const dirs: string[] = [];
 /** A database whose propagations render into a directory of their own and reach `core`. */
 async function setUp(): Promise<Db> {
   const db = await makeTestDb();
-  await seedTenantTimeZone(db, 'UTC');
+  await seedSettings(db, { timezone: 'UTC' });
   const genDir = await mkdtemp(path.join(tmpdir(), 'zamfono-gen-'));
   dirs.push(genDir);
   process.env.ASTERISK_GEN_DIR = genDir;
@@ -205,11 +205,7 @@ describe('an owed config propagation', () => {
         }
       })
     );
-    const run = {
-      actor: { id: 'owner', name: 'Owner', role: 'owner' as const },
-      channel: 'rest' as const,
-      requestId: 'req-1'
-    };
+    const run = asRun();
 
     core.up = false;
     const first = (await runOperation(

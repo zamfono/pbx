@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { DeviceRow } from '#lib/server/provisioning/types.js';
-import { makeTestDb } from '#lib/server/testDb.js';
+import { makeTestDb, owner } from '#lib/server/testDb.js';
 
 import { newEffects } from '../effects.js';
 import type { Context } from '../types.js';
@@ -26,8 +26,6 @@ vi.mock('#lib/server/secretbox.js', () => ({
   decrypt: () => Buffer.from('sip-secret')
 }));
 
-const actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
 describe('restoreProvisionedDevices', () => {
   beforeEach(() => {
     created.length = 0;
@@ -51,7 +49,7 @@ describe('restoreProvisionedDevices', () => {
 
     const ctx = {
       db,
-      actor,
+      actor: owner,
       channel: 'rest',
       effects: newEffects()
     } as unknown as Context;
@@ -97,7 +95,7 @@ describe('restoreProvisionedDevices', () => {
 
     const ctx = {
       db,
-      actor,
+      actor: owner,
       channel: 'rest',
       effects: newEffects()
     } as unknown as Context;

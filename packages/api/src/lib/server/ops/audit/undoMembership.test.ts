@@ -1,62 +1,26 @@
 import { describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '#lib/server/testDb.js';
+import {
+  asConfirmedRun,
+  makeTestDb,
+  seedSettings
+} from '#lib/server/testDb.js';
 
-import { runOperation, type RunInput } from '../runner.js';
-import { type Actor } from '../types.js';
+import { runOperation } from '../runner.js';
 
 import '../ringGroups/index.js';
 import '../userGroups/index.js';
 import '../users/index.js';
 import './index.js';
 
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-process.env.FQDN ??= 'pbx.example.test';
-
-const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };
-
-function asRun(overrides: Partial<RunInput> = {}): RunInput {
-  return {
-    actor: owner,
-    channel: 'rest',
-    requestId: 'req-1',
-    confirm: true,
-    ...overrides
-  };
-}
-
-/** Seeds the tenant `settings` singleton, required by extension assignment. */
-async function seedTenant(db: Db): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId
-    })
-    .execute();
-}
-
 async function createUser(db: Db, name: string, ext: string): Promise<string> {
   const result = (await runOperation(
     db,
     'users.create',
     { name, email: `${name.toLowerCase()}@x.test`, extension: ext },
-    asRun()
+    asConfirmedRun()
   )) as { user: { id: string } };
   return result.user.id;
 }
@@ -74,7 +38,7 @@ async function undoLatest(
     .where('entityId', '=', entityId)
     .orderBy('id', 'desc')
     .executeTakeFirstOrThrow();
-  await runOperation(db, 'audit.undo', { id: entry.id }, asRun());
+  await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 }
 
 type Members = { members: { kind: string; id: string }[] };
@@ -82,7 +46,7 @@ type Members = { members: { kind: string; id: string }[] };
 describe('audit.undo of a deleted member after a members edit', () => {
   it('keeps the ring-group position of a user deleted before the edit', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const anna = await createUser(db, 'Anna', '101');
     const ben = await createUser(db, 'Ben', '102');
     const carl = await createUser(db, 'Carl', '103');
@@ -98,9 +62,9 @@ describe('audit.undo of a deleted member after a members edit', () => {
           { kind: 'user', id: carl }
         ]
       },
-      asRun()
+      asConfirmedRun()
     )) as { id: string };
-    await runOperation(db, 'users.delete', { id: ben }, asRun());
+    await runOperation(db, 'users.delete', { id: ben }, asConfirmedRun());
     await runOperation(
       db,
       'ringGroups.update',
@@ -111,7 +75,7 @@ describe('audit.undo of a deleted member after a members edit', () => {
           { kind: 'user', id: anna }
         ]
       },
-      asRun()
+      asConfirmedRun()
     );
 
     await undoLatest(db, 'users.delete', ben);
@@ -120,7 +84,7 @@ describe('audit.undo of a deleted member after a members edit', () => {
       db,
       'ringGroups.get',
       { id: group.id },
-      asRun()
+      asConfirmedRun()
     )) as Members;
     expect(read.members).toEqual([
       { position: 0, kind: 'user', id: carl },
@@ -131,14 +95,14 @@ describe('audit.undo of a deleted member after a members edit', () => {
 
   it('keeps the user-group links of a user and a child group deleted before the edit', async () => {
     const db = await makeTestDb();
-    await seedTenant(db);
+    await seedSettings(db);
     const anna = await createUser(db, 'Anna', '101');
     const ben = await createUser(db, 'Ben', '102');
     const child = (await runOperation(
       db,
       'userGroups.create',
       { name: 'Night shift', members: [] },
-      asRun()
+      asConfirmedRun()
     )) as { id: string };
     const parent = (await runOperation(
       db,
@@ -151,15 +115,20 @@ describe('audit.undo of a deleted member after a members edit', () => {
           { kind: 'userGroup', id: child.id }
         ]
       },
-      asRun()
+      asConfirmedRun()
     )) as { id: string };
-    await runOperation(db, 'users.delete', { id: ben }, asRun());
-    await runOperation(db, 'userGroups.delete', { id: child.id }, asRun());
+    await runOperation(db, 'users.delete', { id: ben }, asConfirmedRun());
+    await runOperation(
+      db,
+      'userGroups.delete',
+      { id: child.id },
+      asConfirmedRun()
+    );
     await runOperation(
       db,
       'userGroups.update',
       { id: parent.id, members: [] },
-      asRun()
+      asConfirmedRun()
     );
 
     await undoLatest(db, 'users.delete', ben);
@@ -169,7 +138,7 @@ describe('audit.undo of a deleted member after a members edit', () => {
       db,
       'userGroups.get',
       { id: parent.id },
-      asRun()
+      asConfirmedRun()
     )) as Members;
     expect(read.members).toEqual([
       { kind: 'user', id: ben },

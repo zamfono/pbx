@@ -1,45 +1,9 @@
 import * as privateEnv from '$app/env/private';
 import { describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
-
 import { encrypt, keyringFromEnv } from '../secretbox.js';
-import { makeTestDb } from '../testDb.js';
+import { makeTestDb, seedSettings } from '../testDb.js';
 import { activeRingotelProvider } from './index.js';
-
-process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-
-/** Seeds the tenant `settings` singleton, optionally already provisioned with Ringotel ids. */
-async function seedSettings(
-  db: Db,
-  ringotel?: { orgId: string; branchId: string }
-): Promise<void> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId,
-      ringotelOrgId: ringotel?.orgId ?? null,
-      ringotelBranchId: ringotel?.branchId ?? null,
-      ringotelApiTokenEnc: ringotel
-        ? encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
-        : null
-    })
-    .execute();
-}
 
 describe('activeRingotelProvider', () => {
   it('is null while provisioning.ringotelSetup has not run', async () => {
@@ -51,7 +15,11 @@ describe('activeRingotelProvider', () => {
 
   it('is a Ringotel provider once the organization and connection ids are set', async () => {
     const db = await makeTestDb();
-    await seedSettings(db, { orgId: 'org-1', branchId: 'branch-1' });
+    await seedSettings(db, {
+      ringotelOrgId: 'org-1',
+      ringotelBranchId: 'branch-1',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
 
     const provider = await activeRingotelProvider(db);
 

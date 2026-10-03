@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { epochSeconds, nowIso, type Db } from '@zamfono/shared';
 
 import { encrypt, keyringFromEnv, type Keyring } from '../secretbox.js';
-import { makeTestDb } from '../testDb.js';
+import { makeTestDb, seedSettings } from '../testDb.js';
 import {
   discover,
   startLogin,
@@ -497,39 +497,9 @@ describe('discover', () => {
 });
 
 describe('ssoConfigFromSettings', () => {
-  async function seedSettings(
-    db: Db,
-    fields: Record<string, unknown>
-  ): Promise<void> {
-    await db
-      .insertInto('forwardTargets')
-      .values({ id: 'ft1', userId: 'owner' })
-      .execute();
-    await db
-      .insertInto('dids')
-      .values({
-        id: 'did1',
-        number: '+491234567',
-        targetId: 'ft1',
-        createdAt: NOW
-      })
-      .execute();
-    await db
-      .insertInto('settings')
-      .values({
-        id: 1,
-        companyName: 'Acme',
-        mainDidId: 'did1',
-        country: 'DE',
-        emergencyNumbersJson: '["112"]',
-        ...fields
-      })
-      .execute();
-  }
-
   it('returns null while sso_provider is unset', async () => {
     const db = await makeTestDb();
-    await seedSettings(db, {});
+    await seedSettings(db);
     expect(await ssoConfigFromSettings(db, testKeyring())).toBeNull();
   });
 
