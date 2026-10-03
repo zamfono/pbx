@@ -1,9 +1,8 @@
 import { z } from 'zod';
 
-import { HTTP_FORBIDDEN } from '@zamfono/shared';
-
+import { assertSelfOrAdmin } from '../gates.js';
 import { propagate } from '../runner.js';
-import { defineOperation, OpError } from '../types.js';
+import { defineOperation } from '../types.js';
 import { liveUser } from './_shared.js';
 
 /**
@@ -28,12 +27,11 @@ export const setPresence = defineOperation({
   minRole: 'user',
   audit: false,
   run: async (ctx, input) => {
-    if (ctx.actor.role === 'user' && ctx.actor.id !== input.id) {
-      throw new OpError(
-        HTTP_FORBIDDEN,
-        'users: may set only your own presence'
-      );
-    }
+    assertSelfOrAdmin(
+      ctx.actor,
+      input.id,
+      'users: may set only your own presence'
+    );
     await liveUser(ctx.db, input.id);
     await ctx.db
       .updateTable('users')

@@ -38,10 +38,29 @@ export function parseInput(op: ErasedOperation, input: unknown): unknown {
 
 // Only `minRole` is enforced here. §5.3's own-scope rules (e.g. a `user` reading only their own
 // voicemails) have no field on `Operation` to declare them and are each operation's own concern,
-// inside its `run`.
+// inside its `run`, through `isSelfOrAdmin`/`assertSelfOrAdmin` where the scope is one user.
 export function checkRole(op: ErasedOperation, actor: Actor): void {
   if (ROLE_RANK[actor.role] > ROLE_RANK[op.minRole]) {
     throw new OpError(HTTP_FORBIDDEN, 'forbidden');
+  }
+}
+
+/** Whether `actor` may act on user `userId`: a `user` only on themselves, `admin`/`owner` on anyone (§5.3). */
+export function isSelfOrAdmin(
+  actor: Actor,
+  userId: string | undefined
+): boolean {
+  return actor.role !== 'user' || actor.id === userId;
+}
+
+/** Throws `OpError(403, message)` unless `actor` may act on user `userId` (`isSelfOrAdmin`). */
+export function assertSelfOrAdmin(
+  actor: Actor,
+  userId: string,
+  message: string
+): void {
+  if (!isSelfOrAdmin(actor, userId)) {
+    throw new OpError(HTTP_FORBIDDEN, message);
   }
 }
 

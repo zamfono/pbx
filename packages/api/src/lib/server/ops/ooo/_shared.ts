@@ -9,6 +9,7 @@ import {
 } from '@zamfono/shared';
 
 import { targetInputSchema } from '../dids/_shared.js';
+import { isSelfOrAdmin } from '../gates.js';
 import { liveRow } from '../rows.js';
 import { OpError, type Actor } from '../types.js';
 
@@ -109,9 +110,7 @@ export function scopeFromColumns(row: ScopeColumns): ScopeInput {
 
 /** Whether `actor` may act on `scope`: a `user` only their own user scope, `admin`/`owner` any. */
 function ownsScope(actor: Actor, scope: ScopeInput): boolean {
-  return (
-    actor.role !== 'user' || (scope.kind === 'user' && scope.id === actor.id)
-  );
+  return isSelfOrAdmin(actor, scope.kind === 'user' ? scope.id : undefined);
 }
 
 /**

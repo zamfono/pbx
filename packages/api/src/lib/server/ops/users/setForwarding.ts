@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
-import { HTTP_FORBIDDEN, HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
+import { assertSelfOrAdmin } from '../gates.js';
 import { propagate, recordChange } from '../runner.js';
 import { defineOperation, OpError, type Context } from '../types.js';
 import {
@@ -76,12 +77,11 @@ export const setForwarding = defineOperation({
   minRole: 'user',
   entity: input => ({ kind: 'user', id: input.id }),
   run: async (ctx, input) => {
-    if (ctx.actor.role === 'user' && ctx.actor.id !== input.id) {
-      throw new OpError(
-        HTTP_FORBIDDEN,
-        'users: may set only your own forwarding'
-      );
-    }
+    assertSelfOrAdmin(
+      ctx.actor,
+      input.id,
+      'users: may set only your own forwarding'
+    );
     await liveUser(ctx.db, input.id);
     const seenConditions = new Set<string>();
     for (const rule of input.rules) {

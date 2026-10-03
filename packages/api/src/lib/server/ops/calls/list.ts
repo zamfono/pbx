@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { HTTP_FORBIDDEN, type LiveCall } from '@zamfono/shared';
+import type { LiveCall } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import {
@@ -9,8 +9,9 @@ import {
   pageInput
 } from '#lib/server/pagination.js';
 
+import { assertSelfOrAdmin } from '../gates.js';
 import { instantInput, tenantInstantReader } from '../instantInput.js';
-import { defineOperation, OpError } from '../types.js';
+import { defineOperation } from '../types.js';
 import {
   CALL_DIRECTIONS,
   CALL_STATUSES,
@@ -120,12 +121,12 @@ export const list = defineOperation({
   minRole: 'user',
   readOnly: true,
   run: async (ctx, input) => {
-    if (
-      ctx.actor.role === 'user' &&
-      input.userId !== undefined &&
-      input.userId !== ctx.actor.id
-    ) {
-      throw new OpError(HTTP_FORBIDDEN, 'calls: may list only your own calls');
+    if (input.userId !== undefined) {
+      assertSelfOrAdmin(
+        ctx.actor,
+        input.userId,
+        'calls: may list only your own calls'
+      );
     }
     const ownUserId = ctx.actor.role === 'user' ? ctx.actor.id : null;
     if (input.live === true) {

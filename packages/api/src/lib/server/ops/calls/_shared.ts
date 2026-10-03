@@ -6,6 +6,7 @@ import { HTTP_FORBIDDEN, type DB } from '@zamfono/shared';
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { coreRefusal } from '#lib/server/coreHttp.js';
 
+import { assertSelfOrAdmin } from '../gates.js';
 import { OpError, type Context } from '../types.js';
 
 /** A `calls` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
@@ -150,9 +151,7 @@ export function resolveActingUserId(
   userId: string | undefined
 ): string {
   const effective = userId ?? ctx.actor.id;
-  if (ctx.actor.role === 'user' && effective !== ctx.actor.id) {
-    throw new OpError(HTTP_FORBIDDEN, 'calls: may act only for yourself');
-  }
+  assertSelfOrAdmin(ctx.actor, effective, 'calls: may act only for yourself');
   return effective;
 }
 

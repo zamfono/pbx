@@ -1,14 +1,13 @@
 import { z } from 'zod';
 
-import { HTTP_FORBIDDEN } from '@zamfono/shared';
-
 import {
   decodeOffsetCursor,
   offsetPage,
   pageInput
 } from '#lib/server/pagination.js';
 
-import { defineOperation, OpError } from '../types.js';
+import { assertSelfOrAdmin } from '../gates.js';
+import { defineOperation } from '../types.js';
 import { toDeviceOut } from './_shared.js';
 
 /** `GET /users/{id}/devices` (§10.3): a `user` actor lists only their own devices (§5.3). */
@@ -24,12 +23,11 @@ export const list = defineOperation({
   minRole: 'user',
   readOnly: true,
   run: async (ctx, input) => {
-    if (ctx.actor.role === 'user' && ctx.actor.id !== input.userId) {
-      throw new OpError(
-        HTTP_FORBIDDEN,
-        'devices: may list only your own devices'
-      );
-    }
+    assertSelfOrAdmin(
+      ctx.actor,
+      input.userId,
+      'devices: may list only your own devices'
+    );
     const offset = decodeOffsetCursor(input.cursor);
     const { limit } = input;
     const rows = await ctx.db

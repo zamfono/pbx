@@ -1,8 +1,7 @@
 import { z } from 'zod';
 
-import { HTTP_FORBIDDEN } from '@zamfono/shared';
-
-import { defineOperation, OpError } from '../types.js';
+import { assertSelfOrAdmin } from '../gates.js';
+import { defineOperation } from '../types.js';
 import { storedForwardRules } from './_forwarding.js';
 import { liveUser } from './_shared.js';
 
@@ -19,12 +18,11 @@ export const getForwarding = defineOperation({
   minRole: 'user',
   readOnly: true,
   run: async (ctx, input) => {
-    if (ctx.actor.role === 'user' && ctx.actor.id !== input.id) {
-      throw new OpError(
-        HTTP_FORBIDDEN,
-        'users: may read only your own forwarding'
-      );
-    }
+    assertSelfOrAdmin(
+      ctx.actor,
+      input.id,
+      'users: may read only your own forwarding'
+    );
     await liveUser(ctx.db, input.id);
     const rules = await storedForwardRules(ctx.db, input.id);
     return {
