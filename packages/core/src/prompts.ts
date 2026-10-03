@@ -27,7 +27,7 @@ export const PROMPTS = {
   failedCall: 'please-try-call-later'
 } as const;
 
-export type PromptKey = keyof typeof PROMPTS;
+type PromptKey = keyof typeof PROMPTS;
 
 /** Tenant languages (§11.4 `language`) whose prompt set actually names {@link PROMPTS.failedCall}
  * (verified against the image, §9.1, `test/integration/prompts.sh`): `en`'s own file and the

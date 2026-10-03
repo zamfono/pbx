@@ -24,7 +24,7 @@ import { userOfChannel } from './onwardCall.js';
 import type { Pipeline } from './pipeline.js';
 
 /** Which action the leg is for, as its trace and the running call's name it. */
-export type AddedLegKind = 'addParty' | 'consult';
+type AddedLegKind = 'addParty' | 'consult';
 
 /**
  * The added leg's own row, from the user whose channel `byChannelId` is in `running`, its trace

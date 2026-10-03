@@ -55,7 +55,7 @@ export type RecordParams = {
   beep?: boolean;
 };
 
-export type SnoopParams = {
+type SnoopParams = {
   spy: 'in' | 'out' | 'both';
   whisper: 'none';
   app: 'zamfono';

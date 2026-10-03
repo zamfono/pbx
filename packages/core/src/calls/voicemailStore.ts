@@ -18,7 +18,7 @@ import type { MailSender } from './voicemail.js';
 const API_VOICEMAIL_DIR = '/media/voicemail';
 
 /** The mailbox's current old (read) and new (unread) counts (§9.3 "MWI"); `refreshMwi` reuses it. */
-export async function mwiCounts(
+async function mwiCounts(
   db: Db,
   mailbox: Owner
 ): Promise<{ oldMessages: number; newMessages: number }> {
@@ -46,7 +46,7 @@ export async function refreshMwi(
     .catch(logFailure(deps.ari.log, 'MWI update'));
 }
 
-export type DepositContext = {
+type DepositContext = {
   pipeline: Pipeline;
   db: Db;
   apiClient: MailSender;

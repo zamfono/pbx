@@ -18,7 +18,7 @@ import type { Snapshot } from '../internal/snapshot.js';
 /** `trunks.inbound_number_format`'s column default, for a call no trunk row accounts for. */
 const DEFAULT_FORMAT: NumberFormat = 'e164';
 
-export type InboundBoundary = {
+type InboundBoundary = {
   /** The trunk that identified the call, or `null` when no trunk row matches its endpoint. */
   trunkId: string | null;
   called: string;
@@ -49,10 +49,7 @@ const NO_NUMBER_USERS = new Set([
  * word that names no number; any other non-numeric user part passes the boundary verbatim
  * (§9.4 "Inbound number normalization": "Anything else passes the boundary verbatim").
  */
-export function callerWithheld(
-  number: string,
-  privacy: string | null
-): boolean {
+function callerWithheld(number: string, privacy: string | null): boolean {
   const suppressed = (privacy ?? '')
     .split(/[;,]/u)
     .some(value => IDENTITY_PRIVACY.has(value.trim().toLowerCase()));

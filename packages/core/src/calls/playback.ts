@@ -21,11 +21,11 @@ import {
 const PLAYBACK_FALLBACK_MS = 600_000;
 
 /** How a wait ended: the media played out, the channel went away, or no playback happened. */
-export type PlaybackEnd = 'finished' | 'hangup' | 'failed';
+type PlaybackEnd = 'finished' | 'hangup' | 'failed';
 
 /** Stops `playbackId` once a key interrupts it, without waiting: the playback having already
  * ended is the expected race, and any other failure is logged. */
-export function stopPlayback(ari: AriClient, playbackId: string): void {
+function stopPlayback(ari: AriClient, playbackId: string): void {
   ari.playbacks
     .stop(playbackId)
     .catch(logUnlessGone(ari.log, 'playback stop', { playbackId }));
@@ -97,7 +97,7 @@ export function playToneAndWait(
 export type KeyHangup = { kind: 'hangup' };
 
 /** What a play-then-key wait does with the media's end and the caller's keys. */
-export type KeyInput<T> = {
+type KeyInput<T> = {
   /** Runs once when the media ended without a key: played out, or its play request refused. */
   mediaEnded: (wait: EventWait<T | KeyHangup>) => void;
   /** Runs on every key; the first one has already stopped the media. */

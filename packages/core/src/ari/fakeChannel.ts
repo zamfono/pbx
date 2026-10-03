@@ -16,7 +16,7 @@ import type { Channel } from './types.js';
 type RouteResult = { status: number; body: unknown };
 
 /** The slice of `FakeAri` the recording scheduler drives. */
-export type RecordingHost = {
+type RecordingHost = {
   recordingFinishedAfterMs: number | null;
   recordedDurationS: number;
   emit: (event: AriEvent) => void;

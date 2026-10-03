@@ -22,7 +22,7 @@ import {
   type PlaybacksApi
 } from './types.js';
 
-export type AriClientOptions = {
+type AriClientOptions = {
   url: string;
   user: string;
   password: string;

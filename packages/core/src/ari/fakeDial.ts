@@ -13,7 +13,7 @@ import type { RouteResult } from './fakeHttp.js';
 import type { Channel } from './types.js';
 
 /** The slice of `FakeAri` placing a channel reads and drives. */
-export type DialHost = {
+type DialHost = {
   failOriginate: null | { status: number };
   /** A status `POST /channels/{id}/dial` answers with instead of dialling, for the next `count`
    * dials (every one while `count` is absent), or `null`. */

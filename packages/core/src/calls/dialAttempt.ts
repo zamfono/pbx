@@ -123,7 +123,7 @@ function watchAttemptChannelEnd(
   });
 }
 
-export type AttemptCtx = TrunkLegCtx & { route: Route | null };
+type AttemptCtx = TrunkLegCtx & { route: Route | null };
 
 function attemptCause(outcome: AttemptOutcome): string | number {
   if (outcome.kind === 'answered') {

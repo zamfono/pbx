@@ -9,7 +9,7 @@ import { liveView, type LiveEntry } from '../calls/callState.js';
 /** The part of `GET /internal/state` held in memory: the readings derived when it is served
  * (registered devices, recording-mix failures, Asterisk's channels, recordings in progress) are
  * `internal/server.ts`'s. */
-export type StoredState = Pick<
+type StoredState = Pick<
   StateResponse,
   'calls' | 'trunks' | 'trunkChannels' | 'presence'
 >;

@@ -111,7 +111,7 @@ export function waitForRecording(
 }
 
 /** How a Stasis-entry wait ended. */
-export type StasisEntry = 'entered' | 'gone' | 'timeout';
+type StasisEntry = 'entered' | 'gone' | 'timeout';
 
 /** Waits for the channel `channelId` to enter the app: `entered` on its `StasisStart`, `gone` on
  * its `ChannelDestroyed`, `timeout` once `timeoutMs` pass. Subscribe before the channel is

@@ -10,6 +10,7 @@ import {
   parseSipHeaderValue,
   SIP_HEADER_PLACEHOLDERS,
   SIP_HEADER_VALUE_MAX_BYTES,
+  utf8Bytes,
   type SipHeaderPart,
   type SipHeaderPlaceholder,
   type SipHeaderTemplate
@@ -28,7 +29,7 @@ export function cutUtf8(text: string, maxBytes: number): string {
   let bytes = 0;
   let end = 0;
   for (const char of text) {
-    const size = Buffer.byteLength(char);
+    const size = utf8Bytes(char);
     if (bytes + size > maxBytes) {
       break;
     }

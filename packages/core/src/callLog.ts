@@ -4,7 +4,11 @@
  * call end; the buffer never touches the database itself.
  */
 
-import type { CallLogLevel, LogLevelOverride } from '@zamfono/shared';
+import {
+  utf8Bytes,
+  type CallLogLevel,
+  type LogLevelOverride
+} from '@zamfono/shared';
 
 type LevelOverride = {
   level: LogLevelOverride | null;
@@ -109,7 +113,7 @@ export class CallLog {
     }
     // Every call-related log line carries the per-call correlation id (§7).
     const serialized = JSON.stringify({ callId: this.#callId, ...line });
-    const size = Buffer.byteLength(serialized, 'utf8') + NEWLINE_BYTES;
+    const size = utf8Bytes(serialized) + NEWLINE_BYTES;
     if (buffer.bytes + size > this.#maxBytes) {
       buffer.overflowed = true;
       return;

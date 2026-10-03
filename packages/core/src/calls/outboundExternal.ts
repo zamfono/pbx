@@ -61,7 +61,7 @@ async function tryRoute(params: {
 
 /** Who dials an external leg: the pipeline and trunk state, and for a leg dialled for a forward
  * target, the hops that led to it (§9.4 "Forwarded calls"). */
-export type ExternalDialCtx = {
+type ExternalDialCtx = {
   pipeline: Pipeline;
   trunkState: TrunkState;
   forward?: ForwardLeg;
@@ -71,7 +71,7 @@ export type ExternalDialCtx = {
  * route list exhausted — the same three cases `dialExternal`'s own settlement distinguishes, and
  * `features.ts`'s `addParty` (§10.2 "Three-way calls") joins the answered leg into the caller's
  * own bridge in place of `dialExternal`'s call-settlement. */
-export type ExternalDialResult =
+type ExternalDialResult =
   | { kind: 'answered'; channelId: string }
   | { kind: 'final'; failure: AttemptFailure }
   | { kind: 'exhausted'; lastFailureKind: AttemptFailure['kind'] | null };

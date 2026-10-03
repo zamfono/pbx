@@ -25,14 +25,14 @@ import { ignoreMissing } from './fsFailures.js';
 // or `.wav16` for a 16 kHz recording (§10.2 "Sample rate").
 const RAW_FILE = /-[lr]\.wav(?:16)?$/u;
 
-export type RetentionDeps = {
+type RetentionDeps = {
   db: Db;
   mediaDir: string;
   log: Logger;
   now: () => string;
 };
 
-export type RetentionResult = {
+type RetentionResult = {
   recordings: number;
   rawFiles: number;
   presenceLog: number;

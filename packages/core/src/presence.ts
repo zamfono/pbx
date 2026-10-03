@@ -34,7 +34,7 @@ import {
   type CallFlags
 } from './presenceState.js';
 
-export type PresenceDeps = {
+type PresenceDeps = {
   ari: AriClient;
   cache: ConfigCache;
   state: StateStore;

@@ -41,7 +41,7 @@ export type PresenceRefresh = { refreshAll: () => Promise<void> };
 /** `trunkState.ts`'s `TrunkState`, as far as a config change needs it. */
 export type TrunkMonitoringRefresh = { refreshMonitoring: () => Promise<void> };
 
-export type ConfigChangedDeps = {
+type ConfigChangedDeps = {
   cache: ConfigCache;
   ari: AriClient;
   presence: PresenceRefresh;

@@ -11,7 +11,7 @@ import { splitFrames, writeFrame, type AmiEvent } from './frame.js';
 
 const COMPLETE_EVENT_SUFFIX = /complete$/iu;
 
-export type AmiClientOptions = {
+type AmiClientOptions = {
   host: string;
   port: number;
   username: string;

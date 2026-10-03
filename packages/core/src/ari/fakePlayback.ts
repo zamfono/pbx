@@ -8,7 +8,7 @@ import type { AriEvent } from './events.js';
 import type { RouteResult } from './fakeHttp.js';
 
 /** The slice of `FakeAri` a playback drives. */
-export type PlaybackHost = {
+type PlaybackHost = {
   playbackFinishedAfterMs: number;
   emit: (event: AriEvent) => void;
 };

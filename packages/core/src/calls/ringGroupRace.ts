@@ -103,7 +103,7 @@ function handleBatchEvent(ctx: RaceContext, ev: AriEvent): void {
 
 /** The batch race's mutable state and its `AriClient` event handler, factored out so `ringBatch`
  * itself stays a short setup/teardown shell (§ Global Constraints max-lines-per-function). */
-export type BatchRace = {
+type BatchRace = {
   tracked: Map<string, GroupLeg>;
   promise: Promise<BatchOutcome>;
   onEvent: (ev: AriEvent) => void;

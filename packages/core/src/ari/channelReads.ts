@@ -15,7 +15,7 @@ const NO_VALUE_STATUSES: ReadonlySet<number> = new Set([
   HTTP_INTERNAL_SERVER_ERROR
 ]);
 
-export type JsonRequest = <T>(method: string, path: string) => Promise<T>;
+type JsonRequest = <T>(method: string, path: string) => Promise<T>;
 
 /**
  * `GET /channels/{id}/variable`, `null` when there is no value (`NO_VALUE_STATUSES`); every other

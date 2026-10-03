@@ -22,7 +22,7 @@ export type ForwardTarget = { id: string } & (
 
 /** A `forward_targets` row: exactly one target is set, `sip`'s being its column pair, enforced by
  * the table's CHECK. */
-export type ForwardTargetsRow = {
+type ForwardTargetsRow = {
   id: string;
   userId: string | null;
   ringGroupId: string | null;

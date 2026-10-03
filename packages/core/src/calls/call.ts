@@ -100,13 +100,13 @@ export type Call = {
   ending?: CallEnding;
 };
 
-export type CallEnding = {
+type CallEnding = {
   by: 'caller' | 'callee' | 'system';
   channelId: string | null;
   logged: boolean;
 };
 
-export type NewCallParams = {
+type NewCallParams = {
   id: string;
   direction: Call['direction'];
   callerChannelId: string | null;

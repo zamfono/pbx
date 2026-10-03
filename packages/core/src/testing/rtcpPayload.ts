@@ -17,7 +17,7 @@ const SAMPLES_PER_PACKET = 160;
 const HIGHEST_SEQ_NO = 70_123;
 const IA_JITTER = 17;
 
-export type BlockFields = {
+type BlockFields = {
   sourceSsrc: number;
   packetsLost?: number;
   lsr?: number;

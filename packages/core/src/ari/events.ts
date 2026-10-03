@@ -23,7 +23,7 @@ type ChannelEvent<T extends string, Fields = object> = EventBase & {
 
 /** The events core handles, from ARI's own event model (Asterisk 22 `events.json`), with the
  * fields core reads. */
-export type KnownAriEvent =
+type KnownAriEvent =
   | ChannelEvent<'StasisStart', { args: string[] }>
   | ChannelEvent<'StasisEnd'>
   | ChannelEvent<

@@ -84,10 +84,10 @@ async function startSnoop(
 }
 
 /** One direction of a participation: the recording's ARI name and the raw file it writes. */
-export type SnoopHalf = { name: string; file: string };
+type SnoopHalf = { name: string; file: string };
 
 /** A participation's snoop pair, recording in `format` (§10.2 "Sample rate"). */
-export type SnoopPair = {
+type SnoopPair = {
   left: SnoopHalf;
   right: SnoopHalf;
   format: RecordFormat;

@@ -35,7 +35,7 @@ const DEFAULT_RETRY_DELAYS_MS: readonly number[] = Array.from(
 
 type Waiter = { resolve: () => void; reject: (error: unknown) => void };
 
-export type ModuleReloaderOptions = {
+type ModuleReloaderOptions = {
   /** The pause before each retry of a refused reload; its length bounds the retries. */
   retryDelaysMs?: readonly number[];
   wait?: (ms: number) => Promise<void>;

@@ -78,7 +78,7 @@ export function callerGroupIds(userId: string, snapshot: Snapshot): string[] {
   return [...result];
 }
 
-export function didTargetsByNumber(
+function didTargetsByNumber(
   snapshot: Snapshot
 ): Map<string, { id: string; targetId: string }> {
   return new Map(
@@ -89,9 +89,7 @@ export function didTargetsByNumber(
   );
 }
 
-export function buildExtensionsMap(
-  snapshot: Snapshot
-): Map<string, ExtensionRow> {
+function buildExtensionsMap(snapshot: Snapshot): Map<string, ExtensionRow> {
   return new Map(
     snapshot.extensions.map(row => [
       row.ext,

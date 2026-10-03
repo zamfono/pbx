@@ -23,11 +23,11 @@ import type { Pipeline } from './pipeline.js';
 /** How the call to pick up rings: its own ring race (`pendingRing`, a user's ring), or its ring
  * group's tracked batch (`groupPickup.ts`) with a leg ringing for `memberUserId`, any member's
  * for `null`. */
-export type PickupRing =
+type PickupRing =
   { kind: 'direct' } | { kind: 'group'; memberUserId: string | null };
 
 /** The one picking up: their answered channel, and their user. */
-export type Picker = { channelId: string; userId: string | null };
+type Picker = { channelId: string; userId: string | null };
 
 /** The picker's own channel as `target`'s answering leg (§10.1 "Pickup"): it stays up as the
  * picked-up call's answered leg, so the picker hanging up ends that call for its caller too.

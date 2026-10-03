@@ -14,7 +14,7 @@ import {
 import type { EventWait } from './ariWaits.js';
 import { playForKeys, type KeyHangup } from './playback.js';
 
-export type CollectResult =
+type CollectResult =
   | { kind: 'match'; targetId: string; typed: string }
   | { kind: 'unmatched'; typed: string }
   | KeyHangup;

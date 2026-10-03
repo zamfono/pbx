@@ -29,7 +29,7 @@ import { buildOooRules, buildSchedules } from './routing/scheduleRows.js';
 
 /** `startSweep`'s dependencies: the config snapshot, the bus it emits transitions onto, the clock
  * and the stack's zone. */
-export type SweepDeps = {
+type SweepDeps = {
   cache: ConfigCache;
   bus: EventBus;
   log: Logger;

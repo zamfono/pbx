@@ -13,7 +13,7 @@ import {
 
 import { SIP_ADDRESS_INCOMPLETE, SIP_NOT_FOUND } from '../sipCodes.js';
 
-export type ExtensionOwner =
+type ExtensionOwner =
   | { kind: 'user'; userId: string }
   | { kind: 'ringGroup'; ringGroupId: string }
   | { kind: 'parking'; ext: string };

@@ -27,7 +27,7 @@ export type RtcpReportBlock = {
   dlsr: number;
 };
 
-export type RtcpReport = {
+type RtcpReport = {
   ssrc: number;
   /** The packets its sender has sent, from a sender report; null for a receiver report. */
   sentPackets: number | null;

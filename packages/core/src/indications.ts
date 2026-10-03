@@ -7,7 +7,7 @@
 /** The one zone `images/asterisk/conf/indications.conf` defines (spec §9.1, §9.4 "Cross-trunk
  * failover"): ITU-T E.180's special information tone, for every tenant, whatever its
  * `settings.country`. */
-export const ITU_ZONE = 'itu';
+const ITU_ZONE = 'itu';
 
 /** The `info` tone's `tone:` media reference in the `itu` zone (§9.4 "Cross-trunk failover"). */
 export const SPECIAL_INFORMATION_TONE_MEDIA = `tone:info;tonezone=${ITU_ZONE}`;

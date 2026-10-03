@@ -19,7 +19,7 @@
 import type { Channel } from '../ari/types.js';
 import type { Pipeline } from './pipeline.js';
 
-export type PendingTransfer = {
+type PendingTransfer = {
   parentCallId: string;
   /** The user whose routes, caller-ID and CLIR the onward call uses; `null` for an outside party. */
   transferrerUserId: string | null;

@@ -37,7 +37,7 @@ export function ringTimeoutOf(snapshot: Snapshot, userId: string): number {
   return user?.ringTimeoutS ?? DEFAULT_RING_TIMEOUT_S;
 }
 
-export type OwnRingParams = {
+type OwnRingParams = {
   /** The call whose legs the devices are, and whose ring race they run in. */
   host: Call;
   /** The call whose SIP capture each device's dialog joins (§7 level `sip`): the host itself, or
@@ -57,12 +57,12 @@ export type OwnRingParams = {
 
 /** How the ring ended: the answered device's channel, no answer, or the ring stopped outright
  * (`abandoned`, a REST hangup), after which nothing follows. */
-export type OwnRingOutcome =
+type OwnRingOutcome =
   | { kind: 'answered'; channel: Channel }
   | { kind: 'unanswered' }
   | { kind: 'abandoned' };
 
-export type OwnRing = {
+type OwnRing = {
   /** Settles once every device is placed or has failed to be. */
   placed: Promise<void>;
   outcome: Promise<OwnRingOutcome>;

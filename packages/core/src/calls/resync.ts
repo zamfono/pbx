@@ -22,7 +22,7 @@ import type { Pipeline } from './pipeline.js';
 
 const VOICEMAIL_EXTENSION = '.wav';
 
-export type ResyncDeps = {
+type ResyncDeps = {
   db: Db;
   ari: AriClient;
   now: () => string;

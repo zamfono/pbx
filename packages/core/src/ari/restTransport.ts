@@ -6,7 +6,7 @@
 import { AriError, parseErrorBody } from './types.js';
 
 /** Where Asterisk's ARI listens and the ARI user to authenticate as. */
-export type AriCredentials = {
+type AriCredentials = {
   url: string;
   user: string;
   password: string;

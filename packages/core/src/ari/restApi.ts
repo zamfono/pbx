@@ -19,7 +19,7 @@ import type {
 } from './types.js';
 
 /** Every namespace of the ARI REST surface, keyed as `AriClient` exposes them. */
-export type AriRestApi = {
+type AriRestApi = {
   channels: ChannelsApi;
   bridges: BridgesApi;
   playbacks: PlaybacksApi;

@@ -65,7 +65,7 @@ export type ExternalLeg = RouteCursor & {
 
 /** What a race leg dials: `number` as `asUser`'s call through the matching routes, or, with
  * `trunkId`, a SIP target's user part over that trunk alone (§9.4 "SIP targets"). */
-export type ExternalLegTarget = {
+type ExternalLegTarget = {
   number: string;
   asUser: string | null;
   trunkId?: string;

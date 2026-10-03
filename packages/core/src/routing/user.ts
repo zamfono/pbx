@@ -6,7 +6,7 @@
 import { SIP_BUSY_HERE, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import type { ForwardTarget } from './targets.js';
 
-export type UserDecision =
+type UserDecision =
   | { kind: 'forward'; target: ForwardTarget }
   | { kind: 'ring'; findMe: { number: string; delayS: number }[] }
   // eslint-disable-next-line no-magic-numbers -- the SIP release codes of the user step's implicit defaults (§10.1)

@@ -16,7 +16,7 @@ const VOICEMAIL_SILENCE_SECONDS = 5;
 // The `RecordingFinished`/`RecordingFailed` fallback's margin past `maxDurationSeconds`.
 const RECORDING_FALLBACK_BUFFER_S = 5;
 
-export type RecordingOutcome =
+type RecordingOutcome =
   | { kind: 'finished'; durationS: number }
   | { kind: 'failed' }
   | { kind: 'destroyed' };

@@ -21,7 +21,7 @@ import { RtcpQos } from './rtcpQos.js';
 import type { RtcpHepReport } from './rtcpReport.js';
 import { SipCapture, type SipMessage } from './sipCapture.js';
 
-export type CdrWriterDeps = {
+type CdrWriterDeps = {
   db: Db;
   ari: AriClient;
   cache: ConfigCache;

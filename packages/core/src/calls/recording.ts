@@ -23,7 +23,7 @@ import { ffmpegMix, type Mixer } from './recordingMix.js';
 import { recordFormatFor } from './recordingRate.js';
 import { storeParticipation } from './recordingStore.js';
 
-export type RecorderDeps = {
+type RecorderDeps = {
   ari: AriClient;
   cache: ConfigCache;
   db: Db;

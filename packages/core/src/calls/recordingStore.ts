@@ -19,7 +19,7 @@ export type StoreDeps = {
 };
 
 /** A stopped participation: its id, whose it was, and where its files live. */
-export type StoppedParticipation = {
+type StoppedParticipation = {
   id: string;
   callId: string;
   userId: string | null;

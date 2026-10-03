@@ -15,7 +15,7 @@ import type { Pipeline } from './calls/pipeline.js';
 export const STOP_DRAIN_MS = 8000;
 
 /** What a booted `core` releases as it stops. */
-export type Running = {
+type Running = {
   jobs: { stop: () => void };
   hep: { close: () => void } | null;
   server: { close: () => Promise<void> };

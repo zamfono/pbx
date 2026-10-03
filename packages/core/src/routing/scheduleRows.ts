@@ -9,7 +9,7 @@ import type { Snapshot } from '../internal/snapshot.js';
 import type { OooRule, Schedule } from './schedule.js';
 
 /** The `Scope` a row's `scopeUserId`/`scopeRingGroupId`/`scopeMenuId` exclusive arc encodes. */
-export function scopeFromRow(row: {
+function scopeFromRow(row: {
   scopeUserId: string | null;
   scopeRingGroupId: string | null;
   scopeMenuId: string | null;
