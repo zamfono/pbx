@@ -103,14 +103,12 @@ async function ringDevices(
 
 /**
  * Step 4: originate every registered device (+ find-me legs), first answer wins (§10.1).
- * `existingBridgeId`, else the call's own `joinBridgeId`, makes the win join that bridge rather
- * than a fresh one. Returns the decision `applyRingOutcome` hands back.
+ * The call's `joinBridgeId` makes the win join that bridge rather than a fresh one. Returns the decision `applyRingOutcome` hands back.
  */
 export async function ringUser(
   pipeline: Pipeline,
   call: Call,
-  userId: string,
-  existingBridgeId: string | null = null
+  userId: string
 ): Promise<UnappliedDecision | null> {
   const snapshot = await pipeline.deps.cache.get();
   const user = userById(snapshot, userId);
@@ -143,7 +141,7 @@ export async function ringUser(
   pipeline.pendingRing.set(call.id, {
     resolve: resolveOutcome,
     timer,
-    existingBridgeId: existingBridgeId ?? takeJoinBridge(call)
+    existingBridgeId: takeJoinBridge(call)
   });
   // §9.3 "a user: RINGING while any of their devices rings".
   pipeline.deps.presence.setCallState(

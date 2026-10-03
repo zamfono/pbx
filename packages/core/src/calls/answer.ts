@@ -8,7 +8,7 @@
  * told the call is up (§10.6).
  */
 import { logUnlessGone } from '../ari/failures.js';
-import { callerChannel, type Call, type Leg } from './call.js';
+import { callerChannel, takeJoinBridge, type Call, type Leg } from './call.js';
 import { callUp } from './callState.js';
 import { traceCodecs } from './codecTrace.js';
 import type { Pipeline } from './pipeline.js';
@@ -127,15 +127,14 @@ export async function bridgeAnswered(
 
 /**
  * An outbound or emergency dial's answered trunk leg (§9.4): claims it and bridges it with the
- * caller, or joins it to `existingBridgeId` (`*5` to an external number, §10.2 "Three-way
- * calls"). Returns false, hanging the channel up, when the call already had an answer or the
- * bridge to join is gone.
+ * caller, or joins it to the call's `joinBridgeId` (`*5` to an external or emergency number,
+ * §10.2 "Three-way calls"). Returns false, hanging the channel up, when the call already had an
+ * answer or the bridge to join is gone.
  */
 export async function settleAnswered(
   pipeline: Pipeline,
   call: Call,
-  channelId: string,
-  existingBridgeId: string | null = null
+  channelId: string
 ): Promise<boolean> {
   const leg: Leg = call.legs.get(channelId) ?? {
     channelId,
@@ -152,5 +151,5 @@ export async function settleAnswered(
     );
     return false;
   }
-  return bridgeAnswered(pipeline, call, leg, existingBridgeId);
+  return bridgeAnswered(pipeline, call, leg, takeJoinBridge(call));
 }

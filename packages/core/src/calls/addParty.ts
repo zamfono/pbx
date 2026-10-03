@@ -40,7 +40,7 @@ async function releaseFeatureDial(
 }
 
 /** An internal target (§10.1 steps 4-5) rung on a fresh pass over `call`, its win joining
- * `activeBridgeId` (`Call.joinBridgeId`). Whether the added party joined. */
+ * `activeBridgeId`. Whether the added party joined. */
 async function ringInternalTarget(
   pipeline: Pipeline,
   call: Call,
@@ -48,7 +48,6 @@ async function ringInternalTarget(
   activeBridgeId: string,
   target: Extract<AddedTarget, { kind: 'user' | 'ringGroup' }>
 ): Promise<boolean> {
-  call.joinBridgeId = activeBridgeId;
   if (target.kind === 'user') {
     call.calleeUserId = target.userId;
     // An added party is only rung: a forward or mailbox handed back is left undone.
@@ -56,8 +55,6 @@ async function ringInternalTarget(
   } else {
     await ringGroup(pipeline, call, target.ringGroupId);
   }
-  // A ring that never won leaves the bridge to join behind; nothing reads it after this point.
-  delete call.joinBridgeId;
   if (call.status === 'answered') {
     await releaseFeatureDial(pipeline, call);
   }
@@ -81,7 +78,7 @@ async function dialExternalTarget(
     target.clir
   );
   if (result.kind === 'answered') {
-    await settleAnswered(pipeline, call, result.channelId, activeBridgeId);
+    await settleAnswered(pipeline, call, result.channelId);
     await releaseFeatureDial(pipeline, call);
     return call.bridgeId === activeBridgeId;
   }
@@ -98,10 +95,9 @@ async function dialExternalTarget(
  * ring-group target re-enters the normal per-user or ring-group routing — `runUserStep`/
  * `ringGroup`, the same functions Entry itself dispatches to (§10.1 steps 4-5) — so its forward
  * rules, find-me legs and the ring group's own strategy all apply exactly as they would for any
- * other call to it; `Call.joinBridgeId` (as `parking.ts`'s ring-back also sets it) makes the
- * winning leg join `activeBridgeId` in place of a bridge of its own. An external
- * number goes through §9.4's route selection, an emergency number through `emergency.ts`, and
- * either answer joins the bridge through `answer.ts`'s `settleAnswered`. `call.to` and
+ * other call to it. An external number goes through §9.4's route selection, an emergency number
+ * through `emergency.ts`. Whichever answers joins `activeBridgeId` in place of a bridge of its
+ * own, through `Call.joinBridgeId` (as `parking.ts`'s ring-back also sets it). `call.to` and
  * `call.direction` become the pipeline's view of the target (§11.2 `calls`). `call`'s own
  * channel, never part of the added leg, is released once the dial settles. Whether the added
  * party joined. Shared with the party `api` adds (`addedParty.ts`), whose call has no caller
@@ -120,32 +116,42 @@ export async function dialAddPartyTarget(
     await release(pipeline, call, target.code, 'failed');
     return false;
   }
-  if (target.kind === 'user' || target.kind === 'ringGroup') {
-    call.to = target.to;
-    return ringInternalTarget(pipeline, call, snapshot, activeBridgeId, target);
-  }
-  call.to = target.number;
-  call.direction = 'outbound';
-  const { trunkState } = pipeline.deps;
-  if (target.kind === 'external') {
-    return dialExternalTarget(
-      { pipeline, trunkState },
-      call,
-      activeBridgeId,
-      target
-    );
-  }
-  // §10.1 "Emergency calls": the routing trace is kept at level `events`.
-  call.log.raise('events');
   call.joinBridgeId = activeBridgeId;
-  await dialEmergency(
-    pipeline,
-    trunkState,
-    call,
-    target.number,
-    call.callerUserId
-  );
-  delete call.joinBridgeId;
+  try {
+    if (target.kind === 'user' || target.kind === 'ringGroup') {
+      call.to = target.to;
+      return await ringInternalTarget(
+        pipeline,
+        call,
+        snapshot,
+        activeBridgeId,
+        target
+      );
+    }
+    call.to = target.number;
+    call.direction = 'outbound';
+    const { trunkState } = pipeline.deps;
+    if (target.kind === 'external') {
+      return await dialExternalTarget(
+        { pipeline, trunkState },
+        call,
+        activeBridgeId,
+        target
+      );
+    }
+    // §10.1 "Emergency calls": the routing trace is kept at level `events`.
+    call.log.raise('events');
+    await dialEmergency(
+      pipeline,
+      trunkState,
+      call,
+      target.number,
+      call.callerUserId
+    );
+  } finally {
+    // A dial whose answer never took the bridge leaves it behind; nothing reads it after this.
+    delete call.joinBridgeId;
+  }
   if (call.bridgeId !== activeBridgeId) {
     return false;
   }

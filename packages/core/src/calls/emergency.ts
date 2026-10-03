@@ -5,7 +5,7 @@ import { userById, type Snapshot } from '../internal/snapshot.js';
 import { emergencyTrunks } from '../routing/trunk.js';
 import { SIP_SERVICE_UNAVAILABLE } from '../sipCodes.js';
 import { settleAnswered } from './answer.js';
-import { release, takeJoinBridge, type Call } from './call.js';
+import { release, type Call } from './call.js';
 import { resolveAttemptIdentity, type UserRow } from './callerIdentity.js';
 import { attemptRoute, type AttemptOutcome } from './dialAttempt.js';
 import type { Pipeline } from './pipeline.js';
@@ -87,8 +87,8 @@ function anyLiveEmergencyTrunk(
  * Emergency calls (§10.1 "Emergency calls"): the tenant's emergency trunks in priority order, no
  * route, caller list, CLIR or cap, failing over to the next live one on any non-answer and only
  * failing the call once none remains; a trunk without `trunks.emergency` is never tried. The
- * answer joins the bridge `bridgeJoin.ts`'s registry hands over for `call`, if any — `*5`'s added
- * leg joining the running conversation (§10.2 "Three-way calls") — else a bridge of its own.
+ * answer joins `call.joinBridgeId`, if set — `*5`'s added leg joining the running conversation
+ * (§10.2 "Three-way calls") — else a bridge of its own.
  */
 export async function dialEmergency(
   pipeline: Pipeline,
@@ -120,12 +120,7 @@ export async function dialEmergency(
     });
     if (outcome?.kind === 'answered') {
       // eslint-disable-next-line no-await-in-loop -- the loop returns right after, so this is the loop's last iteration
-      await settleAnswered(
-        pipeline,
-        call,
-        outcome.channelId,
-        takeJoinBridge(call)
-      );
+      await settleAnswered(pipeline, call, outcome.channelId);
       return;
     }
   }
