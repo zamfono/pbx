@@ -210,9 +210,14 @@ why the specified behaviour changed; the commit history, how.
 ### Fixed
 
 - `core` ignored the stop signal, so every `docker compose stop`, restart and update waited out
-  the 10 s grace period and then killed it, cutting off whatever it was doing for a call. `core`
-  now stops on SIGTERM and SIGINT: it takes no new call, lets the calls' event handling in
-  progress finish for up to 8 s, then closes its connections to Asterisk and exits.
+  the 10 s grace period and then killed it, and the calls it left running died with Asterisk,
+  their history entries marked `interrupted` at the next start. `core` now stops on SIGTERM and
+  SIGINT and winds its calls down first: callers not answered yet, and calls arriving during the
+  stop, are released with SIP 503 so a provider can try another route; answered calls are hung
+  up normally, their recordings and voicemail messages saved; every call's history entry is
+  closed as on any other end, unanswered ones as `failed`. It waits up to 8 s for this, then
+  closes its connections to Asterisk and exits. A `docker compose restart core` therefore ends
+  the calls in progress.
 - REST and `/events` accepted the access token of a user whose stored role is none of `owner`,
   `admin` and `user`, acting with the role the token was issued with, while MCP refused it. Such a
   token is now refused everywhere, with 401 on REST and MCP and a closed socket on `/events`.

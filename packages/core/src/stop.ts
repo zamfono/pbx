@@ -1,5 +1,5 @@
-// How `core` stops (§3.1 "Independence"): on SIGTERM or SIGINT it takes no new work, lets the
-// calls' event handling in progress finish within a bound, releases the rest and exits.
+// How `core` stops (§3.1 "Independence"): on SIGTERM or SIGINT it takes no new work, winds its
+// calls down and lets their event handling finish within a bound, releases the rest and exits.
 import process from 'node:process';
 
 import type { AmiClient } from './ami/client.js';
@@ -8,7 +8,7 @@ import type { Logger } from './ari/types.js';
 import type { Pipeline } from './calls/pipeline.js';
 
 /**
- * How long a stop waits for the calls' event handling in progress. Its ceiling is the container's
+ * How long a stop waits for the calls' wind-down and event handling. Its ceiling is the container's
  * stop grace period, Compose's default 10 s (compose.yaml sets no `stop_grace_period`), after
  * which Docker kills the process; the rest of that period is left for closing ARI and AMI.
  */
@@ -35,16 +35,21 @@ async function drainPipeline(pipeline: Pipeline, log: Logger): Promise<void> {
   clearTimeout(timer);
   if (outcome === 'timeout') {
     log.warn(
-      { handling: pipeline.handling, waitedMs: STOP_DRAIN_MS },
-      "core stopping before the calls' event handling finished"
+      {
+        handling: pipeline.handling,
+        windingDown: pipeline.windDowns.callIds,
+        waitedMs: STOP_DRAIN_MS
+      },
+      'core stopping before its calls were wound down'
     );
   }
 }
 
 /**
  * New work stops first: the background jobs, the HEP collector, the internal server and the
- * pipeline's new calls. ARI and AMI stay open until the handling in progress has finished, since
- * it still calls Asterisk and waits on the events of its calls.
+ * pipeline's new calls, whose wind-down starts with it. ARI and AMI stay open until the drain has
+ * finished, since the wind-down and the handling in progress call Asterisk and wait on the events
+ * of their calls.
  */
 async function release(running: Running): Promise<void> {
   const { jobs, hep, server, pipeline, ari, ami, log } = running;

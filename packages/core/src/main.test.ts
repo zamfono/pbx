@@ -308,9 +308,10 @@ describe('stopping on SIGTERM or SIGINT', () => {
       args: [
         {
           handling: [{ event: 'StasisStart', callId: null }],
+          windingDown: [],
           waitedMs: STOP_DRAIN_MS
         },
-        "core stopping before the calls' event handling finished"
+        'core stopping before its calls were wound down'
       ]
     });
   });

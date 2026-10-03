@@ -160,6 +160,29 @@ describe('parking ring-back', () => {
     );
   }
 
+  it('places no leg once core is stopping, when the park times out after the wind-down', async () => {
+    await setUp();
+    const anna = await seedParker();
+    const ben = await seedBen();
+    await seedFallback({ userId: ben });
+    await parkFor(anna);
+    await rig.pipeline.drain();
+
+    // The onward call to the fallback starts ringing Ben and ends that ring at once.
+    await eventually(() => {
+      const states = fakeAri.calls
+        .filter(entry => entry.path === 'deviceStates/Stasis:presence-102')
+        .map(entry => (entry.body as { deviceState: string }).deviceState);
+      expect(states.slice(states.indexOf('RINGING'))).toEqual([
+        'RINGING',
+        'NOT_INUSE'
+      ]);
+    }, RINGBACK_WAIT_MS);
+
+    expect(placedTo('e101')).toBe(false);
+    expect(placedTo('e102')).toBe(false);
+  });
+
   it('connects the parked party to a fallback user who answers, in an onward call of its own', async () => {
     await setUp();
     const anna = await seedParker();

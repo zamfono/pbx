@@ -26,8 +26,8 @@
  * is sent: from then on the leg rings, and its far end may answer or refuse before the dial's own
  * answer arrives.
  *
- * A leg that cannot be placed (the create or the dial refused, the channel gone or never in the
- * app) throws `PlacementError`; every caller takes it as a leg that ended at once, so a refusal
+ * A leg that cannot be placed (`core` stopping, §3.1 "Independence"; the create or the dial
+ * refused, the channel gone or never in the app) throws `PlacementError`; every caller takes it as a leg that ended at once, so a refusal
  * never escapes the ring or the attempt it belongs to. A refused dial's channel is hung up without
  * waiting for the answer, so the caller has settled the leg before that hangup's
  * `ChannelDestroyed` can arrive.
@@ -45,7 +45,7 @@ export const STASIS_WAIT_MS = 5000;
 /** Why a leg could not be placed: its create or dial refused, or its channel gone or never in
  * the app before the dial. */
 export class PlacementError extends Error {
-  readonly step: 'create' | 'stasis' | 'dial';
+  readonly step: 'stopping' | 'create' | 'stasis' | 'dial';
 
   constructor(step: PlacementError['step'], cause?: unknown) {
     super(`leg placement failed at ${step}`, { cause });
@@ -114,6 +114,10 @@ export async function originateLeg(
   params: OriginateParams & { channelId: string },
   dialling: (channel: Channel) => void
 ): Promise<Channel> {
+  // A timer or a step still running for a call already wound down places nothing.
+  if (pipeline.stopping) {
+    throw new PlacementError('stopping');
+  }
   const { ari, cdr } = pipeline.deps;
   const { callerId, timeout, variables, ...placement } = params;
   const { channelId } = placement;

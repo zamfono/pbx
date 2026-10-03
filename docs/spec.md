@@ -93,7 +93,7 @@ Three long-running application services run per stack, plus the TLS proxy and a 
 
 **Events.** `core` produces all call, presence, OOO and opening-hours events. Its sweep for OOO and opening hours writes nothing; it evaluates and emits. It runs at the next instant any scope's OOO rule starts or expires or its opening hours open or close, at once after a config change, and at least hourly. `api` produces the `backup.*` events of its own jobs, subscribes to `core` over the internal WebSocket, and fans both streams out to authenticated `/events` clients and to webhooks (§10.6).
 
-**Independence.** Either process can restart on its own. An `api` restart never affects live calls. On SIGTERM or SIGINT `core` takes no new call, lets the event handling of the calls in progress finish for a bounded time below the container's stop grace period, then closes its ARI and AMI connections and exits.
+**Independence.** Either process can restart on its own. An `api` restart never affects live calls. On SIGTERM or SIGINT `core` takes no new call and winds down the calls in progress: a caller not answered yet, and the caller of a call arriving during the stop, is released with SIP 503, so a provider can try elsewhere; an answered call is hung up with normal clearing (Q.850 16), its recordings and a voicemail deposit in progress saved as on a hang-up. Each call's `calls` row is closed as on any other end, an unanswered call's as `failed`. `core` waits for the wind-down and the calls' event handling for a bounded time below the container's stop grace period, then closes its ARI and AMI connections and exits.
 
 ### 3.2 Design rules
 
@@ -1032,7 +1032,7 @@ Two processes run for the life of the stack; `migrate` is a third container that
 
 ### 10.1 Core (ARI) — call handling model
 
-**Boot and restart.** On boot the core connects to the ARI WebSocket, registers the Stasis application `zamfono` and resyncs its state. After a crash or restart, live calls keep their media flowing in their Asterisk bridges. The restarted core adopts the orphaned channels only for cleanup: it marks their `calls` rows `interrupted`, hangs up the bridges when a party leaves, hangs up parked calls whose parker it no longer knows, and deletes voicemail files without a `voicemails` row. Live state is not reconstructed, so transfer and recording control for those calls is lost. That is accepted for the MVP.
+**Boot and restart.** On boot the core connects to the ARI WebSocket, registers the Stasis application `zamfono` and resyncs its state. After a crash, live calls keep their media flowing in their Asterisk bridges; an orderly stop ends them first (§3.1 "Independence"). The restarted core adopts the orphaned channels only for cleanup: it marks their `calls` rows `interrupted`, hangs up the bridges when a party leaves, hangs up parked calls whose parker it no longer knows, and deletes voicemail files without a `voicemails` row. Live state is not reconstructed, so transfer and recording control for those calls is lost. That is accepted for the MVP.
 
 **Call aggregate.** Every call is a Call aggregate in memory: caller channel, callee channels, bridge, timers, routing cursor. SQLite holds only durable outcomes — history, voicemail, recordings, presence transitions — never live state.
 

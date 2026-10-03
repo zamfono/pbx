@@ -28,6 +28,7 @@ import type { ParticipationRecorder } from './recordParticipation.js';
 import { followTransfers } from './referTransfers.js';
 import type { TrunkState } from './trunkState.js';
 import type { MailSender } from './voicemail.js';
+import { refuseCall, startsCall, WindDowns } from './windDown.js';
 
 export type PipelineDeps = {
   ari: AriClient;
@@ -76,15 +77,6 @@ export type PipelineDeps = {
   presence: Presence;
 };
 
-/** A caller's `StasisStart` (§9.2 `inbound,<exten>`, `outbound,<exten>`): the event each call
- * starts with. */
-function startsCall(ev: AriEvent): boolean {
-  const [kind] = (ev.args as (string | undefined)[] | undefined) ?? [];
-  return (
-    ev.type === 'StasisStart' && (kind === 'inbound' || kind === 'outbound')
-  );
-}
-
 // One Pipeline per `core` process, wired directly to its `AriClient`'s event stream so
 // constructing it is the only wiring a caller needs to do, the transfers Asterisk executes on SIP
 // `REFER` included. The live state below is public so the call modules' functions, taking the
@@ -114,19 +106,23 @@ export class Pipeline {
 
   /** The events whose handling is in progress, by the promise that settles as it ends. */
   private readonly handlingInProgress = new Map<Promise<void>, AriEvent>();
-  /** Set by `drain`: a call's first event starts no handling. */
+  /** The calls `drain` is ending. */
+  readonly windDowns = new WindDowns();
+  /** Set by `drain`: a call's first event releases its caller (`refuseCall`), and a call made
+   * reachable from then on is wound down at once. */
   private draining = false;
 
   constructor(deps: PipelineDeps) {
     this.deps = deps;
     this.deps.ari.on('event', (ev: AriEvent) => {
-      if (this.draining && startsCall(ev)) {
-        return;
-      }
       // A rejection here is a fault in the routing of one call, never a reason to stop handling
       // the stream. The call's own trace stops where the throw happened and says nothing about
       // it, so the log line is the only account of what went wrong.
-      const handled = this.routeEvent(ev)
+      const handled = (
+        this.draining && startsCall(ev)
+          ? refuseCall(this, ev.channel as Channel)
+          : this.routeEvent(ev)
+      )
         .catch((error: unknown) => {
           // §7: a call-related line carries the call's correlation id.
           this.deps.logger.error(
@@ -142,6 +138,11 @@ export class Pipeline {
     followTransfers(this);
   }
 
+  /** Whether `drain` has begun: from then on no leg is placed (`legOriginate.ts`). */
+  get stopping(): boolean {
+    return this.draining;
+  }
+
   /** The events whose handling is in progress, with the call each belongs to. */
   get handling(): { event: string; callId: string | null }[] {
     return [...this.handlingInProgress.values()].map(ev => ({
@@ -150,23 +151,33 @@ export class Pipeline {
     }));
   }
 
-  /** Resolves once no event's handling is in progress, handling that starts while it waits
-   * included. */
+  /** Resolves once no event's handling nor call's wind-down is in progress, those that start
+   * while it waits included. */
   async idle(): Promise<void> {
-    if (this.handlingInProgress.size === 0) {
+    const pending = [
+      ...this.handlingInProgress.keys(),
+      ...this.windDowns.pending
+    ];
+    if (pending.length === 0) {
       return;
     }
-    await Promise.all(this.handlingInProgress.keys());
+    await Promise.all(pending);
     await this.idle();
   }
 
   /**
-   * Starts no further calls and resolves once the event handling in progress has finished. The
-   * events of the calls already handled are still routed: a ring or a transfer in progress
-   * finishes on them.
+   * Starts no further calls, winds every call down (`windDown.ts`) and resolves once that and
+   * the event handling in progress have finished. The events of the calls are still routed: a
+   * wind-down and the handling it cuts short finish on them.
    */
   drain(): Promise<void> {
     this.draining = true;
+    for (const call of [
+      ...this.callByChannel.values(),
+      ...this.channelless.values()
+    ]) {
+      this.windDowns.start(this, call);
+    }
     return this.idle();
   }
 
@@ -260,14 +271,18 @@ export class Pipeline {
     // id from the originate and drives its recording directly, so the pipeline leaves it alone.
   }
 
-  /** Makes `call` reachable: by its caller channel, or by its id while it has none. */
+  /** Makes `call` reachable: by its caller channel, or by its id while it has none. One made
+   * reachable during `drain` is wound down at once. */
   registerCall(call: Call): void {
     if (call.callerChannelId === null) {
       this.channelless.set(call.id, call);
-      return;
+    } else {
+      this.channelless.delete(call.id);
+      this.callByChannel.set(call.callerChannelId, call);
     }
-    this.channelless.delete(call.id);
-    this.callByChannel.set(call.callerChannelId, call);
+    if (this.draining) {
+      this.windDowns.start(this, call);
+    }
   }
 
   /** Writes `call`'s history entry (`CdrWriter.finish`): every way a call ends comes through here,
