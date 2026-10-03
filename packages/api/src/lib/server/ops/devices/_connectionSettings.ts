@@ -1,11 +1,7 @@
 import * as env from '$app/env/private';
 import type { Transaction } from 'kysely';
 
-import {
-  HTTP_SERVICE_UNAVAILABLE,
-  type DB,
-  type FeatureCodes
-} from '@zamfono/shared';
+import type { DB, FeatureCodes } from '@zamfono/shared';
 
 import {
   plainSipTransports,
@@ -17,7 +13,6 @@ import {
 
 import { loadSettings } from '../settings/_shared.js';
 import type { Codec } from '../trunks/_shared.js';
-import { OpError } from '../types.js';
 import { userExtension } from '../users/_extensions.js';
 import { liveUser } from '../users/_shared.js';
 import type { DeviceRow } from './_shared.js';
@@ -53,13 +48,10 @@ export async function connectionSettings(
   device: DeviceRow,
   password: string
 ): Promise<ConnectionSettings> {
-  const fqdn = stackDomain(env);
-  if (fqdn === null) {
-    throw new OpError(HTTP_SERVICE_UNAVAILABLE, 'devices: FQDN is not set');
-  }
   const user = await liveUser(db, device.userId);
   const extension = await userExtension(db, device.userId);
   const settings = await loadSettings(db);
+  const fqdn = stackDomain(env);
   const tls = device.transport === 'tls';
   return {
     server: fqdn,

@@ -7,6 +7,10 @@
  */
 import { vi } from 'vitest';
 
+// Every stack has its FQDN, which `src/env.ts` requires (§6.3 "Environment"); a suite that needs
+// a particular one sets it.
+process.env.FQDN ??= 'pbx.test';
+
 vi.mock('$app/env/private', async () => {
   const [{ env }, { variables }] = await Promise.all([
     import('node:process'),

@@ -42,7 +42,7 @@ afterEach(() => {
   vi.mocked(updaterClient).mockReset();
   delete process.env.ZAMFONO_VERSION;
   delete process.env.ZAMFONO_REVISION;
-  delete process.env.FQDN;
+  vi.unstubAllEnvs();
   delete process.env.STACK_IPV4;
   delete process.env.EXTERNAL_IPV4;
 });
@@ -69,7 +69,7 @@ describe('system.info', () => {
       autoUpdate: { enabled: false, failed: null },
       maintenanceGate: { certSync: null, autoUpdate: null },
       ringotel: { profilePending: false },
-      stack: { domain: null, ipv4: null }
+      stack: { domain: 'pbx.test', ipv4: null }
     });
   });
 
@@ -109,7 +109,7 @@ describe('system.info', () => {
       autoUpdate: { enabled: false, failed: null },
       maintenanceGate: { certSync: null, autoUpdate: null },
       ringotel: { profilePending: false },
-      stack: { domain: null, ipv4: null }
+      stack: { domain: 'pbx.test', ipv4: null }
     });
   });
 
@@ -229,7 +229,7 @@ describe('system.info', () => {
 
   it("reports the stack's domain and the IPv4 address SIP and media use (§6.1)", async () => {
     const db = await makeTestDb();
-    process.env.FQDN = 'pbx.example.com';
+    vi.stubEnv('FQDN', 'pbx.example.com');
     process.env.STACK_IPV4 = '203.0.113.34';
     process.env.EXTERNAL_IPV4 = '';
     expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({

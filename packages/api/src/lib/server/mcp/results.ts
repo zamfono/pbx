@@ -55,23 +55,16 @@ const ICONS = [
 ];
 
 /**
- * The `serverInfo` (`Implementation`) both eras send (§10.5). An icon's `src` must be an absolute
- * URI, so the icons are left out while `FQDN` is unset, as it is outside a stack (`vite dev`).
+ * The `serverInfo` (`Implementation`) both eras send (§10.5); an icon's `src` is an absolute URI
+ * on the stack's own origin.
  */
 export function serverInfo(env: NodeJS.ProcessEnv): Result {
-  const info: Result = {
+  const origin = stackOrigin(stackDomain(env));
+  return {
     name: 'zamfono',
     title: 'Zamfono',
     version: resolveVersion(env).display,
-    websiteUrl: WEBSITE_URL
-  };
-  const fqdn = stackDomain(env);
-  if (fqdn === null) {
-    return info;
-  }
-  const origin = stackOrigin(fqdn);
-  return {
-    ...info,
+    websiteUrl: WEBSITE_URL,
     icons: ICONS.map(({ path, ...icon }) => ({
       src: `${origin}${path}`,
       ...icon
@@ -79,16 +72,12 @@ export function serverInfo(env: NodeJS.ProcessEnv): Result {
   };
 }
 
-// `version` is the stack's own (§7 "Version") and the icons follow `FQDN`, read once: none of
-// these environment variables changes for the life of the process.
-const SERVER_INFO = serverInfo(privateEnv);
-
 /** A 2026-07-28 `complete` result, identifying the server as the schema says it SHOULD. */
 function complete(fields: Result): Result {
   return {
     resultType: 'complete',
     ...fields,
-    _meta: { [SERVER_INFO_META_KEY]: SERVER_INFO }
+    _meta: { [SERVER_INFO_META_KEY]: serverInfo(privateEnv) }
   };
 }
 
@@ -104,7 +93,7 @@ export function initializeResult(
   return {
     protocolVersion,
     capabilities: CAPABILITIES,
-    serverInfo: SERVER_INFO,
+    serverInfo: serverInfo(privateEnv),
     instructions
   };
 }
@@ -180,6 +169,6 @@ export function inputRequiredResult(key: string, elicitation: Result): Result {
     inputRequests: {
       [key]: { method: 'elicitation/create', params: elicitation }
     },
-    _meta: { [SERVER_INFO_META_KEY]: SERVER_INFO }
+    _meta: { [SERVER_INFO_META_KEY]: serverInfo(privateEnv) }
   };
 }

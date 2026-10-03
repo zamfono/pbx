@@ -7,10 +7,10 @@ describe('stackDomain', () => {
     expect(stackDomain({ FQDN: 'pbx.example.com' })).toBe('pbx.example.com');
   });
 
-  it('is null while FQDN is unset or empty', () => {
-    expect(stackDomain({})).toBeNull();
+  it('throws while FQDN is unset or empty, which stops the boot', () => {
+    expect(() => stackDomain({})).toThrow(/FQDN/u);
     // Compose hands `${FQDN}` to `api` as an empty string while `.env` leaves it unset.
-    expect(stackDomain({ FQDN: '' })).toBeNull();
+    expect(() => stackDomain({ FQDN: '' })).toThrow(/FQDN/u);
   });
 });
 

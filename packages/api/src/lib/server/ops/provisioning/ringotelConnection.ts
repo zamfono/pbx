@@ -1,6 +1,6 @@
 import * as env from '$app/env/private';
 
-import { HTTP_CONFLICT, HTTP_SERVICE_UNAVAILABLE } from '@zamfono/shared';
+import { HTTP_CONFLICT } from '@zamfono/shared';
 
 import { buildBranchProvision } from '#lib/server/provisioning/ringotel.js';
 import type { RingotelClient } from '#lib/server/provisioning/ringotelClient.js';
@@ -18,20 +18,9 @@ import { OpError, type Context } from '../types.js';
 // stack's own connection address and profile, the organization's `params`, and the one way the
 // two ids reach `settings`.
 
-/**
- * The stack's connection address, `<fqdn>:5061`, from `FQDN` (§6.3), the one hostname `api` is
- * given. `FQDN` is set by the deployment, never by the caller, so a missing one is this stack's
- * own misconfiguration rather than a bad request.
- */
+/** The stack's connection address, `<fqdn>:5061`, from `FQDN` (§6.3), the one hostname `api` is given. */
 export function stackBranchAddress(): string {
-  const fqdn = stackDomain(env);
-  if (fqdn === null) {
-    throw new OpError(
-      HTTP_SERVICE_UNAVAILABLE,
-      'provisioning: FQDN is not set'
-    );
-  }
-  return `${fqdn}:${SIP_TLS_PORT}`;
+  return `${stackDomain(env)}:${SIP_TLS_PORT}`;
 }
 
 /** One organization and one connection per stack (§10.4): a stack already set up refuses a

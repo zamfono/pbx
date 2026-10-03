@@ -6,8 +6,8 @@ import { serverInfo } from './results.js';
 const STATIC_DIR = new URL('../../../../static/', import.meta.url);
 
 describe('serverInfo', () => {
-  it('names the stack, and has no icons without FQDN', () => {
-    expect(serverInfo({})).toEqual({
+  it('names the stack', () => {
+    expect(serverInfo({ FQDN: 'pbx.example' })).toMatchObject({
       name: 'zamfono',
       title: 'Zamfono',
       version: expect.any(String) as string,

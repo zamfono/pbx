@@ -129,7 +129,7 @@ export async function sendMail(
     ...req.values,
     companyName: settings.companyName,
     recipientName: recipients.name,
-    fqdn: stackDomain(env) ?? ''
+    fqdn: stackDomain(env)
   };
   const rendered = template.render(values, {
     language,

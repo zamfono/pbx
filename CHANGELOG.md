@@ -81,9 +81,10 @@ why the specified behaviour changed; the commit history, how.
   a `tls` device; UDP and/or TCP on 5060, as `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED` allow, for a
   `plain` one), `username` and `password`, `extension` and `displayName`, `mediaEncryption`
   (`srtp` or `none`), `codecs` and `voicemailCode`. `GET /devices/{id}/credentials` returns the
-  same set for a `manual` device; a `ringotel` device's reveal is unchanged. Creating or revealing
-  a `manual` device answers 503 while `FQDN` is not set. Help topic `tested-softphones` maps the
-  fields onto Groundwire and MicroSIP.
+  same set for a `manual` device; a `ringotel` device's reveal is unchanged. Help topic
+  `tested-softphones` maps the fields onto Groundwire and MicroSIP.
+- `api` refuses to start while `FQDN` is unset or empty in `.env`, which `setup.sh` always
+  writes; `GET /system/info` therefore always reports `stack.domain`.
 - On a DST night, an opening-hours edge or a maintenance hour at a local time the clock change
   skips or repeats now lies at the earlier of its two possible instants, as the time filters of
   `GET /calls`, `GET /audit` and `GET /presence/log` already read such a time: the `hours`

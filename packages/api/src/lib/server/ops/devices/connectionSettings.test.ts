@@ -139,15 +139,4 @@ describe("devices: a manual device's connection settings (§10.4)", () => {
       .executeTakeFirstOrThrow();
     expect(audit).toEqual({ entityId: created.device.id, undoable: 0 });
   });
-
-  it('refuses with 503 and creates nothing while FQDN is unset', async () => {
-    const db = await makeTestDb();
-    const userId = await seedUser(db);
-    vi.stubEnv('FQDN', undefined);
-    await expect(createManual(db, userId, {})).rejects.toMatchObject({
-      status: 503
-    });
-    const devices = await db.selectFrom('devices').select('id').execute();
-    expect(devices).toEqual([]);
-  });
 });

@@ -49,13 +49,6 @@ export function assertHashOrRelay(env: NodeJS.ProcessEnv): void {
   }
 }
 
-/** Mailing the setup link needs a real origin to build an absolute URL a mail client can open. */
-export function assertOriginWhenMailingSetupLink(env: NodeJS.ProcessEnv): void {
-  if (!env.BOOTSTRAP_OWNER_PASSWORD_HASH) {
-    requiredEnv(env, 'FQDN');
-  }
-}
-
 /** `EXT_LENGTH`, parsed and floored at 2 (§11.4 `ext_length >= 2`, which the parking slots need). */
 export function extLengthFrom(env: NodeJS.ProcessEnv): number {
   if (env.EXT_LENGTH === undefined) {

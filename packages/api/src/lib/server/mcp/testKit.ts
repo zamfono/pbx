@@ -1,18 +1,14 @@
 import process from 'node:process';
 import { z } from 'zod';
 
-import {
-  epochSeconds,
-  HTTP_CONFLICT,
-  nowIso,
-  resolveVersion
-} from '@zamfono/shared';
+import { epochSeconds, HTTP_CONFLICT, nowIso } from '@zamfono/shared';
 
 import { signAccessToken } from '../auth/jwtSigning.js';
 import { handleMcpRequest, type McpDeps } from '../mcp.js';
 import { register } from '../ops/registry.js';
 import { defineOperation } from '../ops/types.js';
 import { makeTestDb } from '../testDb.js';
+import { serverInfo } from './results.js';
 
 // Fixtures the MCP endpoint's tests share (`../mcp.test.ts` and the focused `*.test.ts` beside
 // it): the test operations, a seeded database, and requests shaped as each protocol era sends
@@ -163,15 +159,10 @@ export async function rpc(deps: McpDeps, request: Request): Promise<RpcBody> {
   return (await (await handleMcpRequest(deps, request)).json()) as RpcBody;
 }
 
+// `results.ts`'s own `SERVER_INFO`, from the test process's environment (`serverInfo` itself is
+// covered by `results.test.ts`).
 export const SERVER_INFO_META = {
-  'io.modelcontextprotocol/serverInfo': {
-    name: 'zamfono',
-    title: 'Zamfono',
-    // Mirrors `results.ts`'s own `SERVER_INFO`: the test process sets neither version variable
-    // either, so both resolve the same fallback (§7 "Version"), nor `FQDN`, so it has no icons.
-    version: resolveVersion(process.env).display,
-    websiteUrl: 'https://github.com/zamfono/pbx'
-  }
+  'io.modelcontextprotocol/serverInfo': serverInfo(process.env)
 };
 
 /** A 2026-07-28 `CallToolResult` whose value is `value`, serialised and structured. */

@@ -38,11 +38,7 @@ export function authorizationResponseUrl(
 
 /** The stack's own origin, the issuer every authorization response carries as `iss` (RFC 9207). */
 export function requiredOrigin(): string {
-  const fqdn = stackDomain(env);
-  if (fqdn === null) {
-    throw new Error('FQDN environment variable is required.');
-  }
-  return stackOrigin(fqdn);
+  return stackOrigin(stackDomain(env));
 }
 
 /** The standard OAuth 2.1 error response (§4.1.2.1), delivered to the request's own validated

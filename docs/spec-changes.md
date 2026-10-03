@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-03 · §10.3 System.** `system.info`'s `stack.domain` is always the `FQDN`; only `stack.ipv4` is `null`, while neither `EXTERNAL_IPV4` nor `STACK_IPV4` is set.
+*Why:* §6.3 "Environment" requires `FQDN`, and `api` refuses to start without it, so the domain is never unset.
+
 **2026-10-03 · §6.3 Updates, §11.2 update_state.** `update_state` drops `run_trigger` and `run_actor_name`: who asked for a run is the updater's record alone, which every run of the updater carries, and the updater refuses a `POST /update` that names no `trigger`.
 *Why:* product-owner decision: 0.2.0 is a fresh start without any backwards compatibility; the copy in `update_state` served only an updater of an older release that kept no `trigger`.
 

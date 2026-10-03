@@ -16,7 +16,6 @@ import '../devices/index.js';
 import './index.js';
 
 process.env.SECRETBOX_KEY ??= `1:${Buffer.alloc(32, 7).toString('base64')}`;
-process.env.FQDN ??= 'pbx.example.test';
 
 vi.mock('#lib/server/mail/index.js', async importOriginal => {
   const actual =
@@ -968,7 +967,7 @@ describe('users', () => {
     await seedTenant(db);
     const result = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     expect(result.setupLink).toMatch(
-      /^https:\/\/pbx\.example\.test\/auth\/set-password\?token=/u
+      /^https:\/\/pbx\.test\/auth\/set-password\?token=/u
     );
   });
   it('a name change re-pushes the roster with the stored display name (§10.4)', async () => {

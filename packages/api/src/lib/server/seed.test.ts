@@ -559,8 +559,7 @@ describe('seedIfEmpty', () => {
     sentMail.messages.length = 0;
     const env = baseEnv({
       SMTP_HOST: 'smtp.example.com',
-      MAIL_FROM: 'no-reply@example.com',
-      FQDN: 'pbx.example.test'
+      MAIL_FROM: 'no-reply@example.com'
     });
     delete env.BOOTSTRAP_OWNER_PASSWORD_HASH;
     const result = await seedIfEmpty(
@@ -589,9 +588,7 @@ describe('seedIfEmpty', () => {
 
     expect(sentMail.messages).toHaveLength(1);
     const message = sentMail.messages[0] as { text: string };
-    expect(message.text).toContain(
-      'https://pbx.example.test/auth/set-password?token='
-    );
+    expect(message.text).toContain('https://pbx.test/auth/set-password?token=');
   });
 
   it('leaves the database empty for a retry when the setup mail fails to send', async () => {
@@ -600,8 +597,7 @@ describe('seedIfEmpty', () => {
     vi.mocked(sendMail).mockResolvedValueOnce('failed');
     const env = baseEnv({
       SMTP_HOST: 'smtp.example.com',
-      MAIL_FROM: 'no-reply@example.com',
-      FQDN: 'pbx.example.test'
+      MAIL_FROM: 'no-reply@example.com'
     });
     delete env.BOOTSTRAP_OWNER_PASSWORD_HASH;
     await expect(
@@ -610,20 +606,6 @@ describe('seedIfEmpty', () => {
 
     const owner = await db.selectFrom('users').select('id').executeTakeFirst();
     expect(owner).toBeUndefined();
-  });
-
-  it('rejects a missing hash without FQDN, before mailing anything', async () => {
-    const db = await migratedDb();
-    const mediaDir = await tempMediaDir();
-    const env = baseEnv({
-      SMTP_HOST: 'smtp.example.com',
-      MAIL_FROM: 'no-reply@example.com'
-    });
-    delete env.BOOTSTRAP_OWNER_PASSWORD_HASH;
-    delete env.FQDN;
-    await expect(
-      seedIfEmpty(db, env, testKeyring(), mediaDir, silentLogger)
-    ).rejects.toThrow(/FQDN/u);
   });
 });
 

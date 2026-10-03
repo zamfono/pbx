@@ -66,7 +66,7 @@ type Output = {
    * The stack's public name and the IPv4 address SIP and media use (§6.1): `EXTERNAL_IPV4` in the
    * ports mode, `STACK_IPV4` in the macvlan mode; each `null` while `.env` does not set it.
    */
-  stack: { domain: string | null; ipv4: string | null };
+  stack: { domain: string; ipv4: string | null };
 };
 
 async function updateStatus(): Promise<Output['update']> {

@@ -6,11 +6,11 @@ import { newId, nowIso, type Db } from '@zamfono/shared';
 import { issueResetToken } from './auth/tokens.js';
 import rawEmergencyNumbers from './data/emergencyNumbers.json' with { type: 'json' };
 import { sendMail } from './mail/index.js';
+import { setupLinkFor } from './ops/users/_setupMail.js';
 import { encrypt, type Keyring } from './secretbox.js';
 import {
   assertHashOrRelay,
   assertMailFromPresence,
-  assertOriginWhenMailingSetupLink,
   countryFrom,
   extLengthFrom,
   mainDidFrom,
@@ -20,13 +20,10 @@ import {
 } from './seedEnv.js';
 import { createOwnerExtension, createParkingSlots } from './seedExtensions.js';
 import { createMohAssets } from './seedMoh.js';
-import { stackOrigin } from './stackAddress.js';
 
 const RANDOM_PASSWORD_BYTES = 32;
 const EU_DEFAULT_KEY = 'EU_DEFAULT';
 const FALLBACK_EMERGENCY_NUMBERS = ['112'];
-// The mount point of `src/routes/auth/set-password/+page.svelte` (§5.2 "Authentication pages").
-const SET_PASSWORD_PATH = '/auth/set-password';
 
 type EmergencyNumbersTable = Record<string, string[]>;
 
@@ -153,12 +150,11 @@ async function createSettings(
 async function sendSetupMail(
   db: Db,
   kr: Keyring,
-  params: { env: NodeJS.ProcessEnv; ownerId: string; now: string }
+  params: { ownerId: string; now: string }
 ): Promise<void> {
-  const { env, ownerId, now } = params;
+  const { ownerId, now } = params;
   const { raw, expiresAt } = await issueResetToken(db, ownerId, 'setup', now);
-  // `assertOriginWhenMailingSetupLink` has already required `FQDN` before the transaction.
-  const link = `${stackOrigin(requiredEnv(env, 'FQDN'))}${SET_PASSWORD_PATH}?token=${raw}`;
+  const link = setupLinkFor(raw);
   const outcome = await sendMail(db, kr, {
     kind: 'setup',
     to: { userId: ownerId },
@@ -184,7 +180,6 @@ export async function seedIfEmpty(
   }
   assertMailFromPresence(env);
   assertHashOrRelay(env);
-  assertOriginWhenMailingSetupLink(env);
   const now = nowIso();
   const extLength = extLengthFrom(env);
   await db.transaction().execute(async trx => {
@@ -201,7 +196,7 @@ export async function seedIfEmpty(
     await createParkingSlots(trx, extLength);
     await createMohAssets(trx, env, mediaDir, now, log);
     if (!created.hasPasswordHash) {
-      await sendSetupMail(trx, kr, { env, ownerId: created.id, now });
+      await sendSetupMail(trx, kr, { ownerId: created.id, now });
     }
   });
   return 'seeded';

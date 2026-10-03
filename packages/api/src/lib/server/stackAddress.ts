@@ -1,12 +1,15 @@
 type Env = Record<string, string | undefined>;
 
-/** The stack's public hostname, the `FQDN` of `.env` (§6.1); `null` while unset. */
-export function stackDomain(env: Env): string | null {
+/**
+ * The stack's public hostname, the `FQDN` of `.env`, which every stack has (§6.1, §6.3
+ * "Environment"); throws while it is unset, which `api`'s boot does first (`hooks.server.ts`).
+ */
+export function stackDomain(env: Env): string {
   // An empty value is unset: compose.yaml hands `${FQDN}` to `api` as is.
-  if (env.FQDN) {
-    return env.FQDN;
+  if (!env.FQDN) {
+    throw new Error('FQDN environment variable is required.');
   }
-  return null;
+  return env.FQDN;
 }
 
 /**

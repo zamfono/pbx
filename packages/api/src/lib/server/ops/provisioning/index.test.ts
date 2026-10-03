@@ -206,27 +206,6 @@ describe('provisioning.ringotelSetup', () => {
     expect(ringotel.organizations).toHaveLength(1);
   });
 
-  it('is refused with 503 while FQDN is not set', async () => {
-    const db = await makeTestDb();
-    await seedSettings(db);
-    stubFetch({ createOrganization: { id: 'org-1' } });
-    const previousFqdn = process.env.FQDN;
-    delete process.env.FQDN;
-
-    try {
-      await expect(
-        runOperation(
-          db,
-          'provisioning.ringotelSetup',
-          { domain: 'testco', region: '3', packageid: 1 },
-          asRun()
-        )
-      ).rejects.toMatchObject({ status: 503 });
-    } finally {
-      process.env.FQDN = previousFqdn;
-    }
-  });
-
   it('is refused below owner', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
@@ -240,29 +219,6 @@ describe('provisioning.ringotelSetup', () => {
         asRun({ actor: { id: 'admin-1', name: 'Admin', role: 'admin' } })
       )
     ).rejects.toThrow();
-  });
-  it('checks its FQDN precondition before creating the organization', async () => {
-    const db = await makeTestDb();
-    await seedSettings(db);
-    const calls = stubFetch({
-      createOrganization: { id: 'org-1' },
-      createBranch: { id: 'branch-1' }
-    });
-    const fqdn = process.env.FQDN;
-    delete process.env.FQDN;
-
-    try {
-      const attempt = runOperation(
-        db,
-        'provisioning.ringotelSetup',
-        { domain: 'testco', region: '3', packageid: 1 },
-        asRun()
-      );
-      await expect(attempt).rejects.toMatchObject({ status: 503 });
-    } finally {
-      process.env.FQDN = fqdn;
-    }
-    expect(calls).toEqual([]);
   });
 
   it('deletes the organization again when the connection fails, so a retry succeeds', async () => {
