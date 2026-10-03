@@ -42,7 +42,8 @@ done
 
 # The stub runtime: `docker compose version` answers, `up --help` names --wait unless
 # STUB_PODMAN_COMPOSE, which also has no `rm`, as podman-compose has neither; everything else is
-# recorded and succeeds, bar a pull under STUB_FAIL_PULL and an `up` under STUB_FAIL_UP. A pull
+# recorded and succeeds, `ps -q` naming two containers, which `inspect` reports healthy and
+# without a healthcheck, bar a pull under STUB_FAIL_PULL and an `up` under STUB_FAIL_UP. A pull
 # copies the update's record, .update/state.json, to $STUB_LOG.state, as it stands mid-run.
 mkdir -p "$work/bin"
 cat >"$work/bin/docker" <<'STUB'
@@ -52,7 +53,11 @@ if [[ $* == compose*' up --help' ]]; then
   exit 0
 fi
 echo "$*" >>"$STUB_LOG"
-[[ $* != *' pull'* || ! -e .update/state.json ]] || cp .update/state.json "$STUB_LOG.state"
+case $* in
+  compose*' ps -q') printf 'api-1\nmigrate-1\n' && exit 0 ;;
+  inspect\ *) printf 'healthy\n\n' && exit 0 ;;
+esac
+[[ $* != *' pull'*|| ! -e .update/state.json ]] || cp .update/state.json "$STUB_LOG.state"
 if [[ -n ${STUB_PODMAN_COMPOSE:-} && $* == *' rm '* ]]; then
   echo "podman-compose: error: argument command: invalid choice: 'rm'" >&2
   exit 2
@@ -188,7 +193,7 @@ podman_update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update on 
 compose up -d --wait --wait-timeout 180" ]] ||
   fail "no down before up -d on Podman: $(cat "$work/runtime.log")"
 
-echo "  - on podman-compose, which has no up --wait and no rm: api's and core's /healthz polled"
+echo "  - on podman-compose, which has no up --wait and no rm: the healthchecks polled"
 fresh_stack
 STUB_PODMAN_COMPOSE=1 podman_update 1.2.4 >"$work/out" 2>&1 ||
   { cat "$work/out"; fail "the update on podman-compose failed"; }
@@ -197,10 +202,8 @@ grep -qx 'compose down' "$work/runtime.log" ||
   fail "no down on podman-compose: $(cat "$work/runtime.log")"
 grep -qx 'compose up -d' "$work/runtime.log" ||
   fail "no plain up -d on podman-compose: $(cat "$work/runtime.log")"
-for service in api core; do
-  grep -q "^compose exec -T $service node -e fetch(" \
-    "$work/runtime.log" || fail "$service's /healthz was not polled"
-done
+grep -qx 'inspect --format {{if .State.Health}}{{.State.Health.Status}}{{end}} api-1 migrate-1' \
+  "$work/runtime.log" || fail "the containers' health was not polled: $(cat "$work/runtime.log")"
 grep -q 'Updated 1.2.3 -> 1.2.4' "$work/out" || fail "no report of the update on podman-compose"
 
 echo "  - on Podman with the boot unit: its restart, then an up that recreates nothing waits"
@@ -219,7 +222,7 @@ fresh_stack
 STUB_PODMAN_COMPOSE=1 podman_update 1.2.4 >"$work/out" 2>&1 ||
   { cat "$work/out"; fail "the update through the unit on podman-compose failed"; }
 grep -q ' up -d' "$work/runtime.log" && fail "an up after the unit's restart without --wait"
-grep -q ' exec -T api node -e fetch(' "$work/runtime.log" || fail "api's /healthz was not polled"
+grep -q '^inspect --format ' "$work/runtime.log" || fail "the containers' health was not polled"
 rm "$work/units/zamfono-test.service"
 
 echo "  - an update whose stack does not come up healthy is finished by a rerun"

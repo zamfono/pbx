@@ -16,16 +16,23 @@ unhealthy() {
     "${compose[*]} ps, and its logs"
 }
 
-# Without `up --wait`: api's and core's healthcheck, compose.yaml's x-healthz, run until each
-# passes, within WAIT_SECONDS in all.
-HEALTHZ="fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
-await_healthz() {
-  local service deadline=$((SECONDS + WAIT_SECONDS))
-  for service in api core; do
-    until "${compose[@]}" exec -T "$service" node -e "$HEALTHZ" >/dev/null 2>&1; do
-      ((SECONDS < deadline)) || unhealthy
-      sleep 2
-    done
+# Whether every container of the stack that has a healthcheck, compose.yaml's, reports healthy.
+stack_healthy() {
+  local ids health
+  ids=$("${compose[@]}" ps -q) && [[ -n $ids ]] || return 1
+  # shellcheck disable=SC2086 # one container ID per word
+  health=$("$runtime" inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' $ids) ||
+    return 1
+  ! grep -qvx -e healthy -e '' <<<"$health"
+}
+
+# Without `up --wait`: the containers' own healthchecks, polled until all pass, within
+# WAIT_SECONDS.
+await_healthy() {
+  local deadline=$((SECONDS + WAIT_SECONDS))
+  until stack_healthy; do
+    ((SECONDS < deadline)) || unhealthy
+    sleep 2
   done
 }
 
@@ -41,7 +48,7 @@ recreate_stack() {
     echo "Recreating the stack; up --wait waits for its healthchecks ..."
     wait_args=(--wait --wait-timeout "$WAIT_SECONDS")
   else
-    echo "Recreating the stack; this Compose has no up --wait, so it polls api and core ..."
+    echo "Recreating the stack; this Compose has no up --wait, so it polls the healthchecks ..."
   fi
   if [[ $runtime == podman && -n $unit ]]; then
     echo "Restarting $unit ..."
@@ -57,5 +64,5 @@ recreate_stack() {
     fi
     "${compose[@]}" up -d "${wait_args[@]}" "${services[@]}" || unhealthy
   fi
-  ((${#wait_args[@]} > 0)) || await_healthz
+  ((${#wait_args[@]} > 0)) || await_healthy
 }
