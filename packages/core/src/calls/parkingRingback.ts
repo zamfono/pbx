@@ -1,6 +1,5 @@
 /**
- * The parked party's bridge moves and the timeout ring-back (§10.2 "Call parking"), its own
- * module beside `parking.ts` so both stay under the repository's `max-lines` lint rule;
+ * The parked party's bridge moves and the timeout ring-back (§10.2 "Call parking");
  * `parking.ts` owns the slot registry and calls in here.
  */
 import { newId } from '@zamfono/shared';

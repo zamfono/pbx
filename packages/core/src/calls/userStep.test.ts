@@ -19,8 +19,6 @@ import { runUserStep } from './userStep.js';
  * `offline` rule at once, and one already in a call is rung on their other devices only, or meets
  * the `busy` rule at once when they have none. */
 
-// Asterisk's Q.850 mapping of SIP 486 Busy Here.
-
 /** A user with one device per `sipUsernames` entry, none registered, and a one-second ring
  * timeout. */
 async function seedUserWithDevices(

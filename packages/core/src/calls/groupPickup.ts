@@ -1,7 +1,6 @@
 /**
- * `*8<ext>` on a ring group (§10.1 "Pickup"; §9.3 table), its own module so `ringGroupDial.ts`
- * stays under the repository's `max-lines` lint rule. The `Pipeline`'s `activeBatches` hold the
- * batch currently ringing for a call, so a pickup (`pickup.ts`) and a decline can reach a ring
+ * `*8<ext>` on a ring group (§10.1 "Pickup"; §9.3 table). The `Pipeline`'s `activeBatches` hold
+ * the batch currently ringing for a call, so a pickup (`pickup.ts`) and a decline can reach a ring
  * group's ring race from outside `ringGroupDial.ts`, which sets the entry for the lifetime of one
  * `ringBatch` call; a call rings at most one batch at a time (`ringGroup.ts`'s own sequential
  * loop).

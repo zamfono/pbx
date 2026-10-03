@@ -1,7 +1,6 @@
 /**
  * A call's `call_qos` rows (§7 level `qos`): each leg's RTCP summary, as Asterisk leaves it on the
- * leg's channel when it hangs up. Its own module so `cdr.ts` stays under the repository's
- * `max-lines` lint rule.
+ * leg's channel when it hangs up. `cdr.ts`'s `CdrWriter` owns them.
  *
  * Asterisk sets `RTPAUDIOQOS` on a channel with an RTP instance as it hangs up, whichever side
  * ends it (`ast_rtp_instance_set_stats_vars`: chan_pjsip as a BYE ends the session and as the

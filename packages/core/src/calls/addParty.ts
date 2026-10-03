@@ -1,5 +1,4 @@
-/** `*5<ext or number>` (§10.2 "Three-way calls"), its own module so `features.ts`'s feature-code
- * dispatch stays under the repository's `max-lines` lint rule. */
+/** `*5<ext or number>` (§10.2 "Three-way calls"): a third party added to the caller's call. */
 import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { SIP_FORBIDDEN, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';

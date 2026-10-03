@@ -25,7 +25,6 @@ import { ringGroup } from './ringGroup.js';
 // forwards" — route caller lists, presented number and CLIR are the forwarder's, never those of
 // the caller whose call is being forwarded.
 
-// Q.850 17, user busy (SIP 486), as ARI's `ChannelDestroyed` carries it.
 const MAIN_NUMBER = '+491110000';
 const FORWARD_NUMBER = '+15557777';
 

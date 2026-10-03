@@ -1,8 +1,7 @@
 /**
  * A stopped participation's files (§10.2 "Call recording", §11.6): its two raw per-leg files
- * mixed into the stereo file, stored as a `recordings` row and then removed. Its own module so
- * `recording.ts`, which tracks the participations, stays under the repository's `max-lines` lint
- * rule.
+ * mixed into the stereo file, stored as a `recordings` row and then removed. `recording.ts`
+ * tracks the participations.
  */
 import { rm } from 'node:fs/promises';
 

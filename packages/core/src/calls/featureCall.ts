@@ -1,6 +1,7 @@
 /** The feature-code dial's own call (§9.3 "Feature codes"): the two ways a feature closes that
- * call out with a real outcome (§11.2 `calls.status`). Shared by `features.ts`, `mailbox.ts`, `parking.ts`, `parkingRingback.ts` and
- * `addParty.ts`; its coverage lives in `features.test.ts` alongside theirs. */
+ * call out with a real outcome (§11.2 `calls.status`). Shared by `features.ts`, `mailbox.ts`,
+ * `parking.ts`, `parkingRetrieval.ts` and `pickup.ts`; its coverage lives in `features.test.ts`
+ * alongside theirs. */
 import { endCall, type Call, type CallsRow } from './call.js';
 import type { Pipeline } from './pipeline.js';
 

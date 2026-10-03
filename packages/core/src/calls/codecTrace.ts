@@ -1,8 +1,7 @@
 /**
  * The `codecs` trace line (§7 `events`): the codec each side of an answered call's bridge was
  * negotiated to, so a codec mismatch, or a bridge that transcodes, shows in the routing trace
- * without a SIP capture. Its own module so `answer.ts` stays well under the repository's
- * `max-lines` lint rule.
+ * without a SIP capture.
  */
 import { logFailure } from '../ari/failures.js';
 import type { Call, Leg } from './call.js';

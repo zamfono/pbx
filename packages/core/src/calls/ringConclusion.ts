@@ -1,7 +1,7 @@
 /**
  * A ring race settling without an answer (§10.1 step 4): the timeout, or the last ringing leg
- * ending, and the busy/noAnswer outcome that follows. Its own module so `legsEnded.ts`, the end
- * of a call's answered legs and caller, stays under the repository's `max-lines` lint rule.
+ * ending, and the busy/noAnswer outcome that follows. The end of a call's answered legs and
+ * caller is `legsEnded.ts`'s.
  */
 import { logFailure } from '../ari/failures.js';
 import { AST_CAUSE_USER_BUSY } from '../sipCodes.js';

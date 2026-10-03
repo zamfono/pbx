@@ -1,7 +1,6 @@
 /**
  * A ring-group batch's own originate step (§10.1 step 5): dials every `MemberLeg` at once onto
- * the batch's own `tracked` map. Owned and raced by `ringGroupDial.ts`; kept in its own module so
- * both stay under the size limits (§ Global Constraints).
+ * the batch's own `tracked` map. Owned and raced by `ringGroupDial.ts`.
  */
 import { newId } from '@zamfono/shared';
 

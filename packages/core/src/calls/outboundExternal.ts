@@ -1,7 +1,6 @@
 /**
- * The external-number dialling engine (§9.4 "Outbound routing", "Route fallthrough"), its own
- * module so `outbound.ts` stays under the repository's `max-lines` lint rule. `dialExternal` is
- * outbound step 6's own call settlement; `originateExternalLeg` is the same route-matching and
+ * The external-number dialling engine (§9.4 "Outbound routing", "Route fallthrough").
+ * `dialExternal` is outbound step 6's own call settlement; `originateExternalLeg` is the same route-matching and
  * attempt loop for a caller that joins the answered leg into a bridge of its own, `features.ts`'s
  * `addParty` for `*5` to an external number (§10.2 "Three-way calls"). The route match and each
  * route's pre-checks are `routeSelection.ts`'s.

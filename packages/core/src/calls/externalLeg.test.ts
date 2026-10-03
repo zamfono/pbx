@@ -22,10 +22,8 @@ import type { TrunkState } from './trunkState.js';
 
 // How long the fake Asterisk takes to answer the read of a channel's hangup-cause hash.
 const SLOW_READ_MS = 600;
-// Q.850 causes as ARI's `ChannelDestroyed` carries them: 41 temporary failure (SIP 503), 17 user
-// busy (SIP 486).
+// Q.850 41, temporary failure (SIP 503), as ARI's `ChannelDestroyed` carries it.
 const AST_CAUSE_TEMPORARY_FAILURE = 41;
-// Q.850 21, call rejected: what chan_pjsip maps 401, 403, 407 and 603 alike to.
 
 /** A ring-race member: no mailbox, rung for 30 s. */
 const MEMBER = { mailboxEnabled: 0, ringTimeoutS: 30 };

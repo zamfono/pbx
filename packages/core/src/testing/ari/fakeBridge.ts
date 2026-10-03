@@ -1,5 +1,4 @@
-// FakeAri's bridge model: create/list/destroy and channel membership, a module of its own to keep
-// fake.ts under the file size limit.
+// FakeAri's bridge model: create/list/destroy and channel membership.
 import { randomUUID } from 'node:crypto';
 
 import { HTTP_NOT_FOUND, HTTP_OK } from '@zamfono/shared';

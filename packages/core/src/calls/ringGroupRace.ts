@@ -2,8 +2,7 @@
  * One ring-group batch's race state (§10.1 step 5): the first `Up` wins (`ringGroupWin.ts`), a
  * declined member's siblings drop when `allow_reject`, and exactly one outcome settles it — a win
  * in progress holds off the batch's timeout and its last leg ending, and an answer landing after
- * the batch settled is hung up. Its own module so `ringGroupDial.ts`, which places the batch and
- * waits on this race, stays under the repository's `max-lines` lint rule.
+ * the batch settled is hung up. `ringGroupDial.ts` places the batch and waits on this race.
  */
 import { isEvent, type AriEvent } from '../ari/events.js';
 import { logFailure, logUnlessGone } from '../ari/failures.js';
@@ -19,8 +18,7 @@ import { winBatch } from './ringGroupWin.js';
  * legs.ts's `handleChannelEnded` already finished the call, so `ringGroup` must run no fallback. */
 export type BatchOutcome = 'answered' | 'unanswered' | 'abandoned';
 
-/** The batch race's read-only context, threaded through its event handling as one object so that
- * handling stays free of the local state's own closure (§ Global Constraints max-params). */
+/** The batch race's read-only context, threaded through its event handling as one object. */
 type RaceContext = {
   pipeline: Pipeline;
   call: Call;
@@ -101,8 +99,8 @@ function handleBatchEvent(ctx: RaceContext, ev: AriEvent): void {
   handleDecline(ctx, leg, ev.cause);
 }
 
-/** The batch race's mutable state and its `AriClient` event handler, factored out so `ringBatch`
- * itself stays a short setup/teardown shell (§ Global Constraints max-lines-per-function). */
+/** The batch race's mutable state and its `AriClient` event handler; `ringBatch` sets it up and
+ * tears it down. */
 type BatchRace = {
   tracked: Map<string, GroupLeg>;
   promise: Promise<BatchOutcome>;

@@ -92,7 +92,7 @@ async function applyGroupFallback(
   await release(pipeline, call, action.code, 'missed');
 }
 
-/** `ringGroup`'s batch-plan loop and fallback, its own function for `max-lines-per-function`. */
+/** `ringGroup`'s batch-plan loop and fallback. */
 type BatchPlanCtx = {
   groupId: string;
   snapshot: Snapshot;

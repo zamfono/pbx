@@ -2,7 +2,7 @@
  * §7: which of the HEP collector's datagrams reach the `sip` call log and which the `qos` figures.
  * Asterisk mirrors both SIP messages (`res_hep_pjsip`) and RTCP reports (`res_hep_rtcp`) to the
  * same listener, under the same correlation id, the channel's Call-ID; only the protocol type
- * tells them apart. Its own module so `hep.ts` stays under the repository's `max-lines` lint rule.
+ * tells them apart. `hep.ts` is the listener.
  */
 import type { ParsedHep } from './hep.js';
 import { parseRtcpReport, type RtcpHepReport } from './rtcpReport.js';

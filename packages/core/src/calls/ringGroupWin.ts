@@ -1,7 +1,6 @@
 /**
  * A ring-group batch's win (§10.1 step 5: "the first answer wins and the other legs are hung up"),
- * its own module so `ringGroupDial.ts`, whose race calls it, stays under the repository's
- * `max-lines` lint rule.
+ * settled by the batch's race.
  */
 import { ignoreGone, logUnlessGone } from '../ari/failures.js';
 import { bridgeAnswered, claimAnswer } from './answer.js';

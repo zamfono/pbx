@@ -1,7 +1,6 @@
 /**
  * Retrieving a parked call (§10.2 "Call parking": "Dialling the slot from any device takes the
- * call out of the bridge"; §9.3 table), its own module beside `parking.ts`, which owns the slot
- * registry, so both stay under the repository's `max-lines` lint rule.
+ * call out of the bridge"; §9.3 table); `parking.ts` owns the slot registry.
  */
 import { ignoreGone } from '../ari/failures.js';
 import type { Presence } from '../presence.js';

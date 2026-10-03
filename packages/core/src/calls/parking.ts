@@ -1,5 +1,4 @@
-/** `*70` and call parking (§10.2 "Call parking"): the park and its slot registry, its own module
- * keeping `features.ts` under the repository's `max-lines` lint rule; retrieval is
+/** `*70` and call parking (§10.2 "Call parking"): the park and its slot registry; retrieval is
  * `parkingRetrieval.ts` and the timeout ring-back `parkingRingback.ts`. Its DTMF-menu siblings
  * `mailbox.ts` and `voicemail.ts`'s `deposit` share this file's own suite, `features.test.ts`,
  * rather than one `*.test.ts` each. */

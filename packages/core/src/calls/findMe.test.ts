@@ -15,7 +15,6 @@ import { newCall, type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { ringUser } from './ringUser.js';
 
-// Q.850 normal clearing, as ARI's `ChannelDestroyed` carries it.
 const FIND_ME_NUMBER = '+15557000';
 
 /** A user with one device, unregistered, and one find-me entry `delayS` seconds into the ring. */

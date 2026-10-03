@@ -1,7 +1,6 @@
 /**
  * The end of a call's legs (§10.1 step 4 "Call aggregate"): a leg or the caller's own channel
- * ending; its own module so `legs.ts` stays under the repository's `max-lines` lint rule. A ring
- * race concluding without an answer is `ringConclusion.ts`'s.
+ * ending. A ring race concluding without an answer is `ringConclusion.ts`'s.
  */
 import type { AriEventOf } from '../ari/events.js';
 import { logFailure, logUnlessGone } from '../ari/failures.js';
