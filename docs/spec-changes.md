@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-03 · §10.3 Conventions.** Every list takes `?limit=` up to 200 (default 50) and refuses a larger one, and a cursor the list did not hand out, with 422.
+*Why:* product-owner decision: "200 for every list"; only seven lists capped `limit`, and most accepted any cursor that decoded.
+
 **2026-10-03 · §3.1 Process split, §9.6 Boot and restart.** On SIGTERM or SIGINT `core` winds its calls down before it stops: a caller not answered yet, and the caller of a call arriving during the stop, is released with SIP 503; an answered call is hung up with normal clearing (Q.850 16), its recordings and voicemail deposit saved; every `calls` row is closed as on any other end, an unanswered call's as `failed`. Only a crash leaves live calls in their bridges.
 *Why:* product-owner decision: "I agree with your proposal for the call wind-down"; an orderly stop takes Asterisk down right after `core`, so the calls it left running died with Asterisk and were only marked `interrupted` at the next boot. The proposal named Q.850 41 for the release; chan_pjsip answers 41 with 603 Decline (`hangup_cause2sip()`), so the release uses the cause it answers with 503.
 

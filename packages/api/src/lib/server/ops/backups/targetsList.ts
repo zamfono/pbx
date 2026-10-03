@@ -1,19 +1,13 @@
-import { z } from 'zod';
-
-import { decodeIdCursor, encodeCursor } from '#lib/server/pagination.js';
+import {
+  decodeIdCursor,
+  keysetPage,
+  pageInput
+} from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
 import { targetToWire } from './_shared.js';
 
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 200;
-
-const inputSchema = z
-  .object({
-    limit: z.number().int().positive().max(MAX_LIMIT).optional(),
-    cursor: z.string().optional()
-  })
-  .strict();
+const inputSchema = pageInput.strict();
 
 /** `GET /backups/targets` (§6.5 "Backups"): the tenant's restic destinations, keyset-paginated. */
 export const targetsList = defineOperation({
@@ -23,7 +17,7 @@ export const targetsList = defineOperation({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const limit = input.limit ?? DEFAULT_LIMIT;
+    const { limit } = input;
     let query = ctx.db
       .selectFrom('backupTargets')
       .selectAll()
@@ -35,12 +29,10 @@ export const targetsList = defineOperation({
       .orderBy('id')
       .limit(limit + 1)
       .execute();
-    const page = rows.slice(0, limit);
-    const last = page.at(-1);
+    const { page, nextCursor } = keysetPage(rows, limit);
     return {
       items: page.map(targetToWire),
-      nextCursor:
-        rows.length > limit && last ? encodeCursor({ id: last.id }) : null
+      nextCursor
     };
   }
 });

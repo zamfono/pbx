@@ -100,6 +100,10 @@ why the specified behaviour changed; the commit history, how.
   the same opaque `nextCursor` as every other list instead of the last row's id. A row id passed
   as `cursor`, as these lists returned it up to 0.1.0, is refused with 422: a client holding one
   starts again from the first page.
+- Breaking: every list takes at most `limit=200` and refuses a larger one with 422, as the lists
+  of audit entries, DIDs, number blocks, blocked numbers, webhooks and backup targets and runs
+  already did; without `limit` a page still holds 50. Every list also refuses with 422 a `cursor`
+  it did not hand out itself, where most of them answered with a wrong page or a 500.
 - A renewed TLS certificate is swapped in at the maintenance moment only once nothing is in
   progress: no call, no parked call, no voicemail being left and no recording being made or
   mixed. While something is, the stack looks again every 5 minutes for up to two hours, then

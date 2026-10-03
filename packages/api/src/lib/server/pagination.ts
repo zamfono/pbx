@@ -1,36 +1,102 @@
+import { z } from 'zod';
+
 import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
 import { OpError } from './ops/types.js';
 
-// §10.3 "Conventions": list endpoints paginate with `?limit=` and an opaque `?cursor=`, returning
-// `{ items, nextCursor }`. The cursor carries whatever position value the operation itself needs
-// to resume (a row id, a compound sort key, …); base64url just keeps the wire form opaque.
+// §10.3 "Conventions": list endpoints paginate with `?limit=` (at most 200) and an opaque
+// `?cursor=`, returning `{ items, nextCursor }`. A list resumes either after a row id (keyset) or
+// at an offset; base64url just keeps the wire form opaque.
 const CURSOR_ENCODING = 'base64url';
+const DEFAULT_PAGE_LIMIT = 50;
+const MAX_PAGE_LIMIT = 200;
 
-/** Encodes a list operation's resume position as an opaque `nextCursor` value. */
-export function encodeCursor(position: unknown): string {
+/** The `{ limit, cursor }` input every list operation takes; `limit` defaults to 50. */
+export const pageInput = z.object({
+  limit: z
+    .number()
+    .int()
+    .positive()
+    .max(MAX_PAGE_LIMIT)
+    .default(DEFAULT_PAGE_LIMIT),
+  cursor: z.string().optional()
+});
+
+function encodeCursor(position: object): string {
   return Buffer.from(JSON.stringify(position), 'utf8').toString(
     CURSOR_ENCODING
   );
 }
 
-/**
- * Decodes a cursor produced by `encodeCursor`. Throws `OpError(422)` on a malformed value: a
- * cursor only ever arrives back as this same operation's own previous `nextCursor`.
- */
-export function decodeCursor(cursor: string): unknown {
-  try {
-    return JSON.parse(Buffer.from(cursor, CURSOR_ENCODING).toString('utf8'));
-  } catch {
-    throw new OpError(HTTP_UNPROCESSABLE_CONTENT, 'invalid cursor');
-  }
+function invalidCursor(): OpError {
+  return new OpError(HTTP_UNPROCESSABLE_CONTENT, 'invalid cursor');
 }
 
-/** The row id an id-keyed list resumes after, from its cursor `encodeCursor({ id })`. */
-export function decodeIdCursor(cursor: string): string {
-  const position = decodeCursor(cursor) as { id?: unknown } | null;
-  if (typeof position?.id !== 'string') {
-    throw new OpError(HTTP_UNPROCESSABLE_CONTENT, 'invalid cursor');
+// A cursor only ever arrives back as this same operation's own previous `nextCursor`, so
+// anything else is refused with 422.
+function decodeCursor(cursor: string): { id?: unknown; offset?: unknown } {
+  let position: unknown;
+  try {
+    position = JSON.parse(
+      Buffer.from(cursor, CURSOR_ENCODING).toString('utf8')
+    );
+  } catch {
+    throw invalidCursor();
   }
-  return position.id;
+  if (typeof position !== 'object' || position === null) {
+    throw invalidCursor();
+  }
+  return position;
+}
+
+/** The row id a keyset list resumes after. */
+export function decodeIdCursor(cursor: string): string {
+  const { id } = decodeCursor(cursor);
+  if (typeof id !== 'string') {
+    throw invalidCursor();
+  }
+  return id;
+}
+
+/** The offset an offset-paginated list resumes at; 0, the list's start, without a cursor. */
+export function decodeOffsetCursor(cursor: string | undefined): number {
+  if (cursor === undefined) {
+    return 0;
+  }
+  const { offset } = decodeCursor(cursor);
+  if (
+    typeof offset !== 'number' ||
+    !Number.isSafeInteger(offset) ||
+    offset < 0
+  ) {
+    throw invalidCursor();
+  }
+  return offset;
+}
+
+/** A keyset page from `limit + 1` fetched rows: the first `limit`, and the cursor after the last. */
+export function keysetPage<Row extends { id: string }>(
+  rows: Row[],
+  limit: number
+): { page: Row[]; nextCursor: string | null } {
+  const page = rows.slice(0, limit);
+  const last = page.at(-1);
+  return {
+    page,
+    nextCursor:
+      rows.length > limit && last ? encodeCursor({ id: last.id }) : null
+  };
+}
+
+/** An offset page from `limit + 1` rows fetched at `offset`: the first `limit`, and the next offset. */
+export function offsetPage<Row>(
+  rows: Row[],
+  offset: number,
+  limit: number
+): { page: Row[]; nextCursor: string | null } {
+  return {
+    page: rows.slice(0, limit),
+    nextCursor:
+      rows.length > limit ? encodeCursor({ offset: offset + limit }) : null
+  };
 }

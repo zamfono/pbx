@@ -1,19 +1,16 @@
 import { z } from 'zod';
 
-import { decodeCursor, encodeCursor } from '#lib/server/pagination.js';
+import {
+  decodeOffsetCursor,
+  offsetPage,
+  pageInput
+} from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
 import { mapTrunkRow, type TrunkHostRow, type TrunkWire } from './_shared.js';
 import { getTrunkStatuses, UNKNOWN_STATUS } from './_status.js';
 
-const DEFAULT_LIMIT = 50;
-
-const inputSchema = z
-  .object({
-    limit: z.number().int().positive().optional(),
-    cursor: z.string().optional()
-  })
-  .strict();
+const inputSchema = pageInput.strict();
 type Input = z.infer<typeof inputSchema>;
 type Output = { items: TrunkWire[]; nextCursor: string | null };
 
@@ -38,11 +35,8 @@ export const list = defineOperation<Input, Output>({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const offset =
-      input.cursor === undefined
-        ? 0
-        : (decodeCursor(input.cursor) as { offset: number }).offset;
-    const limit = input.limit ?? DEFAULT_LIMIT;
+    const offset = decodeOffsetCursor(input.cursor);
+    const { limit } = input;
     const pageRows = await ctx.db
       .selectFrom('trunks')
       .selectAll()
@@ -51,7 +45,7 @@ export const list = defineOperation<Input, Output>({
       .offset(offset)
       .limit(limit + 1)
       .execute();
-    const rows = pageRows.slice(0, limit);
+    const { page: rows, nextCursor } = offsetPage(pageRows, offset, limit);
     const trunkIds = rows.map(row => row.id);
     const hosts =
       trunkIds.length === 0
@@ -71,10 +65,7 @@ export const list = defineOperation<Input, Output>({
           statuses[row.id] ?? UNKNOWN_STATUS
         )
       ),
-      nextCursor:
-        pageRows.length > limit
-          ? encodeCursor({ offset: offset + limit })
-          : null
+      nextCursor
     };
   }
 });

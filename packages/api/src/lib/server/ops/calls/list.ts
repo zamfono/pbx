@@ -3,7 +3,11 @@ import { z } from 'zod';
 import { HTTP_FORBIDDEN, type LiveCall } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
-import { decodeCursor, encodeCursor } from '#lib/server/pagination.js';
+import {
+  decodeIdCursor,
+  keysetPage,
+  pageInput
+} from '#lib/server/pagination.js';
 
 import { instantInput, tenantInstantReader } from '../instantInput.js';
 import { defineOperation, OpError } from '../types.js';
@@ -13,8 +17,6 @@ import {
   ownCallWhere,
   toCallOut
 } from './_shared.js';
-
-const DEFAULT_LIMIT = 50;
 
 const inputSchema = z
   .object({
@@ -52,8 +54,7 @@ const inputSchema = z
       .describe(
         'true returns the calls in progress now, unpaginated, each with userIds, the users it concerns now, instead of the history of ended calls.'
       ),
-    limit: z.number().int().positive().optional(),
-    cursor: z.string().optional()
+    ...pageInput.shape
   })
   .strict();
 
@@ -136,11 +137,9 @@ export const list = defineOperation({
         nextCursor: null
       };
     }
-    const limit = input.limit ?? DEFAULT_LIMIT;
+    const { limit } = input;
     const cursor =
-      input.cursor === undefined
-        ? undefined
-        : (decodeCursor(input.cursor) as { id: string }).id;
+      input.cursor === undefined ? undefined : decodeIdCursor(input.cursor);
     const toStoredInstant = await tenantInstantReader(ctx.db);
     const from =
       input.from === undefined ? undefined : toStoredInstant(input.from);
@@ -178,12 +177,10 @@ export const list = defineOperation({
       .orderBy('id', 'desc')
       .limit(limit + 1)
       .execute();
-    const page = rows.slice(0, limit);
-    const last = page.at(-1);
+    const { page, nextCursor } = keysetPage(rows, limit);
     return {
       items: page.map(toCallOut),
-      nextCursor:
-        rows.length > limit && last ? encodeCursor({ id: last.id }) : null
+      nextCursor
     };
   }
 });

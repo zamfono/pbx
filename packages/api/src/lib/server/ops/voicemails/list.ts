@@ -1,18 +1,13 @@
-import { z } from 'zod';
-
-import { decodeCursor, encodeCursor } from '#lib/server/pagination.js';
+import {
+  decodeIdCursor,
+  keysetPage,
+  pageInput
+} from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
 import { ringGroupIdsForUser, toVoicemailOut } from './_shared.js';
 
-const DEFAULT_LIMIT = 50;
-
-const inputSchema = z
-  .object({
-    limit: z.number().int().positive().optional(),
-    cursor: z.string().optional()
-  })
-  .strict();
+const inputSchema = pageInput.strict();
 
 /**
  * `GET /voicemails` (§5.3, §10.3): a `user` sees their own mailbox plus the mailboxes of the
@@ -26,11 +21,9 @@ export const list = defineOperation({
   minRole: 'user',
   readOnly: true,
   run: async (ctx, input) => {
-    const limit = input.limit ?? DEFAULT_LIMIT;
+    const { limit } = input;
     const cursor =
-      input.cursor === undefined
-        ? undefined
-        : (decodeCursor(input.cursor) as { id: string }).id;
+      input.cursor === undefined ? undefined : decodeIdCursor(input.cursor);
     const ringGroupIds =
       ctx.actor.role === 'user'
         ? await ringGroupIdsForUser(ctx.db, ctx.actor.id)
@@ -55,12 +48,10 @@ export const list = defineOperation({
       .orderBy('id', 'desc')
       .limit(limit + 1)
       .execute();
-    const page = rows.slice(0, limit);
-    const last = page.at(-1);
+    const { page, nextCursor } = keysetPage(rows, limit);
     return {
       items: page.map(toVoicemailOut),
-      nextCursor:
-        rows.length > limit && last ? encodeCursor({ id: last.id }) : null
+      nextCursor
     };
   }
 });

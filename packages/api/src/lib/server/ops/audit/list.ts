@@ -1,13 +1,14 @@
 import { z } from 'zod';
 
-import { decodeCursor, encodeCursor } from '#lib/server/pagination.js';
+import {
+  decodeIdCursor,
+  keysetPage,
+  pageInput
+} from '#lib/server/pagination.js';
 
 import { instantInput, tenantInstantReader } from '../instantInput.js';
 import { defineOperation } from '../types.js';
 import { toAuditEntryOut } from './_shared.js';
-
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 200;
 
 const CHANNELS = ['rest', 'mcp', 'ui', 'undo', 'job'] as const;
 const STATES = ['live', 'undone', 'all'] as const;
@@ -58,8 +59,7 @@ const inputSchema = z
       .describe(
         'live (the default) hides undone entries, undone shows only them, all shows both.'
       ),
-    limit: z.number().int().positive().max(MAX_LIMIT).optional(),
-    cursor: z.string().optional()
+    ...pageInput.shape
   })
   .strict();
 
@@ -77,12 +77,10 @@ export const list = defineOperation({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const limit = input.limit ?? DEFAULT_LIMIT;
+    const { limit } = input;
     const state = input.state ?? 'live';
     const cursor =
-      input.cursor === undefined
-        ? undefined
-        : (decodeCursor(input.cursor) as { id: string }).id;
+      input.cursor === undefined ? undefined : decodeIdCursor(input.cursor);
     const toStoredInstant = await tenantInstantReader(ctx.db);
     const from =
       input.from === undefined ? undefined : toStoredInstant(input.from);
@@ -125,12 +123,10 @@ export const list = defineOperation({
       .orderBy('id', 'desc')
       .limit(limit + 1)
       .execute();
-    const page = rows.slice(0, limit);
-    const last = page.at(-1);
+    const { page, nextCursor } = keysetPage(rows, limit);
     return {
       items: page.map(toAuditEntryOut),
-      nextCursor:
-        rows.length > limit && last ? encodeCursor({ id: last.id }) : null
+      nextCursor
     };
   }
 });

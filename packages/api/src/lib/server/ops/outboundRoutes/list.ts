@@ -1,18 +1,15 @@
 import { z } from 'zod';
 
-import { decodeCursor, encodeCursor } from '#lib/server/pagination.js';
+import {
+  decodeOffsetCursor,
+  offsetPage,
+  pageInput
+} from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
 import { loadRouteChildren, routeToWire, type RouteWire } from './_shared.js';
 
-const DEFAULT_LIMIT = 50;
-
-const inputSchema = z
-  .object({
-    limit: z.number().int().positive().optional(),
-    cursor: z.string().optional()
-  })
-  .strict();
+const inputSchema = pageInput.strict();
 type Input = z.infer<typeof inputSchema>;
 type Output = { items: RouteWire[]; nextCursor: string | null };
 
@@ -26,11 +23,8 @@ export const list = defineOperation<Input, Output>({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const offset =
-      input.cursor === undefined
-        ? 0
-        : (decodeCursor(input.cursor) as { offset: number }).offset;
-    const limit = input.limit ?? DEFAULT_LIMIT;
+    const offset = decodeOffsetCursor(input.cursor);
+    const { limit } = input;
     const pageRows = await ctx.db
       .selectFrom('outboundRoutes')
       .selectAll()
@@ -39,17 +33,14 @@ export const list = defineOperation<Input, Output>({
       .offset(offset)
       .limit(limit + 1)
       .execute();
-    const rows = pageRows.slice(0, limit);
+    const { page: rows, nextCursor } = offsetPage(pageRows, offset, limit);
     const children = await loadRouteChildren(
       ctx.db,
       rows.map(row => row.id)
     );
     return {
       items: rows.map(row => routeToWire(row, children)),
-      nextCursor:
-        pageRows.length > limit
-          ? encodeCursor({ offset: offset + limit })
-          : null
+      nextCursor
     };
   }
 });

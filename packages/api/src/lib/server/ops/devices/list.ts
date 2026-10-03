@@ -2,12 +2,14 @@ import { z } from 'zod';
 
 import { HTTP_FORBIDDEN } from '@zamfono/shared';
 
-import { decodeCursor, encodeCursor } from '#lib/server/pagination.js';
+import {
+  decodeOffsetCursor,
+  offsetPage,
+  pageInput
+} from '#lib/server/pagination.js';
 
 import { defineOperation, OpError } from '../types.js';
 import { toDeviceOut } from './_shared.js';
-
-const DEFAULT_LIMIT = 50;
 
 /** `GET /users/{id}/devices` (§10.3): a `user` actor lists only their own devices (§5.3). */
 export const list = defineOperation({
@@ -16,8 +18,7 @@ export const list = defineOperation({
   input: z
     .object({
       userId: z.string(),
-      limit: z.number().int().positive().optional(),
-      cursor: z.string().optional()
+      ...pageInput.shape
     })
     .strict(),
   minRole: 'user',
@@ -29,11 +30,8 @@ export const list = defineOperation({
         'devices: may list only your own devices'
       );
     }
-    const offset =
-      input.cursor === undefined
-        ? 0
-        : (decodeCursor(input.cursor) as { offset: number }).offset;
-    const limit = input.limit ?? DEFAULT_LIMIT;
+    const offset = decodeOffsetCursor(input.cursor);
+    const { limit } = input;
     const rows = await ctx.db
       .selectFrom('devices')
       .selectAll()
@@ -43,9 +41,7 @@ export const list = defineOperation({
       .offset(offset)
       .limit(limit + 1)
       .execute();
-    const page = rows.slice(0, limit);
-    const nextCursor =
-      rows.length > limit ? encodeCursor({ offset: offset + limit }) : null;
+    const { page, nextCursor } = offsetPage(rows, offset, limit);
     return { items: page.map(toDeviceOut), nextCursor };
   }
 });
