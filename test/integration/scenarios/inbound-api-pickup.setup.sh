@@ -3,4 +3,4 @@
 # hangs up a few seconds into the call it took (`answer-speak-hangup`).
 set -euo pipefail
 
-bash "$(dirname "$0")/_api-pickup-setup.sh" "$1" "$2" "$4" answer-speak-hangup
+bash "$(dirname "$0")/_api-pickup-setup.sh" "$@" answer-speak-hangup

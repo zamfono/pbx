@@ -5,4 +5,4 @@
 # (`_api-control.sh consult`).
 set -euo pipefail
 
-bash "$(dirname "$0")/_api-control-setup.sh" "$1" "$2" "$4" consult answer-speak-hangup
+bash "$(dirname "$0")/_api-control-setup.sh" "$@" consult answer-speak-hangup

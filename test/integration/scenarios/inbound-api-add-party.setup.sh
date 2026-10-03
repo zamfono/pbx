@@ -4,4 +4,4 @@
 # (`_api-control.sh add-party`).
 set -euo pipefail
 
-bash "$(dirname "$0")/_api-control-setup.sh" "$1" "$2" "$4" add-party answer-speak-hangup
+bash "$(dirname "$0")/_api-control-setup.sh" "$@" add-party answer-speak-hangup

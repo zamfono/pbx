@@ -13,7 +13,7 @@ set -euo pipefail
 
 api_base=$1
 token=$2
-compose=$4
+compose=$3
 # shellcheck source=_lib.sh
 . "$(dirname "$0")/_lib.sh"
 

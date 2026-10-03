@@ -5,8 +5,8 @@
 # `run_trunk_status_step`/`run_cert_sync_step`, called directly by run.sh).
 #
 # Reads and sets `run.sh`'s own COMPOSE, compose_args, run_dir, here, compose_cmd, api_base,
-# API_PORT, FWD, RUNTIME, OWNER_EMAIL, OWNER_PASSWORD, MAIN_DID, FQDN and fail; sets SIP_USERNAME,
-# SIP_PASSWORD and GROUP_EXT for `run-scenarios.sh` to read.
+# API_PORT, FWD, RUNTIME, OWNER_EMAIL, OWNER_PASSWORD, MAIN_DID, FQDN and fail; sets SIP_USERNAME
+# and SIP_PASSWORD for `run-scenarios.sh` to read.
 
 # The stack's `.env`, then the stack itself, started fresh or, with UPGRADE_FROM, upgraded from
 # a release (upgrade.sh), `assert_migrated`, and the TLS transport on its certificate
@@ -96,9 +96,9 @@ step_caddy() {
 }
 
 # The tenant §8's scenarios are played against, built over the REST API the way an operator
-# builds one (`configure.sh`). Sets SIP_USERNAME, SIP_PASSWORD and GROUP_EXT for the scenario loop
-# and for `save_state` (reuse.sh). Skipped entirely under REUSE, whose `load_state` sets the
-# same three variables from what this left behind on an earlier run.
+# builds one (`configure.sh`). Sets SIP_USERNAME and SIP_PASSWORD for the scenario loop and for
+# `save_state` (reuse.sh). Skipped entirely under REUSE, whose `load_state` sets the same two
+# variables from what this left behind on an earlier run.
 configure_tenant() {
   echo '== configuring the tenant over REST =='
   api GET /users >/dev/null || fail "GET /users did not answer for the bootstrap token"
@@ -109,11 +109,11 @@ configure_tenant() {
   phone_ip=$($COMPOSE "${compose_args[@]}" exec -T sipp-phone hostname -i | tr -d '\r' \
     | awk '{print $1}')
   phone_cidr="${phone_ip%.*}.0/24"
-  read -r SIP_USERNAME SIP_PASSWORD GROUP_EXT < <(
+  read -r SIP_USERNAME SIP_PASSWORD < <(
     bash "$here/configure.sh" "$api_base" "$token" "$trunk_ip" "$phone_cidr"
   ) || fail "the tenant could not be configured over REST"
   [ -n "${SIP_USERNAME:-}" ] || fail "no device credentials came back from the configuration step"
-  echo "   device $SIP_USERNAME, ring group extension $GROUP_EXT"
+  echo "   device $SIP_USERNAME"
 }
 
 # §6.5 "Default target": the stack's start created a `local` target from BACKUP_PASSWORD, and a

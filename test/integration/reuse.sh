@@ -1,8 +1,8 @@
 # Sourced by `run.sh`: REUSE support (see run.sh's own usage block). Detects whether the stack a
 # previous KEEP=1 run left up in its directory is still usable, and saves/recovers the bits of
 # tenant state later code needs that only exist because that earlier run's `configure.sh` created
-# them — the device credentials and the ring group extension it prints — so a REUSE run need not
-# reconfigure the tenant just to learn them again.
+# them, the device credentials it prints, so a REUSE run need not reconfigure the tenant just to
+# learn them again.
 #
 # Reads `run.sh`'s own COMPOSE, compose_args, run_dir, STATE_FILE and fail.
 
@@ -27,17 +27,16 @@ save_state() {
   cat > "$STATE_FILE" <<STATE
 SIP_USERNAME=$SIP_USERNAME
 SIP_PASSWORD=$SIP_PASSWORD
-GROUP_EXT=$GROUP_EXT
 STATE
 }
 
-# The counterpart: sets SIP_USERNAME, SIP_PASSWORD and GROUP_EXT the way `configure_tenant` would
+# The counterpart: sets SIP_USERNAME and SIP_PASSWORD the way `configure_tenant` would
 # have, from what an earlier run's `save_state` left behind.
 load_state() {
   [ -f "$STATE_FILE" ] \
     || fail "REUSE: the stack is up but $STATE_FILE is missing; run once without REUSE first"
   # shellcheck disable=SC1090 # a state file this same script wrote, not user input
   . "$STATE_FILE"
-  [ -n "${SIP_USERNAME:-}" ] && [ -n "${SIP_PASSWORD:-}" ] && [ -n "${GROUP_EXT:-}" ] \
+  [ -n "${SIP_USERNAME:-}" ] && [ -n "${SIP_PASSWORD:-}" ] \
     || fail "REUSE: $STATE_FILE is incomplete; run once without REUSE first"
 }

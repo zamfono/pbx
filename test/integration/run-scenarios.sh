@@ -2,13 +2,12 @@
 # configured, each paired with the phone-side (and, for a call that leaves again, the trunk-side)
 # scenario it expects (`<name>.roles`, below), and checks after each one that Asterisk holds no
 # channel any more, that every sipp run the scenario started ended with its calls and, where the
-# scenario has a
-# `<name>.check.sh`, that the history records what the spec says the call leaves behind. Reads
-# `run.sh`'s own `COMPOSE`, `compose_args`, `compose_cmd`, `here`, `api_base`, `token`, `GROUP_EXT`,
-# `SIP_USERNAME`, `SIP_PASSWORD`, `MAIN_DID` and `fail`, and `only.sh`'s `name_selected`.
+# scenario has a `<name>.check.sh`, that the history records what the spec says the call leaves
+# behind. Reads `run.sh`'s own `COMPOSE`, `compose_args`, `compose_cmd`, `here`, `api_base`,
+# `token`, `SIP_USERNAME`, `SIP_PASSWORD`, `MAIN_DID` and `fail`, and `only.sh`'s `name_selected`.
 #
-# A scenario's setup, check and teardown are called with the api base and the token, then (after
-# the group extension, for the setup) the compose command, so they can drive the containers too.
+# A scenario's setup, check and teardown are called with the api base, the token and the compose
+# command, so they can drive the containers too.
 #
 # A call that no SIP side places, but the REST API (a click-to-dial, §10.2), is a scenario of its
 # own too: `<name>.call.sh` in place of `<name>.xml`, called like a check, places it and returns
@@ -202,7 +201,7 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
   # a colleague's device rather than the answering one.
   phone_account="$SIP_USERNAME $SIP_PASSWORD"
   if [ -f "$setup" ]; then
-    account=$(bash "$setup" "$api_base" "$token" "$GROUP_EXT" "$compose_cmd") \
+    account=$(bash "$setup" "$api_base" "$token" "$compose_cmd") \
       || fail "the setup for $name failed"
     phone_account=${account:-$phone_account}
   fi

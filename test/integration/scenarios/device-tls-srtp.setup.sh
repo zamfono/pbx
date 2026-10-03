@@ -24,7 +24,7 @@ set -euo pipefail
 
 api_base=$1
 token=$2
-compose=$4
+compose=$3
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck source=_lib.sh
 . "$here/_lib.sh"

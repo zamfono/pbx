@@ -2,7 +2,7 @@
 # The tenant §8's scenarios are played against, built over the REST API the way an operator
 # builds one: a trunk that accepts the calling sipp container, a user with a plaintext-transport
 # device for the answering container, a ring group holding that user, and the main DID pointed at
-# the group. Prints `sip_username sip_password ring_group_ext` for the caller.
+# the group. Prints `sip_username sip_password` for the caller.
 set -euo pipefail
 
 api_base=$1
@@ -39,10 +39,9 @@ group=$(api POST /ringGroups "{
   \"mailboxEnabled\": true
 }")
 group_id=$(printf '%s' "$group" | jsonfield id)
-group_ext=$(printf '%s' "$group" | jsonfield ext)
 
 did_id=$(api GET /dids | jsonfield items.0.id)
 api PATCH "/dids/$did_id" \
   "{\"target\":{\"kind\":\"ringGroup\",\"ringGroupId\":\"$group_id\"}}" >/dev/null
 
-printf '%s %s %s\n' "$sip_username" "$sip_password" "$group_ext"
+printf '%s %s\n' "$sip_username" "$sip_password"

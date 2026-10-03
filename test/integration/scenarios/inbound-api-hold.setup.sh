@@ -6,4 +6,4 @@ set -euo pipefail
 
 here=$(dirname "$0")
 bash "$here/inbound-hold.setup.sh" "$@"
-bash "$here/_api-control-setup.sh" "$1" "$2" "$4" hold
+bash "$here/_api-control-setup.sh" "$@" hold

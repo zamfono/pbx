@@ -3,4 +3,4 @@
 # (`ring-no-answer`), for their own ring timeout of 3 s, well before the group's own 10 s.
 set -euo pipefail
 
-bash "$(dirname "$0")/_api-pickup-setup.sh" "$1" "$2" "$4" ring-no-answer 3
+bash "$(dirname "$0")/_api-pickup-setup.sh" "$@" ring-no-answer 3
