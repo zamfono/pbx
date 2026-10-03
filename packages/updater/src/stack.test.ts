@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, onTestFinished } from 'vitest';
@@ -16,29 +16,28 @@ async function stackDir(files: Record<string, string>): Promise<string> {
   return dir;
 }
 
+/** A stand-in for update.sh that, asked as --current by the updater, runs `body`. */
+async function currentScript(body: string): Promise<string> {
+  return stackDir({
+    'update.sh': `[ "$1 $ZAMFONO_UPDATER" = '--current 1' ] || exit 99\n${body}\n`
+  });
+}
+
 describe('stackVersion', () => {
-  it('reads the bundle’s VERSION', async () => {
-    const dir = await stackDir({ VERSION: '0.0.6\n', '.env': 'FQDN=x\n' });
+  it('reads the release update.sh --current prints', async () => {
+    const dir = await currentScript('echo 0.0.6');
     expect(await stackVersion(dir)).toEqual([0, 0, 6]);
   });
 
-  it('prefers the last ZAMFONO_VERSION .env pins', async () => {
-    const dir = await stackDir({
-      VERSION: '0.0.6\n',
-      '.env': "FQDN=x\nZAMFONO_VERSION='0.0.4'\nZAMFONO_VERSION='0.0.5'\n"
-    });
-    expect(await stackVersion(dir)).toEqual([0, 0, 5]);
+  it('knows none where it exits 12', async () => {
+    expect(await stackVersion(await currentScript('exit 12'))).toBeUndefined();
   });
 
-  it('knows none for a directory that pins none', async () => {
-    const dir = await stackDir({ '.env': 'FQDN=x\n' });
-    expect(await stackVersion(dir)).toBeUndefined();
-  });
-
-  it('fails on a .env it cannot read', async () => {
-    const dir = await stackDir({ VERSION: '0.0.6\n' });
-    await mkdir(path.join(dir, '.env'));
-    await expect(stackVersion(dir)).rejects.toThrow(/EISDIR/u);
+  it('fails on any other status, with the script’s message', async () => {
+    const dir = await currentScript("echo 'said so' >&2; exit 1");
+    await expect(stackVersion(dir)).rejects.toThrow(
+      'update.sh --current exited 1: said so'
+    );
   });
 });
 

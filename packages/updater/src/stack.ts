@@ -1,43 +1,12 @@
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { parseVersion, type Version } from './version.js';
 
-const ENV_PIN = /^ZAMFONO_VERSION=["']?(?<version>\d+\.\d+\.\d+)["']?$/gmu;
-
-/** `file`'s text, or `''` when there is no such file. */
-async function readOptional(file: string): Promise<string> {
-  try {
-    return await readFile(file, 'utf8');
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return '';
-    }
-    throw error;
-  }
-}
-
-/**
- * The release the stack directory runs, as `update.sh`'s `current_version` reads it: the last
- * `ZAMFONO_VERSION` in `.env` that names one, the line Compose takes too, else the release the
- * bundle's `VERSION` names. `undefined` for a directory with neither, a checkout of `main` among
- * them.
- */
-export async function stackVersion(
-  stackDir: string
-): Promise<Version | undefined> {
-  const env = await readOptional(path.join(stackDir, '.env'));
-  const fromEnv = [...env.matchAll(ENV_PIN)].at(-1)?.groups?.version;
-  return parseVersion(
-    fromEnv ?? (await readOptional(path.join(stackDir, 'VERSION'))).trim()
-  );
-}
-
 /** `update.sh --check`'s verdict on an update to a release, which only the script decides. */
 export type UpdateVerdict = 'update' | 'breaking' | 'notNewer' | 'noRelease';
 
-/** `update.sh --check`'s exit statuses, as its header documents them. */
+/** `update.sh --check`'s exit statuses, and `--current`'s 0 and 12, as its header documents them. */
 const CHECK_UPDATE = 0;
 const CHECK_BREAKING = 10;
 const CHECK_NOT_NEWER = 11;
@@ -49,22 +18,17 @@ const VERDICTS = new Map<number, UpdateVerdict>([
   [CHECK_NO_RELEASE, 'noRelease']
 ]);
 
-/**
- * What `update.sh --check <version>` in the stack directory says of an update to `version`, as
- * the updater's run (`ZAMFONO_UPDATER=1`): RELEASING.md's policy lives in that script alone. Any
- * exit status but its four verdicts is an error, with the script's own message.
- */
-export async function checkUpdate(
+type ScriptResult = { status: number; stdout: string; stderr: string };
+
+/** `update.sh <args>` in the stack directory as the updater's run (`ZAMFONO_UPDATER=1`). */
+async function runScript(
   stackDir: string,
-  version: string
-): Promise<UpdateVerdict> {
-  const { status, stderr } = await new Promise<{
-    status: number;
-    stderr: string;
-  }>((resolve, reject) => {
+  args: readonly string[]
+): Promise<ScriptResult> {
+  return new Promise((resolve, reject) => {
     execFile(
       'bash',
-      [path.join(stackDir, 'update.sh'), '--check', version],
+      [path.join(stackDir, 'update.sh'), ...args],
       {
         cwd: stackDir,
         env: {
@@ -73,10 +37,10 @@ export async function checkUpdate(
           ZAMFONO_UPDATER: '1'
         }
       },
-      (error, _stdout, errorOutput) => {
+      (error, stdout, stderr) => {
         if (error !== null && typeof error.code !== 'number') {
           reject(
-            new Error(`update.sh --check ${version} did not run`, {
+            new Error(`update.sh ${args.join(' ')} did not run`, {
               cause: error
             })
           );
@@ -84,16 +48,56 @@ export async function checkUpdate(
         }
         resolve({
           status: error === null ? CHECK_UPDATE : Number(error.code),
-          stderr: errorOutput
+          stdout,
+          stderr
         });
       }
     );
   });
-  const verdict = VERDICTS.get(status);
+}
+
+function scriptFailed(args: readonly string[], result: ScriptResult): Error {
+  return new Error(
+    `update.sh ${args.join(' ')} exited ${String(result.status)}: ${result.stderr.trim()}`
+  );
+}
+
+/**
+ * The release the stack directory runs, as `update.sh --current` prints it, the one reading of
+ * it; `undefined` for a directory that names none, a checkout of `main` among them.
+ */
+export async function stackVersion(
+  stackDir: string
+): Promise<Version | undefined> {
+  const args = ['--current'];
+  const result = await runScript(stackDir, args);
+  if (result.status === CHECK_NO_RELEASE) {
+    return undefined;
+  }
+  const version =
+    result.status === CHECK_UPDATE
+      ? parseVersion(result.stdout.trim())
+      : undefined;
+  if (version === undefined) {
+    throw scriptFailed(args, result);
+  }
+  return version;
+}
+
+/**
+ * What `update.sh --check <version>` in the stack directory says of an update to `version`:
+ * RELEASING.md's policy lives in that script alone. Any exit status but its four verdicts is an
+ * error, with the script's own message.
+ */
+export async function checkUpdate(
+  stackDir: string,
+  version: string
+): Promise<UpdateVerdict> {
+  const args = ['--check', version];
+  const result = await runScript(stackDir, args);
+  const verdict = VERDICTS.get(result.status);
   if (verdict === undefined) {
-    throw new Error(
-      `update.sh --check ${version} exited ${String(status)}: ${stderr.trim()}`
-    );
+    throw scriptFailed(args, result);
   }
   return verdict;
 }

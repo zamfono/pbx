@@ -330,6 +330,20 @@ status=0
 (cd "$work/stack" && ZAMFONO_UPDATER=1 ZAMFONO_REPO_URL="http://127.0.0.1:$port" \
   ./update.sh --check 1.2.4 </dev/null >"$work/out" 2>&1) || status=$?
 [[ $status == 12 ]] || fail "--check without a release exited $status, not 12: $(cat "$work/out")"
+
+echo "  - --current: the last ZAMFONO_VERSION .env pins, else VERSION, else exit 12"
+fresh_stack
+current() { (cd "$work/stack" && ZAMFONO_UPDATER=1 ./update.sh --current </dev/null); }
+sed -i '/^ZAMFONO_VERSION=/d' "$work/stack/.env"
+[[ $(current) == 1.2.3 ]] || fail "--current did not read VERSION: $(current 2>&1)"
+printf "ZAMFONO_VERSION='1.2.1'\nZAMFONO_VERSION=\"1.2.2\"\n" >>"$work/stack/.env"
+[[ $(current) == 1.2.2 ]] || fail "--current did not read the last .env pin: $(current 2>&1)"
+sed -i '/^ZAMFONO_VERSION=/d' "$work/stack/.env"
+rm "$work/stack/VERSION"
+status=0
+current >/dev/null 2>&1 || status=$?
+[[ $status == 12 ]] || fail "--current without a release exited $status, not 12"
+[[ ! -e $work/stack/.update ]] || fail "--current wrote $(ls "$work/stack/.update")"
 fresh_stack
 
 echo "  - a breaking release needs --yes without a terminal"

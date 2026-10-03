@@ -322,6 +322,7 @@ Run a backup first (`backups.runs.start`, `POST /backups/runs`). Then, in the st
 cd /srv/zamfono
 ./update.sh            # the latest release; ./update.sh 0.2.1 for one in particular
 ./update.sh --check    # only say what an update would do
+./update.sh --current  # the release this directory runs
 ```
 
 It downloads the release's bundle, checks it against the release's `SHA256SUMS`, unpacks it over

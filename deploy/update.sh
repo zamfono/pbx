@@ -8,13 +8,15 @@
 # (§6.5).
 #
 #   ./update.sh [--yes] [--check] [VERSION]
+#   ./update.sh --current
 #
 # VERSION is X.Y.Z; without it, the latest release. A release that is breaking by RELEASING.md's
 # policy (a new major, or a new minor while 0.x) shows its upgrade notes and asks first; --yes
 # answers for a run without a terminal. --check only says what an update would do, and exits
 # with its verdict, which the updater reads: 0 the update is allowed, 10 it is breaking, 11
 # VERSION is not newer than the release this directory runs, 12 the directory names no release;
-# any other status is a failure.
+# any other status is a failure. --current prints the release this directory runs, which the
+# updater reads too, and exits 12 where it names none.
 #
 # Beyond the flags, from the environment:
 #   ZAMFONO_RUNTIME         docker | podman, when both are installed
@@ -53,13 +55,15 @@ CHECK_NO_RELEASE=12
 
 assume_yes=
 check_only=
+current_only=
 target=
 for arg in "$@"; do
   case $arg in
     --yes) assume_yes=1 ;;
     --check) check_only=1 ;;
+    --current) current_only=1 ;;
     -h | --help)
-      sed -n '2,23p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
+      sed -n '2,25p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     -*) fail "unknown option $arg" ;;
@@ -77,6 +81,7 @@ on_exit() {
 trap on_exit EXIT
 
 # The release this directory runs: .env's ZAMFONO_VERSION when set, else the bundle's VERSION.
+# The one reading of it: the updater asks --current.
 current_version() {
   local pinned
   pinned=$(sed -nE 's/^ZAMFONO_VERSION=["'\'']?([0-9]+\.[0-9]+\.[0-9]+)["'\'']?$/\1/p' .env | tail -n1)
@@ -143,6 +148,15 @@ release_notes() {
 
 main() {
   [[ -f .env ]] || fail "there is no .env here; install with setup.sh first (README.md, step 5)"
+  local from
+  if ! from=$(current_version); then
+    [[ -z $check_only && -z $current_only ]] || exit "$CHECK_NO_RELEASE"
+    exit 1
+  fi
+  if [[ -n $current_only ]]; then
+    echo "$from"
+    exit 0
+  fi
   if [[ -n $updater ]]; then
     runtime=docker
     compose=(docker compose)
@@ -154,11 +168,6 @@ main() {
   # The services `pull` and `up` name: all of them, but for the updater's run.
   services=()
   [[ -z $updater ]] || services=("${STACK_SERVICES[@]}")
-  local from
-  if ! from=$(current_version); then
-    [[ -z $check_only ]] || exit "$CHECK_NO_RELEASE"
-    exit 1
-  fi
   [[ -n $target ]] || target=$(latest_version)
   v_version "$target" || fail "$target is not a release version (X.Y.Z)"
 

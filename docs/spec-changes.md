@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-03 · §6.3 Updates.** The updater learns the release the stack runs from `update.sh --current`, which prints it and exits 12 where the directory names none.
+*Why:* the updater parsed `.env` and `VERSION` with a copy of the script's rule.
+
 **2026-10-03 · §6.3 Updates.** Without `up --wait`, `update.sh` polls the health the runtime reports for the stack's containers, which their Compose healthchecks set, instead of running `api`'s and `core`'s healthcheck itself.
 *Why:* the healthcheck is defined once, in `compose.yaml`; `update.sh` carried a copy of it.
 

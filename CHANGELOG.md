@@ -72,6 +72,9 @@ why the specified behaviour changed; the commit history, how.
   `users.clearVoicemailGreeting` set and remove the personal mailbox greeting `*96` records, for
   oneself or, as an admin, for anyone; like the phone's recording, they are not in the audit log.
   Help topic `click-to-dial`.
+- `update.sh --current` prints the release the stack directory runs, and exits 12 where it names
+  none. The `updater` service asks it, so `system.info` and `update.sh` always agree on the
+  stack's release.
 
 ### Changed
 
