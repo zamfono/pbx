@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { noopLogger } from '../testing/pipelineDeps.js';
-import { AmiClient, type AmiEvent } from './client.js';
+import { AmiClient } from './client.js';
 import { FakeAmi } from './fake.js';
+import type { AmiEvent } from './frame.js';
 
 describe('AmiClient', () => {
   let fake: FakeAmi;

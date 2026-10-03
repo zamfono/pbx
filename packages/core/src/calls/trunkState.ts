@@ -7,7 +7,8 @@
  * "Channels") reads, since nothing else in the process tracks it; it lives in the `StateStore`,
  * whose `trunkChannels` `api` exports in `/metrics` (§7).
  */
-import type { AmiClient, AmiEvent } from '../ami/client.js';
+import type { AmiClient } from '../ami/client.js';
+import type { AmiEvent } from '../ami/frame.js';
 import type { AriClient } from '../ari/client.js';
 import { isEvent, type AriEvent, type AriEventOf } from '../ari/events.js';
 import { logFailure } from '../ari/failures.js';

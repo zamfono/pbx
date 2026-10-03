@@ -1,11 +1,7 @@
 // In-process fake AMI server: enough of the text protocol for AmiClient's tests.
 import { createServer, type Server, type Socket } from 'node:net';
 
-import type { AmiEvent } from './client.js';
-
-const FRAME_SEPARATOR = '\r\n\r\n';
-const LINE_SEPARATOR = '\r\n';
-const HEADER_SEPARATOR = ': ';
+import { splitFrames, writeFrame, type AmiEvent } from './frame.js';
 
 type Registration = {
   ObjectName: string;
@@ -13,27 +9,6 @@ type Registration = {
   ServerUri: string;
   Status: 'Registered' | 'Rejected' | 'Unregistered' | 'Failed';
 };
-
-function parseFrame(text: string): AmiEvent {
-  const frame: AmiEvent = {};
-  for (const line of text.split(LINE_SEPARATOR)) {
-    const separatorIndex = line.indexOf(HEADER_SEPARATOR);
-    if (separatorIndex === -1) {
-      continue;
-    }
-    frame[line.slice(0, separatorIndex)] = line.slice(
-      separatorIndex + HEADER_SEPARATOR.length
-    );
-  }
-  return frame;
-}
-
-function writeFrame(frame: AmiEvent): string {
-  const lines = Object.entries(frame).map(
-    ([key, value]) => `${key}${HEADER_SEPARATOR}${value}`
-  );
-  return `${lines.join(LINE_SEPARATOR)}${FRAME_SEPARATOR}`;
-}
 
 export class FakeAmi {
   readonly registrations: Registration[] = [];
@@ -46,15 +21,10 @@ export class FakeAmi {
         this.sockets.add(socket);
         let buffer = '';
         socket.on('data', (chunk: Buffer) => {
-          buffer += chunk.toString('utf8');
-          let separatorIndex = buffer.indexOf(FRAME_SEPARATOR);
-          while (separatorIndex !== -1) {
-            this.handleFrame(
-              socket,
-              parseFrame(buffer.slice(0, separatorIndex))
-            );
-            buffer = buffer.slice(separatorIndex + FRAME_SEPARATOR.length);
-            separatorIndex = buffer.indexOf(FRAME_SEPARATOR);
+          const { frames, rest } = splitFrames(buffer + chunk.toString('utf8'));
+          buffer = rest;
+          for (const frame of frames) {
+            this.handleFrame(socket, frame);
           }
         });
         socket.on('close', () => {

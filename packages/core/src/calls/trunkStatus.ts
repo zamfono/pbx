@@ -14,7 +14,7 @@ import {
   type TrunkStatus as TrunkStatusWire
 } from '@zamfono/shared';
 
-import type { AmiEvent } from '../ami/client.js';
+import type { AmiEvent } from '../ami/frame.js';
 import type { AriEventOf } from '../ari/events.js';
 import type { Endpoint } from '../ari/types.js';
 import type { Snapshot } from '../internal/snapshot.js';

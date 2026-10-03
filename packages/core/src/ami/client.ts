@@ -7,13 +7,9 @@ import {
   reconnectBackoff,
   type ReconnectBackoff
 } from '../reconnectBackoff.js';
+import { splitFrames, writeFrame, type AmiEvent } from './frame.js';
 
-const FRAME_SEPARATOR = '\r\n\r\n';
-const LINE_SEPARATOR = '\r\n';
-const HEADER_SEPARATOR = ': ';
 const COMPLETE_EVENT_SUFFIX = /complete$/iu;
-
-export type AmiEvent = Record<string, string>;
 
 export type AmiClientOptions = {
   host: string;
@@ -29,32 +25,6 @@ type PendingAction = {
   resolve: (events: AmiEvent[]) => void;
   reject: (error: Error) => void;
 };
-
-function extractFrames(buffer: string): { frames: string[]; rest: string } {
-  const frames: string[] = [];
-  let rest = buffer;
-  let separatorIndex = rest.indexOf(FRAME_SEPARATOR);
-  while (separatorIndex !== -1) {
-    frames.push(rest.slice(0, separatorIndex));
-    rest = rest.slice(separatorIndex + FRAME_SEPARATOR.length);
-    separatorIndex = rest.indexOf(FRAME_SEPARATOR);
-  }
-  return { frames, rest };
-}
-
-function parseFrame(text: string): AmiEvent {
-  const frame: AmiEvent = {};
-  for (const line of text.split(LINE_SEPARATOR)) {
-    const separatorIndex = line.indexOf(HEADER_SEPARATOR);
-    if (separatorIndex === -1) {
-      continue;
-    }
-    frame[line.slice(0, separatorIndex)] = line.slice(
-      separatorIndex + HEADER_SEPARATOR.length
-    );
-  }
-  return frame;
-}
 
 /**
  * AMI text-protocol client: logs in once connected, resolves `action()` calls by ActionID and
@@ -124,13 +94,9 @@ export class AmiClient extends EventEmitter {
     }
     this.actionCounter += 1;
     const actionId = `${this.actionCounter}`;
-    const lines = [`Action: ${name}`, `ActionID: ${actionId}`];
-    for (const [key, value] of Object.entries(params ?? {})) {
-      lines.push(`${key}: ${value}`);
-    }
     return new Promise((resolve, reject) => {
       this.pending.set(actionId, { events: [], awaitEvents, resolve, reject });
-      socket.write(`${lines.join(LINE_SEPARATOR)}${FRAME_SEPARATOR}`);
+      socket.write(writeFrame({ Action: name, ActionID: actionId, ...params }));
     });
   }
 
@@ -182,10 +148,10 @@ export class AmiClient extends EventEmitter {
 
   private handleData(chunk: string): void {
     this.buffer += chunk;
-    const { frames, rest } = extractFrames(this.buffer);
+    const { frames, rest } = splitFrames(this.buffer);
     this.buffer = rest;
-    for (const frameText of frames) {
-      this.routeFrame(parseFrame(frameText));
+    for (const frame of frames) {
+      this.routeFrame(frame);
     }
   }
 
