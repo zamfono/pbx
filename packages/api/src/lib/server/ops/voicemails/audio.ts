@@ -5,12 +5,7 @@ import { z } from 'zod';
 import { downloadAudio } from '#lib/server/audio/transcode.js';
 
 import { defineOperation } from '../types.js';
-import {
-  assertVoicemailScope,
-  loadVoicemail,
-  ringGroupIdsForUser,
-  VOICEMAIL_SUBDIR
-} from './_shared.js';
+import { loadVisibleVoicemail, VOICEMAIL_SUBDIR } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -36,12 +31,7 @@ export const audio = defineOperation({
   minRole: 'user',
   readOnly: true,
   run: async (ctx, input) => {
-    const row = await loadVoicemail(ctx.db, input.id);
-    const ringGroupIds =
-      ctx.actor.role === 'user'
-        ? await ringGroupIdsForUser(ctx.db, ctx.actor.id)
-        : [];
-    assertVoicemailScope(ctx.actor.role, ctx.actor.id, row, ringGroupIds);
+    const row = await loadVisibleVoicemail(ctx, input.id);
     return downloadAudio(
       path.join(env.MEDIA_DIR, VOICEMAIL_SUBDIR, row.filename),
       input.format

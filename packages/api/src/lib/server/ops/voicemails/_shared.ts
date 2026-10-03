@@ -16,7 +16,7 @@ import { getCoreClient } from '#lib/server/coreClient.js';
 import { ringGroupMemberships } from '#lib/server/ringGroupMembership.js';
 
 import { afterCommit } from '../afterCommit.js';
-import { OpError, type Context, type Role } from '../types.js';
+import { OpError, type Context } from '../types.js';
 
 const logger = pino({ name: 'voicemails' });
 
@@ -47,22 +47,6 @@ export function toVoicemailOut(row: VoicemailRow): VoicemailOut {
   };
 }
 
-/** Loads a voicemail by id, or throws `OpError(404)`; `voicemails` carries no soft delete (§11.2). */
-export async function loadVoicemail(
-  db: Transaction<DB>,
-  id: string
-): Promise<VoicemailRow> {
-  const row = await db
-    .selectFrom('voicemails')
-    .selectAll()
-    .where('id', '=', id)
-    .executeTakeFirst();
-  if (!row) {
-    throw new OpError(HTTP_NOT_FOUND, `voicemail '${id}' not found`);
-  }
-  return row;
-}
-
 /** The ring groups `userId` belongs to (§5.3, `ringGroupMemberships`). */
 export async function ringGroupIdsForUser(
   db: Transaction<DB>,
@@ -73,20 +57,28 @@ export async function ringGroupIdsForUser(
 }
 
 /**
- * Throws 403 unless `actorRole`/`actorId` may act on `row`: its own mailbox, the mailbox of a
- * ring group in `ringGroupIds`, or any mailbox for an admin/owner (§5.3).
+ * The voicemail with `id` that `ctx.actor` may act on: its own mailbox, the mailbox of a ring group
+ * it belongs to, or any mailbox for an admin/owner (§5.3). Throws `OpError(404)` for an unknown id
+ * (`voicemails` carries no soft delete, §11.2) and `OpError(403)` for another's mailbox.
  */
-export function assertVoicemailScope(
-  actorRole: Role,
-  actorId: string,
-  row: Pick<VoicemailRow, 'mailboxUserId' | 'mailboxRingGroupId'>,
-  ringGroupIds: readonly string[]
-): void {
-  if (actorRole !== 'user') {
-    return;
+export async function loadVisibleVoicemail(
+  ctx: Context,
+  id: string
+): Promise<VoicemailRow> {
+  const row = await ctx.db
+    .selectFrom('voicemails')
+    .selectAll()
+    .where('id', '=', id)
+    .executeTakeFirst();
+  if (!row) {
+    throw new OpError(HTTP_NOT_FOUND, `voicemail '${id}' not found`);
   }
+  if (ctx.actor.role !== 'user') {
+    return row;
+  }
+  const ringGroupIds = await ringGroupIdsForUser(ctx.db, ctx.actor.id);
   const own =
-    row.mailboxUserId === actorId ||
+    row.mailboxUserId === ctx.actor.id ||
     (row.mailboxRingGroupId !== null &&
       ringGroupIds.includes(row.mailboxRingGroupId));
   if (!own) {
@@ -95,6 +87,7 @@ export function assertVoicemailScope(
       'voicemails: may act only on your own mailbox'
     );
   }
+  return row;
 }
 
 /** The `MwiMailbox` a voicemail row's owning mailbox is addressed as (§3.1, §9.3, `mwiMailboxOf`). */

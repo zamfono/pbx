@@ -1,13 +1,7 @@
 import { z } from 'zod';
 
 import { defineOperation } from '../types.js';
-import {
-  assertVoicemailScope,
-  loadVoicemail,
-  mailboxKey,
-  notifyMwi,
-  ringGroupIdsForUser
-} from './_shared.js';
+import { loadVisibleVoicemail, mailboxKey, notifyMwi } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -31,12 +25,7 @@ export const markRead = defineOperation({
   minRole: 'user',
   audit: false,
   run: async (ctx, input) => {
-    const row = await loadVoicemail(ctx.db, input.id);
-    const ringGroupIds =
-      ctx.actor.role === 'user'
-        ? await ringGroupIdsForUser(ctx.db, ctx.actor.id)
-        : [];
-    assertVoicemailScope(ctx.actor.role, ctx.actor.id, row, ringGroupIds);
+    const row = await loadVisibleVoicemail(ctx, input.id);
     await ctx.db
       .updateTable('voicemails')
       .set({ read: Number(input.read) })

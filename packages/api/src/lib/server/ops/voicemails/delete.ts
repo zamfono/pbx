@@ -4,12 +4,10 @@ import { afterCommit } from '../afterCommit.js';
 import { setUndoable } from '../runner.js';
 import { defineOperation } from '../types.js';
 import {
-  assertVoicemailScope,
   deleteVoicemailFile,
-  loadVoicemail,
+  loadVisibleVoicemail,
   mailboxKey,
-  notifyMwi,
-  ringGroupIdsForUser
+  notifyMwi
 } from './_shared.js';
 
 const inputSchema = z.object({ id: z.string() }).strict();
@@ -28,12 +26,7 @@ export const deleteVoicemail = defineOperation({
     `Delete this voicemail? This cannot be undone. (${input.id})`,
   entity: input => ({ kind: 'voicemail', id: input.id }),
   run: async (ctx, input) => {
-    const row = await loadVoicemail(ctx.db, input.id);
-    const ringGroupIds =
-      ctx.actor.role === 'user'
-        ? await ringGroupIdsForUser(ctx.db, ctx.actor.id)
-        : [];
-    assertVoicemailScope(ctx.actor.role, ctx.actor.id, row, ringGroupIds);
+    const row = await loadVisibleVoicemail(ctx, input.id);
     await ctx.db.deleteFrom('voicemails').where('id', '=', input.id).execute();
     // Only once the row's delete has committed: a rolled-back one keeps its audio.
     afterCommit(ctx, async () => {
