@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import {
   HOST_DIRECTIONS,
+  MAX_PORT,
   type CallerIdHeader,
   type Db,
   type DB,
@@ -17,9 +18,6 @@ import {
 
 import { liveRow } from '../rows.js';
 import { logLevelWire } from '../settings/logLevel.js';
-
-/** The highest TCP/UDP port number: a trunk host's and the mail relay's. */
-export const MAX_PORT = 65535;
 
 /** The trunk offer codecs a client or trunk list may name (§9.1, §9.4); the image ships no others. */
 export const CODECS = ['opus', 'g722', 'amrwb', 'amr', 'alaw', 'ulaw'] as const;

@@ -1,6 +1,8 @@
 /** Emergency calls (§10.1 "Emergency calls"): the tenant's emergency trunks in priority order,
  * bypassing outbound routing entirely. */
-import { effectiveLevel, type LogLevel } from '../callLog.js';
+import type { CallLogLevel } from '@zamfono/shared';
+
+import { effectiveLevel } from '../callLog.js';
 import { userById, type Snapshot } from '../internal/snapshot.js';
 import { emergencyTrunks } from '../routing/trunk.js';
 import { SIP_SERVICE_UNAVAILABLE } from '../sipCodes.js';
@@ -14,9 +16,9 @@ import type { TrunkState } from './trunkState.js';
 /** An emergency call's routing trace is kept at level `events` whatever the tenant default
  * (§10.1 "Emergency calls"). */
 export function emergencyLogLevel(
-  configured: LogLevel,
+  configured: CallLogLevel,
   nowIso: string
-): LogLevel {
+): CallLogLevel {
   return effectiveLevel(
     configured,
     [{ level: 'events', expiresAt: null }],

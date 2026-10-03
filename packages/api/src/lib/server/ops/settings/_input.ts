@@ -5,6 +5,7 @@ import {
   featureCodesSchema,
   isIanaTimeZone,
   LANGUAGES,
+  MAX_PORT,
   SMTP_SECURITIES,
   SSO_PROVIDERS
 } from '@zamfono/shared';
@@ -12,7 +13,7 @@ import {
 import { isCronExpression } from '#lib/server/jobs/cronExpression.js';
 
 import { targetSpecSchema } from '../forwardTargetSchema.js';
-import { CODECS, MAX_PORT } from '../trunks/_shared.js';
+import { CODECS } from '../trunks/_shared.js';
 
 const MAX_TLS_RELOAD_HOUR = 23;
 const MIN_AUDIT_RETENTION_DAYS = 30;

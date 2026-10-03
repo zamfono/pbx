@@ -180,7 +180,7 @@ describe('Presence', () => {
     });
 
     // §9.3 "a user: RINGING while any of their devices rings".
-    presence.setCallState(userId, 'ringing', '+15557777', null);
+    presence.setCallState(userId, 'ringing', '+15557777', null, 'call-1');
     await eventually(() => {
       expect(hintPuts('102').at(-1)).toEqual({ deviceState: 'RINGING' });
       expect(state.presence.get(userId)).toMatchObject({
@@ -191,12 +191,12 @@ describe('Presence', () => {
 
     // §9.3 "... INUSE in a call": the hint moves on even though the call counterpart is
     // unchanged, so the presence status itself (still `busy`) logs no second row for it.
-    presence.setCallState(userId, 'inCall', '+15557777', null);
+    presence.setCallState(userId, 'inCall', '+15557777', null, 'call-1');
     await eventually(() => {
       expect(hintPuts('102').at(-1)).toEqual({ deviceState: 'INUSE' });
     });
 
-    presence.setCallState(userId, 'idle', null, null);
+    presence.setCallState(userId, 'idle', null, null, 'call-1');
     await eventually(() => {
       expect(hintPuts('102').at(-1)).toEqual({ deviceState: 'NOT_INUSE' });
       expect(state.presence.get(userId)?.status).toBe('available');
@@ -301,11 +301,11 @@ describe('Presence', () => {
       }
       return 0;
     };
-    presence.setCallState(userId, 'ringing', '+15557777', null);
+    presence.setCallState(userId, 'ringing', '+15557777', null, 'call-1');
     await eventually(() => {
       expect(ringingHeld).toBe(true);
     });
-    presence.setCallState(userId, 'idle', null, null);
+    presence.setCallState(userId, 'idle', null, null, 'call-1');
 
     // Once the late RINGING has landed, the hint Asterisk holds is still the idle one.
     await eventually(() => {

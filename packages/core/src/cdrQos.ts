@@ -25,11 +25,10 @@
  * summary winning every figure it measured: both come from the same reports, and the summary is
  * the one Asterisk kept to the end of the leg.
  */
-import type { Db, QosRole } from '@zamfono/shared';
+import type { CallLogLevel, Db, QosRole } from '@zamfono/shared';
 
 import { logFailure } from './ari/failures.js';
 import type { Channel, ChannelsApi, Logger } from './ari/types.js';
-import type { LogLevel } from './callLog.js';
 import type { Call } from './calls/call.js';
 import {
   parseRtpAudioQos,
@@ -41,7 +40,7 @@ import { qosTargets, type QosTarget } from './qosTargets.js';
 import { RtcpQos, withRtcp } from './rtcpQos.js';
 
 // §7: `call_qos` is written at diagnostics level `qos` and `sip`, never at `none`/`events`.
-const QOS_ELIGIBLE_LEVELS: ReadonlySet<LogLevel> = new Set(['qos', 'sip']);
+const QOS_ELIGIBLE_LEVELS: ReadonlySet<CallLogLevel> = new Set(['qos', 'sip']);
 
 // How long after a call's write its channels still awaited are checked against Asterisk's: the
 // legs the core hangs up as the call ends are gone within moments, and their `ChannelDestroyed`

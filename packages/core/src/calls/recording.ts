@@ -4,7 +4,7 @@
  */
 import path from 'node:path';
 
-import { newId, type Db } from '@zamfono/shared';
+import { newId, RECORDINGS_SUBDIR, type Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import { logUnlessGone } from '../ari/failures.js';
@@ -22,11 +22,6 @@ import {
 import { ffmpegMix, type Mixer } from './recordingMix.js';
 import { recordFormatFor } from './recordingRate.js';
 import { storeParticipation } from './recordingStore.js';
-
-// §11.6: the raw per-leg pair and the mixed output live in `media/recordings/`. The name given to
-// ARI is relative to Asterisk's recording directory, which the asterisk image resolves to the
-// shared media volume, so the same relative prefix names the file on both sides.
-const RECORDINGS_DIR_NAME = 'recordings';
 
 export type RecorderDeps = {
   ari: AriClient;
@@ -156,7 +151,10 @@ export class Recorder {
     channelId: string
   ): Promise<void> {
     const id = newId();
-    const dir = path.join(this.deps.mediaDir, RECORDINGS_DIR_NAME);
+    // §11.6: the raw per-leg pair and the mixed output live in `media/recordings/`. The name given
+    // to ARI is relative to Asterisk's recording directory, which the asterisk image resolves to
+    // the shared media volume, so the same relative prefix names the file on both sides.
+    const dir = path.join(this.deps.mediaDir, RECORDINGS_SUBDIR);
     // Asterisk names the raw file after its format: `<id>-l.wav` at 8 kHz, `<id>-l.wav16` at 16.
     const format = await recordFormatFor(
       this.deps.ari,
@@ -166,8 +164,8 @@ export class Recorder {
     const leftPath = path.join(dir, `${id}-l.${format}`);
     const rightPath = path.join(dir, `${id}-r.${format}`);
     const snoops = await startSnoopPair(this.deps.ari, channelId, {
-      left: { name: `${RECORDINGS_DIR_NAME}/${id}-l`, file: leftPath },
-      right: { name: `${RECORDINGS_DIR_NAME}/${id}-r`, file: rightPath },
+      left: { name: `${RECORDINGS_SUBDIR}/${id}-l`, file: leftPath },
+      right: { name: `${RECORDINGS_SUBDIR}/${id}-r`, file: rightPath },
       format
     }).catch((error: unknown) => {
       this.deps.log.error(
@@ -241,11 +239,11 @@ export class Recorder {
     // event can fire (and be missed) before this module is listening for it.
     const leftFinished = waitForRecordingFinished(
       this.deps.ari,
-      `${RECORDINGS_DIR_NAME}/${participation.id}-l`
+      `${RECORDINGS_SUBDIR}/${participation.id}-l`
     );
     const rightFinished = waitForRecordingFinished(
       this.deps.ari,
-      `${RECORDINGS_DIR_NAME}/${participation.id}-r`
+      `${RECORDINGS_SUBDIR}/${participation.id}-r`
     );
     await Promise.all([
       this.deps.ari.channels.hangup(participation.leftChannelId).catch(

@@ -15,7 +15,6 @@ import { FakeAri } from './ari/fake.js';
 import { defaultChannel } from './ari/fakeChannel.js';
 import { fakeRtpAudioQos } from './ari/fakeRtp.js';
 import type { Channel } from './ari/types.js';
-import type { LogLevel } from './callLog.js';
 import { callerChannel, newCall, type Call } from './calls/call.js';
 import { CdrWriter } from './cdr.js';
 import { EventBus } from './internal/eventBus.js';
@@ -119,7 +118,7 @@ function withSlowCallsInsert(db: Db): Db {
   });
 }
 
-function buildCall(logLevel: LogLevel = 'events'): Call {
+function buildCall(logLevel: CallLogLevel = 'events'): Call {
   return newCall({
     id: newId(),
     direction: 'inbound',

@@ -13,7 +13,7 @@ const baseUser = {
   id: 'user-1',
   dnd: false,
   mailboxEnabled: false,
-  findMe: null,
+  findMe: [],
   registeredDevices: 0
 };
 

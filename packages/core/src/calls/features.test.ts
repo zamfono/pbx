@@ -459,7 +459,8 @@ describe('features', () => {
     pipeline.pendingRing.set(target.id, {
       resolve: () => undefined,
       timer: ringTimer,
-      existingBridgeId: null
+      existingBridgeId: null,
+      placing: 0
     });
 
     const pickerUserId = await seedUser(db);
@@ -523,7 +524,8 @@ describe('features', () => {
     pipeline.pendingRing.set(target.id, {
       resolve: () => undefined,
       timer: ringTimer,
-      existingBridgeId: null
+      existingBridgeId: null,
+      placing: 0
     });
     return target;
   }
@@ -665,7 +667,8 @@ describe('features', () => {
     pipeline.pendingRing.set(target.id, {
       resolve: () => undefined,
       timer: ringTimer,
-      existingBridgeId: null
+      existingBridgeId: null,
+      placing: 0
     });
     const pickerUserId = await seedUser(db);
     const pickerChannel = fakeAri.addChannel({});

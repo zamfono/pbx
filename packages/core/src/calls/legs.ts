@@ -27,7 +27,7 @@ export type RingResolver = {
   handOver?: (leg: Leg) => void;
   /** Device legs still being placed, all at once (`ringUser.ts`, `ownDevices.ts`): the race does
    * not end on its last ringing leg while one is still to ring. */
-  placing?: number;
+  placing: number;
   /** Set once a leg's answer is claimed (`winLeg`), from before its bridging awaits on: the race is
    * won, so neither its timeout nor its last other leg ending may settle it unanswered meanwhile
    * (§10.1 step 4, "first answer wins"). */

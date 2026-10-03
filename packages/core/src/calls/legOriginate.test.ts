@@ -1,11 +1,10 @@
 import { EventEmitter } from 'node:events';
 import { describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso } from '@zamfono/shared';
+import { newId, nowIso, type CallLogLevel } from '@zamfono/shared';
 
 import { defaultChannel } from '../ari/fakeChannel.js';
 import { AriError, type CreateParams } from '../ari/types.js';
-import type { LogLevel } from '../callLog.js';
 import { noopLogger } from '../testing/pipelineDeps.js';
 import { newCall } from './call.js';
 import {
@@ -93,7 +92,7 @@ function stubPipeline(
   };
 }
 
-function callAt(level: LogLevel): ReturnType<typeof newCall> {
+function callAt(level: CallLogLevel): ReturnType<typeof newCall> {
   return newCall({
     id: newId(),
     direction: 'outbound',

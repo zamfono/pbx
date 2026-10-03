@@ -241,7 +241,8 @@ describe('closeCall, on a call not yet answered', () => {
       pipeline.pendingRing.set(call.id, {
         resolve,
         timer,
-        existingBridgeId: null
+        existingBridgeId: null,
+        placing: 0
       });
     });
 

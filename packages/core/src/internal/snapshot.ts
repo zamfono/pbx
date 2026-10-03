@@ -70,7 +70,7 @@ type Row<K extends ConfigTable> = Omit<Selectable<DB[K]>, 'deletedAt'>;
 type RawTableRows = { [K in ConfigTable]: Row<K>[] };
 
 type ParsedUser = Omit<Row<'users'>, 'findMeJson'> & {
-  findMe: { number: string; delayS: number }[] | null;
+  findMe: { number: string; delayS: number }[];
 };
 type ParsedDevice = Omit<Row<'devices'>, 'allowedIpsJson'> & {
   allowedIps: string[] | null;
@@ -132,8 +132,11 @@ function parseUser(row: Row<'users'>): ParsedUser {
   const { findMeJson, ...rest } = row;
   return {
     ...rest,
-    findMe: parseNullableJson('users.findMeJson', findMeJson) as
-      { number: string; delayS: number }[] | null
+    // `NULL` and an empty list both mean "no find-me numbers".
+    findMe: (parseNullableJson('users.findMeJson', findMeJson) ?? []) as {
+      number: string;
+      delayS: number;
+    }[]
   };
 }
 

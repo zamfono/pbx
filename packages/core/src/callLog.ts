@@ -4,16 +4,14 @@
  * call end; the buffer never touches the database itself.
  */
 
-import type { LogLevelOverride } from '@zamfono/shared';
-
-export type LogLevel = 'none' | 'events' | 'qos' | 'sip';
+import type { CallLogLevel, LogLevelOverride } from '@zamfono/shared';
 
 type LevelOverride = {
   level: LogLevelOverride | null;
   expiresAt: string | null;
 };
 
-const LEVEL_RANK: Record<LogLevel, number> = {
+const LEVEL_RANK: Record<CallLogLevel, number> = {
   none: 0,
   events: 1,
   qos: 2,
@@ -27,10 +25,10 @@ const LEVEL_RANK: Record<LogLevel, number> = {
  * no longer applies.
  */
 export function effectiveLevel(
-  tenant: LogLevel,
+  tenant: CallLogLevel,
   overrides: LevelOverride[],
   nowIso: string
-): LogLevel {
+): CallLogLevel {
   let best = tenant;
   for (const override of overrides) {
     if (override.level === null) {
@@ -66,7 +64,7 @@ type LineBuffer = { bytes: number; overflowed: boolean };
  */
 export class CallLog {
   readonly #callId: string;
-  #level: LogLevel;
+  #level: CallLogLevel;
   readonly #maxBytes: number;
   readonly #lines: { kind: LineKind; serialized: string; size: number }[] = [];
   readonly #buffers: Record<LineKind, LineBuffer> = {
@@ -74,7 +72,7 @@ export class CallLog {
     sip: { bytes: 0, overflowed: false }
   };
 
-  constructor(callId: string, level: LogLevel, maxBytes: number) {
+  constructor(callId: string, level: CallLogLevel, maxBytes: number) {
     this.#callId = callId;
     this.#level = level;
     this.#maxBytes = maxBytes;
@@ -82,13 +80,13 @@ export class CallLog {
 
   /** The level this call has resolved to so far (§7); read back by `CdrWriter` to
    * gate `call_qos` on the call's own level rather than the tenant default alone. */
-  get level(): LogLevel {
+  get level(): CallLogLevel {
     return this.#level;
   }
 
   /** Raises the level to `level`; an override "can only raise the level" (§7), so a lower one is
    * a no-op. */
-  raise(level: LogLevel): void {
+  raise(level: CallLogLevel): void {
     if (LEVEL_RANK[level] > LEVEL_RANK[this.#level]) {
       this.#level = level;
     }

@@ -5,11 +5,10 @@
 import type * as privateEnv from '$app/env/private';
 import { z } from 'zod';
 
-import { isE164, type SmtpSecurity } from '@zamfono/shared';
+import { isE164, MAX_PORT, type SmtpSecurity } from '@zamfono/shared';
 
 import { settingsInputSchema } from './ops/settings/_input.js';
 import { isKnownCountry } from './ops/settings/country.js';
-import { MAX_PORT } from './ops/trunks/_shared.js';
 
 // The extension length's floor (§11.4 `ext_length >= 2`) is what leaves room for the nine parking
 // slots `seedExtensions.ts` numbers.

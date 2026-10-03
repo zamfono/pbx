@@ -7,6 +7,7 @@
 import {
   DEFAULT_DB_FILE,
   DEFAULT_MEDIA_DIR,
+  MAX_PORT,
   resolveVersion,
   stackTimeZoneError,
   type ZamfonoVersion
@@ -21,7 +22,6 @@ const DEFAULT_CALL_LOG_MAX_BYTES = 1048576;
 const DEFAULT_TZ = 'UTC';
 const DEFAULT_API_INTERNAL_URL = 'http://api:3000';
 const MIN_PORT = 1;
-const MAX_PORT = 65535;
 
 export type CoreEnv = {
   ariUrl: string;

@@ -83,7 +83,8 @@ describe('winding calls down as core stops', () => {
     pipeline.pendingRing.set(call.id, {
       resolve: outcome.resolve,
       timer,
-      existingBridgeId: null
+      existingBridgeId: null,
+      placing: 0
     });
 
     await pipeline.drain();

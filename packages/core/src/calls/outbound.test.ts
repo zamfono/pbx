@@ -4,6 +4,7 @@ import {
   newId,
   nowIso,
   openDb,
+  type CallLogLevel,
   type Db,
   type LogLevelOverride
 } from '@zamfono/shared';
@@ -42,7 +43,7 @@ async function seedSettings(
   mainDidId: string,
   overrides: {
     emergencyNumbers?: string[];
-    callLogLevel?: 'none' | 'events' | 'qos' | 'sip';
+    callLogLevel?: CallLogLevel;
   } = {}
 ): Promise<void> {
   await db

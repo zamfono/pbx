@@ -1,12 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, openDb, type Db } from '@zamfono/shared';
+import { newId, openDb, type CallLogLevel, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { defaultChannel } from './ari/fakeChannel.js';
 import { fakeRtpAudioQos } from './ari/fakeRtp.js';
 import type { Channel } from './ari/types.js';
-import type { LogLevel } from './callLog.js';
 import { newCall, type Call } from './calls/call.js';
 import { QosRows } from './cdrQos.js';
 import { RtcpQos } from './rtcpQos.js';
@@ -21,7 +20,7 @@ function ended(id: string, rtpAudioQos = fakeRtpAudioQos()): Channel {
 
 async function openCall(
   db: Db,
-  level: LogLevel = 'qos',
+  level: CallLogLevel = 'qos',
   callerChannelId = 'caller'
 ): Promise<Call> {
   const call = newCall({

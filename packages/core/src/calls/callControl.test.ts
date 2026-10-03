@@ -487,7 +487,8 @@ describe('call control', () => {
         outcome = result;
       },
       timer,
-      existingBridgeId: null
+      existingBridgeId: null,
+      placing: 0
     });
     expect(
       await refusal(

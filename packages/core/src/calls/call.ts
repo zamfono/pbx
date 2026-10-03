@@ -2,10 +2,15 @@
  * routing cursor; SQLite holds durable outcomes alone, via the CDR writer. */
 import type { Selectable } from 'kysely';
 
-import type { DB, Scope, UserForwardCondition } from '@zamfono/shared';
+import type {
+  CallLogLevel,
+  DB,
+  Scope,
+  UserForwardCondition
+} from '@zamfono/shared';
 
 import { logUnlessGone } from '../ari/failures.js';
-import { CallLog, type LogLevel } from '../callLog.js';
+import { CallLog } from '../callLog.js';
 import { userById, type Snapshot } from '../internal/snapshot.js';
 import { targetFromRow, type ForwardTarget } from '../routing/targets.js';
 import type { Diversion } from './forwardContext.js';
@@ -108,7 +113,7 @@ export type NewCallParams = {
   from: string;
   to: string;
   startedAt: string;
-  logLevel: LogLevel;
+  logLevel: CallLogLevel;
   callLogMaxBytes: number;
 };
 

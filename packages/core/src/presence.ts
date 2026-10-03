@@ -44,10 +44,6 @@ export type PresenceDeps = {
   now: () => string;
 };
 
-// `setCallState`'s own key when its caller has no call id to hand it (mainly direct callers such
-// as tests): every such call shares this one slot, matching a single flat flag's own behaviour.
-const DIRECT_CALL_KEY = '__direct__';
-
 /** Per-extension `Stasis:presence-<ext>` hint (§9.3), derived from registrations and call state. */
 export class Presence {
   private readonly deps: PresenceDeps;
@@ -143,15 +139,14 @@ export class Presence {
 
   /** Records `userId`'s ring/bridge state for one call (§9.3): `idle` clears that call's own
    * entry rather than the user's whole state, so a call that stops ringing or ends never clears a
-   * flag another, still-live call set. `callId` defaults to a shared slot for a caller with none
-   * of its own (mainly direct callers such as tests). `refreshUser` reads the result back through
+   * flag another, still-live call set. `refreshUser` reads the result back through
    * `effectiveFlags` to compute the hint and status. */
   setCallState(
     userId: string,
     state: CallFlags['state'],
     peer: string | null,
     ringGroupId: string | null,
-    callId: string = DIRECT_CALL_KEY
+    callId: string
   ): void {
     const perCall = this.callFlags.get(userId) ?? new Map<string, CallFlags>();
     if (state === 'idle') {

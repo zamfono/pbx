@@ -6,8 +6,9 @@
  * dialling user's call, an own DID enters at its target and an internal extension at Entry, or a
  * parking slot retrieves the call parked there.
  */
+import type { CallLogLevel } from '@zamfono/shared';
+
 import { ignoreGone } from '../ari/failures.js';
-import type { LogLevel } from '../callLog.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { defaultPrompt } from '../prompts.js';
 import { resolveDialed, type DialAction } from '../routing/outbound.js';
@@ -53,7 +54,7 @@ export function logLevelFor(
   snapshot: Snapshot,
   action: DialAction,
   nowIso: string
-): LogLevel {
+): CallLogLevel {
   const configured = snapshot.settings.callLogLevel;
   return action.kind === 'emergency'
     ? emergencyLogLevel(configured, nowIso)

@@ -51,7 +51,7 @@ type EntryUser = {
   id: string;
   dnd: boolean;
   mailboxEnabled: boolean;
-  findMe: { number: string; delayS: number }[] | null;
+  findMe: { number: string; delayS: number }[];
   registeredDevices: number;
 };
 
@@ -70,7 +70,7 @@ export function userEntryCondition(
   if (user.dnd) {
     return 'dnd';
   }
-  if (user.registeredDevices === 0 && (user.findMe ?? []).length === 0) {
+  if (user.registeredDevices === 0 && user.findMe.length === 0) {
     return 'offline';
   }
   return null;
@@ -99,5 +99,5 @@ export function userEntryDecision(
   if (condition === 'offline') {
     return userOutcomeDecision(user, rules, 'offline');
   }
-  return { kind: 'ring', findMe: user.findMe ?? [] };
+  return { kind: 'ring', findMe: user.findMe };
 }

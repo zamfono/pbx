@@ -5,10 +5,9 @@
  * `api` requests, `parkingRingback.ts` for a parked party, and `blindTransfer.ts` gives a `REFER`
  * transfer's onward call the same identity.
  */
-import { newId } from '@zamfono/shared';
+import { newId, type CallLogLevel } from '@zamfono/shared';
 
 import { logFailure } from '../ari/failures.js';
-import type { LogLevel } from '../callLog.js';
 import { userById, type Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import { newCall, type Call } from './call.js';
@@ -65,7 +64,7 @@ export function transfereeEntry(
 export type OnwardEntry = {
   to: string;
   direction: Call['direction'];
-  logLevel: LogLevel;
+  logLevel: CallLogLevel;
   asUserId: string | null;
   trace: Record<string, unknown>;
 };

@@ -122,7 +122,7 @@ export async function ringUser(
   const devices = await devicesToRing(pipeline, snapshot, userId);
   if (
     devices.length === 0 &&
-    (user.findMe ?? []).length === 0 &&
+    user.findMe.length === 0 &&
     registeredDevices(pipeline, snapshot, userId).length > 0
   ) {
     // Every registered device carries a call and is left out of the call waiting, so nothing
@@ -141,7 +141,8 @@ export async function ringUser(
   pipeline.pendingRing.set(call.id, {
     resolve: resolveOutcome,
     timer,
-    existingBridgeId: takeJoinBridge(call)
+    existingBridgeId: takeJoinBridge(call),
+    placing: 0
   });
   // §9.3 "a user: RINGING while any of their devices rings".
   pipeline.deps.presence.setCallState(
@@ -160,7 +161,7 @@ export async function ringUser(
     snapshot.settings.language
   );
   callRinging(pipeline.deps, call);
-  scheduleFindMeLegs(pipeline, call, userId, user.findMe ?? []);
+  scheduleFindMeLegs(pipeline, call, userId, user.findMe);
   // Nothing rings nor is still to come (every device refused before it rang, `legOriginate.ts`):
   // the race is over at once, as when the last leg declines.
   const ringing = [...call.legs.values()].some(leg => leg.state === 'ringing');

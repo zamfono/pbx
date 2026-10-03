@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { newId, nowIso, type CallLogLevel, type Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import { type FakeAri } from '../ari/fake.js';
 import { isPlacement } from '../ari/fakeDial.js';
-import type { LogLevel } from '../callLog.js';
 import type { CdrWriter } from '../cdr.js';
 import { delivered, eventually } from '../testing/eventually.js';
 import { noopLogger } from '../testing/pipelineDeps.js';
@@ -604,7 +603,7 @@ describe('transfers', () => {
   async function consultationCall(
     transferrerId: string,
     targetId: string,
-    logLevel: LogLevel = 'events'
+    logLevel: CallLogLevel = 'events'
   ): Promise<{ consultation: Call; secondId: string; targetLegId: string }> {
     const second = fakeAri.addChannel({ name: 'PJSIP/e101-a-00000003' });
     const targetLeg = fakeAri.addChannel({ name: 'PJSIP/e102-a-00000004' });

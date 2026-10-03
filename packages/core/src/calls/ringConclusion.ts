@@ -92,13 +92,13 @@ export async function placeAll<T>(
 ): Promise<void> {
   const pending = pipeline.pendingRing.get(call.id);
   if (pending !== undefined) {
-    pending.placing = (pending.placing ?? 0) + items.length;
+    pending.placing += items.length;
   }
   await Promise.all(
     items.map(item =>
       place(item).finally(() => {
         if (pending !== undefined) {
-          pending.placing = (pending.placing ?? 1) - 1;
+          pending.placing -= 1;
         }
       })
     )

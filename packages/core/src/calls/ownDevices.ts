@@ -169,6 +169,7 @@ export function ringOwnDevices(
     resolve,
     timer,
     existingBridgeId: null,
+    placing: 0,
     handOver: leg => {
       answered = leg;
     }

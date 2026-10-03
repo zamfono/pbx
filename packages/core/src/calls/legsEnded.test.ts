@@ -224,7 +224,8 @@ describe('handleChannelEnded, the caller channel', () => {
       pipeline.pendingRing.set(call.id, {
         resolve,
         timer,
-        existingBridgeId: null
+        existingBridgeId: null,
+        placing: 0
       });
       const legs = causes.map((cause, index) => {
         const leg: Leg = {

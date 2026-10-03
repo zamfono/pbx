@@ -107,7 +107,8 @@ describe('CallActions', () => {
     pipeline.pendingRing.set(call.id, {
       resolve: () => undefined,
       timer,
-      existingBridgeId: null
+      existingBridgeId: null,
+      placing: 0
     });
     return call;
   }
