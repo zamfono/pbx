@@ -145,28 +145,36 @@ export const list = defineOperation({
     const from =
       input.from === undefined ? undefined : toStoredInstant(input.from);
     const to = input.to === undefined ? undefined : toStoredInstant(input.to);
-    const rows = await ctx.db
+    let query = ctx.db
       .selectFrom('calls')
       .selectAll()
-      .where('endedAt', 'is not', null)
-      .$if(input.direction !== undefined, qb =>
-        qb.where('direction', '=', input.direction ?? 'inbound')
-      )
-      .$if(input.status !== undefined, qb =>
-        qb.where('status', '=', input.status ?? 'answered')
-      )
-      .$if(input.ringGroupId !== undefined, qb =>
-        qb.where('ringGroupId', '=', input.ringGroupId ?? '')
-      )
-      .$if(from !== undefined, qb => qb.where('startedAt', '>=', from ?? ''))
-      .$if(to !== undefined, qb => qb.where('startedAt', '<=', to ?? ''))
-      .$if(input.userId !== undefined, qb =>
-        qb.where(eb => ownCallWhere(eb, input.userId ?? ''))
-      )
-      .$if(ownUserId !== null, qb =>
-        qb.where(eb => ownCallWhere(eb, ownUserId ?? ''))
-      )
-      .$if(cursor !== undefined, qb => qb.where('id', '<', cursor ?? ''))
+      .where('endedAt', 'is not', null);
+    if (input.direction !== undefined) {
+      query = query.where('direction', '=', input.direction);
+    }
+    if (input.status !== undefined) {
+      query = query.where('status', '=', input.status);
+    }
+    if (input.ringGroupId !== undefined) {
+      query = query.where('ringGroupId', '=', input.ringGroupId);
+    }
+    if (from !== undefined) {
+      query = query.where('startedAt', '>=', from);
+    }
+    if (to !== undefined) {
+      query = query.where('startedAt', '<=', to);
+    }
+    const { userId } = input;
+    if (userId !== undefined) {
+      query = query.where(eb => ownCallWhere(eb, userId));
+    }
+    if (ownUserId !== null) {
+      query = query.where(eb => ownCallWhere(eb, ownUserId));
+    }
+    if (cursor !== undefined) {
+      query = query.where('id', '<', cursor);
+    }
+    const rows = await query
       .orderBy('id', 'desc')
       .limit(limit + 1)
       .execute();

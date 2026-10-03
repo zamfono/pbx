@@ -24,13 +24,14 @@ export const targetsList = defineOperation({
   readOnly: true,
   run: async (ctx, input) => {
     const limit = input.limit ?? DEFAULT_LIMIT;
-    const rows = await ctx.db
+    let query = ctx.db
       .selectFrom('backupTargets')
       .selectAll()
-      .where('deletedAt', 'is', null)
-      .$if(input.cursor !== undefined, qb =>
-        qb.where('id', '>', decodeIdCursor(input.cursor ?? ''))
-      )
+      .where('deletedAt', 'is', null);
+    if (input.cursor !== undefined) {
+      query = query.where('id', '>', decodeIdCursor(input.cursor));
+    }
+    const rows = await query
       .orderBy('id')
       .limit(limit + 1)
       .execute();

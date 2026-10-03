@@ -28,10 +28,11 @@ export const list = defineOperation({
       input.cursor === undefined
         ? undefined
         : (decodeCursor(input.cursor) as { id: string }).id;
-    const rows = await ctx.db
-      .selectFrom('recordings')
-      .selectAll()
-      .$if(cursor !== undefined, qb => qb.where('id', '<', cursor ?? ''))
+    let query = ctx.db.selectFrom('recordings').selectAll();
+    if (cursor !== undefined) {
+      query = query.where('id', '<', cursor);
+    }
+    const rows = await query
       .orderBy('id', 'desc')
       .limit(limit + 1)
       .execute();

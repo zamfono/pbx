@@ -87,32 +87,41 @@ export const list = defineOperation({
     const from =
       input.from === undefined ? undefined : toStoredInstant(input.from);
     const to = input.to === undefined ? undefined : toStoredInstant(input.to);
-    const rows = await ctx.db
-      .selectFrom('auditLog')
-      .selectAll()
-      .$if(input.entityKind !== undefined, qb =>
-        qb.where('entityKind', '=', input.entityKind ?? '')
-      )
-      .$if(input.entityId !== undefined, qb =>
-        qb.where('entityId', '=', input.entityId ?? '')
-      )
-      .$if(input.actorUserId !== undefined, qb =>
-        qb.where('actorUserId', '=', input.actorUserId ?? '')
-      )
-      .$if(input.channel !== undefined, qb =>
-        qb.where('channel', '=', input.channel ?? 'rest')
-      )
-      .$if(input.clientId !== undefined, qb =>
-        qb.where('clientId', '=', input.clientId ?? '')
-      )
-      .$if(input.operation !== undefined, qb =>
-        qb.where('operation', '=', input.operation ?? '')
-      )
-      .$if(from !== undefined, qb => qb.where('createdAt', '>=', from ?? ''))
-      .$if(to !== undefined, qb => qb.where('createdAt', '<=', to ?? ''))
-      .$if(state === 'live', qb => qb.where('undoneAt', 'is', null))
-      .$if(state === 'undone', qb => qb.where('undoneAt', 'is not', null))
-      .$if(cursor !== undefined, qb => qb.where('id', '<', cursor ?? ''))
+    let query = ctx.db.selectFrom('auditLog').selectAll();
+    if (input.entityKind !== undefined) {
+      query = query.where('entityKind', '=', input.entityKind);
+    }
+    if (input.entityId !== undefined) {
+      query = query.where('entityId', '=', input.entityId);
+    }
+    if (input.actorUserId !== undefined) {
+      query = query.where('actorUserId', '=', input.actorUserId);
+    }
+    if (input.channel !== undefined) {
+      query = query.where('channel', '=', input.channel);
+    }
+    if (input.clientId !== undefined) {
+      query = query.where('clientId', '=', input.clientId);
+    }
+    if (input.operation !== undefined) {
+      query = query.where('operation', '=', input.operation);
+    }
+    if (from !== undefined) {
+      query = query.where('createdAt', '>=', from);
+    }
+    if (to !== undefined) {
+      query = query.where('createdAt', '<=', to);
+    }
+    if (state === 'live') {
+      query = query.where('undoneAt', 'is', null);
+    }
+    if (state === 'undone') {
+      query = query.where('undoneAt', 'is not', null);
+    }
+    if (cursor !== undefined) {
+      query = query.where('id', '<', cursor);
+    }
+    const rows = await query
       .orderBy('id', 'desc')
       .limit(limit + 1)
       .execute();

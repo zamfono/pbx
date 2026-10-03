@@ -28,15 +28,14 @@ export const runsList = defineOperation({
   readOnly: true,
   run: async (ctx, input) => {
     const limit = input.limit ?? DEFAULT_LIMIT;
-    const rows = await ctx.db
-      .selectFrom('backupRuns')
-      .selectAll()
-      .$if(input.targetId !== undefined, qb =>
-        qb.where('targetId', '=', input.targetId ?? '')
-      )
-      .$if(input.cursor !== undefined, qb =>
-        qb.where('id', '<', decodeIdCursor(input.cursor ?? ''))
-      )
+    let query = ctx.db.selectFrom('backupRuns').selectAll();
+    if (input.targetId !== undefined) {
+      query = query.where('targetId', '=', input.targetId);
+    }
+    if (input.cursor !== undefined) {
+      query = query.where('id', '<', decodeIdCursor(input.cursor));
+    }
+    const rows = await query
       .orderBy('id', 'desc')
       .limit(limit + 1)
       .execute();

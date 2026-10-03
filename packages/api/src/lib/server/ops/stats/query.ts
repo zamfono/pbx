@@ -87,17 +87,17 @@ export const query = defineOperation({
       );
     }
     const plan = planBuckets(from, to, input.bucket);
-    const rows = await ctx.db
+    let callsQuery = ctx.db
       .selectFrom('calls')
       .select(['startedAt', 'answeredAt', 'endedAt', 'status'])
       // A call in progress has a placeholder row, not an outcome yet (§10.1 "Call aggregate").
       .where('endedAt', 'is not', null)
       .where('startedAt', '>=', from)
-      .where('startedAt', '<', to)
-      .$if(input.ringGroupId !== undefined, qb =>
-        qb.where('ringGroupId', '=', input.ringGroupId ?? '')
-      )
-      .execute();
+      .where('startedAt', '<', to);
+    if (input.ringGroupId !== undefined) {
+      callsQuery = callsQuery.where('ringGroupId', '=', input.ringGroupId);
+    }
+    const rows = await callsQuery.execute();
     const byBucket = groupByBucket(plan, rows);
     const buckets = plan.starts.map((start, index) => ({
       start,

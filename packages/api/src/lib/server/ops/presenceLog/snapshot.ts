@@ -36,13 +36,14 @@ export const snapshot = defineOperation({
   readOnly: true,
   run: async (ctx, input) => {
     const toStoredInstant = await tenantInstantReader(ctx.db);
-    const rows = await ctx.db
+    let query = ctx.db
       .selectFrom('presenceLog')
       .selectAll()
-      .where('since', '<=', toStoredInstant(input.at))
-      .$if(input.userId !== undefined, qb =>
-        qb.where('userId', '=', input.userId ?? '')
-      )
+      .where('since', '<=', toStoredInstant(input.at));
+    if (input.userId !== undefined) {
+      query = query.where('userId', '=', input.userId);
+    }
+    const rows = await query
       .orderBy('userId')
       .orderBy('since', 'desc')
       .orderBy('id', 'desc')

@@ -52,19 +52,25 @@ export const transfer = defineOperation({
   minRole: 'user',
   audit: false,
   run: async (ctx, input) => {
-    const { target, toCallId } = input;
-    if (
-      (target === undefined) === (toCallId === undefined) ||
-      (toCallId !== undefined && input.voicemail !== undefined)
-    ) {
-      throw new OpError(
-        HTTP_UNPROCESSABLE_CONTENT,
-        'calls: give either target (with voicemail, if wanted) or toCallId'
-      );
-    }
-    await assertOwnLiveCall(ctx, input.id);
+    const { target, toCallId, voicemail } = input;
     const actorUserId = ctx.actor.id;
-    if (toCallId !== undefined) {
+    if (target !== undefined && toCallId === undefined) {
+      await assertOwnLiveCall(ctx, input.id);
+      await proxyCallAction(() =>
+        getCoreClient().transfer(input.id, {
+          target,
+          actorUserId,
+          ...(voicemail === undefined ? {} : { voicemail })
+        })
+      );
+      return { id: input.id };
+    }
+    if (
+      toCallId !== undefined &&
+      target === undefined &&
+      voicemail === undefined
+    ) {
+      await assertOwnLiveCall(ctx, input.id);
       await assertOwnLiveCall(ctx, toCallId);
       await proxyCallAction(() =>
         getCoreClient().attendedTransfer(input.id, {
@@ -74,13 +80,9 @@ export const transfer = defineOperation({
       );
       return { id: input.id };
     }
-    await proxyCallAction(() =>
-      getCoreClient().transfer(input.id, {
-        target: target ?? '',
-        actorUserId,
-        ...(input.voicemail === undefined ? {} : { voicemail: input.voicemail })
-      })
+    throw new OpError(
+      HTTP_UNPROCESSABLE_CONTENT,
+      'calls: give either target (with voicemail, if wanted) or toCallId'
     );
-    return { id: input.id };
   }
 });

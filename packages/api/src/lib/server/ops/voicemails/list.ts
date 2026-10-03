@@ -35,22 +35,23 @@ export const list = defineOperation({
       ctx.actor.role === 'user'
         ? await ringGroupIdsForUser(ctx.db, ctx.actor.id)
         : [];
-    const rows = await ctx.db
-      .selectFrom('voicemails')
-      .selectAll()
-      .$if(ctx.actor.role === 'user', qb =>
-        qb.where(eb =>
-          eb.or(
-            ringGroupIds.length > 0
-              ? [
-                  eb('mailboxUserId', '=', ctx.actor.id),
-                  eb('mailboxRingGroupId', 'in', ringGroupIds)
-                ]
-              : [eb('mailboxUserId', '=', ctx.actor.id)]
-          )
+    let query = ctx.db.selectFrom('voicemails').selectAll();
+    if (ctx.actor.role === 'user') {
+      query = query.where(eb =>
+        eb.or(
+          ringGroupIds.length > 0
+            ? [
+                eb('mailboxUserId', '=', ctx.actor.id),
+                eb('mailboxRingGroupId', 'in', ringGroupIds)
+              ]
+            : [eb('mailboxUserId', '=', ctx.actor.id)]
         )
-      )
-      .$if(cursor !== undefined, qb => qb.where('id', '<', cursor ?? ''))
+      );
+    }
+    if (cursor !== undefined) {
+      query = query.where('id', '<', cursor);
+    }
+    const rows = await query
       .orderBy('id', 'desc')
       .limit(limit + 1)
       .execute();
