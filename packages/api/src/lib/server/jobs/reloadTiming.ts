@@ -15,7 +15,6 @@ import { DAYS_TO_SCAN, longestClosedGap } from './scheduleMath.js';
 
 const DEFAULT_RELOAD_HOUR = 3;
 const MIDPOINT_DIVISOR = 2;
-const MAX_VALID_HOUR = 23;
 
 /**
  * The current or next tenant-wide OOO period's midpoint (§6.4 step 1), when one starts within
@@ -94,18 +93,6 @@ function nextHourOccurrenceMs(
   return todayMs > fromMs ? todayMs : occurrenceMs(today.add({ days: 1 }));
 }
 
-/** `TLS_RELOAD_HOUR` as an integer hour `0`-`23`, `null` when unset, empty or out of range. */
-function parseReloadHourEnv(value: string | undefined): number | null {
-  if (value === undefined || value === '') {
-    return null;
-  }
-  const hour = Number(value);
-  if (!Number.isInteger(hour) || hour < 0 || hour > MAX_VALID_HOUR) {
-    return null;
-  }
-  return hour;
-}
-
 /**
  * The next maintenance moment a detected certificate change is applied at (§6.4 "Reload
  * timing"), in this priority: the current/next tenant OOO period's midpoint; the longest closed
@@ -136,9 +123,10 @@ export async function nextMaintenanceMoment(db: Db, now: Date): Promise<Date> {
       nextHourOccurrenceMs(fromMs, settings.tlsReloadHour, timezone)
     );
   }
-  const envHour = parseReloadHourEnv(env.TLS_RELOAD_HOUR);
-  if (envHour !== null) {
-    return new Date(nextHourOccurrenceMs(fromMs, envHour, timezone));
+  if (env.TLS_RELOAD_HOUR !== undefined) {
+    return new Date(
+      nextHourOccurrenceMs(fromMs, env.TLS_RELOAD_HOUR, timezone)
+    );
   }
   return new Date(nextHourOccurrenceMs(fromMs, DEFAULT_RELOAD_HOUR, timezone));
 }

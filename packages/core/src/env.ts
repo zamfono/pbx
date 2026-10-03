@@ -1,15 +1,22 @@
 /**
  * `core`'s boot environment (§6.3 "Environment"): every variable the process reads, parsed and
- * validated once at start so a malformed value fails the boot instead of a later call.
+ * validated once at start so a malformed value fails the boot instead of a later call. Only the
+ * secrets are required; every other variable has its default here, and an empty value, which
+ * Compose hands over for an unset `${VAR:-}`, counts as unset.
  */
+import {
+  DEFAULT_DB_FILE,
+  DEFAULT_MEDIA_DIR,
+  resolveVersion,
+  stackTimeZoneError,
+  type ZamfonoVersion
+} from '@zamfono/shared';
 
 // Asterisk mounts ARI under `/ari` on its HTTP server, and `http.conf` sets no `prefix`
 // (`images/asterisk/conf/http.conf.tmpl`), so the base URL carries the prefix: `AriClient` appends
 // `/events` and resolves every REST path against it without inserting one.
 const DEFAULT_ARI_URL = 'http://asterisk:8088/ari';
 const DEFAULT_AMI_HOST = 'asterisk:5038';
-const DEFAULT_DB_FILE = '/data/zamfono.sqlite3';
-const DEFAULT_MEDIA_DIR = '/media';
 const DEFAULT_CALL_LOG_MAX_BYTES = 1048576;
 const DEFAULT_TZ = 'UTC';
 const DEFAULT_API_INTERNAL_URL = 'http://api:3000';
@@ -27,6 +34,8 @@ export type CoreEnv = {
   hepEnabled: boolean;
   callLogMaxBytes: number;
   tz: string;
+  /** What `core` logs once at start about a `TZ` that names no IANA time zone, else `undefined`. */
+  timeZoneError: string | undefined;
   /** `STACK_IPV4` and `EXTERNAL_IPV4`, `null` while unset: the addresses the HEP collector counts
    * as Asterisk's own, besides the `ariUrl` host's (§7). */
   stackIpv4: string | null;
@@ -36,11 +45,18 @@ export type CoreEnv = {
   sipHost: string | null;
   /** `api`'s internal HTTP API, where `core` posts its mail requests (§3.1 "Mail"). */
   apiInternalUrl: string;
+  /** `ZAMFONO_VERSION` and `ZAMFONO_REVISION` (§7 "Version"). */
+  version: ZamfonoVersion;
 };
 
+/** The value of `name`, `undefined` while unset or empty. */
+function optionalEnv(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return env[name] === '' ? undefined : env[name];
+}
+
 function requireEnv(env: NodeJS.ProcessEnv, name: string): string {
-  const value = env[name];
-  if (value === undefined || value === '') {
+  const value = optionalEnv(env, name);
+  if (value === undefined) {
     throw new Error(`missing required environment variable ${name}`);
   }
   return value;
@@ -80,43 +96,35 @@ function parseCallLogMaxBytes(raw: string | undefined): number {
   return value;
 }
 
-/** `TZ`, throwing on an explicitly empty value; unset falls back to `DEFAULT_TZ`. */
-function parseTz(raw: string | undefined): string {
-  if (raw === '') {
-    throw new Error('TZ: expected a non-empty value');
-  }
-  return raw ?? DEFAULT_TZ;
-}
-
-/** An address variable, `null` while unset: compose.yaml hands `STACK_IPV4` and `EXTERNAL_IPV4`
- * to `core` as `${…:-}`, so an empty value is unset too. */
-function parseAddress(raw: string | undefined): string | null {
-  return raw === undefined || raw === '' ? null : raw;
-}
-
 // amiHost's port, callLogMaxBytes and tz are validated here and carried on `CoreEnv` for the
 // call pipeline, the OOO/hours sweep and the HEP listener; tz is the tenant clock while
 // `settings.timezone` is NULL (§11.4). hepEnabled accepts any value other than the literal
 // string 'false' as true.
 export function readEnv(env: NodeJS.ProcessEnv): CoreEnv {
-  const ami = parseHostPort(env.AMI_HOST ?? DEFAULT_AMI_HOST);
-  const stackIpv4 = parseAddress(env.STACK_IPV4);
-  const externalIpv4 = parseAddress(env.EXTERNAL_IPV4);
+  const ami = parseHostPort(optionalEnv(env, 'AMI_HOST') ?? DEFAULT_AMI_HOST);
+  const stackIpv4 = optionalEnv(env, 'STACK_IPV4') ?? null;
+  const externalIpv4 = optionalEnv(env, 'EXTERNAL_IPV4') ?? null;
+  const tz = optionalEnv(env, 'TZ') ?? DEFAULT_TZ;
   return {
-    ariUrl: env.ARI_URL ?? DEFAULT_ARI_URL,
+    ariUrl: optionalEnv(env, 'ARI_URL') ?? DEFAULT_ARI_URL,
     ariPassword: requireEnv(env, 'ARI_PASSWORD'),
     amiHost: ami.host,
     amiPort: ami.port,
     amiPassword: requireEnv(env, 'AMI_PASSWORD'),
-    dbFile: env.DB_FILE ?? DEFAULT_DB_FILE,
-    mediaDir: env.MEDIA_DIR ?? DEFAULT_MEDIA_DIR,
+    dbFile: optionalEnv(env, 'DB_FILE') ?? DEFAULT_DB_FILE,
+    mediaDir: optionalEnv(env, 'MEDIA_DIR') ?? DEFAULT_MEDIA_DIR,
     hepEnabled: env.HEP_ENABLED !== 'false',
-    callLogMaxBytes: parseCallLogMaxBytes(env.CALL_LOG_MAX_BYTES),
-    tz: parseTz(env.TZ),
+    callLogMaxBytes: parseCallLogMaxBytes(
+      optionalEnv(env, 'CALL_LOG_MAX_BYTES')
+    ),
+    tz,
+    timeZoneError: stackTimeZoneError(tz),
     stackIpv4,
     externalIpv4,
     // The Asterisk entrypoint's order.
     sipHost: externalIpv4 ?? stackIpv4,
-    apiInternalUrl: env.API_INTERNAL_URL ?? DEFAULT_API_INTERNAL_URL
+    apiInternalUrl:
+      optionalEnv(env, 'API_INTERNAL_URL') ?? DEFAULT_API_INTERNAL_URL,
+    version: resolveVersion(env)
   };
 }

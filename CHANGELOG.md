@@ -91,6 +91,9 @@ why the specified behaviour changed; the commit history, how.
   `.env`, all of which `setup.sh` writes, and its log names every one that is missing at once;
   `GET /system/info` therefore always reports `stack.domain`.
 - `proxy` likewise refuses to start while `FQDN` is unset or empty, and says so in its log.
+- Breaking: the public address is required by the overlay of its mode: Compose refuses to start
+  the stack with `compose.ports.yaml` while `.env` sets no `EXTERNAL_IPV4`, and with
+  `compose.macvlan.yaml` while it sets no `STACK_IPV4`, naming the variable.
 - On a DST night, an opening-hours edge or a maintenance hour at a local time the clock change
   skips or repeats now lies at the earlier of its two possible instants, as the time filters of
   `GET /calls`, `GET /audit` and `GET /presence/log` already read such a time: the `hours`

@@ -18,3 +18,4 @@ export * from './repeat.js';
 export * from './rawData.js';
 export * from './isRecord.js';
 export * from './version.js';
+export * from './stackPaths.js';

@@ -1,7 +1,13 @@
 // Test-only: the call-control suites' shared rig, a Pipeline over a fake Asterisk, an in-memory
 // database and the collaborators `main.ts` wires it with, and the calls those suites start from;
 // the rows they seed are `seedRows.ts`'s.
-import { newId, nowIso, openDb, type Db } from '@zamfono/shared';
+import {
+  newId,
+  nowIso,
+  openDb,
+  resolveVersion,
+  type Db
+} from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
@@ -117,7 +123,8 @@ export async function startRig(
           actions,
           presence,
           recorder: idleRecorder,
-          trunks: pipeline.deps.trunkState
+          trunks: pipeline.deps.trunkState,
+          version: resolveVersion({})
         },
         ANY_FREE_PORT
       );

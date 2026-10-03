@@ -68,14 +68,6 @@ describe('secretbox', () => {
     );
   });
 
-  it('treats an empty SECRETBOX_KEY_PREVIOUS as absent', () => {
-    const kr = keyringFromEnv({
-      SECRETBOX_KEY: keySpec(1),
-      SECRETBOX_KEY_PREVIOUS: ''
-    });
-    expect(kr.previous).toBeUndefined();
-  });
-
   it('rejects a generation operand that is not a bare integer', () => {
     const key = randomBytes(KEY_BYTE_LENGTH).toString('base64');
     for (const generation of ['', ' 1', '1e1', '01', '0x1', '-1']) {

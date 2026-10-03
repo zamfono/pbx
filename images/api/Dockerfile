@@ -56,11 +56,6 @@ COPY db/migrations db/migrations
 # `argon2` binding already in node_modules, so it costs the image nothing beyond the file:
 # `docker compose run --rm --no-deps -T api node hash-password.mjs`.
 COPY packages/api/scripts/hashPassword.mjs hash-password.mjs
-ENV DB_FILE=/data/zamfono.sqlite3 \
-	MEDIA_DIR=/media \
-	ASTERISK_GEN_DIR=/etc/asterisk/gen \
-	MIGRATIONS_DIR=/app/db/migrations \
-	PORT=3000
 USER node
 
 # The commit this image was built from (§6.3 "Images", §7 "Version"), passed by

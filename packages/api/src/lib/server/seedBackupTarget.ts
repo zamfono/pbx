@@ -21,12 +21,12 @@ export const LOCAL_BACKUP_REPOSITORY = '/backups/restic';
  */
 export async function seedBackupTarget(
   db: Db,
-  env: NodeJS.ProcessEnv,
+  env: { BACKUP_PASSWORD?: string | undefined },
   kr: Keyring,
   log: Logger
 ): Promise<'seeded' | 'skipped'> {
-  const password = env.BACKUP_PASSWORD ?? '';
-  if (password === '') {
+  const password = env.BACKUP_PASSWORD;
+  if (password === undefined) {
     return 'skipped';
   }
   const existing = await db

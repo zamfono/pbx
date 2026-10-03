@@ -25,15 +25,13 @@ export type UpdaterClient = {
   ) => Promise<UpdateState>;
 };
 
-const DEFAULT_URL = 'http://updater:8080';
 const TIMEOUT_MS = 10_000;
 
 async function call<T>(
   path: string,
   init: RequestInit & { token: string }
 ): Promise<T> {
-  const base = env.UPDATER_URL ?? DEFAULT_URL;
-  const response = await fetch(`${base}${path}`, {
+  const response = await fetch(`${env.UPDATER_URL}${path}`, {
     ...init,
     headers: {
       authorization: `Bearer ${init.token}`,
@@ -57,8 +55,8 @@ async function call<T>(
 
 /** The client for `UPDATER_TOKEN`, or `undefined` while `.env` sets none. */
 export function updaterClient(): UpdaterClient | undefined {
-  const token = env.UPDATER_TOKEN ?? '';
-  if (token === '') {
+  const token = env.UPDATER_TOKEN;
+  if (token === undefined) {
     return undefined;
   }
   return {

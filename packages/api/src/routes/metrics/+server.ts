@@ -37,7 +37,7 @@ function isValidBearer(authorization: string | null, token: string): boolean {
  */
 export async function GET(event: RequestEvent): Promise<Response> {
   const token = env.METRICS_TOKEN;
-  if (!token) {
+  if (token === undefined) {
     return new Response(null, { status: HTTP_NOT_FOUND });
   }
   const authorization = event.request.headers.get('authorization');

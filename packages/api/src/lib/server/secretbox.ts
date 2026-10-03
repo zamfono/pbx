@@ -62,7 +62,7 @@ export function keyringFromEnv(env: {
 }): Keyring {
   const current = parseKeySpec('SECRETBOX_KEY', env.SECRETBOX_KEY);
   const previousValue = env.SECRETBOX_KEY_PREVIOUS;
-  if (previousValue === undefined || previousValue === '') {
+  if (previousValue === undefined) {
     return { current };
   }
   return {

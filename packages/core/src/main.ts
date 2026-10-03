@@ -6,13 +6,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import pino from 'pino';
 
-import {
-  nowIso,
-  openDb,
-  resolveVersion,
-  stackTimeZoneError,
-  type Db
-} from '@zamfono/shared';
+import { nowIso, openDb, type Db } from '@zamfono/shared';
 
 import { AmiClient } from './ami/client.js';
 import { AriClient } from './ari/client.js';
@@ -52,11 +46,10 @@ function createLogger(): Logger {
 }
 
 /** §7 "Version": the first line `core` logs, before anything that can fail boots. */
-function logStartup(log: Logger): void {
-  log.info({ version: resolveVersion(process.env).display }, 'core starting');
-  const timeZoneError = stackTimeZoneError(process.env.TZ);
-  if (timeZoneError !== undefined) {
-    log.error(timeZoneError);
+function logStartup(env: CoreEnv, log: Logger): void {
+  log.info({ version: env.version.display }, 'core starting');
+  if (env.timeZoneError !== undefined) {
+    log.error(env.timeZoneError);
   }
 }
 
@@ -131,7 +124,7 @@ async function startLiveState(deps: {
 export async function main(): Promise<{ close: () => Promise<void> }> {
   const env = readEnv(process.env);
   const log = createLogger();
-  logStartup(log);
+  logStartup(env, log);
   const db = openDb(env.dbFile);
   const ari = createAriClient(env, log);
   const ami = createAmiClient(env, log);
@@ -184,7 +177,8 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
         actions,
         presence,
         recorder,
-        trunks: trunkState
+        trunks: trunkState,
+        version: env.version
       },
       CORE_INTERNAL_PORT
     );

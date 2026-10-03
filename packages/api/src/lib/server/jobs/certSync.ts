@@ -17,7 +17,6 @@ import type { Db } from '@zamfono/shared';
 
 import type { CoreClient } from '../coreClient.js';
 import {
-  caddyDataDirFromEnv,
   copyCertificate,
   findCaddyCert,
   isMatchingPair,
@@ -97,7 +96,7 @@ export class CertSync {
   async run(): Promise<CertSyncStatus> {
     const deps = this.#deps;
     const genDir = deps.genDir ?? env.ASTERISK_GEN_DIR;
-    const caddyDataDir = deps.caddyDataDir ?? caddyDataDirFromEnv();
+    const caddyDataDir = deps.caddyDataDir ?? env.CADDY_DATA_DIR;
     const source = await findCaddyCert(caddyDataDir);
     if (!source) {
       this.#pending = undefined;

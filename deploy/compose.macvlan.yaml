@@ -3,8 +3,19 @@ networks:
   public:
     external: true
 
+# STACK_IPV4, the stack's own address in the routed block, is required in this mode (§6.1).
 services:
   asterisk:
+    environment:
+      STACK_IPV4: ${STACK_IPV4:?the macvlan mode needs the stack's own IPv4}   # transports bind this address (§9.1)
     networks:
       public:
-        ipv4_address: ${STACK_IPV4}
+        ipv4_address: ${STACK_IPV4:?the macvlan mode needs the stack's own IPv4}
+
+  core:
+    environment:
+      STACK_IPV4: ${STACK_IPV4:?the macvlan mode needs the stack's own IPv4}   # Asterisk's own address, for the SIP message direction (§7)
+
+  api:
+    environment:
+      STACK_IPV4: ${STACK_IPV4:?the macvlan mode needs the stack's own IPv4}   # the stack's public address, shown by system.info (§10.3)

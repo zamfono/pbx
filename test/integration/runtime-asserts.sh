@@ -77,7 +77,7 @@ assert_public_network_address() {
   # when it caught one of the restarts' brief moments up. Throwaway values keep it running.
   if STACK_IPV4=$stack_ip ARI_PASSWORD=unused AMI_PASSWORD=unused \
     $COMPOSE "${macvlan_files[@]}" up -d asterisk; then
-    cid=$($COMPOSE "${macvlan_files[@]}" ps -q asterisk)
+    cid=$(STACK_IPV4=$stack_ip $COMPOSE "${macvlan_files[@]}" ps -q asterisk)
     addr=$("$RUNTIME" inspect "$cid" \
       --format '{{(index .NetworkSettings.Networks "public").IPAddress}}' 2>/dev/null || true)
     if [ "$addr" != "$stack_ip" ]; then
@@ -93,7 +93,7 @@ assert_public_network_address() {
   fi
 
   if [ "$ok" != true ]; then
-    $COMPOSE "${macvlan_files[@]}" logs asterisk >&2 || true
+    STACK_IPV4=$stack_ip $COMPOSE "${macvlan_files[@]}" logs asterisk >&2 || true
   fi
   STACK_IPV4=$stack_ip $COMPOSE "${macvlan_files[@]}" down -v --remove-orphans \
     >/dev/null 2>&1 || true

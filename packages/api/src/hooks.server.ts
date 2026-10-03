@@ -8,7 +8,8 @@ import {
   HTTP_NOT_FOUND,
   HTTP_TOO_MANY_REQUESTS,
   HTTP_UNAUTHORIZED,
-  MS_PER_SECOND
+  MS_PER_SECOND,
+  stackTimeZoneError
 } from '@zamfono/shared';
 
 import { addressKey } from '#lib/server/addressKey.js';
@@ -29,7 +30,8 @@ const INTERNAL_PREFIX = '/internal';
 const jobsLogger = pino({ name: 'hooks' });
 
 /**
- * Starts every background job (`lib/server/jobs/background.ts`), from this file since it is part
+ * Logs a stack `TZ` that names no IANA time zone, then starts every background job
+ * (`lib/server/jobs/background.ts`), from this file since it is part
  * of the SvelteKit build that also builds `runOperation` and every route: a job started here
  * shares their module instance of every import, and an operation reaches it by a call, where
  * `server.ts` is a separate esbuild bundle with its own copy of every relative import. SvelteKit
@@ -38,6 +40,10 @@ const jobsLogger = pino({ name: 'hooks' });
  * and SIGINT.
  */
 export const init: ServerInit = async () => {
+  const timeZoneError = stackTimeZoneError(env.TZ);
+  if (timeZoneError !== undefined) {
+    jobsLogger.error(timeZoneError);
+  }
   const jobs = await startBackgroundJobs(
     getDb(),
     keyringFromEnv(env),

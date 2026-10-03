@@ -9,7 +9,6 @@ import { mohClassDir } from './audio/mohLayout.js';
 // §10.2 "Hold music": Debian's `asterisk-moh-opsound-wav` and `asterisk-moh-opsound-g722`
 // packages install the five bundled tracks under this directory, the wav package the
 // narrowband file and the g722 package the wideband one, both under the same five basenames.
-const DEFAULT_MOH_SOURCE_DIR = '/usr/share/asterisk/moh';
 export const MOH_TRACK_BASENAMES = [
   'macroform-cold_day',
   'macroform-robot_dity',
@@ -126,12 +125,12 @@ async function assertSourceDir(dir: string): Promise<void> {
  */
 export async function createMohAssets(
   db: Db,
-  env: NodeJS.ProcessEnv,
+  env: { MOH_SOURCE_DIR: string },
   mediaDir: string,
   now: string,
   log: Logger
 ): Promise<void> {
-  const sourceDir = env.MOH_SOURCE_DIR ?? DEFAULT_MOH_SOURCE_DIR;
+  const sourceDir = env.MOH_SOURCE_DIR;
   await assertSourceDir(sourceDir);
   log.info(`seed: seeding bundled hold music from ${sourceDir}`);
   const promptsDir = path.join(mediaDir, 'prompts');

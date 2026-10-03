@@ -59,7 +59,7 @@ const ICONS = [
  * on the stack's own origin.
  */
 export function serverInfo(
-  env: Readonly<Record<string, string | undefined>> & { FQDN: string }
+  env: Parameters<typeof resolveVersion>[0] & { FQDN: string }
 ): Result {
   const origin = stackOrigin(env.FQDN);
   return {

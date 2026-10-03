@@ -48,8 +48,7 @@ function assertKnownCountry(country: Input['country']): void {
 
 /** Refuses `callLogLevel: 'sip'` while the deployment mirrors no SIP traffic (§7, §11.4). */
 function assertCallLogLevel(level: Input['callLogLevel']): void {
-  const hepEnabled = env.HEP_ENABLED !== 'false';
-  if (level === 'sip' && !hepEnabled) {
+  if (level === 'sip' && !env.HEP_ENABLED) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
       "settings: callLogLevel 'sip' requires HEP_ENABLED"

@@ -7,11 +7,9 @@
 import { createPrivateKey, X509Certificate } from 'node:crypto';
 import { mkdir, stat } from 'node:fs/promises';
 import path from 'node:path';
-import * as env from '$app/env/private';
 
 import { writeFileAtomically } from '../propagation.js';
 
-const DEFAULT_CADDY_DATA_DIR = '/caddy-data';
 // The fixed pair the hook writes (images/proxy/zamfono-cert-hook) and this reads: §6.4 "`api`
 // reads only the hook's copy, never Caddy's own certificate store, whose layout is internal to
 // Caddy". `TLS_CERT_FILENAME` is also the fixed pair `transport-tls` reads on the
@@ -23,11 +21,6 @@ const TLS_KEY_FILENAME = 'privkey.pem';
 // Owner-only: the private key is the stack's SIP-TLS key, on a volume both `api` and `asterisk`
 // mount (§6.3).
 const TLS_KEY_MODE = 0o600;
-
-/** `CADDY_DATA_DIR` (§6.3, the read-only `caddy-data` mount), read at call time for tests. */
-export function caddyDataDirFromEnv(): string {
-  return env.CADDY_DATA_DIR ?? DEFAULT_CADDY_DATA_DIR;
-}
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {

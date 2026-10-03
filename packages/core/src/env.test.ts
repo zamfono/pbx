@@ -28,3 +28,44 @@ describe('readEnv sipHost', () => {
     expect(readEnv({ ...REQUIRED, STACK_IPV4: '' }).sipHost).toBeNull();
   });
 });
+
+// §6.3 "Environment": Compose hands an unset `${VAR:-}` over as the empty string.
+describe('readEnv defaults', () => {
+  it('takes the default for an unset or empty variable', () => {
+    const env = readEnv({
+      ...REQUIRED,
+      TZ: '',
+      DB_FILE: '',
+      CALL_LOG_MAX_BYTES: ''
+    });
+    expect(env).toMatchObject({
+      ariUrl: 'http://asterisk:8088/ari',
+      amiHost: 'asterisk',
+      amiPort: 5038,
+      dbFile: '/data/zamfono.sqlite3',
+      mediaDir: '/media',
+      hepEnabled: true,
+      callLogMaxBytes: 1048576,
+      tz: 'UTC',
+      timeZoneError: undefined,
+      apiInternalUrl: 'http://api:3000'
+    });
+  });
+
+  it('refuses an empty secret', () => {
+    expect(() => readEnv({ ...REQUIRED, ARI_PASSWORD: '' })).toThrow(
+      'missing required environment variable ARI_PASSWORD'
+    );
+  });
+
+  it('names a TZ that is no IANA time zone, and the version', () => {
+    const env = readEnv({
+      ...REQUIRED,
+      TZ: 'CET-1CEST',
+      ZAMFONO_VERSION: '0.2.0',
+      ZAMFONO_REVISION: 'a04ac57deadbeef'
+    });
+    expect(env.timeZoneError).toContain('TZ=CET-1CEST');
+    expect(env.version.display).toBe('0.2.0 (a04ac57)');
+  });
+});

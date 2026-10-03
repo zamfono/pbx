@@ -48,7 +48,7 @@ export type LogLevelInput = {
 
 /** Refuses `sip` while the deployment mirrors no SIP traffic, so the ladder ends at `qos` (§7). */
 function assertLevelAvailable(level: string): void {
-  if (level === 'sip' && env.HEP_ENABLED === 'false') {
+  if (level === 'sip' && !env.HEP_ENABLED) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
       "logLevel 'sip' requires HEP_ENABLED"

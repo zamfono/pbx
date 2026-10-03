@@ -417,9 +417,10 @@ Clients and trunks see the VPS address in SIP and SDP; the host forwards each po
 # Values in ${…} come from the deployment's .env, which Compose reads for interpolation only. Each
 # service receives exactly the variables it uses, so the encryption key and the JWT secret exist in
 # the api container alone. Fixed paths (/data/zamfono.sqlite3, /media, /etc/asterisk/gen) and fixed
-# internal ports (api 3000, core 3000, Asterisk ARI 8088 and AMI 5038, HEP 9060/udp) are baked into the images.
+# internal ports (api 3000, core 3000, Asterisk ARI 8088 and AMI 5038, HEP 9060/udp) are the services'
+# own defaults, as is every optional value an empty ${VAR:-} hands over.
 # The public address is attached by exactly one overlay, compose.macvlan.yaml or compose.ports.yaml
-# (§6.1); this file alone runs the stack with no public reachability.
+# (§6.1), which requires it; this file alone runs the stack with no public reachability.
 # api's and core's healthcheck: GET /healthz on the internal port answers 200. The script holds no
 # space, since Podman's Docker-compatible API splits a CMD argument at its spaces.
 x-healthz: &healthz ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
@@ -433,16 +434,14 @@ services:
     networks:
       internal:
     environment:
-      STACK_IPV4: ${STACK_IPV4:-}               # macvlan mode: transports bind this address (§9.1)
-      EXTERNAL_IPV4: ${EXTERNAL_IPV4:-}         # ports mode: address written into SIP and SDP (§9.1)
       RTP_PORT_START: ${RTP_PORT_START:-10000}
       RTP_PORT_END: ${RTP_PORT_END:-10200}
       ARI_PASSWORD: ${ARI_PASSWORD}             # ARI user is 'zamfono', fixed in ari.conf
       AMI_PASSWORD: ${AMI_PASSWORD}             # AMI user is 'zamfono', read-only, fixed in manager.conf (§9.1)
-      HEP_ENABLED: ${HEP_ENABLED:-true}         # hep.conf enabled=…; collector = core's current address (§7)
-      SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-true} # false binds transport-udp to loopback (§9.1)
-      SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-true} # false binds transport-tcp to loopback (§9.1)
-      TZ: ${TZ:-UTC}
+      HEP_ENABLED: ${HEP_ENABLED:-}             # hep.conf enabled=…; collector = core's current address (§7)
+      SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-}     # false binds transport-udp to loopback (§9.1)
+      SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-}     # false binds transport-tcp to loopback (§9.1)
+      TZ: ${TZ:-}
     volumes:
       - media:/media
       - asterisk-config:/etc/asterisk/gen       # rendered by api: pjsip_users/trunks, hints, MoH, TLS cert
@@ -471,16 +470,12 @@ services:
     networks:
       - internal
     environment:
-      ARI_URL: http://asterisk:8088/ari
       ARI_PASSWORD: ${ARI_PASSWORD}
-      AMI_HOST: asterisk:5038
       AMI_PASSWORD: ${AMI_PASSWORD}             # outbound registration state (§9.4)
-      HEP_ENABLED: ${HEP_ENABLED:-true}         # HEP listener on 9060/udp (§7)
-      STACK_IPV4: ${STACK_IPV4:-}               # Asterisk's own addresses, for the SIP message direction (§7)
-      EXTERNAL_IPV4: ${EXTERNAL_IPV4:-}
-      CALL_LOG_MAX_BYTES: ${CALL_LOG_MAX_BYTES:-1048576}
+      HEP_ENABLED: ${HEP_ENABLED:-}             # HEP listener on 9060/udp (§7)
+      CALL_LOG_MAX_BYTES: ${CALL_LOG_MAX_BYTES:-}
       ZAMFONO_VERSION: ${ZAMFONO_VERSION:-latest}   # the tag pulled, reported as the version (§7)
-      TZ: ${TZ:-UTC}
+      TZ: ${TZ:-}
     volumes:
       - media:/media
       - db:/data                  # /data/zamfono.sqlite3
@@ -499,21 +494,18 @@ services:
       FQDN: ${FQDN}                             # public host name; https://<FQDN> is the OAuth issuer, redirect and link base (§5.2)
       ADDRESS_HEADER: X-Forwarded-For           # client address for rate limiting (§5.5)
       XFF_DEPTH: "1"                            # trust exactly one proxy hop (Caddy)
-      CORE_URL: http://core:3000                # live-call actions, reload triggers, event stream (§3)
       JWT_SECRET: ${JWT_SECRET}
       SECRETBOX_KEY: ${SECRETBOX_KEY}           # encryption key for every *_enc column (§5.4)
       SECRETBOX_KEY_PREVIOUS: ${SECRETBOX_KEY_PREVIOUS:-}   # set only during a key rotation (§5.4)
       BACKUP_PASSWORD: ${BACKUP_PASSWORD:-}     # restic password of the default local backup target; empty = none (§6.5)
       UPDATER_TOKEN: ${UPDATER_TOKEN:-}         # system.update's token for the updater service; empty = no updates through the API (§6.3)
-      HEP_ENABLED: ${HEP_ENABLED:-true}         # false rejects call_log_level 'sip' (§7)
-      SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-true} # false rejects trunks on that transport; both false reject plain devices (§9.3, §9.4)
-      SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-true}
+      HEP_ENABLED: ${HEP_ENABLED:-}             # false rejects call_log_level 'sip' (§7)
+      SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-}     # false rejects trunks on that transport; both false reject plain devices (§9.3, §9.4)
+      SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-}
       TLS_RELOAD_HOUR: ${TLS_RELOAD_HOUR:-}     # certificate swap hour when settings.tls_reload_hour is NULL (§6.4)
       METRICS_TOKEN: ${METRICS_TOKEN:-}         # empty = GET /metrics answers 404 (§7)
-      STACK_IPV4: ${STACK_IPV4:-}               # the stack's public address, shown by system.info (§10.3)
-      EXTERNAL_IPV4: ${EXTERNAL_IPV4:-}
       ZAMFONO_VERSION: ${ZAMFONO_VERSION:-latest}   # the tag pulled, reported as the version (§7)
-      TZ: ${TZ:-UTC}
+      TZ: ${TZ:-}
       # first-boot seed, read only while the database holds no user (§6.3 "First boot")
       BOOTSTRAP_OWNER_EMAIL: ${BOOTSTRAP_OWNER_EMAIL}
       BOOTSTRAP_OWNER_NAME: ${BOOTSTRAP_OWNER_NAME}
@@ -522,12 +514,12 @@ services:
       MAIN_DID: ${MAIN_DID}
       MAIL_FROM: ${MAIL_FROM:-}                 # required when SMTP_HOST is set
       SMTP_HOST: ${SMTP_HOST:-}                 # the mail relay, seeded into settings.smtp_* (§10.2 "Mail"); empty = no mail until an owner sets one
-      SMTP_PORT: ${SMTP_PORT:-465}
-      SMTP_SECURITY: ${SMTP_SECURITY:-tls}      # tls | starttls
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_SECURITY: ${SMTP_SECURITY:-}         # tls | starttls
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       COUNTRY: ${COUNTRY}                       # ISO 3166-1 alpha-2
-      EXT_LENGTH: ${EXT_LENGTH:-3}
+      EXT_LENGTH: ${EXT_LENGTH:-}
     volumes:
       - media:/media
       - db:/data
@@ -579,18 +571,32 @@ networks:
   public:
     external: true
 
+# STACK_IPV4, the stack's own address in the routed block, is required in this mode (§6.1).
 services:
   asterisk:
+    environment:
+      STACK_IPV4: ${STACK_IPV4:?the macvlan mode needs the stack's own IPv4}   # transports bind this address (§9.1)
     networks:
       public:
-        ipv4_address: ${STACK_IPV4}
+        ipv4_address: ${STACK_IPV4:?the macvlan mode needs the stack's own IPv4}
+
+  core:
+    environment:
+      STACK_IPV4: ${STACK_IPV4:?the macvlan mode needs the stack's own IPv4}   # Asterisk's own address, for the SIP message direction (§7)
+
+  api:
+    environment:
+      STACK_IPV4: ${STACK_IPV4:?the macvlan mode needs the stack's own IPv4}   # the stack's public address, shown by system.info (§10.3)
 ```
 
 ```yaml
 # compose.ports.yaml — the stack uses the host's address; ports are published on asterisk, the owner
 # of the shared namespace, so they cover Caddy as well. Every port maps 1:1.
+# EXTERNAL_IPV4, the host's public IPv4, is required in this mode (§6.1).
 services:
   asterisk:
+    environment:
+      EXTERNAL_IPV4: ${EXTERNAL_IPV4:?the ports mode needs the host's public IPv4}   # written into SIP and SDP (§9.1)
     ports:
       - "80:80/tcp"
       - "443:443/tcp"
@@ -599,6 +605,14 @@ services:
       - "5061:5061/tcp"
       - "${RTP_PORT_START:-10000}-${RTP_PORT_END:-10200}:\
          ${RTP_PORT_START:-10000}-${RTP_PORT_END:-10200}/udp"   # one string; the escaped line break joins it
+
+  core:
+    environment:
+      EXTERNAL_IPV4: ${EXTERNAL_IPV4:?the ports mode needs the host's public IPv4}   # Asterisk's own address, for the SIP message direction (§7)
+
+  api:
+    environment:
+      EXTERNAL_IPV4: ${EXTERNAL_IPV4:?the ports mode needs the host's public IPv4}   # the stack's public address, shown by system.info (§10.3)
 ```
 
 **Caddyfile.** Validated with `caddy validate`; the only two inputs are the two environment variables of the `proxy` service. Its global options wire the certificate hook (§6.4) and import `/etc/caddy/global.d/*.caddy`, which is empty in a deployment and where the integration harness adds `local_certs`, so it can test the certificate sync without reaching Let's Encrypt.
@@ -668,7 +682,7 @@ handle /metrics/litestream {
 
 **Environment.** One `.env` per deployment holds the deployment-specific values; Compose interpolates them into the service definitions above, and a service sees only the variables listed for it:
 
-- `FQDN`, plus `STACK_IPV4` (macvlan mode) or `EXTERNAL_IPV4` (ports mode), §6.1;
+- `FQDN`, plus `STACK_IPV4` (macvlan mode) or `EXTERNAL_IPV4` (ports mode), which that mode's overlay requires, §6.1;
 - `RTP_PORT_START`, `RTP_PORT_END`, `ARI_PASSWORD` and `AMI_PASSWORD` for Asterisk;
 - the JWT secret and the encryption key `SECRETBOX_KEY`, plus `SECRETBOX_KEY_PREVIOUS` while a key rotation is under way (§5.4). The encryption key is the only way to read the `*_enc` columns and secret settings, so `.env` is restored before the database in any recovery (§6.5);
 - optional `BACKUP_PASSWORD`, the restic password of the default backup target (§6.5 "Default target");

@@ -23,7 +23,7 @@ bundle_dir=$(mktemp -d)
 trap 'rm -rf "$env_file" "$bundle_dir"' EXIT
 # Only the variables compose.yaml has no fallback for need a value; the rest are meant to be
 # exercised at their documented defaults.
-required='FQDN|ARI_PASSWORD|AMI_PASSWORD|JWT_SECRET|SECRETBOX_KEY|BOOTSTRAP_OWNER_EMAIL|BOOTSTRAP_OWNER_NAME|COMPANY_NAME|MAIN_DID|COUNTRY'
+required='FQDN|EXTERNAL_IPV4|ARI_PASSWORD|AMI_PASSWORD|JWT_SECRET|SECRETBOX_KEY|BOOTSTRAP_OWNER_EMAIL|BOOTSTRAP_OWNER_NAME|COMPANY_NAME|MAIN_DID|COUNTRY'
 sed -E "s/^($required)=\$/\1=placeholder/" "$script_dir/.env.example" >"$env_file"
 (cd "$script_dir" && docker compose --env-file "$env_file" -f compose.yaml -f compose.ports.yaml config) >/dev/null
 

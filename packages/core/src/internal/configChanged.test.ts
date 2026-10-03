@@ -5,6 +5,7 @@ import {
   newId,
   nowIso,
   openDb,
+  resolveVersion,
   type Db,
   type Envelope
 } from '@zamfono/shared';
@@ -140,7 +141,8 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
         actions: testActions(ari, db),
         presence,
         recorder: idleRecorder,
-        trunks: { refreshMonitoring: () => Promise.resolve() }
+        trunks: { refreshMonitoring: () => Promise.resolve() },
+        version: resolveVersion({})
       },
       ANY_FREE_PORT
     );
@@ -212,7 +214,8 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
             invalidatedFirst = invalidated;
             return Promise.resolve();
           }
-        }
+        },
+        version: resolveVersion({})
       },
       ANY_FREE_PORT
     );

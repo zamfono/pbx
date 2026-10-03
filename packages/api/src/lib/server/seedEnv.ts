@@ -2,6 +2,7 @@
  * The first-boot seed's `.env` values (§6.3 "First boot"), read and validated: a missing or
  * malformed value throws, which stops `api` before it serves a request.
  */
+import type * as privateEnv from '$app/env/private';
 import { z } from 'zod';
 
 import { isE164 } from '@zamfono/shared';
@@ -17,9 +18,30 @@ const MIN_SMTP_PORT = 1;
 const MAX_SMTP_PORT = 65535;
 const DEFAULT_SMTP_SECURITY = 'tls';
 
-export function requiredEnv(env: NodeJS.ProcessEnv, name: string): string {
+type PrivateEnv = typeof privateEnv;
+
+type SeedVariable =
+  | 'BOOTSTRAP_OWNER_EMAIL'
+  | 'BOOTSTRAP_OWNER_NAME'
+  | 'BOOTSTRAP_OWNER_PASSWORD_HASH'
+  | 'COMPANY_NAME'
+  | 'COUNTRY'
+  | 'EXT_LENGTH'
+  | 'MAIL_FROM'
+  | 'MAIN_DID'
+  | 'SMTP_HOST'
+  | 'SMTP_PASSWORD'
+  | 'SMTP_PORT'
+  | 'SMTP_SECURITY'
+  | 'SMTP_USER';
+
+/** The seed's variables as `src/env.ts` reads them: `undefined` while unset or empty. */
+export type SeedEnv = Partial<Pick<PrivateEnv, SeedVariable>> &
+  Pick<PrivateEnv, 'MOH_SOURCE_DIR'>;
+
+export function requiredEnv(env: SeedEnv, name: SeedVariable): string {
   const value = env[name];
-  if (!value) {
+  if (value === undefined) {
     throw new Error(`seed: ${name} is required`);
   }
   return value;
@@ -29,8 +51,8 @@ export function requiredEnv(env: NodeJS.ProcessEnv, name: string): string {
  * `MAIL_FROM` is required and validated whenever `SMTP_HOST` is set (§6.3 "First boot": "a
  * missing or malformed value stops `api` with an error before it serves a request").
  */
-export function assertMailFromPresence(env: NodeJS.ProcessEnv): void {
-  if (!env.SMTP_HOST) {
+export function assertMailFromPresence(env: SeedEnv): void {
+  if (env.SMTP_HOST === undefined) {
     return;
   }
   if (!z.email().safeParse(env.MAIL_FROM).success) {
@@ -41,8 +63,11 @@ export function assertMailFromPresence(env: NodeJS.ProcessEnv): void {
 }
 
 /** Either the seeded hash or a mail relay must be present (§6.3 "First boot"). */
-export function assertHashOrRelay(env: NodeJS.ProcessEnv): void {
-  if (!env.BOOTSTRAP_OWNER_PASSWORD_HASH && !env.SMTP_HOST) {
+export function assertHashOrRelay(env: SeedEnv): void {
+  if (
+    env.BOOTSTRAP_OWNER_PASSWORD_HASH === undefined &&
+    env.SMTP_HOST === undefined
+  ) {
     throw new Error(
       'seed: BOOTSTRAP_OWNER_PASSWORD_HASH or SMTP_HOST is required'
     );
@@ -50,7 +75,7 @@ export function assertHashOrRelay(env: NodeJS.ProcessEnv): void {
 }
 
 /** `EXT_LENGTH`, parsed and floored at 2 (§11.4 `ext_length >= 2`, which the parking slots need). */
-export function extLengthFrom(env: NodeJS.ProcessEnv): number {
+export function extLengthFrom(env: SeedEnv): number {
   if (env.EXT_LENGTH === undefined) {
     return DEFAULT_EXT_LENGTH;
   }
@@ -65,7 +90,7 @@ export function extLengthFrom(env: NodeJS.ProcessEnv): number {
 
 /** `COUNTRY`, required and one `settings.update` would accept (§11.4): a code without a calling
  *  code would make every later number normalization of §9.4 throw. */
-export function countryFrom(env: NodeJS.ProcessEnv): string {
+export function countryFrom(env: SeedEnv): string {
   const value = requiredEnv(env, 'COUNTRY');
   if (!isKnownCountry(value)) {
     throw new Error(
@@ -76,7 +101,7 @@ export function countryFrom(env: NodeJS.ProcessEnv): string {
 }
 
 /** `MAIN_DID`, required and E.164 (§9.4 "Inbound number normalization" matches on that format). */
-export function mainDidFrom(env: NodeJS.ProcessEnv): string {
+export function mainDidFrom(env: SeedEnv): string {
   const value = requiredEnv(env, 'MAIN_DID');
   if (!isE164(value)) {
     throw new Error('seed: MAIN_DID must be E.164');
@@ -85,9 +110,9 @@ export function mainDidFrom(env: NodeJS.ProcessEnv): string {
 }
 
 /** `SMTP_SECURITY`, `tls` when unset, else one of the column's `CHECK` values (§10.2 "Transport"). */
-export function smtpSecurityFrom(env: NodeJS.ProcessEnv): 'tls' | 'starttls' {
+export function smtpSecurityFrom(env: SeedEnv): 'tls' | 'starttls' {
   const value = env.SMTP_SECURITY;
-  if (!value) {
+  if (value === undefined) {
     return DEFAULT_SMTP_SECURITY;
   }
   if (value !== 'tls' && value !== 'starttls') {
@@ -99,8 +124,8 @@ export function smtpSecurityFrom(env: NodeJS.ProcessEnv): 'tls' | 'starttls' {
 }
 
 /** `SMTP_PORT`, parsed and range-checked against the column's `CHECK (BETWEEN 1 AND 65535)`. */
-export function smtpPortFrom(env: NodeJS.ProcessEnv): number {
-  if (!env.SMTP_PORT) {
+export function smtpPortFrom(env: SeedEnv): number {
+  if (env.SMTP_PORT === undefined) {
     return DEFAULT_SMTP_PORT;
   }
   const parsed = Number(env.SMTP_PORT);

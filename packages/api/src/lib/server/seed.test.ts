@@ -30,6 +30,7 @@ import {
 import { sendMail } from './mail/index.js';
 import { decrypt, encrypt, keyringFromEnv, type Keyring } from './secretbox.js';
 import { seedIfEmpty, UNSET_PASSWORD_HASH_PREFIX } from './seed.js';
+import type { SeedEnv } from './seedEnv.js';
 import {
   MOH_NARROWBAND_EXT,
   MOH_TRACK_BASENAMES,
@@ -116,7 +117,7 @@ beforeAll(async () => {
 
 afterAll(() => rm(mohSourceDir, { recursive: true, force: true }));
 
-function baseEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
+function baseEnv(overrides: Partial<SeedEnv> = {}): SeedEnv {
   return {
     BOOTSTRAP_OWNER_EMAIL: 'owner@example.com',
     BOOTSTRAP_OWNER_NAME: 'Owner',
@@ -546,8 +547,7 @@ describe('seedIfEmpty', () => {
   it('throws with neither a password hash nor a mail relay', async () => {
     const db = await migratedDb();
     const mediaDir = await tempMediaDir();
-    const env = baseEnv();
-    delete env.BOOTSTRAP_OWNER_PASSWORD_HASH;
+    const env = baseEnv({ BOOTSTRAP_OWNER_PASSWORD_HASH: undefined });
     await expect(
       seedIfEmpty(db, env, testKeyring(), mediaDir, silentLogger)
     ).rejects.toThrow(/BOOTSTRAP_OWNER_PASSWORD_HASH/u);
@@ -559,9 +559,9 @@ describe('seedIfEmpty', () => {
     sentMail.messages.length = 0;
     const env = baseEnv({
       SMTP_HOST: 'smtp.example.com',
-      MAIL_FROM: 'no-reply@example.com'
+      MAIL_FROM: 'no-reply@example.com',
+      BOOTSTRAP_OWNER_PASSWORD_HASH: undefined
     });
-    delete env.BOOTSTRAP_OWNER_PASSWORD_HASH;
     const result = await seedIfEmpty(
       db,
       env,
@@ -597,9 +597,9 @@ describe('seedIfEmpty', () => {
     vi.mocked(sendMail).mockResolvedValueOnce('failed');
     const env = baseEnv({
       SMTP_HOST: 'smtp.example.com',
-      MAIL_FROM: 'no-reply@example.com'
+      MAIL_FROM: 'no-reply@example.com',
+      BOOTSTRAP_OWNER_PASSWORD_HASH: undefined
     });
-    delete env.BOOTSTRAP_OWNER_PASSWORD_HASH;
     await expect(
       seedIfEmpty(db, env, testKeyring(), mediaDir, silentLogger)
     ).rejects.toThrow(/setup mail/u);

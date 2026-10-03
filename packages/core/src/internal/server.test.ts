@@ -13,6 +13,7 @@ import {
   nowIso,
   openDb,
   rawDataToString,
+  resolveVersion,
   type Db,
   type Presence,
   type TrunkStatus
@@ -33,6 +34,12 @@ import { EventBus } from './eventBus.js';
 import { startInternalServer } from './server.js';
 import { ConfigCache } from './snapshot.js';
 import { StateStore } from './stateStore.js';
+
+// The version every server of this suite reports on `/internal/version`.
+const VERSION = resolveVersion({
+  ZAMFONO_VERSION: '0.0.5',
+  ZAMFONO_REVISION: 'a04ac57deadbeef'
+});
 
 // Every server binds whatever port is free (`0`), never a fixed one another suite running on the
 // same host at the same time may already hold.
@@ -128,7 +135,8 @@ describe('startInternalServer', () => {
         actions: testActions(ari, db),
         presence,
         recorder,
-        trunks: { refreshMonitoring: () => Promise.resolve() }
+        trunks: { refreshMonitoring: () => Promise.resolve() },
+        version: VERSION
       },
       ANY_FREE_PORT
     );
@@ -241,27 +249,20 @@ describe('startInternalServer', () => {
   });
 
   it('answers /internal/version with the version and commit this core runs, and since when', async () => {
-    process.env.ZAMFONO_VERSION = '0.0.5';
-    process.env.ZAMFONO_REVISION = 'a04ac57deadbeef';
-    try {
-      const response = await fetch(`http://127.0.0.1:${port}/internal/version`);
-      expect(response.status).toBe(HTTP_OK);
-      const body = (await response.json()) as Record<string, unknown>;
-      expect(body).toEqual({
-        version: '0.0.5',
-        revision: 'a04ac57deadbeef',
-        display: '0.0.5 (a04ac57)',
-        startedAt: expect.any(String) as unknown,
-        // The fake Asterisk's `startup_time`, `+0000` read as UTC.
-        asteriskStartedAt: '2026-09-29T08:00:00.000Z'
-      });
-      expect(Date.parse(body.startedAt as string)).toBeLessThanOrEqual(
-        Date.now()
-      );
-    } finally {
-      delete process.env.ZAMFONO_VERSION;
-      delete process.env.ZAMFONO_REVISION;
-    }
+    const response = await fetch(`http://127.0.0.1:${port}/internal/version`);
+    expect(response.status).toBe(HTTP_OK);
+    const body = (await response.json()) as Record<string, unknown>;
+    expect(body).toEqual({
+      version: '0.0.5',
+      revision: 'a04ac57deadbeef',
+      display: '0.0.5 (a04ac57)',
+      startedAt: expect.any(String) as unknown,
+      // The fake Asterisk's `startup_time`, `+0000` read as UTC.
+      asteriskStartedAt: '2026-09-29T08:00:00.000Z'
+    });
+    expect(Date.parse(body.startedAt as string)).toBeLessThanOrEqual(
+      Date.now()
+    );
   });
 
   it('reloads res_pjsip and invalidates the config cache on configChanged', async () => {
@@ -335,7 +336,8 @@ describe('startInternalServer', () => {
         actions: testActions(ari, db),
         presence: idlePresence(),
         recorder: idleRecorder,
-        trunks: { refreshMonitoring: () => Promise.resolve() }
+        trunks: { refreshMonitoring: () => Promise.resolve() },
+        version: VERSION
       },
       ANY_FREE_PORT
     );
@@ -383,7 +385,8 @@ describe('startInternalServer', () => {
         actions: testActions(ari, db),
         presence: idlePresence(),
         recorder: idleRecorder,
-        trunks: { refreshMonitoring: () => Promise.resolve() }
+        trunks: { refreshMonitoring: () => Promise.resolve() },
+        version: VERSION
       },
       ANY_FREE_PORT
     );
@@ -431,7 +434,8 @@ describe('startInternalServer', () => {
         actions: testActions(ari, db),
         presence: idlePresence(),
         recorder: idleRecorder,
-        trunks: { refreshMonitoring: () => Promise.resolve() }
+        trunks: { refreshMonitoring: () => Promise.resolve() },
+        version: VERSION
       },
       ANY_FREE_PORT
     );

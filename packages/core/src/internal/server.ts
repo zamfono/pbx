@@ -12,11 +12,11 @@ import {
   HTTP_SERVICE_UNAVAILABLE,
   isDbOpen,
   processStartedAtIso,
-  resolveVersion,
   type CoreHealth,
   type CoreVersionResponse,
   type Db,
-  type StateResponse
+  type StateResponse,
+  type ZamfonoVersion
 } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
@@ -57,6 +57,8 @@ type InternalDeps = {
   recorder: Pick<Recorder, 'inProgressCount' | 'mixFailureCount'>;
   /** The `unmonitored` trunk statuses, likewise. */
   trunks: TrunkMonitoringRefresh;
+  /** The version `/internal/version` reports (§7 "Version"), `CoreEnv.version`. */
+  version: ZamfonoVersion;
 };
 
 async function handleHealthz(
@@ -89,7 +91,7 @@ async function handleVersion(
         .catch(logFailure(deps.log, 'Asterisk start time read'))) ?? null)
     : null;
   const body: CoreVersionResponse = {
-    ...resolveVersion(process.env),
+    ...deps.version,
     startedAt: processStartedAt,
     asteriskStartedAt
   };

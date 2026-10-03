@@ -16,7 +16,8 @@ import {
   mainDidFrom,
   requiredEnv,
   smtpPortFrom,
-  smtpSecurityFrom
+  smtpSecurityFrom,
+  type SeedEnv
 } from './seedEnv.js';
 import { createOwnerExtension, createParkingSlots } from './seedExtensions.js';
 import { createMohAssets } from './seedMoh.js';
@@ -43,10 +44,10 @@ function unusablePasswordPlaceholder(): string {
 
 async function createOwner(
   db: Db,
-  env: NodeJS.ProcessEnv,
+  env: SeedEnv,
   now: string
 ): Promise<SeededOwner> {
-  const hasPasswordHash = Boolean(env.BOOTSTRAP_OWNER_PASSWORD_HASH);
+  const hasPasswordHash = env.BOOTSTRAP_OWNER_PASSWORD_HASH !== undefined;
   const id = newId();
   await db
     .insertInto('users')
@@ -68,7 +69,7 @@ async function createOwner(
 async function createMainDid(
   db: Db,
   ownerId: string,
-  env: NodeJS.ProcessEnv,
+  env: SeedEnv,
   now: string
 ): Promise<{ id: string }> {
   const targetId = newId();
@@ -108,7 +109,7 @@ function emergencyNumbersFor(country: string, log: Logger): string[] {
 async function createSettings(
   db: Db,
   params: {
-    env: NodeJS.ProcessEnv;
+    env: SeedEnv;
     kr: Keyring;
     mainDidId: string;
     extLength: number;
@@ -117,8 +118,7 @@ async function createSettings(
 ): Promise<void> {
   const { env, kr, mainDidId, extLength, log } = params;
   const country = countryFrom(env);
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- Compose's `${SMTP_HOST:-}` yields '' when unset, so a falsy check is required, not just null/undefined
-  const smtpHost = env.SMTP_HOST || null;
+  const smtpHost = env.SMTP_HOST ?? null;
   await db
     .insertInto('settings')
     .values({
@@ -131,12 +131,10 @@ async function createSettings(
       smtpHost,
       smtpPort: smtpPortFrom(env),
       smtpSecurity: smtpSecurityFrom(env),
-      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- Compose's `${SMTP_USER:-}` yields '' when unset, so a falsy check is required, not just null/undefined
-      smtpUser: env.SMTP_USER || null,
-      smtpPasswordEnc: env.SMTP_PASSWORD
-        ? encrypt(kr, env.SMTP_PASSWORD)
-        : null,
-      mailFrom: smtpHost ? requiredEnv(env, 'MAIL_FROM') : null
+      smtpUser: env.SMTP_USER ?? null,
+      smtpPasswordEnc:
+        env.SMTP_PASSWORD === undefined ? null : encrypt(kr, env.SMTP_PASSWORD),
+      mailFrom: smtpHost === null ? null : requiredEnv(env, 'MAIL_FROM')
     })
     .execute();
 }
@@ -169,7 +167,7 @@ async function sendSetupMail(
 // failure or a write error leaves it empty for a retry. Runs only while `users` holds no row.
 export async function seedIfEmpty(
   db: Db,
-  env: NodeJS.ProcessEnv,
+  env: SeedEnv,
   kr: Keyring,
   mediaDir: string,
   log: Logger

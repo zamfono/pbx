@@ -30,9 +30,10 @@ function trimmedOr(value: string | undefined, fallback: string): string {
  * `$app/env/private` in api) into the three forms api, core, /metrics and the MCP
  * `serverInfo` each want.
  */
-export function resolveVersion(
-  env: Readonly<Record<string, string | undefined>>
-): ZamfonoVersion {
+export function resolveVersion(env: {
+  readonly ZAMFONO_VERSION?: string | undefined;
+  readonly ZAMFONO_REVISION?: string | undefined;
+}): ZamfonoVersion {
   const version = trimmedOr(env.ZAMFONO_VERSION, DEV_VERSION);
   const revision = trimmedOr(env.ZAMFONO_REVISION, '');
   const display = revision
