@@ -8,6 +8,7 @@ import * as env from '$app/env/private';
 
 import {
   HTTP_CONFLICT,
+  isRecord,
   type AddPartyRequest,
   type AttendedTransferRequest,
   type ConsultRequest,
@@ -31,9 +32,9 @@ import {
   postJson,
   postJsonChecked,
   postJsonForBody,
-  readJsonBody,
   throwIfNotOk
 } from './coreHttp.js';
+import { tryReadJson } from './json.js';
 
 // `/healthz`, `/metrics` and `system.info` answer within this even while `core` hangs (§6.3
 // "Health", §7, §10.3), and a hung `core` holds up no re-registration check (§10.4).
@@ -68,10 +69,7 @@ export type CoreClient = {
 /** Whether `body` is the problem whose `detail` names the `noRegisteredDevice` cause of a 409
  * (§10.2 "Click-to-dial", `internalApi.ts`). */
 function namesNoRegisteredDevice(body: unknown): boolean {
-  if (typeof body !== 'object' || body === null) {
-    return false;
-  }
-  return (body as { detail?: unknown }).detail === 'noRegisteredDevice';
+  return isRecord(body) && body.detail === 'noRegisteredDevice';
 }
 
 /** `core`'s internal API at `baseUrl` (default `CORE_URL`). */
@@ -105,7 +103,7 @@ export function createCoreClient(
     async originate(req) {
       const url = `${baseUrl}/internal/calls`;
       const response = await postJson(fetchFn, url, req);
-      const body: unknown = await readJsonBody(response);
+      const body: unknown = await tryReadJson(response);
       if (response.status === HTTP_CONFLICT && namesNoRegisteredDevice(body)) {
         return { error: 'noRegisteredDevice' };
       }

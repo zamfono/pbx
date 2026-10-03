@@ -1,6 +1,6 @@
 import pino from 'pino';
 
-import { HTTP_BAD_GATEWAY, type Db } from '@zamfono/shared';
+import { HTTP_BAD_GATEWAY, isRecord, type Db } from '@zamfono/shared';
 
 import { OpError } from '../ops/types.js';
 import { decrypt, type Keyring } from '../secretbox.js';
@@ -34,10 +34,8 @@ function refusal(
   response: Response,
   body: RingotelRpcResponse<unknown>
 ): string | null {
-  const nested = body.result as { error?: unknown } | null | undefined;
   const error =
-    body.error ??
-    (typeof nested === 'object' && nested !== null ? nested.error : undefined);
+    body.error ?? (isRecord(body.result) ? body.result.error : undefined);
   if (error === undefined || error === null) {
     return response.ok ? null : `HTTP ${response.status}`;
   }

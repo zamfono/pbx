@@ -1,11 +1,11 @@
 import pino from 'pino';
 
-import { HTTP_ACCEPTED, newId, type Db } from '@zamfono/shared';
+import { HTTP_ACCEPTED, isRecord, newId, type Db } from '@zamfono/shared';
 
 import { runOperation, type RunInput } from '../ops/runner.js';
 import { ConfirmationRequired, OpError } from '../ops/types.js';
 import { confirmElicitation, isAffirmative } from './confirm.js';
-import { asRecord, JSONRPC_INTERNAL_ERROR, type JsonRpcId } from './jsonRpc.js';
+import { JSONRPC_INTERNAL_ERROR, type JsonRpcId } from './jsonRpc.js';
 import { toolErrorResult, toolResult } from './results.js';
 
 // §10.5: on a legacy 2025-11-25 session a `confirm`-guarded tool call is answered by a
@@ -169,17 +169,20 @@ export function resolveElicitationAnswer(
   body: unknown,
   actorId: string
 ): Response | null {
-  const record = asRecord(body);
-  const id = record?.id;
-  if (!record || typeof record.method === 'string' || typeof id !== 'string') {
+  if (
+    !isRecord(body) ||
+    typeof body.method === 'string' ||
+    typeof body.id !== 'string'
+  ) {
     return null;
   }
+  const id = body.id;
   const entry = pending.get(id);
   if (entry?.actorId !== actorId) {
     return null;
   }
   pending.delete(id);
-  entry.resolve(asRecord(record.result) ?? {});
+  entry.resolve(isRecord(body.result) ? body.result : {});
   // JSON-RPC 2.0 §4.1: the status a notification (no `id` member) is answered with.
   return new Response(null, { status: HTTP_ACCEPTED });
 }

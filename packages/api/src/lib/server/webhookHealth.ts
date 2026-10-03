@@ -8,7 +8,7 @@
 import type { Selectable } from 'kysely';
 import pino from 'pino';
 
-import { MS_PER_DAY, type DB, type Db } from '@zamfono/shared';
+import { isRecord, MS_PER_DAY, type DB, type Db } from '@zamfono/shared';
 
 import { tryParseJson } from './json.js';
 
@@ -141,8 +141,10 @@ export function settleHealth(
 
 /** The `type` of the event `bodyJson` carries, for the log. */
 function eventTypeOf(bodyJson: string): string {
-  const body = tryParseJson(bodyJson) as { type?: unknown } | undefined;
-  return typeof body?.type === 'string' ? body.type : 'unknown';
+  const body = tryParseJson(bodyJson);
+  return isRecord(body) && typeof body.type === 'string'
+    ? body.type
+    : 'unknown';
 }
 
 /**

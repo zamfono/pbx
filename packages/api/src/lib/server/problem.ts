@@ -1,6 +1,6 @@
 import pino from 'pino';
 
-import { HTTP_INTERNAL_SERVER_ERROR } from '@zamfono/shared';
+import { HTTP_INTERNAL_SERVER_ERROR, isRecord } from '@zamfono/shared';
 
 import { OpError } from './ops/types.js';
 
@@ -21,8 +21,8 @@ export function extensionMembers(detail: unknown): Record<string, unknown> {
   if (Array.isArray(detail)) {
     return { errors: detail };
   }
-  if (typeof detail === 'object' && detail !== null) {
-    return detail as Record<string, unknown>;
+  if (isRecord(detail)) {
+    return detail;
   }
   return { detail };
 }

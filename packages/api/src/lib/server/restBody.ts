@@ -3,7 +3,7 @@
  * `multipart: true` route's form. Separate from the route table and the handler so each one is
  * read on its own.
  */
-import { HTTP_BAD_REQUEST } from '@zamfono/shared';
+import { HTTP_BAD_REQUEST, isRecord } from '@zamfono/shared';
 
 import { OpError } from './ops/types.js';
 import type { RouteEntry } from './restRoutes.js';
@@ -24,10 +24,10 @@ async function parseJsonBody(request: Request): Promise<Fields> {
     return {};
   }
   const parsed = parseJsonOrThrow(text);
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+  if (!isRecord(parsed)) {
     throw new OpError(HTTP_BAD_REQUEST, 'request body must be a JSON object');
   }
-  return parsed as Fields;
+  return parsed;
 }
 
 /** A `multipart: true` route's file field becomes `{ filename, mimeType, data }` (the shape an operation's upload schema expects, e.g. `audio.create`'s `upload`); every other field stays its text value. */

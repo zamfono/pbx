@@ -4,7 +4,14 @@
  */
 import * as env from '$app/env/private';
 
-import type { RunRequester, UpdaterStatus, UpdateState } from '@zamfono/shared';
+import {
+  isRecord,
+  type RunRequester,
+  type UpdaterStatus,
+  type UpdateState
+} from '@zamfono/shared';
+
+import { tryReadJson } from '#lib/server/json.js';
 
 /** A refusal the updater answered with, its status and message passed on to the caller. */
 export class UpdaterRefusal extends Error {
@@ -39,13 +46,11 @@ async function call<T>(
     },
     signal: AbortSignal.timeout(TIMEOUT_MS)
   });
-  const body = (await response.json().catch(() => ({}))) as {
-    error?: unknown;
-  };
+  const body = await tryReadJson(response);
   if (!response.ok) {
     throw new UpdaterRefusal(
       response.status,
-      typeof body.error === 'string'
+      isRecord(body) && typeof body.error === 'string'
         ? body.error
         : `the updater answered ${response.status}`
     );

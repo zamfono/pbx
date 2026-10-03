@@ -1,7 +1,11 @@
-import { HTTP_BAD_REQUEST, HTTP_NOT_FOUND, newId } from '@zamfono/shared';
+import {
+  HTTP_BAD_REQUEST,
+  HTTP_NOT_FOUND,
+  isRecord,
+  newId
+} from '@zamfono/shared';
 
 import {
-  asRecord,
   JSONRPC_INVALID_REQUEST,
   jsonRpcErrorWithStatus,
   type IncomingMessage
@@ -48,11 +52,10 @@ export function hasElicitationCapability(
   if (value === true) {
     return true;
   }
-  const modes = asRecord(value);
-  if (!modes) {
+  if (!isRecord(value)) {
     return false;
   }
-  return 'form' in modes || !('url' in modes);
+  return 'form' in value || !('url' in value);
 }
 
 /**
@@ -83,7 +86,9 @@ export function startLegacySession(
     }
   }
   legacySessions.set(sessionId, {
-    elicits: hasElicitationCapability(asRecord(capabilities)),
+    elicits: hasElicitationCapability(
+      isRecord(capabilities) ? capabilities : null
+    ),
     protocolVersion
   });
   return sessionId;

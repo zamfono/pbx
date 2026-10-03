@@ -4,6 +4,7 @@ import { HTTP_BAD_REQUEST, HTTP_OK } from '@zamfono/shared';
 
 import { redeemPasswordReset } from '#lib/server/auth/passwordReset.js';
 import { getDb } from '#lib/server/db.js';
+import { tryReadJson } from '#lib/server/json.js';
 import { problem } from '#lib/server/problem.js';
 
 /**
@@ -14,7 +15,7 @@ import { problem } from '#lib/server/problem.js';
 export async function POST(event: RequestEvent): Promise<Response> {
   const outcome = await redeemPasswordReset(
     getDb(),
-    await event.request.json().catch(() => null)
+    await tryReadJson(event.request)
   );
   if (outcome.kind === 'invalidRequest') {
     return problem(HTTP_BAD_REQUEST, 'invalid request');

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT, isRecord } from '@zamfono/shared';
 
 import { OpError } from './ops/types.js';
 
@@ -43,7 +43,7 @@ function decodeCursor(cursor: string): { id?: unknown; offset?: unknown } {
   } catch {
     throw invalidCursor();
   }
-  if (typeof position !== 'object' || position === null) {
+  if (!isRecord(position)) {
     throw invalidCursor();
   }
   return position;

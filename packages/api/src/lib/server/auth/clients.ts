@@ -1,4 +1,4 @@
-import { MS_PER_SECOND, type Db } from '@zamfono/shared';
+import { isRecord, MS_PER_SECOND, type Db } from '@zamfono/shared';
 
 import { attempt } from '../errors.js';
 import { decrypt, encrypt, type Keyring } from '../secretbox.js';
@@ -50,13 +50,10 @@ export function decodeMetadataClientId(
     return null;
   }
   const parsed = attempt(() => JSON.parse(plain.toString('utf8')) as unknown);
-  if (parsed === undefined || typeof parsed !== 'object' || parsed === null) {
+  if (!isRecord(parsed)) {
     return null;
   }
-  const { name, redirectUris, applicationType } = parsed as Record<
-    string,
-    unknown
-  >;
+  const { name, redirectUris, applicationType } = parsed;
   if (
     typeof name !== 'string' ||
     !Array.isArray(redirectUris) ||
@@ -84,16 +81,15 @@ function parseCimdDocument(
   clientIdUrl: string,
   body: unknown
 ): ClientMeta | null {
-  if (typeof body !== 'object' || body === null) {
+  if (!isRecord(body)) {
     return null;
   }
-  const doc = body as Record<string, unknown>;
   const {
     client_id: docClientId,
     client_name: name,
     redirect_uris: redirectUris,
     application_type: applicationType = DEFAULT_APPLICATION_TYPE
-  } = doc;
+  } = body;
   if (
     docClientId !== clientIdUrl ||
     typeof name !== 'string' ||

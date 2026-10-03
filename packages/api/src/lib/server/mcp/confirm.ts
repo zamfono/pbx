@@ -1,4 +1,4 @@
-import { asRecord } from './jsonRpc.js';
+import { isRecord } from '@zamfono/shared';
 
 // §10.5 "Confirmation over MCP": the question a `confirm`-guarded tool asks through elicitation,
 // in both eras — inside a 2026-07-28 `input_required` result, or as a legacy 2025-11-25
@@ -21,9 +21,10 @@ export function confirmElicitation(question: string): Record<string, unknown> {
 
 /** Whether an `ElicitResult` is an affirmative answer; a decline or a cancel is not. */
 export function isAffirmative(answer: unknown): boolean {
-  const result = asRecord(answer);
   return (
-    result?.action === 'accept' &&
-    asRecord(result.content)?.[CONFIRM_KEY] === true
+    isRecord(answer) &&
+    answer.action === 'accept' &&
+    isRecord(answer.content) &&
+    answer.content[CONFIRM_KEY] === true
   );
 }

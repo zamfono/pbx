@@ -7,6 +7,7 @@ import pino from 'pino';
 import { WebSocket } from 'ws';
 
 import {
+  isRecord,
   rawDataToString,
   type CoreStreamFrame,
   type Envelope
@@ -61,7 +62,7 @@ export function connectCoreEvents(deps: CoreEventsDeps): { close: () => void } {
     ws.on('message', raw => {
       const text = rawDataToString(raw);
       const parsed = tryParseJson(text);
-      if (typeof parsed !== 'object' || parsed === null) {
+      if (!isRecord(parsed)) {
         logger.warn(
           { frame: text },
           'core sent a frame that is no JSON object'

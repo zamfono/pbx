@@ -8,6 +8,7 @@ import {
 
 import { requestPasswordReset } from '#lib/server/auth/passwordReset.js';
 import { getDb } from '#lib/server/db.js';
+import { tryReadJson } from '#lib/server/json.js';
 import { problem } from '#lib/server/problem.js';
 
 /**
@@ -18,7 +19,7 @@ import { problem } from '#lib/server/problem.js';
 export async function POST(event: RequestEvent): Promise<Response> {
   const outcome = await requestPasswordReset(getDb(), {
     clientAddress: () => event.getClientAddress(),
-    body: () => event.request.json().catch(() => null)
+    body: async () => tryReadJson(event.request)
   });
   if (outcome.kind === 'noRelay') {
     return problem(HTTP_NOT_FOUND, 'not found');

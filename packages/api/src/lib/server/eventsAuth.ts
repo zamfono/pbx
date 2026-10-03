@@ -4,6 +4,7 @@
  * to the sockets this admits.
  */
 import type { WebSocket } from 'ws';
+import { z } from 'zod';
 
 import { rawDataToString } from '@zamfono/shared';
 
@@ -15,15 +16,14 @@ import type { Actor } from './ops/types.js';
 // this many milliseconds, is closed.
 const AUTH_TIMEOUT_MS = 5000;
 
-type AuthFrame = { type: 'auth'; token: string };
+const authFrameSchema = z.object({
+  type: z.literal('auth'),
+  token: z.string()
+});
 
-function parseAuthFrame(raw: string): AuthFrame | null {
-  const parsed = tryParseJson(raw);
-  if (typeof parsed !== 'object' || parsed === null) {
-    return null;
-  }
-  const { type, token } = parsed as Record<string, unknown>;
-  return type === 'auth' && typeof token === 'string' ? { type, token } : null;
+function parseAuthFrame(raw: string): z.infer<typeof authFrameSchema> | null {
+  const parsed = authFrameSchema.safeParse(tryParseJson(raw));
+  return parsed.success ? parsed.data : null;
 }
 
 export type EventsAuthDeps = BearerDeps & {

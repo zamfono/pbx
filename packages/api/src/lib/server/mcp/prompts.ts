@@ -1,3 +1,5 @@
+import { isRecord } from '@zamfono/shared';
+
 import { bundledEntries, type BundledEntry } from './guide.js';
 
 // §10.5 "Prompts": every `docs/guide/recipes/*.md` file is published as an MCP prompt, its
@@ -116,7 +118,7 @@ function promptArguments(value: unknown): Record<string, string> | null {
   if (value === undefined) {
     return {};
   }
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+  if (!isRecord(value)) {
     return null;
   }
   const entries = Object.entries(value);

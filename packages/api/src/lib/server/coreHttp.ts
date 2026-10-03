@@ -9,6 +9,8 @@ import {
   HTTP_UNPROCESSABLE_CONTENT
 } from '@zamfono/shared';
 
+import { tryReadJson } from './json.js';
+
 /** A non-2xx response from `core`'s internal API, carrying the status and, if parseable, the body. */
 export class CoreRequestError extends Error {
   readonly status: number;
@@ -34,11 +36,6 @@ export async function postJson(
   });
 }
 
-/** `response`'s body, parsed as JSON, or `undefined` when it is empty or not JSON. */
-export async function readJsonBody(response: Response): Promise<unknown> {
-  return response.json().catch(() => undefined);
-}
-
 /** Throws `CoreRequestError` for a non-2xx `response`; callers get a rejected promise instead of silently treating a failed reload or call action as having succeeded. */
 export async function throwIfNotOk(
   response: Response,
@@ -48,7 +45,7 @@ export async function throwIfNotOk(
     throw new CoreRequestError(
       url,
       response.status,
-      await readJsonBody(response)
+      await tryReadJson(response)
     );
   }
 }
@@ -70,7 +67,7 @@ export async function postJsonForBody(
   body: unknown
 ): Promise<unknown> {
   const response = await postJson(fetchFn, url, body);
-  const parsed = await readJsonBody(response);
+  const parsed = await tryReadJson(response);
   if (!response.ok) {
     throw new CoreRequestError(url, response.status, parsed);
   }

@@ -1,4 +1,6 @@
 /** The Ringotel Admin API methods `ringotelFake.ts` answers (§10.4), each over the fake's state. */
+import { isRecord } from '@zamfono/shared';
+
 import type { FakeRingotelUser, RingotelFake } from './ringotelFake.js';
 
 type Handler = (fake: RingotelFake, params: Record<string, unknown>) => unknown;
@@ -128,8 +130,8 @@ export const HANDLERS: Record<string, Handler> = {
         user[field] = params[field];
       }
     }
-    if (typeof params.options === 'object' && params.options !== null) {
-      user.options = params.options as Record<string, unknown>;
+    if (isRecord(params.options)) {
+      user.options = params.options;
     }
     return null;
   },

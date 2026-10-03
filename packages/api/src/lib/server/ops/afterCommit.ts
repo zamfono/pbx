@@ -1,6 +1,6 @@
 import pino from 'pino';
 
-import type { Db } from '@zamfono/shared';
+import { isRecord, type Db } from '@zamfono/shared';
 
 import { errorMessage } from '../errors.js';
 import { isPropagationPending } from '../propagationPending.js';
@@ -144,10 +144,10 @@ export async function runAfterCommit(
 
 /** `output` with `warnings` appended to any it already carries; a non-object passes unchanged. */
 export function withWarnings(output: unknown, warnings: string[]): unknown {
-  if (warnings.length === 0 || typeof output !== 'object' || output === null) {
+  if (warnings.length === 0 || !isRecord(output)) {
     return output;
   }
-  const current = (output as { warnings?: unknown }).warnings;
+  const current = output.warnings;
   return {
     ...output,
     warnings: [

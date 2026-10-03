@@ -1,4 +1,4 @@
-import { newId } from '@zamfono/shared';
+import { isRecord, newId } from '@zamfono/shared';
 
 import type { Authenticated } from '../auth/bearer.js';
 import { BinaryResult } from '../binaryResult.js';
@@ -14,7 +14,6 @@ import { downloadLink } from './downloadLink.js';
 import type { Era } from './era.js';
 import { callHelp, HELP_TOOL_NAME } from './guide.js';
 import {
-  asRecord,
   JSONRPC_INVALID_PARAMS,
   jsonRpcError,
   jsonRpcResult,
@@ -36,8 +35,7 @@ function toolArguments(
   if (params.arguments === undefined) {
     return {};
   }
-  const args = asRecord(params.arguments);
-  return args && !Array.isArray(args) ? args : null;
+  return isRecord(params.arguments) ? params.arguments : null;
 }
 
 function helpResult(legacy: boolean, args: Record<string, unknown>): object {
@@ -91,7 +89,8 @@ export async function handleToolsCall(
   const { confirm: confirmArg, ...argsWithoutConfirm } = rawArgs;
   const args = op.confirm ? argsWithoutConfirm : rawArgs;
   // The answer to an earlier `input_required`, keyed as its `inputRequests` entry was.
-  const answer = asRecord(msg.params.inputResponses)?.[CONFIRM_KEY];
+  const responses = msg.params.inputResponses;
+  const answer = isRecord(responses) ? responses[CONFIRM_KEY] : undefined;
   const run: RunInput = {
     actor: auth.actor,
     channel: 'mcp',

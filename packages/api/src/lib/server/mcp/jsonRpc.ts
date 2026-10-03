@@ -1,6 +1,6 @@
 // The JSON-RPC 2.0 framing every MCP message travels in (§10.5): parsing an incoming request off
 // the Streamable HTTP body, and wrapping a result or an error back into a response.
-import { HTTP_OK } from '@zamfono/shared';
+import { HTTP_OK, isRecord } from '@zamfono/shared';
 
 export const JSONRPC_PARSE_ERROR = -32700;
 export const JSONRPC_INVALID_REQUEST = -32600;
@@ -30,33 +30,28 @@ export type IncomingMessage = {
   };
 };
 
-export function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
 export function parseMessage(body: unknown): IncomingMessage | null {
-  const record = asRecord(body);
-  if (!record || typeof record.method !== 'string') {
+  if (!isRecord(body) || typeof body.method !== 'string') {
     return null;
   }
-  const id = record.id;
-  const params = asRecord(record.params) ?? {};
+  const id = body.id;
+  const params = isRecord(body.params) ? body.params : {};
   // eslint-disable-next-line @typescript-eslint/dot-notation -- bracket access avoids no-underscore-dangle on `_meta`
-  const meta = asRecord(params['_meta']) ?? {};
+  const metaValue = params['_meta'];
+  const meta = isRecord(metaValue) ? metaValue : {};
   const version = meta[PROTOCOL_VERSION_META_KEY];
+  const capabilities = meta[CLIENT_CAPABILITIES_META_KEY];
   return {
     id: typeof id === 'string' || typeof id === 'number' ? id : null,
     // JSON-RPC 2.0 §4.1: a notification has no `id` member at all, distinct from an explicit
     // `id: null`, and must receive no reply.
-    isNotification: !('id' in record),
-    method: record.method,
+    isNotification: !('id' in body),
+    method: body.method,
     params,
     meta: {
       declaresVersion: PROTOCOL_VERSION_META_KEY in meta,
       protocolVersion: typeof version === 'string' ? version : undefined,
-      capabilities: asRecord(meta[CLIENT_CAPABILITIES_META_KEY]) ?? undefined
+      capabilities: isRecord(capabilities) ? capabilities : undefined
     }
   };
 }
