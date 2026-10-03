@@ -421,9 +421,12 @@ describe('call control', () => {
       actorUserId: memberId
     });
     expect(pipeline.channelless.has(declined.callId)).toBe(true);
+    // A device declines a leg it rings: one dialled, not one still being placed.
     const ringing = await eventually(() => {
       const leg = [...pipeline.callByChannel.entries()].find(
-        ([, candidate]) => candidate.id === declined.callId
+        ([channelId, candidate]) =>
+          candidate.id === declined.callId &&
+          candidate.legs.get(channelId)?.state === 'ringing'
       );
       expect(leg).toBeDefined();
       return leg?.[0] ?? '';
