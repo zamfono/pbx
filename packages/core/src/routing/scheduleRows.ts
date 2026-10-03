@@ -55,7 +55,7 @@ export function buildSchedules(
       intervals: intervalRows
         .filter(interval => interval.openingHoursId === row.id)
         .map(interval => ({
-          weekday: interval.weekday as Schedule['intervals'][number]['weekday'],
+          weekday: interval.weekday,
           opens: interval.opens,
           closes: interval.closes
         }))

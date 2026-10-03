@@ -2,17 +2,16 @@
  * Out-of-office and opening-hours evaluation (spec §10.1 steps 2-3, §10.2 "Out
  * of office" / "Opening hours"). Pure functions only: the routing pipeline
  * passes in the rows already loaded for a call, and every calendar
- * computation goes through `Intl` rather than a date library.
+ * computation goes through `Temporal` rather than a date library.
  */
 
 import {
   closedPeriods,
-  localParts,
   MINUTES_PER_HOUR,
   MS_PER_DAY,
   parseTimeOfDay,
-  type Scope,
-  type Weekday
+  type OpeningInterval,
+  type Scope
 } from '@zamfono/shared';
 
 // A weekly schedule repeats every 7 days; one day more always reaches the next edge of one that
@@ -33,7 +32,7 @@ export type Schedule = {
   scope: Scope;
   active: boolean;
   closedTargetId: string;
-  intervals: { weekday: Weekday; opens: string; closes: string }[];
+  intervals: OpeningInterval[];
 };
 
 /**
@@ -80,11 +79,11 @@ export function isOpen(
   nowIso: string,
   timezone: string
 ): boolean {
-  const local = localParts(new Date(nowIso).getTime(), timezone);
+  const local = Temporal.Instant.from(nowIso).toZonedDateTimeISO(timezone);
   const minuteOfDay = local.hour * MINUTES_PER_HOUR + local.minute;
   return schedule.intervals.some(
     interval =>
-      interval.weekday === local.weekday &&
+      interval.weekday === local.dayOfWeek &&
       minuteOfDay >= parseTimeOfDay(interval.opens) &&
       minuteOfDay < parseTimeOfDay(interval.closes)
   );

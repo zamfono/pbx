@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { closedPeriods } from './openingHours.js';
+import { closedPeriods, parseTimeOfDay } from './openingHours.js';
 import { MS_PER_HOUR } from './time.js';
 
 const weekdayHoursSchedule = {
@@ -13,6 +13,16 @@ const weekdayHoursSchedule = {
 
 const hoursOf = (period: { start: string; end: string }): number =>
   (Date.parse(period.end) - Date.parse(period.start)) / MS_PER_HOUR;
+
+describe('parseTimeOfDay', () => {
+  it.each([
+    ['00:00', 0],
+    ['09:30', 570],
+    ['24:00', 1440]
+  ])('parses %s to %i minutes', (value, minutes) => {
+    expect(parseTimeOfDay(value)).toBe(minutes);
+  });
+});
 
 describe('closedPeriods', () => {
   it('contains one weekend period of at least 63 hours for a Mon-Fri 9-17 schedule', () => {
@@ -72,4 +82,25 @@ describe('closedPeriods', () => {
       { start: '2026-01-06T02:00:00.000Z', end: '2026-01-07T00:00:00.000Z' }
     ]);
   });
+
+  it.each([
+    // Europe/Berlin: 02:00-03:00 is skipped on 2026-03-29 and repeated on 2026-10-25.
+    ['Europe/Berlin', '2026-03-29', '02:30', '2026-03-29T00:30:00.000Z'],
+    ['Europe/Berlin', '2026-10-25', '02:30', '2026-10-25T00:30:00.000Z'],
+    // America/New_York: 02:00-03:00 is skipped on 2026-03-08, 01:00-02:00 repeated on 2026-11-01.
+    ['America/New_York', '2026-03-08', '02:30', '2026-03-08T06:30:00.000Z'],
+    ['America/New_York', '2026-11-01', '01:30', '2026-11-01T05:30:00.000Z']
+  ])(
+    'opens at the earlier instant where DST skips or repeats the local time: %s %s %s',
+    (timeZone, date, opens, instant) => {
+      // Each date is a Sunday; the window starts before the opening time on that zone's clock.
+      const from = `${date}T00:00:00.000Z`;
+      const schedule = { intervals: [{ weekday: 7, opens, closes: '12:00' }] };
+
+      expect(closedPeriods(schedule, from, 1, timeZone)[0]).toEqual({
+        start: from,
+        end: instant
+      });
+    }
+  );
 });

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { wallClockToInstant, type Db } from '@zamfono/shared';
+import type { Db } from '@zamfono/shared';
 
 import { tenantTimeZone } from '../tenantTimeZone.js';
 
@@ -14,7 +14,6 @@ export const instantInput = z.union([
   z.iso.date()
 ]);
 
-const ISO_DATE_LENGTH = 'YYYY-MM-DD'.length;
 const HAS_OFFSET = /(?:Z|[+-]\d{2}:\d{2})$/u;
 /**
  * `value`, an `instantInput`, in the form an `_at` column holds (`toISOString`: UTC with
@@ -25,9 +24,10 @@ export function toStoredInstant(value: string, timeZone: string): string {
   if (HAS_OFFSET.test(value)) {
     return new Date(value).toISOString();
   }
-  const wall = value.length === ISO_DATE_LENGTH ? `${value}T00:00` : value;
-  const wallAsUtc = Date.parse(`${wall}Z`);
-  return new Date(wallClockToInstant(wallAsUtc, timeZone)).toISOString();
+  const { epochMilliseconds } = Temporal.PlainDateTime.from(
+    value
+  ).toZonedDateTime(timeZone, { disambiguation: 'earlier' });
+  return new Date(epochMilliseconds).toISOString();
 }
 
 /** `toStoredInstant` bound to the tenant's time zone as `api` resolves it (§11.4 `timezone`). */

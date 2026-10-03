@@ -5,14 +5,7 @@
 
 import * as env from '$app/env/private';
 
-import {
-  addDays,
-  localParts,
-  MINUTES_PER_HOUR,
-  MS_PER_DAY,
-  zonedTimeToInstant,
-  type Db
-} from '@zamfono/shared';
+import { MS_PER_DAY, type Db } from '@zamfono/shared';
 
 import { loadIntervals, loadSchedule } from '../ops/hours/_shared.js';
 import { liveOooRulesInScope } from '../ops/ooo/_shared.js';
@@ -89,26 +82,16 @@ function nextHourOccurrenceMs(
   hour: number,
   timezone: string
 ): number {
-  const local = localParts(fromMs, timezone);
-  const targetMinuteOfDay = hour * MINUTES_PER_HOUR;
-  const todayMs = zonedTimeToInstant(
-    local.year,
-    local.month,
-    local.day,
-    targetMinuteOfDay,
-    timezone
-  );
-  if (todayMs > fromMs) {
-    return todayMs;
-  }
-  const tomorrow = addDays(local, 1);
-  return zonedTimeToInstant(
-    tomorrow.year,
-    tomorrow.month,
-    tomorrow.day,
-    targetMinuteOfDay,
-    timezone
-  );
+  const today = Temporal.Instant.fromEpochMilliseconds(fromMs)
+    .toZonedDateTimeISO(timezone)
+    .toPlainDate();
+  const occurrenceMs = (date: Temporal.PlainDate): number =>
+    date
+      .toPlainDateTime({ hour })
+      .toZonedDateTime(timezone, { disambiguation: 'earlier' })
+      .epochMilliseconds;
+  const todayMs = occurrenceMs(today);
+  return todayMs > fromMs ? todayMs : occurrenceMs(today.add({ days: 1 }));
 }
 
 /** `TLS_RELOAD_HOUR` as an integer hour `0`-`23`, `null` when unset, empty or out of range. */

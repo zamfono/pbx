@@ -4,7 +4,6 @@ export * from './ids.js';
 export * from './time.js';
 export * from './httpStatus.js';
 export * from './timezone.js';
-export * from './zonedTime.js';
 export * from './openingHours.js';
 export * from './numbers.js';
 export * from './featureCodes.js';

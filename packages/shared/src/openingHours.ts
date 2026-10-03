@@ -1,16 +1,10 @@
 /**
  * The closed periods of a weekly opening-hours schedule over a window of days, for §6.4 step 2's
- * midpoint-of-longest-closed-period search (`packages/api/src/lib/jobs/reloadTiming.ts`) and for
- * core's OOO/hours sweep, which wakes at the next edge of one (`packages/core/src/sweep.ts`).
+ * midpoint-of-longest-closed-period search (`packages/api/src/lib/server/jobs/reloadTiming.ts`)
+ * and for core's OOO/hours sweep, which wakes at the next edge of one (`packages/core/src/sweep.ts`).
+ * A wall-clock time that a DST change skips or repeats is taken at the earlier of its instants.
  */
-import { MS_PER_DAY } from './time.js';
-import {
-  addDays,
-  localParts,
-  parseTimeOfDay,
-  weekdayAt,
-  zonedTimeToInstant
-} from './zonedTime.js';
+import { MINUTES_PER_HOUR, MS_PER_DAY } from './time.js';
 
 /** One `opening_hours_intervals` row: open from `opens` to `closes` (`'HH:MM'`) on ISO `weekday`. */
 export type OpeningInterval = {
@@ -18,6 +12,12 @@ export type OpeningInterval = {
   opens: string;
   closes: string;
 };
+
+/** Parses `'HH:MM'` (or `'24:00'`, end of day) into minutes since local midnight. */
+export function parseTimeOfDay(value: string): number {
+  const [hourPart = '0', minutePart = '0'] = value.split(':');
+  return Number(hourPart) * MINUTES_PER_HOUR + Number(minutePart);
+}
 
 /**
  * The closed periods of `schedule` within `[fromIso, fromIso + days)`, merged
@@ -31,32 +31,27 @@ export function closedPeriods(
 ): { start: string; end: string }[] {
   const from = new Date(fromIso).getTime();
   const to = from + days * MS_PER_DAY;
-  const start = localParts(from, timezone);
+  const startDate = Temporal.Instant.fromEpochMilliseconds(from)
+    .toZonedDateTimeISO(timezone)
+    .toPlainDate();
+  const instantAt = (date: Temporal.PlainDate, time: string): number =>
+    date
+      .toPlainDateTime()
+      .add({ minutes: parseTimeOfDay(time) })
+      .toZonedDateTime(timezone, { disambiguation: 'earlier' })
+      .epochMilliseconds;
 
   const openIntervals: { start: number; end: number }[] = [];
   // One extra day on each side of the range so an open interval that starts before `from` or
   // ends after `to` is still found and clipped into range, instead of being missed entirely.
   for (let dayOffset = -1; dayOffset <= days; dayOffset += 1) {
-    const weekday = weekdayAt(start.weekday, dayOffset);
-    const dayDate = addDays(start, dayOffset);
+    const date = startDate.add({ days: dayOffset });
     for (const interval of schedule.intervals) {
-      if (interval.weekday !== weekday) {
+      if (interval.weekday !== date.dayOfWeek) {
         continue;
       }
-      const openStart = zonedTimeToInstant(
-        dayDate.year,
-        dayDate.month,
-        dayDate.day,
-        parseTimeOfDay(interval.opens),
-        timezone
-      );
-      const openEnd = zonedTimeToInstant(
-        dayDate.year,
-        dayDate.month,
-        dayDate.day,
-        parseTimeOfDay(interval.closes),
-        timezone
-      );
+      const openStart = instantAt(date, interval.opens);
+      const openEnd = instantAt(date, interval.closes);
       if (openEnd <= from || openStart >= to) {
         continue;
       }
