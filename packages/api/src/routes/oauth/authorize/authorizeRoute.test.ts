@@ -26,6 +26,11 @@ import { load } from './+page.server.js';
 import { approveConsentSubmit, denyConsentSubmit } from './consentSubmit.js';
 import { loginSubmit } from './loginSubmit.js';
 
+// A metadata document's host resolves to a public documentation-range address, with no network.
+vi.mock('node:dns/promises', () => ({
+  lookup: () => Promise.resolve([{ address: '203.0.113.10', family: 4 }])
+}));
+
 // The real Argon2id check, observed: a test counts the attempts that reached a stored hash.
 vi.mock('#lib/server/auth/password.js', async importOriginal => {
   const actual =

@@ -10,6 +10,7 @@ import {
 
 import { attempt } from '../errors.js';
 import { tryParseJson } from '../json.js';
+import { resolvesToPublicAddresses } from '../publicHost.js';
 import { decrypt, encrypt, type Keyring } from '../secretbox.js';
 import { TtlMap } from '../ttlMap.js';
 import { redirectUriAcceptable } from './redirectUris.js';
@@ -167,7 +168,8 @@ async function cappedJson(response: Response): Promise<unknown> {
 /**
  * Fetches a Client ID Metadata Document (§5.2), refusing it unless its own `client_id` equals the
  * URL it was fetched from; caches the result per `Cache-Control`. `null` for a document that
- * cannot be fetched in time, is not JSON, is too large or does not describe a client.
+ * cannot be fetched in time, redirects, is not JSON, is too large or does not describe a client,
+ * and, without a fetch, for a host that resolves to a loopback, private or link-local address.
  */
 export async function fetchCimd(
   clientIdUrl: string,
@@ -177,8 +179,17 @@ export async function fetchCimd(
   if (cached) {
     return cached;
   }
+  // ponytail: the host is resolved here and again by `fetch`, so a name whose answer changes in
+  // between (DNS rebinding) slips through; checking at connect time needs an undici dispatcher
+  // with its own `lookup`, which the global `fetch` does not expose.
+  const url = URL.parse(clientIdUrl);
+  if (url === null || !(await resolvesToPublicAddresses(url))) {
+    return null;
+  }
   try {
+    // A redirect could lead where the address check did not look.
     const response = await fetchImpl(clientIdUrl, {
+      redirect: 'error',
       signal: AbortSignal.timeout(CIMD_FETCH_TIMEOUT_MS)
     });
     if (!response.ok) {

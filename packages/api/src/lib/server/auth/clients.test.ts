@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { isIP } from 'node:net';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { keySpec } from '#testing/fixtures.js';
 
@@ -11,6 +12,22 @@ import {
   type ClientMeta
 } from './clients.js';
 import { redirectUriAllowed } from './redirectUris.js';
+
+// A documentation-range address stands for every name a test resolves; an IP literal resolves to
+// itself, as the real lookup does.
+const PUBLIC_ADDRESS = '203.0.113.10';
+const lookup = vi.hoisted(() => vi.fn());
+vi.mock('node:dns/promises', () => ({ lookup }));
+
+beforeEach(() => {
+  lookup.mockImplementation((host: string) =>
+    Promise.resolve([
+      isIP(host) === 0
+        ? { address: PUBLIC_ADDRESS, family: 4 }
+        : { address: host, family: isIP(host) }
+    ])
+  );
+});
 
 /** A valid Client ID Metadata Document served at `url`. */
 function cimdDocument(url: string): Record<string, unknown> {
@@ -204,6 +221,51 @@ describe('fetchCimd', () => {
       )) as typeof fetch;
     expect(await fetchCimd(url, fetchImpl)).toBeNull();
   });
+
+  it('does not follow a redirect', async () => {
+    const url = 'https://moved.example/metadata.json';
+    let redirect: RequestRedirect | undefined;
+    const fetchImpl = ((_input: unknown, init?: RequestInit) => {
+      ({ redirect } = init ?? {});
+      return Promise.resolve(new Response(JSON.stringify(cimdDocument(url))));
+    }) as typeof fetch;
+    await fetchCimd(url, fetchImpl);
+    expect(redirect).toBe('error');
+  });
+
+  // Anyone can make the server fetch a URL: it never reaches the stack's own network.
+  it.each([
+    ['loopback', '127.0.0.1'],
+    ['IPv6 loopback', '::1'],
+    ['unspecified', '0.0.0.0'],
+    ['private 10/8', '10.1.2.3'],
+    ['private 172.16/12', '172.20.0.5'],
+    ['private 192.168/16', '192.168.1.1'],
+    ['shared 100.64/10', '100.64.0.1'],
+    ['link-local (cloud metadata)', '169.254.169.254'],
+    ['IPv6 link-local', 'fe80::1'],
+    ['IPv6 unique local', 'fd00::1'],
+    ['IPv4-mapped loopback', '::ffff:127.0.0.1']
+  ])('refuses a host that resolves to a %s address', async (_case, address) => {
+    lookup.mockResolvedValue([
+      { address: PUBLIC_ADDRESS, family: 4 },
+      { address, family: isIP(address) }
+    ]);
+    const fetchImpl = vi.fn<typeof fetch>();
+    expect(
+      await fetchCimd('https://inside.example/metadata.json', fetchImpl)
+    ).toBeNull();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each(['https://127.0.0.1/metadata.json', 'https://[::1]/metadata.json'])(
+    'refuses an IP literal %s on a loopback address',
+    async url => {
+      const fetchImpl = vi.fn<typeof fetch>();
+      expect(await fetchCimd(url, fetchImpl)).toBeNull();
+      expect(fetchImpl).not.toHaveBeenCalled();
+    }
+  );
 
   it('refuses a document whose redirect URI is not an absolute http(s) URI', async () => {
     const url = 'https://relative.example/metadata.json';
