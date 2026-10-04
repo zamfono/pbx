@@ -96,4 +96,32 @@ describe('resyncOnReconnect', () => {
     expect(pipeline.callByChannel.get(legOf(call))).toBe(call);
     expect(slotResets()).toBe(resetsBefore);
   });
+
+  it('keeps a call that started while the channel list was on its way', async () => {
+    const { pipeline, db, fakeAri, ari } = rig;
+    const userId = await seedUser(db);
+    await resyncOnReconnect(pipeline);
+    let started: Promise<string> | null = null;
+    const list = ari.channels.list.bind(ari.channels);
+    // Asterisk answers the list, then a new call comes up before the answer arrives.
+    ari.channels.list = async () => {
+      const answer = await list();
+      started ??= answeredCall(rig, userId).then(legOf);
+      await started;
+      return answer;
+    };
+
+    const back = reconnected();
+    fakeAri.disconnectClient();
+    await back;
+    await eventually(() => {
+      expect(started).not.toBeNull();
+    });
+    const leg = await (started as unknown as Promise<string>);
+    await new Promise(resolve => {
+      setTimeout(resolve, 100);
+    });
+
+    expect(pipeline.callByChannel.has(leg)).toBe(true);
+  });
 });

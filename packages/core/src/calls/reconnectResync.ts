@@ -56,17 +56,18 @@ async function reconcile(
   asteriskRestarted: boolean
 ): Promise<void> {
   const { ari, presence, trunkState } = pipeline.deps;
-  const live = new Set((await ari.channels.list()).map(channel => channel.id));
-  const calls = [...trackedCalls(pipeline)];
+  // Only channels known before the list was asked for can have gone without their event: one
+  // that came up while the answer was on its way is missing from it but still alive.
   const known = new Set([
-    ...calls.flatMap(channelsOf),
+    ...[...trackedCalls(pipeline)].flatMap(channelsOf),
     ...pipeline.parkedSlotByChannel.keys(),
     ...trunkState.countedChannels
   ]);
-  const gone = [...known].filter(id => !live.has(id));
-  const ended = calls.filter(call => {
+  const live = new Set((await ari.channels.list()).map(channel => channel.id));
+  const gone = new Set([...known].filter(id => !live.has(id)));
+  const ended = [...trackedCalls(pipeline)].filter(call => {
     const channels = channelsOf(call);
-    return channels.length > 0 && channels.every(id => !live.has(id));
+    return channels.length > 0 && channels.every(id => gone.has(id));
   });
   await Promise.all(
     ended.map(call => settleStatus(pipeline, call, 'interrupted'))
@@ -78,7 +79,7 @@ async function reconcile(
     await presence.resyncOnBoot();
   }
   pipeline.deps.logger.info(
-    { gone: gone.length, interrupted: ended.length, asteriskRestarted },
+    { gone: gone.size, interrupted: ended.length, asteriskRestarted },
     'ARI reconnected: channels gone meanwhile ended'
   );
 }
