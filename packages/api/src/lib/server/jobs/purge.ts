@@ -3,12 +3,13 @@
  * config rows once `settings.soft_delete_retention_days` has passed, stale `oauth_clients` and
  * expired `tokens` (§5.2), `audit_log` beyond `settings.audit_retention_days` (§5.7) and
  * `backup_runs` beyond `settings.recording_retention_days` but each target's latest successful one
- * (§11.6).
+ * (§11.6), then the audio files no `audio_assets` row names.
  */
 import { sql, type Transaction } from 'kysely';
 
 import { cutoffIso, type DB, type Db } from '@zamfono/shared';
 
+import { deleteOrphanedAudioFiles } from '../audio/orphans.js';
 import { deleteAudioFile } from '../audio/store.js';
 import { loadSettings } from '../ops/settings/_shared.js';
 import { deleteVoicemailFile } from '../ops/voicemails/_shared.js';
@@ -226,4 +227,5 @@ export async function runPurge(db: Db, now: string): Promise<void> {
       deleteVoicemailFile(filename)
     )
   ]);
+  await deleteOrphanedAudioFiles(db, now);
 }

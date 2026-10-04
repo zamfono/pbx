@@ -2,8 +2,8 @@
  * `core`'s daily retention sweep (§11.6 "Retention"): recordings older than
  * `settings.recording_retention_days` lose their files and their row, the raw per-leg files a
  * failed mix left behind (§10.2 "Best effort") go once they are as old, and `presence_log` rows,
- * `calls.log` content and `call_qos` rows go on the same schedule. Voicemails are not touched —
- * they are kept until their owner deletes them.
+ * `calls.log` content and `call_qos` rows go on the same schedule. A mixed file no row names goes
+ * once it is a day old. Voicemails are not touched — they are kept until their owner deletes them.
  */
 import { readdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -24,6 +24,9 @@ import { ignoreMissing } from './fsFailures.js';
 // A participation's raw pair, `<id>-l.wav` and `<id>-r.wav` (§11.6 "raw per-leg call recordings"),
 // or `.wav16` for a 16 kHz recording (§10.2 "Sample rate").
 const RAW_FILE = /-[lr]\.wav(?:16)?$/u;
+// A participation is mixed before its row is written: a mixed file this young may still be
+// about to get one.
+const MIN_ORPHAN_AGE_MS = MS_PER_DAY;
 
 type RetentionDeps = {
   db: Db;
@@ -35,6 +38,7 @@ type RetentionDeps = {
 type RetentionResult = {
   recordings: number;
   rawFiles: number;
+  orphanedFiles: number;
   presenceLog: number;
   callQos: number;
   callLogs: number;
@@ -52,6 +56,39 @@ async function removeRecordingFiles(
   );
 }
 
+/** The names in `dir`, none when it cannot be read (a fresh volume has none until the first
+ * recording). */
+async function namesIn(dir: string, log: Logger): Promise<string[]> {
+  return (
+    (await readdir(dir)
+      .catch(ignoreMissing)
+      .catch(logFailure(log, 'recordings directory read', { dir }))) ?? []
+  );
+}
+
+/** Removes each of `names` in `dir` last changed before `before`; returns how many went. */
+async function removeOlder(
+  dir: string,
+  names: string[],
+  before: string,
+  log: Logger
+): Promise<number> {
+  const removed = await Promise.all(
+    names.map(async name => {
+      const file = path.join(dir, name);
+      const info = await stat(file)
+        .catch(ignoreMissing)
+        .catch(logFailure(log, 'recording file read', { file }));
+      if (info === undefined || info.mtime.toISOString() >= before) {
+        return false;
+      }
+      await rm(file, { force: true });
+      return true;
+    })
+  );
+  return removed.filter(Boolean).length;
+}
+
 /** Removes the raw per-leg files older than `before`: those of a failed mix, which no
  * `recordings` row names (§10.2 "A failed mix leaves the raw per-leg files"), are recordings too
  * and are purged on the same schedule. Returns how many went. */
@@ -60,26 +97,35 @@ async function removeStaleRawFiles(
   before: string,
   log: Logger
 ): Promise<number> {
-  const names =
-    (await readdir(dir)
-      .catch(ignoreMissing)
-      .catch(logFailure(log, 'recordings directory read', { dir }))) ?? [];
-  const removed = await Promise.all(
-    names
-      .filter(candidate => RAW_FILE.test(candidate))
-      .map(async name => {
-        const file = path.join(dir, name);
-        const info = await stat(file)
-          .catch(ignoreMissing)
-          .catch(logFailure(log, 'raw recording file read', { file }));
-        if (info === undefined || info.mtime.toISOString() >= before) {
-          return false;
-        }
-        await rm(file, { force: true });
-        return true;
-      })
+  const names = await namesIn(dir, log);
+  return removeOlder(
+    dir,
+    names.filter(name => RAW_FILE.test(name)),
+    before,
+    log
   );
-  return removed.filter(Boolean).length;
+}
+
+/** Removes the mixed files no `recordings` row names (§11.6): a mix whose row was never written,
+ * or a deleted recording whose file outlived its row. Returns how many went. */
+async function removeOrphanedMixedFiles(
+  deps: RetentionDeps,
+  dir: string
+): Promise<number> {
+  const rows = await deps.db
+    .selectFrom('recordings')
+    .select('filename')
+    .execute();
+  const known = new Set(rows.map(row => row.filename));
+  const names = await namesIn(dir, deps.log);
+  return removeOlder(
+    dir,
+    names.filter(
+      name => name.endsWith('.wav') && !RAW_FILE.test(name) && !known.has(name)
+    ),
+    new Date(Date.parse(deps.now()) - MIN_ORPHAN_AGE_MS).toISOString(),
+    deps.log
+  );
 }
 
 /**
@@ -110,6 +156,7 @@ export async function runRetention(
     .where('createdAt', '<', before)
     .executeTakeFirst();
   const rawFiles = await removeStaleRawFiles(recordingsDir, before, deps.log);
+  const orphanedFiles = await removeOrphanedMixedFiles(deps, recordingsDir);
 
   // Each user's latest row before the cutoff stays: it is that user's state at every instant from
   // the cutoff to their next transition, which the snapshot (§10.3 "Presence log") reads.
@@ -153,6 +200,7 @@ export async function runRetention(
   return {
     recordings: Number(recordings.numDeletedRows),
     rawFiles,
+    orphanedFiles,
     presenceLog: Number(presenceLog.numDeletedRows),
     callQos: Number(callQos.numDeletedRows),
     callLogs: Number(callLogs.numUpdatedRows)

@@ -19,6 +19,7 @@ import { noopLogger } from './testing/pipelineDeps.js';
 const NOW = '2026-06-01T00:00:00.000Z';
 const LONG_AGO = '2026-01-01T00:00:00.000Z';
 const YESTERDAY = '2026-05-31T00:00:00.000Z';
+const A_MOMENT_AGO = '2026-05-31T23:00:00.000Z';
 const A_BIT_LATER = '2026-01-02T00:00:00.000Z';
 
 /** One call with its log, a QoS row, a recording and a presence entry, all stamped `at`. */
@@ -116,7 +117,6 @@ describe('runRetention', () => {
     const failedOldRight = await write('failed-r.wav', LONG_AGO);
     const failedOld16 = await write('wide-l.wav16', LONG_AGO);
     const failedRecent = await write('recent-l.wav', YESTERDAY);
-    const unrelated = await write('mixed.wav', LONG_AGO);
 
     const result = await runRetention({
       db,
@@ -132,8 +132,35 @@ describe('runRetention', () => {
       )
     );
     await expect(access(failedRecent)).resolves.toBeUndefined();
-    // Only raw per-leg files are swept by age; a mixed file goes with its row.
-    await expect(access(unrelated)).resolves.toBeUndefined();
+  });
+
+  it('removes a mixed file no recording row names once it is a day old (§11.6)', async () => {
+    const recordingsDir = path.join(mediaDir, 'recordings');
+    await mkdir(recordingsDir, { recursive: true });
+    const write = async (name: string, at: string): Promise<string> => {
+      const file = path.join(recordingsDir, name);
+      await writeFile(file, 'x');
+      await utimes(file, new Date(at), new Date(at));
+      return file;
+    };
+    await seedCall(db, YESTERDAY, 'named.wav');
+    const named = await write('named.wav', LONG_AGO);
+    // A deleted recording's file that outlived its row.
+    const orphan = await write('orphan.wav', LONG_AGO);
+    // A mix whose row may still be on its way.
+    const fresh = await write('fresh.wav', A_MOMENT_AGO);
+
+    const result = await runRetention({
+      db,
+      mediaDir,
+      log: noopLogger,
+      now: () => NOW
+    });
+
+    expect(result.orphanedFiles).toBe(1);
+    await expect(access(orphan)).rejects.toThrow();
+    await expect(access(named)).resolves.toBeUndefined();
+    await expect(access(fresh)).resolves.toBeUndefined();
   });
 
   it('clears the diagnostics payload past retention but keeps the call history row (§7, §11.6)', async () => {

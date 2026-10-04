@@ -19,6 +19,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §11.2 Schema.** Product-owner decision (D34): asked how an expired but unrevoked personal access token's name is freed, the user chose "Free the name (Recommended)". Creating a token first revokes the user's expired token of that name in the same transaction; §5.2 ("unique among the user's live tokens") stays.
 *Why:* the unique index covers unrevoked tokens, so an expired token held its name until the daily purge.
+**2026-10-04 · §11.6 Retention.** A file in `recordings/` or `prompts/` that no `recordings` or `audio_assets` row names is deleted once it is a day old, by `core`'s and `api`'s daily jobs.
+*Why:* a crash between a file and its row left files no sweep ever removed, an admin-deleted recording among them, which is personal data.
+
 **2026-10-04 · §10.1 Boot and restart.** The restarted core also hangs up every channel in no bridge that none of its calls holds (a held party, a menu caller, a voicemail depositor).
 *Why:* nothing drives such a channel after a crash, so a held party heard hold music, and a menu or mailbox caller silence, until they hung up themselves.
 
