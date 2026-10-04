@@ -132,15 +132,19 @@ export async function assertNameAvailable(
  * Throws when an `inbound_auth` trunk's `username` cannot name its own endpoint. Asterisk's
  * `identify_by = auth_username` looks the Authorization username up as an endpoint's name (§9.4
  * "Inbound identification"), so the trunk's inbound endpoint is a section named by the username:
- * 422 for a `;`, which a section header cannot carry, or the `trunk-` prefix every trunk's own
- * endpoint uses; 409 when a live device or another live `inbound_auth` trunk already holds it.
+ * 422 for a `;`, which a section header cannot carry, the `trunk-` prefix every trunk's own
+ * endpoint uses, or `anonymous`, the endpoint that would match every unidentified request (§5.6); 409 when a live device or another live `inbound_auth` trunk already holds it.
  */
 export async function assertInboundAuthUsernameFree(
   db: Db,
   username: string,
   excludeId?: string
 ): Promise<void> {
-  if (username.includes(';') || username.startsWith(TRUNK_SECTION_PREFIX)) {
+  if (
+    username.includes(';') ||
+    username.startsWith(TRUNK_SECTION_PREFIX) ||
+    username === 'anonymous'
+  ) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
       `username cannot name an inbound-auth endpoint: ${username}`

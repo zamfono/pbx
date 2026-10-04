@@ -438,6 +438,17 @@ describe('trunks operations', () => {
     ).resolves.toBeDefined();
   });
 
+  it('refuses the inbound-auth username anonymous, which would define the anonymous endpoint (§5.6)', async () => {
+    const db = await makeTestDb();
+    await expect(
+      createTrunk(db, {
+        inboundAuth: true,
+        username: 'anonymous',
+        password: 'secret-4711'
+      })
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
   it('refuses a CIDR host unless its direction is inbound', async () => {
     const db = await makeTestDb();
     await expect(
