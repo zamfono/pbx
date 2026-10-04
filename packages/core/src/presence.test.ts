@@ -12,7 +12,7 @@ import { FakeAri } from './testing/ari/fake.js';
 import { peerStatusChange } from './testing/ari/fakeChannel.js';
 import { eventually } from './testing/eventually.js';
 import { noopLogger } from './testing/pipelineDeps.js';
-import { seedSettings, seedUser } from './testing/seedRows.js';
+import { seedSettings, seedSlot, seedUser } from './testing/seedRows.js';
 
 // How long the fake holds a hint PUT to model a slow connection: well past the round trip of the
 // refresh sent after it, so that one lands first unless the pushes are serialized.
@@ -196,9 +196,16 @@ describe('Presence', () => {
     // `idle` must not clear the flag the still-live first call set. Each refresh PUTs the hint,
     // so both have been judged once two more PUTs have landed.
     const putsBefore = hintPuts('103').length;
+    // §9.3: the waiting call flashes the lamp, so a colleague sees it to pick it up, while the
+    // status keeps the counterpart of the call the user is talking in.
     presence.setCallState(userId, 'ringing', '+15558888', null, 'call-2');
     await eventually(() => {
       expect(hintPuts('103').length).toBeGreaterThanOrEqual(putsBefore + 1);
+    });
+    expect(hintPuts('103').at(-1)).toEqual({ deviceState: 'RINGING' });
+    expect(state.presence.get(userId)).toMatchObject({
+      status: 'busy',
+      peer: '+15557777'
     });
     presence.setCallState(userId, 'idle', null, null, 'call-2');
     await eventually(() => {
@@ -303,5 +310,38 @@ describe('Presence', () => {
     });
     expect(presence.isRegistered('e106-dabc')).toBe(true);
     expect(state.presence.get(userId)?.status).toBe('available');
+  });
+
+  it('keeps a ring group lit while any of its calls still rings (§9.3)', async () => {
+    await presence.setRingGroupRinging('600', 'call-1', true);
+    await presence.setRingGroupRinging('600', 'call-2', true);
+    await presence.setRingGroupRinging('600', 'call-1', false);
+    expect(hintPuts('600').at(-1)).toEqual({ deviceState: 'RINGING' });
+
+    await presence.setRingGroupRinging('600', 'call-2', false);
+    expect(hintPuts('600').at(-1)).toEqual({ deviceState: 'NOT_INUSE' });
+  });
+
+  it('turns every ring-group and parking-slot lamp off at boot (§9.3)', async () => {
+    const ringGroupId = newId();
+    await db
+      .insertInto('ringGroups')
+      .values({
+        id: ringGroupId,
+        name: 'Sales',
+        strategy: 'simultaneous',
+        createdAt: nowIso()
+      })
+      .execute();
+    await db
+      .insertInto('extensions')
+      .values({ ext: '600', userId: null, ringGroupId, isParkingSlot: 0 })
+      .execute();
+    await seedSlot(db, '700');
+
+    await presence.resyncOnBoot();
+
+    expect(hintPuts('600')).toEqual([{ deviceState: 'NOT_INUSE' }]);
+    expect(hintPuts('700')).toEqual([{ deviceState: 'NOT_INUSE' }]);
   });
 });

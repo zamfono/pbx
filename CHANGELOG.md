@@ -273,6 +273,12 @@ why the specified behaviour changed; the commit history, how.
 - A caller who hung up while an outgoing call was still ringing had the call dialled again over
   the next host, route or emergency trunk: a 112 hung up within a second reached the next
   emergency centre with nobody on the line. Dialling now stops when the caller hangs up.
+- Busy lamps: a call waiting for a user who is already on the phone now flashes their lamp, so a
+  colleague can see it and pick it up with `*8`; a ring group's lamp stays lit while any of its
+  calls still rings, rather than going dark when the first is answered; and after `core` restarts
+  following a crash, no ring-group or parking-slot lamp stays lit for a call that is gone.
+- After `core` restarted following a crash, a user who had put the other party on hold through the
+  API was hung up as if they were a parked call; only parked calls are hung up now.
 - A user whose app is registered on several phones showed `offline` as soon as one phone's
   registration expired, and calls to them went to the `offline` rule (often the mailbox) although
   another phone could still ring. A device now counts as registered while any of its phones is.

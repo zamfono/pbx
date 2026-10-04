@@ -19,6 +19,7 @@ import { eventually } from '../testing/eventually.js';
 import { noopLogger } from '../testing/pipelineDeps.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
 import { seedUser } from '../testing/seedRows.js';
+import { PARKED_BRIDGE_NAME } from './parkingRingback.js';
 import type { Pipeline } from './pipeline.js';
 import { resyncOnBoot } from './resync.js';
 
@@ -132,10 +133,34 @@ describe('resyncOnBoot', () => {
     });
   });
 
-  it('hangs up a parked call, a channel alone in its bridge, whose parker it no longer knows', async () => {
-    const parked = fakeAri.addChannel({ name: 'PJSIP/trunk-1-00000001' });
-    const holding = await ari.bridges.create({ type: 'holding' });
-    await ari.bridges.addChannel(holding.id, parked.id);
+  it.each(['holding', 'mixing'] as const)(
+    'hangs up a parked call alone in its %s bridge, whose parker it no longer knows',
+    async type => {
+      // `holding` while parked, `mixing` while the parker is rung back.
+      const parked = fakeAri.addChannel({ name: 'PJSIP/trunk-1-00000001' });
+      const bridge = await ari.bridges.create({
+        type,
+        name: PARKED_BRIDGE_NAME
+      });
+      await ari.bridges.addChannel(bridge.id, parked.id);
+
+      await resyncOnBoot({
+        db,
+        ari,
+        now: nowIso,
+        pipeline,
+        log: noopLogger
+      });
+
+      expect(hungUp(parked.id)).toBe(true);
+      expect(bridgeDestroyed(bridge.id)).toBe(true);
+    }
+  );
+
+  it('keeps the one who held the other party, alone in the conversation bridge, until they leave', async () => {
+    const holder = fakeAri.addChannel({ name: 'PJSIP/e101-a-00000001' });
+    const bridge = await ari.bridges.create({ type: 'mixing' });
+    await ari.bridges.addChannel(bridge.id, holder.id);
 
     await resyncOnBoot({
       db,
@@ -144,9 +169,18 @@ describe('resyncOnBoot', () => {
       pipeline,
       log: noopLogger
     });
+    expect(hungUp(holder.id)).toBe(false);
 
-    expect(hungUp(parked.id)).toBe(true);
-    expect(bridgeDestroyed(holding.id)).toBe(true);
+    fakeAri.emit({
+      type: 'ChannelDestroyed',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: defaultChannel({ id: holder.id }),
+      cause: 16
+    });
+    await eventually(() => {
+      expect(bridgeDestroyed(bridge.id)).toBe(true);
+    });
   });
 
   it('deletes voicemail files without a voicemails row and keeps the others', async () => {

@@ -117,11 +117,12 @@ export type BridgesApi = {
   create: (params: {
     type: 'mixing' | 'holding';
     bridgeId?: string;
+    name?: string;
   }) => Promise<{ id: string }>;
   addChannel: (bridgeId: string, channelId: string) => Promise<void>;
   removeChannel: (bridgeId: string, channelId: string) => Promise<void>;
   destroy: (bridgeId: string) => Promise<void>;
-  list: () => Promise<{ id: string; channels: string[] }[]>;
+  list: () => Promise<{ id: string; name: string; channels: string[] }[]>;
   startMoh: (bridgeId: string, mohClass?: string) => Promise<void>;
   play: (bridgeId: string, media: string) => Promise<{ id: string }>;
 };

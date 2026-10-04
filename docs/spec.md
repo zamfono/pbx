@@ -855,8 +855,8 @@ PJSIP transports carry no ACL and an endpoint ACL applies to every transport ali
 
 **BLF and presence.** Softphones learn extension state through standard SIP `SUBSCRIBE` and `NOTIFY`. The core maintains per-extension state as ARI-controlled device state (`PUT /deviceStates/Stasis:presence-<ext>`; ARI can only drive the `Stasis:` provider), and generated `extensions.conf` hints (`exten => <ext>,hint,Stasis:presence-<ext>`) expose that state to subscribers. Hint states:
 
-- a user: `RINGING` while any of their devices rings, `INUSE` in a call, `BUSY` on DND, `UNAVAILABLE` with no registered device, else `NOT_INUSE`;
-- a ring group: `RINGING` while the group rings, else `NOT_INUSE`;
+- a user, the first that applies: `RINGING` while any of their devices rings, a call waiting during a call included, `INUSE` in a call, `BUSY` on DND, `UNAVAILABLE` with no registered device, else `NOT_INUSE`;
+- a ring group: `RINGING` while any call rings the group, else `NOT_INUSE`;
 - a parking slot: `INUSE` while a call is parked there, so a BLF key per slot shows where the waiting callers are.
 
 Any registered device may subscribe to any hint; which lamps a device shows is the device's own configuration: on a manual device it is set on the phone, on a `ringotel` device it is the user's own list of extensions and parking slots (`device_blf_keys`, §10.4), or every extension of the tenant when that list is empty. One-click transfer and pickup in third-party clients use their native SIP transfer; pickup is also available through the `*8<ext>` feature code, handled in Stasis.
@@ -1044,7 +1044,7 @@ Two processes run for the life of the stack; `migrate` is a third container that
 
 ### 10.1 Core (ARI) — call handling model
 
-**Boot and restart.** On boot the core connects to the ARI WebSocket, registers the Stasis application `zamfono` and resyncs its state. After a crash, live calls keep their media flowing in their Asterisk bridges; an orderly stop ends them first (§3.1 "Independence"). The restarted core adopts the orphaned channels only for cleanup: it marks their `calls` rows `interrupted`, hangs up the bridges when a party leaves, hangs up parked calls whose parker it no longer knows, and deletes voicemail files without a `voicemails` row. Live state is not reconstructed, so transfer and recording control for those calls is lost. That is accepted for the MVP.
+**Boot and restart.** On boot the core connects to the ARI WebSocket, registers the Stasis application `zamfono` and resyncs its state. After a crash, live calls keep their media flowing in their Asterisk bridges; an orderly stop ends them first (§3.1 "Independence"). The restarted core adopts the orphaned channels only for cleanup: it marks their `calls` rows `interrupted`, hangs up the bridges when a party leaves, hangs up parked calls whose parker it no longer knows, turns every ring-group and parking-slot lamp to `NOT_INUSE`, and deletes voicemail files without a `voicemails` row. Live state is not reconstructed, so transfer and recording control for those calls is lost. That is accepted for the MVP.
 
 **Call aggregate.** Every call is a Call aggregate in memory: caller channel, callee channels, bridge, timers, routing cursor. SQLite holds only durable outcomes — history, voicemail, recordings, presence transitions — never live state.
 

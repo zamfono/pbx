@@ -26,16 +26,18 @@ export function registeredDeviceCount(
   ).length;
 }
 
-/** §9.3 "a user: RINGING while ... INUSE ... BUSY on DND ... UNAVAILABLE with no registered device". */
+/** §9.3 "a user: RINGING while ... INUSE ... BUSY on DND ... UNAVAILABLE with no registered
+ * device", the first that applies across every call the user is in: a call waiting while they
+ * talk flashes the lamp, so colleagues see it to pick it up. */
 export function userHint(
-  flags: CallFlags,
+  calls: readonly CallFlags[],
   dnd: boolean,
   registered: number
 ): DeviceState {
-  if (flags.state === 'ringing') {
+  if (calls.some(flags => flags.state === 'ringing')) {
     return 'RINGING';
   }
-  if (flags.state === 'inCall') {
+  if (calls.some(flags => flags.state === 'inCall')) {
     return 'INUSE';
   }
   if (dnd) {

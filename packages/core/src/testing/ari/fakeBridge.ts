@@ -5,7 +5,7 @@ import { HTTP_NOT_FOUND, HTTP_OK } from '@zamfono/shared';
 
 import { splitResource, type RouteResult } from './fakeHttp.js';
 
-export type Bridge = { id: string; channels: string[] };
+export type Bridge = { id: string; name: string; channels: string[] };
 
 function routeBridgeAction(
   method: string,
@@ -46,9 +46,10 @@ export function routeBridge(
   body: unknown
 ): RouteResult {
   if (path === 'bridges' && method === 'POST') {
-    const params = body as { bridgeId?: string };
+    const params = body as { bridgeId?: string; name?: string };
     const bridge: Bridge = {
       id: params.bridgeId ?? randomUUID(),
+      name: params.name ?? '',
       channels: []
     };
     bridges.set(bridge.id, bridge);

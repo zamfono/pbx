@@ -25,6 +25,10 @@ import {
   type UnappliedDecision
 } from './userStep.js';
 
+/** The name of every bridge a parked party waits in, the one mark of a parked call that the boot
+ * resync can read off Asterisk's bridge list (`resync.ts`). */
+export const PARKED_BRIDGE_NAME = 'zamfono-parked';
+
 /** Moves the parked party's channel into a fresh bridge of `type` — `holding` for the park itself
  * (§10.2 "Call parking": "moves the other party into a holding bridge"), `mixing` once someone is
  * about to talk to them (a holding bridge mixes nobody's audio) — and destroys the bridge it
@@ -40,7 +44,7 @@ export async function moveParkedParty(
   const previous = parked.bridgeId;
   // A party held through the API (`hold.ts`) is parked from the bridge it was held out of.
   await endHold(pipeline, previous, previous);
-  const bridge = await ari.bridges.create({ type });
+  const bridge = await ari.bridges.create({ type, name: PARKED_BRIDGE_NAME });
   if (previous !== null) {
     await ari.bridges.removeChannel(previous, partyChannelId).catch(ignoreGone);
   }

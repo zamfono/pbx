@@ -2,8 +2,8 @@
  * Boot resync (§10.1 "Boot and restart"): the restarted core adopts the channels and bridges
  * Asterisk still holds only for cleanup, never reconstructing live state. Every `calls` row still
  * open is marked `interrupted`; a bridge with several parties keeps its media flowing and is torn
- * down as soon as one party leaves; a bridge holding a single channel is a parked call whose
- * parker this process never knew and is hung up now; and a voicemail file without its
+ * down as soon as one party leaves; a parked call, alone in its bridge, has a parker this process
+ * never knew and is hung up now; and a voicemail file without its
  * `voicemails` row is deleted. A channel in no bridge is left to its own end: the party behind it
  * hangs up, or the originate that created it times out.
  */
@@ -18,6 +18,7 @@ import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { Logger } from '../ari/types.js';
 import { ignoreMissing } from '../fsFailures.js';
 import { VOICEMAIL_DIR_NAME } from './mailboxStore.js';
+import { PARKED_BRIDGE_NAME } from './parkingRingback.js';
 import type { Pipeline } from './pipeline.js';
 
 const VOICEMAIL_EXTENSION = '.wav';
@@ -54,7 +55,7 @@ async function tearDown(ari: AriClient, bridge: AdoptedBridge): Promise<void> {
   await ari.bridges.destroy(bridge.id).catch(ignoreGone);
 }
 
-/** Watches the adopted multi-party bridges: the first party to leave takes the rest down. */
+/** Watches the adopted bridges: the first party to leave takes the rest down. */
 function watchBridges(ari: AriClient, bridges: AdoptedBridge[]): void {
   const byChannel = new Map<string, AdoptedBridge>();
   for (const bridge of bridges) {
@@ -93,11 +94,13 @@ function watchBridges(ari: AriClient, bridges: AdoptedBridge[]): void {
 type Adopted = { bridged: number; parked: number };
 
 /**
- * Sorts the bridges Asterisk still holds into watched multi-party bridges and parked calls
- * (§10.1 "Boot and restart"). A bridge holding a channel the pipeline already drives belongs to
- * a call that arrived after the restart and is left to that call. The parking registry lives in
- * memory only and ARI's bridge listing carries no parker, so a channel alone in a bridge is the
- * parked call whose parker this process never knew.
+ * Sorts the bridges Asterisk still holds into watched conversations and parked calls (§10.1 "Boot
+ * and restart"). A bridge holding a channel the pipeline already drives belongs to a call that
+ * arrived after the restart and is left to that call. The parking registry lives in memory only
+ * and ARI's bridge listing carries no parker, so a channel alone in a parked bridge, waiting in
+ * the park or for the ring-back, is the parked call whose parker this process never knew. A
+ * channel alone in any other bridge is one side of a conversation, such as the one who held the
+ * other party (`hold.ts`), and is watched like the rest.
  */
 async function adoptBridges(deps: ResyncDeps): Promise<Adopted> {
   const { ari } = deps;
@@ -111,10 +114,10 @@ async function adoptBridges(deps: ResyncDeps): Promise<Adopted> {
       continue;
     }
     const adopted = { id: bridge.id, channels: new Set(bridge.channels) };
-    if (adopted.channels.size > 1) {
-      watched.push(adopted);
-    } else {
+    if (bridge.name === PARKED_BRIDGE_NAME && adopted.channels.size === 1) {
       parked.push(adopted);
+    } else {
+      watched.push(adopted);
     }
   }
   await Promise.all(parked.map(bridge => tearDown(ari, bridge)));

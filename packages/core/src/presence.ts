@@ -2,10 +2,10 @@
  * Presence and BLF (§9.3 "BLF and presence"; §10.2 "Presence and BLF"): per-user device
  * state (`Stasis:presence-<ext>` hints) and presence status derived from registrations (ARI
  * `PeerStatusChange`, `endpoints.list` at boot) and call state, appended to `presence_log` and
- * emitted on `/events` only on an actual status transition. `setHint` also carries the ring-group
- * and parking-slot hints of §9.3, whose ext is already known to their own callers. The hint and
- * status a user's state folds into are `presenceState.ts`'s; `presenceHints.ts` delivers the hints
- * in order.
+ * emitted on `/events` only on an actual status transition. `setRingGroupRinging` and `setHint`
+ * also carry the ring-group and parking-slot hints of §9.3, whose ext is already known to their
+ * own callers. The hint and status a user's state folds into are `presenceState.ts`'s;
+ * `presenceHints.ts` delivers the hints in order.
  */
 import {
   newId,
@@ -82,6 +82,9 @@ export class Presence {
   // or ending never overwrites the flags an earlier, still-live call set (§9.3, §10.2 "Presence
   // and BLF"). `effectiveFlags` folds a user's several entries into the one hint/status pair.
   private readonly callFlags = new Map<string, Map<string, CallFlags>>();
+  // Per ring-group ext: the calls ringing the group right now (§9.3 "RINGING while the group
+  // rings"), so one call's ring ending never darkens a lamp another call still rings.
+  private readonly ringingGroups = new Map<string, Set<string>>();
 
   constructor(deps: PresenceDeps) {
     this.deps = deps;
@@ -95,12 +98,20 @@ export class Presence {
     });
   }
 
-  /** Seeds registration state from `endpoints.list()` and writes every live user's initial hint. */
+  /** Seeds registration state from `endpoints.list()` and writes every live user's initial hint.
+   * Every ring-group and parking-slot lamp starts `NOT_INUSE` (§9.3): no call of this process
+   * rings a group or waits in a slot yet, while Asterisk keeps the state a crash left behind. */
   async resyncOnBoot(): Promise<void> {
     const endpoints = await this.deps.ari.endpoints.list();
     for (const endpoint of endpoints) {
       this.online.set(endpoint.resource, endpoint.state === 'online');
     }
+    const snapshot = await this.deps.cache.get();
+    await Promise.all(
+      snapshot.extensions
+        .filter(row => row.ringGroupId !== null || row.isParkingSlot === 1)
+        .map(row => this.hints.push(row.ext, 'NOT_INUSE'))
+    );
     await this.refreshAll();
   }
 
@@ -168,9 +179,9 @@ export class Presence {
     );
   }
 
-  /** The strongest state across every call `userId` currently participates in: a bridged call
-   * always wins over one still ringing, so a second call's own ring outcome never downgrades a
-   * user who is already `inCall` in an earlier one (§9.3, §10.2 "Presence and BLF"). */
+  /** The call `userId`'s presence status reports (§10.2 "Presence and BLF"): a bridged call wins
+   * over one still ringing, so a second call's own ring outcome never downgrades a user who is
+   * already `inCall` in an earlier one. */
   private effectiveFlags(userId: string): CallFlags {
     const perCall = this.callFlags.get(userId);
     if (perCall === undefined || perCall.size === 0) {
@@ -198,7 +209,8 @@ export class Presence {
     const dnd = user.dnd === 1;
     const ext = extensionOf(snapshot, { userId });
     if (ext !== null) {
-      await this.hints.push(ext, userHint(flags, dnd, registered));
+      const calls = [...(this.callFlags.get(userId)?.values() ?? [])];
+      await this.hints.push(ext, userHint(calls, dnd, registered));
     }
     await this.writeStatus(userId, userStatus(flags, dnd, registered), flags);
   }
@@ -243,7 +255,27 @@ export class Presence {
     });
   }
 
-  /** A ring group's or a parking slot's own hint (§9.3), keyed by their extension directly. */
+  /** Records whether call `callId` rings the ring group at `ext` (§9.3 "a ring group: RINGING
+   * while the group rings, else NOT_INUSE"): the lamp stays lit while any call still rings it. */
+  async setRingGroupRinging(
+    ext: string,
+    callId: string,
+    ringing: boolean
+  ): Promise<void> {
+    const calls = this.ringingGroups.get(ext) ?? new Set<string>();
+    if (ringing) {
+      calls.add(callId);
+      this.ringingGroups.set(ext, calls);
+    } else {
+      calls.delete(callId);
+      if (calls.size === 0) {
+        this.ringingGroups.delete(ext);
+      }
+    }
+    await this.hints.push(ext, calls.size > 0 ? 'RINGING' : 'NOT_INUSE');
+  }
+
+  /** A parking slot's own hint (§9.3), keyed by its extension directly. */
   async setHint(ext: string, state: DeviceState): Promise<void> {
     await this.hints.push(ext, state);
   }
