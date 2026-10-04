@@ -68,29 +68,21 @@ export function phoneDigits(raw: string): string {
 
 /**
  * A phone-book number in E.164 (§10.2 "Phone book", §9.4): `raw`'s `phoneDigits` under the
- * outbound resolution rules of `settings.country`; `null` when those leave it incomplete.
+ * outbound resolution rules of `settings.country`, refused with 422 when those leave it
+ * incomplete.
  */
-export function contactPhoneE164(
-  raw: string,
-  country: CountryCode
-): string | null {
-  const normalized = normalizeDialed(phoneDigits(raw), country);
-  return normalized.kind === 'e164' ? normalized.number : null;
-}
-
-/** `contactPhoneE164`, refusing a number it cannot resolve with 422. */
 export function normalizeContactPhone(
   raw: string,
   country: CountryCode
 ): string {
-  const number = contactPhoneE164(raw, country);
-  if (number === null) {
+  const normalized = normalizeDialed(phoneDigits(raw), country);
+  if (normalized.kind === 'incomplete') {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
       `contacts: '${raw}' is not a resolvable phone number`
     );
   }
-  return number;
+  return normalized.number;
 }
 
 /** Throws 422 when `phones` holds two entries with the same normalized number or the same label (`contact_phones`' PRIMARY KEY and UNIQUE, §11.2). */

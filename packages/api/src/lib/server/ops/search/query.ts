@@ -1,7 +1,7 @@
 import type { Transaction } from 'kysely';
 import { z } from 'zod';
 
-import type { DB } from '@zamfono/shared';
+import { nationalForm, type CountryCode, type DB } from '@zamfono/shared';
 
 import {
   decodeOffsetCursor,
@@ -9,11 +9,7 @@ import {
   pageInput
 } from '#lib/server/pagination.js';
 
-import {
-  contactPhoneE164,
-  phoneDigits,
-  tenantCountry
-} from '../contacts/_shared.js';
+import { phoneDigits, tenantCountry } from '../contacts/_shared.js';
 import { defineOperation } from '../types.js';
 
 type Hit = {
@@ -168,34 +164,42 @@ async function phonesByContact(
 const PHONE_LIKE = /^\+?[\d\s()./-]+$/u;
 
 /**
- * The forms a stored E.164 contact number may contain a pasted `needle` as: its bare digits, and
- * the number the tenant's dialling rules make of it ("01 2345678" → "+4312345678"). None when the
- * needle is no number.
+ * Whether a pasted `digits`, a fragment of a number as written, is part of the stored E.164
+ * `number`: of its international form ("+49 89 12", "89 12") or of its national digits as dialled
+ * in `country` ("(089) 12"). Nothing is resolved, so a fragment matches without being a number.
  */
-async function phoneNeedles(
+function phoneMatches(
+  number: string,
+  digits: string,
+  country: CountryCode
+): boolean {
+  return (
+    number.includes(digits) || nationalForm(number, country).includes(digits)
+  );
+}
+
+/** A phone-like `needle`'s digits with the tenant's country, `null` for any other needle. */
+async function phoneNeedle(
   db: Transaction<DB>,
   needle: string
-): Promise<string[]> {
-  if (!PHONE_LIKE.test(needle)) {
-    return [];
-  }
-  const digits = phoneDigits(needle);
-  const e164 = contactPhoneE164(needle, await tenantCountry(db));
-  return [...new Set([digits, e164 ?? digits])];
+): Promise<{ digits: string; country: CountryCode } | null> {
+  return PHONE_LIKE.test(needle)
+    ? { digits: phoneDigits(needle), country: await tenantCountry(db) }
+    : null;
 }
 
 async function searchContacts(
   db: Transaction<DB>,
   needle: string
 ): Promise<Hit[]> {
-  const [contacts, phones, numberNeedles] = await Promise.all([
+  const [contacts, phones, numberNeedle] = await Promise.all([
     db
       .selectFrom('contacts')
       .select(['id', 'displayName', 'company'])
       .where('deletedAt', 'is', null)
       .execute(),
     phonesByContact(db),
-    phoneNeedles(db, needle)
+    phoneNeedle(db, needle)
   ]);
   const hits: Hit[] = [];
   for (const contact of contacts) {
@@ -221,9 +225,11 @@ async function searchContacts(
       });
       continue;
     }
-    const matchedPhone = contactPhones.find(number =>
-      numberNeedles.some(numberNeedle => number.includes(numberNeedle))
-    );
+    const matchedPhone =
+      numberNeedle &&
+      contactPhones.find(number =>
+        phoneMatches(number, numberNeedle.digits, numberNeedle.country)
+      );
     if (matchedPhone) {
       hits.push({
         kind: 'contact',
