@@ -139,9 +139,13 @@ export class EventHub {
   /**
    * Registers a socket the handshake authenticated as `auth`, with its session or personal access
    * token, then re-checks it as `usersChanged` does, so a change committed since the handshake
-   * reaches it; removes it on close or error.
+   * reaches it; removes it on close or error. A socket closing already, during the handshake, is
+   * not taken on: its `close` event has fired or is on its way.
    */
   subscribeWs(socket: WebSocket, auth: Authenticated): Promise<void> {
+    if (socket.readyState !== WebSocket.OPEN) {
+      return Promise.resolve();
+    }
     this.subscribers.set(socket, { auth, ringGroupIds: new Set<string>() });
     socket.on('close', () => {
       this.subscribers.delete(socket);

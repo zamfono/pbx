@@ -1,5 +1,5 @@
 import type { AddressInfo } from 'node:net';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket, WebSocketServer } from 'ws';
 
 import {
@@ -788,5 +788,36 @@ describe('EventHub.usersChanged (§10.6)', () => {
     client.terminate();
 
     expect(code).toBe(USER_CHANGED_CLOSE_CODE);
+  });
+
+  it('does not take on a socket that closed during its handshake', async () => {
+    const db = await migratedDb('u1');
+    const hub = new EventHub(db);
+    const auth = await sessionAuth(db);
+    wss = await listeningServer();
+    const gone = new Promise<WebSocket>(resolve => {
+      wss.once('connection', socket => {
+        socket.once('close', () => {
+          resolve(socket);
+        });
+      });
+    });
+    const client = new WebSocket(serverUrl(wss));
+    client.once('open', () => {
+      client.terminate();
+    });
+    const socket = await gone;
+    await hub.subscribeWs(socket, auth);
+    const close = vi.spyOn(socket, 'close');
+    await db
+      .updateTable('users')
+      .set({ deletedAt: nowIso() })
+      .where('id', '=', 'u1')
+      .execute();
+
+    await hub.usersChanged();
+
+    // A socket the hub held would be closed with 4401 here.
+    expect(close).not.toHaveBeenCalled();
   });
 });
