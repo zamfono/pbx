@@ -4,7 +4,6 @@ import type { ForwardTarget } from './targets.js';
 import { userEntryDecision } from './user.js';
 
 const externalTarget = (): ForwardTarget => ({
-  id: 'target-1',
   kind: 'external',
   number: '+491700000000'
 });

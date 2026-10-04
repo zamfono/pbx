@@ -146,19 +146,14 @@ describe('originateLeg (§7 level sip)', () => {
   it('dials a call below level sip without waiting for the join', async () => {
     const { pipeline, steps, dialling } = stubPipeline();
 
-    await originateLeg(
-      pipeline,
-      callAt('events'),
-      { ...PARAMS, timeout: 20 },
-      dialling
-    );
+    await originateLeg(pipeline, callAt('events'), PARAMS, dialling);
 
     expect(steps).toEqual([
       'create',
       'join leg-1',
       'stasisStart',
       'dialling',
-      'dial leg-1 20'
+      'dial leg-1 0'
     ]);
   });
 

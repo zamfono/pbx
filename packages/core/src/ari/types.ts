@@ -36,14 +36,13 @@ export type OriginateParams = {
   app: 'zamfono';
   appArgs: string;
   callerId?: string;
-  timeout?: number;
   variables?: Record<string, string>;
   channelId?: string;
 };
 
 /** `POST /channels/create`'s parameters: an originate's, less the caller ID, which a created
- * channel takes as variables (`CALLERID`, `CONNECTEDLINE`), and the timeout, which is the dial's. */
-export type CreateParams = Omit<OriginateParams, 'callerId' | 'timeout'>;
+ * channel takes as variables (`CALLERID`, `CONNECTEDLINE`). */
+export type CreateParams = Omit<OriginateParams, 'callerId'>;
 
 export type RecordParams = {
   name: string;

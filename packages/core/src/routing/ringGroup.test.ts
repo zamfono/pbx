@@ -9,17 +9,15 @@ import {
 } from './ringGroup.js';
 import type { ForwardTarget } from './targets.js';
 
-const externalTarget = (id: string): ForwardTarget => ({
-  id,
+const externalTarget: ForwardTarget = {
   kind: 'external',
   number: '+491700000000'
-});
+};
 
-const mailboxTarget = (id: string): ForwardTarget => ({
-  id,
+const mailboxTarget: ForwardTarget = {
   kind: 'mailboxUser',
   userId: 'user-mailbox'
-});
+};
 
 const baseMember = (userId: string): MemberState => ({
   userId,
@@ -32,11 +30,10 @@ const baseMember = (userId: string): MemberState => ({
   forwardRegisteredDevices: 0
 });
 
-const userTarget = (id: string): ForwardTarget => ({
-  id,
+const userTarget: ForwardTarget = {
   kind: 'user',
   userId: 'user-forwarded'
-});
+};
 
 describe('expandMembers', () => {
   it('dedups a user reachable through two nested user groups (diamond nesting)', () => {
@@ -101,9 +98,7 @@ describe('ringable', () => {
   });
 
   it('skips a member whose unconditional forward targets a mailbox', () => {
-    const members = [
-      { ...baseMember('user-1'), unconditional: mailboxTarget('target-1') }
-    ];
+    const members = [{ ...baseMember('user-1'), unconditional: mailboxTarget }];
 
     const result = ringable(members, true);
 
@@ -111,7 +106,7 @@ describe('ringable', () => {
   });
 
   it("follows a member's unconditional forward to an external number", () => {
-    const target = externalTarget('target-1');
+    const target = externalTarget;
     const members = [{ ...baseMember('user-1'), unconditional: target }];
 
     const result = ringable(members, true);
@@ -121,7 +116,6 @@ describe('ringable', () => {
 
   it('follows a member\'s unconditional forward to a SIP target (§9.4 "SIP targets")', () => {
     const target: ForwardTarget = {
-      id: 'target-1',
       kind: 'sip',
       trunkId: 'trunk-1',
       user: 'proj_1',
@@ -144,7 +138,7 @@ describe('ringable', () => {
       {
         ...baseMember('user-1'),
         ...overrides,
-        unconditional: externalTarget('target-1')
+        unconditional: externalTarget
       }
     ];
 
@@ -156,7 +150,7 @@ describe('ringable', () => {
       {
         ...baseMember('user-1'),
         inCall: true,
-        unconditional: externalTarget('target-1')
+        unconditional: externalTarget
       }
     ];
 
@@ -164,7 +158,7 @@ describe('ringable', () => {
   });
 
   it('follows a forward to a user only while that user has a registered device', () => {
-    const target = userTarget('target-1');
+    const target = userTarget;
     const unreachable = [{ ...baseMember('user-1'), unconditional: target }];
     const reachable = [
       {
@@ -221,7 +215,7 @@ describe('groupFallback', () => {
   const group = { mailboxEnabled: false, ringGroupId: 'ring-group-1' };
 
   it("falls back to the unanswered rule's target when unavailable has no rule", () => {
-    const unanswered = externalTarget('target-1');
+    const unanswered = externalTarget;
 
     const result = groupFallback(group, { unanswered }, 'unavailable');
 

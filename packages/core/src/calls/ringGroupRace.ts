@@ -7,6 +7,7 @@
 import { isEvent, type AriEvent } from '../ari/events.js';
 import { logFailure, logUnlessGone } from '../ari/failures.js';
 import { AST_CAUSE_CALL_REJECTED, AST_CAUSE_USER_BUSY } from '../sipCodes.js';
+import { waitForEvent, type EventWait } from './ariWaits.js';
 import type { Call } from './call.js';
 import { callPartiesChanged } from './callState.js';
 import { hangupMemberSiblings, type GroupLeg } from './groupLegs.js';
@@ -18,7 +19,7 @@ import { winBatch } from './ringGroupWin.js';
  * legs.ts's `handleChannelEnded` already finished the call, so `ringGroup` must run no fallback. */
 export type BatchOutcome = 'answered' | 'unanswered' | 'abandoned';
 
-/** The batch race's read-only context, threaded through its event handling as one object. */
+/** What the batch race's event handling reads and calls. */
 type RaceContext = {
   pipeline: Pipeline;
   call: Call;
@@ -99,83 +100,74 @@ function handleBatchEvent(ctx: RaceContext, ev: AriEvent): void {
   handleDecline(ctx, leg, ev.cause);
 }
 
-/** The batch race's mutable state and its `AriClient` event handler; `ringBatch` sets it up and
- * tears it down. */
-type BatchRace = {
-  tracked: Map<string, GroupLeg>;
-  promise: Promise<BatchOutcome>;
-  onEvent: (ev: AriEvent) => void;
-  settle: (outcome: BatchOutcome) => void;
-  finishOriginating: () => void;
-  endLeg: (leg: GroupLeg, cause: number | null) => void;
-  /** The batch's timeout: unanswered, unless a member's answer is already claimed and bridging. */
-  timeOut: () => void;
-};
-
-export function createBatchRace(
-  pipeline: Pipeline,
-  call: Call,
-  allowReject: boolean
-): BatchRace {
-  const tracked = new Map<string, GroupLeg>();
-  const { promise, resolve } = Promise.withResolvers<BatchOutcome>();
-  let settled = false;
+/** One batch's race: it listens to the event stream and runs the batch's timeout until its outcome
+ * settles. */
+export class BatchRace implements RaceContext {
+  readonly pipeline: Pipeline;
+  readonly call: Call;
+  readonly allowReject: boolean;
+  readonly tracked = new Map<string, GroupLeg>();
+  readonly promise: Promise<BatchOutcome>;
+  private readonly wait: EventWait<BatchOutcome>;
+  private settled = false;
   // Legs are originated at once, each at its own pace; a leg ending mid-origination must not
   // settle the batch as unanswered while its siblings haven't been dialed yet, and a win in
   // flight (still awaiting its own bridge/answer steps) must not be pre-empted by a sibling's own
   // end landing in that window.
-  let originatingDone = false;
-  let winInProgress = false;
-  const settle = (outcome: BatchOutcome): void => {
-    if (settled) {
+  private originatingDone = false;
+  private winInProgress = false;
+
+  /** Starts the race, its timeout of `timeoutMs` running from now. */
+  constructor(
+    pipeline: Pipeline,
+    call: Call,
+    allowReject: boolean,
+    timeoutMs: number
+  ) {
+    this.pipeline = pipeline;
+    this.call = call;
+    this.allowReject = allowReject;
+    this.wait = waitForEvent(pipeline.deps.ari, ev => {
+      handleBatchEvent(this, ev);
+    });
+    this.promise = this.wait.promise;
+    // §10.1 step 5 "the first answer wins": a timeout landing while the winner is still being
+    // bridged must not send the caller on to the next batch or the fallback beside it.
+    this.wait.arm(timeoutMs, () => {
+      if (!this.winInProgress) {
+        this.settle('unanswered');
+      }
+    });
+  }
+
+  settle(outcome: BatchOutcome): void {
+    this.settled = true;
+    this.wait.settle(outcome);
+  }
+
+  checkStillRinging(): void {
+    if (!this.originatingDone || this.winInProgress) {
       return;
     }
-    settled = true;
-    resolve(outcome);
-  };
-  const checkStillRinging = (): void => {
-    if (!originatingDone || winInProgress) {
-      return;
-    }
-    const stillRinging = [...tracked.values()].some(
+    const stillRinging = [...this.tracked.values()].some(
       entry => entry.state === 'ringing'
     );
     if (!stillRinging) {
-      settle('unanswered');
+      this.settle('unanswered');
     }
-  };
-  const ctx: RaceContext = {
-    pipeline,
-    call,
-    tracked,
-    allowReject,
-    settle,
-    checkStillRinging,
-    beginWin: () => {
-      winInProgress = !settled;
-      return winInProgress;
-    }
-  };
-  return {
-    tracked,
-    promise,
-    onEvent: ev => {
-      handleBatchEvent(ctx, ev);
-    },
-    settle,
-    finishOriginating: () => {
-      originatingDone = true;
-      checkStillRinging();
-    },
-    endLeg: (leg, cause) => {
-      handleDecline(ctx, leg, cause);
-    },
-    // §10.1 step 5 "the first answer wins": a timeout landing while the winner is still being
-    // bridged must not send the caller on to the next batch or the fallback beside it.
-    timeOut: () => {
-      if (!winInProgress) {
-        settle('unanswered');
-      }
-    }
-  };
+  }
+
+  beginWin(): boolean {
+    this.winInProgress = !this.settled;
+    return this.winInProgress;
+  }
+
+  finishOriginating(): void {
+    this.originatingDone = true;
+    this.checkStillRinging();
+  }
+
+  endLeg(leg: GroupLeg, cause: number | null): void {
+    handleDecline(this, leg, cause);
+  }
 }

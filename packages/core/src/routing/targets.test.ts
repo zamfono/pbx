@@ -3,12 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { nextHop, targetFromRow, type ForwardTarget } from './targets.js';
 
 const userTarget: ForwardTarget = {
-  id: 'target-1',
   kind: 'user',
   userId: 'u1'
 };
 const menuTarget: ForwardTarget = {
-  id: 'target-2',
   kind: 'menu',
   menuId: 'menu-1'
 };
@@ -25,7 +23,6 @@ describe('nextHop', () => {
   // §10.1 step 7: a SIP target, like an external number, neither counts a hop nor re-enters.
   it('lets a sip target through at the third hop without counting it', () => {
     const sipTarget: ForwardTarget = {
-      id: 'target-3',
       kind: 'sip',
       trunkId: 'trunk-1',
       user: 'proj_1',
@@ -52,7 +49,6 @@ describe('targetFromRow', () => {
 
   it("reads a sip target's column pair and its headers", () => {
     expect(targetFromRow(sipRow)).toEqual({
-      id: 'ft-1',
       kind: 'sip',
       trunkId: 'trunk-1',
       user: 'proj_1',

@@ -1,3 +1,5 @@
+import { ANONYMOUS } from '@zamfono/shared';
+
 import { SIP_NOT_FOUND } from '../sipCodes.js';
 
 /**
@@ -6,15 +8,12 @@ import { SIP_NOT_FOUND } from '../sipCodes.js';
  * `reject_anonymous` (§9.4 "Withheld caller", §11.2 `blocked_numbers`, §11.3 "Number blocks").
  */
 
-/** The literal caller value of a call whose number is absent or withheld (§9.4). */
-const ANONYMOUS_CALLER = 'anonymous';
-
 /** Whether `caller` matches an entry of `blocklist`; a withheld caller never matches (§9.4). */
 export function isBlocked(
   caller: string,
   blocklist: { number: string; isPrefix: boolean }[]
 ): boolean {
-  if (caller === ANONYMOUS_CALLER) {
+  if (caller === ANONYMOUS) {
     return false;
   }
   return blocklist.some(entry =>
@@ -73,8 +72,7 @@ export function resolveInbound(
 ):
   | { kind: 'did'; didId: string; targetId: string }
   | { kind: 'fallback'; targetId: string; blockId: string | null }
-  // eslint-disable-next-line no-magic-numbers -- the release status a number outside every DID and block gets (§11.3)
-  | { kind: 'release'; code: 404 } {
+  | { kind: 'release'; code: typeof SIP_NOT_FOUND } {
   const did = dids.find(row => row.number === called);
   if (did) {
     return { kind: 'did', didId: did.id, targetId: did.targetId };
@@ -96,7 +94,7 @@ export function rejectAnonymous(
   target: { rejectAnonymous: boolean | null },
   tenantDefault: boolean
 ): boolean {
-  if (caller !== ANONYMOUS_CALLER) {
+  if (caller !== ANONYMOUS) {
     return false;
   }
   return target.rejectAnonymous ?? tenantDefault;

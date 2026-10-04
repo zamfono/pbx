@@ -6,7 +6,7 @@ import type { SipHeaderTemplate, UserForwardCondition } from '@zamfono/shared';
 
 import type { Snapshot } from '../internal/snapshot.js';
 
-export type ForwardTarget = { id: string } & (
+export type ForwardTarget =
   | { kind: 'user'; userId: string }
   | { kind: 'ringGroup'; ringGroupId: string }
   | { kind: 'external'; number: string }
@@ -19,8 +19,7 @@ export type ForwardTarget = { id: string } & (
   | { kind: 'mailboxUser'; userId: string }
   | { kind: 'mailboxRingGroup'; ringGroupId: string }
   | { kind: 'announcement'; audioId: string }
-  | { kind: 'menu'; menuId: string }
-);
+  | { kind: 'menu'; menuId: string };
 
 /** A `forward_targets` row: exactly one target is set, `sip`'s being its column pair, enforced by
  * the table's CHECK. */
@@ -41,15 +40,14 @@ type ForwardTargetsRow = {
 
 /** Reads the one set column of `row` into the `ForwardTarget` union it represents. */
 export function targetFromRow(row: ForwardTargetsRow): ForwardTarget {
-  const { id } = row;
   if (row.userId !== null) {
-    return { id, kind: 'user', userId: row.userId };
+    return { kind: 'user', userId: row.userId };
   }
   if (row.ringGroupId !== null) {
-    return { id, kind: 'ringGroup', ringGroupId: row.ringGroupId };
+    return { kind: 'ringGroup', ringGroupId: row.ringGroupId };
   }
   if (row.external !== null) {
-    return { id, kind: 'external', number: row.external };
+    return { kind: 'external', number: row.external };
   }
   // The table's CHECKs set `sip_user` and `sip_headers_json` exactly when `sip_trunk_id` is set.
   if (
@@ -58,7 +56,6 @@ export function targetFromRow(row: ForwardTargetsRow): ForwardTarget {
     row.sipHeaders !== null
   ) {
     return {
-      id,
       kind: 'sip',
       trunkId: row.sipTrunkId,
       user: row.sipUser,
@@ -66,22 +63,21 @@ export function targetFromRow(row: ForwardTargetsRow): ForwardTarget {
     };
   }
   if (row.mailboxUserId !== null) {
-    return { id, kind: 'mailboxUser', userId: row.mailboxUserId };
+    return { kind: 'mailboxUser', userId: row.mailboxUserId };
   }
   if (row.mailboxRingGroupId !== null) {
     return {
-      id,
       kind: 'mailboxRingGroup',
       ringGroupId: row.mailboxRingGroupId
     };
   }
   if (row.announcementAudioId !== null) {
-    return { id, kind: 'announcement', audioId: row.announcementAudioId };
+    return { kind: 'announcement', audioId: row.announcementAudioId };
   }
   if (row.menuId !== null) {
-    return { id, kind: 'menu', menuId: row.menuId };
+    return { kind: 'menu', menuId: row.menuId };
   }
-  throw new Error(`forwardTargets: row ${id} sets no target column`);
+  throw new Error(`forwardTargets: row ${row.id} sets no target column`);
 }
 
 /** The `ForwardTarget` a `forward_targets` row represents; throws on a dangling id (FK-guaranteed present). */

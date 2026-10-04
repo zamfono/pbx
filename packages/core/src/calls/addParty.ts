@@ -54,8 +54,8 @@ async function ringInternalTarget(
   if (call.callerChannelId !== null) {
     const entered =
       target.kind === 'user'
-        ? { id: '', kind: target.kind, userId: target.userId }
-        : { id: '', kind: target.kind, ringGroupId: target.ringGroupId };
+        ? { kind: target.kind, userId: target.userId }
+        : { kind: target.kind, ringGroupId: target.ringGroupId };
     await enterTarget(pipeline, call, entered, null);
   } else if (target.kind === 'user') {
     call.calleeUserId = target.userId;

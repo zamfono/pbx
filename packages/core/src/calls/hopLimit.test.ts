@@ -90,7 +90,7 @@ describe('hop limit (§10.1 step 7)', () => {
     await enterTarget(
       pipeline,
       call,
-      { id: newId(), kind: 'ringGroup', ringGroupId: groupId },
+      { kind: 'ringGroup', ringGroupId: groupId },
       null
     );
 

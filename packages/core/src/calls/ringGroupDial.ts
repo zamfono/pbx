@@ -13,7 +13,7 @@ import { callPartiesChanged, callRinging } from './callState.js';
 import { hangupAllRinging } from './groupLegs.js';
 import type { Pipeline } from './pipeline.js';
 import { originateBatch } from './ringGroupOriginate.js';
-import { createBatchRace, type BatchOutcome } from './ringGroupRace.js';
+import { BatchRace, type BatchOutcome } from './ringGroupRace.js';
 
 /** One `ringPlan` batch: originates its legs, races them (first `Up` wins, a declined member's
  * siblings drop when `allowReject`), and resolves once answered, the caller abandons, or the
@@ -26,44 +26,49 @@ export async function ringBatch(
   allowReject: boolean
 ): Promise<BatchOutcome> {
   callRinging(pipeline.deps, call);
-  const race = createBatchRace(pipeline, call, allowReject);
-  call.batchLegs = race.tracked;
-  pipeline.deps.ari.on('event', race.onEvent);
-  // The batch `stopGroupRinging` and `declineInBatch` reach (`groupPickup.ts`).
-  pipeline.activeBatches.set(call.id, {
-    tracked: race.tracked,
-    settle: race.settle,
-    endLeg: race.endLeg
-  });
-  const timer = setTimeout(race.timeOut, batch.timeoutS * MS_PER_SECOND);
-  timer.unref();
-
-  await originateBatch(pipeline, call, snapshot, batch.legs, {
-    tracked: race.tracked,
-    end: race.endLeg
-  });
-  // The members it now rings see the call (§10.6), which rang before their legs existed.
-  callPartiesChanged(pipeline.deps, call);
-  // §9.3 "a user: RINGING while any of their devices rings".
-  const ringingUserIds = new Set(
-    [...race.tracked.values()]
-      .map(leg => leg.userId)
-      .filter((userId): userId is string => userId !== null)
+  const race = new BatchRace(
+    pipeline,
+    call,
+    allowReject,
+    batch.timeoutS * MS_PER_SECOND
   );
-  for (const userId of ringingUserIds) {
-    pipeline.deps.presence.setCallState(
-      userId,
-      'ringing',
-      call.from,
-      call.ringGroupId,
-      call.id
+  call.batchLegs = race.tracked;
+  // The batch `stopGroupRinging` and `declineInBatch` reach (`groupPickup.ts`).
+  pipeline.activeBatches.set(call.id, race);
+  let ringingUserIds: Set<string>;
+  let outcome: BatchOutcome;
+  try {
+    await originateBatch(pipeline, call, snapshot, batch.legs, {
+      tracked: race.tracked,
+      end: (leg, cause) => {
+        race.endLeg(leg, cause);
+      }
+    });
+    // The members it now rings see the call (§10.6), which rang before their legs existed.
+    callPartiesChanged(pipeline.deps, call);
+    // §9.3 "a user: RINGING while any of their devices rings".
+    ringingUserIds = new Set(
+      [...race.tracked.values()]
+        .map(leg => leg.userId)
+        .filter((userId): userId is string => userId !== null)
     );
+    for (const userId of ringingUserIds) {
+      pipeline.deps.presence.setCallState(
+        userId,
+        'ringing',
+        call.from,
+        call.ringGroupId,
+        call.id
+      );
+    }
+    race.finishOriginating();
+    outcome = await race.promise;
+  } finally {
+    // Settled already, unless placing the legs threw: then this ends the race's listening and
+    // its timeout.
+    race.settle('unanswered');
+    pipeline.activeBatches.delete(call.id);
   }
-  race.finishOriginating();
-  const outcome = await race.promise;
-  pipeline.deps.ari.off('event', race.onEvent);
-  clearTimeout(timer);
-  pipeline.activeBatches.delete(call.id);
   if (outcome !== 'answered') {
     await hangupAllRinging(pipeline, race.tracked);
   }

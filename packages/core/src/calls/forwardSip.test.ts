@@ -96,7 +96,6 @@ function sipTargetId(
 /** A DID's own sip target, as the pipeline enters it, with the default headers. */
 function sipTarget(trunkId: string): ForwardTarget {
   return {
-    id: '',
     kind: 'sip',
     trunkId,
     user: SIP_USER,
@@ -265,7 +264,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     const call = inboundCall();
 
     const legs = await dialled(
-      enterTarget(pipeline, call, { id: '', kind: 'user', userId: bea }, null)
+      enterTarget(pipeline, call, { kind: 'user', userId: bea }, null)
     );
 
     expect(forwardContext(legs.at(0))).toEqual({
@@ -332,7 +331,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
       const started = enterTarget(
         pipeline,
         inboundCall(),
-        { id: '', kind: 'user', userId: bea },
+        { kind: 'user', userId: bea },
         null
       );
       const legs = await dialled(started, before + 1);
@@ -393,7 +392,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     const call = inboundCall();
 
     const legs = await dialled(
-      enterTarget(pipeline, call, { id: '', kind: 'user', userId: bea }, null)
+      enterTarget(pipeline, call, { kind: 'user', userId: bea }, null)
     );
 
     const variables = legs.at(0)?.variables ?? {};
@@ -437,7 +436,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     const call = inboundCall('anonymous');
 
     const legs = await dialled(
-      enterTarget(pipeline, call, { id: '', kind: 'user', userId: ai }, null)
+      enterTarget(pipeline, call, { kind: 'user', userId: ai }, null)
     );
 
     expect(forwardContext(legs.at(0))).toEqual({
@@ -494,7 +493,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     const call = inboundCall();
 
     const legs = await dialled(
-      enterTarget(pipeline, call, { id: '', kind: 'user', userId: bea }, null)
+      enterTarget(pipeline, call, { kind: 'user', userId: bea }, null)
     );
 
     expect(legs.map(leg => leg.endpoint)).toEqual([
@@ -643,14 +642,14 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
         enterTarget(
           pipeline,
           inboundCall(),
-          { id: '', kind: 'user', userId: offline },
+          { kind: 'user', userId: offline },
           null
         ),
       () =>
         enterTarget(
           pipeline,
           inboundCall(),
-          { id: '', kind: 'user', userId: closed },
+          { kind: 'user', userId: closed },
           null
         ),
       () => ringGroup(pipeline, inboundCall(), groupId)

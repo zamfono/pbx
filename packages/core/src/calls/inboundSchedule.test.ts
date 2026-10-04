@@ -18,7 +18,7 @@ vi.mock('./runTarget.js', () => ({ runTarget }));
 
 /**
  * Seeds the settings row with `timezone` and a tenant schedule open Monday 09:00-17:00, returning
- * the schedule's closed target.
+ * the user its closed target rings.
  */
 async function seedTenantHours(
   db: Db,
@@ -46,7 +46,7 @@ async function seedTenantHours(
     .insertInto('openingHoursIntervals')
     .values({ openingHoursId, weekday: 1, opens: '09:00', closes: '17:00' })
     .execute();
-  return closedTargetId;
+  return userId;
 }
 
 /**
@@ -97,7 +97,7 @@ describe('applyOooAndHours', () => {
   });
 
   it('evaluates hours in UTC when the stored timezone is no zone Intl knows, instead of throwing', async () => {
-    const closedTargetId = await seedTenantHours(db, 'Mars/Olympus');
+    const ownerId = await seedTenantHours(db, 'Mars/Olympus');
     const snapshot = await new ConfigCache(db).get();
     // Monday 18:00 UTC: after closing time in UTC.
     const { pipeline, ran } = stubPipeline('2026-01-05T18:00:00.000Z');
@@ -111,11 +111,11 @@ describe('applyOooAndHours', () => {
 
     expect(ended).toBe(true);
     expect(ran).toHaveLength(1);
-    expect(ran[0]).toMatchObject({ id: closedTargetId });
+    expect(ran[0]).toEqual({ kind: 'user', userId: ownerId });
   });
 
   it("evaluates hours in the stack's TZ while settings.timezone is NULL (§11.4)", async () => {
-    const closedTargetId = await seedTenantHours(db, null);
+    const ownerId = await seedTenantHours(db, null);
     const snapshot = await new ConfigCache(db).get();
     // Monday 10:00 UTC: open in UTC, but 05:00 in New York, before opening time.
     const { pipeline, ran } = stubPipeline(
@@ -131,7 +131,7 @@ describe('applyOooAndHours', () => {
     );
 
     expect(ended).toBe(true);
-    expect(ran[0]).toMatchObject({ id: closedTargetId });
+    expect(ran[0]).toEqual({ kind: 'user', userId: ownerId });
   });
 
   it('traces the opening-hours evaluation also when no schedule applies (§7)', async () => {

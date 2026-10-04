@@ -200,8 +200,7 @@ export function groupFallback(
 ):
   | { kind: 'forward'; target: ForwardTarget }
   | { kind: 'mailbox'; ringGroupId: string }
-  // eslint-disable-next-line no-magic-numbers -- the SIP release code of the group step's implicit default (§10.1)
-  | { kind: 'release'; code: 480 } {
+  | { kind: 'release'; code: typeof SIP_TEMPORARILY_UNAVAILABLE } {
   const target =
     rules[outcome] ??
     (outcome === 'unavailable' ? rules.unanswered : undefined);

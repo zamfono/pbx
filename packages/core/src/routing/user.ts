@@ -9,8 +9,10 @@ import type { ForwardTarget } from './targets.js';
 type UserDecision =
   | { kind: 'forward'; target: ForwardTarget }
   | { kind: 'ring'; findMe: { number: string; delayS: number }[] }
-  // eslint-disable-next-line no-magic-numbers -- the SIP release codes of the user step's implicit defaults (§10.1)
-  | { kind: 'release'; code: 480 | 486 }
+  | {
+      kind: 'release';
+      code: typeof SIP_BUSY_HERE | typeof SIP_TEMPORARILY_UNAVAILABLE;
+    }
   | { kind: 'mailbox'; userId: string };
 
 type OutcomeCondition = 'busy' | 'noAnswer' | 'offline';

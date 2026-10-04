@@ -81,7 +81,7 @@ export async function originateLeg(
     throw new PlacementError('stopping');
   }
   const { ari, cdr } = pipeline.deps;
-  const { callerId, timeout, variables, ...placement } = params;
+  const { callerId, variables, ...placement } = params;
   const { channelId } = placement;
   const stasis = waitForStasisEntry(
     ari,
@@ -114,7 +114,7 @@ export async function originateLeg(
   }
   dialling(channel);
   try {
-    await ari.channels.dial(channel.id, timeout ?? NO_DIAL_TIMEOUT);
+    await ari.channels.dial(channel.id, NO_DIAL_TIMEOUT);
   } catch (error: unknown) {
     ari.channels.hangup(channel.id).catch(
       logUnlessGone(pipeline.deps.logger, 'undialled leg hangup', {

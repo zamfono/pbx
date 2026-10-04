@@ -109,7 +109,6 @@ async function dispatchExtension(
       pipeline,
       call,
       {
-        id: '',
         kind: 'user',
         userId: action.owner.userId
       },
@@ -122,7 +121,6 @@ async function dispatchExtension(
       pipeline,
       call,
       {
-        id: '',
         kind: 'ringGroup',
         ringGroupId: action.owner.ringGroupId
       },

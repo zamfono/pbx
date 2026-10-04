@@ -174,7 +174,6 @@ describe('sipForwardLeg', () => {
   });
 
   const target: Extract<ForwardTarget, { kind: 'sip' }> = {
-    id: 'ft-1',
     kind: 'sip',
     trunkId: 'trunk-1',
     user: 'proj_1',

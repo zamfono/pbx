@@ -232,12 +232,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       const forwarderTrunk = await seedTrunkRoute(db, 2, forwarder);
 
       const legs = await dialled(
-        enterTarget(
-          pipeline,
-          call,
-          { id: '', kind: 'user', userId: forwarder },
-          null
-        )
+        enterTarget(pipeline, call, { kind: 'user', userId: forwarder }, null)
       );
 
       expect(legs.map(leg => leg.endpoint)).toEqual([
@@ -257,7 +252,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       await enterTarget(
         pipeline,
         call,
-        { id: '', kind: 'user', userId: forwarder },
+        { kind: 'user', userId: forwarder },
         null
       );
 
@@ -285,12 +280,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       await seedTrunkRoute(db, 1, null, 'both');
 
       const legs = await dialled(
-        enterTarget(
-          pipeline,
-          call,
-          { id: '', kind: 'user', userId: forwarder },
-          null
-        )
+        enterTarget(pipeline, call, { kind: 'user', userId: forwarder }, null)
       );
 
       expect(legs).toHaveLength(1);
@@ -314,7 +304,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
         enterTarget(
           pipeline,
           newCallFrom(withholding),
-          { id: '', kind: 'user', userId: forwarder },
+          { kind: 'user', userId: forwarder },
           null
         )
       );
@@ -331,12 +321,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       const forwarderTrunk = await seedTrunkRoute(db, 2, forwarder);
 
       const legs = await dialled(
-        enterTarget(
-          pipeline,
-          call,
-          { id: '', kind: 'user', userId: forwarder },
-          null
-        )
+        enterTarget(pipeline, call, { kind: 'user', userId: forwarder }, null)
       );
 
       expect(legs.map(leg => leg.endpoint)).toEqual([
@@ -355,7 +340,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       const started = enterTarget(
         pipeline,
         call,
-        { id: '', kind: 'user', userId: forwarder },
+        { kind: 'user', userId: forwarder },
         null
       );
       started.catch(() => undefined);
@@ -389,12 +374,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       const forwarderTrunk = await seedTrunkRoute(db, 2, forwarder);
 
       const legs = await dialled(
-        enterTarget(
-          pipeline,
-          call,
-          { id: '', kind: 'user', userId: forwarder },
-          null
-        )
+        enterTarget(pipeline, call, { kind: 'user', userId: forwarder }, null)
       );
 
       expect(legs.map(leg => leg.endpoint)).toEqual([
@@ -423,7 +403,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
         enterTarget(
           pipeline,
           newCallFrom(null, 'inbound'),
-          { id: '', kind: 'user', userId: forwarder },
+          { kind: 'user', userId: forwarder },
           null
         )
       );
@@ -448,12 +428,7 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       const openTrunk = await seedRoutes();
 
       const legs = await dialled(
-        enterTarget(
-          pipeline,
-          call,
-          { id: '', kind: 'user', userId: callee },
-          null
-        )
+        enterTarget(pipeline, call, { kind: 'user', userId: callee }, null)
       );
 
       expect(legs.map(leg => leg.endpoint)).toEqual([

@@ -55,10 +55,10 @@ function matchLiveExtension(
     return null;
   }
   if (row.userId !== null) {
-    return { id: '', kind: 'user', userId: row.userId };
+    return { kind: 'user', userId: row.userId };
   }
   if (row.ringGroupId !== null) {
-    return { id: '', kind: 'ringGroup', ringGroupId: row.ringGroupId };
+    return { kind: 'ringGroup', ringGroupId: row.ringGroupId };
   }
   return null;
 }
