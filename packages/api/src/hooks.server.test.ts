@@ -6,7 +6,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { epochSeconds, nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
-import { encodeDownloadToken, signAccessToken } from '#lib/server/auth/jwt.js';
+import { encodeLinkToken, signAccessToken } from '#lib/server/auth/jwt.js';
 import { getDb } from '#lib/server/db.js';
 
 import { handle, init as initHooks } from './hooks.server.js';
@@ -197,7 +197,7 @@ describe('hooks handle', () => {
   it('marks a response to a download link private, and one to a bearer token not', async () => {
     const nowS = epochSeconds(Date.now());
     const path = '/api/v1/voicemails/vm1/audio';
-    const linkToken = await encodeDownloadToken(JWT_SECRET, {
+    const linkToken = await encodeLinkToken(JWT_SECRET, 'download', {
       sub: 'admin1',
       cid: null,
       aud: path,

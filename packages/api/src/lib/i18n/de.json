@@ -45,5 +45,12 @@
     "title": "Sie sind angemeldet",
     "message": "Sie sind bei {company} angemeldet.",
     "mcpHint": "Verbinden Sie einen MCP-Client mit:"
+  },
+  "upload": {
+    "title": "Datei hochladen",
+    "file": "WAV- oder MP3-Datei",
+    "submit": "Hochladen",
+    "uploaded": "Die Datei wurde hochgeladen. Sie können diese Seite schließen.",
+    "expired": "Dieser Upload-Link ist abgelaufen. Bitte fordern Sie einen neuen an."
   }
 }

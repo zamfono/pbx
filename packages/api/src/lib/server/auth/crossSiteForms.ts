@@ -3,8 +3,8 @@
  * `hooks.server.ts` applies in place of SvelteKit's built-in one (`vite.config.ts` turns that
  * off). It is SvelteKit's own rule with the endpoints the spec defines for non-browser clients
  * left out, which send no `Origin` at all: the form-encoded `/oauth/token` and `/oauth/revoke`
- * (RFC 6749 §3.2, RFC 7009 §2.1), and a bearer-authenticated multipart upload such as
- * `POST /api/v1/audio` (§10.3). The remote forms of the login, consent, forgot-password and
+ * (RFC 6749 §3.2, RFC 7009 §2.1), a bearer-authenticated multipart upload such as
+ * `POST /api/v1/audio` (§10.3), and the `POST` of a file to an upload link (§10.5). The remote forms of the login, consent, forgot-password and
  * set-password pages are covered by it, whether a submission posts to the page itself (no
  * JavaScript; the login and consent submissions carry the `zamfono_consent` cookie) or to
  * SvelteKit's `/_app/remote/…` endpoint.
@@ -13,6 +13,7 @@ import { HTTP_FORBIDDEN } from '@zamfono/shared';
 
 import { API_PREFIX } from '../restRoutes.js';
 import { originFromEnv } from '../stackAddress.js';
+import { UPLOAD_PREFIX } from '../uploadLink.js';
 
 // The encodings an HTML form can submit cross-site without a CORS preflight, plus the one
 // SvelteKit's own enhanced forms use; the same list SvelteKit's check guards.
@@ -27,7 +28,8 @@ const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 // The client endpoints (§5.2, §10.3, §10.5): none reads a cookie, so a cross-site form gains no
 // ambient authority there. REST authenticates by bearer token, the OAuth endpoints by the grant
-// or token in the body, and `/mcp` validates `Origin` itself (`#lib/server/mcp/origin.ts`).
+// or token in the body, an upload link by the token in its URL, and `/mcp` validates `Origin`
+// itself (`#lib/server/mcp/origin.ts`).
 const CLIENT_PATHS = new Set([
   '/oauth/token',
   '/oauth/revoke',
@@ -45,6 +47,7 @@ function isClientEndpoint(pathname: string): boolean {
   return (
     CLIENT_PATHS.has(pathname) ||
     pathname.startsWith(CLIENT_PREFIX) ||
+    pathname.startsWith(`${UPLOAD_PREFIX}/`) ||
     pathname.startsWith(INTERNAL_PREFIX)
   );
 }

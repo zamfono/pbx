@@ -30,30 +30,38 @@ async function parseJsonBody(request: Request): Promise<Fields> {
   return parsed;
 }
 
-/** A `multipart: true` route's file field becomes `{ filename, mimeType, data }` (the shape an operation's upload schema expects, e.g. `audio.create`'s `upload`); every other field stays its text value. */
-async function parseMultipart(request: Request): Promise<Fields> {
-  const form = await request.formData();
-  const entries = await Promise.all(
-    [...form.entries()].map(async ([key, value]) => {
-      if (typeof value === 'string') {
-        return [key, value] as const;
-      }
-      const data = Buffer.from(await value.arrayBuffer());
-      return [
-        key,
-        { filename: value.name, mimeType: value.type, data }
-      ] as const;
-    })
-  );
-  return Object.fromEntries(entries) as Fields;
+/** A form's file becomes `{ filename, mimeType, data }`, the shape an operation's upload schema
+ *  expects (e.g. `audio.create`'s `upload`); a text field stays its value. */
+export async function formValue(value: string | File): Promise<unknown> {
+  if (typeof value === 'string') {
+    return value;
+  }
+  const data = Buffer.from(await value.arrayBuffer());
+  return { filename: value.name, mimeType: value.type, data };
 }
-export function readBody(
+
+/** A `multipart: true` route's form, each field as `formValue` reads it. */
+export async function formFields(form: FormData): Promise<Fields> {
+  const entries = await Promise.all(
+    [...form.entries()].map(
+      async ([key, value]): Promise<[string, unknown]> => [
+        key,
+        await formValue(value)
+      ]
+    )
+  );
+  return Object.fromEntries(entries);
+}
+
+export async function readBody(
   request: Request,
   route: RouteEntry,
   queryKinds: QueryFieldKinds
 ): Promise<Fields> {
   if (route.method === 'GET') {
-    return Promise.resolve(parseQuery(request, queryKinds));
+    return parseQuery(new URL(request.url), queryKinds);
   }
-  return route.multipart ? parseMultipart(request) : parseJsonBody(request);
+  return route.multipart
+    ? formFields(await request.formData())
+    : parseJsonBody(request);
 }

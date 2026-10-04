@@ -20,7 +20,9 @@ mailbox's greeting, or the default prompt in the tenant language, and records up
 **The personal greeting.** `users.setVoicemailGreeting` (`PUT /users/{id}/voicemailGreeting`)
 takes a WAV or MP3 file as multipart form data, field `upload`, transcoded like any audio upload,
 and makes it the user's mailbox greeting, replacing the one before, exactly as recording one on
-`*96` does; `users.clearVoicemailGreeting` (`DELETE /users/{id}/voicemailGreeting`, confirmed)
+`*96` does. As an MCP tool it takes no file and returns `{ url, expiresAt }`, an upload link
+for five minutes: post the file to it as the field `upload`, or open it in a browser to pick
+the file; `audio.create` does the same with its `kind` and `label`. `users.clearVoicemailGreeting` (`DELETE /users/{id}/voicemailGreeting`, confirmed)
 goes back to the default prompt. Both are a user's own on their own id, an admin's for anyone,
 and, like the phone's recording, not in the audit log. A ring group's greeting is its
 `mailboxAudioId` (`ringGroups.update`).

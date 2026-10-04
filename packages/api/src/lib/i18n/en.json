@@ -45,5 +45,12 @@
     "title": "You are signed in",
     "message": "You have signed in to {company}.",
     "mcpHint": "Connect an MCP client with:"
+  },
+  "upload": {
+    "title": "Upload a file",
+    "file": "WAV or MP3 file",
+    "submit": "Upload",
+    "uploaded": "The file was uploaded. You can close this page.",
+    "expired": "This upload link has expired. Ask for a new one."
   }
 }

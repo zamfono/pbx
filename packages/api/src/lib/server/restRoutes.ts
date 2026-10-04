@@ -11,6 +11,9 @@ import { registry, type ErasedOperation } from './ops/registry.js';
 /** The base path of every REST endpoint (§10.3). */
 export const API_PREFIX = '/api/v1';
 
+/** The input field a `multipart: true` route's file fills (§10.3), in every upload operation. */
+export const UPLOAD_FIELD = 'upload';
+
 export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
 /** The scopes §10.3's Out of Office and Opening hours rows attach OOO rules and hours to. */
@@ -204,6 +207,11 @@ const STATIC_ROUTES: RouteTuple[] = [
 ];
 
 export const routes: RouteEntry[] = STATIC_ROUTES.map(toRouteEntry);
+
+/** The `multipart: true` route of operation `op`, if it takes an upload. */
+export function uploadRoute(op: string): RouteEntry | undefined {
+  return routes.find(route => route.op === op && route.multipart);
+}
 
 /** The operation `route` runs; every row names a registered one, so a miss is a bug in the table. */
 export function routeOperation(route: RouteEntry): ErasedOperation {

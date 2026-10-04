@@ -14,7 +14,7 @@ import {
 
 import { addressKey } from '#lib/server/addressKey.js';
 import {
-  authenticateDownloadLink,
+  authenticateLink,
   authenticateRequest
 } from '#lib/server/auth/bearer.js';
 import {
@@ -116,7 +116,9 @@ const handleRequest: Handle = async ({ event, resolve }) => {
   // `/api/v1/*` endpoint; §10.3 lists no separate row for it, so it gets no separate exemption.
   const deps = { db: getDb(), jwtSecret: env.JWT_SECRET };
   const bearer = await authenticateRequest(deps, event.request);
-  const link = bearer ? null : await authenticateDownloadLink(deps, event.url);
+  const link = bearer
+    ? null
+    : await authenticateLink(deps, 'download', event.url);
   const auth = bearer ?? link;
   if (!auth) {
     return problem(HTTP_UNAUTHORIZED, 'unauthorized');

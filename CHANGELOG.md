@@ -235,6 +235,10 @@ why the specified behaviour changed; the commit history, how.
   stalled `core` did; they now give up after 3 seconds, as `/healthz` does. A live call id that
   cannot be one (empty, `.`, `..`, or with characters other than letters, digits, `.`, `_` and
   `-`) is refused with 422, where it answered 500.
+- The MCP tools `audio.create` and `users.setVoicemailGreeting` could never succeed, since a
+  tool call cannot carry a file. They now take the other fields and answer with an upload link
+  valid for five minutes: post the WAV or MP3 file to it (field `upload`), or open it in a browser
+  and pick the file there.
 - A ring group's greeting, music or mailbox greeting, a mailbox greeting, and an announcement
   target accepted an audio asset of any kind, so a greeting set as a ring group's music played
   the default music instead. Each now takes only its own kind (`greeting`, `moh`, `vmGreeting`,

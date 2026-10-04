@@ -5,10 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { nowIso } from '@zamfono/shared';
 
-import {
-  authenticateDownloadLink,
-  authenticateRequest
-} from '../auth/bearer.js';
+import { authenticateLink, authenticateRequest } from '../auth/bearer.js';
 import { handleRest } from '../rest.js';
 import type { McpDeps } from './auth.js';
 import { currentRequest, ORIGIN, rpc, seededDeps } from './testKit.js';
@@ -67,7 +64,7 @@ describe('voicemails.audio over MCP (§10.5 "Audio")', () => {
   it('opens that one path as the tool caller, and REST answers it with the file', async () => {
     const deps = await seedVoicemail();
     const url = new URL((await audioLink(deps, { id: 'vm1' })).url);
-    const auth = await authenticateDownloadLink(deps, url);
+    const auth = await authenticateLink(deps, 'download', url);
     expect(auth?.actor.id).toBe('owner');
     const response = await handleRest(new Request(url), auth?.actor ?? null, {
       db: deps.db,
@@ -86,7 +83,7 @@ describe('voicemails.audio over MCP (§10.5 "Audio")', () => {
     const token = url.searchParams.get('access_token') ?? 'missing';
     const other = new URL(url);
     other.pathname = '/api/v1/voicemails/vm2/audio';
-    expect(await authenticateDownloadLink(deps, other)).toBeNull();
+    expect(await authenticateLink(deps, 'download', other)).toBeNull();
     const asBearer = new Request(`${ORIGIN}/api/v1/users`, {
       headers: { authorization: `Bearer ${token}` }
     });

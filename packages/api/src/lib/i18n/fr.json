@@ -45,5 +45,12 @@
     "title": "Vous êtes connecté",
     "message": "Vous êtes connecté à {company}.",
     "mcpHint": "Connectez un client MCP avec :"
+  },
+  "upload": {
+    "title": "Envoyer un fichier",
+    "file": "Fichier WAV ou MP3",
+    "submit": "Envoyer",
+    "uploaded": "Le fichier a été envoyé. Vous pouvez fermer cette page.",
+    "expired": "Ce lien d'envoi a expiré. Demandez-en un nouveau."
   }
 }

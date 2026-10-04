@@ -50,13 +50,13 @@ function coerceTyped(
   return raw === '' ? raw : Number(raw);
 }
 
-/** Query values are coerced only where the matched operation's own schema says `number`/`boolean` (§10.3); every other value, `cursor` included, stays the wire string. A download link's `access_token` authenticates the request (`bearer.ts`) and is no input. */
+/** Query values are coerced only where the matched operation's own schema says `number`/`boolean` (§10.3); every other value, `cursor` included, stays the wire string. A download or upload link's `access_token` authenticates the request (`bearer.ts`) and is no input. */
 export function parseQuery(
-  request: Request,
+  url: URL,
   kinds: QueryFieldKinds
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  for (const [key, value] of new URL(request.url).searchParams) {
+  for (const [key, value] of url.searchParams) {
     if (key === ACCESS_TOKEN_PARAM) {
       continue;
     }

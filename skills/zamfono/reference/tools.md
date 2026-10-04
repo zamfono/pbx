@@ -1,6 +1,6 @@
 | Operation (MCP tool) | REST | Description | Min role | Confirm |
 | --- | --- | --- | --- | --- |
-| `audio.create` | `POST /audio` | Uploads and transcodes a new audio asset. | admin | no |
+| `audio.create` | `POST /audio` | Uploads and transcodes a new audio asset; over MCP, answers with a link to upload the file to. | admin | no |
 | `audio.delete` | `DELETE /audio/{id}` | Soft-deletes an audio asset. | admin | yes |
 | `audio.list` | `GET /audio` | Lists the tenant's live audio assets. | admin | no |
 | `audio.update` | `PATCH /audio/{id}` | Updates an audio asset's label. | admin | no |
@@ -113,7 +113,7 @@
 | `users.resetPassword` | `POST /users/{id}/resetPassword` | Issues a new one-time link to set a user's password. | admin | no |
 | `users.setForwarding` | `PUT /users/{id}/forwarding` | Replaces a user's call-forwarding rules as a whole; a user sets their own, without new sip targets, an admin anyone's. | user | no |
 | `users.setPresence` | `PUT /users/{id}/presence` | Sets a user's do-not-disturb state. | user | no |
-| `users.setVoicemailGreeting` | `PUT /users/{id}/voicemailGreeting` | Sets a user's personal voicemail greeting from a WAV or MP3 upload, as recording it on *96 does. | user | no |
+| `users.setVoicemailGreeting` | `PUT /users/{id}/voicemailGreeting` | Sets a user's personal voicemail greeting from a WAV or MP3 upload, as recording it on *96 does; over MCP, answers with a link to upload the file to. | user | no |
 | `users.update` | `PATCH /users/{id}` | Updates a user's profile; admins write every field, a user only their self-service subset. | user | no |
 | `voicemails.audio` | `GET /voicemails/{id}/audio` | Returns a voicemail's recorded audio; over MCP, a download link that opens for five minutes. | user | no |
 | `voicemails.delete` | `DELETE /voicemails/{id}` | Permanently deletes a voicemail and its audio file. | user | yes |

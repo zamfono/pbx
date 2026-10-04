@@ -38,7 +38,7 @@ function compilePattern(pattern: string): RegExp {
   return new RegExp(`^${source}$`, 'u');
 }
 
-type Matched = {
+export type Matched = {
   route: RouteEntry;
   queryKinds: QueryFieldKinds;
   match: RegExpMatchArray;
@@ -56,6 +56,18 @@ function matchRoute(method: string, path: string): Matched | null {
       continue;
     }
     const match = path.match(regex);
+    if (match) {
+      return { route, queryKinds, match };
+    }
+  }
+  return null;
+}
+
+/** The `multipart: true` route at `path` (below `API_PREFIX`), whatever its method: the one an
+ *  upload link (§10.5) runs. */
+export function matchUploadRoute(path: string): Matched | null {
+  for (const { route, queryKinds, regex } of compiled) {
+    const match = route.multipart ? path.match(regex) : null;
     if (match) {
       return { route, queryKinds, match };
     }

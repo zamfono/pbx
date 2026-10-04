@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-04 · §10.5 Uploads.** Product-owner decision (MCP uploads): `audio.create` and `users.setVoicemailGreeting` over MCP take their fields without the file and return a five-minute upload link (`/upload/<path>`, token `typ` `upload+jwt`, `aud` the REST path); a `POST` of the file to it runs the operation as the call's user and client with channel `mcp`, and a browser opening it gets a file-picker page.
+*Why:* "Upload link + page (Recommended)"; the tools were listed with a `data` field no JSON argument can fill, so every call failed with 422.
+
 **2026-10-04 · §10.3 Audio, §11.2 users, ring_groups, forward_targets.** Every column referencing an audio asset names its kind: a ring group's greeting `greeting`, its music `moh`, a mailbox greeting `vmGreeting`, an announcement target `announcement`. An asset of another kind is refused with 422, one that is not live with 404.
 *Why:* only menus and the hold-music default checked the kind, with different statuses; a greeting set as a ring group's music rendered no MoH class, so callers heard the default music.
 

@@ -8,9 +8,9 @@ import '../ops/index.js';
 import { registry } from '../ops/registry.js';
 import { runOperation, type RunInput } from '../ops/runner.js';
 import { ConfirmationRequired, OpError } from '../ops/types.js';
+import { uploadRoute } from '../restRoutes.js';
 import type { McpDeps } from './auth.js';
 import { CONFIRM_KEY, confirmElicitation, isAffirmative } from './confirm.js';
-import { downloadLink } from './downloadLink.js';
 import type { Era } from './era.js';
 import { callHelp, HELP_TOOL_NAME } from './guide.js';
 import {
@@ -20,6 +20,7 @@ import {
   type IncomingMessage
 } from './jsonRpc.js';
 import { legacyElicitationResponse } from './legacyElicitation.js';
+import { downloadLink, uploadLink } from './links.js';
 import { inputRequiredResult, toolErrorResult, toolResult } from './results.js';
 
 // MCP splits a failed `tools/call` in two. A request the server cannot even dispatch — no tool
@@ -51,7 +52,8 @@ function helpResult(legacy: boolean, args: Record<string, unknown>): object {
 
 /**
  * `tools/call` (§10.5): the help tool, or an operation run through the runner with channel `mcp`,
- * a file it returns answered as a download link.
+ * a file it returns answered as a download link; an upload operation answers with the upload
+ * link its file is posted to, which runs it.
  * A `confirm`-guarded operation called unconfirmed asks through elicitation where the client can
  * answer it — inline as `input_required` (2026-07-28) or as a server-initiated request on a
  * legacy session — and otherwise, or once the person declines, mirrors the REST contract: the
@@ -100,6 +102,10 @@ export async function handleToolsCall(
     confirm: isAffirmative(answer) || confirmArg === true
   };
   try {
+    if (uploadRoute(name)) {
+      const link = await uploadLink(deps, auth, name, args);
+      return jsonRpcResult(msg.id, toolResult(era.legacy, link));
+    }
     const output = await runOperation(deps.db, name, args, run);
     const value =
       output instanceof BinaryResult

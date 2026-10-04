@@ -18,13 +18,14 @@ describe('listTools', () => {
 
   // A multipart upload's bytes have no JSON Schema of their own, so the tool schema falls back to
   // an unconstrained value.
-  it('exports a tool schema for an operation whose input has no JSON Schema representation', () => {
+  it('publishes an upload operation without its file, which its upload link takes (§10.5)', () => {
     const tools = listTools();
     const upload = tools.find(tool => tool.name === 'audio.create');
     expect(upload?.inputSchema).toMatchObject({
       type: 'object',
-      properties: { upload: { properties: { data: {} } } }
+      properties: { kind: {}, label: {} }
     });
+    expect(upload?.inputSchema).not.toHaveProperty('properties.upload');
   });
 
   it('sorts tools by code point and always offers the help tool', () => {

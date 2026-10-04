@@ -45,5 +45,12 @@
     "title": "Hai effettuato l'accesso",
     "message": "Hai effettuato l'accesso a {company}.",
     "mcpHint": "Connetti un client MCP con:"
+  },
+  "upload": {
+    "title": "Carica un file",
+    "file": "File WAV o MP3",
+    "submit": "Carica",
+    "uploaded": "Il file è stato caricato. Puoi chiudere questa pagina.",
+    "expired": "Questo link di caricamento è scaduto. Richiedine uno nuovo."
   }
 }

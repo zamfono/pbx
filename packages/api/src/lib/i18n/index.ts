@@ -7,7 +7,8 @@ import fr from './fr.json' with { type: 'json' };
 import it from './it.json' with { type: 'json' };
 import ru from './ru.json' with { type: 'json' };
 
-/** One dictionary section per authentication page (§5.2 "Authentication pages" table). */
+/** One dictionary section per page `api` serves: the authentication pages (§5.2 "Authentication
+ *  pages" table) and the upload page (§10.5 "Uploads"). */
 export type Dictionary = {
   login: {
     title: string;
@@ -55,6 +56,13 @@ export type Dictionary = {
     title: string;
     message: string;
     mcpHint: string;
+  };
+  upload: {
+    title: string;
+    file: string;
+    submit: string;
+    uploaded: string;
+    expired: string;
   };
 };
 

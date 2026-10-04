@@ -19,7 +19,7 @@ import { liveUser } from './_shared.js';
 export const setVoicemailGreeting = defineOperation({
   name: 'users.setVoicemailGreeting',
   description:
-    "Sets a user's personal voicemail greeting from a WAV or MP3 upload, as recording it on *96 does.",
+    "Sets a user's personal voicemail greeting from a WAV or MP3 upload, as recording it on *96 does; over MCP, answers with a link to upload the file to.",
   input: z
     .object({
       id: z.string().describe('The user whose mailbox greets with it.'),

@@ -40,7 +40,8 @@ export const createAudioAssetInput = z
  */
 export const createAudioAsset = defineOperation({
   name: 'audio.create',
-  description: 'Uploads and transcodes a new audio asset.',
+  description:
+    'Uploads and transcodes a new audio asset; over MCP, answers with a link to upload the file to.',
   input: createAudioAssetInput,
   minRole: 'admin',
   entity: (_input, out: AudioAssetOut) => ({ kind: 'audio', id: out.id }),

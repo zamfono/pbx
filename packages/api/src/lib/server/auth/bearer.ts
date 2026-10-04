@@ -6,10 +6,15 @@
 import { epochSeconds, type Db } from '@zamfono/shared';
 
 import type { Actor } from '../ops/types.js';
-import { isRole, verifyAccessToken, verifyDownloadToken } from './jwt.js';
+import {
+  isRole,
+  verifyAccessToken,
+  verifyLinkToken,
+  type LinkKind
+} from './jwt.js';
 
 export const BEARER_PREFIX = 'Bearer ';
-/** The query parameter a download link carries its token in (RFC 6750 §2.3, §10.5). */
+/** The query parameter a download or upload link carries its token in (RFC 6750 §2.3, §10.5). */
 export const ACCESS_TOKEN_PARAM = 'access_token';
 
 /** The user a request acts as, and the OAuth client and its name it acts through, if any (§5.7). */
@@ -64,25 +69,22 @@ export async function authenticateToken(
 }
 
 /**
- * The live user behind download link `url` (§10.5): its `access_token` query parameter, a
- * download-link token issued for `url`'s path; `null` without one or for one that fails, as
- * `authenticateToken` decides.
+ * The live user behind link `url` of `kind` (§10.5): its `access_token` query parameter, a link
+ * token of that kind issued for `path`, by default `url`'s own; `null` without one or for one that
+ * fails, as `authenticateToken` decides.
  */
-export async function authenticateDownloadLink(
+export async function authenticateLink(
   deps: BearerDeps,
-  url: URL
+  kind: LinkKind,
+  url: URL,
+  path = url.pathname
 ): Promise<Authenticated | null> {
   const token = url.searchParams.get(ACCESS_TOKEN_PARAM);
   if (token === null) {
     return null;
   }
   const nowS = epochSeconds(Date.now());
-  const claims = await verifyDownloadToken(
-    deps.jwtSecret,
-    token,
-    nowS,
-    url.pathname
-  );
+  const claims = await verifyLinkToken(deps.jwtSecret, kind, token, nowS, path);
   return claims && liveAuthenticated(deps, claims);
 }
 

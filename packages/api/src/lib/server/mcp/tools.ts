@@ -3,6 +3,7 @@ import '../ops/index.js';
 
 import { publishedInputSchema } from '../ops/publishedSchema.js';
 import { registry, type ErasedOperation } from '../ops/registry.js';
+import { UPLOAD_FIELD, uploadRoute } from '../restRoutes.js';
 import { HELP_TOOL } from './guide.js';
 
 // An MCP `Tool` (the same fields in 2025-11-25 and 2026-07-28); the two hints §10.5 derives from
@@ -21,8 +22,12 @@ export function listTools(): ToolDescriptor[] {
       name: op.name,
       description: op.description,
       // With `confirm` beside a confirm-guarded operation's own fields: the fallback's second
-      // call carries it in its input (§10.5), and `toolCall.ts` strips it before validation.
-      inputSchema: publishedInputSchema(op),
+      // call carries it in its input (§10.5), and `toolCall.ts` strips it before validation. An
+      // upload operation's file is no tool argument: the call answers with its upload link.
+      inputSchema: publishedInputSchema(
+        op,
+        new Set(uploadRoute(op.name) ? [UPLOAD_FIELD] : [])
+      ),
       annotations: {
         readOnlyHint: Boolean(op.readOnly),
         destructiveHint: Boolean(op.confirm)

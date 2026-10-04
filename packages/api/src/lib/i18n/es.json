@@ -45,5 +45,12 @@
     "title": "Has iniciado sesión",
     "message": "Has iniciado sesión en {company}.",
     "mcpHint": "Conecta un cliente MCP con:"
+  },
+  "upload": {
+    "title": "Subir un archivo",
+    "file": "Archivo WAV o MP3",
+    "submit": "Subir",
+    "uploaded": "El archivo se ha subido. Puede cerrar esta página.",
+    "expired": "Este enlace de subida ha caducado. Solicite uno nuevo."
   }
 }

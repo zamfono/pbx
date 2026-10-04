@@ -70,11 +70,11 @@ export function signAccessToken(
 }
 
 /**
- * A download link's token (§10.5): the user and client a `voicemails.audio` or `recordings.audio`
- * tool call ran as, `aud` the one REST path it opens. Its `typ` sets it apart from an access token
- * (RFC 8725 §3.11), so it never authenticates as one.
+ * A link's token (§10.5): the user and client a file tool call ran as, `aud` the one REST path it
+ * opens. Its `typ`, `download+jwt` or `upload+jwt`, sets it apart from an access token and from the
+ * other kind of link (RFC 8725 §3.11), so it never authenticates as either.
  */
-export type DownloadPayload = {
+export type LinkPayload = {
   sub: string;
   cid: string | null;
   aud: string;
@@ -82,7 +82,7 @@ export type DownloadPayload = {
   exp: number;
 };
 
-const DownloadPayloadSchema = z.object({
+const LinkPayloadSchema = z.object({
   sub: z.string(),
   cid: z.string().nullable(),
   aud: z.string(),
@@ -90,15 +90,17 @@ const DownloadPayloadSchema = z.object({
   exp: z.number()
 });
 
-const DOWNLOAD_TYP = 'download+jwt';
+/** What a link does with its path: `download` the file a `GET` answers, `upload` one it takes. */
+export type LinkKind = 'download' | 'upload';
 
-/** Encodes `payload` as an HS256 download-link token signed with `secret`. */
-export function encodeDownloadToken(
+/** Encodes `payload` as an HS256 link token of `kind` signed with `secret`. */
+export function encodeLinkToken(
   secret: string,
-  payload: DownloadPayload
+  kind: LinkKind,
+  payload: LinkPayload
 ): Promise<string> {
   return new SignJWT(payload)
-    .setProtectedHeader({ alg: JWT_ALG, typ: DOWNLOAD_TYP })
+    .setProtectedHeader({ alg: JWT_ALG, typ: `${kind}+jwt` })
     .sign(keyFor(secret));
 }
 
@@ -146,18 +148,19 @@ export async function verifyAccessToken(
   return payload && { sub: payload.sub, role: payload.role, cid: payload.cid };
 }
 
-/** The user and client of download-link token `token`, verified like an access token and opening
+/** The user and client of link token `token` of `kind`, verified like an access token and opening
  *  `path` alone; `null` for any token that fails. */
-export async function verifyDownloadToken(
+export async function verifyLinkToken(
   secret: string,
+  kind: LinkKind,
   token: string,
   nowS: number,
   path: string
 ): Promise<{ sub: string; cid: string | null } | null> {
   const payload = await verifiedPayload(secret, token, nowS, {
-    typ: DOWNLOAD_TYP,
+    typ: `${kind}+jwt`,
     audience: path,
-    schema: DownloadPayloadSchema
+    schema: LinkPayloadSchema
   });
   return payload && { sub: payload.sub, cid: payload.cid };
 }
