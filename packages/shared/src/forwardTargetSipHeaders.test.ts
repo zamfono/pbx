@@ -25,23 +25,42 @@ async function seed(db: Db): Promise<void> {
 }
 
 // forward_targets.sip_headers_json (§9.4 "Header templates", §11.2).
-test('headers are set exactly on a sip target, and must be a JSON array', async () => {
+test.each([
+  [
+    'headers on an external target',
+    sql`INSERT INTO forward_targets (id, external, sip_headers_json) VALUES ('x1', '+431', '[]')`
+  ],
+  [
+    'a new sip target without headers',
+    sql`INSERT INTO forward_targets (id, sip_trunk_id, sip_user) VALUES ('x2', 't1', 'proj_b')`
+  ],
+  [
+    'clearing the headers of a sip target',
+    sql`UPDATE forward_targets SET sip_headers_json = NULL WHERE id = 'ft-sip'`
+  ],
+  [
+    'headers on a user target',
+    sql`UPDATE forward_targets SET sip_headers_json = '[]' WHERE id = 'ft-user'`
+  ],
+  [
+    'a JSON object',
+    sql`UPDATE forward_targets SET sip_headers_json = '{}' WHERE id = 'ft-sip'`
+  ],
+  [
+    'text that is no JSON',
+    sql`UPDATE forward_targets SET sip_headers_json = 'nope' WHERE id = 'ft-sip'`
+  ]
+])('sip headers refuse %s', async (label, statement) => {
   const db = await migratedTestDb();
   await seed(db);
-  const refused = [
-    sql`INSERT INTO forward_targets (id, external, sip_headers_json) VALUES ('x1', '+431', '[]')`,
-    sql`INSERT INTO forward_targets (id, sip_trunk_id, sip_user) VALUES ('x2', 't1', 'proj_b')`,
-    sql`UPDATE forward_targets SET sip_headers_json = NULL WHERE id = 'ft-sip'`,
-    sql`UPDATE forward_targets SET sip_headers_json = '[]' WHERE id = 'ft-user'`,
-    sql`UPDATE forward_targets SET sip_headers_json = '{}' WHERE id = 'ft-sip'`,
-    sql`UPDATE forward_targets SET sip_headers_json = 'nope' WHERE id = 'ft-sip'`
-  ];
-  for (const statement of refused) {
-    // eslint-disable-next-line no-await-in-loop -- each statement is refused on its own
-    await expect(statement.execute(db)).rejects.toThrow(
-      /CHECK constraint failed/u
-    );
-  }
+  await expect(statement.execute(db)).rejects.toThrow(
+    /CHECK constraint failed/u
+  );
+});
+
+test('headers on a sip target are a JSON array', async () => {
+  const db = await migratedTestDb();
+  await seed(db);
   await sql`UPDATE forward_targets SET sip_headers_json = '[]' WHERE id = 'ft-sip'`.execute(
     db
   );
