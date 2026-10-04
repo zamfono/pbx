@@ -7,6 +7,7 @@ import pino from 'pino';
 import { WebSocket } from 'ws';
 
 import {
+  MAX_TIMER_MS,
   nowIso,
   publicEnvelope,
   type Db,
@@ -64,9 +65,6 @@ type Subscription = { auth: Authenticated; ringGroupIds: ReadonlySet<string> };
 // §10.6: the close code of a socket whose user is gone or whose role changed, or whose session or
 // personal access token ended.
 const USER_CHANGED_CLOSE_CODE = 4401;
-
-// The longest delay `setTimeout` takes; a later expiry is re-checked then and scheduled again.
-const MAX_TIMER_MS = 2_147_483_647;
 
 /** The ring group ids each user may see mailbox events for (§5.3, `ringGroupMemberships`). */
 async function ringGroupIdsByUser(db: Db): Promise<Map<string, Set<string>>> {
@@ -226,6 +224,7 @@ export class EventHub {
     if (expiries.length === 0) {
       return;
     }
+    // A later expiry is re-checked after `MAX_TIMER_MS` and scheduled again.
     const delayMs = Math.min(
       Math.max(Math.min(...expiries) - Date.now(), 0),
       MAX_TIMER_MS

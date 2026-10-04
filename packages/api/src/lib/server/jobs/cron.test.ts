@@ -252,3 +252,29 @@ describe('scheduleBackups: the manual runs handed over', () => {
     ).toBe(false);
   });
 });
+
+describe('scheduleBackups: the automatic runs', () => {
+  it('runs no backup before a cron expression next fires a month or more away', async () => {
+    const db = await migratedTestDb();
+    // 29 February: the next run is weeks or years away, beyond a single timer's reach.
+    await seedSettings(db, { backupCron: '0 3 29 2 *' });
+    const kr = testKeyring();
+    const targetId = await insertTarget(db, kr);
+    await db
+      .updateTable('backupTargets')
+      .set({ enabled: 1 })
+      .where('id', '=', targetId)
+      .execute();
+    const { bus, published } = fakeBus();
+    const scheduler = scheduleBackups(db, kr, {
+      exec: fakeExec('snap-early'),
+      mediaDir: '/media',
+      bus
+    });
+
+    await wait(WAIT_MS);
+    scheduler.stop();
+
+    expect(published.filter(ev => ev.type === 'backup.started')).toEqual([]);
+  });
+});

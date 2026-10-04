@@ -5,7 +5,7 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import pino from 'pino';
 
-import { nowIso, type Db } from '@zamfono/shared';
+import { MAX_TIMER_MS, nowIso, type Db } from '@zamfono/shared';
 
 import { loadLiveTarget, type BackupRunRow } from '../ops/backups/_shared.js';
 import { loadSettings } from '../ops/settings/_shared.js';
@@ -166,11 +166,19 @@ export function scheduleBackups(
         const settings = await loadSettings(db);
         const timezone = tenantTimeZone(settings.timezone);
         const due = nextRun(settings.backupCron, timezone, new Date());
+        const waitMs = due.getTime() - Date.now();
         // eslint-disable-next-line no-await-in-loop -- each cycle waits out its own scheduled delay
-        await delay(Math.max(0, due.getTime() - Date.now()), stopper.signal);
+        await delay(
+          Math.min(Math.max(0, waitMs), MAX_TIMER_MS),
+          stopper.signal
+        );
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- stop() can abort during the delay above, which TS can't see
         if (stopper.signal.aborted) {
           return;
+        }
+        // A run further away than one timer reaches is waited for in slices, each re-checked.
+        if (Date.now() < due.getTime()) {
+          continue;
         }
         // eslint-disable-next-line no-await-in-loop -- one run cycle finishes before the next is due
         await inTurn(async () => runEnabledTargets(db, kr, deps));
