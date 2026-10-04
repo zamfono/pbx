@@ -156,7 +156,7 @@ export async function handleMcpRequest(
   if (body === undefined) {
     return jsonRpcError(null, JSONRPC_PARSE_ERROR, 'invalid JSON');
   }
-  const elicitationAnswer = resolveElicitationAnswer(body, auth.actor.id);
+  const elicitationAnswer = resolveElicitationAnswer(body, auth.actor);
   if (elicitationAnswer) {
     return elicitationAnswer;
   }

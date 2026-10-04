@@ -3,7 +3,7 @@ import pino from 'pino';
 import { HTTP_ACCEPTED, isRecord, newId, type Db } from '@zamfono/shared';
 
 import { runOperation, type RunInput } from '../ops/runner.js';
-import { ConfirmationRequired, OpError } from '../ops/types.js';
+import { ConfirmationRequired, OpError, type Actor } from '../ops/types.js';
 import { confirmElicitation, isAffirmative } from './confirm.js';
 import { JSONRPC_INTERNAL_ERROR, type JsonRpcId } from './jsonRpc.js';
 import { toolErrorResult, toolResult } from './results.js';
@@ -18,7 +18,7 @@ const logger = pino({ name: 'mcp' });
 const sseEncoder = new TextEncoder();
 type ElicitationAnswer = { action?: unknown; content?: unknown };
 type PendingElicitation = {
-  resolve: (answer: ElicitationAnswer) => void;
+  resolve: (answer: ElicitationAnswer, actor: Actor) => void;
   actorId: string;
 };
 /** A tools/call awaiting a legacy client's elicitation answer, keyed by the elicitation request id. */
@@ -48,9 +48,12 @@ type StreamState = {
   timer?: ReturnType<typeof setTimeout>;
 };
 
+/** `actor` is the user as the answering request authenticated them: a confirmed run acts with the
+ * role they hold when they answer (§5.3), not the one they held when the question was put. */
 async function settle(
   request: LegacyElicitationRequest,
   answer: ElicitationAnswer,
+  actor: Actor,
   controller: ReadableStreamDefaultController<Uint8Array>,
   state: StreamState
 ): Promise<void> {
@@ -68,7 +71,11 @@ async function settle(
     const result = isAffirmative(answer)
       ? toolResult(
           true,
-          await runOperation(db, name, args, { ...run, confirm: true })
+          await runOperation(db, name, args, {
+            ...run,
+            actor,
+            confirm: true
+          })
         )
       : toolErrorResult(true, new ConfirmationRequired(question));
     writeSseEvent(controller, { jsonrpc: '2.0', id: toolCallId, result });
@@ -122,14 +129,18 @@ export function legacyElicitationResponse(
           } catch {
             // the client already disconnected; `settle` finds the stream closed too
           }
-          settle(request, {}, controller, state).catch(() => undefined);
+          settle(request, {}, request.run.actor, controller, state).catch(
+            () => undefined
+          );
         }
       }, ELICITATION_TIMEOUT_MS);
       pending.set(elicitId, {
         actorId: request.run.actor.id,
-        resolve: answer => {
+        resolve: (answer, actor) => {
           clearTimeout(state.timer);
-          settle(request, answer, controller, state).catch(() => undefined);
+          settle(request, answer, actor, controller, state).catch(
+            () => undefined
+          );
         }
       });
     },
@@ -164,10 +175,11 @@ export function legacyElicitationResponse(
  * resolved, or `null` when `body` is not a JSON-RPC response to one of this process's pending
  * elicitations (an ordinary request, a late/unknown answer, or an answer from an actor other than
  * the one the elicitation was put to, which is left pending for its own actor to answer).
+ * `actor` is the answering request's, so the confirmed run acts with the user's current role.
  */
 export function resolveElicitationAnswer(
   body: unknown,
-  actorId: string
+  actor: Actor
 ): Response | null {
   if (
     !isRecord(body) ||
@@ -178,11 +190,11 @@ export function resolveElicitationAnswer(
   }
   const id = body.id;
   const entry = pending.get(id);
-  if (entry?.actorId !== actorId) {
+  if (entry?.actorId !== actor.id) {
     return null;
   }
   pending.delete(id);
-  entry.resolve(isRecord(body.result) ? body.result : {});
+  entry.resolve(isRecord(body.result) ? body.result : {}, actor);
   // JSON-RPC 2.0 §4.1: the status a notification (no `id` member) is answered with.
   return new Response(null, { status: HTTP_ACCEPTED });
 }
