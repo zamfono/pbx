@@ -72,7 +72,7 @@
 | `outboundRoutes.replace` | `PUT /outboundRoutes` | Replaces the outbound route list as a whole, in evaluation order: a call takes the first route whose callers and numbers both match, falling through to the next when its trunk fails. | admin | no |
 | `parking.get` | `GET /parking/slots` | Reads the set of parking-slot extensions | admin | no |
 | `parking.list` | `GET /parking/calls` | Lists the calls parked right now: slot, call, caller (null when withheld), parked since and by whom. | user | no |
-| `parking.set` | `PUT /parking/slots` | Replaces the set of parking-slot extensions as a whole; an extension a user or ring group owns is refused | admin | no |
+| `parking.set` | `PUT /parking/slots` | Replaces the set of parking-slot extensions as a whole; an extension a user or ring group owns, or an emergency number, is refused | admin | no |
 | `presenceLog.snapshot` | `GET /presence/log` | Snapshots each user's presence state as of a past timestamp. | admin | no |
 | `provisioning.ringotelAdopt` | `POST /provisioning/ringotel/adopt` | Adopts an existing, empty Ringotel organization (by id and domain) and one of its connections, or a new one, instead of creating them. | owner | yes |
 | `provisioning.ringotelOptions` | `GET /provisioning/ringotel/options` | Lists the Ringotel regions and packages the account offers, the choices provisioning.ringotelSetup takes. | owner | no |

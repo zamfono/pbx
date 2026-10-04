@@ -9,6 +9,7 @@ import { resolveTarget } from '../forwardTargetSpec.js';
 import { propagate } from '../propagate.js';
 import {
   assertOwnScopeOrAdmin,
+  assertScopeExists,
   scopeColumns,
   scopeInputSchema
 } from '../scope.js';
@@ -120,6 +121,7 @@ export const set = defineOperation<Input, HoursWire>({
   }),
   run: async (ctx, input) => {
     assertOwnScopeOrAdmin(ctx.actor, input.scope);
+    await assertScopeExists(ctx.db, input.scope);
     const intervals = validateIntervals(input.intervals);
     const active = input.active ?? true;
     const closedTargetId = await createTarget(ctx, input.closedTarget);

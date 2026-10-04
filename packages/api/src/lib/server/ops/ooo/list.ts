@@ -7,7 +7,11 @@ import {
 } from '#lib/server/pagination.js';
 
 import { resolveTarget } from '../forwardTargetSpec.js';
-import { assertOwnScopeOrAdmin, scopeInputSchema } from '../scope.js';
+import {
+  assertOwnScopeOrAdmin,
+  assertScopeExists,
+  scopeInputSchema
+} from '../scope.js';
 import { defineOperation } from '../types.js';
 import { liveOooRulesInScope } from './_shared.js';
 
@@ -31,6 +35,7 @@ export const list = defineOperation({
   readOnly: true,
   run: async (ctx, input) => {
     assertOwnScopeOrAdmin(ctx.actor, input.scope);
+    await assertScopeExists(ctx.db, input.scope);
     const offset = decodeOffsetCursor(input.cursor);
     const { limit } = input;
     // A scope's rules are few, so the page is cut from the whole ordered set here rather than

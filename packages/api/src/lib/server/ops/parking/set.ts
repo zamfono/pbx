@@ -1,12 +1,11 @@
 import { z } from 'zod';
 
-import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
-
 import { recordChange } from '../audit.js';
 import type { DroppedBlfKey } from '../devices/_shared.js';
 import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
-import { Conflict, defineOperation, OpError, type Context } from '../types.js';
+import { Conflict, defineOperation, type Context } from '../types.js';
+import { assertValidExtension } from '../users/_extensions.js';
 import { loadParkingSlots } from './_shared.js';
 
 /** An extension digit string, matching the `extensions.ext` CHECK (§11.2). */
@@ -27,28 +26,6 @@ const inputSchema = z
 
 type Input = z.infer<typeof inputSchema>;
 type Output = { slots: string[] };
-
-/** Refuses a slot whose length does not match the tenant-wide `settings.ext_length` (§11.2 "extensions"). */
-async function guardExtLength(
-  ctx: Context,
-  additions: string[]
-): Promise<void> {
-  if (additions.length === 0) {
-    return;
-  }
-  const { extLength } = await ctx.db
-    .selectFrom('settings')
-    .select('extLength')
-    .where('id', '=', 1)
-    .executeTakeFirstOrThrow();
-  const wrongLength = additions.filter(ext => ext.length !== extLength);
-  if (wrongLength.length > 0) {
-    throw new OpError(
-      HTTP_UNPROCESSABLE_CONTENT,
-      `parking: slot must be ${extLength} digits long: ${wrongLength.join(', ')}`
-    );
-  }
-}
 
 /**
  * Refuses a new slot ext that already names a user's or ring group's extension (§10.3 "Parking"):
@@ -100,7 +77,7 @@ async function loadDroppedBlfKeys(
 export const set = defineOperation<Input, Output>({
   name: 'parking.set',
   description:
-    'Replaces the set of parking-slot extensions as a whole; an extension a user or ring group owns is refused',
+    'Replaces the set of parking-slot extensions as a whole; an extension a user or ring group owns, or an emergency number, is refused',
   input: inputSchema,
   minRole: 'admin',
   entity: () => ({ kind: 'parking', id: 'parking' }),
@@ -110,7 +87,7 @@ export const set = defineOperation<Input, Output>({
     const afterSet = new Set(input.slots);
     const additions = input.slots.filter(ext => !beforeSet.has(ext));
     const removals = before.filter(ext => !afterSet.has(ext));
-    await guardExtLength(ctx, additions);
+    await Promise.all(additions.map(ext => assertValidExtension(ctx.db, ext)));
     await guardNoCollision(ctx, additions);
     const droppedBlfKeys = await loadDroppedBlfKeys(ctx, removals);
     if (removals.length > 0) {

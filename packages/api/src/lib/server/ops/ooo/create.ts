@@ -7,6 +7,7 @@ import { createTarget } from '../forwardTargets.js';
 import { propagate } from '../propagate.js';
 import {
   assertOwnScopeOrAdmin,
+  assertScopeExists,
   scopeColumns,
   scopeInputSchema
 } from '../scope.js';
@@ -38,6 +39,7 @@ export const create = defineOperation<Input, OooRuleOut>({
   entity: (_input, output: OooRuleOut) => ({ kind: 'oooRule', id: output.id }),
   run: async (ctx, input) => {
     assertOwnScopeOrAdmin(ctx.actor, input.scope);
+    await assertScopeExists(ctx.db, input.scope);
     const active = input.active ?? true;
     const startsAt = normalizeIsoOrNull(input.startsAt) ?? null;
     const expiresAt = normalizeIsoOrNull(input.expiresAt) ?? null;

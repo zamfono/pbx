@@ -4,6 +4,7 @@ import { type TargetSpec } from '../forwardTargetSchema.js';
 import { resolveTarget } from '../forwardTargetSpec.js';
 import {
   assertOwnScopeOrAdmin,
+  assertScopeExists,
   scopeInputSchema,
   type ScopeInput
 } from '../scope.js';
@@ -33,6 +34,7 @@ export const get = defineOperation({
   readOnly: true,
   run: async (ctx, input) => {
     assertOwnScopeOrAdmin(ctx.actor, input.scope);
+    await assertScopeExists(ctx.db, input.scope);
     const schedule = await loadSchedule(ctx.db, input.scope);
     if (!schedule) {
       return { schedule: null };

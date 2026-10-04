@@ -39,6 +39,14 @@ describe('parking', () => {
     expect(read.slots).toEqual(['7001']);
   });
 
+  it('refuses an emergency number as a slot (§9.4 "Dial-plan resolution")', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db, { emergencyNumbersJson: '["110","112"]' });
+    await expect(
+      runOperation(db, 'parking.set', { slots: ['110'] }, asRun())
+    ).rejects.toMatchObject({ status: 422, message: /emergency/u });
+  });
+
   it('refuses a slot that collides with a user extension', async () => {
     const db = await makeTestDb();
     await seedSettings(db);

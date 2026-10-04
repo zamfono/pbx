@@ -1,9 +1,15 @@
 import { expressionBuilder, type Expression, type SqlBool } from 'kysely';
 import { z } from 'zod';
 
-import { HTTP_FORBIDDEN, HTTP_NOT_FOUND, type DB } from '@zamfono/shared';
+import {
+  HTTP_FORBIDDEN,
+  HTTP_NOT_FOUND,
+  type DB,
+  type Db
+} from '@zamfono/shared';
 
 import { isSelfOrAdmin } from './gates.js';
+import { liveRow } from './rows.js';
 import { OpError, type Actor } from './types.js';
 
 /**
@@ -91,6 +97,33 @@ export function assertOwnScopeOrAdmin(actor: Actor, scope: ScopeInput): void {
   if (!ownsScope(actor, scope)) {
     throw new OpError(HTTP_FORBIDDEN, 'forbidden');
   }
+}
+
+/** The live table each non-tenant scope kind names its owner in. */
+const SCOPE_TABLES = {
+  user: 'users',
+  ringGroup: 'ringGroups',
+  menu: 'menus'
+} as const;
+
+/**
+ * Throws 404 unless `scope` names a live user, ring group or menu; the tenant scope always
+ * exists. A scope-addressed route checks it after `assertOwnScopeOrAdmin`, so a `user` learns
+ * nothing about someone else's scope.
+ */
+export async function assertScopeExists(
+  db: Db,
+  scope: ScopeInput
+): Promise<void> {
+  if (scope.kind === 'tenant') {
+    return;
+  }
+  await liveRow(
+    db,
+    SCOPE_TABLES[scope.kind],
+    scope.id,
+    `${scope.kind} '${scope.id}' not found`
+  );
 }
 
 /**

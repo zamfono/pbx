@@ -4,7 +4,11 @@ import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
 import { propagate } from '../propagate.js';
 import { softDelete } from '../rows.js';
-import { assertOwnScopeOrAdmin, scopeInputSchema } from '../scope.js';
+import {
+  assertOwnScopeOrAdmin,
+  assertScopeExists,
+  scopeInputSchema
+} from '../scope.js';
 import { defineOperation, OpError } from '../types.js';
 import { loadSchedule } from './_shared.js';
 
@@ -26,6 +30,7 @@ export const del = defineOperation({
   }),
   run: async (ctx, input) => {
     assertOwnScopeOrAdmin(ctx.actor, input.scope);
+    await assertScopeExists(ctx.db, input.scope);
     const schedule = await loadSchedule(ctx.db, input.scope);
     if (!schedule) {
       throw new OpError(
