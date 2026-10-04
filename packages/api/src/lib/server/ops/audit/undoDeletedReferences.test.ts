@@ -181,4 +181,45 @@ describe('audit.undo of a deletion pointing at a row deleted since (§5.8)', () 
       .executeTakeFirstOrThrow();
     expect(row.deletedAt).toBeNull();
   });
+
+  it('revives a user whose ring group, a membership rather than a route, was deleted since', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    const anna = await createUser(db, '101');
+    const group = await run(db, 'ringGroups.create', {
+      name: 'Sales',
+      strategy: 'simultaneous',
+      members: [{ kind: 'user', id: anna }]
+    });
+    await run(db, 'ringGroups.delete', { id: group.id });
+    await run(db, 'users.delete', { id: anna });
+
+    await undo(db, 'users.delete', anna);
+
+    expect(await deletedAt(db, 'users', anna)).toBeNull();
+  });
+
+  it("revives a user whose personal access token's creator was deleted since", async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    const admin = await createUser(db, '100', { role: 'admin' });
+    const anna = await createUser(db, '101', { email: 'anna@x.test' });
+    await db
+      .insertInto('personalAccessTokens')
+      .values({
+        id: 'pat-1',
+        tokenHash: 'hash-1',
+        userId: anna,
+        name: 'crm-sync',
+        createdBy: admin,
+        createdAt: new Date().toISOString()
+      })
+      .execute();
+    await run(db, 'users.delete', { id: admin });
+    await run(db, 'users.delete', { id: anna });
+
+    await undo(db, 'users.delete', anna);
+
+    expect(await deletedAt(db, 'users', anna)).toBeNull();
+  });
 });
