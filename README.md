@@ -104,7 +104,7 @@ bash images/asterisk/test.sh   # builds the image and exercises it end to end
 bash images/proxy/test.sh      # builds the proxy image: uid 1000, the caddy-events-exec plugin, the hook
 bash db/test.sh                # the migrate image, including its retry behaviour
 bash deploy/test.sh            # compose config, the release bundle, setup.sh, update.sh, the Caddyfile
-bash test/integration/run.sh   # the full sipp-driven stack test (§8); needs the five images built
+bash test/integration/run.sh   # the full sipp-driven stack test (§8); needs the six images built
 ```
 
 `test/integration/run.sh` also runs single scenarios or named steps without repeating a full stack
@@ -116,7 +116,7 @@ usage block at the top of that file.
 To try a pull request's images without building them, a maintainer labels it `publish-image` once
 the diff has been read; its green CI run then publishes them as `ghcr.io/zamfono/<name>-pr:<N>`.
 A later push takes the label off until its new head has been read too, and closing the pull
-request deletes the images. `deploy/compose.pr.yaml` swaps the five images for those, layered last:
+request deletes the images. `deploy/compose.pr.yaml` swaps the six images for those, layered last:
 `ZAMFONO_PR=<N> docker compose -f compose.yaml -f compose.override.yaml -f compose.pr.yaml up -d`.
 
 ## Contributing, security and license

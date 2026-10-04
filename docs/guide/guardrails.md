@@ -15,11 +15,15 @@ time range (`from`, `to`; a time without an offset is the tenant's local time). 
 
 `audit.undo` (`POST /audit/{id}/undo`) reverts one entry by writing its recorded values back. It is
 refused, naming the conflicting row, when a later live change to the same entity exists, when the
-change would recreate a duplicate (a reused extension, e-mail or DID number), or when the entry
-itself is not undoable — a secret-bearing change, a one-shot action such as a manual backup run or a
-sent e-mail, or a hard delete whose file is already gone. The `ringotel.push` and
-`ringotel.rereg` entries, which record what Ringotel answered, are never undoable and never block
-an undo. See the `undo` recipe for the full walk-through.
+change would recreate a duplicate (a reused extension, e-mail or DID number), when a revived row
+would point at a row deleted since (undo that deletion first), or when the entry itself is not
+undoable — a secret-bearing change, a one-shot action such as a manual backup run or a sent
+e-mail, creating or revoking a personal access token, or a hard delete whose file is already gone.
+Only an owner undoes the deletion of an admin or an owner; an admin gets 403. The entries of the
+six operations that record what an effect outside Zamfono answered (`ringotel.push`,
+`ringotel.profile`, `ringotel.roster`, `ringotel.rereg`, `system.autoUpdate`,
+`system.maintenanceGate`) are never undoable and never block an undo. See the `undo` recipe for
+the full walk-through.
 
 ## Deletes are soft, then confirmed, then purged
 
