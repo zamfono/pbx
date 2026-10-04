@@ -104,11 +104,8 @@ export async function maybeRenameExtension(
   // rename again to restore it (§5.8).
   recordChange(ctx, { field: 'extension', from: oldExt, to: input.extension });
   if (affectedDevices.length > 0) {
-    // `affectedDevices` is not a `users.update` input field, so an undo replay of this entry
-    // (which passes each field's `from` value back through this same operation, §5.8) leaves it
-    // unread and does nothing with it; the `extension` revert above already renames the devices
-    // back on its own. Recorded here only so `GET /audit` lists them alongside the ext change
-    // (§9.3 "Naming").
+    // Recorded so `GET /audit` lists the renamed devices alongside the ext change (§9.3
+    // "Naming"); undo skips it, since reverting `extension` renames them back.
     recordChange(ctx, {
       field: 'affectedDevices',
       from: null,

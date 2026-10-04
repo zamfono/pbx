@@ -148,6 +148,10 @@ async function revertChange(
     // §5.9: undo restores the devices; tokens stay revoked and the person signs in again.
     case 'tokensRevoked':
       return;
+    // Lists the devices an extension rename renamed (§9.3 "Naming"); reverting the `extension`
+    // renames them back.
+    case 'affectedDevices':
+      return;
     case 'deletedAt':
       await revertSoftDelete(ctx, entityKind, entityId);
       return;

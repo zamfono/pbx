@@ -6,18 +6,38 @@ import { guardReuseConflict } from './_reuseConflicts.js';
 import { ENTITY_TABLES } from './_shared.js';
 
 /**
- * The reload kinds an entity kind's own `create`/`delete` propagate (§3.1 config propagation),
- * replayed identically here: restoring the row has to reach the rendered PJSIP/dialplan
- * configuration the same way removing it did. A kind absent here is one whose own delete
- * propagates nothing, config for it being read live rather than rendered to a file.
+ * The reload kinds an entity kind's own `delete` propagates (§3.1 config propagation), replayed
+ * identically here: restoring the row has to reach `core`'s config cache and the rendered
+ * configuration the same way removing it did. An empty list drops the cache alone, for a row the
+ * routing pipeline reads live. A kind absent here is one whose own delete propagates nothing;
+ * an audio asset's depends on its kind (`audioReloadKinds`).
  */
 const DELETE_PROPAGATE_KINDS: Partial<Record<string, ReloadKind[]>> = {
   user: ['pjsip', 'dialplan'],
   device: ['pjsip'],
   ringGroup: ['pjsip', 'dialplan'],
   trunk: ['pjsip'],
-  userGroup: ['pjsip']
+  userGroup: ['pjsip'],
+  menu: [],
+  did: [],
+  didBlock: [],
+  oooRule: [],
+  blockedNumber: [],
+  openingHours: []
 };
+
+/** What restoring the deleted audio asset `id` propagates: hold music is rendered (§10.2 "Hold music"). */
+async function audioReloadKinds(
+  ctx: Context,
+  id: string
+): Promise<ReloadKind[] | undefined> {
+  const asset = await ctx.db
+    .selectFrom('audioAssets')
+    .select('kind')
+    .where('id', '=', id)
+    .executeTakeFirstOrThrow();
+  return asset.kind === 'moh' ? ['moh'] : undefined;
+}
 
 /** `extensions.userId`/`ringGroupId` for the entity kind an `ext` change belongs to (§11.2). */
 function extensionOwner(
@@ -112,7 +132,10 @@ export async function revertSoftDelete(
     .set({ deletedAt: null })
     .where('id', '=', entityId)
     .execute();
-  const kinds = DELETE_PROPAGATE_KINDS[entityKind];
+  const kinds =
+    entityKind === 'audio'
+      ? await audioReloadKinds(ctx, entityId)
+      : DELETE_PROPAGATE_KINDS[entityKind];
   if (kinds) {
     propagate(ctx, kinds);
   }

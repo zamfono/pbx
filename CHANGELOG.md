@@ -310,6 +310,10 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- Undoing the deletion of a DID, number block, IVR menu, out-of-office rule, opening-hours schedule,
+  blocked number or hold-music asset now reaches `core` and Asterisk at once: before, calls kept
+  being routed as if the item were still deleted until some other change went through.
+- An extension change of a user with devices can be undone; the undo was refused with a 409.
 - A call whose SIP Call-ID `core` cannot read from Asterisk (Asterisk unreachable or refusing the
   request as the call comes in) is logged as `SIP dialog join failed` and handled as usual: at call
   log level `sip` it no longer goes unrecorded, and below it `core` no longer exits with an
