@@ -6,8 +6,8 @@ import type { AriClient } from '../ari/client.js';
 import type { AriEventOf } from '../ari/events.js';
 import type { Channel } from '../ari/types.js';
 import type { CdrWriter } from '../cdr.js';
+import { ERROR_TONE_MEDIA } from '../indications.js';
 import type { Presence } from '../presence.js';
-import { defaultPrompt } from '../prompts.js';
 import type { FakeAri } from '../testing/ari/fake.js';
 import {
   defaultChannel,
@@ -2005,7 +2005,7 @@ describe('features', () => {
     ).toBe(false);
   });
 
-  it('dialling an empty parking slot plays the invalid-option prompt and releases with 404', async () => {
+  it('dialling an empty parking slot plays a short error tone and releases with 404', async () => {
     await setUp();
     await seedExtension(db, '701', { isParkingSlot: true });
     await seedRetriever();
@@ -2024,7 +2024,7 @@ describe('features', () => {
     );
     expect(relevant.map(entry => entry.method)).toEqual(['POST', 'DELETE']);
     expect((relevant[0]?.body as { media?: string }).media).toBe(
-      defaultPrompt('invalid')
+      ERROR_TONE_MEDIA
     );
     expect(relevant[1]?.qs).toBe(`reason_code=${sipToHangupCause(404)}`);
   });

@@ -49,10 +49,13 @@ describe('matchFeatureCode', () => {
     expect(matchFeatureCode(DEFAULTS, '101')).toBeNull();
   });
 
-  test('no-argument code ignores trailing digits', () => {
-    expect(matchFeatureCode(DEFAULTS, '*901')).toEqual({
-      key: 'dndOn',
+  test('a code dialled alone matches only exactly, never with trailing digits (§9.3)', () => {
+    expect(matchFeatureCode(DEFAULTS, '*901234')).toBeNull();
+    expect(matchFeatureCode(DEFAULTS, '*91')).toEqual({
+      key: 'dndOff',
       rest: ''
     });
+    expect(matchFeatureCode(DEFAULTS, '*9612')).toBeNull();
+    expect(matchFeatureCode(DEFAULTS, '*7099')).toBeNull();
   });
 });

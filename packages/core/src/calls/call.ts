@@ -24,6 +24,9 @@ export type Leg = {
    * routing trace's `answered` line (§7). */
   deviceId?: string;
   trunkId?: string;
+  /** The ring group that placed a `member` leg, whose `record_calls` counts for it (§10.2
+   * "Recording semantics"). */
+  ringGroupId?: string;
 };
 
 export type Call = {

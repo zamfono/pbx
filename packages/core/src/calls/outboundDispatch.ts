@@ -9,8 +9,8 @@
 import type { CallLogLevel } from '@zamfono/shared';
 
 import { ignoreGone } from '../ari/failures.js';
+import { ERROR_TONE_MEDIA, ERROR_TONE_MS } from '../indications.js';
 import type { Snapshot } from '../internal/snapshot.js';
-import { defaultPrompt } from '../prompts.js';
 import { resolveDialed, type DialAction } from '../routing/outbound.js';
 import { findForwardTarget } from '../routing/targets.js';
 import { SIP_NOT_FOUND } from '../sipCodes.js';
@@ -22,7 +22,7 @@ import { dialExternal } from './outboundExternal.js';
 import { resolveDialedContext, toFor } from './outboundLookup.js';
 import { retrieveParkedCall } from './parkingRetrieval.js';
 import type { Pipeline } from './pipeline.js';
-import { playAndWait } from './playback.js';
+import { playToneAndWait } from './playback.js';
 import { release } from './release.js';
 
 export type ResolvedTarget = {
@@ -58,21 +58,20 @@ export function logLevelFor(
     : configured;
 }
 
-/** Asterisk's generic "not a valid option" prompt, then a release (§9.3 table: an empty parking
- * slot's short error tone; feature-code entry outside a menu shares the same fixed prompt as
- * `menu.ts`'s own `defaultPrompt('invalid')`). */
-async function playInvalidAndRelease(
+/** An empty parking slot's short error tone, then a 404 release (§10.1 Outbound step 3). */
+async function playErrorToneAndRelease(
   pipeline: Pipeline,
   call: Call
 ): Promise<void> {
   const channelId = callerChannel(call);
   const ari = pipeline.deps.ari;
   await ari.channels.answer(channelId).catch(ignoreGone);
-  await playAndWait(
+  await playToneAndWait(
     ari,
     channelId,
-    defaultPrompt('invalid'),
-    `${channelId}:invalid`
+    ERROR_TONE_MEDIA,
+    `${channelId}:error-tone`,
+    ERROR_TONE_MS
   );
   await release(pipeline, call, SIP_NOT_FOUND, 'failed');
 }
@@ -131,8 +130,8 @@ async function dispatchExtension(
     );
     return;
   }
-  // §10.1 step 3: a parking slot retrieves the call parked there, or plays the short error tone
-  // when the slot is empty (§9.3 table).
+  // §10.1 Outbound step 3: a parking slot retrieves the call parked there, or plays the short
+  // error tone when the slot is empty.
   const result = await retrieveParkedCall(
     pipeline,
     pipeline.deps.presence,
@@ -145,7 +144,7 @@ async function dispatchExtension(
       ext: action.owner.ext,
       result: 'empty'
     });
-    await playInvalidAndRelease(pipeline, call);
+    await playErrorToneAndRelease(pipeline, call);
   }
 }
 

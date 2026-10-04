@@ -231,6 +231,11 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- A ring group with neither greeting nor music no longer answers the caller and plays the default
+  hold music: the caller hears ringback until a member answers. A ring group's call recording now
+  covers only the members it rang, not a user its fallback reached afterwards. Dialling an empty
+  parking slot plays a short error tone instead of a spoken prompt. `*90`, `*91`, `*96` and `*70`
+  work only dialled alone: `*901234` is no longer taken as `*90`.
 - Out-of-office and opening hours: `*5` to a colleague now applies their out-of-office rule
   instead of ringing their phones; a tenant-wide out-of-office rule is applied once per call, not
   again at the target it forwards to; opening hours that end at a local time the autumn DST

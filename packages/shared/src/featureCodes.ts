@@ -49,13 +49,16 @@ export const CODES_WITH_ARGUMENT: ReadonlySet<FeatureCodeKey> = new Set([
   'clirOff'
 ]);
 
-/** The longest configured code that prefixes `dialed`, with the remainder after it, or null (§9.3). */
+/** The longest configured code that matches `dialed`, with the remainder after it, or null
+ * (§9.3): a code taking an argument prefixes it, one dialled alone equals it. */
 export function matchFeatureCode(
   codes: FeatureCodes,
   dialed: string
 ): { key: FeatureCodeKey; rest: string } | null {
   const matching = FEATURE_CODE_KEYS.filter(key =>
-    dialed.startsWith(codes[key])
+    CODES_WITH_ARGUMENT.has(key)
+      ? dialed.startsWith(codes[key])
+      : dialed === codes[key]
   );
   if (matching.length === 0) {
     return null;

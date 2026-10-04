@@ -12,6 +12,13 @@ const ITU_ZONE = 'itu';
 /** The `info` tone's `tone:` media reference in the `itu` zone (§9.4 "Cross-trunk failover"). */
 export const SPECIAL_INFORMATION_TONE_MEDIA = `tone:info;tonezone=${ITU_ZONE}`;
 
+/** The short error tone of an empty parking slot (§10.1 Outbound step 3): the `itu` zone's
+ * `congestion` tone, played for {@link ERROR_TONE_MS}. */
+export const ERROR_TONE_MEDIA = `tone:congestion;tonezone=${ITU_ZONE}`;
+
+/** How long the error tone plays: five of its 400 ms cycles. */
+export const ERROR_TONE_MS = 2000;
+
 // The special information tone's own cadence, `950/330,1400/330,1800/330,0/1000` — three rising
 // tones of TONE_SEGMENT_MS each, then TONE_SILENCE_MS of silence — exactly as ITU-T E.180 and
 // images/asterisk/conf/indications.conf's `info` line both name it. None of its elements starts

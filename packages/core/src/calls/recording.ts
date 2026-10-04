@@ -9,16 +9,13 @@ import { newId, RECORDINGS_SUBDIR, type Db } from '@zamfono/shared';
 import type { AriClient } from '../ari/client.js';
 import { logUnlessGone } from '../ari/failures.js';
 import type { Logger } from '../ari/types.js';
-import {
-  userById,
-  type ConfigCache,
-  type Snapshot
-} from '../internal/snapshot.js';
+import type { ConfigCache } from '../internal/snapshot.js';
 import type { Call, Leg } from './call.js';
 import {
   startSnoopPair,
   waitForRecordingFinished
 } from './recordingChannels.js';
+import { legRecords, userRecords } from './recordingFlags.js';
 import { ffmpegMix, type Mixer } from './recordingMix.js';
 import { recordFormatFor } from './recordingRate.js';
 import { storeParticipation } from './recordingStore.js';
@@ -43,22 +40,6 @@ type Participation = {
   rightPath: string;
   outPath: string;
 };
-
-/** The OR-resolution of §10.2 "Recording semantics": the participant's own flag, or the flag of
- * the ring group that routed this participation. A participation outside a group is governed by
- * the user flag alone, and a leg with no user behind it, such as an outbound call's trunk leg, is
- * no user's participation at all ("A recording captures one user's participation"). */
-function recordingEnabled(snapshot: Snapshot, call: Call, leg: Leg): boolean {
-  if (leg.userId === null) {
-    return false;
-  }
-  const user = userById(snapshot, leg.userId);
-  const group =
-    call.ringGroupId === null
-      ? undefined
-      : snapshot.ringGroups.find(row => row.id === call.ringGroupId);
-  return user?.recordCalls === 1 || group?.recordCalls === 1;
-}
 
 /** A participation is one user's in one call: a transferee's channel records in the call it
  * leaves and, from the transfer on, in the call it carries on (§10.2 "Start and end"). */
@@ -95,7 +76,7 @@ export class Recorder {
    * which ever reach `onLegUp`. */
   async onLegUp(call: Call, leg: Leg): Promise<void> {
     const snapshot = await this.deps.cache.get();
-    if (!recordingEnabled(snapshot, call, leg)) {
+    if (!legRecords(snapshot, leg)) {
       return;
     }
     await this.start(call.id, leg.userId, leg.channelId);
@@ -134,9 +115,7 @@ export class Recorder {
     if (userId === null) {
       return;
     }
-    const snapshot = await this.deps.cache.get();
-    const user = userById(snapshot, userId);
-    if (user?.recordCalls !== 1) {
+    if (!userRecords(await this.deps.cache.get(), userId)) {
       return;
     }
     await this.start(callId, userId, channelId);

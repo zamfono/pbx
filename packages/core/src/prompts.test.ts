@@ -6,7 +6,6 @@ describe('defaultPrompt', () => {
   it('renders a fixed default prompt as a sound: reference to its core-sounds name', () => {
     expect(defaultPrompt('vmIntro')).toBe(`sound:${PROMPTS.vmIntro}`);
     expect(defaultPrompt('pbxInvalid')).toBe(`sound:${PROMPTS.pbxInvalid}`);
-    expect(defaultPrompt('invalid')).toBe(`sound:${PROMPTS.invalid}`);
   });
 });
 

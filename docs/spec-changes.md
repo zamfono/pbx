@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-04 · §9.4 Cross-trunk failover, §10.2 Ring groups.** Product-owner decision (failed-call announcement): the announcement plays only when the route list ends in 503; a 486 (channel cap) or 403 (CLIR) refusal is signalled by its own code. A ring group with neither greeting nor music leaves the caller unanswered, hearing ringback, until a member answers.
+*Why:* "Only on 503 (Recommended)": the text covered every exhausted route list while the code, rightly, reserved the announcement for 503; a group without either answered every caller and played the default music in place of ringback.
+
 **2026-10-04 · §9.4 Forwarded calls, §10.1 steps 2-3.** A menu hop of an internal call names the tenant's main number as its `REDIRECTING` number, as its `Diversion` entry already did. The once-per-call evaluation covers the tenant's scope too. Opening hours apply to inbound calls only, forwarded ones included.
 *Why:* the menu hop of an internal call had no `REDIRECTING` number and was dropped from the call's hops; a tenant-wide OOO rule was applied again at the target it forwarded to; step 3 said "forwarded calls" though hours describe reachability from outside.
 

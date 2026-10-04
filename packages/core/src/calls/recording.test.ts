@@ -196,7 +196,12 @@ describe('Recorder', () => {
     });
     const call = buildCall(groupId);
     fakeAri.addChannel({ id: 'leg-channel' });
-    const leg = buildLeg({ channelId: 'leg-channel', userId });
+    const leg = buildLeg({
+      channelId: 'leg-channel',
+      kind: 'member',
+      userId,
+      ringGroupId: groupId
+    });
 
     await recorder.onLegUp(call, leg);
 
@@ -234,6 +239,31 @@ describe('Recorder', () => {
     const call = buildCall(groupId);
     fakeAri.addChannel({ id: 'trunk-channel' });
     const leg = buildLeg({ channelId: 'trunk-channel', kind: 'trunk' });
+
+    await recorder.onLegUp(call, leg);
+
+    expect(snoopCalls()).toHaveLength(0);
+  });
+
+  it("does not record a leg the group did not place, after the group's fallback routed elsewhere", async () => {
+    const userId = await seedUser(db, { recordCalls: 0 });
+    const groupId = await seedRingGroup(db, true);
+    const targetId = await seedForwardTargetUser(db, userId);
+    const didId = await seedDid(db, '+15551000', targetId);
+    await seedSettings(db, { mainDidId: didId });
+    const recorder = new Recorder({
+      ari,
+      cache,
+      db,
+      mediaDir: MEDIA_DIR,
+      mix: () => Promise.resolve(0),
+      log: fakeLogger(),
+      now: () => NOW
+    });
+    // The group rang unanswered and its fallback led to a user who does not record.
+    const call = buildCall(groupId);
+    fakeAri.addChannel({ id: 'leg-channel' });
+    const leg = buildLeg({ channelId: 'leg-channel', userId });
 
     await recorder.onLegUp(call, leg);
 

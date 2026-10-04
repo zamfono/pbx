@@ -13,8 +13,6 @@ export const PROMPTS = {
   vmGoodbye: 'vm-goodbye',
   /** Before a menu replays its greeting on silence or an unmatched string (§10.1 step 6). */
   pbxInvalid: 'pbx-invalid',
-  /** Asterisk's own generic "that is not a valid option" prompt, for feature-code entry outside a menu. */
-  invalid: 'invalid',
   /** Find-me's accept prompt (§10.1 step 4), core sounds' "press 1 to accept this call, or 2 to
    * reject it". The German set has no `followme/` prompts, so a `de` tenant hears the English
    * file, as §9.1 has a prompt missing from a community set fall back. */

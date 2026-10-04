@@ -610,6 +610,31 @@ describe('ringGroup', () => {
     expect(answered[0]).toMatchObject({ userId: userA, ringGroupId: groupId });
   });
 
+  it('leaves the caller unanswered, hearing ringback, for a group with neither greeting nor music (§10.2)', async () => {
+    const groupId = await seedRingGroup(db, {
+      strategy: 'simultaneous',
+      ringTimeoutS: 1
+    });
+    const userId = await seedUser(db);
+    await seedDevice(db, userId, 'plain-0');
+    fakeAri.answerAfterMs = 60_000;
+    await registerDevice(fakeAri, pipeline, 'plain-0');
+    await seedMember(db, groupId, 0, userId);
+
+    await ringGroup(pipeline, call, groupId);
+
+    const callerPosts = fakeAri.calls
+      .filter(
+        entry =>
+          entry.method === 'POST' &&
+          entry.path.startsWith(`channels/${callerChannel.id}/`)
+      )
+      .map(entry => entry.path.slice(`channels/${callerChannel.id}/`.length));
+    expect(callerPosts).toContain('ring');
+    expect(callerPosts).not.toContain('answer');
+    expect(callerPosts).not.toContain('moh');
+  }, 10_000);
+
   it('sequential rings members one after another and falls back once every timeout elapses', async () => {
     const groupId = await seedRingGroup(db, {
       strategy: 'sequential',

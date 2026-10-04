@@ -27,10 +27,11 @@ import { runTarget } from './runTarget.js';
 import { busyDevices } from './userDevices.js';
 import { deposit } from './voicemail.js';
 
-/** Answers the caller (no early media without it), plays the group's greeting to completion if it
- * has one (§10.2 "Ring groups"), then starts its MoH class in place of ringback. A call with no
- * caller channel has nobody to play to. */
-async function playGreetingAndMoh(
+/** What the caller hears while members ring (§10.2 "Ring groups"): for a group with a greeting or
+ * music, the caller is answered (no early media without it), hears the greeting to completion if
+ * set, then the group's MoH class in place of ringback; for a group with neither, ringback,
+ * unanswered. A call with no caller channel has nobody to play to. */
+async function callerWhileRinging(
   pipeline: Pipeline,
   call: Call,
   groupId: string,
@@ -39,6 +40,10 @@ async function playGreetingAndMoh(
 ): Promise<void> {
   const channelId = call.callerChannelId;
   if (channelId === null) {
+    return;
+  }
+  if (group.greetingAudioId === null && group.mohAudioId === null) {
+    await pipeline.deps.ari.channels.ring(channelId).catch(ignoreGone);
     return;
   }
   await pipeline.deps.ari.channels.answer(channelId).catch(ignoreGone);
@@ -197,7 +202,7 @@ export async function ringGroup(
     return;
   }
 
-  await playGreetingAndMoh(pipeline, call, groupId, snapshot, group);
+  await callerWhileRinging(pipeline, call, groupId, snapshot, group);
   if (callEnded(call)) {
     // The caller's own channel ended during the greeting or MoH start: legs.ts's
     // `handleChannelEnded` → `endAbandonedCall` already finished the call (§10.1 "Call
