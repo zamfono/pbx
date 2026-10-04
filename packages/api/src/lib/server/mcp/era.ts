@@ -29,11 +29,14 @@ export const PROTOCOL_VERSION_HEADER = 'mcp-protocol-version';
 const LEGACY_PROTOCOL_VERSIONS: readonly string[] = [LEGACY_PROTOCOL_VERSION];
 
 type LegacySession = { elicits: boolean; protocolVersion: string };
-const legacySessions = new Map<string, LegacySession>();
-// ponytail: no client ever closes a legacy session explicitly, so the map is capped by dropping
-// the oldest entry (insertion order) rather than tracked per-session expiry; a persistent session
-// store replaces this if the api ever runs more than one instance behind a load balancer.
-const MAX_LEGACY_SESSIONS = 1000;
+/** Each user's legacy sessions by id, oldest first (a Map keeps insertion order). A session is
+ *  its user's alone: another user's request with its id finds nothing. */
+const legacySessions = new Map<string, Map<string, LegacySession>>();
+// ponytail: no client ever closes a legacy session explicitly, so each user's sessions are capped
+// by dropping that user's oldest (insertion order) rather than tracked per-session expiry; a
+// persistent session store replaces this if the api ever runs more than one instance behind a
+// load balancer.
+const MAX_LEGACY_SESSIONS_PER_USER = 10;
 
 /** How a request's confirmation is asked (§10.5): which era's shapes, and whether it can elicit. */
 export type Era = { legacy: boolean; elicits: boolean };
@@ -72,25 +75,29 @@ export function negotiateLegacyVersion(requested: string): string {
     : LEGACY_PROTOCOL_VERSION;
 }
 
-/** Starts a legacy session for `initialize`'s `params.capabilities` and negotiated version,
- * returning its `Mcp-Session-Id`. */
+/** Starts `userId`'s legacy session for `initialize`'s `params.capabilities` and negotiated
+ * version, returning its `Mcp-Session-Id`. */
 export function startLegacySession(
+  userId: string,
   capabilities: unknown,
   protocolVersion: string
 ): string {
   const sessionId = newId();
-  if (legacySessions.size >= MAX_LEGACY_SESSIONS) {
-    const oldest = legacySessions.keys().next().value;
-    if (oldest !== undefined) {
-      legacySessions.delete(oldest);
+  const sessions =
+    legacySessions.get(userId) ?? new Map<string, LegacySession>();
+  if (sessions.size >= MAX_LEGACY_SESSIONS_PER_USER) {
+    const oldest = sessions.keys().next();
+    if (oldest.done !== true) {
+      sessions.delete(oldest.value);
     }
   }
-  legacySessions.set(sessionId, {
+  sessions.set(sessionId, {
     elicits: hasElicitationCapability(
       isRecord(capabilities) ? capabilities : null
     ),
     protocolVersion
   });
+  legacySessions.set(userId, sessions);
   return sessionId;
 }
 
@@ -119,14 +126,16 @@ function isLegacyRequest(request: Request, msg: IncomingMessage): boolean {
  * A legacy request's session, per the 2025-11-25 Streamable HTTP transport
  * (https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management):
  * without `Mcp-Session-Id` it is refused with 400, as a server that requires one SHOULD; a
- * session this process no longer holds (evicted, or lost to a restart) with 404, which it MUST,
- * telling the client to `initialize` again; and an `MCP-Protocol-Version` other than the one the
- * session negotiated with 400, which it MUST for an unsupported one. With no version header the
- * negotiated version stands, the "other way to identify the version" that revision allows.
+ * session this process does not hold for the requesting user (evicted, lost to a restart, or
+ * another user's) with 404, which it MUST, telling the client to `initialize` again; and an
+ * `MCP-Protocol-Version` other than the one the session negotiated with 400, which it MUST for an
+ * unsupported one. With no version header the negotiated version stands, the "other way to
+ * identify the version" that revision allows.
  */
 function legacySession(
   request: Request,
-  msg: IncomingMessage
+  msg: IncomingMessage,
+  userId: string
 ): LegacySession | Response {
   const reject = (status: number, message: string): Response =>
     jsonRpcErrorWithStatus(status, msg.id, JSONRPC_INVALID_REQUEST, message);
@@ -134,7 +143,7 @@ function legacySession(
   if (sessionId === null) {
     return reject(HTTP_BAD_REQUEST, 'missing Mcp-Session-Id header');
   }
-  const session = legacySessions.get(sessionId);
+  const session = legacySessions.get(userId)?.get(sessionId);
   if (!session) {
     return reject(HTTP_NOT_FOUND, 'session not found; initialize again');
   }
@@ -153,10 +162,11 @@ function legacySession(
  * request declares them in its own `_meta`. */
 export function resolveEra(
   request: Request,
-  msg: IncomingMessage
+  msg: IncomingMessage,
+  userId: string
 ): Era | Response {
   if (isLegacyRequest(request, msg)) {
-    const session = legacySession(request, msg);
+    const session = legacySession(request, msg, userId);
     return session instanceof Response
       ? session
       : { legacy: true, elicits: session.elicits };

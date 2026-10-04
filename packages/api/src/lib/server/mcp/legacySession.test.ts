@@ -1,27 +1,34 @@
 import { describe, expect, it } from 'vitest';
 
+import { epochSeconds } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
+
+import { signAccessToken } from '#lib/server/auth/jwt.js';
 import {
+  CLIENT_ID,
   CURRENT,
+  JWT_SECRET,
   LEGACY,
   mcpRequest,
+  ORIGIN,
   rpc,
   seededDeps,
   type RpcBody
 } from '#testing/mcp/testKit.js';
 import { legacyRequest, legacySession } from '#testing/mcp/testKitLegacy.js';
+import { seedSession } from '#testing/testDb.js';
 
-import { handleMcpRequest } from '../mcp.js';
+import { handleMcpRequest, type McpDeps } from '../mcp.js';
 
 // A legacy session's handshake and the requests that follow it, per
 // https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle#version-negotiation and
 // https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management.
+function initializeBody(params: Record<string, unknown>): unknown {
+  return { jsonrpc: '2.0', id: 'init', method: 'initialize', params };
+}
+
 function initialize(params: Record<string, unknown>): Request {
-  return mcpRequest({
-    jsonrpc: '2.0',
-    id: 'init',
-    method: 'initialize',
-    params
-  });
+  return mcpRequest(initializeBody(params));
 }
 
 describe('legacy initialize, version negotiation', () => {
@@ -112,5 +119,81 @@ describe('legacy session requests', () => {
       )
     );
     expect(response.status).toBe(404);
+  });
+});
+
+describe('legacy sessions per user', () => {
+  /** Seeds a second user, `user-1`, with a live session; its access token. */
+  async function otherUserToken(deps: McpDeps): Promise<string> {
+    await seedUser(deps.db, {
+      id: 'user-1',
+      name: 'User',
+      email: 'user@x',
+      role: 'user',
+      passwordHash: 'x'
+    });
+    await seedSession(deps.db, 'user-1', CLIENT_ID, 'session-2');
+    return signAccessToken(
+      JWT_SECRET,
+      { sub: 'user-1', role: 'user', cid: CLIENT_ID, sid: 'session-2' },
+      epochSeconds(Date.now()),
+      ORIGIN
+    );
+  }
+
+  async function openSession(deps: McpDeps, token?: string): Promise<string> {
+    const response = await handleMcpRequest(
+      deps,
+      mcpRequest(
+        initializeBody({ protocolVersion: LEGACY, capabilities: {} }),
+        {},
+        token
+      )
+    );
+    return response.headers.get('mcp-session-id') ?? '';
+  }
+
+  async function status(
+    deps: McpDeps,
+    sessionId: string,
+    token?: string
+  ): Promise<number> {
+    const request = mcpRequest(
+      { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} },
+      { 'mcp-protocol-version': LEGACY, 'mcp-session-id': sessionId },
+      token
+    );
+    return (await handleMcpRequest(deps, request)).status;
+  }
+
+  it("keeps a user's session however many sessions another user opens", async () => {
+    const deps = await seededDeps();
+    const ownerSession = await openSession(deps);
+    const token = await otherUserToken(deps);
+    for (let index = 0; index < 1000; index += 1) {
+      // eslint-disable-next-line no-await-in-loop -- one initialize after another, as a client restarting would
+      await openSession(deps, token);
+    }
+    expect(await status(deps, ownerSession)).toBe(200);
+  });
+
+  it("drops a user's oldest session for a new one past the per-user cap", async () => {
+    const deps = await seededDeps();
+    const first = await openSession(deps);
+    const later: string[] = [];
+    for (let index = 0; index < 10; index += 1) {
+      // eslint-disable-next-line no-await-in-loop -- sessions open in order, which decides the oldest
+      later.push(await openSession(deps));
+    }
+    expect(await status(deps, first)).toBe(404);
+    expect(await status(deps, later[0] ?? '')).toBe(200);
+  });
+
+  it("does not serve one user's session to another user", async () => {
+    const deps = await seededDeps();
+    const ownerSession = await openSession(deps);
+    expect(await status(deps, ownerSession, await otherUserToken(deps))).toBe(
+      404
+    );
   });
 });

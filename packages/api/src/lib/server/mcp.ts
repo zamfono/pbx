@@ -55,7 +55,7 @@ const logger = pino({ name: 'mcp' });
 // stateful session this endpoint keeps, returned as `Mcp-Session-Id` for the client to echo, with
 // `MCP-Protocol-Version`, on every later request. `protocolVersion` is a required string of
 // 2025-11-25's `InitializeRequestParams`, so a request without one is `-32602`.
-function legacyInitialize(msg: IncomingMessage): Response {
+function legacyInitialize(msg: IncomingMessage, userId: string): Response {
   const requested = msg.params.protocolVersion;
   if (typeof requested !== 'string') {
     return jsonRpcError(
@@ -65,7 +65,11 @@ function legacyInitialize(msg: IncomingMessage): Response {
     );
   }
   const version = negotiateLegacyVersion(requested);
-  const sessionId = startLegacySession(msg.params.capabilities, version);
+  const sessionId = startLegacySession(
+    userId,
+    msg.params.capabilities,
+    version
+  );
   const response = jsonRpcResult(
     msg.id,
     initializeResult(INSTRUCTIONS, version)
@@ -171,9 +175,9 @@ export async function handleMcpRequest(
   // `initialize` opens a legacy session whatever else the request carries; every other message
   // is its session's, or a stateless 2026-07-28 one checked before it runs (`./mcp/era.js`).
   if (msg.method === 'initialize' && !msg.isNotification) {
-    return legacyInitialize(msg);
+    return legacyInitialize(msg, auth.actor.id);
   }
-  const era = resolveEra(request, msg);
+  const era = resolveEra(request, msg, auth.actor.id);
   if (era instanceof Response) {
     return era;
   }

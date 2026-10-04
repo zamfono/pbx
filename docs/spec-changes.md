@@ -6,11 +6,23 @@ Every change made to [the specification](spec.md) during implementation, newest 
 *Why:* the product owner asked for it: "Per mailbox limit, but no arbitrary upper limit. Null means “no limit”. 100 as default".
 **2026-10-04 · §3.1 Write ownership.** A read-only transaction (`core`'s config snapshot) begins `DEFERRED`; only writing transactions begin `IMMEDIATE`.
 *Why:* an `IMMEDIATE` read took the write lock for nothing, so a config reload held off `api`'s and `core`'s writers.
+**2026-10-04 · §10.5 Protocol revision.** A legacy 2025-11-25 session belongs to the user who opened it, and each user holds at most 10, the oldest dropped first.
+*Why:* one global cap let a single user evict every other user's sessions by opening new ones.
+
 **2026-10-04 · §5.2 Client registration.** The Client ID Metadata Document fetch follows no redirect and refuses a host that resolves to a loopback, private or link-local address.
 *Why:* anyone can name any URL as `client_id` at `/oauth/authorize`, which made the server send requests into its own network and to cloud metadata services.
 
 **2026-10-04 · §5.2 Client registration.** A Client ID Metadata Document is cached for at most 24 hours, at most 1000 at a time with the oldest dropped first, and meets the limits `/oauth/register` applies (`client_name` at most 100 characters, at most 5 redirect URIs of at most 512 characters each).
 *Why:* anyone can make the server fetch any URL at `/oauth/authorize`, and a document chose its own cache lifetime and size, so the cache could grow without bound.
+
+**2026-10-04 · §6.5 Target kinds.** A target's `host` (sftp, ftp, ftps) is an FQDN or an IPv4 address, a webdav `url` an `http` or `https` URL, and an sftp username cannot begin with `-` or contain whitespace, a quote or a backslash; anything else is refused with 422.
+*Why:* the sftp host and username reach `ssh` as arguments through restic's `sftp.command`, which restic splits at whitespace itself, so an admin could add `-oProxyCommand=…` and run a command in `api`.
+
+**2026-10-04 · §6.5 Backups.** Every snapshot carries the fixed host `zamfono`.
+*Why:* restic records the container's hostname and `forget` groups by host, so each recreated `api` container started a group of its own whose snapshots were never forgotten.
+
+**2026-10-04 · §5.4 Key rotation, §6.5 Moving a stack.** A retired `SECRETBOX_KEY` is kept outside the stack for as long as snapshots made under it are retained, and a snapshot made under it is restored with it set as `SECRETBOX_KEY_PREVIOUS`; the boot sweep re-encrypts.
+*Why:* retained snapshots hold secrets encrypted under the key of their day, so removing the retired key after the rotation left them unreadable on restore.
 
 **2026-10-04 · §6.5 Target kinds.** A target's `host` (sftp, ftp, ftps) is an FQDN or an IPv4 address, a webdav `url` an `http` or `https` URL, and an sftp username cannot begin with `-` or contain whitespace, a quote or a backslash; anything else is refused with 422.
 *Why:* the sftp host and username reach `ssh` as arguments through restic's `sftp.command`, which restic splits at whitespace itself, so an admin could add `-oProxyCommand=…` and run a command in `api`.
