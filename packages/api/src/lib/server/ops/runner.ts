@@ -94,7 +94,7 @@ async function executeOperation({
   input
 }: Execution): Promise<unknown> {
   await checkScope(op, ctx, input);
-  checkConfirmation(op, run, input);
+  await checkConfirmation(op, ctx, run.confirm, input);
   const output = await op.run(ctx, input);
   if (!op.readOnly && op.audit !== false) {
     await writeAuditRow({ ctx, op, name, run, input, output });
@@ -218,7 +218,6 @@ export async function replayOperation(
       parsed.error.issues
     );
   }
-  checkConfirmation(op, { channel: 'undo' }, parsed.data);
   const effects = newEffects();
   try {
     await op.run({ ...ctx, effects }, parsed.data);

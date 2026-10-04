@@ -34,7 +34,7 @@ export const update = defineOperation<Input, UpdateState>({
   input: inputSchema,
   minRole: 'owner',
   pureAction: true,
-  confirm: input =>
+  confirm: (_ctx, input) =>
     `Update the stack to ${input.version ?? 'the latest release'}? Calls drop while it restarts, and only a restore from the backup undoes it.`,
   entity: () => ({ kind: 'system', id: null }),
   run: async (ctx, input) => {

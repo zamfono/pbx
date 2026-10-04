@@ -99,6 +99,21 @@ const SCOPE_TABLES = {
   menu: 'menus'
 } as const;
 
+/** How a confirmation question names `scope`: the tenant, or its user, ring group or menu by
+ *  name; 404 when that does not exist. */
+export async function scopeLabel(db: Db, scope: ScopeInput): Promise<string> {
+  if (scope.kind === 'tenant') {
+    return 'the tenant';
+  }
+  const row = await liveRow(
+    db,
+    SCOPE_TABLES[scope.kind],
+    scope.id,
+    `${scope.kind} '${scope.id}' not found`
+  );
+  return row.name;
+}
+
 /**
  * Throws 404 unless `scope` names a live user, ring group or menu; the tenant scope always
  * exists. The runner checks a `user`'s own scope first (`ownScopeInput`), so a `user` learns

@@ -257,6 +257,10 @@ why the specified behaviour changed; the commit history, how.
   change repeats close at its first occurrence, as the open/close events on `/events` already
   did; a menu an internal call is forwarded through is counted as a hop and named by the main
   number; a fallback's routing trace names its number block and the called number.
+- Confirmation questions name what they act on ("Delete Anna Huber (extension 101)? The deletion
+  can be undone for 3 days."), where most named only an id, and give the retention period set in
+  `softDeleteRetentionDays` instead of a fixed 30 days. An unknown id answers 404 rather than the
+  question.
 - A user naming a voicemail, device, call, out-of-office rule or other user that is not their own
   gets 403 before any confirmation question: deleting another user's voicemail or device without
   `confirm` answered 409 with the question first. An out-of-office rule in another user's scope

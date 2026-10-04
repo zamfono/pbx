@@ -39,7 +39,7 @@ register(
     input: z.object({ id: z.string() }).strict(),
     minRole: 'user',
     scope: 'any',
-    confirm: input => `Delete ${input.id}?`,
+    confirm: (_ctx, input) => `Delete ${input.id}?`,
     entity: input => ({ kind: 'test', id: input.id }),
     run: (_ctx, input) => Promise.resolve({ deleted: input.id })
   })

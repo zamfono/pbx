@@ -1225,7 +1225,7 @@ type Operation<In, Out> = {
   minRole: 'owner' | 'admin' | 'user'
   scope: 'any' | ((ctx: Context, input: In) => Promise<boolean>)   // required with minRole 'user': whether what the input names is a user's own (§5.3)
   readOnly?: boolean                   // true for reads; the MCP readOnlyHint, so clients need not confirm them
-  confirm?: (input: In) => string      // present on destructive operations: the question a human must answer first
+  confirm?: (ctx: Context, input: In) => Promise<string>   // present on destructive operations: the question a human must answer first
   audit?: false                        // takes a write out of the audit log (§5.7)
   pureAction?: true                    // an audited call that changes no state of its entity (§5.8)
   entity?: (input: In, out: Out) => { kind: string, id: string | null }   // on a write: the entity its audit_log row names
@@ -1246,14 +1246,14 @@ type Context = {
 
 A registry, filled by each area's `index.ts`, maps every name to its object; the REST route table, the MCP tool list and the OpenAPI document are all generated from that one map, which is what keeps the three surfaces from drifting. One runner wraps every `run` and does the four things they share: it validates the input against `input`, enforces `minRole` and the own-scope rules of §5.3 (a `user` reading only their own voicemails) through `scope`, for a `user` before confirmation and before `run` (403 when not their own), writes the `audit_log` entry with the field-level diff, and performs config propagation (§3.1) where the write touched PJSIP-rendered state. It also builds the `Context`: it opens the transaction that `run` and the audit entry share, fixes `now`, and records how the call arrived, so the trail can tell a person's own change from their assistant's. `run` holds only what differs between operations.
 
-**Confirmation.** An operation with `confirm` runs only after a human has answered its question, built from the input, for example "Delete Anna Huber (extension 101)? The deletion can be undone for 30 days." The runner enforces it per channel:
+**Confirmation.** An operation with `confirm` runs only after a human has answered its question, built from the rows the input names, after the own-scope check and a 404 for an unknown id, for example "Delete Anna Huber (extension 101)? The deletion can be undone for 30 days.", the days being `settings.soft_delete_retention_days`. The runner enforces it per channel:
 
 - MCP: elicitation where the client supports it, else a `confirm: true` tool input (§10.5);
 - REST: the request body carries `confirm: true`; without it the answer is 409 with the question text, so a client can show it and retry;
 - the tenant UI: the question is its dialog;
 - undo and jobs never ask.
 
-Every `DELETE` carries `confirm`, as do `users.erase` and `devices.rotate`; the deletion of a voicemail or a recording and those two actions cannot be undone. The guard is not a substitute for undo, which is what makes a wrong deletion cheap; it is there so that neither a human nor an assistant deletes by momentum.
+Every `DELETE` carries `confirm`, as do `users.erase`, `devices.rotate`, `provisioning.ringotelAdopt` and `system.update`; the deletion of a voicemail or a recording, `users.erase` and `devices.rotate` cannot be undone. The guard is not a substitute for undo, which is what makes a wrong deletion cheap; it is there so that neither a human nor an assistant deletes by momentum.
 
 **Callers.** The callers add transport and nothing else:
 
@@ -1272,7 +1272,7 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Audit** (min. role: admin) — `GET /audit` (filters: entity kind/id, actor, channel, client, operation, time range, `state` = live | undone | all), `POST /audit/{id}/undo` (one entry per call, §5)
 
-**Confirmation** — every `DELETE`, `POST /users/{id}/erase` and `POST /devices/{id}/rotate` require `confirm: true` in the body and answer 409 with the question text without it (§10.3, "Confirmation")
+**Confirmation** — every `DELETE`, `POST /users/{id}/erase`, `POST /devices/{id}/rotate`, `POST /provisioning/ringotel/adopt` and `POST /system/update` require `confirm: true` in the body and answer 409 with the question text without it (§10.3, "Confirmation")
 
 **Users** (min. role: admin (self-service subset for `user`)) — `GET/POST /users` (`POST` returns the one-time set-password link, mailed too with a relay), `GET/PATCH/DELETE /users/{id}` (`DELETE` answers 409 with the blocking references, §5.9), `POST /users/{id}/resetPassword` (same link semantics), `POST /users/{id}/erase` (owners only, §5.10), `GET /users/{id}/forwarding` (the rules, in the shape the `PUT` takes, `sip` targets with their `headers`), `PUT /users/{id}/forwarding` (the rules replaced as a whole), `PUT /users/{id}/presence` (dnd; outside the audit log, §5.7), `PUT/DELETE /users/{id}/voicemailGreeting` (the personal greeting, a WAV or MP3 upload; outside the audit log, §5.7). Self-service, on the user's own id alone (403 for another's): `GET /users/{id}`, `GET /users/{id}/forwarding`, `PUT /users/{id}/forwarding` (a new or changed `sip` target excepted, Forward targets), `PUT /users/{id}/presence`, `PUT/DELETE /users/{id}/voicemailGreeting` and the `PATCH` fields `clir`, `rejectAnonymous`, `ringTimeoutS`, `notifyMissedCalls`, `findMe`; `calleridDidId` is admin-set (§9.4)
 

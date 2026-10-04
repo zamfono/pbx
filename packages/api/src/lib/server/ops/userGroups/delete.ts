@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { propagate } from '../propagate.js';
-import { softDelete } from '../rows.js';
+import { softDelete, softDeleteQuestion } from '../rows.js';
 import { defineOperation } from '../types.js';
 import { liveUserGroup } from './_shared.js';
 
@@ -15,8 +15,11 @@ export const deleteUserGroup = defineOperation({
   description: 'Soft-deletes a user group.',
   input: z.object({ id: z.string() }).strict(),
   minRole: 'admin',
-  confirm: input =>
-    `Delete this user group? The deletion can be undone for 30 days. (${input.id})`,
+  confirm: async (ctx, input) =>
+    softDeleteQuestion(
+      ctx,
+      `the user group ${(await liveUserGroup(ctx.db, input.id)).name}`
+    ),
   entity: input => ({ kind: 'userGroup', id: input.id }),
   run: async (ctx, input) => {
     await liveUserGroup(ctx.db, input.id);

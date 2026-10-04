@@ -4,7 +4,7 @@ import { recordChange } from '../audit.js';
 import { loadDroppedBlfKeys } from '../devices/_shared.js';
 import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
-import { softDelete } from '../rows.js';
+import { softDelete, softDeleteQuestion } from '../rows.js';
 import { Conflict, defineOperation } from '../types.js';
 import { findRingGroupReferences } from './_references.js';
 import { liveRingGroup, ringGroupExtension } from './_shared.js';
@@ -14,8 +14,14 @@ export const deleteRingGroup = defineOperation({
   description: 'Soft-deletes a ring group.',
   input: z.object({ id: z.string() }).strict(),
   minRole: 'admin',
-  confirm: input =>
-    `Delete this ring group? The deletion can be undone for 30 days. (${input.id})`,
+  confirm: async (ctx, input) => {
+    const group = await liveRingGroup(ctx.db, input.id);
+    const ext = await ringGroupExtension(ctx.db, input.id);
+    return softDeleteQuestion(
+      ctx,
+      `the ring group ${group.name} (extension ${ext})`
+    );
+  },
   entity: input => ({ kind: 'ringGroup', id: input.id }),
   run: async (ctx, input) => {
     await liveRingGroup(ctx.db, input.id);

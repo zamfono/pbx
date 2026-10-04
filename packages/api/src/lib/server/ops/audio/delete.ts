@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { propagate } from '../propagate.js';
-import { softDelete } from '../rows.js';
+import { softDelete, softDeleteQuestion } from '../rows.js';
 import { Conflict, defineOperation } from '../types.js';
 import { findAudioAssetReferences, liveAudioAsset } from './_shared.js';
 
@@ -14,8 +14,11 @@ export const deleteAudioAsset = defineOperation({
   description: 'Soft-deletes an audio asset.',
   input: z.object({ id: z.string() }).strict(),
   minRole: 'admin',
-  confirm: input =>
-    `Delete this audio asset? The deletion can be undone for 30 days. (${input.id})`,
+  confirm: async (ctx, input) =>
+    softDeleteQuestion(
+      ctx,
+      `the audio asset ${(await liveAudioAsset(ctx.db, input.id)).label}`
+    ),
   entity: input => ({ kind: 'audio', id: input.id }),
   run: async (ctx, input) => {
     const before = await liveAudioAsset(ctx.db, input.id);

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { activeRingotelProvider } from '#lib/server/provisioning/index.js';
 
 import { propagate } from '../propagate.js';
-import { softDelete } from '../rows.js';
+import { softDelete, softDeleteQuestion } from '../rows.js';
 import { defineOperation } from '../types.js';
 import { liveDevice, ownTlsDevice } from './_shared.js';
 
@@ -14,7 +14,11 @@ export const deleteDevice = defineOperation({
   input: z.object({ id: z.string() }).strict(),
   minRole: 'user',
   scope: ownTlsDevice,
-  confirm: input => `Delete this device? (${input.id})`,
+  confirm: async (ctx, input) =>
+    softDeleteQuestion(
+      ctx,
+      `the device ${(await liveDevice(ctx.db, input.id)).label}`
+    ),
   entity: input => ({ kind: 'device', id: input.id }),
   run: async (ctx, input) => {
     const before = await liveDevice(ctx.db, input.id);

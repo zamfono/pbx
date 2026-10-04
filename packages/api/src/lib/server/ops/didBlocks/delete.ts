@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { propagate } from '../propagate.js';
-import { softDelete } from '../rows.js';
+import { softDelete, softDeleteQuestion } from '../rows.js';
 import { Conflict, defineOperation } from '../types.js';
 import { liveDidBlock, liveDidsInBlock } from './_shared.js';
 
@@ -13,7 +13,11 @@ export const del = defineOperation({
   description: 'Soft-deletes a number block once no live DID falls within it',
   input: inputSchema,
   minRole: 'admin',
-  confirm: input => `Delete number block ${input.id}?`,
+  confirm: async (ctx, input) =>
+    softDeleteQuestion(
+      ctx,
+      `the number block ${(await liveDidBlock(ctx.db, input.id)).base}`
+    ),
   entity: input => ({ kind: 'didBlock', id: input.id }),
   run: async (ctx, input) => {
     const block = await liveDidBlock(ctx.db, input.id);

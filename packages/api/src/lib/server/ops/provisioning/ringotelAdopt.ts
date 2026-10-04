@@ -136,7 +136,7 @@ export const ringotelAdopt = defineOperation<Input, Output>({
     'Adopts an existing, empty Ringotel organization (by id and domain) and one of its connections, or a new one, instead of creating them.',
   input: inputSchema,
   minRole: 'owner',
-  confirm: input =>
+  confirm: (_ctx, input) =>
     `Adopt Ringotel organization ${input.domain} and point ${input.branchId === undefined ? 'a new connection' : `connection ${input.branchId}`} at this stack?`,
   entity: () => ({ kind: 'settings', id: 'settings' }),
   run: async (ctx, input) => {

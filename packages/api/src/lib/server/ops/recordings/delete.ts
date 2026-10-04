@@ -16,8 +16,10 @@ export const deleteRecording = defineOperation({
   description: 'Permanently deletes a call recording and its audio file.',
   input: inputSchema,
   minRole: 'admin',
-  confirm: input =>
-    `Delete this recording? This cannot be undone. (${input.id})`,
+  confirm: async (ctx, input) => {
+    const row = await loadRecording(ctx.db, input.id);
+    return `Delete the recording of ${row.createdAt}? This cannot be undone.`;
+  },
   entity: input => ({ kind: 'recording', id: input.id }),
   run: async (ctx, input) => {
     const row = await loadRecording(ctx.db, input.id);

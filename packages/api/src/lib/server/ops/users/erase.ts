@@ -45,7 +45,16 @@ export const erase = defineOperation({
     "Erases a user's personal data from their audit trail (GDPR, irreversible).",
   input: z.object({ id: z.string() }).strict(),
   minRole: 'owner',
-  confirm: input => `Erase user '${input.id}'? This cannot be undone.`,
+  confirm: async (ctx, input) => {
+    const user = await ctx.db
+      .selectFrom('users')
+      .select('name')
+      .where('id', '=', input.id)
+      .executeTakeFirst();
+    // A user already purged still has audit entries to erase, under their id alone.
+    const who = user?.name ?? `user '${input.id}'`;
+    return `Erase ${who} and the personal data the audit log holds about them? This cannot be undone.`;
+  },
   entity: input => ({ kind: 'user', id: input.id }),
   run: async (ctx, input) => {
     // Before the cascade records the erased user's devices and extension (§5.10).

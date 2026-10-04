@@ -24,8 +24,10 @@ export const deleteVoicemail = defineOperation({
   input: inputSchema,
   minRole: 'user',
   scope: ownVoicemail,
-  confirm: input =>
-    `Delete this voicemail? This cannot be undone. (${input.id})`,
+  confirm: async (ctx, input) => {
+    const row = await loadVoicemail(ctx, input.id);
+    return `Delete the voicemail from ${row.caller} of ${row.createdAt}? This cannot be undone.`;
+  },
   entity: input => ({ kind: 'voicemail', id: input.id }),
   run: async (ctx, input) => {
     const row = await loadVoicemail(ctx, input.id);

@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-import { liveRow, softDelete } from '#lib/server/ops/rows.js';
+import {
+  liveRow,
+  softDelete,
+  softDeleteQuestion
+} from '#lib/server/ops/rows.js';
 import { defineOperation } from '#lib/server/ops/types.js';
 
 const inputSchema = z.object({ id: z.string() }).strict();
@@ -11,7 +15,15 @@ export const targetsDelete = defineOperation({
   description: 'Soft-deletes a backup target; no further run backs up to it',
   input: inputSchema,
   minRole: 'admin',
-  confirm: input => `Delete backup target ${input.id}?`,
+  confirm: async (ctx, input) => {
+    const target = await liveRow(
+      ctx.db,
+      'backupTargets',
+      input.id,
+      'backups: target not found'
+    );
+    return softDeleteQuestion(ctx, `the ${target.kind} backup target`);
+  },
   entity: input => ({ kind: 'backupTarget', id: input.id }),
   run: async (ctx, input) => {
     await liveRow(

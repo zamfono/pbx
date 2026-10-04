@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { softDelete } from '../rows.js';
+import { softDelete, softDeleteQuestion } from '../rows.js';
 import { defineOperation } from '../types.js';
 import { liveContact } from './_shared.js';
 
@@ -13,8 +13,11 @@ export const deleteContact = defineOperation({
   description: 'Soft-deletes a phone-book contact.',
   input: z.object({ id: z.string() }).strict(),
   minRole: 'admin',
-  confirm: input =>
-    `Delete this contact? The deletion can be undone for 30 days. (${input.id})`,
+  confirm: async (ctx, input) =>
+    softDeleteQuestion(
+      ctx,
+      `the contact ${(await liveContact(ctx.db, input.id)).displayName}`
+    ),
   entity: input => ({ kind: 'contact', id: input.id }),
   run: async (ctx, input) => {
     await liveContact(ctx.db, input.id);

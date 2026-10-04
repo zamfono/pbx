@@ -3,11 +3,12 @@ import { z } from 'zod';
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
 import { propagate } from '../propagate.js';
-import { softDelete } from '../rows.js';
+import { softDelete, softDeleteQuestion } from '../rows.js';
 import {
   assertScopeExists,
   ownScopeInput,
-  scopeInputSchema
+  scopeInputSchema,
+  scopeLabel
 } from '../scope.js';
 import { defineOperation, OpError } from '../types.js';
 import { loadSchedule } from './_shared.js';
@@ -24,7 +25,11 @@ export const del = defineOperation({
   input: inputSchema,
   minRole: 'user',
   scope: ownScopeInput,
-  confirm: () => 'Delete this opening-hours schedule?',
+  confirm: async (ctx, input) =>
+    softDeleteQuestion(
+      ctx,
+      `the opening hours of ${await scopeLabel(ctx.db, input.scope)}`
+    ),
   entity: (_input, output: { id: string }) => ({
     kind: 'openingHours',
     id: output.id

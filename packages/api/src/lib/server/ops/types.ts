@@ -49,7 +49,8 @@ export type Operation<In, Out> = {
   description: string;
   input: z.ZodType<In>;
   readOnly?: boolean;
-  confirm?: (input: In) => string;
+  /** The question a human answers before a destructive call runs, naming what it acts on (§10.3). */
+  confirm?: (ctx: Context, input: In) => string | Promise<string>;
   /** `false` opts a write out of the audit log: presence, read flags, live-call actions (§5.7). */
   audit?: false;
   /**

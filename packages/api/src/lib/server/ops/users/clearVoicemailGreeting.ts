@@ -25,8 +25,8 @@ export const clearVoicemailGreeting = defineOperation({
   minRole: 'user',
   scope: ownUserId,
   audit: false,
-  confirm: () =>
-    "Remove this user's voicemail greeting? Callers then hear the default prompt.",
+  confirm: async (ctx, input) =>
+    `Remove the voicemail greeting of ${(await liveUser(ctx.db, input.id)).name}? Callers then hear the default prompt.`,
   run: async (ctx, input) => {
     const user = await liveUser(ctx.db, input.id);
     await ctx.db

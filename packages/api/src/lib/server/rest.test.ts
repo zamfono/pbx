@@ -147,6 +147,7 @@ describe('handleRest', () => {
 
   it('answers 409 with the confirmation question when DELETE omits confirm', async () => {
     const deps = await testDeps();
+    await seedSettings(deps.db);
     await seedUsers(deps.db);
     const response = await rest(deps, '/users/u1', { method: 'DELETE' });
     expect(response.status).toBe(409);

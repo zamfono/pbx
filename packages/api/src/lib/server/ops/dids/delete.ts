@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { propagate } from '../propagate.js';
-import { liveRow, softDelete } from '../rows.js';
+import { liveRow, softDelete, softDeleteQuestion } from '../rows.js';
 import { Conflict, defineOperation, type Context } from '../types.js';
 
 const inputSchema = z.object({ id: z.string() }).strict();
@@ -57,7 +57,10 @@ export const del = defineOperation({
     'Soft-deletes a DID unless it is the main number or presented as caller ID',
   input: inputSchema,
   minRole: 'admin',
-  confirm: input => `Delete DID ${input.id}?`,
+  confirm: async (ctx, input) => {
+    const did = await liveRow(ctx.db, 'dids', input.id, 'dids: DID not found');
+    return softDeleteQuestion(ctx, `the DID ${did.number}`);
+  },
   entity: input => ({ kind: 'did', id: input.id }),
   run: async (ctx, input) => {
     await liveRow(ctx.db, 'dids', input.id, 'dids: DID not found');

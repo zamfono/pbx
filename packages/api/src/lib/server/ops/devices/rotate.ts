@@ -16,7 +16,8 @@ export const rotate = defineOperation({
   description: "Rotates a device's SIP password.",
   input: z.object({ id: z.string() }).strict(),
   minRole: 'admin',
-  confirm: input => `Rotate the SIP password of device '${input.id}'?`,
+  confirm: async (ctx, input) =>
+    `Rotate the SIP password of the device ${(await liveDevice(ctx.db, input.id)).label}? It stops registering until it has the new one.`,
   entity: input => ({ kind: 'device', id: input.id }),
   run: async (ctx, input) => {
     const row = await liveDevice(ctx.db, input.id);

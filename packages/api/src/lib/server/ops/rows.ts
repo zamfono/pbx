@@ -40,3 +40,18 @@ export async function softDelete(
     .execute();
   recordChange(ctx, { field: 'deletedAt', from: null, to: ctx.now });
 }
+
+/**
+ * The confirmation question of a soft delete (§10.3 "Confirmation"): `what` goes, and its
+ * deletion can be undone until `settings.soft_delete_retention_days` purge it (§11.6).
+ */
+export async function softDeleteQuestion(
+  ctx: Context,
+  what: string
+): Promise<string> {
+  const { softDeleteRetentionDays } = await ctx.db
+    .selectFrom('settings')
+    .select('softDeleteRetentionDays')
+    .executeTakeFirstOrThrow();
+  return `Delete ${what}? The deletion can be undone for ${softDeleteRetentionDays} days.`;
+}

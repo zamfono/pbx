@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { softDelete } from '../rows.js';
+import { softDelete, softDeleteQuestion } from '../rows.js';
 import { defineOperation } from '../types.js';
 import { liveWebhook } from './_shared.js';
 
@@ -15,7 +15,11 @@ export const del = defineOperation({
   description: 'Soft-deletes a webhook; its events are no longer delivered',
   input: inputSchema,
   minRole: 'admin',
-  confirm: input => `Delete webhook ${input.id}?`,
+  confirm: async (ctx, input) =>
+    softDeleteQuestion(
+      ctx,
+      `the webhook to ${(await liveWebhook(ctx.db, input.id)).url}`
+    ),
   entity: input => ({ kind: 'webhook', id: input.id }),
   run: async (ctx, input) => {
     await liveWebhook(ctx.db, input.id);

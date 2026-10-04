@@ -12,6 +12,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §10.2 Search.** A search hit's `matched` names the field as the hit's resource names it on the wire: a user's `extension`, a contact's `displayName` and `phones`.
 *Why:* `matched` said `ext`, `name` and `phone`, names no resource has, so a client could not point at the field that hit.
+**2026-10-04 · §10.3 Operations layer, Confirmation.** `confirm` takes the `Context` too and builds its question from the rows the input names, after the own-scope check, so an unknown id answers 404 rather than a question; a soft delete's question gives `settings.soft_delete_retention_days`. The confirmation lists name `provisioning.ringotelAdopt` and `system.update`, which already asked.
+*Why:* with only the input, a question could name nothing but an id ("Erase user '0198…'?"), the spec's own example was unreachable, and several questions promised 30 days whatever the retention setting.
+
 **2026-10-04 · §10.3 Operations layer.** Product-owner decision (own scope): every operation a `user` may call declares its `scope`, whether what the input names is the user's own, and the runner checks it before confirmation and before `run` (403 when not). The `Operation`/`Context` sketch lists the fields every operation uses (`scope`, `audit`, `pureAction`, `entity`, `clientName`, `effects`); an operation with a three-part name lives in a subfolder (`backups/targets/create.ts`).
 *Why:* "Runner enforces (Recommended)": each operation re-implemented its own-scope check inside `run`, after the confirmation question, and one forgotten would have opened it to every user; the sketch left out fields that decide the audit row.
 

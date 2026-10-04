@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { propagate } from '../propagate.js';
-import { liveRow, softDelete } from '../rows.js';
+import { liveRow, softDelete, softDeleteQuestion } from '../rows.js';
 import { defineOperation } from '../types.js';
 
 const inputSchema = z.object({ id: z.string() }).strict();
@@ -12,7 +12,18 @@ export const del = defineOperation({
   description: 'Removes a number from the tenant blocklist',
   input: inputSchema,
   minRole: 'admin',
-  confirm: input => `Unblock ${input.id}?`,
+  confirm: async (ctx, input) => {
+    const row = await liveRow(
+      ctx.db,
+      'blockedNumbers',
+      input.id,
+      `blocked number '${input.id}' not found`
+    );
+    return softDeleteQuestion(
+      ctx,
+      `the block of ${row.number}${row.isPrefix ? '…' : ''}`
+    );
+  },
   entity: input => ({ kind: 'blockedNumber', id: input.id }),
   run: async (ctx, input) => {
     await liveRow(

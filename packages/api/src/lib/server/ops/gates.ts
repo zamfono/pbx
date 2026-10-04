@@ -2,7 +2,6 @@ import {
   HTTP_FORBIDDEN,
   HTTP_NOT_FOUND,
   HTTP_UNPROCESSABLE_CONTENT,
-  type AuditChannel,
   type UserRole
 } from '@zamfono/shared';
 
@@ -76,13 +75,14 @@ export function ownActingUser(
 }
 
 /** MCP elicitation, the REST `confirm: true` body field and the UI dialog share this gate (§10.3); undo and jobs never ask. */
-export function checkConfirmation(
+export async function checkConfirmation(
   op: ErasedOperation,
-  run: { channel: AuditChannel; confirm?: boolean },
+  ctx: Context,
+  confirmed: boolean | undefined,
   input: unknown
-): void {
-  const alwaysConfirmed = run.channel === 'undo' || run.channel === 'job';
-  if (op.confirm && !alwaysConfirmed && run.confirm !== true) {
-    throw new ConfirmationRequired(op.confirm(input));
+): Promise<void> {
+  const alwaysConfirmed = ctx.channel === 'undo' || ctx.channel === 'job';
+  if (op.confirm && !alwaysConfirmed && confirmed !== true) {
+    throw new ConfirmationRequired(await op.confirm(ctx, input));
   }
 }

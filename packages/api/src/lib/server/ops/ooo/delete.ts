@@ -1,8 +1,13 @@
 import { z } from 'zod';
 
 import { propagate } from '../propagate.js';
-import { softDelete } from '../rows.js';
-import { assertScopeExists, isOwnScope, scopeFromColumns } from '../scope.js';
+import { softDelete, softDeleteQuestion } from '../rows.js';
+import {
+  assertScopeExists,
+  isOwnScope,
+  scopeFromColumns,
+  scopeLabel
+} from '../scope.js';
 import { defineOperation } from '../types.js';
 import { liveOooRule } from './_shared.js';
 
@@ -16,7 +21,15 @@ export const del = defineOperation({
   minRole: 'user',
   scope: async (ctx, input) =>
     isOwnScope(ctx, scopeFromColumns(await liveOooRule(ctx.db, input.id))),
-  confirm: input => `Delete out-of-office rule ${input.id}?`,
+  confirm: async (ctx, input) => {
+    const rule = await liveOooRule(ctx.db, input.id);
+    const owner = await scopeLabel(ctx.db, scopeFromColumns(rule));
+    const period = rule.startsAt === null ? '' : ` from ${rule.startsAt}`;
+    return softDeleteQuestion(
+      ctx,
+      `the out-of-office rule of ${owner}${period}`
+    );
+  },
   entity: input => ({ kind: 'oooRule', id: input.id }),
   run: async (ctx, input) => {
     const rule = await liveOooRule(ctx.db, input.id);

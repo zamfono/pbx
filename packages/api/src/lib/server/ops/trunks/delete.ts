@@ -5,7 +5,7 @@ import {
   type Reference
 } from '../forwardTargetOwners.js';
 import { propagate } from '../propagate.js';
-import { softDelete } from '../rows.js';
+import { softDelete, softDeleteQuestion } from '../rows.js';
 import { Conflict, defineOperation, type Context } from '../types.js';
 import { liveTrunk } from './_shared.js';
 import { emergencyTrunkWarnings } from './_writeChecks.js';
@@ -52,7 +52,11 @@ export const deleteTrunk = defineOperation<Input, Output>({
     'Soft-deletes a SIP trunk once no outbound route or sip forward target uses it (409 names them).',
   input: inputSchema,
   minRole: 'admin',
-  confirm: () => 'Delete this trunk? The deletion can be undone for 30 days.',
+  confirm: async (ctx, input) =>
+    softDeleteQuestion(
+      ctx,
+      `the trunk ${(await liveTrunk(ctx.db, input.id)).name}`
+    ),
   entity: input => ({ kind: 'trunk', id: input.id }),
   run: async (ctx, input) => {
     await liveTrunk(ctx.db, input.id);

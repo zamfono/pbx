@@ -20,7 +20,8 @@ export const del = defineOperation({
     "Removes a tenant's mail template override, so the shipped template applies again",
   input: inputSchema,
   minRole: 'admin',
-  confirm: input => `Remove the ${input.language} override for ${input.kind}?`,
+  confirm: (_ctx, input) =>
+    `Remove the ${input.language} override for ${input.kind}?`,
   entity: input => ({
     kind: 'mailTemplate',
     id: `${input.kind}:${input.language}`

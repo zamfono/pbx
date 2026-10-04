@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
+import { softDeleteQuestion } from '../rows.js';
 import { Conflict, defineOperation } from '../types.js';
 import { cascadeSoftDeleteUser } from './_cascade.js';
+import { userExtension } from './_extensions.js';
 import { findUserReferences } from './_references.js';
 import { assertNotLastOwner, liveUser } from './_shared.js';
 
@@ -12,8 +14,11 @@ export const deleteUser = defineOperation({
     'Soft-deletes a user, cascading their devices, extension and sessions.',
   input: z.object({ id: z.string() }).strict(),
   minRole: 'admin',
-  confirm: input =>
-    `Delete this user? The deletion can be undone until the retention period expires. (${input.id})`,
+  confirm: async (ctx, input) => {
+    const user = await liveUser(ctx.db, input.id);
+    const ext = await userExtension(ctx.db, input.id);
+    return softDeleteQuestion(ctx, `${user.name} (extension ${ext})`);
+  },
   entity: input => ({ kind: 'user', id: input.id }),
   run: async (ctx, input) => {
     const before = await liveUser(ctx.db, input.id);
