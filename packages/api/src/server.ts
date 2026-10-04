@@ -5,7 +5,7 @@
  * (`lib/server/jobs/background.ts`), through the sink this file provides
  * (`lib/server/eventSink.ts`). It runs outside that bundle, where SvelteKit's `$app/env/private` does not
  * exist, so it reads `process.env` itself and passes what the modules it imports need, the
- * database file (`DB_FILE`, with `src/env.ts`'s default) and `JWT_SECRET`, into them; none of
+ * database file (`DB_FILE`, through shared's `dbFileFrom`) and `JWT_SECRET`, into them; none of
  * them reads the environment.
  */
 import http from 'node:http';
@@ -13,12 +13,7 @@ import process from 'node:process';
 import pino from 'pino';
 import { WebSocketServer, type WebSocket } from 'ws';
 
-import {
-  DEFAULT_DB_FILE,
-  openDb,
-  resolveVersion,
-  type Db
-} from '@zamfono/shared';
+import { dbFileFrom, openDb, resolveVersion, type Db } from '@zamfono/shared';
 
 import { EventHub } from '#lib/server/events.js';
 import { authenticateEventsSocket } from '#lib/server/eventsAuth.js';
@@ -90,11 +85,7 @@ function exitOnSignal(server: http.Server): void {
 async function main(): Promise<void> {
   // §7 "Version": the first line api logs, before anything that can fail boots.
   logger.info({ version: zamfonoVersion.display }, 'api starting');
-  // An empty value is unset, as in `src/env.ts`: Compose hands an unset `${VAR:-}` over as ''.
-  const dbFile = process.env.DB_FILE;
-  const db = openDb(
-    dbFile === undefined || dbFile === '' ? DEFAULT_DB_FILE : dbFile
-  );
+  const db = openDb(dbFileFrom(process.env.DB_FILE));
   const hub = new EventHub(db);
   provideEventSink({
     publish: envelope => {

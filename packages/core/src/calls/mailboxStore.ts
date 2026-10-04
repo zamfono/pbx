@@ -6,16 +6,13 @@
 import { unlink } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { Db } from '@zamfono/shared';
+import { VOICEMAIL_SUBDIR, type Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import { logFailure } from '../ari/failures.js';
 import type { Folder } from './mailboxPrompts.js';
 import type { Owner } from './release.js';
 import { refreshMwi } from './voicemailStore.js';
-
-/** The voicemail directory under the media volume (§11.6). */
-export const VOICEMAIL_DIR_NAME = 'voicemail';
 
 export type MailboxMessage = { id: string; filename: string; folder: Folder };
 
@@ -75,7 +72,7 @@ export async function deleteMessage(
 ): Promise<void> {
   await deps.db.deleteFrom('voicemails').where('id', '=', message.id).execute();
   await unlink(
-    path.join(deps.mediaDir, VOICEMAIL_DIR_NAME, message.filename)
+    path.join(deps.mediaDir, VOICEMAIL_SUBDIR, message.filename)
   ).catch(logFailure(deps.ari.log, 'voicemail file removal'));
   await refreshMwi(deps, owner);
 }

@@ -1,9 +1,12 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import * as env from '$app/env/private';
 import pino from 'pino';
-import { z } from 'zod';
 
-import { HTTP_ACCEPTED, HTTP_BAD_REQUEST } from '@zamfono/shared';
+import {
+  HTTP_ACCEPTED,
+  HTTP_BAD_REQUEST,
+  mailRequestSchema
+} from '@zamfono/shared';
 
 import { getDb } from '#lib/server/db.js';
 import { tryReadJson } from '#lib/server/json.js';
@@ -11,49 +14,6 @@ import { sendMail } from '#lib/server/mail/index.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 const logger = pino({ name: 'internal-mail' });
-
-// §11.6: voicemail audio lives under this media-volume prefix; `attachmentPath` is constrained
-// to it so a malformed request cannot make `sendMail` attach an arbitrary readable file.
-const ATTACHMENT_PREFIX = '/media/voicemail/';
-
-const toUserOrRingGroup = z.union([
-  z.object({ userId: z.string() }),
-  z.object({ ringGroupId: z.string() })
-]);
-
-/** `MailRequest` (§3, §3.1 "Mail"), validated at the internal-network boundary. */
-const mailRequestSchema = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('voicemail'),
-    callId: z.string().optional(),
-    to: toUserOrRingGroup,
-    values: z.object({
-      callerNumber: z.string(),
-      callerName: z.string(),
-      mailboxName: z.string(),
-      receivedAt: z.string(),
-      durationS: z.number()
-    }),
-    attachmentPath: z
-      .string()
-      .startsWith(ATTACHMENT_PREFIX)
-      .refine(
-        attachmentPath => !attachmentPath.includes('..'),
-        'must not contain ..'
-      )
-  }),
-  z.object({
-    kind: z.literal('missedCall'),
-    callId: z.string().optional(),
-    to: z.object({ userId: z.string() }),
-    values: z.object({
-      callerNumber: z.string(),
-      callerName: z.string(),
-      receivedAt: z.string(),
-      didLabel: z.string()
-    })
-  })
-]);
 
 async function handleMailRequest(request: Request): Promise<Response> {
   const parsed = mailRequestSchema.safeParse(await tryReadJson(request));

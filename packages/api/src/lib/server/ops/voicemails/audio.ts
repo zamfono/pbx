@@ -2,10 +2,12 @@ import path from 'node:path';
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
+import { VOICEMAIL_SUBDIR } from '@zamfono/shared';
+
 import { downloadAudio } from '#lib/server/audio/transcode.js';
 
 import { defineOperation } from '../types.js';
-import { loadVoicemail, ownVoicemail, VOICEMAIL_SUBDIR } from './_shared.js';
+import { loadVoicemail, ownVoicemail } from './_shared.js';
 
 const inputSchema = z
   .object({

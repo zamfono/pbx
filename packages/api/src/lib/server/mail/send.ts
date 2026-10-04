@@ -1,9 +1,10 @@
+import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import * as env from '$app/env/private';
 import type { Transporter } from 'nodemailer';
 import pino from 'pino';
 
-import type { Db, MailRequest } from '@zamfono/shared';
+import { VOICEMAIL_SUBDIR, type Db, type MailRequest } from '@zamfono/shared';
 
 import { voicemailAttachment } from '../audio/transcode.js';
 import type { Keyring } from '../secretbox.js';
@@ -34,14 +35,16 @@ type Attachment = { filename: string; content: Buffer; contentType: string };
  * without audio, since the notification is worth more than the recording it would carry.
  */
 async function attachmentsFor(req: {
-  attachmentPath?: string;
+  filename?: string;
   callId?: string;
 }): Promise<Attachment[] | undefined> {
-  if (req.attachmentPath === undefined) {
+  if (req.filename === undefined) {
     return undefined;
   }
   try {
-    const attachment = voicemailAttachment(req.attachmentPath);
+    const attachment = voicemailAttachment(
+      path.join(env.MEDIA_DIR, VOICEMAIL_SUBDIR, req.filename)
+    );
     return [
       {
         filename: attachment.filename,
@@ -135,9 +138,8 @@ export async function sendMail(
   });
   const transport = opts?.transport ?? createTransportFor(relay);
   const attempts = opts?.attempts ?? DEFAULT_ATTEMPTS;
-  const attachments = await attachmentsFor(
-    req as { attachmentPath?: string; callId?: string }
-  );
+  const attachments =
+    req.kind === 'voicemail' ? await attachmentsFor(req) : undefined;
   // The structured form lets nodemailer encode the display name, so a `company_name` (§11.4,
   // owner-editable) containing a quote or comma cannot produce a malformed From header.
   const from = relay.fromName

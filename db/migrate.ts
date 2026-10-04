@@ -1,7 +1,7 @@
 // The migrate image's entry point (spec §6.3 "Migrations"): applies db/migrations to the database
 // DB_FILE names, by default the stack's, with Kysely's Migrator and exits 0 once every migration
 // is applied. A database file another process briefly holds locked, which better-sqlite3 reports
-// as SQLITE_BUSY or SQLITE_LOCKED, is retried five times at 5 s intervals; a migration that fails
+// as SQLITE_BUSY or SQLITE_LOCKED, is retried five times at 5 s intervals, six attempts in all; a migration that fails
 // on its own merits exits 1 at once, so a broken release stops the deployment without running its
 // failing migration again. Node runs this file directly (type stripping).
 import { promises as fs } from 'node:fs';
@@ -11,22 +11,17 @@ import Database from 'better-sqlite3';
 import { Kysely, SqliteDialect } from 'kysely';
 import { FileMigrationProvider, Migrator } from 'kysely/migration';
 
-const ATTEMPTS = 5;
+// The source file itself, which the migrate image carries at the same path as a checkout does.
+import { dbFileFrom } from '../packages/shared/src/stackPaths.ts';
+
+const RETRIES = 5;
+const ATTEMPTS = RETRIES + 1;
 const RETRY_DELAY_MS = 5000;
 // The primary result codes and their extended forms, such as SQLITE_BUSY_RECOVERY.
 const LOCKED_CODE = /^SQLITE_(?:BUSY|LOCKED)(?:_|$)/u;
 
-// The stack's database file in the `db` volume, as compose.yaml mounts it: the same default as
-// @zamfono/shared's DEFAULT_DB_FILE, which api and core use and this image cannot import (§6.3).
-const DEFAULT_DB_FILE = '/data/zamfono.sqlite3';
-const dbFile =
-  process.env.DB_FILE === undefined || process.env.DB_FILE === ''
-    ? DEFAULT_DB_FILE
-    : process.env.DB_FILE;
-
 function isLocked(error: unknown): boolean {
-  const code = (error as { code?: unknown } | undefined)?.code;
-  return typeof code === 'string' && LOCKED_CODE.test(code);
+  return error instanceof Database.SqliteError && LOCKED_CODE.test(error.code);
 }
 
 /** One run of the migrator; throws what it failed with. A relative DB_FILE is the root's. */
@@ -85,4 +80,4 @@ async function migrate(file: string, attempt: number): Promise<number> {
   return migrate(file, attempt + 1);
 }
 
-process.exitCode = await migrate(dbFile, 1);
+process.exitCode = await migrate(dbFileFrom(process.env.DB_FILE), 1);

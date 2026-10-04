@@ -2,7 +2,7 @@ import { access, copyFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import type { Logger } from 'pino';
 
-import { newId, type Db } from '@zamfono/shared';
+import { newId, PROMPTS_SUBDIR, type Db } from '@zamfono/shared';
 
 import { mohClassDir } from './audio/mohLayout.js';
 
@@ -133,7 +133,7 @@ export async function createMohAssets(
   const sourceDir = env.MOH_SOURCE_DIR;
   await assertSourceDir(sourceDir);
   log.info(`seed: seeding bundled hold music from ${sourceDir}`);
-  const promptsDir = path.join(mediaDir, 'prompts');
+  const promptsDir = path.join(mediaDir, PROMPTS_SUBDIR);
   await mkdir(promptsDir, { recursive: true });
   const rows = await Promise.all(
     MOH_TRACK_BASENAMES.map(basename =>

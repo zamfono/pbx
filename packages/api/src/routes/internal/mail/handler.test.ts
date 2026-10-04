@@ -20,7 +20,7 @@ function eventFor(request: Request): RequestEvent {
 }
 
 describe('POST /internal/mail', () => {
-  it('returns 400 for an attachmentPath outside the voicemail media directory', async () => {
+  it('returns 400 for a voicemail filename that reaches outside the voicemail directory', async () => {
     const request = new Request('http://internal/internal/mail', {
       method: 'POST',
       body: JSON.stringify({
@@ -33,7 +33,7 @@ describe('POST /internal/mail', () => {
           receivedAt: '2026-06-15T12:00:00.000Z',
           durationS: 12
         },
-        attachmentPath: '/etc/passwd'
+        filename: '../../etc/passwd'
       })
     });
     const response = await POST(eventFor(request));

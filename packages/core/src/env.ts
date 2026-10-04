@@ -5,7 +5,7 @@
  * empty value, which Compose hands over for an unset `${VAR:-}`, counts as unset.
  */
 import {
-  DEFAULT_DB_FILE,
+  dbFileFrom,
   DEFAULT_MEDIA_DIR,
   MAX_PORT,
   resolveVersion,
@@ -121,7 +121,7 @@ export function readEnv(env: NodeJS.ProcessEnv): CoreEnv {
     amiHost: ami.host,
     amiPort: ami.port,
     amiPassword: requireEnv(env, 'AMI_PASSWORD'),
-    dbFile: optionalEnv(env, 'DB_FILE') ?? DEFAULT_DB_FILE,
+    dbFile: dbFileFrom(env.DB_FILE),
     mediaDir: optionalEnv(env, 'MEDIA_DIR') ?? DEFAULT_MEDIA_DIR,
     hepEnabled: env.HEP_ENABLED !== 'false',
     sipUdpEnabled: env.SIP_UDP_ENABLED !== 'false',

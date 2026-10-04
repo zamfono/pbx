@@ -7,6 +7,7 @@ import pino from 'pino';
 import {
   HTTP_NOT_FOUND,
   mwiMailboxOf,
+  VOICEMAIL_SUBDIR,
   type DB,
   type MwiMailbox
 } from '@zamfono/shared';
@@ -104,8 +105,6 @@ export function mailboxKey(
     'voicemails: row has neither a user nor a ring group mailbox'
   );
 }
-
-export const VOICEMAIL_SUBDIR = 'voicemail';
 
 /** Removes a voicemail's audio file from the media volume; missing files are not an error. */
 export async function deleteVoicemailFile(

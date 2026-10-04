@@ -4,7 +4,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import * as env from '$app/env/private';
 
-import { newId, type AudioKind } from '@zamfono/shared';
+import { newId, PROMPTS_SUBDIR, type AudioKind } from '@zamfono/shared';
 
 import { mohClassDir } from './mohLayout.js';
 import type { AudioUpload, StoredAudio } from './types.js';
@@ -69,7 +69,7 @@ export async function storeAudio(
 ): Promise<StoredAudio> {
   const extension = masterExtension(upload);
   const id = newId();
-  const promptsDir = path.join(mediaDir, 'prompts');
+  const promptsDir = path.join(mediaDir, PROMPTS_SUBDIR);
   const masterPath = path.join(promptsDir, `${id}.master${extension}`);
   const wavFilename = `${id}${PLAYBACK_EXTENSION}`;
   const wavPath = path.join(promptsDir, wavFilename);
@@ -99,7 +99,7 @@ export async function deleteAudioFile(
   mediaDir: string = env.MEDIA_DIR
 ): Promise<void> {
   const id = path.basename(filename, path.extname(filename));
-  const promptsDir = path.join(mediaDir, 'prompts');
+  const promptsDir = path.join(mediaDir, PROMPTS_SUBDIR);
   const entries = await readdir(promptsDir).catch(() => [] as string[]);
   await Promise.all(
     entries

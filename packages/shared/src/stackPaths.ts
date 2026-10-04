@@ -1,14 +1,25 @@
 import path from 'node:path';
 
 /**
- * Where `api` and `core` find the stack's `db` and `media` volumes, as compose.yaml mounts them
- * (§6.3): the defaults of `DB_FILE` and `MEDIA_DIR`, which a run outside the stack sets.
+ * Where `migrate`, `api` and `core` find the stack's `db` and `media` volumes, as compose.yaml
+ * mounts them (§6.3): the defaults of `DB_FILE` and `MEDIA_DIR`, which a run outside the stack
+ * sets. The migrate image carries this file beside `db/migrate.ts`, so it imports nothing but
+ * Node's own modules.
  */
-export const DEFAULT_DB_FILE = '/data/zamfono.sqlite3';
+const DEFAULT_DB_FILE = '/data/zamfono.sqlite3';
 export const DEFAULT_MEDIA_DIR = '/media';
 
-/** The media volume's subdirectory recordings live in (§11.6). */
+/** The database file `DB_FILE` names; the stack's while it is unset or empty, as Compose hands
+ * over an unset `${VAR:-}`. */
+export function dbFileFrom(value: string | undefined): string {
+  return value === undefined || value === '' ? DEFAULT_DB_FILE : value;
+}
+
+/** The media volume's subdirectories (§11.6): greetings, prompts and hold music; recordings;
+ * voicemail messages. */
+export const PROMPTS_SUBDIR = 'prompts';
 export const RECORDINGS_SUBDIR = 'recordings';
+export const VOICEMAIL_SUBDIR = 'voicemail';
 
 // The raw pair's names beside `<id>.wav`: Asterisk's 8 kHz `.wav` or 16 kHz `.wav16`.
 const RAW_SUFFIXES = ['-l.wav', '-r.wav', '-l.wav16', '-r.wav16'];

@@ -3,6 +3,8 @@
  * §10.2 "Voicemail", "Greetings and audio"). Asterisk resolves a `sound:` name's language variant
  * from the channel's own language, so one name covers every tenant language (§9.1).
  */
+import { PROMPTS_SUBDIR } from '@zamfono/shared';
+
 import { ignoreGone } from './ari/failures.js';
 
 /** Asterisk core-sounds names played where no tenant audio applies. */
@@ -46,7 +48,7 @@ export function defaultPrompt(key: PromptKey): string {
 /** The media volume as Asterisk mounts it (§11.6), the root of every `sound:` path handed to it;
  * fixed by the asterisk image, whatever `MEDIA_DIR` says for `core`'s own mount. */
 export const ASTERISK_MEDIA_DIR = '/media';
-const PROMPTS_DIR = `${ASTERISK_MEDIA_DIR}/prompts`;
+const PROMPTS_DIR = `${ASTERISK_MEDIA_DIR}/${PROMPTS_SUBDIR}`;
 
 /**
  * The `sound:` reference for an `audio_assets` row (§10.2 "Greetings and audio"): Asterisk picks

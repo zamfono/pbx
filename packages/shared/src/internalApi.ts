@@ -1,13 +1,12 @@
 /**
  * The core↔api internal API (§3, §3.1). `core` serves these on its internal HTTP+WS port; `api`
- * serves `/internal/mail`. Each request body `core` serves is a zod schema here, which `core` parses
- * it with; its type is the schema's.
+ * serves `/internal/mail`. Each request body either serves is a zod schema here, which the server
+ * parses it with; its type is the schema's.
  */
 import { z } from 'zod';
 
 import type { CallDirection, PresenceStatus } from './columnValues.js';
 import type { Envelope } from './events.js';
-import type { MailboxOwner } from './mwiMailbox.js';
 import type { ZamfonoVersion } from './version.js';
 
 export const reloadKindSchema = z.enum(['pjsip', 'dialplan', 'moh']);
@@ -192,32 +191,42 @@ export type AsteriskStartedFrame = {
 /** WS /internal/events: every JSON frame `core` sends, no auth (internal network). */
 export type CoreStreamFrame = Envelope | AsteriskStartedFrame;
 
-/** `POST /internal/mail` (api) → 202; api rejects a request carrying `X-Forwarded-For` with 404 (§3.1). */
-export type MailRequest =
-  | {
-      kind: 'voicemail';
-      /** The call the mail is about, for the log lines of its send (§7); absent for a test mail. */
-      callId?: string;
-      to: MailboxOwner;
-      values: {
-        callerNumber: string;
-        callerName: string;
-        mailboxName: string;
-        receivedAt: string;
-        durationS: number;
-      };
-      /** The recording, under `/media/voicemail/` (§11.6); absent for a test mail. */
-      attachmentPath?: string;
-    }
-  | {
-      kind: 'missedCall';
-      /** The call the mail is about, for the log lines of its send (§7); absent for a test mail. */
-      callId?: string;
-      to: { userId: string };
-      values: {
-        callerNumber: string;
-        callerName: string;
-        receivedAt: string;
-        didLabel: string;
-      };
-    };
+/** `POST /internal/mail` (api) → 202, 400 for a request this schema refuses; api rejects a
+ * request carrying `X-Forwarded-For` with 404 (§3.1). */
+export const mailRequestSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('voicemail'),
+    /** The call the mail is about, for the log lines of its send (§7); absent for a test mail. */
+    callId: z.string().optional(),
+    to: z.union([
+      z.object({ userId: z.string() }),
+      z.object({ ringGroupId: z.string() })
+    ]),
+    values: z.object({
+      callerNumber: z.string(),
+      callerName: z.string(),
+      mailboxName: z.string(),
+      receivedAt: z.string(),
+      durationS: z.number()
+    }),
+    /** The recording's file name in the media volume's `VOICEMAIL_SUBDIR` (§11.6), a plain name
+     * that cannot reach outside it; absent for a test mail. */
+    filename: z
+      .string()
+      .regex(/^[\w-]+\.\w+$/u)
+      .optional()
+  }),
+  z.object({
+    kind: z.literal('missedCall'),
+    /** The call the mail is about, for the log lines of its send (§7); absent for a test mail. */
+    callId: z.string().optional(),
+    to: z.object({ userId: z.string() }),
+    values: z.object({
+      callerNumber: z.string(),
+      callerName: z.string(),
+      receivedAt: z.string(),
+      didLabel: z.string()
+    })
+  })
+]);
+export type MailRequest = z.infer<typeof mailRequestSchema>;

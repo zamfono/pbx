@@ -109,6 +109,7 @@ describe('sendMail', () => {
   const originalFqdn = process.env.FQDN;
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     if (originalFqdn === undefined) {
       delete process.env.FQDN;
     } else {
@@ -117,6 +118,7 @@ describe('sendMail', () => {
   });
 
   it('sends a voicemail mail with the recipient, subject and attachment', async () => {
+    vi.stubEnv('MEDIA_DIR', '/srv/media');
     const db = await migratedDb();
     await insertSettings(db, { smtpHost: 'smtp.example.test' });
     await insertUser(db, 'u1', 'user@example.test');
@@ -132,7 +134,7 @@ describe('sendMail', () => {
         receivedAt: '2026-06-15T12:00:00.000Z',
         durationS: 12
       },
-      attachmentPath: '/media/voicemail/vm1.wav'
+      filename: 'vm1.wav'
     };
 
     const result = await sendMail(db, testKeyring(), req, { transport });
@@ -150,7 +152,7 @@ describe('sendMail', () => {
     expect(message.to).toBe('user@example.test');
     expect(message.subject).toContain('Alice');
     expect(voicemailAttachment).toHaveBeenCalledWith(
-      '/media/voicemail/vm1.wav'
+      '/srv/media/voicemail/vm1.wav'
     );
     expect(message.attachments).toEqual([
       {
@@ -183,7 +185,7 @@ describe('sendMail', () => {
         receivedAt: '2026-06-15T12:00:00.000Z',
         durationS: 12
       },
-      attachmentPath: '/media/voicemail/vm1.wav'
+      filename: 'vm1.wav'
     };
 
     const result = await sendMail(db, testKeyring(), req, { transport });
@@ -257,7 +259,7 @@ describe('sendMail', () => {
         receivedAt: '2026-06-15T12:00:00.000Z',
         durationS: 12
       },
-      attachmentPath: '/media/voicemail/vm1.mp3'
+      filename: 'vm1.mp3'
     };
 
     const result = await sendMail(db, testKeyring(), req, { transport });

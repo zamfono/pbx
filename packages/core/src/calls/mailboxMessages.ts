@@ -4,7 +4,7 @@
  * per-message keys — previous, repeat, next, delete, back to the main menu. A new message is
  * marked read as soon as it starts playing (`mailboxStore.ts`).
  */
-import type { Db } from '@zamfono/shared';
+import { VOICEMAIL_SUBDIR, type Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import { ASTERISK_MEDIA_DIR } from '../prompts.js';
@@ -19,7 +19,6 @@ import {
 import {
   deleteMessage,
   markRead,
-  VOICEMAIL_DIR_NAME,
   type MailboxMessage
 } from './mailboxStore.js';
 import type { Pipeline } from './pipeline.js';
@@ -136,7 +135,7 @@ async function playMessage(
         message.folder,
         positionInFolder(session.messages, index)
       ),
-      `sound:${ASTERISK_MEDIA_DIR}/${VOICEMAIL_DIR_NAME}/${base}`
+      `sound:${ASTERISK_MEDIA_DIR}/${VOICEMAIL_SUBDIR}/${base}`
     ],
     0
   );

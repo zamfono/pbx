@@ -241,7 +241,7 @@ describe('deposit', () => {
       callId: call.id,
       to: { userId },
       values: { callerName: '' },
-      attachmentPath: `/media/voicemail/${row.filename}`
+      filename: row.filename
     });
     expect(cdr.finished).toEqual([call]);
   });

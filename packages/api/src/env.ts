@@ -12,7 +12,7 @@
  */
 import { defineEnvVars } from '@sveltejs/kit/env';
 
-import { DEFAULT_DB_FILE, DEFAULT_MEDIA_DIR } from '@zamfono/shared';
+import { dbFileFrom, DEFAULT_MEDIA_DIR } from '@zamfono/shared';
 
 const MAX_HOUR = 23;
 
@@ -68,7 +68,7 @@ export const variables = defineEnvVars({
   COMPANY_NAME: optional,
   CORE_URL: withDefault('http://core:3000'),
   COUNTRY: optional,
-  DB_FILE: withDefault(DEFAULT_DB_FILE),
+  DB_FILE: { schema: dbFileFrom },
   EXT_LENGTH: optional,
   EXTERNAL_IPV4: optional,
   FQDN: required,

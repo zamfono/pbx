@@ -1,7 +1,13 @@
 /** Key `0` of the mailbox menu (§10.2 "Mailbox access"): a greeting recorded by phone, which
  * makes `core` insert the `audio_assets` row and set the mailbox's `mailbox_audio_id` (§3.1
  * "Known cross-writes"). The menu itself is `mailbox.ts`'s. */
-import { MS_PER_SECOND, newId, retireGreeting, type Db } from '@zamfono/shared';
+import {
+  MS_PER_SECOND,
+  newId,
+  PROMPTS_SUBDIR,
+  retireGreeting,
+  type Db
+} from '@zamfono/shared';
 
 import { ignoreGone } from '../ari/failures.js';
 import { waitForRecording } from './ariWaits.js';
@@ -10,8 +16,6 @@ import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
 import { type Owner } from './release.js';
 
-// media/prompts/ (§11.6): a recorded greeting's own spool path, matching `assetMedia`'s convention.
-const PROMPTS_DIR_NAME = 'prompts';
 const RECORDING_FALLBACK_BUFFER_S = 5;
 // ponytail: fixed cap; no per-tenant setting exists for a recorded greeting's own length.
 const MAILBOX_GREETING_MAX_S = 30;
@@ -90,7 +94,8 @@ export async function recordGreeting(
   if (played === 'hangup') {
     return false;
   }
-  const name = `${PROMPTS_DIR_NAME}/${id}`;
+  // The recording's name in Asterisk's spool (§11.6), where `assetMedia` finds an asset.
+  const name = `${PROMPTS_SUBDIR}/${id}`;
   const finished = waitForRecording(
     ari,
     name,

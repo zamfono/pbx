@@ -11,16 +11,17 @@ DATA_DIR=$(mktemp -d)
 BROKEN_DIR=$(mktemp -d)
 BROKEN_DATA_DIR=$(mktemp -d)
 LOCKED_DATA_DIR=$(mktemp -d)
+STILL_LOCKED_DATA_DIR=$(mktemp -d)
 LOCK_HOLDER=
 FRESH_VOLUME=zamfono-migrate-test-$$
 cleanup() {
   [ -z "$LOCK_HOLDER" ] || docker rm -f "$LOCK_HOLDER" >/dev/null 2>&1 || true
   docker volume rm "$FRESH_VOLUME" >/dev/null 2>&1 || true
-  rm -rf "$DATA_DIR" "$BROKEN_DIR" "$BROKEN_DATA_DIR" "$LOCKED_DATA_DIR"
+  rm -rf "$DATA_DIR" "$BROKEN_DIR" "$BROKEN_DATA_DIR" "$LOCKED_DATA_DIR" "$STILL_LOCKED_DATA_DIR"
 }
 trap cleanup EXIT
 # mktemp's 0700 keeps the container's uid 1000 out of a directory the host's root created.
-chmod 0777 "$DATA_DIR" "$BROKEN_DIR" "$BROKEN_DATA_DIR" "$LOCKED_DATA_DIR"
+chmod 0777 "$DATA_DIR" "$BROKEN_DIR" "$BROKEN_DATA_DIR" "$LOCKED_DATA_DIR" "$STILL_LOCKED_DATA_DIR"
 
 # CI passes the image it built as MIGRATE_IMAGE, docker-bake.hcl's variable, and nothing is built
 # here, so the image checked is the one published. Standalone, bake builds it fresh under :test.
@@ -55,23 +56,27 @@ echo '== fresh named volume: migrate is the first to mount it =='
 docker volume create "$FRESH_VOLUME" >/dev/null
 docker run --rm -v "$FRESH_VOLUME:/data" "$MIGRATE_IMAGE"
 
-echo '== locked database: retried until the lock is released =='
-# A second process holds an exclusive lock on the fresh database file for 8 s, so the first
-# attempt finds it locked and a later one, 5 s apart, applies the migration.
-LOCK_HOLDER=$(docker run -d -v "$LOCKED_DATA_DIR:/data" --entrypoint node "$MIGRATE_IMAGE" -e "
-  const db = new (require('better-sqlite3'))('/data/zamfono.sqlite3');
-  db.exec('BEGIN EXCLUSIVE');
-  require('node:fs').writeFileSync('/data/locked', '');
-  setTimeout(() => db.exec('COMMIT'), 8000);
-")
-for _ in $(seq 1 50); do
-  [ -e "$LOCKED_DATA_DIR/locked" ] && break
-  sleep 0.2
-done
-[ -e "$LOCKED_DATA_DIR/locked" ] || {
+# Starts a second process that holds an exclusive lock on the database file in $1 for $2 ms, as
+# LOCK_HOLDER, and returns once it has the lock.
+hold_lock() {
+  LOCK_HOLDER=$(docker run -d -v "$1:/data" --entrypoint node "$MIGRATE_IMAGE" -e "
+    const db = new (require('better-sqlite3'))('/data/zamfono.sqlite3');
+    db.exec('BEGIN EXCLUSIVE');
+    require('node:fs').writeFileSync('/data/locked', '');
+    setTimeout(() => db.exec('COMMIT'), $2);
+  ")
+  for _ in $(seq 1 50); do
+    [ -e "$1/locked" ] && return 0
+    sleep 0.2
+  done
   echo 'the lock holder never took its lock' >&2
   exit 1
 }
+
+echo '== locked database: retried until the lock is released =='
+# The lock lasts 8 s, so the first attempt finds it locked and a later one, 5 s apart, applies
+# the migration.
+hold_lock "$LOCKED_DATA_DIR" 8000
 locked_output=$(docker run --rm -v "$LOCKED_DATA_DIR:/data" "$MIGRATE_IMAGE" 2>&1) || {
   echo "$locked_output"
   echo 'expected the migration to succeed once the lock was released' >&2
@@ -80,6 +85,23 @@ locked_output=$(docker run --rm -v "$LOCKED_DATA_DIR:/data" "$MIGRATE_IMAGE" 2>&
 echo "$locked_output"
 echo "$locked_output" | grep -q 'found the database locked; retrying in 5s' || {
   echo 'expected the locked database to be retried' >&2
+  exit 1
+}
+
+echo '== still locked: retried five times, then exits 1 =='
+docker rm -f "$LOCK_HOLDER" >/dev/null
+hold_lock "$STILL_LOCKED_DATA_DIR" 120000
+still_locked_status=0
+still_locked_output=$(docker run --rm -v "$STILL_LOCKED_DATA_DIR:/data" "$MIGRATE_IMAGE" 2>&1) ||
+  still_locked_status=$?
+echo "$still_locked_output"
+[ "$still_locked_status" = 1 ] || {
+  echo "expected a database locked throughout to exit 1, got $still_locked_status" >&2
+  exit 1
+}
+retries=$(echo "$still_locked_output" | grep -c 'retrying in 5s')
+[ "$retries" = 5 ] || {
+  echo "expected five retries, got $retries" >&2
   exit 1
 }
 

@@ -33,6 +33,8 @@ WORKDIR /app/db
 COPY --from=build /app /app
 COPY db/migrate.ts ./
 COPY db/migrations ./migrations
+# migrate.ts's DB_FILE default, at the path it imports it from in a checkout too.
+COPY packages/shared/src/stackPaths.ts /app/packages/shared/src/
 # The `db` volume's mount point, owned by `node`: a fresh named volume takes it over, owner
 # included, so this image can create the database whether or not api or core mounted it first.
 RUN mkdir -p /data && chown node:node /data

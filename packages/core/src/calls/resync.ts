@@ -10,14 +10,13 @@
 import { readdir, unlink } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { Db } from '@zamfono/shared';
+import { VOICEMAIL_SUBDIR, type Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import type { AriEvent } from '../ari/events.js';
 import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { Logger } from '../ari/types.js';
 import { ignoreMissing } from '../fsFailures.js';
-import { VOICEMAIL_DIR_NAME } from './mailboxStore.js';
 import { PARKED_BRIDGE_NAME } from './parkingRingback.js';
 import type { Pipeline } from './pipeline.js';
 
@@ -127,7 +126,7 @@ async function adoptBridges(deps: ResyncDeps): Promise<Adopted> {
 
 /** Deletes every `.wav` in the voicemail directory that no `voicemails` row names; returns the count. */
 async function deleteOrphanedVoicemailFiles(deps: ResyncDeps): Promise<number> {
-  const dir = path.join(deps.pipeline.deps.mediaDir, VOICEMAIL_DIR_NAME);
+  const dir = path.join(deps.pipeline.deps.mediaDir, VOICEMAIL_SUBDIR);
   // A fresh volume has no voicemail directory until the first message is recorded; any other
   // failure to read it is logged, and the files are left for the next boot.
   const names = await readdir(dir)
