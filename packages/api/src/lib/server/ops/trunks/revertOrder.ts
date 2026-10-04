@@ -1,6 +1,6 @@
 import { HTTP_CONFLICT, type ChangeEntry } from '@zamfono/shared';
 
-import { replayOperation } from '../runner.js';
+import { replayOperation } from '../replay.js';
 import { Conflict, OpError, type Context } from '../types.js';
 
 /**

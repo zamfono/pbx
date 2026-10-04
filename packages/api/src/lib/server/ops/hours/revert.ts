@@ -1,7 +1,7 @@
 import { HTTP_CONFLICT, type ChangeEntry } from '@zamfono/shared';
 
 import { resolveTarget } from '../forwardTargetSpec.js';
-import { replayOperation } from '../runner.js';
+import { replayOperation } from '../replay.js';
 import { scopeFromColumns } from '../scope.js';
 import { OpError, type Context } from '../types.js';
 import { loadIntervals } from './_shared.js';

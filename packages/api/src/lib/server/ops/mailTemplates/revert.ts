@@ -1,6 +1,6 @@
 import type { ChangeEntry } from '@zamfono/shared';
 
-import { replayOperation } from '../runner.js';
+import { replayOperation } from '../replay.js';
 import type { Context } from '../types.js';
 
 /** The recorded `from` of `field`, or `null` where the entry recorded no such field. */

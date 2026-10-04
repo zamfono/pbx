@@ -15,7 +15,7 @@ import { Conflict, defineOperation, OpError, type Context } from '../types.js';
 import { isTenantListOperation, revertTenantList } from './_listReverts.js';
 import { ENTITY_TABLES } from './_shared.js';
 import { refuseUniqueViolation } from './_uniqueViolation.js';
-import { revertEntry } from './revert.js';
+import { prepareCreationRevert, revertEntry } from './revert.js';
 
 /**
  * One `audit_log` row as `loadUndoableEntry` resolves it; `entityId` is `null` only for a
@@ -169,7 +169,9 @@ async function restoresAnAdmin(
 /**
  * `POST /audit/{id}/undo` (§5.8): reverts one `audit_log` entry by writing its `changes_json`
  * `from` values back, through the reverted entity's own operation; its own entry is the reverse
- * of the reverted one (`recordRevert`). Never asks confirmation (§10.3).
+ * of the reverted one (`recordRevert`). Never asks confirmation (§10.3). A creation's undo
+ * replays the entity's deletion, whose `prepare` (Ringotel's, §10.4) runs in the undo's own,
+ * before its transaction opens; `run` checks the entry again.
  */
 export const undo = defineOperation({
   name: 'audit.undo',
@@ -184,7 +186,12 @@ export const undo = defineOperation({
   problems: [HTTP_NOT_FOUND, HTTP_CONFLICT],
   minRole: 'admin',
   ownerOnly: restoresAnAdmin,
-  run: async (ctx, input) => {
+  prepare: async (ctx, input) => {
+    const entry = await loadUndoableEntry(ctx, input.id);
+    await assertNoLaterChange(ctx, entry);
+    return prepareCreationRevert(ctx, entry);
+  },
+  run: async (ctx, input, creation) => {
     const entry = await loadUndoableEntry(ctx, input.id);
     await assertNoLaterChange(ctx, entry);
     const changes = changesColumn.decode(entry.changesJson);
@@ -195,7 +202,7 @@ export const undo = defineOperation({
       } else {
         const rowEntry = { ...entry, entityId };
         await assertRowNotPurged(ctx, rowEntry, changes);
-        await revertEntry(ctx, rowEntry, changes);
+        await revertEntry(ctx, rowEntry, changes, creation);
       }
     });
     await ctx.db

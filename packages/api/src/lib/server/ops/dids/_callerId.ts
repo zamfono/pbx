@@ -1,7 +1,7 @@
 import { isE164, type ChangeEntry } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
-import { replayOperation } from '../runner.js';
+import { replayOperation } from '../replay.js';
 import type { Context } from '../types.js';
 
 /** The audit field naming the caller ID a DID write set on its target user. */

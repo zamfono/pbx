@@ -4,8 +4,13 @@ import { revertDidCreate, revertDidUpdate } from '../dids/revert.js';
 import { revertHoursSet } from '../hours/revert.js';
 import { revertMailTemplate } from '../mailTemplates/revert.js';
 import { revertParkingSet } from '../parking/revert.js';
+import {
+  prepareReplay,
+  replayOperation,
+  runReplay,
+  type PreparedReplay
+} from '../replay.js';
 import { pushRoster } from '../roster.js';
-import { replayOperation } from '../runner.js';
 import { revertSettingsUpdate } from '../settings/revert.js';
 import { OpError, type Context } from '../types.js';
 import {
@@ -89,23 +94,31 @@ const CREATION_DELETE_OPERATIONS: Partial<Record<string, string>> = {
 };
 
 /**
- * Reverts a creation entry by deleting the row its `create` inserted, through the entity's own
- * `delete` operation, so the usual cascades (devices, extension, tokens, §5.9) apply the same way
- * a normal delete would (§5.8).
+ * The replay a creation entry's undo reverts through (§5.8), its `prepare` run: the deletion of
+ * the row its `create` inserted, through the entity's own `delete` operation, so the usual
+ * cascades (devices, extension, tokens, §5.9) and Ringotel's (§10.4) apply the same way a normal
+ * delete would. `null` for an entry of any other kind. The undo's `prepare`, before its
+ * transaction opens.
  */
-async function revertCreation(
+export async function prepareCreationRevert(
   ctx: Context,
-  entityKind: string,
-  entityId: string
-): Promise<void> {
-  const opName = CREATION_DELETE_OPERATIONS[entityKind];
+  entry: { operation: string; entityKind: string; entityId: string | null }
+): Promise<PreparedReplay | null> {
+  if (
+    entry.entityId === null ||
+    WHOLE_ENTRY_REVERTS[entry.operation] ||
+    !entry.operation.endsWith(CREATE_SUFFIX)
+  ) {
+    return null;
+  }
+  const opName = CREATION_DELETE_OPERATIONS[entry.entityKind];
   if (!opName) {
     throw new OpError(
       HTTP_CONFLICT,
-      `audit.undo: entity kind '${entityKind}' cannot be reverted`
+      `audit.undo: entity kind '${entry.entityKind}' cannot be reverted`
     );
   }
-  await replayOperation(ctx, opName, { id: entityId });
+  return prepareReplay(ctx, opName, { id: entry.entityId });
 }
 
 /**
@@ -136,7 +149,7 @@ async function revertField(
 /**
  * Reverts one recorded field change, by the field-name conventions every delete cascade shares.
  * A creation entry (every recorded `from` is `null`) is not replayed field by field; `revertEntry`
- * routes it through `revertCreation` instead.
+ * routes it through its `prepareCreationRevert` replay instead.
  */
 async function revertChange(
   ctx: Context,
@@ -173,22 +186,23 @@ async function revertChange(
 }
 
 /**
- * Reverts one recorded entry (§5.8): through the reverter its operation brings, where the entry's
- * fields are parts of one replace or its undo needs more than the plain delete; a creation through
- * the entity's `delete`; any other entry field by field.
+ * Reverts one recorded entry (§5.8): a creation through the replay `prepareCreationRevert` made
+ * of it; through the reverter its operation brings, where the entry's fields are parts of one
+ * replace or its undo needs more than the plain delete; any other entry field by field.
  */
 export async function revertEntry(
   ctx: Context,
   entry: { operation: string; entityKind: string; entityId: string },
-  changes: ChangeEntry[]
+  changes: ChangeEntry[],
+  creation: PreparedReplay | null
 ): Promise<void> {
+  if (creation) {
+    await runReplay(ctx, creation);
+    return;
+  }
   const wholeEntry = WHOLE_ENTRY_REVERTS[entry.operation];
   if (wholeEntry) {
     await wholeEntry(ctx, entry.entityId, changes);
-    return;
-  }
-  if (entry.operation.endsWith(CREATE_SUFFIX)) {
-    await revertCreation(ctx, entry.entityKind, entry.entityId);
     return;
   }
   for (const change of changes) {

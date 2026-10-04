@@ -121,4 +121,56 @@ describe("a deletion of a ringotel device's Ringotel user", () => {
 
     expect(fake?.users).toHaveLength(1);
   });
+
+  it('by an undo of the creation does not wait forever on a push under way', async () => {
+    const { db, deviceId } = await ringotelDevice();
+    const otherUser = await seedUser(db, { ext: '997', passwordHash: 'x' });
+    const created = await db
+      .selectFrom('auditLog')
+      .select('id')
+      .where('operation', '=', 'devices.create')
+      .where('entityId', '=', deviceId)
+      .executeTakeFirstOrThrow();
+    const other = (await runOperation(
+      db,
+      'devices.create',
+      { userId: otherUser, label: 'Tablet', kind: 'ringotel' },
+      owner
+    )) as { device: { id: string } };
+    const pushUnderWay = Promise.withResolvers<undefined>();
+    const release = Promise.withResolvers<undefined>();
+    let held = false;
+    aroundRingotel(async (method, answer) => {
+      if (method === 'getUsers' && !held) {
+        held = true;
+        pushUnderWay.resolve(undefined);
+        await release.promise;
+      }
+      return answer();
+    });
+
+    const rotating = runOperation(
+      db,
+      'devices.rotate',
+      { id: other.device.id },
+      owner
+    );
+    await pushUnderWay.promise;
+    // The undo replays `devices.delete`, whose Ringotel call waits for the push's turn inside
+    // the undo's transaction, while the push waits for that transaction to write its audit row.
+    const undoing = runOperation(db, 'audit.undo', { id: created.id }, owner);
+    await new Promise(resolve => {
+      setTimeout(resolve, 50);
+    });
+    release.resolve(undefined);
+    const outcome = await Promise.race([
+      Promise.allSettled([rotating, undoing]).then(() => 'settled'),
+      new Promise(resolve => {
+        setTimeout(resolve, 2000, 'hung');
+      })
+    ]);
+
+    expect(outcome).toBe('settled');
+    await expect(undoing).resolves.toBeDefined();
+  });
 });

@@ -1,9 +1,4 @@
-import {
-  HTTP_CONFLICT,
-  nowIso,
-  type AuditChannel,
-  type Db
-} from '@zamfono/shared';
+import { nowIso, type AuditChannel, type Db } from '@zamfono/shared';
 
 import { notifyUsersChanged } from '#lib/server/eventSink.js';
 
@@ -14,7 +9,7 @@ import {
   withWarnings
 } from './afterCommit.js';
 import { insertAuditRow, type AuditCaller } from './audit.js';
-import { absorbEffects, newEffects, type Effects } from './effects.js';
+import { newEffects, type Effects } from './effects.js';
 import {
   checkConfirmation,
   checkRole,
@@ -23,9 +18,9 @@ import {
   parseInput
 } from './gates.js';
 import { notifyPropagation } from './propagate.js';
-import { registry, type ErasedOperation } from './registry.js';
+import type { ErasedOperation } from './registry.js';
 import { runRollbackHooks } from './rollbackHooks.js';
-import { OpError, type Actor, type Context } from './types.js';
+import type { Actor, Context } from './types.js';
 
 /** What the runner needs beyond the operation's own input to build a `Context` (§10.3). */
 export type RunInput = {
@@ -224,40 +219,4 @@ export async function runOperation(
     await runRestartPush(db);
   }
   return withWarnings(output, warnings);
-}
-
-/**
- * Writes `input` back through the operation `name` as part of the undo `ctx` runs (§5.8: "Field
- * changes are reverted by writing the `from` values back through the normal operations"), so it
- * never asks confirmation (§10.3). It writes no audit entry of its own, since the undo's entry
- * records the revert; what it propagates, runs after the commit or warns joins `ctx`'s. An operation not registered, or a recorded diff that does not form a valid input for
- * it, is refused with a 409, so the entry stays live and the caller learns why.
- */
-export async function replayOperation(
-  ctx: Context,
-  name: string,
-  input: unknown
-): Promise<void> {
-  const op = registry.get(name);
-  if (!op) {
-    throw new OpError(
-      HTTP_CONFLICT,
-      `audit.undo: operation '${name}' is not registered`
-    );
-  }
-  const parsed = op.input.safeParse(input);
-  if (!parsed.success) {
-    throw new OpError(
-      HTTP_CONFLICT,
-      `audit.undo: '${name}' cannot take this change back`,
-      parsed.error.issues
-    );
-  }
-  const effects = newEffects();
-  try {
-    const prepared = await op.prepare?.({ ...ctx, effects }, parsed.data);
-    await op.run({ ...ctx, effects }, parsed.data, prepared);
-  } finally {
-    absorbEffects(ctx.effects, effects);
-  }
 }
