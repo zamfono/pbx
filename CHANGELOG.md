@@ -288,6 +288,10 @@ why the specified behaviour changed; the commit history, how.
 
 - `core` no longer keeps a record of every call that ended for as long as it runs, so its memory
   stays flat on a busy stack.
+- The restore procedure (`docs/guide/restore.md`) brings a stack up: it unpacks the release's
+  bundle, makes the `compose.override.yaml` link `setup.sh` would make, since `setup.sh` refuses
+  the preserved `.env`, and copies the snapshot's database and media into the stack's volumes
+  with the `api` image's restic before the first start.
 - A ring group with neither greeting nor music no longer answers the caller and plays the default
   hold music: the caller hears ringback until a member answers. A ring group's call recording now
   covers only the members it rang, not a user its fallback reached afterwards. Dialling an empty

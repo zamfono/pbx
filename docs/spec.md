@@ -756,7 +756,7 @@ The sidecar mounts the `db` volume and streams the SQLite WAL continuously to an
 
 Litestream is the sole WAL checkpointer: it holds a long-lived read lock, and the applications' auto-checkpoints skip harmlessly. Exactly one instance runs per stack.
 
-**Moving a stack** to another host is a restore: the preserved `.env` (same encryption key, JWT secret and ARI password), the database from `litestream restore` or the latest restic snapshot, `media/` from the latest restic snapshot, then `docker compose up -d`. With replication, configuration, users and history are current to within seconds and media newer than the last restic run is lost; without it, everything is as old as that snapshot.
+**Moving a stack** to another host is a restore: the release's bundle unpacked into the stack directory, the preserved `.env` (same encryption key, JWT secret and ARI password) beside it with the `compose.override.yaml` link `setup.sh` would make, which refuses an `.env` that holds values, the database from `litestream restore` or the latest restic snapshot (`tmp/zamfono-backup/<targetId>/zamfono.sqlite3` in it) copied into the `db` volume, `media/` from the latest restic snapshot into the `media` volume, both before the first start, then `docker compose up -d`. With replication, configuration, users and history are current to within seconds and media newer than the last restic run is lost; without it, everything is as old as that snapshot.
 
 **Conditions of the overlay.**
 
