@@ -1,18 +1,13 @@
-import type { Transaction } from 'kysely';
-
 import {
   emergencyNumbersColumn,
   HTTP_UNPROCESSABLE_CONTENT,
-  type DB
+  type Db
 } from '@zamfono/shared';
 
 import { Conflict, OpError } from '../types.js';
 
 /** The extension a live user owns (§11.2 `extensions`); every live user has exactly one. */
-export async function userExtension(
-  db: Transaction<DB>,
-  userId: string
-): Promise<string> {
+export async function userExtension(db: Db, userId: string): Promise<string> {
   const row = await db
     .selectFrom('extensions')
     .select('ext')
@@ -27,10 +22,7 @@ export async function userExtension(
  * never a valid extension" (§9.4 "Dial-plan resolution"), and dialling resolves it as the
  * emergency call before it ever reaches an extension, so such a row would be unreachable.
  */
-export async function assertValidExtension(
-  db: Transaction<DB>,
-  ext: string
-): Promise<void> {
+export async function assertValidExtension(db: Db, ext: string): Promise<void> {
   const settings = await db
     .selectFrom('settings')
     .select(['extLength', 'emergencyNumbersJson'])
@@ -73,7 +65,7 @@ function extensionReference(
  * form of it).
  */
 export async function assertExtensionAvailable(
-  db: Transaction<DB>,
+  db: Db,
   ext: string
 ): Promise<void> {
   const existing = await db

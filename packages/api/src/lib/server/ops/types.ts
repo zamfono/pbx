@@ -1,11 +1,10 @@
 /* eslint-disable max-classes-per-file -- OpError and its two fixed-shape subclasses form one error hierarchy */
-import type { Transaction } from 'kysely';
 import type { z } from 'zod';
 
 import {
   HTTP_CONFLICT,
   type AuditChannel,
-  type DB,
+  type Db,
   type UserRole
 } from '@zamfono/shared';
 
@@ -19,7 +18,8 @@ export type Context = {
   /** The running operation's name, e.g. `users.list`: what its list cursors carry (§10.3). */
   operation: string;
   actor: Actor;
-  db: Transaction<DB>;
+  /** The call's transaction, or the database itself for a call that writes nothing to it. */
+  db: Db;
   now: string;
   channel: AuditChannel;
   clientId?: string;
@@ -44,7 +44,7 @@ export type OwnScope<In> =
  * OpenAPI document are all generated from the registry these fill. An operation a `user` may
  * call declares its `scope`; above that role every caller acts on anything (§5.3).
  */
-export type Operation<In, Out> = {
+export type Operation<In, Out, Prepared = void> = {
   name: string;
   description: string;
   input: z.ZodType<In>;
@@ -65,6 +65,12 @@ export type Operation<In, Out> = {
    * being (§10.3). It may throw the 404 of what the input names not existing.
    */
   ownerOnly?: (ctx: Context, input: In) => boolean | Promise<boolean>;
+  /**
+   * `false` marks a write that changes nothing in the database, a live-call action `core` carries
+   * out: like a `readOnly` call it runs without a transaction, so the database serves other
+   * requests while it waits on `core`.
+   */
+  writesDatabase?: false;
   /** The question a human answers before a destructive call runs, naming what it acts on (§10.3). */
   confirm?: (ctx: Context, input: In) => string | Promise<string>;
   /** `false` opts a write out of the audit log: presence, read flags, live-call actions (§5.7). */
@@ -81,16 +87,22 @@ export type Operation<In, Out> = {
    * row names the entity of the entry it reverts (`recordRevert`).
    */
   entity?: (input: In, out: Out) => { kind: string; id: string | null };
-  run(ctx: Context, input: In): Promise<Out>;
+  /**
+   * Work too slow to hold the database, such as transcoding an upload: runs before the
+   * transaction opens, and `run` receives its result. What it leaves outside the database it
+   * takes back through `onRollback`, should the transaction not commit.
+   */
+  prepare?: (ctx: Pick<Context, 'effects'>, input: In) => Promise<Prepared>;
+  run(ctx: Context, input: In, prepared: Prepared): Promise<Out>;
 } & (
   | { minRole: Exclude<UserRole, 'user'> }
   | { minRole: 'user'; scope: OwnScope<In> }
 );
 
 /** Identity function that lets an operation module's `In`/`Out` be inferred from its body. */
-export function defineOperation<In, Out>(
-  op: Operation<In, Out>
-): Operation<In, Out> {
+export function defineOperation<In, Out, Prepared = void>(
+  op: Operation<In, Out, Prepared>
+): Operation<In, Out, Prepared> {
   return op;
 }
 

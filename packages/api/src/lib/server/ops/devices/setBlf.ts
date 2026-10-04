@@ -1,10 +1,9 @@
-import type { Transaction } from 'kysely';
 import { z } from 'zod';
 
 import {
   HTTP_NOT_FOUND,
   HTTP_UNPROCESSABLE_CONTENT,
-  type DB
+  type Db
 } from '@zamfono/shared';
 
 import { deviceBlfKeys } from '#lib/server/provisioning/ringotelRoster.js';
@@ -26,10 +25,7 @@ const inputSchema = z
   .strict();
 
 /** Throws 422 for any `keys` entry that is not a live extension or parking slot (§11.2 `extensions`). */
-async function assertLiveExtensions(
-  db: Transaction<DB>,
-  keys: string[]
-): Promise<void> {
+async function assertLiveExtensions(db: Db, keys: string[]): Promise<void> {
   if (keys.length === 0) {
     return;
   }

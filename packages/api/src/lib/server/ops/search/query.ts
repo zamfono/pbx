@@ -1,7 +1,6 @@
-import type { Transaction } from 'kysely';
 import { z } from 'zod';
 
-import { nationalForm, type CountryCode, type DB } from '@zamfono/shared';
+import { nationalForm, type CountryCode, type Db } from '@zamfono/shared';
 
 import {
   decodeOffsetCursor,
@@ -39,9 +38,7 @@ function firstMatch(
 }
 
 /** `ext` per `user_id`, for every extension a live user owns (§11.2). */
-async function extensionsByUser(
-  db: Transaction<DB>
-): Promise<Map<string, string>> {
+async function extensionsByUser(db: Db): Promise<Map<string, string>> {
   const rows = await db
     .selectFrom('extensions')
     .select(['ext', 'userId'])
@@ -56,9 +53,7 @@ async function extensionsByUser(
 }
 
 /** `ext` per `ring_group_id`, for every extension a live ring group owns (§11.2). */
-async function extensionsByRingGroup(
-  db: Transaction<DB>
-): Promise<Map<string, string>> {
+async function extensionsByRingGroup(db: Db): Promise<Map<string, string>> {
   const rows = await db
     .selectFrom('extensions')
     .select(['ext', 'ringGroupId'])
@@ -76,7 +71,7 @@ async function extensionsByRingGroup(
 // matches through its normalized forms (`phoneNeedles`); SQLite FTS5 is the spec's own upgrade
 // path (§10.2 "Search") once a tenant's row count makes this scan slow.
 async function searchUsers(
-  db: Transaction<DB>,
+  db: Db,
   needle: string,
   includeEmail: boolean
 ): Promise<Hit[]> {
@@ -111,10 +106,7 @@ async function searchUsers(
   return hits;
 }
 
-async function searchRingGroups(
-  db: Transaction<DB>,
-  needle: string
-): Promise<Hit[]> {
+async function searchRingGroups(db: Db, needle: string): Promise<Hit[]> {
   const [groups, exts] = await Promise.all([
     db
       .selectFrom('ringGroups')
@@ -146,9 +138,7 @@ async function searchRingGroups(
 }
 
 /** `number[]` per `contact_id`, for every live contact's phones (§11.2 `contact_phones`). */
-async function phonesByContact(
-  db: Transaction<DB>
-): Promise<Map<string, string[]>> {
+async function phonesByContact(db: Db): Promise<Map<string, string[]>> {
   const rows = await db
     .selectFrom('contactPhones')
     .select(['contactId', 'number'])
@@ -182,7 +172,7 @@ function phoneMatches(
 
 /** A phone-like `needle`'s digits with the tenant's country, `null` for any other needle. */
 async function phoneNeedle(
-  db: Transaction<DB>,
+  db: Db,
   needle: string
 ): Promise<{ digits: string; country: CountryCode } | null> {
   return PHONE_LIKE.test(needle)
@@ -190,10 +180,7 @@ async function phoneNeedle(
     : null;
 }
 
-async function searchContacts(
-  db: Transaction<DB>,
-  needle: string
-): Promise<Hit[]> {
+async function searchContacts(db: Db, needle: string): Promise<Hit[]> {
   const [contacts, phones, numberNeedle] = await Promise.all([
     db
       .selectFrom('contacts')

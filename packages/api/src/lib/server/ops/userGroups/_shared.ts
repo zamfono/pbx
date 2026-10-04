@@ -1,7 +1,7 @@
-import type { Selectable, Transaction } from 'kysely';
+import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
-import { type DB } from '@zamfono/shared';
+import { type DB, type Db } from '@zamfono/shared';
 
 import { assertNoLiveHolder } from '../liveHolder.js';
 import {
@@ -17,16 +17,13 @@ import { assertNoCycle, loadEdgesExcludingParent } from './_nesting.js';
 export type UserGroupRow = Selectable<DB['userGroups']>;
 
 /** Loads a live user group by id, or throws `OpError(404)`. */
-export async function liveUserGroup(
-  db: Transaction<DB>,
-  id: string
-): Promise<UserGroupRow> {
+export async function liveUserGroup(db: Db, id: string): Promise<UserGroupRow> {
   return liveRow(db, 'userGroups', id, `user group '${id}' not found`);
 }
 
 /** Throws 409 when `name` is already used by another live user group (`user_groups_name` partial UNIQUE, §11.2). */
 export async function assertNameAvailable(
-  db: Transaction<DB>,
+  db: Db,
   name: string,
   excludeId?: string
 ): Promise<void> {
@@ -51,7 +48,7 @@ export type UserGroupOut = z.infer<typeof userGroupOut>;
  * groups"), cycle-checking every nested child first.
  */
 export async function replaceMembers(
-  db: Transaction<DB>,
+  db: Db,
   groupId: string,
   members: MemberSpec[]
 ): Promise<void> {
@@ -109,7 +106,7 @@ export async function replaceMembers(
 
 /** A user group's live members; a soft-deleted one is skipped, never blocking (§5.9), so a read-then-write round trip through `replaceMembers` needs no special case. */
 export async function userGroupMembers(
-  db: Transaction<DB>,
+  db: Db,
   groupId: string
 ): Promise<MemberSpec[]> {
   const [users, groups] = await Promise.all([
@@ -136,7 +133,7 @@ export async function userGroupMembers(
 
 /** Assembles the wire shape of a user group from its row and member list (§10.3). */
 export async function toUserGroupOut(
-  db: Transaction<DB>,
+  db: Db,
   row: UserGroupRow
 ): Promise<UserGroupOut> {
   return {

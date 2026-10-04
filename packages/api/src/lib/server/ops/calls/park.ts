@@ -47,6 +47,7 @@ export const park = defineOperation({
   scope: async (ctx, input) =>
     ownActingUser(ctx, input) && (await isOwnLiveCall(ctx, input.id)),
   audit: false,
+  writesDatabase: false,
   run: async (ctx, input) => {
     const userId = input.userId ?? ctx.actor.id;
     const { slot } = await getCoreClient().park(input.id, {

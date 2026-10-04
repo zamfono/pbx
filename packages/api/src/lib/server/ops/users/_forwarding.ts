@@ -1,9 +1,8 @@
-import type { Transaction } from 'kysely';
 import { z } from 'zod';
 
 import {
   USER_FORWARD_CONDITIONS,
-  type DB,
+  type Db,
   type SipHeaderTemplate,
   type UserForwardCondition
 } from '@zamfono/shared';
@@ -46,7 +45,7 @@ export type StoredForwardRule = {
  * (§10.3 "Forward targets"), so a read is exactly what `users.setForwarding` takes back.
  */
 export async function storedForwardRules(
-  db: Transaction<DB>,
+  db: Db,
   userId: string
 ): Promise<StoredForwardRule[]> {
   const rows = await db

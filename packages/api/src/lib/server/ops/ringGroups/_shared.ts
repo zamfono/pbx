@@ -1,4 +1,4 @@
-import type { Selectable, Transaction } from 'kysely';
+import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
 import {
@@ -6,7 +6,8 @@ import {
   HTTP_UNPROCESSABLE_CONTENT,
   RING_STRATEGIES,
   type AudioKind,
-  type DB
+  type DB,
+  type Db
 } from '@zamfono/shared';
 
 import { assertAudioOfKind } from '../audio/_shared.js';
@@ -20,10 +21,7 @@ import { ringGroupMemberOut, ringGroupMembers } from './_members.js';
 export type RingGroupRow = Selectable<DB['ringGroups']>;
 
 /** Loads a live ring group by id, or throws `OpError(404)`. */
-export async function liveRingGroup(
-  db: Transaction<DB>,
-  id: string
-): Promise<RingGroupRow> {
+export async function liveRingGroup(db: Db, id: string): Promise<RingGroupRow> {
   return liveRow(db, 'ringGroups', id, `ring group '${id}' not found`);
 }
 
@@ -35,7 +33,7 @@ const DECIMAL_BASE = 10;
  * (cleared, or left alone) since they need no lookup.
  */
 export async function assertGroupAudioFieldsAvailable(
-  db: Transaction<DB>,
+  db: Db,
   fields: {
     greetingAudioId?: string | null;
     mohAudioId?: string | null;
@@ -65,7 +63,7 @@ export function optionalFlag(value: boolean | undefined): number | undefined {
 }
 
 /** The lowest tenant extension of `settings.ext_length` digits not yet taken or reserved (§11.2). */
-export async function nextExtension(db: Transaction<DB>): Promise<string> {
+export async function nextExtension(db: Db): Promise<string> {
   const settings = await db
     .selectFrom('settings')
     .select(['extLength', 'emergencyNumbersJson'])
@@ -94,7 +92,7 @@ export async function nextExtension(db: Transaction<DB>): Promise<string> {
 
 /** Throws 409 when `name` is already used by another live ring group (`ring_groups_name` partial UNIQUE, §11.2). */
 export async function assertNameAvailable(
-  db: Transaction<DB>,
+  db: Db,
   name: string,
   excludeId?: string
 ): Promise<void> {
@@ -128,7 +126,7 @@ export type RingGroupOut = z.infer<typeof ringGroupOut>;
 
 /** The extension a live ring group owns (§11.2 `extensions`); every live group has exactly one. */
 export async function ringGroupExtension(
-  db: Transaction<DB>,
+  db: Db,
   groupId: string
 ): Promise<string> {
   const row = await db
@@ -141,7 +139,7 @@ export async function ringGroupExtension(
 
 /** Assembles the wire shape of a ring group from its row, extension and member list (§10.3). */
 export async function toRingGroupOut(
-  db: Transaction<DB>,
+  db: Db,
   row: RingGroupRow
 ): Promise<RingGroupOut> {
   const [ext, members] = await Promise.all([

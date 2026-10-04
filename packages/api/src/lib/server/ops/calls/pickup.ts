@@ -26,6 +26,7 @@ export const pickup = defineOperation({
   minRole: 'user',
   scope: 'any',
   audit: false,
+  writesDatabase: false,
   run: async (ctx, input) => {
     await getCoreClient().pickup(input.id, { actorUserId: ctx.actor.id });
     return { id: input.id };

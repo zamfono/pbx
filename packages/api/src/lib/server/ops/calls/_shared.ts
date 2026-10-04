@@ -1,4 +1,4 @@
-import type { ExpressionBuilder, Selectable, Transaction } from 'kysely';
+import type { ExpressionBuilder, Selectable } from 'kysely';
 import { z } from 'zod';
 
 import {
@@ -8,7 +8,8 @@ import {
   HTTP_NOT_FOUND,
   HTTP_SERVICE_UNAVAILABLE,
   QOS_ROLES,
-  type DB
+  type DB,
+  type Db
 } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
@@ -123,7 +124,7 @@ export function toCallOut(row: CallRow): CallOut {
  * `call_qos` rows of the legs, queryable alongside the call history.
  */
 export async function toCallDetailOut(
-  db: Transaction<DB>,
+  db: Db,
   row: CallRow
 ): Promise<CallDetailOut> {
   const qos = await db

@@ -1,6 +1,4 @@
-import type { Transaction } from 'kysely';
-
-import type { DB } from '@zamfono/shared';
+import type { Db } from '@zamfono/shared';
 
 import {
   loadScheduleSources,
@@ -30,7 +28,7 @@ type UnscopedSources = {
  * `deleted_at`, or its owning user's; `settings` has no `deleted_at` (a single tenant-wide row).
  */
 async function loadUnscopedSources(
-  db: Transaction<DB>,
+  db: Db,
   ftIds: string[]
 ): Promise<UnscopedSources> {
   const [dids, didBlocks, settingsRows, userRules] = await Promise.all([
@@ -75,7 +73,7 @@ type MenuOwnedSources = {
  * own fallback and DTMF options travel with it (§5.9) rather than blocking its own delete.
  */
 async function loadMenuOwnedSources(
-  db: Transaction<DB>,
+  db: Db,
   ftIds: string[],
   menuId: string | undefined
 ): Promise<MenuOwnedSources> {
@@ -106,7 +104,7 @@ async function loadMenuOwnedSources(
  * travel with it (§5.9) rather than blocking its own delete.
  */
 async function loadRingGroupOwnedSources(
-  db: Transaction<DB>,
+  db: Db,
   ftIds: string[],
   ringGroupId: string | undefined
 ): Promise<{ groupId: string; condition: string }[]> {
@@ -188,7 +186,7 @@ function toReferences(
  * `opening_hours.closed_target_id` (§5.9: a soft delete is refused while any of these exist).
  */
 export async function findForwardTargetOwners(
-  db: Transaction<DB>,
+  db: Db,
   ftIds: string[],
   exclude: OwnScope = {}
 ): Promise<Reference[]> {

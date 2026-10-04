@@ -1,6 +1,4 @@
-import type { Transaction } from 'kysely';
-
-import { HTTP_CONFLICT, type DB } from '@zamfono/shared';
+import { HTTP_CONFLICT, type Db } from '@zamfono/shared';
 
 import { OpError } from '../types.js';
 
@@ -9,7 +7,7 @@ export type Edge = { parentGroupId: string; childGroupId: string };
 
 /** Every nesting edge except `excludeParentId`'s own outgoing ones, about to be replaced. */
 export async function loadEdgesExcludingParent(
-  db: Transaction<DB>,
+  db: Db,
   excludeParentId: string
 ): Promise<Edge[]> {
   return db

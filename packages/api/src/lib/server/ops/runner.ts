@@ -79,7 +79,7 @@ async function writeAuditRow({
 }
 
 function newContext(
-  trx: Context['db'],
+  db: Db,
   name: string,
   run: RunInput,
   effects: Effects
@@ -87,7 +87,7 @@ function newContext(
   return {
     operation: name,
     actor: run.actor,
-    db: trx,
+    db,
     now: nowIso(),
     channel: run.channel,
     clientId: run.clientId,
@@ -99,46 +99,55 @@ function newContext(
 
 type Execution = {
   op: ErasedOperation;
-  ctx: Context;
   run: RunInput;
   name: string;
   input: unknown;
 };
 
-async function executeOperation({
-  op,
-  ctx,
-  run,
-  name,
-  input
-}: Execution): Promise<unknown> {
+async function checkGates(
+  { op, run, input }: Execution,
+  ctx: Context
+): Promise<void> {
   await checkScope(op, ctx, input);
   await checkConfirmation(op, ctx, run.confirm, input);
-  const output = await op.run(ctx, input);
-  if (!op.readOnly && op.audit !== false) {
-    await writeAuditRow({ ctx, op, name, run, input, output });
-  }
-  return output;
 }
 
 /**
- * Runs the operation and its audit write in one transaction, accumulating its `effects`. Should
- * the transaction not commit, the rollback hooks the operation registered (`onRollback`) run
- * before the error reaches the caller, since the rollback takes back only what the database
- * holds.
+ * Runs the operation, accumulating its `effects`: its own scope (403) and confirmation (409)
+ * gates, its `prepare`, then `run` and the audit write in one transaction. A call that writes
+ * nothing to the database (`readOnly`, `writesDatabase: false`) runs without one, so the database
+ * serves other requests while it waits. The gates share the transaction with `run` unless a
+ * `prepare` stands between them, which runs only once they pass. Should the call not commit, the
+ * rollback hooks it registered (`onRollback`) run before the error reaches the caller, since the
+ * rollback takes back only what the database holds.
  */
-async function executeInTransaction(
+async function executeCall(
   db: Db,
   effects: Effects,
-  execution: Omit<Execution, 'ctx'>
+  execution: Execution
 ): Promise<unknown> {
+  const { op, run, name, input } = execution;
   try {
-    return await db.transaction().execute(async trx =>
-      executeOperation({
-        ...execution,
-        ctx: newContext(trx, execution.name, execution.run, effects)
-      })
-    );
+    let prepared: unknown;
+    if (op.prepare) {
+      await checkGates(execution, newContext(db, name, run, effects));
+      prepared = await op.prepare({ effects }, input);
+    }
+    const execute = async (database: Db): Promise<unknown> => {
+      const ctx = newContext(database, name, run, effects);
+      if (!op.prepare) {
+        await checkGates(execution, ctx);
+      }
+      const output = await op.run(ctx, input, prepared);
+      if (!op.readOnly && op.audit !== false) {
+        await writeAuditRow({ ctx, op, name, run, input, output });
+      }
+      return output;
+    };
+    if (op.readOnly || op.writesDatabase === false) {
+      return await execute(db);
+    }
+    return await db.transaction().execute(execute);
   } catch (error) {
     await runRollbackHooks(effects, error);
     throw error;
@@ -158,17 +167,13 @@ export async function checkAccess(
 ): Promise<void> {
   const op = findOperation(name);
   checkRole(op, run.actor);
-  await db
-    .transaction()
-    .execute(async trx =>
-      checkScope(op, newContext(trx, name, run, newEffects()), input)
-    );
+  await checkScope(op, newContext(db, name, run, newEffects()), input);
 }
 
 /**
  * Validates `input` against the named operation's schema (422), enforces its `minRole` (403),
- * then, in one transaction with its audit row, its own scope (403) and its confirmation gate
- * (409) before running it; then, for a non-`readOnly` operation that called `propagate()`,
+ * then its own scope (403) and its confirmation gate (409) before running it with its audit row
+ * (`executeCall`); then, for a non-`readOnly` operation that called `propagate()`,
  * propagates the deduplicated reload kinds once the transaction has committed (§10.3, §3.1). The operation's own result is returned once
  * the commit succeeds, whatever follows it reports; a failed propagation is a warning of it.
  */
@@ -182,7 +187,7 @@ export async function runOperation(
   const parsedInput = parseInput(op, input);
   checkRole(op, run.actor);
   const effects = newEffects();
-  const output = await executeInTransaction(db, effects, {
+  const output = await executeCall(db, effects, {
     op,
     run,
     name,
@@ -249,7 +254,8 @@ export async function replayOperation(
   }
   const effects = newEffects();
   try {
-    await op.run({ ...ctx, effects }, parsed.data);
+    const prepared = await op.prepare?.({ effects }, parsed.data);
+    await op.run({ ...ctx, effects }, parsed.data, prepared);
   } finally {
     absorbEffects(ctx.effects, effects);
   }

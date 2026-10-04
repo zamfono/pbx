@@ -56,6 +56,7 @@ export const transfer = defineOperation({
     (input.toCallId === undefined ||
       (await isOwnLiveCall(ctx, input.toCallId))),
   audit: false,
+  writesDatabase: false,
   run: async (ctx, input) => {
     const { target, toCallId, voicemail } = input;
     const actorUserId = ctx.actor.id;

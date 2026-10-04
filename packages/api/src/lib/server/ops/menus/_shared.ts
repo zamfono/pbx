@@ -1,7 +1,7 @@
-import type { Selectable, Transaction } from 'kysely';
+import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
-import { type DB } from '@zamfono/shared';
+import { type DB, type Db } from '@zamfono/shared';
 
 import { targetSpecSchema } from '../forwardTargetSchema.js';
 import { rowToTarget } from '../forwardTargetSpec.js';
@@ -12,16 +12,13 @@ import { liveRow } from '../rows.js';
 export type MenuRow = Selectable<DB['menus']>;
 
 /** Loads a live menu by id, or throws `OpError(404)`. */
-export async function liveMenu(
-  db: Transaction<DB>,
-  id: string
-): Promise<MenuRow> {
+export async function liveMenu(db: Db, id: string): Promise<MenuRow> {
   return liveRow(db, 'menus', id, `menu '${id}' not found`);
 }
 
 /** Throws 409 when `name` is already used by another live menu (`menus_name` partial UNIQUE, §11.2). */
 export async function assertNameAvailable(
-  db: Transaction<DB>,
+  db: Db,
   name: string,
   excludeId?: string
 ): Promise<void> {
@@ -96,7 +93,7 @@ export const menuTargetsSchema = z
 
 /** A menu's DTMF map in `menus.setTargets`' own input shape, ordered by digits (§10.3). */
 export async function menuTargetRows(
-  db: Transaction<DB>,
+  db: Db,
   menuId: string
 ): Promise<MenuTargetOut[]> {
   const rows = await db
@@ -133,10 +130,7 @@ export const menuOut = z.object({
 export type MenuOut = z.infer<typeof menuOut>;
 
 /** Assembles the wire shape of a menu from its row, fallback target and DTMF map (§10.3). */
-export async function toMenuOut(
-  db: Transaction<DB>,
-  row: MenuRow
-): Promise<MenuOut> {
+export async function toMenuOut(db: Db, row: MenuRow): Promise<MenuOut> {
   const [fallback, targets] = await Promise.all([
     db
       .selectFrom('forwardTargets')

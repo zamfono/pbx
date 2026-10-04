@@ -1,9 +1,8 @@
-import type { Transaction } from 'kysely';
 import { z } from 'zod';
 
 import {
   RING_GROUP_FORWARD_CONDITIONS,
-  type DB,
+  type Db,
   type RingGroupForwardCondition
 } from '@zamfono/shared';
 
@@ -45,7 +44,7 @@ export type StoredRingGroupForwardRule = {
  * `ringGroups.setForwarding` takes back.
  */
 export async function storedRingGroupForwardRules(
-  db: Transaction<DB>,
+  db: Db,
   groupId: string
 ): Promise<StoredRingGroupForwardRule[]> {
   const rows = await db

@@ -1,11 +1,12 @@
-import type { Selectable, Transaction } from 'kysely';
+import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
 import {
   HTTP_UNPROCESSABLE_CONTENT,
   normalizeDialed,
   type CountryCode,
-  type DB
+  type DB,
+  type Db
 } from '@zamfono/shared';
 
 import { liveRow } from '../rows.js';
@@ -16,10 +17,7 @@ import { OpError } from '../types.js';
 export type ContactRow = Selectable<DB['contacts']>;
 
 /** Loads a live contact by id, or throws `OpError(404)`. */
-export async function liveContact(
-  db: Transaction<DB>,
-  id: string
-): Promise<ContactRow> {
+export async function liveContact(db: Db, id: string): Promise<ContactRow> {
   return liveRow(db, 'contacts', id, `contact '${id}' not found`);
 }
 
@@ -116,7 +114,7 @@ function assertPhonesUnique(phones: { number: string; label: string }[]): void {
 
 /** Replaces a contact's phone-number set as a whole, normalizing every number on write. */
 export async function replacePhones(
-  db: Transaction<DB>,
+  db: Db,
   contactId: string,
   phones: PhoneInput[],
   country: CountryCode
@@ -138,7 +136,7 @@ export async function replacePhones(
 }
 
 export async function contactPhones(
-  db: Transaction<DB>,
+  db: Db,
   contactId: string
 ): Promise<ContactPhoneOut[]> {
   const rows = await db
@@ -152,7 +150,7 @@ export async function contactPhones(
 
 /** Assembles the wire shape of a contact from its row and phone-number list (§10.3). */
 export async function toContactOut(
-  db: Transaction<DB>,
+  db: Db,
   row: ContactRow
 ): Promise<ContactOut> {
   return {
@@ -165,7 +163,7 @@ export async function toContactOut(
 }
 
 /** The tenant's calling-code country (§9.4), used to normalize a contact's numbers on write. */
-export async function tenantCountry(db: Transaction<DB>): Promise<CountryCode> {
+export async function tenantCountry(db: Db): Promise<CountryCode> {
   const settings = await db
     .selectFrom('settings')
     .select('country')

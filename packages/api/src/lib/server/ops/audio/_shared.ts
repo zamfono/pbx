@@ -1,4 +1,4 @@
-import type { Selectable, Transaction } from 'kysely';
+import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
 import {
@@ -6,22 +6,41 @@ import {
   audioReferenceQueries,
   HTTP_UNPROCESSABLE_CONTENT,
   type AudioKind,
-  type DB
+  type DB,
+  type Db
 } from '@zamfono/shared';
 
+import { deleteAudioFile, storeAudio } from '#lib/server/audio/store.js';
+import type { AudioUpload, StoredAudio } from '#lib/server/audio/types.js';
+
 import { findForwardTargetOwners } from '../forwardTargetOwners.js';
+import { onRollback } from '../rollbackHooks.js';
 import { liveRow } from '../rows.js';
-import { OpError } from '../types.js';
+import { OpError, type Context } from '../types.js';
 
 /** An `audio_assets` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type AudioAssetRow = Selectable<DB['audioAssets']>;
 
 /** Loads a live audio asset by id, or throws `OpError(404)`. */
 export async function liveAudioAsset(
-  db: Transaction<DB>,
+  db: Db,
   id: string
 ): Promise<AudioAssetRow> {
   return liveRow(db, 'audioAssets', id, `audio asset '${id}' not found`);
+}
+
+/**
+ * Transcodes and stores `upload` (`storeAudio`), an operation's `prepare`: the file is deleted
+ * again should the transaction that rows it not commit.
+ */
+export async function storeUpload(
+  ctx: Pick<Context, 'effects'>,
+  kind: AudioKind,
+  upload: AudioUpload
+): Promise<StoredAudio> {
+  const stored = await storeAudio(kind, upload);
+  onRollback(ctx, () => deleteAudioFile(stored.filename));
+  return stored;
 }
 
 /** An audio asset's wire shape (§10.3 "Audio"). */
@@ -52,7 +71,7 @@ export type Reference = { kind: string; id: string; label: string };
  * audio asset `audioId` (§5.9): a soft delete is refused while any of these exist.
  */
 export async function findAudioAssetReferences(
-  db: Transaction<DB>,
+  db: Db,
   audioId: string
 ): Promise<Reference[]> {
   const queries = audioReferenceQueries(db, audioId);
@@ -90,7 +109,7 @@ export async function findAudioAssetReferences(
  * that row is of `kind`, the kind its referencing column names in §11.2.
  */
 export async function assertAudioOfKind(
-  db: Transaction<DB>,
+  db: Db,
   audioId: string,
   kind: AudioKind
 ): Promise<void> {

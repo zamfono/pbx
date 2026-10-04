@@ -1,7 +1,7 @@
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import * as env from '$app/env/private';
-import type { Selectable, Transaction } from 'kysely';
+import type { Selectable } from 'kysely';
 import pino from 'pino';
 import { z } from 'zod';
 
@@ -10,6 +10,7 @@ import {
   mwiMailboxOf,
   VOICEMAIL_SUBDIR,
   type DB,
+  type Db,
   type MwiMailbox
 } from '@zamfono/shared';
 
@@ -52,7 +53,7 @@ export function toVoicemailOut(row: VoicemailRow): VoicemailOut {
 
 /** The ring groups `userId` belongs to (§5.3, `ringGroupMemberships`). */
 export async function ringGroupIdsForUser(
-  db: Transaction<DB>,
+  db: Db,
   userId: string
 ): Promise<string[]> {
   const rows = await ringGroupMemberships(db, { userId });

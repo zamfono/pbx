@@ -2,8 +2,7 @@ import { z } from 'zod';
 
 import { HTTP_NOT_FOUND, retireGreeting } from '@zamfono/shared';
 
-import { deleteAudioFile, storeAudio } from '#lib/server/audio/store.js';
-
+import { storeUpload } from '../audio/_shared.js';
 import { uploadSchema } from '../audio/create.js';
 import { ownUserId } from '../gates.js';
 import { propagate } from '../propagate.js';
@@ -36,32 +35,26 @@ export const setVoicemailGreeting = defineOperation({
   minRole: 'user',
   scope: ownUserId,
   audit: false,
-  run: async (ctx, input) => {
+  prepare: (ctx, input) => storeUpload(ctx, 'vmGreeting', input.upload),
+  run: async (ctx, input, stored) => {
     const user = await liveUser(ctx.db, input.id);
-    const stored = await storeAudio('vmGreeting', input.upload);
-    try {
-      await ctx.db
-        .insertInto('audioAssets')
-        .values({
-          id: stored.id,
-          label: GREETING_LABEL,
-          kind: 'vmGreeting',
-          filename: stored.filename,
-          uploadedBy: ctx.actor.id,
-          createdAt: ctx.now
-        })
-        .execute();
-      await ctx.db
-        .updateTable('users')
-        .set({ mailboxAudioId: stored.id })
-        .where('id', '=', input.id)
-        .execute();
-      await retireGreeting(ctx.db, user.mailboxAudioId, ctx.now);
-    } catch (error) {
-      // The transaction rolls back these rows on throw; delete the file they would have orphaned.
-      await deleteAudioFile(stored.filename);
-      throw error;
-    }
+    await ctx.db
+      .insertInto('audioAssets')
+      .values({
+        id: stored.id,
+        label: GREETING_LABEL,
+        kind: 'vmGreeting',
+        filename: stored.filename,
+        uploadedBy: ctx.actor.id,
+        createdAt: ctx.now
+      })
+      .execute();
+    await ctx.db
+      .updateTable('users')
+      .set({ mailboxAudioId: stored.id })
+      .where('id', '=', input.id)
+      .execute();
+    await retireGreeting(ctx.db, user.mailboxAudioId, ctx.now);
     propagate(ctx, []);
     return { id: input.id, mailboxAudioId: stored.id };
   }

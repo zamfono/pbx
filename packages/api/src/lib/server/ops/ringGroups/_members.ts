@@ -1,7 +1,6 @@
-import type { Transaction } from 'kysely';
 import { z } from 'zod';
 
-import type { DB } from '@zamfono/shared';
+import type { Db } from '@zamfono/shared';
 
 import {
   assertMembersValid,
@@ -37,10 +36,7 @@ type MemberRow = {
 };
 
 /** Every `ring_group_members` row of `groupId` in ring order, with its member's `deletedAt`. */
-async function loadMemberRows(
-  db: Transaction<DB>,
-  groupId: string
-): Promise<MemberRow[]> {
+async function loadMemberRows(db: Db, groupId: string): Promise<MemberRow[]> {
   return db
     .selectFrom('ringGroupMembers as rgm')
     .leftJoin('users as u', 'u.id', 'rgm.userId')
@@ -63,7 +59,7 @@ function isLive(row: MemberRow): boolean {
 
 /** A ring group's live members; a soft-deleted one is skipped, never blocking (§5.9), so a read-then-write round trip through `replaceMembers` needs no special case. */
 export async function ringGroupMembers(
-  db: Transaction<DB>,
+  db: Db,
   groupId: string
 ): Promise<RingGroupMemberOut[]> {
   const rows = await loadMemberRows(db, groupId);
@@ -77,7 +73,7 @@ export async function ringGroupMembers(
  * round-trip (§5.9, §11.1 "the membership tables").
  */
 export async function replaceMembers(
-  db: Transaction<DB>,
+  db: Db,
   groupId: string,
   members: MemberSpec[]
 ): Promise<void> {

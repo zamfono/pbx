@@ -1,12 +1,11 @@
 import * as env from '$app/env/private';
-import type { Transaction } from 'kysely';
 import { z } from 'zod';
 
 import {
   codecsColumn,
   codecsSchema,
   featureCodesColumn,
-  type DB
+  type Db
 } from '@zamfono/shared';
 
 import {
@@ -50,7 +49,7 @@ export type ConnectionSettings = z.infer<typeof connectionSettingsOut>;
 
 /** `device`'s connection settings with its plaintext `password`, every value read from its source. */
 export async function connectionSettings(
-  db: Transaction<DB>,
+  db: Db,
   device: DeviceRow,
   password: string
 ): Promise<ConnectionSettings> {

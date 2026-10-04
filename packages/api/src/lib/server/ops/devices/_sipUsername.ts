@@ -1,6 +1,4 @@
-import type { Transaction } from 'kysely';
-
-import type { DB, Db } from '@zamfono/shared';
+import type { Db } from '@zamfono/shared';
 
 import { newSlug, sipUsername } from '#lib/server/sip.js';
 
@@ -51,7 +49,7 @@ export async function endpointNameHolder(
  * `excludeId`) and `users.update`'s extension rename, which excludes the device being renamed.
  */
 export async function uniqueSipUsername(
-  db: Transaction<DB>,
+  db: Db,
   ext: string,
   excludeId?: string
 ): Promise<string> {
@@ -74,7 +72,7 @@ export async function uniqueSipUsername(
  * rename keeps the device's own slug unless doing so would collide with another endpoint.
  */
 export async function sipUsernameOrFresh(
-  db: Transaction<DB>,
+  db: Db,
   ext: string,
   deviceId: string,
   preferred: string

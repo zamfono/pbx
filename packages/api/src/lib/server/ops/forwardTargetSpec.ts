@@ -1,6 +1,4 @@
-import type { Transaction } from 'kysely';
-
-import { newId, sipHeadersColumn, type Db, type DB } from '@zamfono/shared';
+import { newId, sipHeadersColumn, type Db } from '@zamfono/shared';
 
 import { noteWarning } from './afterCommit.js';
 import { assertAudioOfKind } from './audio/_shared.js';
@@ -114,7 +112,7 @@ export async function resolveOptionalTarget(
 
 /** Throws 404 when `id` names no live row of `table` (a `forward_targets` column's `RESTRICT` FK). */
 async function assertLiveRow(
-  db: Transaction<DB>,
+  db: Db,
   table: 'users' | 'ringGroups' | 'menus' | 'audioAssets' | 'trunks',
   id: string,
   label: string
@@ -126,10 +124,7 @@ async function assertLiveRow(
  * Throws 404 when `spec`'s referenced id names no live row (§5.9: routing never depends on a
  * soft-deleted row, so a rule can only ever target one); `external` names no row and needs none.
  */
-async function assertTargetAvailable(
-  db: Transaction<DB>,
-  spec: TargetSpec
-): Promise<void> {
+async function assertTargetAvailable(db: Db, spec: TargetSpec): Promise<void> {
   if (spec.kind === 'user' || spec.kind === 'mailboxUser') {
     await assertLiveRow(db, 'users', spec.userId, 'user');
     return;
@@ -201,7 +196,7 @@ export async function insertForwardTarget(
 
 /** Deletes the `forward_targets` rows an operation no longer owns, e.g. ones it is about to replace. */
 export async function deleteForwardTargets(
-  db: Transaction<DB>,
+  db: Db,
   ids: string[]
 ): Promise<void> {
   if (ids.length > 0) {

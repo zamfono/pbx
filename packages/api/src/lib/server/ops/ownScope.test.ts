@@ -28,7 +28,8 @@ import './index.js';
 
 // §5.3 own scope, cell by cell: a `user` reaches every own-scoped operation on what is their
 // own and gets 403 on what is someone else's, judged by the row the input names; an `admin`
-// reaches both. `run` is stubbed: the scope gate runs before it (§10.3 "Operations layer").
+// reaches both. `prepare` and `run` are stubbed out: the scope gate runs before them (§10.3
+// "Operations layer").
 
 const REACHED = { reached: true };
 
@@ -56,6 +57,7 @@ beforeAll(async () => {
       output: z.unknown(),
       confirm: undefined,
       readOnly: true,
+      prepare: undefined,
       run: () => Promise.resolve(REACHED)
     });
   }

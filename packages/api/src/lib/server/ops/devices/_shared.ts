@@ -1,4 +1,4 @@
-import type { Selectable, Transaction } from 'kysely';
+import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
 import {
@@ -6,7 +6,8 @@ import {
   allowedIpsSchema,
   DEVICE_KINDS,
   DEVICE_TRANSPORTS,
-  type DB
+  type DB,
+  type Db
 } from '@zamfono/shared';
 
 import { assertNoLiveHolder } from '../liveHolder.js';
@@ -21,7 +22,7 @@ export type DroppedBlfKey = { deviceId: string; ext: string; position: number };
 
 /** Throws 409 while `userId` already has a live `ringotel` device (`devices_one_ringotel_per_user`). */
 export async function assertNoExistingRingotelDevice(
-  db: Transaction<DB>,
+  db: Db,
   userId: string
 ): Promise<void> {
   await assertNoLiveHolder(db, 'users: already has a ringotel device', {
@@ -72,10 +73,7 @@ export function toDeviceOut(row: DeviceRow): DeviceOut {
 }
 
 /** Loads a live device by id, or throws `OpError(404)`. */
-export async function liveDevice(
-  db: Transaction<DB>,
-  id: string
-): Promise<DeviceRow> {
+export async function liveDevice(db: Db, id: string): Promise<DeviceRow> {
   return liveRow(db, 'devices', id, `device '${id}' not found`);
 }
 

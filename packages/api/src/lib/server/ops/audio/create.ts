@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 import { AUDIO_KINDS } from '@zamfono/shared';
 
-import { deleteAudioFile, storeAudio } from '#lib/server/audio/store.js';
 import { isAcceptedUploadType } from '#lib/server/audio/uploadTypes.js';
 
 import { recordChange } from '../audit.js';
@@ -10,6 +9,7 @@ import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
 import {
   audioAssetOut,
+  storeUpload,
   toAudioAssetOut,
   type AudioAssetOut
 } from './_shared.js';
@@ -39,8 +39,8 @@ export const createAudioAssetInput = z
   .strict();
 
 /**
- * `POST /audio` (§10.2 "Greetings and audio"): transcodes and stores the upload through
- * `storeAudio`, then rows it as an `audio_assets` asset under the id it returns.
+ * `POST /audio` (§10.2 "Greetings and audio"): transcodes and stores the upload before the
+ * transaction opens (`storeUpload`), then rows it as an `audio_assets` asset under the id it returns.
  */
 export const createAudioAsset = defineOperation({
   name: 'audio.create',
@@ -50,25 +50,19 @@ export const createAudioAsset = defineOperation({
   output: audioAssetOut,
   minRole: 'admin',
   entity: (_input, out: AudioAssetOut) => ({ kind: 'audio', id: out.id }),
-  run: async (ctx, input) => {
-    const stored = await storeAudio(input.kind, input.upload);
-    try {
-      await ctx.db
-        .insertInto('audioAssets')
-        .values({
-          id: stored.id,
-          label: input.label,
-          kind: input.kind,
-          filename: stored.filename,
-          uploadedBy: ctx.actor.id,
-          createdAt: ctx.now
-        })
-        .execute();
-    } catch (error) {
-      // The transaction rolls back this row on throw; delete the file it would have orphaned.
-      await deleteAudioFile(stored.filename);
-      throw error;
-    }
+  prepare: (ctx, input) => storeUpload(ctx, input.kind, input.upload),
+  run: async (ctx, input, stored) => {
+    await ctx.db
+      .insertInto('audioAssets')
+      .values({
+        id: stored.id,
+        label: input.label,
+        kind: input.kind,
+        filename: stored.filename,
+        uploadedBy: ctx.actor.id,
+        createdAt: ctx.now
+      })
+      .execute();
     recordChange(ctx, { field: 'label', from: null, to: input.label });
     if (input.kind === 'moh') {
       propagate(ctx, ['moh']);

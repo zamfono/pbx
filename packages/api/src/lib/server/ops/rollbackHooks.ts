@@ -6,7 +6,10 @@ import type { Context } from './types.js';
  * or the commit itself fails: for an effect outside the database that the rollback cannot take
  * back, such as an object a remote API created (§10.4 setup). Never runs after a commit.
  */
-export function onRollback(ctx: Context, hook: RollbackHook): void {
+export function onRollback(
+  ctx: Pick<Context, 'effects'>,
+  hook: RollbackHook
+): void {
   ctx.effects.rollback.push(hook);
 }
 

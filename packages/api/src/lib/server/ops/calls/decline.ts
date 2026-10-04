@@ -30,6 +30,7 @@ export const decline = defineOperation({
   minRole: 'user',
   scope: 'any',
   audit: false,
+  writesDatabase: false,
   run: async (ctx, input) => {
     await getCoreClient().decline(input.id, { actorUserId: ctx.actor.id });
     return { id: input.id };

@@ -1227,7 +1227,7 @@ Pause and resume and on-demand recording are call-center features (§12). A reco
 Every v1 operation is one module, `packages/api/src/lib/server/ops/<area>/<operation>.ts` (`users/update.ts` for `users.update`, `backups/targets/create.ts` for `backups.targets.create`), exporting one `Operation` object, a plain record built with a `defineOperation` helper that infers `In` from the schema and `Out` from the body:
 
 ```ts
-type Operation<In, Out> = {
+type Operation<In, Out, Prepared = void> = {
   name: string                         // e.g. 'users.update' — stored as audit_log.operation; the MCP tool name
   description: string                  // one line; the MCP tool description and the OpenAPI summary
   input: ZodType<In>                   // validation, OpenAPI, MCP tool schema
@@ -1236,16 +1236,18 @@ type Operation<In, Out> = {
   minRole: 'owner' | 'admin' | 'user'
   scope: 'any' | ((ctx: Context, input: In) => Promise<boolean>)   // required with minRole 'user': whether what the input names is a user's own (§5.3)
   readOnly?: boolean                   // true for reads; the MCP readOnlyHint, so clients need not confirm them
+  writesDatabase?: false               // a write that changes nothing in the database (a live-call action core carries out)
   confirm?: (ctx: Context, input: In) => Promise<string>   // present on destructive operations: the question a human must answer first
   audit?: false                        // takes a write out of the audit log (§5.7)
   pureAction?: true                    // an audited call that changes no state of its entity (§5.8)
   entity?: (input: In, out: Out) => { kind: string, id: string | null }   // on a write: the entity its audit_log row names
-  run(ctx: Context, input: In): Promise<Out>
+  prepare?: (ctx, input: In) => Promise<Prepared>   // work too slow to hold the database (transcoding an upload): runs after the gates, before the transaction
+  run(ctx: Context, input: In, prepared: Prepared): Promise<Out>
 }
 
 type Context = {
   actor: User                          // the authenticated user; RBAC and audit use it
-  db: Transaction                      // the runner's Kysely transaction: body and audit entry commit together
+  db: Kysely                           // the runner's transaction, body and audit entry commit together; the database itself for readOnly and writesDatabase: false
   now: string                          // one ISO 8601 instant per operation, for every timestamp it writes
   channel: 'rest' | 'mcp' | 'ui' | 'undo' | 'job'   // how the call arrived; recorded in audit_log.channel
   clientId?: string                    // the OAuth client behind the token, when there is one
@@ -1255,7 +1257,7 @@ type Context = {
 }
 ```
 
-A registry, filled by each area's `index.ts`, maps every name to its object; the REST route table, the MCP tool list and the OpenAPI document are all generated from that one map, which is what keeps the three surfaces from drifting. One runner wraps every `run` and does the four things they share: it validates the input against `input`, enforces `minRole` and the own-scope rules of §5.3 (a `user` reading only their own voicemails) through `scope`, for a `user` before confirmation and before `run` (403 when not their own), writes the `audit_log` entry with the field-level diff, and performs config propagation (§3.1) after a config write. It also builds the `Context`: it opens the transaction that `run` and the audit entry share, fixes `now`, and records how the call arrived, so the trail can tell a person's own change from their assistant's. `run` holds only what differs between operations.
+A registry, filled by each area's `index.ts`, maps every name to its object; the REST route table, the MCP tool list and the OpenAPI document are all generated from that one map, which is what keeps the three surfaces from drifting. One runner wraps every `run` and does the four things they share: it validates the input against `input`, enforces `minRole` and the own-scope rules of §5.3 (a `user` reading only their own voicemails) through `scope`, for a `user` before confirmation and before `run` (403 when not their own), writes the `audit_log` entry with the field-level diff, and performs config propagation (§3.1) after a config write. It also builds the `Context`: it opens the transaction that `run` and the audit entry share (none for a call that writes nothing to the database, so `api`'s connection serves other requests while it waits on `core`), fixes `now`, and records how the call arrived, so the trail can tell a person's own change from their assistant's. `run` holds only what differs between operations.
 
 **Confirmation.** An operation with `confirm` runs only after a human has answered its question, built from the rows the input names, after the own-scope check and a 404 for an unknown id, for example "Delete Anna Huber (extension 101)? The deletion can be undone for 30 days.", the days being `settings.soft_delete_retention_days`. The runner enforces it per channel:
 

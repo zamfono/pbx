@@ -31,6 +31,7 @@ export const resume = defineOperation({
   minRole: 'user',
   scope: ownLiveCall,
   audit: false,
+  writesDatabase: false,
   run: async (ctx, input) => {
     await getCoreClient().resume(input.id, { actorUserId: ctx.actor.id });
     return { id: input.id };

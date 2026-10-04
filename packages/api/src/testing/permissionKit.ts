@@ -40,8 +40,8 @@ const TARGET_INPUT = { id: TARGET_ID, userId: TARGET_ID, role: 'admin' };
 
 const REACHED = { reached: true };
 
-/** `op` reduced to its gates: any input, no own scope, no confirmation, its owner-only check, a run
- *  that only reports it was reached. Own scope has its own matrix (`lib/server/ops/ownScope.test.ts`). */
+/** `op` reduced to its gates: any input, no own scope, no confirmation, its owner-only check, no
+ *  `prepare` and a run that only reports it was reached. Own scope has its own matrix (`lib/server/ops/ownScope.test.ts`). */
 export function stubbed(op: ErasedOperation): ErasedOperation {
   return {
     ...op,
@@ -51,6 +51,7 @@ export function stubbed(op: ErasedOperation): ErasedOperation {
     ...(op.minRole === 'user' ? { scope: 'any' } : {}),
     confirm: undefined,
     readOnly: true,
+    prepare: undefined,
     run: () => Promise.resolve(REACHED)
   };
 }

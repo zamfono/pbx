@@ -1,6 +1,4 @@
-import type { Transaction } from 'kysely';
-
-import type { DB } from '@zamfono/shared';
+import type { Db } from '@zamfono/shared';
 
 import {
   findForwardTargetOwners,
@@ -11,7 +9,7 @@ export type { Reference };
 
 /** The `forward_targets` ids this user owns as a ring or mailbox target (§11.2). */
 async function ownedForwardTargetIds(
-  db: Transaction<DB>,
+  db: Db,
   userId: string
 ): Promise<string[]> {
   const rows = await db
@@ -31,7 +29,7 @@ async function ownedForwardTargetIds(
  * the two scope columns directly instead.
  */
 async function ownScopeRuleIds(
-  db: Transaction<DB>,
+  db: Db,
   userId: string
 ): Promise<{ oooRuleIds: Set<string>; openingHoursIds: Set<string> }> {
   const [oooRows, hoursRows] = await Promise.all([
@@ -59,7 +57,7 @@ async function ownScopeRuleIds(
  * OOO rules and opening-hours schedules, all deleted with them rather than blocking their delete.
  */
 export async function findUserReferences(
-  db: Transaction<DB>,
+  db: Db,
   userId: string
 ): Promise<Reference[]> {
   const ftIds = await ownedForwardTargetIds(db, userId);

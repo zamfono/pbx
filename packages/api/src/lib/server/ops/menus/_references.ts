@@ -1,6 +1,4 @@
-import type { Transaction } from 'kysely';
-
-import type { DB } from '@zamfono/shared';
+import type { Db } from '@zamfono/shared';
 
 import {
   findForwardTargetOwners,
@@ -14,7 +12,7 @@ export type { Reference };
  * option that dials it, since each such reference owns its own row.
  */
 async function ownedForwardTargetIds(
-  db: Transaction<DB>,
+  db: Db,
   menuId: string
 ): Promise<string[]> {
   const rows = await db
@@ -27,7 +25,7 @@ async function ownedForwardTargetIds(
 
 /** The blocking references a soft delete of menu `menuId` must list, or `[]` when free (§5.9). */
 export async function findMenuReferences(
-  db: Transaction<DB>,
+  db: Db,
   menuId: string
 ): Promise<Reference[]> {
   const ftIds = await ownedForwardTargetIds(db, menuId);

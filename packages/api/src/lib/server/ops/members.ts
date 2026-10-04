@@ -1,7 +1,6 @@
-import type { Transaction } from 'kysely';
 import { z } from 'zod';
 
-import { HTTP_UNPROCESSABLE_CONTENT, type DB } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT, type Db } from '@zamfono/shared';
 
 import { liveRow } from './rows.js';
 import { OpError } from './types.js';
@@ -21,7 +20,7 @@ export type MemberSpec = z.infer<typeof memberSchema>;
  * `label` (`ringGroups`, `userGroups`) prefixes the 422.
  */
 export async function assertMembersValid(
-  db: Transaction<DB>,
+  db: Db,
   members: MemberSpec[],
   label: string
 ): Promise<void> {

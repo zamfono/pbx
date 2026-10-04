@@ -1,4 +1,4 @@
-import type { Selectable, Transaction } from 'kysely';
+import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
 import {
@@ -8,7 +8,8 @@ import {
   HTTP_UNPROCESSABLE_CONTENT,
   isE164,
   USER_ROLES,
-  type DB
+  type DB,
+  type Db
 } from '@zamfono/shared';
 
 import { assertNoLiveHolder } from '../liveHolder.js';
@@ -96,10 +97,7 @@ export const userOut = z.object({
 export type UserOut = z.infer<typeof userOut>;
 
 /** Assembles the wire shape of a user from its row and extension (§10.3); never the password hash. */
-export async function toUserOut(
-  db: Transaction<DB>,
-  row: UserRow
-): Promise<UserOut> {
+export async function toUserOut(db: Db, row: UserRow): Promise<UserOut> {
   return {
     id: row.id,
     name: row.name,
@@ -128,7 +126,7 @@ export async function toUserOut(
  * soft-deleted below one (§5.3, §5.9, §10.3).
  */
 export async function assertNotLastOwner(
-  db: Transaction<DB>,
+  db: Db,
   user: Pick<UserRow, 'id' | 'role'>
 ): Promise<void> {
   if (user.role !== 'owner') {
@@ -147,7 +145,7 @@ export async function assertNotLastOwner(
 
 /** Throws `OpError(422)` for a `callerIdDidId` that is not a live, numeric DID (§9.4 "Caller-ID"). */
 export async function assertCallerIdDidValid(
-  db: Transaction<DB>,
+  db: Db,
   id: string
 ): Promise<void> {
   const did = await db
@@ -172,7 +170,7 @@ export async function assertCallerIdDidValid(
 
 /** Throws `OpError(409)` when `email` is already used by another live user (`users_email` UNIQUE). */
 export async function assertEmailAvailable(
-  db: Transaction<DB>,
+  db: Db,
   email: string,
   excludeId?: string
 ): Promise<void> {
@@ -185,10 +183,7 @@ export async function assertEmailAvailable(
 }
 
 /** Loads a live user by id, or throws `OpError(404)`. */
-export async function liveUser(
-  db: Transaction<DB>,
-  id: string
-): Promise<UserRow> {
+export async function liveUser(db: Db, id: string): Promise<UserRow> {
   return liveRow(db, 'users', id, `user '${id}' not found`);
 }
 

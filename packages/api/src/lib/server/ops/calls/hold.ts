@@ -32,6 +32,7 @@ export const hold = defineOperation({
   minRole: 'user',
   scope: ownLiveCall,
   audit: false,
+  writesDatabase: false,
   run: async (ctx, input) => {
     await getCoreClient().hold(input.id, { actorUserId: ctx.actor.id });
     return { id: input.id };

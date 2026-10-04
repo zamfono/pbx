@@ -1,14 +1,15 @@
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import * as env from '$app/env/private';
-import type { Selectable, Transaction } from 'kysely';
+import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
 import {
   HTTP_NOT_FOUND,
   recordingFileNames,
   RECORDINGS_SUBDIR,
-  type DB
+  type DB,
+  type Db
 } from '@zamfono/shared';
 
 import { OpError } from '../types.js';
@@ -39,10 +40,7 @@ export function toRecordingOut(row: RecordingRow): RecordingOut {
 }
 
 /** Loads a recording by id, or throws `OpError(404)`; `recordings` carries no soft delete (§11.2). */
-export async function loadRecording(
-  db: Transaction<DB>,
-  id: string
-): Promise<RecordingRow> {
+export async function loadRecording(db: Db, id: string): Promise<RecordingRow> {
   const row = await db
     .selectFrom('recordings')
     .selectAll()

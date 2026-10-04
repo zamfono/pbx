@@ -1,6 +1,4 @@
-import type { Transaction } from 'kysely';
-
-import type { DB } from '@zamfono/shared';
+import type { Db } from '@zamfono/shared';
 
 import type { OwnScope } from './forwardTargetOwners.js';
 
@@ -16,7 +14,7 @@ export type ScheduleSources = {
  * `deleted_at` NULL wherever the scope column is NULL, which keeps the tenant-wide rows in.
  */
 async function loadScopedOooRules(
-  db: Transaction<DB>,
+  db: Db,
   ftIds: string[],
   exclude: OwnScope
 ): Promise<{ id: string }[]> {
@@ -57,7 +55,7 @@ async function loadScopedOooRules(
 
 /** `opening_hours.closed_target_id` under the same scope rules as `loadScopedOooRules`. */
 async function loadScopedOpeningHours(
-  db: Transaction<DB>,
+  db: Db,
   ftIds: string[],
   exclude: OwnScope
 ): Promise<{ id: string }[]> {
@@ -101,7 +99,7 @@ async function loadScopedOpeningHours(
  * `opening_hours.closed_target_id`, each outside `exclude`'s own scope (§5.9).
  */
 export async function loadScheduleSources(
-  db: Transaction<DB>,
+  db: Db,
   ftIds: string[],
   exclude: OwnScope
 ): Promise<ScheduleSources> {

@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-04 · §10.3 Operations layer.** A call that writes nothing to the database (`readOnly`, or the new `writesDatabase: false` of the live-call actions) runs without a transaction; an operation's new `prepare` does work too slow to hold the database, such as transcoding an upload, after the gates and before the transaction, and `run` receives its result.
+*Why:* `api` has one database connection, and a transaction held while waiting on `core` or ffmpeg kept every other request waiting with it.
+
 **2026-10-04 · §3.1 Write ownership.** Transactions begin `IMMEDIATE`, beside WAL mode and `busy_timeout`, as what makes concurrent writers safe.
 *Why:* a deferred transaction that reads and then writes after the other process committed fails at once with SQLITE_BUSY_SNAPSHOT, which `busy_timeout` does not wait out; taking the write lock at the start lets the busy timeout cover the wait.
 

@@ -50,6 +50,7 @@ export const originate = defineOperation({
   minRole: 'user',
   scope: ownActingUser,
   audit: false,
+  writesDatabase: false,
   run: async (ctx, input) => {
     const userId = input.userId ?? ctx.actor.id;
     return getCoreClient().originate({

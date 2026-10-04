@@ -35,6 +35,7 @@ export const consult = defineOperation({
   minRole: 'user',
   scope: ownLiveCall,
   audit: false,
+  writesDatabase: false,
   run: async (ctx, input) => {
     const { callId } = await getCoreClient().consult(input.id, {
       target: input.target,

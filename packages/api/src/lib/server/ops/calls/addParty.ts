@@ -34,6 +34,7 @@ export const addParty = defineOperation({
   minRole: 'user',
   scope: ownLiveCall,
   audit: false,
+  writesDatabase: false,
   run: async (ctx, input) => {
     const { callId } = await getCoreClient().addParty(input.id, {
       target: input.target,
