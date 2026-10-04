@@ -11,10 +11,11 @@ import { ignoreGone } from '../ari/failures.js';
 import { userById, type Snapshot } from '../internal/snapshot.js';
 import { assetMedia, defaultPrompt } from '../prompts.js';
 import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
-import { callerChannel, release, type Call, type Owner } from './call.js';
+import { callerChannel, type Call } from './call.js';
 import { finishAbandoned } from './missedCall.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
+import { release, type Owner } from './release.js';
 import { recordCaller } from './voicemailRecording.js';
 import { persistVoicemail } from './voicemailStore.js';
 

@@ -10,7 +10,7 @@ import { traceSystemEnd } from './callEnd.js';
 import { clearFindMeTimers } from './findMe.js';
 import { stopGroupRinging } from './groupPickup.js';
 import { endHold, holdIn, holdOf } from './hold.js';
-import { notifyMissedCall } from './missedCall.js';
+import { settleStatus } from './missedCall.js';
 import type { Pipeline } from './pipeline.js';
 
 /** Every user who took part in `call`: its caller, its legs' owners and whoever answered it. */
@@ -174,11 +174,7 @@ export async function closeCall(
     pipeline.deps.presence.setCallState(userId, 'idle', null, null, call.id);
   }
   // §10.2 "Mail": a call this ends unanswered, still ringing, is missed like any other.
-  const missed = call.status === null && status === 'missed';
-  call.status ??= status;
-  if (missed) {
-    await notifyMissedCall(pipeline, call);
-  }
+  await settleStatus(pipeline, call, status);
   const { recorder } = pipeline.deps;
   // §10.2: each recorded participation is stopped while its channel is still up, then mixed and
   // stored; nothing else ends it once the channels are no longer this call's.

@@ -10,8 +10,8 @@ import type { Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import { logFailure } from '../ari/failures.js';
-import type { Owner } from './call.js';
 import type { Folder } from './mailboxPrompts.js';
+import type { Owner } from './release.js';
 import { refreshMwi } from './voicemailStore.js';
 
 /** The voicemail directory under the media volume (§11.6). */

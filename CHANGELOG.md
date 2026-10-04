@@ -267,6 +267,9 @@ why the specified behaviour changed; the commit history, how.
   attempt now counts the moment it arrives. A refresh token or set-password link presented twice
   at the same moment is redeemed once; the second presentation is refused (for a refresh token,
   as a replay).
+- A parked call whose ring-back nobody answered, on a stack with no fallback target, showed in the
+  history as missed and sent the parker a missed-call mail, though they had talked on it. It now
+  ends as answered, with no mail.
 - A caller who hung up while an outgoing call was still ringing had the call dialled again over
   the next host, route or emergency trunk: a 112 hung up within a second reached the next
   emergency centre with nobody on the line. Dialling now stops when the caller hangs up.

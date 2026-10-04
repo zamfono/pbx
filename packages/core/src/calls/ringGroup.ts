@@ -9,12 +9,13 @@ import type { Snapshot } from '../internal/snapshot.js';
 import { assetMedia } from '../prompts.js';
 import { groupFallback, ringable, ringPlan } from '../routing/ringGroup.js';
 import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
-import { release, type Call } from './call.js';
+import { type Call } from './call.js';
 import { raiseLogLevel } from './callLogLevel.js';
 import { extensionOf } from './extensionOwner.js';
 import { CONDITION_REASONS, diversionFor } from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
+import { release } from './release.js';
 import { ringBatch } from './ringGroupDial.js';
 import {
   buildGroupRules,

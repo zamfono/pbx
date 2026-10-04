@@ -7,14 +7,17 @@ import { newId } from '@zamfono/shared';
 import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
+import { findForwardTarget } from '../routing/targets.js';
 import { SIP_NOT_FOUND } from '../sipCodes.js';
-import { findForwardTarget, newCall, release, type Call } from './call.js';
+import { newCall, type Call } from './call.js';
 import { extensionOf } from './extensionOwner.js';
 import { endHold } from './hold.js';
 import { trackLeg } from './legs.js';
 import { closeCall } from './liveCall.js';
+import { settleStatus } from './missedCall.js';
 import { startOnwardCall, type OnwardEntry } from './onwardCall.js';
 import type { Pipeline } from './pipeline.js';
+import { release } from './release.js';
 import { runTarget } from './runTarget.js';
 import {
   applyUserDecision,
@@ -133,7 +136,7 @@ async function routeParkedParty(
   if (route === null) {
     // The party is the one channel left for the release to end.
     parked.callerChannelId = partyChannelId;
-    await release(pipeline, parked, SIP_NOT_FOUND, 'missed');
+    await release(pipeline, parked, SIP_NOT_FOUND, 'answered');
     return;
   }
   const result = undone?.kind ?? 'fallback';
@@ -226,7 +229,7 @@ export async function ringParkerBack(
   // A row a release or a REST hangup closed already stays as it is; a row still open is closed
   // here, so none stays at `CdrWriter.open`'s placeholder.
   if (ringback.status === null || ringback.status === 'answered') {
-    ringback.status ??= 'missed';
+    await settleStatus(pipeline, ringback, 'missed');
     await pipeline.finishCall(ringback);
   }
   await routeParkedParty(pipeline, snapshot, ctx, { to: parkerExt, undone });

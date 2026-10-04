@@ -12,13 +12,9 @@ import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { defaultPrompt } from '../prompts.js';
 import { resolveDialed, type DialAction } from '../routing/outbound.js';
+import { findForwardTarget } from '../routing/targets.js';
 import { SIP_NOT_FOUND } from '../sipCodes.js';
-import {
-  callerChannel,
-  findForwardTarget,
-  release,
-  type Call
-} from './call.js';
+import { callerChannel, type Call } from './call.js';
 import { dialEmergency, emergencyLogLevel } from './emergency.js';
 import { handleFeature } from './features.js';
 import { enterTarget } from './inbound.js';
@@ -27,6 +23,7 @@ import { resolveDialedContext, toFor } from './outboundLookup.js';
 import { retrieveParkedCall } from './parkingRetrieval.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
+import { release } from './release.js';
 
 export type ResolvedTarget = {
   action: DialAction;

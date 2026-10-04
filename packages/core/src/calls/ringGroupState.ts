@@ -7,8 +7,11 @@ import { userById, type Snapshot } from '../internal/snapshot.js';
 import type { MemberState } from '../routing/ringGroup.js';
 import { ownInEffectOoo } from '../routing/schedule.js';
 import { buildOooRules } from '../routing/scheduleRows.js';
-import type { ForwardTarget } from '../routing/targets.js';
-import { buildUserRules, findForwardTarget } from './call.js';
+import {
+  buildUserRules,
+  findForwardTarget,
+  type ForwardTarget
+} from '../routing/targets.js';
 import { groupMemberUserIds } from './extensionOwner.js';
 import type { Pipeline } from './pipeline.js';
 import { isUserInCall, registeredDevices } from './userDevices.js';

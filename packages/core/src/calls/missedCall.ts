@@ -7,7 +7,7 @@ import type { MailRequest } from '@zamfono/shared';
 
 import { logFailure } from '../ari/failures.js';
 import { userById } from '../internal/snapshot.js';
-import type { Call } from './call.js';
+import type { Call, CallsRow } from './call.js';
 import { contactName } from './contactName.js';
 import type { Pipeline } from './pipeline.js';
 
@@ -53,16 +53,28 @@ export async function notifyMissedCall(
     );
 }
 
-/** Closes out a call whose caller left before any outcome was reached (§11.2 `calls.status`
- * `missed`), with its missed-call mail; an outcome already reached is kept, and so is the row of
- * a call already closed (`cdr.finish` writes once). */
+/** Records how `call` ended (§11.2 `calls.status`), keeping an outcome it already reached: a
+ * call this leaves `missed` gets its missed-call mail, once. */
+export async function settleStatus(
+  pipeline: Pipeline,
+  call: Call,
+  status: CallsRow['status']
+): Promise<void> {
+  if (call.status !== null) {
+    return;
+  }
+  call.status = status;
+  if (status === 'missed') {
+    await notifyMissedCall(pipeline, call);
+  }
+}
+
+/** Closes out a call whose caller left before any outcome was reached as `missed`
+ * (`settleStatus`); the row of a call already closed is kept (`cdr.finish` writes once). */
 export async function finishAbandoned(
   pipeline: Pipeline,
   call: Call
 ): Promise<void> {
-  if (call.status === null) {
-    call.status = 'missed';
-    await notifyMissedCall(pipeline, call);
-  }
+  await settleStatus(pipeline, call, 'missed');
   await pipeline.finishCall(call);
 }

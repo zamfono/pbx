@@ -7,7 +7,7 @@
  */
 import { ignoreGone } from '../ari/failures.js';
 import { SIP_FORBIDDEN, SIP_NOT_FOUND } from '../sipCodes.js';
-import { callerChannel, release, type Call, type Owner } from './call.js';
+import { callerChannel, type Call } from './call.js';
 import { ownerForExt, ringGroupMemberIds } from './extensionOwner.js';
 import { concludeFeature } from './featureCall.js';
 import { recordGreeting } from './mailboxGreeting.js';
@@ -30,6 +30,7 @@ import {
 } from './mailboxPrompts.js';
 import { loadMessages } from './mailboxStore.js';
 import type { Pipeline } from './pipeline.js';
+import { release, type Owner } from './release.js';
 
 function folderCounts(session: MailboxSession): {
   newCount: number;

@@ -1,8 +1,10 @@
 /**
- * The shared forward-target vocabulary (spec §11.2 `forward_targets`) and hop counting for
- * routing pipeline step 7, "Forward targets" (§10.1).
+ * The shared forward-target vocabulary (spec §11.2 `forward_targets`), its lookups in the config
+ * snapshot, and hop counting for routing pipeline step 7, "Forward targets" (§10.1).
  */
-import type { SipHeaderTemplate } from '@zamfono/shared';
+import type { SipHeaderTemplate, UserForwardCondition } from '@zamfono/shared';
+
+import type { Snapshot } from '../internal/snapshot.js';
 
 export type ForwardTarget = { id: string } & (
   | { kind: 'user'; userId: string }
@@ -76,6 +78,35 @@ export function targetFromRow(row: ForwardTargetsRow): ForwardTarget {
     return { id, kind: 'menu', menuId: row.menuId };
   }
   throw new Error(`forwardTargets: row ${id} sets no target column`);
+}
+
+/** The `ForwardTarget` a `forward_targets` row represents; throws on a dangling id (FK-guaranteed present). */
+export function findForwardTarget(
+  snapshot: Snapshot,
+  targetId: string
+): ForwardTarget {
+  const row = snapshot.forwardTargets.find(
+    candidate => candidate.id === targetId
+  );
+  if (!row) {
+    throw new Error(`forwardTargets: missing row ${targetId}`);
+  }
+  return targetFromRow(row);
+}
+
+/** `user_forward_rules` for `userId`, keyed by condition, resolved to their `ForwardTarget`s. */
+export function buildUserRules(
+  snapshot: Snapshot,
+  userId: string
+): Partial<Record<UserForwardCondition, ForwardTarget>> {
+  const rules: Partial<Record<UserForwardCondition, ForwardTarget>> = {};
+  for (const row of snapshot.userForwardRules) {
+    if (row.userId !== userId) {
+      continue;
+    }
+    rules[row.condition] = findForwardTarget(snapshot, row.targetId);
+  }
+  return rules;
 }
 
 /**

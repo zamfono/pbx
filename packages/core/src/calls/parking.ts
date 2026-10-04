@@ -8,13 +8,14 @@ import { ignoreGone, logFailure, logUnlessGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import type { Presence } from '../presence.js';
 import { SIP_FORBIDDEN, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
-import { callerChannel, release, type Call } from './call.js';
+import { callerChannel, type Call } from './call.js';
 import { activeCallOf, bridgedParty, channelOf } from './callLookup.js';
 import { callPartiesChanged } from './callState.js';
 import { concludeFeature } from './featureCall.js';
 import { moveParkedParty, ringParkerBack } from './parkingRingback.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
+import { release } from './release.js';
 
 export type ParkedEntry = {
   call: Call;

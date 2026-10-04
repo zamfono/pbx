@@ -7,8 +7,8 @@
  */
 import type { Snapshot } from '../internal/snapshot.js';
 import { resolveDialed } from '../routing/outbound.js';
+import { findForwardTarget } from '../routing/targets.js';
 import { SIP_NOT_FOUND } from '../sipCodes.js';
-import { findForwardTarget } from './call.js';
 import { extensionOf } from './extensionOwner.js';
 import { resolveDialedContext } from './outboundLookup.js';
 

@@ -13,7 +13,7 @@ import {
 import { logUnlessGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { ActionError, notBridged } from './actionError.js';
-import { type Call, type Owner } from './call.js';
+import { type Call } from './call.js';
 import { bridgedParty, transferrerChannel } from './callLookup.js';
 import { ownerForExt } from './extensionOwner.js';
 import { endHold } from './hold.js';
@@ -30,6 +30,7 @@ import {
   type ResolvedTarget
 } from './outboundDispatch.js';
 import type { Pipeline } from './pipeline.js';
+import { type Owner } from './release.js';
 import { deposit } from './voicemail.js';
 
 /** Where a transfer sends the transferee: `target` dialled as the transferrer's call, or for a

@@ -20,6 +20,7 @@ import { resolveAddedTarget } from './addPartyTarget.js';
 import { newCall, type Call } from './call.js';
 import { ownBridge, transferrerChannel } from './callLookup.js';
 import { extensionOf } from './extensionOwner.js';
+import { settleStatus } from './missedCall.js';
 import { userOfChannel } from './onwardCall.js';
 import type { Pipeline } from './pipeline.js';
 
@@ -114,7 +115,7 @@ export function dialAddedLeg(
       return;
     }
     if (leg.status === null) {
-      leg.status = 'missed';
+      await settleStatus(pipeline, leg, 'missed');
       await pipeline.finishCall(leg);
     }
   };

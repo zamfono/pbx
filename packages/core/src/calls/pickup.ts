@@ -7,18 +7,13 @@
 import { ignoreGone, logUnlessGone } from '../ari/failures.js';
 import { SIP_NOT_FOUND } from '../sipCodes.js';
 import { bridgeAnswered, claimAnswer } from './answer.js';
-import {
-  callerChannel,
-  release,
-  type Call,
-  type Leg,
-  type Owner
-} from './call.js';
+import { callerChannel, type Call, type Leg } from './call.js';
 import { findLiveCall } from './callLookup.js';
 import { ownerForExt } from './extensionOwner.js';
 import { closeFeatureCall } from './featureCall.js';
 import { activeBatchHasRingingLeg, stopGroupRinging } from './groupPickup.js';
 import type { Pipeline } from './pipeline.js';
+import { release, type Owner } from './release.js';
 
 /** How the call to pick up rings: its own ring race (`pendingRing`, a user's ring), or its ring
  * group's tracked batch (`groupPickup.ts`) with a leg ringing for `memberUserId`, any member's

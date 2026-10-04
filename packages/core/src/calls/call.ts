@@ -2,23 +2,11 @@
  * routing cursor; SQLite holds durable outcomes alone, via the CDR writer. */
 import type { Selectable } from 'kysely';
 
-import type {
-  CallLogLevel,
-  DB,
-  Scope,
-  UserForwardCondition
-} from '@zamfono/shared';
+import type { CallLogLevel, DB, Scope } from '@zamfono/shared';
 
-import { logUnlessGone } from '../ari/failures.js';
 import { CallLog } from '../callLog.js';
-import { userById, type Snapshot } from '../internal/snapshot.js';
-import { targetFromRow, type ForwardTarget } from '../routing/targets.js';
 import type { Diversion } from './forwardContext.js';
 import type { GroupLeg } from './groupLegs.js';
-import { notifyMissedCall } from './missedCall.js';
-import type { Pipeline } from './pipeline.js';
-import { sipToHangupCause } from './releaseCause.js';
-import { deposit, type DepositReason } from './voicemail.js';
 
 export type CallsRow = Selectable<DB['calls']>;
 
@@ -154,101 +142,4 @@ export function takeJoinBridge(call: Call): string | null {
   const bridgeId = call.joinBridgeId ?? null;
   delete call.joinBridgeId;
   return bridgeId;
-}
-
-/** The `ForwardTarget` a `forward_targets` row represents; throws on a dangling id (FK-guaranteed present). */
-export function findForwardTarget(
-  snapshot: Snapshot,
-  targetId: string
-): ForwardTarget {
-  const row = snapshot.forwardTargets.find(
-    candidate => candidate.id === targetId
-  );
-  if (!row) {
-    throw new Error(`forwardTargets: missing row ${targetId}`);
-  }
-  return targetFromRow(row);
-}
-
-/** `user_forward_rules` for `userId`, keyed by condition, resolved to their `ForwardTarget`s. */
-export function buildUserRules(
-  snapshot: Snapshot,
-  userId: string
-): Partial<Record<UserForwardCondition, ForwardTarget>> {
-  const rules: Partial<Record<UserForwardCondition, ForwardTarget>> = {};
-  for (const row of snapshot.userForwardRules) {
-    if (row.userId !== userId) {
-      continue;
-    }
-    rules[row.condition] = findForwardTarget(snapshot, row.targetId);
-  }
-  return rules;
-}
-
-/**
- * Closes out a call that ends with its caller's channel alone (§11.2 `calls.status`): records
- * `status`, hangs the caller up, with the Q.850 `reasonCode` where one is given, and writes the
- * call's history entry.
- */
-export async function endCall(
-  pipeline: Pipeline,
-  call: Call,
-  status: CallsRow['status'],
-  reasonCode?: number
-): Promise<void> {
-  call.status = status;
-  // §7: the channel whose `call_qos` row this call has is noted before it goes.
-  pipeline.deps.cdr.noteQosLegs(call);
-  if (call.callerChannelId !== null) {
-    await pipeline.deps.ari.channels
-      .hangup(call.callerChannelId, { reasonCode })
-      .catch(
-        logUnlessGone(pipeline.deps.logger, 'caller hangup', {
-          callId: call.id
-        })
-      );
-  }
-  await pipeline.finishCall(call);
-}
-
-/** Hangs up the caller with SIP response `code`, records `status`, and closes the call's CDR entry. */
-export async function release(
-  pipeline: Pipeline,
-  call: Call,
-  code: number,
-  status: CallsRow['status']
-): Promise<void> {
-  call.log.event({ event: 'release', code });
-  if (status === 'missed') {
-    await notifyMissedCall(pipeline, call);
-  }
-  await endCall(pipeline, call, status, sipToHangupCause(code));
-}
-/** A user's or a ring group's mailbox, the two owners a target can end into. */
-export type Owner = { userId: string } | { ringGroupId: string };
-
-function ownerMailboxEnabled(owner: Owner, snapshot: Snapshot): boolean {
-  return 'userId' in owner
-    ? userById(snapshot, owner.userId)?.mailboxEnabled === 1
-    : snapshot.ringGroups.find(row => row.id === owner.ringGroupId)
-        ?.mailboxEnabled === 1;
-}
-
-/** The last visited target's mailbox when it has one enabled, else `fallback`'s release. */
-export async function endTargetOwner(
-  pipeline: Pipeline,
-  call: Call,
-  owner: Owner | null,
-  snapshot: Snapshot,
-  fallback: {
-    code: number;
-    status: CallsRow['status'];
-    reason: DepositReason;
-  }
-): Promise<void> {
-  if (owner !== null && ownerMailboxEnabled(owner, snapshot)) {
-    await deposit(pipeline, call, owner, fallback.reason);
-    return;
-  }
-  await release(pipeline, call, fallback.code, fallback.status);
 }

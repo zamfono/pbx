@@ -8,9 +8,10 @@ import { mwiMailboxOf, type Db, type MailRequest } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import { logFailure } from '../ari/failures.js';
-import { endCall, type Call, type Owner } from './call.js';
+import { type Call } from './call.js';
 import { contactName } from './contactName.js';
 import type { Pipeline } from './pipeline.js';
+import { endCall, type Owner } from './release.js';
 import type { MailSender } from './voicemail.js';
 
 // §11.6: the voicemail directory as `api` mounts the media volume, where it reads the attachment;

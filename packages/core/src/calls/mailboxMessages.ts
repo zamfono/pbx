@@ -8,7 +8,7 @@ import type { Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import { ASTERISK_MEDIA_DIR } from '../prompts.js';
-import { callerChannel, type Call, type Owner } from './call.js';
+import { callerChannel, type Call } from './call.js';
 import { playForDigit, type MenuInput } from './mailboxInput.js';
 import {
   MAILBOX_KEYS,
@@ -24,6 +24,7 @@ import {
 } from './mailboxStore.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
+import { type Owner } from './release.js';
 
 /** How long the menu waits for a key once a prompt has played out. */
 export const MAILBOX_KEY_WAIT_MS = 5000;

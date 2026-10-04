@@ -5,17 +5,18 @@
  * their call (§10.1 step 7).
  */
 import { userById, type Snapshot } from '../internal/snapshot.js';
-import type { ForwardTarget } from '../routing/targets.js';
+import { buildUserRules, type ForwardTarget } from '../routing/targets.js';
 import {
   userEntryCondition,
   userEntryDecision,
   userOutcomeDecision
 } from '../routing/user.js';
 import { SIP_BUSY_HERE, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
-import { buildUserRules, release, type Call } from './call.js';
+import { type Call } from './call.js';
 import { raiseLogLevel } from './callLogLevel.js';
 import { CONDITION_REASONS, diversionFor } from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';
+import { release } from './release.js';
 import { ringUser } from './ringUser.js';
 import { runTarget } from './runTarget.js';
 import { registeredDevices } from './userDevices.js';

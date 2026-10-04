@@ -6,9 +6,10 @@
  */
 import { ignoreGone } from '../ari/failures.js';
 import { assetMedia } from '../prompts.js';
-import { callerChannel, endCall, type Call } from './call.js';
+import { callerChannel, type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
+import { endCall } from './release.js';
 
 export async function announce(
   pipeline: Pipeline,

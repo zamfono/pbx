@@ -5,7 +5,7 @@
  * `ringGroupState.test.ts`. */
 import type { Snapshot } from '../internal/snapshot.js';
 import { expandMembers } from '../routing/ringGroup.js';
-import type { Owner } from './call.js';
+import type { Owner } from './release.js';
 
 /** The user or ring group owning `ext`, `null` for an unowned or parking-slot one. */
 export function ownerForExt(snapshot: Snapshot, ext: string): Owner | null {

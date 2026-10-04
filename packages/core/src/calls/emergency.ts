@@ -7,10 +7,11 @@ import { userById, type Snapshot } from '../internal/snapshot.js';
 import { emergencyTrunks } from '../routing/trunk.js';
 import { SIP_SERVICE_UNAVAILABLE } from '../sipCodes.js';
 import { settleAnswered } from './answer.js';
-import { release, type Call } from './call.js';
+import { type Call } from './call.js';
 import { resolveAttemptIdentity, type UserRow } from './callerIdentity.js';
 import { attemptRoute, type AttemptOutcome } from './dialAttempt.js';
 import type { Pipeline } from './pipeline.js';
+import { release } from './release.js';
 import type { TrunkState } from './trunkState.js';
 
 /** An emergency call's routing trace is kept at level `events` whatever the tenant default

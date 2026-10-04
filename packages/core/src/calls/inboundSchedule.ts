@@ -7,13 +7,15 @@ import { resolveTenantTimeZone, type Scope } from '@zamfono/shared';
 import type { Snapshot } from '../internal/snapshot.js';
 import { inEffectOoo, isOpen, scheduleFor } from '../routing/schedule.js';
 import { buildOooRules, buildSchedules } from '../routing/scheduleRows.js';
-import { findForwardTarget, type Call, type Owner } from './call.js';
+import { findForwardTarget } from '../routing/targets.js';
+import { type Call } from './call.js';
 import {
   diversionFor,
   type DivertingParty,
   type RedirectingReason
 } from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';
+import { type Owner } from './release.js';
 import { runTarget } from './runTarget.js';
 
 type ScopedTarget =

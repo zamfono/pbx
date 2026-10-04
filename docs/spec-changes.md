@@ -19,6 +19,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §5.2 Client registration, SSO rules.** A redirect URI, registered or in a metadata document, must be an absolute `https` or `http` URI, or for a `native` client a private-use scheme (RFC 8252 §7.1). With `sso_allowed_domain` set, a `google` login also needs `hd` to equal it.
 *Why:* a relative or `javascript:` redirect URI registered fine and failed only at the first redirect, as a 500; and the `hd` quirk §5.2 promised was never checked (product-owner decision: "Check hd").
+**2026-10-04 · §10.2 Call parking, Mail.** A parked call whose ring-back nobody answers, with no forward, mailbox or tenant fallback target to take the party, ends as answered with no missed-call mail; the party is released with 404. A call that leaves a message sends only the voicemail mail; a caller who hangs up in the mailbox before leaving one is a missed call like any other.
+*Why:* the spec covered only a tenant with a fallback target, and the code marked the call the parker had talked on as missed and mailed them; the mail sentence named every call that reached the mailbox, and the product owner decided a caller who leaves no message counts as missed ("Treat it like a regular missed call (mail or not)").
+
 **2026-10-04 · §9.4 Route fallthrough.** A caller who hangs up ends the dialling: no further host, route or emergency trunk is tried.
 *Why:* the leg the core hangs up for the leaving caller ends like a 500 before alerting, which the fall-through rules took for a trunk failure, so a 112 was sent to the next emergency trunk after the caller had gone.
 

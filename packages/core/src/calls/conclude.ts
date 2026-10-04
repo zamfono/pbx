@@ -18,9 +18,10 @@ import {
   SIP_SERVICE_UNAVAILABLE,
   SIP_TEMPORARILY_UNAVAILABLE
 } from '../sipCodes.js';
-import { release, type Call } from './call.js';
+import { type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait, playToneAndWait } from './playback.js';
+import { release } from './release.js';
 
 const CALLEE_BUSY_CODES = new Set<number>([
   SIP_BUSY_HERE,

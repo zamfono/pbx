@@ -8,18 +8,14 @@ import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { assetMedia, defaultPrompt } from '../prompts.js';
 import type { MenuMap } from '../routing/menu.js';
-import type { ForwardTarget } from '../routing/targets.js';
+import { findForwardTarget, type ForwardTarget } from '../routing/targets.js';
 import { SIP_SERVER_ERROR, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
-import {
-  callerChannel,
-  findForwardTarget,
-  release,
-  type Call
-} from './call.js';
+import { callerChannel, type Call } from './call.js';
 import { enterTarget } from './inbound.js';
 import { collectMenuInput } from './menuInput.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
+import { release } from './release.js';
 import { runTarget } from './runTarget.js';
 
 type MenuRow = Snapshot['menus'][number];

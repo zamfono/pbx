@@ -14,13 +14,14 @@ import {
 import { targetFromRow, type ForwardTarget } from '../routing/targets.js';
 import { SIP_DECLINE, SIP_SERVER_ERROR } from '../sipCodes.js';
 import { announce } from './announce.js';
-import { endTargetOwner, newCall, release, type Call } from './call.js';
+import { newCall, type Call } from './call.js';
 import { raiseLogLevel } from './callLogLevel.js';
 import { dialForwardTarget } from './forwardDial.js';
 import { applyOooAndHours, targetIdentity } from './inboundSchedule.js';
 import { inboundBoundary } from './inboundTrunk.js';
 import { playMenu } from './menu.js';
 import type { Pipeline } from './pipeline.js';
+import { endTargetOwner, release } from './release.js';
 import { ringGroup } from './ringGroup.js';
 import { runUserStep } from './userStep.js';
 import { deposit } from './voicemail.js';

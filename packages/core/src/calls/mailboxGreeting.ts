@@ -5,9 +5,10 @@ import { MS_PER_SECOND, newId } from '@zamfono/shared';
 
 import { ignoreGone } from '../ari/failures.js';
 import { waitForRecording } from './ariWaits.js';
-import { callerChannel, type Call, type Owner } from './call.js';
+import { callerChannel, type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
+import { type Owner } from './release.js';
 
 // media/prompts/ (§11.6): a recorded greeting's own spool path, matching `assetMedia`'s convention.
 const PROMPTS_DIR_NAME = 'prompts';

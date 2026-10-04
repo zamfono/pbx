@@ -4,6 +4,7 @@ import {
   newId,
   nowIso,
   type Db,
+  type MailRequest,
   type UserForwardCondition
 } from '@zamfono/shared';
 
@@ -43,8 +44,16 @@ describe('parking ring-back', () => {
   let db: Db;
   let fakeAri: FakeAri;
 
-  async function setUp(): Promise<void> {
-    rig = await startRig({ apiClient: { mail: () => Promise.resolve() } });
+  /** `mails` collects the mail requests core posts. */
+  async function setUp(mails: MailRequest[] = []): Promise<void> {
+    rig = await startRig({
+      apiClient: {
+        mail: request => {
+          mails.push(request);
+          return Promise.resolve();
+        }
+      }
+    });
     ({ db, fakeAri } = rig);
     rig.pipeline.deps.trunkState = rig.trunkState();
     await db.updateTable('settings').set({ parkingTimeoutS: 1 }).execute();
@@ -322,6 +331,31 @@ describe('parking ring-back', () => {
       expect(messages).toEqual([{ mailboxUserId: anna }]);
     }, RINGBACK_WAIT_MS);
     expect(placedTo('e102-a')).toBe(false);
+  });
+
+  it('ends the parked call answered, with no missed-call mail, when no tenant fallback takes the party', async () => {
+    const mails: MailRequest[] = [];
+    await setUp(mails);
+    const anna = await seedParker();
+    await db
+      .updateTable('users')
+      .set({ notifyMissedCalls: 1 })
+      .where('id', '=', anna)
+      .execute();
+    const parked = await parkFor(anna);
+
+    const row = await eventually(async () => {
+      const closed = await db
+        .selectFrom('calls')
+        .select(['status', 'endedAt'])
+        .where('id', '=', parked.id)
+        .executeTakeFirstOrThrow();
+      expect(closed.endedAt).not.toBeNull();
+      return closed;
+    }, RINGBACK_WAIT_MS);
+
+    expect(row.status).toBe('answered');
+    expect(mails.filter(mail => mail.kind === 'missedCall')).toEqual([]);
   });
 
   it('sends the parked party to the tenant fallback when the parker has no forward or mailbox to follow', async () => {

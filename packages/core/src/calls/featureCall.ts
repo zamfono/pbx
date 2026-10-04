@@ -2,8 +2,9 @@
  * call out with a real outcome (§11.2 `calls.status`). Shared by `features.ts`, `mailbox.ts`,
  * `parking.ts`, `parkingRetrieval.ts` and `pickup.ts`; its coverage lives in `features.test.ts`
  * alongside theirs. */
-import { endCall, type Call, type CallsRow } from './call.js';
+import { type Call, type CallsRow } from './call.js';
 import type { Pipeline } from './pipeline.js';
+import { endCall } from './release.js';
 
 /** `answeredAt` for a feature call closing out `answered` (§10.2 "Call history": renders "Ben
  * joined at 14:02"), stamped here rather than at each call site's own point of answer, so every
