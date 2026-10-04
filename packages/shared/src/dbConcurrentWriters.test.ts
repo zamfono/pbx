@@ -62,3 +62,41 @@ test('a transaction that reads before it writes commits while another connection
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('a read-only transaction leaves the write lock to another connection', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'zamfono-writers-'));
+  const file = path.join(dir, 'db.sqlite');
+  const db = openDb(file);
+  await sql`create table t (x integer)`.execute(db);
+  await sql`insert into t values (1)`.execute(db);
+  const other = new Worker(OTHER_WRITER, {
+    eval: true,
+    workerData: {
+      file,
+      driver: createRequire(import.meta.url).resolve('better-sqlite3')
+    }
+  });
+  const otherWrote = new Promise(resolve => {
+    other.once('message', resolve);
+  });
+  try {
+    const wrote = await db
+      .transaction()
+      .setAccessMode('read only')
+      .execute(async () => {
+        other.postMessage('write');
+        // The other process's write, while this transaction is still open.
+        return Promise.race([
+          otherWrote,
+          new Promise(resolve => {
+            setTimeout(resolve, 1000, 'blocked');
+          })
+        ]);
+      });
+    expect(wrote).toBe('ok');
+  } finally {
+    await other.terminate();
+    await db.destroy();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -142,6 +142,7 @@ export class ConfigCache {
   get(): Promise<Snapshot> {
     this.snapshot ??= this.db
       .transaction()
+      .setAccessMode('read only')
       .execute(trx => loadSnapshot(trx))
       .catch((error: unknown) => {
         this.snapshot = null;

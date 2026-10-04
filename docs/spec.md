@@ -81,7 +81,7 @@ Three long-running application services run per stack, plus the TLS proxy, the `
 
 ### 3.1 Process split
 
-**Write ownership.** Each SQLite table has a primary writer. Both processes read everything; WAL mode, `busy_timeout` and transactions that begin `IMMEDIATE` make concurrent writers safe, so a cross-write is allowed where a flow naturally lands in the other process.
+**Write ownership.** Each SQLite table has a primary writer. Both processes read everything; WAL mode, `busy_timeout` and transactions that begin `IMMEDIATE` make concurrent writers safe (a read-only transaction begins `DEFERRED` and takes no write lock), so a cross-write is allowed where a flow naturally lands in the other process.
 
 - `api` owns the configuration tables: users, devices, trunks, trunk_hosts, outbound_routes, outbound_route_users, outbound_route_user_groups, outbound_route_numbers, dids, did_blocks, ring_groups, ring_group_members, user_groups, user_group_users, user_group_groups, extensions, device_blf_keys, forward_targets, user_forward_rules, ring_group_forward_rules, opening_hours, opening_hours_intervals, audio_assets, contacts, contact_phones, settings, ooo_rules, menus, menu_targets, blocked_numbers, mail_templates, tokens, oauth_clients, personal_access_tokens, webhooks, webhook_deliveries, backup_targets, backup_runs, update_state, maintenance_gate, audit_log.
 - `core` owns the runtime tables: calls, call_qos, voicemails, recordings, presence_log.

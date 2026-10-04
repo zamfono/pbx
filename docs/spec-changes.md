@@ -4,6 +4,8 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §10.2 Voicemail, §11.2 `users`, `ring_groups`, §11.5, §11.6 Retention.** Every mailbox has a message limit, `mailbox_max_messages`: 100 by default, any positive count, NULL for no limit, set through `users.update` and `ringGroups.update`. A deposit into a mailbox that holds that many voicemails plays Asterisk's `vm-mailboxfull` prompt, takes no message and hangs up; the call is missed.
 *Why:* the product owner asked for it: "Per mailbox limit, but no arbitrary upper limit. Null means “no limit”. 100 as default".
+**2026-10-04 · §3.1 Write ownership.** A read-only transaction (`core`'s config snapshot) begins `DEFERRED`; only writing transactions begin `IMMEDIATE`.
+*Why:* an `IMMEDIATE` read took the write lock for nothing, so a config reload held off `api`'s and `core`'s writers.
 
 **2026-10-04 · §6.5 Target kinds.** A target's `host` (sftp, ftp, ftps) is an FQDN or an IPv4 address, a webdav `url` an `http` or `https` URL, and an sftp username cannot begin with `-` or contain whitespace, a quote or a backslash; anything else is refused with 422.
 *Why:* the sftp host and username reach `ssh` as arguments through restic's `sftp.command`, which restic splits at whitespace itself, so an admin could add `-oProxyCommand=…` and run a command in `api`.

@@ -10,7 +10,8 @@ import {
   SqliteDialect,
   SqliteDriver,
   type DatabaseConnection,
-  type SqliteDialectConfig
+  type SqliteDialectConfig,
+  type TransactionSettings
 } from 'kysely';
 import { FileMigrationProvider, Migrator } from 'kysely/migration';
 
@@ -28,12 +29,20 @@ export type LogLevelColumns = {
 
 // Transactions begin IMMEDIATE, taking the write lock up front: a deferred transaction that reads,
 // then writes after another connection committed, fails at once with SQLITE_BUSY_SNAPSHOT, which
-// busy_timeout cannot wait out (§3.1).
+// busy_timeout cannot wait out (§3.1). A transaction set `read only` writes nothing, so it begins
+// DEFERRED and leaves the write lock to the writers; SQLite itself does not enforce the mode.
 class ImmediateSqliteDriver extends SqliteDriver {
   override async beginTransaction(
-    connection: DatabaseConnection
+    connection: DatabaseConnection,
+    settings?: TransactionSettings
   ): Promise<void> {
-    await connection.executeQuery(CompiledQuery.raw('begin immediate'));
+    await connection.executeQuery(
+      CompiledQuery.raw(
+        settings?.accessMode === 'read only'
+          ? 'begin deferred'
+          : 'begin immediate'
+      )
+    );
   }
 }
 
