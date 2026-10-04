@@ -1,20 +1,24 @@
 import type { Selectable } from 'kysely';
+import { z } from 'zod';
 
 import type { Db, DB } from '@zamfono/shared';
 
 export type RouteRow = Selectable<DB['outboundRoutes']>;
 
-export type NumberWire = { number: string; isPrefix: boolean };
+const numberWire = z.object({ number: z.string(), isPrefix: z.boolean() });
+export type NumberWire = z.infer<typeof numberWire>;
 
-export type RouteWire = {
-  id: string;
-  priority: number;
-  trunkId: string;
-  callerIdDidId: string | null;
-  users: string[];
-  userGroups: string[];
-  numbers: NumberWire[];
-};
+/** A route's wire shape (§10.3), as `routeToWire` assembles it. */
+export const routeWire = z.object({
+  id: z.string(),
+  priority: z.number(),
+  trunkId: z.string(),
+  callerIdDidId: z.string().nullable(),
+  users: z.array(z.string()),
+  userGroups: z.array(z.string()),
+  numbers: z.array(numberWire)
+});
+export type RouteWire = z.infer<typeof routeWire>;
 
 /** One route's users, user groups and numbers, keyed by `routeId` (§11.2 "outbound_route_*"). */
 export type RouteChildren = {

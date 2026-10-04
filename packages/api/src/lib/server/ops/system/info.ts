@@ -1,22 +1,11 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import {
-  processStartedAtIso,
-  resolveVersion,
-  type CoreVersionResponse,
-  type Db,
-  type MaintenanceWork,
-  type UpdaterStatus,
-  type ZamfonoVersion
-} from '@zamfono/shared';
+import { processStartedAtIso, resolveVersion, type Db } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { errorMessage } from '#lib/server/errors.js';
-import {
-  lastGiveUps,
-  type LastGiveUp
-} from '#lib/server/jobs/maintenanceGiveUp.js';
+import { lastGiveUps } from '#lib/server/jobs/maintenanceGiveUp.js';
 import { isProfilePending } from '#lib/server/provisioning/profilePending.js';
 import { stackIpv4 } from '#lib/server/stackAddress.js';
 
@@ -25,51 +14,58 @@ import { defineOperation } from '../types.js';
 import {
   autoUpdateEnabled,
   autoUpdateFailure,
-  loadUpdateState,
-  type AutoUpdateFailure
+  autoUpdateFailureOut,
+  loadUpdateState
 } from './_state.js';
 import { updaterClient } from './_updater.js';
+import { updaterStatusOut, versionOut } from './_wire.js';
 
 // When this process started, however late this module loads, so a restart is visible (§10.3).
 const apiStartedAt = processStartedAtIso();
 
-type Output = {
-  /** What `api` runs, the process answering this call, and since when. */
-  api: ZamfonoVersion & { startedAt: string };
-  /**
-   * What `core` reports it runs, since when, and since when its Asterisk runs (`null` while ARI
-   * is down); `null` while `core` does not answer.
-   */
-  core: CoreVersionResponse | null;
-  /**
-   * The updater's view (§6.3 "Updates"): the latest release, whether `system.update` can take
-   * the stack there, and how the last update went and who asked for it; `unavailable` says why
-   * there is none.
-   */
-  update: UpdaterStatus | { unavailable: string };
-  /**
-   * `settings.auto_update`, and why the last automatic update failed and after how many attempts
-   * on its release, until an update succeeds (§6.3 "Automatic updates").
-   */
-  autoUpdate: { enabled: boolean; failed: AutoUpdateFailure | null };
-  /**
-   * When the maintenance gate last gave up on each work it holds back, the certificate swap and
-   * the automatic update, and what kept the system busy; `null` for one it never gave up on
-   * (§6.4 "Maintenance gate").
-   */
-  maintenanceGate: Record<MaintenanceWork, LastGiveUp | null>;
-  /**
-   * `profilePending`: a tenant profile change, the emergency numbers among them, is stored and
-   * in force on the PBX but has not reached Ringotel yet (§10.4 "Tenant profile push");
-   * `rosterPending`: a roster change is, likewise (§10.4 "Colleague presence").
-   */
-  ringotel: { profilePending: boolean; rosterPending: boolean };
-  /**
-   * The stack's public name and the IPv4 address SIP and media use (§6.1): `EXTERNAL_IPV4` in the
-   * ports mode, `STACK_IPV4` in the macvlan mode.
-   */
-  stack: { domain: string; ipv4: string };
-};
+const lastGiveUpOut = z
+  .object({ at: z.string(), reason: z.string() })
+  .nullable();
+
+const outputSchema = z.object({
+  api: versionOut
+    .extend({ startedAt: z.string() })
+    .describe(
+      'What api runs, the process answering this call, and since when.'
+    ),
+  core: versionOut
+    .extend({ startedAt: z.string(), asteriskStartedAt: z.string().nullable() })
+    .nullable()
+    .describe(
+      'What core runs, since when, and since when its Asterisk runs (null while ARI is down); null while core does not answer.'
+    ),
+  update: z
+    .union([updaterStatusOut, z.object({ unavailable: z.string() })])
+    .describe(
+      "The updater's view (§6.3): the latest release, whether system.update can take the stack there, and how the last update went and who asked for it; unavailable says why there is none."
+    ),
+  autoUpdate: z
+    .object({ enabled: z.boolean(), failed: autoUpdateFailureOut.nullable() })
+    .describe(
+      'settings.autoUpdate, and why the last automatic update failed and after how many attempts on its release, until an update succeeds.'
+    ),
+  maintenanceGate: z
+    .object({ certSync: lastGiveUpOut, autoUpdate: lastGiveUpOut })
+    .describe(
+      'When the maintenance gate last gave up on each work it holds back, and what kept the system busy; null for one it never gave up on.'
+    ),
+  ringotel: z
+    .object({ profilePending: z.boolean(), rosterPending: z.boolean() })
+    .describe(
+      'profilePending: a tenant profile change is in force on the PBX but has not reached Ringotel yet; rosterPending: a roster change is, likewise.'
+    ),
+  stack: z
+    .object({ domain: z.string(), ipv4: z.string() })
+    .describe(
+      "The stack's public name and the IPv4 address SIP and media use: EXTERNAL_IPV4 in the ports mode, STACK_IPV4 in the macvlan mode."
+    )
+});
+type Output = z.infer<typeof outputSchema>;
 
 async function updateStatus(): Promise<Output['update']> {
   const client = updaterClient();
@@ -103,11 +99,12 @@ async function autoUpdateStatus(db: Db): Promise<Output['autoUpdate']> {
  * since when, when Asterisk started, the latest release with how the last update went and who asked for it, whether automatic updates are on and why the last one failed, after how many attempts (§6.3 "Automatic updates"), when and why the maintenance gate last gave up (§6.4), whether a tenant profile or roster change still waits for Ringotel (§10.4), and the stack's domain and public IPv4 address (§6.1), for anyone signed in. The MCP `serverInfo.version` carries `api`'s too, but only in the connection
  * handshake, which no tool can read; `/healthz` answers without a login and never shows it.
  */
-export const info = defineOperation<Record<string, never>, Output>({
+export const info = defineOperation({
   name: 'system.info',
   description:
     'Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update with who asked for it, whether automatic updates are on and why and how often the last one failed, when and why the maintenance gate last gave up, whether a tenant profile or roster change still waits for Ringotel, and the domain of the stack and the public IPv4 address its SIP and media use.',
   input: z.object({}).strict(),
+  output: outputSchema,
   minRole: 'user',
   scope: 'any',
   readOnly: true,

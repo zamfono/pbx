@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { propagate } from '../propagate.js';
-import { softDelete, softDeleteQuestion } from '../rows.js';
+import { idOutput, softDelete, softDeleteQuestion } from '../rows.js';
 import { Conflict, defineOperation } from '../types.js';
 import { findAudioAssetReferences, liveAudioAsset } from './_shared.js';
 
@@ -13,6 +15,8 @@ export const deleteAudioAsset = defineOperation({
   name: 'audio.delete',
   description: 'Soft-deletes an audio asset.',
   input: z.object({ id: z.string() }).strict(),
+  output: idOutput,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   confirm: async (ctx, input) =>
     softDeleteQuestion(

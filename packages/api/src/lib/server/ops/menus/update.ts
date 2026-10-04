@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_CONFLICT, HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { assertAudioOfKind } from '../audio/_shared.js';
 import {
   recordChange,
@@ -17,6 +19,7 @@ import {
   assertNameAvailable,
   liveMenu,
   menuFields,
+  menuOut,
   toMenuOut,
   type MenuRow
 } from './_shared.js';
@@ -86,6 +89,8 @@ export const updateMenu = defineOperation({
   name: 'menus.update',
   description: "Updates a menu's configuration.",
   input: updateMenuInput,
+  output: menuOut,
+  problems: [HTTP_NOT_FOUND, HTTP_CONFLICT],
   minRole: 'admin',
   entity: input => ({ kind: 'menu', id: input.id }),
   run: async (ctx, input) => {

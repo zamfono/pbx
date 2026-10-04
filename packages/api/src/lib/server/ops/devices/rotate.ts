@@ -1,6 +1,8 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { newSipPassword } from '#lib/server/sip.js';
 
@@ -8,13 +10,15 @@ import { recordChange } from '../audit.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
 import { pushToRingotel } from './_ringotelPush.js';
-import { liveDevice } from './_shared.js';
+import { liveDevice, sipCredentialsOut } from './_shared.js';
 
 /** `POST /devices/{id}/rotate` (§5.2): a new SIP password, for a credential suspected leaked. */
 export const rotate = defineOperation({
   name: 'devices.rotate',
   description: "Rotates a device's SIP password.",
   input: z.object({ id: z.string() }).strict(),
+  output: sipCredentialsOut,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   confirm: async (ctx, input) =>
     `Rotate the SIP password of the device ${(await liveDevice(ctx.db, input.id)).label}? It stops registering until it has the new one.`,

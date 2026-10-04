@@ -4,6 +4,8 @@ import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { defineOperation } from '../types.js';
 import {
+  CALL_ACTION_PROBLEMS,
+  dialledCallOutput,
   dialTargetInput,
   liveCallIdInput,
   ownLiveCall,
@@ -28,6 +30,8 @@ export const addParty = defineOperation({
   description:
     "Three-way call: dials the target from you and, once answered, adds them to a live call so all three talk; returns the added party's own call id (callId). It only rings the target: no forward or mailbox of theirs applies.",
   input: inputSchema,
+  output: dialledCallOutput,
+  problems: CALL_ACTION_PROBLEMS,
   minRole: 'user',
   scope: ownLiveCall,
   audit: false,

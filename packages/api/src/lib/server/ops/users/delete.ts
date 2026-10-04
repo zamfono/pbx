@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
-import { softDeleteQuestion } from '../rows.js';
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
+import { idOutput, softDeleteQuestion } from '../rows.js';
 import { Conflict, defineOperation } from '../types.js';
 import { cascadeSoftDeleteUser } from './_cascade.js';
 import { userExtension } from './_extensions.js';
@@ -13,6 +15,8 @@ export const deleteUser = defineOperation({
   description:
     'Soft-deletes a user, cascading their devices, extension and sessions.',
   input: z.object({ id: z.string() }).strict(),
+  output: idOutput,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   confirm: async (ctx, input) => {
     const user = await liveUser(ctx.db, input.id);

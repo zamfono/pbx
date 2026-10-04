@@ -1,7 +1,12 @@
 import { z } from 'zod';
 
 import { defineOperation } from '../types.js';
-import { effectiveTemplate, kindSchema, languageSchema } from './_shared.js';
+import {
+  effectiveTemplate,
+  kindSchema,
+  languageSchema,
+  mailTemplateWire
+} from './_shared.js';
 
 const inputSchema = z
   .object({ kind: kindSchema, language: languageSchema })
@@ -13,6 +18,7 @@ export const get = defineOperation({
   description:
     'Reads the effective mail template of a kind and language: the tenant override, else the shipped one',
   input: inputSchema,
+  output: mailTemplateWire,
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) =>

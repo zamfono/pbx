@@ -1,11 +1,12 @@
 import {
   decodeIdCursor,
   keysetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
-import { toWire } from './_shared.js';
+import { toWire, webhookWire } from './_shared.js';
 
 const inputSchema = pageInput.strict();
 
@@ -15,6 +16,7 @@ export const list = defineOperation({
   description:
     "Lists the tenant's webhooks with their delivery status, ok or failing",
   input: inputSchema,
+  output: pageOutput(webhookWire),
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

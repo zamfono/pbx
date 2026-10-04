@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { recordChange } from '../audit.js';
 import { createTarget } from '../forwardTargets.js';
 import { targetSpecSchema } from '../forwardTargetSchema.js';
@@ -8,6 +10,7 @@ import { propagate } from '../propagate.js';
 import { liveRow } from '../rows.js';
 import { defineOperation } from '../types.js';
 import { setCallerIdIfUnset } from './_callerId.js';
+import { didOut } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -27,6 +30,8 @@ export const update = defineOperation({
   description:
     "Changes a DID's forward target; number and label are fixed at creation",
   input: inputSchema,
+  output: didOut,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   entity: input => ({ kind: 'did', id: input.id }),
   run: async (ctx, input) => {

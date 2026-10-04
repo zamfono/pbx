@@ -1,17 +1,19 @@
 import {
   decodeOffsetCursor,
   offsetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
-import { toMenuOut } from './_shared.js';
+import { menuOut, toMenuOut } from './_shared.js';
 
 /** `GET /menus` (§10.3 "Auto-attendant menus"): live menus, alphabetical, offset-cursor paginated. */
 export const listMenus = defineOperation({
   name: 'menus.list',
   description: "Lists the tenant's live menus.",
   input: pageInput.strict(),
+  output: pageOutput(menuOut),
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

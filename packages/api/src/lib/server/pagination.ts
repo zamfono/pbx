@@ -23,6 +23,16 @@ export const pageInput = z.object({
   cursor: z.string().optional()
 });
 
+/** The `output` of a list operation: one page of `item`s and the cursor to the next, if any. */
+export function pageOutput<Item extends z.ZodType>(
+  item: Item
+): z.ZodObject<{
+  items: z.ZodArray<Item>;
+  nextCursor: z.ZodNullable<z.ZodString>;
+}> {
+  return z.object({ items: z.array(item), nextCursor: z.string().nullable() });
+}
+
 function encodeCursor(list: string, position: object): string {
   return Buffer.from(JSON.stringify({ list, ...position }), 'utf8').toString(
     CURSOR_ENCODING

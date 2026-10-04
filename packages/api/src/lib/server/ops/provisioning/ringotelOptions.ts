@@ -1,7 +1,7 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+import { HTTP_BAD_GATEWAY, HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
 import {
   createRingotelClient,
@@ -13,11 +13,25 @@ import { loadSettings } from '../settings/_shared.js';
 import { defineOperation, OpError } from '../types.js';
 
 /** A region an organization can be created in, as Ringotel names it (§10.4 "Organization"). */
-type Region = { id: string; name: string };
-/** A plan `packageid` selects, as the account offers it, with the registrations per user it
- *  allows (`features.maxregs`), where Ringotel names them. */
-type Package = { id: number; name: string; maxregs?: number };
-type Output = { regions: Region[]; packages: Package[] };
+const ringotelRegion = z.object({ id: z.string(), name: z.string() });
+type Region = z.infer<typeof ringotelRegion>;
+/** A plan `packageid` selects, as the account offers it. */
+const ringotelPackage = z.object({
+  id: z.number(),
+  name: z.string(),
+  maxregs: z
+    .number()
+    .optional()
+    .describe(
+      'The registrations per user the package allows, where Ringotel names them.'
+    )
+});
+type Package = z.infer<typeof ringotelPackage>;
+const outputSchema = z.object({
+  regions: z.array(ringotelRegion),
+  packages: z.array(ringotelPackage)
+});
+type Output = z.infer<typeof outputSchema>;
 
 /**
  * What the account offers, read live (`getRegions`, `getPackages`): Ringotel adds regions, an
@@ -66,11 +80,13 @@ export async function assertOffered(
   return chosen;
 }
 
-export const ringotelOptions = defineOperation<Record<string, never>, Output>({
+export const ringotelOptions = defineOperation({
   name: 'provisioning.ringotelOptions',
   description:
     'Lists the Ringotel regions and packages the account offers, the choices provisioning.ringotelSetup takes.',
   input: z.object({}).strict(),
+  output: outputSchema,
+  problems: [HTTP_BAD_GATEWAY],
   minRole: 'owner',
   readOnly: true,
   run: async ctx => {

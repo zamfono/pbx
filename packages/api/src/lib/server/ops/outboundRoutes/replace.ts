@@ -16,15 +16,12 @@ import { replaceInputSchema } from './_replaceInput.js';
 import {
   loadRouteChildren,
   routeToWire,
+  routeWire,
   toRouteInput,
   type RouteWire
 } from './_shared.js';
 
-const inputSchema = replaceInputSchema;
-
-type Input = z.infer<typeof inputSchema>;
-type RouteInput = Input['routes'][number];
-type Output = { items: RouteWire[] };
+type RouteInput = z.infer<typeof replaceInputSchema>['routes'][number];
 
 /** Replaces one route's callers and numbers as a whole (§11.2 "outbound_route_*"). */
 async function replaceRouteChildren(
@@ -136,11 +133,12 @@ async function writeRoute(
   return id;
 }
 
-export const replace = defineOperation<Input, Output>({
+export const replace = defineOperation({
   name: 'outboundRoutes.replace',
   description:
     'Replaces the outbound route list as a whole, in evaluation order: a call takes the first route whose callers and numbers both match, falling through to the next when its trunk fails.',
-  input: inputSchema,
+  input: replaceInputSchema,
+  output: z.object({ items: z.array(routeWire) }),
   minRole: 'admin',
   entity: () => ({ kind: 'outboundRoute', id: null }),
   run: async (ctx, input) => {

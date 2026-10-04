@@ -1,10 +1,14 @@
 import type { Selectable } from 'kysely';
+import { z } from 'zod';
 
 import { HTTP_NOT_FOUND, type DB, type Db } from '@zamfono/shared';
 
 import { recordChange } from './audit.js';
 import type { LiveTable } from './liveHolder.js';
 import { OpError, type Context } from './types.js';
+
+/** The `output` of an operation answering with the id of the row it acted on alone. */
+export const idOutput = z.object({ id: z.string() });
 
 /** The live row of `table` with `id`, or `OpError(404, notFoundMessage)`. */
 export async function liveRow<T extends LiveTable>(

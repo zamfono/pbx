@@ -8,7 +8,11 @@ import { isAcceptedUploadType } from '#lib/server/audio/uploadTypes.js';
 import { recordChange } from '../audit.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
-import { toAudioAssetOut, type AudioAssetOut } from './_shared.js';
+import {
+  audioAssetOut,
+  toAudioAssetOut,
+  type AudioAssetOut
+} from './_shared.js';
 
 export const uploadSchema = z.object({
   filename: z.string().min(1),
@@ -43,6 +47,7 @@ export const createAudioAsset = defineOperation({
   description:
     'Uploads and transcodes a new audio asset; over MCP, answers with a link to upload the file to.',
   input: createAudioAssetInput,
+  output: audioAssetOut,
   minRole: 'admin',
   entity: (_input, out: AudioAssetOut) => ({ kind: 'audio', id: out.id }),
   run: async (ctx, input) => {

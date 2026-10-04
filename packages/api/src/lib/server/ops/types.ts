@@ -48,6 +48,16 @@ export type Operation<In, Out> = {
   name: string;
   description: string;
   input: z.ZodType<In>;
+  /**
+   * What `run` returns, as it reaches the wire: the OpenAPI response and the MCP tool's
+   * `outputSchema` (§10.3, §10.5). A file is `binaryOutput`, a list `pageOutput`.
+   */
+  output: z.ZodType<Out>;
+  /**
+   * The problem statuses `run` itself answers with; the ones the runner's gates answer (422,
+   * 403 for a role or own scope, 409 for `confirm`) are derived (`problemStatuses`).
+   */
+  problems?: readonly ProblemStatus[];
   readOnly?: boolean;
   /** The question a human answers before a destructive call runs, naming what it acts on (§10.3). */
   confirm?: (ctx: Context, input: In) => string | Promise<string>;
@@ -78,11 +88,14 @@ export function defineOperation<In, Out>(
   return op;
 }
 
+/** The RFC 9457 problem statuses an operation, or the transport in front of it, answers with. */
+// eslint-disable-next-line no-magic-numbers -- the statuses themselves
+export type ProblemStatus = 400 | 401 | 403 | 404 | 409 | 422 | 502 | 503;
+
 /** Thrown by an operation's `run`, or by the runner itself, to answer with an RFC 9457 problem. */
 export class OpError extends Error {
   constructor(
-    // eslint-disable-next-line no-magic-numbers -- the RFC 9457 status codes an operation may answer with
-    public status: 400 | 401 | 403 | 404 | 409 | 422 | 502 | 503,
+    public status: ProblemStatus,
     public title: string,
     public detail?: unknown
   ) {

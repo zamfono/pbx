@@ -4,10 +4,11 @@ import { defineOperation } from '#lib/server/ops/types.js';
 import {
   decodeIdCursor,
   keysetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
-import { runToWire } from '../_shared.js';
+import { backupRunWire, runToWire } from '../_shared.js';
 
 const inputSchema = z
   .object({
@@ -24,6 +25,7 @@ export const runsList = defineOperation({
   name: 'backups.runs.list',
   description: 'Lists backup runs, newest first',
   input: inputSchema,
+  output: pageOutput(backupRunWire),
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

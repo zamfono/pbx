@@ -3,18 +3,17 @@ import { z } from 'zod';
 
 import {
   findMeColumn,
+  findMeSchema,
   HTTP_CONFLICT,
   HTTP_UNPROCESSABLE_CONTENT,
   isE164,
-  type DB,
-  type FindMeLeg,
-  type LogLevelColumns,
-  type UserRole
+  USER_ROLES,
+  type DB
 } from '@zamfono/shared';
 
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { liveRow } from '../rows.js';
-import { logLevelWire } from '../settings/logLevel.js';
+import { logLevelOutputFields, logLevelWire } from '../settings/logLevel.js';
 import { OpError } from '../types.js';
 import { accountLockedUntil } from './_accountLock.js';
 import { userExtension } from './_extensions.js';
@@ -68,26 +67,33 @@ export const userCallFields = {
     )
 };
 
-export type UserOut = LogLevelColumns & {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  extension: string;
-  ringTimeoutS: number;
-  dnd: boolean;
-  findMe: FindMeLeg[];
-  callerIdDidId: string | null;
-  clir: boolean | null;
-  rejectAnonymous: boolean | null;
-  recordCalls: boolean;
-  notifyMissedCalls: boolean;
-  mailboxEnabled: boolean;
-  mailboxAudioId: string | null;
-  /** The ISO instant an active §5.5 login lock on this account expires at, `null` while unlocked. */
-  lockedUntil: string | null;
-  createdAt: string;
-};
+/** A user's wire shape (§10.3), as `toUserOut` assembles it: never the password hash. */
+export const userOut = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string(),
+  role: z.enum(USER_ROLES),
+  extension: z.string(),
+  ringTimeoutS: z.number(),
+  dnd: z.boolean(),
+  findMe: findMeSchema,
+  callerIdDidId: z.string().nullable(),
+  clir: z.boolean().nullable(),
+  rejectAnonymous: z.boolean().nullable(),
+  recordCalls: z.boolean(),
+  notifyMissedCalls: z.boolean(),
+  mailboxEnabled: z.boolean(),
+  mailboxAudioId: z.string().nullable(),
+  ...logLevelOutputFields,
+  lockedUntil: z
+    .string()
+    .nullable()
+    .describe(
+      'When an active login lock on this account (§5.5) expires, ISO 8601; null while unlocked.'
+    ),
+  createdAt: z.string()
+});
+export type UserOut = z.infer<typeof userOut>;
 
 /** Assembles the wire shape of a user from its row and extension (§10.3); never the password hash. */
 export async function toUserOut(

@@ -1,7 +1,7 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { HTTP_CONFLICT } from '@zamfono/shared';
+import { HTTP_BAD_GATEWAY, HTTP_CONFLICT } from '@zamfono/shared';
 
 import { errorMessage } from '#lib/server/errors.js';
 import {
@@ -19,6 +19,7 @@ import {
   createConnection,
   followPackageMaxRegs,
   organizationParams,
+  ringotelIdsOut,
   stackBranchAddress,
   storeRingotelIds
 } from './ringotelConnection.js';
@@ -100,19 +101,18 @@ const inputSchema = z
   })
   .strict();
 
-type Input = z.infer<typeof inputSchema>;
-type Output = { ringotelOrgId: string; ringotelBranchId: string };
-
 /**
  * `POST /provisioning/ringotel/setup` (§10.3, §10.4): creates the tenant's Ringotel organization
  * and connection (`createOrganization` + `createBranch`), stores their ids in `settings`, and
  * provisions the `ringotel` devices that already exist.
  */
-export const ringotelSetup = defineOperation<Input, Output>({
+export const ringotelSetup = defineOperation({
   name: 'provisioning.ringotelSetup',
   description:
     'Creates the Ringotel organization and connection, and stores their ids; provisioning.ringotelOptions lists the regions and packages it takes.',
   input: inputSchema,
+  output: ringotelIdsOut,
+  problems: [HTTP_CONFLICT, HTTP_BAD_GATEWAY],
   minRole: 'owner',
   entity: () => ({ kind: 'settings', id: 'settings' }),
   run: async (ctx, input) => {

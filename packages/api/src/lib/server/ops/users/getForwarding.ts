@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { ownUserId } from '../gates.js';
 import { defineOperation } from '../types.js';
-import { storedForwardRules } from './_forwarding.js';
+import { forwardingSchema, storedForwardRules } from './_forwarding.js';
 import { liveUser } from './_shared.js';
 
 /**
@@ -15,6 +17,8 @@ export const getForwarding = defineOperation({
   description:
     "Reads a user's call-forwarding rules in the shape users.setForwarding takes; a user reads their own, an admin anyone's.",
   input: z.object({ id: z.string() }).strict(),
+  output: forwardingSchema,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'user',
   scope: ownUserId,
   readOnly: true,

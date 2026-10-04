@@ -26,15 +26,21 @@ export const languageSchema = z
   .describe("The template's language; mails use the one in settings.language.");
 
 /** A `GET /mailTemplates` / `GET /mailTemplates/{kind}/{language}` row (§10.3 "Mail templates"). */
-export type MailTemplateWire = {
-  kind: MailKind;
-  language: Language;
-  subject: string;
-  bodyText: string;
-  bodyHtml: string | null;
-  source: 'builtin' | 'tenant';
-  updatedAt: string | null;
-};
+export const mailTemplateWire = z.object({
+  kind: kindSchema,
+  language: languageSchema,
+  subject: z.string(),
+  bodyText: z.string(),
+  bodyHtml: z.string().nullable(),
+  source: z
+    .enum(['builtin', 'tenant'])
+    .describe("tenant: the tenant's override; builtin: the shipped template."),
+  updatedAt: z
+    .string()
+    .nullable()
+    .describe('When the override was last written; null for a builtin one.')
+});
+export type MailTemplateWire = z.infer<typeof mailTemplateWire>;
 
 /** The tenant's override row for `(kind, language)`, or `undefined` while none exists. */
 export async function loadOverride(

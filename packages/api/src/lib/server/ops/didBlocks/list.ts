@@ -1,11 +1,13 @@
 import {
   decodeIdCursor,
   keysetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { resolveOptionalTarget } from '../forwardTargetSpec.js';
 import { defineOperation } from '../types.js';
+import { didBlockOut } from './_shared.js';
 
 const inputSchema = pageInput.strict();
 
@@ -15,6 +17,7 @@ export const list = defineOperation({
   description:
     "Lists the tenant's number blocks with their digit counts and fallback targets",
   input: inputSchema,
+  output: pageOutput(didBlockOut),
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

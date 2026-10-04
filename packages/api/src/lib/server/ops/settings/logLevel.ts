@@ -83,6 +83,12 @@ export function resolveLogLevel(
   };
 }
 
+/** The override fields of an entity's wire shape (§10.3), as `logLevelWire` returns them. */
+export const logLevelOutputFields = {
+  logLevel: z.enum(LOG_LEVEL_OVERRIDES).nullable(),
+  logLevelExpiresAt: z.string().nullable()
+};
+
 /** An entity row's override as the wire carries it (§10.3). */
 export function logLevelWire(row: LogLevelColumns): LogLevelColumns {
   return {

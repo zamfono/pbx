@@ -1,4 +1,5 @@
 import type { Selectable } from 'kysely';
+import { z } from 'zod';
 
 import { MS_PER_HOUR, type Db, type DB } from '@zamfono/shared';
 
@@ -26,12 +27,13 @@ export const AUTO_UPDATE_RETRY_GAP_MS = RETRY_GAP_HOURS * MS_PER_HOUR;
  * Why the last automatic update failed, on which release and when, and how many attempts on that
  * release failed; `null` while none failed.
  */
-export type AutoUpdateFailure = {
-  version: string;
-  reason: string;
-  at: string;
-  attempts: number;
-};
+export const autoUpdateFailureOut = z.object({
+  version: z.string(),
+  reason: z.string(),
+  at: z.string(),
+  attempts: z.number()
+});
+export type AutoUpdateFailure = z.infer<typeof autoUpdateFailureOut>;
 
 /** The row, which the migration inserts. */
 export async function loadUpdateState(db: Db): Promise<UpdateStateRow> {

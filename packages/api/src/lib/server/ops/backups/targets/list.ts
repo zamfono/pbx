@@ -2,10 +2,11 @@ import { defineOperation } from '#lib/server/ops/types.js';
 import {
   decodeIdCursor,
   keysetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
-import { targetToWire } from '../_shared.js';
+import { backupTargetWire, targetToWire } from '../_shared.js';
 
 const inputSchema = pageInput.strict();
 
@@ -14,6 +15,7 @@ export const targetsList = defineOperation({
   name: 'backups.targets.list',
   description: "Lists the tenant's backup targets",
   input: inputSchema,
+  output: pageOutput(backupTargetWire),
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

@@ -48,6 +48,26 @@ describe('audio', () => {
     expect(row.label).toBe('Main greeting');
   });
 
+  it('renames an asset and lists it under its new label', async () => {
+    const db = await makeTestDb();
+    const { id } = (await runOperation(
+      db,
+      'audio.create',
+      { kind: 'greeting', label: 'Main greeting', upload },
+      asRun()
+    )) as { id: string };
+    await runOperation(
+      db,
+      'audio.update',
+      { id, label: 'Night greeting' },
+      asRun()
+    );
+    const page = (await runOperation(db, 'audio.list', {}, asRun())) as {
+      items: { id: string; label: string }[];
+    };
+    expect(page.items).toMatchObject([{ id, label: 'Night greeting' }]);
+  });
+
   it('refuses an upload of a type other than WAV or MP3 as invalid input, storing nothing (§10.2)', async () => {
     const db = await makeTestDb();
     const attempt = runOperation(

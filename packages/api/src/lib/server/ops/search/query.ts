@@ -6,18 +6,20 @@ import { nationalForm, type CountryCode, type DB } from '@zamfono/shared';
 import {
   decodeOffsetCursor,
   offsetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { phoneDigits, tenantCountry } from '../contacts/_shared.js';
 import { defineOperation } from '../types.js';
 
-type Hit = {
-  kind: 'user' | 'ringGroup' | 'contact';
-  id: string;
-  label: string;
-  matched: string;
-};
+const hit = z.object({
+  kind: z.enum(['user', 'ringGroup', 'contact']),
+  id: z.string(),
+  label: z.string(),
+  matched: z.string().describe('The field the text matched in.')
+});
+type Hit = z.infer<typeof hit>;
 
 function includes(haystack: string | null, needle: string): boolean {
   return haystack?.toLowerCase().includes(needle) ?? false;
@@ -260,6 +262,7 @@ export const searchQuery = defineOperation({
       ...pageInput.shape
     })
     .strict(),
+  output: pageOutput(hit),
   minRole: 'user',
   scope: 'any',
   readOnly: true,

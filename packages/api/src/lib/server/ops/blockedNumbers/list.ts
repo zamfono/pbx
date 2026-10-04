@@ -1,10 +1,12 @@
 import {
   decodeIdCursor,
   keysetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
+import { blockedNumberWire } from './_shared.js';
 
 const inputSchema = pageInput.strict();
 
@@ -13,6 +15,7 @@ export const list = defineOperation({
   name: 'blockedNumbers.list',
   description: "Lists the tenant's inbound blocklist",
   input: inputSchema,
+  output: pageOutput(blockedNumberWire),
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

@@ -1,10 +1,12 @@
 import type { Selectable, Transaction } from 'kysely';
+import { z } from 'zod';
 
 import {
   allowedIpsColumn,
-  type DB,
-  type DeviceKind,
-  type DeviceTransport
+  allowedIpsSchema,
+  DEVICE_KINDS,
+  DEVICE_TRANSPORTS,
+  type DB
 } from '@zamfono/shared';
 
 import { assertNoLiveHolder } from '../liveHolder.js';
@@ -30,19 +32,29 @@ export async function assertNoExistingRingotelDevice(
   });
 }
 
-export type DeviceOut = {
-  id: string;
-  userId: string;
-  label: string;
-  kind: DeviceKind;
-  transport: DeviceTransport;
-  allowedIps: string[] | null;
-  sipUsername: string;
-  /** When the device last became reachable (§11 `devices.last_registered_at`), not its latest
-   * REGISTER refresh; whether it is registered now is live state (§10.1). */
-  lastRegisteredAt: string | null;
-  createdAt: string;
-};
+/** A device's wire shape (§10.3), as `toDeviceOut` assembles it. */
+export const deviceOut = z.object({
+  id: z.string(),
+  userId: z.string(),
+  label: z.string(),
+  kind: z.enum(DEVICE_KINDS),
+  transport: z.enum(DEVICE_TRANSPORTS),
+  allowedIps: allowedIpsSchema.nullable(),
+  sipUsername: z.string(),
+  // Not its latest REGISTER refresh; whether it is registered now is live state (§10.1).
+  lastRegisteredAt: z
+    .string()
+    .nullable()
+    .describe('When the device last became reachable, ISO 8601.'),
+  createdAt: z.string()
+});
+export type DeviceOut = z.infer<typeof deviceOut>;
+
+/** The SIP credentials `devices.rotate` and a `ringotel` device's reveal answer with (§5.2). */
+export const sipCredentialsOut = z.object({
+  sipUsername: z.string(),
+  sipPassword: z.string()
+});
 
 /** The wire shape of a device, never its encrypted password (§5.2 "SIP credentials"). */
 export function toDeviceOut(row: DeviceRow): DeviceOut {

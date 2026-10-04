@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { recordChange, recordFieldChanges } from '../audit.js';
 import { createTarget } from '../forwardTargets.js';
 import { type TargetSpec } from '../forwardTargetSchema.js';
@@ -8,10 +10,10 @@ import { orBefore } from '../patch.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, type Context } from '../types.js';
 import {
+  didBlockOut,
   DIGITS_SCHEMA,
   FALLBACK_TARGET_SCHEMA,
-  liveDidBlock,
-  type DidBlockOut
+  liveDidBlock
 } from './_shared.js';
 
 const inputSchema = z
@@ -22,8 +24,6 @@ const inputSchema = z
     fallbackTarget: FALLBACK_TARGET_SCHEMA
   })
   .strict();
-
-type Input = z.infer<typeof inputSchema>;
 
 /**
  * The block's next `fallback_target_id`: unchanged while `fallbackTarget` is absent, cleared on
@@ -47,11 +47,13 @@ async function resolveFallbackTargetId(
  * `PATCH /didBlocks/{id}` (§10.3 "Extensions & DIDs"): label, digit count and fallback target are
  * editable; `base` is immutable, since the DIDs inside are matched by it.
  */
-export const update = defineOperation<Input, DidBlockOut>({
+export const update = defineOperation({
   name: 'didBlocks.update',
   description:
     "Changes a number block's label, digit count or fallback target; the base is immutable",
   input: inputSchema,
+  output: didBlockOut,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   entity: input => ({ kind: 'didBlock', id: input.id }),
   run: async (ctx, input) => {

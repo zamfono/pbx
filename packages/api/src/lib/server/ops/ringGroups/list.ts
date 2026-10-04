@@ -1,17 +1,19 @@
 import {
   decodeOffsetCursor,
   offsetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
-import { toRingGroupOut } from './_shared.js';
+import { ringGroupOut, toRingGroupOut } from './_shared.js';
 
 /** `GET /ringGroups` (§10.3 "Ring groups"): live ring groups, alphabetical, offset-cursor paginated. */
 export const listRingGroups = defineOperation({
   name: 'ringGroups.list',
   description: "Lists the tenant's live ring groups.",
   input: pageInput.strict(),
+  output: pageOutput(ringGroupOut),
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

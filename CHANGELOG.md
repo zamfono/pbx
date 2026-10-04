@@ -178,6 +178,11 @@ why the specified behaviour changed; the commit history, how.
 - MCP clients and the OpenAPI document now describe what an operation's input fields mean, not
   just their names and types: every tool's input schema carries a one-sentence `description` per
   field whose meaning is not obvious, and terse tool descriptions say what the operation does.
+- The OpenAPI document now describes what every endpoint answers: the shape of its JSON result
+  (a list's `{ items, nextCursor }` page, a write's `warnings`), an audio download as the file in
+  each format it comes in, and the problem statuses the endpoint can answer with; MCP tools
+  whose result is an object carry it as their `outputSchema`, so clients can read the
+  `structuredContent` of a call.
 - `zamfono.help` with an unknown topic still fails with 404, but its message now lists every
   topic; `index` lists them like a call without a topic, and the server instructions say so.
 - Webhook deliveries survive a restart of `api`: an event still queued, or waiting for its retry,

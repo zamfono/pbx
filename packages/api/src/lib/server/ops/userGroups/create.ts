@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { newId } from '@zamfono/shared';
+import { HTTP_CONFLICT, HTTP_NOT_FOUND, newId } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { memberSchema } from '../members.js';
@@ -10,6 +10,7 @@ import {
   assertNameAvailable,
   replaceMembers,
   toUserGroupOut,
+  userGroupOut,
   type UserGroupOut
 } from './_shared.js';
 
@@ -30,6 +31,8 @@ export const createUserGroup = defineOperation({
   description:
     'Creates a user group, a nestable set of users for ring-group membership and outbound-route caller lists.',
   input: userGroupInputSchema,
+  output: userGroupOut,
+  problems: [HTTP_NOT_FOUND, HTTP_CONFLICT],
   minRole: 'admin',
   entity: (_input, out: UserGroupOut) => ({ kind: 'userGroup', id: out.id }),
   run: async (ctx, input) => {

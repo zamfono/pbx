@@ -1,4 +1,5 @@
 import * as env from '$app/env/private';
+import { z } from 'zod';
 
 import { HTTP_CONFLICT } from '@zamfono/shared';
 
@@ -21,6 +22,12 @@ import { OpError, type Context } from '../types.js';
 // What `provisioning.ringotelSetup` and `provisioning.ringotelAdopt` share (§10.3, §10.4): the
 // stack's own connection address and profile, the organization's `params`, and the one way the
 // two ids reach `settings`.
+
+/** The ids `provisioning.ringotelSetup` and `provisioning.ringotelAdopt` answer with, as stored. */
+export const ringotelIdsOut = z.object({
+  ringotelOrgId: z.string(),
+  ringotelBranchId: z.string()
+});
 
 /** The stack's connection address, `<fqdn>:5061`, from `FQDN` (§6.3), the one hostname `api` is given. */
 export function stackBranchAddress(): string {

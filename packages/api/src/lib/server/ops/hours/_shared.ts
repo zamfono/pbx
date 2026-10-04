@@ -1,4 +1,5 @@
 import type { Selectable } from 'kysely';
+import { z } from 'zod';
 
 import { HTTP_UNPROCESSABLE_CONTENT, type DB, type Db } from '@zamfono/shared';
 
@@ -8,9 +9,24 @@ import { OpError } from '../types.js';
 export type OpeningHoursRow = Selectable<DB['openingHours']>;
 export type IntervalRow = Selectable<DB['openingHoursIntervals']>;
 
-// `weekday` is ISO 8601 (1 = Monday … 7 = Sunday, §11.2 `opening_hours_intervals`), a plain
-// `number` here since the zod input schema enforces the 1-7 range at runtime.
-export type IntervalInput = { weekday: number; opens: string; closes: string };
+const MAX_WEEKDAY = 7;
+
+/** One weekly open interval (§11.2 `opening_hours_intervals`), as `hours.set` takes it and `hours.get` returns it. */
+export const intervalSchema = z.object({
+  weekday: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_WEEKDAY)
+    .describe('ISO 8601 weekday: 1 is Monday, 7 Sunday.'),
+  opens: z
+    .string()
+    .describe('HH:MM, inclusive, in the tenant time zone (settings.timezone).'),
+  closes: z
+    .string()
+    .describe('HH:MM, exclusive, after opens; 24:00 is the end of the day.')
+});
+export type IntervalInput = z.infer<typeof intervalSchema>;
 
 // 'HH:MM', 00:00-23:59, plus '24:00' standing for the end of day (§11.2 `opening_hours_intervals`).
 const TIME_OF_DAY_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$|^24:00$/u;

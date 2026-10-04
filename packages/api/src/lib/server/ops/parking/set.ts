@@ -1,12 +1,14 @@
 import { z } from 'zod';
 
+import { HTTP_CONFLICT } from '@zamfono/shared';
+
 import { recordChange } from '../audit.js';
 import type { DroppedBlfKey } from '../devices/_shared.js';
 import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
 import { Conflict, defineOperation, type Context } from '../types.js';
 import { assertValidExtension } from '../users/_extensions.js';
-import { loadParkingSlots } from './_shared.js';
+import { loadParkingSlots, slotsOutput } from './_shared.js';
 
 /** An extension digit string, matching the `extensions.ext` CHECK (§11.2). */
 const EXT_PATTERN = /^[0-9]+$/u;
@@ -23,9 +25,6 @@ const inputSchema = z
       )
   })
   .strict();
-
-type Input = z.infer<typeof inputSchema>;
-type Output = { slots: string[] };
 
 /**
  * Refuses a new slot ext that already names a user's or ring group's extension (§10.3 "Parking"):
@@ -74,11 +73,13 @@ async function loadDroppedBlfKeys(
 }
 
 /** `PUT /parking/slots` (§10.3 "Parking"): replaces the set of parking-slot extensions as a whole. */
-export const set = defineOperation<Input, Output>({
+export const set = defineOperation({
   name: 'parking.set',
   description:
     'Replaces the set of parking-slot extensions as a whole; an extension a user or ring group owns, or an emergency number, is refused',
   input: inputSchema,
+  output: slotsOutput,
+  problems: [HTTP_CONFLICT],
   minRole: 'admin',
   entity: () => ({ kind: 'parking', id: 'parking' }),
   run: async (ctx, input) => {

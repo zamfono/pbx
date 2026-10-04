@@ -1,6 +1,12 @@
 import type { Selectable } from 'kysely';
+import { z } from 'zod';
 
-import { changesColumn, type ChangeEntry, type DB } from '@zamfono/shared';
+import {
+  AUDIT_CHANNELS,
+  changeEntrySchema,
+  changesColumn,
+  type DB
+} from '@zamfono/shared';
 
 export type AuditLogRow = Selectable<DB['auditLog']>;
 
@@ -29,22 +35,23 @@ export const ENTITY_TABLES: Partial<Record<string, keyof DB>> = {
 };
 
 /** The wire shape of one `GET /audit` row (§5.7, §10.3). */
-export type AuditEntryOut = {
-  id: string;
-  actorUserId: string;
-  actorUserName: string;
-  channel: string;
-  clientId: string | null;
-  clientName: string | null;
-  operation: string;
-  entityKind: string;
-  entityId: string | null;
-  changes: ChangeEntry[];
-  undoable: boolean;
-  revertsId: string | null;
-  undoneAt: string | null;
-  createdAt: string;
-};
+export const auditEntryOut = z.object({
+  id: z.string(),
+  actorUserId: z.string(),
+  actorUserName: z.string(),
+  channel: z.enum(AUDIT_CHANNELS),
+  clientId: z.string().nullable(),
+  clientName: z.string().nullable(),
+  operation: z.string(),
+  entityKind: z.string(),
+  entityId: z.string().nullable(),
+  changes: z.array(changeEntrySchema),
+  undoable: z.boolean(),
+  revertsId: z.string().nullable(),
+  undoneAt: z.string().nullable(),
+  createdAt: z.string()
+});
+export type AuditEntryOut = z.infer<typeof auditEntryOut>;
 
 export function toAuditEntryOut(row: AuditLogRow): AuditEntryOut {
   return {

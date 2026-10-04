@@ -59,3 +59,31 @@ vi.mock('#lib/server/propagation.js', async importOriginal => ({
   ...(await importOriginal<typeof import('#lib/server/propagation.js')>()),
   propagateConfig: vi.fn(() => Promise.resolve())
 }));
+
+// Every operation call a suite makes answers as the operation publishes it (§10.3 OpenAPI, §10.5
+// MCP tools): a result is its `output` on the wire, with no field the schema leaves out, and a
+// problem has one of its `problemStatuses`.
+vi.mock('#lib/server/ops/runner.js', async importOriginal => {
+  const [actual, { checkPublishedOutput, checkPublishedProblem }] =
+    await Promise.all([
+      importOriginal<typeof import('#lib/server/ops/runner.js')>(),
+      import('#lib/server/ops/publishedCheck.js')
+    ]);
+  return {
+    ...actual,
+    runOperation: async (
+      ...args: Parameters<typeof actual.runOperation>
+    ): Promise<unknown> => {
+      const [, name] = args;
+      let output: unknown;
+      try {
+        output = await actual.runOperation(...args);
+      } catch (error) {
+        checkPublishedProblem(name, error);
+        throw error;
+      }
+      checkPublishedOutput(name, output);
+      return output;
+    }
+  };
+});

@@ -1,4 +1,5 @@
 import type { Transaction } from 'kysely';
+import { z } from 'zod';
 
 import {
   USER_FORWARD_CONDITIONS,
@@ -7,8 +8,31 @@ import {
   type UserForwardCondition
 } from '@zamfono/shared';
 
-import { type TargetSpec } from '../forwardTargetSchema.js';
+import { targetSpecSchema, type TargetSpec } from '../forwardTargetSchema.js';
 import { rowToTarget } from '../forwardTargetSpec.js';
+
+/** A user's forwarding rules (§10.3 "Users"), as `users.setForwarding` takes them and both
+ * forwarding operations return them. */
+export const forwardingSchema = z
+  .object({
+    id: z.string(),
+    rules: z
+      .array(
+        z.object({
+          condition: z
+            .enum(USER_FORWARD_CONDITIONS)
+            .describe(
+              'unconditional: every call; busy: every device busy; noAnswer: nobody answers within ringTimeoutS; dnd: DND on; offline: no registered device, falling to noAnswer without this rule.'
+            ),
+          target: targetSpecSchema
+        })
+      )
+      .describe(
+        "The user's rules, one per condition; a condition left out sends the call to the user's mailbox, else rejects it (see zamfono.help routing-order)."
+      )
+  })
+  .strict();
+export type Forwarding = z.infer<typeof forwardingSchema>;
 
 /** One stored rule: the wire rule `users.getForwarding` returns, plus the target row it owns. */
 export type StoredForwardRule = {

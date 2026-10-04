@@ -3,7 +3,11 @@ import { z } from 'zod';
 import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { defineOperation } from '../types.js';
-import { proxyCallAction } from './_shared.js';
+import {
+  CALL_ACTION_PROBLEMS,
+  callActionOutput,
+  proxyCallAction
+} from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -25,6 +29,8 @@ export const decline = defineOperation({
   description:
     'Declines a call ringing for you, as declining it on your phone would: your phones stop ringing, and the call goes on to your no-answer rule, or a ring group rings its other members.',
   input: inputSchema,
+  output: callActionOutput,
+  problems: CALL_ACTION_PROBLEMS,
   minRole: 'user',
   scope: 'any',
   audit: false,

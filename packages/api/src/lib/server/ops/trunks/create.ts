@@ -2,6 +2,7 @@ import * as env from '$app/env/private';
 import { z } from 'zod';
 
 import {
+  HTTP_CONFLICT,
   HTTP_UNPROCESSABLE_CONTENT,
   newId,
   type CallerIdHeader,
@@ -20,7 +21,7 @@ import {
   loadTrunkHosts,
   mapTrunkRow,
   replaceTrunkHosts,
-  type TrunkWire
+  trunkWriteOutput
 } from './_shared.js';
 import {
   assertClirAllowed,
@@ -44,7 +45,6 @@ import {
 const inputSchema = createInputSchema;
 
 type Input = z.infer<typeof inputSchema>;
-type Output = { trunk: TrunkWire; warnings: string[] };
 
 /** The next `trunks.priority`, past every live trunk (§9.4 "Trunk order"); a new trunk appends. */
 function nextPriority(liveTrunks: { priority: number }[]): number {
@@ -165,11 +165,13 @@ function recordCreateChanges(ctx: Context, input: Input): void {
   recordChange(ctx, { field: 'hosts', from: null, to: input.hosts });
 }
 
-export const create = defineOperation<Input, Output>({
+export const create = defineOperation({
   name: 'trunks.create',
   description:
     'Creates a SIP trunk to a PSTN or SIP provider with its ordered host list; the first trunk also gets the catch-all outbound route.',
   input: inputSchema,
+  output: trunkWriteOutput,
+  problems: [HTTP_CONFLICT],
   minRole: 'admin',
   entity: (_input, out) => ({ kind: 'trunk', id: out.trunk.id }),
   run: async (ctx, input) => {

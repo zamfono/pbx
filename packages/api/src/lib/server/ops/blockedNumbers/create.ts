@@ -1,11 +1,12 @@
 import { z } from 'zod';
 
-import { isE164, newId } from '@zamfono/shared';
+import { HTTP_CONFLICT, isE164, newId } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
+import { blockedNumberWire } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -23,24 +24,16 @@ const inputSchema = z
   })
   .strict();
 
-type Input = z.infer<typeof inputSchema>;
-
-type CreateOutput = {
-  id: string;
-  number: string;
-  isPrefix: boolean;
-  label: string | null;
-  createdAt: string;
-};
-
 /** `POST /blockedNumbers` (§10.1 "Entry", §10.3 "Blocklist"): a caller number or prefix to reject. */
-export const create = defineOperation<Input, CreateOutput>({
+export const create = defineOperation({
   name: 'blockedNumbers.create',
   description:
     'Adds a number or number prefix to the tenant blocklist; a matching inbound caller is rejected with 603',
   input: inputSchema,
+  output: blockedNumberWire,
+  problems: [HTTP_CONFLICT],
   minRole: 'admin',
-  entity: (_input, output: CreateOutput) => ({
+  entity: (_input, output) => ({
     kind: 'blockedNumber',
     id: output.id
   }),

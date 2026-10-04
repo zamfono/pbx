@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { newId } from '@zamfono/shared';
+import { HTTP_CONFLICT, HTTP_NOT_FOUND, newId } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { propagate } from '../propagate.js';
@@ -13,6 +13,7 @@ import {
   assertNameAvailable,
   nextExtension,
   optionalFlag,
+  ringGroupOut,
   toRingGroupOut,
   type RingGroupOut
 } from './_shared.js';
@@ -23,6 +24,8 @@ export const createRingGroup = defineOperation({
   name: 'ringGroups.create',
   description: 'Creates a ring group and assigns it a tenant extension.',
   input: ringGroupInputSchema,
+  output: ringGroupOut,
+  problems: [HTTP_NOT_FOUND, HTTP_CONFLICT],
   minRole: 'admin',
   entity: (_input, out: RingGroupOut) => ({ kind: 'ringGroup', id: out.id }),
   run: async (ctx, input) => {

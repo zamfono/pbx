@@ -67,11 +67,16 @@ describe('handleMcpRequest, 2026-07-28', () => {
       name: 'test.delete',
       description: 'deletes a thing',
       inputSchema: expect.objectContaining({ type: 'object' }) as object,
+      outputSchema: expect.objectContaining({ type: 'object' }) as object,
       annotations: { readOnlyHint: false, destructiveHint: true }
     });
     expect(tools.find(tool => tool.name === 'zamfono.help')).toMatchObject({
       annotations: { readOnlyHint: true, destructiveHint: false }
     });
+    // MCP fixes an output schema to an object, so a tool answering with a list has none.
+    expect(tools.find(tool => tool.name === 'test.names')).not.toHaveProperty(
+      'outputSchema'
+    );
     const names = tools.map(tool => tool.name as string);
     // Code-point order, not `localeCompare`: it must not depend on the container's ICU locale.
     expect(names).toEqual([...names].sort());
@@ -307,6 +312,7 @@ describe('handleMcpRequest, legacy 2025-11-25', () => {
       name: 'test.write',
       description: 'writes a thing',
       inputSchema: expect.objectContaining({ type: 'object' }) as object,
+      outputSchema: expect.objectContaining({ type: 'object' }) as object,
       annotations: { readOnlyHint: false, destructiveHint: false }
     });
     const prompts = await rpc(deps, legacyRequest(headers, 2, 'prompts/list'));

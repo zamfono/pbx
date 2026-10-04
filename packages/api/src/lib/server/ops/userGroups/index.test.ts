@@ -22,6 +22,22 @@ describe('userGroups', () => {
     expect(group.members).toEqual([{ kind: 'user', id: 'owner' }]);
   });
 
+  it('list returns the live user groups with their members', async () => {
+    const db = await makeTestDb();
+    await runOperation(
+      db,
+      'userGroups.create',
+      { name: 'Support', members: [{ kind: 'user', id: 'owner' }] },
+      asRun()
+    );
+    const page = (await runOperation(db, 'userGroups.list', {}, asRun())) as {
+      items: { name: string; members: unknown[] }[];
+    };
+    expect(page.items).toMatchObject([
+      { name: 'Support', members: [{ kind: 'user', id: 'owner' }] }
+    ]);
+  });
+
   it('create propagates pjsip when members is present', async () => {
     const db = await makeTestDb();
     vi.mocked(propagateConfig).mockClear();

@@ -12,6 +12,7 @@ import {
   httpUrlSchema,
   toWire,
   webhookSecretSchema,
+  webhookWire,
   type WebhookWire
 } from './_shared.js';
 
@@ -23,17 +24,16 @@ const inputSchema = z
   })
   .strict();
 
-type Input = z.infer<typeof inputSchema>;
-
 /**
  * `POST /webhooks` (§10.6): a new event receiver, always created inactive so an admin switches
  * it on once the endpoint is ready to receive deliveries.
  */
-export const create = defineOperation<Input, WebhookWire>({
+export const create = defineOperation({
   name: 'webhooks.create',
   description:
     'Adds a webhook, an endpoint every event (or the filtered types) is POSTed to; created inactive until switched on with webhooks.update',
   input: inputSchema,
+  output: webhookWire,
   minRole: 'admin',
   entity: (_input, output: WebhookWire) => ({ kind: 'webhook', id: output.id }),
   run: async (ctx, input) => {

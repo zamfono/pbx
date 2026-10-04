@@ -1,8 +1,11 @@
+import { z } from 'zod';
+
 import { getCoreClient } from '#lib/server/coreClient.js';
 import {
   decodeOffsetCursor,
   offsetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
@@ -18,6 +21,20 @@ export const list = defineOperation({
   description:
     'Lists the calls parked right now: slot, call, caller (null when withheld), parked since and by whom.',
   input: pageInput.strict(),
+  output: pageOutput(
+    z.object({
+      slot: z.string(),
+      callId: z.string(),
+      caller: z
+        .string()
+        .nullable()
+        .describe(
+          "The parked party's number as phones show it; null when withheld."
+        ),
+      parkedAt: z.string(),
+      parkedByUserId: z.string()
+    })
+  ),
   minRole: 'user',
   scope: 'any',
   readOnly: true,

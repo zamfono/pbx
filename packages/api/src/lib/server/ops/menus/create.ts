@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { newId } from '@zamfono/shared';
+import { HTTP_CONFLICT, HTTP_NOT_FOUND, newId } from '@zamfono/shared';
 
 import { assertAudioOfKind } from '../audio/_shared.js';
 import { recordChange } from '../audit.js';
@@ -10,6 +10,7 @@ import { defineOperation } from '../types.js';
 import {
   assertNameAvailable,
   menuFields,
+  menuOut,
   toMenuOut,
   type MenuOut
 } from './_shared.js';
@@ -24,6 +25,8 @@ export const createMenu = defineOperation({
   description:
     'Creates an auto-attendant menu: a greeting, a DTMF-to-target map (menus.setTargets) and a fallback.',
   input: menuInputSchema,
+  output: menuOut,
+  problems: [HTTP_NOT_FOUND, HTTP_CONFLICT],
   minRole: 'admin',
   entity: (_input, out: MenuOut) => ({ kind: 'menu', id: out.id }),
   run: async (ctx, input) => {

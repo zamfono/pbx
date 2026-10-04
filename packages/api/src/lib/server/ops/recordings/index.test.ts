@@ -5,6 +5,7 @@ import { describe, expect, it, onTestFinished } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
+import type { BinaryResult } from '#lib/server/binaryResult.js';
 import { asRun, makeTestDb } from '#lib/server/testDb.js';
 
 import { runOperation } from '../runner.js';
@@ -61,6 +62,33 @@ describe('recordings', () => {
     await expect(
       runOperation(db, 'recordings.list', {}, asRun({ actor: user }))
     ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('recordings.audio answers the stored WAV', async () => {
+    const db = await makeTestDb();
+    const { id } = await seedRecording(db, { id: 'rec-2' });
+    const mediaDir = await mkdtemp(path.join(os.tmpdir(), 'zamfono-rec-'));
+    onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));
+    await mkdir(path.join(mediaDir, 'recordings'), { recursive: true });
+    await writeFile(path.join(mediaDir, 'recordings', 'rec-2.wav'), 'wav');
+    const previousMediaDir = process.env.MEDIA_DIR;
+    process.env.MEDIA_DIR = mediaDir;
+    try {
+      const file = (await runOperation(
+        db,
+        'recordings.audio',
+        { id },
+        asRun()
+      )) as BinaryResult;
+      expect(file.contentType).toBe('audio/wav');
+      expect((await file.read()).toString()).toBe('wav');
+    } finally {
+      if (previousMediaDir === undefined) {
+        delete process.env.MEDIA_DIR;
+      } else {
+        process.env.MEDIA_DIR = previousMediaDir;
+      }
+    }
   });
 
   it('recordings.delete removes file, raw pair and row with undoable 0', async () => {

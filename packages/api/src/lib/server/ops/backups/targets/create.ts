@@ -9,6 +9,7 @@ import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { assertSecretFitsKind, sealTargetSecret } from '../_secret.js';
 import {
+  backupTargetWire,
   targetFields,
   targetToWire,
   withDefaultForgetPolicy,
@@ -17,14 +18,13 @@ import {
 
 const inputSchema = z.object(targetFields).strict();
 
-type Input = z.infer<typeof inputSchema>;
-
 /** `POST /backups/targets` (§6.5 "Backups"): a restic destination for the nightly backup job. */
-export const targetsCreate = defineOperation<Input, BackupTargetWire>({
+export const targetsCreate = defineOperation({
   name: 'backups.targets.create',
   description:
     'Adds a backup target, a restic repository every scheduled run (settings.backupCron) backs up to while enabled',
   input: inputSchema,
+  output: backupTargetWire,
   minRole: 'admin',
   entity: (_input, output: BackupTargetWire) => ({
     kind: 'backupTarget',

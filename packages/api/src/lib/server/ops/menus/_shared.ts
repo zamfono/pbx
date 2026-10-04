@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { type DB } from '@zamfono/shared';
 
-import { targetSpecSchema, type TargetSpec } from '../forwardTargetSchema.js';
+import { targetSpecSchema } from '../forwardTargetSchema.js';
 import { rowToTarget } from '../forwardTargetSpec.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { liveRow } from '../rows.js';
@@ -75,7 +75,24 @@ export const menuFields = {
   )
 };
 
-export type MenuTargetOut = { digits: string; target: TargetSpec };
+/** One entry of a menu's DTMF map: the keys and the forward target they route to. */
+export const menuTargetOut = z.object({
+  digits: digitsSchema,
+  target: targetSpecSchema
+});
+export type MenuTargetOut = z.infer<typeof menuTargetOut>;
+
+/** A menu's DTMF map as `menus.setTargets` takes it and both target operations return it (§10.3). */
+export const menuTargetsSchema = z
+  .object({
+    id: z.string(),
+    targets: z
+      .array(menuTargetOut)
+      .describe(
+        'Each key string and the forward target it routes to; a matched target re-enters routing without counting a hop.'
+      )
+  })
+  .strict();
 
 /** A menu's DTMF map in `menus.setTargets`' own input shape, ordered by digits (§10.3). */
 export async function menuTargetRows(
@@ -102,16 +119,18 @@ export async function menuTargetRows(
   );
 }
 
-export type MenuOut = {
-  id: string;
-  name: string;
-  audioId: string;
-  timeoutS: number;
-  maxAttempts: number;
-  allowExtensionDialing: boolean;
-  fallbackTarget: TargetSpec;
-  targets: MenuTargetOut[];
-};
+/** A menu's wire shape (§10.3), as `toMenuOut` assembles it. */
+export const menuOut = z.object({
+  id: z.string(),
+  name: z.string(),
+  audioId: z.string(),
+  timeoutS: z.number(),
+  maxAttempts: z.number(),
+  allowExtensionDialing: z.boolean(),
+  fallbackTarget: targetSpecSchema,
+  targets: z.array(menuTargetOut)
+});
+export type MenuOut = z.infer<typeof menuOut>;
 
 /** Assembles the wire shape of a menu from its row, fallback target and DTMF map (§10.3). */
 export async function toMenuOut(

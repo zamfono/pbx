@@ -3,6 +3,7 @@ import path from 'node:path';
 import * as env from '$app/env/private';
 import type { Selectable, Transaction } from 'kysely';
 import pino from 'pino';
+import { z } from 'zod';
 
 import {
   HTTP_NOT_FOUND,
@@ -23,16 +24,18 @@ const logger = pino({ name: 'voicemails' });
 /** A `voicemails` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type VoicemailRow = Selectable<DB['voicemails']>;
 
-export type VoicemailOut = {
-  id: string;
-  mailboxUserId: string | null;
-  mailboxRingGroupId: string | null;
-  caller: string;
-  filename: string;
-  durationS: number;
-  read: boolean;
-  createdAt: string;
-};
+/** A voicemail as `voicemails.list` lists it. */
+export const voicemailOut = z.object({
+  id: z.string(),
+  mailboxUserId: z.string().nullable(),
+  mailboxRingGroupId: z.string().nullable(),
+  caller: z.string(),
+  filename: z.string(),
+  durationS: z.number(),
+  read: z.boolean(),
+  createdAt: z.string()
+});
+export type VoicemailOut = z.infer<typeof voicemailOut>;
 
 export function toVoicemailOut(row: VoicemailRow): VoicemailOut {
   return {

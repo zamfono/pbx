@@ -21,6 +21,7 @@ describe('runOperation', () => {
         name: 'test.echo',
         description: 'echoes num',
         input: z.object({ num: z.number() }),
+        output: z.number(),
         minRole: 'user',
         scope: 'any',
         readOnly: true,
@@ -39,6 +40,7 @@ describe('runOperation', () => {
         name: 'test.adminOnly',
         description: 'an admin-only read',
         input: z.object({}),
+        output: z.string(),
         minRole: 'admin',
         readOnly: true,
         run: () => Promise.resolve('ok')
@@ -59,6 +61,7 @@ describe('runOperation', () => {
         name: 'test.deleteThing',
         description: 'deletes a thing',
         input: z.object({}),
+        output: z.string(),
         minRole: 'user',
         scope: 'any',
         readOnly: true,
@@ -91,6 +94,7 @@ describe('runOperation', () => {
         name: 'test.deleteOwnThing',
         description: "deletes a user's thing",
         input: z.object({ userId: z.string() }),
+        output: z.string(),
         minRole: 'user',
         scope: (ctx, input) => input.userId === ctx.actor.id,
         audit: false,
@@ -136,6 +140,7 @@ describe('runOperation', () => {
         name: 'test.renameThing',
         description: 'renames a thing',
         input: z.object({ id: z.string() }),
+        output: z.object({ id: z.string() }),
         minRole: 'user',
         scope: 'any',
         entity: input => ({ kind: 'thing', id: input.id }),
@@ -164,6 +169,7 @@ describe('runOperation', () => {
         name: 'test.readOnlyThing',
         description: 'reads a thing',
         input: z.object({}),
+        output: z.string(),
         minRole: 'user',
         scope: 'any',
         readOnly: true,
@@ -175,6 +181,7 @@ describe('runOperation', () => {
         name: 'test.silentWrite',
         description: 'writes without an audit trail',
         input: z.object({}),
+        output: z.string(),
         minRole: 'user',
         scope: 'any',
         audit: false,
@@ -194,6 +201,7 @@ describe('runOperation', () => {
         name: 'test.rotateSecret',
         description: 'rotates a secret',
         input: z.object({}),
+        output: z.string(),
         minRole: 'admin',
         entity: () => ({ kind: 'device', id: 'd1' }),
         run: ctx => {
@@ -218,6 +226,7 @@ describe('runOperation', () => {
         name: 'test.writeThenThrow',
         description: 'writes a device then throws',
         input: z.object({}),
+        output: z.never(),
         minRole: 'admin',
         entity: () => ({ kind: 'device', id: 'd1' }),
         run: async ctx => {
@@ -255,6 +264,7 @@ describe('runOperation', () => {
         name: 'test.propagatingWrite',
         description: 'a write requesting the same kind twice and a second kind',
         input: z.object({}),
+        output: z.string(),
         minRole: 'admin',
         entity: () => ({ kind: 'device', id: 'd1' }),
         run: ctx => {
@@ -269,6 +279,7 @@ describe('runOperation', () => {
         name: 'test.propagatingThrow',
         description: 'a write that requests a reload kind then throws',
         input: z.object({}),
+        output: z.string(),
         minRole: 'admin',
         entity: () => ({ kind: 'device', id: 'd1' }),
         run: ctx => {
@@ -282,6 +293,7 @@ describe('runOperation', () => {
         name: 'test.propagatingReadOnly',
         description: 'a readOnly op that still requests a reload kind',
         input: z.object({}),
+        output: z.string(),
         minRole: 'user',
         scope: 'any',
         readOnly: true,
@@ -296,6 +308,7 @@ describe('runOperation', () => {
         name: 'test.noKindRequested',
         description: 'a non-readOnly write that requests no reload kind',
         input: z.object({}),
+        output: z.string(),
         minRole: 'admin',
         entity: () => ({ kind: 'device', id: 'd2' }),
         run: () => Promise.resolve('ok')
@@ -319,6 +332,7 @@ describe('runOperation', () => {
         name: 'test.configOnlyWrite',
         description: 'a write the routing pipeline reads but Asterisk does not',
         input: z.object({}),
+        output: z.string(),
         minRole: 'admin',
         entity: () => ({ kind: 'did', id: 'did-1' }),
         run: ctx => {
@@ -343,6 +357,7 @@ describe('runOperation', () => {
         name: 'test.propagatingWriteThatFailsToReload',
         description: 'a write whose reload notification fails',
         input: z.object({}),
+        output: z.string(),
         minRole: 'admin',
         entity: () => ({ kind: 'device', id: 'd3' }),
         run: async ctx => {
@@ -391,6 +406,7 @@ describe('runOperation', () => {
         name: 'test.writeTouchingUsers',
         description: 'a write',
         input: z.object({}),
+        output: z.string(),
         minRole: 'admin',
         entity: () => ({ kind: 'user', id: 'u1' }),
         run: () => Promise.resolve('ok')
@@ -401,6 +417,7 @@ describe('runOperation', () => {
         name: 'test.readOfUsers',
         description: 'a read',
         input: z.object({}),
+        output: z.string(),
         minRole: 'admin',
         readOnly: true,
         run: () => Promise.resolve('ok')

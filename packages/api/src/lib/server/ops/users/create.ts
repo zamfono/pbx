@@ -2,7 +2,7 @@ import * as env from '$app/env/private';
 import pino from 'pino';
 import { z } from 'zod';
 
-import { findMeSchema, newId } from '@zamfono/shared';
+import { findMeSchema, HTTP_CONFLICT, newId } from '@zamfono/shared';
 
 import { issueResetToken } from '#lib/server/auth/tokens.js';
 import { sendMail } from '#lib/server/mail/index.js';
@@ -23,7 +23,7 @@ import {
   EXTENSION_DESCRIPTION,
   toUserOut,
   userCallFields,
-  type UserOut
+  userOut
 } from './_shared.js';
 
 const logger = pino({ name: 'users.create' });
@@ -48,7 +48,15 @@ const inputSchema = z
   })
   .strict();
 type Input = z.infer<typeof inputSchema>;
-type Output = { user: UserOut; setupLink: string };
+const outputSchema = z.object({
+  user: userOut,
+  setupLink: z
+    .string()
+    .describe(
+      'The one-time link the user sets their password with, also mailed to them.'
+    )
+});
+type Output = z.infer<typeof outputSchema>;
 
 async function insertUserRow(
   ctx: Context,
@@ -93,6 +101,8 @@ export const create = defineOperation({
   description:
     'Creates a user, assigns their extension and returns a setup link.',
   input: inputSchema,
+  output: outputSchema,
+  problems: [HTTP_CONFLICT],
   minRole: 'admin',
   entity: (_input, out: Output) => ({ kind: 'user', id: out.user.id }),
   run: async (ctx, input) => {

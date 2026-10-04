@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_CONFLICT, HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { recordChange, recordFieldChanges } from '../audit.js';
 import type { MemberSpec } from '../members.js';
 import { propagate } from '../propagate.js';
@@ -13,6 +15,7 @@ import {
   assertNameAvailable,
   liveRingGroup,
   optionalFlag,
+  ringGroupOut,
   toRingGroupOut,
   type RingGroupRow
 } from './_shared.js';
@@ -60,6 +63,8 @@ export const updateRingGroup = defineOperation({
   name: 'ringGroups.update',
   description: "Updates a ring group's configuration.",
   input: updateRingGroupInput,
+  output: ringGroupOut,
+  problems: [HTTP_NOT_FOUND, HTTP_CONFLICT],
   minRole: 'admin',
   entity: input => ({ kind: 'ringGroup', id: input.id }),
   run: async (ctx, input) => {

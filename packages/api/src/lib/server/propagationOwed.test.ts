@@ -189,6 +189,7 @@ describe('an owed config propagation', () => {
         description:
           'a write with a step after the commit and one after Asterisk holds it',
         input: z.object({ label: z.string() }),
+        output: z.object({ ok: z.boolean() }),
         minRole: 'admin',
         entity: () => ({ kind: 'device', id: 'd1' }),
         run: (ctx, input) => {

@@ -1,6 +1,8 @@
 import type { Selectable, Transaction } from 'kysely';
+import { z } from 'zod';
 
 import {
+  AUDIO_KINDS,
   audioReferenceQueries,
   HTTP_UNPROCESSABLE_CONTENT,
   type AudioKind,
@@ -22,13 +24,15 @@ export async function liveAudioAsset(
   return liveRow(db, 'audioAssets', id, `audio asset '${id}' not found`);
 }
 
-export type AudioAssetOut = {
-  id: string;
-  label: string;
-  kind: AudioKind;
-  filename: string;
-  createdAt: string;
-};
+/** An audio asset's wire shape (§10.3 "Audio"). */
+export const audioAssetOut = z.object({
+  id: z.string(),
+  label: z.string(),
+  kind: z.enum(AUDIO_KINDS),
+  filename: z.string(),
+  createdAt: z.string()
+});
+export type AudioAssetOut = z.infer<typeof audioAssetOut>;
 
 export function toAudioAssetOut(row: AudioAssetRow): AudioAssetOut {
   return {

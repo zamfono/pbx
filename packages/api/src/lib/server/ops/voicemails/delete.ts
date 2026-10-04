@@ -1,7 +1,10 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { afterCommit } from '../afterCommit.js';
 import { setUndoable } from '../audit.js';
+import { idOutput } from '../rows.js';
 import { defineOperation } from '../types.js';
 import {
   deleteVoicemailFile,
@@ -22,6 +25,8 @@ export const deleteVoicemail = defineOperation({
   name: 'voicemails.delete',
   description: 'Permanently deletes a voicemail and its audio file.',
   input: inputSchema,
+  output: idOutput,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'user',
   scope: ownVoicemail,
   confirm: async (ctx, input) => {

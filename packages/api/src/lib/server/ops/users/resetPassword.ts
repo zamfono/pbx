@@ -2,7 +2,7 @@ import * as env from '$app/env/private';
 import pino from 'pino';
 import { z } from 'zod';
 
-import { HTTP_FORBIDDEN } from '@zamfono/shared';
+import { HTTP_FORBIDDEN, HTTP_NOT_FOUND } from '@zamfono/shared';
 
 import { issueResetToken } from '#lib/server/auth/tokens.js';
 import { sendMail } from '#lib/server/mail/index.js';
@@ -22,6 +22,14 @@ export const resetPassword = defineOperation({
   name: 'users.resetPassword',
   description: "Issues a new one-time link to set a user's password.",
   input: z.object({ id: z.string() }).strict(),
+  output: z.object({
+    link: z
+      .string()
+      .describe(
+        'The one-time link the user sets a new password with, also mailed to them.'
+      )
+  }),
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   // A sent e-mail changes nothing of the user an undo would build on (§5.8 "pure actions").
   pureAction: true,

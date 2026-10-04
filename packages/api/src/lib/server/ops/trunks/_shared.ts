@@ -2,24 +2,23 @@ import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
 import {
+  CALLERID_HEADERS,
   codecsColumn,
+  codecsSchema,
+  DIVERSION_POLICIES,
   HOST_DIRECTIONS,
   MAX_PORT,
-  type CallerIdHeader,
-  type Codec,
+  NUMBER_FORMATS,
+  TRUNK_AUTH_MODES,
+  TRUNK_TRANSPORTS,
   type Db,
   type DB,
-  type DiversionPolicy,
   type HostDirection,
-  type LogLevelColumns,
-  type NumberFormat,
-  type TrunkAuthMode,
-  type TrunkStatus,
-  type TrunkTransport
+  type TrunkStatus
 } from '@zamfono/shared';
 
 import { liveRow } from '../rows.js';
-import { logLevelWire } from '../settings/logLevel.js';
+import { logLevelOutputFields, logLevelWire } from '../settings/logLevel.js';
 
 export type TrunkRow = Selectable<DB['trunks']>;
 export type TrunkHostRow = Selectable<DB['trunkHosts']>;
@@ -58,52 +57,80 @@ export const hostInputSchema = z
   })
   .strict();
 
-export type HostWire = {
-  host: string;
-  port: number | null;
-  direction: HostDirection;
-};
+export const hostWire = z.object({
+  host: z.string(),
+  port: z.number().nullable(),
+  direction: z.enum(HOST_DIRECTIONS)
+});
+export type HostWire = z.infer<typeof hostWire>;
 
 /** The scalar (non-host, non-status) fields of a trunk, in their wire shape (§9.4, §10.3). */
-export type TrunkScalars = {
-  name: string;
-  /** `trunks.emergency`: only these trunks carry emergency calls (§9.4 "Emergency trunks"). */
-  emergency: boolean;
-  authMode: TrunkAuthMode;
-  username: string | null;
-  inboundAuth: boolean;
-  transport: TrunkTransport;
-  /** `trunks.srtp`: SDES-SRTP media, `tls` trunks only (§9.4 "Signaling"). */
-  srtp: boolean;
-  /** `trunks.tls_verify`: the provider's certificate is checked; applies while `transport` is `tls`. */
-  tlsVerify: boolean;
-  /** `trunks.qualify`: an `ip` trunk's contact is OPTIONS-probed for its status; ignored for
-   * `registration` (§9.4 "Provisioning and status"). */
-  qualify: boolean;
-  /** `trunks.diversion`: the `Diversion` a forwarded leg over the trunk carries, none, the newest
-   * hop's or every hop's (§9.4 "Forwarded calls"). */
-  diversion: DiversionPolicy;
-  outboundProxy: string | null;
-  registerExpiryS: number | null;
-  registerRetryS: number | null;
-  inboundNumberFormat: NumberFormat;
-  callerIdFormat: NumberFormat;
-  callerIdHeader: CallerIdHeader;
-  clir: boolean | null;
-  codecs: Codec[] | null;
-  maxChannels: number | null;
-};
+export const trunkScalars = z.object({
+  name: z.string(),
+  emergency: z
+    .boolean()
+    .describe(
+      'Only these trunks carry emergency calls (§9.4 "Emergency trunks").'
+    ),
+  authMode: z.enum(TRUNK_AUTH_MODES),
+  username: z.string().nullable(),
+  inboundAuth: z.boolean(),
+  transport: z.enum(TRUNK_TRANSPORTS),
+  srtp: z.boolean().describe('SDES-SRTP media, tls trunks only.'),
+  tlsVerify: z
+    .boolean()
+    .describe(
+      "The provider's certificate is checked; applies while transport is tls."
+    ),
+  qualify: z
+    .boolean()
+    .describe(
+      "An ip trunk's contact is OPTIONS-probed for its status; ignored for registration."
+    ),
+  diversion: z
+    .enum(DIVERSION_POLICIES)
+    .describe(
+      "The Diversion a forwarded leg over the trunk carries: none, the newest hop's or every hop's."
+    ),
+  outboundProxy: z.string().nullable(),
+  registerExpiryS: z.number().nullable(),
+  registerRetryS: z.number().nullable(),
+  inboundNumberFormat: z.enum(NUMBER_FORMATS),
+  callerIdFormat: z.enum(NUMBER_FORMATS),
+  callerIdHeader: z.enum(CALLERID_HEADERS),
+  clir: z.boolean().nullable(),
+  codecs: codecsSchema.nullable(),
+  maxChannels: z.number().nullable()
+});
+export type TrunkScalars = z.infer<typeof trunkScalars>;
 
-export type TrunkWire = TrunkScalars &
-  LogLevelColumns & {
-    id: string;
-    priority: number;
-    /** Whether a password is stored; the password itself is write-only (§10.3). */
-    passwordSet: boolean;
-    hosts: HostWire[];
-    status: TrunkStatus['status'];
-    statusChangedAt: string | null;
-  };
+const TRUNK_STATUSES = [
+  'registered',
+  'unreachable',
+  'unmonitored',
+  'unknown'
+] as const;
+
+export const trunkWire = trunkScalars.extend({
+  id: z.string(),
+  priority: z.number(),
+  passwordSet: z
+    .boolean()
+    .describe(
+      'Whether a password is stored; the password itself is write-only.'
+    ),
+  hosts: z.array(hostWire),
+  ...logLevelOutputFields,
+  status: z.enum(TRUNK_STATUSES),
+  statusChangedAt: z.string().nullable()
+});
+export type TrunkWire = z.infer<typeof trunkWire>;
+
+/** A trunk write's answer: the trunk, and what it leaves the emergency set without (§9.4). */
+export const trunkWriteOutput = z.object({
+  trunk: trunkWire,
+  warnings: z.array(z.string())
+});
 
 export async function liveTrunk(db: Db, id: string): Promise<TrunkRow> {
   return liveRow(db, 'trunks', id, 'trunk not found');

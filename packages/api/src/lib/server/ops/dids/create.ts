@@ -1,13 +1,19 @@
 import { z } from 'zod';
 
-import { newId, normalizeInbound } from '@zamfono/shared';
+import {
+  HTTP_CONFLICT,
+  HTTP_NOT_FOUND,
+  newId,
+  normalizeInbound
+} from '@zamfono/shared';
 
 import { createTarget } from '../forwardTargets.js';
-import { targetSpecSchema, type TargetSpec } from '../forwardTargetSchema.js';
+import { targetSpecSchema } from '../forwardTargetSchema.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
 import { setCallerIdIfUnset } from './_callerId.js';
+import { didOut, type DidOut } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -25,22 +31,16 @@ const inputSchema = z
   })
   .strict();
 
-type CreateOutput = {
-  id: string;
-  number: string;
-  label: string | null;
-  target: TargetSpec;
-  createdAt: string;
-};
-
 /** `POST /dids` (§10.3 "Extensions & DIDs", §11.3): a DID and the forward target it dials to. */
 export const create = defineOperation({
   name: 'dids.create',
   description:
     'Adds a DID, a phone number the tenant owns, and the forward target its calls go to (zamfono.help numbers)',
   input: inputSchema,
+  output: didOut,
+  problems: [HTTP_NOT_FOUND, HTTP_CONFLICT],
   minRole: 'admin',
-  entity: (_input, output: CreateOutput) => ({ kind: 'did', id: output.id }),
+  entity: (_input, output) => ({ kind: 'did', id: output.id }),
   run: async (ctx, input) => {
     const settings = await ctx.db
       .selectFrom('settings')
@@ -63,7 +63,7 @@ export const create = defineOperation({
     if (input.target.kind === 'user') {
       await setCallerIdIfUnset(ctx, input.target.userId, id, number);
     }
-    const output: CreateOutput = {
+    const output: DidOut = {
       id,
       number,
       label,

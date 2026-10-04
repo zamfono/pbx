@@ -1,18 +1,19 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import {
   findForwardTargetOwners,
   type Reference
 } from '../forwardTargetOwners.js';
 import { propagate } from '../propagate.js';
-import { softDelete, softDeleteQuestion } from '../rows.js';
+import { idOutput, softDelete, softDeleteQuestion } from '../rows.js';
 import { Conflict, defineOperation, type Context } from '../types.js';
 import { liveTrunk } from './_shared.js';
 import { emergencyTrunkWarnings } from './_writeChecks.js';
 
 const inputSchema = z.object({ id: z.string().min(1) }).strict();
-type Input = z.infer<typeof inputSchema>;
-type Output = { id: string; warnings: string[] };
+const outputSchema = idOutput.extend({ warnings: z.array(z.string()) });
 
 /**
  * What still dials over trunk `id` (§5.9): its live outbound routes, and the owners of the `sip`
@@ -46,11 +47,13 @@ async function trunkReferences(ctx: Context, id: string): Promise<Reference[]> {
   ];
 }
 
-export const deleteTrunk = defineOperation<Input, Output>({
+export const deleteTrunk = defineOperation({
   name: 'trunks.delete',
   description:
     'Soft-deletes a SIP trunk once no outbound route or sip forward target uses it (409 names them).',
   input: inputSchema,
+  output: outputSchema,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   confirm: async (ctx, input) =>
     softDeleteQuestion(

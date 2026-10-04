@@ -4,6 +4,8 @@ import { z } from 'zod';
 import {
   DEVICE_KINDS,
   DEVICE_TRANSPORTS,
+  HTTP_CONFLICT,
+  HTTP_NOT_FOUND,
   HTTP_UNPROCESSABLE_CONTENT,
   newId
 } from '@zamfono/shared';
@@ -19,11 +21,12 @@ import { userExtension } from '../users/_extensions.js';
 import { liveUser } from '../users/_shared.js';
 import {
   connectionSettings,
-  type ConnectionSettings
+  connectionSettingsOut
 } from './_connectionSettings.js';
 import { pushToRingotel } from './_ringotelPush.js';
 import {
   assertNoExistingRingotelDevice,
+  deviceOut,
   liveDevice,
   toDeviceOut
 } from './_shared.js';
@@ -63,12 +66,11 @@ const inputSchema = z
  * device's credentials are pushed to Ringotel, so its response carries only the device, and an
  * admin reveals them later through `devices.revealCredentials` (§5.2).
  */
-type Output = {
-  device: ReturnType<typeof toDeviceOut>;
-  connectionSettings?: ConnectionSettings;
-  /** A `ringotel` device Ringotel refused, or no Ringotel setup: the device stands, and this says why (§10.4). */
-  warnings?: string[];
-};
+const outputSchema = z.object({
+  device: deviceOut,
+  connectionSettings: connectionSettingsOut.optional()
+});
+type Output = z.infer<typeof outputSchema>;
 
 /** `POST /users/{id}/devices` (§10.3, §9.3): creates a SIP device, returning a manual one's connection settings once. */
 export const create = defineOperation({
@@ -76,6 +78,8 @@ export const create = defineOperation({
   description:
     "Creates a SIP device for a user; a manual device's connection settings are returned once.",
   input: inputSchema,
+  output: outputSchema,
+  problems: [HTTP_NOT_FOUND, HTTP_CONFLICT],
   minRole: 'user',
   scope: (ctx, input) =>
     ownActingUser(ctx, input) && (input.transport ?? 'tls') === 'tls',

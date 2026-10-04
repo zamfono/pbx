@@ -28,6 +28,25 @@ describe('listTools', () => {
     expect(upload?.inputSchema).not.toHaveProperty('properties.upload');
   });
 
+  it('publishes the object a tool answers with as its output schema (§10.5)', () => {
+    const tools = listTools();
+    const get = tools.find(tool => tool.name === 'users.get');
+    expect(get?.outputSchema).toMatchObject({
+      type: 'object',
+      properties: { id: {}, email: {} }
+    });
+    // A file and an upload answer with their link, not with the operation's own result.
+    for (const name of ['voicemails.audio', 'audio.create']) {
+      expect(tools.find(tool => tool.name === name)?.outputSchema).toEqual({
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        properties: { url: { type: 'string' }, expiresAt: { type: 'string' } },
+        required: ['url', 'expiresAt'],
+        additionalProperties: false
+      });
+    }
+  });
+
   it('sorts tools by code point and always offers the help tool', () => {
     const names = listTools().map(tool => tool.name);
     expect(names).toContain('zamfono.help');

@@ -10,7 +10,7 @@ import {
   kindSchema,
   languageSchema,
   loadOverride,
-  type MailTemplateWire
+  mailTemplateWire
 } from './_shared.js';
 
 const inputSchema = z
@@ -37,17 +37,16 @@ const inputSchema = z
   })
   .strict();
 
-type Input = z.infer<typeof inputSchema>;
-
 /**
  * `PUT /mailTemplates/{kind}/{language}` (§10.2 "Templates", §10.3 "Mail templates"): validates
  * the template against its kind's placeholders and helpers, then stores it as the tenant override.
  */
-export const put = defineOperation<Input, MailTemplateWire>({
+export const put = defineOperation({
   name: 'mailTemplates.put',
   description:
     "Overrides the shipped mail template of a kind and language, checked against the kind's placeholders",
   input: inputSchema,
+  output: mailTemplateWire,
   minRole: 'admin',
   entity: input => ({
     kind: 'mailTemplate',

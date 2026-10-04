@@ -2,11 +2,10 @@ import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
 import {
+  BACKUP_RUN_STATUSES,
   BACKUP_TARGET_KINDS,
   backupParamsColumn,
   backupParamsSchema,
-  type BackupRunStatus,
-  type BackupTargetKind,
   type Db,
   type DB
 } from '@zamfono/shared';
@@ -55,15 +54,20 @@ export function withDefaultForgetPolicy(
     : { ...params, forget: DEFAULT_FORGET_POLICY };
 }
 
-export type BackupTargetWire = {
-  id: string;
-  kind: BackupTargetKind;
-  params: Record<string, unknown>;
-  /** Always `true`: a target's secret is required; the secret itself is write-only (§10.3). */
-  secretSet: true;
-  enabled: boolean;
-  createdAt: string;
-};
+/** A backup target's wire shape (§6.5 "Backups"). */
+export const backupTargetWire = z.object({
+  id: z.string(),
+  kind: z.enum(BACKUP_TARGET_KINDS),
+  params: backupParamsSchema,
+  secretSet: z
+    .literal(true)
+    .describe(
+      "Always true: a target's secret is required; the secret itself is write-only (§10.3)."
+    ),
+  enabled: z.boolean(),
+  createdAt: z.string()
+});
+export type BackupTargetWire = z.infer<typeof backupTargetWire>;
 
 /** `row` as the API returns it; the secret is write-only, only `secretSet` shows it (§10.3). */
 export function targetToWire(row: BackupTargetRow): BackupTargetWire {
@@ -90,18 +94,25 @@ export async function loadLiveTarget(
     .executeTakeFirst();
 }
 
-export type BackupRunWire = {
-  id: string;
-  targetId: string;
-  status: BackupRunStatus;
-  snapshotId: string | null;
-  // §6.5: what the run uploaded after deduplication, and the snapshot's full size.
-  bytesAdded: number | null;
-  bytesTotal: number | null;
-  error: string | null;
-  startedAt: string;
-  finishedAt: string | null;
-};
+/** A backup run's wire shape (§6.5 "Backups"). */
+export const backupRunWire = z.object({
+  id: z.string(),
+  targetId: z.string(),
+  status: z.enum(BACKUP_RUN_STATUSES),
+  snapshotId: z.string().nullable(),
+  bytesAdded: z
+    .number()
+    .nullable()
+    .describe('What the run uploaded after deduplication, in bytes.'),
+  bytesTotal: z
+    .number()
+    .nullable()
+    .describe("The snapshot's full size, in bytes."),
+  error: z.string().nullable(),
+  startedAt: z.string(),
+  finishedAt: z.string().nullable()
+});
+export type BackupRunWire = z.infer<typeof backupRunWire>;
 
 export function runToWire(row: BackupRunRow): BackupRunWire {
   return {

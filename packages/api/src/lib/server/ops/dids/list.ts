@@ -1,11 +1,13 @@
 import {
   decodeIdCursor,
   keysetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { resolveTarget } from '../forwardTargetSpec.js';
 import { defineOperation } from '../types.js';
+import { didOut } from './_shared.js';
 
 const inputSchema = pageInput.strict();
 
@@ -14,6 +16,7 @@ export const list = defineOperation({
   name: 'dids.list',
   description: "Lists the tenant's DIDs",
   input: inputSchema,
+  output: pageOutput(didOut),
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

@@ -1,6 +1,8 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { fromFlag, recordChange, recordFieldChanges } from '../audit.js';
@@ -13,7 +15,7 @@ import {
   liveWebhook,
   toWire,
   webhookSecretSchema,
-  type WebhookWire
+  webhookWire
 } from './_shared.js';
 
 const inputSchema = z
@@ -31,8 +33,6 @@ const inputSchema = z
   })
   .strict();
 
-type Input = z.infer<typeof inputSchema>;
-
 /** The next `event_types_json` value: unchanged while `eventTypes` is absent (§10.6). */
 function nextEventTypesJson(
   before: string | null,
@@ -48,11 +48,13 @@ function nextEventTypesJson(
 }
 
 /** `PATCH /webhooks/{id}` (§10.6): URL, secret, event-type filter and the `active` switch. */
-export const update = defineOperation<Input, WebhookWire>({
+export const update = defineOperation({
   name: 'webhooks.update',
   description:
     "Changes a webhook's URL, secret or event-type filter, or switches it on or off",
   input: inputSchema,
+  output: webhookWire,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   entity: input => ({ kind: 'webhook', id: input.id }),
   run: async (ctx, input) => {

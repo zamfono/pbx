@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { ownUserId } from '../gates.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
@@ -24,6 +26,8 @@ export const setPresence = defineOperation({
         )
     })
     .strict(),
+  output: z.object({ id: z.string(), dnd: z.boolean() }),
+  problems: [HTTP_NOT_FOUND],
   minRole: 'user',
   scope: ownUserId,
   audit: false,

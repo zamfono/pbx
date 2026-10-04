@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { propagate } from '../propagate.js';
-import { softDelete, softDeleteQuestion } from '../rows.js';
+import { idOutput, softDelete, softDeleteQuestion } from '../rows.js';
 import { defineOperation } from '../types.js';
 import { liveUserGroup } from './_shared.js';
 
@@ -14,6 +16,8 @@ export const deleteUserGroup = defineOperation({
   name: 'userGroups.delete',
   description: 'Soft-deletes a user group.',
   input: z.object({ id: z.string() }).strict(),
+  output: idOutput,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   confirm: async (ctx, input) =>
     softDeleteQuestion(

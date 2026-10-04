@@ -245,6 +245,25 @@ describe('devices', () => {
     );
   });
 
+  it("list answers a user's live devices", async () => {
+    const db = await makeTestDb();
+    const userId = await seedUser(db);
+    const { device } = (await runOperation(
+      db,
+      'devices.create',
+      { userId, label: 'Desk', kind: 'manual' },
+      asRun()
+    )) as CreateOutput;
+    const page = (await runOperation(
+      db,
+      'devices.list',
+      { userId },
+      asRun()
+    )) as { items: { id: string }[]; nextCursor: string | null };
+    expect(page.items.map(item => item.id)).toEqual([device.id]);
+    expect(page.nextCursor).toBeNull();
+  });
+
   it('revealCredentials writes an undoable-0 audit row', async () => {
     const db = await makeTestDb();
     const userId = await seedUser(db);

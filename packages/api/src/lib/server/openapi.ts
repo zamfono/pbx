@@ -1,11 +1,22 @@
-import { PROBLEM_CONTENT_TYPE } from '@zamfono/shared';
+import {
+  HTTP_BAD_REQUEST,
+  HTTP_UNAUTHORIZED,
+  PROBLEM_CONTENT_TYPE
+} from '@zamfono/shared';
 
 import { operationIds, pathParamNames } from './openapiRouteFields.js';
+import {
+  outputJsonSchema,
+  outputMediaTypes,
+  problemStatuses
+} from './ops/publishedOutput.js';
 import {
   inputJsonSchema,
   publishedInputSchema,
   type JsonSchema
 } from './ops/publishedSchema.js';
+import type { ErasedOperation } from './ops/registry.js';
+import type { ProblemStatus } from './ops/types.js';
 import {
   API_PREFIX,
   captureField,
@@ -32,7 +43,7 @@ type OpenApiOperation = {
   requestBody?: { content: Record<string, { schema: JsonSchema }> };
   responses: Record<
     string,
-    { description: string; content?: Record<string, { schema: JsonSchema }> }
+    { description: string; content?: Record<string, { schema?: JsonSchema }> }
   >;
 };
 
@@ -63,9 +74,16 @@ const PROBLEM_SCHEMA: JsonSchema = {
   required: ['title', 'status']
 };
 
-// Every operation can answer any of these through the runner (§10.3 "Confirmation", RBAC, input
-// validation), regardless of its own success shape.
-const PROBLEM_STATUSES = ['401', '403', '404', '409', '422'];
+const PROBLEM_DESCRIPTIONS: Record<ProblemStatus, string> = {
+  400: 'The request body is not a JSON object',
+  401: 'No valid bearer token',
+  403: 'The caller’s role or own scope (§5.3) does not allow it',
+  404: 'What the request names does not exist',
+  409: 'Confirmation required, or the change conflicts with the stored state',
+  422: 'The input is invalid',
+  502: 'An upstream service answered with an error',
+  503: 'A service the operation needs is unavailable'
+};
 
 const BEARER_SECURITY_SCHEME: JsonSchema = {
   type: 'http',
@@ -75,12 +93,12 @@ const BEARER_SECURITY_SCHEME: JsonSchema = {
 
 const OPERATION_IDS = operationIds(routes);
 
-function problemResponse(): {
+function problemResponse(status: ProblemStatus): {
   description: string;
   content: Record<string, { schema: JsonSchema }>;
 } {
   return {
-    description: 'RFC 9457 problem details',
+    description: PROBLEM_DESCRIPTIONS[status],
     content: {
       [PROBLEM_CONTENT_TYPE]: {
         schema: { $ref: '#/components/schemas/Problem' }
@@ -107,16 +125,29 @@ function queryParameters(
     }));
 }
 
-function responses(): OpenApiOperation['responses'] {
-  const entries = PROBLEM_STATUSES.map(
-    status => [status, problemResponse()] as const
-  );
+/**
+ * `op`'s success response, its JSON result or its file in each media type it comes in, and its
+ * problems: the operation's own (`problemStatuses`), 401 for every route behind the bearer token,
+ * and 400 for a JSON body that is no object.
+ */
+function responses(
+  route: RouteEntry,
+  op: ErasedOperation
+): OpenApiOperation['responses'] {
+  const mediaTypes = outputMediaTypes(op);
+  const content = mediaTypes
+    ? Object.fromEntries(mediaTypes.map(mediaType => [mediaType, {}]))
+    : { [JSON_CONTENT_TYPE]: { schema: outputJsonSchema(op) } };
+  const statuses: ProblemStatus[] = [HTTP_UNAUTHORIZED, ...problemStatuses(op)];
+  if (route.method !== 'GET' && !route.multipart) {
+    statuses.push(HTTP_BAD_REQUEST);
+  }
+  const problems = statuses
+    .sort((left, right) => left - right)
+    .map(status => [String(status), problemResponse(status)] as const);
   return {
-    '200': {
-      description: 'Successful response',
-      content: { [JSON_CONTENT_TYPE]: { schema: {} } }
-    },
-    ...Object.fromEntries(entries)
+    '200': { description: 'Successful response', content },
+    ...Object.fromEntries(problems)
   };
 }
 
@@ -154,7 +185,7 @@ function operationFor(route: RouteEntry): OpenApiOperation {
     summary: op.description,
     'x-operation-name': route.op,
     parameters,
-    responses: responses()
+    responses: responses(route, op)
   };
   if (route.method === 'GET') {
     return {
@@ -176,7 +207,7 @@ function operationFor(route: RouteEntry): OpenApiOperation {
 
 /**
  * The OpenAPI 3.1 document served at `/api/v1/openapi.json` (§10.3): every route of the table
- * appears, with its operation's zod-derived JSON Schema.
+ * appears, with its operation's zod-derived JSON Schemas of input and output.
  */
 export function buildOpenApiDocument(): OpenApiDocument {
   const paths: OpenApiDocument['paths'] = {};

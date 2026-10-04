@@ -8,13 +8,14 @@ import {
   decodeOffsetCursor,
   keysetPage,
   offsetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { ownActingUser } from '../gates.js';
 import { instantInput, tenantInstantReader } from '../instantInput.js';
 import { defineOperation } from '../types.js';
-import { ownCallWhere, toCallOut } from './_shared.js';
+import { callOut, ownCallWhere, toCallOut } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -59,7 +60,22 @@ const inputSchema = z
 type Input = z.infer<typeof inputSchema>;
 
 /** A live call as `calls.list` answers it: `connectedUserIds` is `api`'s own to check. */
-function listedLiveCall(call: LiveCall): Omit<LiveCall, 'connectedUserIds'> {
+const liveCallOut = z.object({
+  callId: z.string(),
+  direction: z.enum(CALL_DIRECTIONS),
+  from: z.string(),
+  to: z.string(),
+  state: z.enum(['ringing', 'up']),
+  startedAt: z.string(),
+  ringGroupId: z.string().nullable(),
+  userIds: z
+    .array(z.string())
+    .describe(
+      'The users the call concerns now: caller, callee, answerer and every user it rings.'
+    )
+});
+
+function listedLiveCall(call: LiveCall): z.infer<typeof liveCallOut> {
   const {
     callId,
     direction,
@@ -115,6 +131,7 @@ export const list = defineOperation({
   name: 'calls.list',
   description: 'Lists call history, or the calls currently in progress.',
   input: inputSchema,
+  output: pageOutput(z.union([callOut, liveCallOut])),
   minRole: 'user',
   scope: ownActingUser,
   readOnly: true,

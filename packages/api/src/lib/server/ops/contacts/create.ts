@@ -6,6 +6,7 @@ import { recordChange } from '../audit.js';
 import { defineOperation } from '../types.js';
 import {
   contactFields,
+  contactOut,
   replacePhones,
   tenantCountry,
   toContactOut,
@@ -19,6 +20,7 @@ export const createContact = defineOperation({
   description:
     'Adds a contact to the tenant-wide phone book; its numbers name inbound callers.',
   input: contactInputSchema,
+  output: contactOut,
   minRole: 'admin',
   entity: (_input, out: ContactOut) => ({ kind: 'contact', id: out.id }),
   run: async (ctx, input) => {

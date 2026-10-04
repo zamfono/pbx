@@ -3,23 +3,24 @@ import { z } from 'zod';
 
 import { HTTP_UNPROCESSABLE_CONTENT, type Db, type DB } from '@zamfono/shared';
 
-import { targetSpecSchema, type TargetSpec } from '../forwardTargetSchema.js';
+import { targetSpecSchema } from '../forwardTargetSchema.js';
 import { liveRow } from '../rows.js';
-import { inScope, type ScopeInput } from '../scope.js';
+import { inScope, scopeInputSchema, type ScopeInput } from '../scope.js';
 import { OpError, type Context } from '../types.js';
 
 export type OooRuleRow = Selectable<DB['oooRules']>;
 
-/** An out-of-office rule as `ooo.create` and `ooo.update` return it (§10.2 "Out of office"). */
-export type OooRuleOut = {
-  id: string;
-  scope: ScopeInput;
-  active: boolean;
-  startsAt: string | null;
-  expiresAt: string | null;
-  target: TargetSpec;
-  createdAt: string;
-};
+/** An out-of-office rule as the `ooo` operations return it (§10.2 "Out of office"). */
+export const oooRuleOut = z.object({
+  id: z.string(),
+  scope: scopeInputSchema,
+  active: z.boolean(),
+  startsAt: z.string().nullable(),
+  expiresAt: z.string().nullable(),
+  target: targetSpecSchema,
+  createdAt: z.string()
+});
+export type OooRuleOut = z.infer<typeof oooRuleOut>;
 
 /**
  * `startsAt`/`expiresAt` on input: ISO-8601, any offset (clients send local time), normalized to

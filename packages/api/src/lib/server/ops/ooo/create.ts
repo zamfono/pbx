@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { newId } from '@zamfono/shared';
+import { HTTP_NOT_FOUND, newId } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { createTarget } from '../forwardTargets.js';
@@ -17,6 +17,7 @@ import {
   assertNoOverlap,
   normalizeIsoOrNull,
   oooFields,
+  oooRuleOut,
   type OooRuleOut
 } from './_shared.js';
 
@@ -24,17 +25,17 @@ const inputSchema = z
   .object({ scope: scopeInputSchema, ...oooFields })
   .strict();
 
-type Input = z.infer<typeof inputSchema>;
-
 /**
  * `POST /users/{id}/ooo`, `/ringGroups/{id}/ooo`, `/menus/{id}/ooo`, `/tenant/ooo` (§10.2 "Out of
  * office"): a scheduled absence and the forward target it applies while in effect.
  */
-export const create = defineOperation<Input, OooRuleOut>({
+export const create = defineOperation({
   name: 'ooo.create',
   description:
     "Adds an out-of-office rule to a scope: while in effect, its calls go to the rule's target, ahead of opening hours",
   input: inputSchema,
+  output: oooRuleOut,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'user',
   scope: ownScopeInput,
   entity: (_input, output: OooRuleOut) => ({ kind: 'oooRule', id: output.id }),

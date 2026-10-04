@@ -1,23 +1,24 @@
 import type { Selectable, Updateable } from 'kysely';
+import { z } from 'zod';
 
 import {
+  CALL_LOG_LEVELS,
   codecsColumn,
+  codecsSchema,
   emergencyNumbersColumn,
+  emergencyNumbersSchema,
   featureCodesColumn,
+  featureCodesSchema,
   HTTP_FORBIDDEN,
-  type CallLogLevel,
-  type Codec,
-  type CountryCode,
+  LANGUAGES,
+  SMTP_SECURITIES,
+  SSO_PROVIDERS,
   type Db,
   type DB,
-  type FeatureCodes,
-  type Language,
-  type SmtpSecurity,
-  type SsoProvider,
   type UserRole
 } from '@zamfono/shared';
 
-import { type TargetSpec } from '../forwardTargetSchema.js';
+import { targetSpecSchema } from '../forwardTargetSchema.js';
 import { resolveOptionalTarget } from '../forwardTargetSpec.js';
 import { OpError } from '../types.js';
 import type { SettingsInput } from './_input.js';
@@ -31,47 +32,48 @@ export type SettingsColumns = Updateable<DB['settings']>;
  * `ringotelOrgId` and `ringotelBranchId` included, except the `*_pending` state columns. A 🔒
  * secret is never returned: its read-only `<name>Set` says whether one is stored (§10.3).
  */
-export type SettingsWire = {
-  companyName: string;
-  mainDidId: string;
-  country: CountryCode;
-  timezone: string | null;
-  language: Language;
-  smtpHost: string | null;
-  smtpPort: number;
-  smtpSecurity: SmtpSecurity;
-  smtpUser: string | null;
-  smtpPasswordSet: boolean;
-  mailFrom: string | null;
-  extLength: number;
-  emergencyNumbers: string[];
-  featureCodes: FeatureCodes;
-  fallbackTarget: TargetSpec | null;
-  codecs: Codec[];
-  clir: boolean;
-  rejectAnonymous: boolean;
-  holdMohAudioId: string | null;
-  voicemailMaxS: number;
-  parkingTimeoutS: number;
-  callLogLevel: CallLogLevel;
-  recordingRetentionDays: number;
-  softDeleteRetentionDays: number;
-  auditRetentionDays: number | null;
-  backupCron: string;
-  tlsReloadHour: number | null;
-  autoUpdate: boolean;
-  ssoProvider: SsoProvider | null;
-  ssoLabel: string | null;
-  ssoIssuer: string | null;
-  ssoClientId: string | null;
-  ssoTenantId: string | null;
-  ssoAllowedDomain: string | null;
-  ssoClientSecretSet: boolean;
-  ringotelOrgId: string | null;
-  ringotelBranchId: string | null;
-  ringotelMaxRegs: number;
-  ringotelApiTokenSet: boolean;
-};
+export const settingsWire = z.object({
+  companyName: z.string(),
+  mainDidId: z.string(),
+  country: z.string(),
+  timezone: z.string().nullable(),
+  language: z.enum(LANGUAGES),
+  smtpHost: z.string().nullable(),
+  smtpPort: z.number(),
+  smtpSecurity: z.enum(SMTP_SECURITIES),
+  smtpUser: z.string().nullable(),
+  smtpPasswordSet: z.boolean(),
+  mailFrom: z.string().nullable(),
+  extLength: z.number(),
+  emergencyNumbers: emergencyNumbersSchema,
+  featureCodes: featureCodesSchema,
+  fallbackTarget: targetSpecSchema.nullable(),
+  codecs: codecsSchema,
+  clir: z.boolean(),
+  rejectAnonymous: z.boolean(),
+  holdMohAudioId: z.string().nullable(),
+  voicemailMaxS: z.number(),
+  parkingTimeoutS: z.number(),
+  callLogLevel: z.enum(CALL_LOG_LEVELS),
+  recordingRetentionDays: z.number(),
+  softDeleteRetentionDays: z.number(),
+  auditRetentionDays: z.number().nullable(),
+  backupCron: z.string(),
+  tlsReloadHour: z.number().nullable(),
+  autoUpdate: z.boolean(),
+  ssoProvider: z.enum(SSO_PROVIDERS).nullable(),
+  ssoLabel: z.string().nullable(),
+  ssoIssuer: z.string().nullable(),
+  ssoClientId: z.string().nullable(),
+  ssoTenantId: z.string().nullable(),
+  ssoAllowedDomain: z.string().nullable(),
+  ssoClientSecretSet: z.boolean(),
+  ringotelOrgId: z.string().nullable(),
+  ringotelBranchId: z.string().nullable(),
+  ringotelMaxRegs: z.number(),
+  ringotelApiTokenSet: z.boolean()
+});
+export type SettingsWire = z.infer<typeof settingsWire>;
 
 /** Fields only an owner may write (👑, §11.4); every other writable field is admin's. */
 export const OWNER_FIELDS: ReadonlySet<keyof SettingsInput> = new Set([

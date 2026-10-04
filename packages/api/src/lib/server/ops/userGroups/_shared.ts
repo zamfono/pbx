@@ -1,9 +1,14 @@
 import type { Selectable, Transaction } from 'kysely';
+import { z } from 'zod';
 
 import { type DB } from '@zamfono/shared';
 
 import { assertNoLiveHolder } from '../liveHolder.js';
-import { assertMembersValid, type MemberSpec } from '../members.js';
+import {
+  assertMembersValid,
+  memberSchema,
+  type MemberSpec
+} from '../members.js';
 import { liveRow } from '../rows.js';
 import { assertNoCycle, loadEdgesExcludingParent } from './_nesting.js';
 
@@ -33,12 +38,13 @@ export async function assertNameAvailable(
   );
 }
 
-export type UserGroupMemberOut = { kind: 'user' | 'userGroup'; id: string };
-export type UserGroupOut = {
-  id: string;
-  name: string;
-  members: UserGroupMemberOut[];
-};
+/** A user group's wire shape (§10.3), as `toUserGroupOut` assembles it. */
+export const userGroupOut = z.object({
+  id: z.string(),
+  name: z.string(),
+  members: z.array(memberSchema)
+});
+export type UserGroupOut = z.infer<typeof userGroupOut>;
 
 /**
  * Replaces a user group's direct user members and nested child groups as a whole (§10.3 "User
@@ -105,7 +111,7 @@ export async function replaceMembers(
 export async function userGroupMembers(
   db: Transaction<DB>,
   groupId: string
-): Promise<UserGroupMemberOut[]> {
+): Promise<MemberSpec[]> {
   const [users, groups] = await Promise.all([
     db
       .selectFrom('userGroupUsers as ugu')

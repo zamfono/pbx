@@ -1,4 +1,5 @@
 import type { Transaction } from 'kysely';
+import { z } from 'zod';
 
 import {
   RING_GROUP_FORWARD_CONDITIONS,
@@ -6,8 +7,30 @@ import {
   type RingGroupForwardCondition
 } from '@zamfono/shared';
 
-import { type TargetSpec } from '../forwardTargetSchema.js';
+import { targetSpecSchema, type TargetSpec } from '../forwardTargetSchema.js';
 import { rowToTarget } from '../forwardTargetSpec.js';
+
+const forwardingRuleSchema = z.object({
+  condition: z
+    .enum(RING_GROUP_FORWARD_CONDITIONS)
+    .describe(
+      'unanswered: rang and nobody answered; unavailable: no ringable member, fires without ringing and falls to unanswered without this rule.'
+    ),
+  target: targetSpecSchema
+});
+
+/** A ring group's forwarding rules (§10.3 "Ring groups"), as `ringGroups.setForwarding` takes
+ * them and both forwarding operations return them. */
+export const ringGroupForwardingSchema = z
+  .object({
+    id: z.string(),
+    rules: z
+      .array(forwardingRuleSchema)
+      .describe(
+        "The group's rules, one per condition; without an unanswered rule the call goes to the group's mailbox, else is rejected."
+      )
+  })
+  .strict();
 
 /** One stored rule: the wire rule `ringGroups.getForwarding` returns, plus the target row it owns. */
 export type StoredRingGroupForwardRule = {

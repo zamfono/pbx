@@ -45,6 +45,27 @@ describe('menus', () => {
     });
   });
 
+  it('list returns the live menus, a page with no next cursor', async () => {
+    const db = await makeTestDb();
+    const audioId = await seedAudio(db);
+    await runOperation(
+      db,
+      'menus.create',
+      {
+        name: 'Main menu',
+        audioId,
+        fallbackTarget: { kind: 'external', external: '+490000000' }
+      },
+      asRun()
+    );
+    const page = (await runOperation(db, 'menus.list', {}, asRun())) as {
+      items: { name: string }[];
+      nextCursor: string | null;
+    };
+    expect(page.items.map(menu => menu.name)).toEqual(['Main menu']);
+    expect(page.nextCursor).toBeNull();
+  });
+
   it('refuses to create a menu whose name is already used by another live menu', async () => {
     const db = await makeTestDb();
     const audioId = await seedAudio(db);

@@ -1,11 +1,16 @@
 import {
   decodeIdCursor,
   keysetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
-import { ringGroupIdsForUser, toVoicemailOut } from './_shared.js';
+import {
+  ringGroupIdsForUser,
+  toVoicemailOut,
+  voicemailOut
+} from './_shared.js';
 
 const inputSchema = pageInput.strict();
 
@@ -18,6 +23,7 @@ export const list = defineOperation({
   description:
     "Lists voicemails newest first: a user's own mailbox and their ring groups', every mailbox for an admin.",
   input: inputSchema,
+  output: pageOutput(voicemailOut),
   minRole: 'user',
   scope: 'any',
   readOnly: true,

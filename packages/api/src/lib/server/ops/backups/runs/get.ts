@@ -4,7 +4,7 @@ import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
 import { defineOperation, OpError } from '#lib/server/ops/types.js';
 
-import { runToWire } from '../_shared.js';
+import { backupRunWire, runToWire } from '../_shared.js';
 
 const inputSchema = z.object({ id: z.string() }).strict();
 
@@ -13,6 +13,8 @@ export const runsGet = defineOperation({
   name: 'backups.runs.get',
   description: "Reads one backup run's status, snapshot id and sizes",
   input: inputSchema,
+  output: backupRunWire,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

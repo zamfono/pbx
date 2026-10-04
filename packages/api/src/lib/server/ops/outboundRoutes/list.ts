@@ -1,25 +1,21 @@
-import { z } from 'zod';
-
 import {
   decodeOffsetCursor,
   offsetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
-import { loadRouteChildren, routeToWire, type RouteWire } from './_shared.js';
-
-const inputSchema = pageInput.strict();
-type Input = z.infer<typeof inputSchema>;
-type Output = { items: RouteWire[]; nextCursor: string | null };
+import { loadRouteChildren, routeToWire, routeWire } from './_shared.js';
 
 /** `GET /outboundRoutes` (§10.3): live routes in evaluation order (§9.4), offset-cursor paginated
  *  like every list endpoint (§10.3 "Conventions"). */
-export const list = defineOperation<Input, Output>({
+export const list = defineOperation({
   name: 'outboundRoutes.list',
   description:
     'Lists outbound routes in evaluation order, each with its callers and numbers.',
-  input: inputSchema,
+  input: pageInput.strict(),
+  output: pageOutput(routeWire),
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

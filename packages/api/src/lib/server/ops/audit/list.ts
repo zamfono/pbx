@@ -1,16 +1,18 @@
 import { z } from 'zod';
 
+import { AUDIT_CHANNELS } from '@zamfono/shared';
+
 import {
   decodeIdCursor,
   keysetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { instantInput, tenantInstantReader } from '../instantInput.js';
 import { defineOperation } from '../types.js';
-import { toAuditEntryOut } from './_shared.js';
+import { auditEntryOut, toAuditEntryOut } from './_shared.js';
 
-const CHANNELS = ['rest', 'mcp', 'ui', 'undo', 'job'] as const;
 const STATES = ['live', 'undone', 'all'] as const;
 
 const inputSchema = z
@@ -30,7 +32,7 @@ const inputSchema = z
       .optional()
       .describe('Only entries made by this user.'),
     channel: z
-      .enum(CHANNELS)
+      .enum(AUDIT_CHANNELS)
       .optional()
       .describe(
         'Only entries that arrived over this channel; undo marks an audit.undo, job a scheduled job.'
@@ -74,6 +76,7 @@ export const list = defineOperation({
   description:
     'Lists audit_log entries, filterable by entity, actor, channel, client, operation, time range and state.',
   input: inputSchema,
+  output: pageOutput(auditEntryOut),
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

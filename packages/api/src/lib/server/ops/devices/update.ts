@@ -1,11 +1,15 @@
 import { z } from 'zod';
 
-import { allowedIpsColumn, HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+import {
+  allowedIpsColumn,
+  HTTP_NOT_FOUND,
+  HTTP_UNPROCESSABLE_CONTENT
+} from '@zamfono/shared';
 
 import { recordFieldChanges } from '../audit.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, OpError } from '../types.js';
-import { liveDevice, ownTlsDevice, toDeviceOut } from './_shared.js';
+import { deviceOut, liveDevice, ownTlsDevice, toDeviceOut } from './_shared.js';
 import { assertNonEmptyIps, assertValidIps } from './_transportPolicy.js';
 
 const inputSchema = z
@@ -27,6 +31,8 @@ export const update = defineOperation({
   description:
     "Updates a device's label or, for a plain device, its IP allowlist.",
   input: inputSchema,
+  output: z.object({ device: deviceOut }),
+  problems: [HTTP_NOT_FOUND],
   minRole: 'user',
   scope: ownTlsDevice,
   entity: input => ({ kind: 'device', id: input.id }),

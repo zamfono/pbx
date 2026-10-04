@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import {
+  idOutput,
   liveRow,
   softDelete,
   softDeleteQuestion
@@ -14,6 +17,8 @@ export const targetsDelete = defineOperation({
   name: 'backups.targets.delete',
   description: 'Soft-deletes a backup target; no further run backs up to it',
   input: inputSchema,
+  output: idOutput,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   confirm: async (ctx, input) => {
     const target = await liveRow(

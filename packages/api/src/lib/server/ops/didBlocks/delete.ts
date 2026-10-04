@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { propagate } from '../propagate.js';
-import { softDelete, softDeleteQuestion } from '../rows.js';
+import { idOutput, softDelete, softDeleteQuestion } from '../rows.js';
 import { Conflict, defineOperation } from '../types.js';
 import { liveDidBlock, liveDidsInBlock } from './_shared.js';
 
@@ -12,6 +14,8 @@ export const del = defineOperation({
   name: 'didBlocks.delete',
   description: 'Soft-deletes a number block once no live DID falls within it',
   input: inputSchema,
+  output: idOutput,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   confirm: async (ctx, input) =>
     softDeleteQuestion(

@@ -1,7 +1,7 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import type { Language } from '@zamfono/shared';
+import { LANGUAGES } from '@zamfono/shared';
 
 import { sendMail, type AnyMailRequest } from '#lib/server/mail/index.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
@@ -89,13 +89,18 @@ const SAMPLE_REQUEST_BUILDERS: Record<Input['kind'], SampleRequestBuilder> = {
  * `POST /mailTemplates/{kind}/test` (§10.2 "Templates"): sends the effective template, in the
  * tenant language, to the caller with sample values.
  */
-export const test = defineOperation<
-  Input,
-  { status: 'failed' | 'sent' | 'skipped'; language: Language }
->({
+export const test = defineOperation({
   name: 'mailTemplates.test',
   description: 'Sends a mail template to the caller with sample values',
   input: inputSchema,
+  output: z.object({
+    status: z
+      .enum(['failed', 'sent', 'skipped'])
+      .describe(
+        'sent: the relay accepted the mail; skipped: no relay or no recipient; failed: the relay did not accept it by the last retry.'
+      ),
+    language: z.enum(LANGUAGES)
+  }),
   minRole: 'admin',
   pureAction: true,
   entity: (input, output) => ({

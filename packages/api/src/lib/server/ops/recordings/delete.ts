@@ -1,7 +1,10 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { afterCommit } from '../afterCommit.js';
 import { setUndoable } from '../audit.js';
+import { idOutput } from '../rows.js';
 import { defineOperation } from '../types.js';
 import { deleteRecordingFile, loadRecording } from './_shared.js';
 
@@ -15,6 +18,8 @@ export const deleteRecording = defineOperation({
   name: 'recordings.delete',
   description: 'Permanently deletes a call recording and its audio file.',
   input: inputSchema,
+  output: idOutput,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   confirm: async (ctx, input) => {
     const row = await loadRecording(ctx.db, input.id);

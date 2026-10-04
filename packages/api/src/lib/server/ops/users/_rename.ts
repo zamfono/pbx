@@ -1,4 +1,5 @@
 import { sql } from 'kysely';
+import { z } from 'zod';
 
 import { recordChange } from '../audit.js';
 import { sipUsernameOrFresh } from '../devices/_sipUsername.js';
@@ -11,7 +12,11 @@ import {
 } from './_extensions.js';
 
 /** A device whose SIP username an extension rename moved, as `users.update` reports it (§9.3). */
-export type AffectedDevice = { id: string; sipUsername: string };
+export const affectedDevice = z.object({
+  id: z.string(),
+  sipUsername: z.string()
+});
+export type AffectedDevice = z.infer<typeof affectedDevice>;
 
 /**
  * Renames every live device of `userId` from `e<oldExt>-…` to `e<newExt>-…` and moves the BLF

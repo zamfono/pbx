@@ -4,10 +4,10 @@ import { z } from 'zod';
 import {
   eventTypesColumn,
   eventTypesSchema,
+  WEBHOOK_STATUSES,
   type Db,
   type DB,
-  type EventType,
-  type WebhookStatus
+  type EventType
 } from '@zamfono/shared';
 
 import { liveRow } from '../rows.js';
@@ -40,23 +40,36 @@ export function decodeEventTypes(json: string | null): EventType[] | null {
   return eventTypesColumn.nullable().decode(json);
 }
 
-export type WebhookWire = {
-  id: string;
-  url: string;
-  eventTypes: EventType[] | null;
-  /** Always `true`: a hook's secret is required; the secret itself is write-only (§10.3). */
-  secretSet: true;
-  active: boolean;
-  lastStatus: WebhookStatus | null;
-  lastDeliveryAt: string | null;
-  /** When the hook turned `failing`, and the deliveries failed since; `null` and 0 while not. */
-  failingSince: string | null;
-  failedDeliveries: number;
-  /** Why the last delivery that failed did, such as `HTTP 404` or `timeout`, and when. */
-  lastError: string | null;
-  lastErrorAt: string | null;
-  createdAt: string;
-};
+/** A webhook's wire shape (§10.3, §10.6), as `toWire` assembles it. */
+export const webhookWire = z.object({
+  id: z.string(),
+  url: z.string(),
+  eventTypes: eventTypesSchema.nullable(),
+  secretSet: z
+    .literal(true)
+    .describe(
+      "Always true: a hook's secret is required; the secret itself is write-only."
+    ),
+  active: z.boolean(),
+  lastStatus: z.enum(WEBHOOK_STATUSES).nullable(),
+  lastDeliveryAt: z.string().nullable(),
+  failingSince: z
+    .string()
+    .nullable()
+    .describe('When the hook turned failing; null while it is not.'),
+  failedDeliveries: z
+    .number()
+    .describe('The deliveries failed since failingSince; 0 while not failing.'),
+  lastError: z
+    .string()
+    .nullable()
+    .describe(
+      'Why the last delivery that failed did, such as HTTP 404 or timeout.'
+    ),
+  lastErrorAt: z.string().nullable(),
+  createdAt: z.string()
+});
+export type WebhookWire = z.infer<typeof webhookWire>;
 
 /** `row` as `GET /webhooks` returns it; the secret is write-only, only `secretSet` shows it (§10.3). */
 export function toWire(row: WebhookRow): WebhookWire {

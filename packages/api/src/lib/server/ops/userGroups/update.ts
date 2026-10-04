@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_CONFLICT, HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { recordChange, recordFieldChanges } from '../audit.js';
 import { memberSchema } from '../members.js';
 import { propagate } from '../propagate.js';
@@ -9,7 +11,8 @@ import {
   liveUserGroup,
   replaceMembers,
   toUserGroupOut,
-  userGroupMembers
+  userGroupMembers,
+  userGroupOut
 } from './_shared.js';
 
 export const updateUserGroupInput = z
@@ -29,6 +32,8 @@ export const updateUserGroup = defineOperation({
   name: 'userGroups.update',
   description: "Updates a user group's name and nested membership.",
   input: updateUserGroupInput,
+  output: userGroupOut,
+  problems: [HTTP_NOT_FOUND, HTTP_CONFLICT],
   minRole: 'admin',
   entity: input => ({ kind: 'userGroup', id: input.id }),
   run: async (ctx, input) => {

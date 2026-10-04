@@ -1,47 +1,29 @@
-import { z } from 'zod';
-
 import {
+  HTTP_NOT_FOUND,
   HTTP_UNPROCESSABLE_CONTENT,
-  RING_GROUP_FORWARD_CONDITIONS,
   type RingGroupForwardCondition
 } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
-import { targetSpecSchema } from '../forwardTargetSchema.js';
 import {
   deleteForwardTarget,
   insertForwardTarget
 } from '../forwardTargetSpec.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, OpError } from '../types.js';
-import { storedRingGroupForwardRules } from './_forwarding.js';
+import {
+  ringGroupForwardingSchema,
+  storedRingGroupForwardRules
+} from './_forwarding.js';
 import { liveRingGroup } from './_shared.js';
-
-const forwardingRuleSchema = z.object({
-  condition: z
-    .enum(RING_GROUP_FORWARD_CONDITIONS)
-    .describe(
-      'unanswered: rang and nobody answered; unavailable: no ringable member, fires without ringing and falls to unanswered without this rule.'
-    ),
-  target: targetSpecSchema
-});
-
-export const setRingGroupForwardingInput = z
-  .object({
-    id: z.string(),
-    rules: z
-      .array(forwardingRuleSchema)
-      .describe(
-        "The group's rules, one per condition; without an unanswered rule the call goes to the group's mailbox, else is rejected."
-      )
-  })
-  .strict();
 
 export const setRingGroupForwarding = defineOperation({
   name: 'ringGroups.setForwarding',
   description:
     "Replaces a ring group's 'unanswered' and 'unavailable' forwarding rules as a whole.",
-  input: setRingGroupForwardingInput,
+  input: ringGroupForwardingSchema,
+  output: ringGroupForwardingSchema,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   entity: input => ({ kind: 'ringGroup', id: input.id }),
   run: async (ctx, input) => {

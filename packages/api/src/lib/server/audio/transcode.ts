@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
-import { BinaryResult } from '../binaryResult.js';
+import { binaryOutput, BinaryResult } from '../binaryResult.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -51,6 +51,12 @@ export async function transcodeForDownload(
 }
 
 export type DownloadFormat = 'opus' | 'mp3';
+
+/** The `output` of an operation answering with `downloadAudio`: the WAV or a transcode. */
+export const downloadAudioOutput = binaryOutput([
+  'audio/wav',
+  ...Object.values(CONTENT_TYPE_BY_FORMAT)
+]);
 
 /**
  * The audio file at `filePath` for download (§10.3, §11.6): the stored WAV as-is with no

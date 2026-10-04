@@ -10,6 +10,7 @@ import {
 import { recordRevert } from '../audit.js';
 import { OUTCOME_OPERATIONS } from '../outcomeLog.js';
 import { registry } from '../registry.js';
+import { idOutput } from '../rows.js';
 import { Conflict, defineOperation, OpError, type Context } from '../types.js';
 import { isTenantListOperation, revertTenantList } from './_listReverts.js';
 import { ENTITY_TABLES } from './_shared.js';
@@ -159,6 +160,8 @@ export const undo = defineOperation({
       id: z.string().describe('The audit entry to revert, from audit.list.')
     })
     .strict(),
+  output: idOutput,
+  problems: [HTTP_NOT_FOUND, HTTP_CONFLICT],
   minRole: 'admin',
   run: async (ctx, input) => {
     const entry = await loadUndoableEntry(ctx, input.id);

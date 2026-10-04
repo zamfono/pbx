@@ -1,7 +1,14 @@
 import type { ExpressionBuilder, Selectable, Transaction } from 'kysely';
 import { z } from 'zod';
 
-import { type CallDirection, type CallStatus, type DB } from '@zamfono/shared';
+import {
+  CALL_DIRECTIONS,
+  CALL_STATUSES,
+  HTTP_CONFLICT,
+  HTTP_NOT_FOUND,
+  QOS_ROLES,
+  type DB
+} from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { coreRefusal } from '#lib/server/coreHttp.js';
@@ -29,41 +36,55 @@ export function dialTargetInput(verb: string): z.ZodString {
     );
 }
 
-export type CallOut = {
-  id: string;
-  parentCallId: string | null;
-  direction: CallDirection;
-  fromUri: string;
-  toUri: string;
-  didId: string | null;
-  callerUserId: string | null;
-  calleeUserId: string | null;
-  ringGroupId: string | null;
-  answeredByUserId: string | null;
-  status: CallStatus;
-  startedAt: string;
-  answeredAt: string | null;
-  endedAt: string | null;
-};
+/** A call of the history, as `calls.list` lists it (§10.3 "Call history"). */
+export const callOut = z.object({
+  id: z.string(),
+  parentCallId: z.string().nullable(),
+  direction: z.enum(CALL_DIRECTIONS),
+  fromUri: z.string(),
+  toUri: z.string(),
+  didId: z.string().nullable(),
+  callerUserId: z.string().nullable(),
+  calleeUserId: z.string().nullable(),
+  ringGroupId: z.string().nullable(),
+  answeredByUserId: z.string().nullable(),
+  status: z.enum(CALL_STATUSES),
+  startedAt: z.string(),
+  answeredAt: z.string().nullable(),
+  endedAt: z.string().nullable()
+});
+export type CallOut = z.infer<typeof callOut>;
 
 /** One `call_qos` row, the per-leg RTCP summary of a call at diagnostics level `qos` (§7, §11.2).
  * `rxPackets` and `txPackets` are the packets the leg's RTP instance received from the peer and
  * sent to it: 0 received on an answered leg means no audio arrived from that side. */
-export type CallQosOut = {
-  channelId: string;
-  role: string;
-  jitterMs: number | null;
-  lossPct: number | null;
-  rttMs: number | null;
-  rxPackets: number | null;
-  txPackets: number | null;
-};
+const callQosOut = z.object({
+  channelId: z.string(),
+  role: z.enum(QOS_ROLES),
+  jitterMs: z.number().nullable(),
+  lossPct: z.number().nullable(),
+  rttMs: z.number().nullable(),
+  rxPackets: z.number().nullable(),
+  txPackets: z.number().nullable()
+});
 
 /** A call with the §7 diagnostics it recorded: its `calls.log` and its per-leg `call_qos` rows. */
-export type CallDetailOut = CallOut & {
-  log: string | null;
-  qos: CallQosOut[];
-};
+export const callDetailOut = callOut.extend({
+  log: z.string().nullable(),
+  qos: z.array(callQosOut)
+});
+export type CallDetailOut = z.infer<typeof callDetailOut>;
+
+/** The `output` of an action on the live call `id`. */
+export const callActionOutput = z.object({ id: z.string() });
+
+/** The `output` of an action that dialled a new call into the live call `id`: its own `callId`. */
+export const dialledCallOutput = callActionOutput.extend({
+  callId: z.string()
+});
+
+/** The problems `proxyCallAction` turns `core`'s refusals into, besides the input's 422. */
+export const CALL_ACTION_PROBLEMS = [HTTP_NOT_FOUND, HTTP_CONFLICT] as const;
 
 /** A `calls` row's list wire shape; `calls.get` carries the diagnostics of one call on top. */
 export function toCallOut(row: CallRow): CallOut {

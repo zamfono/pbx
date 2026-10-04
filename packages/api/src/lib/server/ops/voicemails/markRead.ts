@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { defineOperation } from '../types.js';
 import {
   loadVoicemail,
@@ -27,6 +29,8 @@ export const markRead = defineOperation({
   name: 'voicemails.markRead',
   description: 'Marks a voicemail read or unread.',
   input: inputSchema,
+  output: z.object({ id: z.string(), read: z.boolean() }),
+  problems: [HTTP_NOT_FOUND],
   minRole: 'user',
   scope: ownVoicemail,
   audit: false,

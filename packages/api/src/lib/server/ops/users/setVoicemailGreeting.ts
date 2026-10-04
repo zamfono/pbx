@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { retireGreeting } from '@zamfono/shared';
+import { HTTP_NOT_FOUND, retireGreeting } from '@zamfono/shared';
 
 import { deleteAudioFile, storeAudio } from '#lib/server/audio/store.js';
 
@@ -31,6 +31,8 @@ export const setVoicemailGreeting = defineOperation({
       )
     })
     .strict(),
+  output: z.object({ id: z.string(), mailboxAudioId: z.string() }),
+  problems: [HTTP_NOT_FOUND],
   minRole: 'user',
   scope: ownUserId,
   audit: false,

@@ -95,6 +95,25 @@ describe('didBlocks', () => {
     ).rejects.toThrow(Conflict);
   });
 
+  it('deletes a block with no live DID inside it', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    const created = (await runOperation(
+      db,
+      'didBlocks.create',
+      { base: '+49891234', digits: 2 },
+      asRun()
+    )) as { id: string };
+    await expect(
+      runOperation(
+        db,
+        'didBlocks.delete',
+        { id: created.id },
+        asRun({ confirm: true })
+      )
+    ).resolves.toEqual({ id: created.id });
+  });
+
   it('the soft-delete guard trigger holds when the operation check is bypassed', async () => {
     const db = await makeTestDb();
     await seedSettings(db);

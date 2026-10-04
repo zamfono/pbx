@@ -1,9 +1,6 @@
-import { z } from 'zod';
-
-import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+import { HTTP_NOT_FOUND, HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
-import { targetSpecSchema } from '../forwardTargetSchema.js';
 import {
   deleteForwardTarget,
   insertForwardTarget,
@@ -11,24 +8,15 @@ import {
 } from '../forwardTargetSpec.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, OpError } from '../types.js';
-import { digitsSchema, liveMenu } from './_shared.js';
-
-export const setMenuTargetsInput = z
-  .object({
-    id: z.string(),
-    targets: z
-      .array(z.object({ digits: digitsSchema, target: targetSpecSchema }))
-      .describe(
-        'Each key string and the forward target it routes to; a matched target re-enters routing without counting a hop.'
-      )
-  })
-  .strict();
+import { liveMenu, menuTargetsSchema } from './_shared.js';
 
 /** `PUT /menus/{id}/targets` (§10.3): replaces a menu's DTMF map as a whole. */
 export const setMenuTargets = defineOperation({
   name: 'menus.setTargets',
   description: "Replaces a menu's DTMF-to-target map as a whole.",
-  input: setMenuTargetsInput,
+  input: menuTargetsSchema,
+  output: menuTargetsSchema,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   entity: input => ({ kind: 'menu', id: input.id }),
   run: async (ctx, input) => {

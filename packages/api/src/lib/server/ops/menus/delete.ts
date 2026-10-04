@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { propagate } from '../propagate.js';
-import { softDelete, softDeleteQuestion } from '../rows.js';
+import { idOutput, softDelete, softDeleteQuestion } from '../rows.js';
 import { Conflict, defineOperation } from '../types.js';
 import { findMenuReferences } from './_references.js';
 import { liveMenu } from './_shared.js';
@@ -10,6 +12,8 @@ export const deleteMenu = defineOperation({
   name: 'menus.delete',
   description: 'Soft-deletes a menu.',
   input: z.object({ id: z.string() }).strict(),
+  output: idOutput,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   confirm: async (ctx, input) =>
     softDeleteQuestion(

@@ -1,7 +1,11 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { HTTP_CONFLICT, HTTP_NOT_FOUND } from '@zamfono/shared';
+import {
+  HTTP_BAD_GATEWAY,
+  HTTP_CONFLICT,
+  HTTP_NOT_FOUND
+} from '@zamfono/shared';
 
 import {
   createRingotelClient,
@@ -18,6 +22,7 @@ import {
   createConnection,
   followPackageMaxRegs,
   organizationParams,
+  ringotelIdsOut,
   stackBranchAddress,
   storeRingotelIds
 } from './ringotelConnection.js';
@@ -44,7 +49,6 @@ const inputSchema = z
   .strict();
 
 type Input = z.infer<typeof inputSchema>;
-type Output = { ringotelOrgId: string; ringotelBranchId: string };
 
 /**
  * The organization `input` names, by its id and its domain together: the account's key reaches
@@ -130,11 +134,13 @@ async function adoptConnection(
  * while it has no users; it points the named connection, or a new one, at this stack, writes the
  * organization's `params` as setup does, then stores the ids exactly as setup does.
  */
-export const ringotelAdopt = defineOperation<Input, Output>({
+export const ringotelAdopt = defineOperation({
   name: 'provisioning.ringotelAdopt',
   description:
     'Adopts an existing, empty Ringotel organization (by id and domain) and one of its connections, or a new one, instead of creating them.',
   input: inputSchema,
+  output: ringotelIdsOut,
+  problems: [HTTP_NOT_FOUND, HTTP_BAD_GATEWAY],
   minRole: 'owner',
   confirm: (_ctx, input) =>
     `Adopt Ringotel organization ${input.domain} and point ${input.branchId === undefined ? 'a new connection' : `connection ${input.branchId}`} at this stack?`,

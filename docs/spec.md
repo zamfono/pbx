@@ -1224,6 +1224,8 @@ type Operation<In, Out> = {
   name: string                         // e.g. 'users.update' — stored as audit_log.operation; the MCP tool name
   description: string                  // one line; the MCP tool description and the OpenAPI summary
   input: ZodType<In>                   // validation, OpenAPI, MCP tool schema
+  output: ZodType<Out>                 // the result on the wire: the OpenAPI response, the MCP tool's outputSchema
+  problems?: ProblemStatus[]           // the problem statuses run answers with besides the runner's (422, 403, 409)
   minRole: 'owner' | 'admin' | 'user'
   scope: 'any' | ((ctx: Context, input: In) => Promise<boolean>)   // required with minRole 'user': whether what the input names is a user's own (§5.3)
   readOnly?: boolean                   // true for reads; the MCP readOnlyHint, so clients need not confirm them
@@ -1350,7 +1352,7 @@ Conventions: one casing on the wire, camelCase, for every name a client sees: pa
 - A secret (every `*_enc` column: the 🔒 settings, a trunk's `password`, a webhook's and a backup target's `secret`) is never returned; a read carries the read-only boolean `<name>Set` instead (`smtpPasswordSet`, `passwordSet`, `secretSet`), saying whether one is stored. A write treats it as a merge patch: omitted keeps it, `null` clears it (422 where the secret is required), a string sets it, whatever the string.
 - List endpoints paginate with `?limit=` (default 50, at most 200, more is refused with 422) and an opaque `?cursor=` and return `{ items, nextCursor }`, every list the same cursor form; a cursor the list did not hand out is refused with 422; errors are RFC 9457 `application/problem+json`.
 
-An **OpenAPI 3.1 document** is generated from the REST route table and the operations' zod schemas (JSON Schema export) and served at `/api/v1/openapi.json` — the same schemas drive request validation, remote-function validation and the MCP tool definitions (§10.5).
+An **OpenAPI 3.1 document** is generated from the REST route table and the operations' zod schemas (JSON Schema export) and served at `/api/v1/openapi.json` — the same schemas drive request validation, remote-function validation and the MCP tool definitions (§10.5). Each operation's responses are its `output` (a list's `{ items, nextCursor }` page, a file's bytes in each media type it comes in) and the problem statuses it answers with: its own `problems`, 422, 403 above role `user` or with an own scope, 409 with `confirm`, 401 for a missing token and 400 for a JSON body that is no object.
 
 ### 10.4 Device provisioning (modular)
 
@@ -1444,7 +1446,7 @@ Everything longer sits behind the read-only tool `zamfono.help(topic)`, which re
 
 **Prompts.** The recipes are also published as MCP prompts through `prompts/list`, one per recipe with its parameters, for clients that surface prompts in their UI.
 
-**Tools** derive from the operation registry (§10.3): the operation's `name` is the tool name, its `description` the tool description, its `input` schema exported as JSON Schema the tool input schema, `readOnly` the tool's `readOnlyHint`, and the presence of `confirm` its `destructiveHint`. Tool handlers invoke the operation itself, so validation, RBAC and auditing behave exactly as for REST. Coverage: read tools for active calls, call history, trunk and registration status, voicemails and config inspection, and mutating tools for the full configuration surface.
+**Tools** derive from the operation registry (§10.3): the operation's `name` is the tool name, its `description` the tool description, its `input` schema exported as JSON Schema the tool input schema, its `output` schema the tool's `outputSchema` where it is an object (for a file or an upload, the link's `{ url, expiresAt }`), `readOnly` the tool's `readOnlyHint`, and the presence of `confirm` its `destructiveHint`. Tool handlers invoke the operation itself, so validation, RBAC and auditing behave exactly as for REST. Coverage: read tools for active calls, call history, trunk and registration status, voicemails and config inspection, and mutating tools for the full configuration surface.
 
 **Audio.** `voicemails.audio` and `recordings.audio` return `{ url, expiresAt }` over MCP, not the file: MCP clients do nothing with audio content. `url` is the operation's REST endpoint with the call's `format`, if any, and an `access_token` query parameter (RFC 6750 §2.3), so it opens without the session's bearer token, in a browser or a player. The token is an HS256 JWT signed with `JWT_SECRET`, its `typ` `download+jwt` setting it apart from an access token, so neither is accepted in place of the other; it names the tool call's user and OAuth client, its `aud` is the endpoint's path, the one file it opens, and it expires five minutes after the call (`expiresAt`). The download acts as that user, with the role they hold at that moment (§5.3), and its response carries `Cache-Control: private`, as RFC 6750 §2.3 asks of a token in the URI.
 

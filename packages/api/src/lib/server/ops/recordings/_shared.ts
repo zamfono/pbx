@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import * as env from '$app/env/private';
 import type { Selectable, Transaction } from 'kysely';
+import { z } from 'zod';
 
 import {
   HTTP_NOT_FOUND,
@@ -15,14 +16,16 @@ import { OpError } from '../types.js';
 /** A `recordings` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type RecordingRow = Selectable<DB['recordings']>;
 
-export type RecordingOut = {
-  id: string;
-  callId: string;
-  userId: string | null;
-  filename: string;
-  durationS: number;
-  createdAt: string;
-};
+/** A recording as `recordings.list` lists it. */
+export const recordingOut = z.object({
+  id: z.string(),
+  callId: z.string(),
+  userId: z.string().nullable(),
+  filename: z.string(),
+  durationS: z.number(),
+  createdAt: z.string()
+});
+export type RecordingOut = z.infer<typeof recordingOut>;
 
 export function toRecordingOut(row: RecordingRow): RecordingOut {
   return {

@@ -3,11 +3,16 @@ import { MAIL_KINDS } from '@zamfono/shared';
 import {
   decodeOffsetCursor,
   offsetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
-import { effectiveTemplate, tenantLanguage } from './_shared.js';
+import {
+  effectiveTemplate,
+  mailTemplateWire,
+  tenantLanguage
+} from './_shared.js';
 
 /**
  * `GET /mailTemplates` (§10.3 "Mail templates"): the effective template of every kind in the
@@ -17,6 +22,7 @@ export const list = defineOperation({
   name: 'mailTemplates.list',
   description: 'Lists the effective mail templates in the tenant language',
   input: pageInput.strict(),
+  output: pageOutput(mailTemplateWire),
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

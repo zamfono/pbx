@@ -66,3 +66,77 @@ describe('the OpenAPI request bodies describe the REST contract (§10.3)', () =>
     expect(usersCreate.required).toContain('email');
   });
 });
+
+function responsesOf(
+  pattern: string,
+  method: string
+): Record<string, { content?: Record<string, { schema?: Schema }> }> {
+  const operation = buildOpenApiDocument().paths[pattern]?.[method];
+  if (operation === undefined) {
+    throw new Error(`openapi test: no operation for ${method} ${pattern}`);
+  }
+  return operation.responses;
+}
+
+function jsonResult(pattern: string, method: string): Schema {
+  const schema = responsesOf(pattern, method)['200']?.content?.[
+    'application/json'
+  ]?.schema;
+  if (schema === undefined) {
+    throw new Error(`openapi test: no JSON result for ${method} ${pattern}`);
+  }
+  return schema;
+}
+
+describe('the OpenAPI responses describe what each operation answers (§10.3)', () => {
+  it('documents a list as a page of its items and the next cursor', () => {
+    const page = jsonResult('/users', 'get');
+    expect(page.required).toEqual(['items', 'nextCursor']);
+    expect(accepts(page, { items: [], nextCursor: 'abc' })).toBe(true);
+    expect(accepts(page, { items: [], nextCursor: null })).toBe(true);
+    expect(accepts(page, { items: [{ id: 'u1' }], nextCursor: null })).toBe(
+      false
+    );
+    expect(accepts(page, { items: [] })).toBe(false);
+  });
+
+  it('documents a write’s result with the warnings its commit may add', () => {
+    const presence = jsonResult('/users/{id}/presence', 'put');
+    expect(accepts(presence, { id: 'u1', dnd: true })).toBe(true);
+    expect(
+      accepts(presence, { id: 'u1', dnd: true, warnings: ['not propagated'] })
+    ).toBe(true);
+    expect(accepts(presence, { id: 'u1', dnd: 'on' })).toBe(false);
+    expect(jsonResult('/users/{id}', 'get').properties).not.toHaveProperty(
+      'warnings'
+    );
+  });
+
+  it('documents a file download as its bytes in each media type, never as JSON', () => {
+    const content = responsesOf('/voicemails/{id}/audio', 'get')['200']
+      ?.content;
+    expect(Object.keys(content ?? {}).sort()).toEqual([
+      'audio/mpeg',
+      'audio/ogg',
+      'audio/wav'
+    ]);
+  });
+
+  it.each([
+    ['/users', 'get', ['401', '403', '422']],
+    ['/users/{id}', 'get', ['401', '403', '404', '422']],
+    ['/users/{id}', 'delete', ['400', '401', '403', '404', '409', '422']],
+    ['/users/{id}/presence', 'put', ['400', '401', '403', '404', '422']]
+  ])(
+    '%s %s documents exactly the problem statuses it answers with',
+    (pattern, method, statuses) => {
+      const problems = Object.entries(responsesOf(pattern, method)).filter(
+        ([status]) => status !== '200'
+      );
+      expect(problems.map(([status]) => status)).toEqual(statuses);
+      for (const [, response] of problems) {
+        expect(response.content).toHaveProperty(['application/problem+json']);
+      }
+    }
+  );
+});

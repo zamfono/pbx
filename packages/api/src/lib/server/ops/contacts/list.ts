@@ -1,17 +1,19 @@
 import {
   decodeOffsetCursor,
   offsetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
-import { toContactOut } from './_shared.js';
+import { contactOut, toContactOut } from './_shared.js';
 
 /** `GET /contacts` (§10.3 "Phone book"): live contacts, alphabetical, offset-cursor paginated. */
 export const listContacts = defineOperation({
   name: 'contacts.list',
   description: "Lists the tenant's live phone-book contacts.",
   input: pageInput.strict(),
+  output: pageOutput(contactOut),
   minRole: 'user',
   scope: 'any',
   readOnly: true,

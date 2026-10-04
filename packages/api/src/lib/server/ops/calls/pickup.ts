@@ -3,7 +3,12 @@ import { z } from 'zod';
 import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { defineOperation } from '../types.js';
-import { liveCallIdInput, proxyCallAction } from './_shared.js';
+import {
+  CALL_ACTION_PROBLEMS,
+  callActionOutput,
+  liveCallIdInput,
+  proxyCallAction
+} from './_shared.js';
 
 const inputSchema = z.object({ id: liveCallIdInput }).strict();
 
@@ -17,6 +22,8 @@ export const pickup = defineOperation({
   description:
     "Picks up a call ringing for another party, on the picking user's devices.",
   input: inputSchema,
+  output: callActionOutput,
+  problems: CALL_ACTION_PROBLEMS,
   minRole: 'user',
   scope: 'any',
   audit: false,

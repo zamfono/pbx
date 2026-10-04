@@ -1,9 +1,12 @@
 import { z } from 'zod';
 
+import { PRESENCE_STATUSES } from '@zamfono/shared';
+
 import {
   decodeOffsetCursor,
   offsetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { instantInput, tenantInstantReader } from '../instantInput.js';
@@ -31,6 +34,15 @@ export const snapshot = defineOperation({
   name: 'presenceLog.snapshot',
   description: "Snapshots each user's presence state as of a past timestamp.",
   input: inputSchema,
+  output: pageOutput(
+    z.object({
+      userId: z.string(),
+      status: z.enum(PRESENCE_STATUSES),
+      since: z.string(),
+      peer: z.string().nullable(),
+      ringGroupId: z.string().nullable()
+    })
+  ),
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

@@ -1,21 +1,23 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { defineOperation } from '../types.js';
 import {
   liveTrunk,
   loadTrunkHosts,
   mapTrunkRow,
-  type TrunkWire
+  trunkWire
 } from './_shared.js';
 import { getTrunkStatuses, UNKNOWN_STATUS } from './_status.js';
 
 const inputSchema = z.object({ id: z.string().min(1) }).strict();
-type Input = z.infer<typeof inputSchema>;
-
-export const get = defineOperation<Input, TrunkWire>({
+export const get = defineOperation({
   name: 'trunks.get',
   description: 'Reads one SIP trunk.',
   input: inputSchema,
+  output: trunkWire,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

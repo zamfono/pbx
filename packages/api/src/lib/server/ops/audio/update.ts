@@ -1,9 +1,11 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { recordFieldChanges } from '../audit.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
-import { liveAudioAsset, toAudioAssetOut } from './_shared.js';
+import { audioAssetOut, liveAudioAsset, toAudioAssetOut } from './_shared.js';
 
 export const updateAudioAssetInput = z
   .object({ id: z.string(), label: z.string().min(1) })
@@ -14,6 +16,8 @@ export const updateAudioAsset = defineOperation({
   name: 'audio.update',
   description: "Updates an audio asset's label.",
   input: updateAudioAssetInput,
+  output: audioAssetOut,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   entity: input => ({ kind: 'audio', id: input.id }),
   run: async (ctx, input) => {

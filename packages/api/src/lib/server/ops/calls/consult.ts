@@ -4,6 +4,8 @@ import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { defineOperation } from '../types.js';
 import {
+  CALL_ACTION_PROBLEMS,
+  dialledCallOutput,
   dialTargetInput,
   liveCallIdInput,
   ownLiveCall,
@@ -29,6 +31,8 @@ export const consult = defineOperation({
   description:
     "Starts an attended transfer: puts the other party of a live call on hold with hold music and dials the target from you, returning the consultation call's id (callId) for calls.transfer with toCallId. The hold happens in the PBX, so the phone does not show it.",
   input: inputSchema,
+  output: dialledCallOutput,
+  problems: CALL_ACTION_PROBLEMS,
   minRole: 'user',
   scope: ownLiveCall,
   audit: false,

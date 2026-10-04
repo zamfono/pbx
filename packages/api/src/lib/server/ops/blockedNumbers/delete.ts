@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { propagate } from '../propagate.js';
-import { liveRow, softDelete, softDeleteQuestion } from '../rows.js';
+import { idOutput, liveRow, softDelete, softDeleteQuestion } from '../rows.js';
 import { defineOperation } from '../types.js';
 
 const inputSchema = z.object({ id: z.string() }).strict();
@@ -11,6 +13,8 @@ export const del = defineOperation({
   name: 'blockedNumbers.delete',
   description: 'Removes a number from the tenant blocklist',
   input: inputSchema,
+  output: idOutput,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   confirm: async (ctx, input) => {
     const row = await liveRow(

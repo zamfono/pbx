@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { newId } from '@zamfono/shared';
+import { HTTP_NOT_FOUND, newId } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { createTarget } from '../forwardTargets.js';
@@ -15,14 +15,13 @@ import {
 } from '../scope.js';
 import { defineOperation, type Context } from '../types.js';
 import {
+  intervalSchema,
   loadIntervals,
   loadSchedule,
   validateIntervals,
   type IntervalInput
 } from './_shared.js';
-import type { HoursWire } from './get.js';
-
-const MAX_WEEKDAY = 7;
+import { hoursWire, type HoursWire } from './get.js';
 
 const inputSchema = z
   .object({
@@ -37,33 +36,12 @@ const inputSchema = z
       'Where inbound and forwarded calls go outside every open interval; internal calls ignore opening hours.'
     ),
     intervals: z
-      .array(
-        z.object({
-          weekday: z
-            .number()
-            .int()
-            .min(1)
-            .max(MAX_WEEKDAY)
-            .describe('ISO 8601 weekday: 1 is Monday, 7 Sunday.'),
-          opens: z
-            .string()
-            .describe(
-              'HH:MM, inclusive, in the tenant time zone (settings.timezone).'
-            ),
-          closes: z
-            .string()
-            .describe(
-              'HH:MM, exclusive, after opens; 24:00 is the end of the day.'
-            )
-        })
-      )
+      .array(intervalSchema)
       .describe(
         'The weekly open intervals; none may cross midnight, so split one that does in two.'
       )
   })
   .strict();
-
-type Input = z.infer<typeof inputSchema>;
 
 /** The `opening_hours_intervals` rows equivalent to `intervals`, so the diff is `JSON`-comparable. */
 function intervalsDiff(
@@ -109,11 +87,13 @@ async function replaceIntervals(
  * `PUT /users/{id}/hours`, `/ringGroups/{id}/hours`, `/menus/{id}/hours`, `/tenant/hours` (§10.2
  * "Opening hours"): replaces the scope's schedule and its open intervals as a whole.
  */
-export const set = defineOperation<Input, HoursWire>({
+export const set = defineOperation({
   name: 'hours.set',
   description:
     "Replaces a scope's weekly opening-hours schedule and the target its calls go to while closed",
   input: inputSchema,
+  output: hoursWire,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'user',
   scope: ownScopeInput,
   entity: (_input, output: HoursWire) => ({

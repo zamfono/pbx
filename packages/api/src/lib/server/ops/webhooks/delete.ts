@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
-import { softDelete, softDeleteQuestion } from '../rows.js';
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
+import { idOutput, softDelete, softDeleteQuestion } from '../rows.js';
 import { defineOperation } from '../types.js';
 import { liveWebhook } from './_shared.js';
 
@@ -14,6 +16,8 @@ export const del = defineOperation({
   name: 'webhooks.delete',
   description: 'Soft-deletes a webhook; its events are no longer delivered',
   input: inputSchema,
+  output: idOutput,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   confirm: async (ctx, input) =>
     softDeleteQuestion(

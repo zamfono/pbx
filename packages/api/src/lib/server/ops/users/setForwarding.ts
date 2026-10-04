@@ -1,44 +1,24 @@
-import { z } from 'zod';
-
 import {
+  HTTP_NOT_FOUND,
   HTTP_UNPROCESSABLE_CONTENT,
-  USER_FORWARD_CONDITIONS,
   type UserForwardCondition
 } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { createTarget, deleteTargetIfOrphan } from '../forwardTargets.js';
-import { targetSpecSchema } from '../forwardTargetSchema.js';
 import { ownUserId } from '../gates.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, OpError, type Context } from '../types.js';
 import {
+  forwardingSchema,
   isSameSipTarget,
   storedForwardRules,
+  type Forwarding,
   type StoredForwardRule
 } from './_forwarding.js';
 import { liveUser } from './_shared.js';
 
-const inputSchema = z
-  .object({
-    id: z.string(),
-    rules: z
-      .array(
-        z.object({
-          condition: z
-            .enum(USER_FORWARD_CONDITIONS)
-            .describe(
-              'unconditional: every call; busy: every device busy; noAnswer: nobody answers within ringTimeoutS; dnd: DND on; offline: no registered device, falling to noAnswer without this rule.'
-            ),
-          target: targetSpecSchema
-        })
-      )
-      .describe(
-        "The user's rules, one per condition; a condition left out sends the call to the user's mailbox, else rejects it (see zamfono.help routing-order)."
-      )
-  })
-  .strict();
-type Rule = z.infer<typeof inputSchema>['rules'][number];
+type Rule = Forwarding['rules'][number];
 
 /**
  * §10.3 "Forward targets": the stored target rows a `user` actor's input keeps as they are, by
@@ -74,7 +54,9 @@ export const setForwarding = defineOperation({
   name: 'users.setForwarding',
   description:
     "Replaces a user's call-forwarding rules as a whole; a user sets their own, without new sip targets, an admin anyone's.",
-  input: inputSchema,
+  input: forwardingSchema,
+  output: forwardingSchema,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'user',
   scope: ownUserId,
   entity: input => ({ kind: 'user', id: input.id }),

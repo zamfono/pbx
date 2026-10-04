@@ -78,6 +78,19 @@ export const query = defineOperation({
   description:
     'Buckets a call metric (answerRate, ringToAnswer, avgCallLength, callVolume) over a time range.',
   input: inputSchema,
+  output: z.object({
+    buckets: z.array(
+      z.object({
+        start: z.string().describe('The bucket start, ISO 8601 UTC.'),
+        value: z
+          .number()
+          .nullable()
+          .describe(
+            "The metric over the bucket's calls; null where it has none to average."
+          )
+      })
+    )
+  }),
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

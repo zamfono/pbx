@@ -9,6 +9,8 @@ Every change made to [the specification](spec.md) during implementation, newest 
 *Why:* "Mirror the profile (Recommended)": a refused roster push was only logged, so an operator saw neither that the colleague panel in the apps was stale nor whether a retry reached Ringotel.
 **2026-10-04 · §11.2 `oauth_clients`.** The `redirect_uris_json` column goes: the row keeps id, name, kind and the two timestamps.
 *Why:* §5.2 validates a redirect URI against the metadata decrypted from the `client_id` or fetched from its document at every authorization, so the stored copy was written and never read.
+**2026-10-04 · §10.3 Operations layer, OpenAPI; §10.5 Tools.** Product-owner decision (OpenAPI responses): every operation declares an `output` schema and the `problems` its `run` answers with; the OpenAPI document generates each route's real responses from them (a list's page, a file's media types, the problem statuses), and an MCP tool whose result is an object publishes it as its `outputSchema`.
+*Why:* "Generate responses": every response was documented as `200` JSON with an empty schema, binary downloads included, and 400 was missing.
 
 **2026-10-04 · §5.4, §10.3 Settings and conventions, §11.2 `settings`, §11.4.** Product-owner decision (secrets on the wire): no secret is ever returned, masked or otherwise; every read carries a read-only `<name>Set` boolean instead, and a write takes the secret as a merge patch, `null` clearing it (422 where required) and any string setting it. §11.4 names `ringotel_roster_pending` among the state columns outside `/settings`.
 *Why:* "I like the “xSet”. Why would the string “***” get any special treatment then?": a `GET /settings` echoed into a `PATCH` stored the mask `***` as the new SMTP, SSO or Ringotel secret.

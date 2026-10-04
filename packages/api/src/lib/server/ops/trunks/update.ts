@@ -1,7 +1,12 @@
 import type { Updateable } from 'kysely';
 import { z } from 'zod';
 
-import type { DB, LogLevelColumns } from '@zamfono/shared';
+import {
+  HTTP_CONFLICT,
+  HTTP_NOT_FOUND,
+  type DB,
+  type LogLevelColumns
+} from '@zamfono/shared';
 
 import { recordChange, recordFieldChanges } from '../audit.js';
 import { propagate } from '../propagate.js';
@@ -15,9 +20,9 @@ import {
   mapTrunkRow,
   replaceTrunkHosts,
   scalarsFromRow,
+  trunkWriteOutput,
   type HostWire,
-  type TrunkRow,
-  type TrunkWire
+  type TrunkRow
 } from './_shared.js';
 import {
   assertNoStrayCredentials,
@@ -141,13 +146,13 @@ function recordPasswordChange(
   }
 }
 
-type Output = { trunk: TrunkWire; warnings: string[] };
-
-export const update = defineOperation<Input, Output>({
+export const update = defineOperation({
   name: 'trunks.update',
   description:
     'Updates a SIP trunk; hosts replace the list as a whole, password is write-only.',
   input: inputSchema,
+  output: trunkWriteOutput,
+  problems: [HTTP_NOT_FOUND, HTTP_CONFLICT],
   minRole: 'admin',
   entity: input => ({ kind: 'trunk', id: input.id }),
   run: async (ctx, input) => {

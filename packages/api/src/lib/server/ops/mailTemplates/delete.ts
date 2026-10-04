@@ -19,6 +19,8 @@ export const del = defineOperation({
   description:
     "Removes a tenant's mail template override, so the shipped template applies again",
   input: inputSchema,
+  output: inputSchema,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   confirm: (_ctx, input) =>
     `Remove the ${input.language} override for ${input.kind}?`,

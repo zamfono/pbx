@@ -4,7 +4,13 @@ import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { ownActingUser } from '../gates.js';
 import { defineOperation } from '../types.js';
-import { isOwnLiveCall, liveCallIdInput, proxyCallAction } from './_shared.js';
+import {
+  CALL_ACTION_PROBLEMS,
+  callActionOutput,
+  isOwnLiveCall,
+  liveCallIdInput,
+  proxyCallAction
+} from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -30,6 +36,14 @@ export const park = defineOperation({
   description:
     'Parks the other party of a live call on the lowest free parking slot, as *70 does, and returns the slot; anyone retrieves it by dialling the slot (calls.originate with the slot as target).',
   input: inputSchema,
+  output: callActionOutput.extend({
+    slot: z
+      .string()
+      .describe(
+        'The parking slot the call waits on; dial it to retrieve the call.'
+      )
+  }),
+  problems: CALL_ACTION_PROBLEMS,
   minRole: 'user',
   scope: async (ctx, input) =>
     ownActingUser(ctx, input) && (await isOwnLiveCall(ctx, input.id)),

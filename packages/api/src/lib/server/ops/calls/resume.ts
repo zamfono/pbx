@@ -3,7 +3,13 @@ import { z } from 'zod';
 import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { defineOperation } from '../types.js';
-import { liveCallIdInput, ownLiveCall, proxyCallAction } from './_shared.js';
+import {
+  CALL_ACTION_PROBLEMS,
+  callActionOutput,
+  liveCallIdInput,
+  ownLiveCall,
+  proxyCallAction
+} from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -21,6 +27,8 @@ export const resume = defineOperation({
   description:
     'Takes a live call off the hold calls.hold or calls.consult put it on: the held party talks with you again, and during a consultation all three talk. The phone does not show it.',
   input: inputSchema,
+  output: callActionOutput,
+  problems: CALL_ACTION_PROBLEMS,
   minRole: 'user',
   scope: ownLiveCall,
   audit: false,

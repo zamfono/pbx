@@ -1,7 +1,12 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { defineOperation } from '../types.js';
-import { storedRingGroupForwardRules } from './_forwarding.js';
+import {
+  ringGroupForwardingSchema,
+  storedRingGroupForwardRules
+} from './_forwarding.js';
 import { liveRingGroup } from './_shared.js';
 
 /**
@@ -14,6 +19,8 @@ export const getRingGroupForwarding = defineOperation({
   description:
     "Reads a ring group's 'unanswered' and 'unavailable' forwarding rules in the shape ringGroups.setForwarding takes.",
   input: z.object({ id: z.string() }).strict(),
+  output: ringGroupForwardingSchema,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

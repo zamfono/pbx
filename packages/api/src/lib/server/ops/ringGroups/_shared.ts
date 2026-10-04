@@ -1,20 +1,20 @@
 import type { Selectable, Transaction } from 'kysely';
+import { z } from 'zod';
 
 import {
   emergencyNumbersColumn,
   HTTP_UNPROCESSABLE_CONTENT,
+  RING_STRATEGIES,
   type AudioKind,
-  type DB,
-  type LogLevelColumns,
-  type RingStrategy
+  type DB
 } from '@zamfono/shared';
 
 import { assertAudioOfKind } from '../audio/_shared.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { liveRow } from '../rows.js';
-import { logLevelWire } from '../settings/logLevel.js';
+import { logLevelOutputFields, logLevelWire } from '../settings/logLevel.js';
 import { OpError } from '../types.js';
-import { ringGroupMembers, type RingGroupMemberOut } from './_members.js';
+import { ringGroupMemberOut, ringGroupMembers } from './_members.js';
 
 /** A `ring_groups` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type RingGroupRow = Selectable<DB['ringGroups']>;
@@ -106,22 +106,25 @@ export async function assertNameAvailable(
   );
 }
 
-export type RingGroupOut = LogLevelColumns & {
-  id: string;
-  name: string;
-  ext: string;
-  strategy: RingStrategy;
-  ringTimeoutS: number;
-  ringTotalS: number | null;
-  skipBusy: boolean;
-  allowReject: boolean;
-  greetingAudioId: string | null;
-  mohAudioId: string | null;
-  recordCalls: boolean;
-  mailboxEnabled: boolean;
-  mailboxAudioId: string | null;
-  members: RingGroupMemberOut[];
-};
+/** A ring group's wire shape (§10.3), as `toRingGroupOut` assembles it. */
+export const ringGroupOut = z.object({
+  id: z.string(),
+  name: z.string(),
+  ext: z.string(),
+  strategy: z.enum(RING_STRATEGIES),
+  ringTimeoutS: z.number(),
+  ringTotalS: z.number().nullable(),
+  skipBusy: z.boolean(),
+  allowReject: z.boolean(),
+  greetingAudioId: z.string().nullable(),
+  mohAudioId: z.string().nullable(),
+  recordCalls: z.boolean(),
+  mailboxEnabled: z.boolean(),
+  mailboxAudioId: z.string().nullable(),
+  ...logLevelOutputFields,
+  members: z.array(ringGroupMemberOut)
+});
+export type RingGroupOut = z.infer<typeof ringGroupOut>;
 
 /** The extension a live ring group owns (§11.2 `extensions`); every live group has exactly one. */
 export async function ringGroupExtension(

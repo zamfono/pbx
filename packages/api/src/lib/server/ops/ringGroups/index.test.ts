@@ -33,6 +33,21 @@ describe('ringGroups', () => {
     ]);
   });
 
+  it('list returns the live ring groups with their extensions', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    await runOperation(
+      db,
+      'ringGroups.create',
+      { name: 'Support', strategy: 'simultaneous' },
+      asRun()
+    );
+    const page = (await runOperation(db, 'ringGroups.list', {}, asRun())) as {
+      items: { name: string; ext: string }[];
+    };
+    expect(page.items).toMatchObject([{ name: 'Support', ext: '001' }]);
+  });
+
   it('refuses to create a ring group whose name is already used by another live group', async () => {
     const db = await makeTestDb();
     await seedSettings(db);

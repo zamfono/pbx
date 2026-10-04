@@ -1,7 +1,7 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { backupParamsColumn } from '@zamfono/shared';
+import { backupParamsColumn, HTTP_NOT_FOUND } from '@zamfono/shared';
 
 import {
   fromFlag,
@@ -19,24 +19,24 @@ import {
   sealTargetSecret
 } from '../_secret.js';
 import {
+  backupTargetWire,
   targetFields,
   targetToWire,
-  withDefaultForgetPolicy,
-  type BackupTargetWire
+  withDefaultForgetPolicy
 } from '../_shared.js';
 
 const inputSchema = z
   .object({ id: z.string(), ...z.object(targetFields).partial().shape })
   .strict();
 
-type Input = z.infer<typeof inputSchema>;
-
 /** `PATCH /backups/targets/{id}` (§6.5 "Backups"): kind, params, secret and the enabled flag. */
-export const targetsUpdate = defineOperation<Input, BackupTargetWire>({
+export const targetsUpdate = defineOperation({
   name: 'backups.targets.update',
   description:
     "Changes a backup target's kind, location, secret or enabled flag",
   input: inputSchema,
+  output: backupTargetWire,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   entity: input => ({ kind: 'backupTarget', id: input.id }),
   run: async (ctx, input) => {

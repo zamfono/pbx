@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { changesColumn } from '@zamfono/shared';
 
 import { maskContent } from '../audit.js';
+import { idOutput } from '../rows.js';
 import { Conflict, defineOperation } from '../types.js';
 import { cascadeSoftDeleteUser } from './_cascade.js';
 import { findUserReferences } from './_references.js';
@@ -43,6 +44,7 @@ export const erase = defineOperation({
   description:
     "Erases a user's personal data from their audit trail (GDPR, irreversible).",
   input: z.object({ id: z.string() }).strict(),
+  output: idOutput,
   minRole: 'owner',
   confirm: async (ctx, input) => {
     const user = await ctx.db

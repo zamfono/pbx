@@ -1,10 +1,15 @@
 import { z } from 'zod';
 
-import type { UpdateState } from '@zamfono/shared';
+import {
+  HTTP_BAD_REQUEST,
+  HTTP_NOT_FOUND,
+  HTTP_SERVICE_UNAVAILABLE
+} from '@zamfono/shared';
 
 import { setUndoable } from '../audit.js';
 import { defineOperation } from '../types.js';
 import { requestUpdate } from './_request.js';
+import { updateStateOut } from './_wire.js';
 
 const inputSchema = z
   .object({
@@ -18,8 +23,6 @@ const inputSchema = z
   })
   .strict();
 
-type Input = z.infer<typeof inputSchema>;
-
 /**
  * `POST /system/update` (§6.3 "Updates", §10.3): has the updater service take the stack to the
  * latest release, or to `version`, when that release is newer and non-breaking. Refused unless a
@@ -27,11 +30,14 @@ type Input = z.infer<typeof inputSchema>;
  * answers as soon as the updater has begun, and `system.info` reports how it went and who asked.
  * Not undoable: migrations only go forward (§6.3 "Upgrades").
  */
-export const update = defineOperation<Input, UpdateState>({
+export const update = defineOperation({
   name: 'system.update',
   description:
     'Updates the stack to the latest release, or to version, if newer and non-breaking; needs a backup run finished ok within the last hour. system.info reports the progress.',
   input: inputSchema,
+  output: updateStateOut,
+  // The updater's own refusals keep their status; anything else, or no updater, is a 503.
+  problems: [HTTP_BAD_REQUEST, HTTP_NOT_FOUND, HTTP_SERVICE_UNAVAILABLE],
   minRole: 'owner',
   pureAction: true,
   confirm: (_ctx, input) =>

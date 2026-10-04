@@ -3,7 +3,13 @@ import { z } from 'zod';
 import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { defineOperation } from '../types.js';
-import { liveCallIdInput, ownLiveCall, proxyCallAction } from './_shared.js';
+import {
+  CALL_ACTION_PROBLEMS,
+  callActionOutput,
+  liveCallIdInput,
+  ownLiveCall,
+  proxyCallAction
+} from './_shared.js';
 
 const inputSchema = z.object({ id: liveCallIdInput }).strict();
 
@@ -15,6 +21,8 @@ export const hangup = defineOperation({
   name: 'calls.hangup',
   description: 'Hangs up a live call.',
   input: inputSchema,
+  output: callActionOutput,
+  problems: CALL_ACTION_PROBLEMS,
   minRole: 'user',
   scope: ownLiveCall,
   audit: false,

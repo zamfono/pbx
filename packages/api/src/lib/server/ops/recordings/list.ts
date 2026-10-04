@@ -1,11 +1,12 @@
 import {
   decodeIdCursor,
   keysetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
-import { toRecordingOut } from './_shared.js';
+import { recordingOut, toRecordingOut } from './_shared.js';
 
 const inputSchema = pageInput.strict();
 
@@ -15,6 +16,7 @@ export const list = defineOperation({
   description:
     'Lists call recordings, newest first: one per recorded user and call (see zamfono.help recording-consent).',
   input: inputSchema,
+  output: pageOutput(recordingOut),
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

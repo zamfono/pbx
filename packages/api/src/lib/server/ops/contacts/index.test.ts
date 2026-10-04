@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
+import {
+  asConfirmedRun,
+  asRun,
+  makeTestDb,
+  seedSettings
+} from '#lib/server/testDb.js';
 
 import { runOperation } from '../runner.js';
 
@@ -97,5 +102,34 @@ describe('contacts', () => {
       asRun()
     );
     await expect(attempt).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('reads a contact, lists it and deletes it', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    const contact = (await runOperation(
+      db,
+      'contacts.create',
+      {
+        displayName: 'Huber GmbH',
+        phones: [{ label: 'work', number: '089 123' }]
+      },
+      asRun()
+    )) as { id: string };
+    expect(
+      await runOperation(db, 'contacts.get', { id: contact.id }, asRun())
+    ).toEqual(contact);
+    expect(await runOperation(db, 'contacts.list', {}, asRun())).toEqual({
+      items: [contact],
+      nextCursor: null
+    });
+    expect(
+      await runOperation(
+        db,
+        'contacts.delete',
+        { id: contact.id },
+        asConfirmedRun()
+      )
+    ).toEqual({ id: contact.id });
   });
 });

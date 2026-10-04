@@ -1,14 +1,17 @@
 import type { Transaction } from 'kysely';
+import { z } from 'zod';
 
 import type { DB } from '@zamfono/shared';
 
-import { assertMembersValid, type MemberSpec } from '../members.js';
+import {
+  assertMembersValid,
+  memberSchema,
+  type MemberSpec
+} from '../members.js';
 
-export type RingGroupMemberOut = {
-  position: number;
-  kind: 'user' | 'userGroup';
-  id: string;
-};
+/** A ring group's member as a read returns it: the member and its place in the ring order. */
+export const ringGroupMemberOut = memberSchema.extend({ position: z.number() });
+export type RingGroupMemberOut = z.infer<typeof ringGroupMemberOut>;
 
 /** One `ring_group_members` row as a member spec; the table's own CHECK keeps exactly one of `userId`/`userGroupId` set. */
 function toMemberOut(row: {

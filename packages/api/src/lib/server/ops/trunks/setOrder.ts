@@ -14,14 +14,13 @@ const inputSchema = z
       .describe('Every live trunk id exactly once, in the new order.')
   })
   .strict();
-type Input = z.infer<typeof inputSchema>;
-type Output = { trunkIds: string[] };
 
-export const setOrder = defineOperation<Input, Output>({
+export const setOrder = defineOperation({
   name: 'trunks.setOrder',
   description:
     'Rewrites the tenant trunk order, the order emergency calls try emergency trunks in (§9.4 "Trunk order").',
   input: inputSchema,
+  output: z.object({ trunkIds: z.array(z.string()) }),
   minRole: 'admin',
   entity: () => ({ kind: 'trunk', id: null }),
   run: async (ctx, input) => {

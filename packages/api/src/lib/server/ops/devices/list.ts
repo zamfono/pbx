@@ -3,12 +3,13 @@ import { z } from 'zod';
 import {
   decodeOffsetCursor,
   offsetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { ownActingUser } from '../gates.js';
 import { defineOperation } from '../types.js';
-import { toDeviceOut } from './_shared.js';
+import { deviceOut, toDeviceOut } from './_shared.js';
 
 /** `GET /users/{id}/devices` (§10.3): a `user` actor lists only their own devices (§5.3). */
 export const list = defineOperation({
@@ -20,6 +21,7 @@ export const list = defineOperation({
       ...pageInput.shape
     })
     .strict(),
+  output: pageOutput(deviceOut),
   minRole: 'user',
   scope: ownActingUser,
   readOnly: true,

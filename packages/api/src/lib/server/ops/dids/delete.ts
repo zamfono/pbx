@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { propagate } from '../propagate.js';
-import { liveRow, softDelete, softDeleteQuestion } from '../rows.js';
+import { idOutput, liveRow, softDelete, softDeleteQuestion } from '../rows.js';
 import { Conflict, defineOperation, type Context } from '../types.js';
 
 const inputSchema = z.object({ id: z.string() }).strict();
@@ -57,6 +59,8 @@ export const del = defineOperation({
   description:
     'Soft-deletes a DID unless it is the main number or presented as caller ID',
   input: inputSchema,
+  output: idOutput,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   confirm: async (ctx, input) => {
     const did = await liveRow(ctx.db, 'dids', input.id, 'dids: DID not found');

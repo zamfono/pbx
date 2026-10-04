@@ -1,9 +1,12 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import {
   decodeOffsetCursor,
   offsetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { resolveTarget } from '../forwardTargetSpec.js';
@@ -13,7 +16,7 @@ import {
   scopeInputSchema
 } from '../scope.js';
 import { defineOperation } from '../types.js';
-import { liveOooRulesInScope } from './_shared.js';
+import { liveOooRulesInScope, oooRuleOut } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -31,6 +34,8 @@ export const list = defineOperation({
   name: 'ooo.list',
   description: "Lists a scope's out-of-office rules",
   input: inputSchema,
+  output: pageOutput(oooRuleOut),
+  problems: [HTTP_NOT_FOUND],
   minRole: 'user',
   scope: ownScopeInput,
   readOnly: true,

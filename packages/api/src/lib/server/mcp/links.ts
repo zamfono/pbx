@@ -28,7 +28,11 @@ const LINK_TTL_S = 300;
 const CAPTURE = /\{(?<name>[^}]+)\}/gu;
 
 /** The link a file tool call answers with: the URL and when it stops opening. */
-export type OperationLink = { url: string; expiresAt: string };
+export const operationLink = z.object({
+  url: z.string(),
+  expiresAt: z.string()
+});
+export type OperationLink = z.infer<typeof operationLink>;
 
 /**
  * The link of `kind` to `route` for `args`, the tool call's input: the path's captures from their

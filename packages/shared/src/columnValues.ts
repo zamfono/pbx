@@ -115,7 +115,8 @@ export type OAuthClientKind = 'metadata' | 'cimd';
 export type TokenKind = 'refresh' | 'reset';
 
 /** `webhooks.last_status`. */
-export type WebhookStatus = 'ok' | 'failing';
+export const WEBHOOK_STATUSES = ['ok', 'failing'] as const;
+export type WebhookStatus = (typeof WEBHOOK_STATUSES)[number];
 
 /** `backup_targets.kind` (§6.5 "Backups"): the restic backends. */
 export const BACKUP_TARGET_KINDS = [
@@ -129,10 +130,12 @@ export const BACKUP_TARGET_KINDS = [
 export type BackupTargetKind = (typeof BACKUP_TARGET_KINDS)[number];
 
 /** `backup_runs.status` (§6.5 "Backups"). */
-export type BackupRunStatus = 'running' | 'ok' | 'failed';
+export const BACKUP_RUN_STATUSES = ['running', 'ok', 'failed'] as const;
+export type BackupRunStatus = (typeof BACKUP_RUN_STATUSES)[number];
 
 /** `audit_log.channel` (§5.7): how an operation call reached the runner. */
-export type AuditChannel = 'rest' | 'mcp' | 'ui' | 'undo' | 'job';
+export const AUDIT_CHANNELS = ['rest', 'mcp', 'ui', 'undo', 'job'] as const;
+export type AuditChannel = (typeof AUDIT_CHANNELS)[number];
 
 /** `calls.direction`. */
 export const CALL_DIRECTIONS = ['inbound', 'outbound', 'internal'] as const;
@@ -151,10 +154,17 @@ export const CALL_STATUSES = [
 export type CallStatus = (typeof CALL_STATUSES)[number];
 
 /** `call_qos.role` (§7 level `qos`). */
-export type QosRole = 'caller' | 'callee';
+export const QOS_ROLES = ['caller', 'callee'] as const;
+export type QosRole = (typeof QOS_ROLES)[number];
 
 /** `presence_log.status`. */
-export type PresenceStatus = 'available' | 'busy' | 'offline' | 'dnd';
+export const PRESENCE_STATUSES = [
+  'available',
+  'busy',
+  'offline',
+  'dnd'
+] as const;
+export type PresenceStatus = (typeof PRESENCE_STATUSES)[number];
 
 /** `maintenance_gate.work`: the certificate swap or the automatic update. */
 export type MaintenanceWork = 'certSync' | 'autoUpdate';

@@ -1,9 +1,12 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { recordChange, recordFieldChanges } from '../audit.js';
 import { defineOperation } from '../types.js';
 import {
   contactFields,
+  contactOut,
   contactPhones,
   liveContact,
   replacePhones,
@@ -33,6 +36,8 @@ export const updateContact = defineOperation({
   description:
     "Updates a contact's details; `phones` replaces the number set as a whole.",
   input: updateContactInput,
+  output: contactOut,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   entity: input => ({ kind: 'contact', id: input.id }),
   run: async (ctx, input) => {

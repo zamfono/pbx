@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { fromFlag, recordChange, recordFieldChanges } from '../audit.js';
 import { assertMayHoldTarget, createTarget } from '../forwardTargets.js';
 import { resolveTarget } from '../forwardTargetSpec.js';
@@ -13,7 +15,7 @@ import {
   liveOooRule,
   normalizeIsoOrNull,
   oooFields,
-  type OooRuleOut
+  oooRuleOut
 } from './_shared.js';
 
 const inputSchema = z
@@ -43,11 +45,13 @@ function resolveSchedule(
 }
 
 /** `PATCH /ooo/{id}` (§10.2 "Out of office"): active flag, schedule and target are editable. */
-export const update = defineOperation<Input, OooRuleOut>({
+export const update = defineOperation({
   name: 'ooo.update',
   description:
     "Changes an out-of-office rule's activity, start, expiry or target",
   input: inputSchema,
+  output: oooRuleOut,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'user',
   scope: async (ctx, input) =>
     isOwnScope(ctx, scopeFromColumns(await liveOooRule(ctx.db, input.id))),

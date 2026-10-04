@@ -1,17 +1,19 @@
 import {
   decodeOffsetCursor,
   offsetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
-import { toUserGroupOut } from './_shared.js';
+import { toUserGroupOut, userGroupOut } from './_shared.js';
 
 /** `GET /userGroups` (§10.3 "User groups"): live user groups, alphabetical, offset-cursor paginated. */
 export const listUserGroups = defineOperation({
   name: 'userGroups.list',
   description: "Lists the tenant's live user groups.",
   input: pageInput.strict(),
+  output: pageOutput(userGroupOut),
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

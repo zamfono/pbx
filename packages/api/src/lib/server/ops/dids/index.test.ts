@@ -97,6 +97,15 @@ describe('dids', () => {
     ).rejects.toThrow(Conflict);
   });
 
+  it('deletes a DID nothing refers to', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    const id = await insertDid(db, '+4930123456');
+    await expect(
+      runOperation(db, 'dids.delete', { id }, asRun({ confirm: true }))
+    ).resolves.toEqual({ id });
+  });
+
   it('refuses to delete a DID a live user presents as caller-ID', async () => {
     const db = await makeTestDb();
     await seedSettings(db);

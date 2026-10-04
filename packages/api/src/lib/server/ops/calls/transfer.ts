@@ -5,7 +5,13 @@ import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { defineOperation, OpError } from '../types.js';
-import { isOwnLiveCall, liveCallIdInput, proxyCallAction } from './_shared.js';
+import {
+  CALL_ACTION_PROBLEMS,
+  callActionOutput,
+  isOwnLiveCall,
+  liveCallIdInput,
+  proxyCallAction
+} from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -43,6 +49,8 @@ export const transfer = defineOperation({
   description:
     "Transfers a live call: blind to an extension or number (target), or with voicemail into an extension's mailbox, where the transferee is routed as a new call; or attended to the consultation calls.consult started (toCallId), where the held party and the consulted party talk on without you.",
   input: inputSchema,
+  output: callActionOutput,
+  problems: CALL_ACTION_PROBLEMS,
   minRole: 'user',
   scope: async (ctx, input) =>
     (await isOwnLiveCall(ctx, input.id)) &&

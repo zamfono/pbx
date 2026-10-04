@@ -1,17 +1,19 @@
 import {
   decodeOffsetCursor,
   offsetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
-import { toAudioAssetOut } from './_shared.js';
+import { audioAssetOut, toAudioAssetOut } from './_shared.js';
 
 /** `GET /audio` (§10.3 "Audio"): live audio assets, alphabetical, offset-cursor paginated. */
 export const listAudioAssets = defineOperation({
   name: 'audio.list',
   description: "Lists the tenant's live audio assets.",
   input: pageInput.strict(),
+  output: pageOutput(audioAssetOut),
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

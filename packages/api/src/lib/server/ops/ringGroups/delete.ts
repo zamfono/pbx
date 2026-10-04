@@ -1,10 +1,12 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { recordChange } from '../audit.js';
 import { loadDroppedBlfKeys } from '../devices/_shared.js';
 import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
-import { softDelete, softDeleteQuestion } from '../rows.js';
+import { idOutput, softDelete, softDeleteQuestion } from '../rows.js';
 import { Conflict, defineOperation } from '../types.js';
 import { findRingGroupReferences } from './_references.js';
 import { liveRingGroup, ringGroupExtension } from './_shared.js';
@@ -13,6 +15,8 @@ export const deleteRingGroup = defineOperation({
   name: 'ringGroups.delete',
   description: 'Soft-deletes a ring group.',
   input: z.object({ id: z.string() }).strict(),
+  output: idOutput,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   confirm: async (ctx, input) => {
     const group = await liveRingGroup(ctx.db, input.id);

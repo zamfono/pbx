@@ -1,16 +1,18 @@
 import {
   decodeOffsetCursor,
   offsetPage,
-  pageInput
+  pageInput,
+  pageOutput
 } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
-import { toUserOut } from './_shared.js';
+import { toUserOut, userOut } from './_shared.js';
 
 export const list = defineOperation({
   name: 'users.list',
   description: "Lists the tenant's live users, paginated.",
   input: pageInput.strict(),
+  output: pageOutput(userOut),
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

@@ -3,20 +3,21 @@ import { z } from 'zod';
 
 import type { Db, DB } from '@zamfono/shared';
 
-import { targetSpecSchema, type TargetSpec } from '../forwardTargetSchema.js';
+import { targetSpecSchema } from '../forwardTargetSchema.js';
 import { liveRow } from '../rows.js';
 
 export type DidBlockRow = Selectable<DB['didBlocks']>;
 
-/** A DID block as `didBlocks.create` and `didBlocks.update` return it (§11.3). */
-export type DidBlockOut = {
-  id: string;
-  base: string;
-  label: string | null;
-  digits: number | null;
-  fallbackTarget: TargetSpec | null;
-  createdAt: string;
-};
+/** A DID block's wire shape (§11.3), as every `didBlocks` operation returns it. */
+export const didBlockOut = z.object({
+  id: z.string(),
+  base: z.string(),
+  label: z.string().nullable(),
+  digits: z.number().nullable(),
+  fallbackTarget: targetSpecSchema.nullable(),
+  createdAt: z.string()
+});
+export type DidBlockOut = z.infer<typeof didBlockOut>;
 
 /** A block's two kinds (§11.3), the same field on create and update. */
 export const DIGITS_SCHEMA = z

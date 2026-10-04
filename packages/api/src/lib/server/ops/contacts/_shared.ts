@@ -50,14 +50,21 @@ export const contactFields = {
     .describe('The contact numbers; on update, the set is replaced as a whole.')
 };
 
-export type ContactPhoneOut = { label: string; number: string };
-export type ContactOut = {
-  id: string;
-  displayName: string;
-  company: string | null;
-  email: string | null;
-  phones: ContactPhoneOut[];
-};
+const contactPhoneOut = z.object({
+  label: z.string(),
+  number: z.string().describe('The number, E.164.')
+});
+export type ContactPhoneOut = z.infer<typeof contactPhoneOut>;
+
+/** A contact's wire shape (§10.3), as `toContactOut` assembles it. */
+export const contactOut = z.object({
+  id: z.string(),
+  displayName: z.string(),
+  company: z.string().nullable(),
+  email: z.string().nullable(),
+  phones: z.array(contactPhoneOut)
+});
+export type ContactOut = z.infer<typeof contactOut>;
 
 /** `raw` with everything but an optional leading `+` and digits stripped. */
 export function phoneDigits(raw: string): string {

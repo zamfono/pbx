@@ -4,9 +4,9 @@ import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
 import { defineOperation, OpError, type Context } from '../types.js';
 import {
+  callDetailOut,
   isOwnCall,
   toCallDetailOut,
-  type CallDetailOut,
   type CallRow
 } from './_shared.js';
 
@@ -30,11 +30,13 @@ async function endedCall(ctx: Context, id: string): Promise<CallRow> {
  * recorded — `calls.log` and its `call_qos` rows. A `user` reads only a call they are the caller,
  * the callee or the answering user of (§5.3).
  */
-export const get = defineOperation<{ id: string }, CallDetailOut>({
+export const get = defineOperation({
   name: 'calls.get',
   description:
     'Reads one call of the history with its log and QoS summary: per leg jitter, loss, round trip and the packets received and sent.',
   input: z.object({ id: z.string() }).strict(),
+  output: callDetailOut,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'user',
   scope: async (ctx, input) =>
     isOwnCall(ctx.actor.id, await endedCall(ctx, input.id)),

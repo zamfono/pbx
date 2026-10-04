@@ -4,7 +4,7 @@ import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { ownActingUser } from '../gates.js';
 import { defineOperation } from '../types.js';
-import { proxyCallAction } from './_shared.js';
+import { CALL_ACTION_PROBLEMS, proxyCallAction } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -41,6 +41,12 @@ export const originate = defineOperation({
   description:
     "Click-to-dial: rings a user's devices, then dials the target on answer, as that phone would; a parking slot as target retrieves the call parked there.",
   input: inputSchema,
+  output: z.object({
+    callId: z
+      .string()
+      .describe("The new call's id, as calls.list with live=true lists it.")
+  }),
+  problems: CALL_ACTION_PROBLEMS,
   minRole: 'user',
   scope: ownActingUser,
   audit: false,

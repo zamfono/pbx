@@ -2,9 +2,12 @@ import path from 'node:path';
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { RECORDINGS_SUBDIR } from '@zamfono/shared';
+import { HTTP_NOT_FOUND, RECORDINGS_SUBDIR } from '@zamfono/shared';
 
-import { downloadAudio } from '#lib/server/audio/transcode.js';
+import {
+  downloadAudio,
+  downloadAudioOutput
+} from '#lib/server/audio/transcode.js';
 
 import { defineOperation } from '../types.js';
 import { loadRecording } from './_shared.js';
@@ -31,6 +34,8 @@ export const audio = defineOperation({
   description:
     "Returns a recording's mixed audio; over MCP, a download link that opens for five minutes.",
   input: inputSchema,
+  output: downloadAudioOutput,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {

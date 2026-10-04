@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { retireGreeting } from '@zamfono/shared';
+import { HTTP_NOT_FOUND, retireGreeting } from '@zamfono/shared';
 
 import { ownUserId } from '../gates.js';
 import { propagate } from '../propagate.js';
@@ -22,6 +22,8 @@ export const clearVoicemailGreeting = defineOperation({
       id: z.string().describe('The user whose mailbox greeting goes.')
     })
     .strict(),
+  output: z.object({ id: z.string(), mailboxAudioId: z.null() }),
+  problems: [HTTP_NOT_FOUND],
   minRole: 'user',
   scope: ownUserId,
   audit: false,

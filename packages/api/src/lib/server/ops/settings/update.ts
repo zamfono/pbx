@@ -1,6 +1,10 @@
 import * as env from '$app/env/private';
 
-import { HTTP_UNPROCESSABLE_CONTENT, type UserRole } from '@zamfono/shared';
+import {
+  HTTP_NOT_FOUND,
+  HTTP_UNPROCESSABLE_CONTENT,
+  type UserRole
+} from '@zamfono/shared';
 
 import { propagate } from '../propagate.js';
 import { defineOperation, OpError } from '../types.js';
@@ -9,8 +13,8 @@ import {
   checkFieldRole,
   loadSettings,
   rowToWire,
-  type SettingsColumns,
-  type SettingsWire
+  settingsWire,
+  type SettingsColumns
 } from './_shared.js';
 import { maybePushTenantProfile, reloadKindsFor } from './changeEffects.js';
 import { assertNoExtensionCollision } from './emergencyNumbers.js';
@@ -46,11 +50,14 @@ function assertCallLogLevel(level: SettingsInput['callLogLevel']): void {
  * are enforced by `checkFieldRole`; the three read-only columns (`extLength`, `ringotelOrgId`,
  * `ringotelBranchId`) are absent from the schema, so submitting them is a plain 422.
  */
-export const update = defineOperation<SettingsInput, SettingsWire>({
+export const update = defineOperation({
   name: 'settings.update',
   description:
     'Updates tenant-wide settings: main number, fallback, country, language, mail relay, feature codes, retention, SSO and more; owner-only fields say so',
   input: inputSchema,
+  output: settingsWire,
+  // A fallbackTarget naming a row that is not live.
+  problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
   entity: () => ({ kind: 'settings', id: 'settings' }),
   run: async (ctx, input) => {

@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
-import { newId, normalizeInbound } from '@zamfono/shared';
+import {
+  HTTP_CONFLICT,
+  HTTP_NOT_FOUND,
+  newId,
+  normalizeInbound
+} from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { createTarget } from '../forwardTargets.js';
@@ -8,9 +13,9 @@ import { assertNoLiveHolder } from '../liveHolder.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
 import {
+  didBlockOut,
   DIGITS_SCHEMA,
-  FALLBACK_TARGET_SCHEMA,
-  type DidBlockOut
+  FALLBACK_TARGET_SCHEMA
 } from './_shared.js';
 
 /**
@@ -41,16 +46,16 @@ const inputSchema = z
   })
   .strict();
 
-type Input = z.infer<typeof inputSchema>;
-
 /** `POST /didBlocks` (§10.3 "Extensions & DIDs", §11.3): a number block and its fallback target. */
-export const create = defineOperation<Input, DidBlockOut>({
+export const create = defineOperation({
   name: 'didBlocks.create',
   description:
     'Adds a number block: a base and a fixed digit count, or open-ended; groups DIDs and gives unassigned numbers in it a fallback (zamfono.help numbers)',
   input: inputSchema,
+  output: didBlockOut,
+  problems: [HTTP_NOT_FOUND, HTTP_CONFLICT],
   minRole: 'admin',
-  entity: (_input, output: DidBlockOut) => ({
+  entity: (_input, output) => ({
     kind: 'didBlock',
     id: output.id
   }),

@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import { propagate } from '../propagate.js';
-import { softDelete, softDeleteQuestion } from '../rows.js';
+import { idOutput, softDelete, softDeleteQuestion } from '../rows.js';
 import {
   assertScopeExists,
   isOwnScope,
@@ -18,6 +20,8 @@ export const del = defineOperation({
   name: 'ooo.delete',
   description: 'Removes an out-of-office rule',
   input: inputSchema,
+  output: idOutput,
+  problems: [HTTP_NOT_FOUND],
   minRole: 'user',
   scope: async (ctx, input) =>
     isOwnScope(ctx, scopeFromColumns(await liveOooRule(ctx.db, input.id))),
