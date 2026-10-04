@@ -11,17 +11,15 @@
 import http from 'node:http';
 import process from 'node:process';
 import pino from 'pino';
-import { WebSocketServer, type WebSocket } from 'ws';
 
-import { dbFileFrom, openDb, resolveVersion, type Db } from '@zamfono/shared';
+import { dbFileFrom, openDb, resolveVersion } from '@zamfono/shared';
 
 import { EventHub } from '#lib/server/events.js';
-import { authenticateEventsSocket } from '#lib/server/eventsAuth.js';
 import { provideEventSink } from '#lib/server/eventSink.js';
+import { attachEventsServer } from '#lib/server/eventsServer.js';
 
 // A fixed internal port, never configurable per stack (§6.3 "Compose stack").
 const API_INTERNAL_PORT = 3000;
-const EVENTS_PATH = '/events';
 const logger = pino({ name: 'server' });
 // §7 "Version": read once at boot, since neither variable changes for the life of the process.
 const zamfonoVersion = resolveVersion(process.env);
@@ -48,23 +46,6 @@ async function loadHandler(): Promise<Handler> {
   const handlerUrl = new URL('./handler.js', import.meta.url).href;
   const built = (await import(handlerUrl)) as { handler: Handler };
   return built.handler;
-}
-
-/** Runs the `/events` auth handshake on an upgraded socket, then registers it with `hub`. */
-async function acceptEventsSocket(
-  hub: EventHub,
-  socket: WebSocket,
-  deps: { db: Db; jwtSecret: string }
-): Promise<void> {
-  try {
-    const auth = await authenticateEventsSocket(socket, deps);
-    if (auth) {
-      await hub.subscribeWs(socket, auth);
-    }
-  } catch (error) {
-    logger.error({ error }, '/events socket setup failed');
-    socket.terminate();
-  }
 }
 
 /**
@@ -101,21 +82,7 @@ async function main(): Promise<void> {
   // After the handler, whose load validates `src/env.ts` and names every required variable missing.
   const jwtSecret = requireEnv('JWT_SECRET');
   const server = http.createServer(handler);
-  const wss = new WebSocketServer({ noServer: true });
-  wss.on('error', (error: unknown) => {
-    logger.error({ error }, '/events WebSocket server error');
-  });
-  server.on('upgrade', (request, socket, head) => {
-    if (request.url !== EVENTS_PATH) {
-      socket.destroy();
-      return;
-    }
-    wss.handleUpgrade(request, socket, head, ws => {
-      acceptEventsSocket(hub, ws, { db, jwtSecret }).catch((error: unknown) => {
-        logger.error({ error }, '/events socket accept failed');
-      });
-    });
-  });
+  attachEventsServer(server, { hub, db, jwtSecret });
   exitOnSignal(server);
   await new Promise<void>(resolve => {
     server.listen(API_INTERNAL_PORT, resolve);

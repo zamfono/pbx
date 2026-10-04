@@ -8,6 +8,10 @@ import { WebSocket, WebSocketServer } from 'ws';
 import type { Logger } from '../ari/types.js';
 import type { EventBus } from './eventBus.js';
 
+// `api` sends nothing on the stream; `ws` closes a socket with 1009 on a frame past this size
+// before buffering it.
+const MAX_FRAME_BYTES = 1024;
+
 /**
  * `ws` reports a receiver protocol violation or a broken pipe as an `'error'` event, which Node
  * throws when no listener is attached; the server, every accepted socket and every send carry
@@ -19,7 +23,10 @@ export function attachEventStream(
   deps: { bus: EventBus; log: Logger }
 ): WebSocketServer {
   const { bus, log } = deps;
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({
+    noServer: true,
+    maxPayload: MAX_FRAME_BYTES
+  });
   wss.on('error', (error: Error) => {
     log.warn({ err: error }, 'internal event stream failed');
   });

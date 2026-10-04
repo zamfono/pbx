@@ -351,6 +351,46 @@ describe('startInternalServer', () => {
     }
   });
 
+  it('closes an /internal/events socket that sends a large frame, with 1009', async () => {
+    const started = await startInternalServer(
+      {
+        db,
+        ari,
+        log: noopLogger,
+        cache: new ConfigCache(db),
+        state: new StateStore(),
+        bus: new EventBus(),
+        actions: testActions(ari, db),
+        presence: idlePresence(),
+        recorder: idleRecorder,
+        trunks: { refreshMonitoring: () => Promise.resolve() },
+        version: VERSION
+      },
+      ANY_FREE_PORT
+    );
+    try {
+      const socket = new WebSocket(
+        `ws://127.0.0.1:${started.port}/internal/events`
+      );
+      await new Promise<void>((resolve, reject) => {
+        socket.once('open', () => {
+          resolve();
+        });
+        socket.once('error', reject);
+      });
+      const closed = new Promise<number>(resolve => {
+        socket.once('close', code => {
+          resolve(code);
+        });
+      });
+      socket.send('x'.repeat(64 * 1024));
+      // RFC 6455 §7.4.1: the close code of a frame too big to process.
+      expect(await closed).toBe(1009);
+    } finally {
+      await started.close();
+    }
+  });
+
   it('closes while an /internal/events subscriber is still connected, ending its socket', async () => {
     const started = await startInternalServer(
       {
