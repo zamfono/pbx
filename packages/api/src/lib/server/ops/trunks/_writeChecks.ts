@@ -5,6 +5,8 @@ import {
   TRUNK_SECTION_PREFIX,
   type CallerIdHeader,
   type Db,
+  type HostDirection,
+  type TrunkAuthMode,
   type TrunkTransport
 } from '@zamfono/shared';
 
@@ -21,6 +23,23 @@ export function assertTransportEnabled(transport: TrunkTransport): void {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
       `transport '${transport}' is disabled by this deployment`
+    );
+  }
+}
+
+/**
+ * Throws 422 for a `registration` trunk none of whose `hosts` is `outbound` or `both`: the first
+ * of them is its registrar, which every INVITE and the registration target (§9.4 "Hosts").
+ */
+export function assertHasRegistrar(
+  authMode: TrunkAuthMode,
+  hosts: { direction?: HostDirection }[]
+): void {
+  const dialable = hosts.some(host => host.direction !== 'inbound');
+  if (authMode === 'registration' && !dialable) {
+    throw new OpError(
+      HTTP_UNPROCESSABLE_CONTENT,
+      'a registration trunk needs an outbound or both host, its registrar'
     );
   }
 }

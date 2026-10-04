@@ -25,6 +25,7 @@ import {
 import {
   assertClirAllowed,
   assertCredentialsConsistency,
+  assertHasRegistrar,
   assertInboundAuthUsernameFree,
   assertNameAvailable,
   assertPaiHasIdentity,
@@ -187,6 +188,7 @@ export const create = defineOperation<Input, Output>({
     assertNoStrayRegistrationFields(input);
     assertPaiHasIdentity(callerIdHeader, input.username ?? null);
     assertValidHosts(input.hosts);
+    assertHasRegistrar(input.authMode, input.hosts);
     assertValidOutboundProxy(input.outboundProxy);
     if (input.username !== undefined) {
       assertValidUsername(input.username);

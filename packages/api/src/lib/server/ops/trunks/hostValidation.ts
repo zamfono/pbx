@@ -2,6 +2,7 @@ import { isIPv4, isIPv6 } from 'node:net';
 
 import {
   HTTP_UNPROCESSABLE_CONTENT,
+  isCidr,
   type HostDirection
 } from '@zamfono/shared';
 
@@ -16,34 +17,12 @@ const UNSAFE_HOST_PATTERN = /[\r\n[\]]/u;
 const FQDN_PATTERN =
   /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/iu;
 
-const MAX_IPV4_PREFIX_LENGTH = 32;
-const MAX_IPV6_PREFIX_LENGTH = 128;
-
-/** Whether `value` is a CIDR range of either family, `<address>/<prefix>` (§11.1 "Column types"). */
-function isValidCidr(value: string): boolean {
-  const slashIndex = value.indexOf('/');
-  if (slashIndex === -1) {
-    return false;
-  }
-  const address = value.slice(0, slashIndex);
-  const prefix = value.slice(slashIndex + 1);
-  if (!/^\d+$/u.test(prefix)) {
-    return false;
-  }
-  const prefixLength = Number(prefix);
-  if (isIPv4(address)) {
-    return prefixLength <= MAX_IPV4_PREFIX_LENGTH;
-  }
-  if (isIPv6(address)) {
-    return prefixLength <= MAX_IPV6_PREFIX_LENGTH;
-  }
-  return false;
-}
-
 /**
  * Throws 422 for a `trunk_hosts.host` value that is not safe to interpolate into generated PJSIP
- * config, or that is not an FQDN, an IP literal, or — for `direction: 'inbound'` only — a CIDR
- * range of either family (§9.4 "Hosts", §11.2 "trunk_hosts": CIDR is inbound-only).
+ * config, or that is not an FQDN, an IPv4 literal, or — for `direction: 'inbound'` only — an IPv6
+ * literal or a CIDR range of either family (§9.4 "Hosts", §11.2 "trunk_hosts"). A host we dial
+ * or register to becomes an unbracketed `sip:<host>` URI, and the public side is IPv4-only
+ * (§9.1), so an IPv6 literal is a source address only.
  */
 export function assertValidHost(host: string, direction: HostDirection): void {
   if (UNSAFE_HOST_PATTERN.test(host)) {
@@ -52,10 +31,10 @@ export function assertValidHost(host: string, direction: HostDirection): void {
       `host contains characters unsafe for generated config: ${host}`
     );
   }
-  if (isIPv4(host) || isIPv6(host) || FQDN_PATTERN.test(host)) {
+  if (isIPv4(host) || FQDN_PATTERN.test(host)) {
     return;
   }
-  if (direction === 'inbound' && isValidCidr(host)) {
+  if (direction === 'inbound' && (isIPv6(host) || isCidr(host))) {
     return;
   }
   throw new OpError(HTTP_UNPROCESSABLE_CONTENT, `invalid host: ${host}`);

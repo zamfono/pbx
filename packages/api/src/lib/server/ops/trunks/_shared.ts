@@ -39,7 +39,7 @@ export const hostInputSchema = z
       .string()
       .min(1)
       .describe(
-        'An FQDN or IP address, or a CIDR range for an inbound host; resolved through NAPTR and SRV unless a port is given.'
+        'An FQDN or IPv4 address, or for an inbound host also an IPv6 address or a CIDR range; resolved through NAPTR and SRV unless a port is given.'
       ),
     port: z
       .number()

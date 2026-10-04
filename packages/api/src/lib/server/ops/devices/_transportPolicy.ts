@@ -3,6 +3,7 @@ import * as env from '$app/env/private';
 
 import {
   HTTP_UNPROCESSABLE_CONTENT,
+  isCidr,
   type DeviceKind,
   type DeviceTransport
 } from '@zamfono/shared';
@@ -10,32 +11,6 @@ import {
 import { plainSipTransports } from '#lib/server/stackAddress.js';
 
 import { OpError } from '../types.js';
-
-const MAX_IPV4_PREFIX = 32;
-const MAX_IPV6_PREFIX = 128;
-const IPV4_FAMILY = 4;
-const NO_SLASH = -1;
-
-/** One IPv4 or IPv6 address, with an optional CIDR prefix of that family's own bit width (§11.1). */
-function isValidIpOrCidr(value: string): boolean {
-  const slashIndex = value.indexOf('/');
-  const address = slashIndex === NO_SLASH ? value : value.slice(0, slashIndex);
-  const family = isIP(address);
-  if (family === 0) {
-    return false;
-  }
-  if (slashIndex === NO_SLASH) {
-    return true;
-  }
-  const prefix = value.slice(slashIndex + 1);
-  if (!/^[0-9]+$/u.test(prefix)) {
-    return false;
-  }
-  return (
-    Number(prefix) <=
-    (family === IPV4_FAMILY ? MAX_IPV4_PREFIX : MAX_IPV6_PREFIX)
-  );
-}
 
 /**
  * Throws 422 for an empty allowlist: §9.3 "Transport policy" makes `allowedIps` the entire ACL
@@ -55,7 +30,7 @@ export function assertNonEmptyIps(ips: string[]): void {
 /** Throws 422 unless every entry of `ips` is a valid IPv4/IPv6 address or CIDR range. */
 export function assertValidIps(ips: string[]): void {
   for (const ip of ips) {
-    if (!isValidIpOrCidr(ip)) {
+    if (isIP(ip) === 0 && !isCidr(ip)) {
       throw new OpError(
         HTTP_UNPROCESSABLE_CONTENT,
         `devices: invalid IP or CIDR '${ip}'`

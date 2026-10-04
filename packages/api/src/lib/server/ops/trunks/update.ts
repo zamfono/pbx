@@ -32,6 +32,7 @@ import { mergeScalars, type Merged } from './_updateMerge.js';
 import {
   assertClirAllowed,
   assertCredentialsConsistency,
+  assertHasRegistrar,
   assertInboundAuthUsernameFree,
   assertNameAvailable,
   assertPaiHasIdentity,
@@ -71,7 +72,11 @@ async function assertUpdateAllowed(
 ): Promise<void> {
   const credentialsRequired =
     merged.authMode === 'registration' || merged.inboundAuth;
-  assertTransportEnabled(merged.transport);
+  // A trunk stays editable on a transport switched off since (§9.4 "Signaling"); only a write
+  // that names the transport is refused it.
+  if (input.transport !== undefined) {
+    assertTransportEnabled(input.transport);
+  }
   assertSrtpNeedsTls(merged.srtp, merged.transport);
   assertClirAllowed(merged.clir, merged.callerIdHeader);
   assertCredentialsConsistency(
@@ -84,6 +89,12 @@ async function assertUpdateAllowed(
   assertPaiHasIdentity(merged.callerIdHeader, merged.username);
   if (input.hosts) {
     assertValidHosts(input.hosts);
+  }
+  if (merged.authMode === 'registration') {
+    assertHasRegistrar(
+      merged.authMode,
+      input.hosts ?? (await loadTrunkHosts(ctx.db, input.id))
+    );
   }
   if (input.outboundProxy !== undefined) {
     assertValidOutboundProxy(input.outboundProxy);

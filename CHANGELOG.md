@@ -224,6 +224,11 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- A `registration` trunk whose hosts were all `inbound` was accepted, after which every
+  configuration change failed to reach Asterisk and `core` restarted in a loop; it is now refused
+  with 422, as is an IPv6 address as an `outbound` or `both` trunk host, which Asterisk could not
+  dial. A trunk on a transport switched off since it was set up (`SIP_UDP_ENABLED`,
+  `SIP_TCP_ENABLED`) can be edited again; only setting that transport is refused.
 - Undoing the creation of a DID that had become a user's caller ID was refused with 409, since
   the user still presented it; the undo now gives the user back no caller ID of their own, then
   deletes the DID. Pointing an existing DID at a user who presents no number of their own now

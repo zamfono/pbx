@@ -8,6 +8,7 @@ export * from './openingHours.js';
 export * from './numbers.js';
 export * from './featureCodes.js';
 export * from './trunks.js';
+export * from './cidr.js';
 export * from './columnValues.js';
 export * from './sipHeaders.js';
 export * from './events.js';

@@ -7,6 +7,8 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §5.4.** The cipher is named by its libsodium API, `crypto_aead_xchacha20poly1305_ietf`. `api` refuses to start when `SECRETBOX_KEY` and `SECRETBOX_KEY_PREVIOUS` carry the same generation; the new key is `<N+1>:<base64 of 32 random bytes>`; `m` in the sweep's log line, and `/healthz`, count the blobs the current key cannot decrypt.
 *Why:* equal generations were accepted and made every old blob unreadable, the procedure never said the generation must rise, and `/healthz` counted only version bytes, so it reported 0 where the sweep reported unreadable secrets; libsodium's secretbox is XSalsa20-Poly1305, not the construction in use.
+**2026-10-04 · §9.4 Hosts, Signaling; §11.2 trunk_hosts.** A dialed trunk host (`outbound`, `both`) is an FQDN or an IPv4 address; an IPv6 literal is `inbound` only. A `registration` trunk needs an `outbound` or `both` host, its registrar, which is the first such host. A disabled transport is refused only when a write sets it; a trunk already on it stays editable.
+*Why:* an inbound-only registration trunk crash-looped `core` and broke every PJSIP render; an IPv6 host rendered an invalid unbracketed SIP URI; a trunk on a since-disabled transport could not be renamed, edited or undone.
 
 **2026-10-03 · §6.3 compose.yaml.** The `migrate` service gets no `DB_FILE`: `/data/zamfono.sqlite3` is its own default, as it is `api`'s and `core`'s.
 *Why:* product-owner decision on internal values: "sensible defaults" in code; compose repeated the path for `migrate` alone.
