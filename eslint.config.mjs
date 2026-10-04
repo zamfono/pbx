@@ -30,6 +30,9 @@ export default defineConfig(
           allowDefaultProject: ['*.mjs', 'packages/*/vitest.config.ts'],
           defaultProject: 'scripts/tsconfig.json'
         },
+        // Set for every file, not only the .svelte ones: the project service is shared, and
+        // parser options that differ between files make it reload its projects.
+        extraFileExtensions: ['.svelte'],
         tsconfigRootDir: import.meta.dirname
       }
     },
@@ -245,8 +248,6 @@ export default defineConfig(
         ...globals.node
       },
       parserOptions: {
-        projectService: true,
-        extraFileExtensions: ['.svelte'],
         parser: tseslint.parser
       }
     },
