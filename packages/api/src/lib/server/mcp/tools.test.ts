@@ -47,6 +47,20 @@ describe('listTools', () => {
     }
   });
 
+  it("publishes the help tool's two answers, the topic list and one topic, as one output schema", () => {
+    const help = listTools().find(tool => tool.name === 'zamfono.help');
+    expect(help?.outputSchema).toMatchObject({
+      type: 'object',
+      properties: {
+        topics: { type: 'array', items: { type: 'string' } },
+        topic: { type: 'string' },
+        content: { type: 'string' }
+      },
+      additionalProperties: false
+    });
+    expect(help?.outputSchema).not.toHaveProperty('required');
+  });
+
   it('sorts tools by code point and always offers the help tool', () => {
     const names = listTools().map(tool => tool.name);
     expect(names).toContain('zamfono.help');

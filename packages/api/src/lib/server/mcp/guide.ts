@@ -32,6 +32,20 @@ export const HELP_TOOL = {
       }
     }
   },
+  // Either answer is this one object: the topic list alone, or the topic with its text.
+  outputSchema: {
+    type: 'object',
+    properties: {
+      topics: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Every topic name, when no topic was asked for.'
+      },
+      topic: { type: 'string', description: 'The topic asked for.' },
+      content: { type: 'string', description: "The topic's text, in Markdown." }
+    },
+    additionalProperties: false
+  },
   annotations: { readOnlyHint: true, destructiveHint: false }
 };
 type HelpOutput = { topics: string[] } | { topic: string; content: string };

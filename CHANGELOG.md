@@ -200,6 +200,8 @@ why the specified behaviour changed; the commit history, how.
   `structuredContent` of a call.
 - `zamfono.help` with an unknown topic still fails with 404, but its message now lists every
   topic; `index` lists them like a call without a topic, and the server instructions say so.
+- `zamfono.help` carries an `outputSchema` too: `topics` for the topic list, `topic` and
+  `content` for one topic.
 - Webhook deliveries survive a restart of `api`: an event still queued, or waiting for its retry,
   when `api` restarts (an update, a crash) is delivered after it, with the attempts it has left,
   where it used to be lost. Deleting a webhook drops its pending deliveries. A delivery cut off
