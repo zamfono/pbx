@@ -367,6 +367,58 @@ describe('EventHub', () => {
     client.close();
   });
 
+  it('drops a socket whose unsent backlog has outgrown the limit, sending it nothing more', async () => {
+    const db = await migratedDb('u1');
+    const hub = new EventHub(db);
+    const { sessionId } = await seedSession(db);
+    wss = await listeningServer();
+    const subscribed = new Promise<WebSocket>(resolve => {
+      wss.once('connection', socket => {
+        hub.subscribeWs(socket, { actor: U1, sessionId }).then(
+          () => {
+            resolve(socket);
+          },
+          () => {
+            resolve(socket);
+          }
+        );
+      });
+    });
+    const client = new WebSocket(serverUrl(wss));
+    await new Promise<void>(resolve => {
+      client.once('open', () => {
+        resolve();
+      });
+    });
+    const serverSocket = await subscribed;
+    // A client that stopped reading: what `ws` has not handed to the kernel yet piles up.
+    Object.defineProperty(serverSocket, 'bufferedAmount', {
+      value: 64 * 1024 * 1024
+    });
+    let received = 0;
+    client.on('message', () => {
+      received += 1;
+    });
+    const closed = new Promise<void>(resolve => {
+      client.once('close', () => {
+        resolve();
+      });
+    });
+
+    hub.publish({
+      id: newId(),
+      at: nowIso(),
+      type: 'ooo',
+      scope: 'tenant',
+      active: false,
+      startsAt: null,
+      expiresAt: null
+    });
+
+    await closed;
+    expect(received).toBe(0);
+  });
+
   it('delivers a user the call.state of a call they placed, in the §10.6 shape', async () => {
     const db = await migratedDb('u1');
     const hub = new EventHub(db);

@@ -66,6 +66,10 @@ type Subscription = { auth: Authenticated; ringGroupIds: ReadonlySet<string> };
 // personal access token ended.
 const USER_CHANGED_CLOSE_CODE = 4401;
 
+// §10.6: the unsent bytes a socket may hold before it is dropped, hundreds of events' worth; a
+// client that stops reading would otherwise keep every later event in `api`'s memory.
+const MAX_BUFFERED_BYTES = 1_048_576;
+
 /** The ring group ids each user may see mailbox events for (§5.3, `ringGroupMemberships`). */
 async function ringGroupIdsByUser(db: Db): Promise<Map<string, Set<string>>> {
   const rows = await ringGroupMemberships(db);
@@ -124,10 +128,18 @@ export class EventHub {
     this.db = db;
   }
 
-  /** Sends `ev` to every connected socket `visibleTo` (plus ring-group mailboxes) admits. */
+  /**
+   * Sends `ev` to every connected socket `visibleTo` (plus ring-group mailboxes) admits; drops a
+   * socket whose unsent backlog has passed `MAX_BUFFERED_BYTES` instead.
+   */
   publish(ev: Envelope): void {
     for (const [socket, sub] of this.subscribers) {
       if (socket.readyState !== WebSocket.OPEN || !isVisible(sub, ev)) {
+        continue;
+      }
+      if (socket.bufferedAmount > MAX_BUFFERED_BYTES) {
+        this.subscribers.delete(socket);
+        socket.terminate();
         continue;
       }
       socket.send(JSON.stringify(publicEnvelope(ev)));
