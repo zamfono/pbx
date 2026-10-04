@@ -1,14 +1,10 @@
 import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
-import {
-  HTTP_FORBIDDEN,
-  HTTP_NOT_FOUND,
-  type DB,
-  type Db
-} from '@zamfono/shared';
+import { HTTP_NOT_FOUND, type DB, type Db } from '@zamfono/shared';
 
 import { OpError, type Context } from '../types.js';
+import { namesAnOwner } from '../users/_shared.js';
 
 export type PersonalAccessTokenRow = Selectable<DB['personalAccessTokens']>;
 
@@ -66,13 +62,25 @@ export async function ownPersonalAccessToken(
   return (await personalAccessToken(ctx.db, input.id)).userId === ctx.actor.id;
 }
 
-/** Throws 403 unless the caller may act on the tokens of a user holding `role`: an owner's are
- *  owner-only, like an owner's password (§10.3). */
-export function assertMayActFor(ctx: Context, role: string): void {
-  if (role === 'owner' && ctx.actor.role !== 'owner') {
-    throw new OpError(
-      HTTP_FORBIDDEN,
-      "personalAccessTokens: only owners act on an owner's tokens"
-    );
-  }
+/** The `ownerOnly` of an operation acting for `userId`: an owner's tokens are owner-only, like an
+ *  owner's password (§10.3). Throws `OpError(404)` when no live user has that id. */
+export function forAnOwner(
+  ctx: Context,
+  input: { userId: string }
+): Promise<boolean> {
+  return namesAnOwner(ctx, { id: input.userId });
+}
+
+/** The `ownerOnly` of an operation addressing a token by `id`: one of an owner's (§10.3). */
+export async function anOwnersToken(
+  ctx: Context,
+  input: { id: string }
+): Promise<boolean> {
+  const token = await personalAccessToken(ctx.db, input.id);
+  const user = await ctx.db
+    .selectFrom('users')
+    .select('role')
+    .where('id', '=', token.userId)
+    .executeTakeFirstOrThrow();
+  return user.role === 'owner';
 }

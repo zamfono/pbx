@@ -112,6 +112,56 @@ describe('personalAccessTokens', () => {
     });
   });
 
+  // §10.3 "Personal access tokens": an owner's are owner-only, the list included.
+  it("refuses an admin the list of an owner's tokens", async () => {
+    const db = await seededDb();
+    await create(db, owner, owner.id);
+    await expect(
+      runOperation(
+        db,
+        'personalAccessTokens.list',
+        { userId: owner.id },
+        asRun({ actor: admin })
+      )
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  // §10.3 "Confirmation": the question comes after the checks that refuse the caller.
+  it("refuses an admin an owner's token before asking to revoke it", async () => {
+    const db = await seededDb();
+    const owners = await create(db, owner, owner.id);
+    await expect(
+      runOperation(
+        db,
+        'personalAccessTokens.revoke',
+        { id: owners.id },
+        asRun({ actor: admin })
+      )
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('answers 404 for the list of an unknown or deleted user', async () => {
+    const db = await seededDb();
+    await db
+      .updateTable('users')
+      .set({ deletedAt: nowIso() })
+      .where('id', '=', ben.id)
+      .execute();
+    for (const actor of [admin, owner]) {
+      for (const userId of ['nobody', ben.id]) {
+        // eslint-disable-next-line no-await-in-loop -- one refusal after another on the same db
+        await expect(
+          runOperation(
+            db,
+            'personalAccessTokens.list',
+            { userId },
+            asRun({ actor })
+          )
+        ).rejects.toMatchObject({ status: 404 });
+      }
+    }
+  });
+
   it('refuses a live duplicate name and an expiry in the past, and asks before revoking', async () => {
     const db = await seededDb();
     const first = await create(db, anna, anna.id);

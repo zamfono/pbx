@@ -42,22 +42,28 @@ export function checkRole(op: ErasedOperation, actor: Actor): void {
   }
 }
 
-/** Throws 403 unless what the input names is a `user` caller's own (`Operation.scope`, §5.3); an
- *  `admin` or `owner` acts on anything. */
+/** Throws 403 unless what the input names is a `user` caller's own (`Operation.scope`, §5.3), and
+ *  when a caller below owner makes a call only an owner makes (`Operation.ownerOnly`, §10.3); an
+ *  `admin` acts on anything else, an `owner` on anything. */
 export async function checkScope(
   op: ErasedOperation,
   ctx: Context,
   input: unknown
 ): Promise<void> {
   if (
-    ctx.actor.role !== 'user' ||
-    op.minRole !== 'user' ||
-    op.scope === 'any'
+    ctx.actor.role === 'user' &&
+    op.minRole === 'user' &&
+    op.scope !== 'any' &&
+    !(await op.scope(ctx, input))
   ) {
-    return;
-  }
-  if (!(await op.scope(ctx, input))) {
     throw new OpError(HTTP_FORBIDDEN, `${op.name}: not your own`);
+  }
+  if (
+    ctx.actor.role !== 'owner' &&
+    op.ownerOnly &&
+    (await op.ownerOnly(ctx, input))
+  ) {
+    throw new OpError(HTTP_FORBIDDEN, `${op.name}: owners only`);
   }
 }
 

@@ -5,7 +5,7 @@ import { HTTP_CONFLICT, HTTP_NOT_FOUND } from '@zamfono/shared';
 import { recordChange, setUndoable } from '../audit.js';
 import { defineOperation, OpError } from '../types.js';
 import {
-  assertMayActFor,
+  anOwnersToken,
   ownPersonalAccessToken,
   personalAccessToken,
   personalAccessTokenWire,
@@ -22,6 +22,7 @@ export const revoke = defineOperation({
   problems: [HTTP_NOT_FOUND, HTTP_CONFLICT],
   minRole: 'user',
   scope: ownPersonalAccessToken,
+  ownerOnly: anOwnersToken,
   confirm: async (ctx, input) => {
     const token = await personalAccessToken(ctx.db, input.id);
     return `Revoke the personal access token '${token.name}'? The application using it loses access at once; this cannot be undone.`;
@@ -29,12 +30,6 @@ export const revoke = defineOperation({
   entity: input => ({ kind: 'personalAccessToken', id: input.id }),
   run: async (ctx, input) => {
     const token = await personalAccessToken(ctx.db, input.id);
-    const user = await ctx.db
-      .selectFrom('users')
-      .select('role')
-      .where('id', '=', token.userId)
-      .executeTakeFirstOrThrow();
-    assertMayActFor(ctx, user.role);
     if (token.revokedAt !== null) {
       throw new OpError(HTTP_CONFLICT, 'personalAccessTokens: already revoked');
     }

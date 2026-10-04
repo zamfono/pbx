@@ -14,7 +14,7 @@ import {
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { liveRow } from '../rows.js';
 import { logLevelOutputFields, logLevelWire } from '../settings/logLevel.js';
-import { OpError } from '../types.js';
+import { OpError, type Context } from '../types.js';
 import { accountLockedUntil } from './_accountLock.js';
 import { userExtension } from './_extensions.js';
 
@@ -190,4 +190,13 @@ export async function liveUser(
   id: string
 ): Promise<UserRow> {
   return liveRow(db, 'users', id, `user '${id}' not found`);
+}
+
+/** The `ownerOnly` of an operation addressing a live user by `id`: an owner's account is
+ *  owner-only (§10.3). Throws `OpError(404)` when no live user has that id. */
+export async function namesAnOwner(
+  ctx: Context,
+  input: { id: string }
+): Promise<boolean> {
+  return (await liveUser(ctx.db, input.id)).role === 'owner';
 }

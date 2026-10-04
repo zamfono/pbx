@@ -46,15 +46,16 @@ export function outputJsonSchema(op: ErasedOperation): JsonSchema {
 }
 
 /**
- * Every problem status `op` answers with: input validation's 422, a 403 for a role above `user`
- * or an own scope (§5.3), a 409 for `confirm` (§10.3), and its own `problems`; ascending.
+ * Every problem status `op` answers with: input validation's 422, a 403 for a role above `user`,
+ * an own scope (§5.3) or `ownerOnly` (§10.3), a 409 for `confirm` (§10.3), and its own
+ * `problems`; ascending.
  */
 export function problemStatuses(op: ErasedOperation): ProblemStatus[] {
   const statuses = new Set<ProblemStatus>([
     HTTP_UNPROCESSABLE_CONTENT,
     ...(op.problems ?? [])
   ]);
-  if (op.minRole !== 'user' || op.scope !== 'any') {
+  if (op.minRole !== 'user' || op.scope !== 'any' || op.ownerOnly) {
     statuses.add(HTTP_FORBIDDEN);
   }
   if (op.confirm) {

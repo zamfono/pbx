@@ -59,6 +59,12 @@ export type Operation<In, Out> = {
    */
   problems?: readonly ProblemStatus[];
   readOnly?: boolean;
+  /**
+   * Whether this call is one only an owner makes, which the runner checks with the own scope for
+   * a caller below owner (403): it acts on an owner's account or tokens, or brings an admin into
+   * being (§10.3). It may throw the 404 of what the input names not existing.
+   */
+  ownerOnly?: (ctx: Context, input: In) => boolean | Promise<boolean>;
   /** The question a human answers before a destructive call runs, naming what it acts on (§10.3). */
   confirm?: (ctx: Context, input: In) => string | Promise<string>;
   /** `false` opts a write out of the audit log: presence, read flags, live-call actions (§5.7). */

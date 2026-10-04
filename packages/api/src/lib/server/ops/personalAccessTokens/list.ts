@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
+
 import {
   decodeIdCursor,
   keysetPage,
@@ -9,7 +11,9 @@ import {
 
 import { ownActingUser } from '../gates.js';
 import { defineOperation } from '../types.js';
+import { liveUser } from '../users/_shared.js';
 import {
+  forAnOwner,
   personalAccessTokenWire,
   toPersonalAccessTokenWire
 } from './_shared.js';
@@ -26,10 +30,13 @@ export const list = defineOperation({
     })
     .strict(),
   output: pageOutput(personalAccessTokenWire),
+  problems: [HTTP_NOT_FOUND],
   minRole: 'user',
   scope: ownActingUser,
+  ownerOnly: forAnOwner,
   readOnly: true,
   run: async (ctx, input) => {
+    await liveUser(ctx.db, input.userId);
     const { limit } = input;
     let query = ctx.db
       .selectFrom('personalAccessTokens')

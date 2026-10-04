@@ -2,7 +2,7 @@ import * as env from '$app/env/private';
 import pino from 'pino';
 import { z } from 'zod';
 
-import { HTTP_FORBIDDEN, HTTP_NOT_FOUND } from '@zamfono/shared';
+import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
 import { issueResetToken } from '#lib/server/auth/tokens.js';
 import { sendMail } from '#lib/server/mail/index.js';
@@ -10,9 +10,9 @@ import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { afterCommit } from '../afterCommit.js';
 import { setUndoable } from '../audit.js';
-import { defineOperation, OpError } from '../types.js';
+import { defineOperation } from '../types.js';
 import { setupLinkFor } from './_setupMail.js';
-import { liveUser } from './_shared.js';
+import { liveUser, namesAnOwner } from './_shared.js';
 
 const logger = pino({ name: 'users.resetPassword' });
 
@@ -31,17 +31,12 @@ export const resetPassword = defineOperation({
   }),
   problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
+  ownerOnly: namesAnOwner,
   // A sent e-mail changes nothing of the user an undo would build on (§5.8 "pure actions").
   pureAction: true,
   entity: input => ({ kind: 'user', id: input.id }),
   run: async (ctx, input) => {
-    const user = await liveUser(ctx.db, input.id);
-    if (user.role === 'owner' && ctx.actor.role !== 'owner') {
-      throw new OpError(
-        HTTP_FORBIDDEN,
-        "users: only owners reset an owner's password"
-      );
-    }
+    await liveUser(ctx.db, input.id);
     const { raw, expiresAt } = await issueResetToken(
       ctx.db,
       input.id,

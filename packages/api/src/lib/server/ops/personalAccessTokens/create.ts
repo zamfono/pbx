@@ -15,7 +15,7 @@ import { isoDatetimeInput, toUtcIso } from '../ooo/_shared.js';
 import { Conflict, defineOperation, OpError } from '../types.js';
 import { liveUser } from '../users/_shared.js';
 import {
-  assertMayActFor,
+  forAnOwner,
   personalAccessTokenWire,
   toPersonalAccessTokenWire
 } from './_shared.js';
@@ -60,10 +60,10 @@ export const create = defineOperation({
   problems: [HTTP_NOT_FOUND, HTTP_CONFLICT],
   minRole: 'user',
   scope: ownActingUser,
+  ownerOnly: forAnOwner,
   entity: (_input, output) => ({ kind: 'personalAccessToken', id: output.id }),
   run: async (ctx, input) => {
-    const user = await liveUser(ctx.db, input.userId);
-    assertMayActFor(ctx, user.role);
+    await liveUser(ctx.db, input.userId);
     const expiresAt =
       input.expiresAt === undefined || input.expiresAt === null
         ? null
