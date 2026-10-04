@@ -8,6 +8,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 *Why:* product-owner decision "Move them": every core test double in one directory the build excludes once.
 **2026-10-04 · §5.8.** Product-owner decision (undo of a deletion vs rows deleted since): undoing a deletion is refused with a 409 naming each row deleted since that the revived row, or the forward targets it and its own rules route to, points at; that deletion is undone first.
 *Why:* "Refuse with 409 (Recommended)": the undo revived a menu onto a greeting deleted meanwhile, and the daily purge then failed on the menu's `RESTRICT` reference every day, or, for a `SET NULL` one, cleared a live row's setting.
+**2026-10-04 · §11.4.** Product-owner decision (soft-delete vs audit retention): `soft_delete_retention_days` may not exceed a set `audit_retention_days`; `PATCH /settings` answers 422 for a pair that would.
+*Why:* "Refuse the setting (Recommended)": with a longer soft-delete window, the audit purge took a deletion's entry while its row still waited, so the undo the confirmation promised for that many days answered 404.
+
 **2026-10-04 · §11.6 Retention.** The daily purge of `backup_runs` keeps each target's latest successful run, however old.
 *Why:* `/metrics` reports the age of that run per target (§7); once a target had failed for longer than `recording_retention_days`, the purge took the run and the gauge vanished instead of growing.
 

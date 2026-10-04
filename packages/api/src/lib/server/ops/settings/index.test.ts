@@ -458,4 +458,41 @@ describe('settings', () => {
       )
     ).resolves.toMatchObject({ backupCron: '30 2 * * 1-5' });
   });
+
+  // The deletion's audit entry is what undo reverts (§5.8), so it must outlive the deleted row.
+  it.each([
+    { patch: { softDeleteRetentionDays: 61 } },
+    { patch: { auditRetentionDays: 44 } },
+    { patch: { softDeleteRetentionDays: 90, auditRetentionDays: 89 } }
+  ])(
+    'refuses $patch, a soft-delete retention beyond the audit retention, with 422',
+    async ({ patch }) => {
+      const db = await makeTestDb();
+      await seedSettings(db, {
+        softDeleteRetentionDays: 45,
+        auditRetentionDays: 60
+      });
+      await expect(
+        runOperation(db, 'settings.update', patch, asRun())
+      ).rejects.toMatchObject({ status: 422 });
+    }
+  );
+
+  it.each([
+    { patch: { softDeleteRetentionDays: 60 } },
+    { patch: { auditRetentionDays: 45 } },
+    { patch: { softDeleteRetentionDays: 400, auditRetentionDays: null } }
+  ])(
+    'accepts $patch, a soft-delete retention within the audit retention',
+    async ({ patch }) => {
+      const db = await makeTestDb();
+      await seedSettings(db, {
+        softDeleteRetentionDays: 45,
+        auditRetentionDays: 60
+      });
+      await expect(
+        runOperation(db, 'settings.update', patch, asRun())
+      ).resolves.toMatchObject(patch);
+    }
+  );
 });

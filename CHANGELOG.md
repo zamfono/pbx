@@ -92,6 +92,9 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
+- `PATCH /settings` refuses with 422 a `softDeleteRetentionDays` longer than a set
+  `auditRetentionDays`: a deletion stays undoable for the whole soft-delete window only while its
+  audit entry is kept as long.
 - **Breaking:** the first owner's password hash, `BOOTSTRAP_OWNER_PASSWORD_HASH`, is required:
   `api` refuses its first boot without it, or with a value that is not an Argon2id hash (such as
   one Compose cut short because it was not quoted), and the first owner no longer gets a

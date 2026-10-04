@@ -2560,7 +2560,7 @@ A DID's `number` is what the trunk boundary produces (§9.4): the international 
 | `parking_timeout_s` | seconds a parked call waits before ringing the parker back; five minutes covers the walk to a colleague's desk that parking exists for | `300` | §10.2 |
 | `call_log_level` | tenant diagnostics default; `sip` is rejected while `HEP_ENABLED=false` | `events` | §7 |
 | `recording_retention_days` | purge age for recordings, `calls.log`, `call_qos`, `presence_log` and `backup_runs` | `90` | §11.6 |
-| `soft_delete_retention_days` | days a soft-deleted row and its files survive before the hard purge; bounds the undo of deletions; at least 1 | `30` | §5 |
+| `soft_delete_retention_days` | days a soft-deleted row and its files survive before the hard purge; bounds the undo of deletions; at least 1 and at most `audit_retention_days` when that is set, since the undo reverts the deletion's audit entry: `PATCH /settings` refuses a pair that breaks this with 422 | `30` | §5 |
 | `audit_retention_days` 👑 | purge age for audit entries; NULL = kept forever. The floor of 30 keeps even an owner from erasing the trail of a recent change | NULL | §5 |
 | `backup_cron` | cron expression of the restic backup job | `0 3 * * *` | §6.5 |
 | `tls_reload_hour` | hour `0`–`23` for certificate swaps when the tenant schedule offers no closed period (priority chain in §6.4) | NULL | §6.4 |

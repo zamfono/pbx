@@ -46,6 +46,31 @@ function assertCallLogLevel(level: SettingsInput['callLogLevel']): void {
 }
 
 /**
+ * Refuses a soft-delete retention longer than the audit retention (§11.4): undoing a deletion
+ * reverts its audit entry (§5.8), which must not be purged while the deleted row is still there.
+ */
+function assertRetentionWindows(
+  before: {
+    softDeleteRetentionDays: number;
+    auditRetentionDays: number | null;
+  },
+  input: SettingsInput
+): void {
+  const softDelete =
+    input.softDeleteRetentionDays ?? before.softDeleteRetentionDays;
+  const audit =
+    input.auditRetentionDays === undefined
+      ? before.auditRetentionDays
+      : input.auditRetentionDays;
+  if (audit !== null && softDelete > audit) {
+    throw new OpError(
+      HTTP_UNPROCESSABLE_CONTENT,
+      `settings: softDeleteRetentionDays (${softDelete}) must not exceed auditRetentionDays (${audit}), or a deletion would outlive the audit entry that undoes it`
+    );
+  }
+}
+
+/**
  * `PATCH /settings` (§10.3, §11.4): a partial update of the tenant settings row. Owner-only fields
  * are enforced by `checkFieldRole`; the three read-only columns (`extLength`, `ringotelOrgId`,
  * `ringotelBranchId`) are absent from the schema, so submitting them is a plain 422.
@@ -66,6 +91,7 @@ export const update = defineOperation({
     await assertNoExtensionCollision(ctx, input.emergencyNumbers);
     assertCallLogLevel(input.callLogLevel);
     assertSsoInvariants(before, input);
+    assertRetentionWindows(before, input);
     const columns: SettingsColumns = {};
     applyPlainFields(ctx, before, input, columns);
     applySecretFields(ctx, input, columns);
