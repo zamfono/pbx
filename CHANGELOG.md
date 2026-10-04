@@ -239,7 +239,8 @@ why the specified behaviour changed; the commit history, how.
   retrieving the call parked there dialled the emergency service; it is now refused with 422, as
   for a user's or ring group's extension. Out-of-office rules and opening hours for a user, ring
   group or menu that does not exist or was deleted answer 404, where they answered 500 or an
-  empty result, or attached rules to the deleted one.
+  empty result, or attached rules to the deleted one; so do changing and deleting a rule whose
+  user, ring group or menu was deleted.
 - A `registration` trunk whose hosts were all `inbound` was accepted, after which every
   configuration change failed to reach Asterisk and `core` restarted in a loop; it is now refused
   with 422, as is an IPv6 address as an `outbound` or `both` trunk host, which Asterisk could not

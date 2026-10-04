@@ -60,4 +60,28 @@ describe('a scope that does not exist (§10.3 "Out of Office", "Opening hours")'
       ).rejects.toMatchObject({ status: 404 });
     }
   );
+
+  it.each([
+    ['ooo.update', (id: string) => ({ id, active: false })],
+    ['ooo.delete', (id: string) => ({ id })]
+  ])(
+    '%s answers 404 for a rule whose user was soft-deleted',
+    async (name, input) => {
+      const db = await makeTestDb();
+      const { id } = (await runOperation(
+        db,
+        'ooo.create',
+        { scope: { kind: 'user', id: 'owner' }, target: TARGET },
+        asRun()
+      )) as { id: string };
+      await db
+        .updateTable('users')
+        .set({ deletedAt: nowIso() })
+        .where('id', '=', 'owner')
+        .execute();
+      await expect(
+        runOperation(db, name, input(id), asRun({ confirm: true }))
+      ).rejects.toMatchObject({ status: 404 });
+    }
+  );
 });

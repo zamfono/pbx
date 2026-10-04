@@ -2,7 +2,11 @@ import { z } from 'zod';
 
 import { propagate } from '../propagate.js';
 import { softDelete } from '../rows.js';
-import { assertVisibleScope, scopeFromColumns } from '../scope.js';
+import {
+  assertScopeExists,
+  assertVisibleScope,
+  scopeFromColumns
+} from '../scope.js';
 import { defineOperation } from '../types.js';
 import { liveOooRule } from './_shared.js';
 
@@ -18,11 +22,9 @@ export const del = defineOperation({
   entity: input => ({ kind: 'oooRule', id: input.id }),
   run: async (ctx, input) => {
     const rule = await liveOooRule(ctx.db, input.id);
-    assertVisibleScope(
-      ctx.actor,
-      scopeFromColumns(rule),
-      'ooo: rule not found'
-    );
+    const scope = scopeFromColumns(rule);
+    assertVisibleScope(ctx.actor, scope, 'ooo: rule not found');
+    await assertScopeExists(ctx.db, scope);
     await softDelete(ctx, 'oooRules', input.id);
     // Read by the routing pipeline (§3.1), and nothing in it reaches Asterisk's own
     // configuration, so this drops `core`'s config cache without a reload.
