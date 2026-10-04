@@ -240,7 +240,7 @@ describe('runAutoUpdatePass', () => {
     ]);
     expect(await loadUpdateState(db)).toMatchObject({
       runStartedAt: STARTED_AT,
-      runOutcomePending: 1
+      runRelease: '0.1.2'
     });
     expect(await auditOutcomes(db)).toEqual([
       {
@@ -280,7 +280,7 @@ describe('runAutoUpdatePass', () => {
     // The first of the release's attempts: no mail yet, and the retry waits for the gate.
     expect(job.mails).toEqual([]);
     expect(await loadUpdateState(db)).toMatchObject({
-      runOutcomePending: 0,
+      runRelease: null,
       autoFailedVersion: '0.1.2',
       autoFailure: 'the recreated services did not report healthy',
       autoFailedAttempts: 1
@@ -290,6 +290,44 @@ describe('runAutoUpdatePass', () => {
       { outcome: 'started' },
       { outcome: 'failed', to: '0.1.2' }
     ]);
+  });
+
+  it("counts an edge run's failure on its own build, though main published a newer one meanwhile", async () => {
+    const db = await makeTestDb();
+    await seed(db, true);
+    const job = harness(db);
+    const edge = (commit: string) => ({
+      version: 'edge',
+      commit,
+      url: `https://example/actions/runs/${commit.slice(0, 1)}`,
+      publishedAt: '2026-09-30T12:00:00Z'
+    });
+    job.current.status = status({
+      current: 'edge',
+      latest: edge('b'.repeat(40))
+    });
+    await runAutoUpdatePass(job.deps);
+    expect(job.asked).toHaveLength(1);
+
+    job.current.status = status({
+      current: 'edge',
+      latest: edge('c'.repeat(40)),
+      last: {
+        state: 'failed',
+        from: 'edge',
+        to: 'edge',
+        startedAt: STARTED_AT,
+        finishedAt: '2026-10-01T03:05:00.000Z',
+        error: 'the recreated services did not report healthy'
+      }
+    });
+    job.current.gate = { open: false, nextCheckAt: TOMORROW };
+    await runAutoUpdatePass(job.deps);
+
+    expect(await loadUpdateState(db)).toMatchObject({
+      autoFailedVersion: 'b'.repeat(40),
+      autoFailedAttempts: 1
+    });
   });
 
   it('ends a recorded failure with an update that succeeded after it', async () => {
@@ -628,6 +666,44 @@ describe('runAutoUpdatePass', () => {
         entry => (entry as { outcome: string }).outcome === 'backupFailed'
       )
     ).toHaveLength(MAX_AUTO_UPDATE_ATTEMPTS + 1);
+  });
+
+  it(`tries a newer edge build once ${MAX_AUTO_UPDATE_ATTEMPTS} attempts on the previous one failed`, async () => {
+    const db = await makeTestDb();
+    await seed(db, true);
+    const job = harness(db);
+    const clock = { now: NOW };
+    job.deps.now = () => clock.now;
+    job.current.backupOk = false;
+    job.current.status = status({
+      current: 'edge',
+      latest: {
+        version: 'edge',
+        commit: 'b'.repeat(40),
+        url: 'https://example/actions/runs/1',
+        publishedAt: '2026-09-30T12:00:00Z'
+      }
+    });
+    for (let pass = 0; pass < MAX_AUTO_UPDATE_ATTEMPTS; pass += 1) {
+      // eslint-disable-next-line no-await-in-loop -- passes run one after the other, as the job's do
+      await runAutoUpdatePass(job.deps);
+      clock.now = new Date(clock.now.getTime() + MS_PER_DAY);
+    }
+    expect(job.backups.count).toBe(MAX_AUTO_UPDATE_ATTEMPTS);
+
+    // main publishes a newer build: a newer release for an edge stack (§6.3 "Images", "Updates").
+    job.current.status = status({
+      current: 'edge',
+      latest: {
+        version: 'edge',
+        commit: 'c'.repeat(40),
+        url: 'https://example/actions/runs/2',
+        publishedAt: '2026-10-04T12:00:00Z'
+      }
+    });
+    await runAutoUpdatePass(job.deps);
+
+    expect(job.backups.count).toBe(MAX_AUTO_UPDATE_ATTEMPTS + 1);
   });
 
   it('announces a breaking release once, whether or not auto_update is on', async () => {

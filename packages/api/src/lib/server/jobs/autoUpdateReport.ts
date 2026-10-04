@@ -31,18 +31,19 @@ export type Outcome =
   | 'succeeded'
   | 'failed';
 
-/** One attempt or outcome, as its audit entry carries it. */
-export type Attempt = { from: string; to: string };
+/** One attempt or outcome: the versions its audit entry carries, and the release its failure
+ * counts on (`attemptedRelease`). */
+export type Attempt = { from: string; to: string; release: string };
 
 export async function audit(
   db: Db,
-  fields: Attempt & { outcome: Outcome; reason?: string }
+  { from, to, outcome, reason }: Attempt & { outcome: Outcome; reason?: string }
 ): Promise<void> {
   await recordOutcome(db, {
     caller: JOB_CALLER,
     operation: 'system.autoUpdate',
     entity: { kind: 'system', id: null },
-    changes: outcomeChanges(fields)
+    changes: outcomeChanges({ from, to, outcome, reason })
   });
 }
 
@@ -57,9 +58,10 @@ export async function reportFailure(
 ): Promise<void> {
   const at = (deps.now?.() ?? new Date()).toISOString();
   const previous = autoUpdateFailure(await loadUpdateState(deps.db));
-  const attempts = previous?.version === attempt.to ? previous.attempts + 1 : 1;
+  const attempts =
+    previous?.version === attempt.release ? previous.attempts + 1 : 1;
   await setAutoUpdateFailure(deps.db, {
-    version: attempt.to,
+    version: attempt.release,
     reason: attempt.reason,
     at,
     attempts
@@ -90,7 +92,8 @@ export async function followUpRun(
   row: UpdateStateRow,
   status: UpdaterStatus
 ): Promise<boolean> {
-  if (row.runOutcomePending !== 1) {
+  const release = row.runRelease;
+  if (release === null) {
     return false;
   }
   const { last } = status;
@@ -99,7 +102,7 @@ export async function followUpRun(
   }
   await deps.db
     .updateTable('updateState')
-    .set({ runOutcomePending: 0 })
+    .set({ runRelease: null })
     .where('id', '=', 1)
     .execute();
   const { from, to } = last;
@@ -110,7 +113,7 @@ export async function followUpRun(
   ) {
     return false;
   }
-  const attempt = { from, to };
+  const attempt = { from, to, release };
   if (last.state === 'succeeded') {
     await audit(deps.db, { ...attempt, outcome: 'succeeded' });
     return false;

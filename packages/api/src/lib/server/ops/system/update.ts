@@ -45,9 +45,12 @@ export const update = defineOperation({
   entity: () => ({ kind: 'system', id: null }),
   run: async (ctx, input) => {
     setUndoable(ctx, false);
-    return requestUpdate(ctx.db, ctx.now, input.version, {
-      trigger: 'manual',
-      by: ctx.actor.name
-    });
+    return requestUpdate(
+      ctx.db,
+      ctx.now,
+      input.version,
+      { trigger: 'manual', by: ctx.actor.name },
+      null
+    );
   }
 });

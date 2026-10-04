@@ -28,7 +28,13 @@ export type RunTrigger = RunRequester | { trigger: 'host' };
 /** `GET /status`. */
 export type UpdaterStatus = {
   current: string | null;
-  latest: { version: string; url: string; publishedAt: string } | null;
+  /** On an `edge` stack, `commit` names main's newest build. */
+  latest: {
+    version: string;
+    url: string;
+    publishedAt: string;
+    commit?: string;
+  } | null;
   /** Why `latest` is null when GitHub could not be asked. */
   latestError?: string;
   /** Whether `latest` is newer than `current` and non-breaking: what `POST /update` takes. */

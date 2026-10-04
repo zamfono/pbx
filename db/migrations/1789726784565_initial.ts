@@ -1527,12 +1527,7 @@ async function createUpdateStateTable(db: Db): Promise<void> {
     .createTable('update_state')
     .addColumn('id', 'integer', col => col.primaryKey().check(sql`id = 1`))
     .addColumn('run_started_at', 'text')
-    .addColumn('run_outcome_pending', 'integer', col =>
-      col
-        .notNull()
-        .defaultTo(0)
-        .check(sql`run_outcome_pending in (0,1)`)
-    )
+    .addColumn('run_release', 'text')
     .addColumn('auto_failed_version', 'text')
     .addColumn('auto_failure', 'text')
     .addColumn('auto_failed_at', 'text')

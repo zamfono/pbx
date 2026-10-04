@@ -20,6 +20,7 @@ import type { SendUpdateMail } from '../mail/owners.js';
 import type { BackupRunRow } from '../ops/backups/_shared.js';
 import { requestUpdate } from '../ops/system/_request.js';
 import {
+  attemptedRelease,
   autoUpdateEnabled,
   loadUpdateState,
   retryHeldOff,
@@ -63,17 +64,20 @@ async function wantedRelease(
   row: UpdateStateRow,
   status: UpdaterStatus,
   now: Date
-): Promise<string | null> {
-  const version = status.latest?.version;
+): Promise<{ to: string; release: string } | null> {
+  const to = status.latest?.version;
   if (
-    version === undefined ||
+    to === undefined ||
     !status.updatable ||
-    status.last.state === 'running' ||
-    retryHeldOff(row, version, now)
+    status.last.state === 'running'
   ) {
     return null;
   }
-  return (await autoUpdateEnabled(db)) ? version : null;
+  const release = attemptedRelease(to, status.latest);
+  if (retryHeldOff(row, release, now)) {
+    return null;
+  }
+  return (await autoUpdateEnabled(db)) ? { to, release } : null;
 }
 
 /** Whether the updater runs an update now, one started by hand or on the host meanwhile. */
@@ -123,9 +127,13 @@ async function install(deps: AutoUpdateDeps, attempt: Attempt): Promise<void> {
     return;
   }
   try {
-    await requestUpdate(deps.db, nowIso(), attempt.to, {
-      trigger: 'automatic'
-    });
+    await requestUpdate(
+      deps.db,
+      nowIso(),
+      attempt.to,
+      { trigger: 'automatic' },
+      attempt.release
+    );
   } catch (error) {
     if (!(error instanceof OpError)) {
       throw error;
@@ -201,12 +209,12 @@ export async function runAutoUpdatePass(
   await clearFailureAfterSuccess(deps.db, row, status);
   await announceBreaking(deps, row, status, from);
   const fresh = await loadUpdateState(deps.db);
-  const to = await wantedRelease(deps.db, fresh, status, now);
-  if (to === null) {
+  const wanted = await wantedRelease(deps.db, fresh, status, now);
+  if (wanted === null) {
     await deps.gate.reset();
     return null;
   }
-  const attempt = { from, to };
+  const attempt = { from, ...wanted };
   const verdict = await deps.gate.check(now);
   if (await reportGiveUps(deps, attempt, verdict)) {
     return null;

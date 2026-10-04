@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-04 · §6.3 Automatic updates.** On an `edge` stack each of `main`'s builds is a release of its own: the updater's `GET /status` names the newest build's commit, and the failed automatic attempts (with their 20-hour gap) count on that commit, which `autoUpdate.failed` names. `update_state.run_release` records the release an automatic run's failure counts on when it starts, in place of `run_outcome_pending`, so a build published during the run does not take its failure.
+*Why:* keyed on the version `edge`, three failed attempts on one build held off every later build until a manual update succeeded (follows D25).
+
 **2026-10-04 · §10.5 Uploads.** Product-owner decision (D37): asked about MCP upload links ignoring own scope, the user chose "Refuse the link (Recommended)". The upload-link tool applies the operation's own-scope check and refuses a `user`'s link to another user's upload with 403 up front.
 *Why:* a link handed out for an upload its run would refuse can never succeed.
 **2026-10-04 · §10.4 When a device reaches Ringotel.** Device pushes run one at a time and send the device as stored when their turn comes; a device deleted by then is skipped.

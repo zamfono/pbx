@@ -27,9 +27,9 @@ async function lookUpLatest(
     if (build === undefined) {
       return undefined;
     }
-    const { url, publishedAt } = build;
+    const { commit, url, publishedAt } = build;
     return {
-      latest: { version: EDGE, url, publishedAt },
+      latest: { version: EDGE, commit, url, publishedAt },
       newer: build.commit !== (await deps.runningRevision())
     };
   }

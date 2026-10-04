@@ -45,6 +45,7 @@ describe('describeStatus on an edge stack', () => {
       current: 'edge',
       latest: {
         version: 'edge',
+        commit: EDGE_BUILD.commit,
         url: EDGE_BUILD.url,
         publishedAt: EDGE_BUILD.publishedAt
       },

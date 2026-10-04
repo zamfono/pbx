@@ -40,13 +40,15 @@ function passOn(error: unknown): never {
  * automatic update (`jobs/autoUpdate.ts`) share: the latest release, or `version`. Refused
  * unless `.env` sets `UPDATER_TOKEN` and a backup run finished `ok` within the last hour, so the
  * update begins from a restorable point. The updater records who asked with the run;
- * `update_state` keeps when it began, so the automatic update can follow its own run up.
+ * `update_state` keeps when it began and, for an automatic run, the `release` its failure counts
+ * on (`attemptedRelease`), so the automatic update can follow its own run up.
  */
 export async function requestUpdate(
   db: Db,
   now: string,
   version: string | undefined,
-  requester: RunRequester
+  requester: RunRequester,
+  release: string | null
 ): Promise<UpdateState> {
   const client = updaterClient();
   if (client === undefined) {
@@ -73,7 +75,7 @@ export async function requestUpdate(
     .updateTable('updateState')
     .set({
       runStartedAt: state.startedAt ?? now,
-      runOutcomePending: requester.trigger === 'automatic' ? 1 : 0
+      runRelease: release
     })
     .where('id', '=', 1)
     .execute();

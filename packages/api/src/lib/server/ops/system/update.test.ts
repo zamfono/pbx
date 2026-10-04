@@ -115,11 +115,11 @@ describe('system.update', () => {
     await expect(
       db
         .selectFrom('updateState')
-        .select(['runStartedAt', 'runOutcomePending'])
+        .select(['runStartedAt', 'runRelease'])
         .executeTakeFirst()
     ).resolves.toEqual({
       runStartedAt: started.startedAt,
-      runOutcomePending: 0
+      runRelease: null
     });
   });
 

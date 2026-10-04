@@ -438,7 +438,7 @@ export interface UpdateState {
   breakingAnnounced: string | null;
   breakingVersion: string | null;
   id: Generated<number | null>;
-  runOutcomePending: Generated<number>;
+  runRelease: string | null;
   runStartedAt: string | null;
 }
 

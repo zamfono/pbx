@@ -1,7 +1,12 @@
 import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
-import { MS_PER_HOUR, type Db, type DB } from '@zamfono/shared';
+import {
+  MS_PER_HOUR,
+  type Db,
+  type DB,
+  type UpdaterStatus
+} from '@zamfono/shared';
 
 import { updaterClient } from './_updater.js';
 
@@ -56,16 +61,27 @@ export function autoUpdateFailure(
 }
 
 /**
- * Whether the automatic update holds off `version` at `now`: for good once its failed attempts
+ * What failed automatic attempts on `version` are counted on: the version, or on an `edge` stack
+ * the commit of main's newest build `latest` names, so a newer build is a newer release.
+ */
+export function attemptedRelease(
+  version: string,
+  latest: UpdaterStatus['latest']
+): string {
+  return latest?.version === version ? (latest.commit ?? version) : version;
+}
+
+/**
+ * Whether the automatic update holds off `release` (`attemptedRelease`) at `now`: for good once its failed attempts
  * reached `MAX_AUTO_UPDATE_ATTEMPTS`, else until `AUTO_UPDATE_RETRY_GAP_MS` after the last.
  */
 export function retryHeldOff(
   row: UpdateStateRow,
-  version: string,
+  release: string,
   now: Date
 ): boolean {
   const failure = autoUpdateFailure(row);
-  if (failure?.version !== version) {
+  if (failure?.version !== release) {
     return false;
   }
   return (

@@ -16,7 +16,7 @@ test('admits the update mail kinds and starts update_state with its one row', as
     {
       id: 1,
       runStartedAt: null,
-      runOutcomePending: 0,
+      runRelease: null,
       autoFailedVersion: null,
       autoFailure: null,
       autoFailedAt: null,
