@@ -18,10 +18,10 @@ services:
     networks:
       internal:
     environment:
-      RTP_PORT_START: ${RTP_PORT_START:-10000}
-      RTP_PORT_END: ${RTP_PORT_END:-10200}
+      RTP_PORT_START: ${RTP_PORT_START:-}
+      RTP_PORT_END: ${RTP_PORT_END:-}
       ARI_PASSWORD: ${ARI_PASSWORD}             # ARI user is 'zamfono', fixed in ari.conf
-      AMI_PASSWORD: ${AMI_PASSWORD}             # AMI user is 'zamfono', read-only, fixed in manager.conf (§9.1)
+      AMI_PASSWORD: ${AMI_PASSWORD}             # AMI user is 'zamfono', fixed in manager.conf: system read, reporting write (§9.1)
       HEP_ENABLED: ${HEP_ENABLED:-}             # hep.conf enabled=…; collector = core's current address (§7)
       SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-}     # false binds transport-udp to loopback (§9.1)
       SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-}     # false binds transport-tcp to loopback (§9.1)

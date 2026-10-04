@@ -34,6 +34,14 @@
   <text class="s" x="605" y="299" text-anchor="middle">operations · REST · OAuth</text>
   <text class="s" x="605" y="315" text-anchor="middle">MCP · /events · UI</text>
 
+  <rect class="box" x="240" y="178" width="150" height="56" rx="6" stroke-dasharray="5 3"/>
+  <text class="t" x="315" y="201" text-anchor="middle" font-weight="600">migrate</text>
+  <text class="s" x="315" y="220" text-anchor="middle">one-shot · schema first</text>
+
+  <rect class="box" x="402" y="178" width="110" height="56" rx="6"/>
+  <text class="t" x="457" y="201" text-anchor="middle" font-weight="600">updater</text>
+  <text class="s" x="457" y="220" text-anchor="middle">system.update</text>
+
   <rect class="store" x="240" y="375" width="450" height="40" rx="4"/>
   <text class="s" x="465" y="392" text-anchor="middle">shared volumes</text>
   <text class="s" x="465" y="407" text-anchor="middle" font-size="11">media (asterisk · core · api) · SQLite WAL (core · api) · asterisk-config (api → asterisk)</text>
@@ -53,4 +61,5 @@
   <text class="m" x="455" y="280" text-anchor="middle">reverse proxy</text>
   <line class="l" x1="605" y1="332" x2="605" y2="373"/>
   <polyline class="l" points="692,125 740,125 740,395 692,395"/>
+  <polyline class="l" points="560,248 560,206 514,206" marker-end="url(#a)"/>
 </svg>

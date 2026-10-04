@@ -71,7 +71,7 @@ This document specifies the server platform and its external contracts: REST API
 
 ![Architecture overview](architecture.svg)
 
-Three long-running application services run per stack, plus the TLS proxy and a one-shot migration container that runs before them (§6.3).
+Three long-running application services run per stack, plus the TLS proxy, the `updater`, which carries out `system.update` and the automatic updates (§6.3 "Updates"), and a one-shot migration container that runs before them (§6.3).
 
 **`asterisk`** does media and SIP signaling only. It contains almost no call logic: every inbound and outbound call is handed to the core through a Stasis application over ARI, and the dialplan is a thin shim that ends in `Stasis(zamfono)` for everything.
 
@@ -107,11 +107,11 @@ Three long-running application services run per stack, plus the TLS proxy and a 
 
 **Telephony core:** Asterisk 22 (current LTS) — chan_pjsip only; chan_sip removed upstream in Asterisk 21
 
-**Control protocol:** ARI (WebSocket events + REST); AMI, read-only, for outbound registration state (§9.4) — Stasis app name: `zamfono`; AMI user `zamfono` with the `system` read class
+**Control protocol:** ARI (WebSocket events + REST); AMI for outbound registration state (§9.4) — Stasis app name: `zamfono`; AMI user `zamfono` with the `system` read class and the `reporting` write class for `PJSIPShowRegistrationsOutbound` (§9.1)
 
 **App runtime:** Node.js 26, TypeScript — two processes: `core` + `api`
 
-**ARI client:** `ari-client` npm package (or thin custom WS+fetch wrapper if it proves stale)
+**ARI client:** a thin custom WebSocket + fetch client (`packages/core/src/ari/`)
 
 **Application framework:** SvelteKit on `adapter-node` — the `api` process: REST catch-all, OAuth pages, MCP endpoint, later the tenant UI via remote functions; a custom server entry adds the first-boot seed, schedulers and the `/events` WebSocket (§10)
 
@@ -129,7 +129,7 @@ Three long-running application services run per stack, plus the TLS proxy and a 
 
 **Codecs:** tenant default `settings.codecs_json`, per-trunk override `trunks.codecs_json` (§9.4, §11.4); default Opus, G.722, G.711 A-law — the image ships `opus`, `g722`, `amrwb`, `amr`, `alaw`, `ulaw`; "HD Voice" comes from the default order
 
-**Container base:** Debian 13 (`trixie`) slim images — `asterisk` installs from the Zamfono APT repository (built by the sibling `asterisk-builder` repo for Debian 13); Node images on `node:26-slim`, so `better-sqlite3` and `argon2` use glibc prebuilds
+**Container base:** `asterisk` on Debian 13 (`trixie`) slim, installing from the Zamfono APT repository (built by the sibling `asterisk-builder` repo for Debian 13); `migrate`, `api` and `core` on `node:26-slim`, so `better-sqlite3` and `argon2` use glibc prebuilds; `updater` on `node:26-alpine`, which needs no native modules; `proxy` on the official Caddy image (§6.3 "Images")
 
 **Container runtime:** Docker Engine with Compose v2, or Podman ≥ 5 with `podman compose` — the stack is one Compose Specification file; CI brings it up on both runtimes (§6.3, §8)
 
@@ -439,10 +439,10 @@ services:
     networks:
       internal:
     environment:
-      RTP_PORT_START: ${RTP_PORT_START:-10000}
-      RTP_PORT_END: ${RTP_PORT_END:-10200}
+      RTP_PORT_START: ${RTP_PORT_START:-}
+      RTP_PORT_END: ${RTP_PORT_END:-}
       ARI_PASSWORD: ${ARI_PASSWORD}             # ARI user is 'zamfono', fixed in ari.conf
-      AMI_PASSWORD: ${AMI_PASSWORD}             # AMI user is 'zamfono', read-only, fixed in manager.conf (§9.1)
+      AMI_PASSWORD: ${AMI_PASSWORD}             # AMI user is 'zamfono', fixed in manager.conf: system read, reporting write (§9.1)
       HEP_ENABLED: ${HEP_ENABLED:-}             # hep.conf enabled=…; collector = core's current address (§7)
       SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-}     # false binds transport-udp to loopback (§9.1)
       SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-}     # false binds transport-tcp to loopback (§9.1)
