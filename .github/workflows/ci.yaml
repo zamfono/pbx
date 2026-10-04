@@ -66,8 +66,8 @@ jobs:
           # The step before the save removes this builder itself, to free its disk.
           cleanup: false
       - name: Build the six images, plus the TLS/SRTP scenario's baresip device
-        # docker-bake.hcl names the six targets, with the Dockerfiles and contexts they always
-        # had, and their tags; bake builds them in parallel, and
+        # docker-bake.hcl names the six targets with their Dockerfiles, contexts and tags; bake
+        # builds them in parallel, and
         # `load` puts them in the local daemon. `source: .` builds this checkout, not a fetch of
         # the ref.
         #

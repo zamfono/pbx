@@ -35,7 +35,7 @@ variable "CACHE_TO" { default = "" }
 variable "FRESH" { default = false }
 
 # The full commit these images are built from (docs/spec.md §6.3 "Images", §7 "Version"), a build
-# arg on the five stack images alone; test-devices ships to no registry and reports no version.
+# arg on the six stack images alone; test-devices ships to no registry and reports no version.
 # Default empty, so a local `bake --load` still builds, just with no revision label or env.
 variable "REVISION" { default = "" }
 

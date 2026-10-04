@@ -10,8 +10,8 @@
 #   bash test/integration/run.sh
 #     A full run: every prerequisite (bring-up, tenant configuration), every named step
 #     (steps.sh, trunk-status.sh, propagation-owed.sh, asterisk-started.sh, host-update.sh,
-#     cert-sync.sh) and every scenario under scenarios/, in the same order this file always ran
-#     them in. cert-sync always runs last.
+#     cert-sync.sh) and every scenario under scenarios/, in this file's order. cert-sync always
+#     runs last.
 #
 #   ONLY=<glob>[,<glob>...] bash test/integration/run.sh
 #     Only the scenarios and named steps whose name matches one of the (comma-separated) globs —

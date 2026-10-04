@@ -1531,7 +1531,7 @@ WAL mode, `foreign_keys=ON`, write ownership split per §3.1 (`api` = config tab
 -- demoted or soft-deleted, §5.9, §10.3).
 --   password_hash:          Argon2id; NULL = SSO-only; every owner keeps a local password (CHECK, §5)
 --   sso_subject:            OIDC `sub` at the tenant's provider, bound on first SSO login and cleared when
---                           the tenant changes provider or issuer (§5.2)
+--                           the tenant changes provider, issuer or Entra tenant id (§5.2)
 --   dnd:                    cross-written by core via the feature codes (§3)
 --   notify_missed_calls:    1 = an e-mail per missed inbound call (§10.2, "Mail"); self-service
 --   find_me_json:           [{ "number": E.164, "delayS": n }, …] external legs rung with the user's
@@ -2165,7 +2165,8 @@ CREATE TABLE oauth_clients (
 --   token_hash: SHA-256; the raw value is never stored
 --   client_id:  set for kind 'refresh' only
 --   expires_at: refresh: 30 d rotating; reset: single-use, 7 d for a setup link, 1 h for a reset link (§5.2);
---               expired rows are purged by the daily job
+--               the daily job purges a reset row once it expired and a refresh row 30 d after, as
+--               its client's last token expiry (`oauth_clients`, §5.2)
 --   revoked_at: set when a refresh token is rotated or revoked, or a reset token redeemed; the row
 --               stays until expires_at so that a replayed token is recognised (§5.2)
 CREATE TABLE tokens (
