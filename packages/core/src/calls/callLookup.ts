@@ -1,7 +1,7 @@
 /** Finding a party in the live calls: the channel a user is present as, a two-party bridge's other
  * side, and a user's current bridged call (§10.1 "Transfers and pickup"; §10.2 "Call parking",
  * "Three-way calls"). Shared by the feature codes, the transfers and the live-call actions; its
- * coverage lives in `features.test.ts` and `transfers.test.ts` alongside theirs. */
+ * coverage lives in `parking.test.ts` and `transfers.test.ts` alongside theirs. */
 import type { Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 

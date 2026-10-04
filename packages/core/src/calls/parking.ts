@@ -1,7 +1,6 @@
 /** `*70` and call parking (§10.2 "Call parking"): the park and its slot registry; retrieval is
- * `parkingRetrieval.ts` and the timeout ring-back `parkingRingback.ts`. Its DTMF-menu siblings
- * `mailbox.ts` and `voicemail.ts`'s `deposit` share this file's own suite, `features.test.ts`,
- * rather than one `*.test.ts` each. */
+ * `parkingRetrieval.ts` and the timeout ring-back `parkingRingback.ts`; the three share
+ * `parking.test.ts`. */
 import { MS_PER_SECOND } from '@zamfono/shared';
 
 import { ignoreGone, logFailure, logUnlessGone } from '../ari/failures.js';
