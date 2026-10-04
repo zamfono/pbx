@@ -360,6 +360,34 @@ describe('runBackup: retention grouping', () => {
     expect(paths[1]).toBe(paths[0]);
   });
 
+  it('keeps a target’s snapshots in one forget group when the container’s hostname changes', async () => {
+    const db = await migratedTestDb();
+    const kr = testKeyring();
+    const targetId = await insertTarget(
+      db,
+      kr,
+      'local',
+      { path: '/backups/restic' },
+      { resticPassword: 'restic-pw' }
+    );
+    const { exec, calls } = recordingExec('snap-local', SNAPSHOT_BYTES);
+    const { bus } = fakeBus();
+
+    await runBackup(db, kr, targetId, { exec, mediaDir: '/media', bus });
+
+    // restic records `os.Hostname()`, the container id that every recreated `api` container
+    // changes, and `forget` groups by `host,paths` by default: either the backup names a host of
+    // its own or the forget leaves the host out of its grouping.
+    const backupArgs = calls.find(call => call.args[0] === 'backup')?.args;
+    const forgetArgs = calls.find(call => call.args[0] === 'forget')?.args;
+    const groupBy = forgetArgs?.[forgetArgs.indexOf('--group-by') + 1];
+    const stableHost = backupArgs?.includes('--host') ?? false;
+    const hostlessGroups =
+      forgetArgs?.includes('--group-by') === true &&
+      groupBy?.split(',').includes('host') === false;
+    expect(stableHost || hostlessGroups).toBe(true);
+  });
+
   it('backs up successfully after a prior run left its snapshot file behind', async () => {
     const db = await migratedTestDb();
     const kr = testKeyring();

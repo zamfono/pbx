@@ -4,6 +4,8 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §6.5 Target kinds.** A target's `host` (sftp, ftp, ftps) is an FQDN or an IPv4 address, a webdav `url` an `http` or `https` URL, and an sftp username cannot begin with `-` or contain whitespace, a quote or a backslash; anything else is refused with 422.
 *Why:* the sftp host and username reach `ssh` as arguments through restic's `sftp.command`, which restic splits at whitespace itself, so an admin could add `-oProxyCommand=…` and run a command in `api`.
+**2026-10-04 · §6.5 Backups.** Every snapshot carries the fixed host `zamfono`.
+*Why:* restic records the container's hostname and `forget` groups by host, so each recreated `api` container started a group of its own whose snapshots were never forgotten.
 
 **2026-10-04 · §5.4 Key rotation, §6.5 Moving a stack.** A retired `SECRETBOX_KEY` is kept outside the stack for as long as snapshots made under it are retained, and a snapshot made under it is restored with it set as `SECRETBOX_KEY_PREVIOUS`; the boot sweep re-encrypts.
 *Why:* retained snapshots hold secrets encrypted under the key of their day, so removing the retired key after the rotation left them unreadable on restore.

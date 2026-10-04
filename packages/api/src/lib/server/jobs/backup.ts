@@ -30,9 +30,8 @@ import { type Keyring } from '../secretbox.js';
 import { loadParams, repositoryAndEnv, type ExecFn } from './backupBackends.js';
 import {
   ensureRepository,
-  parseResticSummary,
   pruneSnapshots,
-  RESTIC_BIN
+  takeSnapshot
 } from './backupRestic.js';
 
 // 0700: the snapshot is a full-database VACUUM, secrets and password hashes included.
@@ -100,7 +99,7 @@ export async function performBackup(
   const startedAtMs = Date.parse(run.startedAt);
   // Keyed by `target.id`, not a random name: `restic forget` groups snapshots by `host,paths`,
   // so a path that changed every run would put each snapshot in its own group and nothing
-  // would ever be forgotten.
+  // would ever be forgotten. `takeSnapshot` fixes the host for the same reason.
   const snapshotDir = path.join(os.tmpdir(), 'zamfono-backup', target.id);
   const snapshotFile = path.join(snapshotDir, 'zamfono.sqlite3');
   try {
@@ -121,12 +120,12 @@ export async function performBackup(
     };
     await ensureRepository(deps.exec, { ...process.env, ...fullEnv }, options);
     await sql`VACUUM INTO ${snapshotFile}`.execute(db);
-    const { stdout } = await deps.exec(
-      RESTIC_BIN,
-      ['backup', snapshotFile, deps.mediaDir, '--json', ...options],
-      { env: { ...process.env, ...fullEnv } }
+    const { snapshotId, bytesAdded, bytesTotal } = await takeSnapshot(
+      deps.exec,
+      { ...process.env, ...fullEnv },
+      options,
+      [snapshotFile, deps.mediaDir]
     );
-    const { snapshotId, bytesAdded, bytesTotal } = parseResticSummary(stdout);
     const finishedAt = now();
     await db
       .updateTable('backupRuns')

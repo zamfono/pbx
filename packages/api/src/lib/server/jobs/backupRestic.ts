@@ -1,6 +1,6 @@
 /**
  * The restic commands a backup run issues (§6.5): creating a target's repository on its first run,
- * reading the snapshot id and sizes from `restic backup --json`, and applying the target's keep-daily/weekly/monthly policy with
+ * taking the snapshot with `restic backup --json` and reading its id and sizes, and applying the target's keep-daily/weekly/monthly policy with
  * `restic forget --prune`. `backup.ts` holds the run lifecycle around them.
  */
 import process from 'node:process';
@@ -70,6 +70,25 @@ export function parseResticSummary(stdout: string): Summary {
     };
   }
   throw new Error('backup: restic produced no summary line');
+}
+
+// restic records the container's hostname by default, which every recreated `api` container
+// changes; one fixed host keeps a target's snapshots in one `forget` group (§6.5).
+const SNAPSHOT_HOST = 'zamfono';
+
+/** Backs `paths` up into the target's repository, with the backend's restic `options`. */
+export async function takeSnapshot(
+  exec: ExecFn,
+  env: NodeJS.ProcessEnv,
+  options: readonly string[],
+  paths: readonly string[]
+): Promise<Summary> {
+  const { stdout } = await exec(
+    RESTIC_BIN,
+    ['backup', ...paths, '--json', '--host', SNAPSHOT_HOST, ...options],
+    { env }
+  );
+  return parseResticSummary(stdout);
 }
 
 // restic's forget flags, by the matching key in `params.forget` (§6.5's default policy).
