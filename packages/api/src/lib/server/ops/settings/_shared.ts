@@ -24,7 +24,10 @@ export type SettingsColumns = Updateable<DB['settings']>;
 
 const MASKED = '***';
 
-/** The wire shape of the tenant `settings` row (§11.4), every column but the three read-only ones. */
+/**
+ * The wire shape of the tenant `settings` row (§11.4): every column, the read-only `extLength`,
+ * `ringotelOrgId` and `ringotelBranchId` included, except the `*_pending` state columns.
+ */
 export type SettingsWire = {
   companyName: string;
   mainDidId: string;
