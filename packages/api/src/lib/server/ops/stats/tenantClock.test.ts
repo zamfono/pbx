@@ -152,4 +152,28 @@ describe('stats.query buckets on the tenant clock', () => {
       { start: '2026-01-01T05:00:00.000Z', value: 1 }
     ]);
   });
+
+  it('steps past an hour bucket a half-hour DST change repeats', async () => {
+    // Lord Howe falls back half an hour at 02:00 on 5 April 2026 (+11:00 to +10:30): local
+    // 01:30-02:00 happens twice, so the 01:00 bucket lasts 90 minutes.
+    const db = await makeStatsDb('Australia/Lord_Howe');
+    await insertCall(db, {
+      startedAt: '2026-04-04T15:15:00.000Z',
+      status: 'answered'
+    });
+
+    const result = await queryStats(db, {
+      metric: 'callVolume',
+      from: '2026-04-04T13:00:00.000Z',
+      to: '2026-04-04T17:30:00.000Z',
+      bucket: 'hour'
+    });
+
+    expect(result.buckets).toEqual([
+      { start: '2026-04-04T13:00:00.000Z', value: 0 },
+      { start: '2026-04-04T14:00:00.000Z', value: 1 },
+      { start: '2026-04-04T15:30:00.000Z', value: 0 },
+      { start: '2026-04-04T16:30:00.000Z', value: 0 }
+    ]);
+  });
 });

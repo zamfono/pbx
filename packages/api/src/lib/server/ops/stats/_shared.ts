@@ -41,6 +41,26 @@ function bucketStart(
     : midnight.subtract({ days: midnight.dayOfWeek - 1 }).startOfDay();
 }
 
+/**
+ * The start of the `unit` bucket after the one starting at `cursor`. An hour a half-hour DST
+ * change repeats lasts 90 minutes, so an hour later can still fall into it; the next bucket then
+ * starts at the next local hour.
+ */
+function nextBucketStart(
+  cursor: Temporal.ZonedDateTime,
+  unit: BucketUnit
+): Temporal.ZonedDateTime {
+  const next = bucketStart(cursor.add(ONE_BUCKET[unit]), unit);
+  if (Temporal.ZonedDateTime.compare(next, cursor) > 0) {
+    return next;
+  }
+  const nextLocal = cursor
+    .toPlainDateTime()
+    .add(ONE_BUCKET[unit])
+    .toZonedDateTime(cursor.timeZoneId);
+  return bucketStart(nextLocal, unit);
+}
+
 /** The epoch milliseconds of the `unit` bucket start `instant` falls into in `timeZone`. */
 export function bucketStartMs(
   instant: string,
@@ -71,7 +91,7 @@ export function bucketStarts(
   );
   while (cursor.epochMilliseconds < endMs && starts.length <= limit) {
     starts.push(cursor.epochMilliseconds);
-    cursor = bucketStart(cursor.add(ONE_BUCKET[unit]), unit);
+    cursor = nextBucketStart(cursor, unit);
   }
   return starts;
 }
