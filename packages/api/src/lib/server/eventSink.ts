@@ -2,19 +2,23 @@
  * The one hand-off between `api`'s two bundles (§3.1 "Events"). `server.ts` holds the `/events`
  * sockets, since a WebSocket upgrade never reaches SvelteKit; every event, `core`'s and the
  * backup jobs' alike, is produced in the SvelteKit bundle, where the background jobs run
- * (`jobs/background.ts`). Each bundle carries its own copy of this module, so the sink is kept
- * under a process-wide `Symbol.for` key they share: `server.ts` provides it before it loads the
- * SvelteKit handler, and the jobs publish to it.
+ * (`jobs/background.ts`), and so is every write that changes who may see what (§10.6). Each
+ * bundle carries its own copy of this module, so the sink is kept under a process-wide
+ * `Symbol.for` key they share: `server.ts` provides it before it loads the SvelteKit handler,
+ * and the jobs and the operation runner call it.
  */
 import type { Envelope } from '@zamfono/shared';
 
-export type EventSink = (envelope: Envelope) => void;
+export type EventSink = {
+  publish: (envelope: Envelope) => void;
+  usersChanged: () => void;
+};
 
 const SINK_KEY = Symbol.for('zamfono.api.eventSink');
 
 type SinkHolder = { [SINK_KEY]?: EventSink };
 
-/** `server.ts`: every event published from now on reaches `sink`. */
+/** `server.ts`: every event published, and every user change, from now on reaches `sink`. */
 export function provideEventSink(sink: EventSink): void {
   (globalThis as SinkHolder)[SINK_KEY] = sink;
 }
@@ -24,5 +28,13 @@ export function provideEventSink(sink: EventSink): void {
  * where there are none to hand it to.
  */
 export function publishEvent(envelope: Envelope): void {
-  (globalThis as SinkHolder)[SINK_KEY]?.(envelope);
+  (globalThis as SinkHolder)[SINK_KEY]?.publish(envelope);
+}
+
+/**
+ * Tells the `/events` sockets that users, roles or memberships may have changed, so each is
+ * checked again against its user (§10.6); nothing without a `server.ts`.
+ */
+export function notifyUsersChanged(): void {
+  (globalThis as SinkHolder)[SINK_KEY]?.usersChanged();
 }

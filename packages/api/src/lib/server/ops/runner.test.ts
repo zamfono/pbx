@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
+import { provideEventSink } from '#lib/server/eventSink.js';
 import { propagateConfig } from '#lib/server/propagation.js';
 
 import { asRun, makeTestDb, owner } from '../testDb.js';
@@ -327,5 +328,36 @@ describe('runOperation', () => {
       .where('operation', '=', 'test.propagatingWriteThatFailsToReload')
       .execute();
     expect(audit).toHaveLength(1);
+  });
+
+  it('has the /events sockets checked again after a committed write, never after a read (§10.6)', async () => {
+    const db = await makeTestDb();
+    const usersChanged = vi.fn();
+    provideEventSink({ publish: vi.fn(), usersChanged });
+    register(
+      defineOperation({
+        name: 'test.writeTouchingUsers',
+        description: 'a write',
+        input: z.object({}),
+        minRole: 'admin',
+        entity: () => ({ kind: 'user', id: 'u1' }),
+        run: () => Promise.resolve('ok')
+      })
+    );
+    register(
+      defineOperation({
+        name: 'test.readOfUsers',
+        description: 'a read',
+        input: z.object({}),
+        minRole: 'admin',
+        readOnly: true,
+        run: () => Promise.resolve('ok')
+      })
+    );
+
+    await runOperation(db, 'test.readOfUsers', {}, asRun());
+    expect(usersChanged).not.toHaveBeenCalled();
+    await runOperation(db, 'test.writeTouchingUsers', {}, asRun());
+    expect(usersChanged).toHaveBeenCalledOnce();
   });
 });

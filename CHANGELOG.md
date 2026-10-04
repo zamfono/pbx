@@ -224,6 +224,11 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- An open `/events` socket kept the role, and the ring groups, its user had when it connected: a
+  demoted or deleted admin went on receiving every event of the tenant until they disconnected.
+  After every write the server now checks each socket again: one whose user was deleted or holds
+  another role is closed with code 4401, so the client reconnects with a fresh token, and a user
+  gets the voicemail events of the ring groups they belong to now.
 - A key rotation whose new `SECRETBOX_KEY` kept the old generation number made every stored
   secret unreadable, while `/healthz` still reported `keyRotationRemaining: 0`. `api` now refuses
   to start when `SECRETBOX_KEY` and `SECRETBOX_KEY_PREVIOUS` carry the same generation, and

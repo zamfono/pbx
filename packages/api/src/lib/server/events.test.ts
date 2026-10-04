@@ -20,6 +20,8 @@ import type { Actor } from './ops/types.js';
 const JWT_SECRET = 'test-secret';
 const SHORT_TIMEOUT_MS = 30;
 const FAN_OUT_WAIT_MS = 40;
+// §10.6: the close code of a socket whose user is gone or whose role changed.
+const USER_CHANGED_CLOSE_CODE = 4401;
 const NOW_S = epochSeconds(Date.now());
 
 /**
@@ -505,6 +507,124 @@ describe('EventHub', () => {
     });
 
     expect(JSON.parse(await received)).toMatchObject({ voicemailId: 'vm2' });
+    client.close();
+  });
+});
+
+describe('EventHub.usersChanged (§10.6)', () => {
+  let wss: WebSocketServer;
+
+  afterEach(async () => {
+    await new Promise<void>(resolve => {
+      wss.close(() => {
+        resolve();
+      });
+    });
+  });
+
+  /** A client connected to `hub` as `actor`, once the hub holds its socket. */
+  async function subscribedClient(
+    hub: EventHub,
+    actor: Actor
+  ): Promise<WebSocket> {
+    wss = await listeningServer();
+    const subscribed = new Promise<void>(resolve => {
+      wss.once('connection', socket => {
+        hub.subscribeWs(socket, actor).then(resolve, resolve);
+      });
+    });
+    const client = new WebSocket(serverUrl(wss));
+    await new Promise<void>(resolve => {
+      client.once('open', () => {
+        resolve();
+      });
+    });
+    await subscribed;
+    return client;
+  }
+
+  function closeCode(client: WebSocket): Promise<number> {
+    return new Promise(resolve => {
+      client.once('close', code => {
+        resolve(code);
+      });
+    });
+  }
+
+  it('closes with 4401 the socket of a user whose role changed', async () => {
+    const db = await migratedDb('u1');
+    const hub = new EventHub(db);
+    const client = await subscribedClient(hub, {
+      id: 'u1',
+      name: 'A User',
+      role: 'admin'
+    });
+    const closed = closeCode(client);
+
+    await hub.usersChanged();
+
+    expect(await closed).toBe(USER_CHANGED_CLOSE_CODE);
+  });
+
+  it('closes with 4401 the socket of a soft-deleted user', async () => {
+    const db = await migratedDb('u1');
+    const hub = new EventHub(db);
+    const client = await subscribedClient(hub, {
+      id: 'u1',
+      name: 'A User',
+      role: 'user'
+    });
+    const closed = closeCode(client);
+    await db
+      .updateTable('users')
+      .set({ deletedAt: nowIso() })
+      .where('id', '=', 'u1')
+      .execute();
+
+    await hub.usersChanged();
+
+    expect(await closed).toBe(USER_CHANGED_CLOSE_CODE);
+  });
+
+  it('stops a ring group’s voicemail.new reaching a user removed from it', async () => {
+    const db = await migratedDb('u1');
+    await db
+      .insertInto('ringGroups')
+      .values({
+        id: 'g1',
+        name: 'Sales',
+        strategy: 'simultaneous',
+        createdAt: nowIso()
+      })
+      .execute();
+    await db
+      .insertInto('ringGroupMembers')
+      .values({ groupId: 'g1', userId: 'u1', position: 0 })
+      .execute();
+    const hub = new EventHub(db);
+    const client = await subscribedClient(hub, {
+      id: 'u1',
+      name: 'A User',
+      role: 'user'
+    });
+    const messages: string[] = [];
+    client.on('message', data => {
+      messages.push(rawDataToString(data));
+    });
+    await db.deleteFrom('ringGroupMembers').execute();
+
+    await hub.usersChanged();
+    hub.publish({
+      id: newId(),
+      at: nowIso(),
+      type: 'voicemail.new',
+      voicemailId: 'vm3',
+      mailbox: 'ringGroup:g1'
+    });
+    await wait(FAN_OUT_WAIT_MS);
+
+    expect(messages).toEqual([]);
+    expect(client.readyState).toBe(WebSocket.OPEN);
     client.close();
   });
 });

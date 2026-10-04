@@ -5,6 +5,8 @@ import {
   type Db
 } from '@zamfono/shared';
 
+import { notifyUsersChanged } from '#lib/server/eventSink.js';
+
 import {
   runAfterCommit,
   runRestartPush,
@@ -154,6 +156,11 @@ export async function runOperation(
     name,
     input: parsedInput
   });
+  // §10.6: any committed write may have changed a user's role, deletion or memberships, so the
+  // open `/events` sockets are checked again against their users.
+  if (!op.readOnly) {
+    notifyUsersChanged();
+  }
   // §3.1 "Config propagation": an operation that wrote configuration `core` reads tells it so,
   // which drops its config cache; the PJSIP regeneration and the Asterisk reload follow only
   // where the accumulated kinds ask for them. An operation that names no kind still propagates

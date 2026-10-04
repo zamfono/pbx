@@ -52,10 +52,37 @@ export function visibleTo(actor: Actor, ev: Event): boolean {
 
 type Subscription = { actor: Actor; ringGroupIds: ReadonlySet<string> };
 
-/** The ring group ids `userId` may see mailbox events for (§5.3, `ringGroupMemberships`). */
-async function ringGroupIdsFor(db: Db, userId: string): Promise<Set<string>> {
-  const rows = await ringGroupMemberships(db, { userId });
-  return new Set(rows.map(row => row.ringGroupId));
+// §10.6: the close code of a socket whose user is gone or whose role changed.
+const USER_CHANGED_CLOSE_CODE = 4401;
+
+/**
+ * The ring group ids each user, or only `userId`, may see mailbox events for (§5.3,
+ * `ringGroupMemberships`).
+ */
+async function ringGroupIdsByUser(
+  db: Db,
+  userId?: string
+): Promise<Map<string, Set<string>>> {
+  const rows = await ringGroupMemberships(
+    db,
+    userId === undefined ? undefined : { userId }
+  );
+  const byUser = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const ids = byUser.get(row.userId) ?? new Set<string>();
+    ids.add(row.ringGroupId);
+    byUser.set(row.userId, ids);
+  }
+  return byUser;
+}
+
+/** `actor`'s subscription from `byUser`: no ring group for an admin, who sees every mailbox. */
+function subscription(
+  actor: Actor,
+  byUser: ReadonlyMap<string, Set<string>>
+): Subscription {
+  const ringGroupIds = actor.role === 'user' ? byUser.get(actor.id) : undefined;
+  return { actor, ringGroupIds: ringGroupIds ?? new Set<string>() };
 }
 
 function isVisible(sub: Subscription, ev: Event): boolean {
@@ -90,14 +117,8 @@ export class EventHub {
 
   /** Registers an already-authenticated socket; removes it on close or error. */
   async subscribeWs(socket: WebSocket, actor: Actor): Promise<void> {
-    // ponytail: ring-group membership is resolved once, at subscribe time, and held for the
-    // socket's life; a membership change takes effect on the next reconnect. Re-read it per
-    // `voicemail.new` if that staleness window matters.
-    const ringGroupIds =
-      actor.role === 'user'
-        ? await ringGroupIdsFor(this.db, actor.id)
-        : new Set<string>();
-    this.subscribers.set(socket, { actor, ringGroupIds });
+    const byUser = await ringGroupIdsByUser(this.db, actor.id);
+    this.subscribers.set(socket, subscription(actor, byUser));
     socket.on('close', () => {
       this.subscribers.delete(socket);
     });
@@ -105,5 +126,40 @@ export class EventHub {
       this.subscribers.delete(socket);
       socket.terminate();
     });
+  }
+
+  /**
+   * Re-reads the user row and ring-group memberships behind every open socket (§10.6): closes
+   * with 4401 a socket whose user is gone or holds another role than at its handshake, and
+   * narrows or widens the rest to their current ring groups.
+   */
+  async usersChanged(): Promise<void> {
+    const open = [...this.subscribers];
+    if (open.length === 0) {
+      return;
+    }
+    const ids = [...new Set(open.map(([, sub]) => sub.actor.id))];
+    const [users, byUser] = await Promise.all([
+      this.db
+        .selectFrom('users')
+        .select(['id', 'role'])
+        .where('id', 'in', ids)
+        .where('deletedAt', 'is', null)
+        .execute(),
+      ringGroupIdsByUser(this.db)
+    ]);
+    const roles = new Map(users.map(user => [user.id, user.role]));
+    for (const [socket, sub] of open) {
+      // A socket that closed while the rows were read is gone already.
+      if (this.subscribers.get(socket) !== sub) {
+        continue;
+      }
+      if (roles.get(sub.actor.id) === sub.actor.role) {
+        this.subscribers.set(socket, subscription(sub.actor, byUser));
+      } else {
+        this.subscribers.delete(socket);
+        socket.close(USER_CHANGED_CLOSE_CODE, 'user changed');
+      }
+    }
   }
 }

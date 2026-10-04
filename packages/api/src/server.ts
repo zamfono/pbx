@@ -96,8 +96,15 @@ async function main(): Promise<void> {
     dbFile === undefined || dbFile === '' ? DEFAULT_DB_FILE : dbFile
   );
   const hub = new EventHub(db);
-  provideEventSink(envelope => {
-    hub.publish(envelope);
+  provideEventSink({
+    publish: envelope => {
+      hub.publish(envelope);
+    },
+    usersChanged: () => {
+      hub.usersChanged().catch((error: unknown) => {
+        logger.error({ error }, '/events user re-check failed');
+      });
+    }
   });
   const handler = await loadHandler();
   // After the handler, whose load validates `src/env.ts` and names every required variable missing.
