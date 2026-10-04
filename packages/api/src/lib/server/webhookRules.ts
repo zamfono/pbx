@@ -1,5 +1,5 @@
 /** When a webhook delivery is made and retried (§10.6 "Webhooks"). */
-import { tryParseJson } from './json.js';
+import { eventTypesColumn, type EventType } from '@zamfono/shared';
 
 // §10.6: three attempts total per delivery, and the two backoff delays between them.
 export const DELIVERY_ATTEMPTS = 3;
@@ -14,13 +14,13 @@ const RETRY_BACKOFF_MS = [FIRST_RETRY_DELAY_MS, SECOND_RETRY_DELAY_MS];
  */
 export function matchesFilter(
   eventTypesJson: string | null,
-  eventType: string
+  eventType: EventType
 ): boolean {
   if (eventTypesJson === null) {
     return true;
   }
-  const types = tryParseJson(eventTypesJson);
-  return Array.isArray(types) && types.includes(eventType);
+  const types = eventTypesColumn.safeDecode(eventTypesJson);
+  return types.success && types.data.includes(eventType);
 }
 
 /** The wait before retry `retry` (1-based), from `RETRY_BACKOFF_MS`. */

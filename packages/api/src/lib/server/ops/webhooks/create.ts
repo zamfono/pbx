@@ -8,7 +8,7 @@ import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { recordChange } from '../audit.js';
 import { defineOperation } from '../types.js';
 import {
-  eventTypesSchema,
+  eventTypesField,
   httpUrlSchema,
   toWire,
   webhookSecretSchema,
@@ -19,7 +19,7 @@ const inputSchema = z
   .object({
     url: httpUrlSchema,
     secret: webhookSecretSchema,
-    eventTypes: eventTypesSchema
+    eventTypes: eventTypesField
   })
   .strict();
 

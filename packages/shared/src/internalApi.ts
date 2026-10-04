@@ -192,14 +192,6 @@ export type AsteriskStartedFrame = {
 /** WS /internal/events: every JSON frame `core` sends, no auth (internal network). */
 export type CoreStreamFrame = Envelope | AsteriskStartedFrame;
 
-export type MailKind =
-  | 'voicemail'
-  | 'missedCall'
-  | 'setup'
-  | 'reset'
-  | 'updateFailed'
-  | 'breakingUpdate';
-
 /** `POST /internal/mail` (api) → 202; api rejects a request carrying `X-Forwarded-For` with 404 (§3.1). */
 export type MailRequest =
   | {

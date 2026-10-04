@@ -4,6 +4,7 @@
  */
 import { z } from 'zod';
 
+import { EVENT_TYPES } from './events.js';
 import { featureCodesSchema } from './featureCodes.js';
 import { isE164 } from './numbers.js';
 import type { SipHeaderTemplate } from './sipHeaders.js';
@@ -50,6 +51,9 @@ export const sipHeaderTemplatesSchema: z.ZodType<SipHeaderTemplate[]> = z.array(
   z.object({ name: z.string(), value: z.string() })
 );
 
+/** `webhooks.event_types_json`: the event types a hook is delivered (§10.6). */
+export const eventTypesSchema = z.array(z.enum(EVENT_TYPES));
+
 /** `backup_targets.params_json`: the repository location and forget policy, free-form per kind
  * (§6.5 "Backups"). */
 export const backupParamsSchema = z.record(z.string(), z.unknown());
@@ -87,6 +91,7 @@ export const emergencyNumbersColumn = jsonColumn(emergencyNumbersSchema);
 export const featureCodesColumn = jsonColumn(featureCodesSchema);
 export const allowedIpsColumn = jsonColumn(allowedIpsSchema);
 export const sipHeadersColumn = jsonColumn(sipHeaderTemplatesSchema);
+export const eventTypesColumn = jsonColumn(eventTypesSchema);
 export const backupParamsColumn = jsonColumn(backupParamsSchema);
 
 /** `users.find_me_json`, where NULL means no find-me legs (§11.2): decoded, NULL is the empty list. */

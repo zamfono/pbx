@@ -1,29 +1,18 @@
 import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
-import type { Db, DB, Event, WebhookStatus } from '@zamfono/shared';
+import {
+  eventTypesColumn,
+  eventTypesSchema,
+  type Db,
+  type DB,
+  type EventType,
+  type WebhookStatus
+} from '@zamfono/shared';
 
 import { liveRow } from '../rows.js';
 
 export type WebhookRow = Selectable<DB['webhooks']>;
-
-/** Every `Event.type` a webhook's `event_types_json` filter may name (§10.6). */
-export const EVENT_TYPES = [
-  'presence',
-  'call.state',
-  'voicemail.new',
-  'ooo',
-  'hours',
-  'trunk.status',
-  'history.appended',
-  'backup.started',
-  'backup.finished',
-  'backup.failed'
-] as const satisfies readonly Event['type'][];
-
-export type EventType = (typeof EVENT_TYPES)[number];
-
-export const eventTypeSchema = z.enum(EVENT_TYPES);
 
 /** A webhook's `secret`, the same field on create and update (§10.6). */
 export const webhookSecretSchema = z
@@ -34,8 +23,7 @@ export const webhookSecretSchema = z
   );
 
 /** A webhook's event-type filter, the same field on create and update (§10.6). */
-export const eventTypesSchema = z
-  .array(eventTypeSchema)
+export const eventTypesField = eventTypesSchema
   .nullable()
   .optional()
   .describe(
@@ -47,9 +35,9 @@ export const httpUrlSchema = z
   .url({ protocol: /^https?$/u })
   .describe('The http(s) endpoint every event is POSTed to as JSON.');
 
-/** `event_types_json` parsed back to the wire shape: `null` unfiltered, an array of `EventType`. */
-export function parseEventTypesJson(json: string | null): EventType[] | null {
-  return json === null ? null : (JSON.parse(json) as EventType[]);
+/** `event_types_json` as the wire shape: `null` unfiltered, else the types delivered. */
+export function decodeEventTypes(json: string | null): EventType[] | null {
+  return eventTypesColumn.nullable().decode(json);
 }
 
 export type WebhookWire = {
@@ -75,7 +63,7 @@ export function toWire(row: WebhookRow): WebhookWire {
   return {
     id: row.id,
     url: row.url,
-    eventTypes: parseEventTypesJson(row.eventTypesJson),
+    eventTypes: decodeEventTypes(row.eventTypesJson),
     secretSet: true,
     active: row.active === 1,
     lastStatus: row.lastStatus,

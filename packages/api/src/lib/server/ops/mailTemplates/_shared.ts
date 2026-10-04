@@ -3,30 +3,21 @@ import { z } from 'zod';
 import {
   HTTP_UNPROCESSABLE_CONTENT,
   LANGUAGES,
+  MAIL_KINDS,
   type Db,
-  type Language
+  type Language,
+  type MailKind
 } from '@zamfono/shared';
 
 import {
   loadBuiltinTemplate,
-  type TemplateKind,
   type TemplateSource
 } from '#lib/server/mail/index.js';
 
 import { OpError } from '../types.js';
 
-/** The six mail kinds `api` renders a template for (§10.2 "Templates"). */
-export const TEMPLATE_KINDS = [
-  'voicemail',
-  'missedCall',
-  'setup',
-  'reset',
-  'updateFailed',
-  'breakingUpdate'
-] as const satisfies readonly TemplateKind[];
-
 export const kindSchema = z
-  .enum(TEMPLATE_KINDS)
+  .enum(MAIL_KINDS)
   .describe(
     'The mail: voicemail (a new voicemail), missedCall, setup (the set-password link of a new account), reset (a password reset link), updateFailed (to the owners: an automatic update failed) or breakingUpdate (to the owners: a breaking release needs a manual update).'
   );
@@ -36,7 +27,7 @@ export const languageSchema = z
 
 /** A `GET /mailTemplates` / `GET /mailTemplates/{kind}/{language}` row (§10.3 "Mail templates"). */
 export type MailTemplateWire = {
-  kind: TemplateKind;
+  kind: MailKind;
   language: Language;
   subject: string;
   bodyText: string;
@@ -48,7 +39,7 @@ export type MailTemplateWire = {
 /** The tenant's override row for `(kind, language)`, or `undefined` while none exists. */
 export async function loadOverride(
   db: Db,
-  kind: TemplateKind,
+  kind: MailKind,
   language: Language
 ): Promise<
   | {
@@ -70,7 +61,7 @@ export async function loadOverride(
 /** The effective `(kind, language)` template as `GET` returns it: the tenant's override, else the shipped one. */
 export async function effectiveTemplate(
   db: Db,
-  kind: TemplateKind,
+  kind: MailKind,
   language: Language
 ): Promise<MailTemplateWire> {
   const override = await loadOverride(db, kind, language);

@@ -34,7 +34,7 @@
       "HostDirection": "../columnValues.js",
       "Language": "../columnValues.js",
       "LogLevelOverride": "../columnValues.js",
-      "MailKind": "../internalApi.js",
+      "MailKind": "../columnValues.js",
       "MaintenanceWork": "../columnValues.js",
       "NumberFormat": "../columnValues.js",
       "OAuthClientKind": "../columnValues.js",

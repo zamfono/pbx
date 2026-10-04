@@ -1,12 +1,8 @@
 import Handlebars from 'handlebars';
 
-import type { Db, Language } from '@zamfono/shared';
+import type { Db, Language, MailKind } from '@zamfono/shared';
 
-import {
-  loadBuiltinTemplate,
-  PLACEHOLDERS,
-  type TemplateKind
-} from './templates.js';
+import { loadBuiltinTemplate, PLACEHOLDERS } from './templates.js';
 import { usedPlaceholders } from './templateSyntax.js';
 
 // Handlebars' own `knownHelpersOnly` compile guard (defense in depth next to the helper check
@@ -77,7 +73,7 @@ function compileField(
  * `with`/`date`, and `Error('template: missing required X')` for an unused required one.
  */
 export function compileTemplate(
-  kind: TemplateKind,
+  kind: MailKind,
   subject: string,
   bodyText: string,
   bodyHtml: string | null
@@ -133,7 +129,7 @@ export function compileTemplate(
  */
 export async function resolveTemplate(
   db: Db,
-  kind: TemplateKind,
+  kind: MailKind,
   language: Language
 ): Promise<CompiledTemplate> {
   const override = await db

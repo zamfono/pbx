@@ -7,10 +7,10 @@ import { recordChange } from '../audit.js';
 import { orBefore } from '../patch.js';
 import { defineOperation } from '../types.js';
 import {
-  eventTypesSchema,
+  decodeEventTypes,
+  eventTypesField,
   httpUrlSchema,
   liveWebhook,
-  parseEventTypesJson,
   toWire,
   webhookSecretSchema,
   type WebhookWire
@@ -21,7 +21,7 @@ const inputSchema = z
     id: z.string(),
     url: httpUrlSchema.optional(),
     secret: webhookSecretSchema.optional(),
-    eventTypes: eventTypesSchema,
+    eventTypes: eventTypesField,
     active: z
       .boolean()
       .optional()
@@ -80,8 +80,8 @@ export const update = defineOperation<Input, WebhookWire>({
     if (eventTypesJson !== before.eventTypesJson) {
       recordChange(ctx, {
         field: 'eventTypes',
-        from: parseEventTypesJson(before.eventTypesJson),
-        to: parseEventTypesJson(eventTypesJson)
+        from: decodeEventTypes(before.eventTypesJson),
+        to: decodeEventTypes(eventTypesJson)
       });
     }
     if (input.secret !== undefined) {

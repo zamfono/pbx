@@ -1,3 +1,5 @@
+import { MAIL_KINDS } from '@zamfono/shared';
+
 import {
   decodeOffsetCursor,
   offsetPage,
@@ -5,11 +7,7 @@ import {
 } from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
-import {
-  effectiveTemplate,
-  TEMPLATE_KINDS,
-  tenantLanguage
-} from './_shared.js';
+import { effectiveTemplate, tenantLanguage } from './_shared.js';
 
 /**
  * `GET /mailTemplates` (§10.3 "Mail templates"): the effective template of every kind in the
@@ -25,7 +23,7 @@ export const list = defineOperation({
     const offset = decodeOffsetCursor(ctx.operation, input.cursor);
     const { page, nextCursor } = offsetPage(
       ctx.operation,
-      TEMPLATE_KINDS.slice(offset, offset + input.limit + 1),
+      MAIL_KINDS.slice(offset, offset + input.limit + 1),
       offset,
       input.limit
     );

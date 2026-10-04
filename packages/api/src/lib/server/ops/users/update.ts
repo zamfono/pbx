@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { findMeSchema } from '@zamfono/shared';
+import { findMeSchema, USER_ROLES } from '@zamfono/shared';
 
 import { assertAudioOfKind } from '../audio/_shared.js';
 import { recordFieldChanges } from '../audit.js';
@@ -37,7 +37,7 @@ const inputSchema = z
     name: z.string().min(1).optional(),
     email: z.email().optional(),
     role: z
-      .enum(['owner', 'admin', 'user'])
+      .enum(USER_ROLES)
       .optional()
       .describe(
         'owner and admin configure the stack (only an owner writes owner-only settings), user only their own self-service fields; the last owner cannot be demoted.'

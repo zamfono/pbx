@@ -5,7 +5,19 @@
  */
 
 /** `users.role` (§5.3), most to least privileged. */
-export type UserRole = 'owner' | 'admin' | 'user';
+export const USER_ROLES = ['owner', 'admin', 'user'] as const;
+export type UserRole = (typeof USER_ROLES)[number];
+
+/** `mail_templates.kind` (§10.2 "Templates"): the mails `api` renders. */
+export const MAIL_KINDS = [
+  'voicemail',
+  'missedCall',
+  'setup',
+  'reset',
+  'updateFailed',
+  'breakingUpdate'
+] as const;
+export type MailKind = (typeof MAIL_KINDS)[number];
 
 /** `users.log_level`, `trunks.log_level` and `ring_groups.log_level` (§7): an override only
  * raises a call's level, so `none` belongs to the tenant default alone. */

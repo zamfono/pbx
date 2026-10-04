@@ -1,9 +1,6 @@
 /// <reference types="vite/client" />
 import type { Language, MailKind } from '@zamfono/shared';
 
-/** §10.2 "Templates": the mail kinds `api` renders, one shipped template per kind and language. */
-export type TemplateKind = MailKind;
-
 /** A shipped or tenant-authored template row before compilation (§11.2 `mail_templates`). */
 export type TemplateSource = {
   subject: string;
@@ -17,7 +14,7 @@ const COMMON_PLACEHOLDERS = ['companyName', 'recipientName', 'fqdn'];
 
 /** §10.2 table: the placeholders each kind offers, and which of those a template must use. */
 export const PLACEHOLDERS: Record<
-  TemplateKind,
+  MailKind,
   { offered: string[]; required: string[] }
 > = {
   voicemail: {
@@ -79,7 +76,7 @@ const BUILTIN_TEMPLATES = import.meta.glob<TemplateSource>('./builtin/*.json', {
 
 /** The shipped `builtin/<kind>.<language>.json` template (§10.2 "Templates"). */
 export function loadBuiltinTemplate(
-  kind: TemplateKind,
+  kind: MailKind,
   language: Language
 ): TemplateSource {
   const source = BUILTIN_TEMPLATES[`./builtin/${kind}.${language}.json`];
