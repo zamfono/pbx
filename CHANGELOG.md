@@ -324,6 +324,9 @@ why the specified behaviour changed; the commit history, how.
 - A caller who hangs up just as a phone answers (or a pickup is answered) no longer leaves that
   phone connected to nobody, its user shown busy and the call listed as live: the phone is hung
   up.
+- `/metrics` keeps reporting `zamfono_backup_last_success_age_seconds` for a backup target whose
+  backups have failed for longer than `recording_retention_days`: the daily purge keeps each
+  target's latest successful run.
 - An `api` restart no longer re-registers every Ringotel app for an Asterisk it already handled
   once the audit retention (`audit_retention_days`) has purged the earlier re-registration: the
   time the apps last registered is kept in the settings row instead of read from the audit log.

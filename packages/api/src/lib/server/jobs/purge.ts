@@ -2,7 +2,8 @@
  * The daily retention purge (§5.9 last paragraph, §5.2, §5.7, §11.6): hard-deletes soft-deleted
  * config rows once `settings.soft_delete_retention_days` has passed, stale `oauth_clients` and
  * expired `tokens` (§5.2), `audit_log` beyond `settings.audit_retention_days` (§5.7) and
- * `backup_runs` beyond `settings.recording_retention_days` (§11.6).
+ * `backup_runs` beyond `settings.recording_retention_days` but each target's latest successful one
+ * (§11.6).
  */
 import { sql, type Transaction } from 'kysely';
 
@@ -127,12 +128,31 @@ async function purgeAuditLog(
     .execute();
 }
 
-/** §11.6 "Retention": `backup_runs` rows beyond `recording_retention_days`. */
+/**
+ * §11.6 "Retention": `backup_runs` rows beyond `recording_retention_days`, except each target's
+ * latest successful run, whose age `/metrics` reports however long ago it was (§7).
+ */
 async function purgeBackupRuns(
   trx: Transaction<DB>,
   cutoff: string
 ): Promise<void> {
-  await trx.deleteFrom('backupRuns').where('startedAt', '<', cutoff).execute();
+  await trx
+    .deleteFrom('backupRuns')
+    .where('startedAt', '<', cutoff)
+    .where(eb =>
+      eb.or([
+        eb('status', '!=', 'ok'),
+        eb.exists(
+          eb
+            .selectFrom('backupRuns as later')
+            .select('later.id')
+            .whereRef('later.targetId', '=', 'backupRuns.targetId')
+            .where('later.status', '=', 'ok')
+            .whereRef('later.finishedAt', '>', 'backupRuns.finishedAt')
+        )
+      ])
+    )
+    .execute();
 }
 
 /**

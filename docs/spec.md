@@ -2257,7 +2257,8 @@ CREATE TABLE backup_targets (
 );
 
 -- backup_runs — one row per backup run (§6.5), written by api; the store behind GET /backups/runs
--- and the source of the backup.* events. Purged by api's daily job after recording_retention_days.
+-- and the source of the backup.* events. Purged by api's daily job after recording_retention_days,
+-- except each target's latest ok run (§11.6).
 --   status:      'running' until the run ends
 --   snapshot_id: the restic snapshot; set on 'ok'
 --   bytes_added: restic's data_added, what the run uploaded after deduplication; set on 'ok'
@@ -2591,7 +2592,7 @@ One named volume, `media/`, is shared between `asterisk`, `core` and `api`:
 - `media/voicemail/`: voicemail recordings; Asterisk writes them via ARI record, `api` reads and serves them;
 - `media/recordings/`: raw per-leg call recordings and the mixed stereo output.
 
-**Retention.** Voicemails are kept until the user deletes them. Recordings are purged after `settings.recording_retention_days` (default 90) by a daily job in `core`; `presence_log` rows, `calls.log` content and `call_qos` rows are purged by the same job on the same schedule, except each user's latest `presence_log` row before the cutoff, which is still their state from then on, and `backup_runs` rows by `api`'s daily job (§5.9). Call recording is off by default and enabled per user or per ring group by an admin (§10.2, "Recording semantics"). Recordings and voicemails are personal data under GDPR; the operator is responsible for consent and announcement, as documented in the admin guide.
+**Retention.** Voicemails are kept until the user deletes them. Recordings are purged after `settings.recording_retention_days` (default 90) by a daily job in `core`; `presence_log` rows, `calls.log` content and `call_qos` rows are purged by the same job on the same schedule, except each user's latest `presence_log` row before the cutoff, which is still their state from then on, and `backup_runs` rows by `api`'s daily job (§5.9), except each target's latest successful run, whose age `/metrics` reports however old it is (§7). Call recording is off by default and enabled per user or per ring group by an admin (§10.2, "Recording semantics"). Recordings and voicemails are personal data under GDPR; the operator is responsible for consent and announcement, as documented in the admin guide.
 
 **Audio formats.** Masters are stored as uploaded. Playback uses 16-bit 8 kHz or 16 kHz WAV for Asterisk, and Opus or MP3 for downloads through `api`.
 

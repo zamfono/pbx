@@ -8,6 +8,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 *Why:* product-owner decision "Move them": every core test double in one directory the build excludes once.
 **2026-10-04 · §5.8.** Product-owner decision (undo of a deletion vs rows deleted since): undoing a deletion is refused with a 409 naming each row deleted since that the revived row, or the forward targets it and its own rules route to, points at; that deletion is undone first.
 *Why:* "Refuse with 409 (Recommended)": the undo revived a menu onto a greeting deleted meanwhile, and the daily purge then failed on the menu's `RESTRICT` reference every day, or, for a `SET NULL` one, cleared a live row's setting.
+**2026-10-04 · §11.6 Retention.** The daily purge of `backup_runs` keeps each target's latest successful run, however old.
+*Why:* `/metrics` reports the age of that run per target (§7); once a target had failed for longer than `recording_retention_days`, the purge took the run and the gauge vanished instead of growing.
+
 **2026-10-04 · §10.4 After a restart, §11.2 `settings`, §11.4.** The re-registration's memory across an `api` restart is the new state column `settings.ringotel_registered_at`, set by the re-registration (refused or not), setup and adoption, rather than the latest `ringotel.rereg`, `provisioning.ringotelSetup` or `provisioning.ringotelAdopt` audit entry.
 *Why:* the audit retention purges those entries, after which an `api` restart re-registered every app for an Asterisk start it had already handled.
 
