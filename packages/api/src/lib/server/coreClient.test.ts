@@ -181,40 +181,27 @@ describe('CoreClient.health', () => {
       signal: expect.any(AbortSignal) as unknown
     });
   });
-
-  it('rejects once its timeout aborts a request core never answers', async () => {
-    // A core that hangs: the request ends only when its own signal gives up on it.
-    const fetchFn = (_url: string | URL | Request, init?: RequestInit) =>
-      new Promise<Response>((_resolve, reject) => {
-        init?.signal?.addEventListener('abort', () => {
-          reject(new Error('aborted'));
-        });
-      });
-    vi.spyOn(AbortSignal, 'timeout').mockReturnValueOnce(
-      AbortSignal.timeout(HANG_TIMEOUT_MS)
-    );
-
-    await expect(
-      createCoreClient('http://core:3000', fetchFn).health()
-    ).rejects.toThrow('aborted');
-  });
 });
 
-describe('CoreClient.version', () => {
-  it('rejects once its timeout aborts a request core never answers', async () => {
-    // A core that hangs: `system.info` then answers `core: null` rather than hanging with it.
-    const fetchFn = (_url: string | URL | Request, init?: RequestInit) =>
-      new Promise<Response>((_resolve, reject) => {
-        init?.signal?.addEventListener('abort', () => {
-          reject(new Error('aborted'));
+// `/healthz`, `/metrics`, `system.info` and every live-call action ask these of `core`: none of
+// them hangs with a `core` that accepts the request and never answers it.
+describe.each(['health', 'version', 'state'] as const)(
+  'CoreClient.%s',
+  method => {
+    it('rejects once its timeout aborts a request core never answers', async () => {
+      const fetchFn = (_url: string | URL | Request, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new Error('aborted'));
+          });
         });
-      });
-    vi.spyOn(AbortSignal, 'timeout').mockReturnValueOnce(
-      AbortSignal.timeout(HANG_TIMEOUT_MS)
-    );
+      vi.spyOn(AbortSignal, 'timeout').mockReturnValueOnce(
+        AbortSignal.timeout(HANG_TIMEOUT_MS)
+      );
 
-    await expect(
-      createCoreClient('http://core:3000', fetchFn).version()
-    ).rejects.toThrow('aborted');
-  });
-});
+      await expect(
+        createCoreClient('http://core:3000', fetchFn)[method]()
+      ).rejects.toThrow('aborted');
+    });
+  }
+);

@@ -166,6 +166,22 @@ describe('call control over the API (§10.3 "Live calls")', () => {
     }
   });
 
+  // An id that is not one `core` could hold would otherwise reach its URL path, where a dot
+  // segment is normalised away and `core` answers a 404 with no reason, which is no refusal.
+  it.each(['', '.', '..', 'a/b', 'a?b'])(
+    'refuses %j as a live call id with 422, asking core nothing',
+    async id => {
+      const requests = coreWith(CALLS);
+      await expect(run(admin, 'calls.hold', { id })).rejects.toMatchObject({
+        status: 422
+      });
+      await expect(
+        run(admin, 'calls.transfer', { id: 'answered', toCallId: id })
+      ).rejects.toMatchObject({ status: 422 });
+      expect(requests).toEqual([]);
+    }
+  );
+
   it('declines only the caller’s own ring, needing no control of the call', async () => {
     const requests = coreWith(CALLS);
     await run(user('ringing'), 'calls.decline', { id: 'answered' });

@@ -36,9 +36,10 @@ import {
 } from './coreHttp.js';
 import { tryReadJson } from './json.js';
 
-// `/healthz`, `/metrics` and `system.info` answer within this even while `core` hangs (§6.3
-// "Health", §7, §10.3), and a hung `core` holds up no re-registration check (§10.4).
-const CORE_HEALTH_TIMEOUT_MS = 3000;
+// `/healthz`, `/metrics`, `system.info` and the live-call reads answer within this even while
+// `core` hangs (§6.3 "Health", §7, §10.3), and a hung `core` holds up no re-registration check
+// (§10.4).
+const CORE_READ_TIMEOUT_MS = 3000;
 
 export type OriginateOutcome =
   { callId: string } | { error: 'noRegisteredDevice' };
@@ -89,16 +90,19 @@ export function createCoreClient(
       postJsonChecked(fetchFn, `${baseUrl}/internal/configChanged`, {
         reload: kinds
       }),
-    state: async () => getJson<StateResponse>(`${baseUrl}/internal/state`),
+    state: async () =>
+      getJson<StateResponse>(`${baseUrl}/internal/state`, {
+        signal: AbortSignal.timeout(CORE_READ_TIMEOUT_MS)
+      }),
     async health() {
       const response = await fetchFn(`${baseUrl}/healthz`, {
-        signal: AbortSignal.timeout(CORE_HEALTH_TIMEOUT_MS)
+        signal: AbortSignal.timeout(CORE_READ_TIMEOUT_MS)
       });
       return (await response.json()) as CoreHealth;
     },
     version: async () =>
       getJson<CoreVersionResponse>(`${baseUrl}/internal/version`, {
-        signal: AbortSignal.timeout(CORE_HEALTH_TIMEOUT_MS)
+        signal: AbortSignal.timeout(CORE_READ_TIMEOUT_MS)
       }),
     async originate(req) {
       const url = `${baseUrl}/internal/calls`;

@@ -228,6 +228,10 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- `GET /metrics`, `GET /calls?live=true` and the actions on a live call waited as long as a
+  stalled `core` did; they now give up after 3 seconds, as `/healthz` does. A live call id that
+  cannot be one (empty, `.`, `..`, or with characters other than letters, digits, `.`, `_` and
+  `-`) is refused with 422, where it answered 500.
 - A parking slot could be an emergency number, such as `110` with three-digit extensions, so
   retrieving the call parked there dialled the emergency service; it is now refused with 422, as
   for a user's or ring group's extension. Out-of-office rules and opening hours for a user, ring

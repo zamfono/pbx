@@ -20,6 +20,9 @@ export type CallRow = Selectable<DB['calls']>;
 /** The `id` input of an action on a live call (§10.3 "Live calls"). */
 export const liveCallIdInput = z
   .string()
+  // `core` names calls in its URL paths: an id of anything but this charset, or a dot segment
+  // the URL normalises away, could only ever reach some other route.
+  .regex(/^(?!\.{1,2}$)[A-Za-z0-9._-]+$/u)
   .describe("The live call's id, as calls.list with live=true lists it.");
 
 /** The `target` input of an action that dials from the caller's own phone: `verb` names whom. */

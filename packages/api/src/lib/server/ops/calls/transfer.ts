@@ -27,9 +27,7 @@ const inputSchema = z
       .describe(
         'Puts the transferee straight through to the mailbox of the user or ring group owning the target extension, without ringing, as *97<ext> does; 422 noMailbox when nobody owns it.'
       ),
-    toCallId: z
-      .string()
-      .min(1)
+    toCallId: liveCallIdInput
       .optional()
       .describe(
         "Attended transfer: the consultation call's id calls.consult returned; the held party joins whoever answered it, and you leave both calls. Give this or target."
