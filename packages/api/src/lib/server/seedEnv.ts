@@ -67,14 +67,15 @@ export function assertMailFromPresence(env: SeedEnv): void {
   }
 }
 
-/** Either the seeded hash or a mail relay must be present (§6.3 "First boot"). */
-export function assertHashOrRelay(env: SeedEnv): void {
-  if (
-    env.BOOTSTRAP_OWNER_PASSWORD_HASH === undefined &&
-    env.SMTP_HOST === undefined
-  ) {
+/**
+ * The owner's `BOOTSTRAP_OWNER_PASSWORD_HASH` is required, an Argon2id PHC string (§6.3 "First
+ * boot"): the first owner signs in with it, and an unquoted value Compose cut short is refused
+ * here rather than stored as a password nobody can use.
+ */
+export function assertPasswordHash(env: SeedEnv): void {
+  if (!env.BOOTSTRAP_OWNER_PASSWORD_HASH?.startsWith('$argon2id$')) {
     throw new Error(
-      'seed: BOOTSTRAP_OWNER_PASSWORD_HASH or SMTP_HOST is required'
+      'seed: BOOTSTRAP_OWNER_PASSWORD_HASH is required and must be an Argon2id hash'
     );
   }
 }

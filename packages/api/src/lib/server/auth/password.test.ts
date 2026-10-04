@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { UNSET_PASSWORD_HASH_PREFIX } from '../seed.js';
 import { hashPassword, verifyPassword } from './password.js';
 
 describe('password', () => {
@@ -18,10 +17,5 @@ describe('password', () => {
 
   it('rejects without throwing for a null hash (SSO-only user)', async () => {
     await expect(verifyPassword(null, 'anything')).resolves.toBe(false);
-  });
-
-  it("rejects without throwing for seed.ts's unset-password placeholder", async () => {
-    const placeholder = `${UNSET_PASSWORD_HASH_PREFIX}deadbeef`;
-    await expect(verifyPassword(placeholder, 'anything')).resolves.toBe(false);
   });
 });

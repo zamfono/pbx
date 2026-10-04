@@ -93,7 +93,7 @@ services:
       # first-boot seed, read only while the database holds no user (§6.3 "First boot")
       BOOTSTRAP_OWNER_EMAIL: ${BOOTSTRAP_OWNER_EMAIL}
       BOOTSTRAP_OWNER_NAME: ${BOOTSTRAP_OWNER_NAME}
-      BOOTSTRAP_OWNER_PASSWORD_HASH: ${BOOTSTRAP_OWNER_PASSWORD_HASH:-}   # empty = set-password mail; requires SMTP_HOST
+      BOOTSTRAP_OWNER_PASSWORD_HASH: ${BOOTSTRAP_OWNER_PASSWORD_HASH:-}
       COMPANY_NAME: ${COMPANY_NAME}
       MAIN_DID: ${MAIN_DID}
       MAIL_FROM: ${MAIL_FROM:-}                 # required when SMTP_HOST is set

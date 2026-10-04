@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-04 · §5.2, §6.3 First boot and the `compose.yaml` listing, §10.2 Mail.** Product-owner decision (first owner without a password): `BOOTSTRAP_OWNER_PASSWORD_HASH` is required, an Argon2id PHC string, and `api` refuses the first boot without it; the set-password mail to the first owner and the `compose.yaml` comment offering it go.
+*Why:* "Hash always required": the owner seeded without a hash held an undocumented placeholder that satisfied the owner-has-a-password check but was no password, a third state the spec did not know.
+
 **2026-10-04 · §5.7, §10.3 Health and System, §10.4 Colleague presence, §11.4.** Product-owner decision (Ringotel roster visibility): every roster push attempt is a sixth outcome operation, `ringotel.roster` on the settings, with `outcome`, `trigger` and `reason` as the profile push's; a pending roster shows in `GET /system/info` as `ringotel.rosterPending` and in `/healthz` as `ringotelRosterPending`.
 *Why:* "Mirror the profile (Recommended)": a refused roster push was only logged, so an operator saw neither that the colleague panel in the apps was stale nor whether a retry reached Ringotel.
 

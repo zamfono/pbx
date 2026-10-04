@@ -1,17 +1,13 @@
-import { randomBytes } from 'node:crypto';
 import type { Logger } from 'pino';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { issueResetToken } from './auth/tokens.js';
 import rawEmergencyNumbers from './data/emergencyNumbers.json' with { type: 'json' };
-import { sendMail } from './mail/index.js';
-import { setupLinkFor } from './ops/users/_setupMail.js';
 import { encrypt, type Keyring } from './secretbox.js';
 import { createDefaultBackupTarget } from './seedBackupTarget.js';
 import {
-  assertHashOrRelay,
   assertMailFromPresence,
+  assertPasswordHash,
   countryFrom,
   extLengthFrom,
   mainDidFrom,
@@ -23,32 +19,13 @@ import {
 import { createOwnerExtension, createParkingSlots } from './seedExtensions.js';
 import { createMohAssets } from './seedMoh.js';
 
-const RANDOM_PASSWORD_BYTES = 32;
-const EU_DEFAULT_KEY = 'EU_DEFAULT';
+// A country without an entry in the per-country table (§6.3 "First boot").
 const FALLBACK_EMERGENCY_NUMBERS = ['112'];
 
-type EmergencyNumbersTable = Record<string, string[]>;
+const EMERGENCY_NUMBERS_TABLE: Record<string, string[]> = rawEmergencyNumbers;
 
-const EMERGENCY_NUMBERS_TABLE: EmergencyNumbersTable = rawEmergencyNumbers;
-
-/** Owner row created at first boot (§6.3 "First boot"). */
-type SeededOwner = { id: string; hasPasswordHash: boolean };
-
-// A password nobody knows: satisfies `users`' `password_hash IS NOT NULL` check until the
-// setup mail's link sets a real one (§6.3 "First boot"). The prefix is not a valid Argon2id PHC
-// string (which starts `$argon2`), so `verifyPassword` (`auth/password.ts`) rejects it as "no
-// password set" before ever calling `argon2.verify` on it.
-export const UNSET_PASSWORD_HASH_PREFIX = 'unset:';
-function unusablePasswordPlaceholder(): string {
-  return `${UNSET_PASSWORD_HASH_PREFIX}${randomBytes(RANDOM_PASSWORD_BYTES).toString('hex')}`;
-}
-
-async function createOwner(
-  db: Db,
-  env: SeedEnv,
-  now: string
-): Promise<SeededOwner> {
-  const hasPasswordHash = env.BOOTSTRAP_OWNER_PASSWORD_HASH !== undefined;
+/** The owner row created at first boot (§6.3 "First boot"), returning its id. */
+async function createOwner(db: Db, env: SeedEnv, now: string): Promise<string> {
   const id = newId();
   await db
     .insertInto('users')
@@ -57,13 +34,11 @@ async function createOwner(
       name: requiredEnv(env, 'BOOTSTRAP_OWNER_NAME'),
       email: requiredEnv(env, 'BOOTSTRAP_OWNER_EMAIL'),
       role: 'owner',
-      passwordHash: hasPasswordHash
-        ? requiredEnv(env, 'BOOTSTRAP_OWNER_PASSWORD_HASH')
-        : unusablePasswordPlaceholder(),
+      passwordHash: requiredEnv(env, 'BOOTSTRAP_OWNER_PASSWORD_HASH'),
       createdAt: now
     })
     .execute();
-  return { id, hasPasswordHash };
+  return id;
 }
 
 /** The main-number DID (§11.4 `main_did_id`), targeting the owner until an admin retargets it. */
@@ -104,7 +79,7 @@ function emergencyNumbersFor(country: string, log: Logger): string[] {
   log.warn(
     `seed: no emergency numbers for country ${country}, using ${FALLBACK_EMERGENCY_NUMBERS.join(',')}`
   );
-  return EMERGENCY_NUMBERS_TABLE[EU_DEFAULT_KEY] ?? FALLBACK_EMERGENCY_NUMBERS;
+  return FALLBACK_EMERGENCY_NUMBERS;
 }
 
 async function createSettings(
@@ -140,30 +115,6 @@ async function createSettings(
     .execute();
 }
 
-/**
- * Without a seeded hash, the owner gets the set-password mail instead (§6.3 "First boot"); an
- * undelivered link is the owner's only way in, so a non-`'sent'` outcome throws (run inside
- * `seedIfEmpty`'s transaction, this rolls the whole boot back for a retry on the next start
- * rather than leaving a placeholder hash nobody can turn into a real login).
- */
-async function sendSetupMail(
-  db: Db,
-  kr: Keyring,
-  params: { ownerId: string; now: string }
-): Promise<void> {
-  const { ownerId, now } = params;
-  const { raw, expiresAt } = await issueResetToken(db, ownerId, 'setup', now);
-  const link = setupLinkFor(raw);
-  const outcome = await sendMail(db, kr, {
-    kind: 'setup',
-    to: { userId: ownerId },
-    values: { link, linkExpiresAt: expiresAt }
-  });
-  if (outcome !== 'sent') {
-    throw new Error(`seed: setup mail was not sent (${outcome})`);
-  }
-}
-
 // Seeds an empty database from `.env` (§6.3 "First boot") in one transaction, so a validation
 // failure or a write error leaves it empty for a retry. Runs only while `users` holds no row.
 export async function seedIfEmpty(
@@ -178,13 +129,13 @@ export async function seedIfEmpty(
     return 'skipped';
   }
   assertMailFromPresence(env);
-  assertHashOrRelay(env);
+  assertPasswordHash(env);
   const now = nowIso();
   const extLength = extLengthFrom(env);
   await db.transaction().execute(async trx => {
-    const created = await createOwner(trx, env, now);
-    await createOwnerExtension(trx, created.id, extLength);
-    const mainDid = await createMainDid(trx, created.id, env, now);
+    const ownerId = await createOwner(trx, env, now);
+    await createOwnerExtension(trx, ownerId, extLength);
+    const mainDid = await createMainDid(trx, ownerId, env, now);
     await createSettings(trx, {
       env,
       kr,
@@ -195,9 +146,6 @@ export async function seedIfEmpty(
     await createParkingSlots(trx, extLength);
     await createMohAssets(trx, env, mediaDir, now, log);
     await createDefaultBackupTarget(trx, env, kr, now, log);
-    if (!created.hasPasswordHash) {
-      await sendSetupMail(trx, kr, { ownerId: created.id, now });
-    }
   });
   return 'seeded';
 }

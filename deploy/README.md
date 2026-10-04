@@ -275,7 +275,7 @@ log in:
 BOOTSTRAP_OWNER_PASSWORD_HASH='$argon2id$v=19$m=65536,p=4,t=3$...'
 ```
 
-Leave it empty instead and the owner gets a set-password mail, which needs `SMTP_HOST`.
+It is required: `api` refuses its first boot without it.
 
 ## 6. Start it
 

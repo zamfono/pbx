@@ -101,21 +101,12 @@ ask_mail() {
   ask MAIL_FROM v_email "Sender address" "The From: address of every mail the stack sends."
 }
 
-# The owner's password: hashed now, or — with a mail relay — a set-password mail at first boot.
+# The owner's password, hashed now: the first boot needs its hash (§6.3 "First boot").
 ask_password() {
-  local first second choice
+  local first second
   [[ -n ${BOOTSTRAP_OWNER_PASSWORD_HASH:-} ]] && return 0
   if [[ -z ${OWNER_PASSWORD:-} ]]; then
-    if [[ -z $interactive ]]; then
-      [[ -n ${SMTP_HOST:-} ]] && return 0
-      fail "neither OWNER_PASSWORD nor BOOTSTRAP_OWNER_PASSWORD_HASH is set, and without" \
-        "SMTP_HOST the owner cannot get a set-password mail instead"
-    fi
-    if [[ -n ${SMTP_HOST:-} ]]; then
-      choice=$(ui_menu "Owner password" "How does $BOOTSTRAP_OWNER_EMAIL get in the first time?" \
-        now "set a password now" mail "a set-password mail at first boot") || ui_cancel
-      [[ $choice == mail ]] && return 0
-    fi
+    [[ -n $interactive ]] || fail "neither OWNER_PASSWORD nor BOOTSTRAP_OWNER_PASSWORD_HASH is set"
     while true; do
       first=$(ui_password "Owner password" "Password for $BOOTSTRAP_OWNER_EMAIL (at least 8 characters).") || { ui_cancel; continue; }
       second=$(ui_password "Owner password" "The same password again.") || { ui_cancel; continue; }

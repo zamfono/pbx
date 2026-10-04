@@ -83,6 +83,11 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
+- **Breaking:** the first owner's password hash, `BOOTSTRAP_OWNER_PASSWORD_HASH`, is required:
+  `api` refuses its first boot without it, or with a value that is not an Argon2id hash (such as
+  one Compose cut short because it was not quoted), and the first owner no longer gets a
+  set-password mail instead. `setup.sh` always asks for the owner's password, or with
+  `SETUP_NONINTERACTIVE=1` refuses to run without `OWNER_PASSWORD` or the hash.
 - Breaking, API surface: a ring group's forwarding rules can be read back with
   `ringGroups.getForwarding` (`GET /ringGroups/{id}/forwarding`), in the shape
   `ringGroups.setForwarding` takes, `sip` targets with their `headers`; the set-password page

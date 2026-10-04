@@ -67,6 +67,12 @@ run_setup() {
     BOOTSTRAP_OWNER_PASSWORD_HASH='$argon2id$v=19$m=65536,p=4,t=3$c2FsdA$aGFzaA' \
     "$@" ./setup.sh </dev/null >/dev/null 2>&1)
 }
+# Without the owner's password or its hash, a relay notwithstanding, nothing is written.
+if run_setup BOOTSTRAP_OWNER_PASSWORD_HASH= SMTP_HOST=smtp.example.com MAIL_FROM=pbx@example.com \
+  || [ -e "$bundle_dir/x/.env" ]; then
+  echo "setup.sh wrote an .env without the owner's password" >&2
+  exit 1
+fi
 # A TZ that names no time zone is refused before anything is written.
 if run_setup TZ=Europe/Viena || [ -e "$bundle_dir/x/.env" ]; then
   echo "setup.sh took TZ=Europe/Viena" >&2

@@ -17,9 +17,8 @@ import { HTTP_OK, HTTP_SERVICE_UNAVAILABLE, openDb } from '@zamfono/shared';
 import { migratedTestDb, MIGRATIONS_DIR } from '@zamfono/shared/testDb.js';
 
 import { apiHealth, healthStatus } from './health.js';
-import { sendMail } from './mail/index.js';
 import { decrypt, keyringFromEnv, type Keyring } from './secretbox.js';
-import { seedIfEmpty, UNSET_PASSWORD_HASH_PREFIX } from './seed.js';
+import { seedIfEmpty } from './seed.js';
 import type { SeedEnv } from './seedEnv.js';
 import {
   MOH_NARROWBAND_EXT,
@@ -32,29 +31,6 @@ const KEY_BYTES = 32;
 const EXT_LENGTH_TWO = 2;
 
 const silentLogger = pino({ level: 'silent' });
-
-// The mocked `nodemailer` transport records what `sendMail` (via `seedIfEmpty`'s setup mail)
-// would otherwise send over a real relay; `vi.hoisted` runs before the `vi.mock` factory below.
-const sentMail = vi.hoisted(() => ({
-  messages: [] as Record<string, unknown>[]
-}));
-vi.mock('nodemailer', () => ({
-  default: {
-    createTransport: () => ({
-      sendMail: (message: Record<string, unknown>) => {
-        sentMail.messages.push(message);
-        return Promise.resolve({});
-      }
-    })
-  }
-}));
-
-// Wraps the real `sendMail` in a spy so one test can force a `'failed'` outcome without
-// exercising the relay's real in-process retries (§10.2 "Mail" "Failure": 30 s/60 s/120 s apart).
-vi.mock(import('./mail/index.js'), async importOriginal => {
-  const actual = await importOriginal();
-  return { ...actual, sendMail: vi.fn(actual.sendMail) };
-});
 
 function testKeyring(): Keyring {
   return keyringFromEnv({
@@ -545,69 +521,31 @@ describe('seedIfEmpty', () => {
     ).rejects.toThrow(/MAIL_FROM/u);
   });
 
-  it('throws with neither a password hash nor a mail relay', async () => {
-    const db = await migratedTestDb();
-    const mediaDir = await tempMediaDir();
-    const env = baseEnv({ BOOTSTRAP_OWNER_PASSWORD_HASH: undefined });
-    await expect(
-      seedIfEmpty(db, env, testKeyring(), mediaDir, silentLogger)
-    ).rejects.toThrow(/BOOTSTRAP_OWNER_PASSWORD_HASH/u);
-  });
+  it.each([
+    ['missing', undefined],
+    ['not an Argon2id PHC string', '=19=65536,p=4,t=3'],
+    ['an Argon2i one', '$argon2i$v=19$m=1,t=1,p=1$c2FsdA$aGFzaA']
+  ])(
+    'refuses to seed, even with a mail relay, with the password hash %s',
+    async (_case, hash) => {
+      const db = await migratedTestDb();
+      const mediaDir = await tempMediaDir();
+      const env = baseEnv({
+        SMTP_HOST: 'smtp.example.com',
+        MAIL_FROM: 'no-reply@example.com',
+        BOOTSTRAP_OWNER_PASSWORD_HASH: hash
+      });
+      await expect(
+        seedIfEmpty(db, env, testKeyring(), mediaDir, silentLogger)
+      ).rejects.toThrow(/BOOTSTRAP_OWNER_PASSWORD_HASH/u);
 
-  it('sends the setup mail and issues a token when no hash is seeded', async () => {
-    const db = await migratedTestDb();
-    const mediaDir = await tempMediaDir();
-    sentMail.messages.length = 0;
-    const env = baseEnv({
-      SMTP_HOST: 'smtp.example.com',
-      MAIL_FROM: 'no-reply@example.com',
-      BOOTSTRAP_OWNER_PASSWORD_HASH: undefined
-    });
-    const result = await seedIfEmpty(
-      db,
-      env,
-      testKeyring(),
-      mediaDir,
-      silentLogger
-    );
-    expect(result).toBe('seeded');
-
-    const owner = await db
-      .selectFrom('users')
-      .selectAll()
-      .executeTakeFirstOrThrow();
-    expect(owner.passwordHash?.startsWith(UNSET_PASSWORD_HASH_PREFIX)).toBe(
-      true
-    );
-
-    const token = await db
-      .selectFrom('tokens')
-      .selectAll()
-      .where('userId', '=', owner.id)
-      .executeTakeFirstOrThrow();
-    expect(token.revokedAt).toBeNull();
-
-    expect(sentMail.messages).toHaveLength(1);
-    const message = sentMail.messages[0] as { text: string };
-    expect(message.text).toContain('https://pbx.test/auth/setPassword?token=');
-  });
-
-  it('leaves the database empty for a retry when the setup mail fails to send', async () => {
-    const db = await migratedTestDb();
-    const mediaDir = await tempMediaDir();
-    vi.mocked(sendMail).mockResolvedValueOnce('failed');
-    const env = baseEnv({
-      SMTP_HOST: 'smtp.example.com',
-      MAIL_FROM: 'no-reply@example.com',
-      BOOTSTRAP_OWNER_PASSWORD_HASH: undefined
-    });
-    await expect(
-      seedIfEmpty(db, env, testKeyring(), mediaDir, silentLogger)
-    ).rejects.toThrow(/setup mail/u);
-
-    const owner = await db.selectFrom('users').select('id').executeTakeFirst();
-    expect(owner).toBeUndefined();
-  });
+      const owner = await db
+        .selectFrom('users')
+        .select('id')
+        .executeTakeFirst();
+      expect(owner).toBeUndefined();
+    }
+  );
 });
 
 describe('apiHealth', () => {
