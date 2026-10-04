@@ -11,73 +11,41 @@ import pino from 'pino';
 
 import type { Db } from '@zamfono/shared';
 
-import { errorMessage } from '#lib/server/errors.js';
-import { activeRingotelProvider } from '#lib/server/provisioning/index.js';
 import { setProfilePending } from '#lib/server/provisioning/profilePending.js';
 
 import { afterPropagation } from '../afterCommit.js';
 import type { AuditCaller } from '../audit.js';
+import { callerOf, JOB_CALLER } from '../outcomeLog.js';
 import {
-  callerOf,
-  JOB_CALLER,
-  outcomeChanges,
-  recordOutcome
-} from '../outcomeLog.js';
+  attemptRingotel,
+  settleRingotel,
+  type RetryTrigger,
+  type RingotelOutcome
+} from '../ringotelOutcome.js';
 import type { Context } from '../types.js';
 import { loadSettings } from './_shared.js';
 
 const log = pino({ name: 'ringotel' });
 
-/** What caused a profile push: the write, or one of the two moments `api` retries a pending one. */
-export type ProfileTrigger =
-  'settings.update' | 'api.start' | 'asterisk.started';
-
-type ProfileOutcome =
-  { outcome: 'pushed' } | { outcome: 'refused' | 'skipped'; reason: string };
-
-/**
- * Runs the tenant's profile push, never throwing; `skipped` while Ringotel is not set up. A
- * Ringotel key that cannot be used is a refusal like any other.
- */
-async function attempt(db: Db): Promise<ProfileOutcome> {
-  try {
-    const provider = await activeRingotelProvider(db);
-    if (provider === null) {
-      return { outcome: 'skipped', reason: 'Ringotel is not set up' };
-    }
+async function attempt(db: Db): Promise<RingotelOutcome> {
+  return attemptRingotel(db, async provider => {
     await provider.onTenantProfileChanged?.(await loadSettings(db));
-    return { outcome: 'pushed' };
-  } catch (error) {
-    const reason = errorMessage(error);
-    return { outcome: 'refused', reason };
-  }
+  });
 }
 
-/**
- * Keeps the marker set after a refusal and clears it otherwise, then appends the
- * `ringotel.profile` row (§5.7) on the settings. Neither may throw: the write it follows stands.
- */
 async function settle(
   db: Db,
   caller: AuditCaller,
-  trigger: ProfileTrigger,
-  result: ProfileOutcome
+  trigger: 'settings.update' | RetryTrigger,
+  result: RingotelOutcome
 ): Promise<void> {
-  const reason = result.outcome === 'pushed' ? undefined : result.reason;
-  try {
-    await setProfilePending(db, result.outcome === 'refused');
-    await recordOutcome(db, {
-      caller,
-      operation: 'ringotel.profile',
-      entity: { kind: 'settings', id: 'settings' },
-      changes: outcomeChanges({ outcome: result.outcome, trigger, reason })
-    });
-  } catch (error) {
-    log.error(
-      { error, trigger, outcome: result.outcome },
-      'ringotel: the profile push outcome could not be recorded'
-    );
-  }
+  await settleRingotel(db, {
+    operation: 'ringotel.profile',
+    setPending: setProfilePending,
+    caller,
+    trigger,
+    result
+  });
 }
 
 /**
@@ -115,7 +83,7 @@ export async function pushProfileAfterCommit(ctx: Context): Promise<void> {
  */
 export async function retryPendingProfile(
   db: Db,
-  trigger: Exclude<ProfileTrigger, 'settings.update'>
+  trigger: RetryTrigger
 ): Promise<void> {
   const settings = await loadSettings(db);
   if (settings.ringotelProfilePending !== 1) {

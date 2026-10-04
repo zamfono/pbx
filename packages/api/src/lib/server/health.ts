@@ -7,6 +7,7 @@ import {
 } from '@zamfono/shared';
 
 import { countKeyRotationRemaining } from './jobs/keyRotation.js';
+import { isRosterPending } from './ops/roster.js';
 import { updateNews } from './ops/system/_state.js';
 import { hasEmergencyTrunk } from './ops/trunks/_shared.js';
 import { isPropagationPending } from './propagationPending.js';
@@ -35,6 +36,8 @@ export type ApiHealth = {
    * yet (§10.4 "Tenant profile push").
    */
   ringotelProfilePending: boolean;
+  /** Whether a roster change has not reached Ringotel yet (§10.4 "Colleague presence"). */
+  ringotelRosterPending: boolean;
   /**
    * Whether a config propagation failed and none has succeeded since, so Asterisk may run on an
    * older configuration than the one stored (§3.1 "Config propagation").
@@ -74,6 +77,7 @@ type TableChecks = Pick<
   | 'keyRotationRemaining'
   | 'emergencyTrunk'
   | 'ringotelProfilePending'
+  | 'ringotelRosterPending'
   | 'configPropagationPending'
   | 'autoUpdateFailed'
 >;
@@ -84,6 +88,7 @@ const UNMIGRATED_CHECKS: TableChecks = {
   keyRotationRemaining: 0,
   emergencyTrunk: false,
   ringotelProfilePending: false,
+  ringotelRosterPending: false,
   configPropagationPending: false,
   autoUpdateFailed: false
 };
@@ -94,6 +99,7 @@ async function tableChecks(db: Db, kr: Keyring): Promise<TableChecks> {
     keyRotationRemaining: await countKeyRotationRemaining(db, kr),
     emergencyTrunk: await hasEmergencyTrunk(db),
     ringotelProfilePending: await isProfilePending(db),
+    ringotelRosterPending: await isRosterPending(db),
     configPropagationPending: await isPropagationPending(db),
     autoUpdateFailed: (await updateNews(db)).autoUpdateFailed
   };

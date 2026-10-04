@@ -2,10 +2,16 @@ import pino from 'pino';
 
 import type { Db } from '@zamfono/shared';
 
-import { errorMessage } from '../errors.js';
-import { activeRingotelProvider } from '../provisioning/index.js';
 import type { UserRow } from '../provisioning/types.js';
 import { afterPropagation } from './afterCommit.js';
+import type { AuditCaller } from './audit.js';
+import { callerOf, JOB_CALLER } from './outcomeLog.js';
+import {
+  attemptRingotel,
+  settleRingotel,
+  type RetryTrigger,
+  type RingotelOutcome
+} from './ringotelOutcome.js';
 import { loadSettings } from './settings/_shared.js';
 import type { Context } from './types.js';
 
@@ -26,20 +32,37 @@ export async function setRosterPending(
     .execute();
 }
 
+/** Whether a roster change still waits for a push Ringotel takes. */
+export async function isRosterPending(db: Db): Promise<boolean> {
+  const row = await db
+    .selectFrom('settings')
+    .select('ringotelRosterPending')
+    .where('id', '=', 1)
+    .executeTakeFirstOrThrow();
+  return row.ringotelRosterPending === 1;
+}
+
 /**
- * Runs `onRosterChanged` for `users`, never throwing: `null` once Ringotel took it, which clears
- * the marker, else Ringotel's reason, which keeps it set.
+ * Runs `onRosterChanged` for `users` and settles the marker with its `ringotel.roster` row (§5.7),
+ * `trigger` the operation that changed the roster or the moment of a retry. Never throws.
  */
-async function attempt(db: Db, users: UserRow[]): Promise<string | null> {
-  try {
-    const provider = await activeRingotelProvider(db);
-    await provider?.onRosterChanged?.(users);
-    await setRosterPending(db, false);
-    return null;
-  } catch (error) {
-    await setRosterPending(db, true);
-    return errorMessage(error);
-  }
+async function attempt(
+  db: Db,
+  caller: AuditCaller,
+  trigger: string,
+  users: UserRow[]
+): Promise<RingotelOutcome> {
+  const result = await attemptRingotel(db, async provider => {
+    await provider.onRosterChanged?.(users);
+  });
+  await settleRingotel(db, {
+    operation: 'ringotel.roster',
+    setPending: setRosterPending,
+    caller,
+    trigger,
+    result
+  });
+  return result;
 }
 
 /**
@@ -63,11 +86,13 @@ export async function pushRoster(
     return;
   }
   await setRosterPending(ctx.db, true);
+  const caller = callerOf(ctx);
   afterPropagation(ctx, async db => {
-    const reason = await attempt(db, users);
-    if (reason === null) {
+    const result = await attempt(db, caller, ctx.operation, users);
+    if (result.outcome !== 'refused') {
       return null;
     }
+    const { reason } = result;
     log.error({ reason }, 'ringotel: the roster push was refused');
     return `the change is stored and in force on the PBX, but Ringotel refused the roster (${reason}); api pushes the whole roster again at its next start, when Asterisk next starts, or with the next roster change`;
   });
@@ -77,9 +102,13 @@ export async function pushRoster(
  * One more try for a roster push Ringotel refused before, at `api`'s start or at an Asterisk start
  * (§10.4 "Colleague presence"): the whole roster, every live user included, since which users a
  * refused push carried is not kept. Nothing is sent while none is pending; a refusal keeps the
- * marker for the next such moment, never for a timer, so nothing loops.
+ * marker for the next such moment, never for a timer, so nothing loops. The job (channel `job`)
+ * records it; a stack no longer set up with Ringotel drops the marker as `skipped`.
  */
-export async function retryPendingRoster(db: Db): Promise<void> {
+export async function retryPendingRoster(
+  db: Db,
+  trigger: RetryTrigger
+): Promise<void> {
   const settings = await loadSettings(db);
   if (settings.ringotelRosterPending !== 1) {
     return;
@@ -89,10 +118,16 @@ export async function retryPendingRoster(db: Db): Promise<void> {
     .selectAll()
     .where('deletedAt', 'is', null)
     .execute();
-  const reason = await attempt(db, users);
-  if (reason === null) {
-    log.info('ringotel: the pending roster was pushed');
+  const result = await attempt(db, JOB_CALLER, trigger, users);
+  if (result.outcome === 'refused') {
+    log.error(
+      { trigger, reason: result.reason },
+      'ringotel: the pending roster was refused again'
+    );
   } else {
-    log.error({ reason }, 'ringotel: the pending roster was refused again');
+    log.info(
+      { trigger, outcome: result.outcome },
+      'ringotel: the pending roster was settled'
+    );
   }
 }

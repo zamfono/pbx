@@ -152,7 +152,7 @@ describe('the Ringotel roster follows every user and extension change (§10.4)',
     expect(roster(ringotel)).toEqual([]);
 
     ringotel.failing.delete('updateBranch');
-    await retryPendingRoster(db);
+    await retryPendingRoster(db, 'api.start');
 
     expect(roster(ringotel)).toEqual([{ number: '101', title: 'Anna Huber' }]);
     expect(await rosterPending(db)).toBe(0);

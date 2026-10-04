@@ -7,7 +7,8 @@ import type { Context } from './types.js';
 /**
  * The `audit_log` operations that record what an effect outside Zamfono answered, rather than a
  * change Zamfono made (§5.7): a device's Ringotel push that ran after its operation committed,
- * the tenant profile's push (§10.4 "Tenant profile push"), the re-registration a restart
+ * the tenant profile's push (§10.4 "Tenant profile push"), the roster's push (§10.4 "Colleague
+ * presence"), the re-registration a restart
  * triggers (§10.4), each automatic update attempt (§6.3 "Updates") and the maintenance gate
  * giving up (§6.4 "Maintenance gate"). They are written outside any operation's transaction,
  * never undoable, and, like a pure action, never block an undo of the entity's earlier entries
@@ -16,6 +17,7 @@ import type { Context } from './types.js';
 const OUTCOME_OPERATION_NAMES = [
   'ringotel.push',
   'ringotel.profile',
+  'ringotel.roster',
   'ringotel.rereg',
   'system.autoUpdate',
   'system.maintenanceGate'

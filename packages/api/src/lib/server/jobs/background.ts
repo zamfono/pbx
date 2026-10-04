@@ -125,8 +125,8 @@ export async function runBootSteps(
 /**
  * `core`'s event stream, relayed to the `/events` sockets and to webhooks; its `asterisk.started`
  * frames and every (re)connection drive the Ringotel re-registration (§10.4 "After a restart"),
- * and `api`'s start and each `asterisk.started` retry a pending tenant profile push once (§10.4
- * "Tenant profile push").
+ * and `api`'s start and each `asterisk.started` retry a pending tenant profile push and a pending
+ * roster push once (§10.4 "Tenant profile push", "Colleague presence").
  */
 function relayCoreEvents(
   db: Db,
@@ -141,7 +141,7 @@ function relayCoreEvents(
     retryPending: trigger =>
       onceConfigPropagated(db, async later => {
         await retryPendingProfile(later, trigger);
-        await retryPendingRoster(later);
+        await retryPendingRoster(later, trigger);
       })
   });
   return connectCoreEvents({

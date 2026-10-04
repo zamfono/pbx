@@ -630,6 +630,7 @@ describe('apiHealth', () => {
       certificateSync: 'unknown',
       emergencyTrunk: false,
       ringotelProfilePending: false,
+      ringotelRosterPending: false,
       configPropagationPending: false,
       autoUpdateFailed: false
     });

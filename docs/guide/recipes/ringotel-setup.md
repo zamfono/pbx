@@ -60,3 +60,9 @@ Ringotel afterwards; a Ringotel outage never fails `settings.update`. Each attem
 Ringotel's reason, or `skipped`). After a refusal the response carries a `warnings` entry and
 `system.info` shows `ringotel.profilePending: true`: the stack sends the profile again with the
 next push that reaches Ringotel, when `api` starts, and when Asterisk restarts, never on a timer.
+
+The colleague panel in the apps, one entry per extension and parking slot, follows every user,
+ring group and parking slot change the same way: the change stands on the PBX first, and each
+push leaves a `ringotel.roster` entry on the settings in `audit.list`. After a refusal
+`system.info` shows `ringotel.rosterPending: true`, and the stack sends the whole roster again
+with the next roster change, when `api` starts, and when Asterisk restarts.

@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-04 · §5.7, §10.3 Health and System, §10.4 Colleague presence, §11.4.** Product-owner decision (Ringotel roster visibility): every roster push attempt is a sixth outcome operation, `ringotel.roster` on the settings, with `outcome`, `trigger` and `reason` as the profile push's; a pending roster shows in `GET /system/info` as `ringotel.rosterPending` and in `/healthz` as `ringotelRosterPending`.
+*Why:* "Mirror the profile (Recommended)": a refused roster push was only logged, so an operator saw neither that the colleague panel in the apps was stale nor whether a retry reached Ringotel.
+
 **2026-10-04 · §5.4, §10.3 Settings and conventions, §11.2 `settings`, §11.4.** Product-owner decision (secrets on the wire): no secret is ever returned, masked or otherwise; every read carries a read-only `<name>Set` boolean instead, and a write takes the secret as a merge patch, `null` clearing it (422 where required) and any string setting it. §11.4 names `ringotel_roster_pending` among the state columns outside `/settings`.
 *Why:* "I like the “xSet”. Why would the string “***” get any special treatment then?": a `GET /settings` echoed into a `PATCH` stored the mask `***` as the new SMTP, SSO or Ringotel secret.
 **2026-10-04 · §6.5 Moving a stack.** A restore unpacks the release's bundle, makes the `compose.override.yaml` link by hand beside the preserved `.env`, and copies the snapshot's database (`tmp/zamfono-backup/<targetId>/zamfono.sqlite3`) and `media/` into the `db` and `media` volumes before the first start.

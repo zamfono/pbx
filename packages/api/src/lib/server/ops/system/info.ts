@@ -20,6 +20,7 @@ import {
 import { isProfilePending } from '#lib/server/provisioning/profilePending.js';
 import { stackIpv4 } from '#lib/server/stackAddress.js';
 
+import { isRosterPending } from '../roster.js';
 import { defineOperation } from '../types.js';
 import {
   autoUpdateEnabled,
@@ -59,9 +60,10 @@ type Output = {
   maintenanceGate: Record<MaintenanceWork, LastGiveUp | null>;
   /**
    * `profilePending`: a tenant profile change, the emergency numbers among them, is stored and
-   * in force on the PBX but has not reached Ringotel yet (§10.4 "Tenant profile push").
+   * in force on the PBX but has not reached Ringotel yet (§10.4 "Tenant profile push");
+   * `rosterPending`: a roster change is, likewise (§10.4 "Colleague presence").
    */
-  ringotel: { profilePending: boolean };
+  ringotel: { profilePending: boolean; rosterPending: boolean };
   /**
    * The stack's public name and the IPv4 address SIP and media use (§6.1): `EXTERNAL_IPV4` in the
    * ports mode, `STACK_IPV4` in the macvlan mode.
@@ -98,35 +100,42 @@ async function autoUpdateStatus(db: Db): Promise<Output['autoUpdate']> {
 
 /**
  * `GET /system/info` (§7 "Version", §10.3): the version and commit `api` and `core` each run and
- * since when, when Asterisk started, the latest release with how the last update went and who asked for it, whether automatic updates are on and why the last one failed, after how many attempts (§6.3 "Automatic updates"), when and why the maintenance gate last gave up (§6.4), whether a tenant profile change still waits for Ringotel (§10.4), and the stack's domain and public IPv4 address (§6.1), for anyone signed in. The MCP `serverInfo.version` carries `api`'s too, but only in the connection
+ * since when, when Asterisk started, the latest release with how the last update went and who asked for it, whether automatic updates are on and why the last one failed, after how many attempts (§6.3 "Automatic updates"), when and why the maintenance gate last gave up (§6.4), whether a tenant profile or roster change still waits for Ringotel (§10.4), and the stack's domain and public IPv4 address (§6.1), for anyone signed in. The MCP `serverInfo.version` carries `api`'s too, but only in the connection
  * handshake, which no tool can read; `/healthz` answers without a login and never shows it.
  */
 export const info = defineOperation<Record<string, never>, Output>({
   name: 'system.info',
   description:
-    'Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update with who asked for it, whether automatic updates are on and why and how often the last one failed, when and why the maintenance gate last gave up, whether a tenant profile change still waits for Ringotel, and the domain of the stack and the public IPv4 address its SIP and media use.',
+    'Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update with who asked for it, whether automatic updates are on and why and how often the last one failed, when and why the maintenance gate last gave up, whether a tenant profile or roster change still waits for Ringotel, and the domain of the stack and the public IPv4 address its SIP and media use.',
   input: z.object({}).strict(),
   minRole: 'user',
   scope: 'any',
   readOnly: true,
   run: async ctx => {
-    const [core, update, autoUpdate, maintenanceGate, profilePending] =
-      await Promise.all([
-        getCoreClient()
-          .version()
-          .catch(() => null),
-        updateStatus(),
-        autoUpdateStatus(ctx.db),
-        lastGiveUps(ctx.db),
-        isProfilePending(ctx.db)
-      ]);
+    const [
+      core,
+      update,
+      autoUpdate,
+      maintenanceGate,
+      profilePending,
+      rosterPending
+    ] = await Promise.all([
+      getCoreClient()
+        .version()
+        .catch(() => null),
+      updateStatus(),
+      autoUpdateStatus(ctx.db),
+      lastGiveUps(ctx.db),
+      isProfilePending(ctx.db),
+      isRosterPending(ctx.db)
+    ]);
     return {
       api: { ...resolveVersion(env), startedAt: apiStartedAt },
       core,
       update,
       autoUpdate,
       maintenanceGate,
-      ringotel: { profilePending },
+      ringotel: { profilePending, rosterPending },
       stack: { domain: env.FQDN, ipv4: stackIpv4(env) }
     };
   }

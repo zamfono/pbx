@@ -13,6 +13,11 @@ why the specified behaviour changed; the commit history, how.
 
 ### Added
 
+- Every push of the colleague roster to Ringotel is in the audit log as `ringotel.roster`, with
+  its outcome, what triggered it and Ringotel's reason for a refusal, and a roster change that has
+  not reached Ringotel yet shows in `system.info` as `ringotel.rosterPending` and in `/healthz` as
+  `ringotelRosterPending`. A stack no longer set up with Ringotel drops a pending roster at the next
+  start.
 - Call control through the API and the MCP tools, as a phone does it: `calls.consult` puts the
   other party of a call on hold and dials someone from you, and `calls.transfer` with `toCallId`
   hands the held party over to them (attended transfer); `calls.addParty` adds a third party to a

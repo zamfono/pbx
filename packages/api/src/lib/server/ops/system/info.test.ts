@@ -74,7 +74,7 @@ describe('system.info', () => {
       update: NO_UPDATER,
       autoUpdate: { enabled: false, failed: null },
       maintenanceGate: { certSync: null, autoUpdate: null },
-      ringotel: { profilePending: false },
+      ringotel: { profilePending: false, rosterPending: false },
       stack: { domain: 'pbx.test', ipv4: '192.0.2.10' }
     });
   });
@@ -114,7 +114,7 @@ describe('system.info', () => {
       update: NO_UPDATER,
       autoUpdate: { enabled: false, failed: null },
       maintenanceGate: { certSync: null, autoUpdate: null },
-      ringotel: { profilePending: false },
+      ringotel: { profilePending: false, rosterPending: false },
       stack: { domain: 'pbx.test', ipv4: '192.0.2.10' }
     });
   });
@@ -209,7 +209,16 @@ describe('system.info', () => {
     await seedSettings(db, { ringotelProfilePending: 1 });
 
     expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
-      ringotel: { profilePending: true }
+      ringotel: { profilePending: true, rosterPending: false }
+    });
+  });
+
+  it('reports a roster change that has not reached Ringotel yet (§10.4)', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db, { ringotelRosterPending: 1 });
+
+    expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
+      ringotel: { profilePending: false, rosterPending: true }
     });
   });
 

@@ -159,3 +159,14 @@ describe('apiHealth emergencyTrunk (§9.4 "Emergency trunks", §10.3 Health row)
     await expect(healthOf(db)).rejects.toThrow(/trunks/u);
   });
 });
+
+describe('apiHealth Ringotel markers (§10.4, §10.3 Health row)', () => {
+  it('shows a pending roster push as ringotelRosterPending', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db, { ringotelRosterPending: 1 });
+    expect(await healthOf(db)).toMatchObject({
+      ringotelProfilePending: false,
+      ringotelRosterPending: true
+    });
+  });
+});
