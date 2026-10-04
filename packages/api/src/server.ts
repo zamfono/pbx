@@ -57,9 +57,9 @@ async function acceptEventsSocket(
   deps: { db: Db; jwtSecret: string }
 ): Promise<void> {
   try {
-    const actor = await authenticateEventsSocket(socket, deps);
-    if (actor) {
-      await hub.subscribeWs(socket, actor);
+    const auth = await authenticateEventsSocket(socket, deps);
+    if (auth) {
+      await hub.subscribeWs(socket, auth.actor, auth.personalAccessToken);
     }
   } catch (error) {
     logger.error({ error }, '/events socket setup failed');

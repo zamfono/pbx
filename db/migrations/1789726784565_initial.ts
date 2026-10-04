@@ -1202,7 +1202,7 @@ async function createContactPhonesTable(db: Db): Promise<void> {
     .execute();
 }
 
-// oauth_clients, tokens, webhooks — auth and event-delivery security tables.
+// oauth_clients, tokens, personal_access_tokens, webhooks — auth and event-delivery security tables.
 async function createOauthClientsTable(db: Db): Promise<void> {
   await db.schema
     .createTable('oauth_clients')
@@ -1236,6 +1236,32 @@ async function createTokensTable(db: Db): Promise<void> {
       'tokens_refresh_needs_client',
       sql`(kind = 'refresh') = (client_id is not null)`
     )
+    .execute();
+}
+
+async function createPersonalAccessTokensTable(db: Db): Promise<void> {
+  await db.schema
+    .createTable('personal_access_tokens')
+    .addColumn('id', 'text', col => col.primaryKey().notNull())
+    .addColumn('token_hash', 'text', col => col.notNull().unique())
+    .addColumn('user_id', 'text', col =>
+      col.notNull().references('users.id').onDelete('cascade')
+    )
+    .addColumn('name', 'text', col => col.notNull())
+    .addColumn('created_by', 'text', col =>
+      col.references('users.id').onDelete('set null')
+    )
+    .addColumn('created_at', 'text', col => col.notNull())
+    .addColumn('expires_at', 'text')
+    .addColumn('last_used_at', 'text')
+    .addColumn('revoked_at', 'text')
+    .execute();
+  await db.schema
+    .createIndex('personal_access_tokens_name')
+    .on('personal_access_tokens')
+    .unique()
+    .columns(['user_id', 'name'])
+    .where(sql.ref('revoked_at'), 'is', null)
     .execute();
 }
 
@@ -1726,6 +1752,7 @@ export async function up(db: Db): Promise<void> {
   await createContactPhonesTable(db);
   await createOauthClientsTable(db);
   await createTokensTable(db);
+  await createPersonalAccessTokensTable(db);
   await createWebhooksTable(db);
   await createWebhookDeliveriesTable(db);
   await createBackupTargetsTable(db);

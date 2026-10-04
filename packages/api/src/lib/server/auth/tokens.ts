@@ -14,7 +14,8 @@ const REFRESH_TOKEN_TTL_MS = REFRESH_TOKEN_TTL_DAYS * MS_PER_DAY;
 const SETUP_TOKEN_TTL_MS = SETUP_TOKEN_TTL_DAYS * MS_PER_DAY;
 const RESET_TOKEN_TTL_MS = MS_PER_HOUR;
 
-function generateRawToken(): string {
+/** 256 random bits, base64url: the raw value of every opaque token (§5.2). */
+export function generateRawToken(): string {
   return randomBytes(RAW_TOKEN_BYTES).toString('base64url');
 }
 

@@ -1,6 +1,7 @@
 /**
- * The daily purge's §5.2 credential windows: expired `tokens` rows and the `oauth_clients` rows
- * no token references any more. `purge.ts` runs both inside its one transaction.
+ * The daily purge's §5.2 credential windows: expired `tokens` rows, the `oauth_clients` rows no
+ * token references any more, and revoked or expired personal access tokens. `purge.ts` runs them
+ * inside its one transaction.
  */
 import type { Transaction } from 'kysely';
 
@@ -58,6 +59,22 @@ export async function purgeOauthClients(
             .whereRef('tokens.clientId', '=', 'oauthClients.clientId')
         )
       )
+    )
+    .execute();
+}
+
+/**
+ * §11.2 "personal_access_tokens": a revoked or expired token is purged by the daily job. Nothing
+ * reads such a row again, since a replay of a personal access token is just an unknown token.
+ */
+export async function purgePersonalAccessTokens(
+  trx: Transaction<DB>,
+  now: string
+): Promise<void> {
+  await trx
+    .deleteFrom('personalAccessTokens')
+    .where(eb =>
+      eb.or([eb('revokedAt', 'is not', null), eb('expiresAt', '<', now)])
     )
     .execute();
 }

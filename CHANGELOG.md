@@ -13,6 +13,15 @@ why the specified behaviour changed; the commit history, how.
 
 ### Added
 
+- Personal access tokens for server applications that cannot log in through OAuth:
+  `personalAccessTokens.create` (`POST /users/{id}/personalAccessTokens`) returns a `zpat_…` token
+  once, with a name and an optional expiry, and the application sends it as its bearer token on the
+  API, MCP and `/events`, acting as that user with their current role. A user creates tokens for
+  themselves, an admin or owner for any user, and only an owner for an owner.
+  `personalAccessTokens.list` shows a user's tokens with their last use, never their values, and
+  `personalAccessTokens.revoke` stops one at once, an open `/events` stream included, as does
+  its expiry; deleting the user revokes them all. Recipe
+  `server-application-access` describes the setup.
 - Every push of the colleague roster to Ringotel is in the audit log as `ringotel.roster`, with
   its outcome, what triggered it and Ringotel's reason for a refusal, and a roster change that has
   not reached Ringotel yet shows in `system.info` as `ringotel.rosterPending` and in `/healthz` as

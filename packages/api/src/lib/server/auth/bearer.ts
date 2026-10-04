@@ -1,9 +1,9 @@
 /**
- * The access token to `Actor` step every authenticated channel shares (§5.2, §5.3): REST's
+ * The bearer token to `Actor` step every authenticated channel shares (§5.2, §5.3): REST's
  * server hook, the MCP endpoint and the `/events` handshake. It never reads `$app/env/private`, since
  * `server.ts` runs the handshake outside the SvelteKit bundle.
  */
-import { epochSeconds, type Db } from '@zamfono/shared';
+import { epochSeconds, nowIso, type Db } from '@zamfono/shared';
 
 import type { Actor } from '../ops/types.js';
 import {
@@ -12,16 +12,25 @@ import {
   verifyLinkToken,
   type LinkKind
 } from './jwt.js';
+import {
+  livePersonalAccessToken,
+  PAT_PREFIX,
+  type PersonalAccessTokenGrant
+} from './personalAccessTokens.js';
 
 export const BEARER_PREFIX = 'Bearer ';
 /** The query parameter a download or upload link carries its token in (RFC 6750 §2.3, §10.5). */
 export const ACCESS_TOKEN_PARAM = 'access_token';
 
-/** The user a request acts as, and the OAuth client and its name it acts through, if any (§5.7). */
+/**
+ * The user a request acts as, and the OAuth client and its name it acts through, if any (§5.7),
+ * or the personal access token it presented (§5.2).
+ */
 export type Authenticated = {
   actor: Actor;
   clientId?: string;
   clientName?: string;
+  personalAccessToken?: PersonalAccessTokenGrant;
 };
 
 export type BearerDeps = { db: Db; jwtSecret: string };
@@ -53,16 +62,29 @@ async function liveAuthenticated(
 }
 
 /**
- * The live user behind access token `token`, read fresh from `users` so a role change takes
- * effect before the token's 15 minutes run out; `null` for a token that fails verification or
- * was not issued for `audience` when one is given, a soft-deleted user, or a stored role that is
- * none of the three (§5.3).
+ * The live user behind bearer token `token`, read fresh from `users` so a role change takes
+ * effect at once: a personal access token's user (§5.2), or an access token's, which fails
+ * unless issued for `audience` when one is given; `null` for a token that fails verification, a
+ * soft-deleted user, or a stored role that is none of the three (§5.3).
  */
 export async function authenticateToken(
   deps: BearerDeps,
   token: string,
   audience?: string
 ): Promise<Authenticated | null> {
+  if (token.startsWith(PAT_PREFIX)) {
+    const pat = await livePersonalAccessToken(deps.db, token, nowIso());
+    if (pat === null) {
+      return null;
+    }
+    const auth = await liveAuthenticated(deps, { sub: pat.userId, cid: null });
+    return (
+      auth && {
+        ...auth,
+        personalAccessToken: { id: pat.id, expiresAt: pat.expiresAt }
+      }
+    );
+  }
   const nowS = epochSeconds(Date.now());
   const claims = await verifyAccessToken(deps.jwtSecret, token, nowS, audience);
   return claims && liveAuthenticated(deps, claims);

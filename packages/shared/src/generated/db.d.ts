@@ -273,6 +273,18 @@ export interface OutboundRouteUsers {
   userId: string;
 }
 
+export interface PersonalAccessTokens {
+  createdAt: string;
+  createdBy: string | null;
+  expiresAt: string | null;
+  id: string;
+  lastUsedAt: string | null;
+  name: string;
+  revokedAt: string | null;
+  tokenHash: string;
+  userId: string;
+}
+
 export interface PresenceLog {
   id: string;
   peer: string | null;
@@ -539,6 +551,7 @@ export interface DB {
   outboundRoutes: OutboundRoutes;
   outboundRouteUserGroups: OutboundRouteUserGroups;
   outboundRouteUsers: OutboundRouteUsers;
+  personalAccessTokens: PersonalAccessTokens;
   presenceLog: PresenceLog;
   recordings: Recordings;
   ringGroupForwardRules: RingGroupForwardRules;

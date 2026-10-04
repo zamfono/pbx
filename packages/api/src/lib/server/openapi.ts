@@ -88,7 +88,8 @@ const PROBLEM_DESCRIPTIONS: Record<ProblemStatus, string> = {
 const BEARER_SECURITY_SCHEME: JsonSchema = {
   type: 'http',
   scheme: 'bearer',
-  bearerFormat: 'JWT'
+  description:
+    'An access token from the OAuth 2.1 server, or a personal access token (zpat_…) for a server application'
 };
 
 const OPERATION_IDS = operationIds(routes);

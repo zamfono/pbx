@@ -73,6 +73,9 @@
 | `parking.get` | `GET /parking/slots` | Reads the set of parking-slot extensions | admin | no |
 | `parking.list` | `GET /parking/calls` | Lists the calls parked right now: slot, call, caller (null when withheld), parked since and by whom. | user | no |
 | `parking.set` | `PUT /parking/slots` | Replaces the set of parking-slot extensions as a whole; an extension a user or ring group owns, or an emergency number, is refused | admin | no |
+| `personalAccessTokens.create` | `POST /users/{id}/personalAccessTokens` | Creates a personal access token, acting as the user, for a server application; its value is returned once. | user | no |
+| `personalAccessTokens.list` | `GET /users/{id}/personalAccessTokens` | Lists a user's personal access tokens, revoked and expired ones until the daily purge, paginated. | user | no |
+| `personalAccessTokens.revoke` | `POST /personalAccessTokens/{id}/revoke` | Revokes a personal access token; the application using it loses access at once. | user | yes |
 | `presenceLog.snapshot` | `GET /presence/log` | Snapshots each user's presence state as of a past timestamp. | admin | no |
 | `provisioning.ringotelAdopt` | `POST /provisioning/ringotel/adopt` | Adopts an existing, empty Ringotel organization (by id and domain) and one of its connections, or a new one, instead of creating them. | owner | yes |
 | `provisioning.ringotelOptions` | `GET /provisioning/ringotel/options` | Lists the Ringotel regions and packages the account offers, the choices provisioning.ringotelSetup takes. | owner | no |

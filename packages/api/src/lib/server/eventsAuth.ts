@@ -8,9 +8,12 @@ import { z } from 'zod';
 
 import { rawDataToString } from '@zamfono/shared';
 
-import { authenticateToken, type BearerDeps } from './auth/bearer.js';
+import {
+  authenticateToken,
+  type Authenticated,
+  type BearerDeps
+} from './auth/bearer.js';
 import { tryParseJson } from './json.js';
-import type { Actor } from './ops/types.js';
 
 // §10.6: a connection that sends anything other than the auth frame first, or nothing, within
 // this many milliseconds, is closed.
@@ -32,17 +35,18 @@ export type EventsAuthDeps = BearerDeps & {
 };
 
 /**
- * Waits for the socket's first frame, expects `{ type: 'auth', token }`, and resolves the
- * `Actor` it names. Closes the socket and resolves `null` on a wrong first frame, an invalid
- * token, or silence past `deps.timeoutMs`/`AUTH_TIMEOUT_MS` (§10.6).
+ * Waits for the socket's first frame, expects `{ type: 'auth', token }`, and resolves the user
+ * it names, with the personal access token it presented, if any. Closes the socket and resolves
+ * `null` on a wrong first frame, an invalid token, or silence past
+ * `deps.timeoutMs`/`AUTH_TIMEOUT_MS` (§10.6).
  */
 export function authenticateEventsSocket(
   socket: WebSocket,
   deps: EventsAuthDeps
-): Promise<Actor | null> {
+): Promise<Authenticated | null> {
   return new Promise(resolve => {
     let settled = false;
-    const finish = (actor: Actor | null): void => {
+    const finish = (auth: Authenticated | null): void => {
       if (settled) {
         return;
       }
@@ -51,7 +55,7 @@ export function authenticateEventsSocket(
       clearTimeout(timer);
       // eslint-disable-next-line no-use-before-define -- finish, timer and onMessage form one closure; finish only ever runs after both exist
       socket.removeListener('message', onMessage);
-      resolve(actor);
+      resolve(auth);
     };
     const timer = setTimeout(() => {
       socket.close();
@@ -69,7 +73,7 @@ export function authenticateEventsSocket(
           if (!auth) {
             socket.close();
           }
-          finish(auth?.actor ?? null);
+          finish(auth);
         })
         .catch(() => {
           socket.close();

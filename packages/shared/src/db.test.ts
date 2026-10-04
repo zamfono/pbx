@@ -12,7 +12,7 @@ test('migrates and enforces the schema', async () => {
   const tables = (await db.introspection.getTables())
     .map(table => table.name)
     .sort();
-  expect(tables).toHaveLength(45);
+  expect(tables).toHaveLength(46);
 
   // partial unique: two soft-deleted users may share an e-mail with a live one
   await db

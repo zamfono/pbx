@@ -16,6 +16,7 @@ import './menus/index.js';
 import './ooo/index.js';
 import './outboundRoutes/index.js';
 import './parking/index.js';
+import './personalAccessTokens/index.js';
 import './presenceLog/index.js';
 import './provisioning/index.js';
 import './recordings/index.js';

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocket, WebSocketServer } from 'ws';
 
 import {
+  addMsIso,
   epochSeconds,
   newId,
   nowIso,
@@ -12,7 +13,9 @@ import {
 } from '@zamfono/shared';
 import { migratedTestDb, seedUser } from '@zamfono/shared/testDb.js';
 
+import type { Authenticated } from './auth/bearer.js';
 import { signAccessToken } from './auth/jwt.js';
+import type { PersonalAccessTokenGrant } from './auth/personalAccessTokens.js';
 import { EventHub, visibleTo } from './events.js';
 import { authenticateEventsSocket } from './eventsAuth.js';
 import type { Actor } from './ops/types.js';
@@ -179,7 +182,7 @@ describe('authenticateEventsSocket', () => {
   it('closes a socket that sends nothing within the timeout', async () => {
     const db = await migratedDb('u1');
     wss = await listeningServer();
-    const serverResult = new Promise<Actor | null>(resolve => {
+    const serverResult = new Promise<Authenticated | null>(resolve => {
       wss.once('connection', socket => {
         authenticateEventsSocket(socket, {
           db,
@@ -201,7 +204,7 @@ describe('authenticateEventsSocket', () => {
   it('closes a socket whose first frame is not the auth frame', async () => {
     const db = await migratedDb('u1');
     wss = await listeningServer();
-    const serverResult = new Promise<Actor | null>(resolve => {
+    const serverResult = new Promise<Authenticated | null>(resolve => {
       wss.once('connection', socket => {
         authenticateEventsSocket(socket, {
           db,
@@ -222,7 +225,7 @@ describe('authenticateEventsSocket', () => {
   it('resolves the actor a valid auth frame names', async () => {
     const db = await migratedDb('u1');
     wss = await listeningServer();
-    const serverResult = new Promise<Actor | null>(resolve => {
+    const serverResult = new Promise<Authenticated | null>(resolve => {
       wss.once('connection', socket => {
         authenticateEventsSocket(socket, {
           db,
@@ -244,9 +247,7 @@ describe('authenticateEventsSocket', () => {
     );
     client.send(JSON.stringify({ type: 'auth', token }));
     expect(await serverResult).toEqual({
-      id: 'u1',
-      name: 'A User',
-      role: 'user'
+      actor: { id: 'u1', name: 'A User', role: 'user' }
     });
     client.close();
   });
@@ -254,7 +255,7 @@ describe('authenticateEventsSocket', () => {
   it('closes a socket whose token does not verify', async () => {
     const db = await migratedDb('u1');
     wss = await listeningServer();
-    const serverResult = new Promise<Actor | null>(resolve => {
+    const serverResult = new Promise<Authenticated | null>(resolve => {
       wss.once('connection', socket => {
         authenticateEventsSocket(socket, {
           db,
@@ -516,12 +517,15 @@ describe('EventHub.usersChanged (§10.6)', () => {
   /** A client connected to `hub` as `actor`, once the hub holds its socket. */
   async function subscribedClient(
     hub: EventHub,
-    actor: Actor
+    actor: Actor,
+    personalAccessToken?: PersonalAccessTokenGrant
   ): Promise<WebSocket> {
     wss = await listeningServer();
     const subscribed = new Promise<void>(resolve => {
       wss.once('connection', socket => {
-        hub.subscribeWs(socket, actor).then(resolve, resolve);
+        hub
+          .subscribeWs(socket, actor, personalAccessToken)
+          .then(resolve, resolve);
       });
     });
     const client = new WebSocket(serverUrl(wss));
@@ -617,5 +621,66 @@ describe('EventHub.usersChanged (§10.6)', () => {
     expect(messages).toEqual([]);
     expect(client.readyState).toBe(WebSocket.OPEN);
     client.close();
+  });
+
+  /** A personal access token of `u1`, as the `/events` handshake hands it to the hub. */
+  async function seedToken(
+    db: Db,
+    expiresAt: string | null
+  ): Promise<PersonalAccessTokenGrant> {
+    await db
+      .insertInto('personalAccessTokens')
+      .values({
+        id: 'pat-1',
+        tokenHash: 'hash-1',
+        userId: 'u1',
+        name: 'crm-sync',
+        createdAt: nowIso(),
+        expiresAt
+      })
+      .execute();
+    return { id: 'pat-1', expiresAt };
+  }
+
+  const U1: Actor = { id: 'u1', name: 'A User', role: 'user' };
+
+  it('closes with 4401 the socket of a personal access token revoked since', async () => {
+    const db = await migratedDb('u1');
+    const hub = new EventHub(db);
+    const client = await subscribedClient(hub, U1, await seedToken(db, null));
+    const closed = closeCode(client);
+    await db
+      .updateTable('personalAccessTokens')
+      .set({ revokedAt: nowIso() })
+      .execute();
+
+    await hub.usersChanged();
+
+    expect(await closed).toBe(USER_CHANGED_CLOSE_CODE);
+  });
+
+  it('keeps the socket of a live personal access token open', async () => {
+    const db = await migratedDb('u1');
+    const hub = new EventHub(db);
+    const client = await subscribedClient(hub, U1, await seedToken(db, null));
+
+    await hub.usersChanged();
+
+    expect(client.readyState).toBe(WebSocket.OPEN);
+    client.close();
+  });
+
+  it('closes with 4401 the socket of a personal access token once it reaches expiresAt, with no write in between', async () => {
+    const db = await migratedDb('u1');
+    const hub = new EventHub(db);
+    const expiresAt = addMsIso(nowIso(), SHORT_TIMEOUT_MS);
+    const client = await subscribedClient(
+      hub,
+      U1,
+      await seedToken(db, expiresAt)
+    );
+
+    expect(await closeCode(client)).toBe(USER_CHANGED_CLOSE_CODE);
+    expect(Date.now()).toBeGreaterThanOrEqual(Date.parse(expiresAt));
   });
 });

@@ -133,6 +133,19 @@ const STATIC_ROUTES: RouteTuple[] = [
   ['POST', '/devices/{id}/rotate', 'devices.rotate'],
   ['GET', '/devices/{id}/blf', 'devices.getBlf'],
   ['PUT', '/devices/{id}/blf', 'devices.setBlf'],
+  [
+    'GET',
+    '/users/{id}/personalAccessTokens',
+    'personalAccessTokens.list',
+    WITH_USER_ID
+  ],
+  [
+    'POST',
+    '/users/{id}/personalAccessTokens',
+    'personalAccessTokens.create',
+    WITH_USER_ID
+  ],
+  ['POST', '/personalAccessTokens/{id}/revoke', 'personalAccessTokens.revoke'],
   ['POST', '/provisioning/ringotel/setup', 'provisioning.ringotelSetup'],
   ['POST', '/provisioning/ringotel/adopt', 'provisioning.ringotelAdopt'],
   ['GET', '/provisioning/ringotel/options', 'provisioning.ringotelOptions'],

@@ -83,7 +83,7 @@ Three long-running application services run per stack, plus the TLS proxy and a 
 
 **Write ownership.** Each SQLite table has a primary writer. Both processes read everything; WAL mode and `busy_timeout` make concurrent writers safe, so a cross-write is allowed where a flow naturally lands in the other process.
 
-- `api` owns the configuration tables: users, devices, trunks, trunk_hosts, outbound_routes, outbound_route_users, outbound_route_user_groups, outbound_route_numbers, dids, did_blocks, ring_groups, ring_group_members, user_groups, user_group_users, user_group_groups, extensions, device_blf_keys, forward_targets, user_forward_rules, ring_group_forward_rules, opening_hours, opening_hours_intervals, audio_assets, contacts, contact_phones, settings, ooo_rules, menus, menu_targets, blocked_numbers, mail_templates, tokens, oauth_clients, webhooks, webhook_deliveries, backup_targets, backup_runs, update_state, maintenance_gate, audit_log.
+- `api` owns the configuration tables: users, devices, trunks, trunk_hosts, outbound_routes, outbound_route_users, outbound_route_user_groups, outbound_route_numbers, dids, did_blocks, ring_groups, ring_group_members, user_groups, user_group_users, user_group_groups, extensions, device_blf_keys, forward_targets, user_forward_rules, ring_group_forward_rules, opening_hours, opening_hours_intervals, audio_assets, contacts, contact_phones, settings, ooo_rules, menus, menu_targets, blocked_numbers, mail_templates, tokens, oauth_clients, personal_access_tokens, webhooks, webhook_deliveries, backup_targets, backup_runs, update_state, maintenance_gate, audit_log.
 - `core` owns the runtime tables: calls, call_qos, voicemails, recordings, presence_log.
 - Known cross-writes: `api` updates and deletes `voicemails` and `recordings` rows through their REST endpoints and, after a voicemail change, calls `core`'s internal `/internal/mwi/{mailbox}` so the MWI counts follow (§9.3). `core` toggles `users.dnd` through the `*90`/`*91` feature codes and stamps `devices.last_registered_at` when a `PeerStatusChange` event reports the device's endpoint `Reachable`, a timestamp of an event rather than a state: the last time the device became reachable, not its latest REGISTER, since Asterisk raises no event for a registration refresh; a greeting recorded by phone (§10.2) makes `core` insert the `audio_assets` row, write its file to `media/prompts/` and set the mailbox's `mailbox_audio_id`. Live state such as a trunk's registration status never lands in a table (§10.1); `api` reads it from the core when a request needs it.
 
@@ -147,7 +147,7 @@ Three long-running application services run per stack, plus the TLS proxy and a 
 
 ### 5.2 Authentication
 
-`api` is an OAuth 2.1 authorization server, and it is the only way to obtain a token, for REST and MCP alike. It publishes discovery metadata (RFC 8414 and RFC 9728), implements the authorization-code grant with PKCE, and serves `/oauth/token` and `/oauth/revoke`. Authorization responses carry `iss` (RFC 9207). Authorization codes and their PKCE challenges live in `api`'s memory for 60 seconds, single-use; an `api` restart voids the codes in flight, and the client starts the flow again.
+`api` is an OAuth 2.1 authorization server, and it issues every token, for REST and MCP alike: through OAuth, or as a personal access token. It publishes discovery metadata (RFC 8414 and RFC 9728), implements the authorization-code grant with PKCE, and serves `/oauth/token` and `/oauth/revoke`. Authorization responses carry `iss` (RFC 9207). Authorization codes and their PKCE challenges live in `api`'s memory for 60 seconds, single-use; an `api` restart voids the codes in flight, and the client starts the flow again.
 
 **Client registration.** Two mechanisms, in the priority order MCP clients apply:
 
@@ -157,7 +157,7 @@ Registered clients are public clients: PKCE, no secret. A redirect URI matches a
 
 **Client rows.** At `/oauth/authorize` the server decrypts a metadata `client_id` or fetches the document behind a URL `client_id`, and validates the redirect URI from that. On the first successful authorization it upserts the client's `oauth_clients` row (id, name, kind), so a row exists exactly for clients a real user has logged in with, and the foreign key from `tokens` holds for every kind. The daily job deletes a row once no `tokens` row references it and its last token expired more than 30 days ago.
 
-**Integrations.** A script or an external system is an OAuth client like any other: it registers through one of the two mechanisms, a person logs in once and approves it, and it continues headlessly on its refresh token. It acts, and is audited, as the user who logged in, so an integration gets its own dedicated user.
+**Integrations.** An interactive or MCP client, or a script a person can log in for, is an OAuth client like any other: it registers through one of the two mechanisms, a person logs in once and approves it, and it continues headlessly on its refresh token. A server application that cannot do a login uses a personal access token instead. Either acts, and is audited, as its user, so an integration gets its own dedicated user.
 
 **Login and SSO.** The login page authenticates with a local password (Argon2id) or with SSO through an upstream OpenID Connect provider. One code flow with discovery serves every provider. `settings.sso_provider` selects a preset, `microsoft` or `google`, which fixes the issuer, the button and the claim quirks: Microsoft may deliver the address in `preferred_username` instead of `email`, Google carries the workspace domain in `hd`. The `microsoft` preset discovers against the customer's tenant, `https://login.microsoftonline.com/<sso_tenant_id>/v2.0`, so the issuer carries the tenant id and ordinary issuer validation rejects a token from any other tenant. The value `oidc` covers any other issuer, Nextcloud, Keycloak, Authentik or an IT partner's service; the admin enters `sso_issuer` and `sso_label` for the button. For the presets, one multi-tenant app registration on the operator's side serves every stack. UIs, including the future tenant UI, authenticate through the code flow like any other client and never render their own credential form.
 
@@ -184,6 +184,8 @@ SSO rules:
 The first-boot owner needs none of them: their password hash is seeded (§6.3). Every later user sets their password through the mail link, or through the link an admin hands over (§10.2).
 
 **Tokens.** JWT access tokens live 15 minutes and are signed HS256 with `JWT_SECRET` from `.env`; the authorization server is the only party that verifies them, so there is no JWKS and no asymmetric key pair. Rotating the secret is changing the value and redeploying: only access tokens younger than 15 minutes are invalidated, every client meets a 401, refreshes and continues, and nobody signs in again, because refresh tokens are not JWTs. Refresh tokens live 30 days, rotate on use, are revocable and are stored hashed; rotation and revocation set `tokens.revoked_at`, and the row stays until it expires. Presenting a revoked refresh token is therefore recognised and revokes every token of that user and client, per OAuth 2.1. Headless access uses a refresh token from one interactive login; the device-code grant (RFC 8628) is a noted extension if that proves cumbersome. Set-password links are single-use tokens of kind `reset`: a setup link from `POST /users` or `POST /users/{id}/resetPassword` is valid for 7 days, since a new employee may open the invitation days later and an admin hands such a link on; a reset link from the forgot-password form for 1 hour, since it is requested and used at once.
+
+**Personal access tokens.** A personal access token is an opaque bearer token, `zpat_` followed by 256 random bits in base64url, created for one user through `POST /users/{id}/personalAccessTokens`: by the user for themselves, or by an `admin` or `owner` for any user, an owner's only by an owner. The create response returns it once; it is stored as its SHA-256 hash with a name unique among the user's live tokens, who created it, and an optional expiry, NULL never expiring. It is accepted wherever an access token is, on REST, MCP and `/events`, and acts exactly as its user, with the role they hold at the request (§5.3), without scopes. Its last use is recorded at most once a minute. Revoking it (`POST /personalAccessTokens/{id}/revoke`, by the same callers) takes effect at once, and so does the soft delete of its user, which revokes it (§5.9); the daily job deletes a revoked or expired token.
 
 **SIP credentials.** The response that creates a `manual` device returns the SIP credentials; for a provisioned device they are pushed to the provider. Afterwards an `admin` or `owner` can reveal a device's credentials with `GET /devices/{id}/credentials`, which is audited as `devices.revealCredentials`, so who looked at a password and when is always answerable. `POST /devices/{id}/rotate` generates a new password, re-pushes it for provisioned devices and returns it, for a credential suspected leaked. Trunk passwords, webhook secrets and the `*_enc` settings are write-only: they are re-entered from the provider's side, never read back.
 
@@ -229,6 +231,8 @@ The limits are constants of the implementation:
 **Forgot password.** The endpoint answers identically whether the address exists or not. Exceeding the per-account limit drops the mail without telling the caller. Redeeming a set-password link (`POST /auth/reset`) and the setup links created by `POST /users` are outside these limits, so a new user setting their first password never touches the request endpoint.
 
 **Token endpoint.** The limit is generous because legitimate clients refresh every 15 minutes and MCP clients may hold several sessions. The 30-day random tokens already make bulk guessing infeasible.
+
+**Bearer tokens.** A bearer token presented to the API, MCP or `/events`, an access token or a personal access token (§5.2), is outside these limits: a wrong one answers 401, and an access token's signature, like a personal access token's 256 random bits, makes guessing infeasible.
 
 Lockouts and limit hits are logged with the account or address, and an active lock is visible to admins on the user record.
 
@@ -280,6 +284,7 @@ An entry is undoable while all of the following hold:
 - `undoable` is 1. The operation sets `undoable=0` where reversal is impossible:
   - secret-bearing changes: trunk, webhook and backup credentials, SIP and user passwords, the `*_enc` settings. Secret values are masked in `changes_json`, so there is no `from` to restore;
   - pure actions with no prior state: manual backup runs, sent e-mails;
+  - creating or revoking a personal access token (§5.2): a credential is revoked, never revived;
   - hard deletes of runtime rows, voicemails and recordings, whose files are gone;
   - undo entries themselves.
 
@@ -301,7 +306,7 @@ The response lists those references. The admin retargets them first, each as its
 
 An entity's own rules and their forward targets travel with it. A ring group's rules may point at the group's own mailbox, and a user's rules at their own; these are deleted with the entity and restored by undo, and never count as blocking references.
 
-Soft-deleting a user also soft-deletes their devices, so the rendered configuration drops the endpoints and their registrations end, and revokes their tokens, so no session survives. Undo restores the devices; tokens stay revoked and the person signs in again.
+Soft-deleting a user also soft-deletes their devices, so the rendered configuration drops the endpoints and their registrations end, and revokes their tokens and personal access tokens, so no session survives. Undo restores the devices; tokens stay revoked and the person signs in again.
 
 Soft-deleting a user or ring group also deletes its `extensions` row and, through the FK, the BLF keys of other devices watching it, both recorded in the audit diff, so the extension is free for a new owner at once. Endpoint names carry a random per-device slug (§9.3), so a new owner's devices never collide with the old ones. Undo re-inserts the row, or is refused if the extension has been taken (§5.8).
 
@@ -1257,7 +1262,7 @@ A registry, filled by each area's `index.ts`, maps every name to its object; the
 - the tenant UI: the question is its dialog;
 - undo and jobs never ask.
 
-Every `DELETE` carries `confirm`, as do `users.erase`, `devices.rotate`, `provisioning.ringotelAdopt` and `system.update`; the deletion of a voicemail or a recording, `users.erase` and `devices.rotate` cannot be undone. The guard is not a substitute for undo, which is what makes a wrong deletion cheap; it is there so that neither a human nor an assistant deletes by momentum.
+Every `DELETE` carries `confirm`, as do `users.erase`, `devices.rotate`, `personalAccessTokens.revoke`, `provisioning.ringotelAdopt` and `system.update`; the deletion of a voicemail or a recording, `users.erase` and `devices.rotate` cannot be undone. The guard is not a substitute for undo, which is what makes a wrong deletion cheap; it is there so that neither a human nor an assistant deletes by momentum.
 
 **Callers.** The callers add transport and nothing else:
 
@@ -1268,7 +1273,7 @@ Every `DELETE` carries `confirm`, as do `users.erase`, `devices.rotate`, `provis
 
 #### REST surface
 
-Base: `https://<host>/api/v1`. JSON only. JWT bearer auth (tokens issued by the OAuth server, §5). RBAC roles: `owner`, `admin`, `user` — any number of owners, at least one; only owners change roles, reset an owner's password or change an owner's e-mail (an admin gets 403), and the last owner cannot be demoted or soft-deleted.
+Base: `https://<host>/api/v1`. JSON only. Bearer auth: a JWT access token issued by the OAuth server, or a personal access token (§5.2). RBAC roles: `owner`, `admin`, `user` — any number of owners, at least one; only owners change roles, reset an owner's password or change an owner's e-mail (an admin gets 403), and the last owner cannot be demoted or soft-deleted.
 
 The endpoints by area, as a sketch, each with the minimum role it needs:
 
@@ -1276,9 +1281,11 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Audit** (min. role: admin) — `GET /audit` (filters: entity kind/id, actor, channel, client, operation, time range, `state` = live | undone | all), `POST /audit/{id}/undo` (one entry per call, §5)
 
-**Confirmation** — every `DELETE`, `POST /users/{id}/erase`, `POST /devices/{id}/rotate`, `POST /provisioning/ringotel/adopt` and `POST /system/update` require `confirm: true` in the body and answer 409 with the question text without it (§10.3, "Confirmation")
+**Confirmation** — every `DELETE`, `POST /users/{id}/erase`, `POST /devices/{id}/rotate`, `POST /personalAccessTokens/{id}/revoke`, `POST /provisioning/ringotel/adopt` and `POST /system/update` require `confirm: true` in the body and answer 409 with the question text without it (§10.3, "Confirmation")
 
 **Users** (min. role: admin (self-service subset for `user`)) — `GET/POST /users` (`POST` returns the one-time set-password link, mailed too with a relay), `GET/PATCH/DELETE /users/{id}` (`DELETE` answers 409 with the blocking references, §5.9), `POST /users/{id}/resetPassword` (same link semantics), `POST /users/{id}/erase` (owners only, §5.10), `GET /users/{id}/forwarding` (the rules, in the shape the `PUT` takes, `sip` targets with their `headers`), `PUT /users/{id}/forwarding` (the rules replaced as a whole), `PUT /users/{id}/presence` (dnd; outside the audit log, §5.7), `PUT/DELETE /users/{id}/voicemailGreeting` (the personal greeting, a WAV or MP3 upload; outside the audit log, §5.7). Self-service, on the user's own id alone (403 for another's): `GET /users/{id}`, `GET /users/{id}/forwarding`, `PUT /users/{id}/forwarding` (a new or changed `sip` target excepted, Forward targets), `PUT /users/{id}/presence`, `PUT/DELETE /users/{id}/voicemailGreeting` and the `PATCH` fields `clir`, `rejectAnonymous`, `ringTimeoutS`, `notifyMissedCalls`, `findMe`; `callerIdDidId` is admin-set (§9.4)
+
+**Personal access tokens** (min. role: user (own) / admin; an owner's owner-only) — `GET/POST /users/{id}/personalAccessTokens` (`POST` takes `name` and an optional `expiresAt` and returns the token once; `GET` lists the user's tokens, never their values, with `createdBy`, `createdAt`, `expiresAt`, `lastUsedAt` and `revokedAt`), `POST /personalAccessTokens/{id}/revoke` (§5.2)
 
 **Devices** (min. role: user (own, `tls` only) / admin; `plain` devices, reveal and rotate admin) — `GET /users/{id}/devices`, `POST` (transport class + allowlist for `plain`, refused while both plain transports are disabled, §9.3; returns a `manual` device's connection settings, §10.4), `PATCH /devices/{id}` (label, `allowedIps`), `DELETE /devices/{id}`, `GET /devices/{id}/credentials` (reveal, audited; a `manual` device's connection settings), `POST /devices/{id}/rotate` (new password, re-pushed and returned), `GET/PUT /devices/{id}/blf` (the `ringotel` device's BLF panel, an ordered list of extensions and parking slots replaced as a whole, §10.4)
 
@@ -1454,13 +1461,13 @@ Everything longer sits behind the read-only tool `zamfono.help(topic)`, which re
 
 **Confirmation over MCP.** A tool with `confirm` pauses before running and asks the person through elicitation: the call returns an `input_required` result whose `inputRequests` carry one boolean field with the question, the client answers with `inputResponses`, and the tool runs only on an affirmative answer; on a legacy 2025-11-25 session the same payload travels as a server-initiated `elicitation/create` request. Claude Code, Cursor and VS Code offer the capability; Codex advertises it but declines every request at the time of writing. With a client that lacks it, among them Claude Desktop and claude.ai connectors at the time of writing, and whenever a client declines the elicitation, the tool mirrors the REST contract: the first call returns the question and `confirmationRequired`, the second must carry `confirm: true` in its input. On such clients the human gate is the client's own permission prompt for tools marked destructive, which is why the hint is set even though it is advisory; the guard there is as strong as a REST call with `confirm: true`, and no stronger.
 
-**Auth** follows the MCP authorization spec on OAuth 2.1. The endpoint publishes protected-resource metadata pointing at the stack's own authorization server (§5.2), so MCP clients connect via Client ID Metadata Documents or dynamic registration plus PKCE, without manual token handling. An MCP session acts as the authenticated user with that user's role, and mutating tool calls appear in `audit_log` under that actor with channel `mcp` and the MCP client's OAuth client id and name, so "was that you or your assistant" has an answer.
+**Auth** follows the MCP authorization spec on OAuth 2.1. The endpoint publishes protected-resource metadata pointing at the stack's own authorization server (§5.2), so MCP clients connect via Client ID Metadata Documents or dynamic registration plus PKCE, without manual token handling. A server application may present a personal access token instead (§5.2), and acts as its user without an OAuth client. An MCP session acts as the authenticated user with that user's role, and mutating tool calls appear in `audit_log` under that actor with channel `mcp` and the MCP client's OAuth client id and name, so "was that you or your assistant" has an answer.
 
 ### 10.6 Realtime events (WebSocket `/events` + webhooks)
 
 Consumers are the future admin frontends, the operator's tooling and integrations. End-user softphones are not consumers; they use SIP-native BLF and MWI. The WebSocket is served by the `api` process on its HTTP port, with `ws` attached to the server in `server.ts` (§10).
 
-**Authentication** happens in the first message: the client sends `{ "type": "auth", "token": "<jwt>" }` as its first frame, and the server closes a connection that sends anything else first, or nothing within 5 s. The token never travels in the URL, since Caddy logs every request line and a log shipper forwards it off the host (§7). Once any write operation commits, the server checks every open socket against its user again: a socket whose user is deleted or holds another role than at the handshake is closed with code 4401, and the others see the ring-group mailboxes of their current memberships.
+**Authentication** happens in the first message: the client sends `{ "type": "auth", "token": "<token>" }` as its first frame, an access token or a personal access token (§5.2), and the server closes a connection that sends anything else first, or nothing within 5 s. The token never travels in the URL, since Caddy logs every request line and a log shipper forwards it off the host (§7). Once any write operation commits, and when the personal access token of an open socket reaches its `expires_at`, the server checks every open socket against its user and token again: a socket whose user is deleted or holds another role than at the handshake, or whose personal access token is revoked or expired, is closed with code 4401, and the others see the ring-group mailboxes of their current memberships. A socket otherwise lives until either side closes it; the token is checked at the handshake and by this re-check, so an access token running out after its 15 minutes does not end a socket it opened.
 
 Visibility follows roles: `admin` and `owner` receive every event; a `user` receives events about themselves (own presence, own calls, and voicemails for the mailboxes they may read, §5.3) plus the tenant-scope `ooo` and `hours` events. A call is a user's own while the live calls list it for them (§10.3 "Live calls"): a user whose leg starts ringing it receives its current state, one it stops being the call of while it goes on, their leg having stopped ringing or left, receives `ended`, and nothing of it after; neither event goes to an admin or a webhook.
 
@@ -1506,7 +1513,7 @@ WAL mode, `foreign_keys=ON`, write ownership split per §3.1 (`api` = config tab
 - `settings`: a singleton, never deleted;
 - `update_state`: `api`'s own singleton, never deleted, without undo (§6.3 "Automatic updates");
 - `maintenance_gate`: `api`'s own record of the maintenance gate, a row per work, never deleted, without undo (§6.4 "Maintenance gate");
-- `tokens` and `oauth_clients`: security artifacts without undo;
+- `tokens`, `oauth_clients` and `personal_access_tokens`: security artifacts without undo;
 - `webhook_deliveries`: the webhook outbox, without undo; deleting a hook deletes its pending rows (§10.6);
 - `audit_log`: append-only.
 
@@ -2169,6 +2176,25 @@ CREATE TABLE tokens (
   CHECK ((kind = 'refresh') = (client_id IS NOT NULL))
 );
 
+-- personal_access_tokens — bearer tokens for server applications, acting as their user (§5.2).
+--   token_hash:   SHA-256 of the `zpat_…` value; the raw value is returned once and never stored
+--   created_by:   the user who created it
+--   expires_at:   NULL = never
+--   last_used_at: written at most once a minute
+--   revoked_at:   set on revocation and by the user's soft delete; revoked and expired rows are
+--                 purged by the daily job
+CREATE TABLE personal_access_tokens (
+  id           TEXT    PRIMARY KEY,
+  token_hash   TEXT    NOT NULL UNIQUE,
+  user_id      TEXT    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name         TEXT    NOT NULL,
+  created_by   TEXT    REFERENCES users(id) ON DELETE SET NULL,
+  created_at   TEXT    NOT NULL,
+  expires_at   TEXT,
+  last_used_at TEXT,
+  revoked_at   TEXT
+);
+
 -- webhooks — admin-configured event receivers (§10.6).
 --   secret_enc:       HMAC-SHA256 signing secret
 --   event_types_json: JSON array; NULL = all event types
@@ -2440,6 +2466,10 @@ CREATE INDEX webhook_deliveries_webhook ON webhook_deliveries (webhook_id);
 -- devices_one_ringotel_per_user — a Ringotel device is the user's Ringotel account (§10.4).
 CREATE UNIQUE INDEX devices_one_ringotel_per_user ON devices (user_id)
   WHERE kind = 'ringotel' AND deleted_at IS NULL;
+
+-- personal_access_tokens_name — a name tells a user's live tokens apart (§5.2).
+CREATE UNIQUE INDEX personal_access_tokens_name ON personal_access_tokens (user_id, name)
+  WHERE revoked_at IS NULL;
 
 -- ── integrity triggers (§11.1) ───────────────────────────────────────────────
 

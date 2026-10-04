@@ -16,7 +16,11 @@ import {
   purgeOwnRuleRows
 } from './purgeForwardTargets.js';
 import { purgeDidBlocks, purgeTrunks } from './purgeGuarded.js';
-import { purgeExpiredTokens, purgeOauthClients } from './purgeOauthTokens.js';
+import {
+  purgeExpiredTokens,
+  purgeOauthClients,
+  purgePersonalAccessTokens
+} from './purgeOauthTokens.js';
 
 /** Every table with both an `id` and a `deleted_at` column, the shape the purge sweeps by age. */
 type SoftDeleteTable = {
@@ -190,6 +194,7 @@ export async function runPurge(db: Db, now: string): Promise<void> {
 
     await purgeExpiredTokens(trx, now);
     await purgeOauthClients(trx, now);
+    await purgePersonalAccessTokens(trx, now);
     await purgeAuditLog(trx, settings.auditRetentionDays, now);
     await purgeBackupRuns(trx, cutoffIso(now, settings.recordingRetentionDays));
     return { audioFilenames, voicemailFilenames };
