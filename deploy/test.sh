@@ -99,6 +99,14 @@ if run_setup BOOTSTRAP_OWNER_PASSWORD_HASH= OWNER_PASSWORD=short || [ -e "$bundl
   echo "setup.sh took an OWNER_PASSWORD under 8 characters" >&2
   exit 1
 fi
+# While the stack's database volume from an earlier start exists, a new .env is refused.
+docker volume create x_db >/dev/null
+if run_setup || [ -e "$bundle_dir/x/.env" ]; then
+  docker volume rm x_db >/dev/null
+  echo "setup.sh wrote an .env beside the database volume of an earlier start" >&2
+  exit 1
+fi
+docker volume rm x_db >/dev/null
 # An FQDN in capitals is written in lower case, the form Caddy names its certificate by.
 run_setup FQDN=Pbx.Example.com
 (cd "$bundle_dir/x" && docker compose config) | grep -qF 'FQDN: pbx.example.com' || {

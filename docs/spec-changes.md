@@ -25,6 +25,15 @@ Every change made to [the specification](spec.md) during implementation, newest 
 **2026-10-04 · §6.3 Environment.** `FQDN` is taken in lower case by `setup.sh`, `api` and `proxy`'s certificate hook.
 *Why:* Caddy names a certificate by the lower-case host, so an `FQDN` typed with capitals left Asterisk on its placeholder certificate and the OAuth issuer unlike the host browsers send.
 
+**2026-10-04 · §6.3 Images.** `setup.sh` refuses while the stack's `db` volume from an earlier start exists, and names `compose down -v` as the fresh start.
+*Why:* run again after a first start, it wrote new secrets beside a database seeded under the old ones, so the seed was skipped and the stored secrets could no longer be read.
+
+**2026-10-04 · §6.3 Images.** `setup.sh` checks `COUNTRY` with the `api` image, by the rule the first boot applies, takes an owner's password of at least 8 characters from the environment too, and a given `BOOTSTRAP_OWNER_PASSWORD_HASH` only as an Argon2id hash.
+*Why:* it wrote values the first boot then refused (`COUNTRY=UK`), or an owner password shorter than the floor every other password has.
+
+**2026-10-04 · §6.3 Environment.** `FQDN` is taken in lower case by `setup.sh`, `api` and `proxy`'s certificate hook.
+*Why:* Caddy names a certificate by the lower-case host, so an `FQDN` typed with capitals left Asterisk on its placeholder certificate and the OAuth issuer unlike the host browsers send.
+
 **2026-10-04 · §6.5 Target kinds.** A target's `host` (sftp, ftp, ftps) is an FQDN or an IPv4 address, a webdav `url` an `http` or `https` URL, and an sftp username cannot begin with `-` or contain whitespace, a quote or a backslash; anything else is refused with 422.
 *Why:* the sftp host and username reach `ssh` as arguments through restic's `sftp.command`, which restic splits at whitespace itself, so an admin could add `-oProxyCommand=…` and run a command in `api`.
 

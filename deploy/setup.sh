@@ -138,9 +138,19 @@ main() {
   [[ -f compose.yaml && -f .env.example ]] || fail "run setup.sh from the stack directory it came in"
   if [[ -e .env ]] && ! cmp -s .env .env.example; then
     fail ".env already exists here, and setup.sh never overwrites it: a new SECRETBOX_KEY would" \
-      "make the existing database unreadable. Move it away first if this is a fresh stack."
+      "make the existing database unreadable. For a fresh stack, remove the old one's data with" \
+      "\`compose down -v\` first, then move .env away."
   fi
   detect_runtime
+  # The volume Compose names the stack's database by: <project>_db, the project being the
+  # directory's name in Compose's normalized form.
+  project=${COMPOSE_PROJECT_NAME:-${PWD##*/}}
+  project=$(tr -cd 'a-z0-9_-' <<<"${project,,}")
+  if "$runtime" volume inspect "${project}_db" >/dev/null 2>&1; then
+    fail "the volume ${project}_db holds the database of an earlier start, which a new .env could" \
+      "not read. For a fresh stack, remove the old one's data with \`${compose[*]} down -v\` (with the" \
+      ".env it ran with) first."
+  fi
   if [[ $runtime == podman && $(id -u) -ne 0 ]]; then
     fail "run setup.sh as root: the stack runs on rootful Podman (README.md, step 2)"
   fi

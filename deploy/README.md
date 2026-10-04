@@ -58,7 +58,9 @@ echo '{ "userland-proxy": false }' > /etc/docker/daemon.json
 systemctl restart docker
 ```
 
-Docker brings `unless-stopped` containers back after a reboot by itself.
+Docker brings `unless-stopped` containers back after a reboot by itself. Its default `json-file`
+log driver never rotates a container's log: cap it in `daemon.json`, or log to the journal, as
+[Logs](#logs) shows.
 
 ### Podman
 
@@ -210,7 +212,9 @@ busy ports, Docker's userland proxy or a missing `public` network:
 ```
 
 It uses dialogs where `whiptail` is installed (as on every Debian and Ubuntu) and plain prompts
-elsewhere, or with `SETUP_PLAIN=1`. It never overwrites an `.env` that holds values. For automation,
+elsewhere, or with `SETUP_PLAIN=1`. It never overwrites an `.env` that holds values, and refuses
+while the stack's `db` volume from an earlier start exists: for a fresh start, run
+`docker compose down -v` with the old `.env` first. For automation,
 every answer can come from the environment under its `.env` name, plus `ZAMFONO_MODE`
 (`ports`/`macvlan`) and `OWNER_PASSWORD`; `SETUP_NONINTERACTIVE=1` makes a missing one an error
 instead of a question. The header of `setup.sh` lists them.
@@ -424,6 +428,14 @@ container. Where that log survives depends on the runtime's log driver:
 
   ```bash
   echo '{ "log-driver": "journald" }' > /etc/docker/daemon.json   # merge by hand if the file exists
+  systemctl restart docker
+  ```
+
+  Staying on Docker's default `json-file` driver instead, cap each container's log file, which
+  otherwise grows until the container is recreated:
+
+  ```bash
+  echo '{ "log-opts": { "max-size": "10m", "max-file": "5" } }' > /etc/docker/daemon.json   # merge by hand if the file exists
   systemctl restart docker
   ```
 
