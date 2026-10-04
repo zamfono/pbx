@@ -66,8 +66,9 @@ type PriorityTable = 'trunks' | 'outboundRoutes';
 /**
  * Moves each row of `table` named in `moves` to its new `priority`. `priority` is unique among
  * the live rows (and at least 1 for a trunk), so every row first takes a distinct temporary value
- * past the table's highest, then its final one: no write collides with a row still on its old
- * one. The final priorities must be free of every live row `moves` does not name.
+ * past both the table's highest and the largest final one, then its final one: no write collides
+ * with a row still on its old or temporary one. The final priorities must be free of every live
+ * row `moves` does not name.
  */
 export async function renumberPriorities(
   db: Db,
@@ -78,11 +79,12 @@ export async function renumberPriorities(
     .selectFrom(table)
     .select(eb => eb.fn.max('priority').as('highest'))
     .executeTakeFirstOrThrow();
+  const parked = Math.max(highest, ...moves.map(({ priority }) => priority));
   await Promise.all(
     moves.map(({ id }, index) =>
       db
         .updateTable(table)
-        .set({ priority: highest + index + 1 })
+        .set({ priority: parked + index + 1 })
         .where('id', '=', id)
         .execute()
     )

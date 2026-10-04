@@ -342,4 +342,49 @@ describe('outboundRoutes operations', () => {
     expect(two.items.map(item => item.id)).toEqual([routeId]);
     expect(two.nextCursor).toBeNull();
   });
+
+  // Two kept routes move behind three new ones: their final priorities lie past the table's
+  // highest, where each one also parks on the way.
+  it('replace moves two kept routes behind three new ones', async () => {
+    const db = await makeTestDb();
+    const { trunkId, routeId } = await createTrunkAndCatchAll(db);
+    const route = (numbers: { number: string; isPrefix: boolean }[]) => ({
+      trunkId,
+      users: [],
+      userGroups: [],
+      numbers
+    });
+    const first = (await runOperation(
+      db,
+      'outboundRoutes.replace',
+      {
+        routes: [
+          { id: routeId, ...route([]) },
+          route([{ number: '+4930', isPrefix: true }])
+        ]
+      },
+      asRun()
+    )) as RoutesOutput;
+    const [kept, second] = first.items.map(item => item.id);
+
+    const { items } = (await runOperation(
+      db,
+      'outboundRoutes.replace',
+      {
+        routes: [
+          route([{ number: '+4940', isPrefix: true }]),
+          route([{ number: '+4950', isPrefix: true }]),
+          route([{ number: '+4960', isPrefix: true }]),
+          { id: kept, ...route([]) },
+          { id: second, ...route([{ number: '+4930', isPrefix: true }]) }
+        ]
+      },
+      asRun()
+    )) as RoutesOutput;
+
+    expect(items.map(item => [item.id, item.priority]).slice(3)).toEqual([
+      [kept, 4],
+      [second, 5]
+    ]);
+  });
 });
