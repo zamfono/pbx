@@ -1,7 +1,5 @@
 import { z } from 'zod';
 
-import { HTTP_FORBIDDEN, HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
-
 import { assertAudioAvailable } from '../audio/_shared.js';
 import { recordFieldChanges } from '../audit.js';
 import { propagate } from '../propagate.js';
@@ -11,12 +9,11 @@ import {
   recordLogLevelChanges,
   resolveLogLevel
 } from '../settings/logLevel.js';
-import { defineOperation, OpError, type Context } from '../types.js';
+import { defineOperation, type Context } from '../types.js';
 import { maybeRenameExtension, type AffectedDevice } from './_rename.js';
 import {
   assertCallerIdDidValid,
   assertEmailAvailable,
-  assertNotLastOwner,
   EXTENSION_DESCRIPTION,
   findMeSchema,
   liveUser,
@@ -25,16 +22,12 @@ import {
   type UserOut,
   type UserRow
 } from './_shared.js';
+import {
+  assertAllowedFields,
+  assertEmailChangeAllowed,
+  assertRoleChangeAllowed
+} from './_updateAccess.js';
 import { USER_WIRE_COLUMNS } from './_wireColumns.js';
-
-/** §10.3 "Users": the self-service subset a `user` actor may `PATCH` on their own profile. */
-const SELF_SERVICE_FIELDS = new Set([
-  'clir',
-  'rejectAnonymous',
-  'ringTimeoutS',
-  'notifyMissedCalls',
-  'findMe'
-]);
 
 const inputSchema = z
   .object({
@@ -67,47 +60,6 @@ const inputSchema = z
   .strict();
 type Input = z.infer<typeof inputSchema>;
 type Output = { user: UserOut; affectedDevices?: AffectedDevice[] };
-
-/** Throws 403 unless `ctx.actor` may write every field `input` carries (§5.3, §10.3). */
-function assertAllowedFields(ctx: Context, input: Input): void {
-  if (ctx.actor.role !== 'user') {
-    return;
-  }
-  if (ctx.actor.id !== input.id) {
-    throw new OpError(
-      HTTP_FORBIDDEN,
-      'users: may update only your own profile'
-    );
-  }
-  for (const key of Object.keys(input)) {
-    if (key !== 'id' && !SELF_SERVICE_FIELDS.has(key)) {
-      throw new OpError(HTTP_FORBIDDEN, `users: '${key}' is admin-only`);
-    }
-  }
-}
-
-/** Throws unless `ctx.actor` may set `input.role` on `before` (§5.3 "only owners change roles"). */
-async function assertRoleChangeAllowed(
-  ctx: Context,
-  before: UserRow,
-  input: Input
-): Promise<void> {
-  if (input.role === undefined || input.role === before.role) {
-    return;
-  }
-  if (ctx.actor.role !== 'owner') {
-    throw new OpError(HTTP_FORBIDDEN, 'users: only owners change roles');
-  }
-  if (input.role === 'owner' && before.passwordHash === null) {
-    throw new OpError(
-      HTTP_UNPROCESSABLE_CONTENT,
-      'users: an SSO-only user needs a password before becoming owner'
-    );
-  }
-  if (before.role === 'owner') {
-    await assertNotLastOwner(ctx.db, before);
-  }
-}
 
 /** A nullable wire boolean's next column value: unchanged while absent, else `null` or 0/1. */
 function nextNullableFlag(
@@ -192,6 +144,7 @@ export const update = defineOperation({
     assertAllowedFields(ctx, input);
     const before = await liveUser(ctx.db, input.id);
     await assertRoleChangeAllowed(ctx, before, input);
+    assertEmailChangeAllowed(ctx, before, input);
     if (input.email !== undefined && input.email !== before.email) {
       await assertEmailAvailable(ctx.db, input.email, input.id);
     }

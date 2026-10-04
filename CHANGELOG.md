@@ -78,6 +78,10 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
+- Only an owner may reset an owner's password (`users.resetPassword`) or change an owner's e-mail
+  (`users.update`); an admin gets 403, so an admin can no longer take over an owner account. A
+  link from `users.resetPassword` is now valid for 7 days, like the setup link of a new user,
+  instead of 1 hour.
 - Breaking: `PATCH /settings` (`settings.update`) refuses a `featureCodes` object with a key
   other than the ten feature codes with 422, instead of ignoring it; the OpenAPI description and
   the MCP tool now list the ten keys and the rules each code follows.
