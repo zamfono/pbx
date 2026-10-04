@@ -1,8 +1,8 @@
 /**
  * What the automatic update (`autoUpdate.ts`) reports (§6.3 "Updates"): every attempt and
- * outcome as an audit entry `system.autoUpdate` on channel `job` (§5.7), a failure for `/healthz`
- * and `system.info`, the last attempt a release gets in a mail to the owners, and a breaking
- * release for `/healthz` and in one mail to the owners per release.
+ * outcome as an audit entry `system.autoUpdate` on channel `job` (§5.7), a failure for `/healthz`,
+ * `/metrics` and `system.info`, the last attempt a release gets in a mail to the owners, and a
+ * breaking release for `/metrics` and in one mail to the owners per release.
  */
 import type { Db, UpdaterStatus } from '@zamfono/shared';
 
@@ -143,7 +143,7 @@ export async function clearFailureAfterSuccess(
 }
 
 /**
- * Records the breaking release the updater reports, or that there is none, for `/healthz`, and
+ * Records the breaking release the updater reports, or that there is none, for `/metrics`, and
  * mails the owners once per release. A failed lookup tells nothing and changes nothing.
  */
 export async function announceBreaking(

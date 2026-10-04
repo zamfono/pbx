@@ -29,6 +29,10 @@ describe('stackVersion', () => {
     expect(await stackVersion(dir)).toEqual([0, 0, 6]);
   });
 
+  it('reads edge, a stack that follows main', async () => {
+    expect(await stackVersion(await currentScript('echo edge'))).toBe('edge');
+  });
+
   it('knows none where it exits 12', async () => {
     expect(await stackVersion(await currentScript('exit 12'))).toBeUndefined();
   });

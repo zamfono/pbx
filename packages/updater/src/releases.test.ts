@@ -113,4 +113,33 @@ describe('createReleases', () => {
     });
     await expect(createReleases(fetchFn).latest()).rejects.toThrow('403');
   });
+
+  it('reads main newest build off the latest successful main.yaml run, cached for an hour', async () => {
+    const runs =
+      'https://api.github.com/repos/zamfono/pbx/actions/workflows/main.yaml/runs?branch=main&status=success&per_page=1';
+    const { fetchFn, urls } = answering({
+      [runs]: {
+        status: HTTP_OK,
+        body: {
+          workflow_runs: [
+            {
+              head_sha: 'b'.repeat(40),
+              html_url: 'https://example/runs/1',
+              updated_at: '2026-10-04T00:00:00Z'
+            }
+          ]
+        }
+      }
+    });
+    const clock = { now: 0 };
+    const releases = createReleases(fetchFn, () => clock.now);
+    expect(await releases.latestEdge()).toEqual({
+      commit: 'b'.repeat(40),
+      url: 'https://example/runs/1',
+      publishedAt: '2026-10-04T00:00:00Z'
+    });
+    clock.now = HOUR_MS - 1;
+    await releases.latestEdge();
+    expect(urls).toEqual([runs]);
+  });
 });

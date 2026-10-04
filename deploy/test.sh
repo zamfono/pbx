@@ -28,10 +28,17 @@ sed -E "s/^($required)=\$/\1=placeholder/" "$script_dir/.env.example" >"$env_fil
 (cd "$script_dir" && docker compose --env-file "$env_file" -f compose.yaml -f compose.ports.yaml config) >/dev/null
 
 echo "==> compose config (reviewer override, compose.pr.yaml)"
-pr_images=$(cd "$script_dir" && ZAMFONO_VERSION=1 docker compose --env-file "$env_file" \
-  -f compose.yaml -f compose.ports.yaml -f compose.pr.yaml config --images)
-echo "$pr_images" | grep -qx 'ghcr.io/zamfono/api-pr:1'
-echo "$pr_images" | grep -qx 'ghcr.io/zamfono/proxy-pr:1'
+pr_config=$(cd "$script_dir" && ZAMFONO_PR=1-0123abc docker compose --env-file "$env_file" \
+  -f compose.yaml -f compose.ports.yaml -f compose.pr.yaml config)
+echo "$pr_config" | grep -qx '    image: ghcr.io/zamfono/api-pr:1-0123abc'
+echo "$pr_config" | grep -qx '    image: ghcr.io/zamfono/proxy-pr:1-0123abc'
+[ "$(echo "$pr_config" | grep -cx '      ZAMFONO_VERSION: 1-0123abc')" = 2 ]
+# Without ZAMFONO_PR, Compose stops rather than run a release; ZAMFONO_VERSION does not stand in.
+if (cd "$script_dir" && ZAMFONO_VERSION=1 docker compose --env-file "$env_file" \
+  -f compose.yaml -f compose.ports.yaml -f compose.pr.yaml config) >/dev/null 2>&1; then
+  echo "compose.pr.yaml ran without ZAMFONO_PR" >&2
+  exit 1
+fi
 
 echo "==> release bundle (.github/scripts/deploy-bundle.sh)"
 bash "$repo_root/.github/scripts/deploy-bundle.sh" 1.2.3 "$bundle_dir"

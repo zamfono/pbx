@@ -237,6 +237,17 @@ why the specified behaviour changed; the commit history, how.
   not newer than the stack's, 12 when the stack directory names no release, anything else for an
   error. `system.update` and `system.info` take their verdict from it, so the two can no longer
   disagree on which releases are breaking.
+- Breaking: `update.sh` reads and moves `ZAMFONO_VERSION` by one rule (`.env.example` lists
+  the forms): a release (`0.3.1`) becomes the release installed, a line (`0.3`, `1`) the new
+  release's line, empty and `latest` stay. On `edge`, `update.sh`, `system.update` and the
+  automatic update pull the newest edge images and recreate the stack, once main has a build
+  newer than the running one, where they used to install a release; a `sha-<commit>` build is
+  immutable and refused; any other value stops `update.sh` with an error. A pull request's
+  images are run with `ZAMFONO_PR=<N>` (or `<N>-<commit>`) and `compose.pr.yaml`, no longer with
+  `ZAMFONO_VERSION`. An update that stopped after installing the new release's files, before its stack
+  reported healthy, is now finished by `system.update` and by the automatic update's next
+  attempt too, where the updater refused it as not newer. The automatic update's runs are
+  recorded with `trigger` `automatic` and no `by`.
 - `trunks.list` and `trunks.get` still answer status `unknown` while `core` does not answer, and
   `api` now logs a warning saying so, where it said nothing.
 - A frame on `core`'s internal event stream that `api` cannot read is still dropped, and `api`

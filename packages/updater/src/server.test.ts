@@ -17,7 +17,14 @@ const HTTP_UNAUTHORIZED = 401;
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
 const HTTP_SERVICE_UNAVAILABLE = 503;
-const MANUAL = { trigger: 'manual' };
+const MANUAL = { trigger: 'manual', by: 'Olga Owner' };
+
+const RUNNING_COMMIT = 'a'.repeat(40);
+const EDGE_BUILD = {
+  commit: 'b'.repeat(40),
+  url: 'https://example/runs/1',
+  publishedAt: '2026-10-04T00:00:00Z'
+};
 
 function release(version: Version): Release {
   return {
@@ -33,7 +40,8 @@ function fakeReleases(latest: Version, known: Version[] = [latest]): Releases {
     byVersion: text =>
       Promise.resolve(
         known.map(release).find(item => item.version.join('.') === text)
-      )
+      ),
+    latestEdge: () => Promise.resolve(EDGE_BUILD)
   };
 }
 
@@ -101,6 +109,7 @@ function deps(overrides: Partial<ServerDeps> = {}): ServerDeps {
     releases: fakeReleases([0, 0, 7]),
     currentVersion: () => Promise.resolve([0, 0, 6]),
     checkUpdate: version => Promise.resolve(VERDICTS[version] ?? 'update'),
+    runningRevision: () => Promise.resolve(RUNNING_COMMIT),
     runner: fakeRunner(),
     ...overrides
   };
@@ -183,20 +192,24 @@ describe('the updater API', () => {
     ).toBe(HTTP_BAD_REQUEST);
   });
 
-  it('records who asked for the run, and refuses a trigger it does not know', async () => {
+  it.each([
+    {},
+    { trigger: 'host' },
+    { trigger: 'manual' },
+    { trigger: 'manual', by: 7 },
+    { trigger: 'automatic', by: 'Zamfono' }
+  ])('refuses the requester %j', async requester => {
     const runner = fakeRunner();
     const base = await serve(deps({ runner }));
-    expect((await call(base, 'POST', '/update', {})).status).toBe(
+    expect((await call(base, 'POST', '/update', requester)).status).toBe(
       HTTP_BAD_REQUEST
     );
-    expect(
-      (await call(base, 'POST', '/update', { trigger: 'host' })).status
-    ).toBe(HTTP_BAD_REQUEST);
-    expect(
-      (await call(base, 'POST', '/update', { trigger: 'manual', by: 7 })).status
-    ).toBe(HTTP_BAD_REQUEST);
     expect(runner.started).toEqual([]);
+  });
 
+  it('records who asked for the run', async () => {
+    const runner = fakeRunner();
+    const base = await serve(deps({ runner }));
     const { status, body } = await call(base, 'POST', '/update', {
       trigger: 'manual',
       by: 'Olga Owner'
@@ -216,5 +229,25 @@ describe('the updater API', () => {
       updatable: false,
       unavailable: 'no labels'
     });
+  });
+
+  it('updates an edge stack to edge alone', async () => {
+    const runner = fakeRunner();
+    const base = await serve(
+      deps({ runner, currentVersion: () => Promise.resolve('edge') })
+    );
+    const refused = await call(base, 'POST', '/update', {
+      ...MANUAL,
+      version: '0.0.7'
+    });
+    expect(refused.status).toBe(HTTP_CONFLICT);
+    expect(refused.body.error).toContain('follows edge');
+    expect(runner.started).toEqual([]);
+    const { status, body } = await call(base, 'POST', '/update', {
+      trigger: 'automatic',
+      version: 'edge'
+    });
+    expect(status).toBe(HTTP_ACCEPTED);
+    expect(body).toMatchObject({ from: 'edge', to: 'edge' });
   });
 });

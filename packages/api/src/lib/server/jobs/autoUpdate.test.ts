@@ -233,7 +233,7 @@ describe('runAutoUpdatePass', () => {
     await runAutoUpdatePass(job.deps);
     expect(job.backups.count).toBe(1);
     expect(job.asked).toEqual([
-      { version: '0.1.2', requester: { trigger: 'automatic', by: 'Zamfono' } }
+      { version: '0.1.2', requester: { trigger: 'automatic' } }
     ]);
     expect(await loadUpdateState(db)).toMatchObject({
       runStartedAt: STARTED_AT,
@@ -447,14 +447,14 @@ describe('runAutoUpdatePass', () => {
       Promise.reject(
         new UpdaterRefusal(
           HTTP_CONFLICT,
-          'the stack directory pins no release; update it once with update.sh on the host'
+          'the stack directory runs no release to update from: .env sets ZAMFONO_VERSION to an immutable sha- build, or the directory has no VERSION file; update.sh --current says which'
         )
       );
 
     await runAutoUpdatePass(job.deps);
 
     expect(await loadUpdateState(db)).toMatchObject({
-      autoFailure: expect.stringContaining('pins no release') as unknown,
+      autoFailure: expect.stringContaining('runs no release') as unknown,
       autoFailedAttempts: 1
     });
     expect(await auditOutcomes(db)).toMatchObject([{ outcome: 'refused' }]);

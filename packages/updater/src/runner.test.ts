@@ -36,7 +36,8 @@ describe('createRunner', () => {
     });
     await fakeScript(stackDir, 0);
     const { finished } = await runner.start('0.0.6', '0.0.7', {
-      trigger: 'manual'
+      trigger: 'manual',
+      by: 'Olga Owner'
     });
     expect(runner.current()).toMatchObject({ state: 'running', to: '0.0.7' });
     await finished;
@@ -84,7 +85,8 @@ describe('createRunner', () => {
     });
     await fakeScript(stackDir, 1);
     const { finished } = await runner.start('0.0.6', '0.0.7', {
-      trigger: 'manual'
+      trigger: 'manual',
+      by: 'Olga Owner'
     });
     await finished;
     expect(runner.current().state).toBe('failed');
@@ -100,7 +102,8 @@ describe('createRunner', () => {
     });
     await fakeScript(stackDir, 0);
     const { finished } = await runner.start('0.0.6', '0.0.7', {
-      trigger: 'manual'
+      trigger: 'manual',
+      by: 'Olga Owner'
     });
     await finished;
     const hostRun = {
@@ -129,7 +132,8 @@ describe('loadState', () => {
     });
     await fakeScript(stackDir, 0);
     const { finished } = await runner.start('0.0.6', '0.0.7', {
-      trigger: 'manual'
+      trigger: 'manual',
+      by: 'Olga Owner'
     });
     // Read back before the child ends, as a restarted updater would find it.
     const state = await loadState(stackDir);

@@ -1,8 +1,33 @@
 # shellcheck shell=bash
-# Release versions for update.sh: what X.Y.Z is, which of two is newer, and which update is
-# breaking by RELEASING.md's policy.
+# Release versions for update.sh: what X.Y.Z is, which form a ZAMFONO_VERSION value has, which
+# of two releases is newer, and which update is breaking by RELEASING.md's policy.
 
 v_version() { [[ $1 =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; }
+
+# tag_kind TAG — the form of a ZAMFONO_VERSION value, one of the image tags the workflows publish
+# (.env.example), by which update.sh reads the release a stack runs and moves it on an update:
+#   release   X.Y.Z, that release, pinned
+#   line      X.Y or X, the newest release of that line
+#   releases  empty or latest, the newest release
+#   edge      the newest build of main, which an update pulls afresh
+#   build     sha-<7>, one build of main, immutable; no release
+# Fails for anything else. A pull request's build is never a ZAMFONO_VERSION: compose.pr.yaml
+# reads ZAMFONO_PR.
+tag_kind() {
+  if [[ -z $1 || $1 == latest ]]; then
+    echo releases
+  elif v_version "$1"; then
+    echo release
+  elif [[ $1 =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    echo line
+  elif [[ $1 == edge ]]; then
+    echo edge
+  elif [[ $1 =~ ^sha-[0-9a-f]{7}$ ]]; then
+    echo build
+  else
+    return 1
+  fi
+}
 
 # version_cmp A B — prints -1, 0 or 1 as A is older than, the same as or newer than B.
 # shellcheck disable=SC2206 # the split on IFS=. is the point

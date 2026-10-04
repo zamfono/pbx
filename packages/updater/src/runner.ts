@@ -172,7 +172,7 @@ export async function createRunner(options: RunnerOptions): Promise<Runner> {
 
   async function finish(
     code: number | null,
-    run: Pick<UpdateState, 'by' | 'from' | 'to' | 'trigger'>,
+    run: RunRequester & { from: string; to: string },
     startedAt: string
   ): Promise<void> {
     const ok = code === 0;

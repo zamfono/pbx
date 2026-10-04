@@ -18,7 +18,6 @@ import { errorMessage } from '#lib/server/errors.js';
 
 import type { SendUpdateMail } from '../mail/owners.js';
 import type { BackupRunRow } from '../ops/backups/_shared.js';
-import { JOB_CALLER } from '../ops/outcomeLog.js';
 import { requestUpdate } from '../ops/system/_request.js';
 import {
   autoUpdateEnabled,
@@ -125,8 +124,7 @@ async function install(deps: AutoUpdateDeps, attempt: Attempt): Promise<void> {
   }
   try {
     await requestUpdate(deps.db, nowIso(), attempt.to, {
-      trigger: 'automatic',
-      by: JOB_CALLER.actor.name
+      trigger: 'automatic'
     });
   } catch (error) {
     if (!(error instanceof OpError)) {

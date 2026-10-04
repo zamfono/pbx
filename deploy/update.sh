@@ -1,22 +1,24 @@
 #!/usr/bin/env bash
 # Updates this stack to a newer release (README.md, step 8): downloads that release's bundle,
-# checks it against the release's SHA256SUMS, unpacks it over this directory (never touching
-# .env), lists the settings a newer .env.example introduced, pulls the images and recreates the
-# stack. The `updater` service runs this same script for
-# `system.update` (§6.3 "Updates"). Compose reads compose.yaml and compose.override.yaml, the link
-# to the mode's overlay setup.sh makes, and compose.dr.yaml where the stack directory holds one
-# (§6.5).
+# checks it against the release's SHA256SUMS, pulls the images, unpacks the bundle over this
+# directory, moves .env's ZAMFONO_VERSION along by its form and lists the settings a newer
+# .env.example introduced, and recreates the stack. The `updater` service runs this same script
+# for `system.update` (§6.3 "Updates"). Compose reads compose.yaml and compose.override.yaml, the
+# link to the mode's overlay setup.sh makes, and compose.dr.yaml where the stack directory holds
+# one (§6.5).
 #
 #   ./update.sh [--yes] [--check] [VERSION]
 #   ./update.sh --current
 #
-# VERSION is X.Y.Z; without it, the latest release. A release that is breaking by RELEASING.md's
+# VERSION is X.Y.Z; without it, the latest release; on a stack that follows edge, edge or none,
+# which pulls the newest edge images and recreates the stack, files unchanged. A release that is breaking by RELEASING.md's
 # policy (a new major, or a new minor while 0.x) shows its upgrade notes and asks first; --yes
 # answers for a run without a terminal. --check only says what an update would do, and exits
-# with its verdict, which the updater reads: 0 the update is allowed, 10 it is breaking, 11
-# VERSION is not newer than the release this directory runs, 12 the directory names no release;
+# with its verdict, which the updater reads: 0 the update is allowed, or finishes one that stopped
+# before its stack reported healthy, 10 it is breaking, 11 VERSION is not newer than the release
+# this directory runs, 12 the directory runs no release (setup/versions.sh, tag_kind);
 # any other status is a failure. --current prints the release this directory runs, which the
-# updater reads too, and exits 12 where it names none.
+# updater reads too, and exits 12 where it runs none.
 #
 # Beyond the flags, from the environment:
 #   ZAMFONO_RUNTIME         docker | podman, when both are installed
@@ -63,7 +65,7 @@ for arg in "$@"; do
     --check) check_only=1 ;;
     --current) current_only=1 ;;
     -h | --help)
-      sed -n '2,25p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
+      sed -n '2,27p' "$(basename "$0")" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     -*) fail "unknown option $arg" ;;
@@ -80,15 +82,34 @@ on_exit() {
 }
 trap on_exit EXIT
 
-# The release this directory runs: .env's ZAMFONO_VERSION when set, else the bundle's VERSION.
-# The one reading of it: the updater asks --current.
+# ZAMFONO_VERSION as .env sets it, without its quotes; empty where .env sets none.
+env_tag() {
+  sed -nE 's/^ZAMFONO_VERSION=["'\'']?([^"'\'']*)["'\'']?$/\1/p' .env | tail -n1
+}
+
+# The release this directory runs, by ZAMFONO_VERSION's form (tag_kind): a pinned release itself,
+# `edge` for main's newest build, any other release tag the bundle's VERSION. A sha- build runs
+# none, which exits CHECK_NO_RELEASE. The one reading of it: the updater asks --current.
 current_version() {
-  local pinned
-  pinned=$(sed -nE 's/^ZAMFONO_VERSION=["'\'']?([0-9]+\.[0-9]+\.[0-9]+)["'\'']?$/\1/p' .env | tail -n1)
-  [[ -n $pinned || ! -f VERSION ]] || pinned=$(<VERSION)
-  [[ -n $pinned ]] || fail "cannot tell which release runs here: there is no VERSION and .env sets" \
-    "no ZAMFONO_VERSION"
-  echo "$pinned"
+  local tag kind
+  tag=$(env_tag)
+  kind=$(tag_kind "$tag") ||
+    fail "ZAMFONO_VERSION=$tag in .env is no tag Zamfono publishes (see .env.example)"
+  case $kind in
+    release | edge) echo "$tag" ;;
+    build)
+      echo "ZAMFONO_VERSION=$tag runs an immutable build of main; set it to a release, edge or" \
+        "empty to update" >&2
+      exit "$CHECK_NO_RELEASE"
+      ;;
+    *)
+      if [[ ! -f VERSION ]]; then
+        echo "cannot tell which release runs here: there is no VERSION and .env pins none" >&2
+        exit "$CHECK_NO_RELEASE"
+      fi
+      cat VERSION
+      ;;
+  esac
 }
 
 # The newest release's version, from the redirect GitHub answers releases/latest with.
@@ -114,13 +135,20 @@ find_unit() {
   done
 }
 
-# A pinned ZAMFONO_VERSION moves to the new release; the settings a newer .env.example added are
-# listed, for the operator to set.
+# ZAMFONO_VERSION follows the update by its form (tag_kind): a pinned release becomes the new one,
+# a line the new release's line, X.Y or X as before; empty and latest stay. The settings a newer
+# .env.example added are listed, for the operator to set.
 update_env() {
-  local name
-  if grep -qE "^ZAMFONO_VERSION=[\"']?[^\"' ]" .env; then
-    set_env_line .env ZAMFONO_VERSION "$target"
-    echo "  .env: set ZAMFONO_VERSION"
+  local name tag new
+  tag=$(env_tag)
+  case $(tag_kind "$tag") in
+    release) new=$target ;;
+    line) [[ $tag == *.* ]] && new=${target%.*} || new=${target%%.*} ;;
+    *) new=$tag ;;
+  esac
+  if [[ $new != "$tag" ]]; then
+    set_env_line .env ZAMFONO_VERSION "$new"
+    echo "  .env: ZAMFONO_VERSION $tag -> $new"
   fi
   sed -nE 's/^([A-Z_][A-Z0-9_]*)=.*/\1/p' .env.example | while read -r name; do
     grep -qE "^$name=" .env || echo "  .env: new setting $name, unset (see .env.example)"
@@ -146,11 +174,27 @@ release_notes() {
   ' "$1"
 }
 
+# An edge stack's update: the newest edge images, pulled, and the stack recreated on them; the
+# files stay, since main publishes no bundle. Exits.
+update_edge() {
+  [[ -z $target || $target == edge ]] ||
+    fail "this stack follows edge; set ZAMFONO_VERSION to a release, or empty, to update to $target"
+  echo "edge -> edge (update)"
+  [[ -z $check_only ]] || exit "$CHECK_UPDATE"
+  outcome_start edge edge
+  echo "Pulling the newest edge images ..."
+  "${compose[@]}" pull "${services[@]}" || fail "pulling the edge images failed; nothing was changed"
+  recreate_stack
+  echo "Updated to the newest edge build."
+  exit 0
+}
+
 main() {
   [[ -f .env ]] || fail "there is no .env here; install with setup.sh first (README.md, step 5)"
-  local from
-  if ! from=$(current_version); then
-    [[ -z $check_only && -z $current_only ]] || exit "$CHECK_NO_RELEASE"
+  local from status=0
+  from=$(current_version) || status=$?
+  if ((status != 0)); then
+    [[ $status != "$CHECK_NO_RELEASE" || (-z $check_only && -z $current_only) ]] || exit "$status"
     exit 1
   fi
   if [[ -n $current_only ]]; then
@@ -168,6 +212,7 @@ main() {
   # The services `pull` and `up` name: all of them, but for the updater's run.
   services=()
   [[ -z $updater ]] || services=("${STACK_SERVICES[@]}")
+  [[ $from != edge ]] || update_edge
   [[ -n $target ]] || target=$(latest_version)
   v_version "$target" || fail "$target is not a release version (X.Y.Z)"
 
@@ -179,7 +224,7 @@ main() {
         exit 0
       fi
       echo "The update to $from stopped before its stack reported healthy; finishing it."
-      [[ -z $check_only ]] || exit "$CHECK_NOT_NEWER"
+      [[ -z $check_only ]] || exit "$CHECK_UPDATE"
       outcome_start '' "$from"
       recreate_stack
       rm -f "$PENDING"

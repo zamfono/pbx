@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 
-import { parseVersion, type Version } from './version.js';
+import { EDGE, parseVersion, type StackVersion } from './version.js';
 
 /** `update.sh --check`'s verdict on an update to a release, which only the script decides. */
 export type UpdateVerdict = 'update' | 'breaking' | 'notNewer' | 'noRelease';
@@ -71,21 +71,20 @@ function scriptFailed(args: readonly string[], result: ScriptResult): Error {
 }
 
 /**
- * The release the stack directory runs, as `update.sh --current` prints it, the one reading of
- * it; `undefined` for a directory that names none, a checkout of `main` among them.
+ * The release the stack directory runs, or `edge`, as `update.sh --current` prints it, the one
+ * reading of it; `undefined` for a directory that names none, a checkout of `main` among them.
  */
 export async function stackVersion(
   stackDir: string
-): Promise<Version | undefined> {
+): Promise<StackVersion | undefined> {
   const args = ['--current'];
   const result = await runScript(stackDir, args);
   if (result.status === CHECK_NO_RELEASE) {
     return undefined;
   }
-  const version =
-    result.status === CHECK_UPDATE
-      ? parseVersion(result.stdout.trim())
-      : undefined;
+  const printed = result.stdout.trim();
+  const read = printed === EDGE ? EDGE : parseVersion(printed);
+  const version = result.status === CHECK_UPDATE ? read : undefined;
   if (version === undefined) {
     throw scriptFailed(args, result);
   }

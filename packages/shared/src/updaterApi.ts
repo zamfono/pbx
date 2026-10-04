@@ -11,14 +11,19 @@ export type UpdateState = {
   state: 'idle' | 'running' | 'succeeded' | 'failed';
   from?: string;
   to?: string;
-  /** Who asked: an owner through `system.update` (`by` names them), the automatic update, or
-   * `update.sh` run on the host. Absent while no run is recorded. */
-  trigger?: 'manual' | 'automatic' | 'host';
-  by?: string;
   startedAt?: string;
   finishedAt?: string;
   error?: string;
-};
+} & (RunTrigger | { trigger?: undefined });
+
+/** Who asks for a run in `POST /update`'s body, recorded with it: an owner through
+ * `system.update`, whom `by` names, or `api`'s automatic update. */
+export type RunRequester =
+  { trigger: 'manual'; by: string } | { trigger: 'automatic' };
+
+/** Who asked for a recorded run: a `RunRequester`, or `update.sh` run on the host. Absent from
+ * the record while it holds no run. */
+export type RunTrigger = RunRequester | { trigger: 'host' };
 
 /** `GET /status`. */
 export type UpdaterStatus = {
@@ -34,7 +39,3 @@ export type UpdaterStatus = {
   /** Why the updater cannot update at all, such as a container without Compose labels. */
   unavailable?: string;
 };
-
-/** Who asks for a run in `POST /update`'s body, recorded with it: `api`, for an owner or for its
- * automatic update. `by` is optional. */
-export type RunRequester = { trigger: 'manual' | 'automatic'; by?: string };

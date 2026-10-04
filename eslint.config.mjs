@@ -127,10 +127,13 @@ export default tseslint.config(
             'rtp_timestamp',
             'sender_information',
             'source_ssrc',
-            // GitHub's releases API
+            // GitHub's releases and workflow runs APIs
+            'head_sha',
             'html_url',
             'published_at',
-            'tag_name'
+            'tag_name',
+            'updated_at',
+            'workflow_runs'
           ]
         }
       ],

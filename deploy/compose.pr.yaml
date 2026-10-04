@@ -3,20 +3,25 @@
 # maintainer has read the pull request and labelled it `publish-image`, and deletes them when it
 # closes. Layered last, after compose.yaml and the attachment overlay setup.sh linked (§6.1):
 #
-#   ZAMFONO_VERSION=123 docker compose -f compose.yaml -f compose.override.yaml -f compose.pr.yaml up -d
+#   ZAMFONO_PR=123 docker compose -f compose.yaml -f compose.override.yaml -f compose.pr.yaml up -d
 #
-# ZAMFONO_VERSION is the pull request number (123), or <number>-<short sha> for one pushed build of
-# it; it has no default here, so a forgotten value stops Compose instead of running a release.
+# ZAMFONO_PR is the pull request number (123), or <number>-<short sha> for one pushed build of it;
+# it has no default, so a forgotten value stops Compose instead of running a release. api and core
+# report it as their version. ZAMFONO_VERSION never names a pull request's build.
 services:
   asterisk:
-    image: ghcr.io/zamfono/asterisk-pr:${ZAMFONO_VERSION:?set it to the PR number}
+    image: ghcr.io/zamfono/asterisk-pr:${ZAMFONO_PR:?set it to the PR number}
   migrate:
-    image: ghcr.io/zamfono/migrate-pr:${ZAMFONO_VERSION:?set it to the PR number}
+    image: ghcr.io/zamfono/migrate-pr:${ZAMFONO_PR:?set it to the PR number}
   core:
-    image: ghcr.io/zamfono/core-pr:${ZAMFONO_VERSION:?set it to the PR number}
+    image: ghcr.io/zamfono/core-pr:${ZAMFONO_PR:?set it to the PR number}
+    environment:
+      ZAMFONO_VERSION: ${ZAMFONO_PR:?set it to the PR number}
   api:
-    image: ghcr.io/zamfono/api-pr:${ZAMFONO_VERSION:?set it to the PR number}
+    image: ghcr.io/zamfono/api-pr:${ZAMFONO_PR:?set it to the PR number}
+    environment:
+      ZAMFONO_VERSION: ${ZAMFONO_PR:?set it to the PR number}
   proxy:
-    image: ghcr.io/zamfono/proxy-pr:${ZAMFONO_VERSION:?set it to the PR number}
+    image: ghcr.io/zamfono/proxy-pr:${ZAMFONO_PR:?set it to the PR number}
   updater:
-    image: ghcr.io/zamfono/updater-pr:${ZAMFONO_VERSION:?set it to the PR number}
+    image: ghcr.io/zamfono/updater-pr:${ZAMFONO_PR:?set it to the PR number}

@@ -376,8 +376,10 @@ systemctl restart zamfono.service    # or: podman compose ... down && podman com
 Read the new release's **Upgrade notes** in `CHANGELOG.md`, which the bundle holds and the release
 page shows: anything an upgrade needs beyond these commands is there. Compare the new
 `.env.example` with your `.env`: a release that adds a setting adds it there, and `update.sh`
-names the ones `.env` lacks. If you set `ZAMFONO_VERSION` in `.env`, `update.sh` changes it
-to the new release; by hand, change it yourself.
+names the ones `.env` lacks. If `ZAMFONO_VERSION` in `.env` pins a release (`0.3.1`) or a line
+(`0.3`), `update.sh` changes it to the new release or its line, as `.env.example` describes; on
+`edge` it pulls the newest edge images instead, and it refuses an immutable `sha-` build; by
+hand, change it yourself.
 
 Migrations only go forward. A bad release is undone by restoring the snapshot the upgrade began
 with ([`docs/guide/restore.md`](https://github.com/zamfono/pbx/blob/main/docs/guide/restore.md)) and unpacking the previous release's

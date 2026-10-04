@@ -15,7 +15,9 @@ the work; it takes only a published release that is newer than the running one a
    `current` and the `latest` release. `updatable: true` means `system.update` can install it.
    `breaking: true` means the release needs the operator: it is installed on the host with
    `update.sh`, after reading its upgrade notes. `unavailable` says why the updater cannot run at
-   all, usually a missing `UPDATER_TOKEN` or `CONTAINER_SOCKET` in `.env`.
+   all, usually a missing `UPDATER_TOKEN` or `CONTAINER_SOCKET` in `.env`. On a test stack whose
+   `ZAMFONO_VERSION` is `edge`, `current` and `latest` both say `edge`, `latest` naming main's
+   newest build; `updatable: true` means the stack runs an older one, and the update pulls it.
 2. Back up first: `backups.runs.start` (`POST /backups/runs`) on a target from
    `backups.targets.list` (`GET /backups/targets`), then read the run with `backups.runs.get`
    (`GET /backups/runs/{id}`) until its `status` is `ok`. The update is refused without a backup
@@ -39,7 +41,7 @@ An owner can let the stack take newer non-breaking releases on its own: `setting
 updater every hour. When a release is available, it waits for the next maintenance moment, the
 same quiet time a renewed TLS certificate is swapped in at: the middle of a tenant-wide
 out-of-office period, else of the longest closed period of the opening hours, else
-`settings.tlsReloadHour`, else 03:00. Then it waits until nothing is in progress (no call, no
+`settings.tlsReloadHour`, else the hour `TLS_RELOAD_HOUR` in `.env` names, else 03:00. Then it waits until nothing is in progress (no call, no
 parked call, no voicemail being left, no recording), looking again every 5 minutes for up to two
 hours, after which it gives up and waits for the next maintenance moment: it logs a warning and
 writes a `system.maintenanceGate` entry to the audit log with what kept the stack busy (the live
@@ -70,7 +72,8 @@ failure until an update succeeds:
   failure with the same `reason`.
 
 Fix the cause, then update with `system.update` as above, or wait for the next release or the
-next attempt.
+next attempt. An update that installed the new release's files but whose stack did not report
+healthy shows that release as `current`; `system.update`, or the next attempt, finishes it.
 
 ## Breaking releases
 

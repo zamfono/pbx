@@ -1,13 +1,20 @@
 import { timingSafeEqual } from 'node:crypto';
 import http from 'node:http';
 
-import type { RunRequester, UpdaterStatus, UpdateState } from '@zamfono/shared';
+import type { RunRequester, UpdateState } from '@zamfono/shared';
 
 import { errorMessage } from './errors.js';
-import type { Release, Releases } from './releases.js';
+import type { Releases } from './releases.js';
 import type { Runner } from './runner.js';
 import type { UpdateVerdict } from './stack.js';
-import { formatVersion, parseVersion, type Version } from './version.js';
+import { describeStatus } from './status.js';
+import {
+  EDGE,
+  formatStackVersion,
+  formatVersion,
+  parseVersion,
+  type StackVersion
+} from './version.js';
 
 /**
  * The updater's HTTP API on the stack's internal network (§6.3 "Updates"), no port published:
@@ -23,16 +30,19 @@ const HTTP_SERVICE_UNAVAILABLE = 503;
 const MAX_BODY_BYTES = 4096;
 const MAX_BY_LENGTH = 200;
 const PINS_NO_RELEASE =
-  'the stack directory pins no release; update it once with update.sh on the host';
+  'the stack directory runs no release to update from: .env sets ZAMFONO_VERSION to an immutable sha- build, or the directory has no VERSION file; update.sh --current says which';
 
 export type ServerDeps = {
   /** `undefined` while `UPDATER_TOKEN` is not set, which refuses every request. */
   token: string | undefined;
   releases: Releases;
   /** The version the stack directory runs, read afresh on every request. */
-  currentVersion: () => Promise<Version | undefined>;
+  currentVersion: () => Promise<StackVersion | undefined>;
   /** `update.sh --check`'s verdict on an update to a release (stack.ts), the one judge of it. */
   checkUpdate: (version: string) => Promise<UpdateVerdict>;
+  /** The commit the stack's running `api` was built from, which an `edge` stack's newest build
+   * is newer than when they differ; `undefined` while it does not run. */
+  runningRevision: () => Promise<string | undefined>;
   /** `undefined` when the updater could not learn its Compose project, with `unavailable` why. */
   runner: Runner | undefined;
   unavailable?: string;
@@ -75,40 +85,6 @@ async function readBody(request: http.IncomingMessage): Promise<unknown> {
   }
 }
 
-async function describeStatus(deps: ServerDeps): Promise<UpdaterStatus> {
-  const current = await deps.currentVersion();
-  const base = {
-    current: current === undefined ? null : formatVersion(current),
-    last: deps.runner?.current() ?? { state: 'idle' as const },
-    ...(deps.unavailable === undefined ? {} : { unavailable: deps.unavailable })
-  };
-  let latest: Release | undefined;
-  try {
-    latest = await deps.releases.latest();
-  } catch (error) {
-    return {
-      ...base,
-      latest: null,
-      latestError: errorMessage(error),
-      updatable: false,
-      breaking: false
-    };
-  }
-  const verdict =
-    latest === undefined || current === undefined
-      ? undefined
-      : await deps.checkUpdate(formatVersion(latest.version));
-  return {
-    ...base,
-    latest:
-      latest === undefined
-        ? null
-        : { ...latest, version: formatVersion(latest.version) },
-    updatable: verdict === 'update' && deps.runner !== undefined,
-    breaking: verdict === 'breaking'
-  };
-}
-
 /** Why the updater does not take the stack from `current` to `to`, by `update.sh --check`'s verdict. */
 function refusal(
   verdict: Exclude<UpdateVerdict, 'update'>,
@@ -122,25 +98,62 @@ function refusal(
   }[verdict];
 }
 
-/** Who `body` says asks for the run, recorded with it. */
+/** Who `body` says asks for the run, recorded with it: `manual` with the owner in `by`, or
+ * `automatic` without. */
 function requesterOf(body: unknown): RunRequester {
   const { trigger, by } = body as { trigger?: unknown; by?: unknown };
-  if (trigger !== 'manual' && trigger !== 'automatic') {
+  if (trigger === 'automatic' && by === undefined) {
+    return { trigger };
+  }
+  if (trigger !== 'manual') {
     throw new HttpError(
       HTTP_BAD_REQUEST,
-      'trigger must be manual or automatic'
+      'trigger must be manual, with by, or automatic, without'
     );
   }
-  if (
-    by !== undefined &&
-    (typeof by !== 'string' || by.length > MAX_BY_LENGTH)
-  ) {
+  if (typeof by !== 'string' || by.length > MAX_BY_LENGTH) {
     throw new HttpError(
       HTTP_BAD_REQUEST,
       `by must be a string of at most ${String(MAX_BY_LENGTH)} characters`
     );
   }
-  return by === undefined ? { trigger } : { trigger, by };
+  return { trigger, by };
+}
+
+/** The release `asked` names, `X.Y.Z`, or the latest one without it. */
+async function releaseTarget(
+  deps: ServerDeps,
+  asked: unknown
+): Promise<string> {
+  const askedVersion =
+    typeof asked === 'string' ? parseVersion(asked) : undefined;
+  if (asked !== undefined && askedVersion === undefined) {
+    throw new HttpError(HTTP_BAD_REQUEST, 'version must be X.Y.Z');
+  }
+  const release =
+    askedVersion === undefined
+      ? await deps.releases.latest()
+      : await deps.releases.byVersion(formatVersion(askedVersion));
+  if (release === undefined) {
+    throw new HttpError(
+      HTTP_NOT_FOUND,
+      askedVersion === undefined
+        ? 'GitHub lists no release'
+        : `there is no published release ${formatVersion(askedVersion)}`
+    );
+  }
+  return formatVersion(release.version);
+}
+
+/** A stack on `edge` takes main's newest build alone, `edge` or no version at all. */
+function edgeTarget(asked: unknown): string {
+  if (asked !== undefined && asked !== EDGE) {
+    throw new HttpError(
+      HTTP_CONFLICT,
+      'the stack follows edge: it takes no release until .env sets ZAMFONO_VERSION to one, which update.sh on the host installs'
+    );
+  }
+  return EDGE;
 }
 
 async function update(deps: ServerDeps, body: unknown): Promise<UpdateState> {
@@ -159,32 +172,16 @@ async function update(deps: ServerDeps, body: unknown): Promise<UpdateState> {
   }
   const requester = requesterOf(body);
   const asked = (body as { version?: unknown }).version;
-  const askedVersion =
-    typeof asked === 'string' ? parseVersion(asked) : undefined;
-  if (asked !== undefined && askedVersion === undefined) {
-    throw new HttpError(HTTP_BAD_REQUEST, 'version must be X.Y.Z');
-  }
-  const release =
-    askedVersion === undefined
-      ? await deps.releases.latest()
-      : await deps.releases.byVersion(formatVersion(askedVersion));
-  if (release === undefined) {
-    throw new HttpError(
-      HTTP_NOT_FOUND,
-      askedVersion === undefined
-        ? 'GitHub lists no release'
-        : `there is no published release ${formatVersion(askedVersion)}`
-    );
-  }
-  const to = formatVersion(release.version);
+  const to =
+    current === EDGE ? edgeTarget(asked) : await releaseTarget(deps, asked);
   const verdict = await deps.checkUpdate(to);
   if (verdict !== 'update') {
     throw new HttpError(
       HTTP_CONFLICT,
-      refusal(verdict, formatVersion(current), to)
+      refusal(verdict, formatStackVersion(current), to)
     );
   }
-  await deps.runner.start(formatVersion(current), to, requester);
+  await deps.runner.start(formatStackVersion(current), to, requester);
   return deps.runner.current();
 }
 

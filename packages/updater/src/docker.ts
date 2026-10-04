@@ -52,6 +52,28 @@ export function projectFromLabels(
   return { name, workingDir };
 }
 
+/**
+ * The commit the image of the project's running `service` container was built from, its
+ * `org.opencontainers.image.revision` label (§6.3 "Images"); `undefined` while none runs.
+ */
+export async function serviceRevision(
+  socketPath: string,
+  project: ComposeProject,
+  service: string
+): Promise<string | undefined> {
+  const filters = JSON.stringify({
+    label: [
+      `com.docker.compose.project=${project.name}`,
+      `com.docker.compose.service=${service}`
+    ]
+  });
+  const containers = (await getJson(
+    socketPath,
+    `/containers/json?filters=${encodeURIComponent(filters)}`
+  )) as { Labels?: Record<string, string> }[];
+  return containers[0]?.Labels?.['org.opencontainers.image.revision'];
+}
+
 /** The Compose project of container `id`, this process's own. */
 export async function inspectProject(
   socketPath: string,

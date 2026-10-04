@@ -2,7 +2,11 @@ import { mkdir, readlink, stat, symlink } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { inspectProject, type ComposeProject } from './docker.js';
+import {
+  inspectProject,
+  serviceRevision,
+  type ComposeProject
+} from './docker.js';
 import { errorMessage } from './errors.js';
 import { createReleases } from './releases.js';
 import { createRunner, type Runner } from './runner.js';
@@ -54,7 +58,11 @@ async function assertSocket(): Promise<void> {
   }
 }
 
-async function prepare(): Promise<{ runner?: Runner; unavailable?: string }> {
+async function prepare(): Promise<{
+  runner?: Runner;
+  project?: ComposeProject;
+  unavailable?: string;
+}> {
   try {
     await assertSocket();
     // A container's host name is its id's first 12 characters, on Docker and on Podman alike.
@@ -65,6 +73,7 @@ async function prepare(): Promise<{ runner?: Runner; unavailable?: string }> {
       workingDir: project.workingDir
     });
     return {
+      project,
       runner: await createRunner({
         stackDir: STACK_DIR,
         project,
@@ -78,7 +87,7 @@ async function prepare(): Promise<{ runner?: Runner; unavailable?: string }> {
   }
 }
 
-const { runner, unavailable } = await prepare();
+const { runner, project, unavailable } = await prepare();
 // Compose hands an unset UPDATER_TOKEN over empty, which counts as unset.
 const token =
   process.env.UPDATER_TOKEN === '' ? undefined : process.env.UPDATER_TOKEN;
@@ -90,6 +99,8 @@ createServer({
   releases: createReleases(),
   currentVersion: async () => stackVersion(STACK_DIR),
   checkUpdate: async version => checkUpdate(STACK_DIR, version),
+  runningRevision: async () =>
+    project === undefined ? undefined : serviceRevision(SOCKET, project, 'api'),
   runner,
   ...(unavailable === undefined ? {} : { unavailable })
 }).listen(PORT);

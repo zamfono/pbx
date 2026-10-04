@@ -15,3 +15,13 @@ export function parseVersion(text: string): Version | undefined {
 export function formatVersion(version: Version): string {
   return version.join('.');
 }
+
+/** The tag of main's newest build, which a stack following it names as the version it runs. */
+export const EDGE = 'edge';
+
+/** What a stack directory runs, by `update.sh --current`: a release, or main's newest build. */
+export type StackVersion = Version | typeof EDGE;
+
+export function formatStackVersion(version: StackVersion): string {
+  return version === EDGE ? EDGE : formatVersion(version);
+}
