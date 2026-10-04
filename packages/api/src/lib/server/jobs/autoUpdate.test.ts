@@ -295,7 +295,7 @@ describe('runAutoUpdatePass', () => {
     const job = harness(db);
     job.current.backupOk = false;
     await runAutoUpdatePass(job.deps);
-    expect((await loadUpdateState(db))?.autoFailedVersion).toBe('0.1.2');
+    expect((await loadUpdateState(db)).autoFailedVersion).toBe('0.1.2');
 
     job.current.status = status({
       current: '0.1.2',
@@ -312,7 +312,7 @@ describe('runAutoUpdatePass', () => {
       }
     });
     await runAutoUpdatePass(job.deps);
-    expect((await loadUpdateState(db))?.autoFailedVersion).toBeNull();
+    expect((await loadUpdateState(db)).autoFailedVersion).toBeNull();
   });
 
   it('aborts on a failed backup without asking the updater, and reports it', async () => {
@@ -326,8 +326,8 @@ describe('runAutoUpdatePass', () => {
     expect(job.asked).toEqual([]);
     expect(job.mails).toEqual([]);
     const row = await loadUpdateState(db);
-    expect(row?.autoFailure).toContain('no space left on device');
-    expect(row?.autoFailedAttempts).toBe(1);
+    expect(row.autoFailure).toContain('no space left on device');
+    expect(row.autoFailedAttempts).toBe(1);
     expect(await auditOutcomes(db)).toMatchObject([
       { outcome: 'backupFailed', to: '0.1.2' }
     ]);
@@ -374,7 +374,7 @@ describe('runAutoUpdatePass', () => {
     await runAutoUpdatePass(job.deps);
 
     expect(job.asked).toEqual([]);
-    expect((await loadUpdateState(db))?.autoFailure).toBe(
+    expect((await loadUpdateState(db)).autoFailure).toBe(
       "the backup failed: backup: target 't9' not found"
     );
     expect(await auditOutcomes(db)).toMatchObject([
@@ -415,7 +415,7 @@ describe('runAutoUpdatePass', () => {
     await runAutoUpdatePass(job.deps);
     await busyDay('2026-10-01');
     await busyDay('2026-10-02');
-    expect((await loadUpdateState(db))?.autoFailedAttempts).toBe(0);
+    expect((await loadUpdateState(db)).autoFailedAttempts).toBe(0);
     await busyDay('2026-10-03');
 
     expect(job.backups.count).toBe(0);
@@ -540,7 +540,7 @@ describe('runAutoUpdatePass', () => {
     clock.now = TOMORROW;
     await runAutoUpdatePass(job.deps);
     expect(job.backups.count).toBe(2);
-    expect((await loadUpdateState(db))?.autoFailedAttempts).toBe(2);
+    expect((await loadUpdateState(db)).autoFailedAttempts).toBe(2);
   });
 
   it('waits the retry gap after a failed attempt even where the gate is always open', async () => {
@@ -661,7 +661,7 @@ describe('runAutoUpdatePass', () => {
     // A failed lookup says nothing; once installed by hand, none is pending any more.
     job.current.status = status({ latest: null, latestError: 'timeout' });
     await runAutoUpdatePass(job.deps);
-    expect((await loadUpdateState(db))?.breakingVersion).toBe('0.2.0');
+    expect((await loadUpdateState(db)).breakingVersion).toBe('0.2.0');
     job.current.status = status({
       current: '0.2.0',
       latest: null,

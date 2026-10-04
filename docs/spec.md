@@ -1865,8 +1865,7 @@ CREATE TABLE extensions (
 --   sip_trunk_id / sip_user: dial sip:<sip_user>@<host> over that trunk, bypassing outbound_routes
 --                          (§9.4 SIP targets); set together; the trunk purges once no row names it
 --   sip_headers_json:      the sip target's custom headers, a JSON array of { name, value }
---                          (§9.4 Header templates); NULL unless sip_trunk_id is set, and set on
---                          every sip row by the API, since SQLite's ADD COLUMN cannot require it
+--                          (§9.4 Header templates); set exactly on the sip rows (CHECK)
 --   mailbox_user_id / mailbox_ring_group_id: deposit in that mailbox
 --   announcement_audio_id: play the announcement, then hang up; kind 'announcement'
 --   menu_id:               play the menu (§10.1, Target menu)
@@ -1877,7 +1876,7 @@ CREATE TABLE forward_targets (
   external              TEXT CHECK (external IS NULL OR (external GLOB '+[0-9]*' AND substr(external, 2) NOT GLOB '*[^0-9]*')),
   sip_trunk_id          TEXT REFERENCES trunks(id)       ON DELETE RESTRICT,
   sip_user              TEXT CHECK (sip_user IS NULL OR (length(sip_user) BETWEEN 1 AND 64 AND sip_user NOT GLOB '*[^A-Za-z0-9._~+-]*')),
-  sip_headers_json      TEXT CHECK (sip_headers_json IS NULL OR (sip_trunk_id IS NOT NULL AND json_valid(sip_headers_json) AND json_type(sip_headers_json) = 'array')),
+  sip_headers_json      TEXT CHECK (sip_headers_json IS NULL OR (json_valid(sip_headers_json) AND json_type(sip_headers_json) = 'array')),
   mailbox_user_id       TEXT REFERENCES users(id)        ON DELETE RESTRICT,
   mailbox_ring_group_id TEXT REFERENCES ring_groups(id)  ON DELETE RESTRICT,
   announcement_audio_id TEXT REFERENCES audio_assets(id) ON DELETE RESTRICT,
@@ -1886,7 +1885,8 @@ CREATE TABLE forward_targets (
          (sip_trunk_id IS NOT NULL) + (mailbox_user_id IS NOT NULL) +
          (mailbox_ring_group_id IS NOT NULL) + (announcement_audio_id IS NOT NULL) +
          (menu_id IS NOT NULL) = 1),
-  CHECK ((sip_trunk_id IS NULL) = (sip_user IS NULL))
+  CHECK ((sip_trunk_id IS NULL) = (sip_user IS NULL)),
+  CHECK ((sip_trunk_id IS NULL) = (sip_headers_json IS NULL))
 );
 
 -- menus — auto-attendant menus (§10.1, Target menu; §10.2). A menu's OOO rules and opening hours

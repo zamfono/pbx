@@ -5,7 +5,7 @@ import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
 import { renderMetrics } from './metrics.js';
 import { recordApiRequestSeconds } from './metricsCounters.js';
 import { updaterClient, type UpdaterClient } from './ops/system/_updater.js';
-import { makeTestDb } from './testDb.js';
+import { makeTestDb, seedSettings } from './testDb.js';
 
 vi.mock('./ops/system/_updater.js', async importOriginal => ({
   ...(await importOriginal<typeof import('./ops/system/_updater.js')>()),
@@ -88,6 +88,7 @@ async function insertTrunk(
 describe('renderMetrics', () => {
   it('renders parseable Prometheus text with the active-calls and ARI gauges', async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
     const state: StateResponse = {
       calls: [
         {
@@ -123,6 +124,7 @@ describe('renderMetrics', () => {
 
   it("reports the core's live registered-device count, not every device that ever registered", async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
     // Once registered, now gone: `last_registered_at` stays set (§3.1).
     await db
       .insertInto('devices')
@@ -153,6 +155,7 @@ describe('renderMetrics', () => {
 
   it('reports zamfono_ari_connected 0 when the ARI check fails', async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
 
     const text = await renderMetrics(
       stubDeps({ db, checkAri: () => Promise.reject(new Error('down')) })
@@ -163,6 +166,7 @@ describe('renderMetrics', () => {
 
   it('renders one zamfono_trunk_registered and zamfono_trunk_max_channels line per live trunk', async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
     await insertTrunk(db, { maxChannels: 10 });
     const state: StateResponse = {
       calls: [],
@@ -185,6 +189,7 @@ describe('renderMetrics', () => {
 
   it('leaves an unmonitored trunk out of zamfono_trunk_registered (§9.4 "Provisioning and status")', async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
     const upId = await insertTrunk(db, { name: 'up' });
     const unprobedId = await insertTrunk(db, { name: 'unprobed', priority: 2 });
     const state: StateResponse = {
@@ -206,6 +211,7 @@ describe('renderMetrics', () => {
 
   it("renders each live trunk's channels in use from the core's count, 0 for one carrying none", async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
     const busyId = await insertTrunk(db, { name: 'busy', maxChannels: 4 });
     await insertTrunk(db, { name: 'idle', priority: 2 });
     const state: StateResponse = {
@@ -224,6 +230,7 @@ describe('renderMetrics', () => {
 
   it('escapes a newline in an operator-chosen trunk name instead of letting it forge a line', async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
     await insertTrunk(db, { name: 'evil\nzamfono_ari_connected 0"trunk' });
 
     const text = await renderMetrics(stubDeps({ db }));
@@ -236,6 +243,7 @@ describe('renderMetrics', () => {
 
   it('renders zamfono_build_info with the version and the full revision (§7 "Version")', async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
 
     const text = await renderMetrics(
       stubDeps({
@@ -256,6 +264,7 @@ describe('renderMetrics', () => {
 
   it('renders the certificate-sync gauge from certSyncStatus', async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
 
     const ok = await renderMetrics(
       stubDeps({ db, certSyncStatus: () => 'ok' })
@@ -274,6 +283,7 @@ describe('renderMetrics', () => {
       update: () => Promise.reject(new Error('not asked'))
     };
     const db = await makeTestDb();
+    await seedSettings(db);
     await db
       .updateTable('updateState')
       .set({
@@ -317,6 +327,7 @@ describe('renderMetrics', () => {
 
   it('accumulates zamfono_api_request_seconds', async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
     recordApiRequestSeconds(0.2);
     recordApiRequestSeconds(2);
 
@@ -327,6 +338,7 @@ describe('renderMetrics', () => {
 
   it("reports the core's recording-mix failures, and no sample while the core is unreachable", async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
 
     const live = await renderMetrics(
       stubDeps({
@@ -352,6 +364,7 @@ describe('renderMetrics', () => {
 
   it("reports a backup target's last successful run age in seconds", async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
     const targetId = newId();
     await db
       .insertInto('backupTargets')

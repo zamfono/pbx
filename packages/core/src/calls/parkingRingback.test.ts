@@ -263,7 +263,11 @@ describe('parking ring-back', () => {
     await setUp();
     const trunkId = await seedExternalRoute(db);
     const anna = await seedParker();
-    await seedFallback({ sipTrunkId: trunkId, sipUser: 'agent' });
+    await seedFallback({
+      sipTrunkId: trunkId,
+      sipUser: 'agent',
+      sipHeadersJson: '[]'
+    });
     const parked = await parkFor(anna);
 
     const { onward } = await answeredOnward(parked);

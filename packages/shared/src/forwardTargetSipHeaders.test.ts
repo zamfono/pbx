@@ -16,7 +16,7 @@ async function seed(db: Db): Promise<void> {
   await sql`INSERT INTO forward_targets (id, external) VALUES ('ft-ext', '+4312345')`.execute(
     db
   );
-  await sql`INSERT INTO forward_targets (id, sip_trunk_id, sip_user) VALUES ('ft-sip', 't1', 'proj_a')`.execute(
+  await sql`INSERT INTO forward_targets (id, sip_trunk_id, sip_user, sip_headers_json) VALUES ('ft-sip', 't1', 'proj_a', '[]')`.execute(
     db
   );
   await sql`INSERT INTO user_forward_rules (user_id, condition, target_id) VALUES ('u1', 'busy', 'ft-sip')`.execute(
@@ -25,11 +25,13 @@ async function seed(db: Db): Promise<void> {
 }
 
 // forward_targets.sip_headers_json (§9.4 "Header templates", §11.2).
-test('headers are refused on a row that is no sip target, and must be a JSON array', async () => {
+test('headers are set exactly on a sip target, and must be a JSON array', async () => {
   const db = await migratedTestDb();
   await seed(db);
   const refused = [
     sql`INSERT INTO forward_targets (id, external, sip_headers_json) VALUES ('x1', '+431', '[]')`,
+    sql`INSERT INTO forward_targets (id, sip_trunk_id, sip_user) VALUES ('x2', 't1', 'proj_b')`,
+    sql`UPDATE forward_targets SET sip_headers_json = NULL WHERE id = 'ft-sip'`,
     sql`UPDATE forward_targets SET sip_headers_json = '[]' WHERE id = 'ft-user'`,
     sql`UPDATE forward_targets SET sip_headers_json = '{}' WHERE id = 'ft-sip'`,
     sql`UPDATE forward_targets SET sip_headers_json = 'nope' WHERE id = 'ft-sip'`

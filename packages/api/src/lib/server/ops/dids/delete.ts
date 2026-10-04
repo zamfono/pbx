@@ -14,8 +14,9 @@ async function guardDeletable(ctx: Context, didId: string): Promise<void> {
   const settings = await ctx.db
     .selectFrom('settings')
     .select('mainDidId')
-    .executeTakeFirst();
-  if (settings?.mainDidId === didId) {
+    .where('id', '=', 1)
+    .executeTakeFirstOrThrow();
+  if (settings.mainDidId === didId) {
     throw new Conflict('dids: is the tenant main number', [
       { kind: 'settings', id: 'settings', label: 'Main number' }
     ]);

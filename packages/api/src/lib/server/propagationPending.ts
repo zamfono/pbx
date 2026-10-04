@@ -22,6 +22,6 @@ export async function isPropagationPending(db: Db): Promise<boolean> {
     .selectFrom('settings')
     .select('configPropagationPending')
     .where('id', '=', 1)
-    .executeTakeFirst();
-  return row?.configPropagationPending === 1;
+    .executeTakeFirstOrThrow();
+  return row.configPropagationPending === 1;
 }

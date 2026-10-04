@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getCoreClient } from './coreClient.js';
 import { stubCoreClient } from './coreClientStub.js';
 import { propagateConfig } from './propagation.js';
-import { makeTestDb } from './testDb.js';
+import { makeTestDb, seedSettings } from './testDb.js';
 
 // The propagation under test, not the setup file's stand-in for it.
 vi.unmock('./propagation.js');
@@ -39,6 +39,7 @@ afterEach(() => {
 describe('propagateConfig runs one propagation at a time', () => {
   it('starts a propagation only once the one before it has settled, even when it failed', async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
     const log: string[] = [];
     let release: () => void = () => undefined;
     coreAnswering(log, [
@@ -62,6 +63,7 @@ describe('propagateConfig runs one propagation at a time', () => {
     release();
     await expect(first).rejects.toThrow('core refused');
     await second;
-    expect(log).toEqual(['first:', 'second:']);
+    // The failed first left the propagation pending, so the second reloads everything.
+    expect(log).toEqual(['first:', 'second:pjsip,dialplan,moh']);
   });
 });

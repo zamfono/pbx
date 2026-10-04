@@ -81,7 +81,6 @@ cat >"$BROKEN_DIR/9999999999999_broken.ts" <<'EOF'
 export async function up(): Promise<void> {
   throw new Error('deliberately broken migration');
 }
-export async function down(): Promise<void> {}
 EOF
 
 broken_status=0

@@ -4,54 +4,6 @@ import { sql, type CreateTableBuilder, type Kysely } from 'kysely';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- migrations are frozen in time; typing against the live schema would break earlier migrations once it evolves
 type Db = Kysely<any>;
 
-const TABLE_NAMES = [
-  'users',
-  'devices',
-  'device_blf_keys',
-  'trunks',
-  'trunk_hosts',
-  'outbound_routes',
-  'outbound_route_users',
-  'outbound_route_user_groups',
-  'outbound_route_numbers',
-  'did_blocks',
-  'dids',
-  'ring_groups',
-  'ring_group_members',
-  'user_groups',
-  'user_group_users',
-  'user_group_groups',
-  'extensions',
-  'forward_targets',
-  'menus',
-  'menu_targets',
-  'user_forward_rules',
-  'ring_group_forward_rules',
-  'settings',
-  'ooo_rules',
-  'opening_hours',
-  'opening_hours_intervals',
-  'audio_assets',
-  'blocked_numbers',
-  'mail_templates',
-  'contacts',
-  'contact_phones',
-  'oauth_clients',
-  'tokens',
-  'webhooks',
-  'webhook_deliveries',
-  'backup_targets',
-  'backup_runs',
-  'audit_log',
-  'calls',
-  'call_qos',
-  'voicemails',
-  'recordings',
-  'presence_log',
-  'update_state',
-  'maintenance_gate'
-] as const;
-
 // Named §11.4 defaults: `no-magic-numbers` requires every meaningful literal to carry a name.
 const DEFAULT_USER_RING_TIMEOUT_S = 25;
 const DEFAULT_RING_GROUP_RING_TIMEOUT_S = 20;
@@ -277,6 +229,7 @@ async function createTrunksTable(db: Db): Promise<void> {
         .defaultTo('udp')
         .check(sql`transport in ('udp','tcp','tls')`)
     )
+    .$call(addTrunksSignalingColumns)
     .addColumn('outbound_proxy', 'text')
     .addColumn('register_expiry_s', 'integer')
     .addColumn('register_retry_s', 'integer')
@@ -309,7 +262,6 @@ async function createTrunksTable(db: Db): Promise<void> {
     .addColumn('log_level_expires_at', 'text')
     .addColumn('created_at', 'text', col => col.notNull())
     .addColumn('deleted_at', 'text')
-    .$call(addTrunksSignalingColumns)
     .addCheckConstraint(
       'trunks_auth_credentials',
       sql`(auth_mode = 'registration' or inbound_auth = 1) = (username is not null and password_enc is not null)`
@@ -682,6 +634,11 @@ async function createForwardTargetsTable(db: Db): Promise<void> {
         sql`sip_user is null or (length(sip_user) between 1 and 64 and sip_user not glob '*[^A-Za-z0-9._~+-]*')`
       )
     )
+    .addColumn('sip_headers_json', 'text', col =>
+      col.check(
+        sql`sip_headers_json is null or (json_valid(sip_headers_json) and json_type(sip_headers_json) = 'array')`
+      )
+    )
     .addColumn('mailbox_user_id', 'text', col =>
       col.references('users.id').onDelete('restrict')
     )
@@ -694,14 +651,13 @@ async function createForwardTargetsTable(db: Db): Promise<void> {
     .addColumn('menu_id', 'text', col =>
       col.references('menus.id').onDelete('restrict')
     )
-    .addColumn('sip_headers_json', 'text', col =>
-      col.check(
-        sql`sip_headers_json is null or (sip_trunk_id is not null and json_valid(sip_headers_json) and json_type(sip_headers_json) = 'array')`
-      )
-    )
     .addCheckConstraint(
       'forward_targets_sip_pair',
       sql`(sip_trunk_id is null) = (sip_user is null)`
+    )
+    .addCheckConstraint(
+      'forward_targets_sip_headers',
+      sql`(sip_trunk_id is null) = (sip_headers_json is null)`
     )
     .addCheckConstraint(
       'forward_targets_one_kind',
@@ -940,6 +896,18 @@ function addSettingsRetentionColumns<TB extends string, C extends string>(
     )
     .addColumn('tls_reload_hour', 'integer', col =>
       col.check(sql`tls_reload_hour between 0 and 23`)
+    )
+    .addColumn('auto_update', 'integer', col =>
+      col
+        .notNull()
+        .defaultTo(0)
+        .check(sql`auto_update in (0,1)`)
+    )
+    .addColumn('config_propagation_pending', 'integer', col =>
+      col
+        .notNull()
+        .defaultTo(0)
+        .check(sql`config_propagation_pending in (0,1)`)
     );
 }
 
@@ -995,18 +963,6 @@ async function createSettingsTable(db: Db): Promise<void> {
     .$call(addSettingsRetentionColumns)
     .$call(addSettingsSsoColumns)
     .$call(addSettingsRingotelColumns)
-    .addColumn('auto_update', 'integer', col =>
-      col
-        .notNull()
-        .defaultTo(0)
-        .check(sql`auto_update in (0,1)`)
-    )
-    .addColumn('config_propagation_pending', 'integer', col =>
-      col
-        .notNull()
-        .defaultTo(0)
-        .check(sql`config_propagation_pending in (0,1)`)
-    )
     .addCheckConstraint(
       'settings_sso_provider_needs_client_id',
       sql`sso_provider is null or sso_client_id is not null`
@@ -1301,18 +1257,18 @@ async function createWebhooksTable(db: Db): Promise<void> {
       col.check(sql`last_status in ('ok','failing')`)
     )
     .addColumn('last_delivery_at', 'text')
-    .addColumn('created_at', 'text', col => col.notNull())
-    .addColumn('deleted_at', 'text')
     .addColumn('last_error', 'text')
     .addColumn('last_error_at', 'text')
     .addColumn('failing_since', 'text')
-    .addColumn('last_logged_at', 'text')
     .addColumn('failed_deliveries', 'integer', col =>
       col
         .notNull()
         .defaultTo(0)
         .check(sql`failed_deliveries >= 0`)
     )
+    .addColumn('last_logged_at', 'text')
+    .addColumn('created_at', 'text', col => col.notNull())
+    .addColumn('deleted_at', 'text')
     .execute();
 }
 
@@ -1377,10 +1333,10 @@ async function createBackupRunsTable(db: Db): Promise<void> {
     )
     .addColumn('snapshot_id', 'text')
     .addColumn('bytes_added', 'integer')
+    .addColumn('bytes_total', 'integer')
     .addColumn('error', 'text')
     .addColumn('started_at', 'text', col => col.notNull())
     .addColumn('finished_at', 'text')
-    .addColumn('bytes_total', 'integer')
     .execute();
 }
 
@@ -1788,11 +1744,4 @@ export async function up(db: Db): Promise<void> {
   await createDidBlockGuardTriggers(db);
   await createUserGroupGroupsTriggers(db);
   await createOpeningHoursTenantSingleIndex(db);
-}
-
-export async function down(db: Db): Promise<void> {
-  for (const table of [...TABLE_NAMES].reverse()) {
-    // eslint-disable-next-line no-await-in-loop -- tables drop one at a time, in reverse creation order
-    await db.schema.dropTable(table).ifExists().execute();
-  }
 }

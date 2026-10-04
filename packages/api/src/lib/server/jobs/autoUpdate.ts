@@ -185,7 +185,7 @@ export async function runAutoUpdatePass(
 ): Promise<Date | null> {
   const client = deps.updater();
   const row = await loadUpdateState(deps.db);
-  if (client === undefined || row === undefined) {
+  if (client === undefined) {
     return null;
   }
   const status = await client.status();
@@ -202,7 +202,7 @@ export async function runAutoUpdatePass(
   }
   await clearFailureAfterSuccess(deps.db, row, status);
   await announceBreaking(deps, row, status, from);
-  const fresh = (await loadUpdateState(deps.db)) ?? row;
+  const fresh = await loadUpdateState(deps.db);
   const to = await wantedRelease(deps.db, fresh, status, now);
   if (to === null) {
     await deps.gate.reset();

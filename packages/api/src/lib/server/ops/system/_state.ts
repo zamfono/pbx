@@ -33,23 +33,18 @@ export type AutoUpdateFailure = {
   attempts: number;
 };
 
-/** The row, or `undefined` for a database without the table or its row yet. */
-export async function loadUpdateState(
-  db: Db
-): Promise<UpdateStateRow | undefined> {
+/** The row, which the migration inserts. */
+export async function loadUpdateState(db: Db): Promise<UpdateStateRow> {
   return db
     .selectFrom('updateState')
     .selectAll()
     .where('id', '=', 1)
-    .executeTakeFirst();
+    .executeTakeFirstOrThrow();
 }
 
 export function autoUpdateFailure(
-  row: UpdateStateRow | undefined
+  row: UpdateStateRow
 ): AutoUpdateFailure | null {
-  if (row === undefined) {
-    return null;
-  }
   const { autoFailedVersion: version, autoFailure: reason } = row;
   const at = row.autoFailedAt;
   if (version === null || reason === null || at === null) {
@@ -63,7 +58,7 @@ export function autoUpdateFailure(
  * reached `MAX_AUTO_UPDATE_ATTEMPTS`, else until `AUTO_UPDATE_RETRY_GAP_MS` after the last.
  */
 export function retryHeldOff(
-  row: UpdateStateRow | undefined,
+  row: UpdateStateRow,
   version: string,
   now: Date
 ): boolean {
@@ -125,16 +120,16 @@ export async function updateNews(db: Db): Promise<UpdateNews> {
   return {
     autoUpdateFailed: failure !== null,
     autoUpdateFailedAttempts: failure?.attempts ?? 0,
-    breakingUpdateAvailable: (row?.breakingVersion ?? null) !== null
+    breakingUpdateAvailable: row.breakingVersion !== null
   };
 }
 
-/** `settings.auto_update` (§11.4); off for a database without its settings row yet. */
+/** `settings.auto_update` (§11.4). */
 export async function autoUpdateEnabled(db: Db): Promise<boolean> {
   const row = await db
     .selectFrom('settings')
     .select('autoUpdate')
     .where('id', '=', 1)
-    .executeTakeFirst();
-  return row?.autoUpdate === 1;
+    .executeTakeFirstOrThrow();
+  return row.autoUpdate === 1;
 }

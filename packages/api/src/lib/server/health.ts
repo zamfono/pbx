@@ -63,8 +63,8 @@ async function mailConfigured(db: Db): Promise<'configured' | 'notConfigured'> {
     .selectFrom('settings')
     .select('smtpHost')
     .where('id', '=', 1)
-    .executeTakeFirst();
-  return settings?.smtpHost ? 'configured' : 'notConfigured';
+    .executeTakeFirstOrThrow();
+  return settings.smtpHost ? 'configured' : 'notConfigured';
 }
 
 /** The body fields read from the tables, which only a migrated database holds. */

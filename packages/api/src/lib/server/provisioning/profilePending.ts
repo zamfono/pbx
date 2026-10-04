@@ -24,6 +24,6 @@ export async function isProfilePending(db: Db): Promise<boolean> {
     .selectFrom('settings')
     .select('ringotelProfilePending')
     .where('id', '=', 1)
-    .executeTakeFirst();
-  return row?.ringotelProfilePending === 1;
+    .executeTakeFirstOrThrow();
+  return row.ringotelProfilePending === 1;
 }

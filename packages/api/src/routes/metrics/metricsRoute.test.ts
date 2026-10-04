@@ -14,6 +14,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { stubCoreClient } from '#lib/server/coreClientStub.js';
 import { getDb } from '#lib/server/db.js';
+import { seedSettings } from '#lib/server/testDb.js';
 
 import { GET } from './+server.js';
 
@@ -86,6 +87,7 @@ describe('GET /metrics', () => {
     process.env.METRICS_TOKEN = token;
     stubCore();
     await migrateForTest(getDb());
+    await seedSettings(getDb());
 
     const response = await GET(eventWithAuth(`Bearer ${token}`));
 

@@ -26,6 +26,7 @@ import {
   MOH_TRACK_BASENAMES,
   MOH_WIDEBAND_EXT
 } from './seedMoh.js';
+import { seedSettings } from './testDb.js';
 
 const KEY_BYTES = 32;
 const EXT_LENGTH_TWO = 2;
@@ -637,6 +638,7 @@ describe('apiHealth', () => {
 
   it('reports ok once the database is open and migrated', async () => {
     const db = await migratedTestDb();
+    await seedSettings(db);
     const health = await apiHealth({
       db,
       migrationsDir: MIGRATIONS_DIR,

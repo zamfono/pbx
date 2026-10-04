@@ -8,7 +8,7 @@ import { apiHealth, type ApiHealth } from './health.js';
 import { updateNews } from './ops/system/_state.js';
 import { updaterClient, type UpdaterClient } from './ops/system/_updater.js';
 import { keyringFromEnv } from './secretbox.js';
-import { makeTestDb } from './testDb.js';
+import { makeTestDb, seedSettings } from './testDb.js';
 
 vi.mock('./ops/system/_updater.js', async importOriginal => ({
   ...(await importOriginal<typeof import('./ops/system/_updater.js')>()),
@@ -65,6 +65,7 @@ describe('apiHealth update fields (§6.3 "Automatic updates", §10.3 Health row)
   it('says whether an automatic update failed, and nothing of releases', async () => {
     vi.mocked(updaterClient).mockImplementation(() => UNUSED_UPDATER);
     const db = await makeTestDb();
+    await seedSettings(db);
     await expect(healthOf(db)).resolves.toMatchObject({
       autoUpdateFailed: false
     });
@@ -88,6 +89,7 @@ describe('apiHealth update fields (§6.3 "Automatic updates", §10.3 Health row)
   it('reports no failure without an updater, whatever update_state stores, and keeps the record', async () => {
     vi.mocked(updaterClient).mockImplementation(() => undefined);
     const db = await makeTestDb();
+    await seedSettings(db);
     await db
       .updateTable('updateState')
       .set({
@@ -125,11 +127,13 @@ describe('apiHealth update fields (§6.3 "Automatic updates", §10.3 Health row)
 describe('apiHealth emergencyTrunk (§9.4 "Emergency trunks", §10.3 Health row)', () => {
   it('is false with no trunk at all', async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
     expect((await healthOf(db)).emergencyTrunk).toBe(false);
   });
 
   it('is false while only unflagged or deleted flagged trunks exist', async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
     await seedTrunk(db, 'foreign', 1, 0);
     await seedTrunk(db, 'gone', 2, 1, nowIso());
     expect((await healthOf(db)).emergencyTrunk).toBe(false);
@@ -137,6 +141,7 @@ describe('apiHealth emergencyTrunk (§9.4 "Emergency trunks", §10.3 Health row)
 
   it('is true once a live trunk is flagged', async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
     await seedTrunk(db, 'foreign', 1, 0);
     await seedTrunk(db, 'local', 2, 1);
     expect((await healthOf(db)).emergencyTrunk).toBe(true);
@@ -149,6 +154,7 @@ describe('apiHealth emergencyTrunk (§9.4 "Emergency trunks", §10.3 Health row)
 
   it('rejects when the query fails on a migrated database', async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
     await sql`ALTER TABLE trunks RENAME TO trunks_gone`.execute(db);
     await expect(healthOf(db)).rejects.toThrow(/trunks/u);
   });

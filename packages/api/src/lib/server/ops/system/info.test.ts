@@ -1,6 +1,8 @@
 import process from 'node:process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { Db } from '@zamfono/shared';
+
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { stubCoreClient } from '#lib/server/coreClientStub.js';
 import { makeTestDb, seedSettings } from '#lib/server/testDb.js';
@@ -46,6 +48,13 @@ afterEach(() => {
   delete process.env.EXTERNAL_IPV4;
 });
 
+/** A test database with the tenant settings row every running `api` has. */
+async function tenantDb(): Promise<Db> {
+  const db = await makeTestDb();
+  await seedSettings(db);
+  return db;
+}
+
 describe('system.info', () => {
   it("reports api's version and the one core reports, each on its own", async () => {
     process.env.ZAMFONO_VERSION = '0.0.5';
@@ -55,7 +64,7 @@ describe('system.info', () => {
     );
 
     expect(
-      await runOperation(await makeTestDb(), 'system.info', {}, asUser)
+      await runOperation(await tenantDb(), 'system.info', {}, asUser)
     ).toEqual({
       api: {
         version: '0.0.5',
@@ -74,7 +83,7 @@ describe('system.info', () => {
 
   it("dates api's start to this process's own, so a restart is visible", async () => {
     const out = (await runOperation(
-      await makeTestDb(),
+      await tenantDb(),
       'system.info',
       {},
       asUser
@@ -95,7 +104,7 @@ describe('system.info', () => {
     );
 
     expect(
-      await runOperation(await makeTestDb(), 'system.info', {}, asUser)
+      await runOperation(await tenantDb(), 'system.info', {}, asUser)
     ).toEqual({
       api: {
         version: 'dev',
@@ -125,6 +134,7 @@ describe('system.info', () => {
       update: () => Promise.reject(new Error('unused'))
     }));
     const db = await makeTestDb();
+    await seedSettings(db);
     expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
       update: status
     });
@@ -174,6 +184,7 @@ describe('system.info', () => {
 
   it('reports when and why the maintenance gate last gave up on each work (§6.4)', async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
     await db
       .insertInto('maintenanceGate')
       .values({
@@ -206,6 +217,7 @@ describe('system.info', () => {
 
   it("reports the stack's domain and the IPv4 address SIP and media use (§6.1)", async () => {
     const db = await makeTestDb();
+    await seedSettings(db);
     vi.stubEnv('FQDN', 'pbx.example.com');
     process.env.STACK_IPV4 = '203.0.113.34';
     process.env.EXTERNAL_IPV4 = '';
