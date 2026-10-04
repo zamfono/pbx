@@ -15,6 +15,8 @@ export type Channel = {
   caller: { number: string; name: string };
   connected: { number: string; name: string };
   dialplan: { context: string; exten: string };
+  /** When Asterisk created the channel, in its own timestamp format (`asteriskTimeMs`). */
+  creationtime: string;
   channelvars?: Record<string, string>;
 };
 

@@ -18,6 +18,7 @@ import {
   startHepCollector
 } from './boot.js';
 import { CallActions } from './calls/actions.js';
+import type { Pipeline } from './calls/pipeline.js';
 import { resyncOnReconnect } from './calls/reconnectResync.js';
 import { resyncOnBoot } from './calls/resync.js';
 import { TrunkState } from './calls/trunkState.js';
@@ -117,6 +118,23 @@ async function startLiveState(deps: {
 }
 
 /**
+ * The boot resync (§10.1 "Boot and restart"), then the one each later ARI connection runs. The boot
+ * resync runs once the ARI connection is up and the pipeline exists, so a channel the pipeline
+ * already handles is left alone, and before the internal server listens, so no action of `api`'s
+ * lands on a call the resync then interrupts.
+ */
+async function resyncCalls(deps: {
+  db: Db;
+  ari: AriClient;
+  pipeline: Pipeline;
+  log: Logger;
+  connectingSince: number;
+}): Promise<void> {
+  await resyncOnBoot({ ...deps, now: nowIso });
+  await resyncOnReconnect(deps.pipeline);
+}
+
+/**
  * Boots `core`: opens the database, connects ARI then AMI, starts the internal server and the
  * OOO/hours sweep. On any failure it closes both clients before rethrowing, so neither leaves a
  * reconnect timer running: an unclosed `AriClient`/`AmiClient` keeps Node's event loop alive on a
@@ -132,6 +150,7 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
   const ari = createAriClient(env, log);
   const ami = createAmiClient(env, log);
   reloadHepOnConnect(ari, env.hepEnabled, log);
+  const connectingSince = Date.now();
   try {
     await ari.connect();
     await ami.connect();
@@ -165,13 +184,8 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
       trunkState,
       presence
     });
-    // The boot resync (§10.1 "Boot and restart") runs once the ARI connection is up and the
-    // pipeline exists, so a channel the pipeline already handles is left alone, and before the
-    // internal server listens, so no action of `api`'s lands on a call the resync then interrupts.
     const actions = new CallActions(pipeline);
-    await resyncOnBoot({ db, ari, now: nowIso, pipeline, log });
-    // Every ARI connection after this first one: the calls whose channels went with it end.
-    await resyncOnReconnect(pipeline);
+    await resyncCalls({ db, ari, pipeline, log, connectingSince });
     const server = await startInternalServer(
       {
         db,

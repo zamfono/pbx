@@ -4,8 +4,9 @@
  * open is marked `interrupted`; a bridge with several parties keeps its media flowing and is torn
  * down as soon as one party leaves; a parked call, alone in its bridge, has a parker this process
  * never knew and is hung up now; and a voicemail file without its
- * `voicemails` row is deleted. A channel in no bridge is left to its own end: the party behind it
- * hangs up, or the originate that created it times out.
+ * `voicemails` row is deleted. A channel in no bridge that no call of this process holds (a party
+ * held out of its conversation, a menu caller, a voicemail depositor) has nothing left to drive it
+ * and is hung up.
  */
 import { readdir, unlink } from 'node:fs/promises';
 import path from 'node:path';
@@ -15,6 +16,7 @@ import { VOICEMAIL_SUBDIR, type Db } from '@zamfono/shared';
 import type { AriClient } from '../ari/client.js';
 import type { AriEvent } from '../ari/events.js';
 import { ignoreGone, logFailure } from '../ari/failures.js';
+import { asteriskTimeMs } from '../ari/restApi.js';
 import type { Logger } from '../ari/types.js';
 import { ignoreMissing } from '../fsFailures.js';
 import { PARKED_BRIDGE_NAME } from './parkingRingback.js';
@@ -26,10 +28,14 @@ type ResyncDeps = {
   db: Db;
   ari: AriClient;
   now: () => string;
-  // The pipeline whose calls arrive while the resync runs; a bridge holding a channel of one of
-  // its calls is that call's, not an orphan.
+  // The pipeline whose calls arrive while the resync runs; a channel of one of its calls, and a
+  // bridge holding one, is that call's, not an orphan.
   pipeline: Pipeline;
   log: Logger;
+  // When this process began opening its ARI connection, in milliseconds since the epoch. A
+  // channel created since enters the Stasis app over that connection, so its `StasisStart`
+  // reaches the pipeline: it is a call of this process however far its handling has come.
+  connectingSince: number;
 };
 
 type AdoptedBridge = { id: string; channels: Set<string> };
@@ -90,7 +96,7 @@ function watchBridges(ari: AriClient, bridges: AdoptedBridge[]): void {
   ari.on('event', onEvent);
 }
 
-type Adopted = { bridged: number; parked: number };
+type Adopted = { bridged: number; parked: number; unbridged: number };
 
 /**
  * Sorts the bridges Asterisk still holds into watched conversations and parked calls (§10.1 "Boot
@@ -99,13 +105,17 @@ type Adopted = { bridged: number; parked: number };
  * and ARI's bridge listing carries no parker, so a channel alone in a parked bridge, waiting in
  * the park or for the ring-back, is the parked call whose parker this process never knew. A
  * channel alone in any other bridge is one side of a conversation, such as the one who held the
- * other party (`hold.ts`), and is watched like the rest.
+ * other party (`hold.ts`), and is watched like the rest. A channel in no bridge, created before
+ * this process connected and not driven by the pipeline, is hung up.
  */
 async function adoptBridges(deps: ResyncDeps): Promise<Adopted> {
   const { ari } = deps;
-  const bridges = await ari.bridges.list();
+  const [bridges, channels] = await Promise.all([
+    ari.bridges.list(),
+    ari.channels.list()
+  ]);
   const handled = (channelId: string): boolean =>
-    deps.pipeline.callByChannel.has(channelId);
+    deps.pipeline.tracks(channelId);
   const watched: AdoptedBridge[] = [];
   const parked: AdoptedBridge[] = [];
   for (const bridge of bridges) {
@@ -119,9 +129,25 @@ async function adoptBridges(deps: ResyncDeps): Promise<Adopted> {
       watched.push(adopted);
     }
   }
-  await Promise.all(parked.map(bridge => tearDown(ari, bridge)));
+  const bridged = new Set(bridges.flatMap(bridge => bridge.channels));
+  const unbridged = channels
+    .filter(
+      channel =>
+        asteriskTimeMs(channel.creationtime) < deps.connectingSince &&
+        !bridged.has(channel.id) &&
+        !handled(channel.id)
+    )
+    .map(channel => channel.id);
+  await Promise.all([
+    ...parked.map(bridge => tearDown(ari, bridge)),
+    ...unbridged.map(id => ari.channels.hangup(id).catch(ignoreGone))
+  ]);
   watchBridges(ari, watched);
-  return { bridged: watched.length, parked: parked.length };
+  return {
+    bridged: watched.length,
+    parked: parked.length,
+    unbridged: unbridged.length
+  };
 }
 
 /** Deletes every `.wav` in the voicemail directory that no `voicemails` row names; returns the count. */

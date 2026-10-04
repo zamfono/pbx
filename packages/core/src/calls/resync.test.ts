@@ -19,6 +19,7 @@ import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { eventually } from '../testing/eventually.js';
 import { noopLogger } from '../testing/pipelineDeps.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
+import { newCall } from './call.js';
 import { PARKED_BRIDGE_NAME } from './parkingRingback.js';
 import type { Pipeline } from './pipeline.js';
 import { resyncOnBoot } from './resync.js';
@@ -46,6 +47,10 @@ async function seedOpenCall(
   return id;
 }
 
+// When the core began connecting; the fake's channels are created after it unless a test says.
+const CONNECTING_SINCE = Date.parse('2026-01-01T00:00:00.000Z');
+const BEFORE_CONNECTING = '2025-12-31T23:00:00.000+0000';
+
 describe('resyncOnBoot', () => {
   let rig: Rig;
   let db: Db;
@@ -62,6 +67,17 @@ describe('resyncOnBoot', () => {
     await rig.stop();
   });
 
+  function deps(): Parameters<typeof resyncOnBoot>[0] {
+    return {
+      db,
+      ari,
+      now: nowIso,
+      pipeline,
+      log: noopLogger,
+      connectingSince: CONNECTING_SINCE
+    };
+  }
+
   function hungUp(channelId: string): boolean {
     return fakeAri.calls.some(
       entry =>
@@ -75,18 +91,11 @@ describe('resyncOnBoot', () => {
     );
   }
 
-  it('marks a pre-existing channel call interrupted and leaves a channel in no bridge alone', async () => {
+  it('marks a pre-existing channel call interrupted', async () => {
     const answered = await seedOpenCall(db, 'answered');
     const placeholder = await seedOpenCall(db, 'interrupted');
-    const unbridged = fakeAri.addChannel({ name: 'PJSIP/e101-a-00000001' });
 
-    await resyncOnBoot({
-      db,
-      ari,
-      now: nowIso,
-      pipeline,
-      log: noopLogger
-    });
+    await resyncOnBoot(deps());
 
     const rows = await db
       .selectFrom('calls')
@@ -98,8 +107,40 @@ describe('resyncOnBoot', () => {
       expect(row.status).toBe('interrupted');
       expect(row.endedAt).not.toBeNull();
     }
-    // §10.1 lists no cleanup for it: a call arriving while the resync runs is not hung up.
-    expect(hungUp(unbridged.id)).toBe(false);
+  });
+
+  it('hangs up a channel in no bridge from before the connection that no call holds, and leaves the others alone', async () => {
+    // A party held out of its bridge, a menu caller or a voicemail depositor of the crashed core.
+    const orphan = fakeAri.addChannel({
+      name: 'PJSIP/e101-a-00000001',
+      creationtime: BEFORE_CONNECTING
+    });
+    // One a call of this process already drives.
+    const tracked = fakeAri.addChannel({
+      name: 'PJSIP/e102-a-00000002',
+      creationtime: BEFORE_CONNECTING
+    });
+    pipeline.callByChannel.set(
+      tracked.id,
+      newCall({
+        id: newId(),
+        direction: 'inbound',
+        callerChannelId: tracked.id,
+        from: '+15559999',
+        to: '102',
+        startedAt: nowIso(),
+        logLevel: 'events',
+        callLogMaxBytes: 1_048_576
+      })
+    );
+    // A call arriving while the resync runs, its `StasisStart` not handled yet.
+    const arriving = fakeAri.addChannel({ name: 'PJSIP/e103-a-00000003' });
+
+    await resyncOnBoot(deps());
+
+    expect(hungUp(orphan.id)).toBe(true);
+    expect(hungUp(tracked.id)).toBe(false);
+    expect(hungUp(arriving.id)).toBe(false);
   });
 
   it('keeps a two-party bridge up until one party leaves, then hangs up the rest and destroys it', async () => {
@@ -109,13 +150,7 @@ describe('resyncOnBoot', () => {
     await ari.bridges.addChannel(bridge.id, caller.id);
     await ari.bridges.addChannel(bridge.id, callee.id);
 
-    await resyncOnBoot({
-      db,
-      ari,
-      now: nowIso,
-      pipeline,
-      log: noopLogger
-    });
+    await resyncOnBoot(deps());
     expect(hungUp(caller.id)).toBe(false);
     expect(hungUp(callee.id)).toBe(false);
     expect(bridgeDestroyed(bridge.id)).toBe(false);
@@ -144,13 +179,7 @@ describe('resyncOnBoot', () => {
       });
       await ari.bridges.addChannel(bridge.id, parked.id);
 
-      await resyncOnBoot({
-        db,
-        ari,
-        now: nowIso,
-        pipeline,
-        log: noopLogger
-      });
+      await resyncOnBoot(deps());
 
       expect(hungUp(parked.id)).toBe(true);
       expect(bridgeDestroyed(bridge.id)).toBe(true);
@@ -162,13 +191,7 @@ describe('resyncOnBoot', () => {
     const bridge = await ari.bridges.create({ type: 'mixing' });
     await ari.bridges.addChannel(bridge.id, holder.id);
 
-    await resyncOnBoot({
-      db,
-      ari,
-      now: nowIso,
-      pipeline,
-      log: noopLogger
-    });
+    await resyncOnBoot(deps());
     expect(hungUp(holder.id)).toBe(false);
 
     fakeAri.emit({
@@ -207,13 +230,7 @@ describe('resyncOnBoot', () => {
       .execute();
 
     pipeline.deps.mediaDir = mediaDir;
-    await resyncOnBoot({
-      db,
-      ari,
-      now: nowIso,
-      pipeline,
-      log: noopLogger
-    });
+    await resyncOnBoot(deps());
 
     const remaining = await readdir(dir);
     expect(remaining.sort()).toEqual(['kept.wav', 'notes.txt']);

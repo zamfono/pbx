@@ -43,7 +43,8 @@ function destroyed(channelId: string): AriEvent {
       state: 'Down',
       caller: { number: '', name: '' },
       connected: { number: '', name: '' },
-      dialplan: { context: '', exten: '' }
+      dialplan: { context: '', exten: '' },
+      creationtime: ''
     },
     cause: AST_CAUSE_NETWORK_OUT_OF_ORDER,
     cause_txt: 'Network out of order'

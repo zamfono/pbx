@@ -95,18 +95,21 @@ function buildBridgesApi(rest: AriRequests): BridgesApi {
   };
 }
 
+/** An Asterisk timestamp (`2026-09-29T10:00:00.000+0000`, an offset without a colon) in
+ * milliseconds since the epoch; `NaN` when it is not one. */
+export function asteriskTimeMs(raw: string): number {
+  return Date.parse(
+    raw.replace(/(?<hours>[+-]\d{2})(?<minutes>\d{2})$/u, '$<hours>:$<minutes>')
+  );
+}
+
 /**
- * Asterisk's `startup_time` (`2026-09-29T10:00:00.000+0000`, an offset without a colon) as ISO
- * 8601 UTC; anything else is an error, since a start time nobody can compare says nothing.
+ * Asterisk's `startup_time` as ISO 8601 UTC; anything else is an error, since a start time nobody
+ * can compare says nothing.
  */
 export function isoStartupTime(raw: unknown): string {
   if (typeof raw === 'string') {
-    const parsed = Date.parse(
-      raw.replace(
-        /(?<hours>[+-]\d{2})(?<minutes>\d{2})$/u,
-        '$<hours>:$<minutes>'
-      )
-    );
+    const parsed = asteriskTimeMs(raw);
     if (!Number.isNaN(parsed)) {
       return new Date(parsed).toISOString();
     }

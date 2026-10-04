@@ -19,6 +19,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §11.2 Schema.** Product-owner decision (D34): asked how an expired but unrevoked personal access token's name is freed, the user chose "Free the name (Recommended)". Creating a token first revokes the user's expired token of that name in the same transaction; §5.2 ("unique among the user's live tokens") stays.
 *Why:* the unique index covers unrevoked tokens, so an expired token held its name until the daily purge.
+**2026-10-04 · §10.1 Boot and restart.** The restarted core also hangs up every channel in no bridge that none of its calls holds (a held party, a menu caller, a voicemail depositor).
+*Why:* nothing drives such a channel after a crash, so a held party heard hold music, and a menu or mailbox caller silence, until they hung up themselves.
+
 **2026-10-04 · §10.1 Boot and restart.** An ARI connection that reopens under a running core ends each channel of its calls, parking slots and trunks that Asterisk no longer holds as if its `ChannelDestroyed` had arrived, a call left with none of its channels as `interrupted`, and after a new Asterisk start turns the lamps to `NOT_INUSE` as at boot.
 *Why:* the section covered only a restart of the core; channels that went with a restarted Asterisk send no `ChannelDestroyed`, so their calls stayed live (open row, busy presence, counted trunk channels) until the core restarted.
 

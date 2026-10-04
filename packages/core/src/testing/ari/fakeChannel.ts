@@ -147,6 +147,8 @@ export function defaultChannel(overrides: Partial<Channel>): Channel {
     caller: overrides.caller ?? { number: '', name: '' },
     connected: overrides.connected ?? { number: '', name: '' },
     dialplan: overrides.dialplan ?? { context: '', exten: '' },
+    creationtime:
+      overrides.creationtime ?? new Date().toISOString().replace('Z', '+0000'),
     channelvars: overrides.channelvars
   };
 }

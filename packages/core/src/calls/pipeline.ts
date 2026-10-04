@@ -95,6 +95,16 @@ export class Pipeline {
     }));
   }
 
+  /** Whether a call of this process holds `channelId`, or an event on it is being handled. */
+  tracks(channelId: string): boolean {
+    return (
+      this.callByChannel.has(channelId) ||
+      [...this.handlingInProgress.values()].some(
+        ev => ev.channel?.id === channelId
+      )
+    );
+  }
+
   /** Resolves once no event's handling nor call's wind-down is in progress, those that start
    * while it waits included. */
   async idle(): Promise<void> {
