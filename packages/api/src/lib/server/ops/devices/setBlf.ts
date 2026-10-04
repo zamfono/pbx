@@ -2,16 +2,14 @@ import type { Transaction } from 'kysely';
 import { z } from 'zod';
 
 import {
-  HTTP_BAD_GATEWAY,
   HTTP_NOT_FOUND,
   HTTP_UNPROCESSABLE_CONTENT,
   type DB
 } from '@zamfono/shared';
 
-import { activeRingotelProvider } from '#lib/server/provisioning/index.js';
-
 import { recordChange } from '../audit.js';
 import { defineOperation, OpError } from '../types.js';
+import { pushToRingotel } from './_ringotelPush.js';
 import { liveDevice, ownTlsDevice } from './_shared.js';
 
 const inputSchema = z
@@ -55,7 +53,7 @@ export const setBlf = defineOperation({
   description: "Replaces a ringotel device's BLF panel as a whole.",
   input: inputSchema,
   output: z.object({ id: z.string(), keys: z.array(z.string()) }),
-  problems: [HTTP_NOT_FOUND, HTTP_BAD_GATEWAY],
+  problems: [HTTP_NOT_FOUND],
   minRole: 'user',
   scope: ownTlsDevice,
   entity: input => ({ kind: 'device', id: input.id }),
@@ -96,8 +94,18 @@ export const setBlf = defineOperation({
       from: before.map(row => row.ext),
       to: input.keys
     });
-    const provider = await activeRingotelProvider(ctx.db);
-    await provider?.onDeviceBlfChanged?.(device, input.keys);
+    pushToRingotel(ctx, {
+      trigger: 'devices.setBlf',
+      deviceId: input.id,
+      push: async provider => {
+        await provider.onDeviceBlfChanged?.(device, input.keys);
+        return null;
+      },
+      failure: {
+        what: `device ${input.id}'s BLF panel is stored`,
+        retry: 'setting the panel again retries it'
+      }
+    });
     return { id: input.id, keys: input.keys };
   }
 });
