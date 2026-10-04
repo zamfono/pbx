@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
-import { isE164, newId, normalizeInbound } from '@zamfono/shared';
+import { newId, normalizeInbound } from '@zamfono/shared';
 
-import { recordChange } from '../audit.js';
 import { createTarget } from '../forwardTargets.js';
 import { targetSpecSchema, type TargetSpec } from '../forwardTargetSchema.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { propagate } from '../propagate.js';
-import { defineOperation, type Context } from '../types.js';
+import { defineOperation } from '../types.js';
+import { setCallerIdIfUnset } from './_callerId.js';
 
 const inputSchema = z
   .object({
@@ -32,32 +32,6 @@ type CreateOutput = {
   target: TargetSpec;
   createdAt: string;
 };
-
-/**
- * Sets a user's caller-ID DID the first time they receive one (§9.4 "Caller-ID"): a user target
- * that so far presents no number of their own gets this DID as `users.callerid_did_id`.
- */
-async function setCallerIdIfUnset(
-  ctx: Context,
-  userId: string,
-  didId: string,
-  number: string
-): Promise<void> {
-  const user = await ctx.db
-    .selectFrom('users')
-    .select('calleridDidId')
-    .where('id', '=', userId)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (user?.calleridDidId === null && isE164(number)) {
-    await ctx.db
-      .updateTable('users')
-      .set({ calleridDidId: didId })
-      .where('id', '=', userId)
-      .execute();
-    recordChange(ctx, { field: 'callerIdDidId', from: null, to: didId });
-  }
-}
 
 /** `POST /dids` (§10.3 "Extensions & DIDs", §11.3): a DID and the forward target it dials to. */
 export const create = defineOperation({

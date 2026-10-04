@@ -7,11 +7,14 @@ import { resolveTarget } from '../forwardTargetSpec.js';
 import { propagate } from '../propagate.js';
 import { liveRow } from '../rows.js';
 import { defineOperation } from '../types.js';
+import { setCallerIdIfUnset } from './_callerId.js';
 
 const inputSchema = z
   .object({
     id: z.string(),
-    target: targetSpecSchema.describe('Where a call to this number goes.')
+    target: targetSpecSchema.describe(
+      'Where a call to this number goes; a numeric DID for a user with no caller ID of their own becomes it.'
+    )
   })
   .strict();
 
@@ -36,8 +39,11 @@ export const update = defineOperation({
       .where('id', '=', input.id)
       .execute();
     // The diff names this operation's own input field and carries the wire target, so `audit.undo`
-    // replays it straight back through `dids.update` (§5.8).
+    // replays it straight back through `dids.update` (§5.8, `revertDidUpdate`).
     recordChange(ctx, { field: 'target', from: before, to: input.target });
+    if (input.target.kind === 'user') {
+      await setCallerIdIfUnset(ctx, input.target.userId, did.id, did.number);
+    }
     // Read by the routing pipeline (§3.1), and nothing in it reaches Asterisk's own
     // configuration, so this drops `core`'s config cache without a reload.
     propagate(ctx, []);

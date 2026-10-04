@@ -9,9 +9,7 @@ import { Conflict, defineOperation, OpError, type Context } from '../types.js';
 import { isTenantListOperation, revertTenantList } from './_listReverts.js';
 import { ENTITY_TABLES, parseChanges, type ChangeEntry } from './_shared.js';
 import { refuseUniqueViolation } from './_uniqueViolation.js';
-import { revertCreation, revertEntry } from './revert.js';
-
-const CREATE_SUFFIX = '.create';
+import { revertEntry } from './revert.js';
 
 /**
  * One `audit_log` row as `loadUndoableEntry` resolves it; `entityId` is `null` only for a
@@ -165,8 +163,6 @@ export const undo = defineOperation({
     await refuseUniqueViolation(async () => {
       if (entityId === null) {
         await revertTenantList(ctx, entry.operation, changes);
-      } else if (entry.operation.endsWith(CREATE_SUFFIX)) {
-        await revertCreation(ctx, entry.entityKind, entityId);
       } else {
         const rowEntry = { ...entry, entityId };
         await assertRowNotPurged(ctx, rowEntry, changes);

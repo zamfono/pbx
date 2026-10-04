@@ -1,5 +1,6 @@
 import { HTTP_CONFLICT } from '@zamfono/shared';
 
+import { revertDidCreate, revertDidUpdate } from '../dids/revert.js';
 import { revertHoursSet } from '../hours/revert.js';
 import { revertMailTemplate } from '../mailTemplates/revert.js';
 import { revertParkingSet } from '../parking/revert.js';
@@ -16,6 +17,8 @@ import {
 import { LIST_REVERTS, type EntryRevert } from './_listReverts.js';
 import type { ChangeEntry } from './_shared.js';
 import { restoreProvisionedDevices } from './restoreProvisioning.js';
+
+const CREATE_SUFFIX = '.create';
 
 /**
  * `<entityKind>.update`, the operation a plain field change replays through (§5.8, §10.3
@@ -48,10 +51,12 @@ const FIELD_UPDATE_OPERATIONS: Partial<Record<string, string>> = {
 const SINGLETON_UPDATE_KINDS = new Set(['settings']);
 
 /**
- * Operations whose recorded fields are parts of one whole replace and go back together, through
- * the operation that wrote them, rather than field by field (§5.8).
+ * Operations whose recorded fields go back together, through the operation's own reverter: parts
+ * of one whole replace, or a DID write whose caller-ID side effect goes with it (§5.8).
  */
 const WHOLE_ENTRY_REVERTS: Partial<Record<string, EntryRevert>> = {
+  'dids.create': revertDidCreate,
+  'dids.update': revertDidUpdate,
   'hours.set': revertHoursSet,
   'parking.set': revertParkingSet,
   'mailTemplates.put': revertMailTemplate,
@@ -89,7 +94,7 @@ const CREATION_DELETE_OPERATIONS: Partial<Record<string, string>> = {
  * `delete` operation, so the usual cascades (devices, extension, tokens, §5.9) apply the same way
  * a normal delete would (§5.8).
  */
-export async function revertCreation(
+async function revertCreation(
   ctx: Context,
   entityKind: string,
   entityId: string
@@ -131,8 +136,8 @@ async function revertField(
 
 /**
  * Reverts one recorded field change, by the field-name conventions every delete cascade shares.
- * A creation entry (every recorded `from` is `null`) is not replayed field by field; `undo.ts`
- * routes it through `revertCreation` instead, before ever calling this function.
+ * A creation entry (every recorded `from` is `null`) is not replayed field by field; `revertEntry`
+ * routes it through `revertCreation` instead.
  */
 async function revertChange(
   ctx: Context,
@@ -165,8 +170,9 @@ async function revertChange(
 }
 
 /**
- * Reverts one recorded entry that is not a creation (§5.8): through the reverter its operation
- * brings, where the entry's fields are parts of one replace, and field by field otherwise.
+ * Reverts one recorded entry (§5.8): through the reverter its operation brings, where the entry's
+ * fields are parts of one replace or its undo needs more than the plain delete; a creation through
+ * the entity's `delete`; any other entry field by field.
  */
 export async function revertEntry(
   ctx: Context,
@@ -176,6 +182,10 @@ export async function revertEntry(
   const wholeEntry = WHOLE_ENTRY_REVERTS[entry.operation];
   if (wholeEntry) {
     await wholeEntry(ctx, entry.entityId, changes);
+    return;
+  }
+  if (entry.operation.endsWith(CREATE_SUFFIX)) {
+    await revertCreation(ctx, entry.entityKind, entry.entityId);
     return;
   }
   for (const change of changes) {

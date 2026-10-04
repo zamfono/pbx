@@ -224,6 +224,11 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- Undoing the creation of a DID that had become a user's caller ID was refused with 409, since
+  the user still presented it; the undo now gives the user back no caller ID of their own, then
+  deletes the DID. Pointing an existing DID at a user who presents no number of their own now
+  makes it their caller ID, as creating the DID for them does, and undoing that change takes it
+  back.
 - An open `/events` socket kept the role, and the ring groups, its user had when it connected: a
   demoted or deleted admin went on receiving every event of the tenant until they disconnected.
   After every write the server now checks each socket again: one whose user was deleted or holds
