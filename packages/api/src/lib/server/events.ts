@@ -19,6 +19,7 @@ import { livePersonalAccessTokenIds } from './auth/personalAccessTokens.js';
 import { liveSessionIds } from './auth/tokens.js';
 import type { Actor } from './ops/types.js';
 import { ringGroupMemberships } from './ringGroupMembership.js';
+import { serialQueue } from './serialQueue.js';
 
 const RING_GROUP_MAILBOX_PREFIX = 'ringGroup:';
 const USER_MAILBOX_PREFIX = 'user:';
@@ -67,18 +68,9 @@ const USER_CHANGED_CLOSE_CODE = 4401;
 // The longest delay `setTimeout` takes; a later expiry is re-checked then and scheduled again.
 const MAX_TIMER_MS = 2_147_483_647;
 
-/**
- * The ring group ids each user, or only `userId`, may see mailbox events for (§5.3,
- * `ringGroupMemberships`).
- */
-async function ringGroupIdsByUser(
-  db: Db,
-  userId?: string
-): Promise<Map<string, Set<string>>> {
-  const rows = await ringGroupMemberships(
-    db,
-    userId === undefined ? undefined : { userId }
-  );
+/** The ring group ids each user may see mailbox events for (§5.3, `ringGroupMemberships`). */
+async function ringGroupIdsByUser(db: Db): Promise<Map<string, Set<string>>> {
+  const rows = await ringGroupMemberships(db);
   const byUser = new Map<string, Set<string>>();
   for (const row of rows) {
     const ids = byUser.get(row.userId) ?? new Set<string>();
@@ -127,6 +119,8 @@ export class EventHub {
   private readonly subscribers = new Map<WebSocket, Subscription>();
   /** Runs the re-check when the earliest personal access token of an open socket expires. */
   private expiryTimer: NodeJS.Timeout | undefined;
+  /** Runs one re-check at a time, each on rows read after the one before it applied. */
+  private readonly inTurn = serialQueue();
 
   constructor(db: Db) {
     this.db = db;
@@ -144,12 +138,11 @@ export class EventHub {
 
   /**
    * Registers a socket the handshake authenticated as `auth`, with its session or personal access
-   * token; removes it on close or error.
+   * token, then re-checks it as `usersChanged` does, so a change committed since the handshake
+   * reaches it; removes it on close or error.
    */
-  async subscribeWs(socket: WebSocket, auth: Authenticated): Promise<void> {
-    const byUser = await ringGroupIdsByUser(this.db, auth.actor.id);
-    this.subscribers.set(socket, subscription(auth, byUser));
-    this.scheduleExpiry();
+  subscribeWs(socket: WebSocket, auth: Authenticated): Promise<void> {
+    this.subscribers.set(socket, { auth, ringGroupIds: new Set<string>() });
     socket.on('close', () => {
       this.subscribers.delete(socket);
     });
@@ -157,6 +150,7 @@ export class EventHub {
       this.subscribers.delete(socket);
       socket.terminate();
     });
+    return this.usersChanged();
   }
 
   /**
@@ -164,9 +158,14 @@ export class EventHub {
    * every open socket (§10.6): closes with 4401 a socket whose user is gone or holds another role
    * than at its handshake, or whose session or personal access token was revoked or has expired,
    * and narrows or widens the rest to their current ring groups. Runs after every committed write
-   * and every session revocation, and when the earliest token of an open socket expires.
+   * and every session revocation, when a socket registers, and when the earliest token of an open
+   * socket expires; one at a time, so an earlier re-check never overrides a later one.
    */
-  async usersChanged(): Promise<void> {
+  usersChanged(): Promise<void> {
+    return this.inTurn(() => this.recheck());
+  }
+
+  private async recheck(): Promise<void> {
     const open = [...this.subscribers];
     if (open.length === 0) {
       return;

@@ -63,6 +63,8 @@ async function migratedDb(userId: string): Promise<Db> {
   return db;
 }
 
+const U1: Actor = { id: 'u1', name: 'A User', role: 'user' };
+
 /** A session of `u1` with an OAuth client, as the token endpoint starts it on a login. */
 async function seedSession(db: Db): Promise<IssuedRefresh> {
   await db
@@ -309,13 +311,12 @@ describe('EventHub', () => {
   it('delivers to a user only what visibleTo admits', async () => {
     const db = await migratedDb('u1');
     const hub = new EventHub(db);
+    const { sessionId } = await seedSession(db);
     wss = await listeningServer();
     const subscribed = new Promise<void>(resolve => {
       wss.once('connection', socket => {
         hub
-          .subscribeWs(socket, {
-            actor: { id: 'u1', name: 'A User', role: 'user' }
-          })
+          .subscribeWs(socket, { actor: U1, sessionId })
           .then(resolve, resolve);
       });
     });
@@ -369,13 +370,12 @@ describe('EventHub', () => {
   it('delivers a user the call.state of a call they placed, in the §10.6 shape', async () => {
     const db = await migratedDb('u1');
     const hub = new EventHub(db);
+    const { sessionId } = await seedSession(db);
     wss = await listeningServer();
     const subscribed = new Promise<void>(resolve => {
       wss.once('connection', socket => {
         hub
-          .subscribeWs(socket, {
-            actor: { id: 'u1', name: 'A User', role: 'user' }
-          })
+          .subscribeWs(socket, { actor: U1, sessionId })
           .then(resolve, resolve);
       });
     });
@@ -430,13 +430,12 @@ describe('EventHub', () => {
       .values({ groupId: 'g1', userId: 'u1', position: 0 })
       .execute();
     const hub = new EventHub(db);
+    const { sessionId } = await seedSession(db);
     wss = await listeningServer();
     const subscribed = new Promise<void>(resolve => {
       wss.once('connection', socket => {
         hub
-          .subscribeWs(socket, {
-            actor: { id: 'u1', name: 'A User', role: 'user' }
-          })
+          .subscribeWs(socket, { actor: U1, sessionId })
           .then(resolve, resolve);
       });
     });
@@ -496,13 +495,12 @@ describe('EventHub', () => {
       .values({ groupId: 'g1', userGroupId: 'parent', position: 0 })
       .execute();
     const hub = new EventHub(db);
+    const { sessionId } = await seedSession(db);
     wss = await listeningServer();
     const subscribed = new Promise<void>(resolve => {
       wss.once('connection', socket => {
         hub
-          .subscribeWs(socket, {
-            actor: { id: 'u1', name: 'A User', role: 'user' }
-          })
+          .subscribeWs(socket, { actor: U1, sessionId })
           .then(resolve, resolve);
       });
     });
@@ -571,8 +569,6 @@ describe('EventHub.usersChanged (§10.6)', () => {
       });
     });
   }
-
-  const U1: Actor = { id: 'u1', name: 'A User', role: 'user' };
 
   /** `u1` on a live session, as an access token's handshake hands it to the hub. */
   async function sessionAuth(
@@ -752,5 +748,45 @@ describe('EventHub.usersChanged (§10.6)', () => {
 
     expect(await closeCode(client)).toBe(USER_CHANGED_CLOSE_CODE);
     expect(Date.now()).toBeGreaterThanOrEqual(Date.parse(expiresAt));
+  });
+
+  it('closes with 4401 a socket whose session was revoked while the hub was taking it on', async () => {
+    const db = await migratedDb('u1');
+    const hub = new EventHub(db);
+    // The handshake found the session live; its revocation commits right after.
+    const auth = await sessionAuth(db);
+    await db
+      .updateTable('tokens')
+      .set({ revokedAt: nowIso() })
+      .where('sessionId', '=', auth.sessionId ?? '')
+      .execute();
+    wss = await listeningServer();
+    const subscribed = new Promise<void>(resolve => {
+      wss.once('connection', socket => {
+        // The revocation's re-check runs while the hub reads the user's ring groups.
+        Promise.all([hub.subscribeWs(socket, auth), hub.usersChanged()]).then(
+          () => {
+            resolve();
+          },
+          () => {
+            resolve();
+          }
+        );
+      });
+    });
+    const client = new WebSocket(serverUrl(wss));
+    const closed = Promise.race([
+      closeCode(client),
+      new Promise<null>(resolve => {
+        setTimeout(() => {
+          resolve(null);
+        }, 500);
+      })
+    ]);
+    await subscribed;
+    const code = await closed;
+    client.terminate();
+
+    expect(code).toBe(USER_CHANGED_CLOSE_CODE);
   });
 });
