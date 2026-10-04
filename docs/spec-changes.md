@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-04 · §5.4.** The cipher is named by its libsodium API, `crypto_aead_xchacha20poly1305_ietf`. `api` refuses to start when `SECRETBOX_KEY` and `SECRETBOX_KEY_PREVIOUS` carry the same generation; the new key is `<N+1>:<base64 of 32 random bytes>`; `m` in the sweep's log line, and `/healthz`, count the blobs the current key cannot decrypt.
+*Why:* equal generations were accepted and made every old blob unreadable, the procedure never said the generation must rise, and `/healthz` counted only version bytes, so it reported 0 where the sweep reported unreadable secrets; libsodium's secretbox is XSalsa20-Poly1305, not the construction in use.
+
 **2026-10-03 · §6.3 compose.yaml.** The `migrate` service gets no `DB_FILE`: `/data/zamfono.sqlite3` is its own default, as it is `api`'s and `core`'s.
 *Why:* product-owner decision on internal values: "sensible defaults" in code; compose repeated the path for `migrate` alone.
 

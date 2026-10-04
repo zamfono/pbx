@@ -76,4 +76,15 @@ describe('secretbox', () => {
       ).toThrow('secretbox: malformed SECRETBOX_KEY');
     }
   });
+
+  it("refuses a previous key with the current key's generation", () => {
+    expect(() =>
+      keyringFromEnv({
+        SECRETBOX_KEY: keySpec(1),
+        SECRETBOX_KEY_PREVIOUS: keySpec(1)
+      })
+    ).toThrow(
+      'secretbox: SECRETBOX_KEY_PREVIOUS has the generation of SECRETBOX_KEY'
+    );
+  });
 });

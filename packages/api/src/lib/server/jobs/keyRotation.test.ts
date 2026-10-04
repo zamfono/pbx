@@ -7,7 +7,7 @@ import { type Db } from '@zamfono/shared';
 import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { decrypt, encrypt, keyringFromEnv } from '../secretbox.js';
-import { reencryptSweep } from './keyRotation.js';
+import { countKeyRotationRemaining, reencryptSweep } from './keyRotation.js';
 
 const KEY_BYTE_LENGTH = 32;
 const CREATED_AT = '2026-01-01T00:00:00.000Z';
@@ -108,5 +108,44 @@ describe('reencryptSweep', () => {
 
     const result = await reencryptSweep(db, currentRing, silentLog);
     expect(result).toEqual({ reencrypted: 0, remaining: 1 });
+  });
+});
+
+describe('countKeyRotationRemaining', () => {
+  it('counts zero when every blob decrypts under the current key', async () => {
+    const db = await migratedDb();
+    const kr = keyringFromEnv({ SECRETBOX_KEY: keySpec(1) });
+    await insertWebhook(db, 'wh1', encrypt(kr, 'shh'));
+    await expect(countKeyRotationRemaining(db, kr)).resolves.toBe(0);
+  });
+
+  it('counts a blob on the previous generation until the sweep re-encrypts it', async () => {
+    const db = await migratedDb();
+    const previousSpec = keySpec(1);
+    await insertWebhook(
+      db,
+      'wh2',
+      encrypt(keyringFromEnv({ SECRETBOX_KEY: previousSpec }), 'shh')
+    );
+    const kr = keyringFromEnv({
+      SECRETBOX_KEY: keySpec(2),
+      SECRETBOX_KEY_PREVIOUS: previousSpec
+    });
+    await expect(countKeyRotationRemaining(db, kr)).resolves.toBe(1);
+    await reencryptSweep(db, kr, silentLog);
+    await expect(countKeyRotationRemaining(db, kr)).resolves.toBe(0);
+  });
+
+  it('agrees with the sweep on a blob whose generation byte is current but whose key is not', async () => {
+    const db = await migratedDb();
+    await insertWebhook(
+      db,
+      'wh3',
+      encrypt(keyringFromEnv({ SECRETBOX_KEY: keySpec(1) }), 'lost')
+    );
+    const kr = keyringFromEnv({ SECRETBOX_KEY: keySpec(1) });
+    const { remaining } = await reencryptSweep(db, kr, silentLog);
+    expect(remaining).toBe(1);
+    await expect(countKeyRotationRemaining(db, kr)).resolves.toBe(remaining);
   });
 });

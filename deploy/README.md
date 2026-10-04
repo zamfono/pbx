@@ -244,6 +244,17 @@ with it set, the stack backs up every night to the `backups` volume on this host
 start. That covers a broken database or a bad upgrade, not a lost host: add a target elsewhere
 (`backups.targets.create`) before you rely on the stack.
 
+**Rotating `SECRETBOX_KEY`** later is a redeploy. Move the current value to
+`SECRETBOX_KEY_PREVIOUS` and generate the new key one generation higher, `2:` after `1:`:
+
+```bash
+printf '2:%s' "$(openssl rand -base64 32)"    # the new SECRETBOX_KEY
+```
+
+Run `docker compose up -d`, wait for `api`'s log line `key rotation: {n} re-encrypted, 0 remaining`
+(`/healthz` reports the same count as `keyRotationRemaining`), then empty `SECRETBOX_KEY_PREVIOUS`.
+`api` refuses to start while both keys carry the same generation.
+
 Fill in `FQDN`, `COMPANY_NAME`, `MAIN_DID`, `COUNTRY`, `BOOTSTRAP_OWNER_EMAIL`,
 `BOOTSTRAP_OWNER_NAME`, `CONTAINER_SOCKET` (`/var/run/docker.sock`, or `/run/podman/podman.sock`
 on Podman) and, if you have one, the mail relay (`SMTP_*`, `MAIL_FROM`). The comments in

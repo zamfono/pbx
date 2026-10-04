@@ -196,11 +196,11 @@ Every operation (§10.3) performs its own RBAC check, so REST, MCP, undo and UI 
 
 ### 5.4 Secrets
 
-All stored secrets are encrypted at rest with libsodium secretbox (XChaCha20-Poly1305) under `SECRETBOX_KEY` from `.env`: SIP passwords and every `*_enc` column in `trunks`, `webhooks`, `backup_targets` and `settings`, and the dynamic OAuth client ids (§5.2). Every blob is `version(1 byte) || nonce(24) || ciphertext`; the version byte is a generation counter that names the key the blob was written with.
+All stored secrets are encrypted at rest with libsodium's XChaCha20-Poly1305 IETF AEAD (`crypto_aead_xchacha20poly1305_ietf`) under `SECRETBOX_KEY` from `.env`: SIP passwords and every `*_enc` column in `trunks`, `webhooks`, `backup_targets` and `settings`, and the dynamic OAuth client ids (§5.2). Every blob is `version(1 byte) || nonce(24) || ciphertext`; the version byte is a generation counter that names the key the blob was written with.
 
-**Key rotation** is a redeploy, never a command. `.env` holds `SECRETBOX_KEY` (generation N) and, during a rotation, `SECRETBOX_KEY_PREVIOUS` (generation N−1); a read decrypts with the key its version byte names, and a byte matching neither is refused. At boot, before it serves a request, `api` sweeps every `*_enc` column and re-encrypts each blob still on the previous generation under the current key, then logs `key rotation: {n} re-encrypted, {m} remaining`; a non-zero `m` is a secret nobody can read and is reported by `/healthz`. The procedure:
+**Key rotation** is a redeploy, never a command. `.env` holds `SECRETBOX_KEY` (generation N) and, during a rotation, `SECRETBOX_KEY_PREVIOUS` (generation N−1); a read decrypts with the key its version byte names, and a byte matching neither is refused. `api` refuses to start when both keys carry the same generation. At boot, before it serves a request, `api` sweeps every `*_enc` column and re-encrypts each blob still on the previous generation under the current key, then logs `key rotation: {n} re-encrypted, {m} remaining`; `m` counts the blobs the current key cannot decrypt, a non-zero `m` after the sweep is a secret nobody can read, and `/healthz` reports the same count. The procedure:
 
-1. generate the new key into `SECRETBOX_KEY` and move the old value to `SECRETBOX_KEY_PREVIOUS`;
+1. move the old value to `SECRETBOX_KEY_PREVIOUS` and generate the new key into `SECRETBOX_KEY` as `<N+1>:<base64 of 32 random bytes>`, one generation above the old one;
 2. `docker compose up -d`;
 3. confirm the log line reports 0 remaining;
 4. remove `SECRETBOX_KEY_PREVIOUS`.

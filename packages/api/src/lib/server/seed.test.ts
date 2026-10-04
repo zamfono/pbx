@@ -2,7 +2,6 @@ import { randomBytes } from 'node:crypto';
 import { access, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { sql } from 'kysely';
 import pino from 'pino';
 import {
   afterAll,
@@ -17,13 +16,9 @@ import {
 import { HTTP_OK, HTTP_SERVICE_UNAVAILABLE, openDb } from '@zamfono/shared';
 import { migratedTestDb, MIGRATIONS_DIR } from '@zamfono/shared/testDb.js';
 
-import {
-  apiHealth,
-  countKeyRotationRemaining,
-  healthStatus
-} from './health.js';
+import { apiHealth, healthStatus } from './health.js';
 import { sendMail } from './mail/index.js';
-import { decrypt, encrypt, keyringFromEnv, type Keyring } from './secretbox.js';
+import { decrypt, keyringFromEnv, type Keyring } from './secretbox.js';
 import { seedIfEmpty, UNSET_PASSWORD_HASH_PREFIX } from './seed.js';
 import type { SeedEnv } from './seedEnv.js';
 import {
@@ -635,36 +630,5 @@ describe('apiHealth', () => {
     });
     expect(health.ok).toBe(true);
     expect(healthStatus(health)).toBe(HTTP_OK);
-  });
-});
-
-describe('countKeyRotationRemaining', () => {
-  it('counts zero when every *_enc blob matches the current generation', async () => {
-    const db = await migratedTestDb();
-    const kr = testKeyring();
-    await sql`
-      INSERT INTO webhooks (id, url, secret_enc, created_at)
-      VALUES ('wh1', 'https://example.test/hook', ${encrypt(kr, 'shh')}, '2026-01-01T00:00:00.000Z')
-    `.execute(db);
-    await expect(countKeyRotationRemaining(db, kr)).resolves.toBe(0);
-  });
-
-  it('counts a blob written under a previous key generation as remaining (§5.4)', async () => {
-    const db = await migratedTestDb();
-    const previousGenerationKeyring = keyringFromEnv({
-      SECRETBOX_KEY: `1:${randomBytes(KEY_BYTES).toString('base64')}`
-    });
-    const staleBlob = encrypt(previousGenerationKeyring, 'stuck');
-    await sql`
-      INSERT INTO webhooks (id, url, secret_enc, created_at)
-      VALUES ('wh2', 'https://example.test/hook', ${staleBlob}, '2026-01-01T00:00:00.000Z')
-    `.execute(db);
-    const currentKeyring = keyringFromEnv({
-      SECRETBOX_KEY: `2:${randomBytes(KEY_BYTES).toString('base64')}`,
-      SECRETBOX_KEY_PREVIOUS: `1:${randomBytes(KEY_BYTES).toString('base64')}`
-    });
-    await expect(countKeyRotationRemaining(db, currentKeyring)).resolves.toBe(
-      1
-    );
   });
 });

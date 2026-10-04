@@ -1,26 +1,63 @@
-import { sql } from 'kysely';
 import type { Logger } from 'pino';
 
-import type { Db } from '@zamfono/shared';
+import type { DB, Db } from '@zamfono/shared';
 
 import { decrypt, encrypt, type Keyring } from '../secretbox.js';
 
+type EncTable =
+  'backupTargets' | 'devices' | 'settings' | 'trunks' | 'webhooks';
+type EncColumn<T extends EncTable> = Extract<keyof DB[T], `${string}Enc`>;
+type AnyEncColumn = { [T in EncTable]: EncColumn<T> }[EncTable];
+
 // §5.4: every `*_enc` column the boot sweep re-encrypts, by table.
-export const ENC_COLUMNS: Record<string, readonly string[]> = {
-  devices: ['sip_password_enc'],
-  trunks: ['password_enc'],
-  webhooks: ['secret_enc'],
-  backup_targets: ['secret_enc'],
-  settings: [
-    'smtp_password_enc',
-    'sso_client_secret_enc',
-    'ringotel_api_token_enc'
-  ]
+const ENC_COLUMNS: readonly {
+  [T in EncTable]: { table: T; columns: readonly EncColumn<T>[] };
+}[EncTable][] = [
+  { table: 'backupTargets', columns: ['secretEnc'] },
+  { table: 'devices', columns: ['sipPasswordEnc'] },
+  {
+    table: 'settings',
+    columns: ['ringotelApiTokenEnc', 'smtpPasswordEnc', 'ssoClientSecretEnc']
+  },
+  { table: 'trunks', columns: ['passwordEnc'] },
+  { table: 'webhooks', columns: ['secretEnc'] }
+];
+
+/** One stored blob and the row and column it lives in. */
+type EncBlob = {
+  table: EncTable;
+  column: AnyEncColumn;
+  id: string | number | null;
+  blob: Buffer;
 };
 
-type SweepResult = { reencrypted: number; remaining: number };
+/** Every non-null blob in `table.column`. */
+async function readColumn(
+  db: Db,
+  table: EncTable,
+  column: AnyEncColumn
+): Promise<EncBlob[]> {
+  const ref = db.dynamic.ref<AnyEncColumn>(column);
+  const rows = await db
+    .selectFrom(table)
+    .select(['id', ref])
+    .where(ref, 'is not', null)
+    .execute();
+  return rows.flatMap(row => {
+    const blob = row[column];
+    return blob ? [{ table, column, id: row.id, blob }] : [];
+  });
+}
 
-/** Decrypts `blob`, or `null` when its key generation is unreadable by `kr`. */
+/** Every non-null blob in every `*_enc` column (§5.4). */
+async function readEncBlobs(db: Db): Promise<EncBlob[]> {
+  const columns = ENC_COLUMNS.flatMap(({ table, columns: names }) =>
+    names.map(column => readColumn(db, table, column))
+  );
+  return (await Promise.all(columns)).flat();
+}
+
+/** `blob`'s plaintext, or `null` when the keyring cannot decrypt it. */
 function tryDecrypt(kr: Keyring, blob: Buffer): Buffer | null {
   try {
     return decrypt(kr, blob);
@@ -30,67 +67,56 @@ function tryDecrypt(kr: Keyring, blob: Buffer): Buffer | null {
 }
 
 /**
- * Re-encrypts every blob in `table.column` still on the keyring's previous generation.
- * A blob on the current generation is left alone; a blob on neither generation is a
- * secret nobody can read and is counted as `remaining`.
+ * Whether `blob` is still to be brought forward or lost (§5.4): anything the keyring's current
+ * key cannot decrypt. The one definition of "remaining" the sweep logs and `/healthz` reports.
  */
-async function reencryptColumn(
-  db: Db,
-  kr: Keyring,
-  table: string,
-  column: string
-): Promise<SweepResult> {
-  const { rows } = await sql<{
-    id: string | number;
-    blob: Buffer;
-  }>`SELECT id, ${sql.ref(column)} AS blob FROM ${sql.table(table)} WHERE ${sql.ref(column)} IS NOT NULL`.execute(
-    db
+function isRemaining(kr: Keyring, blob: Buffer): boolean {
+  return (
+    tryDecrypt(kr, blob) === null || blob.readUInt8(0) !== kr.current.generation
   );
-
-  let reencrypted = 0;
-  let remaining = 0;
-  for (const row of rows) {
-    if (row.blob.length === 0) {
-      remaining += 1;
-      continue;
-    }
-    const plain = tryDecrypt(kr, row.blob);
-    if (plain === null) {
-      remaining += 1;
-      continue;
-    }
-    if (row.blob.readUInt8(0) === kr.current.generation) {
-      continue;
-    }
-    const reencryptedBlob = encrypt(kr, plain);
-    // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; updates must serialize
-    await sql`UPDATE ${sql.table(table)} SET ${sql.ref(column)} = ${reencryptedBlob} WHERE id = ${row.id}`.execute(
-      db
-    );
-    reencrypted += 1;
-  }
-  return { reencrypted, remaining };
 }
 
 /**
- * Walks every `*_enc` column in `ENC_COLUMNS`, re-encrypting each blob still on the
- * keyring's previous generation, and logs `key rotation: {n} re-encrypted, {m} remaining` (§5.4).
+ * Blobs the keyring's current key cannot decrypt (§5.4): those the boot sweep has not brought
+ * forward yet and those no key the keyring holds can read. Read-only, so a `/healthz` request
+ * never itself re-encrypts anything.
+ */
+export async function countKeyRotationRemaining(
+  db: Db,
+  kr: Keyring
+): Promise<number> {
+  const blobs = await readEncBlobs(db);
+  return blobs.filter(({ blob }) => isRemaining(kr, blob)).length;
+}
+
+/**
+ * Re-encrypts every blob still on the keyring's previous generation under the current key and
+ * logs `key rotation: {n} re-encrypted, {m} remaining` (§5.4), `m` counting as
+ * `countKeyRotationRemaining` does once the sweep is done.
  */
 export async function reencryptSweep(
   db: Db,
   kr: Keyring,
   log: Logger
-): Promise<SweepResult> {
-  let reencrypted = 0;
-  let remaining = 0;
-  for (const [table, columns] of Object.entries(ENC_COLUMNS)) {
-    for (const column of columns) {
-      // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; sweeps must serialize
-      const result = await reencryptColumn(db, kr, table, column);
-      reencrypted += result.reencrypted;
-      remaining += result.remaining;
-    }
-  }
+): Promise<{ reencrypted: number; remaining: number }> {
+  const stale = (await readEncBlobs(db)).filter(({ blob }) =>
+    isRemaining(kr, blob)
+  );
+  const readable = stale.flatMap(entry => {
+    const plain = tryDecrypt(kr, entry.blob);
+    return plain === null ? [] : [{ ...entry, plain }];
+  });
+  await Promise.all(
+    readable.map(({ table, column, id, plain }) =>
+      db
+        .updateTable(table)
+        .set(db.dynamic.ref(column), encrypt(kr, plain))
+        .where('id', '=', id)
+        .execute()
+    )
+  );
+  const reencrypted = readable.length;
+  const remaining = stale.length - reencrypted;
   log.info(`key rotation: ${reencrypted} re-encrypted, ${remaining} remaining`);
   return { reencrypted, remaining };
 }

@@ -224,6 +224,11 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- A key rotation whose new `SECRETBOX_KEY` kept the old generation number made every stored
+  secret unreadable, while `/healthz` still reported `keyRotationRemaining: 0`. `api` now refuses
+  to start when `SECRETBOX_KEY` and `SECRETBOX_KEY_PREVIOUS` carry the same generation, and
+  `/healthz` counts what the boot log counts: every secret the current key cannot decrypt.
+  deploy/README.md gives the rotation recipe.
 - A dialled number starting with `0` or `00` but carrying `*` or `#` after it went to the trunk
   as an E.164 number with those characters in it; it is now refused with 484 address incomplete,
   as the national number rules leave it incomplete.

@@ -1,5 +1,3 @@
-import { sql } from 'kysely';
-
 import {
   HTTP_OK,
   HTTP_SERVICE_UNAVAILABLE,
@@ -8,7 +6,7 @@ import {
   type Db
 } from '@zamfono/shared';
 
-import { ENC_COLUMNS } from './jobs/keyRotation.js';
+import { countKeyRotationRemaining } from './jobs/keyRotation.js';
 import { updateNews } from './ops/system/_state.js';
 import { hasEmergencyTrunk } from './ops/trunks/_shared.js';
 import { isPropagationPending } from './propagationPending.js';
@@ -58,50 +56,6 @@ export type ApiHealthDeps = {
   keyring: Keyring;
   certificateSync: 'ok' | 'missing' | 'unknown';
 };
-
-/**
- * Rows in `table.column` whose blob is not on the keyring's current key generation. Selects
- * only the version byte (`substr`), never the ciphertext, since `GET /healthz` is public and
- * unauthenticated (§10.3 Health row) and must not pull decryptable secrets into memory.
- */
-async function countRemainingInColumn(
-  db: Db,
-  kr: Keyring,
-  table: string,
-  column: string
-): Promise<number> {
-  const { rows } = await sql<{
-    versionByte: Buffer | null;
-  }>`SELECT substr(${sql.ref(column)}, 1, 1) AS versionByte FROM ${sql.table(table)} WHERE ${sql.ref(column)} IS NOT NULL`.execute(
-    db
-  );
-  return rows.filter(
-    row =>
-      row.versionByte === null ||
-      row.versionByte.length === 0 ||
-      row.versionByte.readUInt8(0) !== kr.current.generation
-  ).length;
-}
-
-/**
- * Rows still encrypted under a key generation other than the keyring's current one (§5.4): what
- * the boot-time re-encryption sweep (`jobs/keyRotation.ts`) has not brought forward, whether it
- * has not run yet or the blob is unreadable under any key the keyring holds. Read-only, so a
- * `/healthz` request never itself re-encrypts anything.
- */
-export async function countKeyRotationRemaining(
-  db: Db,
-  kr: Keyring
-): Promise<number> {
-  let remaining = 0;
-  for (const [table, columns] of Object.entries(ENC_COLUMNS)) {
-    for (const column of columns) {
-      // eslint-disable-next-line no-await-in-loop -- a handful of columns; nothing here benefits from parallelizing over one sqlite connection
-      remaining += await countRemainingInColumn(db, kr, table, column);
-    }
-  }
-  return remaining;
-}
 
 /** `settings.smtp_host` set means a relay is configured (§11.4). */
 async function mailConfigured(db: Db): Promise<'configured' | 'notConfigured'> {

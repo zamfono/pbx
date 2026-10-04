@@ -129,9 +129,7 @@ export default tseslint.config(
             // GitHub's releases API
             'html_url',
             'published_at',
-            'tag_name',
-            // Table names
-            'backup_targets'
+            'tag_name'
           ]
         }
       ],

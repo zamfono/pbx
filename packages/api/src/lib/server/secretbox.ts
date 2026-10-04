@@ -55,7 +55,11 @@ function parseKeySpec(name: string, value: string): KeySpec {
   return { generation, key };
 }
 
-/** Reads `SECRETBOX_KEY` and, if set, `SECRETBOX_KEY_PREVIOUS` into a `Keyring` (§5.4). */
+/**
+ * Reads `SECRETBOX_KEY` and, if set, `SECRETBOX_KEY_PREVIOUS` into a `Keyring` (§5.4). Throws
+ * when both name the same generation, since a blob's version byte could then pick only one of
+ * the two keys; `api`'s boot builds a keyring, so it refuses to start.
+ */
 export function keyringFromEnv(env: {
   SECRETBOX_KEY: string;
   SECRETBOX_KEY_PREVIOUS?: string | undefined;
@@ -65,10 +69,13 @@ export function keyringFromEnv(env: {
   if (previousValue === undefined) {
     return { current };
   }
-  return {
-    current,
-    previous: parseKeySpec('SECRETBOX_KEY_PREVIOUS', previousValue)
-  };
+  const previous = parseKeySpec('SECRETBOX_KEY_PREVIOUS', previousValue);
+  if (previous.generation === current.generation) {
+    throw new Error(
+      'secretbox: SECRETBOX_KEY_PREVIOUS has the generation of SECRETBOX_KEY'
+    );
+  }
+  return { current, previous };
 }
 
 /** The key for `generation`, from `current` or `previous`. Throws when neither matches. */
