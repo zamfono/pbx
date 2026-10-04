@@ -1,5 +1,4 @@
 import process from 'node:process';
-import type { RequestEvent } from '@sveltejs/kit';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { epochSeconds, newId, nowIso } from '@zamfono/shared';
@@ -7,6 +6,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { encodeLinkToken } from '#lib/server/auth/jwt.js';
 import { getDb } from '#lib/server/db.js';
+import { requestEvent } from '#testing/requestEvent.js';
 
 import { POST } from './+server.js';
 
@@ -57,11 +57,11 @@ async function uploadUrl(aud: string): Promise<URL> {
 async function post(url: URL): Promise<Response> {
   const form = new FormData();
   form.set('upload', new File(['x'], 'hold.wav', { type: 'audio/wav' }));
-  const request = new Request(url, { method: 'POST', body: form });
-  return POST({ request, url } as unknown as RequestEvent<
-    { path: string },
-    '/upload/[...path]'
-  >);
+  return POST(
+    requestEvent<Parameters<typeof POST>[0]>(url, {
+      init: { method: 'POST', body: form }
+    })
+  );
 }
 
 describe('POST <upload link> (§10.5 "Uploads")', () => {

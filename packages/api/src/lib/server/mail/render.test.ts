@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { nowIso, type Db, type Language, type MailKind } from '@zamfono/shared';
+import { nowIso, type Language, type MailKind } from '@zamfono/shared';
 import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { compileTemplate, resolveTemplate } from './render.js';
@@ -15,11 +15,6 @@ const BUILTIN_KINDS: MailKind[] = [
   'breakingUpdate'
 ];
 const BUILTIN_LANGUAGES: Language[] = ['de', 'en', 'es', 'fr', 'it', 'ru'];
-
-async function migratedDb(): Promise<Db> {
-  const db = await migratedTestDb();
-  return db;
-}
 
 describe('compileTemplate', () => {
   it('rejects a placeholder the kind does not offer', () => {
@@ -159,7 +154,7 @@ describe('the update mails', () => {
 
 describe('resolveTemplate', () => {
   it('prefers the tenant row over the shipped built-in', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await db
       .insertInto('mailTemplates')
       .values({

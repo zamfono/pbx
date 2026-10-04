@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, seedSettings } from '#testing/testDb.js';
 
 import { runOperation } from './runner.js';
 

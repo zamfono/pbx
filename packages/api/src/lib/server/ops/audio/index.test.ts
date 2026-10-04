@@ -4,7 +4,7 @@ import { newId, nowIso } from '@zamfono/shared';
 
 import { deleteAudioFile, storeAudio } from '#lib/server/audio/store.js';
 import { propagateConfig } from '#lib/server/propagation.js';
-import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, seedSettings } from '#testing/testDb.js';
 
 import '../ringGroups/index.js';
 

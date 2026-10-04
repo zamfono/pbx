@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { asRun, makeTestDb } from '#lib/server/testDb.js';
+import { asRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 import type { HoursWire } from './get.js';

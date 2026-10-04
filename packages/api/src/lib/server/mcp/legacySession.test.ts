@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { handleMcpRequest } from '../mcp.js';
 import {
   CURRENT,
   LEGACY,
@@ -8,8 +7,10 @@ import {
   rpc,
   seededDeps,
   type RpcBody
-} from './testKit.js';
-import { legacyRequest, legacySession } from './testKitLegacy.js';
+} from '#testing/mcp/testKit.js';
+import { legacyRequest, legacySession } from '#testing/mcp/testKitLegacy.js';
+
+import { handleMcpRequest } from '../mcp.js';
 
 // A legacy session's handshake and the requests that follow it, per
 // https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle#version-negotiation and

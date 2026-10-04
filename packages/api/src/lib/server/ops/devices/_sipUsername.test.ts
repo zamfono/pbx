@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '#lib/server/testDb.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 import { sipUsernameOrFresh, uniqueSipUsername } from './_sipUsername.js';
 

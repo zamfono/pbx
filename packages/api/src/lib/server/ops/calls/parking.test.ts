@@ -8,9 +8,9 @@ import {
 } from '@zamfono/shared';
 
 import { createCoreClient, getCoreClient } from '#lib/server/coreClient.js';
-import { stubCoreClient } from '#lib/server/coreClientStub.js';
 import { handleRest } from '#lib/server/rest.js';
-import { makeTestDb } from '#lib/server/testDb.js';
+import { stubCoreClient } from '#testing/coreClientStub.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 import '../parking/index.js';
 

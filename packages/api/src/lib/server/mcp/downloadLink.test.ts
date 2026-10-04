@@ -5,10 +5,16 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { nowIso } from '@zamfono/shared';
 
+import {
+  currentRequest,
+  ORIGIN,
+  rpc,
+  seededDeps
+} from '#testing/mcp/testKit.js';
+
 import { authenticateLink, authenticateRequest } from '../auth/bearer.js';
 import { handleRest } from '../rest.js';
 import type { McpDeps } from './auth.js';
-import { currentRequest, ORIGIN, rpc, seededDeps } from './testKit.js';
 
 async function seedVoicemail(): Promise<McpDeps> {
   const deps = await seededDeps();

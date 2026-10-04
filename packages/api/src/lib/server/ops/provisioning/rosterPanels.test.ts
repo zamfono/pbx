@@ -3,13 +3,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { type Db } from '@zamfono/shared';
 
-import { installRingotelFake } from '#lib/server/provisioning/ringotelFake.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import {
-  asConfirmedRun,
-  makeTestDb,
-  seedSettings
-} from '#lib/server/testDb.js';
+import { createUser } from '#testing/fixtures.js';
+import { installRingotelFake } from '#testing/ringotelFake.js';
+import { asConfirmedRun, makeTestDb, seedSettings } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 
@@ -30,20 +27,6 @@ async function seedRingotel(db: Db): Promise<void> {
   );
 }
 
-async function createUser(
-  db: Db,
-  name: string,
-  extension: string
-): Promise<string> {
-  const { user } = (await runOperation(
-    db,
-    'users.create',
-    { name, email: `${name.toLowerCase()}@x.test`, extension },
-    asConfirmedRun()
-  )) as { user: { id: string } };
-  return user.id;
-}
-
 const realFetch = globalThis.fetch;
 
 afterEach(() => {
@@ -55,8 +38,14 @@ describe('the Ringotel roster push re-renders the per-user panels (§10.4)', () 
     const db = await makeTestDb();
     const ringotel = installRingotelFake([]);
     await seedRingotel(db);
-    const anna = await createUser(db, 'Anna', '101');
-    const bob = await createUser(db, 'Bob', '102');
+    const anna = await createUser(db, '101', {
+      name: 'Anna',
+      email: 'anna@x.test'
+    });
+    const bob = await createUser(db, '102', {
+      name: 'Bob',
+      email: 'bob@x.test'
+    });
     const { device } = (await runOperation(
       db,
       'devices.create',

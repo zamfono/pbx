@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_SIP_HEADERS, nowIso, type Db } from '@zamfono/shared';
 
+import { createTrunk } from '#testing/fixtures.js';
+import { asRun, makeTestDb, seedSettings } from '#testing/testDb.js';
+
 import { runPurge } from '../jobs/purge.js';
-import { asRun, makeTestDb, seedSettings } from '../testDb.js';
 import { runOperation } from './runner.js';
 import type { Actor } from './types.js';
 
@@ -18,31 +20,19 @@ const self: Actor = { id: 'owner', name: 'Owner', role: 'user' };
 
 /** The OpenAI trunk, behind a carrier trunk that takes the catch-all route the first trunk gets
  * (§9.4 "Outbound routing"), so no route holds the one under test. */
-async function createTrunk(db: Db): Promise<string> {
-  await runOperation(
-    db,
-    'trunks.create',
-    {
-      name: 'Carrier',
-      emergency: true,
-      authMode: 'ip',
-      hosts: [{ host: 'sip.carrier.example' }]
-    },
-    asRun()
-  );
-  const { trunk } = (await runOperation(
-    db,
-    'trunks.create',
-    {
-      name: 'OpenAI',
-      emergency: false,
-      authMode: 'ip',
-      transport: 'tls',
-      srtp: true,
-      hosts: [{ host: 'sip.api.openai.com', port: 5061, direction: 'outbound' }]
-    },
-    asRun()
-  )) as { trunk: { id: string } };
+/** An emergency carrier, then the OpenAI trunk a `sip` target dials over; returns the latter's id. */
+async function createOpenAiTrunk(db: Db): Promise<string> {
+  await createTrunk(db, {
+    name: 'Carrier',
+    hosts: [{ host: 'sip.carrier.example' }]
+  });
+  const { trunk } = await createTrunk(db, {
+    name: 'OpenAI',
+    emergency: false,
+    transport: 'tls',
+    srtp: true,
+    hosts: [{ host: 'sip.api.openai.com', port: 5061, direction: 'outbound' }]
+  });
   return trunk.id;
 }
 
@@ -71,7 +61,7 @@ describe('sip forward targets', () => {
   it('stores a sip target in its column pair and reads it back in the wire shape', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const trunkId = await createTrunk(db);
+    const trunkId = await createOpenAiTrunk(db);
     const did = await createDid(db, sipTarget(trunkId));
     // A write without headers gets the defaults, which every read returns (§10.3).
     const stored = { ...sipTarget(trunkId), headers: DEFAULT_SIP_HEADERS };
@@ -100,7 +90,7 @@ describe('sip forward targets', () => {
   it('refuses a user part outside the safe subset, and a trunk that is not live', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const trunkId = await createTrunk(db);
+    const trunkId = await createOpenAiTrunk(db);
     for (const user of ['', 'a@b', 'a/b', 'a;b', 'a b', 'x'.repeat(65)]) {
       // eslint-disable-next-line no-await-in-loop -- each user part is refused on its own
       await expect(
@@ -119,7 +109,7 @@ describe('sip forward targets', () => {
   it('lets an admin set a sip target on a user, and refuses a user who sets or keeps one', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const trunkId = await createTrunk(db);
+    const trunkId = await createOpenAiTrunk(db);
     await runOperation(
       db,
       'users.setForwarding',
@@ -186,7 +176,7 @@ describe('sip forward targets', () => {
   it('refuses to delete a trunk a live sip target dials over, listing its owners, until retargeted', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const trunkId = await createTrunk(db);
+    const trunkId = await createOpenAiTrunk(db);
     const did = await createDid(db, sipTarget(trunkId));
     await runOperation(
       db,
@@ -230,7 +220,7 @@ describe('sip forward targets', () => {
   it('keeps a soft-deleted trunk from the purge while a soft-deleted owner’s sip target names it', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const trunkId = await createTrunk(db);
+    const trunkId = await createOpenAiTrunk(db);
     await db
       .insertInto('users')
       .values({ id: 'u2', name: 'AI', email: 'ai@x', createdAt: nowIso() })

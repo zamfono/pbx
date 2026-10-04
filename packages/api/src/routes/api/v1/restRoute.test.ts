@@ -5,6 +5,7 @@ import { nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { getDb } from '#lib/server/db.js';
+import { requestEvent } from '#testing/requestEvent.js';
 
 import { GET } from './[...path]/+server.js';
 
@@ -27,14 +28,11 @@ beforeAll(async () => {
 });
 
 function eventFor(url: string): RequestEvent {
-  return {
-    request: new Request(url),
-    url: new URL(url),
+  return requestEvent(url, {
     locals: {
       auth: { actor: { id: 'admin1', name: 'Admin', role: 'admin' } }
-    },
-    getClientAddress: () => '198.51.100.1'
-  } as RequestEvent;
+    }
+  });
 }
 
 describe('GET /api/v1/[...path]', () => {

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { handleMcpRequest } from '../mcp.js';
 import {
   CURRENT,
   currentHeaders,
@@ -10,8 +9,10 @@ import {
   mcpRequest,
   seededDeps,
   type RpcBody
-} from './testKit.js';
-import { legacySession } from './testKitLegacy.js';
+} from '#testing/mcp/testKit.js';
+import { legacySession } from '#testing/mcp/testKitLegacy.js';
+
+import { handleMcpRequest } from '../mcp.js';
 
 // What https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http
 // ("Request Metadata", "Server Validation"), .../basic#meta and .../basic/versioning require of a

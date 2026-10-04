@@ -9,10 +9,10 @@ import {
 } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
-import { stubCoreClient } from '#lib/server/coreClientStub.js';
 import { CoreRequestError } from '#lib/server/coreHttp.js';
 import { handleRest } from '#lib/server/rest.js';
-import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
+import { stubCoreClient } from '#testing/coreClientStub.js';
+import { asRun, makeTestDb, seedSettings } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 import { type Actor } from '../types.js';

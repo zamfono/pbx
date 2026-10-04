@@ -2,12 +2,13 @@ import { z } from 'zod';
 
 import { epochSeconds, HTTP_CONFLICT, nowIso } from '@zamfono/shared';
 
-import { signAccessToken } from '../auth/jwt.js';
-import { handleMcpRequest, type McpDeps } from '../mcp.js';
-import { register } from '../ops/registry.js';
-import { defineOperation } from '../ops/types.js';
+import { signAccessToken } from '#lib/server/auth/jwt.js';
+import { handleMcpRequest, type McpDeps } from '#lib/server/mcp.js';
+import { serverInfo } from '#lib/server/mcp/results.js';
+import { register } from '#lib/server/ops/registry.js';
+import { defineOperation } from '#lib/server/ops/types.js';
+
 import { makeTestDb } from '../testDb.js';
-import { serverInfo } from './results.js';
 
 // Fixtures the MCP endpoint's tests share (`../mcp.test.ts` and the focused `*.test.ts` beside
 // it): the test operations, a seeded database, and requests shaped as each protocol era sends

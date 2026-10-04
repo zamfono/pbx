@@ -5,7 +5,7 @@ import { newId, nowIso, type Db } from '@zamfono/shared';
 import { storeAudio } from '#lib/server/audio/store.js';
 import { propagateConfig } from '#lib/server/propagation.js';
 import { handleRest } from '#lib/server/rest.js';
-import { makeTestDb } from '#lib/server/testDb.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 import { type Actor } from '../types.js';

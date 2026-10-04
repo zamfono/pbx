@@ -4,12 +4,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
 import { setPropagationPending } from '#lib/server/propagationPending.js';
+import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import {
   installRingotelFake,
   type RingotelFake
-} from '#lib/server/provisioning/ringotelFake.js';
-import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import { makeTestDb, seedSettings } from '#lib/server/testDb.js';
+} from '#testing/ringotelFake.js';
+import { makeTestDb, seedSettings } from '#testing/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 import { oweDevicePushesAtStart } from './_ringotelPush.js';

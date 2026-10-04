@@ -5,8 +5,8 @@ import {
   rpc,
   seededDeps,
   SERVER_INFO_META
-} from './testKit.js';
-import { legacyRequest, legacySession } from './testKitLegacy.js';
+} from '#testing/mcp/testKit.js';
+import { legacyRequest, legacySession } from '#testing/mcp/testKitLegacy.js';
 
 // `prompts/get` against the recipes bundled from `docs/guide/recipes/` (§10.5 "Prompts"), in the
 // shapes of https://modelcontextprotocol.io/specification/2026-07-28/server/prompts and

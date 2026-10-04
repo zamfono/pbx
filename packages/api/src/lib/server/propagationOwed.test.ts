@@ -8,8 +8,10 @@ import { z } from 'zod';
 import type { Db, ReloadKind } from '@zamfono/shared';
 import { MIGRATIONS_DIR } from '@zamfono/shared/testDb.js';
 
+import { stubCoreClient } from '#testing/coreClientStub.js';
+import { asRun, makeTestDb, seedSettings } from '#testing/testDb.js';
+
 import { getCoreClient, type CoreClient } from './coreClient.js';
-import { stubCoreClient } from './coreClientStub.js';
 import { apiHealth } from './health.js';
 import { renderMetrics } from './metrics.js';
 import {
@@ -26,7 +28,6 @@ import { defineOperation } from './ops/types.js';
 import { propagateConfig } from './propagation.js';
 import { isPropagationPending } from './propagationPending.js';
 import { keyringFromEnv } from './secretbox.js';
-import { asRun, makeTestDb, seedSettings } from './testDb.js';
 
 // The propagation under test, not the setup file's stand-in for it.
 vi.unmock('./propagation.js');

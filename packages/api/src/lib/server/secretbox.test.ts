@@ -1,16 +1,13 @@
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
+import { keySpec } from '#testing/fixtures.js';
+
 import { decrypt, encrypt, keyringFromEnv } from './secretbox.js';
 
 const KEY_BYTE_LENGTH = 32;
 const NONCE_BYTE_LENGTH = 24;
 const TAG_BYTE_LENGTH = 16;
-
-/** A valid `SECRETBOX_KEY`-shaped value for `generation`, with a fresh random key. */
-function keySpec(generation: number): string {
-  return `${generation}:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
-}
 
 describe('secretbox', () => {
   it('round-trips a plaintext through encrypt and decrypt', () => {

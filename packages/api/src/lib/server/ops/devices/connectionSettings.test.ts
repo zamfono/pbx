@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newId, nowIso, type Db } from '@zamfono/shared';
 import { defaultFeatureCodes } from '@zamfono/shared/testDb.js';
 
-import { makeTestDb, owner, seedSettings } from '#lib/server/testDb.js';
+import { makeTestDb, owner, seedSettings } from '#testing/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 import type { ConnectionSettings } from './_connectionSettings.js';

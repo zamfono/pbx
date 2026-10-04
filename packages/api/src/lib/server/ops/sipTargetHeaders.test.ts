@@ -3,33 +3,14 @@ import { describe, expect, it } from 'vitest';
 
 import { type Db } from '@zamfono/shared';
 
-import { asRun, makeTestDb, seedSettings } from '../testDb.js';
+import { createTrunk } from '#testing/fixtures.js';
+import { asRun, makeTestDb, seedSettings } from '#testing/testDb.js';
+
 import { runOperation } from './runner.js';
 
 import './dids/index.js';
 import './trunks/index.js';
 import './users/index.js';
-
-/** A trunk named `name` on `transport`, the first one taking the catch-all route. */
-async function createTrunk(
-  db: Db,
-  name: string,
-  transport: 'udp' | 'tls'
-): Promise<string> {
-  const { trunk } = (await runOperation(
-    db,
-    'trunks.create',
-    {
-      name,
-      emergency: true,
-      authMode: 'ip',
-      transport,
-      hosts: [{ host: `${name.toLowerCase()}.example` }]
-    },
-    asRun()
-  )) as { trunk: { id: string } };
-  return trunk.id;
-}
 
 type Header = { name: string; value: string };
 type DidOut = { id: string; target: unknown; warnings?: string[] };
@@ -73,7 +54,13 @@ describe('sip target headers', () => {
   it('stores the headers given, none for an empty list, and returns them on reads', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const trunkId = await createTrunk(db, 'OpenAI', 'tls');
+    const trunkId = (
+      await createTrunk(db, {
+        name: 'OpenAI',
+        transport: 'tls',
+        hosts: [{ host: 'openai.example' }]
+      })
+    ).trunk.id;
     const headers = [
       { name: 'X-Called', value: '{{calledExtension}}' },
       { name: 'x-reason', value: 'via {{ forwardReason }} ${EXTEN}' }
@@ -91,7 +78,13 @@ describe('sip target headers', () => {
   it('refuses bad names, duplicates, bad values and oversized headers with 422', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const trunkId = await createTrunk(db, 'OpenAI', 'tls');
+    const trunkId = (
+      await createTrunk(db, {
+        name: 'OpenAI',
+        transport: 'tls',
+        hosts: [{ host: 'openai.example' }]
+      })
+    ).trunk.id;
     const refused: Header[][] = [
       [{ name: 'Diversion', value: 'a' }],
       [{ name: 'X-', value: 'a' }],
@@ -121,7 +114,13 @@ describe('sip target headers', () => {
   it('limits the size, not the count', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const trunkId = await createTrunk(db, 'OpenAI', 'tls');
+    const trunkId = (
+      await createTrunk(db, {
+        name: 'OpenAI',
+        transport: 'tls',
+        hosts: [{ host: 'openai.example' }]
+      })
+    ).trunk.id;
     // 7 × 266 = 1862 bytes, under 2048.
     await createDid(
       db,
@@ -142,8 +141,20 @@ describe('sip target headers', () => {
   it('warns for headers too large for an INVITE over a UDP trunk, and writes them', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const udpId = await createTrunk(db, 'Carrier', 'udp');
-    const tlsId = await createTrunk(db, 'OpenAI', 'tls');
+    const udpId = (
+      await createTrunk(db, {
+        name: 'Carrier',
+        transport: 'udp',
+        hosts: [{ host: 'carrier.example' }]
+      })
+    ).trunk.id;
+    const tlsId = (
+      await createTrunk(db, {
+        name: 'OpenAI',
+        transport: 'tls',
+        hosts: [{ host: 'openai.example' }]
+      })
+    ).trunk.id;
     const large = [nameHeader('X-Caller-Name', 3)];
     const warned = await createDid(db, udpId, large);
     expect(warned.warnings).toEqual([

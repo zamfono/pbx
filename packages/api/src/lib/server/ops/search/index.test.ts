@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { nowIso, type Db } from '@zamfono/shared';
 
-import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, seedSettings } from '#testing/testDb.js';
 
 import '../contacts/index.js';
 

@@ -2,16 +2,17 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { newId } from '@zamfono/shared';
 
-import { authenticateLink } from '../auth/bearer.js';
-import { runUploadLink } from '../uploadLink.js';
-import type { McpDeps } from './auth.js';
 import {
   CLIENT_ID,
   currentRequest,
   ORIGIN,
   rpc,
   seededDeps
-} from './testKit.js';
+} from '#testing/mcp/testKit.js';
+
+import { authenticateLink } from '../auth/bearer.js';
+import { runUploadLink } from '../uploadLink.js';
+import type { McpDeps } from './auth.js';
 
 vi.mock('#lib/server/audio/store.js', () => ({
   storeAudio: vi.fn(async (kind: string, upload: { filename: string }) =>

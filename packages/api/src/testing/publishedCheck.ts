@@ -4,14 +4,14 @@
  */
 import { isDeepStrictEqual } from 'node:util';
 
-import { BinaryResult } from '../binaryResult.js';
+import { BinaryResult } from '#lib/server/binaryResult.js';
 import {
   outputMediaTypes,
   problemStatuses,
   publishedOutput
-} from './publishedOutput.js';
-import { registry } from './registry.js';
-import { OpError } from './types.js';
+} from '#lib/server/ops/publishedOutput.js';
+import { registry } from '#lib/server/ops/registry.js';
+import { OpError } from '#lib/server/ops/types.js';
 
 /**
  * Throws unless `output`, the result of operation `name`, is its published `output` as the wire

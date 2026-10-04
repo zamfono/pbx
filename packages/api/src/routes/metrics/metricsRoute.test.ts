@@ -12,9 +12,10 @@ import {
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
-import { stubCoreClient } from '#lib/server/coreClientStub.js';
 import { getDb } from '#lib/server/db.js';
-import { seedSettings } from '#lib/server/testDb.js';
+import { stubCoreClient } from '#testing/coreClientStub.js';
+import { requestEvent } from '#testing/requestEvent.js';
+import { seedSettings } from '#testing/testDb.js';
 
 import { GET } from './+server.js';
 
@@ -52,13 +53,11 @@ function stubCore(): void {
 }
 
 function eventWithAuth(authorization: string | null): RequestEvent {
-  const headers = new Headers();
-  if (authorization !== null) {
-    headers.set('authorization', authorization);
-  }
-  return {
-    request: new Request('http://api/metrics', { headers })
-  } as RequestEvent;
+  return requestEvent('http://api/metrics', {
+    init: {
+      headers: authorization === null ? {} : { authorization }
+    }
+  });
 }
 
 describe('GET /metrics', () => {

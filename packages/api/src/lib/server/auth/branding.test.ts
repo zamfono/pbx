@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { dictionaryFor } from '#lib/i18n/index.js';
+import { makeTestDb, seedSettings } from '#testing/testDb.js';
 
-import { makeTestDb, seedSettings } from '../testDb.js';
 import { loadBranding } from './branding.js';
 
 describe('loadBranding', () => {

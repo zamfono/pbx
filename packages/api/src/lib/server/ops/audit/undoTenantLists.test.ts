@@ -2,11 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { type Db } from '@zamfono/shared';
 
-import {
-  asConfirmedRun,
-  makeTestDb,
-  seedSettings
-} from '#lib/server/testDb.js';
+import { createTrunk } from '#testing/fixtures.js';
+import { asConfirmedRun, makeTestDb, seedSettings } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 
@@ -34,21 +31,6 @@ async function undoLatest(db: Db, operation: string): Promise<void> {
   await runOperation(db, 'audit.undo', { id }, asConfirmedRun());
 }
 
-async function createTrunk(db: Db, name: string): Promise<string> {
-  const { trunk } = (await runOperation(
-    db,
-    'trunks.create',
-    {
-      name,
-      emergency: true,
-      authMode: 'ip',
-      hosts: [{ host: 'sip.provider.example' }]
-    },
-    asConfirmedRun()
-  )) as { trunk: { id: string } };
-  return trunk.id;
-}
-
 async function liveTrunkOrder(db: Db): Promise<string[]> {
   const rows = await db
     .selectFrom('trunks')
@@ -64,7 +46,7 @@ type Routes = { items: { id: string; numbers: { number: string }[] }[] };
 describe('audit.undo of a tenant-wide list replace', () => {
   it('restores the outbound routes a replace dropped', async () => {
     const db = await makeTestDb();
-    const trunkId = await createTrunk(db, 'Provider A');
+    const trunkId = (await createTrunk(db, { name: 'Provider A' })).trunk.id;
     const before = (await runOperation(
       db,
       'outboundRoutes.list',
@@ -100,8 +82,8 @@ describe('audit.undo of a tenant-wide list replace', () => {
 
   it('restores the trunk order', async () => {
     const db = await makeTestDb();
-    const first = await createTrunk(db, 'Provider A');
-    const second = await createTrunk(db, 'Provider B');
+    const first = (await createTrunk(db, { name: 'Provider A' })).trunk.id;
+    const second = (await createTrunk(db, { name: 'Provider B' })).trunk.id;
     await runOperation(
       db,
       'trunks.setOrder',
@@ -116,15 +98,15 @@ describe('audit.undo of a tenant-wide list replace', () => {
 
   it('refuses to restore a trunk order once another trunk exists, naming it', async () => {
     const db = await makeTestDb();
-    const first = await createTrunk(db, 'Provider A');
-    const second = await createTrunk(db, 'Provider B');
+    const first = (await createTrunk(db, { name: 'Provider A' })).trunk.id;
+    const second = (await createTrunk(db, { name: 'Provider B' })).trunk.id;
     await runOperation(
       db,
       'trunks.setOrder',
       { trunkIds: [second, first] },
       asConfirmedRun()
     );
-    const third = await createTrunk(db, 'Provider C');
+    const third = (await createTrunk(db, { name: 'Provider C' })).trunk.id;
     const id = await latestEntry(db, 'trunks.setOrder');
 
     await expect(

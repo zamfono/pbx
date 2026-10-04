@@ -2,11 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { type Db } from '@zamfono/shared';
 
-import {
-  asConfirmedRun,
-  makeTestDb,
-  seedSettings
-} from '#lib/server/testDb.js';
+import { createUser } from '#testing/fixtures.js';
+import { asConfirmedRun, makeTestDb, seedSettings } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 
@@ -14,16 +11,6 @@ import '../ringGroups/index.js';
 import '../userGroups/index.js';
 import '../users/index.js';
 import './index.js';
-
-async function createUser(db: Db, name: string, ext: string): Promise<string> {
-  const result = (await runOperation(
-    db,
-    'users.create',
-    { name, email: `${name.toLowerCase()}@x.test`, extension: ext },
-    asConfirmedRun()
-  )) as { user: { id: string } };
-  return result.user.id;
-}
 
 /** Undoes the latest `operation` entry recorded for `entityId`. */
 async function undoLatest(
@@ -47,9 +34,18 @@ describe('audit.undo of a deleted member after a members edit', () => {
   it('keeps the ring-group position of a user deleted before the edit', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const anna = await createUser(db, 'Anna', '101');
-    const ben = await createUser(db, 'Ben', '102');
-    const carl = await createUser(db, 'Carl', '103');
+    const anna = await createUser(db, '101', {
+      name: 'Anna',
+      email: 'anna@x.test'
+    });
+    const ben = await createUser(db, '102', {
+      name: 'Ben',
+      email: 'ben@x.test'
+    });
+    const carl = await createUser(db, '103', {
+      name: 'Carl',
+      email: 'carl@x.test'
+    });
     const group = (await runOperation(
       db,
       'ringGroups.create',
@@ -96,8 +92,14 @@ describe('audit.undo of a deleted member after a members edit', () => {
   it('keeps the user-group links of a user and a child group deleted before the edit', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const anna = await createUser(db, 'Anna', '101');
-    const ben = await createUser(db, 'Ben', '102');
+    const anna = await createUser(db, '101', {
+      name: 'Anna',
+      email: 'anna@x.test'
+    });
+    const ben = await createUser(db, '102', {
+      name: 'Ben',
+      email: 'ben@x.test'
+    });
     const child = (await runOperation(
       db,
       'userGroups.create',

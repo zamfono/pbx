@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { MS_PER_DAY, type Db } from '@zamfono/shared';
 
-import { asRun, makeTestDb, owner, seedSettings } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, owner, seedSettings } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 import type { Actor } from '../types.js';

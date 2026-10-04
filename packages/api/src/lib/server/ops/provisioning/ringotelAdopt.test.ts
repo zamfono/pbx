@@ -3,20 +3,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { type Db } from '@zamfono/shared';
 
+import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import {
   installRingotelFake,
   type RingotelFake
-} from '#lib/server/provisioning/ringotelFake.js';
-import {
-  FAKE_PACKAGES,
-  FAKE_REGIONS
-} from '#lib/server/provisioning/ringotelFakeHandlers.js';
-import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import {
-  asConfirmedRun,
-  makeTestDb,
-  seedSettings
-} from '#lib/server/testDb.js';
+} from '#testing/ringotelFake.js';
+import { FAKE_PACKAGES, FAKE_REGIONS } from '#testing/ringotelFakeHandlers.js';
+import { asConfirmedRun, makeTestDb, seedSettings } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 

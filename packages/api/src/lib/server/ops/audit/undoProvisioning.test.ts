@@ -4,13 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MS_PER_DAY, MS_PER_HOUR, type Db } from '@zamfono/shared';
 
 import { propagateConfig } from '#lib/server/propagation.js';
-import { installRingotelFake } from '#lib/server/provisioning/ringotelFake.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import {
-  asConfirmedRun,
-  makeTestDb,
-  seedSettings
-} from '#lib/server/testDb.js';
+import { installRingotelFake } from '#testing/ringotelFake.js';
+import { asConfirmedRun, makeTestDb, seedSettings } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 

@@ -6,7 +6,7 @@ import { describe, expect, it, onTestFinished } from 'vitest';
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
 import type { BinaryResult } from '#lib/server/binaryResult.js';
-import { asRun, makeTestDb } from '#lib/server/testDb.js';
+import { asRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 import { type Actor } from '../types.js';

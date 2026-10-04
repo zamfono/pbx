@@ -4,8 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Db } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
-import { stubCoreClient } from '#lib/server/coreClientStub.js';
-import { makeTestDb, seedSettings } from '#lib/server/testDb.js';
+import { stubCoreClient } from '#testing/coreClientStub.js';
+import { makeTestDb, seedSettings } from '#testing/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 

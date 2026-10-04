@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { Db } from '@zamfono/shared';
 
-import { asRun, makeTestDb } from '#lib/server/testDb.js';
+import { createTrunk } from '#testing/fixtures.js';
+import { asRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 
@@ -11,24 +12,6 @@ import '../outboundRoutes/index.js';
 
 type TrunkWire = { id: string; authMode: string; qualify: boolean };
 type TrunkOutput = { trunk: TrunkWire; warnings: string[] };
-
-async function createTrunk(
-  db: Db,
-  fields: Record<string, unknown>
-): Promise<TrunkOutput> {
-  return runOperation(
-    db,
-    'trunks.create',
-    {
-      name: 'Provider A',
-      emergency: true,
-      authMode: 'ip',
-      hosts: [{ host: 'sip.provider.example' }],
-      ...fields
-    },
-    asRun()
-  ) as Promise<TrunkOutput>;
-}
 
 async function updateTrunk(
   db: Db,

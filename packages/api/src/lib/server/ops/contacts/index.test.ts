@@ -5,7 +5,7 @@ import {
   asRun,
   makeTestDb,
   seedSettings
-} from '#lib/server/testDb.js';
+} from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 

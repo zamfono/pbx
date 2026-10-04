@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createCoreClient, getCoreClient } from '#lib/server/coreClient.js';
 import { handleRest } from '#lib/server/rest.js';
-import { makeTestDb, owner } from '#lib/server/testDb.js';
+import { makeTestDb, owner } from '#testing/testDb.js';
 
 import './index.js';
 

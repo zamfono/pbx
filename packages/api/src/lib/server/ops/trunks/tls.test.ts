@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { Db } from '@zamfono/shared';
 
-import { asRun, makeTestDb } from '#lib/server/testDb.js';
+import { createTrunk } from '#testing/fixtures.js';
+import { asRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 
@@ -16,25 +17,6 @@ type TrunkWire = {
   tlsVerify: boolean;
 };
 type TrunkOutput = { trunk: TrunkWire };
-
-async function createTrunk(
-  db: Db,
-  fields: Record<string, unknown>
-): Promise<TrunkWire> {
-  const { trunk } = (await runOperation(
-    db,
-    'trunks.create',
-    {
-      name: 'Provider A',
-      emergency: true,
-      authMode: 'ip',
-      hosts: [{ host: 'sip.provider.example' }],
-      ...fields
-    },
-    asRun()
-  )) as TrunkOutput;
-  return trunk;
-}
 
 async function updateTrunk(
   db: Db,
@@ -54,13 +36,13 @@ async function updateTrunk(
 describe('trunk TLS and SRTP settings', () => {
   it('a new trunk checks its certificate and sends plain RTP unless told otherwise', async () => {
     const db = await makeTestDb();
-    const trunk = await createTrunk(db, { transport: 'tls' });
+    const { trunk } = await createTrunk(db, { transport: 'tls' });
     expect(trunk).toMatchObject({ srtp: false, tlsVerify: true });
   });
 
   it('stores srtp and tlsVerify as given on a tls trunk', async () => {
     const db = await makeTestDb();
-    const trunk = await createTrunk(db, {
+    const { trunk } = await createTrunk(db, {
       transport: 'tls',
       srtp: true,
       tlsVerify: false
@@ -86,7 +68,7 @@ describe('trunk TLS and SRTP settings', () => {
 
   it('refuses switching an srtp trunk off tls unless srtp goes with it', async () => {
     const db = await makeTestDb();
-    const trunk = await createTrunk(db, { transport: 'tls', srtp: true });
+    const { trunk } = await createTrunk(db, { transport: 'tls', srtp: true });
     await expect(
       updateTrunk(db, trunk.id, { transport: 'tcp' })
     ).rejects.toMatchObject({ status: 422 });
@@ -99,7 +81,7 @@ describe('trunk TLS and SRTP settings', () => {
 
   it('keeps tlsVerify across a transport change and updates it alone', async () => {
     const db = await makeTestDb();
-    const trunk = await createTrunk(db, {
+    const { trunk } = await createTrunk(db, {
       transport: 'tls',
       tlsVerify: false
     });
@@ -114,7 +96,7 @@ describe('trunk TLS and SRTP settings', () => {
 
   it('records a changed srtp and tlsVerify in the audit entry', async () => {
     const db = await makeTestDb();
-    const trunk = await createTrunk(db, { transport: 'tls' });
+    const { trunk } = await createTrunk(db, { transport: 'tls' });
     await updateTrunk(db, trunk.id, { srtp: true, tlsVerify: false });
     const entry = await db
       .selectFrom('auditLog')

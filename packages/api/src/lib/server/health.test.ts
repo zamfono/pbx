@@ -4,11 +4,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nowIso, openDb, type Db } from '@zamfono/shared';
 import { MIGRATIONS_DIR } from '@zamfono/shared/testDb.js';
 
+import { makeTestDb, seedSettings } from '#testing/testDb.js';
+
 import { apiHealth, type ApiHealth } from './health.js';
 import { updateNews } from './ops/system/_state.js';
 import { updaterClient, type UpdaterClient } from './ops/system/_updater.js';
 import { keyringFromEnv } from './secretbox.js';
-import { makeTestDb, seedSettings } from './testDb.js';
 
 vi.mock('./ops/system/_updater.js', async importOriginal => ({
   ...(await importOriginal<typeof import('./ops/system/_updater.js')>()),

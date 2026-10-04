@@ -1,31 +1,20 @@
-import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db, type Envelope } from '@zamfono/shared';
 import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
+import { testKeyring } from '#testing/fixtures.js';
+import { seedSettings } from '#testing/testDb.js';
+
 import { sealTargetSecret } from '../ops/backups/_secret.js';
-import { keyringFromEnv, type Keyring } from '../secretbox.js';
-import { seedSettings } from '../testDb.js';
+import { type Keyring } from '../secretbox.js';
 import type { Bus } from './backup.js';
 import type { ExecFn } from './backupBackends.js';
 import { queueRun, scheduleBackups } from './cron.js';
 
-const KEY_BYTE_LENGTH = 32;
 const SNAPSHOT_BYTES = 4321;
 const READ_INTERVAL_MS = 5;
 const WAIT_MS = 200;
-
-function testKeyring(): Keyring {
-  return keyringFromEnv({
-    SECRETBOX_KEY: `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`
-  });
-}
-
-async function migratedDb(): Promise<Db> {
-  const db = await migratedTestDb();
-  return db;
-}
 
 async function insertTarget(db: Db, kr: Keyring): Promise<string> {
   const id = newId();
@@ -126,7 +115,7 @@ async function waitForRun(db: Db, runId: string): Promise<string> {
 
 describe('scheduleBackups: the manual runs handed over', () => {
   it('executes a run backups.runs.start hands over', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const kr = testKeyring();
     const targetId = await insertTarget(db, kr);
@@ -156,7 +145,7 @@ describe('scheduleBackups: the manual runs handed over', () => {
   });
 
   it('fails a queued run whose target has been deleted', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const kr = testKeyring();
     const targetId = await insertTarget(db, kr);
@@ -186,7 +175,7 @@ describe('scheduleBackups: the manual runs handed over', () => {
   });
 
   it('runs a handed-over run once', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const kr = testKeyring();
     const targetId = await insertTarget(db, kr);
@@ -207,7 +196,7 @@ describe('scheduleBackups: the manual runs handed over', () => {
   });
 
   it('leaves a run an earlier process left behind to the boot sweep', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const kr = testKeyring();
     const targetId = await insertTarget(db, kr);
@@ -238,7 +227,7 @@ describe('scheduleBackups: the manual runs handed over', () => {
   });
 
   it('takes no run once stopped, and none without a scheduler', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const kr = testKeyring();
     const targetId = await insertTarget(db, kr);

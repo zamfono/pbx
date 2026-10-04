@@ -8,8 +8,9 @@ import {
   type Db
 } from '@zamfono/shared';
 
+import { makeTestDb } from '#testing/testDb.js';
+
 import type { ProvisioningProvider } from '../provisioning/index.js';
-import { makeTestDb } from '../testDb.js';
 import {
   checkAsteriskRestart,
   watchAsteriskRestarts,

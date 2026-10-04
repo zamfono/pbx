@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { insertCall, makeStatsDb, queryStats } from './statsTestKit.js';
+import { insertCall, makeStatsDb, queryStats } from '#testing/statsTestKit.js';
 
 describe('stats.query buckets on the tenant clock', () => {
   it('lays a 23-hour day bucket over the spring-forward day', async () => {

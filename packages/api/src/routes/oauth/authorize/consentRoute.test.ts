@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import process from 'node:process';
-import { isRedirect, type Cookies, type RequestEvent } from '@sveltejs/kit';
+import { isRedirect } from '@sveltejs/kit';
 import * as privateEnv from '$app/env/private';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -12,7 +12,12 @@ import { CONSENT_COOKIE } from '#lib/server/auth/consent.js';
 import { setSealedCookie } from '#lib/server/auth/sealedCookie.js';
 import { getDb } from '#lib/server/db.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
-import { seedSettings } from '#lib/server/testDb.js';
+import {
+  cookieJar,
+  requestEvent,
+  type CookieJar
+} from '#testing/requestEvent.js';
+import { seedSettings } from '#testing/testDb.js';
 
 import { load } from './+page.server.js';
 import { approveConsentSubmit } from './consentSubmit.js';
@@ -52,48 +57,23 @@ beforeAll(async () => {
   await seedSettings(db, { companyName: 'Acme', language: 'en' });
 });
 
-/** An in-memory `event.cookies`, the way a browser carries `zamfono_consent` between requests. */
-function cookieJar(): {
-  get: (name: string) => string | undefined;
-  set: (name: string, value: string) => void;
-  delete: (name: string) => void;
-} {
-  const store = new Map<string, string>();
-  return {
-    get: name => store.get(name),
-    set: (name, value) => {
-      store.set(name, value);
-    },
-    delete: name => {
-      store.delete(name);
-    }
-  };
-}
-
-type Jar = ReturnType<typeof cookieJar>;
-
 function sealConsent(
-  jar: Jar,
+  jar: CookieJar,
   clientId: string,
   clientName: string,
   state: string | null = 'state-a'
 ): void {
-  setSealedCookie(
-    jar as unknown as Cookies,
-    keyringFromEnv(privateEnv),
-    CONSENT_COOKIE,
-    {
-      userId: 'user-1',
-      clientName,
-      authorize: {
-        clientId,
-        redirectUri: REDIRECT_A,
-        codeChallenge: 'challenge-a',
-        scope: 'openid',
-        state
-      }
+  setSealedCookie(jar, keyringFromEnv(privateEnv), CONSENT_COOKIE, {
+    userId: 'user-1',
+    clientName,
+    authorize: {
+      clientId,
+      redirectUri: REDIRECT_A,
+      codeChallenge: 'challenge-a',
+      scope: 'openid',
+      state
     }
-  );
+  });
 }
 
 function authorizeUrl(clientId: string, redirectUri: string): URL {
@@ -112,8 +92,8 @@ function authorizeUrl(clientId: string, redirectUri: string): URL {
   return url;
 }
 
-function loadFor(url: URL, cookies: Jar): ReturnType<typeof load> {
-  return load({ url, cookies } as unknown as Parameters<typeof load>[0]);
+function loadFor(url: URL, cookies: CookieJar): ReturnType<typeof load> {
+  return load(requestEvent(url, { cookies }));
 }
 
 describe('GET /oauth/authorize with a pending consent cookie', () => {
@@ -182,10 +162,9 @@ describe('the consent step, approved', () => {
     // A `client_id` that resolves to no metadata: `oauth_clients` gets no row, and a code minted
     // here would be redeemed against a `tokens.client_id` with nothing to reference (§5.2).
     sealConsent(jar, 'not-a-resolvable-client-id', 'Client A');
-    const err = await approveConsentSubmit({
-      cookies: jar,
-      url: new URL(`${ORIGIN}/oauth/authorize`)
-    } as unknown as RequestEvent).catch((caught: unknown) => caught);
+    const err = await approveConsentSubmit(
+      requestEvent(`${ORIGIN}/oauth/authorize`, { cookies: jar })
+    ).catch((caught: unknown) => caught);
     if (!isRedirect(err)) {
       throw new Error('expected a redirect');
     }

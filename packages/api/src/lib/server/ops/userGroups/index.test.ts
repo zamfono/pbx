@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { nowIso } from '@zamfono/shared';
 
 import { propagateConfig } from '#lib/server/propagation.js';
-import { asRun, makeTestDb } from '#lib/server/testDb.js';
+import { asRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 import { Conflict, OpError } from '../types.js';

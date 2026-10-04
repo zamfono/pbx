@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -8,20 +7,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { nowIso, type Db } from '@zamfono/shared';
 
+import { stubCoreClient } from '#testing/coreClientStub.js';
+import { keySpec } from '#testing/fixtures.js';
+import { makeTestDb, seedSettings } from '#testing/testDb.js';
+
 import { getCoreClient, type CoreClient } from './coreClient.js';
-import { stubCoreClient } from './coreClientStub.js';
 import { propagateAtBoot, propagateConfig } from './propagation.js';
 import { encrypt, keyringFromEnv, type Keyring } from './secretbox.js';
-import { makeTestDb, seedSettings } from './testDb.js';
-
-const KEY_BYTE_LENGTH = 32;
 
 // The propagation under test, not the setup file's stand-in for it.
 vi.unmock('./propagation.js');
 
 /** A fresh `SECRETBOX_KEY`, the keyring a propagation renders with. */
 function testKeyring(): Keyring {
-  process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
+  process.env.SECRETBOX_KEY = keySpec();
   return keyringFromEnv(privateEnv);
 }
 

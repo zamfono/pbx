@@ -5,6 +5,7 @@ import { nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { getDb } from '#lib/server/db.js';
+import { jsonPost } from '#testing/requestEvent.js';
 
 import { POST } from './[...path]/+server.js';
 
@@ -44,18 +45,11 @@ function eventFor(
   body: unknown,
   client: { clientId: string; clientName: string } | null
 ): RequestEvent {
-  return {
-    request: new Request(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body)
-    }),
-    url: new URL(url),
+  return jsonPost(url, body, {
     locals: {
       auth: { actor: { id: 'admin1', name: 'Admin', role: 'admin' }, ...client }
-    },
-    getClientAddress: () => '198.51.100.1'
-  } as RequestEvent;
+    }
+  });
 }
 
 describe('POST /api/v1/[...path]', () => {

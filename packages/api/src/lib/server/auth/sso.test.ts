@@ -4,8 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 import { epochSeconds, nowIso, type Db } from '@zamfono/shared';
 
+import { makeTestDb, seedSettings } from '#testing/testDb.js';
+
 import { encrypt, keyringFromEnv, type Keyring } from '../secretbox.js';
-import { makeTestDb, seedSettings } from '../testDb.js';
 import {
   discover,
   startLogin,

@@ -4,7 +4,7 @@ import path from 'node:path';
 import pino from 'pino';
 import { describe, expect, it, onTestFinished } from 'vitest';
 
-import { nowIso, type Db } from '@zamfono/shared';
+import { nowIso } from '@zamfono/shared';
 import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import {
@@ -15,11 +15,6 @@ import {
 } from './seedMoh.js';
 
 const logger = pino({ level: 'silent' });
-
-async function migratedDb(): Promise<Db> {
-  const db = await migratedTestDb();
-  return db;
-}
 
 async function tempDir(prefix: string): Promise<string> {
   const dir = await mkdtemp(path.join(tmpdir(), prefix));
@@ -44,7 +39,7 @@ async function mohSourceFixture(): Promise<string> {
 
 describe('createMohAssets', () => {
   it('seeds one row per bundled track from the source directory', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempDir('zamfono-media-');
     await createMohAssets(
       db,
@@ -59,7 +54,7 @@ describe('createMohAssets', () => {
   });
 
   it('fails loudly when the source directory is absent', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempDir('zamfono-media-');
     const missing = path.join(
       await tempDir('zamfono-moh-missing-'),
@@ -79,7 +74,7 @@ describe('createMohAssets', () => {
   });
 
   it('fails loudly when the source directory is missing one track', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const mediaDir = await tempDir('zamfono-media-');
     const sourceDir = await tempDir('zamfono-moh-partial-');
     await writeFile(

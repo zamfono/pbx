@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nowIso, type LiveCall, type StateResponse } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
-import { stubCoreClient } from '#lib/server/coreClientStub.js';
-import { makeTestDb } from '#lib/server/testDb.js';
+import { stubCoreClient } from '#testing/coreClientStub.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 import { type Actor } from '../types.js';

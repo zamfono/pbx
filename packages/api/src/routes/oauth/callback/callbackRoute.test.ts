@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import process from 'node:process';
-import { isRedirect, type Cookies, type RequestEvent } from '@sveltejs/kit';
+import { isRedirect, type RequestEvent } from '@sveltejs/kit';
 import * as privateEnv from '$app/env/private';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -15,6 +15,11 @@ import { SSO_COOKIE, type PendingLogin } from '#lib/server/auth/ssoCookie.js';
 import { ssoConfigFromSettings } from '#lib/server/auth/ssoSettings.js';
 import { getDb } from '#lib/server/db.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
+import {
+  cookieJar,
+  requestEvent,
+  type CookieJar
+} from '#testing/requestEvent.js';
 
 import { GET } from './+server.js';
 
@@ -53,41 +58,20 @@ beforeEach(() => {
   finishLoginMock.mockReset();
 });
 
-/** The `zamfono_sso` value the SSO button seals for `pending`. */
-function sealedLogin(pending: PendingLogin): string {
-  let value = '';
-  setSealedCookie(
-    {
-      set: (_name: string, sealed: string) => {
-        value = sealed;
-      }
-    } as unknown as Cookies,
-    keyringFromEnv(privateEnv),
-    SSO_COOKIE,
-    pending
-  );
-  return value;
+/** A browser's cookies holding the `zamfono_sso` value the SSO button seals for `pending`. */
+function sealedLogin(pending: PendingLogin): CookieJar {
+  const jar = cookieJar();
+  setSealedCookie(jar, keyringFromEnv(privateEnv), SSO_COOKIE, pending);
+  return jar;
 }
 
-/** A `RequestEvent` for `GET /oauth/callback?state=...&code=...` presenting the `zamfono_sso`
- *  value `cookie` (`undefined` for none). `sets` collects every `cookies.set` call, for tests
- *  asserting the handler seals a consent cookie rather than minting a code directly. */
-function eventFor(
-  query: string,
-  cookie: string | undefined,
-  sets: { name: string; value: string }[] = []
-): RequestEvent {
-  const url = new URL(`https://pbx.example.com/oauth/callback?${query}`);
-  return {
-    url,
-    cookies: {
-      get: (name: string) => (name === SSO_COOKIE.name ? cookie : undefined),
-      set: (name: string, value: string) => {
-        sets.push({ name, value });
-      },
-      delete: () => undefined
-    }
-  } as unknown as RequestEvent;
+/** A `RequestEvent` for `GET /oauth/callback?state=...&code=...` presenting `cookies` (default:
+ *  none); the tests asserting the handler seals a consent cookie rather than minting a code
+ *  directly read it back from the jar. */
+function eventFor(query: string, cookies = cookieJar()): RequestEvent {
+  return requestEvent(`https://pbx.example.com/oauth/callback?${query}`, {
+    cookies
+  });
 }
 
 /** The `reason` query parameter of a thrown `Redirect`'s location, asserting it points at
@@ -134,7 +118,7 @@ describe('GET /oauth/callback', () => {
 
   it('refuses a code/state pair presented with no cookie at all', async () => {
     const err = await GET(
-      eventFor('state=victim-state&code=victim-code', undefined)
+      eventFor('state=victim-state&code=victim-code')
     ).catch((caught: unknown) => caught);
     expect(errorReasonOf(err)).toBe('expired');
   });
@@ -174,9 +158,8 @@ describe('GET /oauth/callback', () => {
         state: 'outer-state-1'
       }
     });
-    const sets: { name: string; value: string }[] = [];
     const err = await GET(
-      eventFor('state=state-1&code=auth-code', cookie, sets)
+      eventFor('state=state-1&code=auth-code', cookie)
     ).catch((caught: unknown) => caught);
     if (!isRedirect(err)) {
       throw new Error('expected a redirect');
@@ -188,9 +171,7 @@ describe('GET /oauth/callback', () => {
     expect(location.origin).toBe('https://pbx.example.com');
     expect(location.pathname).toBe('/oauth/authorize');
     expect(location.searchParams.get('code')).toBeNull();
-    expect(sets.some(cookieSet => cookieSet.name === CONSENT_COOKIE.name)).toBe(
-      true
-    );
+    expect(cookie.written.has(CONSENT_COOKIE.name)).toBe(true);
   });
 
   it('fails as a server error, not as an expired link, while SECRETBOX_KEY is malformed', async () => {

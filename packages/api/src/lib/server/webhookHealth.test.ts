@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -10,7 +9,9 @@ import {
 } from '@zamfono/shared';
 import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
-import { encrypt, keyringFromEnv, type Keyring } from './secretbox.js';
+import { testKeyring } from '#testing/fixtures.js';
+
+import { encrypt, type Keyring } from './secretbox.js';
 import { errorReason, SECRET_UNREADABLE } from './webhookFailure.js';
 import { WebhookDispatcher } from './webhooks.js';
 
@@ -30,14 +31,7 @@ vi.mock('pino', () => ({
   })
 }));
 
-const KEY_BYTE_LENGTH = 32;
 const URL = 'https://crm.example/hooks/zamfono?token=abc';
-
-function testKeyring(): Keyring {
-  return keyringFromEnv({
-    SECRETBOX_KEY: `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`
-  });
-}
 
 function noDelay(): Promise<void> {
   return Promise.resolve();

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { DeviceRow } from '#lib/server/provisioning/types.js';
-import { makeTestDb, owner } from '#lib/server/testDb.js';
+import { makeTestDb, owner } from '#testing/testDb.js';
 
 import { newEffects } from '../effects.js';
 import type { Context } from '../types.js';

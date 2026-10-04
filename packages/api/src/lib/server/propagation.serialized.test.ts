@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { stubCoreClient } from '#testing/coreClientStub.js';
+import { makeTestDb, seedSettings } from '#testing/testDb.js';
+
 import { getCoreClient } from './coreClient.js';
-import { stubCoreClient } from './coreClientStub.js';
 import { propagateConfig } from './propagation.js';
-import { makeTestDb, seedSettings } from './testDb.js';
 
 // The propagation under test, not the setup file's stand-in for it.
 vi.unmock('./propagation.js');

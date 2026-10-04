@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -13,27 +12,17 @@ import {
 } from '@zamfono/shared';
 import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
+import { testKeyring } from '#testing/fixtures.js';
+
 import { sealTargetSecret, type BackupSecret } from '../ops/backups/_secret.js';
-import { keyringFromEnv, type Keyring } from '../secretbox.js';
+import { type Keyring } from '../secretbox.js';
 import { failBackupRun, runBackup, type Bus } from './backup.js';
 import type { ExecFn } from './backupBackends.js';
 import { markInterruptedRuns } from './cron.js';
 import { nextRun } from './cronExpression.js';
 
-const KEY_BYTE_LENGTH = 32;
 const SNAPSHOT_BYTES = 12345;
 const SNAPSHOT_TOTAL_BYTES = 27_000_000;
-
-function testKeyring(): Keyring {
-  return keyringFromEnv({
-    SECRETBOX_KEY: `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`
-  });
-}
-
-async function migratedDb(): Promise<Db> {
-  const db = await migratedTestDb();
-  return db;
-}
 
 /** A `backup_targets` row with the default forget policy, its `secret` encrypted under `kr`. */
 async function insertTarget(
@@ -134,7 +123,7 @@ function recordingExec(
 
 describe('runBackup: command lines per target kind', () => {
   it('builds a plain filesystem repository for a local target', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     const targetId = await insertTarget(
       db,
@@ -156,7 +145,7 @@ describe('runBackup: command lines per target kind', () => {
   });
 
   it('builds an s3 repository with AWS credentials from the secret', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     const targetId = await insertTarget(
       db,
@@ -185,7 +174,7 @@ describe('runBackup: command lines per target kind', () => {
 
   it('builds an sftp repository whose ssh authenticates with the secret’s password', async () => {
     vi.stubEnv('DB_FILE', '/data/zamfono.sqlite3');
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     const targetId = await insertTarget(
       db,
@@ -226,7 +215,7 @@ describe('runBackup: command lines per target kind', () => {
 
   it('fails an sftp run whose secret carries no password', async () => {
     vi.stubEnv('DB_FILE', '/data/zamfono.sqlite3');
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     const targetId = await insertTarget(
       db,
@@ -251,7 +240,7 @@ describe('runBackup: command lines per target kind', () => {
   });
 
   it('builds an ftp repository through restic’s rclone backend', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     const targetId = await insertTarget(
       db,
@@ -287,7 +276,7 @@ describe('runBackup: command lines per target kind', () => {
   });
 
   it('builds a webdav repository addressed by URL, not host', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     const targetId = await insertTarget(
       db,
@@ -316,7 +305,7 @@ describe('runBackup: command lines per target kind', () => {
 
 describe('runBackup: retention grouping', () => {
   it('backs up the same target under the same path on every run', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     const targetId = await insertTarget(
       db,
@@ -341,7 +330,7 @@ describe('runBackup: retention grouping', () => {
   });
 
   it('backs up successfully after a prior run left its snapshot file behind', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     const targetId = await insertTarget(
       db,
@@ -375,7 +364,7 @@ describe('runBackup: retention grouping', () => {
 
 describe('pruneSnapshots: default retention', () => {
   it('keeps 7 daily/4 weekly/6 monthly when a target has no forget policy at all', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     const id = newId();
     await db
@@ -410,7 +399,7 @@ describe('pruneSnapshots: default retention', () => {
 
 describe('failBackupRun', () => {
   it('marks a running row failed and emits backup.failed', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     const targetId = await insertTarget(
       db,
@@ -479,7 +468,7 @@ describe('failBackupRun', () => {
 
 describe('runBackup: run lifecycle', () => {
   it('starts a run "running", ending "ok" with the restic snapshot id and sizes', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     const targetId = await insertTarget(
       db,
@@ -537,7 +526,7 @@ describe('runBackup: run lifecycle', () => {
   });
 
   it('marks a run "failed" with the error and emits backup.failed', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     const targetId = await insertTarget(
       db,
@@ -570,7 +559,7 @@ describe('runBackup: run lifecycle', () => {
 
 describe('markInterruptedRuns', () => {
   it('fails a run still "running" from an earlier process with error "interrupted"', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     const targetId = await insertTarget(
       db,
@@ -607,7 +596,7 @@ describe('markInterruptedRuns', () => {
   });
 
   it('leaves a run started at or after `startedBefore` untouched', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     const targetId = await insertTarget(
       db,

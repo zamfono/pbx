@@ -1,4 +1,4 @@
-import { createHmac, randomBytes } from 'node:crypto';
+import { createHmac } from 'node:crypto';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -6,18 +6,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { nowIso, type Db, type Envelope } from '@zamfono/shared';
 import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
-import { encrypt, keyringFromEnv, type Keyring } from './secretbox.js';
+import { testKeyring } from '#testing/fixtures.js';
+
+import { encrypt, type Keyring } from './secretbox.js';
 import { WebhookDispatcher } from './webhooks.js';
 
-const KEY_BYTE_LENGTH = 32;
 const FAILING_STATUS = 500;
 const DELIVERY_ATTEMPTS = 3;
-
-function testKeyring(): Keyring {
-  return keyringFromEnv({
-    SECRETBOX_KEY: `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`
-  });
-}
 
 /** Skips the real backoff delay so the three-attempt tests run instantly. */
 function noDelay(): Promise<void> {
@@ -71,11 +66,6 @@ async function startStub(): Promise<{
         });
       })
   };
-}
-
-async function migratedDb(): Promise<Db> {
-  const db = await migratedTestDb();
-  return db;
 }
 
 async function insertWebhook(
@@ -162,7 +152,7 @@ describe('WebhookDispatcher', () => {
   afterEach(() => stub.close());
 
   it("signs the body with the hook's secret", async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, { url: stub.url, secret: 'top-secret' });
     const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
@@ -183,7 +173,7 @@ describe('WebhookDispatcher', () => {
   });
 
   it('posts a call.state event in the §10.6 shape, without its internal participant list', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, { url: stub.url, secret: 'top-secret' });
     const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
@@ -215,7 +205,7 @@ describe('WebhookDispatcher', () => {
   });
 
   it('posts nothing for a call.state event meant for the users it names alone (§10.6)', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, { url: stub.url, secret: 'top-secret' });
     const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
@@ -240,7 +230,7 @@ describe('WebhookDispatcher', () => {
   });
 
   it('marks the hook failing after three failed attempts, and ok on the next success', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, { url: stub.url });
     const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
@@ -258,7 +248,7 @@ describe('WebhookDispatcher', () => {
   });
 
   it('sends nothing to an inactive hook', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, { url: stub.url, active: 0 });
     const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
@@ -269,7 +259,7 @@ describe('WebhookDispatcher', () => {
   });
 
   it("skips a hook whose event-type filter excludes the event's type", async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, {
       url: stub.url,
@@ -283,7 +273,7 @@ describe('WebhookDispatcher', () => {
   });
 
   it('a hook with an unparsable event-type filter never blocks delivery to the others', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, {
       id: 'hook-bad-filter',
@@ -305,7 +295,7 @@ describe('WebhookDispatcher', () => {
   });
 
   it('leaves nothing in the outbox once a delivery is delivered or given up', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, { url: stub.url });
     const dispatcher = new WebhookDispatcher({ db, kr, delay: noDelay });
@@ -328,7 +318,7 @@ describe('WebhookDispatcher across a restart', () => {
   afterEach(() => stub.close());
 
   it('resumes a retrying delivery with its attempt count, waiting out the rest of its backoff', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, { url: stub.url, secret: 'top-secret' });
     stub.setStatus(FAILING_STATUS);
@@ -371,7 +361,7 @@ describe('WebhookDispatcher across a restart', () => {
   });
 
   it('gives a resumed delivery only the attempts it has left', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, { url: stub.url });
     await db
@@ -395,7 +385,7 @@ describe('WebhookDispatcher across a restart', () => {
   });
 
   it('drops a retrying delivery whose hook is deleted, without a status', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = testKeyring();
     await insertWebhook(db, kr, { url: stub.url });
     stub.setStatus(FAILING_STATUS);

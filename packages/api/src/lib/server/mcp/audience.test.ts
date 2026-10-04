@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { epochSeconds } from '@zamfono/shared';
 
+import { JWT_SECRET, ORIGIN, seededDeps } from '#testing/mcp/testKit.js';
+
 import { ACCESS_TOKEN_TTL_S, encodeAccessToken } from '../auth/jwt.js';
 import { authenticate } from './auth.js';
-import { JWT_SECRET, ORIGIN, seededDeps } from './testKit.js';
 
 /** A request to `/mcp` carrying an access token signed for `audience`. */
 async function requestFor(audience: string): Promise<Request> {

@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { MS_PER_DAY, MS_PER_HOUR, type Db } from '@zamfono/shared';
 
+import { makeTestDb } from '#testing/testDb.js';
+
 import { sha256Hex } from '../hash.js';
-import { makeTestDb } from '../testDb.js';
 import { upsertClient } from './clients.js';
 import {
   issueRefresh,

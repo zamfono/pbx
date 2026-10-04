@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { Db } from '@zamfono/shared';
 
-import { asRun, makeTestDb } from '#lib/server/testDb.js';
+import { createTrunk } from '#testing/fixtures.js';
+import { asRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 
@@ -15,24 +16,6 @@ type TrunkOutput = {
   trunk: { id: string; emergency: boolean };
   warnings: string[];
 };
-
-async function createTrunk(
-  db: Db,
-  name: string,
-  emergency: boolean
-): Promise<TrunkOutput> {
-  return runOperation(
-    db,
-    'trunks.create',
-    {
-      name,
-      emergency,
-      authMode: 'ip',
-      hosts: [{ host: `${name}.provider.example` }]
-    },
-    asRun()
-  ) as Promise<TrunkOutput>;
-}
 
 async function updateTrunk(
   db: Db,
@@ -80,7 +63,11 @@ describe('emergency trunks (§9.4 "Emergency trunks")', () => {
 
   it('stores the flag and returns it on create, get and update', async () => {
     const db = await makeTestDb();
-    const { trunk } = await createTrunk(db, 'local', true);
+    const { trunk } = await createTrunk(db, {
+      name: 'local',
+      emergency: true,
+      hosts: [{ host: 'local.provider.example' }]
+    });
     expect(trunk.emergency).toBe(true);
     const updated = await updateTrunk(db, trunk.id, false);
     expect(updated.trunk.emergency).toBe(false);
@@ -95,17 +82,33 @@ describe('emergency trunks (§9.4 "Emergency trunks")', () => {
 
   it('warns on a create that leaves no trunk flagged, and not once one is', async () => {
     const db = await makeTestDb();
-    const foreign = await createTrunk(db, 'foreign', false);
+    const foreign = await createTrunk(db, {
+      name: 'foreign',
+      emergency: false,
+      hosts: [{ host: 'foreign.provider.example' }]
+    });
     expect(foreign.warnings).toEqual([NO_EMERGENCY_TRUNK]);
-    const local = await createTrunk(db, 'local', true);
+    const local = await createTrunk(db, {
+      name: 'local',
+      emergency: true,
+      hosts: [{ host: 'local.provider.example' }]
+    });
     expect(local.warnings).toEqual([]);
-    const other = await createTrunk(db, 'other', false);
+    const other = await createTrunk(db, {
+      name: 'other',
+      emergency: false,
+      hosts: [{ host: 'other.provider.example' }]
+    });
     expect(other.warnings).toEqual([]);
   });
 
   it('warns on an update that clears the last flag', async () => {
     const db = await makeTestDb();
-    const { trunk } = await createTrunk(db, 'local', true);
+    const { trunk } = await createTrunk(db, {
+      name: 'local',
+      emergency: true,
+      hosts: [{ host: 'local.provider.example' }]
+    });
     const cleared = await updateTrunk(db, trunk.id, false);
     expect(cleared.warnings).toEqual([NO_EMERGENCY_TRUNK]);
     const restored = await updateTrunk(db, trunk.id, true);
@@ -114,8 +117,16 @@ describe('emergency trunks (§9.4 "Emergency trunks")', () => {
 
   it('warns on a delete that removes the last flagged trunk', async () => {
     const db = await makeTestDb();
-    const local = await createTrunk(db, 'local', true);
-    const foreign = await createTrunk(db, 'foreign', false);
+    const local = await createTrunk(db, {
+      name: 'local',
+      emergency: true,
+      hosts: [{ host: 'local.provider.example' }]
+    });
+    const foreign = await createTrunk(db, {
+      name: 'foreign',
+      emergency: false,
+      hosts: [{ host: 'foreign.provider.example' }]
+    });
     expect((await deleteTrunk(db, foreign.trunk.id)).warnings).toEqual([]);
     expect((await deleteTrunk(db, local.trunk.id)).warnings).toEqual([
       NO_EMERGENCY_TRUNK
@@ -124,7 +135,11 @@ describe('emergency trunks (§9.4 "Emergency trunks")', () => {
 
   it('records a changed flag in the audit diff (§5.8)', async () => {
     const db = await makeTestDb();
-    const { trunk } = await createTrunk(db, 'local', true);
+    const { trunk } = await createTrunk(db, {
+      name: 'local',
+      emergency: true,
+      hosts: [{ host: 'local.provider.example' }]
+    });
     await updateTrunk(db, trunk.id, false);
     const entry = await db
       .selectFrom('auditLog')

@@ -7,7 +7,8 @@ import { nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { getDb } from '#lib/server/db.js';
-import { seedSettings } from '#lib/server/testDb.js';
+import { requestEvent } from '#testing/requestEvent.js';
+import { seedSettings } from '#testing/testDb.js';
 
 import { login } from './authorize.remote.js';
 
@@ -39,11 +40,9 @@ type LoginHandler = (payload: {
 const submit = login as unknown as LoginHandler;
 
 function eventFrom(address: string): RequestEvent {
-  return {
-    url: new URL('https://pbx.example.com/oauth/authorize'),
-    cookies: { get: () => undefined, set: () => undefined },
-    getClientAddress: () => address
-  } as unknown as RequestEvent;
+  return requestEvent('https://pbx.example.com/oauth/authorize', {
+    clientAddress: address
+  });
 }
 
 /** The HTTP status `promise` rejects with, or `undefined` when it rejects with anything else. */

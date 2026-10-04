@@ -1,11 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import process from 'node:process';
-import {
-  isHttpError,
-  isRedirect,
-  type Cookies,
-  type RequestEvent
-} from '@sveltejs/kit';
+import { isHttpError, isRedirect, type RequestEvent } from '@sveltejs/kit';
 import * as privateEnv from '$app/env/private';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -21,7 +16,8 @@ import { tokenEndpoint } from '#lib/server/auth/tokenEndpoint.js';
 import { getDb } from '#lib/server/db.js';
 import { accountLockedUntil } from '#lib/server/ops/users/_accountLock.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
-import { seedSettings } from '#lib/server/testDb.js';
+import { cookieJar, requestEvent } from '#testing/requestEvent.js';
+import { seedSettings } from '#testing/testDb.js';
 
 import { load } from './+page.server.js';
 import { approveConsentSubmit, denyConsentSubmit } from './consentSubmit.js';
@@ -75,33 +71,14 @@ beforeAll(async () => {
   await seedSettings(db, { companyName: 'Acme', language: 'en' });
 });
 
-/** An in-memory `event.cookies` a test can share across two calls (login, then approve/deny), the
- *  same way a browser carries the `zamfono_consent` cookie between the two requests. */
-function cookieJar(): {
-  get: (name: string) => string | undefined;
-  set: (name: string, value: string) => void;
-  delete: (name: string) => void;
-} {
-  const store = new Map<string, string>();
-  return {
-    get: name => store.get(name),
-    set: (name, value) => {
-      store.set(name, value);
-    },
-    delete: name => {
-      store.delete(name);
-    }
-  };
-}
-
 /** A `RequestEvent` for a submission to `/oauth/authorize`, sharing `cookies` (default: a fresh
- *  jar) so the login step's `Set-Cookie` is visible to a later approve/deny in the same test. */
+ *  jar) so the login step's `Set-Cookie` is visible to a later approve/deny in the same test, the
+ *  same way a browser carries the `zamfono_consent` cookie between the two requests. */
 function eventFor(cookies = cookieJar()): RequestEvent {
-  return {
-    url: new URL(`${ORIGIN}/oauth/authorize`),
+  return requestEvent(`${ORIGIN}/oauth/authorize`, {
     cookies,
-    getClientAddress: () => '203.0.113.1'
-  } as unknown as RequestEvent;
+    clientAddress: '203.0.113.1'
+  });
 }
 
 /** The login form's payload, as the `form` schema hands it to `loginSubmit`. */
@@ -381,10 +358,11 @@ describe('the login step', () => {
 
 describe('GET /oauth/authorize (load)', () => {
   it('renders a bare login for a request with no client_id', async () => {
-    const data = await load({
-      url: new URL(`${ORIGIN}/oauth/authorize`),
-      cookies: cookieJar()
-    } as unknown as Parameters<typeof load>[0]);
+    const data = await load(
+      requestEvent(new URL(`${ORIGIN}/oauth/authorize`), {
+        cookies: cookieJar()
+      })
+    );
     expect(data.authorize).toBeNull();
     expect(data.consent).toBeNull();
   });
@@ -392,7 +370,7 @@ describe('GET /oauth/authorize (load)', () => {
   it('renders the consent step for a pending `zamfono_consent` cookie, the same one the SSO callback sets', async () => {
     const cookies = cookieJar();
     const kr = keyringFromEnv(privateEnv);
-    setSealedCookie(cookies as unknown as Cookies, kr, CONSENT_COOKIE, {
+    setSealedCookie(cookies, kr, CONSENT_COOKIE, {
       userId: 'user-1',
       clientName: 'Callback Client',
       authorize: {
@@ -403,10 +381,9 @@ describe('GET /oauth/authorize (load)', () => {
         state: 'state-1'
       }
     });
-    const data = await load({
-      url: new URL(`${ORIGIN}/oauth/authorize`),
-      cookies
-    } as unknown as Parameters<typeof load>[0]);
+    const data = await load(
+      requestEvent(new URL(`${ORIGIN}/oauth/authorize`), { cookies })
+    );
     expect(data.authorize).toBeNull();
     expect(data.consent).toEqual({
       clientName: 'Callback Client',
@@ -423,19 +400,13 @@ describe('GET /oauth/authorize (load)', () => {
     url.searchParams.set('redirect_uri', 'https://client.example.com/callback');
     url.searchParams.set('response_type', 'code');
     url.searchParams.set('code_challenge', 'challenge-1');
-    const data = await load({
-      url,
-      cookies: cookieJar()
-    } as unknown as Parameters<typeof load>[0]);
+    const data = await load(requestEvent(url, { cookies: cookieJar() }));
     expect(data.authorize).toMatchObject({ state: null });
   });
 
   /** `load`'s thrown redirect for `url`, failing the test on anything else. */
   async function loadRedirect(url: URL): Promise<URL> {
-    const err = await load({
-      url,
-      cookies: cookieJar()
-    } as unknown as Parameters<typeof load>[0]).catch(
+    const err = await load(requestEvent(url, { cookies: cookieJar() })).catch(
       (caught: unknown) => caught
     );
     if (!isRedirect(err)) {
@@ -485,10 +456,11 @@ describe('GET /oauth/authorize (load)', () => {
   });
 
   it("proceeds to the login form for this stack's own MCP resource", async () => {
-    const data = await load({
-      url: requestUrl({ resource: `${ORIGIN}/mcp` }),
-      cookies: cookieJar()
-    } as unknown as Parameters<typeof load>[0]);
+    const data = await load(
+      requestEvent(requestUrl({ resource: `${ORIGIN}/mcp` }), {
+        cookies: cookieJar()
+      })
+    );
     expect(data.authorize).toMatchObject({
       redirectUri: 'https://client.example.com/callback'
     });
@@ -504,10 +476,9 @@ describe('GET /oauth/authorize (load)', () => {
   });
 
   it('resumes a request without redirect_uri at the single registered one (OAuth 2.1 §2.3.2)', async () => {
-    const data = await load({
-      url: requestUrl({ redirect_uri: null }),
-      cookies: cookieJar()
-    } as unknown as Parameters<typeof load>[0]);
+    const data = await load(
+      requestEvent(requestUrl({ redirect_uri: null }), { cookies: cookieJar() })
+    );
     expect(data.authorize).toMatchObject({
       redirectUri: 'https://client.example.com/callback',
       redirectUriDefaulted: true
@@ -523,12 +494,11 @@ describe('GET /oauth/authorize (load)', () => {
       ],
       applicationType: 'web'
     });
-    const err = await load({
-      url: requestUrl({ client_id: clientId, redirect_uri: null }),
-      cookies: cookieJar()
-    } as unknown as Parameters<typeof load>[0]).catch(
-      (caught: unknown) => caught
-    );
+    const err = await load(
+      requestEvent(requestUrl({ client_id: clientId, redirect_uri: null }), {
+        cookies: cookieJar()
+      })
+    ).catch((caught: unknown) => caught);
     expect(isRedirect(err)).toBe(false);
     if (!isHttpError(err)) {
       throw new Error('expected an HttpError');
@@ -554,15 +524,15 @@ describe('GET /oauth/authorize (load)', () => {
   });
 
   it('never redirects to an unregistered redirect_uri, whatever else is wrong', async () => {
-    const err = await load({
-      url: requestUrl({
-        redirect_uri: 'https://not-registered.example.com/callback',
-        response_type: 'token'
-      }),
-      cookies: cookieJar()
-    } as unknown as Parameters<typeof load>[0]).catch(
-      (caught: unknown) => caught
-    );
+    const err = await load(
+      requestEvent(
+        requestUrl({
+          redirect_uri: 'https://not-registered.example.com/callback',
+          response_type: 'token'
+        }),
+        { cookies: cookieJar() }
+      )
+    ).catch((caught: unknown) => caught);
     expect(isRedirect(err)).toBe(false);
     if (!isHttpError(err)) {
       throw new Error('expected an HttpError');

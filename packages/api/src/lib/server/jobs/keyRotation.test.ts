@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import { sql } from 'kysely';
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
@@ -6,22 +5,13 @@ import { describe, expect, it } from 'vitest';
 import { type Db } from '@zamfono/shared';
 import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
+import { keySpec } from '#testing/fixtures.js';
+
 import { decrypt, encrypt, keyringFromEnv } from '../secretbox.js';
 import { countKeyRotationRemaining, reencryptSweep } from './keyRotation.js';
 
-const KEY_BYTE_LENGTH = 32;
 const CREATED_AT = '2026-01-01T00:00:00.000Z';
 const silentLog = pino({ enabled: false });
-
-/** A valid `SECRETBOX_KEY`-shaped value for `generation`, with a fresh random key. */
-function keySpec(generation: number): string {
-  return `${generation}:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
-}
-
-async function migratedDb(): Promise<Db> {
-  const db = await migratedTestDb();
-  return db;
-}
 
 async function insertWebhook(
   db: Db,
@@ -36,7 +26,7 @@ async function insertWebhook(
 
 describe('reencryptSweep', () => {
   it('re-encrypts a row written under the previous generation', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const previousSpec = keySpec(1);
     const previousRing = keyringFromEnv({ SECRETBOX_KEY: previousSpec });
     await insertWebhook(db, 'wh1', encrypt(previousRing, 'shh'));
@@ -61,7 +51,7 @@ describe('reencryptSweep', () => {
   });
 
   it('counts a blob under a generation the keyring does not hold as remaining', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const staleRing = keyringFromEnv({ SECRETBOX_KEY: keySpec(0) });
     const staleBlob = encrypt(staleRing, 'stuck');
     await insertWebhook(db, 'wh2', staleBlob);
@@ -83,7 +73,7 @@ describe('reencryptSweep', () => {
   });
 
   it('counts a zero-length blob as remaining instead of throwing', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await insertWebhook(db, 'wh3', Buffer.alloc(0));
 
     const currentRing = keyringFromEnv({ SECRETBOX_KEY: keySpec(1) });
@@ -92,7 +82,7 @@ describe('reencryptSweep', () => {
   });
 
   it('counts a corrupt blob on the current generation as remaining instead of skipping it', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const currentSpec = keySpec(1);
     const currentRing = keyringFromEnv({ SECRETBOX_KEY: currentSpec });
     const goodBlob = encrypt(currentRing, 'shh');
@@ -113,14 +103,14 @@ describe('reencryptSweep', () => {
 
 describe('countKeyRotationRemaining', () => {
   it('counts zero when every blob decrypts under the current key', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const kr = keyringFromEnv({ SECRETBOX_KEY: keySpec(1) });
     await insertWebhook(db, 'wh1', encrypt(kr, 'shh'));
     await expect(countKeyRotationRemaining(db, kr)).resolves.toBe(0);
   });
 
   it('counts a blob on the previous generation until the sweep re-encrypts it', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     const previousSpec = keySpec(1);
     await insertWebhook(
       db,
@@ -137,7 +127,7 @@ describe('countKeyRotationRemaining', () => {
   });
 
   it('agrees with the sweep on a blob whose generation byte is current but whose key is not', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await insertWebhook(
       db,
       'wh3',

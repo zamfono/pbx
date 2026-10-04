@@ -8,6 +8,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { issueRefresh, issueResetToken } from '#lib/server/auth/tokens.js';
 import { getDb } from '#lib/server/db.js';
 import { sha256Hex } from '#lib/server/hash.js';
+import { jsonPost } from '#testing/requestEvent.js';
 
 import { POST } from './+server.js';
 
@@ -15,9 +16,7 @@ process.env.DB_FILE = ':memory:';
 const PASSWORD = 'a brand new password';
 
 function eventFor(body: unknown): RequestEvent {
-  return {
-    request: { json: () => Promise.resolve(body) } as Request
-  } as unknown as RequestEvent;
+  return jsonPost('https://pbx.example.com/auth/reset', body);
 }
 
 beforeAll(async () => {

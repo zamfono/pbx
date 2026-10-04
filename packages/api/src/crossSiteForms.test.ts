@@ -1,5 +1,4 @@
 import process from 'node:process';
-import type { RequestEvent } from '@sveltejs/kit';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { epochSeconds, nowIso } from '@zamfono/shared';
@@ -7,6 +6,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { signAccessToken } from '#lib/server/auth/jwt.js';
 import { getDb } from '#lib/server/db.js';
+import { requestEvent } from '#testing/requestEvent.js';
 
 import { handle } from './hooks.server.js';
 
@@ -52,15 +52,6 @@ beforeAll(async () => {
     .execute();
 });
 
-function eventFor(url: string, init: RequestInit): RequestEvent {
-  return {
-    request: new Request(url, init),
-    url: new URL(url),
-    locals: {},
-    getClientAddress: () => '198.51.100.7'
-  } as RequestEvent;
-}
-
 /** `handle`'s response, and whether it passed the request on to the route. */
 async function serve(
   url: string,
@@ -68,7 +59,7 @@ async function serve(
 ): Promise<{ response: Response; resolved: boolean }> {
   let resolved = false;
   const response = await handle({
-    event: eventFor(url, init),
+    event: requestEvent(url, { init }),
     resolve: () => {
       resolved = true;
       return Promise.resolve(new Response('ok'));

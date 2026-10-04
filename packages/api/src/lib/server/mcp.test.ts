@@ -3,10 +3,6 @@ import { describe, expect, it } from 'vitest';
 
 import { epochSeconds, nowIso } from '@zamfono/shared';
 
-import { signAccessToken } from './auth/jwt.js';
-import { handleMcpRequest } from './mcp.js';
-import { protectedResourceMetadata } from './mcp/auth.js';
-import { callHelp } from './mcp/guide.js';
 import {
   CLIENT_ID,
   confirmationProblem,
@@ -21,12 +17,17 @@ import {
   seededDeps,
   SERVER_INFO_META,
   type RpcBody
-} from './mcp/testKit.js';
+} from '#testing/mcp/testKit.js';
 import {
   legacyRequest,
   legacySession,
   readSseEvents
-} from './mcp/testKitLegacy.js';
+} from '#testing/mcp/testKitLegacy.js';
+
+import { signAccessToken } from './auth/jwt.js';
+import { handleMcpRequest } from './mcp.js';
+import { protectedResourceMetadata } from './mcp/auth.js';
+import { callHelp } from './mcp/guide.js';
 
 // The result shapes below are asserted field by field against the MCP schema of the era the
 // request speaks: https://modelcontextprotocol.io/specification/2026-07-28/schema for a

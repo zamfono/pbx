@@ -5,12 +5,12 @@ import { type Db } from '@zamfono/shared';
 
 import { activeRingotelProvider } from '#lib/server/provisioning/index.js';
 import { isProfilePending } from '#lib/server/provisioning/profilePending.js';
+import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import {
   installRingotelFake,
   type RingotelFake
-} from '#lib/server/provisioning/ringotelFake.js';
-import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
+} from '#testing/ringotelFake.js';
+import { asRun, makeTestDb, seedSettings } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 

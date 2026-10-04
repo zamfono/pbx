@@ -7,7 +7,8 @@ import { nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { getDb } from '#lib/server/db.js';
-import { seedSettings } from '#lib/server/testDb.js';
+import { jsonPost } from '#testing/requestEvent.js';
+import { seedSettings } from '#testing/testDb.js';
 
 import { POST } from '../resetRequest/+server.js';
 import { requestReset } from './forgot.remote.js';
@@ -48,11 +49,9 @@ const submit = requestReset as unknown as (
 ) => Promise<unknown>;
 
 function eventFrom(address: string, body: unknown = null): RequestEvent {
-  return {
-    url: new URL('https://pbx.example.com/auth/forgot'),
-    getClientAddress: () => address,
-    request: { json: () => Promise.resolve(body) } as Request
-  } as unknown as RequestEvent;
+  return jsonPost('https://pbx.example.com/auth/forgot', body, {
+    clientAddress: address
+  });
 }
 
 /** The HTTP status `promise` rejects with, or `undefined` when it rejects with anything else. */

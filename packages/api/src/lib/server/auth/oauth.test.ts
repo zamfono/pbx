@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
+import { makeTestDb } from '#testing/testDb.js';
+
 import { keyringFromEnv } from '../secretbox.js';
-import { makeTestDb } from '../testDb.js';
 import { AuthCodeStore } from './codes.js';
 import { revokeEndpoint } from './oauth.js';
 import { registerEndpoint, type RegisterDeps } from './registerEndpoint.js';

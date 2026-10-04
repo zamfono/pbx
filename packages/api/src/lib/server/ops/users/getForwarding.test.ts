@@ -2,17 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_SIP_HEADERS, type Db } from '@zamfono/shared';
 
-import { makeTestDb, seedSettings } from '#lib/server/testDb.js';
-
 import {
   admin,
-  createTrunk,
-  createUser,
+  createSipTargetTrunk,
+  createUserActor,
   getForwarding,
   setForwarding,
   storedTargetIds,
   type Rule
-} from './forwardingTestKit.js';
+} from '#testing/forwardingTestKit.js';
+import { makeTestDb, seedSettings } from '#testing/testDb.js';
 
 /** Every audit entry `operation` wrote, which a read must never add to (§5.7). */
 async function auditCount(db: Db, operation: string): Promise<number> {
@@ -29,8 +28,8 @@ describe('users.getForwarding', () => {
   it('reads a user’s own rules in the PUT’s shape, sip headers included, in condition order', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const anna = await createUser(db, 'Anna Huber', '101');
-    const trunkId = await createTrunk(db);
+    const anna = await createUserActor(db, 'Anna Huber', '101');
+    const trunkId = await createSipTargetTrunk(db);
     expect(await getForwarding(db, anna.id, anna)).toEqual({
       id: anna.id,
       rules: []
@@ -82,8 +81,8 @@ describe('users.getForwarding', () => {
   it("refuses a user reading another user's forwarding with 403, and lets an admin read anyone's", async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const anna = await createUser(db, 'Anna Huber', '101');
-    const ben = await createUser(db, 'Ben Roth', '102');
+    const anna = await createUserActor(db, 'Anna Huber', '101');
+    const ben = await createUserActor(db, 'Ben Roth', '102');
     const rules: Rule[] = [
       { condition: 'busy', target: { kind: 'mailboxUser', userId: ben.id } }
     ];
@@ -103,8 +102,8 @@ describe('users.getForwarding', () => {
   it('round-trips: a user sending back what they read, a sip rule included, changes nothing', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const anna = await createUser(db, 'Anna Huber', '101');
-    const trunkId = await createTrunk(db);
+    const anna = await createUserActor(db, 'Anna Huber', '101');
+    const trunkId = await createSipTargetTrunk(db);
     await setForwarding(db, anna.id, [
       {
         condition: 'noAnswer',

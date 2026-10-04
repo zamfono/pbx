@@ -3,11 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
 import { propagateConfig } from '#lib/server/propagation.js';
-import {
-  asConfirmedRun,
-  makeTestDb,
-  seedSettings
-} from '#lib/server/testDb.js';
+import { createUser } from '#testing/fixtures.js';
+import { asConfirmedRun, makeTestDb, seedSettings } from '#testing/testDb.js';
 
 import type { HoursWire } from '../hours/get.js';
 import { runOperation } from '../runner.js';
@@ -22,21 +19,6 @@ import '../ooo/index.js';
 import '../settings/index.js';
 import '../users/index.js';
 import './index.js';
-
-async function createUser(
-  db: Db,
-  name: string,
-  email: string,
-  extension: string
-): Promise<{ id: string }> {
-  const result = (await runOperation(
-    db,
-    'users.create',
-    { name, email, extension },
-    asConfirmedRun()
-  )) as { user: { id: string } };
-  return result.user;
-}
 
 /** The single audit row a call just wrote for `entityId`, most recent first. */
 async function latestAuditEntry(
@@ -55,14 +37,17 @@ describe('audit.undo', () => {
   it('restores a plain field change and writes the undo row', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
+    const userId = await createUser(db, '101', {
+      name: 'Anna Huber',
+      email: 'anna@x.test'
+    });
     await runOperation(
       db,
       'users.update',
-      { id: user.id, name: 'Anna Berger' },
+      { id: userId, name: 'Anna Berger' },
       asConfirmedRun()
     );
-    const entry = await latestAuditEntry(db, user.id);
+    const entry = await latestAuditEntry(db, userId);
 
     const result = (await runOperation(
       db,
@@ -75,7 +60,7 @@ describe('audit.undo', () => {
     const row = await db
       .selectFrom('users')
       .select('name')
-      .where('id', '=', user.id)
+      .where('id', '=', userId)
       .executeTakeFirstOrThrow();
     expect(row.name).toBe('Anna Huber');
     const reverted = await db
@@ -100,14 +85,17 @@ describe('audit.undo', () => {
   it("leaves the undo row's client columns NULL, even when a client calls it", async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
+    const userId = await createUser(db, '101', {
+      name: 'Anna Huber',
+      email: 'anna@x.test'
+    });
     await runOperation(
       db,
       'users.update',
-      { id: user.id, name: 'Anna Berger' },
+      { id: userId, name: 'Anna Berger' },
       asConfirmedRun()
     );
-    const entry = await latestAuditEntry(db, user.id);
+    const entry = await latestAuditEntry(db, userId);
 
     await runOperation(
       db,
@@ -131,21 +119,24 @@ describe('audit.undo', () => {
   it('refuses undo with 409 while a later live change exists for the entity', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
+    const userId = await createUser(db, '101', {
+      name: 'Anna Huber',
+      email: 'anna@x.test'
+    });
     await runOperation(
       db,
       'users.update',
-      { id: user.id, name: 'Anna Berger' },
+      { id: userId, name: 'Anna Berger' },
       asConfirmedRun()
     );
-    const first = await latestAuditEntry(db, user.id);
+    const first = await latestAuditEntry(db, userId);
     await runOperation(
       db,
       'users.update',
-      { id: user.id, name: 'Anna Carell' },
+      { id: userId, name: 'Anna Carell' },
       asConfirmedRun()
     );
-    const second = await latestAuditEntry(db, user.id);
+    const second = await latestAuditEntry(db, userId);
 
     await expect(
       runOperation(db, 'audit.undo', { id: first.id }, asConfirmedRun())
@@ -158,22 +149,25 @@ describe('audit.undo', () => {
   it('re-inserts the extension and devices an undone user deletion had dropped', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
+    const userId = await createUser(db, '101', {
+      name: 'Anna Huber',
+      email: 'anna@x.test'
+    });
     const device = (await runOperation(
       db,
       'devices.create',
-      { userId: user.id, label: 'Desk phone', kind: 'manual' },
+      { userId, label: 'Desk phone', kind: 'manual' },
       asConfirmedRun()
     )) as { device: { id: string } };
-    await runOperation(db, 'users.delete', { id: user.id }, asConfirmedRun());
-    const entry = await latestAuditEntry(db, user.id);
+    await runOperation(db, 'users.delete', { id: userId }, asConfirmedRun());
+    const entry = await latestAuditEntry(db, userId);
 
     await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 
     const userRow = await db
       .selectFrom('users')
       .select('deletedAt')
-      .where('id', '=', user.id)
+      .where('id', '=', userId)
       .executeTakeFirstOrThrow();
     expect(userRow.deletedAt).toBeNull();
     const ext = await db
@@ -181,7 +175,7 @@ describe('audit.undo', () => {
       .select('userId')
       .where('ext', '=', '101')
       .executeTakeFirstOrThrow();
-    expect(ext.userId).toBe(user.id);
+    expect(ext.userId).toBe(userId);
     const deviceRow = await db
       .selectFrom('devices')
       .select('deletedAt')
@@ -193,9 +187,12 @@ describe('audit.undo', () => {
   it('notifies pjsip/dialplan propagation when undoing a user deletion', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
-    await runOperation(db, 'users.delete', { id: user.id }, asConfirmedRun());
-    const entry = await latestAuditEntry(db, user.id);
+    const userId = await createUser(db, '101', {
+      name: 'Anna Huber',
+      email: 'anna@x.test'
+    });
+    await runOperation(db, 'users.delete', { id: userId }, asConfirmedRun());
+    const entry = await latestAuditEntry(db, userId);
     vi.mocked(propagateConfig).mockClear();
 
     await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
@@ -208,26 +205,35 @@ describe('audit.undo', () => {
   it('refuses undo with 409 once another user has taken the freed e-mail', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
-    await runOperation(db, 'users.delete', { id: user.id }, asConfirmedRun());
-    const entry = await latestAuditEntry(db, user.id);
-    const other = await createUser(db, 'Bea Nolte', 'anna@x.test', '102');
+    const userId = await createUser(db, '101', {
+      name: 'Anna Huber',
+      email: 'anna@x.test'
+    });
+    await runOperation(db, 'users.delete', { id: userId }, asConfirmedRun());
+    const entry = await latestAuditEntry(db, userId);
+    const otherId = await createUser(db, '102', {
+      name: 'Bea Nolte',
+      email: 'anna@x.test'
+    });
 
     await expect(
       runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun())
     ).rejects.toMatchObject({
       status: 409,
-      detail: { references: [{ kind: 'user', id: other.id }] }
+      detail: { references: [{ kind: 'user', id: otherId }] }
     });
   });
 
   it('refuses undo with 409 once another user has taken the freed extension', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
-    await runOperation(db, 'users.delete', { id: user.id }, asConfirmedRun());
-    const entry = await latestAuditEntry(db, user.id);
-    await createUser(db, 'Bea Nolte', 'bea@x.test', '101');
+    const userId = await createUser(db, '101', {
+      name: 'Anna Huber',
+      email: 'anna@x.test'
+    });
+    await runOperation(db, 'users.delete', { id: userId }, asConfirmedRun());
+    const entry = await latestAuditEntry(db, userId);
+    await createUser(db, '101', { name: 'Bea Nolte', email: 'bea@x.test' });
 
     await expect(
       runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun())
@@ -240,15 +246,18 @@ describe('audit.undo', () => {
   it('reverts a creation entry by deleting the row it created', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
-    const entry = await latestAuditEntry(db, user.id);
+    const userId = await createUser(db, '101', {
+      name: 'Anna Huber',
+      email: 'anna@x.test'
+    });
+    const entry = await latestAuditEntry(db, userId);
 
     await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 
     const row = await db
       .selectFrom('users')
       .select('deletedAt')
-      .where('id', '=', user.id)
+      .where('id', '=', userId)
       .executeTakeFirstOrThrow();
     expect(row.deletedAt).not.toBeNull();
   });
@@ -304,11 +313,14 @@ describe('audit.undo', () => {
   it('refuses undo of a masked, secret-bearing change', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
+    const userId = await createUser(db, '101', {
+      name: 'Anna Huber',
+      email: 'anna@x.test'
+    });
     const device = (await runOperation(
       db,
       'devices.create',
-      { userId: user.id, label: 'Desk phone', kind: 'manual' },
+      { userId, label: 'Desk phone', kind: 'manual' },
       asConfirmedRun()
     )) as { device: { id: string } };
     await runOperation(
@@ -332,21 +344,24 @@ describe('audit.list', () => {
   it('filters by entity and hides undone entries by default', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
-    await createUser(db, 'Bea Nolte', 'bea@x.test', '102');
+    const userId = await createUser(db, '101', {
+      name: 'Anna Huber',
+      email: 'anna@x.test'
+    });
+    await createUser(db, '102', { name: 'Bea Nolte', email: 'bea@x.test' });
     await runOperation(
       db,
       'users.update',
-      { id: user.id, name: 'Anna Berger' },
+      { id: userId, name: 'Anna Berger' },
       asConfirmedRun()
     );
-    const entry = await latestAuditEntry(db, user.id);
+    const entry = await latestAuditEntry(db, userId);
     await runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun());
 
     const live = (await runOperation(
       db,
       'audit.list',
-      { entityKind: 'user', entityId: user.id },
+      { entityKind: 'user', entityId: userId },
       asConfirmedRun()
     )) as { items: { entityId: string | null; operation: string }[] };
     expect(live.items.map(item => item.operation)).toEqual([
@@ -357,7 +372,7 @@ describe('audit.list', () => {
     const all = (await runOperation(
       db,
       'audit.list',
-      { entityKind: 'user', entityId: user.id, state: 'all' },
+      { entityKind: 'user', entityId: userId, state: 'all' },
       asConfirmedRun()
     )) as { items: { operation: string }[] };
     expect(all.items.map(item => item.operation)).toEqual([
@@ -619,7 +634,10 @@ describe('audit.undo of an entry it cannot replay', () => {
   it('refuses with 409 and leaves the entry live', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
+    const userId = await createUser(db, '101', {
+      name: 'Anna Huber',
+      email: 'anna@x.test'
+    });
     const id = newId();
     await db
       .insertInto('auditLog')
@@ -632,7 +650,7 @@ describe('audit.undo of an entry it cannot replay', () => {
         clientName: null,
         operation: 'users.update',
         entityKind: 'user',
-        entityId: user.id,
+        entityId: userId,
         // A field no `users.update` input carries: §5.8 answers 409 rather than replaying a diff
         // the owning operation cannot accept. (`logLevel` is a real input, so it replays.)
         changesJson: JSON.stringify([
@@ -660,26 +678,32 @@ describe('audit.undo of an entry it cannot replay', () => {
   it('refuses with 409 once another user has taken the freed SSO subject', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
+    const userId = await createUser(db, '101', {
+      name: 'Anna Huber',
+      email: 'anna@x.test'
+    });
     await db
       .updateTable('users')
       .set({ ssoSubject: 'subject-1' })
-      .where('id', '=', user.id)
+      .where('id', '=', userId)
       .execute();
-    await runOperation(db, 'users.delete', { id: user.id }, asConfirmedRun());
-    const entry = await latestAuditEntry(db, user.id);
-    const other = await createUser(db, 'Bea Nolte', 'bea@x.test', '102');
+    await runOperation(db, 'users.delete', { id: userId }, asConfirmedRun());
+    const entry = await latestAuditEntry(db, userId);
+    const otherId = await createUser(db, '102', {
+      name: 'Bea Nolte',
+      email: 'bea@x.test'
+    });
     await db
       .updateTable('users')
       .set({ ssoSubject: 'subject-1' })
-      .where('id', '=', other.id)
+      .where('id', '=', otherId)
       .execute();
 
     await expect(
       runOperation(db, 'audit.undo', { id: entry.id }, asConfirmedRun())
     ).rejects.toMatchObject({
       status: 409,
-      detail: { references: [{ kind: 'user', id: other.id }] }
+      detail: { references: [{ kind: 'user', id: otherId }] }
     });
   });
 });

@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import { access, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -16,8 +15,11 @@ import {
 import { HTTP_OK, HTTP_SERVICE_UNAVAILABLE, openDb } from '@zamfono/shared';
 import { migratedTestDb, MIGRATIONS_DIR } from '@zamfono/shared/testDb.js';
 
+import { testKeyring } from '#testing/fixtures.js';
+import { seedSettings } from '#testing/testDb.js';
+
 import { apiHealth, healthStatus } from './health.js';
-import { decrypt, keyringFromEnv, type Keyring } from './secretbox.js';
+import { decrypt } from './secretbox.js';
 import { seedIfEmpty } from './seed.js';
 import type { SeedEnv } from './seedEnv.js';
 import {
@@ -25,18 +27,10 @@ import {
   MOH_TRACK_BASENAMES,
   MOH_WIDEBAND_EXT
 } from './seedMoh.js';
-import { seedSettings } from './testDb.js';
 
-const KEY_BYTES = 32;
 const EXT_LENGTH_TWO = 2;
 
 const silentLogger = pino({ level: 'silent' });
-
-function testKeyring(): Keyring {
-  return keyringFromEnv({
-    SECRETBOX_KEY: `1:${randomBytes(KEY_BYTES).toString('base64')}`
-  });
-}
 
 async function tempDir(prefix: string): Promise<string> {
   const dir = await mkdtemp(path.join(tmpdir(), prefix));

@@ -1,10 +1,10 @@
 import { newId, type CallStatus, type Db } from '@zamfono/shared';
 
-import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
+import { runOperation } from '#lib/server/ops/runner.js';
 
-import { runOperation } from '../runner.js';
+import { asRun, makeTestDb, seedSettings } from './testDb.js';
 
-import './index.js';
+import '#lib/server/ops/stats/index.js';
 
 // Fixtures the statistics tests share (`index.test.ts`, `tenantClock.test.ts`): a tenant on a
 // given clock, call rows, and `stats.query` called as the owner. Importing it registers the

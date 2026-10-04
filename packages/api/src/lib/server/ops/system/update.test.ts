@@ -10,7 +10,7 @@ import {
   type UpdateState
 } from '@zamfono/shared';
 
-import { makeTestDb } from '#lib/server/testDb.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 import { OpError } from '../types.js';

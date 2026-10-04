@@ -7,6 +7,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { signAccessToken } from '#lib/server/auth/jwt.js';
 import { getDb } from '#lib/server/db.js';
+import { requestEvent } from '#testing/requestEvent.js';
 
 import { POST } from './+server.js';
 
@@ -49,8 +50,8 @@ async function eventFor(
   );
   const name: Record<string, string> =
     typeof params.name === 'string' ? { 'mcp-name': params.name } : {};
-  return {
-    request: new Request(`${ORIGIN}/mcp`, {
+  return requestEvent(`${ORIGIN}/mcp`, {
+    init: {
       method: 'POST',
       headers: {
         authorization: `Bearer ${token}`,
@@ -71,8 +72,8 @@ async function eventFor(
           }
         }
       })
-    })
-  } as RequestEvent;
+    }
+  });
 }
 
 describe('POST /mcp', () => {

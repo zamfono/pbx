@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';
 import type { Transporter } from 'nodemailer';
@@ -7,13 +6,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nowIso, type Db, type MailRequest } from '@zamfono/shared';
 import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
+import { testKeyring } from '#testing/fixtures.js';
+import { seedSettings } from '#testing/testDb.js';
+
 import { voicemailAttachment } from '../audio/transcode.js';
-import { keyringFromEnv, type Keyring } from '../secretbox.js';
-import { seedSettings } from '../testDb.js';
 import { relayFromSettings } from './relay.js';
 import { sendMail, type SetupOrResetRequest } from './send.js';
-
-const KEY_BYTE_LENGTH = 32;
 
 // The real transcode shells out to `ffmpeg`; these tests assert which bytes reach the relay,
 // so the transcode stands in as a stub that records the path it was handed.
@@ -37,18 +35,6 @@ vi.mock('pino', () => ({
     }
   })
 }));
-
-function testKeyring(): Keyring {
-  return keyringFromEnv({
-    SECRETBOX_KEY: `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`
-  });
-}
-
-/** A migrated in-memory database. */
-async function migratedDb(): Promise<Db> {
-  const db = await migratedTestDb();
-  return db;
-}
 
 /** Inserts the `settings` singleton, with a relay configured unless `smtpHost` is `null`. */
 async function insertSettings(
@@ -88,13 +74,13 @@ function fakeTransport(): { transport: Transporter; sent: unknown[] } {
 
 describe('relayFromSettings', () => {
   it('is null while smtp_host is unset', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await insertSettings(db, { smtpHost: null });
     await expect(relayFromSettings(db, testKeyring())).resolves.toBeNull();
   });
 
   it('is null when smtp_host is set but mail_from is not', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await insertSettings(db, { smtpHost: 'smtp.example.test' });
     await db
       .updateTable('settings')
@@ -119,7 +105,7 @@ describe('sendMail', () => {
 
   it('sends a voicemail mail with the recipient, subject and attachment', async () => {
     vi.stubEnv('MEDIA_DIR', '/srv/media');
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await insertSettings(db, { smtpHost: 'smtp.example.test' });
     await insertUser(db, 'u1', 'user@example.test');
     const { transport, sent } = fakeTransport();
@@ -164,7 +150,7 @@ describe('sendMail', () => {
   });
 
   it('sends the notification without an attachment when the transcode fails', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await insertSettings(db, { smtpHost: 'smtp.example.test' });
     await insertUser(db, 'u1', 'user@example.test');
     const { transport, sent } = fakeTransport();
@@ -196,7 +182,7 @@ describe('sendMail', () => {
   });
 
   it('names the call in the line logged when a mail about it cannot be sent (§7)', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await insertSettings(db, { smtpHost: 'smtp.example.test' });
     await insertUser(db, 'u1', 'user@example.test');
     const transport = {
@@ -227,7 +213,7 @@ describe('sendMail', () => {
   });
 
   it('bccs a ring group with several members instead of sharing one To header', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await insertSettings(db, { smtpHost: 'smtp.example.test' });
     await insertUser(db, 'u1', 'one@example.test');
     await insertUser(db, 'u2', 'two@example.test');
@@ -276,7 +262,7 @@ describe('sendMail', () => {
   });
 
   it('returns skipped while no relay is configured', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await insertSettings(db, { smtpHost: null });
     await insertUser(db, 'u1', 'user@example.test');
     const { transport } = fakeTransport();
@@ -298,7 +284,7 @@ describe('sendMail', () => {
 
   it('renders a non-empty fqdn from FQDN', async () => {
     process.env.FQDN = 'pbx.example.test';
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await insertSettings(db, { smtpHost: 'smtp.example.test' });
     await insertUser(db, 'u1', 'user@example.test');
     const { transport, sent } = fakeTransport();

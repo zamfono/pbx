@@ -6,9 +6,10 @@ import { type Db } from '@zamfono/shared';
 import {
   installRingotelFake,
   type RingotelFake
-} from '../provisioning/ringotelFake.js';
+} from '#testing/ringotelFake.js';
+import { asConfirmedRun, makeTestDb, seedSettings } from '#testing/testDb.js';
+
 import { encrypt, keyringFromEnv } from '../secretbox.js';
-import { asConfirmedRun, makeTestDb, seedSettings } from '../testDb.js';
 import { isRosterPending, retryPendingRoster } from './roster.js';
 import { runOperation } from './runner.js';
 

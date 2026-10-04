@@ -12,13 +12,15 @@ import {
 } from '@zamfono/shared';
 import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
+import { createUser } from '#testing/fixtures.js';
+
 import { runOperation } from '../ops/runner.js';
 import { runPurge } from './purge.js';
 
 import '../ops/ooo/index.js';
 import '../ops/users/index.js';
 
-import { asConfirmedRun, seedSettings } from '../testDb.js';
+import { asConfirmedRun, seedSettings } from '#testing/testDb.js';
 
 const DAYS_PAST_DEFAULT_RETENTION = 31;
 const DAYS_WITHIN_DEFAULT_RETENTION = 5;
@@ -66,11 +68,6 @@ async function insertRefreshToken(
 async function clientIdsOf(db: Db): Promise<string[]> {
   const rows = await db.selectFrom('oauthClients').select('clientId').execute();
   return rows.map(row => row.clientId).sort();
-}
-
-async function migratedDb(): Promise<Db> {
-  const db = await migratedTestDb();
-  return db;
 }
 
 /** A `did_blocks` row; `digits` NULL means "any number starting with `base`" (§5.9). */
@@ -122,19 +119,9 @@ async function insertDid(
   return id;
 }
 
-async function createUser(db: Db, extension: string): Promise<string> {
-  const result = (await runOperation(
-    db,
-    'users.create',
-    { name: 'Anna Huber', email: `${extension}@x.test`, extension },
-    asConfirmedRun()
-  )) as { user: { id: string } };
-  return result.user.id;
-}
-
 describe('runPurge', () => {
   it('purges a user whose own rule targets their own mailbox, with no FK error, and clears the orphaned target', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const userId = await createUser(db, '101');
     await runOperation(
@@ -186,7 +173,7 @@ describe('runPurge', () => {
   });
 
   it('purges a soft-deleted DID whose target is a soft-deleted user, with no FK error', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const userId = await createUser(db, '105');
     const targetId = newId();
@@ -256,7 +243,7 @@ describe('runPurge', () => {
   });
 
   it('purges a soft-deleted DID whose target is a soft-deleted announcement asset, with no FK error', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const audioId = newId();
     await db
@@ -324,7 +311,7 @@ describe('runPurge', () => {
   });
 
   it('purges a user whose own OOO rule targets their own mailbox, with no FK error', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const userId = await createUser(db, '104');
     await runOperation(
@@ -376,7 +363,7 @@ describe('runPurge', () => {
   });
 
   it('leaves a soft-deleted row younger than the retention window untouched', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const userId = await createUser(db, '102');
     await runOperation(db, 'users.delete', { id: userId }, asConfirmedRun());
@@ -403,7 +390,7 @@ describe('runPurge', () => {
   });
 
   it('purges expired tokens and audit_log entries beyond audit_retention_days', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const userId = await createUser(db, '103');
     const now = nowIso();
@@ -484,7 +471,7 @@ describe('runPurge', () => {
   });
 
   it('purges backup_runs older than recording_retention_days and keeps the younger ones', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const now = nowIso();
     await db
@@ -529,7 +516,7 @@ describe('runPurge', () => {
   });
 
   it('purges an oauth_clients row only once its last token expired more than 30 days ago', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const userId = await createUser(db, '104');
     const now = nowIso();
@@ -578,7 +565,7 @@ describe('runPurge', () => {
   });
 
   it('keeps a client that kept refreshing until 30 days after its last token expired', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const userId = await createUser(db, '105');
     const now = nowIso();
@@ -603,7 +590,7 @@ describe('runPurge', () => {
   });
 
   it('purges a client no token references, unless it was authorized within the code lifetime', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const now = nowIso();
     // Authorized a moment ago: its code may not have been redeemed for a token yet (§5.2).
@@ -621,7 +608,7 @@ describe('runPurge', () => {
   });
 
   it('keeps a due DID block that still holds a live DID, and purges the rest of the pass', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const now = nowIso();
     const deletedAt = daysAfter(now, -DAYS_PAST_DEFAULT_RETENTION);
@@ -639,7 +626,7 @@ describe('runPurge', () => {
   });
 
   it('purges a due DID block whose only DIDs inside it are soft-deleted', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const now = nowIso();
     const deletedAt = daysAfter(now, -DAYS_PAST_DEFAULT_RETENTION);
@@ -657,7 +644,7 @@ describe('runPurge', () => {
   });
 
   it('keeps a due digits block only while a live DID matches its digit count', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const now = nowIso();
     const deletedAt = daysAfter(now, -DAYS_PAST_DEFAULT_RETENTION);
@@ -721,7 +708,7 @@ describe('runPurge: voicemail files', () => {
     onTestFinished(() => rm(mediaDir, { recursive: true, force: true }));
     await mkdir(path.join(mediaDir, 'voicemail'), { recursive: true });
     process.env.MEDIA_DIR = mediaDir;
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await seedSettings(db);
     const deletedUser = await createUser(db, '101');
     const liveUser = await createUser(db, '102');

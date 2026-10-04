@@ -1,7 +1,8 @@
 // The 2025-11-25 era's side of the MCP test fixtures (`testKit.ts`): a session opened with
 // `initialize`, its requests, and the SSE events a response streams.
 
-import { handleMcpRequest, type McpDeps } from '../mcp.js';
+import { handleMcpRequest, type McpDeps } from '#lib/server/mcp.js';
+
 import { LEGACY, mcpRequest } from './testKit.js';
 
 const SSE_SEPARATOR = '\n\n';

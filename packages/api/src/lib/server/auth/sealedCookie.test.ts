@@ -1,36 +1,16 @@
-import { randomBytes } from 'node:crypto';
-import type { Cookies } from '@sveltejs/kit';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { MS_PER_SECOND } from '@zamfono/shared';
 
-import { encrypt, keyringFromEnv, type Keyring } from '../secretbox.js';
+import { testKeyring } from '#testing/fixtures.js';
+import { cookieJar } from '#testing/requestEvent.js';
+
+import { encrypt } from '../secretbox.js';
 import { CONSENT_COOKIE, type PendingConsent } from './consent.js';
 import { setSealedCookie, unsealCookie } from './sealedCookie.js';
 import { SSO_COOKIE, type PendingLogin } from './ssoCookie.js';
 
-const KEY_BYTE_LENGTH = 32;
 const NOW_MS = Date.parse('2026-01-01T00:00:00.000Z');
-
-function testKeyring(): Keyring {
-  return keyringFromEnv({
-    SECRETBOX_KEY: `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`
-  });
-}
-
-type Written = { value: string; options: Record<string, unknown> };
-
-/** An in-memory `event.cookies` that also keeps the options each cookie was set with. */
-function cookieJar(): Cookies & { written: Map<string, Written> } {
-  const written = new Map<string, Written>();
-  return {
-    written,
-    get: (name: string) => written.get(name)?.value,
-    set: (name: string, value: string, options: Record<string, unknown>) => {
-      written.set(name, { value, options });
-    }
-  } as unknown as Cookies & { written: Map<string, Written> };
-}
 
 const consent: PendingConsent = {
   userId: 'user-1',

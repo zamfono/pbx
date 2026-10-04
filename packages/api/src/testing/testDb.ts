@@ -3,8 +3,8 @@ import type { Insertable } from 'kysely';
 import { newId, nowIso, type DB, type Db } from '@zamfono/shared';
 import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
-import type { RunInput } from './ops/runner.js';
-import type { Actor } from './ops/types.js';
+import type { RunInput } from '#lib/server/ops/runner.js';
+import type { Actor } from '#lib/server/ops/types.js';
 
 /** The `owner` user `makeTestDb` seeds, as the actor operations run as. */
 export const owner: Actor = { id: 'owner', name: 'Owner', role: 'owner' };

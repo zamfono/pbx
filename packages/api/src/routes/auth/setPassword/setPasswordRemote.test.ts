@@ -1,5 +1,5 @@
 import process from 'node:process';
-import { isRedirect, type RequestEvent } from '@sveltejs/kit';
+import { isRedirect } from '@sveltejs/kit';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso } from '@zamfono/shared';
@@ -10,7 +10,8 @@ import { verifyPassword } from '#lib/server/auth/password.js';
 import { issueResetToken } from '#lib/server/auth/tokens.js';
 import { getDb } from '#lib/server/db.js';
 import { sha256Hex } from '#lib/server/hash.js';
-import { seedSettings } from '#lib/server/testDb.js';
+import { jsonPost, requestEvent } from '#testing/requestEvent.js';
+import { seedSettings } from '#testing/testDb.js';
 
 import { POST } from '../reset/+server.js';
 import { load } from './+page.server.js';
@@ -76,9 +77,7 @@ async function tokenRevoked(raw: string): Promise<boolean> {
 }
 
 function pageEvent(search: string): Parameters<typeof load>[0] {
-  return {
-    url: new URL(`https://pbx.example.com/auth/setPassword${search}`)
-  } as unknown as Parameters<typeof load>[0];
+  return requestEvent(`https://pbx.example.com/auth/setPassword${search}`);
 }
 
 beforeAll(async () => {
@@ -106,11 +105,12 @@ describe('the set-password form', () => {
     expect(await verifyPassword(user.passwordHash, PASSWORD)).toBe(true);
     expect(await tokenRevoked(raw)).toBe(true);
     // The same token checks as `POST /auth/reset`: a link the form redeemed is refused there too.
-    const rest = await POST({
-      request: {
-        json: () => Promise.resolve({ token: raw, password: PASSWORD })
-      }
-    } as unknown as RequestEvent);
+    const rest = await POST(
+      jsonPost('https://pbx.example.com/auth/reset', {
+        token: raw,
+        password: PASSWORD
+      })
+    );
     expect(rest.status).toBe(400);
     // …and the page's own load sends it to the expired-link error page.
     expect(await redirectOf(load(pageEvent(`?token=${raw}`)))).toEqual({
@@ -137,11 +137,12 @@ describe('the set-password form', () => {
     ).toEqual({ message: 'This link has expired or was already used.' });
     const userId = await newUser('dora@example.com');
     const { raw } = await issueResetToken(getDb(), userId, 'reset', nowIso());
-    const rest = await POST({
-      request: {
-        json: () => Promise.resolve({ token: raw, password: PASSWORD })
-      }
-    } as unknown as RequestEvent);
+    const rest = await POST(
+      jsonPost('https://pbx.example.com/auth/reset', {
+        token: raw,
+        password: PASSWORD
+      })
+    );
     expect(rest.status).toBe(200);
     expect(await submit({ token: raw, _password: PASSWORD })).toEqual({
       message: 'This link has expired or was already used.'

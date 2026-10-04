@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { type Db } from '@zamfono/shared';
 
-import { makeTestDb, seedSettings } from '../testDb.js';
+import { makeTestDb, seedSettings } from '#testing/testDb.js';
+
 import type { Busy } from './maintenanceGiveUp.js';
 import {
   createMaintenanceGate,

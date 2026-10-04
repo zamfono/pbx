@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import type { Db } from '@zamfono/shared';
 
-import { asRun, makeTestDb } from '#lib/server/testDb.js';
+import { createTrunk } from '#testing/fixtures.js';
+import { asRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 
 import '../trunks/index.js';
 import './index.js';
 
-type TrunkOutput = { trunk: { id: string } };
 type RouteWire = {
   id: string;
   priority: number;
@@ -21,17 +21,7 @@ type RoutesOutput = { items: RouteWire[] };
 async function createTrunkAndCatchAll(
   db: Db
 ): Promise<{ trunkId: string; routeId: string }> {
-  const { trunk } = (await runOperation(
-    db,
-    'trunks.create',
-    {
-      name: 'Provider A',
-      emergency: true,
-      authMode: 'ip',
-      hosts: [{ host: 'sip.provider.example' }]
-    },
-    asRun()
-  )) as TrunkOutput;
+  const { trunk } = await createTrunk(db);
   const { items } = (await runOperation(
     db,
     'outboundRoutes.list',

@@ -2,10 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
 
+import { makeTestDb, seedSettings } from '#testing/testDb.js';
+
 import { renderMetrics } from './metrics.js';
 import { recordApiRequestSeconds } from './metricsCounters.js';
 import { updaterClient, type UpdaterClient } from './ops/system/_updater.js';
-import { makeTestDb, seedSettings } from './testDb.js';
 
 vi.mock('./ops/system/_updater.js', async importOriginal => ({
   ...(await importOriginal<typeof import('./ops/system/_updater.js')>()),

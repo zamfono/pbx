@@ -1,9 +1,10 @@
-import { randomBytes } from 'node:crypto';
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
 
-import { nowIso, type Db } from '@zamfono/shared';
+import { nowIso } from '@zamfono/shared';
 import { migratedTestDb } from '@zamfono/shared/testDb.js';
+
+import { keySpec } from '#testing/fixtures.js';
 
 import { openTargetSecret } from './ops/backups/_secret.js';
 import { keyringFromEnv } from './secretbox.js';
@@ -13,19 +14,13 @@ import {
 } from './seedBackupTarget.js';
 
 const logger = pino({ level: 'silent' });
-const KEY_BYTES = 32;
 const kr = keyringFromEnv({
-  SECRETBOX_KEY: `1:${randomBytes(KEY_BYTES).toString('base64')}`
+  SECRETBOX_KEY: keySpec()
 });
-
-async function migratedDb(): Promise<Db> {
-  const db = await migratedTestDb();
-  return db;
-}
 
 describe('createDefaultBackupTarget', () => {
   it('creates a local target on the backups volume, keyed by BACKUP_PASSWORD', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await createDefaultBackupTarget(
       db,
       { BACKUP_PASSWORD: 'from-env', MOH_SOURCE_DIR: '' },
@@ -48,7 +43,7 @@ describe('createDefaultBackupTarget', () => {
   });
 
   it('creates nothing without BACKUP_PASSWORD', async () => {
-    const db = await migratedDb();
+    const db = await migratedTestDb();
     await createDefaultBackupTarget(
       db,
       { MOH_SOURCE_DIR: '' },

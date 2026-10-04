@@ -1,6 +1,5 @@
 import { randomBytes } from 'node:crypto';
 import process from 'node:process';
-import type { RequestEvent } from '@sveltejs/kit';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { epochSeconds, nowIso } from '@zamfono/shared';
@@ -8,6 +7,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { encodeLinkToken, signAccessToken } from '#lib/server/auth/jwt.js';
 import { getDb } from '#lib/server/db.js';
+import { requestEvent } from '#testing/requestEvent.js';
 
 import { handle, init as initHooks } from './hooks.server.js';
 
@@ -52,40 +52,26 @@ beforeAll(async () => {
     .execute();
 });
 
-/** A minimal `RequestEvent`-shaped value: `handle` reads only `request`, `url`, `locals` and `getClientAddress`. */
-function eventFor(
-  url: string,
-  init?: RequestInit,
-  clientAddress = '198.51.100.1'
-): RequestEvent {
-  return {
-    request: new Request(url, init),
-    url: new URL(url),
-    locals: {},
-    getClientAddress: () => clientAddress
-  } as RequestEvent;
-}
-
 const resolvePassThrough = (): Promise<Response> =>
   Promise.resolve(new Response('ok'));
 
 describe('hooks handle', () => {
   it('refuses /internal/* carrying X-Forwarded-For with 404', async () => {
-    const event = eventFor('http://internal/internal/mail', {
-      headers: { 'x-forwarded-for': '203.0.113.9' }
+    const event = requestEvent('http://internal/internal/mail', {
+      init: { headers: { 'x-forwarded-for': '203.0.113.9' } }
     });
     const response = await handle({ event, resolve: resolvePassThrough });
     expect(response.status).toBe(404);
   });
 
   it('resolves /internal/* through without the header', async () => {
-    const event = eventFor('http://internal/internal/mail');
+    const event = requestEvent('http://internal/internal/mail');
     const response = await handle({ event, resolve: resolvePassThrough });
     expect(await response.text()).toBe('ok');
   });
 
   it('answers 401 problem+json for /api/v1/* without a bearer token', async () => {
-    const event = eventFor('http://internal/api/v1/users');
+    const event = requestEvent('http://internal/api/v1/users');
     const response = await handle({ event, resolve: resolvePassThrough });
     expect(response.status).toBe(401);
     expect(response.headers.get('content-type')).toBe(
@@ -94,7 +80,7 @@ describe('hooks handle', () => {
   });
 
   it('answers 401 for the openapi document without a bearer token', async () => {
-    const event = eventFor('http://internal/api/v1/openapi.json');
+    const event = requestEvent('http://internal/api/v1/openapi.json');
     const response = await handle({ event, resolve: resolvePassThrough });
     expect(response.status).toBe(401);
   });
@@ -104,7 +90,9 @@ describe('hooks handle', () => {
     const address = '203.0.113.50';
     const responses: Response[] = [];
     for (let attempt = 0; attempt < TOKEN_LIMIT_PER_MINUTE + 1; attempt += 1) {
-      const event = eventFor('http://internal/oauth/token', undefined, address);
+      const event = requestEvent('http://internal/oauth/token', {
+        clientAddress: address
+      });
       // eslint-disable-next-line no-await-in-loop -- each request must count before the next is made
       responses.push(await handle({ event, resolve: resolvePassThrough }));
     }
@@ -123,11 +111,9 @@ describe('hooks handle', () => {
       attempt < REGISTER_LIMIT_PER_MINUTE + 1;
       attempt += 1
     ) {
-      const event = eventFor(
-        'http://internal/oauth/register',
-        undefined,
-        address
-      );
+      const event = requestEvent('http://internal/oauth/register', {
+        clientAddress: address
+      });
       // eslint-disable-next-line no-await-in-loop -- each request must count before the next is made
       responses.push(await handle({ event, resolve: resolvePassThrough }));
     }
@@ -136,11 +122,9 @@ describe('hooks handle', () => {
   });
 
   it('does not rate limit a client registration request under the limit', async () => {
-    const event = eventFor(
-      'http://internal/oauth/register',
-      undefined,
-      '203.0.113.51'
-    );
+    const event = requestEvent('http://internal/oauth/register', {
+      clientAddress: '203.0.113.51'
+    });
     const response = await handle({ event, resolve: resolvePassThrough });
     expect(await response.text()).toBe('ok');
   });
@@ -194,8 +178,8 @@ describe('hooks handle', () => {
       nowS,
       'https://pbx.example.com'
     );
-    const event = eventFor('http://internal/api/v1/users', {
-      headers: { authorization: `Bearer ${token}` }
+    const event = requestEvent('http://internal/api/v1/users', {
+      init: { headers: { authorization: `Bearer ${token}` } }
     });
     await handle({ event, resolve: resolvePassThrough });
     expect(event.locals.auth).toEqual({
@@ -215,7 +199,9 @@ describe('hooks handle', () => {
       iat: nowS,
       exp: nowS + 300
     });
-    const linked = eventFor(`http://internal${path}?access_token=${linkToken}`);
+    const linked = requestEvent(
+      `http://internal${path}?access_token=${linkToken}`
+    );
     const viaLink = await handle({
       event: linked,
       resolve: resolvePassThrough
@@ -229,8 +215,8 @@ describe('hooks handle', () => {
       'https://pbx.example.com'
     );
     const viaBearer = await handle({
-      event: eventFor(`http://internal${path}`, {
-        headers: { authorization: `Bearer ${bearerToken}` }
+      event: requestEvent(`http://internal${path}`, {
+        init: { headers: { authorization: `Bearer ${bearerToken}` } }
       }),
       resolve: resolvePassThrough
     });

@@ -1,29 +1,22 @@
-import { randomBytes } from 'node:crypto';
 import process from 'node:process';
-import type { RequestEvent } from '@sveltejs/kit';
 import { describe, expect, it } from 'vitest';
 
 import { HTTP_ACCEPTED, HTTP_BAD_REQUEST } from '@zamfono/shared';
 
-import { POST } from './+server.js';
+import { keySpec } from '#testing/fixtures.js';
+import { jsonPost } from '#testing/requestEvent.js';
 
-const KEY_BYTE_LENGTH = 32;
+import { POST } from './+server.js';
 
 // `getDb()` and `keyringFromEnv()` read these once per process; an in-memory database with no
 // migrations is enough here since the 202 case never awaits the mail send it kicks off.
 process.env.DB_FILE = ':memory:';
-process.env.SECRETBOX_KEY = `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
-
-/** A minimal `RequestEvent`-shaped value: the handler reads only `event.request`. */
-function eventFor(request: Request): RequestEvent {
-  return { request } as RequestEvent;
-}
+process.env.SECRETBOX_KEY = keySpec();
 
 describe('POST /internal/mail', () => {
   it('returns 400 for a voicemail filename that reaches outside the voicemail directory', async () => {
-    const request = new Request('http://internal/internal/mail', {
-      method: 'POST',
-      body: JSON.stringify({
+    const response = await POST(
+      jsonPost('http://internal/internal/mail', {
         kind: 'voicemail',
         to: { userId: 'u1' },
         values: {
@@ -35,15 +28,13 @@ describe('POST /internal/mail', () => {
         },
         filename: '../../etc/passwd'
       })
-    });
-    const response = await POST(eventFor(request));
+    );
     expect(response.status).toBe(HTTP_BAD_REQUEST);
   });
 
   it('returns 202 for a request with no X-Forwarded-For', async () => {
-    const request = new Request('http://internal/internal/mail', {
-      method: 'POST',
-      body: JSON.stringify({
+    const response = await POST(
+      jsonPost('http://internal/internal/mail', {
         kind: 'missedCall',
         to: { userId: 'unknown-user' },
         values: {
@@ -53,8 +44,7 @@ describe('POST /internal/mail', () => {
           didLabel: 'Main line'
         }
       })
-    });
-    const response = await POST(eventFor(request));
+    );
     expect(response.status).toBe(HTTP_ACCEPTED);
   });
 });

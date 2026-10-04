@@ -1,17 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { handleMcpRequest } from '../mcp.js';
 import {
   confirmationProblem,
   mcpRequest,
   seededDeps,
   type RpcBody
-} from './testKit.js';
+} from '#testing/mcp/testKit.js';
 import {
   legacyRequest,
   legacySession,
   readSseEvents
-} from './testKitLegacy.js';
+} from '#testing/mcp/testKitLegacy.js';
+
+import { handleMcpRequest } from '../mcp.js';
 
 // A legacy 2025-11-25 session's confirmation, asked as a server-initiated `elicitation/create`
 // on the tools/call's SSE stream (§10.5), when the person never answers it.

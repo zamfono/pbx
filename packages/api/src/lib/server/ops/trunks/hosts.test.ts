@@ -2,32 +2,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '@zamfono/shared';
 
-import { asRun, makeTestDb } from '#lib/server/testDb.js';
+import { createTrunk } from '#testing/fixtures.js';
+import { asRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 
 import '../outboundRoutes/index.js';
 import './index.js';
-
-type TrunkOutput = { trunk: { id: string } };
-
-async function createTrunk(
-  db: Db,
-  overrides: Record<string, unknown> = {}
-): Promise<TrunkOutput> {
-  return runOperation(
-    db,
-    'trunks.create',
-    {
-      name: 'Provider A',
-      emergency: true,
-      authMode: 'ip',
-      hosts: [{ host: 'sip.provider.example' }],
-      ...overrides
-    },
-    asRun()
-  ) as Promise<TrunkOutput>;
-}
 
 async function updateTrunk(
   db: Db,

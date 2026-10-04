@@ -3,8 +3,8 @@ import { z } from 'zod';
 
 import { provideEventSink } from '#lib/server/eventSink.js';
 import { propagateConfig } from '#lib/server/propagation.js';
+import { asRun, makeTestDb, owner } from '#testing/testDb.js';
 
-import { asRun, makeTestDb, owner } from '../testDb.js';
 import { recordChange } from './audit.js';
 import { propagate } from './propagate.js';
 import { register } from './registry.js';

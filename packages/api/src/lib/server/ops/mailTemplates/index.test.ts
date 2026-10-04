@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
+import { asRun, makeTestDb, seedSettings } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 import type { MailTemplateWire } from './_shared.js';

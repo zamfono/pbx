@@ -6,7 +6,7 @@ import { HTTP_SERVICE_UNAVAILABLE, type CoreHealth } from '@zamfono/shared';
 import { MIGRATIONS_DIR } from '@zamfono/shared/testDb.js';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
-import { stubCoreClient } from '#lib/server/coreClientStub.js';
+import { stubCoreClient } from '#testing/coreClientStub.js';
 
 import { GET } from './+server.js';
 

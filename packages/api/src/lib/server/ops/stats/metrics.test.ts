@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { nowIso, type Db } from '@zamfono/shared';
 
-import { insertCall, makeStatsDb, queryStats } from './statsTestKit.js';
+import { insertCall, makeStatsDb, queryStats } from '#testing/statsTestKit.js';
 
 const DAY = { from: '2026-01-01', to: '2026-01-01', bucket: 'day' } as const;
 

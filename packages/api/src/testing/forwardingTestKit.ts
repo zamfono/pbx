@@ -1,13 +1,14 @@
 import type { Db } from '@zamfono/shared';
 
-import { asRun, owner } from '#lib/server/testDb.js';
+import { runOperation } from '#lib/server/ops/runner.js';
+import type { Actor } from '#lib/server/ops/types.js';
 
-import { runOperation } from '../runner.js';
-import type { Actor } from '../types.js';
+import { createTrunk, createUser } from './fixtures.js';
+import { asRun, owner } from './testDb.js';
 
-import '../audit/index.js';
-import '../trunks/index.js';
-import './index.js';
+import '#lib/server/ops/audit/index.js';
+import '#lib/server/ops/trunks/index.js';
+import '#lib/server/ops/users/index.js';
 
 // Fixtures the forwarding tests share (`setForwarding.test.ts`, `setForwardingSip.test.ts`,
 // `getForwarding.test.ts`): an `admin` actor, `user`-role accounts, a trunk a `sip` target dials
@@ -15,42 +16,25 @@ import './index.js';
 export const admin: Actor = { id: 'admin-1', name: 'Admin', role: 'admin' };
 
 /** A `user`-role account, returned as the actor it signs in as. */
-export async function createUser(
+export async function createUserActor(
   db: Db,
   name: string,
   extension: string
 ): Promise<Actor> {
-  const { user } = (await runOperation(
-    db,
-    'users.create',
-    {
-      name,
-      email: `${extension}@x.test`,
-      extension,
-      role: 'user'
-    },
-    asRun()
-  )) as { user: { id: string } };
-  return { id: user.id, name, role: 'user' };
+  const id = await createUser(db, extension, { name, role: 'user' });
+  return { id, name, role: 'user' };
 }
 
 /** An `ip` trunk a `sip` target can dial over (§9.4 "SIP targets"). */
-export async function createTrunk(
+export async function createSipTargetTrunk(
   db: Db,
   name = 'OpenAI',
   host = 'sip.api.openai.com'
 ): Promise<string> {
-  const { trunk } = (await runOperation(
-    db,
-    'trunks.create',
-    {
-      name,
-      emergency: true,
-      authMode: 'ip',
-      hosts: [{ host, direction: 'outbound' }]
-    },
-    asRun()
-  )) as { trunk: { id: string } };
+  const { trunk } = await createTrunk(db, {
+    name,
+    hosts: [{ host, direction: 'outbound' }]
+  });
   return trunk.id;
 }
 

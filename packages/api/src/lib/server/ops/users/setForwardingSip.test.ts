@@ -2,19 +2,19 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_SIP_HEADERS, type Db } from '@zamfono/shared';
 
-import { makeTestDb, seedSettings } from '#lib/server/testDb.js';
-
-import type { Actor } from '../types.js';
 import {
   admin,
-  createTrunk,
-  createUser,
+  createSipTargetTrunk,
+  createUserActor,
   getForwarding,
   setForwarding,
   storedConditions,
   storedTargetIds,
   type Rule
-} from './forwardingTestKit.js';
+} from '#testing/forwardingTestKit.js';
+import { makeTestDb, seedSettings } from '#testing/testDb.js';
+
+import type { Actor } from '../types.js';
 
 type Fixture = { db: Db; anna: Actor; sipRule: Rule };
 
@@ -22,8 +22,8 @@ type Fixture = { db: Db; anna: Actor; sipRule: Rule };
 async function withAdminSipRule(): Promise<Fixture> {
   const db = await makeTestDb();
   await seedSettings(db);
-  const anna = await createUser(db, 'Anna Huber', '101');
-  const trunkId = await createTrunk(db);
+  const anna = await createUserActor(db, 'Anna Huber', '101');
+  const trunkId = await createSipTargetTrunk(db);
   const sipRule: Rule = {
     condition: 'noAnswer',
     target: {
@@ -99,8 +99,8 @@ describe('users.setForwarding, an admin-set sip rule', () => {
   it('keeps a sip rule sent without headers when it holds the defaults, as the wire returns it', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    const anna = await createUser(db, 'Anna Huber', '101');
-    const trunkId = await createTrunk(db);
+    const anna = await createUserActor(db, 'Anna Huber', '101');
+    const trunkId = await createSipTargetTrunk(db);
     const bare: Rule = {
       condition: 'offline',
       target: { kind: 'sip', trunkId, user: 'proj_abc123' }
@@ -117,7 +117,11 @@ describe('users.setForwarding, an admin-set sip rule', () => {
 
   it('refuses a user a sip rule differing in its trunk, user part or headers with 403', async () => {
     const { db, anna, sipRule } = await withAdminSipRule();
-    const otherTrunk = await createTrunk(db, 'Other', 'sip.other.test');
+    const otherTrunk = await createSipTargetTrunk(
+      db,
+      'Other',
+      'sip.other.test'
+    );
     const target = sipRule.target;
     const variants: Record<string, unknown>[] = [
       { ...target, trunkId: otherTrunk },

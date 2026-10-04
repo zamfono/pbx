@@ -6,7 +6,7 @@ import { nowIso } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
 
 import { getDb } from '#lib/server/db.js';
-import { seedSettings } from '#lib/server/testDb.js';
+import { seedSettings } from '#testing/testDb.js';
 
 import { load } from './+page.server.js';
 

@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import { epochSeconds, nowIso, type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '../testDb.js';
+import { makeTestDb } from '#testing/testDb.js';
+
 import { authenticateRequest, authenticateToken } from './bearer.js';
 import { signAccessToken } from './jwt.js';
 

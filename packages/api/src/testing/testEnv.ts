@@ -19,7 +19,7 @@ process.env.ASTERISK_GEN_DIR ??= '/nonexistent/asterisk-gen';
 vi.mock('$app/env/private', async () => {
   const [{ env }, { variables }] = await Promise.all([
     import('node:process'),
-    import('./env.js')
+    import('../env.js')
   ]);
   return Object.defineProperties(
     {},
@@ -67,7 +67,7 @@ vi.mock('#lib/server/ops/runner.js', async importOriginal => {
   const [actual, { checkPublishedOutput, checkPublishedProblem }] =
     await Promise.all([
       importOriginal<typeof import('#lib/server/ops/runner.js')>(),
-      import('#lib/server/ops/publishedCheck.js')
+      import('./publishedCheck.js')
     ]);
   return {
     ...actual,

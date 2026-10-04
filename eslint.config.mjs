@@ -264,8 +264,9 @@ export default tseslint.config(
     // file grows with the cases it covers, a vitest `describe` is a function holding every case in
     // it, and pulling a single case's setup into a named helper scatters the arrange/act/assert a
     // reader follows top to bottom. Fixture data is literal for the same reason: a timestamp or a
-    // uid in a test is the input, not an unexplained constant.
-    files: ['**/*.test.ts', 'test/**/*.ts'],
+    // uid in a test is the input, not an unexplained constant. The doubles and fixtures under each
+    // package's `src/testing/` are test code by the same measure.
+    files: ['**/*.test.ts', 'packages/*/src/testing/**/*.ts', 'test/**/*.ts'],
     rules: {
       'max-lines': 'off',
       'max-lines-per-function': 'off',

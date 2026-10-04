@@ -12,6 +12,8 @@ import {
   type UpdateState
 } from '@zamfono/shared';
 
+import { makeTestDb, seedSettings } from '#testing/testDb.js';
+
 import type { UpdateMailRequest } from '../mail/send.js';
 import type { BackupRunRow } from '../ops/backups/_shared.js';
 import {
@@ -24,7 +26,6 @@ import {
   UpdaterRefusal,
   type UpdaterClient
 } from '../ops/system/_updater.js';
-import { makeTestDb, seedSettings } from '../testDb.js';
 import {
   GIVE_UPS_PER_ATTEMPT,
   runAutoUpdatePass,

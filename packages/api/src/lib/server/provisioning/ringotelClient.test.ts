@@ -1,18 +1,12 @@
-import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
-import { encrypt, keyringFromEnv, type Keyring } from '../secretbox.js';
+import { testKeyring } from '#testing/fixtures.js';
+
+import { encrypt } from '../secretbox.js';
 import { createRingotelClient, RingotelError } from './ringotelClient.js';
 
-const KEY_BYTE_LENGTH = 32;
 const API_TOKEN = 'ringotel-admin-key';
 const TEST_TIMEOUT_MS = 5;
-
-function testKeyring(): Keyring {
-  return keyringFromEnv({
-    SECRETBOX_KEY: `1:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`
-  });
-}
 
 type FetchCall = {
   url: string;

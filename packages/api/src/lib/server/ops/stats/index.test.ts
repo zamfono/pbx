@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { insertCall, makeStatsDb, queryStats } from './statsTestKit.js';
+import { insertCall, makeStatsDb, queryStats } from '#testing/statsTestKit.js';
 
 describe('stats.query', () => {
   it('callVolume by day counts calls per bucket', async () => {

@@ -1,5 +1,6 @@
-import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+
+import { keySpec } from '#testing/fixtures.js';
 
 import { keyringFromEnv } from '../secretbox.js';
 import {
@@ -10,12 +11,6 @@ import {
   type ClientMeta
 } from './clients.js';
 import { redirectUriAllowed } from './redirectUris.js';
-
-const KEY_BYTE_LENGTH = 32;
-
-function keySpec(generation: number): string {
-  return `${generation}:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
-}
 
 /** A valid Client ID Metadata Document served at `url`. */
 function cimdDocument(url: string): Record<string, unknown> {

@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { nowIso, type Db } from '@zamfono/shared';
 
+import { makeTestDb } from '#testing/testDb.js';
+
 import { ringGroupMemberships } from './ringGroupMembership.js';
-import { makeTestDb } from './testDb.js';
 
 /** Ring group `rg` holding `u1` directly and `u2` through `parent` → `child`. */
 async function seededDb(): Promise<Db> {
