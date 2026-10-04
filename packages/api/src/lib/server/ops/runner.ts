@@ -130,8 +130,9 @@ async function executeCall(
   try {
     let prepared: unknown;
     if (op.prepare) {
-      await checkGates(execution, newContext(db, name, run, effects));
-      prepared = await op.prepare({ effects }, input);
+      const outside = newContext(db, name, run, effects);
+      await checkGates(execution, outside);
+      prepared = await op.prepare(outside, input);
     }
     const execute = async (database: Db): Promise<unknown> => {
       const ctx = newContext(database, name, run, effects);
@@ -254,7 +255,7 @@ export async function replayOperation(
   }
   const effects = newEffects();
   try {
-    const prepared = await op.prepare?.({ effects }, parsed.data);
+    const prepared = await op.prepare?.({ ...ctx, effects }, parsed.data);
     await op.run({ ...ctx, effects }, parsed.data, prepared);
   } finally {
     absorbEffects(ctx.effects, effects);

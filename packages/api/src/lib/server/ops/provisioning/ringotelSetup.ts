@@ -17,11 +17,11 @@ import { defineOperation, OpError } from '../types.js';
 import {
   assertNotSetUp,
   createConnection,
-  followPackageMaxRegs,
-  organizationParams,
   ringotelIdsOut,
   stackBranchAddress,
-  storeRingotelIds
+  storeRingotelIds,
+  tenantProfile,
+  type RingotelConnection
 } from './ringotelConnection.js';
 import { assertOffered } from './ringotelOptions.js';
 
@@ -103,8 +103,8 @@ const inputSchema = z
 
 /**
  * `POST /provisioning/ringotel/setup` (§10.3, §10.4): creates the tenant's Ringotel organization
- * and connection (`createOrganization` + `createBranch`), stores their ids in `settings`, and
- * provisions the `ringotel` devices that already exist.
+ * and connection (`createOrganization` + `createBranch`) before its transaction opens, then
+ * stores their ids in `settings` and provisions the `ringotel` devices that already exist.
  */
 export const ringotelSetup = defineOperation({
   name: 'provisioning.ringotelSetup',
@@ -115,7 +115,7 @@ export const ringotelSetup = defineOperation({
   problems: [HTTP_CONFLICT, HTTP_BAD_GATEWAY],
   minRole: 'owner',
   entity: () => ({ kind: 'settings', id: 'settings' }),
-  run: async (ctx, input) => {
+  prepare: async (ctx, input): Promise<RingotelConnection> => {
     const settings = await loadSettings(ctx.db);
     assertNotSetUp(settings);
     // Resolved before the first RPC, so a stack that cannot name its own branch address creates
@@ -125,25 +125,26 @@ export const ringotelSetup = defineOperation({
     // The region is immutable once the organization exists (§10.4), so a value the account does
     // not offer is refused here, naming the ones it does, before anything is created.
     const chosen = await assertOffered(client, input.region, input.packageid);
+    const sent = await tenantProfile(ctx.db, address, chosen.maxregs);
     const org = await createOrganization(client, {
       name: settings.companyName,
       domain: input.domain,
       region: input.region,
       packageid: input.packageid,
-      params: organizationParams(settings)
+      params: sent.organization
     });
     // From here on, whatever keeps the ids from being committed, the connection, the settings
     // write, the audit row or the commit itself, deletes the organization again, and the
     // connection with it.
     onRollback(ctx, cause => discardOrganization(client, org.id, cause));
-    await followPackageMaxRegs(ctx, chosen.maxregs);
-    const branchId = await createConnection(ctx, client, org.id, address);
-    await storeRingotelIds(
-      ctx,
-      client,
-      { orgId: org.id, branchId },
-      'provisioning.ringotelSetup'
-    );
-    return { ringotelOrgId: org.id, ringotelBranchId: branchId };
+    const branchId = await createConnection(client, org.id, sent);
+    return { client, ids: { orgId: org.id, branchId }, sent };
+  },
+  run: async (ctx, _input, connection) => {
+    await storeRingotelIds(ctx, connection, 'provisioning.ringotelSetup');
+    return {
+      ringotelOrgId: connection.ids.orgId,
+      ringotelBranchId: connection.ids.branchId
+    };
   }
 });

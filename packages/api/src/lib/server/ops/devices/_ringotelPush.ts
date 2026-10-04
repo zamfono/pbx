@@ -9,6 +9,7 @@ import {
   type ProvisioningProvider,
   type PushReceipt
 } from '#lib/server/provisioning/index.js';
+import { storedCredentials } from '#lib/server/provisioning/ringotelUser.js';
 import { serialQueue } from '#lib/server/serialQueue.js';
 
 import { afterPropagation } from '../afterCommit.js';
@@ -19,8 +20,9 @@ import type { Context } from '../types.js';
 const log = pino({ name: 'ringotel' });
 
 // Every device push, one at a time (§10.4): each sends the device as the database holds it when
-// its turn comes, so the last push Ringotel takes carries the last committed write.
-const inTurn = serialQueue();
+// its turn comes, so the last push Ringotel takes carries the last committed write. A device's
+// deletion calls Ringotel in the same turns (`deleteInTurn`).
+export const inTurn = serialQueue();
 
 export type PushOutcome =
   | { outcome: 'pushed'; receipt: PushReceipt }
@@ -209,4 +211,22 @@ export function pushExistingDevice(
       attempt: (later, device) => provisioned(later, device, push.provision)
     })
   );
+}
+
+/**
+ * `deviceId`'s stored credentials pushed again (`onCredentialsRotated`, which creates a Ringotel
+ * user that is missing), after `trigger`: what restores a device's Ringotel user from the
+ * database alone.
+ */
+export function storedCredentialsPush(trigger: string, deviceId: string): Push {
+  return {
+    trigger,
+    deviceId,
+    push: (provider, stored) =>
+      provider.onCredentialsRotated(stored, storedCredentials(stored)),
+    failure: {
+      what: `device ${deviceId}'s credentials are stored`,
+      retry: 'devices.rotate on the device pushes them again'
+    }
+  };
 }

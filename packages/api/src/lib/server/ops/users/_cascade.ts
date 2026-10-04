@@ -1,15 +1,19 @@
+import type { Db } from '@zamfono/shared';
+
 import { revokeUserPersonalAccessTokens } from '#lib/server/auth/personalAccessTokens.js';
 import { revokeUserTokens } from '#lib/server/auth/tokens.js';
-import { activeRingotelProvider } from '#lib/server/provisioning/index.js';
 import type { DeviceRow } from '#lib/server/provisioning/types.js';
 
 import { recordChange } from '../audit.js';
+import { releaseRingotelUsers } from '../devices/_ringotelDeletion.js';
 import { loadDroppedBlfKeys } from '../devices/_shared.js';
 import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
 import { softDelete } from '../rows.js';
-import type { Context } from '../types.js';
+import { Conflict, type Context } from '../types.js';
 import { userExtension } from './_extensions.js';
+import { findUserReferences } from './_references.js';
+import { assertNotLastOwner, type UserRow } from './_shared.js';
 
 type DeviceSnapshot = {
   id: string;
@@ -19,11 +23,8 @@ type DeviceSnapshot = {
   sipUsername: string;
 };
 
-async function loadLiveDevices(
-  ctx: Context,
-  userId: string
-): Promise<DeviceRow[]> {
-  return ctx.db
+async function loadLiveDevices(db: Db, userId: string): Promise<DeviceRow[]> {
+  return db
     .selectFrom('devices')
     .selectAll()
     .where('userId', '=', userId)
@@ -43,27 +44,32 @@ function toSnapshot(device: DeviceRow): DeviceSnapshot {
 }
 
 /**
- * Runs `onDeviceDeleted` for each of `devices` that a provisioning provider holds, so the
- * Ringotel user is deleted and its extension freed at the same moment Zamfono frees it (§10.4
- * "Configuration and lifecycle"). Called while the `extensions` row still exists, since the
- * provider resolves the remote user by the owner's extension.
+ * Refuses deleting `user` (§5.9): the last owner (409), or a user something still references
+ * (409 naming it), until the admin retargets the reference.
  */
-async function releaseProvisionedDevices(
-  ctx: Context,
-  devices: DeviceRow[]
+export async function assertDeletable(
+  db: Db,
+  user: Pick<UserRow, 'id' | 'role'>
 ): Promise<void> {
-  const provisioned = devices.filter(device => device.kind === 'ringotel');
-  if (provisioned.length === 0) {
-    return;
+  await assertNotLastOwner(db, user);
+  const references = await findUserReferences(db, user.id);
+  if (references.length > 0) {
+    throw new Conflict('user is still in use', references);
   }
-  const provider = await activeRingotelProvider(ctx.db);
-  if (!provider) {
-    return;
-  }
-  for (const device of provisioned) {
-    // eslint-disable-next-line no-await-in-loop -- one Ringotel request at a time: no roster-sized burst against the provider's API
-    await provider.onDeviceDeleted(device);
-  }
+}
+
+/**
+ * The `prepare` of `users.delete` and `users.erase` for a live `user`: refuses what the deletion
+ * would (`assertDeletable`), then deletes the user's Ringotel users (§10.4) before the
+ * transaction opens (`releaseRingotelUsers`). `run` checks `assertDeletable` again inside the
+ * transaction, then calls the returned `release`.
+ */
+export async function releaseUser(
+  ctx: Context,
+  user: Pick<UserRow, 'id' | 'role'>
+): Promise<() => void> {
+  await assertDeletable(ctx.db, user);
+  return releaseRingotelUsers(ctx, await loadLiveDevices(ctx.db, user.id));
 }
 
 /**
@@ -77,7 +83,7 @@ export async function cascadeSoftDeleteUser(
 ): Promise<void> {
   const ext = await userExtension(ctx.db, userId);
   const [devices, droppedBlfKeys] = await Promise.all([
-    loadLiveDevices(ctx, userId),
+    loadLiveDevices(ctx.db, userId),
     loadDroppedBlfKeys(ctx, ext)
   ]);
   await softDelete(ctx, 'users', userId);
@@ -87,7 +93,6 @@ export async function cascadeSoftDeleteUser(
     .where('userId', '=', userId)
     .where('deletedAt', 'is', null)
     .execute();
-  await releaseProvisionedDevices(ctx, devices);
   await ctx.db.deleteFrom('extensions').where('userId', '=', userId).execute();
   await pushRoster(ctx);
   await revokeUserTokens(ctx.db, userId, ctx.now);

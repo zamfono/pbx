@@ -15,6 +15,7 @@ import {
 import { decrypt, encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import {
   installRingotelFake,
+  type FakeRingotelOrganization,
   type RingotelFake
 } from '#testing/ringotelFake.js';
 import { makeTestDb } from '#testing/testDb.js';
@@ -62,18 +63,30 @@ async function fileDb(): Promise<{ db: Db; file: string }> {
   return { db, file };
 }
 
+/** The fake's Ringotel, with `settings` on top of a stored API key. */
+async function ringotel(
+  db: Db,
+  settings: { ringotelOrgId?: string; ringotelBranchId?: string } = {},
+  organizations?: FakeRingotelOrganization[]
+): Promise<RingotelFake> {
+  await seedSettings(db, {
+    ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key'),
+    ...settings
+  });
+  const fake = installRingotelFake(organizations);
+  cleanups.push(() => {
+    fake.restore();
+  });
+  return fake;
+}
+
 /** A stack set up with the fake's Ringotel, user 998 and one `ringotel` device of theirs. */
 async function ringotelDevice(
   db: Db
-): Promise<{ fake: RingotelFake; deviceId: string }> {
-  await seedSettings(db, {
-    ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key'),
+): Promise<{ fake: RingotelFake; userId: string; deviceId: string }> {
+  const fake = await ringotel(db, {
     ringotelOrgId: 'org-1',
     ringotelBranchId: 'branch-1'
-  });
-  const fake = installRingotelFake();
-  cleanups.push(() => {
-    fake.restore();
   });
   const userId = await seedUser(db, { ext: '998' });
   const created = (await runOperation(
@@ -82,7 +95,7 @@ async function ringotelDevice(
     { userId, label: 'Phone', kind: 'ringotel' },
     owner
   )) as { device: { id: string } };
-  return { fake, deviceId: created.device.id };
+  return { fake, userId, deviceId: created.device.id };
 }
 
 /** Holds each Ringotel request `hold` picks before the fake sees it, until `hold` settles. */
@@ -134,8 +147,8 @@ async function otherWriteWhileRingotelAnswers(
   return outcome;
 }
 
-describe('devices.setBlf', () => {
-  it('leaves the file writable to another connection while Ringotel answers', async () => {
+describe('an operation that calls Ringotel leaves the file writable to another connection while Ringotel answers', () => {
+  it('devices.setBlf', async () => {
     const stack = await fileDb();
     const { deviceId } = await ringotelDevice(stack.db);
 
@@ -147,6 +160,73 @@ describe('devices.setBlf', () => {
           stack.db,
           'devices.setBlf',
           { id: deviceId, keys: ['998'] },
+          owner
+        )
+    );
+
+    expect(outcome).toBe('written');
+  });
+
+  it('devices.delete', async () => {
+    const stack = await fileDb();
+    const { deviceId } = await ringotelDevice(stack.db);
+
+    const outcome = await otherWriteWhileRingotelAnswers(
+      stack.file,
+      'deleteUser',
+      () => runOperation(stack.db, 'devices.delete', { id: deviceId }, owner)
+    );
+
+    expect(outcome).toBe('written');
+  });
+
+  it('users.delete', async () => {
+    const stack = await fileDb();
+    const { userId } = await ringotelDevice(stack.db);
+
+    const outcome = await otherWriteWhileRingotelAnswers(
+      stack.file,
+      'deleteUser',
+      () => runOperation(stack.db, 'users.delete', { id: userId }, owner)
+    );
+
+    expect(outcome).toBe('written');
+  });
+
+  it('provisioning.ringotelSetup', async () => {
+    const stack = await fileDb();
+    await ringotel(stack.db, {}, []);
+
+    // The Pro package raises `ringotel_max_regs`, a write of the setup's own.
+    const outcome = await otherWriteWhileRingotelAnswers(
+      stack.file,
+      'createBranch',
+      () =>
+        runOperation(
+          stack.db,
+          'provisioning.ringotelSetup',
+          { domain: 'testco', region: '3', packageid: 2 },
+          owner
+        )
+    );
+
+    expect(outcome).toBe('written');
+  });
+
+  it('provisioning.ringotelAdopt', async () => {
+    const stack = await fileDb();
+    await ringotel(stack.db, {}, [
+      { id: 'org-9', domain: 'adopted', packageid: 2 }
+    ]);
+
+    const outcome = await otherWriteWhileRingotelAnswers(
+      stack.file,
+      'createBranch',
+      () =>
+        runOperation(
+          stack.db,
+          'provisioning.ringotelAdopt',
+          { orgId: 'org-9', domain: 'adopted' },
           owner
         )
     );

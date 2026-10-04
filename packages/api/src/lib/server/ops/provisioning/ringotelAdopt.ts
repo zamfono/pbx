@@ -18,13 +18,13 @@ import { loadSettings } from '../settings/_shared.js';
 import { defineOperation, OpError, type Context } from '../types.js';
 import {
   assertNotSetUp,
-  connectionFields,
   createConnection,
-  followPackageMaxRegs,
-  organizationParams,
   ringotelIdsOut,
   stackBranchAddress,
-  storeRingotelIds
+  storeRingotelIds,
+  tenantProfile,
+  type RingotelConnection,
+  type TenantProfile
 } from './ringotelConnection.js';
 import { ringotelOffer } from './ringotelOptions.js';
 
@@ -96,13 +96,13 @@ async function assertEmpty(
  * profile, or a new one, which a failure later in the operation deletes again.
  */
 async function adoptConnection(
-  ctx: Context,
+  ctx: Pick<Context, 'effects'>,
   client: RingotelClient,
   input: Input,
-  address: string
+  profile: TenantProfile
 ): Promise<string> {
   if (input.branchId === undefined) {
-    const created = await createConnection(ctx, client, input.orgId, address);
+    const created = await createConnection(client, input.orgId, profile);
     onRollback(ctx, () =>
       client
         .call('deleteBranch', { id: created, orgid: input.orgId })
@@ -122,7 +122,7 @@ async function adoptConnection(
   await client.call('updateBranch', {
     id: input.branchId,
     orgid: input.orgId,
-    ...(await connectionFields(ctx, address))
+    ...profile.connection
   });
   return input.branchId;
 }
@@ -145,7 +145,7 @@ export const ringotelAdopt = defineOperation({
   confirm: (_ctx, input) =>
     `Adopt Ringotel organization ${input.domain} and point ${input.branchId === undefined ? 'a new connection' : `connection ${input.branchId}`} at this stack?`,
   entity: () => ({ kind: 'settings', id: 'settings' }),
-  run: async (ctx, input) => {
+  prepare: async (ctx, input): Promise<RingotelConnection> => {
     const settings = await loadSettings(ctx.db);
     assertNotSetUp(settings);
     // Resolved before the first RPC, as in setup: a stack that cannot name its own address
@@ -154,24 +154,25 @@ export const ringotelAdopt = defineOperation({
     const client = createRingotelClient(settings, keyringFromEnv(env));
     const organization = await findOrganization(client, input);
     await assertEmpty(client, input);
-    if (organization.packageid !== undefined) {
-      const { packages } = await ringotelOffer(client);
-      await followPackageMaxRegs(
-        ctx,
-        packages.find(item => item.id === organization.packageid)?.maxregs
-      );
-    }
-    const branchId = await adoptConnection(ctx, client, input, address);
+    const maxregs =
+      organization.packageid === undefined
+        ? undefined
+        : (await ringotelOffer(client)).packages.find(
+            item => item.id === organization.packageid
+          )?.maxregs;
+    const sent = await tenantProfile(ctx.db, address, maxregs);
+    const branchId = await adoptConnection(ctx, client, input, sent);
     await client.call('updateOrganization', {
       id: input.orgId,
-      params: organizationParams(settings)
+      params: sent.organization
     });
-    await storeRingotelIds(
-      ctx,
-      client,
-      { orgId: input.orgId, branchId },
-      'provisioning.ringotelAdopt'
-    );
-    return { ringotelOrgId: input.orgId, ringotelBranchId: branchId };
+    return { client, ids: { orgId: input.orgId, branchId }, sent };
+  },
+  run: async (ctx, _input, connection) => {
+    await storeRingotelIds(ctx, connection, 'provisioning.ringotelAdopt');
+    return {
+      ringotelOrgId: connection.ids.orgId,
+      ringotelBranchId: connection.ids.branchId
+    };
   }
 });

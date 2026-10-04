@@ -1,7 +1,7 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { HTTP_CONFLICT } from '@zamfono/shared';
+import { HTTP_CONFLICT, type Db } from '@zamfono/shared';
 
 import { buildBranchProvision } from '#lib/server/provisioning/branchProvision.js';
 import type { RingotelClient } from '#lib/server/provisioning/ringotelClient.js';
@@ -58,73 +58,110 @@ export function organizationParams(settings: SettingsRow): {
 const DEFAULT_MAX_REGS = 3;
 
 /**
- * Sets `settings.ringotelMaxRegs` to `maxregs`, the registrations per user the organization's
- * package allows (6 for Pro, `ringotelOffer`), while it is still at its default, so a value an
- * owner chose stays. Run before the connection's profile is written, which carries it.
+ * The `ringotel_max_regs` a stack at `settings` takes from its package's `maxregs`, the
+ * registrations per user the package allows (6 for Pro, `ringotelOffer`), or `null` where it
+ * keeps its own: only while the setting is still at its default, so a value an owner chose stays.
  */
-export async function followPackageMaxRegs(
-  ctx: Context,
+function followedMaxRegs(
+  settings: SettingsRow,
   maxregs: number | undefined
-): Promise<void> {
-  const settings = await loadSettings(ctx.db);
+): number | null {
   if (
     settings.ringotelMaxRegs !== DEFAULT_MAX_REGS ||
     maxregs === undefined ||
     maxregs < 1 ||
     maxregs === DEFAULT_MAX_REGS
   ) {
+    return null;
+  }
+  return maxregs;
+}
+
+/** Sets `settings.ringotelMaxRegs` to what the package's `maxregs` makes it (`followedMaxRegs`). */
+async function followPackageMaxRegs(
+  ctx: Context,
+  maxregs: number | undefined
+): Promise<void> {
+  const followed = followedMaxRegs(await loadSettings(ctx.db), maxregs);
+  if (followed === null) {
     return;
   }
   await ctx.db
     .updateTable('settings')
-    .set({ ringotelMaxRegs: maxregs })
+    .set({ ringotelMaxRegs: followed })
     .where('id', '=', 1)
     .execute();
   recordChange(ctx, {
     field: 'ringotelMaxRegs',
     from: DEFAULT_MAX_REGS,
-    to: maxregs
+    to: followed
   });
   // `max_contacts` on every `ringotel` endpoint follows it (§10.4).
   propagate(ctx, ['pjsip']);
 }
 
-/** The connection's name, address and provision profile (§10.4), as this stack wants it. */
-export async function connectionFields(
-  ctx: Context,
-  address: string
-): Promise<{
-  name: string;
-  address: string;
-  country: string;
-  provision: ReturnType<typeof buildBranchProvision>;
-}> {
-  const settings = await loadSettings(ctx.db);
-  const parkingSlots = await loadParkingSlots(ctx.db);
-  const blfs = await branchBlfEntries(ctx.db);
+/**
+ * What setup and adoption give Ringotel of the tenant (§10.4): the connection's name, address,
+ * country and provision profile, roster included, and the organization's `params`, from the
+ * settings as the package's `maxregs` leaves them.
+ */
+export type TenantProfile = {
+  connection: {
+    name: string;
+    address: string;
+    country: string;
+    provision: ReturnType<typeof buildBranchProvision>;
+  };
+  organization: ReturnType<typeof organizationParams>;
+  maxregs: number | undefined;
+};
+
+/** The `TenantProfile` of the stack at `address` as `db` holds it now. */
+export async function tenantProfile(
+  db: Db,
+  address: string,
+  maxregs: number | undefined
+): Promise<TenantProfile> {
+  const stored = await loadSettings(db);
+  const settings = {
+    ...stored,
+    ringotelMaxRegs: followedMaxRegs(stored, maxregs) ?? stored.ringotelMaxRegs
+  };
+  const parkingSlots = await loadParkingSlots(db);
+  const blfs = await branchBlfEntries(db);
   return {
-    name: settings.companyName,
-    address,
-    // The default country the app matches phone numbers against to find a caller among the
-    // contacts (the Shell's "Country"), the tenant's own (§11.4).
-    country: settings.country,
-    provision: buildBranchProvision(settings, parkingSlots, blfs)
+    connection: {
+      name: settings.companyName,
+      address,
+      // The default country the app matches phone numbers against to find a caller among the
+      // contacts (the Shell's "Country"), the tenant's own (§11.4).
+      country: settings.country,
+      provision: buildBranchProvision(settings, parkingSlots, blfs)
+    },
+    organization: organizationParams(settings),
+    maxregs
   };
 }
 
-/** `createBranch` under `orgId` with the stack's address and provision profile (§10.4). */
+/** `createBranch` under `orgId` with the stack's connection fields (§10.4). */
 export async function createConnection(
-  ctx: Context,
   client: RingotelClient,
   orgId: string,
-  address: string
+  profile: TenantProfile
 ): Promise<string> {
   const branch = await client.call<{ id: string }>('createBranch', {
     orgid: orgId,
-    ...(await connectionFields(ctx, address))
+    ...profile.connection
   });
   return branch.id;
 }
+
+/** What setup's and adoption's `prepare` created or took at Ringotel, for their `run` to store. */
+export type RingotelConnection = {
+  client: RingotelClient;
+  ids: { orgId: string; branchId: string };
+  sent: TenantProfile;
+};
 
 /**
  * Stores the two ids and provisions the `ringotel` devices created before any provider existed
@@ -137,21 +174,31 @@ export async function createConnection(
  */
 export async function storeRingotelIds(
   ctx: Context,
-  client: RingotelClient,
-  ids: { orgId: string; branchId: string },
+  { client, ids, sent }: RingotelConnection,
   trigger: 'provisioning.ringotelSetup' | 'provisioning.ringotelAdopt'
 ): Promise<void> {
   const { orgId, branchId } = ids;
+  // A setup or adoption that committed since this one's `prepare` stands; this one rolls back,
+  // and its rollback hooks take back what it created at Ringotel.
+  assertNotSetUp(await loadSettings(ctx.db));
+  await followPackageMaxRegs(ctx, sent.maxregs);
+  // The connection and the organization were given the whole profile and roster
+  // (`tenantProfile`), so nothing waits for Ringotel any more, unless a write since changed what
+  // they were given: then both pushes are owed (§10.4 "Tenant profile push", "Colleague
+  // presence").
+  const now = await tenantProfile(
+    ctx.db,
+    sent.connection.address,
+    sent.maxregs
+  );
+  const owed = JSON.stringify(now) === JSON.stringify(sent) ? 0 : 1;
   await ctx.db
     .updateTable('settings')
-    // The connection was just written with the whole profile and roster (`connectionFields`)
-    // and the organization with its `params`, so no profile or roster change waits for Ringotel
-    // any more (§10.4 "Tenant profile push", "Colleague presence").
     .set({
       ringotelOrgId: orgId,
       ringotelBranchId: branchId,
-      ringotelProfilePending: 0,
-      ringotelRosterPending: 0,
+      ringotelProfilePending: owed,
+      ringotelRosterPending: owed,
       // The apps register against the running Asterisk from here on (§10.4 "After a restart").
       ringotelRegisteredAt: ctx.now
     })

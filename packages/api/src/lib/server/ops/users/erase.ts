@@ -1,13 +1,16 @@
 import { z } from 'zod';
 
-import { changesColumn } from '@zamfono/shared';
+import { changesColumn, type Db } from '@zamfono/shared';
 
 import { maskContent } from '../audit.js';
 import { idOutput } from '../rows.js';
-import { Conflict, defineOperation } from '../types.js';
-import { cascadeSoftDeleteUser } from './_cascade.js';
-import { findUserReferences } from './_references.js';
-import { assertNotLastOwner } from './_shared.js';
+import { defineOperation } from '../types.js';
+import {
+  assertDeletable,
+  cascadeSoftDeleteUser,
+  releaseUser
+} from './_cascade.js';
+import type { UserRow } from './_shared.js';
 
 const ERASED_ACTOR_NAME = 'erased user';
 
@@ -18,6 +21,19 @@ const ERASED_ACTOR_NAME = 'erased user';
  * records as `rules` (§11.2 `user_forward_rules`) both carry.
  */
 const PERSONAL_FIELDS = new Set(['name', 'email', 'findMe', 'rules']);
+
+/** The user `id` names while it is live; an erasure also takes a deleted or purged one. */
+async function liveUserOrNone(
+  db: Db,
+  id: string
+): Promise<Pick<UserRow, 'id' | 'role'> | undefined> {
+  return db
+    .selectFrom('users')
+    .select(['id', 'role'])
+    .where('id', '=', id)
+    .where('deletedAt', 'is', null)
+    .executeTakeFirst();
+}
 
 /**
  * Redacts the personal field values an entry's `changes_json` carries for `userId`, without
@@ -57,24 +73,21 @@ export const erase = defineOperation({
     return `Erase ${who} and the personal data the audit log holds about them? This cannot be undone.`;
   },
   entity: input => ({ kind: 'user', id: input.id }),
-  run: async (ctx, input) => {
+  prepare: async (ctx, input): Promise<() => void> => {
+    const user = await liveUserOrNone(ctx.db, input.id);
+    return user ? releaseUser(ctx, user) : () => undefined;
+  },
+  run: async (ctx, input, release) => {
     // Before the cascade records the erased user's devices and extension (§5.10).
     maskContent(ctx);
-    const user = await ctx.db
-      .selectFrom('users')
-      .select(['id', 'role', 'deletedAt'])
-      .where('id', '=', input.id)
-      .executeTakeFirst();
-    if (user?.deletedAt === null) {
-      await assertNotLastOwner(ctx.db, user);
+    const user = await liveUserOrNone(ctx.db, input.id);
+    if (user) {
       // Erasure still soft-deletes rather than orphaning a route: the admin retargets the
       // blocking reference first, same as `users.delete` (§5.9), then erases again.
-      const references = await findUserReferences(ctx.db, input.id);
-      if (references.length > 0) {
-        throw new Conflict('user is still in use', references);
-      }
+      await assertDeletable(ctx.db, user);
       await cascadeSoftDeleteUser(ctx, input.id);
     }
+    release();
     await ctx.db
       .updateTable('auditLog')
       .set({ actorUserName: ERASED_ACTOR_NAME })

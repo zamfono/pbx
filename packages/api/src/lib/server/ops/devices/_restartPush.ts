@@ -7,30 +7,21 @@ import {
   activeRingotelProvider,
   type DeviceRow
 } from '#lib/server/provisioning/index.js';
-import {
-  liveRingotelDevices,
-  storedCredentials
-} from '#lib/server/provisioning/ringotelUser.js';
+import { liveRingotelDevices } from '#lib/server/provisioning/ringotelUser.js';
 
 import { oweRestartPush } from '../afterCommit.js';
 import { JOB_CALLER } from '../outcomeLog.js';
-import { runPush, type Push } from './_ringotelPush.js';
+import { runPush, storedCredentialsPush } from './_ringotelPush.js';
 
 const log = pino({ name: 'ringotel' });
 
 /** One device's stored credentials, pushed again as the job (`pushEveryDevice`). */
 async function pushStoredCredentials(db: Db, device: DeviceRow): Promise<void> {
-  const push: Push = {
-    trigger: 'api.start',
-    deviceId: device.id,
-    push: (provider, stored) =>
-      provider.onCredentialsRotated(stored, storedCredentials(stored)),
-    failure: {
-      what: `device ${device.id}'s credentials are stored`,
-      retry: 'devices.rotate on the device pushes them again'
-    }
-  };
-  const warning = await runPush(db, JOB_CALLER, push);
+  const warning = await runPush(
+    db,
+    JOB_CALLER,
+    storedCredentialsPush('api.start', device.id)
+  );
   if (warning !== null) {
     log.error(
       { deviceId: device.id, warning },

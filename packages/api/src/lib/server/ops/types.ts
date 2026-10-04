@@ -88,11 +88,13 @@ export type Operation<In, Out, Prepared = void> = {
    */
   entity?: (input: In, out: Out) => { kind: string; id: string | null };
   /**
-   * Work too slow to hold the database, such as transcoding an upload: runs before the
-   * transaction opens, and `run` receives its result. What it leaves outside the database it
-   * takes back through `onRollback`, should the transaction not commit.
+   * Work too slow to hold the database, such as transcoding an upload or a call to Ringotel: runs
+   * once the gates passed, before the transaction opens, with `ctx.db` the database itself, and
+   * `run` receives its result. It reads the database but writes nothing to it, and `run` checks again what a concurrent write could
+   * have changed since. What it leaves outside the database it takes back through `onRollback`,
+   * should the transaction not commit.
    */
-  prepare?: (ctx: Pick<Context, 'effects'>, input: In) => Promise<Prepared>;
+  prepare?: (ctx: Context, input: In) => Promise<Prepared>;
   run(ctx: Context, input: In, prepared: Prepared): Promise<Out>;
 } & (
   | { minRole: Exclude<UserRole, 'user'> }
