@@ -49,10 +49,19 @@ describe('buildPipeline', () => {
       db,
       log: noopLogger,
       env: {
-        ...readEnv({ ARI_PASSWORD: 'secret', AMI_PASSWORD: 'secret' }),
+        ...readEnv({
+          ARI_PASSWORD: 'secret',
+          AMI_PASSWORD: 'secret',
+          EXTERNAL_IPV4: '192.0.2.10'
+        }),
         tz: stackTz
       },
-      trunkState: new TrunkState({ log: noopLogger, ...deps, ami }),
+      trunkState: new TrunkState({
+        log: noopLogger,
+        ...deps,
+        ami,
+        plainTransports: { sipUdpEnabled: true, sipTcpEnabled: true }
+      }),
       presence: new Presence({ log: noopLogger, ...deps, db })
     });
     return { ...built, state };

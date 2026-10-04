@@ -135,7 +135,8 @@ describe('TrunkState', () => {
       cache,
       state,
       bus,
-      now: nowIso
+      now: nowIso,
+      plainTransports: { sipUdpEnabled: true, sipTcpEnabled: true }
     });
   });
 
@@ -442,6 +443,54 @@ describe('TrunkState', () => {
       expect(state.trunks.get(probedId)?.status).toBe('registered');
       expect(state.trunks.has(registrationId)).toBe(false);
     });
+  });
+
+  // §9.4 "Signaling": Asterisk binds a transport SIP_UDP_ENABLED or SIP_TCP_ENABLED switches off
+  // to loopback (§9.1), so nothing a trunk on it reports means it is reachable.
+  it('reads a trunk on a switched-off transport as unreachable, whatever its qualify or registration', async () => {
+    await seedSettings(db);
+    const unprobedId = await seedIpTrunk(db, 'agent', 3, null, 0);
+    const probedId = await seedIpTrunk(db, 'carrier', 2);
+    const registrationId = await seedRegistrationTrunk(
+      db,
+      'acct1',
+      'sip.example.com'
+    );
+    const { clientUri, serverUri } = registrationUris({
+      username: 'acct1',
+      hosts: [{ priority: 1, host: 'sip.example.com', port: null }]
+    });
+    fakeAmi.registrations.push({
+      ObjectName: registrationId,
+      ClientUri: clientUri,
+      ServerUri: serverUri,
+      Status: 'Registered'
+    });
+    fakeAri.endpoints.push({
+      technology: 'PJSIP',
+      resource: trunkSectionName(probedId),
+      state: 'online',
+      channel_ids: []
+    });
+    const udpOff = new TrunkState({
+      log: noopLogger,
+      ari,
+      ami,
+      cache,
+      state,
+      bus,
+      now: nowIso,
+      plainTransports: { sipUdpEnabled: false, sipTcpEnabled: true }
+    });
+
+    await udpOff.resyncOnBoot();
+    for (const id of [unprobedId, probedId, registrationId]) {
+      expect(state.trunks.get(id)?.status).toBe('unreachable');
+    }
+
+    // A config change settles an unprobed trunk's status without Asterisk.
+    await udpOff.refreshMonitoring();
+    expect(state.trunks.get(unprobedId)?.status).toBe('unreachable');
   });
 
   it("serves each trunk's channels in use in the live state until it carries none (§7, §9.4)", () => {

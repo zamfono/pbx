@@ -23,7 +23,9 @@ describe('stackIpv4', () => {
     ).toBe('198.51.100.7');
   });
 
-  it('is null while neither is set', () => {
-    expect(stackIpv4({})).toBeNull();
+  it('refuses while neither is set (§6.1)', () => {
+    expect(() => stackIpv4({})).toThrow(
+      'neither EXTERNAL_IPV4 nor STACK_IPV4 is set'
+    );
   });
 });

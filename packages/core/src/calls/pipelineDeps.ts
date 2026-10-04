@@ -37,8 +37,8 @@ export type PipelineDeps = {
   // The stack's `TZ` (§11.4 `timezone`: "NULL = stack `TZ`, else UTC"), `CoreEnv.tz`.
   stackTz: string;
   // The address the stack writes into SIP (`CoreEnv.sipHost`), the host a forwarded leg's
-  // `Diversion` entries name (§9.4 "Forwarded calls"); `null` = the trunk's own host.
-  stackSipHost: string | null;
+  // `Diversion` entries name (§9.4 "Forwarded calls").
+  stackSipHost: string;
   /** How long a created leg may take to enter the app before it counts as not placed
    * (`legOriginate.ts`), `STASIS_WAIT_MS`. */
   legStasisWaitMs: number;

@@ -17,10 +17,13 @@ import {
 import type { AmiEvent } from '../ami/frame.js';
 import type { AriEventOf } from '../ari/events.js';
 import type { Endpoint } from '../ari/types.js';
+import type { CoreEnv } from '../env.js';
 import type { Snapshot } from '../internal/snapshot.js';
 
 export type TrunkStatus = TrunkStatusWire['status'];
 export type StatusChange = [trunkId: string, status: TrunkStatus];
+/** Which plain SIP transports the stack serves (§9.1). */
+export type PlainTransports = Pick<CoreEnv, 'sipUdpEnabled' | 'sipTcpEnabled'>;
 
 /** AMI `Registry`/`OutboundRegistrationDetail` status → trunk status; `Partial` since an unmapped AMI status looks up as `undefined` at runtime. */
 const REGISTRY_STATUS: Partial<Record<string, TrunkStatus>> = {
@@ -82,6 +85,33 @@ export function registrationTrunks(
         hosts: outboundHosts(snapshot, trunk.id)
       })
     }));
+}
+
+/**
+ * `changes`, with every trunk on a transport `SIP_UDP_ENABLED` or `SIP_TCP_ENABLED` switches off
+ * `unreachable` instead (§9.4 "Signaling"): Asterisk binds that transport to loopback (§9.1), so
+ * whatever its `qualify` or registration reports, the provider cannot be reached over it.
+ */
+export function onEnabledTransports(
+  snapshot: Snapshot,
+  enabled: PlainTransports,
+  changes: (StatusChange | null)[]
+): StatusChange[] {
+  const off = new Set(
+    snapshot.trunks
+      .filter(
+        trunk =>
+          (trunk.transport === 'udp' && !enabled.sipUdpEnabled) ||
+          (trunk.transport === 'tcp' && !enabled.sipTcpEnabled)
+      )
+      .map(trunk => trunk.id)
+  );
+  return [
+    ...changes.filter(
+      (change): change is StatusChange => change !== null && !off.has(change[0])
+    ),
+    ...[...off].map(trunkId => [trunkId, 'unreachable'] as StatusChange)
+  ];
 }
 
 /** The registration trunks' outcomes in a `PJSIPShowRegistrationsOutbound` answer. */

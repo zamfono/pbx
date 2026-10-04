@@ -107,19 +107,18 @@ export type DiversionTrunk = {
 /**
  * `trunk`'s `Diversion` settings. The host is chan_pjsip's own `Diversion`'s, the leg's `From`
  * host, where the core can know it: a `pai` trunk's `from_domain`, its first outbound host; else
- * the address the stack writes into SIP (`stackSipHost`, `EXTERNAL_IPV4` else `STACK_IPV4`); else
- * the trunk's first outbound host.
+ * the address the stack writes into SIP (`stackSipHost`, `EXTERNAL_IPV4` else `STACK_IPV4`).
  */
 export function diversionTrunk(
   trunk: Snapshot['trunks'][number],
   snapshot: Snapshot,
-  stackSipHost: string | null
+  stackSipHost: string
 ): DiversionTrunk {
   const firstHost = outboundHosts(snapshot, trunk.id).at(0)?.host ?? null;
   const host =
     trunk.callerIdHeader === 'pai' && trunk.username !== null
       ? firstHost
-      : (stackSipHost ?? firstHost);
+      : stackSipHost;
   return {
     policy: trunk.diversion,
     host,

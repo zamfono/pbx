@@ -28,11 +28,13 @@ import { recordApiRequestSeconds } from '#lib/server/metricsCounters.js';
 import { problem } from '#lib/server/problem.js';
 import { API_PREFIX } from '#lib/server/restRoutes.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
+import { stackIpv4 } from '#lib/server/stackAddress.js';
 
 const jobsLogger = pino({ name: 'hooks' });
 
 /**
- * Logs a stack `TZ` that names no IANA time zone, then starts every background job
+ * Refuses to start without the mode's public address, which `src/env.ts` cannot require of either
+ * variable alone; logs a stack `TZ` that names no IANA time zone, then starts every background job
  * (`lib/server/jobs/background.ts`), from this file since it is part
  * of the SvelteKit build that also builds `runOperation` and every route: a job started here
  * shares their module instance of every import, and an operation reaches it by a call, where
@@ -42,6 +44,7 @@ const jobsLogger = pino({ name: 'hooks' });
  * and SIGINT.
  */
 export const init: ServerInit = async () => {
+  stackIpv4(env);
   const timeZoneError = stackTimeZoneError(env.TZ);
   if (timeZoneError !== undefined) {
     jobsLogger.error(timeZoneError);

@@ -44,8 +44,6 @@ afterEach(() => {
   delete process.env.ZAMFONO_VERSION;
   delete process.env.ZAMFONO_REVISION;
   vi.unstubAllEnvs();
-  delete process.env.STACK_IPV4;
-  delete process.env.EXTERNAL_IPV4;
 });
 
 /** A test database with the tenant settings row every running `api` has. */
@@ -77,7 +75,7 @@ describe('system.info', () => {
       autoUpdate: { enabled: false, failed: null },
       maintenanceGate: { certSync: null, autoUpdate: null },
       ringotel: { profilePending: false },
-      stack: { domain: 'pbx.test', ipv4: null }
+      stack: { domain: 'pbx.test', ipv4: '192.0.2.10' }
     });
   });
 
@@ -117,7 +115,7 @@ describe('system.info', () => {
       autoUpdate: { enabled: false, failed: null },
       maintenanceGate: { certSync: null, autoUpdate: null },
       ringotel: { profilePending: false },
-      stack: { domain: 'pbx.test', ipv4: null }
+      stack: { domain: 'pbx.test', ipv4: '192.0.2.10' }
     });
   });
 
@@ -219,14 +217,14 @@ describe('system.info', () => {
     const db = await makeTestDb();
     await seedSettings(db);
     vi.stubEnv('FQDN', 'pbx.example.com');
-    process.env.STACK_IPV4 = '203.0.113.34';
-    process.env.EXTERNAL_IPV4 = '';
+    vi.stubEnv('STACK_IPV4', '203.0.113.34');
+    vi.stubEnv('EXTERNAL_IPV4', '');
     expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
       stack: { domain: 'pbx.example.com', ipv4: '203.0.113.34' }
     });
 
-    process.env.STACK_IPV4 = '';
-    process.env.EXTERNAL_IPV4 = '198.51.100.7';
+    vi.stubEnv('STACK_IPV4', '');
+    vi.stubEnv('EXTERNAL_IPV4', '198.51.100.7');
     expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
       stack: { domain: 'pbx.example.com', ipv4: '198.51.100.7' }
     });

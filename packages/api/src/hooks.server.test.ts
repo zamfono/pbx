@@ -164,6 +164,18 @@ describe('hooks handle', () => {
     expect(jobs.stop).toHaveBeenCalledOnce();
   });
 
+  // §6.1, §6.3 "Environment": the mode's public address is required, like FQDN and the secrets.
+  it('refuses to start while neither EXTERNAL_IPV4 nor STACK_IPV4 is set', async () => {
+    vi.stubEnv('EXTERNAL_IPV4', '');
+    vi.stubEnv('STACK_IPV4', '');
+    jobs.start.mockClear();
+    await expect(initHooks()).rejects.toThrow(
+      'neither EXTERNAL_IPV4 nor STACK_IPV4 is set'
+    );
+    expect(jobs.start).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+  });
+
   it('sets locals.auth from a valid bearer token: the user, the client and its name', async () => {
     await getDb()
       .insertInto('oauthClients')

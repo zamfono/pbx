@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { readEnv } from './env.js';
 
-const REQUIRED = { ARI_PASSWORD: 'ari', AMI_PASSWORD: 'ami' };
+// The secrets, and the public address of the ports mode (§6.1), a documentation-range address.
+const REQUIRED = {
+  ARI_PASSWORD: 'ari',
+  AMI_PASSWORD: 'ami',
+  EXTERNAL_IPV4: '192.0.2.10'
+};
 
 // §6.1, §9.1: the address the stack writes into SIP, the host a forwarded leg's `Diversion`
 // entries name (§9.4 "Forwarded calls").
@@ -24,8 +29,12 @@ describe('readEnv sipHost', () => {
     ).toBe('203.0.113.34');
   });
 
-  it('is null while neither is set', () => {
-    expect(readEnv({ ...REQUIRED, STACK_IPV4: '' }).sipHost).toBeNull();
+  it('refuses to start while neither is set', () => {
+    expect(() =>
+      readEnv({ ...REQUIRED, EXTERNAL_IPV4: '', STACK_IPV4: '' })
+    ).toThrow(
+      'missing required environment variable EXTERNAL_IPV4 or STACK_IPV4'
+    );
   });
 });
 
@@ -36,6 +45,8 @@ describe('readEnv defaults', () => {
       ...REQUIRED,
       TZ: '',
       DB_FILE: '',
+      SIP_UDP_ENABLED: '',
+      SIP_TCP_ENABLED: '',
       CALL_LOG_MAX_BYTES: ''
     });
     expect(env).toMatchObject({
@@ -45,11 +56,19 @@ describe('readEnv defaults', () => {
       dbFile: '/data/zamfono.sqlite3',
       mediaDir: '/media',
       hepEnabled: true,
+      sipUdpEnabled: true,
+      sipTcpEnabled: true,
       callLogMaxBytes: 1048576,
       tz: 'UTC',
       timeZoneError: undefined,
       apiInternalUrl: 'http://api:3000'
     });
+  });
+
+  it('reads SIP_UDP_ENABLED and SIP_TCP_ENABLED as on unless false (§9.1)', () => {
+    expect(
+      readEnv({ ...REQUIRED, SIP_UDP_ENABLED: 'false', SIP_TCP_ENABLED: 'yes' })
+    ).toMatchObject({ sipUdpEnabled: false, sipTcpEnabled: true });
   });
 
   it('refuses an empty secret', () => {

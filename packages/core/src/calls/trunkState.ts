@@ -14,16 +14,18 @@ import { isEvent, type AriEvent, type AriEventOf } from '../ari/events.js';
 import { logFailure } from '../ari/failures.js';
 import type { Logger } from '../ari/types.js';
 import type { EventBus } from '../internal/eventBus.js';
-import type { ConfigCache } from '../internal/snapshot.js';
+import type { ConfigCache, Snapshot } from '../internal/snapshot.js';
 import type { StateStore } from '../internal/stateStore.js';
 import { waitForEvent } from './ariWaits.js';
 import {
   contactEventStatus,
   endpointStatuses,
   monitoringStatuses,
+  onEnabledTransports,
   registrationDetailStatuses,
   registrationTrunks,
   registryEventStatus,
+  type PlainTransports,
   type StatusChange,
   type TrunkStatus
 } from './trunkStatus.js';
@@ -36,6 +38,7 @@ type TrunkStateDeps = {
   bus: EventBus;
   log: Logger;
   now: () => string;
+  plainTransports: PlainTransports;
 };
 
 export class TrunkState {
@@ -145,7 +148,7 @@ export class TrunkState {
       return;
     }
     const frames = await this.deps.ami.action('PJSIPShowRegistrationsOutbound');
-    this.apply(registrationDetailStatuses(snapshot, frames));
+    this.apply(snapshot, registrationDetailStatuses(snapshot, frames));
   }
 
   /**
@@ -155,6 +158,7 @@ export class TrunkState {
   async resyncContacts(): Promise<void> {
     const snapshot = await this.deps.cache.get();
     this.apply(
+      snapshot,
       endpointStatuses(snapshot, await this.deps.ari.endpoints.list())
     );
   }
@@ -168,6 +172,7 @@ export class TrunkState {
   async refreshMonitoring(): Promise<void> {
     const snapshot = await this.deps.cache.get();
     this.apply(
+      snapshot,
       monitoringStatuses(
         snapshot,
         trunkId => this.deps.state.trunks.get(trunkId)?.status
@@ -175,11 +180,13 @@ export class TrunkState {
     );
   }
 
-  private apply(changes: (StatusChange | null)[]): void {
-    for (const change of changes) {
-      if (change !== null) {
-        this.setStatus(...change);
-      }
+  private apply(snapshot: Snapshot, changes: (StatusChange | null)[]): void {
+    for (const change of onEnabledTransports(
+      snapshot,
+      this.deps.plainTransports,
+      changes
+    )) {
+      this.setStatus(...change);
     }
   }
 
@@ -197,13 +204,13 @@ export class TrunkState {
 
   private async handleRegistry(event: AmiEvent): Promise<void> {
     const snapshot = await this.deps.cache.get();
-    this.apply([registryEventStatus(snapshot, event)]);
+    this.apply(snapshot, [registryEventStatus(snapshot, event)]);
   }
 
   private async handleContactStatusChange(
     event: AriEventOf<'ContactStatusChange'>
   ): Promise<void> {
     const snapshot = await this.deps.cache.get();
-    this.apply([contactEventStatus(snapshot, event)]);
+    this.apply(snapshot, [contactEventStatus(snapshot, event)]);
   }
 }

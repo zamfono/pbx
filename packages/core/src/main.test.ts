@@ -50,6 +50,7 @@ const ENV_KEYS = [
   'ARI_PASSWORD',
   'AMI_HOST',
   'AMI_PASSWORD',
+  'EXTERNAL_IPV4',
   'DB_FILE',
   'HEP_ENABLED'
 ] as const;
@@ -97,6 +98,7 @@ describe('main', () => {
     process.env.ARI_PASSWORD = 'ari-secret';
     process.env.AMI_HOST = '127.0.0.1:1';
     process.env.AMI_PASSWORD = 'ami-secret';
+    process.env.EXTERNAL_IPV4 = '192.0.2.10';
     process.env.DB_FILE = ':memory:';
     process.env.HEP_ENABLED = 'false';
 
@@ -120,6 +122,7 @@ describe('main', () => {
     process.env.ARI_PASSWORD = 'ari-secret';
     process.env.AMI_HOST = `${ami.host}:${ami.port}`;
     process.env.AMI_PASSWORD = 'ami-secret';
+    process.env.EXTERNAL_IPV4 = '192.0.2.10';
     process.env.DB_FILE = await migratedDbFile();
     process.env.HEP_ENABLED = 'false';
 
@@ -145,6 +148,7 @@ describe('main', () => {
     process.env.ARI_PASSWORD = 'ari-secret';
     process.env.AMI_HOST = `${ami.host}:${ami.port}`;
     process.env.AMI_PASSWORD = 'ami-secret';
+    process.env.EXTERNAL_IPV4 = '192.0.2.10';
     process.env.DB_FILE = await migratedDbFile();
     process.env.HEP_ENABLED = 'false';
 
@@ -175,6 +179,7 @@ describe('stopping on SIGTERM or SIGINT', () => {
     process.env.ARI_PASSWORD = 'ari-secret';
     process.env.AMI_HOST = `${ami.host}:${ami.port}`;
     process.env.AMI_PASSWORD = 'ami-secret';
+    process.env.EXTERNAL_IPV4 = '192.0.2.10';
     process.env.DB_FILE = await migratedDbFile();
     process.env.HEP_ENABLED = 'false';
     listenersBefore = new Set([

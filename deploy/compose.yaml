@@ -55,6 +55,8 @@ services:
       ARI_PASSWORD: ${ARI_PASSWORD}
       AMI_PASSWORD: ${AMI_PASSWORD}             # outbound registration state (§9.4)
       HEP_ENABLED: ${HEP_ENABLED:-}             # HEP listener on 9060/udp (§7)
+      SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-}     # false turns trunks on that transport unreachable (§9.4)
+      SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-}
       CALL_LOG_MAX_BYTES: ${CALL_LOG_MAX_BYTES:-}
       ZAMFONO_VERSION: ${ZAMFONO_VERSION:-latest}   # the tag pulled, reported as the version (§7)
       TZ: ${TZ:-}

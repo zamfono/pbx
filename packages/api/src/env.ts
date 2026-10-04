@@ -3,7 +3,8 @@
  * serves every stack, so each is read from the container's environment when the server starts,
  * never inlined at build time. SvelteKit validates them on every start and refuses to start while
  * a `required` one is missing or empty, naming each. Only what the operator alone can give is
- * required: `FQDN` and the secrets. Every other variable is read here once into the value its
+ * required: `FQDN` and the secrets here, the public address of either mode in `hooks.server.ts`'s
+ * `init`. Every other variable is read here once into the value its
  * readers use: an empty value, which Compose hands over for an unset `${VAR:-}`, counts as unset,
  * and a variable with a default takes it here. A conditional requirement (the first-boot seed) is
  * its reader's to check. The build's route analysis starts the server too, with

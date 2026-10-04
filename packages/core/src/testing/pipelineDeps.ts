@@ -82,7 +82,8 @@ export function trunkStateFor(
     cache: live.cache ?? new ConfigCache(db),
     state: live.state ?? new StateStore(),
     bus: live.bus ?? new EventBus(),
-    now: nowIso
+    now: nowIso,
+    plainTransports: { sipUdpEnabled: true, sipTcpEnabled: true }
   });
 }
 
@@ -104,7 +105,7 @@ export function testPipelineDeps(
     recorder: noopRecorder,
     now: nowIso,
     stackTz: 'UTC',
-    stackSipHost: null,
+    stackSipHost: '192.0.2.10',
     legStasisWaitMs: STASIS_WAIT_MS,
     callLogMaxBytes: 1_048_576,
     mediaDir: '/nonexistent',

@@ -12,13 +12,18 @@ export function originFromEnv(): string {
 /**
  * The public IPv4 address SIP and media use (§6.1, §9.1): `EXTERNAL_IPV4` in the ports mode, which
  * Asterisk writes into SIP and SDP, else `STACK_IPV4`, which its transports bind in the macvlan
- * mode, the same order as the Asterisk entrypoint's; `null` when neither is set.
+ * mode, the same order as the Asterisk entrypoint's. The mode's overlay requires one of them, and
+ * `api` refuses to start without (`hooks.server.ts`).
  */
 export function stackIpv4(env: {
   EXTERNAL_IPV4?: string | undefined;
   STACK_IPV4?: string | undefined;
-}): string | null {
-  return env.EXTERNAL_IPV4 ?? env.STACK_IPV4 ?? null;
+}): string {
+  const address = env.EXTERNAL_IPV4 ?? env.STACK_IPV4;
+  if (address === undefined) {
+    throw new Error('neither EXTERNAL_IPV4 nor STACK_IPV4 is set (§6.1)');
+  }
+  return address;
 }
 
 /** §6.1 "One IP, two listeners": the fixed SIP-TLS port every client, Ringotel included, dials. */

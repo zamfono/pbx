@@ -88,8 +88,9 @@ async function startLiveState(deps: {
   cache: ConfigCache;
   state: StateStore;
   bus: EventBus;
+  env: CoreEnv;
 }): Promise<{ presence: Presence; trunkState: TrunkState }> {
-  const { db, ari, ami, cache, state, bus, log } = deps;
+  const { db, ari, ami, cache, state, bus, log, env } = deps;
   const presence = new Presence({
     ari,
     cache,
@@ -107,7 +108,8 @@ async function startLiveState(deps: {
     state,
     bus,
     log,
-    now: nowIso
+    now: nowIso,
+    plainTransports: env
   });
   await trunkState.resyncOnBoot();
   return { presence, trunkState };
@@ -148,7 +150,8 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
       cache,
       state,
       bus,
-      log
+      log,
+      env
     });
     const { pipeline, cdr, recorder } = buildPipeline({
       db,

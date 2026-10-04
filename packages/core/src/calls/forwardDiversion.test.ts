@@ -269,10 +269,4 @@ describe('diversionTrunk', () => {
       'sip.provider.example'
     );
   });
-
-  it("falls back to the trunk's first outbound host without a stack address", () => {
-    expect(diversionTrunk(trunk, snapshot, null).host).toBe(
-      'sip.provider.example'
-    );
-  });
 });

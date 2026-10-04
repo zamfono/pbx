@@ -64,9 +64,9 @@ type Output = {
   ringotel: { profilePending: boolean };
   /**
    * The stack's public name and the IPv4 address SIP and media use (§6.1): `EXTERNAL_IPV4` in the
-   * ports mode, `STACK_IPV4` in the macvlan mode; each `null` while `.env` does not set it.
+   * ports mode, `STACK_IPV4` in the macvlan mode.
    */
-  stack: { domain: string; ipv4: string | null };
+  stack: { domain: string; ipv4: string };
 };
 
 async function updateStatus(): Promise<Output['update']> {

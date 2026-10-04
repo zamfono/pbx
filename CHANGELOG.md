@@ -89,6 +89,10 @@ why the specified behaviour changed; the commit history, how.
   as trunks spell `callerIdFormat` and `callerIdHeader`; `calleridDidId` is refused as an
   unknown field. The database columns are `caller_id_did_id`, `caller_id_format` and
   `caller_id_header`.
+- Breaking: `api` and `core` refuse to start without `EXTERNAL_IPV4` (ports mode) or
+  `STACK_IPV4` (macvlan mode) in `.env`; `system.info`'s `stack.ipv4` is never `null`. A trunk
+  on a transport that `SIP_UDP_ENABLED=false` or `SIP_TCP_ENABLED=false` switches off now shows
+  `unreachable`, also with `qualify` off, so outbound calls skip it instead of trying it.
 - `calls.originate` (`POST /calls`) refused for a user with no registered device answers the
   problem title `no registered device`, as `calls.pickup` does; the `detail` stays
   `noRegisteredDevice`.

@@ -7,11 +7,12 @@
  */
 import { vi } from 'vitest';
 
-// `FQDN` and `SECRETBOX_KEY` (a fixed 32-byte test key), which `src/env.ts` requires and `.env`
-// always has (§6.3 "Environment"), and the directories no suite may write to the host's real
+// `FQDN`, `SECRETBOX_KEY` (a fixed 32-byte test key) and the ports mode's public address, a
+// documentation-range one, which `api` requires and `.env` always has (§6.3 "Environment"), and the directories no suite may write to the host's real
 // ones of; a suite that needs a particular one, such as a media directory of its own, sets it.
 process.env.FQDN ??= 'pbx.test';
 process.env.SECRETBOX_KEY ??= '1:BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=';
+process.env.EXTERNAL_IPV4 ??= '192.0.2.10';
 process.env.MEDIA_DIR ??= '/nonexistent/media';
 process.env.ASTERISK_GEN_DIR ??= '/nonexistent/asterisk-gen';
 

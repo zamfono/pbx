@@ -1,8 +1,8 @@
 /**
  * `core`'s boot environment (§6.3 "Environment"): every variable the process reads, parsed and
  * validated once at start so a malformed value fails the boot instead of a later call. Only the
- * secrets are required; every other variable has its default here, and an empty value, which
- * Compose hands over for an unset `${VAR:-}`, counts as unset.
+ * secrets and the public address are required; every other variable has its default here, and an
+ * empty value, which Compose hands over for an unset `${VAR:-}`, counts as unset.
  */
 import {
   DEFAULT_DB_FILE,
@@ -32,17 +32,20 @@ export type CoreEnv = {
   dbFile: string;
   mediaDir: string;
   hepEnabled: boolean;
+  /** `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED` (§9.1): whether the plain SIP transports serve trunks. */
+  sipUdpEnabled: boolean;
+  sipTcpEnabled: boolean;
   callLogMaxBytes: number;
   tz: string;
   /** What `core` logs once at start about a `TZ` that names no IANA time zone, else `undefined`. */
   timeZoneError: string | undefined;
-  /** `STACK_IPV4` and `EXTERNAL_IPV4`, `null` while unset: the addresses the HEP collector counts
-   * as Asterisk's own, besides the `ariUrl` host's (§7). */
+  /** `STACK_IPV4` and `EXTERNAL_IPV4`, `null` while unset, which one of them is in each mode: the
+   * addresses the HEP collector counts as Asterisk's own, besides the `ariUrl` host's (§7). */
   stackIpv4: string | null;
   externalIpv4: string | null;
   /** The address the stack writes into SIP (§6.1, §9.1): `EXTERNAL_IPV4` in the ports mode, else
-   * `STACK_IPV4`, which the transports bind in the macvlan mode; `null` while neither is set. */
-  sipHost: string | null;
+   * `STACK_IPV4`, which the transports bind in the macvlan mode. */
+  sipHost: string;
   /** `api`'s internal HTTP API, where `core` posts its mail requests (§3.1 "Mail"). */
   apiInternalUrl: string;
   /** `ZAMFONO_VERSION` and `ZAMFONO_REVISION` (§7 "Version"). */
@@ -99,12 +102,19 @@ function parseCallLogMaxBytes(raw: string | undefined): number {
 // amiHost's port, callLogMaxBytes and tz are validated here and carried on `CoreEnv` for the
 // call pipeline, the OOO/hours sweep and the HEP listener; tz is the tenant clock while
 // `settings.timezone` is NULL (§11.4). hepEnabled accepts any value other than the literal
-// string 'false' as true.
+// string 'false' as true, as do sipUdpEnabled and sipTcpEnabled.
 export function readEnv(env: NodeJS.ProcessEnv): CoreEnv {
   const ami = parseHostPort(optionalEnv(env, 'AMI_HOST') ?? DEFAULT_AMI_HOST);
   const stackIpv4 = optionalEnv(env, 'STACK_IPV4') ?? null;
   const externalIpv4 = optionalEnv(env, 'EXTERNAL_IPV4') ?? null;
   const tz = optionalEnv(env, 'TZ') ?? DEFAULT_TZ;
+  // The Asterisk entrypoint's order; the mode's overlay requires one of them (§6.1).
+  const sipHost = externalIpv4 ?? stackIpv4;
+  if (sipHost === null) {
+    throw new Error(
+      'missing required environment variable EXTERNAL_IPV4 or STACK_IPV4'
+    );
+  }
   return {
     ariUrl: optionalEnv(env, 'ARI_URL') ?? DEFAULT_ARI_URL,
     ariPassword: requireEnv(env, 'ARI_PASSWORD'),
@@ -114,6 +124,8 @@ export function readEnv(env: NodeJS.ProcessEnv): CoreEnv {
     dbFile: optionalEnv(env, 'DB_FILE') ?? DEFAULT_DB_FILE,
     mediaDir: optionalEnv(env, 'MEDIA_DIR') ?? DEFAULT_MEDIA_DIR,
     hepEnabled: env.HEP_ENABLED !== 'false',
+    sipUdpEnabled: env.SIP_UDP_ENABLED !== 'false',
+    sipTcpEnabled: env.SIP_TCP_ENABLED !== 'false',
     callLogMaxBytes: parseCallLogMaxBytes(
       optionalEnv(env, 'CALL_LOG_MAX_BYTES')
     ),
@@ -121,8 +133,7 @@ export function readEnv(env: NodeJS.ProcessEnv): CoreEnv {
     timeZoneError: stackTimeZoneError(tz),
     stackIpv4,
     externalIpv4,
-    // The Asterisk entrypoint's order.
-    sipHost: externalIpv4 ?? stackIpv4,
+    sipHost,
     apiInternalUrl:
       optionalEnv(env, 'API_INTERNAL_URL') ?? DEFAULT_API_INTERNAL_URL,
     version: resolveVersion(env)
