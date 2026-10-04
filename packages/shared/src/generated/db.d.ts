@@ -388,6 +388,7 @@ export interface Tokens {
   expiresAt: string;
   kind: TokenKind;
   revokedAt: string | null;
+  sessionId: string | null;
   tokenHash: string;
   userId: string;
 }

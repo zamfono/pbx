@@ -25,21 +25,22 @@ describe('jwt', () => {
   it('round-trips claims through sign and verify', async () => {
     const token = await signAccessToken(
       SECRET,
-      { sub: 'u1', role: 'admin', cid: 'c1' },
+      { sub: 'u1', role: 'admin', cid: 'c1', sid: 'session-1' },
       NOW_S,
       ORIGIN
     );
     expect(await verifyAccessToken(SECRET, token, NOW_S)).toEqual({
       sub: 'u1',
       role: 'admin',
-      cid: 'c1'
+      cid: 'c1',
+      sid: 'session-1'
     });
   });
 
   it('signs exactly the bytes a hand-assembled token of the same claims has', async () => {
     const token = await signAccessToken(
       SECRET,
-      { sub: 'u1', role: 'admin', cid: 'c1' },
+      { sub: 'u1', role: 'admin', cid: 'c1', sid: 'session-1' },
       NOW_S,
       ORIGIN
     );
@@ -48,6 +49,7 @@ describe('jwt', () => {
         sub: 'u1',
         role: 'admin',
         cid: 'c1',
+        sid: 'session-1',
         iss: ORIGIN,
         aud: AUDIENCE,
         iat: NOW_S,
@@ -61,6 +63,7 @@ describe('jwt', () => {
       sub: 'u1',
       role: 'user',
       cid: null,
+      sid: 'session-1',
       iss: ORIGIN,
       aud: AUDIENCE,
       iat: NOW_S,
@@ -69,14 +72,15 @@ describe('jwt', () => {
     expect(await verifyAccessToken(SECRET, token, NOW_S, AUDIENCE)).toEqual({
       sub: 'u1',
       role: 'user',
-      cid: null
+      cid: null,
+      sid: 'session-1'
     });
   });
 
   it('accepts a null client id, for the direct login flow', async () => {
     const token = await signAccessToken(
       SECRET,
-      { sub: 'u1', role: 'owner', cid: null },
+      { sub: 'u1', role: 'owner', cid: null, sid: 'session-1' },
       NOW_S,
       ORIGIN
     );
@@ -86,7 +90,7 @@ describe('jwt', () => {
   it('is valid up to, and expired at, exactly 900 seconds after issuance', async () => {
     const token = await signAccessToken(
       SECRET,
-      { sub: 'u1', role: 'user', cid: null },
+      { sub: 'u1', role: 'user', cid: null, sid: 'session-1' },
       NOW_S,
       ORIGIN
     );
@@ -101,7 +105,7 @@ describe('jwt', () => {
   it('rejects a token signed with a different secret', async () => {
     const token = await signAccessToken(
       SECRET,
-      { sub: 'u1', role: 'user', cid: null },
+      { sub: 'u1', role: 'user', cid: null, sid: 'session-1' },
       NOW_S,
       ORIGIN
     );
@@ -111,7 +115,7 @@ describe('jwt', () => {
   it('accepts a token for the audience it was issued for, and refuses it for any other', async () => {
     const token = await signAccessToken(
       SECRET,
-      { sub: 'u1', role: 'user', cid: null },
+      { sub: 'u1', role: 'user', cid: null, sid: 'session-1' },
       NOW_S,
       ORIGIN
     );
@@ -128,6 +132,7 @@ describe('jwt', () => {
       sub: 'u1',
       role: 'user',
       cid: null,
+      sid: 'session-1',
       iss: ORIGIN,
       iat: NOW_S,
       exp: NOW_S + ACCESS_TOKEN_TTL_S
@@ -136,11 +141,25 @@ describe('jwt', () => {
     expect(await verifyAccessToken(SECRET, token, NOW_S, AUDIENCE)).toBeNull();
   });
 
+  it('refuses a token without the session it was issued in', async () => {
+    const token = handSigned({
+      sub: 'u1',
+      role: 'user',
+      cid: null,
+      iss: ORIGIN,
+      aud: AUDIENCE,
+      iat: NOW_S,
+      exp: NOW_S + ACCESS_TOKEN_TTL_S
+    });
+    expect(await verifyAccessToken(SECRET, token, NOW_S)).toBeNull();
+  });
+
   it('refuses a token whose role is none of the three', async () => {
     const token = handSigned({
       sub: 'u1',
       role: 'root',
       cid: null,
+      sid: 'session-1',
       iss: ORIGIN,
       aud: AUDIENCE,
       iat: NOW_S,

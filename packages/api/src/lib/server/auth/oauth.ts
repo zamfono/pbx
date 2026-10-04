@@ -5,6 +5,7 @@
  */
 import { HTTP_OK } from '@zamfono/shared';
 
+import { notifyUsersChanged } from '../eventSink.js';
 import { sha256Hex } from '../hash.js';
 import {
   GRANT_AUTHORIZATION_CODE,
@@ -30,6 +31,8 @@ export async function revokeEndpoint(
       .where('tokenHash', '=', sha256Hex(token))
       .where('revokedAt', 'is', null)
       .execute();
+    // §10.6: a revoked session's `/events` sockets close.
+    notifyUsersChanged();
   }
   return new Response(null, { status: HTTP_OK });
 }

@@ -15,6 +15,7 @@ import { nowIso, type Db } from '@zamfono/shared';
 import { MIN_PASSWORD_LENGTH } from '#lib/auth/passwordPolicy.js';
 
 import { addressKey } from '../addressKey.js';
+import { notifyUsersChanged } from '../eventSink.js';
 import { limiter } from '../limiter.js';
 import { sendMail } from '../mail/index.js';
 import { setupLinkFor } from '../ops/users/_setupMail.js';
@@ -156,5 +157,7 @@ export async function redeemPasswordReset(
     .where('id', '=', user.id)
     .execute();
   await revokeUserTokens(db, user.id, now);
+  // §10.6: the revoked sessions' `/events` sockets close.
+  notifyUsersChanged();
   return { kind: 'passwordSet' };
 }

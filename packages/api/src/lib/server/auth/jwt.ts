@@ -11,8 +11,17 @@ export const ACCESS_TOKEN_TTL_S = 900;
 const JWT_ALG = 'HS256';
 const JWT_TYP = 'JWT';
 
-/** The identity an access token carries: the user, their role and the OAuth client, if any. */
-export type AccessClaims = { sub: string; role: UserRole; cid: string | null };
+/**
+ * The identity an access token carries: the user, their role, the OAuth client, if any, and
+ * `sid`, the session whose refresh token it was issued with (§5.2), which an `/events` socket
+ * it opens lives by (§10.6).
+ */
+export type AccessClaims = {
+  sub: string;
+  role: UserRole;
+  cid: string | null;
+  sid: string;
+};
 
 /** Type guard for the RBAC roles a JWT `role` claim (or a `users.role` column) may hold. */
 export function isRole(value: unknown): value is UserRole {
@@ -24,6 +33,7 @@ const AccessPayloadSchema = z.object({
   sub: z.string(),
   role: z.custom<UserRole>(isRole),
   cid: z.string().nullable(),
+  sid: z.string(),
   iss: z.string(),
   aud: z.string(),
   iat: z.number(),
@@ -145,7 +155,14 @@ export async function verifyAccessToken(
     audience,
     schema: AccessPayloadSchema
   });
-  return payload && { sub: payload.sub, role: payload.role, cid: payload.cid };
+  return (
+    payload && {
+      sub: payload.sub,
+      role: payload.role,
+      cid: payload.cid,
+      sid: payload.sid
+    }
+  );
 }
 
 /** The user and client of link token `token` of `kind`, verified like an access token and opening

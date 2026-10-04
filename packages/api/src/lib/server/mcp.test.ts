@@ -475,7 +475,7 @@ describe('handleMcpRequest, legacy 2025-11-25', () => {
 
     const otherActorToken = await signAccessToken(
       JWT_SECRET,
-      { sub: 'someone-else', role: 'owner', cid: CLIENT_ID },
+      { sub: 'someone-else', role: 'owner', cid: CLIENT_ID, sid: 'session-1' },
       epochSeconds(Date.now()),
       ORIGIN
     );

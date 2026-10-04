@@ -1230,12 +1230,17 @@ async function createTokensTable(db: Db): Promise<void> {
     .addColumn('client_id', 'text', col =>
       col.references('oauth_clients.client_id').onDelete('cascade')
     )
+    .addColumn('session_id', 'text')
     .addColumn('created_at', 'text', col => col.notNull())
     .addColumn('expires_at', 'text', col => col.notNull())
     .addColumn('revoked_at', 'text')
     .addCheckConstraint(
       'tokens_refresh_needs_client',
       sql`(kind = 'refresh') = (client_id is not null)`
+    )
+    .addCheckConstraint(
+      'tokens_refresh_needs_session',
+      sql`(kind = 'refresh') = (session_id is not null)`
     )
     .execute();
 }
@@ -1634,6 +1639,11 @@ async function createRemainingHotPathIndexes(db: Db): Promise<void> {
     .createIndex('tokens_expiry')
     .on('tokens')
     .column('expires_at')
+    .execute();
+  await db.schema
+    .createIndex('tokens_session')
+    .on('tokens')
+    .column('session_id')
     .execute();
   await db.schema
     .createIndex('contact_phones_number')

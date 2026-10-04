@@ -160,7 +160,7 @@ describe('hooks handle', () => {
     vi.unstubAllEnvs();
   });
 
-  it('sets locals.auth from a valid bearer token: the user, the client and its name', async () => {
+  it('sets locals.auth from a valid bearer token: the user, its session, the client and its name', async () => {
     await getDb()
       .insertInto('oauthClients')
       .values({
@@ -174,7 +174,7 @@ describe('hooks handle', () => {
     const nowS = epochSeconds(Date.now());
     const token = await signAccessToken(
       JWT_SECRET,
-      { sub: 'admin1', role: 'admin', cid: 'client1' },
+      { sub: 'admin1', role: 'admin', cid: 'client1', sid: 'session-1' },
       nowS,
       'https://pbx.example.com'
     );
@@ -184,6 +184,7 @@ describe('hooks handle', () => {
     await handle({ event, resolve: resolvePassThrough });
     expect(event.locals.auth).toEqual({
       actor: { id: 'admin1', name: 'Admin', role: 'admin' },
+      sessionId: 'session-1',
       clientId: 'client1',
       clientName: 'Ops Console'
     });
@@ -210,7 +211,7 @@ describe('hooks handle', () => {
     expect(viaLink.headers.get('cache-control')).toBe('private');
     const bearerToken = await signAccessToken(
       JWT_SECRET,
-      { sub: 'admin1', role: 'admin', cid: null },
+      { sub: 'admin1', role: 'admin', cid: null, sid: 'session-1' },
       nowS,
       'https://pbx.example.com'
     );

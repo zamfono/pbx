@@ -15,7 +15,11 @@ import { migratedTestDb, seedUser } from '@zamfono/shared/testDb.js';
 
 import type { Authenticated } from './auth/bearer.js';
 import { signAccessToken } from './auth/jwt.js';
-import type { PersonalAccessTokenGrant } from './auth/personalAccessTokens.js';
+import {
+  issueRefresh,
+  rotateRefresh,
+  type IssuedRefresh
+} from './auth/tokens.js';
 import { EventHub, visibleTo } from './events.js';
 import { authenticateEventsSocket } from './eventsAuth.js';
 import type { Actor } from './ops/types.js';
@@ -241,13 +245,14 @@ describe('authenticateEventsSocket', () => {
     });
     const token = await signAccessToken(
       JWT_SECRET,
-      { sub: 'u1', role: 'user', cid: null },
+      { sub: 'u1', role: 'user', cid: null, sid: 'session-1' },
       NOW_S,
       'https://pbx.example.com'
     );
     client.send(JSON.stringify({ type: 'auth', token }));
     expect(await serverResult).toEqual({
-      actor: { id: 'u1', name: 'A User', role: 'user' }
+      actor: { id: 'u1', name: 'A User', role: 'user' },
+      sessionId: 'session-1'
     });
     client.close();
   });
@@ -292,7 +297,9 @@ describe('EventHub', () => {
     const subscribed = new Promise<void>(resolve => {
       wss.once('connection', socket => {
         hub
-          .subscribeWs(socket, { id: 'u1', name: 'A User', role: 'user' })
+          .subscribeWs(socket, {
+            actor: { id: 'u1', name: 'A User', role: 'user' }
+          })
           .then(resolve, resolve);
       });
     });
@@ -350,7 +357,9 @@ describe('EventHub', () => {
     const subscribed = new Promise<void>(resolve => {
       wss.once('connection', socket => {
         hub
-          .subscribeWs(socket, { id: 'u1', name: 'A User', role: 'user' })
+          .subscribeWs(socket, {
+            actor: { id: 'u1', name: 'A User', role: 'user' }
+          })
           .then(resolve, resolve);
       });
     });
@@ -409,7 +418,9 @@ describe('EventHub', () => {
     const subscribed = new Promise<void>(resolve => {
       wss.once('connection', socket => {
         hub
-          .subscribeWs(socket, { id: 'u1', name: 'A User', role: 'user' })
+          .subscribeWs(socket, {
+            actor: { id: 'u1', name: 'A User', role: 'user' }
+          })
           .then(resolve, resolve);
       });
     });
@@ -473,7 +484,9 @@ describe('EventHub', () => {
     const subscribed = new Promise<void>(resolve => {
       wss.once('connection', socket => {
         hub
-          .subscribeWs(socket, { id: 'u1', name: 'A User', role: 'user' })
+          .subscribeWs(socket, {
+            actor: { id: 'u1', name: 'A User', role: 'user' }
+          })
           .then(resolve, resolve);
       });
     });
@@ -514,18 +527,15 @@ describe('EventHub.usersChanged (§10.6)', () => {
     });
   });
 
-  /** A client connected to `hub` as `actor`, once the hub holds its socket. */
+  /** A client connected to `hub` as `auth`, once the hub holds its socket. */
   async function subscribedClient(
     hub: EventHub,
-    actor: Actor,
-    personalAccessToken?: PersonalAccessTokenGrant
+    auth: Authenticated
   ): Promise<WebSocket> {
     wss = await listeningServer();
     const subscribed = new Promise<void>(resolve => {
       wss.once('connection', socket => {
-        hub
-          .subscribeWs(socket, actor, personalAccessToken)
-          .then(resolve, resolve);
+        hub.subscribeWs(socket, auth).then(resolve, resolve);
       });
     });
     const client = new WebSocket(serverUrl(wss));
@@ -546,14 +556,38 @@ describe('EventHub.usersChanged (§10.6)', () => {
     });
   }
 
+  const U1: Actor = { id: 'u1', name: 'A User', role: 'user' };
+
+  /** A session of `u1` with an OAuth client, as the token endpoint starts it on a login. */
+  async function seedSession(db: Db): Promise<IssuedRefresh> {
+    await db
+      .insertInto('oauthClients')
+      .values({
+        clientId: 'client-1',
+        name: 'Ops Console',
+        kind: 'cimd',
+        createdAt: nowIso(),
+        lastLoginAt: nowIso()
+      })
+      .execute();
+    return issueRefresh(db, 'u1', 'client-1', nowIso());
+  }
+
+  /** `u1` on a live session, as an access token's handshake hands it to the hub. */
+  async function sessionAuth(
+    db: Db,
+    actor: Actor = U1
+  ): Promise<Authenticated> {
+    return { actor, sessionId: (await seedSession(db)).sessionId };
+  }
+
   it('closes with 4401 the socket of a user whose role changed', async () => {
     const db = await migratedDb('u1');
     const hub = new EventHub(db);
-    const client = await subscribedClient(hub, {
-      id: 'u1',
-      name: 'A User',
-      role: 'admin'
-    });
+    const client = await subscribedClient(
+      hub,
+      await sessionAuth(db, { ...U1, role: 'admin' })
+    );
     const closed = closeCode(client);
 
     await hub.usersChanged();
@@ -564,11 +598,7 @@ describe('EventHub.usersChanged (§10.6)', () => {
   it('closes with 4401 the socket of a soft-deleted user', async () => {
     const db = await migratedDb('u1');
     const hub = new EventHub(db);
-    const client = await subscribedClient(hub, {
-      id: 'u1',
-      name: 'A User',
-      role: 'user'
-    });
+    const client = await subscribedClient(hub, await sessionAuth(db));
     const closed = closeCode(client);
     await db
       .updateTable('users')
@@ -597,11 +627,7 @@ describe('EventHub.usersChanged (§10.6)', () => {
       .values({ groupId: 'g1', userId: 'u1', position: 0 })
       .execute();
     const hub = new EventHub(db);
-    const client = await subscribedClient(hub, {
-      id: 'u1',
-      name: 'A User',
-      role: 'user'
-    });
+    const client = await subscribedClient(hub, await sessionAuth(db));
     const messages: string[] = [];
     client.on('message', data => {
       messages.push(rawDataToString(data));
@@ -623,11 +649,60 @@ describe('EventHub.usersChanged (§10.6)', () => {
     client.close();
   });
 
+  it('keeps the socket of a session open across its refresh-token rotations', async () => {
+    const db = await migratedDb('u1');
+    const session = await seedSession(db);
+    const hub = new EventHub(db);
+    const client = await subscribedClient(hub, {
+      actor: U1,
+      sessionId: session.sessionId
+    });
+    const rotated = await rotateRefresh(db, session.raw, nowIso());
+    expect(rotated.ok).toBe(true);
+
+    await hub.usersChanged();
+
+    expect(client.readyState).toBe(WebSocket.OPEN);
+    client.close();
+  });
+
+  it('closes with 4401 the socket of a session revoked since, and keeps another session’s', async () => {
+    const db = await migratedDb('u1');
+    const revoked = await seedSession(db);
+    const other = await issueRefresh(db, 'u1', 'client-1', nowIso());
+    const hub = new EventHub(db);
+    const ended = await subscribedClient(hub, {
+      actor: U1,
+      sessionId: revoked.sessionId
+    });
+    const closed = closeCode(ended);
+    const kept = new WebSocket(serverUrl(wss));
+    const keptSubscribed = new Promise<void>(resolve => {
+      wss.once('connection', socket => {
+        hub
+          .subscribeWs(socket, { actor: U1, sessionId: other.sessionId })
+          .then(resolve, resolve);
+      });
+    });
+    await keptSubscribed;
+    await db
+      .updateTable('tokens')
+      .set({ revokedAt: nowIso() })
+      .where('sessionId', '=', revoked.sessionId)
+      .execute();
+
+    await hub.usersChanged();
+
+    expect(await closed).toBe(USER_CHANGED_CLOSE_CODE);
+    expect(kept.readyState).toBe(WebSocket.OPEN);
+    kept.close();
+  });
+
   /** A personal access token of `u1`, as the `/events` handshake hands it to the hub. */
   async function seedToken(
     db: Db,
     expiresAt: string | null
-  ): Promise<PersonalAccessTokenGrant> {
+  ): Promise<Authenticated> {
     await db
       .insertInto('personalAccessTokens')
       .values({
@@ -639,15 +714,13 @@ describe('EventHub.usersChanged (§10.6)', () => {
         expiresAt
       })
       .execute();
-    return { id: 'pat-1', expiresAt };
+    return { actor: U1, personalAccessToken: { id: 'pat-1', expiresAt } };
   }
-
-  const U1: Actor = { id: 'u1', name: 'A User', role: 'user' };
 
   it('closes with 4401 the socket of a personal access token revoked since', async () => {
     const db = await migratedDb('u1');
     const hub = new EventHub(db);
-    const client = await subscribedClient(hub, U1, await seedToken(db, null));
+    const client = await subscribedClient(hub, await seedToken(db, null));
     const closed = closeCode(client);
     await db
       .updateTable('personalAccessTokens')
@@ -662,7 +735,7 @@ describe('EventHub.usersChanged (§10.6)', () => {
   it('keeps the socket of a live personal access token open', async () => {
     const db = await migratedDb('u1');
     const hub = new EventHub(db);
-    const client = await subscribedClient(hub, U1, await seedToken(db, null));
+    const client = await subscribedClient(hub, await seedToken(db, null));
 
     await hub.usersChanged();
 
@@ -674,11 +747,7 @@ describe('EventHub.usersChanged (§10.6)', () => {
     const db = await migratedDb('u1');
     const hub = new EventHub(db);
     const expiresAt = addMsIso(nowIso(), SHORT_TIMEOUT_MS);
-    const client = await subscribedClient(
-      hub,
-      U1,
-      await seedToken(db, expiresAt)
-    );
+    const client = await subscribedClient(hub, await seedToken(db, expiresAt));
 
     expect(await closeCode(client)).toBe(USER_CHANGED_CLOSE_CODE);
     expect(Date.now()).toBeGreaterThanOrEqual(Date.parse(expiresAt));

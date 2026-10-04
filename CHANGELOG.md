@@ -13,6 +13,9 @@ why the specified behaviour changed; the commit history, how.
 
 ### Added
 
+- An open `/events` connection ends, with close code 4401, when the login it was opened under is
+  revoked: through `/oauth/revoke`, a reused refresh token, a password reset or the user's deletion.
+  A connection whose login is still valid stays open as long as the client keeps it.
 - Personal access tokens for server applications that cannot log in through OAuth:
   `personalAccessTokens.create` (`POST /users/{id}/personalAccessTokens`) returns a `zpat_…` token
   once, with a name and an optional expiry, and the application sends it as its bearer token on the

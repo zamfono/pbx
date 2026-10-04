@@ -278,6 +278,7 @@ describe('users', () => {
         userId: user.user.id,
         kind: 'refresh',
         clientId,
+        sessionId: newId(),
         createdAt: nowIso(),
         expiresAt: nowIso()
       })

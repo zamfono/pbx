@@ -60,6 +60,7 @@ async function insertRefreshToken(
       ...token,
       userId,
       kind: 'refresh',
+      sessionId: token.tokenHash,
       createdAt: daysAfter(token.expiresAt, -30)
     })
     .execute();
@@ -548,6 +549,7 @@ describe('runPurge', () => {
           userId,
           kind: 'refresh',
           clientId: client.clientId,
+          sessionId: client.clientId,
           createdAt: daysAfter(now, client.tokenExpiresInDays - 30),
           expiresAt: daysAfter(now, client.tokenExpiresInDays)
         })

@@ -1,5 +1,6 @@
 import { epochSeconds, HTTP_BAD_REQUEST, HTTP_OK } from '@zamfono/shared';
 
+import { notifyUsersChanged } from '../eventSink.js';
 import type { AuthCodeStore } from './codes.js';
 import { ACCESS_TOKEN_TTL_S, isRole, signAccessToken } from './jwt.js';
 import {
@@ -68,13 +69,13 @@ async function handleAuthorizationCode(
   }
   const nowIso = deps.now();
   const nowS = epochSeconds(Date.parse(nowIso));
+  const refresh = await issueRefresh(deps.db, user.id, clientId, nowIso);
   const accessToken = await signAccessToken(
     deps.jwtSecret,
-    { sub: user.id, role: user.role, cid: clientId },
+    { sub: user.id, role: user.role, cid: clientId, sid: refresh.sessionId },
     nowS,
     deps.origin
   );
-  const refresh = await issueRefresh(deps.db, user.id, clientId, nowIso);
   return tokenResponse(accessToken, refresh.raw);
 }
 
@@ -89,6 +90,10 @@ async function handleRefreshToken(
   const nowIso = deps.now();
   const rotated = await rotateRefresh(deps.db, refreshToken, nowIso);
   if (!rotated.ok) {
+    if (rotated.reason === 'replayed') {
+      // §10.6: the revoked sessions' `/events` sockets close.
+      notifyUsersChanged();
+    }
     return oauthError(HTTP_BAD_REQUEST, 'invalid_grant');
   }
   const user = await deps.db
@@ -103,7 +108,12 @@ async function handleRefreshToken(
   const nowS = epochSeconds(Date.parse(nowIso));
   const accessToken = await signAccessToken(
     deps.jwtSecret,
-    { sub: user.id, role: user.role, cid: rotated.clientId },
+    {
+      sub: user.id,
+      role: user.role,
+      cid: rotated.clientId,
+      sid: rotated.next.sessionId
+    },
     nowS,
     deps.origin
   );

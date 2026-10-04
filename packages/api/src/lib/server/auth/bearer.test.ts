@@ -11,11 +11,12 @@ import { signAccessToken } from './jwt.js';
 const JWT_SECRET = 'test-secret';
 const ORIGIN = 'https://pbx.example.com';
 const OWNER = { id: 'owner', name: 'Owner', role: 'owner' };
+const SESSION_ID = 'session-1';
 
 function tokenFor(sub: string, cid: string | null = null): Promise<string> {
   return signAccessToken(
     JWT_SECRET,
-    { sub, role: 'owner', cid },
+    { sub, role: 'owner', cid, sid: SESSION_ID },
     epochSeconds(Date.now()),
     ORIGIN
   );
@@ -40,7 +41,8 @@ describe('authenticateToken', () => {
         .execute()
     );
     expect(await authenticateToken(deps, await tokenFor('owner'))).toEqual({
-      actor: { ...OWNER, role: 'admin' }
+      actor: { ...OWNER, role: 'admin' },
+      sessionId: SESSION_ID
     });
   });
 
@@ -61,6 +63,7 @@ describe('authenticateToken', () => {
       await authenticateToken(deps, await tokenFor('owner', 'client-1'))
     ).toEqual({
       actor: OWNER,
+      sessionId: SESSION_ID,
       clientId: 'client-1',
       clientName: 'Ops Console'
     });

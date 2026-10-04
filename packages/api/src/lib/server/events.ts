@@ -14,10 +14,9 @@ import {
   type Event
 } from '@zamfono/shared';
 
-import {
-  livePersonalAccessTokenIds,
-  type PersonalAccessTokenGrant
-} from './auth/personalAccessTokens.js';
+import type { Authenticated } from './auth/bearer.js';
+import { livePersonalAccessTokenIds } from './auth/personalAccessTokens.js';
+import { liveSessionIds } from './auth/tokens.js';
 import type { Actor } from './ops/types.js';
 import { ringGroupMemberships } from './ringGroupMembership.js';
 
@@ -58,14 +57,11 @@ export function visibleTo(actor: Actor, ev: Event): boolean {
 
 const logger = pino({ name: 'events' });
 
-type Subscription = {
-  actor: Actor;
-  ringGroupIds: ReadonlySet<string>;
-  personalAccessToken?: PersonalAccessTokenGrant;
-};
+/** An open socket: who it authenticated as, with which session or token, and its ring groups. */
+type Subscription = { auth: Authenticated; ringGroupIds: ReadonlySet<string> };
 
-// §10.6: the close code of a socket whose user is gone or whose role changed, or whose personal
-// access token was revoked or expired.
+// §10.6: the close code of a socket whose user is gone or whose role changed, or whose session or
+// personal access token ended.
 const USER_CHANGED_CLOSE_CODE = 4401;
 
 // The longest delay `setTimeout` takes; a later expiry is re-checked then and scheduled again.
@@ -92,22 +88,30 @@ async function ringGroupIdsByUser(
   return byUser;
 }
 
-/** `actor`'s subscription from `byUser`: no ring group for an admin, who sees every mailbox. */
+/** `auth`'s subscription from `byUser`: no ring group for an admin, who sees every mailbox. */
 function subscription(
-  actor: Actor,
-  byUser: ReadonlyMap<string, Set<string>>,
-  personalAccessToken?: PersonalAccessTokenGrant
+  auth: Authenticated,
+  byUser: ReadonlyMap<string, Set<string>>
 ): Subscription {
+  const { actor } = auth;
   const ringGroupIds = actor.role === 'user' ? byUser.get(actor.id) : undefined;
-  return {
-    actor,
-    ringGroupIds: ringGroupIds ?? new Set<string>(),
-    personalAccessToken
-  };
+  return { auth, ringGroupIds: ringGroupIds ?? new Set<string>() };
+}
+
+/** Whether the session or personal access token `auth` opened its socket with is still live. */
+function credentialLive(
+  auth: Authenticated,
+  liveSessions: ReadonlySet<string>,
+  liveTokens: ReadonlySet<string>
+): boolean {
+  if (auth.personalAccessToken) {
+    return liveTokens.has(auth.personalAccessToken.id);
+  }
+  return auth.sessionId !== undefined && liveSessions.has(auth.sessionId);
 }
 
 function isVisible(sub: Subscription, ev: Event): boolean {
-  if (visibleTo(sub.actor, ev)) {
+  if (visibleTo(sub.auth.actor, ev)) {
     return true;
   }
   return (
@@ -139,19 +143,12 @@ export class EventHub {
   }
 
   /**
-   * Registers an already-authenticated socket, and the personal access token it authenticated
-   * with, if any; removes it on close or error.
+   * Registers a socket the handshake authenticated as `auth`, with its session or personal access
+   * token; removes it on close or error.
    */
-  async subscribeWs(
-    socket: WebSocket,
-    actor: Actor,
-    personalAccessToken?: PersonalAccessTokenGrant
-  ): Promise<void> {
-    const byUser = await ringGroupIdsByUser(this.db, actor.id);
-    this.subscribers.set(
-      socket,
-      subscription(actor, byUser, personalAccessToken)
-    );
+  async subscribeWs(socket: WebSocket, auth: Authenticated): Promise<void> {
+    const byUser = await ringGroupIdsByUser(this.db, auth.actor.id);
+    this.subscribers.set(socket, subscription(auth, byUser));
     this.scheduleExpiry();
     socket.on('close', () => {
       this.subscribers.delete(socket);
@@ -163,22 +160,27 @@ export class EventHub {
   }
 
   /**
-   * Re-reads the user row, ring-group memberships and personal access token behind every open
-   * socket (§10.6): closes with 4401 a socket whose user is gone or holds another role than at
-   * its handshake, or whose personal access token was revoked or has expired, and narrows or
-   * widens the rest to their current ring groups. Runs after every committed write, and when the
-   * earliest token of an open socket expires.
+   * Re-reads the user row, ring-group memberships and session or personal access token behind
+   * every open socket (§10.6): closes with 4401 a socket whose user is gone or holds another role
+   * than at its handshake, or whose session or personal access token was revoked or has expired,
+   * and narrows or widens the rest to their current ring groups. Runs after every committed write
+   * and every session revocation, and when the earliest token of an open socket expires.
    */
   async usersChanged(): Promise<void> {
     const open = [...this.subscribers];
     if (open.length === 0) {
       return;
     }
-    const ids = [...new Set(open.map(([, sub]) => sub.actor.id))];
-    const tokenIds = open.flatMap(([, sub]) =>
-      sub.personalAccessToken ? [sub.personalAccessToken.id] : []
+    const auths = open.map(([, sub]) => sub.auth);
+    const ids = [...new Set(auths.map(auth => auth.actor.id))];
+    const sessionIds = auths.flatMap(auth =>
+      auth.sessionId === undefined ? [] : [auth.sessionId]
     );
-    const [users, byUser, liveTokens] = await Promise.all([
+    const tokenIds = auths.flatMap(auth =>
+      auth.personalAccessToken ? [auth.personalAccessToken.id] : []
+    );
+    const now = nowIso();
+    const [users, byUser, liveSessions, liveTokens] = await Promise.all([
       this.db
         .selectFrom('users')
         .select(['id', 'role'])
@@ -186,7 +188,8 @@ export class EventHub {
         .where('deletedAt', 'is', null)
         .execute(),
       ringGroupIdsByUser(this.db),
-      livePersonalAccessTokenIds(this.db, tokenIds, nowIso())
+      liveSessionIds(this.db, sessionIds, now),
+      livePersonalAccessTokenIds(this.db, tokenIds, now)
     ]);
     const roles = new Map(users.map(user => [user.id, user.role]));
     for (const [socket, sub] of open) {
@@ -194,13 +197,12 @@ export class EventHub {
       if (this.subscribers.get(socket) !== sub) {
         continue;
       }
-      const tokenLive =
-        !sub.personalAccessToken || liveTokens.has(sub.personalAccessToken.id);
-      if (roles.get(sub.actor.id) === sub.actor.role && tokenLive) {
-        this.subscribers.set(
-          socket,
-          subscription(sub.actor, byUser, sub.personalAccessToken)
-        );
+      const { actor } = sub.auth;
+      if (
+        roles.get(actor.id) === actor.role &&
+        credentialLive(sub.auth, liveSessions, liveTokens)
+      ) {
+        this.subscribers.set(socket, subscription(sub.auth, byUser));
       } else {
         this.subscribers.delete(socket);
         socket.close(USER_CHANGED_CLOSE_CODE, 'user changed');
@@ -214,8 +216,8 @@ export class EventHub {
     clearTimeout(this.expiryTimer);
     this.expiryTimer = undefined;
     const expiries = [...this.subscribers.values()].flatMap(sub =>
-      sub.personalAccessToken?.expiresAt
-        ? [Date.parse(sub.personalAccessToken.expiresAt)]
+      sub.auth.personalAccessToken?.expiresAt
+        ? [Date.parse(sub.auth.personalAccessToken.expiresAt)]
         : []
     );
     if (expiries.length === 0) {

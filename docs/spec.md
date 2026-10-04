@@ -183,7 +183,7 @@ SSO rules:
 
 The first-boot owner needs none of them: their password hash is seeded (§6.3). Every later user sets their password through the mail link, or through the link an admin hands over (§10.2).
 
-**Tokens.** JWT access tokens live 15 minutes and are signed HS256 with `JWT_SECRET` from `.env`; the authorization server is the only party that verifies them, so there is no JWKS and no asymmetric key pair. Rotating the secret is changing the value and redeploying: only access tokens younger than 15 minutes are invalidated, every client meets a 401, refreshes and continues, and nobody signs in again, because refresh tokens are not JWTs. Refresh tokens live 30 days, rotate on use, are revocable and are stored hashed; rotation and revocation set `tokens.revoked_at`, and the row stays until it expires. Presenting a revoked refresh token is therefore recognised and revokes every token of that user and client, per OAuth 2.1. Headless access uses a refresh token from one interactive login; the device-code grant (RFC 8628) is a noted extension if that proves cumbersome. Set-password links are single-use tokens of kind `reset`: a setup link from `POST /users` or `POST /users/{id}/resetPassword` is valid for 7 days, since a new employee may open the invitation days later and an admin hands such a link on; a reset link from the forgot-password form for 1 hour, since it is requested and used at once.
+**Tokens.** JWT access tokens live 15 minutes and are signed HS256 with `JWT_SECRET` from `.env`; the authorization server is the only party that verifies them, so there is no JWKS and no asymmetric key pair. Rotating the secret is changing the value and redeploying: only access tokens younger than 15 minutes are invalidated, every client meets a 401, refreshes and continues, and nobody signs in again, because refresh tokens are not JWTs. Refresh tokens live 30 days, rotate on use, are revocable and are stored hashed; rotation and revocation set `tokens.revoked_at`, and the row stays until it expires. A login starts a session (`tokens.session_id`): its first refresh token and every rotation of it, the old token revoked and its successor issued in one transaction; an access token carries its session as the `sid` claim. A session lives while it holds a refresh token neither revoked nor expired, and ends when its tokens are revoked: through `/oauth/revoke`, a replay, a password reset or the soft delete of its user. Presenting a revoked refresh token is therefore recognised and revokes every token of that user and client, per OAuth 2.1. Headless access uses a refresh token from one interactive login; the device-code grant (RFC 8628) is a noted extension if that proves cumbersome. Set-password links are single-use tokens of kind `reset`: a setup link from `POST /users` or `POST /users/{id}/resetPassword` is valid for 7 days, since a new employee may open the invitation days later and an admin hands such a link on; a reset link from the forgot-password form for 1 hour, since it is requested and used at once.
 
 **Personal access tokens.** A personal access token is an opaque bearer token, `zpat_` followed by 256 random bits in base64url, created for one user through `POST /users/{id}/personalAccessTokens`: by the user for themselves, or by an `admin` or `owner` for any user, an owner's only by an owner. The create response returns it once; it is stored as its SHA-256 hash with a name unique among the user's live tokens, who created it, and an optional expiry, NULL never expiring. It is accepted wherever an access token is, on REST, MCP and `/events`, and acts exactly as its user, with the role they hold at the request (§5.3), without scopes. Its last use is recorded at most once a minute. Revoking it (`POST /personalAccessTokens/{id}/revoke`, by the same callers) takes effect at once, and so does the soft delete of its user, which revokes it (§5.9); the daily job deletes a revoked or expired token.
 
@@ -1469,7 +1469,7 @@ Everything longer sits behind the read-only tool `zamfono.help(topic)`, which re
 
 Consumers are the future admin frontends, the operator's tooling and integrations. End-user softphones are not consumers; they use SIP-native BLF and MWI. The WebSocket is served by the `api` process on its HTTP port, with `ws` attached to the server in `server.ts` (§10).
 
-**Authentication** happens in the first message: the client sends `{ "type": "auth", "token": "<token>" }` as its first frame, an access token or a personal access token (§5.2), and the server closes a connection that sends anything else first, or nothing within 5 s. The token never travels in the URL, since Caddy logs every request line and a log shipper forwards it off the host (§7). Once any write operation commits, and when the personal access token of an open socket reaches its `expires_at`, the server checks every open socket against its user and token again: a socket whose user is deleted or holds another role than at the handshake, or whose personal access token is revoked or expired, is closed with code 4401, and the others see the ring-group mailboxes of their current memberships. A socket otherwise lives until either side closes it; the token is checked at the handshake and by this re-check, so an access token running out after its 15 minutes does not end a socket it opened.
+**Authentication** happens in the first message: the client sends `{ "type": "auth", "token": "<token>" }` as its first frame, an access token or a personal access token (§5.2), and the server closes a connection that sends anything else first, or nothing within 5 s. The token never travels in the URL, since Caddy logs every request line and a log shipper forwards it off the host (§7). Once any write operation commits, once a session is revoked (§5.2 "Tokens"), and when the personal access token of an open socket reaches its `expires_at`, the server checks every open socket against its user and credential again: a socket whose user is deleted or holds another role than at the handshake, whose access token's session has ended, or whose personal access token is revoked or expired, is closed with code 4401, and the others see the ring-group mailboxes of their current memberships. A socket otherwise lives until either side closes it, with no re-authentication on it: an access token running out after its 15 minutes does not end a socket it opened while its session lives.
 
 Visibility follows roles: `admin` and `owner` receive every event; a `user` receives events about themselves (own presence, own calls, and voicemails for the mailboxes they may read, §5.3) plus the tenant-scope `ooo` and `hours` events. A call is a user's own while the live calls list it for them (§10.3 "Live calls"): a user whose leg starts ringing it receives its current state, one it stops being the call of while it goes on, their leg having stopped ringing or left, receives `ended`, and nothing of it after; neither event goes to an admin or a webhook.
 
@@ -2169,6 +2169,8 @@ CREATE TABLE oauth_clients (
 --   expires_at: refresh: 30 d rotating; reset: single-use, 7 d for a setup link, 1 h for a reset link (§5.2);
 --               the daily job purges a reset row once it expired and a refresh row 30 d after, as
 --               its client's last token expiry (`oauth_clients`, §5.2)
+--   session_id: set for kind 'refresh' only: the session a login started, kept by every rotation;
+--               an access token's `sid` (§5.2)
 --   revoked_at: set when a refresh token is rotated or revoked, or a reset token redeemed; the row
 --               stays until expires_at so that a replayed token is recognised (§5.2)
 CREATE TABLE tokens (
@@ -2176,10 +2178,12 @@ CREATE TABLE tokens (
   user_id    TEXT    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   kind       TEXT    NOT NULL CHECK (kind IN ('refresh','reset')),
   client_id  TEXT    REFERENCES oauth_clients(client_id) ON DELETE CASCADE,
+  session_id TEXT,
   created_at TEXT    NOT NULL,
   expires_at TEXT    NOT NULL,
   revoked_at TEXT,
-  CHECK ((kind = 'refresh') = (client_id IS NOT NULL))
+  CHECK ((kind = 'refresh') = (client_id IS NOT NULL)),
+  CHECK ((kind = 'refresh') = (session_id IS NOT NULL))
 );
 
 -- personal_access_tokens — bearer tokens for server applications, acting as their user (§5.2).
@@ -2466,6 +2470,7 @@ CREATE INDEX audit_entity          ON audit_log (entity_kind, entity_id, created
 CREATE INDEX audit_created         ON audit_log (created_at);
 CREATE INDEX audit_actor           ON audit_log (actor_user_id, created_at);
 CREATE INDEX tokens_expiry         ON tokens (expires_at);
+CREATE INDEX tokens_session        ON tokens (session_id);
 CREATE INDEX contact_phones_number ON contact_phones (number);
 CREATE INDEX backup_runs_target     ON backup_runs (target_id, started_at);
 CREATE INDEX webhook_deliveries_webhook ON webhook_deliveries (webhook_id);

@@ -1,7 +1,13 @@
 import { randomBytes } from 'node:crypto';
 import type { NotNull } from 'kysely';
 
-import { addMsIso, MS_PER_DAY, MS_PER_HOUR, type Db } from '@zamfono/shared';
+import {
+  addMsIso,
+  MS_PER_DAY,
+  MS_PER_HOUR,
+  newId,
+  type Db
+} from '@zamfono/shared';
 
 import { sha256Hex } from '../hash.js';
 
@@ -19,13 +25,21 @@ export function generateRawToken(): string {
   return randomBytes(RAW_TOKEN_BYTES).toString('base64url');
 }
 
-/** Issues a 30-day refresh token for `userId`/`clientId`, returning the raw value once. */
-export async function issueRefresh(
+/** A refresh token as issued: the raw value, returned once, and the session it continues. */
+export type IssuedRefresh = {
+  raw: string;
+  expiresAt: string;
+  sessionId: string;
+};
+
+/** Inserts a 30-day refresh token of session `sessionId` for `userId`/`clientId`. */
+async function insertRefresh(
   db: Db,
   userId: string,
   clientId: string,
+  sessionId: string,
   now: string
-): Promise<{ raw: string; expiresAt: string }> {
+): Promise<IssuedRefresh> {
   const raw = generateRawToken();
   const expiresAt = addMsIso(now, REFRESH_TOKEN_TTL_MS);
   await db
@@ -35,12 +49,51 @@ export async function issueRefresh(
       userId,
       kind: 'refresh',
       clientId,
+      sessionId,
       createdAt: now,
       expiresAt,
       revokedAt: null
     })
     .execute();
-  return { raw, expiresAt };
+  return { raw, expiresAt, sessionId };
+}
+
+/**
+ * Starts a session for `userId`/`clientId` (§5.2 "Tokens"): its first 30-day refresh token,
+ * returning the raw value once. Every rotation continues the session under the same id.
+ */
+export function issueRefresh(
+  db: Db,
+  userId: string,
+  clientId: string,
+  now: string
+): Promise<IssuedRefresh> {
+  return insertRefresh(db, userId, clientId, newId(), now);
+}
+
+/**
+ * Which of the sessions `ids` are live at `now`: holding a refresh token neither revoked nor
+ * expired. A session ends when its tokens are revoked, which an `/events` socket it opened
+ * follows (§10.6).
+ */
+export async function liveSessionIds(
+  db: Db,
+  ids: readonly string[],
+  now: string
+): Promise<Set<string>> {
+  if (ids.length === 0) {
+    return new Set();
+  }
+  const rows = await db
+    .selectFrom('tokens')
+    .select('sessionId')
+    .where('sessionId', 'in', ids)
+    .where('kind', '=', 'refresh')
+    .where('revokedAt', 'is', null)
+    .where('expiresAt', '>', now)
+    .$narrowType<{ sessionId: NotNull }>()
+    .execute();
+  return new Set(rows.map(row => row.sessionId));
 }
 
 /**
@@ -68,6 +121,7 @@ export async function revokeUserTokens(
  * Redeems and rotates a refresh token. A revoked token being presented again is a replay
  * (§5.2): every refresh token of that user and client is revoked, per OAuth 2.1. The redemption
  * is the guarded revoke itself, so of two requests presenting the same token only one rotates it.
+ * The revoke and its successor commit together, so the session never shows without a live token.
  */
 export async function rotateRefresh(
   db: Db,
@@ -78,30 +132,40 @@ export async function rotateRefresh(
       ok: true;
       userId: string;
       clientId: string;
-      next: { raw: string; expiresAt: string };
+      next: IssuedRefresh;
     }
   | { ok: false; reason: 'unknown' | 'expired' | 'replayed' }
 > {
   const tokenHash = sha256Hex(raw);
-  const claimed = await db
-    .updateTable('tokens')
-    .set({ revokedAt: now })
-    .where('tokenHash', '=', tokenHash)
-    .where('kind', '=', 'refresh')
-    .where('clientId', 'is not', null)
-    .where('revokedAt', 'is', null)
-    .where('expiresAt', '>', now)
-    .returning(['userId', 'clientId'])
-    .$narrowType<{ clientId: NotNull }>()
-    .executeTakeFirst();
-  if (claimed) {
-    const next = await issueRefresh(db, claimed.userId, claimed.clientId, now);
-    return {
-      ok: true,
-      userId: claimed.userId,
-      clientId: claimed.clientId,
-      next
-    };
+  const rotated = await db.transaction().execute(async trx => {
+    const claimed = await trx
+      .updateTable('tokens')
+      .set({ revokedAt: now })
+      .where('tokenHash', '=', tokenHash)
+      .where('kind', '=', 'refresh')
+      .where('clientId', 'is not', null)
+      .where('sessionId', 'is not', null)
+      .where('revokedAt', 'is', null)
+      .where('expiresAt', '>', now)
+      .returning(['userId', 'clientId', 'sessionId'])
+      .$narrowType<{ clientId: NotNull; sessionId: NotNull }>()
+      .executeTakeFirst();
+    return (
+      claimed && {
+        userId: claimed.userId,
+        clientId: claimed.clientId,
+        next: await insertRefresh(
+          trx,
+          claimed.userId,
+          claimed.clientId,
+          claimed.sessionId,
+          now
+        )
+      }
+    );
+  });
+  if (rotated) {
+    return { ok: true, ...rotated };
   }
   const row = await db
     .selectFrom('tokens')

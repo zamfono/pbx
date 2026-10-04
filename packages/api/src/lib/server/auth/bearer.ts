@@ -24,13 +24,15 @@ export const ACCESS_TOKEN_PARAM = 'access_token';
 
 /**
  * The user a request acts as, and the OAuth client and its name it acts through, if any (§5.7),
- * or the personal access token it presented (§5.2).
+ * with the session of its access token or the personal access token it presented (§5.2).
  */
 export type Authenticated = {
   actor: Actor;
   clientId?: string;
   clientName?: string;
   personalAccessToken?: PersonalAccessTokenGrant;
+  /** The session an access token was issued in (§5.2), which an `/events` socket lives by. */
+  sessionId?: string;
 };
 
 export type BearerDeps = { db: Db; jwtSecret: string };
@@ -87,7 +89,11 @@ export async function authenticateToken(
   }
   const nowS = epochSeconds(Date.now());
   const claims = await verifyAccessToken(deps.jwtSecret, token, nowS, audience);
-  return claims && liveAuthenticated(deps, claims);
+  if (!claims) {
+    return null;
+  }
+  const auth = await liveAuthenticated(deps, claims);
+  return auth && { ...auth, sessionId: claims.sid };
 }
 
 /**

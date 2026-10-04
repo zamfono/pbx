@@ -75,7 +75,7 @@ register(
 /** The owner's access token, signed once per test file, which ends well within its 15 minutes. */
 export const OWNER_TOKEN = await signAccessToken(
   JWT_SECRET,
-  { sub: 'owner', role: 'owner', cid: CLIENT_ID },
+  { sub: 'owner', role: 'owner', cid: CLIENT_ID, sid: 'session-1' },
   epochSeconds(Date.now()),
   ORIGIN
 );

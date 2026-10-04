@@ -44,7 +44,7 @@ async function eventFor(
 ): Promise<RequestEvent> {
   const token = await signAccessToken(
     JWT_SECRET,
-    { sub: 'admin1', role: 'admin', cid: null },
+    { sub: 'admin1', role: 'admin', cid: null, sid: 'session-1' },
     epochSeconds(Date.now()),
     ORIGIN
   );

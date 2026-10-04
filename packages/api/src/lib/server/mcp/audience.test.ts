@@ -14,6 +14,7 @@ async function requestFor(audience: string): Promise<Request> {
     sub: 'owner',
     role: 'owner',
     cid: null,
+    sid: 'session-1',
     iss: ORIGIN,
     aud: audience,
     iat: nowS,
