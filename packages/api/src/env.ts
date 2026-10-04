@@ -7,7 +7,7 @@
  * `init`. Every other variable is read here once into the value its
  * readers use: an empty value, which Compose hands over for an unset `${VAR:-}`, counts as unset,
  * and a variable with a default takes it here. A conditional requirement (the first-boot seed) is
- * its reader's to check. The build's route analysis starts the server too, with
+ * its reader's to check. The build's route analysis and prerendering start the server too, with
  * `.env.production`'s placeholders.
  */
 import { defineEnvVars } from '@sveltejs/kit/env';

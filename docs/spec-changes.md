@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-04 · §10.3 REST API.** Product-owner decision (D32, follow-up to D31): "currently the JSON is rebuilt in every request. that seems wasteful", then "how about generating it statically during the build process? let's discuss", then "yes, i like the prerender path". `/api/v1/openapi.json` is generated at build time and served as a static file.
+*Why:* the document depends only on the code, so one build produces it for every request of that release.
+
 **2026-10-04 · §10.3 REST API.** Product-owner decision (D31): asked whether `/api/v1/openapi.json` (bearer-only until now; the same document for every user and stack, no tenant data) should be public, the user answered "yes, please". `GET /api/v1/openapi.json` is served without authentication; every other `/api/v1/*` endpoint still requires a bearer token.
 *Why:* the document describes the API, not the tenant, so a client or developer can read it before obtaining a token.
 

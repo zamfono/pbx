@@ -1,6 +1,7 @@
 import process from 'node:process';
 import type { RequestEvent } from '@sveltejs/kit';
 import type { Handle, ServerInit } from '@sveltejs/kit/hooks';
+import { building } from '$app/env';
 import * as env from '$app/env/private';
 import pino from 'pino';
 
@@ -40,10 +41,14 @@ const jobsLogger = pino({ name: 'hooks' });
  * shares their module instance of every import, and an operation reaches it by a call, where
  * `server.ts` is a separate esbuild bundle with its own copy of every relative import. SvelteKit
  * runs it once, after validating `src/env.ts`, and serves no request before it resolves; a
- * failure of the first-boot seed rejects it, which fails loading the handler and so `api`'s boot. The jobs stop on `sveltekit:shutdown`, which `server.ts` emits on SIGTERM
- * and SIGINT.
+ * failure of the first-boot seed rejects it, which fails loading the handler and so `api`'s boot.
+ * The jobs stop on `sveltekit:shutdown`, which `server.ts` emits on SIGTERM and SIGINT. During
+ * the build, which prerenders the OpenAPI document, it does nothing.
  */
 export const init: ServerInit = async () => {
+  if (building) {
+    return;
+  }
   stackIpv4(env);
   const timeZoneError = stackTimeZoneError(env.TZ);
   if (timeZoneError !== undefined) {
