@@ -32,6 +32,13 @@ const required = {
   }
 };
 
+/** A required host name in lower case, the form every comparison of it and Caddy's certificate
+ *  use (§6.3). */
+const requiredHost = {
+  schema: (value: string | undefined): string =>
+    required.schema(value).toLowerCase()
+};
+
 /** The value, `fallback` while unset or empty. */
 function withDefault(fallback: string) {
   return {
@@ -71,7 +78,7 @@ export const variables = defineEnvVars({
   DB_FILE: { schema: dbFileFrom },
   EXT_LENGTH: optional,
   EXTERNAL_IPV4: optional,
-  FQDN: required,
+  FQDN: requiredHost,
   HEP_ENABLED: onUnlessFalse,
   JWT_SECRET: required,
   MAIL_FROM: optional,

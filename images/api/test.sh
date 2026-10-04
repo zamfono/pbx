@@ -2,7 +2,8 @@
 # Builds the api image (or takes the one API_IMAGE names) and asserts what the image itself has to carry, as opposed to what the
 # code does with it: the admin guide bundled at build time (spec §10.5), the hold-music tracks
 # that first boot seeds into the media volume (§6.3, §10.2), the ssh client restic's sftp backend
-# spawns (§6.5), and the Argon2id generator for BOOTSTRAP_OWNER_PASSWORD_HASH (§6.3 "First boot"). Run from the repository root's build
+# spawns (§6.5), the Argon2id generator for BOOTSTRAP_OWNER_PASSWORD_HASH and setup.sh's COUNTRY
+# check (§6.3 "First boot"). Run from the repository root's build
 # context, which is what the Dockerfile expects.
 set -euo pipefail
 repo_root=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
@@ -57,5 +58,11 @@ case "$HASH" in
   '$argon2id$'*) ;;
   *) fail "hash-password.mjs printed '$HASH', which is not an Argon2id PHC string" ;;
 esac
+
+docker run --rm --entrypoint node "$API_IMAGE" check-country.mjs GB \
+  || fail "check-country.mjs refused GB"
+if docker run --rm --entrypoint node "$API_IMAGE" check-country.mjs UK; then
+  fail "check-country.mjs took UK, which is no ISO 3166-1 code"
+fi
 
 echo "PASS: images/api"

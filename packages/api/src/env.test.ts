@@ -36,6 +36,10 @@ describe('src/env.ts', () => {
     expect(() => read('JWT_SECRET', undefined)).toThrow();
   });
 
+  it('reads FQDN in lower case, the form Caddy names its certificate by', () => {
+    expect(read('FQDN', 'Pbx.Example.com')).toBe('pbx.example.com');
+  });
+
   it('turns a switch off only for the literal false', () => {
     expect(read('HEP_ENABLED', 'false')).toBe(false);
     expect(read('HEP_ENABLED', '')).toBe(true);

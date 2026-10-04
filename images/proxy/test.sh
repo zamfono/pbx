@@ -84,6 +84,20 @@ if out=$(run 'FQDN=x zamfono-cert-hook certificates/i/x/x.crt certificates/i/x/x
 fi
 grep -q 'still not readable' <<<"$out" || fail "the hook failed without naming the unreadable source: $out"
 
+echo "==> an FQDN in capitals: Caddy stores and names its certificate in lower case"
+docker run --rm -e FQDN=Pbx.Example.Test "$PROXY_IMAGE" sh -c '
+  src=/data/caddy/certificates/local/pbx.example.test
+  mkdir -p $src; echo crt > $src/pbx.example.test.crt; echo key > $src/pbx.example.test.key
+  for _ in $(seq 1 10); do [ -s /data/zamfono/privkey.pem ] && exit 0; sleep 1; done
+  exit 1' >/dev/null 2>&1 \
+  || fail "the entrypoint made no copy of the certificate Caddy stores for FQDN=Pbx.Example.Test"
+run 'export FQDN=Pbx.Example.Test; src=/data/caddy/certificates/local/pbx.example.test
+  mkdir -p $src; echo crt > $src/pbx.example.test.crt; echo key > $src/pbx.example.test.key
+  zamfono-cert-hook certificates/local/pbx.example.test/pbx.example.test.crt \
+    certificates/local/pbx.example.test/pbx.example.test.key pbx.example.test 2>/dev/null &
+  for _ in $(seq 1 10); do [ -s /data/zamfono/privkey.pem ] && exit 0; sleep 1; done
+  exit 1' || fail "the hook ignored the certificate Caddy obtained for FQDN=Pbx.Example.Test"
+
 echo "==> the shipped Caddyfile validates (production shape: no global.d snippet)"
 docker run --rm -e FQDN=x -v "$repo_root/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" "$PROXY_IMAGE" \
   caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 \

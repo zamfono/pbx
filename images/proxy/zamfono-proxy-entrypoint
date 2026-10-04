@@ -12,6 +12,8 @@
 set -eu
 
 : "${FQDN:?FQDN is required}"
+# Caddy stores a certificate under the lower-case form of its host.
+fqdn=$(printf '%s' "$FQDN" | tr '[:upper:]' '[:lower:]')
 
 reconcile() {
   data_home=${XDG_DATA_HOME:-/data}
@@ -21,15 +23,15 @@ reconcile() {
   for _ in $(seq 1 120); do
     # The newest, should more than one issuer's certificate for the name be stored.
     # shellcheck disable=SC2012 -- names under Caddy's storage carry no newlines
-    crt=$(ls -t "$storage_root"/certificates/*/"$FQDN"/"$FQDN".crt 2>/dev/null | head -1 || true)
+    crt=$(ls -t "$storage_root"/certificates/*/"$fqdn"/"$fqdn".crt 2>/dev/null | head -1 || true)
     if [ -n "$crt" ] && [ -r "${crt%.crt}.key" ]; then
       rel=${crt#"$storage_root"/}
-      zamfono-cert-hook "$rel" "${rel%.crt}.key" "$FQDN"
+      zamfono-cert-hook "$rel" "${rel%.crt}.key" "$fqdn"
       return 0
     fi
     sleep 1
   done
-  echo "zamfono-proxy-entrypoint: no certificate for '$FQDN' after 120s; leaving it to the event" >&2
+  echo "zamfono-proxy-entrypoint: no certificate for '$fqdn' after 120s; leaving it to the event" >&2
 }
 
 reconcile &

@@ -8,9 +8,10 @@
 # SETUP_NONINTERACTIVE=1, or without a terminal, every answer must. Beyond the .env names:
 #   ZAMFONO_MODE           ports | macvlan (README.md, step 1)
 #   ZAMFONO_RUNTIME        docker | podman, when both are installed
-#   OWNER_PASSWORD         hashed into BOOTSTRAP_OWNER_PASSWORD_HASH
+#   OWNER_PASSWORD         hashed into BOOTSTRAP_OWNER_PASSWORD_HASH, at least 8 characters
 #   SETUP_PLAIN=1          plain prompts even where whiptail is installed
-#   ZAMFONO_API_IMAGE      the image that hashes the password, instead of compose.yaml's
+#   ZAMFONO_API_IMAGE      the image that checks COUNTRY and hashes the password, instead of
+#                          compose.yaml's
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -35,7 +36,8 @@ v_nonempty() { [[ -n $1 ]]; }
 v_ipv4() { [[ $1 =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; }
 v_fqdn() { [[ $1 =~ ^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]]; }
 v_e164() { [[ $1 =~ ^\+[1-9][0-9]{1,14}$ ]]; }
-v_country() { [[ $1 =~ ^[A-Za-z]{2}$ ]]; }
+# A code the api image's own first boot takes (§6.3 "First boot"), asked of that image.
+v_country() { [[ $1 =~ ^[A-Za-z]{2}$ ]] && country_supported "${1^^}"; }
 v_email() { [[ $1 =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]]; }
 v_extlen() { [[ $1 =~ ^[0-9]+$ ]] && (($1 >= 2)); }
 v_port() { [[ $1 =~ ^[0-9]+$ ]] && (($1 >= 1 && $1 <= 65535)); }
@@ -104,7 +106,11 @@ ask_mail() {
 # The owner's password, hashed now: the first boot needs its hash (§6.3 "First boot").
 ask_password() {
   local first second
-  [[ -n ${BOOTSTRAP_OWNER_PASSWORD_HASH:-} ]] && return 0
+  if [[ -n ${BOOTSTRAP_OWNER_PASSWORD_HASH:-} ]]; then
+    [[ $BOOTSTRAP_OWNER_PASSWORD_HASH == '$argon2id$'* ]] ||
+      fail "BOOTSTRAP_OWNER_PASSWORD_HASH is not an Argon2id hash (\$argon2id\$...)"
+    return 0
+  fi
   if [[ -z ${OWNER_PASSWORD:-} ]]; then
     [[ -n $interactive ]] || fail "neither OWNER_PASSWORD nor BOOTSTRAP_OWNER_PASSWORD_HASH is set"
     while true; do
@@ -119,6 +125,8 @@ ask_password() {
         break
       fi
     done
+  elif ((${#OWNER_PASSWORD} < 8)); then
+    fail "OWNER_PASSWORD is shorter than 8 characters"
   fi
   echo "Hashing the owner's password with $(api_image) ..." >&2
   BOOTSTRAP_OWNER_PASSWORD_HASH=$(hash_password "$OWNER_PASSWORD") ||
@@ -149,6 +157,8 @@ main() {
     address=$STACK_IPV4 overlay=compose.macvlan.yaml
   fi
   ask FQDN v_fqdn "Host name" "The name the stack is reached at; its A record points at $address."
+  # Lower case, the form Caddy names the stack's certificate by.
+  FQDN=${FQDN,,}
   ask COMPANY_NAME v_nonempty "Company" "The company name."
   ask MAIN_DID v_e164 "Main number" "The company's main number in E.164, e.g. +4930123456."
   ask COUNTRY v_country "Country" "The ISO 3166-1 country code, e.g. DE."
@@ -165,7 +175,7 @@ main() {
   : "${ARI_PASSWORD:=$(random_hex)}"
   : "${AMI_PASSWORD:=$(random_hex)}"
   : "${BACKUP_PASSWORD:=$(random_hex)}"
-: "${UPDATER_TOKEN:=$(random_hex)}"
+  : "${UPDATER_TOKEN:=$(random_hex)}"
   if [[ -z ${CONTAINER_SOCKET:-} ]]; then
     if [[ $runtime == podman ]]; then
       CONTAINER_SOCKET=/run/podman/podman.sock

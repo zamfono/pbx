@@ -108,6 +108,15 @@ api_image() {
   echo "${ZAMFONO_API_IMAGE:-ghcr.io/zamfono/api:${ZAMFONO_VERSION:-$tag}}"
 }
 
+# country_supported CODE — whether api's first boot takes CODE as COUNTRY, asked of the api image,
+# which holds the rule; stops setup.sh when the image cannot answer.
+country_supported() {
+  local rc=0
+  "$runtime" run --rm "$(api_image)" node check-country.mjs "$1" >/dev/null || rc=$?
+  ((rc <= 1)) || fail "the api image $(api_image) could not check COUNTRY"
+  return "$rc"
+}
+
 # hash_password PASSWORD — the Argon2id hash from the api image's own generator (§6.3 "First
 # boot"); the password travels on stdin, never in the process list.
 hash_password() {

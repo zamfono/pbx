@@ -15,7 +15,8 @@
 # assumed absolute. `identifier` is the name the certificate covers; the stack's Caddyfile has
 # one site block, but certmagic can still emit this event for a certificate that is not that
 # site's (an internal one, a renewal in flight for something else), so this hook acts only when
-# it matches $FQDN, the same variable the Caddyfile site address reads (§6.3).
+# it matches $FQDN, the same variable the Caddyfile site address reads (§6.3). Caddy names a
+# certificate by the lower-case form of its host, so the comparison is made in lower case.
 #
 # The copy this hook makes is what `api` reads instead of Caddy's own store, whose layout is
 # undocumented (§6.4: "`api` reads only the hook's copy, never Caddy's own certificate store").
@@ -41,9 +42,10 @@ cert_rel=${1:?usage: zamfono-cert-hook <certificate_path> <private_key_path> <id
 key_rel=${2:?usage: zamfono-cert-hook <certificate_path> <private_key_path> <identifier>}
 identifier=${3:-}
 : "${FQDN:?FQDN is required}"
+fqdn=$(printf '%s' "$FQDN" | tr '[:upper:]' '[:lower:]')
 
-if [ "$identifier" != "$FQDN" ]; then
-  log "ignoring the certificate for '$identifier' (stack FQDN is '$FQDN')"
+if [ "$identifier" != "$fqdn" ]; then
+  log "ignoring the certificate for '$identifier' (stack FQDN is '$fqdn')"
   exit 0
 fi
 

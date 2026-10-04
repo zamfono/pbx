@@ -4,7 +4,8 @@
 #
 # Caddy isn't assumed to be installed on the host (it isn't, on the CI runner): the Caddyfile is
 # validated inside the `proxy` image instead: the one PROXY_IMAGE, docker-bake.hcl's variable,
-# names (CI's own build), else one bake builds fresh here under :test.
+# names (CI's own build), else one bake builds fresh here under :test. setup.sh checks COUNTRY
+# with the `api` image API_IMAGE names, built the same way.
 set -eu
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
@@ -14,6 +15,11 @@ if [ -z "${PROXY_IMAGE:-}" ]; then
   PROXY_IMAGE=zamfono/proxy:test
   export PROXY_IMAGE
   (cd "$repo_root" && docker buildx bake --load proxy) >/dev/null
+fi
+if [ -z "${API_IMAGE:-}" ]; then
+  API_IMAGE=zamfono/api:test
+  export API_IMAGE
+  (cd "$repo_root" && docker buildx bake --load api) >/dev/null
 fi
 
 echo "==> compose config (ports overlay, .env.example values)"
@@ -61,7 +67,8 @@ echo "==> setup.sh (non-interactive, in the unpacked bundle)"
 (cd "$bundle_dir/x" && bash -c '. setup/checks.sh && api_image') | grep -qx 'ghcr.io/zamfono/api:1.2.3'
 # run_setup [NAME=VALUE...] — setup.sh with every answer from the environment, plus these.
 run_setup() {
-  (cd "$bundle_dir/x" && env SETUP_NONINTERACTIVE=1 ZAMFONO_MODE=ports EXTERNAL_IPV4=198.51.100.7 \
+  (cd "$bundle_dir/x" && env SETUP_NONINTERACTIVE=1 ZAMFONO_API_IMAGE="$API_IMAGE" \
+    ZAMFONO_MODE=ports EXTERNAL_IPV4=198.51.100.7 \
     FQDN=pbx.example.com COMPANY_NAME="O'Brien & \$ons" MAIN_DID=+4930123456 COUNTRY=de \
     BOOTSTRAP_OWNER_NAME=Owner BOOTSTRAP_OWNER_EMAIL=owner@example.com \
     BOOTSTRAP_OWNER_PASSWORD_HASH='$argon2id$v=19$m=65536,p=4,t=3$c2FsdA$aGFzaA' \
@@ -78,6 +85,27 @@ if run_setup TZ=Europe/Viena || [ -e "$bundle_dir/x/.env" ]; then
   echo "setup.sh took TZ=Europe/Viena" >&2
   exit 1
 fi
+# A COUNTRY api's first boot refuses (UK is no ISO 3166-1 code; GB is) is refused here already.
+if run_setup COUNTRY=UK || [ -e "$bundle_dir/x/.env" ]; then
+  echo "setup.sh took COUNTRY=UK, which api's first boot refuses" >&2
+  exit 1
+fi
+# A hash that is no Argon2id one, and an owner's password under 8 characters, are refused.
+if run_setup BOOTSTRAP_OWNER_PASSWORD_HASH=secret || [ -e "$bundle_dir/x/.env" ]; then
+  echo "setup.sh took a BOOTSTRAP_OWNER_PASSWORD_HASH that is no Argon2id hash" >&2
+  exit 1
+fi
+if run_setup BOOTSTRAP_OWNER_PASSWORD_HASH= OWNER_PASSWORD=short || [ -e "$bundle_dir/x/.env" ]; then
+  echo "setup.sh took an OWNER_PASSWORD under 8 characters" >&2
+  exit 1
+fi
+# An FQDN in capitals is written in lower case, the form Caddy names its certificate by.
+run_setup FQDN=Pbx.Example.com
+(cd "$bundle_dir/x" && docker compose config) | grep -qF 'FQDN: pbx.example.com' || {
+  echo "setup.sh wrote FQDN=Pbx.Example.com as given" >&2
+  exit 1
+}
+rm -f "$bundle_dir/x/.env" "$bundle_dir/x/compose.override.yaml"
 run_setup TZ=Europe/Vienna
 [ "$(stat -c %a "$bundle_dir/x/.env")" = 600 ]
 # The mode's overlay is linked as compose.override.yaml, which a plain `compose` reads.

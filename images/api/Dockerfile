@@ -50,6 +50,8 @@ COPY db/migrations db/migrations
 # `argon2` binding already in node_modules, so it costs the image nothing beyond the file:
 # `docker compose run --rm --no-deps -T api node hash-password.mjs`.
 COPY packages/api/scripts/hashPassword.mjs hash-password.mjs
+# setup.sh's check of COUNTRY against the rule the first boot applies (§6.3 "First boot").
+COPY packages/api/scripts/checkCountry.mjs check-country.mjs
 USER node
 
 # The commit this image was built from (§6.3 "Images", §7 "Version"), passed by
