@@ -15,7 +15,7 @@ member_id=$(user_with_ext 101)
 # "Caller-ID"), so the teardown puts back the one 101 presents now.
 caller_id=$(api GET /users | python3 -c "
 import json, sys
-print(json.dumps([u for u in json.load(sys.stdin)['items'] if u['id'] == sys.argv[1]][0]['calleridDidId']))
+print(json.dumps([u for u in json.load(sys.stdin)['items'] if u['id'] == sys.argv[1]][0]['callerIdDidId']))
 " "$member_id")
 api PATCH "/users/$member_id" '{"mailboxEnabled":false}' >/dev/null
 did_id=$(api POST /dids \

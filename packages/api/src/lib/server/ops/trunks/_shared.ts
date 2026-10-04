@@ -172,8 +172,8 @@ export function scalarsFromRow(row: TrunkRow): TrunkScalars {
     registerExpiryS: row.registerExpiryS,
     registerRetryS: row.registerRetryS,
     inboundNumberFormat: row.inboundNumberFormat,
-    callerIdFormat: row.calleridFormat,
-    callerIdHeader: row.calleridHeader,
+    callerIdFormat: row.callerIdFormat,
+    callerIdHeader: row.callerIdHeader,
     clir: row.clir === null ? null : row.clir === 1,
     codecs:
       row.codecsJson === null ? null : (JSON.parse(row.codecsJson) as Codec[]),

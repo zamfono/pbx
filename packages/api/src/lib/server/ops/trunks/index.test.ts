@@ -132,10 +132,10 @@ describe('trunks operations', () => {
     });
     const row = await db
       .selectFrom('trunks')
-      .select(['calleridHeader', 'username'])
+      .select(['callerIdHeader', 'username'])
       .where('id', '=', inbound.id)
       .executeTakeFirstOrThrow();
-    expect(row).toEqual({ calleridHeader: 'both', username: null });
+    expect(row).toEqual({ callerIdHeader: 'both', username: null });
   });
 
   it('refuses to delete a trunk still used by an outbound route, naming it', async () => {

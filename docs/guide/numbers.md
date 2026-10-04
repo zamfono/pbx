@@ -21,7 +21,7 @@ A national number is accepted and normalized with the tenant's `settings.country
 `089123456` for a German tenant is stored as `+4989123456`; `0049…` becomes `+49…`. A DID's
 `number` and `label` are fixed once created; `dids.update` (`PATCH /dids/{id}`) changes its
 target. The first numeric DID whose target is a user who presents no number yet becomes that
-user's caller ID (`calleridDidId`).
+user's caller ID (`callerIdDidId`).
 
 Numbers are not bound to a trunk: a call is matched by its called number alone, whichever trunk
 delivered it. The trunk's `inboundNumberFormat` (`e164` or `national`) says how the provider

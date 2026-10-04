@@ -157,9 +157,9 @@ const snapshot = {
     { id: 't-menu', userId: null, ringGroupId: null }
   ],
   users: [
-    { id: 'u-bea', calleridDidId: 'd-bea' },
-    { id: 'u-ai', calleridDidId: null },
-    { id: 'u-left', calleridDidId: 'd-gone' }
+    { id: 'u-bea', callerIdDidId: 'd-bea' },
+    { id: 'u-ai', callerIdDidId: null },
+    { id: 'u-left', callerIdDidId: 'd-gone' }
   ],
   trunks: [],
   trunkHosts: [
@@ -249,8 +249,8 @@ describe('diversionTrunk', () => {
   const trunk = {
     id: 'tr-1',
     diversion: 'last',
-    calleridHeader: 'from',
-    calleridFormat: 'national',
+    callerIdHeader: 'from',
+    callerIdFormat: 'national',
     username: null
   } as unknown as Snapshot['trunks'][number];
 
@@ -264,7 +264,7 @@ describe('diversionTrunk', () => {
   });
 
   it("names a pai trunk's from_domain, its first outbound host, as its From does", () => {
-    const pai = { ...trunk, calleridHeader: 'pai' as const, username: 'acct' };
+    const pai = { ...trunk, callerIdHeader: 'pai' as const, username: 'acct' };
     expect(diversionTrunk(pai, snapshot, '203.0.113.34').host).toBe(
       'sip.provider.example'
     );

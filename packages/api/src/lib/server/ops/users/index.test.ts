@@ -510,7 +510,7 @@ describe('users', () => {
     );
   });
 
-  it('refuses a calleridDidId that names no live DID, and accepts a live numeric one', async () => {
+  it('refuses a callerIdDidId that names no live DID, and accepts a live numeric one', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
@@ -518,7 +518,7 @@ describe('users', () => {
       runOperation(
         db,
         'users.update',
-        { id: user.user.id, calleridDidId: 'missing' },
+        { id: user.user.id, callerIdDidId: 'missing' },
         asRun()
       )
     ).rejects.toMatchObject({ status: 422 });
@@ -530,13 +530,13 @@ describe('users', () => {
     const result = (await runOperation(
       db,
       'users.update',
-      { id: user.user.id, calleridDidId: did.id },
+      { id: user.user.id, callerIdDidId: did.id },
       asRun()
-    )) as { user: { calleridDidId: string | null } };
-    expect(result.user.calleridDidId).toBe(did.id);
+    )) as { user: { callerIdDidId: string | null } };
+    expect(result.user.callerIdDidId).toBe(did.id);
   });
 
-  it('refuses a calleridDidId naming a soft-deleted DID', async () => {
+  it('refuses a callerIdDidId naming a soft-deleted DID', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
@@ -561,7 +561,7 @@ describe('users', () => {
       runOperation(
         db,
         'users.update',
-        { id: user.user.id, calleridDidId: deletedDidId },
+        { id: user.user.id, callerIdDidId: deletedDidId },
         asRun()
       )
     ).rejects.toMatchObject({ status: 422 });

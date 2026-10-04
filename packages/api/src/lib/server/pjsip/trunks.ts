@@ -115,7 +115,7 @@ function renderTrunkIdentify(trunk: Trunk): string | null {
 }
 
 /**
- * The header layout of `trunks.callerid_header` (§9.4 "Caller-ID", "Anonymous calls (CLIR)"),
+ * The header layout of `trunks.caller_id_header` (§9.4 "Caller-ID", "Anonymous calls (CLIR)"),
  * which the core leaves to chan_pjsip: it presents the attempt's number as the channel's caller
  * ID, which `From` carries. `send_pai` adds a `P-Asserted-Identity` of that number for `pai` and
  * `both`, and `trust_id_outbound` keeps it there when the number is withheld. A `pai` trunk's

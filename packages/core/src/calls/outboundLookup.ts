@@ -29,7 +29,7 @@ export function buildRoutes(snapshot: Snapshot): Route[] {
     id: row.id,
     priority: row.priority,
     trunkId: row.trunkId,
-    calleridDidId: row.calleridDidId,
+    callerIdDidId: row.callerIdDidId,
     users: snapshot.outboundRouteUsers
       .filter(user => user.routeId === row.id)
       .map(user => user.userId),

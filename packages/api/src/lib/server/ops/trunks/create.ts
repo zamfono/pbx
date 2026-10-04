@@ -108,8 +108,8 @@ async function insertTrunkRow(
           ? (input.registerRetryS ?? null)
           : null,
       inboundNumberFormat: input.inboundNumberFormat ?? 'e164',
-      calleridFormat: input.callerIdFormat ?? 'e164',
-      calleridHeader: resolved.callerIdHeader,
+      callerIdFormat: input.callerIdFormat ?? 'e164',
+      callerIdHeader: resolved.callerIdHeader,
       clir:
         input.clir === undefined || input.clir === null
           ? null
@@ -133,7 +133,7 @@ async function insertCatchAllRoute(
       id: newId(),
       priority: 1,
       trunkId,
-      calleridDidId: null,
+      callerIdDidId: null,
       createdAt: now
     })
     .execute();

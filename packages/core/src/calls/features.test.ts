@@ -1045,7 +1045,7 @@ describe('features', () => {
     await setUp();
     const { addPartyCall } = await externalAddParty();
     // A withheld call needs a PAI-carrying trunk (§9.4 "Anonymous calls").
-    await db.updateTable('trunks').set({ calleridHeader: 'both' }).execute();
+    await db.updateTable('trunks').set({ callerIdHeader: 'both' }).execute();
     await handleFeature(
       pipeline,
       presence,

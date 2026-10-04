@@ -51,7 +51,7 @@ async function createUsersTable(db: Db): Promise<void> {
         .check(sql`dnd in (0,1)`)
     )
     .addColumn('find_me_json', 'text')
-    .addColumn('callerid_did_id', 'text', col =>
+    .addColumn('caller_id_did_id', 'text', col =>
       col.references('dids.id').onDelete('set null')
     )
     .addColumn('clir', 'integer', col => col.check(sql`clir in (0,1)`))
@@ -239,17 +239,17 @@ async function createTrunksTable(db: Db): Promise<void> {
         .defaultTo('e164')
         .check(sql`inbound_number_format in ('e164','national')`)
     )
-    .addColumn('callerid_format', 'text', col =>
+    .addColumn('caller_id_format', 'text', col =>
       col
         .notNull()
         .defaultTo('e164')
-        .check(sql`callerid_format in ('e164','national')`)
+        .check(sql`caller_id_format in ('e164','national')`)
     )
-    .addColumn('callerid_header', 'text', col =>
+    .addColumn('caller_id_header', 'text', col =>
       col
         .notNull()
         .defaultTo('from')
-        .check(sql`callerid_header in ('from','pai','both')`)
+        .check(sql`caller_id_header in ('from','pai','both')`)
     )
     .addColumn('clir', 'integer', col => col.check(sql`clir in (0,1)`))
     .addColumn('codecs_json', 'text')
@@ -271,8 +271,8 @@ async function createTrunksTable(db: Db): Promise<void> {
       sql`auth_mode = 'registration' or (register_expiry_s is null and register_retry_s is null)`
     )
     .addCheckConstraint(
-      'trunks_clir_needs_callerid_header',
-      sql`clir is not 1 or callerid_header in ('pai','both')`
+      'trunks_clir_needs_caller_id_header',
+      sql`clir is not 1 or caller_id_header in ('pai','both')`
     )
     .execute();
 }
@@ -323,7 +323,7 @@ async function createOutboundRoutesTable(db: Db): Promise<void> {
     .addColumn('trunk_id', 'text', col =>
       col.notNull().references('trunks.id').onDelete('restrict')
     )
-    .addColumn('callerid_did_id', 'text', col =>
+    .addColumn('caller_id_did_id', 'text', col =>
       col.references('dids.id').onDelete('set null')
     )
     .addColumn('created_at', 'text', col => col.notNull())

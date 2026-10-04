@@ -256,7 +256,7 @@ export interface OutboundRouteNumbers {
 }
 
 export interface OutboundRoutes {
-  calleridDidId: string | null;
+  callerIdDidId: string | null;
   createdAt: string;
   deletedAt: string | null;
   id: string;
@@ -390,8 +390,8 @@ export interface TrunkHosts {
 
 export interface Trunks {
   authMode: TrunkAuthMode;
-  calleridFormat: Generated<NumberFormat>;
-  calleridHeader: Generated<CallerIdHeader>;
+  callerIdFormat: Generated<NumberFormat>;
+  callerIdHeader: Generated<CallerIdHeader>;
   clir: number | null;
   codecsJson: string | null;
   createdAt: string;
@@ -453,7 +453,7 @@ export interface UserGroupUsers {
 }
 
 export interface Users {
-  calleridDidId: string | null;
+  callerIdDidId: string | null;
   clir: number | null;
   createdAt: string;
   deletedAt: string | null;

@@ -10,7 +10,7 @@ const CALLER_ID_FIELD = 'callerIdDidId';
 
 /**
  * Sets a user's caller-ID DID the first time they receive one (§9.4 "Caller-ID"): a user target
- * that so far presents no number of their own gets this DID as `users.callerid_did_id`.
+ * that so far presents no number of their own gets this DID as `users.caller_id_did_id`.
  */
 export async function setCallerIdIfUnset(
   ctx: Context,
@@ -20,14 +20,14 @@ export async function setCallerIdIfUnset(
 ): Promise<void> {
   const user = await ctx.db
     .selectFrom('users')
-    .select('calleridDidId')
+    .select('callerIdDidId')
     .where('id', '=', userId)
     .where('deletedAt', 'is', null)
     .executeTakeFirst();
-  if (user?.calleridDidId === null && isE164(number)) {
+  if (user?.callerIdDidId === null && isE164(number)) {
     await ctx.db
       .updateTable('users')
-      .set({ calleridDidId: didId })
+      .set({ callerIdDidId: didId })
       .where('id', '=', userId)
       .execute();
     recordChange(ctx, { field: CALLER_ID_FIELD, from: null, to: didId });
@@ -54,13 +54,13 @@ export async function clearCallerIdSet(
     .innerJoin('users', 'users.id', 'forwardTargets.userId')
     .select('users.id')
     .where('dids.id', '=', didId)
-    .where('users.calleridDidId', '=', didId)
+    .where('users.callerIdDidId', '=', didId)
     .where('users.deletedAt', 'is', null)
     .executeTakeFirst();
   if (user) {
     await replayOperation(ctx, 'users.update', {
       id: user.id,
-      calleridDidId: null
+      callerIdDidId: null
     });
   }
 }

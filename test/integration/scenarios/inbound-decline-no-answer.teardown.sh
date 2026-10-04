@@ -9,6 +9,6 @@ token=$2
 . "$(dirname "$0")/_lib.sh"
 
 read -r member_id did_id caller_id < "$(state_file decline)"
-api PATCH "/users/$member_id" "{\"mailboxEnabled\":true,\"calleridDidId\":$caller_id}" >/dev/null
+api PATCH "/users/$member_id" "{\"mailboxEnabled\":true,\"callerIdDidId\":$caller_id}" >/dev/null
 api_delete "/dids/$did_id"
 rm -f "$(state_file decline)"

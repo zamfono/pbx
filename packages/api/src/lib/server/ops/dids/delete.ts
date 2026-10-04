@@ -24,7 +24,7 @@ async function guardDeletable(ctx: Context, didId: string): Promise<void> {
   const users = await ctx.db
     .selectFrom('users')
     .select(['id', 'name'])
-    .where('calleridDidId', '=', didId)
+    .where('callerIdDidId', '=', didId)
     .where('deletedAt', 'is', null)
     .execute();
   if (users.length > 0) {
@@ -36,7 +36,7 @@ async function guardDeletable(ctx: Context, didId: string): Promise<void> {
   const routes = await ctx.db
     .selectFrom('outboundRoutes')
     .select('id')
-    .where('calleridDidId', '=', didId)
+    .where('callerIdDidId', '=', didId)
     .where('deletedAt', 'is', null)
     .execute();
   if (routes.length > 0) {

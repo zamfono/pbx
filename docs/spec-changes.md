@@ -17,6 +17,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §10.3 Operations layer.** Product-owner decision (own scope): every operation a `user` may call declares its `scope`, whether what the input names is the user's own, and the runner checks it before confirmation and before `run` (403 when not). The `Operation`/`Context` sketch lists the fields every operation uses (`scope`, `audit`, `pureAction`, `entity`, `clientName`, `effects`); an operation with a three-part name lives in a subfolder (`backups/targets/create.ts`).
 *Why:* "Runner enforces (Recommended)": each operation re-implemented its own-scope check inside `run`, after the confirmation question, and one forgotten would have opened it to every user; the sketch left out fields that decide the audit row.
+**2026-10-04 · §9.4 Caller-ID, §10.3, §11.2 users, trunks, outbound_routes.** Product-owner decision (caller-ID spelling): the columns `callerid_did_id`, `callerid_format` and `callerid_header` become `caller_id_did_id`, `caller_id_format` and `caller_id_header`, so the wire spells every one `callerId…` (`callerIdDidId` on users and outbound routes, as trunks already had `callerIdFormat` and `callerIdHeader`).
+*Why:* "callerId… (Recommended)"; one word was spelled two ways on the wire, and a client guessing one spelling got 422 "unknown field" on the other resource.
+
 **2026-10-04 · §11.2 forward_targets.** A CHECK sets `sip_headers_json` exactly on the sip rows, `(sip_trunk_id IS NULL) = (sip_headers_json IS NULL)`; the column's own CHECK keeps only the JSON-array shape.
 *Why:* the sentence that the API sets the column on every sip row "since SQLite's ADD COLUMN cannot require it" described a migration the greenfield baseline no longer has; the schema states the pairing itself.
 

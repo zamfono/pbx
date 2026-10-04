@@ -71,7 +71,7 @@ function partyDid(
 ): string | null {
   if ('userId' in party) {
     const user = userById(snapshot, party.userId);
-    return didNumber(snapshot, user?.calleridDidId ?? null);
+    return didNumber(snapshot, user?.callerIdDidId ?? null);
   }
   if ('ringGroupId' in party) {
     return ringGroupDid(snapshot, party.ringGroupId);
@@ -117,13 +117,13 @@ export function diversionTrunk(
 ): DiversionTrunk {
   const firstHost = outboundHosts(snapshot, trunk.id).at(0)?.host ?? null;
   const host =
-    trunk.calleridHeader === 'pai' && trunk.username !== null
+    trunk.callerIdHeader === 'pai' && trunk.username !== null
       ? firstHost
       : (stackSipHost ?? firstHost);
   return {
     policy: trunk.diversion,
     host,
-    format: trunk.calleridFormat,
+    format: trunk.callerIdFormat,
     country: snapshot.settings.country
   };
 }

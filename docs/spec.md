@@ -941,11 +941,11 @@ An attempt is final, and the call ends with that outcome, once the far end alert
 
 **Caller-ID** is decided separately from the trunk. The presented number is the first of:
 
-1. the matching route's `callerid_did_id`, when the route sets one;
-2. the caller's own `users.callerid_did_id`, the primary number; the API sets it when a user receives their first DID and has none, and the admin may change it afterwards;
+1. the matching route's `caller_id_did_id`, when the route sets one;
+2. the caller's own `users.caller_id_did_id`, the primary number; the API sets it when a user receives their first DID and has none, and the admin may change it afterwards;
 3. the company main number (`settings.main_did_id`).
 
-A leg the system dials without a user (Outbound routing) presents the main number unless a route overrides it. Only a numeric DID can be presented: the operation refuses a DID whose `number` is a provider's verbatim string as `callerid_did_id`. Number format (E.164 or national) and the header layout are per-trunk settings, since providers differ. `trunks.callerid_header` has three values: `from`, the presented number in `From` and no `P-Asserted-Identity`; `pai`, `From` carrying the trunk's account identity and the presented number in `P-Asserted-Identity`, which some providers require (the account identity is the trunk's `username`, so the API refuses `pai` on a trunk without one); `both`, the presented number in `From` and in `P-Asserted-Identity`.
+A leg the system dials without a user (Outbound routing) presents the main number unless a route overrides it. Only a numeric DID can be presented: the operation refuses a DID whose `number` is a provider's verbatim string as `caller_id_did_id`. Number format (E.164 or national) and the header layout are per-trunk settings, since providers differ. `trunks.caller_id_header` has three values: `from`, the presented number in `From` and no `P-Asserted-Identity`; `pai`, `From` carrying the trunk's account identity and the presented number in `P-Asserted-Identity`, which some providers require (the account identity is the trunk's `username`, so the API refuses `pai` on a trunk without one); `both`, the presented number in `From` and in `P-Asserted-Identity`.
 
 **Anonymous calls (CLIR).** Whether the presented number is shown or withheld is resolved per call from four levels; the first that is set wins:
 
@@ -954,11 +954,11 @@ A leg the system dials without a user (Outbound routing) presents the main numbe
 3. `trunks.clir` of the selected trunk;
 4. `settings.clir`, the tenant default.
 
-The user and trunk levels are tri-state, NULL meaning inherit. A withheld call is sent per RFC 3325: the real number travels in `P-Asserted-Identity` and `Privacy: id` asks the provider to strip it before the callee, while `From` is `"Anonymous" <sip:anonymous@anonymous.invalid>` on a `both` trunk and stays the account identity on a `pai` trunk. That needs a trunk that carries PAI, `callerid_header` `pai` or `both`, since a `from`-only trunk has nowhere to carry the identity. The API refuses `clir = 1` on a `from` trunk, and the core skips a route whose trunk is `from`-only for a call that resolves to "withhold" (Route fallthrough), refusing the call with 403 and a line at level `events` only when no matching route remains. Emergency numbers are never anonymous, whatever any level says.
+The user and trunk levels are tri-state, NULL meaning inherit. A withheld call is sent per RFC 3325: the real number travels in `P-Asserted-Identity` and `Privacy: id` asks the provider to strip it before the callee, while `From` is `"Anonymous" <sip:anonymous@anonymous.invalid>` on a `both` trunk and stays the account identity on a `pai` trunk. That needs a trunk that carries PAI, `caller_id_header` `pai` or `both`, since a `from`-only trunk has nowhere to carry the identity. The API refuses `clir = 1` on a `from` trunk, and the core skips a route whose trunk is `from`-only for a call that resolves to "withhold" (Route fallthrough), refusing the call with 403 and a line at level `events` only when no matching route remains. Emergency numbers are never anonymous, whatever any level says.
 
 **Forwarded calls.** A trunk leg the core dials for a forward target, of kind `external` or `sip`, a ring-group member's followed forward included, carries the call's forwarding context; a user's own dial, a find-me leg, a transfer and a click-to-dial carry none.
 
-- `Diversion` (RFC 5806), as the trunk's `trunks.diversion` says: `off`, the default, sends none; `last` one entry, the newest hop; `all` one entry per hop, newest first, the order of RFC 5806 §4. Each forward hop of the call (§10.1 step 7) records the diverting party, a user, a ring group or a menu, with the party's name and a reason, as Asterisk's `REDIRECTING` reason and the `Diversion` `reason` sent for it: an OOO rule `away` (`away`), a closed schedule `time_of_day` (`time-of-day`), a user's `unconditional` rule and a member's followed forward `cfu` (`unconditional`), `busy` `cfb` (`user-busy`), `noAnswer` and a group's `unanswered` `cfnr` (`no-answer`), `offline` and a group's `unavailable` `unavailable` (`unavailable`), `dnd` `dnd` (`do-not-disturb`). The leg's `REDIRECTING` data holds the first hop as the original party (`orig-*`), the last as the redirecting party (`from-*`, `reason`) and the number of hops (`count`), set without an indication (`,i`) before the INVITE, with a user's primary number or else their extension, a ring group's extension, a menu's called number of an inbound call, else the tenant's main number; it feeds the header placeholders below and the call log, and nothing is sent from it: every trunk endpoint section, a trunk's username endpoint included, carries `send_diversion = no`, and `send_history_info` stays at its default `no`, since Asterisk builds `History-Info` from the same party. The core writes the header itself, as the originate variable `PJSIP_HEADER(add,Diversion)` beside the custom headers: one header field, its entries comma-separated, RFC 5806 §4's `1#` list, which RFC 3261 §7.3.1 makes equivalent to one field per entry and the one form a single originate variable can carry. An entry is `"<name>" <sip:<number>@<host>>;reason=<reason>`, without a `counter`, which counts 1 when absent (RFC 5806 §9.2.4), one per hop. The number is the diverting party's own, never an extension: a user's primary number, a ring group's DID (of the DIDs in the international form whose target is the group, the one created first), a menu's called number of an inbound call in the international form; else the tenant's main number (`settings.main_did_id`); formatted as the trunk formats a caller ID (`callerid_format`). A hop with neither, a main DID since deleted, is left out before `last` or `all` picks. The name has its control characters stripped, `"` and `\` escaped and is cut to 64 bytes; a party without one has no display name. The host is the one chan_pjsip's own `Diversion` took, the host of the leg's `From`, where the core can know it: a `pai` trunk's `from_domain`, its first outbound host; else the address the stack writes into SIP (`EXTERNAL_IPV4`, else `STACK_IPV4`, §6.1), which in the macvlan mode is the `From`'s own and in the ports mode replaces the container's internal one there; else the trunk's first outbound host.
+- `Diversion` (RFC 5806), as the trunk's `trunks.diversion` says: `off`, the default, sends none; `last` one entry, the newest hop; `all` one entry per hop, newest first, the order of RFC 5806 §4. Each forward hop of the call (§10.1 step 7) records the diverting party, a user, a ring group or a menu, with the party's name and a reason, as Asterisk's `REDIRECTING` reason and the `Diversion` `reason` sent for it: an OOO rule `away` (`away`), a closed schedule `time_of_day` (`time-of-day`), a user's `unconditional` rule and a member's followed forward `cfu` (`unconditional`), `busy` `cfb` (`user-busy`), `noAnswer` and a group's `unanswered` `cfnr` (`no-answer`), `offline` and a group's `unavailable` `unavailable` (`unavailable`), `dnd` `dnd` (`do-not-disturb`). The leg's `REDIRECTING` data holds the first hop as the original party (`orig-*`), the last as the redirecting party (`from-*`, `reason`) and the number of hops (`count`), set without an indication (`,i`) before the INVITE, with a user's primary number or else their extension, a ring group's extension, a menu's called number of an inbound call, else the tenant's main number; it feeds the header placeholders below and the call log, and nothing is sent from it: every trunk endpoint section, a trunk's username endpoint included, carries `send_diversion = no`, and `send_history_info` stays at its default `no`, since Asterisk builds `History-Info` from the same party. The core writes the header itself, as the originate variable `PJSIP_HEADER(add,Diversion)` beside the custom headers: one header field, its entries comma-separated, RFC 5806 §4's `1#` list, which RFC 3261 §7.3.1 makes equivalent to one field per entry and the one form a single originate variable can carry. An entry is `"<name>" <sip:<number>@<host>>;reason=<reason>`, without a `counter`, which counts 1 when absent (RFC 5806 §9.2.4), one per hop. The number is the diverting party's own, never an extension: a user's primary number, a ring group's DID (of the DIDs in the international form whose target is the group, the one created first), a menu's called number of an inbound call in the international form; else the tenant's main number (`settings.main_did_id`); formatted as the trunk formats a caller ID (`caller_id_format`). A hop with neither, a main DID since deleted, is left out before `last` or `all` picks. The name has its control characters stripped, `"` and `\` escaped and is cut to 64 bytes; a party without one has no display name. The host is the one chan_pjsip's own `Diversion` took, the host of the leg's `From`, where the core can know it: a `pai` trunk's `from_domain`, its first outbound host; else the address the stack writes into SIP (`EXTERNAL_IPV4`, else `STACK_IPV4`, §6.1), which in the macvlan mode is the `From`'s own and in the ports mode replaces the container's internal one there; else the trunk's first outbound host.
 - For a `sip` target alone, the target's own headers (§10.3 Forward targets, §11.2 `forward_targets`), each a name and a value template. An `external` forward carries `Diversion` alone, under the trunk's policy, since a carrier has no use for the rest; some carriers present the original caller's number on a forwarded call only with a `Diversion` naming one of the tenant's numbers.
 
 No other header is added.
@@ -1274,7 +1274,7 @@ The endpoints by area, as a sketch, each with the minimum role it needs:
 
 **Confirmation** — every `DELETE`, `POST /users/{id}/erase`, `POST /devices/{id}/rotate`, `POST /provisioning/ringotel/adopt` and `POST /system/update` require `confirm: true` in the body and answer 409 with the question text without it (§10.3, "Confirmation")
 
-**Users** (min. role: admin (self-service subset for `user`)) — `GET/POST /users` (`POST` returns the one-time set-password link, mailed too with a relay), `GET/PATCH/DELETE /users/{id}` (`DELETE` answers 409 with the blocking references, §5.9), `POST /users/{id}/resetPassword` (same link semantics), `POST /users/{id}/erase` (owners only, §5.10), `GET /users/{id}/forwarding` (the rules, in the shape the `PUT` takes, `sip` targets with their `headers`), `PUT /users/{id}/forwarding` (the rules replaced as a whole), `PUT /users/{id}/presence` (dnd; outside the audit log, §5.7), `PUT/DELETE /users/{id}/voicemailGreeting` (the personal greeting, a WAV or MP3 upload; outside the audit log, §5.7). Self-service, on the user's own id alone (403 for another's): `GET /users/{id}`, `GET /users/{id}/forwarding`, `PUT /users/{id}/forwarding` (a new or changed `sip` target excepted, Forward targets), `PUT /users/{id}/presence`, `PUT/DELETE /users/{id}/voicemailGreeting` and the `PATCH` fields `clir`, `rejectAnonymous`, `ringTimeoutS`, `notifyMissedCalls`, `findMe`; `calleridDidId` is admin-set (§9.4)
+**Users** (min. role: admin (self-service subset for `user`)) — `GET/POST /users` (`POST` returns the one-time set-password link, mailed too with a relay), `GET/PATCH/DELETE /users/{id}` (`DELETE` answers 409 with the blocking references, §5.9), `POST /users/{id}/resetPassword` (same link semantics), `POST /users/{id}/erase` (owners only, §5.10), `GET /users/{id}/forwarding` (the rules, in the shape the `PUT` takes, `sip` targets with their `headers`), `PUT /users/{id}/forwarding` (the rules replaced as a whole), `PUT /users/{id}/presence` (dnd; outside the audit log, §5.7), `PUT/DELETE /users/{id}/voicemailGreeting` (the personal greeting, a WAV or MP3 upload; outside the audit log, §5.7). Self-service, on the user's own id alone (403 for another's): `GET /users/{id}`, `GET /users/{id}/forwarding`, `PUT /users/{id}/forwarding` (a new or changed `sip` target excepted, Forward targets), `PUT /users/{id}/presence`, `PUT/DELETE /users/{id}/voicemailGreeting` and the `PATCH` fields `clir`, `rejectAnonymous`, `ringTimeoutS`, `notifyMissedCalls`, `findMe`; `callerIdDidId` is admin-set (§9.4)
 
 **Devices** (min. role: user (own, `tls` only) / admin; `plain` devices, reveal and rotate admin) — `GET /users/{id}/devices`, `POST` (transport class + allowlist for `plain`, refused while both plain transports are disabled, §9.3; returns a `manual` device's connection settings, §10.4), `PATCH /devices/{id}` (label, `allowedIps`), `DELETE /devices/{id}`, `GET /devices/{id}/credentials` (reveal, audited; a `manual` device's connection settings), `POST /devices/{id}/rotate` (new password, re-pushed and returned), `GET/PUT /devices/{id}/blf` (the `ringotel` device's BLF panel, an ordered list of extensions and parking slots replaced as a whole, §10.4)
 
@@ -1529,7 +1529,7 @@ WAL mode, `foreign_keys=ON`, write ownership split per §3.1 (`api` = config tab
 --   ring_timeout_s:         seconds the user's devices ring before the noAnswer rule (§10.1);
 --                           self-service
 --   log_level(_expires_at): per-user diagnostics override, auto-expiring (§7)
---   callerid_did_id:        the number presented on the user's outbound calls (§9.4); set by the API on
+--   caller_id_did_id:       the number presented on the user's outbound calls (§9.4); set by the API on
 --                           the user's first DID when NULL; NULL = the company main number
 --   mailbox_audio_id:       personal voicemail greeting, kind 'vmGreeting'
 CREATE TABLE users (
@@ -1542,7 +1542,7 @@ CREATE TABLE users (
   ring_timeout_s       INTEGER NOT NULL DEFAULT 25 CHECK (ring_timeout_s > 0),
   dnd                  INTEGER NOT NULL DEFAULT 0,
   find_me_json         TEXT,
-  callerid_did_id      TEXT    REFERENCES dids(id) ON DELETE SET NULL,
+  caller_id_did_id     TEXT    REFERENCES dids(id) ON DELETE SET NULL,
   clir                 INTEGER CHECK (clir IN (0,1)),
   reject_anonymous     INTEGER CHECK (reject_anonymous IN (0,1)),
   record_calls         INTEGER NOT NULL DEFAULT 0,
@@ -1608,13 +1608,13 @@ CREATE TABLE device_blf_keys (
 --                              service; only these trunks carry them (§9.4, "Emergency trunks"; §10.1)
 --   username, password_enc:    required for auth_mode 'registration' and for inbound_auth; NULL otherwise
 --   clir:                      withhold the number on calls over this trunk (§9.4); NULL = inherit the
---                              tenant default; 1 requires a PAI-carrying callerid_header (CHECK)
+--                              tenant default; 1 requires a PAI-carrying caller_id_header (CHECK)
 --   max_channels:              concurrent calls the provider allows on this trunk; NULL = unlimited (§9.4)
 --   inbound_auth:              1 = the provider authenticates its INVITEs with the trunk's credentials;
 --                              the endpoint challenges and identifies by auth username (§9.4)
 --   register_expiry_s / register_retry_s: registration interval and retry delay
 --                              ('registration' only; inbound calls identified by the `line` tag, §9.4)
---   callerid_header:           header layout (§9.4): 'from' = presented number in From, no PAI;
+--   caller_id_header:          header layout (§9.4): 'from' = presented number in From, no PAI;
 --                              'pai' = From carries the account identity, presented number in PAI;
 --                              'both' = presented number in From and PAI
 --   inbound_number_format:     how the provider delivers numbers; normalized to E.164 at the
@@ -1648,8 +1648,8 @@ CREATE TABLE trunks (
   register_expiry_s     INTEGER,
   register_retry_s      INTEGER,
   inbound_number_format TEXT    NOT NULL DEFAULT 'e164' CHECK (inbound_number_format IN ('e164','national')),
-  callerid_format       TEXT    NOT NULL DEFAULT 'e164' CHECK (callerid_format IN ('e164','national')),
-  callerid_header       TEXT    NOT NULL DEFAULT 'from' CHECK (callerid_header IN ('from','pai','both')),
+  caller_id_format      TEXT    NOT NULL DEFAULT 'e164' CHECK (caller_id_format IN ('e164','national')),
+  caller_id_header      TEXT    NOT NULL DEFAULT 'from' CHECK (caller_id_header IN ('from','pai','both')),
   clir                  INTEGER CHECK (clir IN (0,1)),
   codecs_json           TEXT,
   max_channels          INTEGER CHECK (max_channels > 0),
@@ -1659,7 +1659,7 @@ CREATE TABLE trunks (
   deleted_at            TEXT,
   CHECK ((auth_mode = 'registration' OR inbound_auth = 1) = (username IS NOT NULL AND password_enc IS NOT NULL)),
   CHECK (auth_mode = 'registration' OR (register_expiry_s IS NULL AND register_retry_s IS NULL)),
-  CHECK (clir IS NOT 1 OR callerid_header IN ('pai','both'))
+  CHECK (clir IS NOT 1 OR caller_id_header IN ('pai','both'))
 );
 
 -- trunk_hosts — a trunk's ordered host list (§9.4).
@@ -1684,16 +1684,16 @@ CREATE TABLE trunk_hosts (
 -- outbound_route_users and outbound_route_user_groups; a soft-deleted entry matches nobody. A leg
 -- the system dials for a DID, a menu, a ring group or a tenant rule carries no user and matches
 -- only routes without callers. Numbers are the E.164 entries of outbound_route_numbers.
---   priority:        evaluation order, first match wins
---   callerid_did_id: caller-ID override for calls over this route; NULL = the caller's own
---                    users.callerid_did_id, else the company main number (§9.4)
+--   priority:         evaluation order, first match wins
+--   caller_id_did_id: caller-ID override for calls over this route; NULL = the caller's own
+--                     users.caller_id_did_id, else the company main number (§9.4)
 CREATE TABLE outbound_routes (
-  id              TEXT    PRIMARY KEY,
-  priority        INTEGER NOT NULL UNIQUE,
-  trunk_id        TEXT    NOT NULL REFERENCES trunks(id) ON DELETE RESTRICT,
-  callerid_did_id TEXT    REFERENCES dids(id) ON DELETE SET NULL,
-  created_at      TEXT    NOT NULL,
-  deleted_at      TEXT
+  id               TEXT    PRIMARY KEY,
+  priority         INTEGER NOT NULL UNIQUE,
+  trunk_id         TEXT    NOT NULL REFERENCES trunks(id) ON DELETE RESTRICT,
+  caller_id_did_id TEXT    REFERENCES dids(id) ON DELETE SET NULL,
+  created_at       TEXT    NOT NULL,
+  deleted_at       TEXT
 );
 
 -- outbound_route_users / outbound_route_user_groups — a route's callers; replaced as a whole by

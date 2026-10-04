@@ -112,7 +112,7 @@ export async function seedSlot(db: Db, ext: string): Promise<void> {
 /** One `ip`-mode trunk with a single host and a catch-all route (§9.4 "Outbound routing"). */
 export async function seedExternalRoute(
   db: Db,
-  calleridHeader: 'from' | 'both' = 'from'
+  callerIdHeader: 'from' | 'both' = 'from'
 ): Promise<string> {
   const trunkId = newId();
   await db
@@ -127,7 +127,7 @@ export async function seedExternalRoute(
       passwordEnc: null,
       inboundAuth: 0,
       transport: 'udp',
-      calleridHeader,
+      callerIdHeader,
       maxChannels: null,
       createdAt: nowIso()
     })
@@ -148,7 +148,7 @@ export async function seedExternalRoute(
       id: newId(),
       priority: 1,
       trunkId,
-      calleridDidId: null,
+      callerIdDidId: null,
       createdAt: nowIso()
     })
     .execute();

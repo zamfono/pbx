@@ -115,7 +115,7 @@ async function loadTrunks(db: Db, kr: Keyring): Promise<RenderInput['trunks']> {
     outboundProxy: row.outboundProxy,
     registerExpiryS: row.registerExpiryS,
     registerRetryS: row.registerRetryS,
-    callerIdHeader: row.calleridHeader,
+    callerIdHeader: row.callerIdHeader,
     codecs:
       row.codecsJson === null ? null : (JSON.parse(row.codecsJson) as string[]),
     hosts: hostsByTrunk.get(row.id) ?? []

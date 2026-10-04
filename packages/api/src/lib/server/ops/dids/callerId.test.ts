@@ -34,10 +34,10 @@ async function undo(db: Db, operation: string): Promise<void> {
 async function ownerCallerId(db: Db): Promise<string | null> {
   const user = await db
     .selectFrom('users')
-    .select('calleridDidId')
+    .select('callerIdDidId')
     .where('id', '=', 'owner')
     .executeTakeFirstOrThrow();
-  return user.calleridDidId;
+  return user.callerIdDidId;
 }
 
 /** A test database whose owner has an extension, which `users.update` reports back. */

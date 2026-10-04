@@ -61,8 +61,8 @@ async function seedCaller(
 
 type TrunkOverrides = {
   authMode?: 'registration' | 'ip';
-  calleridHeader?: 'from' | 'pai' | 'both';
-  calleridDidId?: string | null;
+  callerIdHeader?: 'from' | 'pai' | 'both';
+  callerIdDidId?: string | null;
   maxChannels?: number | null;
   emergency?: boolean;
 };
@@ -86,7 +86,7 @@ async function seedTrunk(
       passwordEnc: authMode === 'registration' ? Buffer.from('secret') : null,
       inboundAuth: 0,
       transport: 'udp',
-      calleridHeader: overrides.calleridHeader ?? 'from',
+      callerIdHeader: overrides.callerIdHeader ?? 'from',
       maxChannels: overrides.maxChannels ?? null,
       createdAt: nowIso()
     })
@@ -108,7 +108,7 @@ async function seedRoute(
   db: Db,
   priority: number,
   trunkId: string,
-  calleridDidId: string | null = null
+  callerIdDidId: string | null = null
 ): Promise<void> {
   await db
     .insertInto('outboundRoutes')
@@ -116,7 +116,7 @@ async function seedRoute(
       id: newId(),
       priority,
       trunkId,
-      calleridDidId,
+      callerIdDidId,
       createdAt: nowIso()
     })
     .execute();
@@ -311,7 +311,7 @@ describe('outbound dialing', () => {
 
   it('selects the first matching route trunk and presents the route DID', async () => {
     const routeDidId = await seedDid(db, '+491230000');
-    const trunkId = await seedTrunk(db, 1, { calleridDidId: routeDidId });
+    const trunkId = await seedTrunk(db, 1, { callerIdDidId: routeDidId });
     await seedRoute(db, 1, trunkId, routeDidId);
 
     const call = await dial('+498912345');
@@ -414,7 +414,7 @@ describe('outbound dialing', () => {
   });
 
   it('withholds the number on a both trunk by restricting the presentation of the real number (§9.4 "Anonymous calls (CLIR)")', async () => {
-    const trunkId = await seedTrunk(db, 1, { calleridHeader: 'both' });
+    const trunkId = await seedTrunk(db, 1, { callerIdHeader: 'both' });
     await seedRoute(db, 1, trunkId);
 
     await dial('#31#+498912345');
@@ -436,7 +436,7 @@ describe('outbound dialing', () => {
   });
 
   it('presents the number as the caller ID on a pai trunk, leaving From and PAI to the endpoint (§9.4 "Caller-ID")', async () => {
-    const trunkId = await seedTrunk(db, 1, { calleridHeader: 'pai' });
+    const trunkId = await seedTrunk(db, 1, { callerIdHeader: 'pai' });
     await seedRoute(db, 1, trunkId);
 
     await dial('+498912345');
@@ -456,7 +456,7 @@ describe('outbound dialing', () => {
   });
 
   it('skips a from-only trunk for a withheld call and ends 403 with no other route', async () => {
-    const trunkId = await seedTrunk(db, 1, { calleridHeader: 'from' });
+    const trunkId = await seedTrunk(db, 1, { callerIdHeader: 'from' });
     await seedRoute(db, 1, trunkId);
 
     const call = await dial('#31#+498912345');

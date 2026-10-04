@@ -49,7 +49,7 @@ async function seedNumberedUser(
     name: 'User',
     mailboxEnabled: 0,
     ringTimeoutS: 30,
-    calleridDidId:
+    callerIdDidId:
       opts.number === undefined ? null : await seedDid(db, opts.number),
     clir: opts.clir ?? null
   });
@@ -79,7 +79,7 @@ async function seedTrunkRoute(
   db: Db,
   priority: number,
   onlyUserId: string | null,
-  calleridHeader: 'from' | 'both' = 'from'
+  callerIdHeader: 'from' | 'both' = 'from'
 ): Promise<string> {
   const trunkId = newId();
   await db
@@ -94,7 +94,7 @@ async function seedTrunkRoute(
       passwordEnc: Buffer.from('secret'),
       inboundAuth: 0,
       transport: 'udp',
-      calleridHeader,
+      callerIdHeader,
       createdAt: nowIso()
     })
     .execute();

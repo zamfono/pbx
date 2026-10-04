@@ -56,9 +56,9 @@ export const CONDITION_REASONS = {
 function userNumber(snapshot: Snapshot, userId: string): string | null {
   const user = userById(snapshot, userId);
   const did =
-    user?.calleridDidId === null || user === null
+    user?.callerIdDidId === null || user === null
       ? undefined
-      : snapshot.dids.find(row => row.id === user.calleridDidId);
+      : snapshot.dids.find(row => row.id === user.callerIdDidId);
   return did?.number ?? extensionOf(snapshot, { userId });
 }
 

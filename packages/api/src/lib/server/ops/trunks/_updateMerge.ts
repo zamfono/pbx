@@ -74,8 +74,8 @@ export function mergeScalars(row: TrunkRow, input: MergeInput): Merged {
         ? orRow(input.registerRetryS, row.registerRetryS)
         : null,
     inboundNumberFormat: input.inboundNumberFormat ?? row.inboundNumberFormat,
-    callerIdFormat: input.callerIdFormat ?? row.calleridFormat,
-    callerIdHeader: input.callerIdHeader ?? row.calleridHeader,
+    callerIdFormat: input.callerIdFormat ?? row.callerIdFormat,
+    callerIdHeader: input.callerIdHeader ?? row.callerIdHeader,
     clir: mergedClir(row, input),
     codecs: mergedCodecs(row, input),
     maxChannels: orRow(input.maxChannels, row.maxChannels)

@@ -307,7 +307,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
       .execute();
     await db
       .updateTable('users')
-      .set({ calleridDidId: beaDid })
+      .set({ callerIdDidId: beaDid })
       .where('id', '=', bea)
       .execute();
     await db
@@ -430,7 +430,7 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
       .execute();
     await db
       .updateTable('users')
-      .set({ calleridDidId: didId })
+      .set({ callerIdDidId: didId })
       .where('id', '=', ai)
       .execute();
     await seedRule(db, ai, 'unconditional', await sipTargetId(db, trunkId));

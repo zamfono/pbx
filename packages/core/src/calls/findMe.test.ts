@@ -44,7 +44,7 @@ async function seedRoute(db: Db): Promise<string> {
       passwordEnc: Buffer.from('secret'),
       inboundAuth: 0,
       transport: 'udp',
-      calleridHeader: 'from',
+      callerIdHeader: 'from',
       createdAt: nowIso()
     })
     .execute();

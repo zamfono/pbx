@@ -46,10 +46,10 @@ describe('dids', () => {
     expect(created.number).toBe('+4989123456');
     const user = await db
       .selectFrom('users')
-      .select('calleridDidId')
+      .select('callerIdDidId')
       .where('id', '=', 'owner')
       .executeTakeFirstOrThrow();
-    expect(user.calleridDidId).toBe(created.id);
+    expect(user.callerIdDidId).toBe(created.id);
   });
 
   it('does not set a verbatim (non-numeric) DID as a user caller-ID', async () => {
@@ -64,10 +64,10 @@ describe('dids', () => {
     expect(created.number).toBe('acct-4711');
     const user = await db
       .selectFrom('users')
-      .select('calleridDidId')
+      .select('callerIdDidId')
       .where('id', '=', 'owner')
       .executeTakeFirstOrThrow();
-    expect(user.calleridDidId).toBeNull();
+    expect(user.callerIdDidId).toBeNull();
   });
 
   it('refuses whitespace in a DID number', async () => {
@@ -103,7 +103,7 @@ describe('dids', () => {
     const presentedId = await insertDid(db, '+4930000001');
     await db
       .updateTable('users')
-      .set({ calleridDidId: presentedId })
+      .set({ callerIdDidId: presentedId })
       .where('id', '=', 'owner')
       .execute();
     await expect(

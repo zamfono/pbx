@@ -6,7 +6,7 @@ import { OpError } from '../types.js';
 export type RouteAssertInput = {
   id?: string;
   trunkId: string;
-  calleridDidId?: string | null;
+  callerIdDidId?: string | null;
   users: string[];
   userGroups: string[];
 };
@@ -36,7 +36,7 @@ export async function assertTrunksLive(
   }
 }
 
-/** Throws 422 for a `calleridDidId` that is not a live, numeric DID (§9.4 "Caller-ID"). */
+/** Throws 422 for a `callerIdDidId` that is not a live, numeric DID (§9.4 "Caller-ID"). */
 export async function assertCallerIdsNumeric(
   db: Db,
   routes: RouteAssertInput[]
@@ -44,7 +44,7 @@ export async function assertCallerIdsNumeric(
   const ids = [
     ...new Set(
       routes
-        .map(route => route.calleridDidId)
+        .map(route => route.callerIdDidId)
         .filter((id): id is string => id !== undefined && id !== null)
     )
   ];
@@ -69,7 +69,7 @@ export async function assertCallerIdsNumeric(
     if (!isE164(number)) {
       throw new OpError(
         HTTP_UNPROCESSABLE_CONTENT,
-        `calleridDidId must be a numeric DID: ${id}`
+        `callerIdDidId must be a numeric DID: ${id}`
       );
     }
   }

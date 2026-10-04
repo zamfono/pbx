@@ -32,11 +32,11 @@ export type TrunkTransport = (typeof TRUNK_TRANSPORTS)[number];
 export const TRUNK_AUTH_MODES = ['registration', 'ip'] as const;
 export type TrunkAuthMode = (typeof TRUNK_AUTH_MODES)[number];
 
-/** `trunks.inbound_number_format` and `trunks.callerid_format`. */
+/** `trunks.inbound_number_format` and `trunks.caller_id_format`. */
 export const NUMBER_FORMATS = ['e164', 'national'] as const;
 export type NumberFormat = (typeof NUMBER_FORMATS)[number];
 
-/** `trunks.callerid_header`. */
+/** `trunks.caller_id_header`. */
 export const CALLERID_HEADERS = ['from', 'pai', 'both'] as const;
 export type CallerIdHeader = (typeof CALLERID_HEADERS)[number];
 

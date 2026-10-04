@@ -16,7 +16,7 @@ const route = (overrides: Partial<Route>): Route => ({
   id: 'route-1',
   priority: 1,
   trunkId: 'trunk-1',
-  calleridDidId: null,
+  callerIdDidId: null,
   users: [],
   userGroups: [],
   numbers: [],
@@ -175,8 +175,8 @@ describe('presentedNumber', () => {
   it("prefers the route's override over the user's own number", () => {
     expect(
       presentedNumber({
-        route: route({ calleridDidId: 'did-route' }),
-        user: { calleridDidId: 'did-user' },
+        route: route({ callerIdDidId: 'did-route' }),
+        user: { callerIdDidId: 'did-user' },
         dids,
         mainDidId: 'did-main'
       })
@@ -186,8 +186,8 @@ describe('presentedNumber', () => {
   it("falls back to the caller's own number when the route sets none", () => {
     expect(
       presentedNumber({
-        route: route({ calleridDidId: null }),
-        user: { calleridDidId: 'did-user' },
+        route: route({ callerIdDidId: null }),
+        user: { callerIdDidId: 'did-user' },
         dids,
         mainDidId: 'did-main'
       })

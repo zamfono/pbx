@@ -78,6 +78,10 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
+- Breaking: users and outbound routes spell their caller-ID number `callerIdDidId` on the wire,
+  as trunks spell `callerIdFormat` and `callerIdHeader`; `calleridDidId` is refused as an
+  unknown field. The database columns are `caller_id_did_id`, `caller_id_format` and
+  `caller_id_header`.
 - `calls.originate` (`POST /calls`) refused for a user with no registered device answers the
   problem title `no registered device`, as `calls.pickup` does; the `detail` stays
   `noRegisteredDevice`.

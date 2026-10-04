@@ -48,7 +48,7 @@ const inputSchema = z
       .nullable()
       .optional()
       .describe('The personal voicemail greeting, an audio asset id.'),
-    calleridDidId: z
+    callerIdDidId: z
       .string()
       .nullable()
       .optional()
@@ -101,10 +101,10 @@ function resolvedFields(before: UserRow, input: Input): Partial<UserRow> {
       input.mailboxAudioId === undefined
         ? before.mailboxAudioId
         : input.mailboxAudioId,
-    calleridDidId:
-      input.calleridDidId === undefined
-        ? before.calleridDidId
-        : input.calleridDidId,
+    callerIdDidId:
+      input.callerIdDidId === undefined
+        ? before.callerIdDidId
+        : input.callerIdDidId,
     findMeJson:
       input.findMe === undefined
         ? before.findMeJson
@@ -150,8 +150,8 @@ export const update = defineOperation({
     if (input.email !== undefined && input.email !== before.email) {
       await assertEmailAvailable(ctx.db, input.email, input.id);
     }
-    if (input.calleridDidId !== undefined && input.calleridDidId !== null) {
-      await assertCallerIdDidValid(ctx.db, input.calleridDidId);
+    if (input.callerIdDidId !== undefined && input.callerIdDidId !== null) {
+      await assertCallerIdDidValid(ctx.db, input.callerIdDidId);
     }
     if (input.mailboxAudioId !== undefined && input.mailboxAudioId !== null) {
       await assertAudioOfKind(ctx.db, input.mailboxAudioId, 'vmGreeting');

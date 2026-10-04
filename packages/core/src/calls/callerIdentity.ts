@@ -31,7 +31,7 @@ export function resolveAttemptIdentity(params: {
   const { route, trunk, callerUser, clirPerCall, emergency, snapshot } = params;
   const presented = presentedNumber({
     route,
-    user: callerUser ? { calleridDidId: callerUser.calleridDidId } : null,
+    user: callerUser ? { callerIdDidId: callerUser.callerIdDidId } : null,
     dids: didNumbersById(snapshot),
     mainDidId: snapshot.settings.mainDidId
   });
@@ -47,10 +47,7 @@ export function resolveAttemptIdentity(params: {
   const headers = callerIdHeaders({
     withhold,
     number: presented,
-    trunk: {
-      callerIdHeader: trunk.calleridHeader,
-      callerIdFormat: trunk.calleridFormat
-    },
+    trunk,
     country: snapshot.settings.country
   });
   if (!headers.ok) {

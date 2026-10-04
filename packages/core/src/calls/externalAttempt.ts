@@ -69,8 +69,8 @@ function attemptTracer(
       // header(s) the trunk takes it in, and whether it was withheld (§9.4 "Caller ID", CLIR).
       callerId: {
         number: candidate.identity.number,
-        format: candidate.trunk.calleridFormat,
-        header: candidate.trunk.calleridHeader,
+        format: candidate.trunk.callerIdFormat,
+        header: candidate.trunk.callerIdHeader,
         withheld: candidate.identity.withhold
       },
       cause

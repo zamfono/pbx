@@ -97,7 +97,7 @@ export type UserOut = LogLevelColumns & {
   ringTimeoutS: number;
   dnd: boolean;
   findMe: FindMeLeg[];
-  calleridDidId: string | null;
+  callerIdDidId: string | null;
   clir: boolean | null;
   rejectAnonymous: boolean | null;
   recordCalls: boolean;
@@ -125,7 +125,7 @@ export async function toUserOut(
     findMe: row.findMeJson
       ? findMeSchema.parse(JSON.parse(row.findMeJson))
       : [],
-    calleridDidId: row.calleridDidId,
+    callerIdDidId: row.callerIdDidId,
     clir: row.clir === null ? null : row.clir === 1,
     rejectAnonymous:
       row.rejectAnonymous === null ? null : row.rejectAnonymous === 1,
@@ -161,7 +161,7 @@ export async function assertNotLastOwner(
   }
 }
 
-/** Throws `OpError(422)` for a `calleridDidId` that is not a live, numeric DID (§9.4 "Caller-ID"). */
+/** Throws `OpError(422)` for a `callerIdDidId` that is not a live, numeric DID (§9.4 "Caller-ID"). */
 export async function assertCallerIdDidValid(
   db: Transaction<DB>,
   id: string
@@ -181,7 +181,7 @@ export async function assertCallerIdDidValid(
   if (!isE164(did.number)) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
-      `calleridDidId must be a numeric DID: ${id}`
+      `callerIdDidId must be a numeric DID: ${id}`
     );
   }
 }

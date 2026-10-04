@@ -125,13 +125,13 @@ async function writeRoute(
   priority: number,
   now: string
 ): Promise<string> {
-  const calleridDidId = route.calleridDidId ?? null;
+  const callerIdDidId = route.callerIdDidId ?? null;
   if (route.id) {
     await db
       .updateTable('outboundRoutes')
       .set({
         trunkId: route.trunkId,
-        calleridDidId,
+        callerIdDidId,
         priority,
         deletedAt: null
       })
@@ -147,7 +147,7 @@ async function writeRoute(
       id,
       priority,
       trunkId: route.trunkId,
-      calleridDidId,
+      callerIdDidId,
       createdAt: now
     })
     .execute();

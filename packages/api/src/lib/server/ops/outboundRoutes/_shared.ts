@@ -10,7 +10,7 @@ export type RouteWire = {
   id: string;
   priority: number;
   trunkId: string;
-  calleridDidId: string | null;
+  callerIdDidId: string | null;
   users: string[];
   userGroups: string[];
   numbers: NumberWire[];
@@ -78,7 +78,7 @@ export function routeToWire(row: RouteRow, children: RouteChildren): RouteWire {
     id: row.id,
     priority: row.priority,
     trunkId: row.trunkId,
-    calleridDidId: row.calleridDidId,
+    callerIdDidId: row.callerIdDidId,
     users: children.users.get(row.id) ?? [],
     userGroups: children.userGroups.get(row.id) ?? [],
     numbers: children.numbers.get(row.id) ?? []
@@ -93,7 +93,7 @@ export function routeToWire(row: RouteRow, children: RouteChildren): RouteWire {
 export type RouteInputWire = {
   id: string;
   trunkId: string;
-  calleridDidId: string | null;
+  callerIdDidId: string | null;
   users: string[];
   userGroups: string[];
   numbers: NumberWire[];
@@ -103,7 +103,7 @@ export function toRouteInput(route: RouteWire): RouteInputWire {
   return {
     id: route.id,
     trunkId: route.trunkId,
-    calleridDidId: route.calleridDidId,
+    callerIdDidId: route.callerIdDidId,
     users: route.users,
     userGroups: route.userGroups,
     numbers: route.numbers

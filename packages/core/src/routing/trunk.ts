@@ -19,7 +19,7 @@ export type Route = {
   id: string;
   priority: number;
   trunkId: string;
-  calleridDidId: string | null;
+  callerIdDidId: string | null;
   users: string[];
   userGroups: string[];
   numbers: { number: string; isPrefix: boolean }[];
@@ -134,13 +134,13 @@ export function emergencyTrunks(
  */
 export function presentedNumber(params: {
   route: Route | null;
-  user: { calleridDidId: string | null } | null;
+  user: { callerIdDidId: string | null } | null;
   dids: Map<string, { number: string }>;
   mainDidId: string;
 }): string {
   const didId =
-    params.route?.calleridDidId ??
-    params.user?.calleridDidId ??
+    params.route?.callerIdDidId ??
+    params.user?.callerIdDidId ??
     params.mainDidId;
   const did = params.dids.get(didId);
   if (did === undefined) {

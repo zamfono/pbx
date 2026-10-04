@@ -71,7 +71,7 @@ async function seedTrunk(
       passwordEnc: authMode === 'registration' ? Buffer.from('secret') : null,
       inboundAuth: 0,
       transport: 'udp',
-      calleridHeader: 'from',
+      callerIdHeader: 'from',
       createdAt: nowIso()
     })
     .execute();
@@ -271,7 +271,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const memberDidId = await seedDid(db, '+491230000');
       const forwarding = await seedUser(db, {
         ...MEMBER,
-        calleridDidId: memberDidId
+        callerIdDidId: memberDidId
       });
       await seedExternalForward(db, forwarding, '+15557777');
       // A member who forwards is still skipped while offline (§10.1 step 5).
@@ -559,7 +559,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
 
     it("rings over the route's trunk as the user's own call alongside their device, and is hung up when the device answers", async () => {
       const didId = await seedDid(db, '+491230000');
-      const userId = await seedUser(db, { ...FINDS_ME, calleridDidId: didId });
+      const userId = await seedUser(db, { ...FINDS_ME, callerIdDidId: didId });
       await seedDevice(db, userId, 'e101-d1');
       await registerDevice(fakeAri, pipeline, 'e101-d1');
       const trunkId = await seedTrunk(db, 1);

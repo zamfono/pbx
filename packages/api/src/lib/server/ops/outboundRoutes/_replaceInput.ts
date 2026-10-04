@@ -32,7 +32,7 @@ const routeInputSchema = z
       .optional()
       .describe("An existing route's id, to keep it; left out: a new route."),
     trunkId: z.string().min(1).describe('The trunk that carries the call.'),
-    calleridDidId: z
+    callerIdDidId: z
       .string()
       .min(1)
       .nullable()
