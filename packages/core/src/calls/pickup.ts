@@ -54,7 +54,7 @@ async function bridgePickup(
 ): Promise<void> {
   const ari = pipeline.deps.ari;
   await ari.channels.answer(picker.channelId).catch(ignoreGone);
-  await bridgeAnswered(pipeline, target, leg);
+  const joined = await bridgeAnswered(pipeline, target, leg);
   for (const other of target.legs.values()) {
     if (other.state === 'ringing') {
       other.state = 'ended';
@@ -67,7 +67,7 @@ async function bridgePickup(
       );
     }
   }
-  // Presence (§9.3, §10.2 "Presence and BLF"): the ringing callee idle, the picker in the call.
+  // Presence (§9.3, §10.2 "Presence and BLF"): the ringing callee idle, the picker in the call once bridged.
   if (target.calleeUserId !== null) {
     pipeline.deps.presence.setCallState(
       target.calleeUserId,
@@ -77,7 +77,7 @@ async function bridgePickup(
       target.id
     );
   }
-  if (picker.userId !== null) {
+  if (picker.userId !== null && joined) {
     pipeline.deps.presence.setCallState(
       picker.userId,
       'inCall',

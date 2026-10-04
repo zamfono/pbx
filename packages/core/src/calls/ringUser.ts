@@ -13,7 +13,13 @@ import { callPartiesChanged, callRinging } from './callState.js';
 import { softphoneCallerId } from './contactName.js';
 import { findMeLegsPending, scheduleFindMeLegs } from './findMe.js';
 import { originateLeg } from './legOriginate.js';
-import { hangupLeg, trackLeg, untrackLeg, type RingOutcome } from './legs.js';
+import {
+  hangupLeg,
+  trackLeg,
+  untrackLeg,
+  type RingOutcome,
+  type RingResolver
+} from './legs.js';
 import type { Pipeline } from './pipeline.js';
 import { release } from './release.js';
 import { concludeRing, placeAll } from './ringConclusion.js';
@@ -139,12 +145,13 @@ export async function ringUser(
     concludeRing(pipeline, call);
   }, user.ringTimeoutS * MS_PER_SECOND);
   timer.unref();
-  pipeline.pendingRing.set(call.id, {
+  const ring: RingResolver = {
     resolve: resolveOutcome,
     timer,
     existingBridgeId: takeJoinBridge(call),
     placing: 0
-  });
+  };
+  pipeline.pendingRing.set(call.id, ring);
   // §9.3 "a user: RINGING while any of their devices rings".
   pipeline.deps.presence.setCallState(
     userId,
@@ -161,18 +168,23 @@ export async function ringUser(
     devices,
     snapshot.settings.language
   );
-  callRinging(pipeline.deps, call);
-  scheduleFindMeLegs(pipeline, call, userId, user.findMe);
-  // Nothing rings nor is still to come (every device refused before it rang, `legOriginate.ts`):
-  // the race is over at once, as when the last leg declines.
-  const ringing = [...call.legs.values()].some(leg => leg.state === 'ringing');
-  if (!ringing && !findMeLegsPending(pipeline, call.id)) {
-    concludeRing(pipeline, call);
-  }
-  if (call.callerChannelId !== null) {
-    await pipeline.deps.ari.channels
-      .ring(call.callerChannelId)
-      .catch(ignoreGone);
+  // The race can be over before every device is dialled: the caller hung up, or a phone answered.
+  if (pipeline.pendingRing.get(call.id) === ring && ring.won !== true) {
+    callRinging(pipeline.deps, call);
+    scheduleFindMeLegs(pipeline, call, userId, user.findMe);
+    // Nothing rings nor is still to come (every device refused before it rang,
+    // `legOriginate.ts`): the race is over at once, as when the last leg declines.
+    const ringing = [...call.legs.values()].some(
+      leg => leg.state === 'ringing'
+    );
+    if (!ringing && !findMeLegsPending(pipeline, call.id)) {
+      concludeRing(pipeline, call);
+    }
+    if (call.callerChannelId !== null) {
+      await pipeline.deps.ari.channels
+        .ring(call.callerChannelId)
+        .catch(ignoreGone);
+    }
   }
 
   const outcome = await outcomePromise;

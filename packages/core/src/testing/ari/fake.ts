@@ -3,11 +3,13 @@ import { HTTP_CONFLICT, HTTP_NOT_FOUND, HTTP_OK } from '@zamfono/shared';
 
 import type { Channel } from '#src/ari/types.js';
 import type { RtpQos } from '#src/qosFigures.js';
+import { AST_CAUSE_NORMAL_CLEARING } from '#src/sipCodes.js';
 
 import { routeBridge, type Bridge } from './fakeBridge.js';
 import {
   defaultChannel,
   fakeEndpoint,
+  hangupEvents,
   peerStatusChange,
   readChannelVariable,
   routeMisc,
@@ -82,6 +84,9 @@ export class FakeAri {
   failOriginate: null | { status: number } = null;
   failDial: null | { status: number; count?: number } = null;
   createdEntersStasis = true;
+  /** Whether a channel the client hangs up (`DELETE /channels/{id}`) then leaves its bridges and
+   * is reported gone (`hangupEvents`), as on Asterisk; off, it only disappears. */
+  reportsHangups = false;
   /**
    * Runs as an originate is handled, before its response is sent: Asterisk dials the channel
    * while it answers the request, so its events can reach the client ahead of the response.
@@ -143,6 +148,38 @@ export class FakeAri {
     return channel;
   }
 
+  /** The channels and bridges that exist right now, by id. */
+  get channelIds(): string[] {
+    return [...this.channels.keys()];
+  }
+
+  get bridgeIds(): string[] {
+    return [...this.bridges.keys()];
+  }
+
+  /** `channelId`'s party hanging up: it leaves its bridges and is reported gone. */
+  hangUpRemotely(channelId: string): void {
+    this.endChannel(channelId, true);
+  }
+
+  private endChannel(channelId: string, byParty: boolean): void {
+    const channel = this.channels.get(channelId);
+    if (channel === undefined) {
+      return;
+    }
+    this.channels.delete(channelId);
+    for (const bridge of this.bridges.values()) {
+      bridge.channels = bridge.channels.filter(id => id !== channelId);
+    }
+    for (const event of hangupEvents(
+      channel,
+      AST_CAUSE_NORMAL_CLEARING,
+      byParty
+    )) {
+      this.emit(event);
+    }
+  }
+
   /**
    * `POST /channels/{id}/snoop`: a snoop channel under the requested `snoopId`. Asterisk answers
    * the request before the channel has entered Stasis, and refuses a `record` on it until then;
@@ -202,6 +239,13 @@ export class FakeAri {
     const channel = this.channels.get(id);
     if (!channel) {
       return { status: HTTP_NOT_FOUND, body: { message: 'Channel not found' } };
+    }
+    if (action === '' && method === 'DELETE' && this.reportsHangups) {
+      // Asterisk answers the request before the channel's own events follow.
+      setImmediate(() => {
+        this.endChannel(id, false);
+      });
+      return { status: HTTP_OK, body: {} };
     }
     if (action === '' && method === 'DELETE') {
       this.channels.delete(id);

@@ -149,3 +149,27 @@ export function defaultChannel(overrides: Partial<Channel>): Channel {
     channelvars: overrides.channelvars
   };
 }
+
+/**
+ * What Asterisk reports as `channel` hangs up with Q.850 `cause`: a party's own hangup (a BYE, a
+ * CANCEL) raises a hard `ChannelHangupRequest` first, one the client requested itself
+ * (`DELETE /channels/{id}`) none. Either way the channel leaves Stasis, then is destroyed.
+ */
+export function hangupEvents(
+  channel: Channel,
+  cause: number,
+  byParty: boolean
+): AriEvent[] {
+  const base = {
+    timestamp: new Date().toISOString(),
+    application: 'zamfono' as const,
+    channel
+  };
+  const ending: AriEvent[] = [
+    { ...base, type: 'StasisEnd' },
+    { ...base, type: 'ChannelDestroyed', cause, cause_txt: 'Normal Clearing' }
+  ];
+  return byParty
+    ? [{ ...base, type: 'ChannelHangupRequest', cause }, ...ending]
+    : ending;
+}

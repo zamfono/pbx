@@ -318,6 +318,12 @@ why the specified behaviour changed; the commit history, how.
   since (a menu's greeting, a DID's target user, a forwarding rule's ring group); the answer names
   what to restore first. Before, the undo went through, and the daily purge then failed every day
   from the moment the deleted item was due, or cleared the revived item's greeting.
+- A call whose caller hangs up, or that a phone answers, while the user's phones are still being
+  dialled no longer shows as ringing in the live calls (`GET /calls?live=true`, `/events`): it no
+  longer stays listed after it ended, and an answered one shows as answered.
+- A caller who hangs up just as a phone answers (or a pickup is answered) no longer leaves that
+  phone connected to nobody, its user shown busy and the call listed as live: the phone is hung
+  up.
 - A call whose SIP Call-ID `core` cannot read from Asterisk (Asterisk unreachable or refusing the
   request as the call comes in) is logged as `SIP dialog join failed` and handled as usual: at call
   log level `sip` it no longer goes unrecorded, and below it `core` no longer exits with an

@@ -7,7 +7,7 @@
  * its participations offered to the recorder (§10.2 "Recording semantics"), and the live view
  * told the call is up (§10.6).
  */
-import { logUnlessGone } from '../ari/failures.js';
+import { isGone, logUnlessGone } from '../ari/failures.js';
 import { callerChannel, takeJoinBridge, type Call, type Leg } from './call.js';
 import { callUp } from './callState.js';
 import { traceCodecs } from './codecTrace.js';
@@ -84,10 +84,56 @@ async function joinBridge(
 }
 
 /**
+ * Answers the caller and bridges `leg` with them in a fresh bridge. False when a party left
+ * meanwhile, the caller hanging up as their phone was answered: that party's end found no
+ * conversation to release (`legsEnded.ts`), so the other is hung up and the bridge destroyed
+ * here, as a party leaving a two-party call does.
+ */
+async function bridgeWithCaller(
+  pipeline: Pipeline,
+  call: Call,
+  leg: Leg
+): Promise<boolean> {
+  const { ari, logger } = pipeline.deps;
+  const callerChannelId = callerChannel(call);
+  let bridgeId: string | null = null;
+  try {
+    await ari.channels.answer(callerChannelId);
+    ({ id: bridgeId } = await ari.bridges.create({ type: 'mixing' }));
+    await ari.bridges.addChannel(bridgeId, callerChannelId);
+    // eslint-disable-next-line require-atomic-updates -- the answer is this caller's own claim (`claimAnswer`); nothing else writes bridgeId
+    call.bridgeId = bridgeId;
+    await ari.bridges.addChannel(bridgeId, leg.channelId);
+    if (call.callerEnded !== true) {
+      return true;
+    }
+  } catch (error) {
+    if (!isGone(error)) {
+      throw error;
+    }
+  }
+  const fields = { callId: call.id };
+  await Promise.all(
+    [leg.channelId, callerChannelId].map(channelId =>
+      ari.channels
+        .hangup(channelId)
+        .catch(logUnlessGone(logger, 'party hangup', fields))
+    )
+  );
+  if (bridgeId !== null) {
+    await ari.bridges
+      .destroy(bridgeId)
+      .catch(logUnlessGone(logger, 'bridge destroy', fields));
+  }
+  return false;
+}
+
+/**
  * Bridges a claimed answer with the caller, then starts recording and publishes the call as up.
  * With `existingBridgeId` (§10.2 "Call parking"'s ring-back, "Three-way calls"'s `*5`) the leg
  * joins that bridge in place of a fresh one, and `call.callerChannelId` is left untouched.
- * Returns false when that bridge is gone (`joinBridge`); the answer stays claimed either way.
+ * Returns false when that bridge is gone (`joinBridge`) or a party left before a fresh one held
+ * both (`bridgeWithCaller`); the answer stays claimed either way.
  */
 export async function bridgeAnswered(
   pipeline: Pipeline,
@@ -95,15 +141,11 @@ export async function bridgeAnswered(
   leg: Leg,
   existingBridgeId: string | null = null
 ): Promise<boolean> {
-  const { ari, recorder } = pipeline.deps;
+  const { recorder } = pipeline.deps;
   if (existingBridgeId === null) {
-    const callerChannelId = callerChannel(call);
-    await ari.channels.answer(callerChannelId);
-    const bridge = await ari.bridges.create({ type: 'mixing' });
-    await ari.bridges.addChannel(bridge.id, callerChannelId);
-    // eslint-disable-next-line require-atomic-updates -- the answer is this caller's own claim (`claimAnswer`); nothing else writes bridgeId
-    call.bridgeId = bridge.id;
-    await ari.bridges.addChannel(bridge.id, leg.channelId);
+    if (!(await bridgeWithCaller(pipeline, call, leg))) {
+      return false;
+    }
     // A snoop attaches to a bridged channel, so the recorder follows the bridge, not the answer.
     await recordAnsweredParticipation(recorder, call, leg);
   } else {
