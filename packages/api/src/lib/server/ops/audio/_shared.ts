@@ -1,6 +1,7 @@
 import type { Selectable, Transaction } from 'kysely';
 
 import {
+  audioReferenceQueries,
   HTTP_UNPROCESSABLE_CONTENT,
   type AudioKind,
   type DB
@@ -50,42 +51,14 @@ export async function findAudioAssetReferences(
   db: Transaction<DB>,
   audioId: string
 ): Promise<Reference[]> {
+  const queries = audioReferenceQueries(db, audioId);
   const [ringGroups, users, menus, settingsRows, announcementTargetIds] =
     await Promise.all([
-      db
-        .selectFrom('ringGroups')
-        .select(['id', 'name'])
-        .where('deletedAt', 'is', null)
-        .where(eb =>
-          eb.or([
-            eb('greetingAudioId', '=', audioId),
-            eb('mohAudioId', '=', audioId),
-            eb('mailboxAudioId', '=', audioId)
-          ])
-        )
-        .execute(),
-      db
-        .selectFrom('users')
-        .select(['id', 'name'])
-        .where('deletedAt', 'is', null)
-        .where('mailboxAudioId', '=', audioId)
-        .execute(),
-      db
-        .selectFrom('menus')
-        .select(['id', 'name'])
-        .where('deletedAt', 'is', null)
-        .where('audioId', '=', audioId)
-        .execute(),
-      db
-        .selectFrom('settings')
-        .select('id')
-        .where('holdMohAudioId', '=', audioId)
-        .execute(),
-      db
-        .selectFrom('forwardTargets')
-        .select('id')
-        .where('announcementAudioId', '=', audioId)
-        .execute()
+      queries.ringGroups.select('name').execute(),
+      queries.users.select('name').execute(),
+      queries.menus.select('name').execute(),
+      queries.settings.execute(),
+      queries.forwardTargets.execute()
     ]);
   const announcements = await findForwardTargetOwners(
     db,

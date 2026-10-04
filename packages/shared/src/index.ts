@@ -16,6 +16,7 @@ export * from './events.js';
 export * from './internalApi.js';
 export * from './updaterApi.js';
 export * from './mwiMailbox.js';
+export * from './audioReferences.js';
 export * from './mailboxGreeting.js';
 export * from './asteriskNames.js';
 export * from './repeat.js';

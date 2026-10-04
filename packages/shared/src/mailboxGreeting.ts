@@ -1,3 +1,4 @@
+import { audioReferenceQueries } from './audioReferences.js';
 import type { Db } from './db.js';
 
 /**
@@ -22,47 +23,11 @@ export async function retireGreeting(
     .where('deletedAt', 'is', null)
     .where(eb =>
       eb.not(
-        eb.or([
-          eb.exists(
-            eb
-              .selectFrom('users')
-              .select('id')
-              .where('deletedAt', 'is', null)
-              .where('mailboxAudioId', '=', audioId)
-          ),
-          eb.exists(
-            eb
-              .selectFrom('ringGroups')
-              .select('id')
-              .where('deletedAt', 'is', null)
-              .where(ref =>
-                ref.or([
-                  ref('mailboxAudioId', '=', audioId),
-                  ref('greetingAudioId', '=', audioId),
-                  ref('mohAudioId', '=', audioId)
-                ])
-              )
-          ),
-          eb.exists(
-            eb
-              .selectFrom('menus')
-              .select('id')
-              .where('deletedAt', 'is', null)
-              .where('audioId', '=', audioId)
-          ),
-          eb.exists(
-            eb
-              .selectFrom('settings')
-              .select('id')
-              .where('holdMohAudioId', '=', audioId)
-          ),
-          eb.exists(
-            eb
-              .selectFrom('forwardTargets')
-              .select('id')
-              .where('announcementAudioId', '=', audioId)
+        eb.or(
+          Object.values(audioReferenceQueries(db, audioId)).map(query =>
+            eb.exists(query)
           )
-        ])
+        )
       )
     )
     .execute();
