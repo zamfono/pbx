@@ -12,7 +12,7 @@ FROM workspace AS build
 RUN npx tsc -b packages/core
 # The compile is done: the development dependencies (the TypeScript and test toolchain, the
 # linters, the SvelteKit build tooling) leave node_modules before the runtime stage copies it.
-# Without its lifecycle scripts: api's `prepare` runs `svelte-kit sync`, which the prune has just
+# Without its lifecycle scripts: api's `postinstall` runs `svelte-kit sync`, which the prune has just
 # removed, and the native modules were built by `npm ci` already.
 RUN npm prune --omit=dev --ignore-scripts
 

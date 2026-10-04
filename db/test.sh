@@ -12,8 +12,10 @@ BROKEN_DIR=$(mktemp -d)
 BROKEN_DATA_DIR=$(mktemp -d)
 LOCKED_DATA_DIR=$(mktemp -d)
 LOCK_HOLDER=
+FRESH_VOLUME=zamfono-migrate-test-$$
 cleanup() {
   [ -z "$LOCK_HOLDER" ] || docker rm -f "$LOCK_HOLDER" >/dev/null 2>&1 || true
+  docker volume rm "$FRESH_VOLUME" >/dev/null 2>&1 || true
   rm -rf "$DATA_DIR" "$BROKEN_DIR" "$BROKEN_DATA_DIR" "$LOCKED_DATA_DIR"
 }
 trap cleanup EXIT
@@ -46,6 +48,12 @@ owner_uid=$(docker run --rm -v "$DATA_DIR:/data" --entrypoint stat "$MIGRATE_IMA
   echo "expected the database file to be owned by uid 1000, got $owner_uid" >&2
   exit 1
 }
+
+echo '== fresh named volume: migrate is the first to mount it =='
+# A new named volume takes the image's /data, owner included, so migrate can create the database
+# file even when it starts before api and core have ever mounted the `db` volume.
+docker volume create "$FRESH_VOLUME" >/dev/null
+docker run --rm -v "$FRESH_VOLUME:/data" "$MIGRATE_IMAGE"
 
 echo '== locked database: retried until the lock is released =='
 # A second process holds an exclusive lock on the fresh database file for 8 s, so the first

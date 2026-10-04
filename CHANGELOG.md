@@ -292,6 +292,8 @@ why the specified behaviour changed; the commit history, how.
   bundle, makes the `compose.override.yaml` link `setup.sh` would make, since `setup.sh` refuses
   the preserved `.env`, and copies the snapshot's database and media into the stack's volumes
   with the `api` image's restic before the first start.
+- The `migrate` image creates its database on a fresh `db` volume even when it is the first
+  container to mount it; before, it could not write to the volume until `api` or `core` had.
 - A ring group with neither greeting nor music no longer answers the caller and plays the default
   hold music: the caller hears ringback until a member answers. A ring group's call recording now
   covers only the members it rang, not a user its fallback reached afterwards. Dialling an empty

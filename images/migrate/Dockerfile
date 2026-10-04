@@ -33,6 +33,9 @@ WORKDIR /app/db
 COPY --from=build /app /app
 COPY db/migrate.ts ./
 COPY db/migrations ./migrations
+# The `db` volume's mount point, owned by `node`: a fresh named volume takes it over, owner
+# included, so this image can create the database whether or not api or core mounted it first.
+RUN mkdir -p /data && chown node:node /data
 
 ENV NODE_ENV=production
 USER node

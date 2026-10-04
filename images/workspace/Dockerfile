@@ -11,5 +11,10 @@ RUN apt-get update \
 	&& apt-get install -y --no-install-recommends python3 make g++ \
 	&& rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json tsconfig.base.json tsconfig.json ./
-COPY packages packages
+# The workspace's manifests before its sources, so a source change reuses the installed layer.
+COPY packages/api/package.json packages/api/
+COPY packages/core/package.json packages/core/
+COPY packages/shared/package.json packages/shared/
+COPY packages/updater/package.json packages/updater/
 RUN npm ci
+COPY packages packages

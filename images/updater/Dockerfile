@@ -6,9 +6,14 @@
 FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json tsconfig.json ./
-COPY packages packages
+# The workspace's manifests before its sources, so a source change reuses the installed layer.
+COPY packages/api/package.json packages/api/
+COPY packages/core/package.json packages/core/
+COPY packages/shared/package.json packages/shared/
+COPY packages/updater/package.json packages/updater/
 # Only the TypeScript compiler is needed, so no package's native build runs.
 RUN npm ci --ignore-scripts
+COPY packages packages
 RUN npx tsc -b packages/updater
 
 FROM node:26-alpine
@@ -25,6 +30,5 @@ COPY --from=build /app/packages/updater/dist dist
 
 ARG ZAMFONO_REVISION
 LABEL org.opencontainers.image.revision=$ZAMFONO_REVISION
-ENV ZAMFONO_REVISION=$ZAMFONO_REVISION
 
 CMD ["node", "dist/main.js"]
