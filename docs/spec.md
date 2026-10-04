@@ -647,6 +647,14 @@ services:
 	log                                      # access log to stdout, shipped with the container logs (§7)
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
 
+	# Request bodies (§10.2): 512 KiB, refused with 413 once api has read past it, except an
+	# audio upload — the REST upload endpoints, an upload link and its page's `upload` remote
+	# form — which api caps at 50 MB
+	@notUpload not expression `method('POST') && path('/api/v1/audio') || method('PUT') && path('/api/v1/users/*/voicemailGreeting') || path('/upload/*', '/_app/remote/*/upload')`
+	request_body @notUpload {
+		max_size 512KiB
+	}
+
 	# /metrics and /metrics/*: bearer token from .env; refused outright while the token is unset (§7)
 	@metrics path /metrics /metrics/*
 	handle @metrics {
@@ -1134,7 +1142,7 @@ Timers, the hop counter and busy handling live entirely in the core.
 
 **Mailbox access** (`*96`, `*95<ext>`) is a small DTMF menu in the core: play new and old messages, delete, and record a greeting. The identity is the device's owner, and there is no PIN, so a shared desk phone belongs to one user. A recorded greeting is stored as an `audio_assets` row of kind `vmGreeting` uploaded by that user and set as the mailbox's `mailbox_audio_id`, replacing the previous one, so the REST API and the phone share one greeting; `PUT /users/{id}/voicemailGreeting` stores an upload the same way, transcoded as `POST /audio` transcodes one, and `DELETE` returns the mailbox to the language default prompt. A replaced or removed greeting is soft-deleted in the same transaction, unless another live row still uses it (§5.9).
 
-**Greetings and audio.** Uploaded via REST as WAV or MP3, transcoded with ffmpeg to 16-bit signed linear WAV for Asterisk playback, and referenced by `sound:` URIs from the media volume. An upload is at most 50 MB, about 50 minutes of MP3 at 128 kbit/s (`api`'s `BODY_SIZE_LIMIT`); a REST, MCP or OAuth body that is not an upload is at most 512 KiB, by its `Content-Length` before it is read and by the bytes received for one sent in chunks; a larger body is refused with 413. An upload link (§10.5) checks its token before it reads the body, and an ffmpeg run that has not finished after two minutes is killed and the upload refused.
+**Greetings and audio.** Uploaded via REST as WAV or MP3, transcoded with ffmpeg to 16-bit signed linear WAV for Asterisk playback, and referenced by `sound:` URIs from the media volume. An upload is at most 50 MB, about 50 minutes of MP3 at 128 kbit/s (`api`'s `BODY_SIZE_LIMIT`); every other request body is at most 512 KiB, refused by `proxy` (§6.3) as it streams to `api`, and the REST, MCP and OAuth bodies `api` reads itself are held to the same limit, by their `Content-Length` before they are read and by the bytes received for one sent in chunks; a larger body is refused with 413. An upload link (§10.5) checks its token before it reads the body, and an ffmpeg run that has not finished after two minutes is killed and the upload refused.
 
 **Hold music.** One MoH class per `moh` asset, plus Asterisk's built-in `default` class. `musiconhold.conf` is rendered by `api` and reloaded like the PJSIP files (§9.1); the files live on the media volume. A party put on hold by a softphone (re-INVITE with `sendonly`) hears `settings.hold_moh_audio_id`, else the static default class, and so does one held through `calls.hold` or `calls.consult` (§10.3), which the core takes out of the bridge while the phone shows nothing of it, a hold or resume from the phone staying independent of it; ring groups choose their ringing music separately (`ring_groups.moh_audio_id`). The bundled music is the opsound set that Asterisk itself ships:
 

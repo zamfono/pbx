@@ -112,4 +112,54 @@ docker run --rm -e FQDN=x \
   | grep -q "Valid configuration" \
   || fail "deploy/Caddyfile did not validate with the test harness's global.d/local-certs.caddy mounted"
 
+echo "==> request bodies: 512 KiB outside the audio upload paths, which api caps at 50 MB (§10.2)"
+# A stand-in api that reads every body, as api does, and answers 200, behind the shipped
+# Caddyfile: Caddy refuses a body once the reading passes the limit, so an upstream answering
+# without reading would see no refusal. `localhost` gets a certificate from Caddy's internal CA,
+# so no ACME is involved.
+tag="zamfono-proxy-test-$$"
+body=$(mktemp)
+cleanup() {
+  docker rm -f "$tag-api" "$tag-proxy" >/dev/null 2>&1 || true
+  docker network rm "$tag" >/dev/null 2>&1 || true
+  rm -f "$body"
+}
+trap cleanup EXIT
+docker network create "$tag" >/dev/null
+# The Caddyfile placeholder is Caddy's, not the shell's.
+# shellcheck disable=SC2016
+docker run -d --name "$tag-api" --network "$tag" --network-alias api --entrypoint sh \
+  "$PROXY_IMAGE" -c 'printf ":3000 {\n\trespond \"{http.request.body}\" 200\n}\n" >/tmp/Caddyfile &&
+    exec caddy run --config /tmp/Caddyfile --adapter caddyfile' >/dev/null
+docker run -d --name "$tag-proxy" --network "$tag" -e FQDN=localhost -p 127.0.0.1::443 \
+  -v "$repo_root/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" "$PROXY_IMAGE" >/dev/null
+port=$(docker port "$tag-proxy" 443/tcp | head -1 | sed 's/.*://')
+for _ in $(seq 1 30); do
+  curl -sk -o /dev/null "https://localhost:$port/healthz" && break
+  sleep 1
+done
+head -c 614400 /dev/zero >"$body"
+# The status of a 600 KB body sent with method $1 to path $2; `chunked` as $3 sends no length.
+status() {
+  local extra=()
+  if [ "${3:-}" = chunked ]; then
+    extra=(-H 'Transfer-Encoding: chunked')
+  fi
+  curl -sk -o /dev/null -w '%{http_code}' -X "$1" "${extra[@]}" --data-binary "@$body" \
+    "https://localhost:$port$2"
+}
+for case in 'POST /api/v1/contacts' 'POST /api/v1/contacts chunked' 'POST /oauth/token' \
+  'POST /mcp' 'POST /_app/remote/abc123/authorize'; do
+  # The case's words are its arguments.
+  # shellcheck disable=SC2086
+  [ "$(status $case)" = 413 ] || fail "$case: a 600 KB body was not refused with 413"
+done
+for case in 'POST /api/v1/audio' 'POST /api/v1/audio chunked' \
+  'PUT /api/v1/users/u1/voicemailGreeting' 'POST /upload/audio' \
+  'POST /_app/remote/abc123/upload'; do
+  # The case's words are its arguments.
+  # shellcheck disable=SC2086
+  [ "$(status $case)" = 200 ] || fail "$case: a 600 KB audio upload was refused"
+done
+
 echo "PASS: images/proxy"

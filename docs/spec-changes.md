@@ -33,6 +33,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §6.3 Environment.** `FQDN` is taken in lower case by `setup.sh`, `api` and `proxy`'s certificate hook.
 *Why:* Caddy names a certificate by the lower-case host, so an `FQDN` typed with capitals left Asterisk on its placeholder certificate and the OAuth issuer unlike the host browsers send.
+**2026-10-04 · §6.3 Caddyfile, §10.2 Greetings and audio.** `proxy` holds every request body to 512 KiB (`request_body`), except the audio uploads, which `api` caps at 50 MB: `POST /api/v1/audio`, `PUT /api/v1/users/{id}/voicemailGreeting`, `/upload/*` and the upload page's `upload` remote form.
+*Why:* SvelteKit reads a remote function's body itself under `BODY_SIZE_LIMIT`, so the unauthenticated sign-in and password forms took 50 MB bodies; the proxy is the one layer that sees every request.
+
 **2026-10-04 · §10.6 Realtime events.** An `/events` connection that stops reading is dropped once 1 MiB of events waits unsent on it.
 *Why:* `ws` buffers every unsent frame, so one stalled client kept every later event in `api`'s memory without bound.
 
