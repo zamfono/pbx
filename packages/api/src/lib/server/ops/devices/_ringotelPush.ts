@@ -15,11 +15,7 @@ import {
   storedCredentials
 } from '#lib/server/provisioning/ringotelUser.js';
 
-import {
-  afterCommit,
-  afterPropagation,
-  oweRestartPush
-} from '../afterCommit.js';
+import { afterPropagation, oweRestartPush } from '../afterCommit.js';
 import type { AuditCaller } from '../audit.js';
 import {
   callerOf,
@@ -127,18 +123,31 @@ export function pushToRingotel(ctx: Context, push: Push): void {
   });
 }
 
+/** `provision`'s answer as the push's outcome, never throwing. */
+async function provisioned(
+  db: Db,
+  provision: (db: Db) => Promise<string>
+): Promise<PushOutcome> {
+  try {
+    return { outcome: 'pushed', receipt: { remoteId: await provision(db) } };
+  } catch (error) {
+    return { outcome: 'refused', reason: errorMessage(error) };
+  }
+}
+
 /**
- * Records a push that ran inside `ctx`'s operation, as setup and adoption provision the devices
- * created before them (§10.4): the `ringotel.push` row is written, and a refusal becomes the
- * result's warning, once the operation has committed, like every other push's.
+ * Provisions a device that existed before setup or adoption (§10.4) once their write has
+ * committed and Asterisk holds it, as every other push: `provision` creates its Ringotel user and
+ * returns its id; the outcome is a `ringotel.push` row and a refusal the result's warning. A
+ * rolled-back setup or adoption has created no Ringotel user.
  */
-export function reportPush(
+export function pushExistingDevice(
   ctx: Context,
-  push: PushTarget,
-  result: PushOutcome
+  push: PushTarget & { provision: (db: Db) => Promise<string> }
 ): void {
   const caller = callerOf(ctx);
-  afterCommit(ctx, async db => {
+  afterPropagation(ctx, async db => {
+    const result = await provisioned(db, push.provision);
     await auditPush(db, caller, push, result);
     return pushWarning(push, result);
   });

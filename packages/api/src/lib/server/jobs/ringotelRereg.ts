@@ -39,10 +39,11 @@ export type ReregDeps = {
   /** The tenant's Ringotel provider, `null` while Ringotel is not set up. */
   provider?: (db: Db) => Promise<ProvisioningProvider | null>;
   /**
-   * One more try for a tenant profile push Ringotel refused before (§10.4 "Tenant profile
-   * push"), at `api`'s start and at each Asterisk start, ahead of that start's re-registration.
+   * One more try for a tenant profile or roster push Ringotel refused before (§10.4 "Tenant
+   * profile push", "Colleague presence"), at `api`'s start and at each Asterisk start, ahead of
+   * that start's re-registration.
    */
-  retryProfile?: (trigger: 'api.start' | 'asterisk.started') => Promise<void>;
+  retryPending?: (trigger: 'api.start' | 'asterisk.started') => Promise<void>;
 };
 
 /** What one check saw: the Asterisk start it handled last, so each start is handled once. */
@@ -130,8 +131,8 @@ export async function handleAsteriskStart(
 
 /**
  * `handleAsteriskStart` for the Asterisk `core` reports running now; nothing while it cannot say.
- * A start it has not handled went unannounced, so the pending tenant profile gets the retry an
- * announcement would have given it, ahead of the re-registration.
+ * A start it has not handled went unannounced, so the pending profile and roster get the retry
+ * an announcement would have given them, ahead of the re-registration.
  */
 export async function checkAsteriskRestart(
   deps: ReregDeps,
@@ -140,12 +141,12 @@ export async function checkAsteriskRestart(
   const version = await deps.lookup().catch(() => null);
   const asteriskStartedAt = version?.asteriskStartedAt ?? null;
   if (
-    deps.retryProfile !== undefined &&
+    deps.retryPending !== undefined &&
     asteriskStartedAt !== null &&
     asteriskStartedAt !== state.lastSeen &&
     (await restartIsNew(deps.db, asteriskStartedAt))
   ) {
-    await deps.retryProfile('asterisk.started');
+    await deps.retryPending('asterisk.started');
   }
   await handleAsteriskStart(deps, state, asteriskStartedAt);
 }
@@ -165,11 +166,11 @@ export type ReregWatcher = {
 
 /**
  * Runs a check for each thing the stream tells, one at a time and in order, for the process's
- * life; a failed check is logged, and the next event runs the next one. The pending tenant
- * profile's retries share that queue: the first runs as the watcher starts, with `api`, and one
- * runs before each announced Asterisk start's check, so the profile push, which also carries the
- * organization's language, goes first; the re-registration's own `updateBranch` leaves the
- * marker alone.
+ * life; a failed check is logged, and the next event runs the next one. The retries of a pending
+ * tenant profile and roster share that queue: the first runs as the watcher starts, with `api`,
+ * and one runs before each announced Asterisk start's check, so the profile push, which also
+ * carries the organization's language, goes first; the re-registration's own `updateBranch`
+ * leaves the markers alone.
  */
 export function watchAsteriskRestarts(deps: ReregDeps): ReregWatcher {
   const state: ReregState = { lastSeen: null };
@@ -179,17 +180,17 @@ export function watchAsteriskRestarts(deps: ReregDeps): ReregWatcher {
       logger.error({ error }, 'ringotel: re-registration check failed');
     });
   };
-  const { retryProfile } = deps;
-  if (retryProfile !== undefined) {
-    enqueue(() => retryProfile('api.start'));
+  const { retryPending } = deps;
+  if (retryPending !== undefined) {
+    enqueue(() => retryPending('api.start'));
   }
   return {
     streamConnected: () => {
       enqueue(() => checkAsteriskRestart(deps, state));
     },
     asteriskStarted: asteriskStartedAt => {
-      if (retryProfile !== undefined) {
-        enqueue(() => retryProfile('asterisk.started'));
+      if (retryPending !== undefined) {
+        enqueue(() => retryPending('asterisk.started'));
       }
       enqueue(() => handleAsteriskStart(deps, state, asteriskStartedAt));
     },

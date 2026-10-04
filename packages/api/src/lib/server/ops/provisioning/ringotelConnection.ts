@@ -5,11 +5,14 @@ import { HTTP_CONFLICT } from '@zamfono/shared';
 import { buildBranchProvision } from '#lib/server/provisioning/branchProvision.js';
 import type { RingotelClient } from '#lib/server/provisioning/ringotelClient.js';
 import { branchBlfEntries } from '#lib/server/provisioning/ringotelRoster.js';
-import { provisionExistingDevices } from '#lib/server/provisioning/ringotelUser.js';
+import {
+  liveRingotelDevices,
+  provisionExistingDevice
+} from '#lib/server/provisioning/ringotelUser.js';
 import { SIP_TLS_PORT } from '#lib/server/stackAddress.js';
 
 import { recordChange, setUndoable } from '../audit.js';
-import { reportPush } from '../devices/_ringotelPush.js';
+import { pushExistingDevice } from '../devices/_ringotelPush.js';
 import { loadParkingSlots } from '../parking/_shared.js';
 import { propagate } from '../propagate.js';
 import { loadSettings, type SettingsRow } from '../settings/_shared.js';
@@ -118,8 +121,9 @@ export async function createConnection(
 
 /**
  * Stores the two ids and provisions the `ringotel` devices created before any provider existed
- * (§10.4), inside the caller's rollback; each device's outcome is a `ringotel.push` row with the
- * operation, `trigger`, as its trigger, and a refusal a warning. Not undoable (§5.8, "where
+ * (§10.4), once the caller's write committed and Asterisk holds it, so a rolled-back setup or
+ * adoption leaves no Ringotel user behind; each device's outcome is a `ringotel.push` row with
+ * the operation, `trigger`, as its trigger, and a refusal a warning. Not undoable (§5.8, "where
  * reversal is impossible"): the ids are "written by the setup operation, read-only through
  * `PATCH`" (§11.4), so no normal operation takes the `from` values back, and the objects at
  * Ringotel lie beyond a diff.
@@ -133,32 +137,27 @@ export async function storeRingotelIds(
   const { orgId, branchId } = ids;
   await ctx.db
     .updateTable('settings')
-    // The connection was just written with the whole profile (`connectionFields`) and the
-    // organization with its `params`, so no profile change waits for Ringotel any more (§10.4
-    // "Tenant profile push").
+    // The connection was just written with the whole profile and roster (`connectionFields`)
+    // and the organization with its `params`, so no profile or roster change waits for Ringotel
+    // any more (§10.4 "Tenant profile push", "Colleague presence").
     .set({
       ringotelOrgId: orgId,
       ringotelBranchId: branchId,
-      ringotelProfilePending: 0
+      ringotelProfilePending: 0,
+      ringotelRosterPending: 0
     })
     .where('id', '=', 1)
     .execute();
-  const outcomes = await provisionExistingDevices({ client, db: ctx.db });
-  for (const outcome of outcomes) {
-    reportPush(
-      ctx,
-      {
-        trigger,
-        deviceId: outcome.deviceId,
-        failure: {
-          what: `device ${outcome.deviceId} has no Ringotel user yet`,
-          retry: 'devices.rotate on the device creates it'
-        }
+  for (const device of await liveRingotelDevices(ctx.db)) {
+    pushExistingDevice(ctx, {
+      trigger,
+      deviceId: device.id,
+      failure: {
+        what: `device ${device.id} has no Ringotel user yet`,
+        retry: 'devices.rotate on the device creates it'
       },
-      'remoteId' in outcome
-        ? { outcome: 'pushed', receipt: { remoteId: outcome.remoteId } }
-        : { outcome: 'refused', reason: outcome.reason }
-    );
+      provision: db => provisionExistingDevice({ client, db }, device)
+    });
   }
   recordChange(ctx, { field: 'ringotelOrgId', from: null, to: orgId });
   recordChange(ctx, { field: 'ringotelBranchId', from: null, to: branchId });

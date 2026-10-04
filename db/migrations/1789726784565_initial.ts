@@ -976,6 +976,12 @@ function addSettingsRingotelColumns<TB extends string, C extends string>(
         .notNull()
         .defaultTo(0)
         .check(sql`ringotel_profile_pending in (0,1)`)
+    )
+    .addColumn('ringotel_roster_pending', 'integer', col =>
+      col
+        .notNull()
+        .defaultTo(0)
+        .check(sql`ringotel_roster_pending in (0,1)`)
     );
 }
 

@@ -206,7 +206,7 @@ describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile 
     const watcher = watchAsteriskRestarts({
       db,
       lookup: core(nowIso()),
-      retryProfile: trigger => retryPendingProfile(db, trigger)
+      retryPending: trigger => retryPendingProfile(db, trigger)
     });
     await watcher.idle();
 
@@ -231,7 +231,7 @@ describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile 
     const watcher = watchAsteriskRestarts({
       db,
       lookup: core(nowIso()),
-      retryProfile: trigger => retryPendingProfile(db, trigger)
+      retryPending: trigger => retryPendingProfile(db, trigger)
     });
     await watcher.idle();
     // The start retry was refused: one push, the marker kept, no further attempt of its own.

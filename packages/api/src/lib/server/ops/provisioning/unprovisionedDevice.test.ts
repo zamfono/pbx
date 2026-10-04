@@ -1,4 +1,5 @@
 import * as privateEnv from '$app/env/private';
+import { sql } from 'kysely';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type Db } from '@zamfono/shared';
@@ -169,6 +170,39 @@ describe('a ringotel device created before provisioning.ringotelSetup (§10.4)',
       { field: 'trigger', from: null, to: 'provisioning.ringotelSetup' },
       { field: 'reason', from: null, to: expect.any(String) as unknown }
     ]);
+  });
+});
+
+describe('a ringotel device created before provisioning.ringotelAdopt (§10.4)', () => {
+  it('gets no Ringotel user from an adoption that rolls back, so a retry adopts', async () => {
+    process.env.FQDN = 'pbx.example.com';
+    const db = await makeTestDb();
+    await seedSettings(db, {
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
+    const ringotel = installRingotelFake(
+      [{ id: 'org-9', domain: 'zamfono-test' }],
+      [{ id: 'branch-default', orgid: 'org-9', address: '' }]
+    );
+    await deviceBeforeSetup(db);
+    const adopt = () =>
+      runOperation(
+        db,
+        'provisioning.ringotelAdopt',
+        { orgId: 'org-9', domain: 'zamfono-test', branchId: 'branch-default' },
+        asConfirmedRun()
+      );
+    // The audit entry, the adoption's last write before its commit, is refused.
+    await sql`create trigger refuse_audit before insert on audit_log begin select raise(abort, 'audit refused'); end`.execute(
+      db
+    );
+
+    await expect(adopt()).rejects.toThrow('audit refused');
+    expect(ringotel.users).toEqual([]);
+
+    await sql`drop trigger refuse_audit`.execute(db);
+    await adopt();
+    expect(ringotel.users).toMatchObject([{ extension: '101' }]);
   });
 });
 

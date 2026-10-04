@@ -258,7 +258,7 @@ describe('watchAsteriskRestarts (§10.4 "After a restart")', () => {
         order.push('rereg');
         return Promise.resolve();
       }),
-      retryProfile: trigger => {
+      retryPending: trigger => {
         order.push(trigger);
         return Promise.resolve();
       }

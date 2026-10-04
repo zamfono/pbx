@@ -9,7 +9,6 @@ import * as env from '$app/env/private';
 
 import { MS_PER_DAY, nowIso, type Db } from '@zamfono/shared';
 
-import { errorMessage } from '../errors.js';
 import { decrypt, keyringFromEnv } from '../secretbox.js';
 import { ringotelLog } from './ringotelBranchHooks.js';
 import { RingotelError, type RingotelProviderDeps } from './ringotelClient.js';
@@ -148,12 +147,19 @@ export async function ensureRemoteUser(
   return provisioned;
 }
 
-/** `createUser` for one existing device, then its stored panel as `options.blfs` if it has one. */
-async function provisionDevice(
+/**
+ * Provisions a live `ringotel` device that existed when `provisioning.ringotelSetup` or
+ * `provisioning.ringotelAdopt` set Ringotel up: while no organization existed, no provider could
+ * run `onDeviceCreated` (§10.4), so it gets its `createUser` now, with its stored credentials, and
+ * its stored panel as `options.blfs` if it has one; returns the new user's id. `createUser`
+ * rather than `onDeviceCreated`, since a Ringotel user never existed for it, so there is no
+ * deleted user to recover.
+ */
+export async function provisionExistingDevice(
   deps: RingotelProviderDeps,
-  orgId: string,
   device: DeviceRow
 ): Promise<string> {
+  const { orgId } = await resolveIds(deps.db);
   const remoteId = await createRemoteUser(
     deps,
     device,
@@ -179,36 +185,4 @@ export async function liveRingotelDevices(db: Db): Promise<DeviceRow[]> {
     .where('deletedAt', 'is', null)
     .orderBy('createdAt')
     .execute();
-}
-
-/** What Ringotel answered for one existing device: its new user's id, or why it refused. */
-export type ExistingDeviceOutcome = { deviceId: string } & (
-  { remoteId: string } | { reason: string }
-);
-
-/**
- * Provisions every live `ringotel` device that exists when `provisioning.ringotelSetup` creates
- * the organization and connection: while none existed, no provider could run `onDeviceCreated`
- * (§10.4), so each gets its `createUser` now, with its stored credentials, and its stored panel.
- * `createUser` rather than `onDeviceCreated`, since a Ringotel user never existed for any of
- * them, so there is no deleted user to recover. A device Ringotel refuses leaves the others and
- * the setup standing, as a device's push does after its own operation; its outcome says why.
- */
-export async function provisionExistingDevices(
-  deps: RingotelProviderDeps
-): Promise<ExistingDeviceOutcome[]> {
-  const { orgId } = await resolveIds(deps.db);
-  const devices = await liveRingotelDevices(deps.db);
-  const outcomes: ExistingDeviceOutcome[] = [];
-  for (const device of devices) {
-    try {
-      // eslint-disable-next-line no-await-in-loop -- the Ringotel RPC has no batch create; sequential pushes are the plain reading of the API
-      const remoteId = await provisionDevice(deps, orgId, device);
-      outcomes.push({ deviceId: device.id, remoteId });
-    } catch (error) {
-      const reason = errorMessage(error);
-      outcomes.push({ deviceId: device.id, reason });
-    }
-  }
-  return outcomes;
 }

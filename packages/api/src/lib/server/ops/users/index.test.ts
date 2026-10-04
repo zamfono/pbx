@@ -1,4 +1,5 @@
 import * as privateEnv from '$app/env/private';
+import { sql } from 'kysely';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
@@ -121,12 +122,13 @@ describe('users', () => {
   it('create sends no setup mail when its transaction rolls back', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    await enableRingotel(db);
-    // Ringotel cannot be reached for the roster push, which rolls the new user back (§10.4).
-    globalThis.fetch = () => Promise.reject(new Error('unreachable'));
+    // The audit entry, the last write before the commit, is refused, which rolls the user back.
+    await sql`create trigger refuse_audit before insert on audit_log begin select raise(abort, 'audit refused'); end`.execute(
+      db
+    );
     await expect(
       createUser(db, 'Anna Huber', 'anna@x.test', '101')
-    ).rejects.toThrow('unreachable');
+    ).rejects.toThrow('audit refused');
     expect(sendMailMock).not.toHaveBeenCalled();
   });
 

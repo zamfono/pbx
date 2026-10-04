@@ -383,6 +383,14 @@ why the specified behaviour changed; the commit history, how.
 - An Asterisk start `api` learned of only when its connection to `core` came back re-registered
   the Ringotel apps but left a pending tenant profile for the next start. The profile is now sent
   again first, as for an announced start.
+- Creating, renaming or deleting a user, ring group or parking slot failed, and nothing was
+  stored, while Ringotel could not be reached, and an extension rename reached the Ringotel apps
+  before the PBX knew the new name. The change is now stored and in force on the PBX at once;
+  Ringotel gets the colleague roster afterwards, and if Ringotel refuses, the result warns and the
+  stack sends the whole roster again when `api` starts or Asterisk restarts.
+- A Ringotel setup or adoption that failed after provisioning the existing Ringotel devices left
+  their Ringotel users behind, so a retried adoption was refused. Those devices are now provisioned
+  only once the setup or adoption is stored.
 
 ### Upgrade notes
 

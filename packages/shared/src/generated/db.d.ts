@@ -351,6 +351,7 @@ export interface Settings {
   ringotelMaxRegs: Generated<number>;
   ringotelOrgId: string | null;
   ringotelProfilePending: Generated<number>;
+  ringotelRosterPending: Generated<number>;
   smtpHost: string | null;
   smtpPasswordEnc: Buffer | null;
   smtpPort: Generated<number>;

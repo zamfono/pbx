@@ -49,9 +49,10 @@ function refusal(
 const RINGOTEL_API_URL = 'https://shell.ringotel.co/api';
 
 /**
- * How long one Ringotel RPC may take before it is aborted. A provisioning push runs inside the
- * operation's SQLite write transaction, and SQLite admits one writer at a time, so this bound is
- * also the bound on how long one push blocks every other write.
+ * How long one Ringotel RPC may take before it is aborted. Setup, adoption, `devices.delete`,
+ * `devices.setBlf` and a user's deletion call Ringotel inside the operation's SQLite write
+ * transaction, and SQLite admits one writer at a time, so this bound is also the bound on how
+ * long one such call blocks every other write.
  */
 const RINGOTEL_TIMEOUT_MS = 15_000;
 
