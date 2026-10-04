@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-04 · §3.1 Write ownership.** Transactions begin `IMMEDIATE`, beside WAL mode and `busy_timeout`, as what makes concurrent writers safe.
+*Why:* a deferred transaction that reads and then writes after the other process committed fails at once with SQLITE_BUSY_SNAPSHOT, which `busy_timeout` does not wait out; taking the write lock at the start lets the busy timeout cover the wait.
+
 **2026-10-04 · §6.3 Automatic updates.** On an `edge` stack each of `main`'s builds is a release of its own: the updater's `GET /status` names the newest build's commit, and the failed automatic attempts (with their 20-hour gap) count on that commit, which `autoUpdate.failed` names. `update_state.run_release` records the release an automatic run's failure counts on when it starts, in place of `run_outcome_pending`, so a build published during the run does not take its failure.
 *Why:* keyed on the version `edge`, three failed attempts on one build held off every later build until a manual update succeeded (follows D25).
 

@@ -50,6 +50,13 @@ export default defineConfig(
           checkForEach: true
         }
       ],
+      // An override's use of `this` is the base class's to decide.
+      'class-methods-use-this': [
+        'error',
+        {
+          ignoreOverrideMethods: true
+        }
+      ],
       // Snake_case names other systems fix on the wire or in the schema.
       camelcase: [
         'error',

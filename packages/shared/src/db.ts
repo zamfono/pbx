@@ -1,7 +1,17 @@
+/* eslint-disable max-classes-per-file -- the IMMEDIATE driver and the dialect that builds it */
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
-import { CamelCasePlugin, Kysely, sql, SqliteDialect } from 'kysely';
+import {
+  CamelCasePlugin,
+  CompiledQuery,
+  Kysely,
+  sql,
+  SqliteDialect,
+  SqliteDriver,
+  type DatabaseConnection,
+  type SqliteDialectConfig
+} from 'kysely';
 import { FileMigrationProvider, Migrator } from 'kysely/migration';
 
 import type { LogLevelOverride } from './columnValues.js';
@@ -16,6 +26,32 @@ export type LogLevelColumns = {
   logLevelExpiresAt: string | null;
 };
 
+// Transactions begin IMMEDIATE, taking the write lock up front: a deferred transaction that reads,
+// then writes after another connection committed, fails at once with SQLITE_BUSY_SNAPSHOT, which
+// busy_timeout cannot wait out (§3.1).
+class ImmediateSqliteDriver extends SqliteDriver {
+  override async beginTransaction(
+    connection: DatabaseConnection
+  ): Promise<void> {
+    await connection.executeQuery(CompiledQuery.raw('begin immediate'));
+  }
+}
+
+class ImmediateSqliteDialect extends SqliteDialect {
+  readonly #config: SqliteDialectConfig;
+
+  constructor(config: SqliteDialectConfig) {
+    super(config);
+    this.#config = config;
+  }
+
+  override createDriver(): SqliteDriver {
+    return new ImmediateSqliteDriver(this.#config);
+  }
+}
+
+/* eslint-enable max-classes-per-file */
+
 // journal_mode/foreign_keys/busy_timeout/synchronous mirror the deployed stack (§3.1, §6.6);
 // setting them on ':memory:' is a harmless no-op, so `openDb(':memory:')` stays test-friendly.
 export function openDb(file: string): Db {
@@ -25,7 +61,7 @@ export function openDb(file: string): Db {
   database.pragma('busy_timeout = 5000');
   database.pragma('synchronous = NORMAL');
   return new Kysely<DB>({
-    dialect: new SqliteDialect({ database }),
+    dialect: new ImmediateSqliteDialect({ database }),
     plugins: [new CamelCasePlugin({ maintainNestedObjectKeys: true })]
   });
 }
