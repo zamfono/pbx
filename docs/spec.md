@@ -1285,7 +1285,7 @@ A `sip` target's `headers` is a list of `{ name, value }` (§9.4 Header template
 
 **User groups** (min. role: admin) — `GET/POST /userGroups`, `GET/PATCH/DELETE /userGroups/{id}` (nested members; cycle-checked)
 
-**Audio** (min. role: admin) — `GET/POST /audio` (kinds `greeting`, `moh`, `vmGreeting`, `announcement`), `PATCH /audio/{id}` (label), `DELETE /audio/{id}`
+**Audio** (min. role: admin) — `GET/POST /audio` (kinds `greeting`, `moh`, `vmGreeting`, `announcement`), `PATCH /audio/{id}` (label), `DELETE /audio/{id}`. Every column that references an asset names its kind (§11.2); naming an asset of another kind is refused with 422, one that is not live with 404.
 
 **Voicemail** (min. role: user) — `GET /voicemails` (own: the personal mailbox plus the mailboxes of ring groups the user belongs to; all for admin), `GET /voicemails/{id}/audio` (the file; over MCP a download link, §10.5), `DELETE`, `PATCH` (mark read)
 
@@ -1522,7 +1522,7 @@ WAL mode, `foreign_keys=ON`, write ownership split per §3.1 (`api` = config tab
 --   log_level(_expires_at): per-user diagnostics override, auto-expiring (§7)
 --   callerid_did_id:        the number presented on the user's outbound calls (§9.4); set by the API on
 --                           the user's first DID when NULL; NULL = the company main number
---   mailbox_audio_id:       personal voicemail greeting
+--   mailbox_audio_id:       personal voicemail greeting, kind 'vmGreeting'
 CREATE TABLE users (
   id                   TEXT    PRIMARY KEY,
   name                 TEXT    NOT NULL,
@@ -1751,8 +1751,9 @@ CREATE TABLE dids (
 --                           the member saying "not me", and 0 makes the group ring on regardless
 --   record_calls:           record group calls regardless of the answerer's own flag (§10.2)
 --   log_level(_expires_at): per-group diagnostics override, auto-expiring (§7)
---   greeting_audio_id:      played to the caller before ringing
---   moh_audio_id:           replaces ringback while ringing
+--   greeting_audio_id:      played to the caller before ringing, kind 'greeting'
+--   moh_audio_id:           replaces ringback while ringing, kind 'moh'
+--   mailbox_audio_id:       the group mailbox's greeting, kind 'vmGreeting'
 CREATE TABLE ring_groups (
   id                   TEXT    PRIMARY KEY,
   name                 TEXT    NOT NULL UNIQUE,
@@ -1858,7 +1859,7 @@ CREATE TABLE extensions (
 --                          (§9.4 Header templates); NULL unless sip_trunk_id is set, and set on
 --                          every sip row by the API, since SQLite's ADD COLUMN cannot require it
 --   mailbox_user_id / mailbox_ring_group_id: deposit in that mailbox
---   announcement_audio_id: play the announcement, then hang up
+--   announcement_audio_id: play the announcement, then hang up; kind 'announcement'
 --   menu_id:               play the menu (§10.1, Target menu)
 CREATE TABLE forward_targets (
   id                    TEXT PRIMARY KEY,

@@ -8,6 +8,7 @@ import {
 } from '@zamfono/shared';
 
 import { noteWarning } from './afterCommit.js';
+import { assertAudioOfKind } from './audio/_shared.js';
 import type { TargetSpec } from './forwardTargetSchema.js';
 import { liveRow } from './rows.js';
 import { udpHeadersWarning } from './sipHeaders.js';
@@ -140,7 +141,7 @@ async function assertTargetAvailable(
     return;
   }
   if (spec.kind === 'announcement') {
-    await assertLiveRow(db, 'audioAssets', spec.audioId, 'audio asset');
+    await assertAudioOfKind(db, spec.audioId, 'announcement');
     return;
   }
   if (spec.kind === 'menu') {

@@ -1,9 +1,14 @@
 import type { Selectable, Transaction } from 'kysely';
 
-import { type AudioKind, type DB } from '@zamfono/shared';
+import {
+  HTTP_UNPROCESSABLE_CONTENT,
+  type AudioKind,
+  type DB
+} from '@zamfono/shared';
 
 import { findForwardTargetOwners } from '../forwardTargetOwners.js';
 import { liveRow } from '../rows.js';
+import { OpError } from '../types.js';
 
 /** An `audio_assets` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type AudioAssetRow = Selectable<DB['audioAssets']>;
@@ -103,10 +108,20 @@ export async function findAudioAssetReferences(
   ];
 }
 
-/** Throws `OpError(404)` unless `audioId` names a live `audio_assets` row (a ring group's audio ids, `users.mailbox_audio_id`, §5.9). */
-export async function assertAudioAvailable(
+/**
+ * Throws `OpError(404)` unless `audioId` names a live `audio_assets` row, and `OpError(422)` unless
+ * that row is of `kind`, the kind its referencing column names in §11.2.
+ */
+export async function assertAudioOfKind(
   db: Transaction<DB>,
-  audioId: string
+  audioId: string,
+  kind: AudioKind
 ): Promise<void> {
-  await liveAudioAsset(db, audioId);
+  const row = await liveAudioAsset(db, audioId);
+  if (row.kind !== kind) {
+    throw new OpError(
+      HTTP_UNPROCESSABLE_CONTENT,
+      `audio asset '${audioId}' is of kind '${row.kind}', not '${kind}'`
+    );
+  }
 }

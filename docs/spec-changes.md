@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-04 · §10.3 Audio, §11.2 users, ring_groups, forward_targets.** Every column referencing an audio asset names its kind: a ring group's greeting `greeting`, its music `moh`, a mailbox greeting `vmGreeting`, an announcement target `announcement`. An asset of another kind is refused with 422, one that is not live with 404.
+*Why:* only menus and the hold-music default checked the kind, with different statuses; a greeting set as a ring group's music rendered no MoH class, so callers heard the default music.
+
 **2026-10-04 · §10.6 Authentication.** Once any write operation commits, every open `/events` socket is checked against its user again: deleted, or another role than at the handshake, closes it with 4401; otherwise its ring-group mailboxes follow the current memberships.
 *Why:* product-owner decision: "Re-check on change (Recommended)"; a socket kept its handshake's role and memberships, so a demoted or deleted admin kept receiving every tenant event.
 

@@ -235,6 +235,11 @@ why the specified behaviour changed; the commit history, how.
   stalled `core` did; they now give up after 3 seconds, as `/healthz` does. A live call id that
   cannot be one (empty, `.`, `..`, or with characters other than letters, digits, `.`, `_` and
   `-`) is refused with 422, where it answered 500.
+- A ring group's greeting, music or mailbox greeting, a mailbox greeting, and an announcement
+  target accepted an audio asset of any kind, so a greeting set as a ring group's music played
+  the default music instead. Each now takes only its own kind (`greeting`, `moh`, `vmGreeting`,
+  `announcement`) and refuses another with 422; a menu's audio of the wrong kind answers 422
+  instead of 404, and an unknown hold-music asset in the settings answers 404 instead of 422.
 - A parking slot could be an emergency number, such as `110` with three-digit extensions, so
   retrieving the call parked there dialled the emergency service; it is now refused with 422, as
   for a user's or ring group's extension. Out-of-office rules and opening hours for a user, ring

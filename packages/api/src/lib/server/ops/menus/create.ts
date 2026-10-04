@@ -2,12 +2,12 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
+import { assertAudioOfKind } from '../audio/_shared.js';
 import { recordChange } from '../audit.js';
 import { insertForwardTarget } from '../forwardTargetSpec.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
 import {
-  assertAudioAvailable,
   assertNameAvailable,
   menuFields,
   toMenuOut,
@@ -28,7 +28,7 @@ export const createMenu = defineOperation({
   entity: (_input, out: MenuOut) => ({ kind: 'menu', id: out.id }),
   run: async (ctx, input) => {
     await assertNameAvailable(ctx.db, input.name);
-    await assertAudioAvailable(ctx.db, input.audioId);
+    await assertAudioOfKind(ctx.db, input.audioId, 'announcement');
     const id = newId();
     const fallbackTargetId = await insertForwardTarget(
       ctx,

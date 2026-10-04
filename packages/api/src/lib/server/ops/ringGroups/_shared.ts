@@ -2,12 +2,13 @@ import type { Selectable, Transaction } from 'kysely';
 
 import {
   HTTP_UNPROCESSABLE_CONTENT,
+  type AudioKind,
   type DB,
   type LogLevelColumns,
   type RingStrategy
 } from '@zamfono/shared';
 
-import { assertAudioAvailable } from '../audio/_shared.js';
+import { assertAudioOfKind } from '../audio/_shared.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { liveRow } from '../rows.js';
 import { logLevelWire } from '../settings/logLevel.js';
@@ -28,8 +29,9 @@ export async function liveRingGroup(
 const DECIMAL_BASE = 10;
 
 /**
- * Throws 404 when any of a ring group's greeting, MoH or mailbox audio id names no live row;
- * `null`/`undefined` are skipped (cleared, or left alone) since they need no lookup.
+ * Throws 404 when any of a ring group's greeting, MoH or mailbox audio id names no live row, and 422
+ * when it names an asset of another kind than its column (§11.2); `null`/`undefined` are skipped
+ * (cleared, or left alone) since they need no lookup.
  */
 export async function assertGroupAudioFieldsAvailable(
   db: Transaction<DB>,
@@ -39,12 +41,18 @@ export async function assertGroupAudioFieldsAvailable(
     mailboxAudioId?: string | null;
   }
 ): Promise<void> {
-  const ids = [
-    fields.greetingAudioId,
-    fields.mohAudioId,
-    fields.mailboxAudioId
-  ].filter((id): id is string => id !== undefined && id !== null);
-  await Promise.all(ids.map(id => assertAudioAvailable(db, id)));
+  const refs: [string | null | undefined, AudioKind][] = [
+    [fields.greetingAudioId, 'greeting'],
+    [fields.mohAudioId, 'moh'],
+    [fields.mailboxAudioId, 'vmGreeting']
+  ];
+  await Promise.all(
+    refs.map(async ([id, kind]) => {
+      if (id !== undefined && id !== null) {
+        await assertAudioOfKind(db, id, kind);
+      }
+    })
+  );
 }
 
 /** Maps an optional wire boolean to the `INTEGER 0/1` column value, or `undefined` to keep the column's own default (§11.1). */

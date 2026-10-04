@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { assertAudioOfKind } from '../audio/_shared.js';
 import {
   recordChange,
   recordFieldChanges,
@@ -13,7 +14,6 @@ import {
 import { propagate } from '../propagate.js';
 import { defineOperation, type Context } from '../types.js';
 import {
-  assertAudioAvailable,
   assertNameAvailable,
   liveMenu,
   menuFields,
@@ -94,7 +94,7 @@ export const updateMenu = defineOperation({
       await assertNameAvailable(ctx.db, input.name, input.id);
     }
     if (input.audioId !== undefined) {
-      await assertAudioAvailable(ctx.db, input.audioId);
+      await assertAudioOfKind(ctx.db, input.audioId, 'announcement');
     }
     const after = resolvedFields(before, input);
     recordFieldChanges(ctx, before, after, WIRE_COLUMNS);

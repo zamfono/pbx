@@ -1,13 +1,12 @@
 import type { Selectable, Transaction } from 'kysely';
 import { z } from 'zod';
 
-import { HTTP_NOT_FOUND, type DB } from '@zamfono/shared';
+import { type DB } from '@zamfono/shared';
 
 import { targetSpecSchema, type TargetSpec } from '../forwardTargetSchema.js';
 import { rowToTarget } from '../forwardTargetSpec.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { liveRow } from '../rows.js';
-import { OpError } from '../types.js';
 
 /** A `menus` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type MenuRow = Selectable<DB['menus']>;
@@ -18,29 +17,6 @@ export async function liveMenu(
   id: string
 ): Promise<MenuRow> {
   return liveRow(db, 'menus', id, `menu '${id}' not found`);
-}
-
-/**
- * Throws 404 when `audioId` names no live `audio_assets` row of kind `announcement` (`menus.audio_id`,
- * §11.2 `ON DELETE RESTRICT`; §11.2 "audio_id: the greeting, an audio_assets row of kind 'announcement'").
- */
-export async function assertAudioAvailable(
-  db: Transaction<DB>,
-  audioId: string
-): Promise<void> {
-  const row = await db
-    .selectFrom('audioAssets')
-    .select('id')
-    .where('id', '=', audioId)
-    .where('kind', '=', 'announcement')
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!row) {
-    throw new OpError(
-      HTTP_NOT_FOUND,
-      `announcement audio asset '${audioId}' not found`
-    );
-  }
 }
 
 /** Throws 409 when `name` is already used by another live menu (`menus_name` partial UNIQUE, §11.2). */

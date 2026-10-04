@@ -25,7 +25,7 @@ export const createAudioAssetInput = z
     kind: z
       .enum(AUDIO_KINDS)
       .describe(
-        "What the asset is for: a menu greeting, hold or ringing music (moh, see zamfono.help music-licensing), a mailbox greeting, or an announcement target's audio."
+        "What the asset is for: a ring group's greeting (greeting), hold or ringing music (moh, see zamfono.help music-licensing), a mailbox greeting (vmGreeting), or a menu's or announcement target's audio (announcement)."
       ),
     label: z.string().min(1),
     upload: uploadSchema.describe(

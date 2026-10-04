@@ -1,13 +1,12 @@
 import { HTTP_UNPROCESSABLE_CONTENT, isE164 } from '@zamfono/shared';
 
+import { assertAudioOfKind } from '../audio/_shared.js';
 import { recordChange } from '../audit.js';
 import { createTarget } from '../forwardTargets.js';
 import { type TargetSpec } from '../forwardTargetSchema.js';
 import { resolveOptionalTarget } from '../forwardTargetSpec.js';
 import { OpError, type Context } from '../types.js';
 import type { SettingsColumns, SettingsRow } from './_shared.js';
-
-const MOH_KIND = 'moh';
 
 /** The `settings.update` fields that name another row, as the helpers below read them. */
 type ReferenceFieldInput = {
@@ -46,7 +45,7 @@ export async function applyMainDidId(
   columns.mainDidId = input.mainDidId;
 }
 
-/** Validates `holdMohAudioId` is a live `moh` audio asset (§11.4) before applying it. */
+/** Validates `holdMohAudioId` is a live `moh` audio asset (§11.4, 404/422) before applying it. */
 export async function applyHoldMohAudioId(
   ctx: Context,
   before: SettingsRow,
@@ -59,21 +58,8 @@ export async function applyHoldMohAudioId(
   ) {
     return;
   }
-  const audio =
-    input.holdMohAudioId === null
-      ? undefined
-      : await ctx.db
-          .selectFrom('audioAssets')
-          .select('id')
-          .where('id', '=', input.holdMohAudioId)
-          .where('kind', '=', MOH_KIND)
-          .where('deletedAt', 'is', null)
-          .executeTakeFirst();
-  if (input.holdMohAudioId !== null && !audio) {
-    throw new OpError(
-      HTTP_UNPROCESSABLE_CONTENT,
-      "settings: holdMohAudioId must be a live 'moh' audio asset"
-    );
+  if (input.holdMohAudioId !== null) {
+    await assertAudioOfKind(ctx.db, input.holdMohAudioId, 'moh');
   }
   recordChange(ctx, {
     field: 'holdMohAudioId',

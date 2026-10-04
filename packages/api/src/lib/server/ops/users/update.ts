@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { assertAudioAvailable } from '../audio/_shared.js';
+import { assertAudioOfKind } from '../audio/_shared.js';
 import { recordFieldChanges } from '../audit.js';
 import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
@@ -152,7 +152,7 @@ export const update = defineOperation({
       await assertCallerIdDidValid(ctx.db, input.calleridDidId);
     }
     if (input.mailboxAudioId !== undefined && input.mailboxAudioId !== null) {
-      await assertAudioAvailable(ctx.db, input.mailboxAudioId);
+      await assertAudioOfKind(ctx.db, input.mailboxAudioId, 'vmGreeting');
     }
 
     const affectedDevices = await maybeRenameExtension(ctx, input);
