@@ -1,247 +1,128 @@
 /**
- * The shared outbound-attempt engine (§9.4 "Route fallthrough", "Hosts"): one INVITE's outcome,
- * and `ip`-trunk host failover. Used by both `outbound.ts`'s per-route dialling and
- * `emergency.ts`'s per-trunk dialling; the INVITE itself is `trunkDial.ts`, caller-ID resolution
- * `callerIdentity.ts`, the terminal outcomes `answer.ts` and `conclude.ts`.
+ * The dial that waits for its outcome (§9.4 "Route fallthrough", "Hosts"): a route cursor's
+ * attempts one at a time, each awaited, until one answers or the cursor has none left. Used by
+ * `outboundExternal.ts`'s routes and `emergency.ts`'s trunks; the attempt itself is
+ * `externalAttempt.ts`, the cursor `externalLegRoutes.ts`, the terminal outcomes `answer.ts` and
+ * `conclude.ts`.
  */
-import { newId } from '@zamfono/shared';
-
-import type { AriClient } from '../ari/client.js';
-import { isEvent } from '../ari/events.js';
-import { logFailure, logUnlessGone } from '../ari/failures.js';
-import type { Snapshot } from '../internal/snapshot.js';
-import {
-  ATTEMPT_NO_RESPONSE_MS,
-  type AttemptFailure,
-  type Route
-} from '../routing/trunk.js';
-import { SIP_SERVER_ERROR } from '../sipCodes.js';
-import { waitForEvent } from './ariWaits.js';
+import { shouldFallThrough, type AttemptFailure } from '../routing/trunk.js';
 import type { Leg } from './call.js';
 import { callRinging } from './callState.js';
-import { alertsOn, provisionalArrived, type TrunkLeg } from './provisional.js';
+import { placeAttempt } from './externalAttempt.js';
 import {
-  dialTargets,
-  endedSipStatus,
-  originateTrunkLeg,
-  retriesNextHost,
-  type TrunkLegCtx
-} from './trunkDial.js';
-import type { TrunkState } from './trunkState.js';
+  nextCandidate,
+  nextRoute,
+  type Candidate,
+  type RouteCursor
+} from './externalLegRoutes.js';
 
-export type AttemptOutcome =
+type AttemptOutcome =
   | { kind: 'answered'; channelId: string }
   | { kind: 'failure'; failure: AttemptFailure };
 
-// A leg Asterisk would not place (its create or dial refused, `legOriginate.ts`) fails as a 500
-// before alerting would: the next host, then the next route, is tried (§9.4 "Route fallthrough").
-const PLACEMENT_FAILED: AttemptFailure = {
-  kind: 'final',
-  code: SIP_SERVER_ERROR,
-  alerted: false
-};
+/** A waiting dial's result: an answered leg, a final (non-fallthrough) failure, or the cursor
+ * exhausted. */
+export type DialResult =
+  | { kind: 'answered'; channelId: string }
+  | { kind: 'final'; failure: AttemptFailure }
+  | { kind: 'exhausted'; lastFailureKind: AttemptFailure['kind'] | null };
 
-const CALLER_GONE: AttemptOutcome = {
-  kind: 'failure',
-  failure: { kind: 'callerGone' }
-};
+const CALLER_GONE: AttemptFailure = { kind: 'callerGone' };
 
-/** An attempt's outcome as its channel's events tell it, and the no-response budget's start. */
-type AttemptWatch = {
-  outcome: Promise<AttemptOutcome>;
-  /** Starts the budget, once the leg is placed: it needs the channel's name. */
-  start: (leg: TrunkLeg, timeoutMs: number) => void;
-  /** Stops watching a leg that could not be placed. */
-  stop: () => void;
-};
-
-/**
- * Watches `channelId`, from before its create, until it alerts and later ends, answers, or times
- * out (§9.4 "Route fallthrough"): a far end that answers or refuses at once may do so before the
- * leg's placement returns.
- */
-function watchAttemptOutcome(ari: AriClient, channelId: string): AttemptWatch {
-  let alerted = false;
-  const wait = waitForEvent<AttemptOutcome>(ari, (event, waiting) => {
-    if (!alerted && alertsOn(event, channelId)) {
-      // The no-response budget covers only the interval before the first provisional
-      // response (§9.4 "Route fallthrough"); once the far end alerted, the attempt is final
-      // only on answer or a terminal response, never on this timer.
-      alerted = true;
-      waiting.disarm();
-      return;
-    }
-    const channel = event.channel;
-    if (channel?.id !== channelId) {
-      return;
-    }
-    if (event.type === 'ChannelStateChange' && channel.state === 'Up') {
-      waiting.settle({ kind: 'answered', channelId });
-      return;
-    }
-    if (isEvent(event, 'ChannelDestroyed')) {
-      const code = endedSipStatus(event);
-      waiting.settle({
-        kind: 'failure',
-        failure: { kind: 'final', code, alerted }
-      });
-    }
-  });
-  const start = (leg: TrunkLeg, timeoutMs: number): void => {
-    if (alerted) {
-      return;
-    }
-    wait.arm(timeoutMs, () => {
-      // A `100 Trying` ends the budget as any provisional response does, though no event says
-      // so; the attempt then waits for its outcome like one that alerted.
-      provisionalArrived(ari, leg)
-        .then(arrived => {
-          if (!arrived) {
-            wait.settle({ kind: 'failure', failure: { kind: 'noResponse' } });
-          }
-        })
-        .catch(logFailure(ari.log, 'provisional response read'));
-    });
-  };
-  return {
-    outcome: wait.promise,
-    start,
-    stop: () => {
-      wait.settle({ kind: 'failure', failure: PLACEMENT_FAILED });
-    }
-  };
-}
-
-/** Decrements the trunk's active count once the answered leg's channel eventually ends. */
-function watchAttemptChannelEnd(
-  ari: AriClient,
-  trunkState: TrunkState,
-  channelId: string
-): void {
-  waitForEvent<undefined>(ari, (event, wait) => {
-    const channel = event.channel;
-    if (channel?.id !== channelId || event.type !== 'ChannelDestroyed') {
-      return;
-    }
-    wait.settle(undefined);
-    trunkState.noteAttemptEnded(channelId);
-  });
-}
-
-type AttemptCtx = TrunkLegCtx & { route: Route | null };
-
-function attemptCause(outcome: AttemptOutcome): string | number {
-  if (outcome.kind === 'answered') {
+/** A waiting dial's result as its trace lines name it. */
+export function dialCause(result: DialResult): string | null {
+  if (result.kind === 'answered') {
     return 'answered';
   }
-  if (outcome.failure.kind === 'final') {
-    return outcome.failure.code;
-  }
-  return outcome.failure.kind;
+  return result.kind === 'final' ? result.failure.kind : result.lastFailureKind;
 }
 
-/** One INVITE to `endpoint`: originate, track as a `trunk` leg, wait for its outcome (§9.4). */
+/** One INVITE to `candidate`: placed and tracked as a `trunk` leg of the call, its outcome awaited
+ * (§9.4). A caller who hung up ended the leg (`legsEnded.ts`, `legOriginate.ts`): its end is no
+ * failure of the far end's. */
 async function attemptOnce(
-  ctx: AttemptCtx,
-  endpoint: string
+  cursor: RouteCursor,
+  candidate: Candidate
 ): Promise<AttemptOutcome> {
-  const { pipeline, call, trunkState, route, trunk } = ctx;
-  const channelId = newId();
-  const placing: Leg = {
-    channelId,
-    kind: 'trunk',
-    userId: null,
-    state: 'placing',
-    endCause: null,
-    trunkId: trunk.id
-  };
-  call.legs.set(channelId, placing);
-  const watch = watchAttemptOutcome(pipeline.deps.ari, channelId);
-  const trunkLeg = await originateTrunkLeg(ctx, endpoint, channelId, () => {
-    placing.state = 'ringing';
-  }).catch(
-    logFailure(pipeline.deps.logger, 'trunk attempt placement', {
-      callId: call.id,
-      trunkId: trunk.id
-    })
+  const { pipeline, call } = cursor;
+  let leg: Leg | undefined;
+  const { attempt, trunkLeg } = await placeAttempt(
+    cursor,
+    candidate,
+    channelId => {
+      leg = {
+        channelId,
+        kind: 'trunk',
+        userId: null,
+        state: 'placing',
+        endCause: null,
+        trunkId: candidate.trunk.id
+      };
+      call.legs.set(channelId, leg);
+    },
+    () => {
+      if (leg) {
+        leg.state = 'ringing';
+      }
+    }
   );
   if (trunkLeg === undefined) {
-    watch.stop();
-    call.legs.delete(channelId);
-    call.log.event({
-      event: 'attempt',
-      routeId: route?.id ?? null,
-      trunkId: trunk.id,
-      endpoint,
-      cause: 'placementFailed'
-    });
-    return call.callerEnded === true
-      ? CALLER_GONE
-      : { kind: 'failure', failure: PLACEMENT_FAILED };
+    call.legs.delete(attempt.channelId);
+    const { failure } = await attempt.ended;
+    return {
+      kind: 'failure',
+      failure: call.callerEnded === true ? CALLER_GONE : failure
+    };
   }
   // The live view (§10.6) shows the call ringing its external target from the first INVITE on.
   callRinging(pipeline.deps, call);
-  watch.start(trunkLeg, ATTEMPT_NO_RESPONSE_MS);
-  const watched = await watch.outcome;
-  // A caller who hung up ended the leg (`legsEnded.ts`): its end is no failure of the far end's.
-  const outcome =
-    watched.kind === 'failure' && call.callerEnded === true
-      ? CALLER_GONE
-      : watched;
-  const leg = call.legs.get(channelId);
-  // One `events` trace line per attempt, naming route, trunk and cause (§9.4 "Route fallthrough").
-  call.log.event({
-    event: 'attempt',
-    routeId: route?.id ?? null,
-    trunkId: trunk.id,
-    endpoint,
-    // The caller ID the INVITE presented: the number as formatted for the trunk, the format and
-    // header(s) the trunk takes it in, and whether it was withheld (§9.4 "Caller ID", CLIR).
-    callerId: {
-      number: ctx.identity.number,
-      format: trunk.calleridFormat,
-      header: trunk.calleridHeader,
-      withheld: ctx.identity.withhold
-    },
-    cause: attemptCause(outcome)
-  });
+  const outcome = await Promise.race([
+    attempt.answered.then((): AttemptOutcome => ({
+      kind: 'answered',
+      channelId: attempt.channelId
+    })),
+    attempt.ended.then(({ failure }): AttemptOutcome => ({
+      kind: 'failure',
+      failure: call.callerEnded === true ? CALLER_GONE : failure
+    }))
+  ]);
+  const tracked = call.legs.get(attempt.channelId);
   if (outcome.kind === 'answered') {
-    if (leg) {
-      leg.state = 'up';
+    if (tracked) {
+      tracked.state = 'up';
     }
-    watchAttemptChannelEnd(pipeline.deps.ari, trunkState, channelId);
     return outcome;
   }
-  if (leg) {
-    leg.state = 'ended';
+  attempt.trace(
+    outcome.failure.kind === 'final'
+      ? outcome.failure.code
+      : outcome.failure.kind
+  );
+  if (tracked) {
+    tracked.state = 'ended';
   }
-  trunkState.noteAttemptEnded(channelId);
-  await pipeline.deps.ari.channels
-    .hangup(channelId)
-    .catch(logUnlessGone(pipeline.deps.logger, 'trunk attempt hangup'));
   return outcome;
 }
 
-/** One route's (or emergency trunk's) attempt: every host in turn for an `ip` trunk (§9.4 "Hosts"),
- * once otherwise; none once the caller has hung up. */
-export async function attemptRoute(
-  ctx: AttemptCtx,
-  snapshot: Snapshot
-): Promise<AttemptOutcome> {
-  let lastFailure: AttemptFailure = { kind: 'hostsExhausted' };
-  for (const endpoint of dialTargets(ctx.trunk, snapshot)) {
-    if (ctx.call.callerEnded === true) {
-      return CALLER_GONE;
+/** Dials `cursor`'s attempts in turn (§9.4 "Route fallthrough", "Hosts") until one answers, a
+ * failure does not fall through, or none is left; none once the caller has hung up. */
+export async function dialRoutes(cursor: RouteCursor): Promise<DialResult> {
+  let failure: AttemptFailure | null = null;
+  let candidate = nextRoute(cursor);
+  while (candidate !== null) {
+    if (cursor.call.callerEnded === true) {
+      return { kind: 'final', failure: CALLER_GONE };
     }
-    // eslint-disable-next-line no-await-in-loop -- hosts are attempted one at a time, in priority order, by design
-    const outcome = await attemptOnce(ctx, endpoint);
+    // eslint-disable-next-line no-await-in-loop -- attempts are dialled one at a time, in fallthrough order, by design
+    const outcome = await attemptOnce(cursor, candidate);
     if (outcome.kind === 'answered') {
       return outcome;
     }
-    if (!retriesNextHost(outcome.failure)) {
-      return outcome;
-    }
-    lastFailure = outcome.failure;
+    ({ failure } = outcome);
+    candidate = nextCandidate(cursor, failure);
   }
-  return { kind: 'failure', failure: lastFailure };
+  if (failure !== null && !shouldFallThrough(failure)) {
+    return { kind: 'final', failure };
+  }
+  return { kind: 'exhausted', lastFailureKind: cursor.lastFailureKind };
 }

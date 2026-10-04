@@ -9,7 +9,8 @@ import { SIP_SERVICE_UNAVAILABLE } from '../sipCodes.js';
 import { settleAnswered } from './answer.js';
 import { type Call } from './call.js';
 import { resolveAttemptIdentity, type UserRow } from './callerIdentity.js';
-import { attemptRoute, type AttemptOutcome } from './dialAttempt.js';
+import { dialCause, dialRoutes, type DialResult } from './dialAttempt.js';
+import { openCursor } from './externalLegRoutes.js';
 import type { Pipeline } from './pipeline.js';
 import { release } from './release.js';
 import type { TrunkState } from './trunkState.js';
@@ -27,6 +28,9 @@ export function emergencyLogLevel(
   );
 }
 
+/** One emergency trunk's dial (§10.1 "Emergency calls"): its hosts in turn with the emergency
+ * caller identity and no pre-checks, traced at its end; `undefined` for a trunk that is gone or
+ * cannot present the call. */
 async function attemptEmergencyTrunk(params: {
   pipeline: Pipeline;
   trunkState: TrunkState;
@@ -35,9 +39,8 @@ async function attemptEmergencyTrunk(params: {
   number: string;
   callerUser: UserRow | null;
   snapshot: Snapshot;
-}): Promise<AttemptOutcome | undefined> {
-  const { pipeline, trunkState, call, trunkId, number, callerUser, snapshot } =
-    params;
+}): Promise<DialResult | undefined> {
+  const { call, trunkId, callerUser, snapshot } = params;
   const trunk = snapshot.trunks.find(row => row.id === trunkId);
   if (!trunk) {
     return undefined;
@@ -53,24 +56,17 @@ async function attemptEmergencyTrunk(params: {
   if (!identity.ok) {
     return undefined;
   }
-  const outcome = await attemptRoute(
-    {
-      pipeline,
-      call,
-      trunkState,
-      route: null,
-      trunk,
-      number,
-      identity: identity.identity
-    },
-    snapshot
+  const result = await dialRoutes(
+    openCursor({ ...params, clirPerCall: null, forward: undefined }, [
+      { route: null, trunk, identity: identity.identity }
+    ])
   );
   call.log.event({
     event: 'emergencyAttempt',
     trunkId,
-    cause: outcome.kind === 'answered' ? 'answered' : outcome.failure.kind
+    cause: dialCause(result)
   });
-  return outcome;
+  return result;
 }
 
 /** Whether any of the tenant's emergency trunks is live, anything but `unreachable` (§9.4 "Trunk
@@ -127,7 +123,7 @@ export async function dialEmergency(
       return;
     }
     // A caller who hung up is no failed emergency call: nothing more is dialled or released.
-    if (outcome?.failure.kind === 'callerGone') {
+    if (outcome?.kind === 'final' && outcome.failure.kind === 'callerGone') {
       return;
     }
   }

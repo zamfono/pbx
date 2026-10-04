@@ -1,8 +1,7 @@
 /**
  * One INVITE over a trunk (§9.4 "Hosts", "Caller-ID", "Anonymous calls (CLIR)"): the trunk's dial
  * targets, the originate that carries an attempt's resolved identity, and the reading of how it
- * ended. Shared by `dialAttempt.ts`, which waits for each attempt's outcome, and `externalLeg.ts`,
- * whose attempts ring alongside a ring race's other legs.
+ * ended, for every outbound attempt (`externalAttempt.ts`).
  */
 import { sipHostUri, trunkSectionName } from '@zamfono/shared';
 

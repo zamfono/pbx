@@ -6,19 +6,17 @@
  */
 import { userById, type Snapshot } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
-import { shouldFallThrough } from '../routing/trunk.js';
 import { SIP_SERVICE_UNAVAILABLE } from '../sipCodes.js';
-import { settleAnswered } from './answer.js';
 import { type Call } from './call.js';
 import type { TrunkRow } from './callerIdentity.js';
-import { concludeExhausted, concludeFinal } from './conclude.js';
-import { attemptRoute } from './dialAttempt.js';
+import { dialRoutes } from './dialAttempt.js';
+import { openCursor, trunkWay } from './externalLegRoutes.js';
 import type { ForwardLeg } from './forwardContext.js';
 import { sipForwardLeg } from './forwardValues.js';
-import { dialExternal } from './outboundExternal.js';
+import { dialExternal, settleDial } from './outboundExternal.js';
 import type { Pipeline } from './pipeline.js';
 import { release } from './release.js';
-import { liveTrunk, prepareRoute } from './routeSelection.js';
+import { liveTrunk } from './routeSelection.js';
 import { dialTargets } from './trunkDial.js';
 import type { TrunkState } from './trunkState.js';
 
@@ -60,21 +58,6 @@ async function dialSipTarget(
     await release(pipeline, call, SIP_SERVICE_UNAVAILABLE, 'failed');
     return;
   }
-  const callerUser = userById(snapshot, asUser);
-  const prepared = prepareRoute({
-    pipeline,
-    trunkState,
-    call,
-    route: null,
-    trunk,
-    callerUser,
-    clirPerCall: null,
-    snapshot
-  });
-  if (!prepared.ok) {
-    await concludeExhausted(pipeline, call, prepared.failure.kind);
-    return;
-  }
   const forward = await sipForwardLeg(
     pipeline,
     call,
@@ -82,26 +65,20 @@ async function dialSipTarget(
     [...call.diversions],
     snapshot
   );
-  const outcome = await attemptRoute(
+  const cursor = openCursor(
     {
       pipeline,
-      call,
       trunkState,
-      route: null,
-      trunk,
+      call,
+      snapshot,
       number: target.user,
-      identity: prepared.identity,
+      callerUser: userById(snapshot, asUser),
+      clirPerCall: null,
       forward
     },
-    snapshot
+    [trunkWay(snapshot, trunk.id)]
   );
-  if (outcome.kind === 'answered') {
-    await settleAnswered(pipeline, call, outcome.channelId);
-    return;
-  }
-  await (shouldFallThrough(outcome.failure)
-    ? concludeExhausted(pipeline, call, outcome.failure.kind)
-    : concludeFinal(pipeline, call, outcome.failure));
+  await settleDial(pipeline, call, await dialRoutes(cursor));
 }
 
 /**

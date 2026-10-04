@@ -1,8 +1,8 @@
 /**
  * Route selection for an outbound attempt (§9.4 "Outbound routing", "Route fallthrough"): the
  * routes matching a number and its caller, and one route's pre-checks and caller identity, which
- * decide whether it is attempted at all. Shared by `outboundExternal.ts`, whose attempts wait for
- * their outcome, and `externalLegRoutes.ts`, whose ring-race legs do not.
+ * decide whether it is attempted at all, for the route cursor every outbound dial walks
+ * (`externalLegRoutes.ts`).
  */
 import type { Snapshot } from '../internal/snapshot.js';
 import {
