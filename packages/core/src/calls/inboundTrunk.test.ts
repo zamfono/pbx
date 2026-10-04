@@ -332,6 +332,37 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
     );
   });
 
+  it('names the number block and the called number of a fallback in the routing trace (§11.3)', async () => {
+    const trunkId = await seedTrunk(db, 'e164');
+    const { targetId } = await db
+      .selectFrom('dids')
+      .select('targetId')
+      .where('id', '=', mainDidId)
+      .executeTakeFirstOrThrow();
+    const blockId = newId();
+    await db
+      .insertInto('didBlocks')
+      .values({
+        id: blockId,
+        base: '+493012',
+        digits: null,
+        fallbackTargetId: targetId,
+        createdAt: nowIso()
+      })
+      .execute();
+
+    const call = await arrive(trunkId, '+4930129999', '+49892315194925');
+
+    expect(traceEvents(call)).toContainEqual(
+      expect.objectContaining({
+        event: 'entry',
+        result: 'fallback',
+        blockId,
+        called: '+4930129999'
+      })
+    );
+  });
+
   it('records a called number taken from To in the routing trace', async () => {
     const trunkId = await seedTrunk(db, 'e164');
     const channel = fakeAri.addChannel({

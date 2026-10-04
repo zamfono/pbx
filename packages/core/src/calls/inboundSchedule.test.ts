@@ -167,4 +167,32 @@ describe('applyOooAndHours', () => {
     expect(ended).toBe(false);
     expect(ran).toHaveLength(0);
   });
+
+  it("applies the tenant's OOO rule once per call, not again at the target it forwards to (§10.1 step 2)", async () => {
+    const userId = await seedUser(db, {
+      name: 'Owner',
+      email: 'owner@example.com'
+    });
+    const targetId = newId();
+    await db
+      .insertInto('forwardTargets')
+      .values({ id: targetId, userId })
+      .execute();
+    await seedSettings(db, { timezone: 'UTC' });
+    await db
+      .insertInto('oooRules')
+      .values({ id: newId(), targetId, createdAt: nowIso() })
+      .execute();
+    const snapshot = await new ConfigCache(db).get();
+    const { pipeline, ran } = stubPipeline('2026-01-05T10:00:00.000Z');
+    const call = inboundCall();
+
+    expect(await applyOooAndHours(pipeline, call, snapshot, 'user:first')).toBe(
+      true
+    );
+    expect(
+      await applyOooAndHours(pipeline, call, snapshot, `user:${userId}`)
+    ).toBe(false);
+    expect(ran).toHaveLength(1);
+  });
 });

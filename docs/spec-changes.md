@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-04 · §9.4 Forwarded calls, §10.1 steps 2-3.** A menu hop of an internal call names the tenant's main number as its `REDIRECTING` number, as its `Diversion` entry already did. The once-per-call evaluation covers the tenant's scope too. Opening hours apply to inbound calls only, forwarded ones included.
+*Why:* the menu hop of an internal call had no `REDIRECTING` number and was dropped from the call's hops; a tenant-wide OOO rule was applied again at the target it forwarded to; step 3 said "forwarded calls" though hours describe reachability from outside.
+
 **2026-10-04 · §10.5 Uploads.** Product-owner decision (MCP uploads): `audio.create` and `users.setVoicemailGreeting` over MCP take their fields without the file and return a five-minute upload link (`/upload/<path>`, token `typ` `upload+jwt`, `aud` the REST path); a `POST` of the file to it runs the operation as the call's user and client with channel `mcp`, and a browser opening it gets a file-picker page.
 *Why:* "Upload link + page (Recommended)"; the tools were listed with a `data` field no JSON argument can fill, so every call failed with 422.
 

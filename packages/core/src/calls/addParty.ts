@@ -8,6 +8,7 @@ import { type Call } from './call.js';
 import { activeCallOf, channelOf } from './callLookup.js';
 import { concludeExhausted, concludeFinal } from './conclude.js';
 import { dialEmergency } from './emergency.js';
+import { enterTarget } from './inbound.js';
 import { originateExternalLeg } from './outboundExternal.js';
 import type { Pipeline } from './pipeline.js';
 import { release } from './release.js';
@@ -39,8 +40,10 @@ async function releaseFeatureDial(
     .catch(ignoreGone);
 }
 
-/** An internal target (§10.1 steps 4-5) rung on a fresh pass over `call`, its win joining
- * `activeBridgeId`. Whether the added party joined. */
+/** An internal target on a fresh pass over `call`, its win joining `activeBridgeId`: `*5`'s
+ * enters at Entry like any dialled extension, OOO and opening hours included (§10.1); `api`'s,
+ * with no caller channel, is only rung (§10.1 steps 4-5), a forward or mailbox handed back left
+ * undone. Whether the added party joined. */
 async function ringInternalTarget(
   pipeline: Pipeline,
   call: Call,
@@ -48,9 +51,14 @@ async function ringInternalTarget(
   activeBridgeId: string,
   target: Extract<AddedTarget, { kind: 'user' | 'ringGroup' }>
 ): Promise<boolean> {
-  if (target.kind === 'user') {
+  if (call.callerChannelId !== null) {
+    const entered =
+      target.kind === 'user'
+        ? { id: '', kind: target.kind, userId: target.userId }
+        : { id: '', kind: target.kind, ringGroupId: target.ringGroupId };
+    await enterTarget(pipeline, call, entered, null);
+  } else if (target.kind === 'user') {
     call.calleeUserId = target.userId;
-    // An added party is only rung: a forward or mailbox handed back is left undone.
     await runUserStep(pipeline, call, snapshot, target.userId);
   } else {
     await ringGroup(pipeline, call, target.ringGroupId);
@@ -92,8 +100,7 @@ async function dialExternalTarget(
 
 /**
  * Dials `*5`'s target, resolved like any dialled string (`addPartyTarget.ts`): a user or
- * ring-group target re-enters the normal per-user or ring-group routing — `runUserStep`/
- * `ringGroup`, the same functions Entry itself dispatches to (§10.1 steps 4-5) — so its forward
+ * ring-group target enters the normal routing (`ringInternalTarget`), so its OOO rule, forward
  * rules, find-me legs and the ring group's own strategy all apply exactly as they would for any
  * other call to it. An external number goes through §9.4's route selection, an emergency number
  * through `emergency.ts`. Whichever answers joins `activeBridgeId` in place of a bridge of its

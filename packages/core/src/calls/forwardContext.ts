@@ -70,7 +70,8 @@ type PartyIdentity = Omit<
 };
 
 /** `party`'s number, name and extension: a user's primary number or extension, a ring group's
- * extension, a menu's called number, the one an inbound call dialled. */
+ * extension, a menu's called number, the one an inbound call dialled, else the tenant's main
+ * number; `null` for a menu with neither, a main DID since deleted. */
 function partyIdentity(
   snapshot: Snapshot,
   call: Call,
@@ -98,7 +99,10 @@ function partyIdentity(
     };
   }
   return {
-    number: call.direction === 'inbound' ? call.to : null,
+    number:
+      call.direction === 'inbound'
+        ? call.to
+        : diversionNumber(snapshot, call, party),
     name: snapshot.menus.find(row => row.id === party.menuId)?.name ?? null,
     party: 'menu',
     extension: null
@@ -107,7 +111,7 @@ function partyIdentity(
 
 /**
  * The hop `party` makes for `reason`, with the party's numbers and name; `null` where it has no
- * `REDIRECTING` number to name, a menu of an internal call.
+ * `REDIRECTING` number to name, a menu of an internal call with no main number.
  */
 export function diversionFor(
   snapshot: Snapshot,

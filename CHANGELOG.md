@@ -231,6 +231,12 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- Out-of-office and opening hours: `*5` to a colleague now applies their out-of-office rule
+  instead of ringing their phones; a tenant-wide out-of-office rule is applied once per call, not
+  again at the target it forwards to; opening hours that end at a local time the autumn DST
+  change repeats close at its first occurrence, as the open/close events on `/events` already
+  did; a menu an internal call is forwarded through is counted as a hop and named by the main
+  number; a fallback's routing trace names its number block and the called number.
 - `GET /metrics`, `GET /calls?live=true` and the actions on a live call waited as long as a
   stalled `core` did; they now give up after 3 seconds, as `/healthz` does. A live call id that
   cannot be one (empty, `.`, `..`, or with characters other than letters, digits, `.`, `_` and

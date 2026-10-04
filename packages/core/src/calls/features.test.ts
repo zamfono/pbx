@@ -709,6 +709,73 @@ describe('features', () => {
     expect(joinedNewParty).toBe(true);
   });
 
+  it('*5 to a colleague applies their OOO rule instead of ringing their phones (§10.1 step 2)', async () => {
+    await setUp();
+    const userA = await seedUser(db);
+    const userC = await seedUser(db);
+    const userD = await seedUser(db);
+    fakeAri.registerEndpoint('e300-dabc');
+    await seedDevice(db, userC, 'e300-dabc');
+    await seedExtension(db, '300', { userId: userC });
+    const targetId = newId();
+    await db
+      .insertInto('forwardTargets')
+      .values({ id: targetId, userId: userD })
+      .execute();
+    await db
+      .insertInto('oooRules')
+      .values({
+        id: newId(),
+        scopeUserId: userC,
+        targetId,
+        createdAt: nowIso()
+      })
+      .execute();
+
+    const customerChannel = fakeAri.addChannel({});
+    const userAChannel = fakeAri.addChannel({});
+    const activeCall = newCall({
+      id: newId(),
+      direction: 'inbound',
+      callerChannelId: customerChannel.id,
+      from: '+15559999',
+      to: '100',
+      startedAt: nowIso(),
+      logLevel: 'events',
+      callLogMaxBytes: 1_048_576
+    });
+    activeCall.legs.set(userAChannel.id, {
+      channelId: userAChannel.id,
+      kind: 'device',
+      userId: userA,
+      state: 'up',
+      endCause: null
+    });
+    const bridge = await ari.bridges.create({ type: 'mixing' });
+    await ari.bridges.addChannel(bridge.id, customerChannel.id);
+    await ari.bridges.addChannel(bridge.id, userAChannel.id);
+    activeCall.bridgeId = bridge.id;
+    pipeline.registerCall(activeCall);
+    await cdr.open(activeCall);
+
+    const addPartyChannel = fakeAri.addChannel({});
+    const addPartyCall = newInternalCall(addPartyChannel.id, 'e100', '*5300');
+    addPartyCall.callerUserId = userA;
+    pipeline.registerCall(addPartyCall);
+    await presence.resyncOnBoot();
+    await handleFeature(pipeline, presence, addPartyCall, 'addParty', '300');
+
+    expect(traceEvents(addPartyCall)).toContain('ooo');
+    const rangColleague = fakeAri.calls.some(
+      entry =>
+        isPlacement(entry) &&
+        ((entry.body as { endpoint?: string }).endpoint ?? '').includes(
+          'e300-dabc'
+        )
+    );
+    expect(rangColleague).toBe(false);
+  });
+
   it('*5 to an external number dials it through the normal outbound resolution', async () => {
     await setUp();
     await seedExternalRoute(db);

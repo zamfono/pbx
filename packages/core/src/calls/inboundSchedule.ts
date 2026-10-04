@@ -64,20 +64,30 @@ function scheduleDiversion(
   return party === null ? null : diversionFor(snapshot, call, party, reason);
 }
 
-/** Steps 2-3, OOO then opening hours (skipped for internal calls): the first applicable forward target ends the call, returning true. */
+/** Steps 2-3, OOO then opening hours (skipped for internal calls): the first applicable forward
+ * target ends the call, returning true. Each scope is evaluated at most once per call (§10.1 step
+ * 2): the target's own, and that of a rule applied, the tenant's included, are not looked at
+ * again, so a rule whose target leads back into its scope is not applied twice. */
 export async function applyOooAndHours(
   pipeline: Pipeline,
   call: Call,
   snapshot: Snapshot,
   scope: Scope
 ): Promise<boolean> {
-  const ooo = inEffectOoo(
-    buildOooRules(snapshot.oooRules),
-    scope,
-    pipeline.deps.now()
+  if (call.evaluated.has(scope)) {
+    return false;
+  }
+  const unevaluated = <Row extends { scope: Scope }>(rows: Row[]): Row[] =>
+    rows.filter(row => !call.evaluated.has(row.scope));
+  const rules = unevaluated(buildOooRules(snapshot.oooRules));
+  const schedules = unevaluated(
+    buildSchedules(snapshot.openingHours, snapshot.openingHoursIntervals)
   );
+  call.evaluated.add(scope);
+  const ooo = inEffectOoo(rules, scope, pipeline.deps.now());
   call.log.event({ event: 'ooo', scope, active: ooo !== null });
   if (ooo) {
+    call.evaluated.add(ooo.scope);
     await runTarget(
       pipeline,
       call,
@@ -90,10 +100,7 @@ export async function applyOooAndHours(
   if (call.direction === 'internal') {
     return false;
   }
-  const schedule = scheduleFor(
-    buildSchedules(snapshot.openingHours, snapshot.openingHoursIntervals),
-    scope
-  );
+  const schedule = scheduleFor(schedules, scope);
   if (schedule === null) {
     // §7 "OOO evaluation": a trace that shows no hours line would not say whether they were
     // evaluated at all.
@@ -111,6 +118,7 @@ export async function applyOooAndHours(
   if (open) {
     return false;
   }
+  call.evaluated.add(schedule.scope);
   await runTarget(
     pipeline,
     call,

@@ -4,7 +4,7 @@
 import { newId } from '@zamfono/shared';
 
 import type { AriEventOf } from '../ari/events.js';
-import { userById } from '../internal/snapshot.js';
+import { userById, type Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import {
   isBlocked,
@@ -93,11 +93,8 @@ export async function enterTarget(
     return;
   }
 
-  if (!call.evaluated.has(scope)) {
-    call.evaluated.add(scope);
-    if (await applyOooAndHours(pipeline, call, snapshot, scope)) {
-      return;
-    }
+  if (await applyOooAndHours(pipeline, call, snapshot, scope)) {
+    return;
   }
 
   if (target.kind === 'user') {
@@ -111,6 +108,52 @@ export async function enterTarget(
   // The last of `ForwardTarget`'s kinds: the two mailboxes, the announcement, the user and the
   // menu each returned above.
   await ringGroup(pipeline, call, target.ringGroupId);
+}
+
+/** Entry's DID lookup for an inbound call (§10.1 step 1, §11.3): the called number's DID, else
+ * the block or tenant fallback, entered without a caller (§10.1 step 7), else a 404 release. */
+async function enterCalled(
+  pipeline: Pipeline,
+  call: Call,
+  snapshot: Snapshot
+): Promise<void> {
+  const resolved = resolveInbound(
+    call.to,
+    snapshot.dids,
+    snapshot.didBlocks,
+    snapshot.settings.fallbackTargetId
+  );
+  if (resolved.kind === 'release') {
+    // Why the call is refused, at the default `events` level: the number looked up matched no
+    // DID, no number block and there is no tenant-wide fallback (§10.1 Entry).
+    call.log.event({ event: 'entry', result: 'noDid', called: call.to });
+    await release(pipeline, call, resolved.code, 'failed');
+    return;
+  }
+  if (resolved.kind === 'did') {
+    call.didId = resolved.didId;
+  }
+  // §11.3: a fallback names the block it came from (`null`: the tenant's) and the number looked up.
+  call.log.event(
+    resolved.kind === 'fallback'
+      ? {
+          event: 'entry',
+          result: resolved.kind,
+          blockId: resolved.blockId,
+          called: call.to
+        }
+      : { event: 'entry', result: resolved.kind }
+  );
+  const targetRow = snapshot.forwardTargets.find(
+    row => row.id === resolved.targetId
+  );
+  if (!targetRow) {
+    // The foreign key keeps a DID's or block's target row present.
+    await release(pipeline, call, SIP_SERVER_ERROR, 'failed');
+    return;
+  }
+  // §10.1 step 7: a DID's own target is dialled without a caller.
+  await enterTarget(pipeline, call, targetFromRow(targetRow), null);
 }
 
 /** A `from-trunk` StasisStart (§9.2): both numbers normalized with the delivering trunk's
@@ -174,31 +217,5 @@ export async function handleInboundStart(
     return;
   }
 
-  const resolved = resolveInbound(
-    call.to,
-    snapshot.dids,
-    snapshot.didBlocks,
-    snapshot.settings.fallbackTargetId
-  );
-  if (resolved.kind === 'release') {
-    // Why the call is refused, at the default `events` level: the number looked up matched no
-    // DID, no number block and there is no tenant-wide fallback (§10.1 Entry).
-    call.log.event({ event: 'entry', result: 'noDid', called: call.to });
-    await release(pipeline, call, resolved.code, 'failed');
-    return;
-  }
-  if (resolved.kind === 'did') {
-    call.didId = resolved.didId;
-  }
-  call.log.event({ event: 'entry', result: resolved.kind });
-  const targetRow = snapshot.forwardTargets.find(
-    row => row.id === resolved.targetId
-  );
-  if (!targetRow) {
-    // The foreign key keeps a DID's or block's target row present.
-    await release(pipeline, call, SIP_SERVER_ERROR, 'failed');
-    return;
-  }
-  // §10.1 step 7: a DID's own target is dialled without a caller.
-  await enterTarget(pipeline, call, targetFromRow(targetRow), null);
+  await enterCalled(pipeline, call, snapshot);
 }

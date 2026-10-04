@@ -7,9 +7,7 @@
 
 import {
   closedPeriods,
-  MINUTES_PER_HOUR,
   MS_PER_DAY,
-  parseTimeOfDay,
   type OpeningInterval,
   type Scope
 } from '@zamfono/shared';
@@ -73,20 +71,15 @@ export function inEffectOoo(
   );
 }
 
-/** Whether `schedule` is open at `nowIso`, evaluated in `timezone` (§10.2 "Opening hours"). */
+/** Whether `schedule` is open at `nowIso`, evaluated in `timezone` (§10.2 "Opening hours"): closed
+ * exactly when a closed period of `closedPeriods`, whose edges follow the DST rule, starts now. */
 export function isOpen(
   schedule: Schedule,
   nowIso: string,
   timezone: string
 ): boolean {
-  const local = Temporal.Instant.from(nowIso).toZonedDateTimeISO(timezone);
-  const minuteOfDay = local.hour * MINUTES_PER_HOUR + local.minute;
-  return schedule.intervals.some(
-    interval =>
-      interval.weekday === local.dayOfWeek &&
-      minuteOfDay >= parseTimeOfDay(interval.opens) &&
-      minuteOfDay < parseTimeOfDay(interval.closes)
-  );
+  const [first] = closedPeriods(schedule, nowIso, 1, timezone);
+  return first === undefined || Date.parse(first.start) > Date.parse(nowIso);
 }
 
 /** The active schedule for `scope`, else the tenant's active schedule, else null. */

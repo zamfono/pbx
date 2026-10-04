@@ -92,6 +92,20 @@ describe('isOpen', () => {
       isOpen(midnightSchedule, '2026-03-30T21:59:00.000Z', 'Europe/Berlin')
     ).toBe(true);
   });
+  it('closes at the earlier instant of a closing time the autumn DST change repeats (§10.2)', () => {
+    // Europe/Vienna, Sunday 2026-10-25: 02:30 occurs at 00:30Z and again at 01:30Z; the edge is
+    // the earlier one, so 01:15Z (02:15 CET, the second pass) is already closed.
+    const sundayNight = weekdayHoursSchedule({
+      intervals: [{ weekday: 7, opens: '00:00', closes: '02:30' }]
+    });
+
+    expect(
+      isOpen(sundayNight, '2026-10-25T00:15:00.000Z', 'Europe/Vienna')
+    ).toBe(true);
+    expect(
+      isOpen(sundayNight, '2026-10-25T01:15:00.000Z', 'Europe/Vienna')
+    ).toBe(false);
+  });
 });
 
 describe('scheduleFor', () => {
