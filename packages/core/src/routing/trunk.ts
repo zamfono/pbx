@@ -74,7 +74,10 @@ export type AttemptFailure =
   | { kind: 'clirUnsupported' }
   | { kind: 'hostsExhausted' }
   | { kind: 'noResponse' }
-  | { kind: 'final'; code: number; alerted: boolean };
+  | { kind: 'final'; code: number; alerted: boolean }
+  /** The caller hung up: the attempt ended with no outcome of the far end's, and nothing is
+   * dialled after it — no next host, route or emergency trunk. */
+  | { kind: 'callerGone' };
 
 /** SIP final responses that state the callee's own condition (§9.4 "Route fallthrough"). */
 const CALLEE_CONDITION_CODES = new Set<number>([
@@ -88,9 +91,12 @@ const CALLEE_CONDITION_CODES = new Set<number>([
  * Whether an attempt's failure falls through to the next matching route
  * (§9.4 "Route fallthrough"). A response naming the callee's own condition
  * never falls through; any other final response falls through only when it
- * arrived before the far end alerted.
+ * arrived before the far end alerted. A caller who hung up ends the dial.
  */
 export function shouldFallThrough(failure: AttemptFailure): boolean {
+  if (failure.kind === 'callerGone') {
+    return false;
+  }
   if (failure.kind !== 'final') {
     return true;
   }

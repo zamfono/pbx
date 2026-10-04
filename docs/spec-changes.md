@@ -19,6 +19,8 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §5.2 Client registration, SSO rules.** A redirect URI, registered or in a metadata document, must be an absolute `https` or `http` URI, or for a `native` client a private-use scheme (RFC 8252 §7.1). With `sso_allowed_domain` set, a `google` login also needs `hd` to equal it.
 *Why:* a relative or `javascript:` redirect URI registered fine and failed only at the first redirect, as a 500; and the `hd` quirk §5.2 promised was never checked (product-owner decision: "Check hd").
+**2026-10-04 · §9.4 Route fallthrough.** A caller who hangs up ends the dialling: no further host, route or emergency trunk is tried.
+*Why:* the leg the core hangs up for the leaving caller ends like a 500 before alerting, which the fall-through rules took for a trunk failure, so a 112 was sent to the next emergency trunk after the caller had gone.
 
 **2026-10-03 · §6.3 compose.yaml.** The `migrate` service gets no `DB_FILE`: `/data/zamfono.sqlite3` is its own default, as it is `api`'s and `core`'s.
 *Why:* product-owner decision on internal values: "sensible defaults" in code; compose repeated the path for `migrate` alone.

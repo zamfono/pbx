@@ -1039,6 +1039,87 @@ describe('outbound dialing', () => {
     ]);
   });
 
+  /**
+   * The caller hangs up while `leg` rings: the caller's own `ChannelDestroyed`, then — once the
+   * core has hung the ringing leg up — that leg's, Q.850 16 with no SIP code, as Asterisk reports
+   * a leg it was told to hang up. A leg placed from here on answers at once, so a dial that went
+   * on settles instead of hanging the test.
+   */
+  async function callerLeavesWhileRinging(
+    call: Call,
+    leg: { channelId: string }
+  ): Promise<void> {
+    fakeAri.answerAfterMs = 20;
+    emitDestroyed(fakeAri, callerChannel(call), 16);
+    await eventually(() => {
+      expect(
+        fakeAri.calls.some(
+          entry =>
+            entry.method === 'DELETE' &&
+            entry.path === `channels/${leg.channelId}`
+        )
+      ).toBe(true);
+    });
+    emitDestroyed(fakeAri, leg.channelId, 16);
+  }
+
+  it('dials no further route once the caller has hung up (§9.4 "Route fallthrough")', async () => {
+    const trunk1 = await seedTrunk(db, 1);
+    const trunk2 = await seedTrunk(db, 2);
+    await seedRoute(db, 1, trunk1);
+    await seedRoute(db, 2, trunk2);
+    fakeAri.answerAfterMs = 60_000;
+
+    const { call, finished } = await startDial('+498912345');
+    await callerLeavesWhileRinging(call, await ringingLeg(call));
+    await finished;
+
+    expect(attemptEndpoints(fakeAri)).toEqual([
+      `PJSIP/+498912345@trunk-${trunk1}`
+    ]);
+    expect(call.status).toBe('missed');
+    expect(traceEvents(call)).not.toContain('release');
+  });
+
+  it('dials no further host of an ip trunk once the caller has hung up (§9.4 "Hosts")', async () => {
+    const trunk1 = await seedTrunk(db, 1, { authMode: 'ip' });
+    await db
+      .insertInto('trunkHosts')
+      .values({
+        trunkId: trunk1,
+        priority: 2,
+        host: 'sip1b.example.com',
+        port: null,
+        direction: 'both'
+      })
+      .execute();
+    await seedRoute(db, 1, trunk1);
+    fakeAri.answerAfterMs = 60_000;
+
+    const { call, finished } = await startDial('+498912345');
+    await callerLeavesWhileRinging(call, await ringingLeg(call));
+    await finished;
+
+    expect(attemptEndpoints(fakeAri)).toEqual([
+      `PJSIP/+498912345@trunk-${trunk1}/sip:sip1.example.com`
+    ]);
+    expect(call.status).toBe('missed');
+  });
+
+  it('dials no further emergency trunk once the caller has hung up (§10.1 "Emergency calls")', async () => {
+    const trunk1 = await seedTrunk(db, 1);
+    await seedTrunk(db, 2);
+    fakeAri.answerAfterMs = 60_000;
+
+    const { call, finished } = await startDial('112');
+    await callerLeavesWhileRinging(call, await ringingLeg(call));
+    await finished;
+
+    expect(attemptEndpoints(fakeAri)).toEqual([`PJSIP/112@trunk-${trunk1}`]);
+    expect(call.status).toBe('missed');
+    expect(traceEvents(call)).not.toContain('emergencyFailed');
+  });
+
   it('does not count a hop for an internal-extension or own-DID dispatch', async () => {
     const targetUserId = newId();
     await db

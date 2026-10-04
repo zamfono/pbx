@@ -41,6 +41,11 @@ const PLACEMENT_FAILED: AttemptFailure = {
   alerted: false
 };
 
+const CALLER_GONE: AttemptOutcome = {
+  kind: 'failure',
+  failure: { kind: 'callerGone' }
+};
+
 /** An attempt's outcome as its channel's events tell it, and the no-response budget's start. */
 type AttemptWatch = {
   outcome: Promise<AttemptOutcome>;
@@ -175,7 +180,12 @@ async function attemptOnce(
   // The live view (§10.6) shows the call ringing its external target from the first INVITE on.
   callRinging(pipeline.deps, call);
   watch.start(trunkLeg, ATTEMPT_NO_RESPONSE_MS);
-  const outcome = await watch.outcome;
+  const watched = await watch.outcome;
+  // A caller who hung up ended the leg (`legsEnded.ts`): its end is no failure of the far end's.
+  const outcome =
+    watched.kind === 'failure' && call.callerEnded === true
+      ? CALLER_GONE
+      : watched;
   const leg = call.legs.get(channelId);
   // One `events` trace line per attempt, naming route, trunk and cause (§9.4 "Route fallthrough").
   call.log.event({
@@ -210,13 +220,17 @@ async function attemptOnce(
   return outcome;
 }
 
-/** One route's (or emergency trunk's) attempt: every host in turn for an `ip` trunk (§9.4 "Hosts"), once otherwise. */
+/** One route's (or emergency trunk's) attempt: every host in turn for an `ip` trunk (§9.4 "Hosts"),
+ * once otherwise; none once the caller has hung up. */
 export async function attemptRoute(
   ctx: AttemptCtx,
   snapshot: Snapshot
 ): Promise<AttemptOutcome> {
   let lastFailure: AttemptFailure = { kind: 'hostsExhausted' };
   for (const endpoint of dialTargets(ctx.trunk, snapshot)) {
+    if (ctx.call.callerEnded === true) {
+      return CALLER_GONE;
+    }
     // eslint-disable-next-line no-await-in-loop -- hosts are attempted one at a time, in priority order, by design
     const outcome = await attemptOnce(ctx, endpoint);
     if (outcome.kind === 'answered') {

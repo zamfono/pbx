@@ -88,9 +88,9 @@ function anyLiveEmergencyTrunk(
 /**
  * Emergency calls (§10.1 "Emergency calls"): the tenant's emergency trunks in priority order, no
  * route, caller list, CLIR or cap, failing over to the next live one on any non-answer and only
- * failing the call once none remains; a trunk without `trunks.emergency` is never tried. The
- * answer joins `call.joinBridgeId`, if set — `*5`'s added leg joining the running conversation
- * (§10.2 "Three-way calls") — else a bridge of its own.
+ * failing the call once none remains; a trunk without `trunks.emergency` is never tried, and none
+ * once the caller has hung up. The answer joins `call.joinBridgeId`, if set — `*5`'s added leg
+ * joining the running conversation (§10.2 "Three-way calls") — else a bridge of its own.
  */
 export async function dialEmergency(
   pipeline: Pipeline,
@@ -123,6 +123,10 @@ export async function dialEmergency(
     if (outcome?.kind === 'answered') {
       // eslint-disable-next-line no-await-in-loop -- the loop returns right after, so this is the loop's last iteration
       await settleAnswered(pipeline, call, outcome.channelId);
+      return;
+    }
+    // A caller who hung up is no failed emergency call: nothing more is dialled or released.
+    if (outcome?.failure.kind === 'callerGone') {
       return;
     }
   }
