@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { inTurn } from './backupTurns.js';
+import { serialQueue } from './serialQueue.js';
 
-describe('inTurn', () => {
+describe('serialQueue', () => {
   it('runs each piece of work once the one queued before it has ended, failed or not', async () => {
+    const inTurn = serialQueue();
     const order: string[] = [];
     const first = Promise.withResolvers<undefined>();
 

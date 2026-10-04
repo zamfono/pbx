@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { recordChange } from '../audit.js';
+import { recordFieldChanges } from '../audit.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
 import { liveAudioAsset, toAudioAssetOut } from './_shared.js';
@@ -18,18 +18,12 @@ export const updateAudioAsset = defineOperation({
   entity: input => ({ kind: 'audio', id: input.id }),
   run: async (ctx, input) => {
     const before = await liveAudioAsset(ctx.db, input.id);
-    if (input.label !== before.label) {
-      recordChange(ctx, {
-        field: 'label',
-        from: before.label,
-        to: input.label
-      });
-      await ctx.db
-        .updateTable('audioAssets')
-        .set({ label: input.label })
-        .where('id', '=', input.id)
-        .execute();
-    }
+    recordFieldChanges(ctx, before, { label: input.label });
+    await ctx.db
+      .updateTable('audioAssets')
+      .set({ label: input.label })
+      .where('id', '=', input.id)
+      .execute();
     const row = await ctx.db
       .selectFrom('audioAssets')
       .selectAll()

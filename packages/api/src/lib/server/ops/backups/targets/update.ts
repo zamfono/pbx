@@ -3,7 +3,11 @@ import { z } from 'zod';
 
 import { backupParamsColumn } from '@zamfono/shared';
 
-import { recordChange } from '#lib/server/ops/audit.js';
+import {
+  fromFlag,
+  recordChange,
+  recordFieldChanges
+} from '#lib/server/ops/audit.js';
 import { orBefore } from '#lib/server/ops/patch.js';
 import { liveRow } from '#lib/server/ops/rows.js';
 import { defineOperation } from '#lib/server/ops/types.js';
@@ -60,29 +64,20 @@ export const targetsUpdate = defineOperation<Input, BackupTargetWire>({
       input.secret === undefined
         ? before.secretEnc
         : sealTargetSecret(kr, input.secret);
-    if (kind !== before.kind) {
-      recordChange(ctx, { field: 'kind', from: before.kind, to: kind });
-    }
-    if (enabled !== (before.enabled === 1)) {
-      recordChange(ctx, {
-        field: 'enabled',
-        from: before.enabled === 1,
-        to: enabled
-      });
-    }
-    if (paramsJson !== before.paramsJson) {
-      recordChange(ctx, {
+    const columns = { kind, enabled: enabled ? 1 : 0, paramsJson };
+    recordFieldChanges(ctx, before, columns, {
+      enabled: { decode: fromFlag },
+      paramsJson: {
         field: 'params',
-        from: backupParamsColumn.decode(before.paramsJson),
-        to: backupParamsColumn.decode(paramsJson)
-      });
-    }
+        decode: stored => backupParamsColumn.decode(stored)
+      }
+    });
     if (input.secret !== undefined) {
       recordChange(ctx, { field: 'secret', from: null, to: input.secret });
     }
     await ctx.db
       .updateTable('backupTargets')
-      .set({ kind, paramsJson, enabled: enabled ? 1 : 0, secretEnc })
+      .set({ ...columns, secretEnc })
       .where('id', '=', input.id)
       .execute();
     const row = await ctx.db

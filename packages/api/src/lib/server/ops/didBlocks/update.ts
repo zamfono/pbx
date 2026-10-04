@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { recordChange } from '../audit.js';
+import { recordChange, recordFieldChanges } from '../audit.js';
 import { createTarget } from '../forwardTargets.js';
 import { type TargetSpec } from '../forwardTargetSchema.js';
 import { resolveOptionalTarget } from '../forwardTargetSpec.js';
@@ -63,12 +63,7 @@ export const update = defineOperation<Input, DidBlockOut>({
       before.fallbackTargetId,
       input.fallbackTarget
     );
-    if (label !== before.label) {
-      recordChange(ctx, { field: 'label', from: before.label, to: label });
-    }
-    if (digits !== before.digits) {
-      recordChange(ctx, { field: 'digits', from: before.digits, to: digits });
-    }
+    recordFieldChanges(ctx, before, { label, digits });
     if (input.fallbackTarget !== undefined) {
       // The diff names this operation's own input field and carries the wire target, so
       // `audit.undo` replays it straight back through `didBlocks.update` (§5.8).

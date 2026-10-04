@@ -8,21 +8,15 @@ import type { Db } from '@zamfono/shared';
 
 import type { BackupRunRow } from '../ops/backups/_shared.js';
 import type { Keyring } from '../secretbox.js';
+import { serialQueue } from '../serialQueue.js';
 import {
   createBackupRun,
   performBackup,
   type BackupJobDeps
 } from './backup.js';
 
-// The tail of the work queued so far: each waits for the one before it, whatever its outcome.
-let tail: Promise<unknown> = Promise.resolve();
-
 /** Runs `work` once every backup queued before it has ended. */
-export async function inTurn<T>(work: () => Promise<T>): Promise<T> {
-  const result = tail.then(work, work);
-  tail = result.catch(() => undefined);
-  return result;
-}
+export const inTurn = serialQueue();
 
 /** The ids of the live, enabled backup targets. */
 export async function enabledTargetIds(db: Db): Promise<string[]> {

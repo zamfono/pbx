@@ -4,11 +4,7 @@ import { recordChange, recordFieldChanges } from '../audit.js';
 import type { MemberSpec } from '../members.js';
 import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
-import {
-  logLevelInputFields,
-  recordLogLevelChanges,
-  resolveLogLevel
-} from '../settings/logLevel.js';
+import { logLevelInputFields, resolveLogLevel } from '../settings/logLevel.js';
 import { defineOperation } from '../types.js';
 import { ringGroupFields } from './_input.js';
 import { replaceMembers, ringGroupMembers } from './_members.js';
@@ -74,10 +70,7 @@ export const updateRingGroup = defineOperation({
     await assertGroupAudioFieldsAvailable(ctx.db, input);
     const after = resolvedFields(before, input);
     const logLevel = resolveLogLevel(ctx, before, input);
-    recordFieldChanges(ctx, before, after);
-    if (logLevel) {
-      recordLogLevelChanges(ctx, before, logLevel);
-    }
+    recordFieldChanges(ctx, before, { ...after, ...logLevel });
     await ctx.db
       .updateTable('ringGroups')
       .set({ ...after, ...logLevel })

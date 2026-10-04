@@ -4,6 +4,7 @@ import { newId, type Db } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { propagate } from '../propagate.js';
+import { renumberPriorities } from '../rows.js';
 import { defineOperation } from '../types.js';
 import {
   assertCallerIdsNumeric,
@@ -67,26 +68,6 @@ async function replaceRouteChildren(
       )
       .execute();
   }
-}
-
-/**
- * Moves every kept route to a temporary, mutually distinct negative priority: `priority` is
- * unique among live routes, so writing final positions in one pass could collide with a route
- * not yet moved off its current one (§11.2 "outbound_routes").
- */
-async function parkKeptRoutesAtNegativePriority(
-  db: Db,
-  keptIds: string[]
-): Promise<void> {
-  await Promise.all(
-    keptIds.map((id, index) =>
-      db
-        .updateTable('outboundRoutes')
-        .set({ priority: -1 * (index + 1) })
-        .where('id', '=', id)
-        .execute()
-    )
-  );
 }
 
 async function softDeleteDroppedRoutes(
@@ -179,7 +160,14 @@ export const replace = defineOperation<Input, Output>({
       .filter(id => !keptIdSet.has(id));
 
     await softDeleteDroppedRoutes(ctx.db, droppedIds, ctx.now);
-    await parkKeptRoutesAtNegativePriority(ctx.db, keptIds);
+    // Kept routes reach their new positions first, so each new route's insert finds its own free.
+    await renumberPriorities(
+      ctx.db,
+      'outboundRoutes',
+      input.routes.flatMap((route, index) =>
+        route.id === undefined ? [] : [{ id: route.id, priority: index + 1 }]
+      )
+    );
     await Promise.all(
       input.routes.map((route, index) =>
         writeRoute(ctx.db, route, index + 1, ctx.now)

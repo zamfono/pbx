@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { recordChange } from '../audit.js';
+import { recordChange, recordFieldChanges } from '../audit.js';
 import { memberSchema } from '../members.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
@@ -33,15 +33,16 @@ export const updateUserGroup = defineOperation({
   entity: input => ({ kind: 'userGroup', id: input.id }),
   run: async (ctx, input) => {
     const before = await liveUserGroup(ctx.db, input.id);
-    if (input.name !== undefined && input.name !== before.name) {
-      await assertNameAvailable(ctx.db, input.name, input.id);
-      recordChange(ctx, { field: 'name', from: before.name, to: input.name });
-      await ctx.db
-        .updateTable('userGroups')
-        .set({ name: input.name })
-        .where('id', '=', input.id)
-        .execute();
+    const name = input.name ?? before.name;
+    if (name !== before.name) {
+      await assertNameAvailable(ctx.db, name, input.id);
     }
+    recordFieldChanges(ctx, before, { name });
+    await ctx.db
+      .updateTable('userGroups')
+      .set({ name })
+      .where('id', '=', input.id)
+      .execute();
     if (input.members) {
       const beforeMembers = await userGroupMembers(ctx.db, input.id);
       await replaceMembers(ctx.db, input.id, input.members);

@@ -1,11 +1,7 @@
 import { findMeColumn } from '@zamfono/shared';
 
-import type { WireColumns } from '../audit.js';
+import { fromFlag, type WireColumns } from '../audit.js';
 import type { UserRow } from './_shared.js';
-
-/** A 0/1 column (nullable or not) as its wire `boolean` (§11.1, §10.3). */
-const fromFlag = (stored: number | null): boolean | null =>
-  stored === null ? null : Boolean(stored);
 
 /**
  * The `users` columns whose wire field differs in name or value (§10.3 "Conventions": every value

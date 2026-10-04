@@ -1,12 +1,15 @@
-import { codecsColumn, emergencyNumbersColumn } from '@zamfono/shared';
+import {
+  codecsColumn,
+  emergencyNumbersColumn,
+  featureCodesColumn
+} from '@zamfono/shared';
 
-import { recordFieldChanges } from '../audit.js';
+import { fromFlag, recordFieldChanges } from '../audit.js';
 import type { Context } from '../types.js';
 import type { SettingsInput } from './_input.js';
 import type { SettingsColumns, SettingsRow } from './_shared.js';
 
 const toBit = (value: unknown): number => (value ? 1 : 0);
-const fromBit = (stored: number): boolean => stored === 1;
 const toJson = (value: unknown): string => JSON.stringify(value);
 
 /**
@@ -45,9 +48,9 @@ const PLAIN_COLUMNS: {
   ssoTenantId: {},
   ssoAllowedDomain: {},
   ringotelMaxRegs: {},
-  clir: { encode: toBit, decode: fromBit },
-  rejectAnonymous: { encode: toBit, decode: fromBit },
-  autoUpdate: { encode: toBit, decode: fromBit },
+  clir: { encode: toBit, decode: fromFlag },
+  rejectAnonymous: { encode: toBit, decode: fromFlag },
+  autoUpdate: { encode: toBit, decode: fromFlag },
   emergencyNumbersJson: {
     field: 'emergencyNumbers',
     encode: toJson,
@@ -57,6 +60,11 @@ const PLAIN_COLUMNS: {
     field: 'codecs',
     encode: toJson,
     decode: stored => codecsColumn.decode(stored)
+  },
+  featureCodesJson: {
+    field: 'featureCodes',
+    encode: toJson,
+    decode: stored => featureCodesColumn.decode(stored)
   }
 };
 

@@ -55,3 +55,37 @@ export async function softDeleteQuestion(
     .executeTakeFirstOrThrow();
   return `Delete ${what}? The deletion can be undone for ${softDeleteRetentionDays} days.`;
 }
+
+/** A table whose live rows each hold a distinct `priority` (§11.2 "trunks", "outbound_routes"). */
+type PriorityTable = 'trunks' | 'outboundRoutes';
+
+/**
+ * Moves each row of `table` named in `moves` to its new `priority`. `priority` is unique among
+ * the live rows (and at least 1 for a trunk), so every row first takes a distinct temporary value
+ * past the table's highest, then its final one: no write collides with a row still on its old
+ * one. The final priorities must be free of every live row `moves` does not name.
+ */
+export async function renumberPriorities(
+  db: Db,
+  table: PriorityTable,
+  moves: { id: string; priority: number }[]
+): Promise<void> {
+  const { highest } = await db
+    .selectFrom(table)
+    .select(eb => eb.fn.max('priority').as('highest'))
+    .executeTakeFirstOrThrow();
+  await Promise.all(
+    moves.map(({ id }, index) =>
+      db
+        .updateTable(table)
+        .set({ priority: highest + index + 1 })
+        .where('id', '=', id)
+        .execute()
+    )
+  );
+  await Promise.all(
+    moves.map(({ id, priority }) =>
+      db.updateTable(table).set({ priority }).where('id', '=', id).execute()
+    )
+  );
+}

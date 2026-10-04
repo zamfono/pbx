@@ -3,12 +3,9 @@ import { z } from 'zod';
 
 import type { DB, LogLevelColumns } from '@zamfono/shared';
 
-import { recordChange } from '../audit.js';
+import { recordChange, recordFieldChanges } from '../audit.js';
 import { propagate } from '../propagate.js';
-import {
-  recordLogLevelChanges,
-  resolveLogLevel
-} from '../settings/logLevel.js';
+import { logLevelWire, resolveLogLevel } from '../settings/logLevel.js';
 import { defineOperation, type Context } from '../types.js';
 import { updateInputSchema } from './_inputs.js';
 import {
@@ -20,7 +17,6 @@ import {
   scalarsFromRow,
   type HostWire,
   type TrunkRow,
-  type TrunkScalars,
   type TrunkWire
 } from './_shared.js';
 import {
@@ -49,20 +45,6 @@ import {
 const inputSchema = updateInputSchema;
 
 type Input = z.infer<typeof inputSchema>;
-
-/** Records one `changes_json` entry per scalar field whose wire value actually changed. */
-function diffScalars(
-  ctx: Context,
-  before: TrunkScalars,
-  after: TrunkScalars
-): void {
-  const fields = Object.keys(before) as (keyof TrunkScalars)[];
-  for (const field of fields) {
-    if (JSON.stringify(before[field]) !== JSON.stringify(after[field])) {
-      recordChange(ctx, { field, from: before[field], to: after[field] });
-    }
-  }
-}
 
 /** Every check a merged update must pass before the row is written (§9.4, §11.2). */
 async function assertUpdateAllowed(
@@ -170,7 +152,6 @@ export const update = defineOperation<Input, Output>({
   entity: input => ({ kind: 'trunk', id: input.id }),
   run: async (ctx, input) => {
     const row = await liveTrunk(ctx.db, input.id);
-    const before = scalarsFromRow(row);
     const merged = mergeScalars(row, input);
     await assertUpdateAllowed(ctx, merged, input);
     const logLevel = resolveLogLevel(ctx, row, input);
@@ -187,17 +168,18 @@ export const update = defineOperation<Input, Output>({
       await replaceTrunkHosts(ctx.db, input.id, input.hosts);
     }
 
-    diffScalars(ctx, before, merged);
-    if (logLevel) {
-      recordLogLevelChanges(ctx, row, logLevel);
-    }
+    const updatedRow = await liveTrunk(ctx.db, input.id);
+    recordFieldChanges(
+      ctx,
+      { ...scalarsFromRow(row), ...logLevelWire(row) },
+      { ...scalarsFromRow(updatedRow), ...logLevelWire(updatedRow) }
+    );
     recordPasswordChange(ctx, row, merged, input);
     if (hostsBefore) {
       recordChange(ctx, { field: 'hosts', from: hostsBefore, to: input.hosts });
     }
     propagate(ctx, ['pjsip']);
 
-    const updatedRow = await liveTrunk(ctx.db, input.id);
     const hosts = await loadTrunkHosts(ctx.db, input.id);
     const trunk = mapTrunkRow(updatedRow, hosts, {
       status: 'unknown',

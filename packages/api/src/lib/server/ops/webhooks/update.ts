@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
-import { recordChange } from '../audit.js';
+import { fromFlag, recordChange, recordFieldChanges } from '../audit.js';
 import { orBefore } from '../patch.js';
 import { defineOperation } from '../types.js';
 import {
@@ -67,29 +67,17 @@ export const update = defineOperation<Input, WebhookWire>({
       input.secret === undefined
         ? before.secretEnc
         : encrypt(keyringFromEnv(env), input.secret);
-    if (url !== before.url) {
-      recordChange(ctx, { field: 'url', from: before.url, to: url });
-    }
-    if (active !== (before.active === 1)) {
-      recordChange(ctx, {
-        field: 'active',
-        from: before.active === 1,
-        to: active
-      });
-    }
-    if (eventTypesJson !== before.eventTypesJson) {
-      recordChange(ctx, {
-        field: 'eventTypes',
-        from: decodeEventTypes(before.eventTypesJson),
-        to: decodeEventTypes(eventTypesJson)
-      });
-    }
+    const columns = { url, active: active ? 1 : 0, eventTypesJson };
+    recordFieldChanges(ctx, before, columns, {
+      active: { decode: fromFlag },
+      eventTypesJson: { field: 'eventTypes', decode: decodeEventTypes }
+    });
     if (input.secret !== undefined) {
       recordChange(ctx, { field: 'secret', from: null, to: input.secret });
     }
     await ctx.db
       .updateTable('webhooks')
-      .set({ url, active: active ? 1 : 0, eventTypesJson, secretEnc })
+      .set({ ...columns, secretEnc })
       .where('id', '=', input.id)
       .execute();
     const row = await ctx.db

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { recordChange } from '../audit.js';
+import { fromFlag, recordChange, recordFieldChanges } from '../audit.js';
 import { assertMayHoldTarget, createTarget } from '../forwardTargets.js';
 import { resolveTarget } from '../forwardTargetSpec.js';
 import { orBefore } from '../patch.js';
@@ -70,27 +70,8 @@ export const update = defineOperation<Input, OooRuleOut>({
       input.target === undefined
         ? before.targetId
         : await createTarget(ctx, input.target);
-    if (active !== (before.active === 1)) {
-      recordChange(ctx, {
-        field: 'active',
-        from: before.active === 1,
-        to: active
-      });
-    }
-    if (startsAt !== before.startsAt) {
-      recordChange(ctx, {
-        field: 'startsAt',
-        from: before.startsAt,
-        to: startsAt
-      });
-    }
-    if (expiresAt !== before.expiresAt) {
-      recordChange(ctx, {
-        field: 'expiresAt',
-        from: before.expiresAt,
-        to: expiresAt
-      });
-    }
+    const columns = { active: active ? 1 : 0, startsAt, expiresAt };
+    recordFieldChanges(ctx, before, columns, { active: { decode: fromFlag } });
     if (input.target !== undefined) {
       // The diff names this operation's own input field and carries the wire target, so
       // `audit.undo` replays it straight back through `ooo.update` (§5.8).
@@ -102,7 +83,7 @@ export const update = defineOperation<Input, OooRuleOut>({
     }
     await ctx.db
       .updateTable('oooRules')
-      .set({ active: active ? 1 : 0, startsAt, expiresAt, targetId })
+      .set({ ...columns, targetId })
       .where('id', '=', input.id)
       .execute();
     const target = input.target ?? beforeTarget;

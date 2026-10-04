@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from 'node:util';
+
 import { newId, type AuditChannel, type Db } from '@zamfono/shared';
 
 import type { ChangeEntry, RevertedEntry } from './effects.js';
@@ -49,10 +51,14 @@ export type WireColumns<Row> = {
   };
 };
 
+/** A 0/1 column (nullable or not) as its wire `boolean` (§11.1, §10.3). */
+export const fromFlag = (stored: number | null): boolean | null =>
+  stored === null ? null : Boolean(stored);
+
 /**
- * Records one field change per column of `after` whose value differs from `before`'s, under its
- * wire field name and value (`wire`), so `audit.undo` replays the diff straight back through the
- * operation's own input (§5.8). Returns the changed columns.
+ * Records one field change per column of `after` whose wire value differs from `before`'s, under
+ * its wire field name and value (`wire`), so `audit.undo` replays the diff straight back through
+ * the operation's own input (§5.8). Returns the changed columns.
  */
 export function recordFieldChanges<Row extends object>(
   ctx: Context,
@@ -63,16 +69,14 @@ export function recordFieldChanges<Row extends object>(
   const changed: Partial<Row> = {};
   for (const column of Object.keys(after) as (keyof Row & string)[]) {
     const value = after[column] as Row[typeof column];
-    if (value === before[column]) {
-      continue;
-    }
     const { field = column, decode = (stored: unknown) => stored } =
       wire[column] ?? {};
-    recordChange(ctx, {
-      field,
-      from: decode(before[column]),
-      to: decode(value)
-    });
+    const from = decode(before[column]);
+    const to = decode(value);
+    if (isDeepStrictEqual(from, to)) {
+      continue;
+    }
+    recordChange(ctx, { field, from, to });
     changed[column] = value;
   }
   return changed;

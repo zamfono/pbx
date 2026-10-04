@@ -21,6 +21,7 @@ import {
 } from './propagationPending.js';
 import { loadRenderInput } from './renderInput.js';
 import { keyringFromEnv } from './secretbox.js';
+import { serialQueue } from './serialQueue.js';
 
 // Every module the render feeds (§9.1): PJSIP, the dialplan's hints include, `res_musiconhold`.
 const ALL_RELOAD_KINDS: ReloadKind[] = [...reloadKindSchema.options];
@@ -42,20 +43,13 @@ export async function writeFileAtomically(
   await rename(tmpPath, filePath);
 }
 
-// The tail of the propagation chain: one render-and-reload at a time (`serialized`).
-let chainTail: Promise<unknown> = Promise.resolve();
-
 /**
- * Runs `task` once every propagation started before it has settled, whatever its outcome. Two
+ * Runs a task once every propagation started before it has settled, whatever its outcome. Two
  * writes propagating side by side could otherwise render in one order and write the files in the
  * other: the older render, read before the newer write committed, would land last, and both
  * reloads would load it, leaving that write out of Asterisk until the next one (§3.1, §9.1).
  */
-function serialized<T>(task: () => Promise<T>): Promise<T> {
-  const run = chainTail.then(task, task);
-  chainTail = run.catch(() => undefined);
-  return run;
-}
+const serialized = serialQueue();
 
 /**
  * Renders the PJSIP/hints/MoH configuration from the live database onto the `asterisk-config`

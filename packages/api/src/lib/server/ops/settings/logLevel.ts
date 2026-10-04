@@ -10,7 +10,6 @@ import {
   type LogLevelOverride
 } from '@zamfono/shared';
 
-import { recordChange } from '../audit.js';
 import { OpError, type Context } from '../types.js';
 
 /**
@@ -82,28 +81,6 @@ export function resolveLogLevel(
     logLevel: level,
     logLevelExpiresAt: input.logLevelExpiresAt ?? defaultExpiry(ctx.now)
   };
-}
-
-/** Records one `audit_log` diff entry per override column that changed (§7 "Level changes"). */
-export function recordLogLevelChanges(
-  ctx: Context,
-  before: LogLevelColumns,
-  after: LogLevelColumns
-): void {
-  if (after.logLevel !== before.logLevel) {
-    recordChange(ctx, {
-      field: 'logLevel',
-      from: before.logLevel,
-      to: after.logLevel
-    });
-  }
-  if (after.logLevelExpiresAt !== before.logLevelExpiresAt) {
-    recordChange(ctx, {
-      field: 'logLevelExpiresAt',
-      from: before.logLevelExpiresAt,
-      to: after.logLevelExpiresAt
-    });
-  }
 }
 
 /** An entity row's override as the wire carries it (§10.3). */

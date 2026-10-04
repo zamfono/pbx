@@ -14,7 +14,6 @@ import {
 } from './_shared.js';
 import { maybePushTenantProfile, reloadKindsFor } from './changeEffects.js';
 import { assertNoExtensionCollision } from './emergencyNumbers.js';
-import { applyFeatureCodes } from './featureCodes.js';
 import { applyPlainFields } from './plainFields.js';
 import {
   applyFallbackTarget,
@@ -62,7 +61,6 @@ export const update = defineOperation<SettingsInput, SettingsWire>({
     assertSsoInvariants(before, input);
     const columns: SettingsColumns = {};
     applyPlainFields(ctx, before, input, columns);
-    applyFeatureCodes(ctx, before, input.featureCodes, columns);
     applySecretFields(ctx, input, columns);
     await applyMainDidId(ctx, before, input, columns);
     await applyHoldMohAudioId(ctx, before, input, columns);

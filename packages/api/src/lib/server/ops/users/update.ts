@@ -7,11 +7,7 @@ import { recordFieldChanges } from '../audit.js';
 import { ownUserId } from '../gates.js';
 import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
-import {
-  logLevelInputFields,
-  recordLogLevelChanges,
-  resolveLogLevel
-} from '../settings/logLevel.js';
+import { logLevelInputFields, resolveLogLevel } from '../settings/logLevel.js';
 import { defineOperation, type Context } from '../types.js';
 import { maybeRenameExtension, type AffectedDevice } from './_rename.js';
 import {
@@ -161,10 +157,12 @@ export const update = defineOperation({
     const affectedDevices = await maybeRenameExtension(ctx, input);
     const after = resolvedFields(before, input);
     const logLevel = resolveLogLevel(ctx, before, input);
-    recordFieldChanges(ctx, before, after, USER_WIRE_COLUMNS);
-    if (logLevel) {
-      recordLogLevelChanges(ctx, before, logLevel);
-    }
+    recordFieldChanges(
+      ctx,
+      before,
+      { ...after, ...logLevel },
+      USER_WIRE_COLUMNS
+    );
     await ctx.db
       .updateTable('users')
       .set({ ...after, ...logLevel })

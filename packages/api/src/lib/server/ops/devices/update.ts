@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { allowedIpsColumn, HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
-import { recordChange } from '../audit.js';
+import { recordFieldChanges } from '../audit.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, OpError } from '../types.js';
 import { liveDevice, ownTlsDevice, toDeviceOut } from './_shared.js';
@@ -47,20 +47,19 @@ export const update = defineOperation({
       input.allowedIps === undefined
         ? before.allowedIpsJson
         : JSON.stringify(input.allowedIps);
-    if (label !== before.label) {
-      recordChange(ctx, { field: 'label', from: before.label, to: label });
-    }
-    if (allowedIpsJson !== before.allowedIpsJson) {
-      recordChange(ctx, {
+    const columns = { label, allowedIpsJson };
+    const changed = recordFieldChanges(ctx, before, columns, {
+      allowedIpsJson: {
         field: 'allowedIps',
-        from: allowedIpsColumn.nullable().decode(before.allowedIpsJson),
-        to: input.allowedIps ?? null
-      });
+        decode: stored => allowedIpsColumn.nullable().decode(stored)
+      }
+    });
+    if ('allowedIpsJson' in changed) {
       propagate(ctx, ['pjsip']);
     }
     await ctx.db
       .updateTable('devices')
-      .set({ label, allowedIpsJson })
+      .set(columns)
       .where('id', '=', input.id)
       .execute();
     return { device: toDeviceOut(await liveDevice(ctx.db, input.id)) };

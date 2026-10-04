@@ -19,6 +19,7 @@ import {
   activeRingotelProvider,
   type ProvisioningProvider
 } from '../provisioning/index.js';
+import { serialQueue } from '../serialQueue.js';
 
 const logger = pino({ name: 'ringotel' });
 
@@ -174,9 +175,9 @@ export type ReregWatcher = {
  */
 export function watchAsteriskRestarts(deps: ReregDeps): ReregWatcher {
   const state: ReregState = { lastSeen: null };
-  let queue = Promise.resolve();
+  const inQueue = serialQueue();
   const enqueue = (check: () => Promise<void>): void => {
-    queue = queue.then(check).catch((error: unknown) => {
+    inQueue(check).catch((error: unknown) => {
       logger.error({ error }, 'ringotel: re-registration check failed');
     });
   };
@@ -194,6 +195,6 @@ export function watchAsteriskRestarts(deps: ReregDeps): ReregWatcher {
       }
       enqueue(() => handleAsteriskStart(deps, state, asteriskStartedAt));
     },
-    idle: () => queue
+    idle: async () => inQueue(async () => Promise.resolve())
   };
 }
