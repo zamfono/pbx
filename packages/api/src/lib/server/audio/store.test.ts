@@ -1,10 +1,16 @@
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { deleteAudioFile, storeAudio } from './store.js';
+
+// The real `execFile`, watched for the options `storeAudio` runs ffmpeg with.
+vi.mock('node:child_process', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return { ...actual, execFile: vi.fn(actual.execFile) };
+});
 
 const WAV_CHANNELS_OFFSET = 22;
 const WAV_SAMPLE_RATE_OFFSET = 24;
@@ -70,6 +76,18 @@ describe('storeAudio', () => {
       `${stored.id}.master.mp3`
     );
     await expect(stat(masterPath)).resolves.toBeDefined();
+  });
+
+  it('runs ffmpeg under a timeout, so an upload it never finishes on fails', async () => {
+    vi.mocked(execFile).mockClear();
+    await storeAudio(
+      'greeting',
+      { filename: 'greeting.mp3', mimeType: 'audio/mpeg', data: sineMp3 },
+      mediaDir
+    );
+    expect(vi.mocked(execFile).mock.calls[0]?.[2]).toMatchObject({
+      timeout: expect.any(Number) as unknown
+    });
   });
 
   it('also lays the WAV under its MoH class directory, inside media/prompts/, for kind moh', async () => {

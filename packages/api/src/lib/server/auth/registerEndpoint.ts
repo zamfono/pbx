@@ -1,6 +1,6 @@
 import { HTTP_BAD_REQUEST, HTTP_CREATED } from '@zamfono/shared';
 
-import { tryReadJson } from '../json.js';
+import { readJsonBody } from '../requestBody.js';
 import type { Keyring } from '../secretbox.js';
 import {
   ClientMetadataSchema,
@@ -24,7 +24,7 @@ export async function registerEndpoint(
   deps: RegisterDeps,
   req: Request
 ): Promise<Response> {
-  const body = await tryReadJson(req);
+  const body = await readJsonBody(req);
   if (body === undefined) {
     return oauthError(HTTP_BAD_REQUEST, 'invalid_client_metadata');
   }

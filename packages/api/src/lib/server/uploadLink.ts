@@ -44,15 +44,16 @@ export async function uploadLinkAuth(
 }
 
 /**
- * Runs the upload operation link `url` stands for with `fields`, the posted form: the input is
- * the link's query, the form and the path's captures. It runs as the token's user and OAuth
+ * Runs the upload operation link `url` stands for with the posted form, which `readFields` reads
+ * once the token has verified, so a request with a failing token is refused before its body is
+ * read: the input is the link's query, the form and the path's captures. It runs as the token's user and OAuth
  * client with channel `mcp`, since the link completes that client's tool call, and is audited
  * like any run (§5.7). A link that names no upload route is a 404, a failing token a 401.
  */
 export async function runUploadLink(
   deps: UploadLinkDeps,
   url: URL,
-  fields: Record<string, unknown>
+  readFields: () => Promise<Record<string, unknown>>
 ): Promise<unknown> {
   const target = linkRoute(url);
   if (!target) {
@@ -65,7 +66,7 @@ export async function runUploadLink(
   const { route, queryKinds, match } = target.matched;
   const input = {
     ...parseQuery(url, queryKinds),
-    ...fields,
+    ...(await readFields()),
     ...pathInput(route, match.groups ?? {})
   };
   return runOperation(deps.db, route.op, input, {

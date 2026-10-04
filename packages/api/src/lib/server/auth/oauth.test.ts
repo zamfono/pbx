@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { isHttpError } from '@sveltejs/kit';
 import { describe, expect, it } from 'vitest';
 
 import { makeTestDb } from '#testing/testDb.js';
@@ -62,6 +63,18 @@ async function seedClient(deps: TokenDeps, clientId: string): Promise<void> {
 }
 
 describe('tokenEndpoint (authorization_code)', () => {
+  it('refuses a form over 512 KiB with 413', async () => {
+    const { deps } = await tokenDeps();
+    const refused = await tokenEndpoint(
+      deps,
+      formRequest({ grant_type: 'x'.repeat(524_288) })
+    ).then(
+      () => null,
+      (error: unknown) => error
+    );
+    expect(isHttpError(refused, 413)).toBe(true);
+  });
+
   it('exchanges a valid code and PKCE verifier for an access and refresh token', async () => {
     const { deps, codes } = await tokenDeps();
     await seedClient(deps, 'client-1');

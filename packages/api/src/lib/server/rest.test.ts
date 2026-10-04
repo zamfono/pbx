@@ -118,6 +118,19 @@ describe('handleRest', () => {
     expect(body.status).toBe(401);
   });
 
+  it('refuses a JSON body over 512 KiB with a 413 problem', async () => {
+    const deps = await testDeps();
+    const response = await rest(
+      deps,
+      '/contacts',
+      postJson({ displayName: 'x'.repeat(524_288) })
+    );
+    expect(response.status).toBe(413);
+    expect(response.headers.get('content-type')).toBe(
+      'application/problem+json'
+    );
+  });
+
   it('answers 404 for a path matching no route', async () => {
     const deps = await testDeps();
     const response = await rest(deps, '/nope');

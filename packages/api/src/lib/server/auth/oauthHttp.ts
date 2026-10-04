@@ -4,6 +4,8 @@
  */
 import type { Db } from '@zamfono/shared';
 
+import { readBodyText } from '../requestBody.js';
+
 // RFC 6749 grant types this authorization server accepts (§5.2).
 export const GRANT_AUTHORIZATION_CODE = 'authorization_code';
 export const GRANT_REFRESH_TOKEN = 'refresh_token';
@@ -30,10 +32,16 @@ export function oauthError(status: number, error: string): Response {
 }
 
 /** The request's `application/x-www-form-urlencoded` body; file fields are dropped. A body that
- *  is not a form reads as no parameters, which the endpoint answers as a request missing them. */
+ *  is not a form reads as no parameters, which the endpoint answers as a request missing them;
+ *  one over `MAX_BODY_BYTES` is refused with 413 (`readBodyText`). */
 export async function readForm(req: Request): Promise<URLSearchParams> {
   const params = new URLSearchParams();
-  const formData = await req.formData().catch(() => null);
+  const body = await readBodyText(req);
+  const formData = await new Response(body, {
+    headers: { 'content-type': req.headers.get('content-type') ?? '' }
+  })
+    .formData()
+    .catch(() => null);
   if (formData === null) {
     return params;
   }

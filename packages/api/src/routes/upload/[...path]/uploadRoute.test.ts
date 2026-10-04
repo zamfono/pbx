@@ -1,4 +1,7 @@
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import process from 'node:process';
+import { getRequest } from '@sveltejs/kit/node';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { epochSeconds, newId, nowIso } from '@zamfono/shared';
@@ -64,7 +67,77 @@ async function post(url: URL): Promise<Response> {
   );
 }
 
+/**
+ * `POST`s a form to the link at `url` through a real HTTP server whose request carries
+ * adapter-node's body limit of `bodySizeLimit` bytes, as `handler.js` builds it.
+ */
+async function postThroughServer(
+  url: URL,
+  bodySizeLimit: number
+): Promise<Response> {
+  const answered = Promise.withResolvers<Response>();
+  const server = http.createServer((req, res) => {
+    const request = getRequest({ request: req, base: ORIGIN, bodySizeLimit });
+    Promise.resolve(
+      POST(requestEvent<Parameters<typeof POST>[0]>(url, { init: request }))
+    )
+      .then(answered.resolve, answered.reject)
+      .finally(() => res.end());
+  });
+  await new Promise<void>(resolve => {
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const { port } = server.address() as AddressInfo;
+  const form = new FormData();
+  form.set(
+    'upload',
+    new File(['x'.repeat(64)], 'hold.wav', { type: 'audio/wav' })
+  );
+  await fetch(`http://127.0.0.1:${port}/`, { method: 'POST', body: form });
+  server.close();
+  return answered.promise;
+}
+
 describe('POST <upload link> (§10.5 "Uploads")', () => {
+  it('answers a body over the size limit with a 413 problem', async () => {
+    const response = await postThroughServer(
+      await uploadUrl('/api/v1/audio'),
+      16
+    );
+    expect(response.status).toBe(413);
+    expect(response.headers.get('content-type')).toBe(
+      'application/problem+json'
+    );
+  });
+
+  it('refuses a failing token before it reads the body', async () => {
+    let read = false;
+    const body = new ReadableStream(
+      {
+        pull: () => {
+          read = true;
+          throw new Error('the body was read');
+        }
+      },
+      { highWaterMark: 0 }
+    );
+    const response = await POST(
+      requestEvent<Parameters<typeof POST>[0]>(
+        await uploadUrl('/api/v1/users'),
+        {
+          init: {
+            method: 'POST',
+            body,
+            duplex: 'half',
+            headers: { 'content-type': 'multipart/form-data; boundary=x' }
+          } as RequestInit
+        }
+      )
+    );
+    expect(response.status).toBe(401);
+    expect(read).toBe(false);
+  });
+
   it('runs the operation with the posted file, kept from shared caches', async () => {
     const response = await post(await uploadUrl('/api/v1/audio'));
     expect(response.status).toBe(200);

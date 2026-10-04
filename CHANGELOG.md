@@ -78,6 +78,7 @@ why the specified behaviour changed; the commit history, how.
 - `GET /api/v1/openapi.json` is served without a token.
 - Signing out, revoking a token or resetting a password ends that session's API and MCP access
   at once, not after its access token's 15 minutes.
+- Audio uploads (hold music, greetings) take files up to 50 MB; a larger one answers 413.
 
 ### Removed
 

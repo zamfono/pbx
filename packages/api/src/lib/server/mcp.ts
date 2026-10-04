@@ -3,7 +3,6 @@ import pino from 'pino';
 import { HTTP_ACCEPTED, HTTP_NOT_FOUND, HTTP_OK } from '@zamfono/shared';
 
 import type { Authenticated } from './auth/bearer.js';
-import { tryReadJson } from './json.js';
 import {
   authenticate,
   unauthorizedResponse,
@@ -41,6 +40,7 @@ import {
 } from './mcp/results.js';
 import { handleToolsCall } from './mcp/toolCall.js';
 import { listTools } from './mcp/tools.js';
+import { readJsonBody } from './requestBody.js';
 
 export type { McpDeps } from './mcp/auth.js';
 
@@ -156,7 +156,7 @@ export async function handleMcpRequest(
   if (!auth) {
     return unauthorizedResponse(deps.origin);
   }
-  const body = await tryReadJson(request);
+  const body = await readJsonBody(request);
   if (body === undefined) {
     return jsonRpcError(null, JSONRPC_PARSE_ERROR, 'invalid JSON');
   }

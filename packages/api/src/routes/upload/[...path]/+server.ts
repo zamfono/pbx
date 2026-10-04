@@ -15,11 +15,10 @@ import type { RequestHandler } from './$types.js';
  */
 export const POST: RequestHandler = async ({ request, url }) => {
   try {
-    const fields = await formFields(await request.formData());
     const output = await runUploadLink(
       { db: getDb(), jwtSecret: env.JWT_SECRET },
       url,
-      fields
+      async () => formFields(await request.formData())
     );
     const response = await outputResponse(output);
     // RFC 6750 §2.3: a response to a request whose token is in the URI is kept from shared caches.

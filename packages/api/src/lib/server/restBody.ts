@@ -6,6 +6,7 @@
 import { HTTP_BAD_REQUEST, isRecord } from '@zamfono/shared';
 
 import { OpError } from './ops/types.js';
+import { readBodyText } from './requestBody.js';
 import type { RouteEntry } from './restRoutes.js';
 import { parseQuery, type QueryFieldKinds } from './restTransport.js';
 
@@ -19,7 +20,7 @@ function parseJsonOrThrow(text: string): unknown {
   }
 }
 async function parseJsonBody(request: Request): Promise<Fields> {
-  const text = await request.text();
+  const text = await readBodyText(request);
   if (text.length === 0) {
     return {};
   }

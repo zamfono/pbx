@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { isHttpError } from '@sveltejs/kit';
 import { describe, expect, it } from 'vitest';
 
 import { epochSeconds, nowIso } from '@zamfono/shared';
@@ -180,6 +181,20 @@ describe('handleMcpRequest, 2026-07-28', () => {
     });
     const nameless = await rpc(deps, currentRequest(5, 'tools/call', {}));
     expect(nameless.error?.code).toBe(-32602);
+  });
+
+  it('refuses a body over 512 KiB with 413', async () => {
+    const refused = await handleMcpRequest(
+      await seededDeps(),
+      currentRequest(7, 'tools/call', {
+        name: 'contacts.create',
+        arguments: { displayName: 'x'.repeat(524_288) }
+      })
+    ).then(
+      () => null,
+      (error: unknown) => error
+    );
+    expect(isHttpError(refused, 413)).toBe(true);
   });
 
   it('answers an unexpected failure with JSON-RPC -32603, leaking nothing', async () => {

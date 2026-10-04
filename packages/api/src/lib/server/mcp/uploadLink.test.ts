@@ -93,7 +93,9 @@ describe('upload tools over MCP (§10.5 "Uploads")', () => {
       kind: 'moh',
       label: 'Hold'
     });
-    const asset = (await runUploadLink(deps, url, { upload: file })) as {
+    const asset = (await runUploadLink(deps, url, () =>
+      Promise.resolve({ upload: file })
+    )) as {
       id: string;
       kind: string;
       label: string;
@@ -125,7 +127,7 @@ describe('upload tools over MCP (§10.5 "Uploads")', () => {
     const other = new URL(url);
     other.pathname = '/upload/users/owner/voicemailGreeting';
     await expect(
-      runUploadLink(deps, other, { upload: file })
+      runUploadLink(deps, other, () => Promise.resolve({ upload: file }))
     ).rejects.toMatchObject({ status: 401 });
     const rest = new URL(url);
     rest.pathname = '/api/v1/audio';

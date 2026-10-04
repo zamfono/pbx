@@ -41,7 +41,7 @@ export const upload = form(
       await runUploadLink(
         { db: getDb(), jwtSecret: env.JWT_SECRET },
         new URL(link, originFromEnv()),
-        { upload: await formValue(file) }
+        async () => ({ upload: await formValue(file) })
       );
       return { uploaded: true };
     } catch (error) {

@@ -9,14 +9,14 @@ import {
 } from '@zamfono/shared';
 
 import { getDb } from '#lib/server/db.js';
-import { tryReadJson } from '#lib/server/json.js';
 import { sendMail } from '#lib/server/mail/index.js';
+import { readJsonBody } from '#lib/server/requestBody.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 const logger = pino({ name: 'internal-mail' });
 
 async function handleMailRequest(request: Request): Promise<Response> {
-  const parsed = mailRequestSchema.safeParse(await tryReadJson(request));
+  const parsed = mailRequestSchema.safeParse(await readJsonBody(request));
   if (!parsed.success) {
     return new Response(null, { status: HTTP_BAD_REQUEST });
   }

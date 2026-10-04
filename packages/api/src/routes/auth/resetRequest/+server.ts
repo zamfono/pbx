@@ -8,8 +8,8 @@ import {
 
 import { requestPasswordReset } from '#lib/server/auth/passwordReset.js';
 import { getDb } from '#lib/server/db.js';
-import { tryReadJson } from '#lib/server/json.js';
 import { problem } from '#lib/server/problem.js';
+import { readJsonBody } from '#lib/server/requestBody.js';
 
 /**
  * `POST /auth/resetRequest` (§5.2, §5.5, §10.3): answers identically whether the address exists
@@ -19,7 +19,7 @@ import { problem } from '#lib/server/problem.js';
 export async function POST(event: RequestEvent): Promise<Response> {
   const outcome = await requestPasswordReset(getDb(), {
     clientAddress: () => event.getClientAddress(),
-    body: async () => tryReadJson(event.request)
+    body: async () => readJsonBody(event.request)
   });
   if (outcome.kind === 'noRelay') {
     return problem(HTTP_NOT_FOUND, 'not found');

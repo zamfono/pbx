@@ -33,6 +33,15 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §6.3 Environment.** `FQDN` is taken in lower case by `setup.sh`, `api` and `proxy`'s certificate hook.
 *Why:* Caddy names a certificate by the lower-case host, so an `FQDN` typed with capitals left Asterisk on its placeholder certificate and the OAuth issuer unlike the host browsers send.
+**2026-10-04 · §6.3 Compose stack, §10.2 Greetings and audio.** Request bodies are capped at 50 MB (`BODY_SIZE_LIMIT=50M` on `api`), a larger one answering 413; an upload link verifies its token before reading the body, and the upload transcode is killed after two minutes.
+**2026-10-04 · §10.6 Realtime events.** An `/events` connection that stops reading is dropped once 1 MiB of events waits unsent on it.
+*Why:* `ws` buffers every unsent frame, so one stalled client kept every later event in `api`'s memory without bound.
+
+**2026-10-04 · §10.6 Authentication.** A frame over 4 KiB closes an `/events` connection with 1009 before it is read.
+*Why:* `ws` buffers frames up to 100 MiB by default, so a few unauthenticated connections could exhaust `api`'s memory.
+
+**2026-10-04 · §6.3 Compose stack, §10.2 Greetings and audio.** Audio uploads are capped at 50 MB (`BODY_SIZE_LIMIT=50M` on `api`) and every other REST, MCP or OAuth body at 512 KiB, a larger one answering 413; an upload link verifies its token before reading the body, and the upload transcode is killed after two minutes.
+*Why:* adapter-node's default 512 KiB refused ordinary hold-music and greeting uploads, and as a 500; the product owner chose 50 MB.
 
 **2026-10-04 · §6.5 Target kinds.** A target's `host` (sftp, ftp, ftps) is an FQDN or an IPv4 address, a webdav `url` an `http` or `https` URL, and an sftp username cannot begin with `-` or contain whitespace, a quote or a backslash; anything else is refused with 422.
 *Why:* the sftp host and username reach `ssh` as arguments through restic's `sftp.command`, which restic splits at whitespace itself, so an admin could add `-oProxyCommand=…` and run a command in `api`.

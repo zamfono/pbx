@@ -18,6 +18,9 @@ const execFileAsync = promisify(execFile);
 const PLAYBACK_SAMPLE_RATE_HZ = 16_000;
 const PLAYBACK_CHANNELS = 1;
 const PLAYBACK_EXTENSION = '.wav16';
+// An upload is at most 50 MB (§10.2 "Greetings and audio"), which ffmpeg decodes in seconds; one
+// it is still working on after this long is a malformed file, and ffmpeg is killed.
+const TRANSCODE_TIMEOUT_MS = 120_000;
 
 /** The master file's extension, or a rejection for a type §10.2 does not accept. */
 function masterExtension(upload: AudioUpload): string {
@@ -35,24 +38,28 @@ async function transcodeToPlaybackWav(
   src: string,
   dest: string
 ): Promise<void> {
-  await execFileAsync('ffmpeg', [
-    '-hide_banner',
-    '-loglevel',
-    'error',
-    '-y',
-    '-i',
-    src,
-    '-ar',
-    String(PLAYBACK_SAMPLE_RATE_HZ),
-    '-ac',
-    String(PLAYBACK_CHANNELS),
-    '-c:a',
-    'pcm_s16le',
-    // ffmpeg picks the container by the extension, which it does not know as `.wav16`.
-    '-f',
-    'wav',
-    dest
-  ]);
+  await execFileAsync(
+    'ffmpeg',
+    [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-y',
+      '-i',
+      src,
+      '-ar',
+      String(PLAYBACK_SAMPLE_RATE_HZ),
+      '-ac',
+      String(PLAYBACK_CHANNELS),
+      '-c:a',
+      'pcm_s16le',
+      // ffmpeg picks the container by the extension, which it does not know as `.wav16`.
+      '-f',
+      'wav',
+      dest
+    ],
+    { timeout: TRANSCODE_TIMEOUT_MS }
+  );
 }
 
 /**

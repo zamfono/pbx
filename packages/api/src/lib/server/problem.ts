@@ -1,6 +1,8 @@
+import { isHttpError } from '@sveltejs/kit';
 import pino from 'pino';
 
 import {
+  HTTP_CONTENT_TOO_LARGE,
   HTTP_INTERNAL_SERVER_ERROR,
   isRecord,
   PROBLEM_CONTENT_TYPE
@@ -50,14 +52,34 @@ export function problem(
 }
 
 /**
- * Converts an error thrown by the runner or an operation's `run` into its problem response: an
- * `OpError` answers with its own status, title and detail; anything else answers 500 without
+ * Whether `error` is SvelteKit's refusal of a request body over adapter-node's `BODY_SIZE_LIMIT`,
+ * which reading the body rejects with: an `Error` with `status` 413 (SvelteKit's `SvelteKitError`,
+ * which it does not export).
+ */
+function isBodyTooLarge(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    'status' in error &&
+    error.status === HTTP_CONTENT_TOO_LARGE
+  );
+}
+
+/**
+ * Converts an error thrown by the runner, an operation's `run` or reading the request body into
+ * its problem response: an `OpError` answers with its own status, title and detail, a body over
+ * the size limit with 413; anything else answers 500 without
  * detail, so an operation's internal failure never leaks internals over the wire. That failure is
  * logged here instead, since the opaque response is the only other trace it leaves.
  */
 export function problemFromError(error: unknown): Response {
   if (error instanceof OpError) {
     return problem(error.status, error.title, error.detail);
+  }
+  if (isHttpError(error)) {
+    return problem(error.status, error.body.message);
+  }
+  if (isBodyTooLarge(error)) {
+    return problem(HTTP_CONTENT_TOO_LARGE, 'request body too large');
   }
   logger.error({ err: error }, 'rest: operation failed');
   return problem(HTTP_INTERNAL_SERVER_ERROR, 'internal server error');

@@ -14,12 +14,10 @@ describe('tryParseJson', () => {
 
 describe('tryReadJson', () => {
   it('reads a JSON body', async () => {
-    const request = new Request('http://x/', { method: 'POST', body: '[1]' });
-    expect(await tryReadJson(request)).toEqual([1]);
+    expect(await tryReadJson(new Response('[1]'))).toEqual([1]);
   });
 
   it('is undefined for a body that is not JSON', async () => {
-    const request = new Request('http://x/', { method: 'POST', body: 'nope' });
-    expect(await tryReadJson(request)).toBeUndefined();
+    expect(await tryReadJson(new Response('nope'))).toBeUndefined();
   });
 });
