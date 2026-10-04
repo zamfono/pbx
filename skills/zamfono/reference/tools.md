@@ -88,7 +88,7 @@
 | `ringGroups.setForwarding` | `PUT /ringGroups/{id}/forwarding` | Replaces a ring group's 'unanswered' and 'unavailable' forwarding rules as a whole. | admin | no |
 | `ringGroups.update` | `PATCH /ringGroups/{id}` | Updates a ring group's configuration. | admin | no |
 | `search.query` | `GET /search` | The type-ahead behind the search bar: users, ring groups and contacts. | user | no |
-| `settings.get` | `GET /settings` | Reads the tenant settings row, with secrets masked | admin | no |
+| `settings.get` | `GET /settings` | Reads the tenant settings row, each secret only as whether it is set | admin | no |
 | `settings.update` | `PATCH /settings` | Updates tenant-wide settings: main number, fallback, country, language, mail relay, feature codes, retention, SSO and more; owner-only fields say so | admin | no |
 | `stats.query` | `GET /stats` | Buckets a call metric (answerRate, ringToAnswer, avgCallLength, callVolume) over a time range. | admin | no |
 | `system.info` | `GET /system/info` | Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update with who asked for it, whether automatic updates are on and why and how often the last one failed, when and why the maintenance gate last gave up, whether a tenant profile change still waits for Ringotel, and the domain of the stack and the public IPv4 address its SIP and media use. | user | no |

@@ -27,7 +27,7 @@ import { assertSsoInvariants, maybeResetSsoSubjects } from './sso.js';
 const inputSchema = settingsInputSchema;
 
 function assertFieldRoles(input: SettingsInput, role: UserRole): void {
-  for (const field of Object.keys(input) as (keyof SettingsWire)[]) {
+  for (const field of Object.keys(input) as (keyof SettingsInput)[]) {
     checkFieldRole(field, role);
   }
 }

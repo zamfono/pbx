@@ -59,16 +59,19 @@ export type BackupTargetWire = {
   id: string;
   kind: BackupTargetKind;
   params: Record<string, unknown>;
+  /** Always `true`: a target's secret is required; the secret itself is write-only (§10.3). */
+  secretSet: true;
   enabled: boolean;
   createdAt: string;
 };
 
-/** `row` as the API returns it; the secret is write-only and never appears here (§5.4). */
+/** `row` as the API returns it; the secret is write-only, only `secretSet` shows it (§10.3). */
 export function targetToWire(row: BackupTargetRow): BackupTargetWire {
   return {
     id: row.id,
     kind: row.kind,
     params: JSON.parse(row.paramsJson) as Record<string, unknown>,
+    secretSet: true,
     enabled: row.enabled === 1,
     createdAt: row.createdAt
   };

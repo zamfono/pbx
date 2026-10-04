@@ -16,7 +16,8 @@ All webhook operations are `admin`.
 - `webhooks.update` (`PATCH /webhooks/{id}`) changes `url`, `secret` or `eventTypes`, and switches
   delivery on and off with `active`. `{ "active": true }` once the receiver verifies signatures.
 - `webhooks.list` (`GET /webhooks`) lists the hooks with `eventTypes`, `active`, `lastStatus`,
-  `lastDeliveryAt` and the failure fields below; the secret never appears in a read.
+  `lastDeliveryAt` and the failure fields below; the secret never appears in a read, only
+  `secretSet`.
 - `webhooks.delete` (`DELETE /webhooks/{id}`) soft-deletes a hook (`guardrails`); nothing more is
   delivered to it.
 

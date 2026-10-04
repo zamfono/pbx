@@ -7,15 +7,18 @@ import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import type { Codec, TrunkRow, TrunkScalars } from './_shared.js';
 
 /** The scalar fields of a `trunks.update` request the merge reads, plus its write-only password. */
-export type MergeInput = Partial<TrunkScalars> & { password?: string };
+export type MergeInput = Partial<TrunkScalars> & { password?: string | null };
 
 /** A trunk's next scalar state, with the encrypted password it stores alongside. */
 export type Merged = TrunkScalars & { passwordEnc: Buffer | null };
 
-/** The row's stored password, or a freshly encrypted one when `input.password` was given. */
+/** The row's stored password, none for `null`, or a freshly encrypted one for a string. */
 function mergedPasswordEnc(row: TrunkRow, input: MergeInput): Buffer | null {
   if (input.password === undefined) {
     return row.passwordEnc;
+  }
+  if (input.password === null) {
+    return null;
   }
   return encrypt(keyringFromEnv(env), input.password);
 }

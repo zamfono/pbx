@@ -150,7 +150,7 @@ function recordPasswordChange(
   input: Input
 ): void {
   const dropped = row.passwordEnc !== null && merged.passwordEnc === null;
-  if (input.password !== undefined || dropped) {
+  if (typeof input.password === 'string' || dropped) {
     recordChange(ctx, {
       field: 'password',
       from: null,

@@ -22,7 +22,7 @@ const FIELD = {
     "registration: the stack registers with username and password; ip: the provider whitelists the stack's address and nothing registers.",
   username:
     'The provider account name, for registration and digest auth; callerIdHeader pai needs one.',
-  password: 'The provider account password; write-only, never returned.',
+  password: 'The provider account password; write-only, read as passwordSet.',
   inboundAuth:
     "Challenges the provider's INVITEs and identifies the trunk by its username, so it needs no inbound hosts; either auth mode.",
   transport: 'SIP signalling transport: udp (default), tcp or tls.',
@@ -118,7 +118,7 @@ export const updateInputSchema = z
     emergency: z.boolean().optional().describe(FIELD.emergency),
     authMode: z.enum(TRUNK_AUTH_MODES).optional().describe(FIELD.authMode),
     username: z.string().min(1).nullable().optional().describe(FIELD.username),
-    password: z.string().min(1).optional().describe(FIELD.password),
+    password: z.string().min(1).nullable().optional().describe(FIELD.password),
     inboundAuth: z.boolean().optional().describe(FIELD.inboundAuth),
     transport: z.enum(TRUNK_TRANSPORTS).optional().describe(FIELD.transport),
     srtp: z.boolean().optional().describe(FIELD.srtp),

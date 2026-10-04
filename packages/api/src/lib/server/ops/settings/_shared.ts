@@ -17,16 +17,16 @@ import { type TargetSpec } from '../forwardTargetSchema.js';
 import { resolveOptionalTarget } from '../forwardTargetSpec.js';
 import type { Codec } from '../trunks/_shared.js';
 import { OpError } from '../types.js';
+import type { SettingsInput } from './_input.js';
 
 export type SettingsRow = Selectable<DB['settings']>;
 /** The `settings` columns one `PATCH /settings` writes. */
 export type SettingsColumns = Updateable<DB['settings']>;
 
-const MASKED = '***';
-
 /**
  * The wire shape of the tenant `settings` row (§11.4): every column, the read-only `extLength`,
- * `ringotelOrgId` and `ringotelBranchId` included, except the `*_pending` state columns.
+ * `ringotelOrgId` and `ringotelBranchId` included, except the `*_pending` state columns. A 🔒
+ * secret is never returned: its read-only `<name>Set` says whether one is stored (§10.3).
  */
 export type SettingsWire = {
   companyName: string;
@@ -38,7 +38,7 @@ export type SettingsWire = {
   smtpPort: number;
   smtpSecurity: SmtpSecurity;
   smtpUser: string | null;
-  smtpPassword: string | null;
+  smtpPasswordSet: boolean;
   mailFrom: string | null;
   extLength: number;
   emergencyNumbers: string[];
@@ -63,15 +63,15 @@ export type SettingsWire = {
   ssoClientId: string | null;
   ssoTenantId: string | null;
   ssoAllowedDomain: string | null;
-  ssoClientSecret: string | null;
+  ssoClientSecretSet: boolean;
   ringotelOrgId: string | null;
   ringotelBranchId: string | null;
   ringotelMaxRegs: number;
-  ringotelApiToken: string | null;
+  ringotelApiTokenSet: boolean;
 };
 
 /** Fields only an owner may write (👑, §11.4); every other writable field is admin's. */
-export const OWNER_FIELDS: ReadonlySet<keyof SettingsWire> = new Set([
+export const OWNER_FIELDS: ReadonlySet<keyof SettingsInput> = new Set([
   'smtpHost',
   'smtpPort',
   'smtpSecurity',
@@ -94,16 +94,12 @@ export const OWNER_FIELDS: ReadonlySet<keyof SettingsWire> = new Set([
 
 /** Throws 403 when `role` may not write `field` (owner-only fields, §11.4). */
 export function checkFieldRole(
-  field: keyof SettingsWire,
+  field: keyof SettingsInput,
   role: UserRole
 ): void {
   if (OWNER_FIELDS.has(field) && role !== 'owner') {
     throw new OpError(HTTP_FORBIDDEN, `settings: '${field}' is owner-only`);
   }
-}
-
-function maskSecret(enc: Buffer | null): string | null {
-  return enc === null ? null : MASKED;
 }
 
 /** Loads the `settings` singleton row (`id = 1`, §11.1). */
@@ -115,7 +111,7 @@ export function loadSettings(db: Db): Promise<SettingsRow> {
     .executeTakeFirstOrThrow();
 }
 
-/** Maps a `settings` row to its wire shape, masking 🔒 secrets as `'***'` (§5.4, §11.4). */
+/** Maps a `settings` row to its wire shape, each 🔒 secret as its `<name>Set` (§10.3, §11.4). */
 export async function rowToWire(
   db: Db,
   row: SettingsRow
@@ -130,7 +126,7 @@ export async function rowToWire(
     smtpPort: row.smtpPort,
     smtpSecurity: row.smtpSecurity,
     smtpUser: row.smtpUser,
-    smtpPassword: maskSecret(row.smtpPasswordEnc),
+    smtpPasswordSet: row.smtpPasswordEnc !== null,
     mailFrom: row.mailFrom,
     extLength: row.extLength,
     emergencyNumbers: JSON.parse(row.emergencyNumbersJson) as string[],
@@ -155,10 +151,10 @@ export async function rowToWire(
     ssoClientId: row.ssoClientId,
     ssoTenantId: row.ssoTenantId,
     ssoAllowedDomain: row.ssoAllowedDomain,
-    ssoClientSecret: maskSecret(row.ssoClientSecretEnc),
+    ssoClientSecretSet: row.ssoClientSecretEnc !== null,
     ringotelOrgId: row.ringotelOrgId,
     ringotelBranchId: row.ringotelBranchId,
     ringotelMaxRegs: row.ringotelMaxRegs,
-    ringotelApiToken: maskSecret(row.ringotelApiTokenEnc)
+    ringotelApiTokenSet: row.ringotelApiTokenEnc !== null
   };
 }

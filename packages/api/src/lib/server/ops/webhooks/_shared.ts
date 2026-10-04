@@ -30,7 +30,7 @@ export const webhookSecretSchema = z
   .string()
   .min(1)
   .describe(
-    'Shared secret: each POST carries X-Zamfono-Signature, the HMAC-SHA256 of the body under it; write-only.'
+    'Shared secret: each POST carries X-Zamfono-Signature, the HMAC-SHA256 of the body under it; write-only, read as secretSet; required, so null is refused.'
   );
 
 /** A webhook's event-type filter, the same field on create and update (§10.6). */
@@ -56,6 +56,8 @@ export type WebhookWire = {
   id: string;
   url: string;
   eventTypes: EventType[] | null;
+  /** Always `true`: a hook's secret is required; the secret itself is write-only (§10.3). */
+  secretSet: true;
   active: boolean;
   lastStatus: WebhookStatus | null;
   lastDeliveryAt: string | null;
@@ -68,12 +70,13 @@ export type WebhookWire = {
   createdAt: string;
 };
 
-/** `row` as `GET /webhooks` returns it; the secret is write-only and never appears here (§10.6). */
+/** `row` as `GET /webhooks` returns it; the secret is write-only, only `secretSet` shows it (§10.3). */
 export function toWire(row: WebhookRow): WebhookWire {
   return {
     id: row.id,
     url: row.url,
     eventTypes: parseEventTypesJson(row.eventTypesJson),
+    secretSet: true,
     active: row.active === 1,
     lastStatus: row.lastStatus,
     lastDeliveryAt: row.lastDeliveryAt,

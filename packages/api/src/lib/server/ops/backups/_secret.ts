@@ -37,7 +37,7 @@ export const targetSecretSchema = z
   })
   .strict()
   .describe(
-    "The restic repository password and the kind's backend credentials: { resticPassword } for local, { resticPassword, username, password } for sftp, ftp, ftps and webdav, { resticPassword, accessKeyId, secretAccessKey } for s3; write-only."
+    "The restic repository password and the kind's backend credentials: { resticPassword } for local, { resticPassword, username, password } for sftp, ftp, ftps and webdav, { resticPassword, accessKeyId, secretAccessKey } for s3; write-only, read as secretSet; required, so null is refused."
   );
 
 export type BackupSecret = z.infer<typeof targetSecretSchema>;

@@ -9,7 +9,7 @@ import { assertValidPassword, assertValidUsername } from './hostValidation.js';
 /** The credential and registration fields of a `trunks.update` request these checks read. */
 export type CredentialInput = {
   username?: string | null;
-  password?: string;
+  password?: string | null;
   registerExpiryS?: number | null;
   registerRetryS?: number | null;
 };
@@ -24,7 +24,7 @@ export function assertNoStrayCredentials(
   input: CredentialInput
 ): void {
   const usernameGiven = input.username !== undefined && input.username !== null;
-  const passwordGiven = input.password !== undefined;
+  const passwordGiven = input.password !== undefined && input.password !== null;
   if (!required && (usernameGiven || passwordGiven)) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
@@ -58,7 +58,7 @@ export function assertValidCredentialFields(input: CredentialInput): void {
   if (input.username !== undefined && input.username !== null) {
     assertValidUsername(input.username);
   }
-  if (input.password !== undefined) {
+  if (input.password !== undefined && input.password !== null) {
     assertValidPassword(input.password);
   }
 }

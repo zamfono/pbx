@@ -27,7 +27,7 @@ export const mailInputFields = {
     .string()
     .nullish()
     .describe(
-      'The mail relay password; write-only, masked on read. Owner-only.'
+      'The mail relay password; write-only, read as smtpPasswordSet; null clears it. Owner-only.'
     ),
   mailFrom: z
     .string()
@@ -74,7 +74,9 @@ export const ssoInputFields = {
   ssoClientSecret: z
     .string()
     .nullish()
-    .describe('The OIDC client secret; write-only, masked on read. Owner-only.')
+    .describe(
+      'The OIDC client secret; write-only, read as ssoClientSecretSet; null clears it. Owner-only.'
+    )
 };
 
 /** The Ringotel fields of `PATCH /settings` (§10.4, §11.4). */
@@ -91,6 +93,6 @@ export const ringotelInputFields = {
     .string()
     .nullish()
     .describe(
-      'The Ringotel Admin API bearer token; write-only, masked on read. Owner-only.'
+      'The Ringotel Admin API bearer token; write-only, read as ringotelApiTokenSet; null clears it. Owner-only.'
     )
 };

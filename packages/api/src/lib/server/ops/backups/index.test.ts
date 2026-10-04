@@ -21,6 +21,15 @@ describe('backups', () => {
       asRun()
     )) as BackupTargetWire & { secret?: unknown };
     expect(created.secret).toBeUndefined();
+    expect(created.secretSet).toBe(true);
+    await expect(
+      runOperation(
+        db,
+        'backups.targets.update',
+        { id: created.id, secret: null },
+        asRun()
+      )
+    ).rejects.toMatchObject({ status: 422 });
     const row = await db
       .selectFrom('backupTargets')
       .select('secretEnc')

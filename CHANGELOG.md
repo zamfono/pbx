@@ -255,6 +255,13 @@ why the specified behaviour changed; the commit history, how.
   new kind without a new `secret`. The default `local` target from `BACKUP_PASSWORD` is stored the
   same way. A backup target created before this release can no longer be read, and its runs fail
   until it is re-entered: set its secret again with `backups.targets.update`.
+- **Breaking:** no secret is returned any more, not even masked: `GET /settings` carries
+  `smtpPasswordSet`, `ssoClientSecretSet` and `ringotelApiTokenSet` in place of `smtpPassword`,
+  `ssoClientSecret` and `ringotelApiToken` (no longer `"***"`), a trunk carries `passwordSet`, and a
+  webhook and a backup target carry `secretSet`, each saying whether a secret is stored. A write
+  leaves an omitted secret as it is, clears it with `null` (refused with 422 where it is required:
+  a trunk with credentials, a webhook, a backup target) and stores any string as given, `"***"`
+  included.
 - While the updater knows no current release, the automatic update attempts nothing and reports
   no breaking release, so no audit entry and no mail carry an empty version; `api` logs once why.
 

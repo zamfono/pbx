@@ -205,7 +205,7 @@ All stored secrets are encrypted at rest with libsodium's XChaCha20-Poly1305 IET
 3. confirm the log line reports 0 remaining;
 4. remove `SECRETBOX_KEY_PREVIOUS`.
 
-Dynamic client ids are encrypted but not stored, so a client whose id was issued under a retired key registers again; that is the one visible effect. The SSO client secret and the Ringotel API token are write-only through the API and masked in `GET /settings`. ARI and AMI credentials exist only on the internal Docker network; neither port is published.
+Dynamic client ids are encrypted but not stored, so a client whose id was issued under a retired key registers again; that is the one visible effect. Every stored secret is write-only through the API: a read says only whether it is set (§10.3, conventions). ARI and AMI credentials exist only on the internal Docker network; neither port is published.
 
 ### 5.5 Rate limiting
 
@@ -1326,7 +1326,7 @@ The time filters of these reads, `from` and `to` of `GET /audit`, `GET /calls` a
 
 **Backups** (min. role: admin) — `GET/POST /backups/targets`, `PATCH/DELETE /backups/targets/{id}`; `GET /backups/runs` (history and status), `POST /backups/runs` (start a run), `GET /backups/runs/{id}`; a target's write-only `secret` is that JSON object, `resticPassword` and the backend credentials its kind takes, `username` and `password` for `sftp`, `ftp`, `ftps` and `webdav`, `accessKeyId` and `secretAccessKey` for `s3`, and nothing else; a run carries `bytesAdded` and `bytesTotal` (§6.5)
 
-**Settings** (min. role: admin; owners for the columns marked 👑 in §11.4) — `GET/PATCH /settings` — the columns of the singleton row (§11.4) under their wire names; unknown fields rejected, secret values masked; a change to the tenant's Ringotel profile reaches Ringotel after the write committed, and a refusal is a `warnings` entry of the result, never a failed write (§10.4 "Tenant profile push")
+**Settings** (min. role: admin; owners for the columns marked 👑 in §11.4) — `GET/PATCH /settings` — the columns of the singleton row (§11.4) under their wire names; unknown fields rejected, each 🔒 secret read as its `<name>Set`; a change to the tenant's Ringotel profile reaches Ringotel after the write committed, and a refusal is a `warnings` entry of the result, never a failed write (§10.4 "Tenant profile push")
 
 **Live calls** (min. role: user (own scope) / admin) — `GET /calls?live=true` (the calls in progress, each with `callId`, `direction`, `from`, `to`, `state`, `startedAt`, its ring-group context `ringGroupId`, and `userIds`, the users the call concerns now: its caller, callee and answerer and every user with a leg ringing or up in it), `POST /calls` (click-to-dial: target, optional `userId` for admins and `clir`, §10.2), `POST /calls/{id}/transfer` (a `target`, with `voicemail` for the target's mailbox, or `toCallId`, the consultation, §10.1 "Transfers and pickup"), `POST /calls/{id}/pickup`, `POST /calls/{id}/hangup`, `POST /calls/{id}/park` (optional `userId` for admins, the user in the call who parks it; 409 `noFreeSlot` with every slot taken, `notBridged` for an added party's call, §10.2 "Call parking"), `POST /calls/{id}/consult`, `POST /calls/{id}/parties` (a third party, §10.2 "Three-way calls"), `POST /calls/{id}/hold` and `/resume` (in the core, so the phone does not show it, §10.2 "Hold music"; hangup, transfer and park work as usual while held), `POST /calls/{id}/decline` (the actor's own ringing legs, §10.1 steps 4 and 5; 409 when none rings); a `user`'s own scope: the live calls list a call they placed, were called on or answered, or that a leg of theirs rings or is up in right now, and they transfer, park, hang up, consult on, add to, hold or resume only a call they placed, while their own channel is in it, or have a leg up in
 
@@ -1347,6 +1347,7 @@ Conventions: one casing on the wire, camelCase, for every name a client sees: pa
 - Columns are snake_case in the database (§11.1). The operations' zod schemas name the wire fields, and Kysely's `CamelCasePlugin` maps column names, configured with `maintainNestedObjectKeys: true`, since the plugin otherwise recurses into any value that is already an object and rewrites the keys inside JSON columns; JSON columns are therefore parsed in the operations layer, after the row is mapped.
 - Enum values are stored camelCase (§11.1), so they need no mapping.
 - Storage suffixes do not cross the boundary: `codecs_json` is `codecs` and carries a JSON value, `sso_client_secret_enc` is the write-only `ssoClientSecret`. A unit suffix such as `ringTimeoutS` is meaning, and crosses.
+- A secret (every `*_enc` column: the 🔒 settings, a trunk's `password`, a webhook's and a backup target's `secret`) is never returned; a read carries the read-only boolean `<name>Set` instead (`smtpPasswordSet`, `passwordSet`, `secretSet`), saying whether one is stored. A write treats it as a merge patch: omitted keeps it, `null` clears it (422 where the secret is required), a string sets it, whatever the string.
 - List endpoints paginate with `?limit=` (default 50, at most 200, more is refused with 422) and an opaque `?cursor=` and return `{ items, nextCursor }`, every list the same cursor form; a cursor the list did not hand out is refused with 422; errors are RFC 9457 `application/problem+json`.
 
 An **OpenAPI 3.1 document** is generated from the REST route table and the operations' zod schemas (JSON Schema export) and served at `/api/v1/openapi.json` — the same schemas drive request validation, remote-function validation and the MCP tool definitions (§10.5).
@@ -1951,7 +1952,7 @@ CREATE TABLE ring_group_forward_rules (
 
 -- settings — tenant configuration as one typed row (id = 1); the columns are the definitive
 -- registry, meaning and defaults per column in §11.4. Seeded at first boot (§6.3).
---   *_enc:              secretbox ciphertext, masked on read (§5)
+--   *_enc:              secretbox ciphertext, write-only on the wire (§5.4)
 --   feature_codes_json: { action: dialledPrefix } with the ten fixed keys of §9.3; codes start with
 --                       * or # and none is a prefix of another (checked by the operation)
 --   fallback_target_id: tenant-wide fallback forward target (§11.3), owned by this column
@@ -2499,7 +2500,7 @@ A DID's `number` is what the trunk boundary produces (§9.4): the international 
 
 ### 11.4 Settings
 
-`settings` is one typed row. Every setting is a column, with its type, range and foreign key enforced by the schema (§11.2). The column list is therefore the definitive registry, and `PATCH /settings` accepts these fields under their wire names (§10.3, conventions: `company_name` is `companyName`, `codecs_json` is `codecs`, `sso_client_secret_enc` is `ssoClientSecret`), except the read-only `ext_length`, `ringotel_org_id` and `ringotel_branch_id`, and `ringotel_profile_pending` and `config_propagation_pending`, which are state rather than settings and neither read nor written through `/settings`. 🔒 marks an `*_enc` secret, write-only and masked on read (§5.4). 👑 marks a column only owners may write; every other column is admin (§10.3).
+`settings` is one typed row. Every setting is a column, with its type, range and foreign key enforced by the schema (§11.2). The column list is therefore the definitive registry, and `PATCH /settings` accepts these fields under their wire names (§10.3, conventions: `company_name` is `companyName`, `codecs_json` is `codecs`, `sso_client_secret_enc` is `ssoClientSecret`), except the read-only `ext_length`, `ringotel_org_id` and `ringotel_branch_id`, and `ringotel_profile_pending`, `ringotel_roster_pending` and `config_propagation_pending`, which are state rather than settings and neither read nor written through `/settings`. 🔒 marks an `*_enc` secret, write-only and read as its `<name>Set` (§5.4, §10.3). 👑 marks a column only owners may write; every other column is admin (§10.3).
 
 | Column | Meaning | Default | Ref |
 |---|---|---|---|

@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-04 · §5.4, §10.3 Settings and conventions, §11.2 `settings`, §11.4.** Product-owner decision (secrets on the wire): no secret is ever returned, masked or otherwise; every read carries a read-only `<name>Set` boolean instead, and a write takes the secret as a merge patch, `null` clearing it (422 where required) and any string setting it. §11.4 names `ringotel_roster_pending` among the state columns outside `/settings`.
+*Why:* "I like the “xSet”. Why would the string “***” get any special treatment then?": a `GET /settings` echoed into a `PATCH` stored the mask `***` as the new SMTP, SSO or Ringotel secret.
+
 **2026-10-04 · §9.4 Cross-trunk failover, §10.2 Ring groups.** Product-owner decision (failed-call announcement): the announcement plays only when the route list ends in 503; a 486 (channel cap) or 403 (CLIR) refusal is signalled by its own code. A ring group with neither greeting nor music leaves the caller unanswered, hearing ringback, until a member answers.
 *Why:* "Only on 503 (Recommended)": the text covered every exhausted route list while the code, rightly, reserved the announcement for 503; a group without either answered every caller and played the default music in place of ringback.
 

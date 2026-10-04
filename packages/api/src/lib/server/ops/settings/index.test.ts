@@ -5,11 +5,12 @@ import type { Db } from '@zamfono/shared';
 import { defaultFeatureCodes } from '@zamfono/shared/testDb.js';
 
 import { propagateConfig } from '#lib/server/propagation.js';
-import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
+import { decrypt, encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { asRun, makeTestDb, owner, seedSettings } from '#lib/server/testDb.js';
 
 import { runOperation } from '../runner.js';
 import { type Actor } from '../types.js';
+import { loadSettings } from './_shared.js';
 
 import './index.js';
 
@@ -53,21 +54,53 @@ afterEach(() => {
 });
 
 describe('settings', () => {
-  it('masks secret fields on read', async () => {
+  it('never returns a secret, reports whether each is set, and takes every string as is', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
+    const get = async (): Promise<Record<string, unknown>> =>
+      (await runOperation(db, 'settings.get', {}, asRun())) as Record<
+        string,
+        unknown
+      >;
     await runOperation(
       db,
       'settings.update',
-      { smtpHost: 'mail.example.com', smtpPassword: 'sekret' },
+      { smtpHost: 'mail.example.com', smtpPassword: '***' },
       asRun()
     );
-    const settings = (await runOperation(db, 'settings.get', {}, asRun())) as {
-      smtpPassword: string | null;
-      smtpHost: string | null;
-    };
-    expect(settings.smtpHost).toBe('mail.example.com');
-    expect(settings.smtpPassword).toBe('***');
+    const set = await get();
+    expect(set).toMatchObject({
+      smtpHost: 'mail.example.com',
+      smtpPasswordSet: true,
+      ssoClientSecretSet: false,
+      ringotelApiTokenSet: false
+    });
+    for (const secret of [
+      'smtpPassword',
+      'ssoClientSecret',
+      'ringotelApiToken'
+    ]) {
+      expect(set).not.toHaveProperty(secret);
+    }
+    const row = await loadSettings(db);
+    if (row.smtpPasswordEnc === null) {
+      throw new Error('expected smtp_password_enc to be set');
+    }
+    expect(
+      decrypt(keyringFromEnv(privateEnv), row.smtpPasswordEnc).toString()
+    ).toBe('***');
+    await runOperation(
+      db,
+      'settings.update',
+      { smtpHost: 'relay.example.com' },
+      asRun()
+    );
+    expect(await get()).toMatchObject({ smtpPasswordSet: true });
+    await runOperation(db, 'settings.update', { smtpPassword: null }, asRun());
+    expect(await get()).toMatchObject({ smtpPasswordSet: false });
+    await expect(
+      runOperation(db, 'settings.update', { smtpPasswordSet: true }, asRun())
+    ).rejects.toMatchObject({ status: 422 });
   });
 
   // §3.1 "Config propagation": `core` reads `language` (§9.1, §9.4 "Cross-trunk failover") from

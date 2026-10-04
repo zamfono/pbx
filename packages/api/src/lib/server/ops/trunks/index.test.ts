@@ -697,6 +697,41 @@ describe('trunks operations', () => {
       .executeTakeFirstOrThrow();
     expect(audit.undoable).toBe(1);
   });
+  it('never returns the password, reports passwordSet, and refuses null where credentials are required', async () => {
+    const db = await makeTestDb();
+    const { trunk } = await createTrunk(db, {
+      authMode: 'registration',
+      username: 'alice',
+      password: 's3cret',
+      registerExpiryS: 120
+    });
+    const get = async (): Promise<Record<string, unknown>> =>
+      (await runOperation(
+        db,
+        'trunks.get',
+        { id: trunk.id },
+        asRun()
+      )) as Record<string, unknown>;
+    const read = await get();
+    expect(read.passwordSet).toBe(true);
+    expect(read).not.toHaveProperty('password');
+    await expect(
+      runOperation(
+        db,
+        'trunks.update',
+        { id: trunk.id, password: null },
+        asRun()
+      )
+    ).rejects.toMatchObject({ status: 422 });
+    await runOperation(
+      db,
+      'trunks.update',
+      { id: trunk.id, authMode: 'ip', username: null, password: null },
+      asRun()
+    );
+    expect((await get()).passwordSet).toBe(false);
+  });
+
   it('sets a diagnostics override on a trunk and gives it a 7-day expiry (§7)', async () => {
     const db = await makeTestDb();
     const { trunk } = await createTrunk(db);

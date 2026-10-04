@@ -18,6 +18,15 @@ describe('webhooks', () => {
     )) as WebhookWire & { secret?: unknown };
     expect(created.active).toBe(false);
     expect(created.secret).toBeUndefined();
+    expect(created.secretSet).toBe(true);
+    await expect(
+      runOperation(
+        db,
+        'webhooks.update',
+        { id: created.id, secret: null },
+        asRun()
+      )
+    ).rejects.toMatchObject({ status: 422 });
     const row = await db
       .selectFrom('webhooks')
       .select('secretEnc')

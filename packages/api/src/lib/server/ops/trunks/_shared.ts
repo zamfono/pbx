@@ -100,6 +100,8 @@ export type TrunkWire = TrunkScalars &
   LogLevelColumns & {
     id: string;
     priority: number;
+    /** Whether a password is stored; the password itself is write-only (§10.3). */
+    passwordSet: boolean;
     hosts: HostWire[];
     status: TrunkStatus['status'];
     statusChangedAt: string | null;
@@ -200,6 +202,7 @@ export function mapTrunkRow(
     id: row.id,
     priority: row.priority,
     ...scalarsFromRow(row),
+    passwordSet: row.passwordEnc !== null,
     hosts: hostsToWire(hosts),
     ...logLevelWire(row),
     status: status.status,
