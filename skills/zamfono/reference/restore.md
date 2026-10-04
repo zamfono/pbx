@@ -1,7 +1,8 @@
 # Restore
 
-Moving a stack to another host, or recovering it after data loss, is the same procedure: restore
-`.env`, then the database, then the media volume, then start the stack.
+Moving a stack to another host, or recovering it after data loss, is the same procedure: unpack
+the release's files, restore `.env`, then the database and the media into their volumes, then
+start the stack.
 
 ## What a restore needs
 
@@ -24,13 +25,48 @@ Moving a stack to another host, or recovering it after data loss, is the same pr
 
 ## Procedure
 
-1. Provision the new host and copy the preserved `.env` onto it.
-2. Restore the database: `litestream restore` for a recovery point within seconds, or otherwise a
-   restic restore of the latest snapshot using the repository location and password from the
-   operator's own record.
-3. Restore `media/` from the latest restic snapshot, the same way.
-4. `docker compose up -d` (or the Podman equivalent); with `compose.dr.yaml` in the stack
-   directory, `./setup/compose.sh up -d`, which runs Compose on it too.
+The commands are Docker's; on Podman, `podman compose` takes the same arguments.
+
+1. Provision the new host as `deploy/README.md` steps 1 to 4 describe, with the same mode, FQDN
+   and public address.
+2. Unpack the bundle of the release the stack ran (its `VERSION`), or of a newer one, whose
+   migrations bring the restored database forward, into an empty stack directory, as step 5
+   does: `releases/download/vX.Y.Z/zamfono-deploy.tar.gz` in place of `releases/latest/…`.
+3. Copy the preserved `.env` into it, readable by root only (`chmod 600 .env`). Do not run
+   `setup.sh`: it refuses a directory whose `.env` holds values, since it would generate new
+   secrets. Make the link it would make instead: `ln -s compose.ports.yaml compose.override.yaml`
+   when `.env` sets `EXTERNAL_IPV4`, `ln -s compose.macvlan.yaml compose.override.yaml` when it
+   sets `STACK_IPV4`. With continuous replication, put the overlay back as `compose.dr.yaml`.
+4. Restore the database and the media into the stack's volumes before the first start, with the
+   restic and rclone of the `api` image, which runs as the uid the volumes belong to. A restic
+   snapshot holds the database as `tmp/zamfono-backup/<targetId>/zamfono.sqlite3` and the media
+   as `media/`:
+
+   ```bash
+   docker compose run --rm --no-deps --entrypoint sh \
+     -e RESTIC_REPOSITORY='<repository>' -e RESTIC_PASSWORD='<password>' api -c '
+       restic restore latest --target /tmp/restore &&
+       cp /tmp/restore/tmp/zamfono-backup/*/zamfono.sqlite3 /data/zamfono.sqlite3 &&
+       cp -a /tmp/restore/media/. /media/'
+   ```
+
+   For the default `local` target, which only a surviving host still has, the repository is
+   `/backups/restic` and the password `BACKUP_PASSWORD` from `.env`. For another target, add the
+   backend's variables as restic documents them (for `s3`, `AWS_ACCESS_KEY_ID` and
+   `AWS_SECRET_ACCESS_KEY`).
+
+5. With continuous replication, replace the database with Litestream's newer copy, through the
+   sidecar of `compose.dr.yaml`, which mounts the `db` volume at `/data`, as uid 1000 like every
+   container writing that volume. The restic step above still brings the media.
+
+   ```bash
+   ./setup/compose.sh run --rm --no-deps --user 1000:1000 <sidecar> \
+     litestream restore -o /data/zamfono.sqlite3 '<replica URL>'
+   ```
+
+6. Start the stack: `docker compose up -d`, or `./setup/compose.sh up -d` with `compose.dr.yaml`;
+   on Podman, install the boot unit of step 7. `migrate` applies the migrations of a newer
+   release; the first-boot seed does not run, since the database holds users.
 
 With continuous replication, configuration, users and call history are current to within
 seconds, and media newer than the last restic run is lost. Without it, everything is as old as

@@ -62,13 +62,16 @@ matched case-insensitively as a substring, against
       "kind": "contact",
       "id": "…",
       "label": "Huber GmbH · +4319876543",
-      "matched": "phone"
+      "matched": "phones"
     }
-  ]
+  ],
+  "nextCursor": null
 }
 ```
 
-`kind` is `user`, `ringGroup` or `contact`, `label` the text to show and `matched` the field that
-hit (`name`, `ext`, `email`, `company`, `phone`), so a client renders one mixed list and links
-each item to its resource. Phone numbers are matched in their stored international form: `9876543`
-or `+43198` finds the contact above, `01 987` does not. Deleted rows never appear.
+`kind` is `user`, `ringGroup` or `contact`, `label` the text to show and `matched` the field of
+the resource that hit, as that resource names it (a user's `name`, `extension` or `email`, a ring
+group's `name` or `ext`, a contact's `displayName`, `company` or `phones`), so a client renders one
+mixed list and links each item to its resource. A pasted number finds the contact whatever its
+spelling: `+43 1 987 6543`, `01 987 6543`, `9876543` and `(01) 987` all find the contact above.
+Deleted rows never appear. Like every list, the hits are paged with `limit` and `cursor`.

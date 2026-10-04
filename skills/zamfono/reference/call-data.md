@@ -20,7 +20,9 @@ mailbox's greeting, or the default prompt in the tenant language, and records up
 **The personal greeting.** `users.setVoicemailGreeting` (`PUT /users/{id}/voicemailGreeting`)
 takes a WAV or MP3 file as multipart form data, field `upload`, transcoded like any audio upload,
 and makes it the user's mailbox greeting, replacing the one before, exactly as recording one on
-`*96` does; `users.clearVoicemailGreeting` (`DELETE /users/{id}/voicemailGreeting`, confirmed)
+`*96` does. As an MCP tool it takes no file and returns `{ url, expiresAt }`, an upload link
+for five minutes: post the file to it as the field `upload`, or open it in a browser to pick
+the file; `audio.create` does the same with its `kind` and `label`. `users.clearVoicemailGreeting` (`DELETE /users/{id}/voicemailGreeting`, confirmed)
 goes back to the default prompt. Both are a user's own on their own id, an admin's for anyone,
 and, like the phone's recording, not in the audit log. A ring group's greeting is its
 `mailboxAudioId` (`ringGroups.update`).
@@ -58,12 +60,14 @@ time it began and, while busy, the other party (`peer`) and the ring group that 
 
 `presenceLog.snapshot` (`GET /presence/log?at=&userId=`, `admin`) answers what everyone's status
 was at instant `at`: for each user, the last logged state at or before it, with its `since`.
-`userId` narrows it to one user. `at` is an ISO 8601 time with any offset
-(`2026-10-01T11:00:00+02:00`, `2026-10-01T09:00:00Z`; in a query string, write the `+` as `%2B`),
+`userId` narrows it to one user; the snapshot is paged by user like every list. `at` is an ISO
+8601 time with any offset (`2026-10-01T11:00:00+02:00`, `2026-10-01T09:00Z`; in a query string,
+write the `+` as `%2B`), seconds optional,
 or without one, `2026-10-01T11:00`, a local time in the tenant's time zone (`settings.timezone`);
 a date alone is its local midnight, and a local time that a daylight-saving change skips or
-repeats is the earlier of its two possible instants. The `from` and `to` of `calls.list` and
-`audit.list` read the same way. The log is purged after `settings.recordingRetentionDays`
+repeats is the earlier of its two possible instants. The `from` and `to` of `calls.list`,
+`audit.list` and `stats.query` read the same way, as the range from `from` up to but not including
+`to`; a date alone as `to` covers that whole day, so `from=2026-10-01&to=2026-10-01` is that day. The log is purged after `settings.recordingRetentionDays`
 (default 90), so a user whose last change is older than that is missing from a snapshot.
 
 ## Statistics
@@ -78,17 +82,22 @@ over the finished calls of the history, on demand; there are no precomputed tota
 | `ringToAnswer`  | the mean seconds from a call's start to its answer, answered calls |
 | `avgCallLength` | the mean seconds from answer to end, answered calls                |
 
-- `from` (inclusive) and `to` (exclusive) are ISO 8601 timestamps with an offset; a call counts
-  by its start time.
+- `from` (inclusive) and `to` (exclusive) are read like the time filters above, local times and
+  dates included; a call counts by its start time.
 - `bucket` is `minute`, `hour`, `day` or `week`, aligned to the tenant time zone
   (`settings.timezone`): an hour starts on the local hour, a day at local midnight, a week at
   local Monday midnight, so a day across a daylight-saving change lasts 23 or 25 hours, and the
   first bucket can start before `from`. Changing the time zone re-buckets every call on the next
   query. At most 10080 buckets per
   request, a week by minute or about a year by hour; a wider range is refused with 422.
-- `ringGroupId` limits the calls to those that group routed.
+- Without `ringGroupId`, each call counts once, as the caller saw it: a transfer or three-way leg
+  is part of its call, not a call of its own, and a transferred call's length ends at the
+  transfer. A call is answered when its status is `answered`.
+- With `ringGroupId`, each offer to that group counts, a call transferred into it included: it is
+  answered when a member of the group took it, its ring time runs until that member answered,
+  and its length is that member's part of the call. An offer only an announcement answered is
+  not answered.
 
 The answer is `{ "buckets": [{ "start": "…", "value": … }] }`, one entry per bucket, `value`
-`null` where there is nothing to average or divide. Every history row counts toward
-`callVolume`, transfer and three-way legs included; voicemail, blocked, failed and interrupted
-calls are left out of `answerRate`.
+`null` where there is nothing to average or divide. Voicemail, blocked, failed and interrupted
+calls count toward `callVolume` but are left out of `answerRate`.
