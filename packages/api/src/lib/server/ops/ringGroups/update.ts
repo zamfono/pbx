@@ -55,7 +55,11 @@ function resolvedFields(
     mailboxAudioId:
       input.mailboxAudioId === undefined
         ? before.mailboxAudioId
-        : input.mailboxAudioId
+        : input.mailboxAudioId,
+    mailboxMaxMessages:
+      input.mailboxMaxMessages === undefined
+        ? before.mailboxMaxMessages
+        : input.mailboxMaxMessages
   };
 }
 

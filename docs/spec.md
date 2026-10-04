@@ -1129,7 +1129,7 @@ Timers, the hop counter and busy handling live entirely in the core.
 
 **Opening hours.** `opening_hours` and `opening_hours_intervals` (§11) hold recurring weekly open intervals, one schedule per user, ring group, menu or tenant scope. Outside every interval, inbound calls route to the schedule's closed target. Times are in the tenant time zone (`settings.timezone`); an interval edge at a local time that a DST change skips or repeats lies at the earlier of its two possible instants. Precedence: an in-effect OOO rule, then the target's own schedule, then the tenant schedule. The OOO sweep also emits open and close transitions on `/events`, at the interval edges themselves. One-off closures are OOO rules; public-holiday calendars are future work.
 
-**Voicemail.** Over ARI: answer, play the mailbox greeting or the language default prompt (`settings.language`) when none is set, then `POST /channels/{id}/record` capped at `settings.voicemail_max_s`, with a 5 s silence stop and `#` to end. The silence threshold is a constant: it has to outlast a caller's pause for thought, 2 to 3 seconds, and stay short enough that a dropped line does not record long stretches of dead air, which leaves no room for a per-tenant choice. The file lands on the media volume and a row in `voicemails`. MWI is updated through the ARI mailboxes API, the e-mail notification with the audio attached follows the rules in "Mail", and a `voicemail.new` event is emitted.
+**Voicemail.** Over ARI: answer; a mailbox that already holds its `mailbox_max_messages` (§11.5) plays the `vm-mailboxfull` prompt instead, takes no message and hangs up, and the call is missed. Otherwise play the mailbox greeting or the language default prompt (`settings.language`) when none is set, then `POST /channels/{id}/record` capped at `settings.voicemail_max_s`, with a 5 s silence stop and `#` to end. The silence threshold is a constant: it has to outlast a caller's pause for thought, 2 to 3 seconds, and stay short enough that a dropped line does not record long stretches of dead air, which leaves no room for a per-tenant choice. The file lands on the media volume and a row in `voicemails`. MWI is updated through the ARI mailboxes API, the e-mail notification with the audio attached follows the rules in "Mail", and a `voicemail.new` event is emitted.
 
 **Mailbox access** (`*96`, `*95<ext>`) is a small DTMF menu in the core: play new and old messages, delete, and record a greeting. The identity is the device's owner, and there is no PIN, so a shared desk phone belongs to one user. A recorded greeting is stored as an `audio_assets` row of kind `vmGreeting` uploaded by that user and set as the mailbox's `mailbox_audio_id`, replacing the previous one, so the REST API and the phone share one greeting; `PUT /users/{id}/voicemailGreeting` stores an upload the same way, transcoded as `POST /audio` transcodes one, and `DELETE` returns the mailbox to the language default prompt. A replaced or removed greeting is soft-deleted in the same transaction, unless another live row still uses it (§5.9).
 
@@ -1551,6 +1551,7 @@ WAL mode, `foreign_keys=ON`, write ownership split per §3.1 (`api` = config tab
 --   caller_id_did_id:       the number presented on the user's outbound calls (§9.4); set by the API on
 --                           the user's first DID when NULL; NULL = the company main number
 --   mailbox_audio_id:       personal voicemail greeting, kind 'vmGreeting'
+--   mailbox_max_messages:   most voicemails the mailbox holds (§11.5); NULL = no limit
 CREATE TABLE users (
   id                   TEXT    PRIMARY KEY,
   name                 TEXT    NOT NULL,
@@ -1568,6 +1569,7 @@ CREATE TABLE users (
   notify_missed_calls  INTEGER NOT NULL DEFAULT 1,
   mailbox_enabled      INTEGER NOT NULL DEFAULT 1,
   mailbox_audio_id     TEXT    REFERENCES audio_assets(id) ON DELETE SET NULL,
+  mailbox_max_messages INTEGER DEFAULT 100 CHECK (mailbox_max_messages > 0),
   log_level            TEXT    CHECK (log_level IN ('events','qos','sip')),
   log_level_expires_at TEXT,
   created_at           TEXT    NOT NULL,
@@ -1782,6 +1784,7 @@ CREATE TABLE dids (
 --   greeting_audio_id:      played to the caller before ringing, kind 'greeting'
 --   moh_audio_id:           replaces ringback while ringing, kind 'moh'
 --   mailbox_audio_id:       the group mailbox's greeting, kind 'vmGreeting'
+--   mailbox_max_messages:   most voicemails the group mailbox holds (§11.5); NULL = no limit
 CREATE TABLE ring_groups (
   id                   TEXT    PRIMARY KEY,
   name                 TEXT    NOT NULL UNIQUE,
@@ -1795,6 +1798,7 @@ CREATE TABLE ring_groups (
   record_calls         INTEGER NOT NULL DEFAULT 0,
   mailbox_enabled      INTEGER NOT NULL DEFAULT 0,
   mailbox_audio_id     TEXT    REFERENCES audio_assets(id) ON DELETE SET NULL,
+  mailbox_max_messages INTEGER DEFAULT 100 CHECK (mailbox_max_messages > 0),
   log_level            TEXT    CHECK (log_level IN ('events','qos','sip')),
   log_level_expires_at TEXT,
   created_at           TEXT    NOT NULL,
@@ -2590,7 +2594,7 @@ A DID's `number` is what the trunk boundary produces (§9.4): the international 
 
 ### 11.5 Voicemail model
 
-Mailboxes belong to users and to ring groups. Every user has one personal mailbox (`users.mailbox_enabled`), the target of DND and no-answer forwarding. A ring group has one mailbox as well, off by default (`ring_groups.mailbox_enabled`), since most groups are answered by people and a message left with "sales" belongs to nobody in particular; enabled, it is the implicit fallback of the group's `unanswered` condition (§10.1). Each mailbox has its own greeting through `mailbox_audio_id` in `audio_assets`.
+Mailboxes belong to users and to ring groups. Every user has one personal mailbox (`users.mailbox_enabled`), the target of DND and no-answer forwarding. A ring group has one mailbox as well, off by default (`ring_groups.mailbox_enabled`), since most groups are answered by people and a message left with "sales" belongs to nobody in particular; enabled, it is the implicit fallback of the group's `unanswered` condition (§10.1). Each mailbox has its own greeting through `mailbox_audio_id` in `audio_assets`, and its own message limit, `mailbox_max_messages`: 100 by default, any positive count, NULL for no limit. A deposit into a mailbox that holds that many voicemails takes no message (§10.2 "Voicemail").
 
 A voicemail belongs to exactly one mailbox, through `voicemails.mailbox_user_id` or `mailbox_ring_group_id`. MWI and the voicemail e-mail go to the user, or to all members of the ring group. DIDs and OOO rules deliver into a mailbox through a forward target of kind mailbox (§11, `forward_targets`); such a target deposits regardless of `mailbox_enabled`, which governs only the implicit defaults of §10.1.
 
@@ -2602,7 +2606,7 @@ One named volume, `media/`, is shared between `asterisk`, `core` and `api`:
 - `media/voicemail/`: voicemail recordings; Asterisk writes them via ARI record, `api` reads and serves them;
 - `media/recordings/`: raw per-leg call recordings and the mixed stereo output.
 
-**Retention.** Voicemails are kept until the user deletes them. Recordings are purged after `settings.recording_retention_days` (default 90) by a daily job in `core`; `presence_log` rows, `calls.log` content and `call_qos` rows are purged by the same job on the same schedule, except each user's latest `presence_log` row before the cutoff, which is still their state from then on, and `backup_runs` rows by `api`'s daily job (§5.9), except each target's latest successful run, whose age `/metrics` reports however old it is (§7). A file in `recordings/` or `prompts/` that no `recordings` or `audio_assets` row names (its row never written, or the row gone before the file) is deleted once it is a day old, by `core`'s daily job and `api`'s respectively. Call recording is off by default and enabled per user or per ring group by an admin (§10.2, "Recording semantics"). Recordings and voicemails are personal data under GDPR; the operator is responsible for consent and announcement, as documented in the admin guide.
+**Retention.** Voicemails are kept until the user deletes them; a full mailbox takes no new one (§11.5). Recordings are purged after `settings.recording_retention_days` (default 90) by a daily job in `core`; `presence_log` rows, `calls.log` content and `call_qos` rows are purged by the same job on the same schedule, except each user's latest `presence_log` row before the cutoff, which is still their state from then on, and `backup_runs` rows by `api`'s daily job (§5.9), except each target's latest successful run, whose age `/metrics` reports however old it is (§7). A file in `recordings/` or `prompts/` that no `recordings` or `audio_assets` row names (its row never written, or the row gone before the file) is deleted once it is a day old, by `core`'s daily job and `api`'s respectively. Call recording is off by default and enabled per user or per ring group by an admin (§10.2, "Recording semantics"). Recordings and voicemails are personal data under GDPR; the operator is responsible for consent and announcement, as documented in the admin guide.
 
 **Audio formats.** Masters are stored as uploaded. Playback uses 16-bit 8 kHz or 16 kHz WAV for Asterisk, and Opus or MP3 for downloads through `api`.
 

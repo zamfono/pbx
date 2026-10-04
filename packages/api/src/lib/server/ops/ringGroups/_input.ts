@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { RING_STRATEGIES } from '@zamfono/shared';
 
+import { mailboxMaxMessagesField } from '../mailbox.js';
 import { memberSchema } from '../members.js';
 
 /**
@@ -67,6 +68,7 @@ export const ringGroupFields = {
     .string()
     .nullish()
     .describe("The group mailbox's greeting, an audio asset id."),
+  ...mailboxMaxMessagesField,
   members: z
     .array(memberSchema)
     .optional()

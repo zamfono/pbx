@@ -48,6 +48,7 @@ export const createRingGroup = defineOperation({
         recordCalls: optionalFlag(input.recordCalls),
         mailboxEnabled: optionalFlag(input.mailboxEnabled),
         mailboxAudioId: input.mailboxAudioId ?? null,
+        mailboxMaxMessages: input.mailboxMaxMessages,
         createdAt: ctx.now
       })
       .execute();

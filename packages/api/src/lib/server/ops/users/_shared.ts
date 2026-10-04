@@ -13,6 +13,7 @@ import {
 } from '@zamfono/shared';
 
 import { assertNoLiveHolder } from '../liveHolder.js';
+import { mailboxMaxMessagesField } from '../mailbox.js';
 import { liveRow } from '../rows.js';
 import { logLevelOutputFields, logLevelWire } from '../settings/logLevel.js';
 import { OpError, type Context } from '../types.js';
@@ -65,7 +66,8 @@ export const userCallFields = {
     .optional()
     .describe(
       'Gives the user a voicemail box, where an absent forward rule sends the call; on by default.'
-    )
+    ),
+  ...mailboxMaxMessagesField
 };
 
 /** A user's wire shape (§10.3), as `toUserOut` assembles it: never the password hash. */
@@ -85,6 +87,7 @@ export const userOut = z.object({
   notifyMissedCalls: z.boolean(),
   mailboxEnabled: z.boolean(),
   mailboxAudioId: z.string().nullable(),
+  mailboxMaxMessages: z.number().nullable(),
   ...logLevelOutputFields,
   lockedUntil: z
     .string()
@@ -115,6 +118,7 @@ export async function toUserOut(db: Db, row: UserRow): Promise<UserOut> {
     notifyMissedCalls: row.notifyMissedCalls === 1,
     mailboxEnabled: row.mailboxEnabled === 1,
     mailboxAudioId: row.mailboxAudioId,
+    mailboxMaxMessages: row.mailboxMaxMessages,
     ...logLevelWire(row),
     lockedUntil: accountLockedUntil(row.email),
     createdAt: row.createdAt

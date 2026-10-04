@@ -30,6 +30,19 @@ async function mwiCounts(
   return { oldMessages: rows.length - newMessages, newMessages };
 }
 
+/** Whether `mailbox` already holds `limit` messages (§11.5); a `null` limit is no limit. */
+export async function mailboxFull(
+  db: Db,
+  mailbox: Owner,
+  limit: number | null
+): Promise<boolean> {
+  if (limit === null) {
+    return false;
+  }
+  const { oldMessages, newMessages } = await mwiCounts(db, mailbox);
+  return oldMessages + newMessages >= limit;
+}
+
 /** Recomputes `mailbox`'s MWI counts and pushes them (§9.3 "MWI"): called after core's own DTMF
  * mailbox menu changes a read flag or deletes a message, and by the internal route `api` calls
  * after doing the same. */

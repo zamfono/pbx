@@ -90,6 +90,7 @@ async function insertUserRow(
         input.mailboxEnabled === undefined
           ? undefined
           : Number(input.mailboxEnabled),
+      mailboxMaxMessages: input.mailboxMaxMessages,
       createdAt: ctx.now
     })
     .execute();

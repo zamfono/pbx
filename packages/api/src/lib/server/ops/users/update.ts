@@ -112,6 +112,10 @@ function resolvedFields(before: UserRow, input: Input): Partial<UserRow> {
       input.mailboxAudioId === undefined
         ? before.mailboxAudioId
         : input.mailboxAudioId,
+    mailboxMaxMessages:
+      input.mailboxMaxMessages === undefined
+        ? before.mailboxMaxMessages
+        : input.mailboxMaxMessages,
     callerIdDidId:
       input.callerIdDidId === undefined
         ? before.callerIdDidId

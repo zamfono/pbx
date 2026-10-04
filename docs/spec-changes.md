@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-04 · §10.2 Voicemail, §11.2 `users`, `ring_groups`, §11.5, §11.6 Retention.** Every mailbox has a message limit, `mailbox_max_messages`: 100 by default, any positive count, NULL for no limit, set through `users.update` and `ringGroups.update`. A deposit into a mailbox that holds that many voicemails plays Asterisk's `vm-mailboxfull` prompt, takes no message and hangs up; the call is missed.
+*Why:* the product owner asked for it: "Per mailbox limit, but no arbitrary upper limit. Null means “no limit”. 100 as default".
+
 **2026-10-04 · §6.5 Target kinds.** A target's `host` (sftp, ftp, ftps) is an FQDN or an IPv4 address, a webdav `url` an `http` or `https` URL, and an sftp username cannot begin with `-` or contain whitespace, a quote or a backslash; anything else is refused with 422.
 *Why:* the sftp host and username reach `ssh` as arguments through restic's `sftp.command`, which restic splits at whitespace itself, so an admin could add `-oProxyCommand=…` and run a command in `api`.
 **2026-10-04 · §6.5 Backups.** Every snapshot carries the fixed host `zamfono`.

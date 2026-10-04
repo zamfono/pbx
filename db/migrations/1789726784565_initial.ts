@@ -12,6 +12,7 @@ const DEFAULT_MENU_MAX_ATTEMPTS = 3;
 const DEFAULT_SMTP_PORT = 465;
 const DEFAULT_EXT_LENGTH = 3;
 const DEFAULT_VOICEMAIL_MAX_S = 180;
+const DEFAULT_MAILBOX_MAX_MESSAGES = 100;
 const DEFAULT_PARKING_TIMEOUT_S = 300;
 const DEFAULT_RECORDING_RETENTION_DAYS = 90;
 const DEFAULT_SOFT_DELETE_RETENTION_DAYS = 30;
@@ -78,6 +79,11 @@ async function createUsersTable(db: Db): Promise<void> {
     )
     .addColumn('mailbox_audio_id', 'text', col =>
       col.references('audio_assets.id').onDelete('set null')
+    )
+    .addColumn('mailbox_max_messages', 'integer', col =>
+      col
+        .defaultTo(DEFAULT_MAILBOX_MAX_MESSAGES)
+        .check(sql`mailbox_max_messages > 0`)
     )
     .addColumn('log_level', 'text', col =>
       col.check(sql`log_level in ('events','qos','sip')`)
@@ -489,6 +495,11 @@ async function createRingGroupsTable(db: Db): Promise<void> {
     )
     .addColumn('mailbox_audio_id', 'text', col =>
       col.references('audio_assets.id').onDelete('set null')
+    )
+    .addColumn('mailbox_max_messages', 'integer', col =>
+      col
+        .defaultTo(DEFAULT_MAILBOX_MAX_MESSAGES)
+        .check(sql`mailbox_max_messages > 0`)
     )
     .addColumn('log_level', 'text', col =>
       col.check(sql`log_level in ('events','qos','sip')`)

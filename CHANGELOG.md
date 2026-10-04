@@ -21,6 +21,8 @@ why the specified behaviour changed; the commit history, how.
 
 ### Added
 
+- Mailbox message limit: `mailboxMaxMessages` on users and ring groups, 100 by default, `null`
+  for none; a full mailbox tells the caller and takes no message.
 - Personal access tokens (`zpat_…`) for server applications that cannot sign in through OAuth:
   `personalAccessTokens.create`, `list` and `revoke`; recipe `server-application-access`.
 - Call control over the API and MCP, as a phone does it: `calls.consult` with attended

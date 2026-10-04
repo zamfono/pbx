@@ -15,7 +15,9 @@ the mailbox is enabled. `*97<ext>` puts a caller straight through to a mailbox, 
 other party goes to the mailbox of the user or ring group owning that extension without ringing
 anyone, and an extension nobody owns is refused with 422 `noMailbox`. The caller hears the
 mailbox's greeting, or the default prompt in the tenant language, and records up to
-`settings.voicemailMaxS` seconds (default 180), ended by `#` or 5 s of silence.
+`settings.voicemailMaxS` seconds (default 180), ended by `#` or 5 s of silence. A mailbox holds
+at most `mailboxMaxMessages` messages (`users.update`, `ringGroups.update`; 100 by default, `null`
+for no limit): a caller to a full one hears that it is full, leaves nothing, and is a missed call.
 
 **The personal greeting.** `users.setVoicemailGreeting` (`PUT /users/{id}/voicemailGreeting`)
 takes a WAV or MP3 file as multipart form data, field `upload`, transcoded like any audio upload,

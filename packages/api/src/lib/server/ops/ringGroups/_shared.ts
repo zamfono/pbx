@@ -119,6 +119,7 @@ export const ringGroupOut = z.object({
   recordCalls: z.boolean(),
   mailboxEnabled: z.boolean(),
   mailboxAudioId: z.string().nullable(),
+  mailboxMaxMessages: z.number().nullable(),
   ...logLevelOutputFields,
   members: z.array(ringGroupMemberOut)
 });
@@ -160,6 +161,7 @@ export async function toRingGroupOut(
     recordCalls: row.recordCalls === 1,
     mailboxEnabled: row.mailboxEnabled === 1,
     mailboxAudioId: row.mailboxAudioId,
+    mailboxMaxMessages: row.mailboxMaxMessages,
     ...logLevelWire(row),
     members
   };

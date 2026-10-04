@@ -15,9 +15,9 @@ import { callerChannel, type Call } from './call.js';
 import { finishAbandoned } from './missedCall.js';
 import type { Pipeline } from './pipeline.js';
 import { playAndWait } from './playback.js';
-import { release, type Owner } from './release.js';
+import { endCall, release, type Owner } from './release.js';
 import { recordCaller } from './voicemailRecording.js';
-import { persistVoicemail } from './voicemailStore.js';
+import { mailboxFull, persistVoicemail } from './voicemailStore.js';
 
 /** Just the surface `deposit` needs from `ApiClient`, so a test can stub it without its private
  * `baseUrl` field. */
@@ -47,7 +47,11 @@ export type DepositReason =
 function findOwner(
   snapshot: Snapshot,
   mailbox: Owner
-): { name: string; mailboxAudioId: string | null } {
+): {
+  name: string;
+  mailboxAudioId: string | null;
+  mailboxMaxMessages: number | null;
+} {
   const row =
     'userId' in mailbox
       ? userById(snapshot, mailbox.userId)
@@ -60,6 +64,23 @@ function findOwner(
     );
   }
   return row;
+}
+
+/** A full mailbox takes no message (§11.5): the caller hears so, and the call is missed. */
+async function refuseMessage(
+  pipeline: Pipeline,
+  call: Call,
+  mailbox: Owner
+): Promise<void> {
+  const channelId = callerChannel(call);
+  call.log.event({ event: 'voicemailFailed', mailbox, reason: 'mailboxFull' });
+  await playAndWait(
+    pipeline.deps.ari,
+    channelId,
+    defaultPrompt('vmMailboxFull'),
+    `${channelId}:vmMailboxFull`
+  );
+  await endCall(pipeline, call, 'missed');
 }
 
 /** `deposit`'s own steps, from the answer to the row the outcome leaves. */
@@ -84,6 +105,10 @@ async function recordMessage(
   call.log.event({ event: 'voicemail', mailbox, reason });
   const channelId = callerChannel(call);
   await pipeline.deps.ari.channels.answer(channelId).catch(ignoreGone);
+  if (await mailboxFull(db, mailbox, owner.mailboxMaxMessages)) {
+    await refuseMessage(pipeline, call, mailbox);
+    return;
+  }
   const greetingEnd = await playAndWait(
     pipeline.deps.ari,
     channelId,
@@ -140,7 +165,8 @@ async function recordMessage(
 /**
  * Deposits the caller in `mailbox` (§10.2 "Voicemail"): answer, greeting, record capped at
  * `settings.voicemail_max_s`, then the `voicemails` row, MWI, `voicemail.new` and the mail
- * request, before hanging up. A recording that failed releases the caller without any of that
+ * request, before hanging up. A mailbox holding its `mailbox_max_messages` already plays the
+ * mailbox-full prompt and ends the call as missed (§11.5). A recording that failed releases the caller without any of that
  * (§10.2 "Voicemail"); a caller who hung up before leaving a message was missed.
  *
  * The deposit owns the call's row from here on (`call.depositing`): the caller hanging up is the

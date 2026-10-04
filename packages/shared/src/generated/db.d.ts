@@ -326,6 +326,7 @@ export interface RingGroups {
   logLevelExpiresAt: string | null;
   mailboxAudioId: string | null;
   mailboxEnabled: Generated<number>;
+  mailboxMaxMessages: Generated<number | null>;
   mohAudioId: string | null;
   name: string;
   recordCalls: Generated<number>;
@@ -478,6 +479,7 @@ export interface Users {
   logLevelExpiresAt: string | null;
   mailboxAudioId: string | null;
   mailboxEnabled: Generated<number>;
+  mailboxMaxMessages: Generated<number | null>;
   name: string;
   notifyMissedCalls: Generated<number>;
   passwordHash: string | null;

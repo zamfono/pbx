@@ -13,6 +13,8 @@ export const PROMPTS = {
   vmIntro: 'vm-intro',
   /** After the recording ends, before the caller is hung up. */
   vmGoodbye: 'vm-goodbye',
+  /** Instead of the greeting, when the mailbox already holds its message limit (§11.5). */
+  vmMailboxFull: 'vm-mailboxfull',
   /** Before a menu replays its greeting on silence or an unmatched string (§10.1 step 6). */
   pbxInvalid: 'pbx-invalid',
   /** Find-me's accept prompt (§10.1 step 4), core sounds' "press 1 to accept this call, or 2 to
