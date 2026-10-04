@@ -1,6 +1,6 @@
 /**
- * How `FakeAri` places a channel: `POST /channels` (originate, created and dialled in one) and
- * `POST /channels/create` followed by `POST /channels/{id}/dial`, the two steps a leg takes so its
+ * How `FakeAri` places a channel: `POST /channels/create` followed by
+ * `POST /channels/{id}/dial`, the two steps a leg takes so its
  * SIP dialog joins the call before the INVITE leaves (§7 level `sip`). As on Asterisk, a created
  * channel is in the app at once (its `StasisStart`, in state `Down`), and a dialled one answers
  * `answerAfterMs` later with a `ChannelStateChange` to `Up`.
@@ -68,31 +68,9 @@ function dialNow(host: DialHost, channel: Channel): void {
 type PlaceBody = {
   channelId?: string;
   endpoint?: string;
-  callerId?: string;
   appArgs?: string;
   variables?: Record<string, string>;
 };
-
-/** `POST /channels`: an originate. */
-export function fakeOriginate(
-  host: DialHost,
-  channels: Map<string, Channel>,
-  body: unknown
-): RouteResult {
-  const failure = refused(host);
-  if (failure !== null) {
-    return failure;
-  }
-  const params = body as PlaceBody;
-  const channel = defaultChannel({
-    id: params.channelId,
-    name: params.endpoint,
-    caller: { number: params.callerId ?? '', name: '' }
-  });
-  channels.set(channel.id, channel);
-  dialNow(host, channel);
-  return { status: HTTP_OK, body: channel };
-}
 
 /** `POST /channels/create`: the channel, in the app and not dialled yet. */
 export function fakeCreate(
@@ -124,22 +102,19 @@ export function fakeCreate(
   return { status: HTTP_OK, body: channel };
 }
 
-/** Whether `request` placed a channel: an originate, or a create (whose `dial` follows). Tests
- * read what a leg was placed with from either, since a leg takes one step or two. */
+/** Whether `request` placed a channel (a create, whose `dial` follows): tests read what a leg
+ * was placed with from it. */
 export function isPlacement(request: {
   method: string;
   path: string;
 }): boolean {
-  return (
-    request.method === 'POST' &&
-    (request.path === 'channels' || request.path === 'channels/create')
-  );
+  return request.method === 'POST' && request.path === 'channels/create';
 }
 
-/** The caller ID a placement set: an originate's `callerId`, a create's `CALLERID(all)`. */
+/** The caller ID a placement set: its `CALLERID(all)`. */
 export function placedCallerId(request: { body: unknown }): string | undefined {
   const body = request.body as PlaceBody | undefined;
-  return body?.callerId ?? body?.variables?.['CALLERID(all)'];
+  return body?.variables?.['CALLERID(all)'];
 }
 
 /** `POST /channels/{id}/dial` for a created channel. */

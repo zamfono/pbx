@@ -14,7 +14,7 @@ import {
   scheduleRecordingFinished,
   type FakeEndpoint
 } from './fakeChannel.js';
-import { fakeCreate, fakeDial, fakeOriginate } from './fakeDial.js';
+import { fakeCreate, fakeDial } from './fakeDial.js';
 import { splitResource, type RouteResult } from './fakeHttp.js';
 import { FakePlaybacks } from './fakePlayback.js';
 import { fakeChannelVars } from './fakeRtp.js';
@@ -173,9 +173,6 @@ export class FakeAri {
     body: unknown,
     qs: string
   ): RouteResult {
-    if (path === 'channels' && method === 'POST') {
-      return fakeOriginate(this, this.channels, body);
-    }
     if (path === 'channels/create' && method === 'POST') {
       return fakeCreate(this, this.channels, body);
     }

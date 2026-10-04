@@ -43,20 +43,6 @@ describe('AriClient', () => {
     await expect(received).resolves.toMatchObject({ type: 'StasisStart' });
   });
 
-  it('originates a channel via POST /ari/channels', async () => {
-    await client.connect();
-    const channel = await client.channels.originate({
-      endpoint: 'PJSIP/e1',
-      app: TEST_APP,
-      appArgs: 'inbound'
-    });
-    expect(channel.id).toBeTruthy();
-    const originateCall = fake.calls.find(
-      call => call.method === 'POST' && call.path === 'channels'
-    );
-    expect(originateCall?.body).toMatchObject({ app: TEST_APP });
-  });
-
   it('reconnects after the fake drops the socket', async () => {
     await client.connect();
     const disconnected = new Promise<void>(resolve => {
@@ -76,11 +62,7 @@ describe('AriClient', () => {
 
   it('hangs up with a Q.850 cause as the reason_code query parameter', async () => {
     await client.connect();
-    const channel = await client.channels.originate({
-      endpoint: 'PJSIP/e1',
-      app: TEST_APP,
-      appArgs: 'inbound'
-    });
+    const channel = fake.addChannel({});
     await client.channels.hangup(channel.id, { reasonCode: 21 });
     const hangupCall = fake.calls.find(
       call => call.method === 'DELETE' && call.path.startsWith('channels/')

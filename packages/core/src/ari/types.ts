@@ -77,7 +77,6 @@ export type Endpoint = {
 export type HangupOptions = { reason?: string; reasonCode?: number };
 
 export type ChannelsApi = {
-  originate: (params: OriginateParams) => Promise<Channel>;
   /** `POST /channels/create`: the channel, in the app from the start but not dialled yet, so its
    * SIP dialog (and Call-ID) exists before its INVITE leaves; `dial` sends it. */
   create: (params: CreateParams) => Promise<Channel>;
