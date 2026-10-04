@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db, type Envelope } from '@zamfono/shared';
-import { migratedTestDb } from '@zamfono/shared/testDb.js';
+import { migratedTestDb, seedSettings } from '@zamfono/shared/testDb.js';
 
 import { testKeyring } from '#testing/fixtures.js';
-import { seedSettings } from '#testing/testDb.js';
 
 import { sealTargetSecret } from '../ops/backups/_secret.js';
 import { type Keyring } from '../secretbox.js';

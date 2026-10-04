@@ -1,14 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db, type Envelope } from '@zamfono/shared';
-import { migratedTestDb } from '@zamfono/shared/testDb.js';
+import {
+  migratedTestDb,
+  seedDid,
+  seedSettings,
+  seedUser
+} from '@zamfono/shared/testDb.js';
 
 import { EventBus } from './internal/eventBus.js';
 import { ConfigCache } from './internal/snapshot.js';
 import { startSweep } from './sweep.js';
 import { onEvents } from './testing/busEvents.js';
 import { noopLogger } from './testing/pipelineDeps.js';
-import { seedDid, seedSettings, seedUser } from './testing/seedRows.js';
 
 const SWEEP_INTERVAL_MS = 5;
 // A dozen sweep intervals: a transition is picked up, and a repeated emission would show.

@@ -17,7 +17,7 @@ import {
   type Presence,
   type TrunkStatus
 } from '@zamfono/shared';
-import { migratedTestDb } from '@zamfono/shared/testDb.js';
+import { migratedTestDb, seedSettings } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
 import type { Logger } from '../ari/types.js';
@@ -29,7 +29,6 @@ import {
   noopLogger,
   testActions
 } from '../testing/pipelineDeps.js';
-import { seedSettings } from '../testing/seedRows.js';
 import { EventBus } from './eventBus.js';
 import { MAX_INTERNAL_BODY_BYTES } from './http.js';
 import { startInternalServer } from './server.js';

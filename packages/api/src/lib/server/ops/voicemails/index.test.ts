@@ -5,6 +5,7 @@ import { sql } from 'kysely';
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { stubCoreClient } from '#testing/coreClientStub.js';
@@ -16,19 +17,6 @@ import { type Actor } from '../types.js';
 import './index.js';
 
 const anna: Actor = { id: 'u1', name: 'Anna', role: 'user' };
-
-async function seedUser(db: Db, id: string, name: string): Promise<void> {
-  await db
-    .insertInto('users')
-    .values({
-      id,
-      name,
-      email: `${id}@x.test`,
-      role: 'user',
-      createdAt: nowIso()
-    })
-    .execute();
-}
 
 async function seedRingGroup(db: Db, name: string): Promise<string> {
   const id = newId();
@@ -84,8 +72,8 @@ afterEach(() => {
 describe('voicemails', () => {
   it("a user lists only their own and their groups' voicemails", async () => {
     const db = await makeTestDb();
-    await seedUser(db, 'u1', 'Anna');
-    await seedUser(db, 'u2', 'Ben');
+    await seedUser(db, { id: 'u1', name: 'Anna' });
+    await seedUser(db, { id: 'u2', name: 'Ben' });
     const groupId = await seedRingGroup(db, 'Sales');
     await addRingGroupMember(db, groupId, 'u1', 1);
     const ownId = await seedVoicemail(db, { mailboxUserId: 'u1' });
@@ -115,8 +103,8 @@ describe('voicemails', () => {
 
   it("refuses a user another's voicemail with 403 before asking to confirm its deletion", async () => {
     const db = await makeTestDb();
-    await seedUser(db, 'u1', 'Anna');
-    await seedUser(db, 'u2', 'Ben');
+    await seedUser(db, { id: 'u1', name: 'Anna' });
+    await seedUser(db, { id: 'u2', name: 'Ben' });
     const otherId = await seedVoicemail(db, { mailboxUserId: 'u2' });
     await expect(
       runOperation(
@@ -130,7 +118,7 @@ describe('voicemails', () => {
 
   it('markRead writes no audit row and triggers one mwi call', async () => {
     const db = await makeTestDb();
-    await seedUser(db, 'u1', 'Anna');
+    await seedUser(db, { id: 'u1', name: 'Anna' });
     const vmId = await seedVoicemail(db, { mailboxUserId: 'u1' });
     const mwiCalls: string[] = [];
     vi.mocked(getCoreClient).mockReturnValue(
@@ -161,7 +149,7 @@ describe('voicemails', () => {
 
   it('markRead succeeds when core refuses the mwi update', async () => {
     const db = await makeTestDb();
-    await seedUser(db, 'u1', 'Anna');
+    await seedUser(db, { id: 'u1', name: 'Anna' });
     const vmId = await seedVoicemail(db, { mailboxUserId: 'u1' });
     vi.mocked(getCoreClient).mockReturnValue(
       stubCoreClient({ mwi: () => Promise.reject(new Error('core down')) })
@@ -178,7 +166,7 @@ describe('voicemails', () => {
 
   it('voicemails.delete removes file and row with undoable 0', async () => {
     const db = await makeTestDb();
-    await seedUser(db, 'u1', 'Anna');
+    await seedUser(db, { id: 'u1', name: 'Anna' });
     const filename = 'vm-1.wav';
     const vmId = await seedVoicemail(db, {
       id: 'vm-1',
@@ -224,7 +212,7 @@ describe('voicemails', () => {
 
   it('voicemails.delete keeps the file when the delete rolls back', async () => {
     const db = await makeTestDb();
-    await seedUser(db, 'u1', 'Anna');
+    await seedUser(db, { id: 'u1', name: 'Anna' });
     const filename = 'vm-1.wav';
     const vmId = await seedVoicemail(db, {
       id: 'vm-1',

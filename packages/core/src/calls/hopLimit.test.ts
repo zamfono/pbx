@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import { MAX_HOPS } from '../routing/targets.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
-import { seedUser } from '../testing/seedRows.js';
+import { seedRingGroup } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
 import { enterTarget } from './inbound.js';
 import { Pipeline } from './pipeline.js';
@@ -17,21 +18,6 @@ vi.mock('./voicemail.js', async importOriginal => ({
   ...(await importOriginal<typeof import('./voicemail.js')>()),
   deposit
 }));
-
-async function seedRingGroup(db: Db): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('ringGroups')
-    .values({
-      id,
-      name: `Group ${id}`,
-      strategy: 'simultaneous',
-      mailboxEnabled: 1,
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
-}
 
 describe('hop limit (§10.1 step 7)', () => {
   let rig: Rig;
@@ -65,7 +51,7 @@ describe('hop limit (§10.1 step 7)', () => {
   it("ends in the last target's mailbox: a ring group reached after a user, whose callee is cleared", async () => {
     const firstUser = await seedUser(db, { mailboxEnabled: 1 });
     const nextUser = await seedUser(db, { mailboxEnabled: 1 });
-    const groupId = await seedRingGroup(db);
+    const groupId = await seedRingGroup(db, { mailboxEnabled: 1 });
     const nextTargetId = newId();
     await db
       .insertInto('forwardTargets')

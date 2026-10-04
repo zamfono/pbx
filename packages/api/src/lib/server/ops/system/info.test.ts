@@ -2,10 +2,11 @@ import process from 'node:process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Db } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { stubCoreClient } from '#testing/coreClientStub.js';
-import { makeTestDb, seedSettings } from '#testing/testDb.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 

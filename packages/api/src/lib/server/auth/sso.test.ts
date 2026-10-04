@@ -3,8 +3,9 @@ import { exportJWK, generateKeyPair, SignJWT, type JWK } from 'jose';
 import { describe, expect, it } from 'vitest';
 
 import { epochSeconds, nowIso, type Db } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
-import { makeTestDb, seedSettings } from '#testing/testDb.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 import { encrypt, keyringFromEnv, type Keyring } from '../secretbox.js';
 import {

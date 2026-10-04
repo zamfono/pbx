@@ -13,10 +13,13 @@ import {
 } from 'vitest';
 
 import { HTTP_OK, HTTP_SERVICE_UNAVAILABLE, openDb } from '@zamfono/shared';
-import { migratedTestDb, MIGRATIONS_DIR } from '@zamfono/shared/testDb.js';
+import {
+  migratedTestDb,
+  MIGRATIONS_DIR,
+  seedSettings
+} from '@zamfono/shared/testDb.js';
 
 import { testKeyring } from '#testing/fixtures.js';
-import { seedSettings } from '#testing/testDb.js';
 
 import { apiHealth, healthStatus } from './health.js';
 import { decrypt } from './secretbox.js';

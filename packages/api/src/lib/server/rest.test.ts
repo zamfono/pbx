@@ -5,9 +5,10 @@ import SwaggerParser from '@apidevtools/swagger-parser';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
 import { stubCoreClient } from '#testing/coreClientStub.js';
-import { makeTestDb, owner, seedSettings } from '#testing/testDb.js';
+import { makeTestDb, owner } from '#testing/testDb.js';
 
 import { storeAudio } from './audio/store.js';
 import { getCoreClient } from './coreClient.js';

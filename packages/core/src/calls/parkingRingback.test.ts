@@ -7,16 +7,16 @@ import {
   type MailRequest,
   type UserForwardCondition
 } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import { type FakeAri } from '../testing/ari/fake.js';
 import { isPlacement } from '../testing/ari/fakeDial.js';
 import { eventually } from '../testing/eventually.js';
 import { answeredCall, startRig, type Rig } from '../testing/pipelineRig.js';
 import {
-  seedDevice,
   seedExternalRoute,
-  seedSlot,
-  seedUser
+  seedRegisteredDevice,
+  seedSlot
 } from '../testing/seedRows.js';
 import { CallActions } from './actions.js';
 import type { Call, Leg } from './call.js';
@@ -106,7 +106,7 @@ describe('parking ring-back', () => {
   /** Ben at 102, with a registered phone that answers. */
   async function seedBen(): Promise<string> {
     const ben = await seedUser(db, { ext: '102' });
-    await seedDevice(rig, ben, 'e102-a');
+    await seedRegisteredDevice(rig, ben, 'e102-a');
     return ben;
   }
 
@@ -281,7 +281,7 @@ describe('parking ring-back', () => {
     const anna = await seedParker();
     const ben = await seedBen();
     const carl = await seedUser(db, { ext: '103' });
-    await seedDevice(rig, carl, 'e103-a');
+    await seedRegisteredDevice(rig, carl, 'e103-a');
     await seedFallback({ userId: carl });
     // Anna has no phone registered, so her `offline` rule decides the ring-back.
     await seedRule(anna, 'offline', { userId: ben });

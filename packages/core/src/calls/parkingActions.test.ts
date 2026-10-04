@@ -8,6 +8,7 @@ import {
   nowIso,
   type Db
 } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import { type FakeAri } from '../testing/ari/fake.js';
 import { isPlacement, placedCallerId } from '../testing/ari/fakeDial.js';
@@ -19,10 +20,9 @@ import {
   type Rig
 } from '../testing/pipelineRig.js';
 import {
-  seedDevice,
   seedExternalRoute,
-  seedSlot,
-  seedUser
+  seedRegisteredDevice,
+  seedSlot
 } from '../testing/seedRows.js';
 import { CallActions } from './actions.js';
 import { newCall, type Call } from './call.js';
@@ -158,7 +158,7 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
     await seedSlot(db, '701');
     const anna = await seedUser(db, { ext: '101' });
     const ben = await seedUser(db, { ext: '102' });
-    await seedDevice(rig, ben, 'e102-a');
+    await seedRegisteredDevice(rig, ben, 'e102-a');
     await rig.devicesUp();
     const call = await answeredCall(rig, anna);
     await actions.park(call.id, { userId: anna, actorUserId: anna });
@@ -183,7 +183,7 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
     await setUp();
     const anna = await seedUser(db, { ext: '101' });
     const ben = await seedUser(db, { ext: '102' });
-    await seedDevice(rig, ben, 'e102-a');
+    await seedRegisteredDevice(rig, ben, 'e102-a');
     await rig.devicesUp();
     const call = await answeredCall(rig, anna);
 
@@ -242,7 +242,7 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
     pipeline.deps.trunkState = rig.trunkState();
     await seedExternalRoute(db, 'both');
     const anna = await seedUser(db, { ext: '101' });
-    await seedDevice(rig, anna, 'e101-a');
+    await seedRegisteredDevice(rig, anna, 'e101-a');
     await rig.devicesUp();
 
     type Placed = {

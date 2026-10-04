@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
-import { makeTestDb, seedSettings } from '#testing/testDb.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 import { renderMetrics } from './metrics.js';
 import { recordApiRequestSeconds } from './metricsCounters.js';

@@ -15,7 +15,7 @@ import {
   startRig,
   type Rig
 } from '../testing/pipelineRig.js';
-import { seedDevice, seedUser } from '../testing/seedRows.js';
+import { seedUserWithDevice } from '../testing/seedRows.js';
 import { newAddedLeg } from './addedParty.js';
 import { callerChannel, newCall, type Call } from './call.js';
 import { channelOf } from './callLookup.js';
@@ -63,13 +63,6 @@ async function seedTrunkWithRoute(db: Db, userId: string): Promise<string> {
     .values({ routeId, userId })
     .execute();
   return trunkId;
-}
-
-/** A user at `ext` with one registered device. */
-async function seedUserWithDevice(rig: Rig, ext: string): Promise<string> {
-  const id = await seedUser(rig.db, { ext });
-  await seedDevice(rig, id, `e${ext}-a`);
-  return id;
 }
 
 describe('transfers', () => {

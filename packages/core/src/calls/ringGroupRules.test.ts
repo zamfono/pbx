@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import type { Channel } from '../ari/types.js';
 import type { Presence } from '../presence.js';
@@ -8,7 +9,7 @@ import type { FakeAri } from '../testing/ari/fake.js';
 import { isPlacement } from '../testing/ari/fakeDial.js';
 import { eventually } from '../testing/eventually.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
-import { seedUser } from '../testing/seedRows.js';
+import { seedRingGroup } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { ringGroup } from './ringGroup.js';
@@ -44,26 +45,6 @@ async function seedMemberUser(
     .values({ groupId, position, userId, userGroupId: null })
     .execute();
   return userId;
-}
-
-async function seedRingGroup(
-  db: Db,
-  overrides: { skipBusy?: boolean; mailboxEnabled?: boolean } = {}
-): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('ringGroups')
-    .values({
-      id,
-      name: `Group ${id}`,
-      strategy: 'simultaneous',
-      ringTimeoutS: 1,
-      skipBusy: overrides.skipBusy === false ? 0 : 1,
-      mailboxEnabled: overrides.mailboxEnabled === true ? 1 : 0,
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
 }
 
 /** A group forward rule whose target is an announcement, `filename` telling the rules apart. */
@@ -177,7 +158,7 @@ describe('ring-group ringability and fallback rules', () => {
   }
 
   it('applies the unavailable rule at once, ringing nobody, when every member’s phone is off', async () => {
-    const groupId = await seedRingGroup(db);
+    const groupId = await seedRingGroup(db, { ringTimeoutS: 1 });
     await seedMemberUser(db, groupId, 0, ['e101-da']);
     await seedMemberUser(db, groupId, 1, ['e102-db']);
     await seedAnnouncementRule(db, groupId, 'unavailable', 'nobody.wav');
@@ -192,7 +173,7 @@ describe('ring-group ringability and fallback rules', () => {
   });
 
   it('falls to the unanswered rule at once when the group has no unavailable rule', async () => {
-    const groupId = await seedRingGroup(db);
+    const groupId = await seedRingGroup(db, { ringTimeoutS: 1 });
     await seedMemberUser(db, groupId, 0, ['e101-da']);
     await seedAnnouncementRule(db, groupId, 'unanswered', 'noanswer.wav');
 
@@ -208,7 +189,7 @@ describe('ring-group ringability and fallback rules', () => {
   });
 
   it('rings only a member’s registered devices, then applies the unanswered rule on timeout', async () => {
-    const groupId = await seedRingGroup(db);
+    const groupId = await seedRingGroup(db, { ringTimeoutS: 1 });
     await seedMemberUser(db, groupId, 0, ['e101-da', 'e101-db']);
     await seedAnnouncementRule(db, groupId, 'unavailable', 'nobody.wav');
     await seedAnnouncementRule(db, groupId, 'unanswered', 'noanswer.wav');
@@ -223,7 +204,10 @@ describe('ring-group ringability and fallback rules', () => {
   });
 
   it('deposits in the group’s own mailbox when unanswered without a rule', async () => {
-    const groupId = await seedRingGroup(db, { mailboxEnabled: true });
+    const groupId = await seedRingGroup(db, {
+      ringTimeoutS: 1,
+      mailboxEnabled: 1
+    });
     await seedMemberUser(db, groupId, 0, ['e101-da']);
     await register('e101-da');
 
@@ -236,7 +220,7 @@ describe('ring-group ringability and fallback rules', () => {
   });
 
   it('skips a member on a call they placed while skip_busy is set', async () => {
-    const groupId = await seedRingGroup(db);
+    const groupId = await seedRingGroup(db, { ringTimeoutS: 1 });
     const busyId = await seedMemberUser(db, groupId, 0, ['e101-da']);
     await seedMemberUser(db, groupId, 1, ['e102-db']);
     await register('e101-da');
@@ -250,7 +234,7 @@ describe('ring-group ringability and fallback rules', () => {
   });
 
   it('skips a member whose answer on a party api added is still joining while skip_busy is set', async () => {
-    const groupId = await seedRingGroup(db);
+    const groupId = await seedRingGroup(db, { ringTimeoutS: 1 });
     const busyId = await seedMemberUser(db, groupId, 0, ['e101-da']);
     await seedMemberUser(db, groupId, 1, ['e102-db']);
     await register('e101-da');
@@ -283,7 +267,7 @@ describe('ring-group ringability and fallback rules', () => {
   });
 
   it('rings a member on a call they placed as call waiting while skip_busy is cleared', async () => {
-    const groupId = await seedRingGroup(db, { skipBusy: false });
+    const groupId = await seedRingGroup(db, { ringTimeoutS: 1, skipBusy: 0 });
     const busyId = await seedMemberUser(db, groupId, 0, ['e101-da']);
     await register('e101-da');
     presence.setCallState(busyId, 'inCall', '+4930999', null, newId());
@@ -294,9 +278,9 @@ describe('ring-group ringability and fallback rules', () => {
   });
 
   it('skips a member on DND though they forward unconditionally to a reachable user', async () => {
-    const groupId = await seedRingGroup(db);
+    const groupId = await seedRingGroup(db, { ringTimeoutS: 1 });
     const memberId = await seedMemberUser(db, groupId, 0, ['e101-da']);
-    const otherGroupId = await seedRingGroup(db);
+    const otherGroupId = await seedRingGroup(db, { ringTimeoutS: 1 });
     const forwardedId = await seedMemberUser(db, otherGroupId, 0, ['e102-db']);
     await seedUserForward(db, memberId, forwardedId, true);
     await seedAnnouncementRule(db, groupId, 'unavailable', 'nobody.wav');
@@ -312,9 +296,9 @@ describe('ring-group ringability and fallback rules', () => {
   });
 
   it('applies the unavailable rule at once when a member forwards to a user whose phones are off', async () => {
-    const groupId = await seedRingGroup(db);
+    const groupId = await seedRingGroup(db, { ringTimeoutS: 1 });
     const memberId = await seedMemberUser(db, groupId, 0, ['e101-da']);
-    const otherGroupId = await seedRingGroup(db);
+    const otherGroupId = await seedRingGroup(db, { ringTimeoutS: 1 });
     const forwardedId = await seedMemberUser(db, otherGroupId, 0, ['e102-db']);
     await seedUserForward(db, memberId, forwardedId);
     await seedAnnouncementRule(db, groupId, 'unavailable', 'nobody.wav');
@@ -332,9 +316,9 @@ describe('ring-group ringability and fallback rules', () => {
   });
 
   it('rings the registered phone of the user a member forwards to', async () => {
-    const groupId = await seedRingGroup(db);
+    const groupId = await seedRingGroup(db, { ringTimeoutS: 1 });
     const memberId = await seedMemberUser(db, groupId, 0, ['e101-da']);
-    const otherGroupId = await seedRingGroup(db);
+    const otherGroupId = await seedRingGroup(db, { ringTimeoutS: 1 });
     const forwardedId = await seedMemberUser(db, otherGroupId, 0, ['e102-db']);
     await seedUserForward(db, memberId, forwardedId);
     await register('e101-da');
@@ -346,7 +330,7 @@ describe('ring-group ringability and fallback rules', () => {
   });
 
   it('rings a busy member only on the devices not carrying their call while skip_busy is cleared', async () => {
-    const groupId = await seedRingGroup(db, { skipBusy: false });
+    const groupId = await seedRingGroup(db, { ringTimeoutS: 1, skipBusy: 0 });
     const busyId = await seedMemberUser(db, groupId, 0, ['e101-da', 'e101-db']);
     await register('e101-da');
     await register('e101-db');
@@ -360,7 +344,7 @@ describe('ring-group ringability and fallback rules', () => {
   });
 
   it('applies the unavailable rule at once when a busy member has no other device while skip_busy is cleared', async () => {
-    const groupId = await seedRingGroup(db, { skipBusy: false });
+    const groupId = await seedRingGroup(db, { ringTimeoutS: 1, skipBusy: 0 });
     const busyId = await seedMemberUser(db, groupId, 0, ['e101-da']);
     await seedAnnouncementRule(db, groupId, 'unavailable', 'nobody.wav');
     await register('e101-da');
@@ -377,7 +361,7 @@ describe('ring-group ringability and fallback rules', () => {
 
   // §7: the ring group's diagnostics override counts toward the call's level.
   it('raises the call to the ring group’s diagnostics override', async () => {
-    const groupId = await seedRingGroup(db);
+    const groupId = await seedRingGroup(db, { ringTimeoutS: 1 });
     await db
       .updateTable('ringGroups')
       .set({ logLevel: 'qos', logLevelExpiresAt: '2999-01-01T00:00:00.000Z' })
@@ -392,7 +376,7 @@ describe('ring-group ringability and fallback rules', () => {
 
   // §7 level `sip`: every leg's dialog is part of the call's SIP log.
   it('joins every member leg it rings to the call’s SIP capture', async () => {
-    const groupId = await seedRingGroup(db);
+    const groupId = await seedRingGroup(db, { ringTimeoutS: 1 });
     await seedMemberUser(db, groupId, 0, ['e101-da']);
     await seedMemberUser(db, groupId, 1, ['e102-db']);
     await register('e101-da');

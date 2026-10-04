@@ -1,31 +1,24 @@
 import * as privateEnv from '$app/env/private';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { type Db } from '@zamfono/shared';
+import { seedSettings, seedUser } from '@zamfono/shared/testDb.js';
 
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import { asRun, makeTestDb, seedSettings } from '#testing/testDb.js';
+import { asRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 
 import './index.js';
 
-/** Seeds the tenant `settings` singleton and one live user with extension `101`. */
-async function seedUser(db: Db): Promise<string> {
+/** The tenant, and Anna Huber at extension 101. Returns her id. */
+async function seedAnna(db: Db): Promise<string> {
   await seedSettings(db);
-  const userId = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id: userId,
-      name: 'Anna Huber',
-      email: 'anna@x.test',
-      role: 'user',
-      createdAt: nowIso()
-    })
-    .execute();
-  await db.insertInto('extensions').values({ ext: '101', userId }).execute();
-  return userId;
+  return seedUser(db, {
+    name: 'Anna Huber',
+    email: 'anna@x.test',
+    ext: '101'
+  });
 }
 
 type CreateOutput = {
@@ -80,7 +73,7 @@ afterEach(() => {
 describe('devices.create/delete/rotate/setBlf: provisioning wiring (§10.4)', () => {
   it('create pushes createUser for a ringotel device once Ringotel is provisioned', async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     await enableRingotel(db);
     const calls = stubFetch();
 
@@ -101,7 +94,7 @@ describe('devices.create/delete/rotate/setBlf: provisioning wiring (§10.4)', ()
 
   it('create returns no SIP credentials for a ringotel device; an admin reveals them (§5.2)', async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     await enableRingotel(db);
     const calls = stubFetch();
 
@@ -124,7 +117,7 @@ describe('devices.create/delete/rotate/setBlf: provisioning wiring (§10.4)', ()
 
   it('create pushes nothing for a ringotel device while Ringotel is not provisioned', async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     const calls = stubFetch();
 
     (await runOperation(
@@ -139,7 +132,7 @@ describe('devices.create/delete/rotate/setBlf: provisioning wiring (§10.4)', ()
 
   it('delete pushes deleteUser, resolved via getUsers, for a ringotel device', async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     await enableRingotel(db);
     const calls = stubFetch({ getUsers: [{ id: 'ru-1', extension: '101' }] });
     const device = (await runOperation(
@@ -165,7 +158,7 @@ describe('devices.create/delete/rotate/setBlf: provisioning wiring (§10.4)', ()
 
   it('rotate pushes the new password via updateUser for a ringotel device', async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     await enableRingotel(db);
     const calls = stubFetch({ getUsers: [{ id: 'ru-1', extension: '101' }] });
     const device = (await runOperation(
@@ -190,7 +183,7 @@ describe('devices.create/delete/rotate/setBlf: provisioning wiring (§10.4)', ()
 
   it('setBlf pushes the panel via updateUser options.blfs for a ringotel device', async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     await db
       .insertInto('extensions')
       .values({ ext: '701', isParkingSlot: 1 })
@@ -226,7 +219,7 @@ describe('devices.create/delete/rotate/setBlf: provisioning wiring (§10.4)', ()
 describe('devices', () => {
   it('create returns a 24-char alphanumeric password and stores only ciphertext', async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     const result = (await runOperation(
       db,
       'devices.create',
@@ -247,7 +240,7 @@ describe('devices', () => {
 
   it("list answers a user's live devices", async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     const { device } = (await runOperation(
       db,
       'devices.create',
@@ -266,7 +259,7 @@ describe('devices', () => {
 
   it('revealCredentials writes an undoable-0 audit row', async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     const device = (await runOperation(
       db,
       'devices.create',
@@ -289,7 +282,7 @@ describe('devices', () => {
 
   it('setBlf accepts a parking-slot extension and refuses an unknown one with 422', async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     await db
       .insertInto('extensions')
       .values({ ext: '701', isParkingSlot: 1 })
@@ -326,7 +319,7 @@ describe('devices', () => {
 
   it('create writes an undoable audit row (no secret-bearing diff field)', async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     (await runOperation(
       db,
       'devices.create',
@@ -343,7 +336,7 @@ describe('devices', () => {
 
   it('refuses an empty allowedIps on a plain device, on both create and update', async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     await expect(
       runOperation(
         db,
@@ -382,7 +375,7 @@ describe('devices', () => {
 
   it('refuses allowedIps on a non-plain (default tls) device, with 422', async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     await expect(
       runOperation(
         db,
@@ -400,7 +393,7 @@ describe('devices', () => {
 
   it('refuses a plain device while both plain transports are disabled', async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     const original = {
       udp: process.env.SIP_UDP_ENABLED,
       tcp: process.env.SIP_TCP_ENABLED
@@ -430,7 +423,7 @@ describe('devices', () => {
 
   it('records an allowedIps change as wire arrays, not the stored JSON string', async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     const device = (await runOperation(
       db,
       'devices.create',

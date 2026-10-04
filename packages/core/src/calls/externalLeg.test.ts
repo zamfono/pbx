@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
+import { seedDid, seedUser } from '@zamfono/shared/testDb.js';
 
 import type { AriClient } from '../ari/client.js';
 import type { Channel } from '../ari/types.js';
@@ -12,7 +13,12 @@ import { isPlacement, placedCallerId } from '../testing/ari/fakeDial.js';
 import { eventually, flush } from '../testing/eventually.js';
 import { registerDevice } from '../testing/pipelineDeps.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
-import { seedDid, seedUser } from '../testing/seedRows.js';
+import {
+  seedDevice,
+  seedRingGroup,
+  seedRoute,
+  seedTrunk
+} from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { sipToHangupCause } from './releaseCause.js';
@@ -33,81 +39,6 @@ const FINDS_ME = {
   findMeJson: JSON.stringify([{ number: '+15557000', delayS: 0 }])
 };
 
-async function seedDevice(
-  db: Db,
-  userId: string,
-  sipUsername: string
-): Promise<void> {
-  await db
-    .insertInto('devices')
-    .values({
-      id: newId(),
-      userId,
-      label: sipUsername,
-      kind: 'manual',
-      sipUsername,
-      sipPasswordEnc: Buffer.from('secret'),
-      createdAt: nowIso()
-    })
-    .execute();
-}
-
-/** A `from`-header trunk with one host: `registration` dials the trunk's section, `ip` the host. */
-async function seedTrunk(
-  db: Db,
-  priority: number,
-  authMode: 'registration' | 'ip' = 'registration'
-): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('trunks')
-    .values({
-      id,
-      name: `trunk-${priority}`,
-      priority,
-      emergency: 1,
-      authMode,
-      username: authMode === 'registration' ? `user${priority}` : null,
-      passwordEnc: authMode === 'registration' ? Buffer.from('secret') : null,
-      inboundAuth: 0,
-      transport: 'udp',
-      callerIdHeader: 'from',
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('trunkHosts')
-    .values({
-      trunkId: id,
-      priority: 1,
-      host: `sip${priority}.example.com`,
-      port: null,
-      direction: 'both'
-    })
-    .execute();
-  return id;
-}
-
-/** An outbound route over `trunkId`; `onlyUserId` restricts its caller list to that one user. */
-async function seedRoute(
-  db: Db,
-  priority: number,
-  trunkId: string,
-  onlyUserId: string | null = null
-): Promise<void> {
-  const id = newId();
-  await db
-    .insertInto('outboundRoutes')
-    .values({ id, priority, trunkId, createdAt: nowIso() })
-    .execute();
-  if (onlyUserId !== null) {
-    await db
-      .insertInto('outboundRouteUsers')
-      .values({ routeId: id, userId: onlyUserId })
-      .execute();
-  }
-}
-
 async function seedExternalForward(
   db: Db,
   userId: string,
@@ -124,27 +55,21 @@ async function seedExternalForward(
     .execute();
 }
 
-async function seedRingGroup(db: Db, memberIds: string[]): Promise<string> {
-  const id = newId();
+/** A ring group of `memberIds`, in that order, ringing 30 s. Returns its id. */
+async function seedGroupOf(db: Db, memberIds: string[]): Promise<string> {
+  const groupId = await seedRingGroup(db, { ringTimeoutS: 30 });
   await db
-    .insertInto('ringGroups')
-    .values({
-      id,
-      name: `Group ${id}`,
-      strategy: 'simultaneous',
-      ringTimeoutS: 30,
-      mailboxEnabled: 0,
-      createdAt: nowIso()
-    })
+    .insertInto('ringGroupMembers')
+    .values(
+      memberIds.map((userId, position) => ({
+        groupId,
+        position,
+        userId,
+        userGroupId: null
+      }))
+    )
     .execute();
-  for (const [position, userId] of memberIds.entries()) {
-    // eslint-disable-next-line no-await-in-loop -- members keep their positions in order
-    await db
-      .insertInto('ringGroupMembers')
-      .values({ groupId: id, position, userId, userGroupId: null })
-      .execute();
-  }
-  return id;
+  return groupId;
 }
 
 type Originate = {
@@ -280,9 +205,9 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const other = await seedUser(db, MEMBER);
       await seedDevice(db, other, 'member-other');
       await registerDevice(fakeAri, pipeline, 'member-other');
-      const trunkId = await seedTrunk(db, 1, 'ip');
-      await seedRoute(db, 1, trunkId);
-      const groupId = await seedRingGroup(db, [forwarding, other]);
+      const trunkId = await seedTrunk(db, { priority: 1, authMode: 'ip' });
+      await seedRoute(db, trunkId, { priority: 1 });
+      const groupId = await seedGroupOf(db, [forwarding, other]);
 
       const finished = ringGroup(pipeline, call, groupId);
       await membersRinging(call, 2);
@@ -317,9 +242,9 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
       await registerDevice(fakeAri, pipeline, 'member-forwarding');
-      const trunkId = await seedTrunk(db, 1);
-      await seedRoute(db, 1, trunkId);
-      const groupId = await seedRingGroup(db, [forwarding]);
+      const trunkId = await seedTrunk(db, { priority: 1 });
+      await seedRoute(db, trunkId, { priority: 1 });
+      const groupId = await seedGroupOf(db, [forwarding]);
 
       const finished = ringGroup(pipeline, call, groupId);
       await membersRinging(call, 1);
@@ -342,11 +267,11 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
       await registerDevice(fakeAri, pipeline, 'member-forwarding');
-      const trunk1 = await seedTrunk(db, 1);
-      const trunk2 = await seedTrunk(db, 2);
-      await seedRoute(db, 1, trunk1);
-      await seedRoute(db, 2, trunk2);
-      const groupId = await seedRingGroup(db, [forwarding]);
+      const trunk1 = await seedTrunk(db, { priority: 1 });
+      const trunk2 = await seedTrunk(db, { priority: 2 });
+      await seedRoute(db, trunk1, { priority: 1 });
+      await seedRoute(db, trunk2, { priority: 2 });
+      const groupId = await seedGroupOf(db, [forwarding]);
 
       const finished = ringGroup(pipeline, call, groupId);
       await membersRinging(call, 1);
@@ -380,11 +305,11 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
       await registerDevice(fakeAri, pipeline, 'member-forwarding');
-      const trunk1 = await seedTrunk(db, 1);
-      const trunk2 = await seedTrunk(db, 2);
-      await seedRoute(db, 1, trunk1);
-      await seedRoute(db, 2, trunk2);
-      const groupId = await seedRingGroup(db, [forwarding]);
+      const trunk1 = await seedTrunk(db, { priority: 1 });
+      const trunk2 = await seedTrunk(db, { priority: 2 });
+      await seedRoute(db, trunk1, { priority: 1 });
+      await seedRoute(db, trunk2, { priority: 2 });
+      const groupId = await seedGroupOf(db, [forwarding]);
       vi.useFakeTimers({
         toFake: ['setTimeout', 'clearTimeout'],
         shouldAdvanceTime: true
@@ -415,9 +340,9 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
       await registerDevice(fakeAri, pipeline, 'member-forwarding');
-      const trunk1 = await seedTrunk(db, 1);
-      await seedRoute(db, 1, trunk1);
-      const groupId = await seedRingGroup(db, [forwarding]);
+      const trunk1 = await seedTrunk(db, { priority: 1 });
+      await seedRoute(db, trunk1, { priority: 1 });
+      const groupId = await seedGroupOf(db, [forwarding]);
       // The read of the channel's hangup-cause hash is slow to answer.
       fakeAri.holdRequest = request =>
         request.method === 'GET' &&
@@ -465,11 +390,11 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
       await registerDevice(fakeAri, pipeline, 'member-forwarding');
-      const trunk1 = await seedTrunk(db, 1);
-      const trunk2 = await seedTrunk(db, 2);
-      await seedRoute(db, 1, trunk1);
-      await seedRoute(db, 2, trunk2);
-      const groupId = await seedRingGroup(db, [forwarding]);
+      const trunk1 = await seedTrunk(db, { priority: 1 });
+      const trunk2 = await seedTrunk(db, { priority: 2 });
+      await seedRoute(db, trunk1, { priority: 1 });
+      await seedRoute(db, trunk2, { priority: 2 });
+      const groupId = await seedGroupOf(db, [forwarding]);
 
       const finished = ringGroup(pipeline, call, groupId);
       await membersRinging(call, 1);
@@ -491,11 +416,11 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
       await registerDevice(fakeAri, pipeline, 'member-forwarding');
-      const trunk1 = await seedTrunk(db, 1);
-      const trunk2 = await seedTrunk(db, 2);
-      await seedRoute(db, 1, trunk1);
-      await seedRoute(db, 2, trunk2);
-      const groupId = await seedRingGroup(db, [forwarding]);
+      const trunk1 = await seedTrunk(db, { priority: 1 });
+      const trunk2 = await seedTrunk(db, { priority: 2 });
+      await seedRoute(db, trunk1, { priority: 1 });
+      await seedRoute(db, trunk2, { priority: 2 });
+      const groupId = await seedGroupOf(db, [forwarding]);
       refuseFirstOriginate({ cause: AST_CAUSE_CALL_REJECTED, techCause: 403 });
 
       const finished = ringGroup(pipeline, call, groupId);
@@ -512,9 +437,9 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       await seedExternalForward(db, forwarding, '+15557777');
       await seedDevice(db, forwarding, 'member-forwarding');
       await registerDevice(fakeAri, pipeline, 'member-forwarding');
-      const trunkId = await seedTrunk(db, 1);
-      await seedRoute(db, 1, trunkId);
-      const groupId = await seedRingGroup(db, [forwarding]);
+      const trunkId = await seedTrunk(db, { priority: 1 });
+      await seedRoute(db, trunkId, { priority: 1 });
+      const groupId = await seedGroupOf(db, [forwarding]);
 
       const finished = ringGroup(pipeline, call, groupId);
       await membersRinging(call, 1);
@@ -534,9 +459,13 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       await seedDevice(db, forwarding, 'member-forwarding');
       await registerDevice(fakeAri, pipeline, 'member-forwarding');
       const someoneElse = await seedUser(db, MEMBER);
-      const trunkId = await seedTrunk(db, 1);
-      await seedRoute(db, 1, trunkId, someoneElse);
-      const groupId = await seedRingGroup(db, [forwarding]);
+      const trunkId = await seedTrunk(db, { priority: 1 });
+      const routeId = await seedRoute(db, trunkId);
+      await db
+        .insertInto('outboundRouteUsers')
+        .values({ routeId, userId: someoneElse })
+        .execute();
+      const groupId = await seedGroupOf(db, [forwarding]);
 
       await ringGroup(pipeline, call, groupId);
 
@@ -562,8 +491,12 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const userId = await seedUser(db, { ...FINDS_ME, callerIdDidId: didId });
       await seedDevice(db, userId, 'e101-d1');
       await registerDevice(fakeAri, pipeline, 'e101-d1');
-      const trunkId = await seedTrunk(db, 1);
-      await seedRoute(db, 1, trunkId, userId);
+      const trunkId = await seedTrunk(db, { priority: 1 });
+      const routeId = await seedRoute(db, trunkId);
+      await db
+        .insertInto('outboundRouteUsers')
+        .values({ routeId, userId })
+        .execute();
 
       const finished = ringUser(pipeline, call, userId);
       // The device leg and the find-me leg, each ringing once its dial is sent.
@@ -595,8 +528,8 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
     it('is originated with the tenant’s language', async () => {
       await db.updateTable('settings').set({ language: 'de' }).execute();
       const userId = await seedUser(db, FINDS_ME);
-      const trunkId = await seedTrunk(db, 1);
-      await seedRoute(db, 1, trunkId);
+      const trunkId = await seedTrunk(db, { priority: 1 });
+      await seedRoute(db, trunkId, { priority: 1 });
 
       const finished = ringUser(pipeline, call, userId);
       await eventually(() => {
@@ -618,8 +551,8 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       finished: Promise<unknown>;
     }> {
       const userId = await seedUser(db, FINDS_ME);
-      const trunkId = await seedTrunk(db, 1);
-      await seedRoute(db, 1, trunkId);
+      const trunkId = await seedTrunk(db, { priority: 1 });
+      await seedRoute(db, trunkId, { priority: 1 });
       const finished = ringUser(pipeline, call, userId);
       const leg = await eventually(() => {
         const found = findMeLegs().at(0);
@@ -679,8 +612,8 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const userId = await seedUser(db, FINDS_ME);
       await seedDevice(db, userId, 'e101-d1');
       await registerDevice(fakeAri, pipeline, 'e101-d1');
-      const trunkId = await seedTrunk(db, 1);
-      await seedRoute(db, 1, trunkId);
+      const trunkId = await seedTrunk(db, { priority: 1 });
+      await seedRoute(db, trunkId, { priority: 1 });
 
       const finished = ringUser(pipeline, call, userId);
       // The device leg and the find-me leg, each ringing once its dial is sent.
@@ -700,10 +633,10 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
 
     it("falls through to the next route before alerting, keeping the ring race open, and ends it on the callee's busy", async () => {
       const userId = await seedUser(db, FINDS_ME);
-      const trunk1 = await seedTrunk(db, 1);
-      const trunk2 = await seedTrunk(db, 2);
-      await seedRoute(db, 1, trunk1);
-      await seedRoute(db, 2, trunk2);
+      const trunk1 = await seedTrunk(db, { priority: 1 });
+      const trunk2 = await seedTrunk(db, { priority: 2 });
+      await seedRoute(db, trunk1, { priority: 1 });
+      await seedRoute(db, trunk2, { priority: 2 });
 
       const finished = ringUser(pipeline, call, userId);
       const first = await eventually(() => {
@@ -747,8 +680,8 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
 
     it("ends the ring race on the callee's busy that ended the channel before its originate returned", async () => {
       const userId = await seedUser(db, FINDS_ME);
-      const trunkId = await seedTrunk(db, 1);
-      await seedRoute(db, 1, trunkId);
+      const trunkId = await seedTrunk(db, { priority: 1 });
+      await seedRoute(db, trunkId, { priority: 1 });
       refuseFirstOriginate({ cause: AST_CAUSE_USER_BUSY });
 
       await ringUser(pipeline, call, userId);
@@ -762,8 +695,12 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       await seedDevice(db, userId, 'e101-d1');
       await registerDevice(fakeAri, pipeline, 'e101-d1');
       const someoneElse = await seedUser(db, MEMBER);
-      const trunkId = await seedTrunk(db, 1);
-      await seedRoute(db, 1, trunkId, someoneElse);
+      const trunkId = await seedTrunk(db, { priority: 1 });
+      const routeId = await seedRoute(db, trunkId);
+      await db
+        .insertInto('outboundRouteUsers')
+        .values({ routeId, userId: someoneElse })
+        .execute();
 
       const finished = ringUser(pipeline, call, userId);
       // The find-me leg is judged unrouted (and traced) once the device leg rings.

@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
-import { migratedTestDb } from '@zamfono/shared/testDb.js';
+import { migratedTestDb, seedSettings } from '@zamfono/shared/testDb.js';
 
-import { seedSettings } from '../testing/seedRows.js';
 import { ConfigCache } from './snapshot.js';
 
 describe('ConfigCache snapshot', () => {

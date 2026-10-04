@@ -10,7 +10,7 @@ import {
   nowIso,
   type Db
 } from '@zamfono/shared';
-import { migratedTestDb } from '@zamfono/shared/testDb.js';
+import { migratedTestDb, seedSettings } from '@zamfono/shared/testDb.js';
 
 import { createUser } from '#testing/fixtures.js';
 
@@ -20,7 +20,7 @@ import { runPurge } from './purge.js';
 import '../ops/ooo/index.js';
 import '../ops/users/index.js';
 
-import { asConfirmedRun, seedSettings } from '#testing/testDb.js';
+import { asConfirmedRun } from '#testing/testDb.js';
 
 const DAYS_PAST_DEFAULT_RETENTION = 31;
 const DAYS_WITHIN_DEFAULT_RETENTION = 5;

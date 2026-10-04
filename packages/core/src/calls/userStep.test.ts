@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import type { Channel } from '../ari/types.js';
 import type { Presence } from '../presence.js';
@@ -10,7 +11,7 @@ import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { isPlacement } from '../testing/ari/fakeDial.js';
 import { eventually } from '../testing/eventually.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
-import { seedDevice, seedUser } from '../testing/seedRows.js';
+import { seedDevice } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { runUserStep } from './userStep.js';
@@ -28,7 +29,7 @@ async function seedUserWithDevices(
   const userId = await seedUser(rig.db, { name: 'Anna', ringTimeoutS: 1 });
   for (const sipUsername of sipUsernames) {
     // eslint-disable-next-line no-await-in-loop -- a user has one or two devices
-    await seedDevice(rig, userId, sipUsername, false);
+    await seedDevice(rig.db, userId, sipUsername);
   }
   return userId;
 }

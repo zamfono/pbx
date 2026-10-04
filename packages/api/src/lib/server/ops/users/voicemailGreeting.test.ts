@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { newId, type Db } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import { storeAudio } from '#lib/server/audio/store.js';
 import { propagateConfig } from '#lib/server/propagation.js';
@@ -33,19 +34,16 @@ const upload = {
 };
 
 async function seedUsers(db: Db): Promise<void> {
-  for (const id of ['admin', 'anna', 'ben']) {
-    // eslint-disable-next-line no-await-in-loop -- three rows, one after the other
-    await db
-      .insertInto('users')
-      .values({
+  await Promise.all(
+    ['admin', 'anna', 'ben'].map(id =>
+      seedUser(db, {
         id,
         name: id,
         email: `${id}@x.test`,
-        role: id === 'admin' ? 'admin' : 'user',
-        createdAt: nowIso()
+        role: id === 'admin' ? 'admin' : 'user'
       })
-      .execute();
-  }
+    )
+  );
 }
 
 async function greetingOf(db: Db, userId: string): Promise<string | null> {

@@ -2,9 +2,9 @@ import { sql } from 'kysely';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { nowIso, openDb, type Db } from '@zamfono/shared';
-import { MIGRATIONS_DIR } from '@zamfono/shared/testDb.js';
+import { MIGRATIONS_DIR, seedSettings } from '@zamfono/shared/testDb.js';
 
-import { makeTestDb, seedSettings } from '#testing/testDb.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 import { apiHealth, type ApiHealth } from './health.js';
 import { updateNews } from './ops/system/_state.js';

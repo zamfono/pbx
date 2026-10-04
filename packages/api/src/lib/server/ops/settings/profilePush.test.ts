@@ -2,12 +2,13 @@ import * as privateEnv from '$app/env/private';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { nowIso, type CoreVersionResponse, type Db } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
 import { watchAsteriskRestarts } from '#lib/server/jobs/ringotelRereg.js';
 import { propagateConfig } from '#lib/server/propagation.js';
 import { isProfilePending } from '#lib/server/provisioning/profilePending.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import { asRun, makeTestDb, seedSettings } from '#testing/testDb.js';
+import { asRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 

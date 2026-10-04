@@ -1,90 +1,22 @@
-// Test-only: the configuration rows the call-control suites seed (`pipelineRig.ts`): the settings
-// row, DIDs, users, devices, parking slots and an outbound route.
-import type { Insertable } from 'kysely';
+// Test-only: the configuration rows the call-control suites seed beside the shared settings, DID
+// and user seeders (`@zamfono/shared/testDb.js`): devices, extensions, ring groups, audio
+// assets, forward targets, trunks and outbound routes. Each takes the row's columns on top of its
+// defaults.
+import { newId, nowIso, type Db } from '@zamfono/shared';
+import { seedUser, type Row } from '@zamfono/shared/testDb.js';
 
-import { newId, nowIso, type DB, type Db } from '@zamfono/shared';
+import { registerDevice } from './pipelineDeps.js';
+import type { Rig } from './pipelineRig.js';
 
-import type { FakeAri } from './ari/fake.js';
-
-type Row<Table extends keyof DB> = Partial<Insertable<DB[Table]>>;
-
-/** A DID `number` routed to `targetId`, or to a forward target of its own that forwards to an
- * external number. Returns its id. */
-export async function seedDid(
-  db: Db,
-  number: string,
-  targetId?: string
-): Promise<string> {
-  let didTargetId = targetId;
-  if (didTargetId === undefined) {
-    didTargetId = newId();
-    await db
-      .insertInto('forwardTargets')
-      .values({ id: didTargetId, external: '+15550000' })
-      .execute();
-  }
-  const id = newId();
-  await db
-    .insertInto('dids')
-    .values({ id, number, targetId: didTargetId, createdAt: nowIso() })
-    .execute();
-  return id;
-}
-
-/** The `settings` singleton, `settings` on top. Unless `settings.mainDidId` names one, the main
- * DID is `+15551234`, forwarding to an external number. Returns the main DID's id. */
-export async function seedSettings(
-  db: Db,
-  settings: Row<'settings'> = {}
-): Promise<string> {
-  const mainDidId = settings.mainDidId ?? (await seedDid(db, '+15551234'));
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Zamfono',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      ...settings,
-      mainDidId
-    })
-    .execute();
-  return mainDidId;
-}
-
-/** A user without a device, `user` on top, at extension `ext` if one is given. Returns its id. */
-export async function seedUser(
-  db: Db,
-  { ext, ...user }: Row<'users'> & { ext?: string } = {}
-): Promise<string> {
-  const id = user.id ?? newId();
-  await db
-    .insertInto('users')
-    .values({
-      name: 'Test User',
-      email: `${id}@example.com`,
-      createdAt: nowIso(),
-      ...user,
-      id
-    })
-    .execute();
-  if (ext !== undefined) {
-    await db
-      .insertInto('extensions')
-      .values({ ext, userId: id, ringGroupId: null, isParkingSlot: 0 })
-      .execute();
-  }
-  return id;
-}
-
-/** A manual device of `userId`'s, registered with the fake Asterisk unless `registered` is false. */
+/** A manual device `sipUsername` of `userId`'s, `device` on top. It rings only once registered
+ * (`registerDevice`, or `seedRegisteredDevice`). */
 export async function seedDevice(
-  rig: { db: Db; fakeAri: FakeAri },
+  db: Db,
   userId: string,
   sipUsername: string,
-  registered = true
+  device: Row<'devices'> = {}
 ): Promise<void> {
-  await rig.db
+  await db
     .insertInto('devices')
     .values({
       id: newId(),
@@ -93,20 +25,165 @@ export async function seedDevice(
       kind: 'manual',
       sipUsername,
       sipPasswordEnc: Buffer.from('secret'),
-      createdAt: nowIso()
+      createdAt: nowIso(),
+      ...device
     })
     .execute();
-  if (registered) {
-    rig.fakeAri.registerEndpoint(sipUsername);
-  }
+}
+
+/** `seedDevice`, then the device's REGISTER reaching the rig's pipeline (`registerDevice`). */
+export async function seedRegisteredDevice(
+  rig: Pick<Rig, 'db' | 'fakeAri' | 'pipeline'>,
+  userId: string,
+  sipUsername: string
+): Promise<void> {
+  await seedDevice(rig.db, userId, sipUsername);
+  await registerDevice(rig.fakeAri, rig.pipeline, sipUsername);
+}
+
+/** A user at extension `ext` with one registered device `e<ext>-a`. Returns the user's id. */
+export async function seedUserWithDevice(
+  rig: Pick<Rig, 'db' | 'fakeAri' | 'pipeline'>,
+  ext: string
+): Promise<string> {
+  const id = await seedUser(rig.db, { ext });
+  await seedRegisteredDevice(rig, id, `e${ext}-a`);
+  return id;
+}
+
+/** An extension `ext`, `extension` on top: owned by nobody unless it names a user or group. */
+export async function seedExtension(
+  db: Db,
+  ext: string,
+  extension: Row<'extensions'> = {}
+): Promise<void> {
+  await db
+    .insertInto('extensions')
+    .values({
+      ext,
+      userId: null,
+      ringGroupId: null,
+      isParkingSlot: 0,
+      ...extension
+    })
+    .execute();
 }
 
 /** A parking slot at extension `ext` (§10.2 "Call parking"). */
 export async function seedSlot(db: Db, ext: string): Promise<void> {
+  await seedExtension(db, ext, { isParkingSlot: 1 });
+}
+
+/** A simultaneous ring group, `group` on top, every other column at its default. Returns its id. */
+export async function seedRingGroup(
+  db: Db,
+  group: Row<'ringGroups'> = {}
+): Promise<string> {
+  const id = group.id ?? newId();
   await db
-    .insertInto('extensions')
-    .values({ ext, userId: null, ringGroupId: null, isParkingSlot: 1 })
+    .insertInto('ringGroups')
+    .values({
+      name: `Group ${id}`,
+      strategy: 'simultaneous',
+      createdAt: nowIso(),
+      ...group,
+      id
+    })
     .execute();
+  return id;
+}
+
+/** An announcement `audio.wav`, `asset` on top. Returns its id. */
+export async function seedAudioAsset(
+  db: Db,
+  asset: Row<'audioAssets'> = {}
+): Promise<string> {
+  const id = asset.id ?? newId();
+  await db
+    .insertInto('audioAssets')
+    .values({
+      label: 'Audio',
+      kind: 'announcement',
+      filename: 'audio.wav',
+      createdAt: nowIso(),
+      ...asset,
+      id
+    })
+    .execute();
+  return id;
+}
+
+/** A forward target with the columns of `target`. Returns its id. */
+export async function seedForwardTarget(
+  db: Db,
+  target: Row<'forwardTargets'>
+): Promise<string> {
+  const id = target.id ?? newId();
+  await db
+    .insertInto('forwardTargets')
+    .values({ ...target, id })
+    .execute();
+  return id;
+}
+
+/**
+ * A trunk, `trunk` on top: emergency-capable over UDP, `registration` with an account unless
+ * `trunk.authMode` is `ip`, named after its priority (default 1), reached at `hosts` (default one
+ * host `sip<priority>.example.com`). Returns its id.
+ */
+export async function seedTrunk(
+  db: Db,
+  trunk: Row<'trunks'> = {},
+  hosts?: string[]
+): Promise<string> {
+  const id = trunk.id ?? newId();
+  const priority = trunk.priority ?? 1;
+  const registration = (trunk.authMode ?? 'registration') === 'registration';
+  await db
+    .insertInto('trunks')
+    .values({
+      name: `trunk-${priority}`,
+      emergency: 1,
+      authMode: 'registration',
+      username: registration ? `user${priority}` : null,
+      passwordEnc: registration ? Buffer.from('secret') : null,
+      inboundAuth: 0,
+      transport: 'udp',
+      callerIdHeader: 'from',
+      createdAt: nowIso(),
+      ...trunk,
+      id,
+      priority
+    })
+    .execute();
+  const hostRows = (hosts ?? [`sip${priority}.example.com`]).map(
+    (host, index) => ({
+      trunkId: id,
+      priority: index + 1,
+      host,
+      port: null,
+      direction: 'both' as const
+    })
+  );
+  if (hostRows.length > 0) {
+    await db.insertInto('trunkHosts').values(hostRows).execute();
+  }
+  return id;
+}
+
+/** An outbound route over `trunkId`, `route` on top, at priority 1 unless it says otherwise.
+ * Returns its id. */
+export async function seedRoute(
+  db: Db,
+  trunkId: string,
+  route: Row<'outboundRoutes'> = {}
+): Promise<string> {
+  const id = route.id ?? newId();
+  await db
+    .insertInto('outboundRoutes')
+    .values({ priority: 1, createdAt: nowIso(), ...route, id, trunkId })
+    .execute();
+  return id;
 }
 
 /** One `ip`-mode trunk with a single host and a catch-all route (§9.4 "Outbound routing"). */
@@ -114,43 +191,9 @@ export async function seedExternalRoute(
   db: Db,
   callerIdHeader: 'from' | 'both' = 'from'
 ): Promise<string> {
-  const trunkId = newId();
-  await db
-    .insertInto('trunks')
-    .values({
-      id: trunkId,
-      name: 'trunk-1',
-      priority: 1,
-      emergency: 1,
-      authMode: 'ip',
-      username: null,
-      passwordEnc: null,
-      inboundAuth: 0,
-      transport: 'udp',
-      callerIdHeader,
-      maxChannels: null,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('trunkHosts')
-    .values({
-      trunkId,
-      priority: 1,
-      host: 'sip.example.com',
-      port: null,
-      direction: 'both'
-    })
-    .execute();
-  await db
-    .insertInto('outboundRoutes')
-    .values({
-      id: newId(),
-      priority: 1,
-      trunkId,
-      callerIdDidId: null,
-      createdAt: nowIso()
-    })
-    .execute();
+  const trunkId = await seedTrunk(db, { authMode: 'ip', callerIdHeader }, [
+    'sip.example.com'
+  ]);
+  await seedRoute(db, trunkId);
   return trunkId;
 }

@@ -6,10 +6,11 @@ import pino from 'pino';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { nowIso, type Db } from '@zamfono/shared';
+import { seedSettings, seedUser } from '@zamfono/shared/testDb.js';
 
 import { stubCoreClient } from '#testing/coreClientStub.js';
 import { keySpec } from '#testing/fixtures.js';
-import { makeTestDb, seedSettings } from '#testing/testDb.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 import { getCoreClient, type CoreClient } from './coreClient.js';
 import { propagateAtBoot, propagateConfig } from './propagation.js';
@@ -38,21 +39,13 @@ afterEach(() => {
 
 /** A user with a `1xx` extension and one manual device on it. */
 async function seedUserWithDevice(db: Db, kr: Keyring): Promise<void> {
-  await db
-    .insertInto('users')
-    .values({
-      id: 'u1',
-      name: 'Alice',
-      email: 'alice@x',
-      role: 'user',
-      passwordHash: 'x',
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('extensions')
-    .values({ ext: '101', userId: 'u1', ringGroupId: null })
-    .execute();
+  await seedUser(db, {
+    id: 'u1',
+    name: 'Alice',
+    email: 'alice@x',
+    passwordHash: 'x',
+    ext: '101'
+  });
   await db
     .insertInto('devices')
     .values({

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { seedSettings } from '@zamfono/shared/testDb.js';
+
 import {
   admin,
   createSipTargetTrunk,
@@ -8,7 +10,7 @@ import {
   storedConditions,
   type Rule
 } from '#testing/forwardingTestKit.js';
-import { asRun, makeTestDb, seedSettings } from '#testing/testDb.js';
+import { asRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 

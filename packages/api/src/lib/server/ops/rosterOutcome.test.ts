@@ -2,16 +2,17 @@ import * as privateEnv from '$app/env/private';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { type Db } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
+import { createUser } from '#testing/fixtures.js';
 import {
   installRingotelFake,
   type RingotelFake
 } from '#testing/ringotelFake.js';
-import { asConfirmedRun, makeTestDb, seedSettings } from '#testing/testDb.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 import { encrypt, keyringFromEnv } from '../secretbox.js';
 import { isRosterPending, retryPendingRoster } from './roster.js';
-import { runOperation } from './runner.js';
 
 import './users/index.js';
 
@@ -48,15 +49,6 @@ async function setUpRingotel(db: Db): Promise<void> {
   });
 }
 
-async function createUser(db: Db): Promise<void> {
-  await runOperation(
-    db,
-    'users.create',
-    { name: 'Anna Huber', email: 'anna@x.test', extension: '101' },
-    asConfirmedRun()
-  );
-}
-
 let fake: RingotelFake | null = null;
 
 afterEach(() => {
@@ -70,7 +62,7 @@ describe('ringotel.roster outcome rows (§5.7, §10.4 "Colleague presence")', ()
     await setUpRingotel(db);
     fake = installRingotelFake();
 
-    await createUser(db);
+    await createUser(db, '101', { email: 'anna@x.test' });
 
     expect(await rosterRows(db)).toEqual([
       {
@@ -86,7 +78,7 @@ describe('ringotel.roster outcome rows (§5.7, §10.4 "Colleague presence")', ()
     await setUpRingotel(db);
     fake = installRingotelFake();
     fake.failing.add('updateBranch');
-    await createUser(db);
+    await createUser(db, '101', { email: 'anna@x.test' });
     await retryPendingRoster(db, 'api.start');
     fake.failing.delete('updateBranch');
     await retryPendingRoster(db, 'asterisk.started');

@@ -11,8 +11,9 @@ import {
   type UpdaterStatus,
   type UpdateState
 } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
-import { makeTestDb, seedSettings } from '#testing/testDb.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 import type { UpdateMailRequest } from '../mail/send.js';
 import type { BackupRunRow } from '../ops/backups/_shared.js';

@@ -5,7 +5,7 @@ import * as privateEnv from '$app/env/private';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { nowIso } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { migrateForTest, seedSettings } from '@zamfono/shared/testDb.js';
 
 import { encodeMetadataClientId } from '#lib/server/auth/clients.js';
 import { CONSENT_COOKIE } from '#lib/server/auth/consent.js';
@@ -17,7 +17,6 @@ import {
   requestEvent,
   type CookieJar
 } from '#testing/requestEvent.js';
-import { seedSettings } from '#testing/testDb.js';
 
 import { load } from './+page.server.js';
 import { approveConsentSubmit } from './consentSubmit.js';

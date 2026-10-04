@@ -9,6 +9,7 @@ import type { FakeAri } from '../testing/ari/fake.js';
 import { eventually } from '../testing/eventually.js';
 import { noopCdr } from '../testing/pipelineDeps.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
+import { seedTrunk } from '../testing/seedRows.js';
 import type { Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import type { PipelineDeps } from './pipelineDeps.js';
@@ -52,29 +53,24 @@ async function seedAnnouncementDid(db: Db, number: string): Promise<string> {
   return didId;
 }
 
-async function seedTrunk(
+async function seedInboundTrunk(
   db: Db,
   inboundNumberFormat: 'e164' | 'national',
   inboundAuthUsername: string | null = null
 ): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('trunks')
-    .values({
-      id,
+  return seedTrunk(
+    db,
+    {
       name: `trunk ${inboundNumberFormat} ${inboundAuthUsername ?? ''}`,
       priority: inboundNumberFormat === 'e164' ? 1 : 2,
-      emergency: 1,
       authMode: 'ip',
       inboundAuth: inboundAuthUsername === null ? 0 : 1,
       username: inboundAuthUsername,
       passwordEnc: inboundAuthUsername === null ? null : Buffer.from('sealed'),
-      transport: 'udp',
-      inboundNumberFormat,
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
+      inboundNumberFormat
+    },
+    []
+  );
 }
 
 /** A `from-trunk` StasisStart for a channel chan_pjsip named after the trunk's endpoint. */
@@ -134,7 +130,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   }
 
   it('turns a national trunk’s leading 0 into +<calling code> for both parties', async () => {
-    const trunkId = await seedTrunk(db, 'national');
+    const trunkId = await seedInboundTrunk(db, 'national');
 
     const call = await arrive(trunkId, '030123456', '08912345');
 
@@ -145,7 +141,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   });
 
   it('reads 00 as the international prefix and keeps + on a national trunk', async () => {
-    const trunkId = await seedTrunk(db, 'national');
+    const trunkId = await seedInboundTrunk(db, 'national');
 
     const call = await arrive(trunkId, '004930123456', '+43123456');
 
@@ -155,7 +151,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   });
 
   it('passes an e164 trunk’s 00 and leading 0 verbatim: e164 is +digits only', async () => {
-    const trunkId = await seedTrunk(db, 'e164');
+    const trunkId = await seedInboundTrunk(db, 'e164');
 
     const call = await arrive(trunkId, '004930123456', '08912345');
 
@@ -165,7 +161,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   });
 
   it('does not read an e164 trunk’s national digits as a national number', async () => {
-    const trunkId = await seedTrunk(db, 'e164');
+    const trunkId = await seedInboundTrunk(db, 'e164');
 
     const call = await arrive(trunkId, '030123456', '+498912345');
 
@@ -174,7 +170,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   });
 
   it('passes a provider’s account string verbatim and matches it against dids.number', async () => {
-    const trunkId = await seedTrunk(db, 'national');
+    const trunkId = await seedInboundTrunk(db, 'national');
     const accountDidId = await seedAnnouncementDid(db, 'acct-4711');
 
     const call = await arrive(trunkId, 'acct-4711', '');
@@ -186,7 +182,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
 
   it('takes the dialled number from To when the Request-URI names the registration account', async () => {
     // mucpbx on 2026-09-29: `INVITE sip:zamfono-test@…;line=…`, `To: <sip:+498995409700@…>`.
-    const trunkId = await seedTrunk(db, 'e164');
+    const trunkId = await seedInboundTrunk(db, 'e164');
     const channel = fakeAri.addChannel({
       name: `PJSIP/trunk-${trunkId}-0000002a`,
       caller: { number: '+49892315194925', name: '' }
@@ -204,7 +200,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   });
 
   it('normalizes a national number in To with the trunk’s format', async () => {
-    const trunkId = await seedTrunk(db, 'national');
+    const trunkId = await seedInboundTrunk(db, 'national');
     const channel = fakeAri.addChannel({
       name: `PJSIP/trunk-${trunkId}-0000002a`,
       caller: { number: '0301111', name: '' }
@@ -221,7 +217,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   });
 
   it('keeps the account name when To names the account too', async () => {
-    const trunkId = await seedTrunk(db, 'national');
+    const trunkId = await seedInboundTrunk(db, 'national');
     const accountDidId = await seedAnnouncementDid(db, 'acct-4711');
     const channel = fakeAri.addChannel({
       name: `PJSIP/trunk-${trunkId}-0000002a`,
@@ -246,7 +242,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   ])(
     'carries a caller whose user part is %s as anonymous (§9.4 "Withheld caller")',
     async (_label, user) => {
-      const trunkId = await seedTrunk(db, 'e164');
+      const trunkId = await seedInboundTrunk(db, 'e164');
 
       const call = await arrive(trunkId, '+4930123456', user);
 
@@ -255,7 +251,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   );
 
   it('carries a caller whose identity RFC 3323 privacy suppresses as anonymous, number or not', async () => {
-    const trunkId = await seedTrunk(db, 'e164');
+    const trunkId = await seedInboundTrunk(db, 'e164');
     const channel = fakeAri.addChannel({
       name: `PJSIP/trunk-${trunkId}-0000002b`,
       caller: { number: '+498912345', name: '' }
@@ -272,7 +268,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   });
 
   it('keeps a caller whose Privacy suppresses nothing, and a non-numeric user part verbatim', async () => {
-    const trunkId = await seedTrunk(db, 'e164');
+    const trunkId = await seedInboundTrunk(db, 'e164');
     const channel = fakeAri.addChannel({
       name: `PJSIP/trunk-${trunkId}-0000002c`,
       caller: { number: '+498912345', name: '' }
@@ -293,8 +289,8 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   it('reads an inbound-auth trunk from the endpoint its digest username names', async () => {
     // `identify_by = auth_username` delivers the call on the endpoint named by the
     // Authorization username (§9.4 "Inbound identification"), not on `trunk-<id>`.
-    await seedTrunk(db, 'e164', 'acct-other');
-    const trunkId = await seedTrunk(db, 'national', 'acct-4711');
+    await seedInboundTrunk(db, 'e164', 'acct-other');
+    const trunkId = await seedInboundTrunk(db, 'national', 'acct-4711');
 
     const call = await arrive(trunkId, '030123456', '08912345', 'acct-4711');
 
@@ -306,7 +302,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   });
 
   it('records the trunk that identified the call in the routing trace', async () => {
-    const trunkId = await seedTrunk(db, 'national');
+    const trunkId = await seedInboundTrunk(db, 'national');
 
     const call = await arrive(trunkId, '030123456', '08912345');
 
@@ -316,7 +312,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   });
 
   it('says in the routing trace which number matched no DID before it releases with 404', async () => {
-    const trunkId = await seedTrunk(db, 'e164');
+    const trunkId = await seedInboundTrunk(db, 'e164');
 
     const call = await arrive(trunkId, 'zamfono-test', '+49892315194925');
 
@@ -333,7 +329,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   });
 
   it('names the number block and the called number of a fallback in the routing trace (§11.3)', async () => {
-    const trunkId = await seedTrunk(db, 'e164');
+    const trunkId = await seedInboundTrunk(db, 'e164');
     const { targetId } = await db
       .selectFrom('dids')
       .select('targetId')
@@ -364,7 +360,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   });
 
   it('records a called number taken from To in the routing trace', async () => {
-    const trunkId = await seedTrunk(db, 'e164');
+    const trunkId = await seedInboundTrunk(db, 'e164');
     const channel = fakeAri.addChannel({
       name: `PJSIP/trunk-${trunkId}-0000002a`,
       caller: { number: '+49892315194925', name: '' }
@@ -385,7 +381,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   // §7: the call's level is the maximum of the tenant default and the overrides of the trunk
   // (among others) that routed it; an expired override no longer counts.
   it('raises the call to the delivering trunk’s unexpired diagnostics override', async () => {
-    const trunkId = await seedTrunk(db, 'national');
+    const trunkId = await seedInboundTrunk(db, 'national');
     await db
       .updateTable('trunks')
       .set({ logLevel: 'qos', logLevelExpiresAt: '2999-01-01T00:00:00.000Z' })
@@ -398,7 +394,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   });
 
   it('ignores the delivering trunk’s expired diagnostics override', async () => {
-    const trunkId = await seedTrunk(db, 'national');
+    const trunkId = await seedInboundTrunk(db, 'national');
     await db
       .updateTable('trunks')
       .set({ logLevel: 'qos', logLevelExpiresAt: '2000-01-01T00:00:00.000Z' })
@@ -411,7 +407,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   });
 
   it('counts the call among the delivering trunk’s channels in use until its channel is destroyed', async () => {
-    const trunkId = await seedTrunk(db, 'national');
+    const trunkId = await seedInboundTrunk(db, 'national');
     const { state, trunkState } = pipeline.deps;
 
     const call = await arrive(trunkId, '030123456', '08912345');
@@ -432,7 +428,7 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   });
 
   it('does not count a call whose channel is destroyed during the config read that names its trunk', async () => {
-    const trunkId = await seedTrunk(db, 'national');
+    const trunkId = await seedInboundTrunk(db, 'national');
     const { trunkState } = pipeline.deps;
     // The inbound entry's config read is held until the caller's hangup has been delivered.
     const { cache } = pipeline.deps;

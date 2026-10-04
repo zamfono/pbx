@@ -2,13 +2,16 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   HTTP_NO_CONTENT,
-  newId,
   nowIso,
   resolveVersion,
   type Db,
   type Envelope
 } from '@zamfono/shared';
-import { migratedTestDb } from '@zamfono/shared/testDb.js';
+import {
+  migratedTestDb,
+  seedSettings,
+  seedUser
+} from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
 import { Presence } from '../presence.js';
@@ -22,7 +25,7 @@ import {
   noopLogger,
   testActions
 } from '../testing/pipelineDeps.js';
-import { seedSettings, seedUser } from '../testing/seedRows.js';
+import { seedDevice } from '../testing/seedRows.js';
 import { EventBus } from './eventBus.js';
 import { startInternalServer } from './server.js';
 import { ConfigCache } from './snapshot.js';
@@ -34,18 +37,7 @@ const ANY_FREE_PORT = 0;
 async function seedUserWithDevice(db: Db): Promise<string> {
   await seedSettings(db);
   const userId = await seedUser(db, { name: 'Anna', ext: '101' });
-  await db
-    .insertInto('devices')
-    .values({
-      id: newId(),
-      userId,
-      label: 'desk',
-      kind: 'manual',
-      sipUsername: 'e101-dabc',
-      sipPasswordEnc: Buffer.from('secret'),
-      createdAt: nowIso()
-    })
-    .execute();
+  await seedDevice(db, userId, 'e101-dabc', { label: 'desk' });
   return userId;
 }
 

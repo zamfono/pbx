@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db, type MailRequest } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
@@ -11,7 +12,6 @@ import {
   stubMailSender
 } from '../testing/pipelineDeps.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
-import { seedUser } from '../testing/seedRows.js';
 import { callerChannel, newCall, type Call, type Leg } from './call.js';
 import type { RingOutcome } from './legs.js';
 import { closeCall } from './liveCall.js';

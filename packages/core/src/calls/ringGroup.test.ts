@@ -8,6 +8,7 @@ import {
   type Envelope,
   type LiveCall
 } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import type { AriClient } from '../ari/client.js';
 import type { Channel } from '../ari/types.js';
@@ -19,79 +20,17 @@ import { onEvents } from '../testing/busEvents.js';
 import { eventually, requestTo } from '../testing/eventually.js';
 import { noopRecorder, registerDevice } from '../testing/pipelineDeps.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
-import { seedUser } from '../testing/seedRows.js';
+import {
+  seedAudioAsset,
+  seedDevice,
+  seedRingGroup
+} from '../testing/seedRows.js';
 import { newCall, type Call, type Leg } from './call.js';
 import { liveView } from './callState.js';
 import type { Pipeline } from './pipeline.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 import { sipToHangupCause } from './releaseCause.js';
 import { ringGroup } from './ringGroup.js';
-
-async function seedDevice(
-  db: Db,
-  userId: string,
-  sipUsername: string
-): Promise<void> {
-  await db
-    .insertInto('devices')
-    .values({
-      id: newId(),
-      userId,
-      label: sipUsername,
-      kind: 'manual',
-      sipUsername,
-      sipPasswordEnc: Buffer.from('secret'),
-      createdAt: nowIso()
-    })
-    .execute();
-}
-
-type RingGroupOverrides = {
-  strategy?: 'simultaneous' | 'sequential' | 'random';
-  ringTimeoutS?: number;
-  ringTotalS?: number | null;
-  allowReject?: boolean;
-  mailboxEnabled?: boolean;
-  greetingAudioId?: string;
-  mohAudioId?: string;
-};
-
-async function seedRingGroup(
-  db: Db,
-  overrides: RingGroupOverrides = {}
-): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('ringGroups')
-    .values({
-      id,
-      name: `Group ${id}`,
-      strategy: overrides.strategy ?? 'simultaneous',
-      ringTimeoutS: overrides.ringTimeoutS,
-      ringTotalS: overrides.ringTotalS ?? null,
-      allowReject: overrides.allowReject === false ? 0 : 1,
-      mailboxEnabled: overrides.mailboxEnabled === true ? 1 : 0,
-      greetingAudioId: overrides.greetingAudioId ?? null,
-      mohAudioId: overrides.mohAudioId ?? null,
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
-}
-
-/** An `audio_assets` row (§10.2 "Greetings and audio"), for a group's greeting or MoH class. */
-async function seedAudioAsset(
-  db: Db,
-  kind: 'greeting' | 'moh',
-  filename: string
-): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('audioAssets')
-    .values({ id, label: kind, kind, filename, createdAt: nowIso() })
-    .execute();
-  return id;
-}
 
 async function seedMember(
   db: Db,
@@ -193,8 +132,16 @@ describe('ringGroup', () => {
   });
 
   it('simultaneous with three members originates three legs, the first Up wins, the others are hung up', async () => {
-    const greetingId = await seedAudioAsset(db, 'greeting', 'welcome.wav');
-    const mohId = await seedAudioAsset(db, 'moh', 'hold.wav');
+    const greetingId = await seedAudioAsset(db, {
+      label: 'greeting',
+      kind: 'greeting',
+      filename: 'welcome.wav'
+    });
+    const mohId = await seedAudioAsset(db, {
+      label: 'moh',
+      kind: 'moh',
+      filename: 'hold.wav'
+    });
     const groupId = await seedRingGroup(db, {
       strategy: 'simultaneous',
       greetingAudioId: greetingId,
@@ -710,7 +657,7 @@ describe('ringGroup', () => {
     const groupId = await seedRingGroup(db, {
       strategy: 'sequential',
       ringTimeoutS: 20,
-      allowReject: true
+      allowReject: 1
     });
     const userA = await seedUser(db);
     const userB = await seedUser(db);
@@ -771,7 +718,7 @@ describe('ringGroup', () => {
     const groupId = await seedRingGroup(db, {
       strategy: 'sequential',
       ringTimeoutS: 20,
-      allowReject: true
+      allowReject: 1
     });
     const userA = await seedUser(db);
     const userB = await seedUser(db);
@@ -818,7 +765,7 @@ describe('ringGroup', () => {
     const groupId = await seedRingGroup(db, {
       strategy: 'sequential',
       ringTimeoutS: RING_TIMEOUT_S,
-      allowReject: false
+      allowReject: 0
     });
     const userA = await seedUser(db);
     const userB = await seedUser(db);
@@ -909,7 +856,11 @@ describe('ringGroup', () => {
   }, 10_000);
 
   it('the caller abandoning during the group greeting originates no members and runs no fallback', async () => {
-    const greetingId = await seedAudioAsset(db, 'greeting', 'welcome.wav');
+    const greetingId = await seedAudioAsset(db, {
+      label: 'greeting',
+      kind: 'greeting',
+      filename: 'welcome.wav'
+    });
     const groupId = await seedRingGroup(db, {
       strategy: 'simultaneous',
       greetingAudioId: greetingId

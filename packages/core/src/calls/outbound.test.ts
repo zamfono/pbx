@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db, type LogLevelOverride } from '@zamfono/shared';
+import { seedDid } from '@zamfono/shared/testDb.js';
 
 import type { AriEventOf } from '../ari/events.js';
 import type { Channel } from '../ari/types.js';
@@ -14,7 +15,7 @@ import { onEvents } from '../testing/busEvents.js';
 import { eventually } from '../testing/eventually.js';
 import { noopCdr, noopLogger, noopRecorder } from '../testing/pipelineDeps.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
-import { seedDid } from '../testing/seedRows.js';
+import { seedRoute, seedTrunk } from '../testing/seedRows.js';
 import { callerChannel, type Call, type Leg } from './call.js';
 import { handleOutbound } from './outbound.js';
 import type { Pipeline } from './pipeline.js';
@@ -54,69 +55,6 @@ async function seedCaller(
       kind: 'manual',
       sipUsername: 'e101-d1',
       sipPasswordEnc: Buffer.from('secret'),
-      createdAt: nowIso()
-    })
-    .execute();
-}
-
-type TrunkOverrides = {
-  authMode?: 'registration' | 'ip';
-  callerIdHeader?: 'from' | 'pai' | 'both';
-  callerIdDidId?: string | null;
-  maxChannels?: number | null;
-  emergency?: boolean;
-};
-
-async function seedTrunk(
-  db: Db,
-  priority: number,
-  overrides: TrunkOverrides = {}
-): Promise<string> {
-  const id = newId();
-  const authMode = overrides.authMode ?? 'registration';
-  await db
-    .insertInto('trunks')
-    .values({
-      id,
-      name: `trunk-${priority}`,
-      priority,
-      emergency: Number(overrides.emergency ?? true),
-      authMode,
-      username: authMode === 'registration' ? `user${priority}` : null,
-      passwordEnc: authMode === 'registration' ? Buffer.from('secret') : null,
-      inboundAuth: 0,
-      transport: 'udp',
-      callerIdHeader: overrides.callerIdHeader ?? 'from',
-      maxChannels: overrides.maxChannels ?? null,
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('trunkHosts')
-    .values({
-      trunkId: id,
-      priority: 1,
-      host: `sip${priority}.example.com`,
-      port: null,
-      direction: 'both'
-    })
-    .execute();
-  return id;
-}
-
-async function seedRoute(
-  db: Db,
-  priority: number,
-  trunkId: string,
-  callerIdDidId: string | null = null
-): Promise<void> {
-  await db
-    .insertInto('outboundRoutes')
-    .values({
-      id: newId(),
-      priority,
-      trunkId,
-      callerIdDidId,
       createdAt: nowIso()
     })
     .execute();
@@ -311,8 +249,8 @@ describe('outbound dialing', () => {
 
   it('selects the first matching route trunk and presents the route DID', async () => {
     const routeDidId = await seedDid(db, '+491230000');
-    const trunkId = await seedTrunk(db, 1, { callerIdDidId: routeDidId });
-    await seedRoute(db, 1, trunkId, routeDidId);
+    const trunkId = await seedTrunk(db);
+    await seedRoute(db, trunkId, { priority: 1, callerIdDidId: routeDidId });
 
     const call = await dial('+498912345');
 
@@ -327,8 +265,8 @@ describe('outbound dialing', () => {
   // §7: the call's level is the maximum of the tenant default and the overrides of the user and
   // the trunk (among others) that routed it.
   it('raises the call to the calling user’s diagnostics override', async () => {
-    const trunkId = await seedTrunk(db, 1);
-    await seedRoute(db, 1, trunkId);
+    const trunkId = await seedTrunk(db, { priority: 1 });
+    await seedRoute(db, trunkId, { priority: 1 });
 
     const call = await dial('+498912345', {
       logLevel: 'qos',
@@ -339,13 +277,13 @@ describe('outbound dialing', () => {
   });
 
   it('raises the call to the diagnostics override of the trunk it leaves over', async () => {
-    const trunkId = await seedTrunk(db, 1);
+    const trunkId = await seedTrunk(db, { priority: 1 });
     await db
       .updateTable('trunks')
       .set({ logLevel: 'sip', logLevelExpiresAt: '2999-01-01T00:00:00.000Z' })
       .where('id', '=', trunkId)
       .execute();
-    await seedRoute(db, 1, trunkId);
+    await seedRoute(db, trunkId, { priority: 1 });
 
     const call = await dial('+498912345');
 
@@ -354,8 +292,8 @@ describe('outbound dialing', () => {
 
   // §7 level `sip`: the trunk leg's dialog is part of the call's SIP log.
   it('joins the trunk leg it originates to the call’s SIP capture', async () => {
-    const trunkId = await seedTrunk(db, 1);
-    await seedRoute(db, 1, trunkId);
+    const trunkId = await seedTrunk(db, { priority: 1 });
+    await seedRoute(db, trunkId, { priority: 1 });
     const joined: { callId: string; channelId: string; dialled: boolean }[] =
       [];
     pipeline.deps.cdr.dialogs.joinLeg = (joinedCall, channelId) => {
@@ -382,8 +320,8 @@ describe('outbound dialing', () => {
   // colleague's own dial included, so an internal call hears the tenant's prompts.
   it('sets the dialling channel’s language from the tenant setting', async () => {
     await db.updateTable('settings').set({ language: 'de' }).execute();
-    const trunkId = await seedTrunk(db, 1);
-    await seedRoute(db, 1, trunkId);
+    const trunkId = await seedTrunk(db, { priority: 1 });
+    await seedRoute(db, trunkId, { priority: 1 });
 
     const call = await dial('+498912345');
 
@@ -391,8 +329,8 @@ describe('outbound dialing', () => {
   });
 
   it('stores the resolved E.164 form in calls.to, the dialled digits only in the trace', async () => {
-    const trunkId = await seedTrunk(db, 1);
-    await seedRoute(db, 1, trunkId);
+    const trunkId = await seedTrunk(db, { priority: 1 });
+    await seedRoute(db, trunkId, { priority: 1 });
 
     const call = await dial('089123456');
 
@@ -405,8 +343,8 @@ describe('outbound dialing', () => {
   });
 
   it('stores an own DID dialled in national form as its E.164 number in calls.to (§10.1 Outbound step 4)', async () => {
-    const trunkId = await seedTrunk(db, 1);
-    await seedRoute(db, 1, trunkId);
+    const trunkId = await seedTrunk(db, { priority: 1 });
+    await seedRoute(db, trunkId, { priority: 1 });
     await seedDid(db, '+4930123456');
 
     const call = await dial('030123456');
@@ -415,8 +353,11 @@ describe('outbound dialing', () => {
   });
 
   it('withholds the number on a both trunk by restricting the presentation of the real number (§9.4 "Anonymous calls (CLIR)")', async () => {
-    const trunkId = await seedTrunk(db, 1, { callerIdHeader: 'both' });
-    await seedRoute(db, 1, trunkId);
+    const trunkId = await seedTrunk(db, {
+      priority: 1,
+      callerIdHeader: 'both'
+    });
+    await seedRoute(db, trunkId, { priority: 1 });
 
     await dial('#31#+498912345');
 
@@ -437,8 +378,8 @@ describe('outbound dialing', () => {
   });
 
   it('presents the number as the caller ID on a pai trunk, leaving From and PAI to the endpoint (§9.4 "Caller-ID")', async () => {
-    const trunkId = await seedTrunk(db, 1, { callerIdHeader: 'pai' });
-    await seedRoute(db, 1, trunkId);
+    const trunkId = await seedTrunk(db, { priority: 1, callerIdHeader: 'pai' });
+    await seedRoute(db, trunkId, { priority: 1 });
 
     await dial('+498912345');
 
@@ -457,8 +398,11 @@ describe('outbound dialing', () => {
   });
 
   it('skips a from-only trunk for a withheld call and ends 403 with no other route', async () => {
-    const trunkId = await seedTrunk(db, 1, { callerIdHeader: 'from' });
-    await seedRoute(db, 1, trunkId);
+    const trunkId = await seedTrunk(db, {
+      priority: 1,
+      callerIdHeader: 'from'
+    });
+    await seedRoute(db, trunkId, { priority: 1 });
 
     const call = await dial('#31#+498912345');
 
@@ -470,10 +414,10 @@ describe('outbound dialing', () => {
   });
 
   it('falls through to the second route once the first is over its channel cap', async () => {
-    const trunk1 = await seedTrunk(db, 1, { maxChannels: 1 });
-    const trunk2 = await seedTrunk(db, 2);
-    await seedRoute(db, 1, trunk1);
-    await seedRoute(db, 2, trunk2);
+    const trunk1 = await seedTrunk(db, { priority: 1, maxChannels: 1 });
+    const trunk2 = await seedTrunk(db, { priority: 2 });
+    await seedRoute(db, trunk1, { priority: 1 });
+    await seedRoute(db, trunk2, { priority: 2 });
     pipeline.deps.trunkState.noteAttemptStarted(trunk1, 'busy-channel');
 
     const call = await dial('+498912345');
@@ -485,10 +429,10 @@ describe('outbound dialing', () => {
   });
 
   it('falls through on a 503 before alerting, with one trace line per attempt', async () => {
-    const trunk1 = await seedTrunk(db, 1);
-    const trunk2 = await seedTrunk(db, 2);
-    await seedRoute(db, 1, trunk1);
-    await seedRoute(db, 2, trunk2);
+    const trunk1 = await seedTrunk(db, { priority: 1 });
+    const trunk2 = await seedTrunk(db, { priority: 2 });
+    await seedRoute(db, trunk1, { priority: 1 });
+    await seedRoute(db, trunk2, { priority: 2 });
     fakeAri.answerAfterMs = 60_000;
 
     const { call, finished } = await startDial('+498912345');
@@ -526,10 +470,10 @@ describe('outbound dialing', () => {
   // A leg Asterisk will not place fails its attempt before alerting, as a 500 would: the next
   // route is tried, and a call none of whose legs could be placed ends released.
   it('falls through to the next route when a trunk leg’s dial is refused, tracing placementFailed', async () => {
-    const trunk1 = await seedTrunk(db, 1);
-    const trunk2 = await seedTrunk(db, 2);
-    await seedRoute(db, 1, trunk1);
-    await seedRoute(db, 2, trunk2);
+    const trunk1 = await seedTrunk(db, { priority: 1 });
+    const trunk2 = await seedTrunk(db, { priority: 2 });
+    await seedRoute(db, trunk1, { priority: 1 });
+    await seedRoute(db, trunk2, { priority: 2 });
     fakeAri.failDial = { status: 409, count: 1 };
 
     const call = await dial('+498912345');
@@ -543,10 +487,10 @@ describe('outbound dialing', () => {
   });
 
   it('releases the call when no trunk leg can be created, tracing each attempt', async () => {
-    const trunk1 = await seedTrunk(db, 1);
-    const trunk2 = await seedTrunk(db, 2);
-    await seedRoute(db, 1, trunk1);
-    await seedRoute(db, 2, trunk2);
+    const trunk1 = await seedTrunk(db, { priority: 1 });
+    const trunk2 = await seedTrunk(db, { priority: 2 });
+    await seedRoute(db, trunk1, { priority: 1 });
+    await seedRoute(db, trunk2, { priority: 2 });
     fakeAri.failOriginate = { status: 500 };
 
     const call = await dial('+498912345');
@@ -563,8 +507,8 @@ describe('outbound dialing', () => {
   });
 
   it('releases the call when no created trunk leg ever enters the app, dialling none', async () => {
-    const trunkId = await seedTrunk(db, 1);
-    await seedRoute(db, 1, trunkId);
+    const trunkId = await seedTrunk(db, { priority: 1 });
+    await seedRoute(db, trunkId, { priority: 1 });
     fakeAri.createdEntersStasis = false;
     pipeline.deps.legStasisWaitMs = LEG_STASIS_WAIT_MS;
 
@@ -578,8 +522,8 @@ describe('outbound dialing', () => {
   });
 
   it('ends busy on a 486 with no second attempt', async () => {
-    const trunkId = await seedTrunk(db, 1);
-    await seedRoute(db, 1, trunkId);
+    const trunkId = await seedTrunk(db, { priority: 1 });
+    await seedRoute(db, trunkId, { priority: 1 });
     fakeAri.answerAfterMs = 60_000;
 
     const { call, finished } = await startDial('+498912345');
@@ -593,10 +537,10 @@ describe('outbound dialing', () => {
   });
 
   it('falls through to the next route on a 403, which chan_pjsip reports as Q.850 21 like a 603', async () => {
-    const trunk1 = await seedTrunk(db, 1);
-    const trunk2 = await seedTrunk(db, 2);
-    await seedRoute(db, 1, trunk1);
-    await seedRoute(db, 2, trunk2);
+    const trunk1 = await seedTrunk(db, { priority: 1 });
+    const trunk2 = await seedTrunk(db, { priority: 2 });
+    await seedRoute(db, trunk1, { priority: 1 });
+    await seedRoute(db, trunk2, { priority: 2 });
     fakeAri.answerAfterMs = 60_000;
 
     const { call, finished } = await startDial('+498912345');
@@ -615,10 +559,10 @@ describe('outbound dialing', () => {
   });
 
   it('falls through on a 403 whose channel ended before the originate returned', async () => {
-    const trunk1 = await seedTrunk(db, 1);
-    const trunk2 = await seedTrunk(db, 2);
-    await seedRoute(db, 1, trunk1);
-    await seedRoute(db, 2, trunk2);
+    const trunk1 = await seedTrunk(db, { priority: 1 });
+    const trunk2 = await seedTrunk(db, { priority: 2 });
+    await seedRoute(db, trunk1, { priority: 1 });
+    await seedRoute(db, trunk2, { priority: 2 });
     fakeAri.answerAfterMs = 60_000;
     // Asterisk sends the INVITE while it answers the originate; a far end that refuses at once
     // has the channel destroyed before the core learns its id.
@@ -666,10 +610,10 @@ describe('outbound dialing', () => {
   });
 
   it('ends on a 603 before alerting, the callee declining, without trying the next route', async () => {
-    const trunk1 = await seedTrunk(db, 1);
-    const trunk2 = await seedTrunk(db, 2);
-    await seedRoute(db, 1, trunk1);
-    await seedRoute(db, 2, trunk2);
+    const trunk1 = await seedTrunk(db, { priority: 1 });
+    const trunk2 = await seedTrunk(db, { priority: 2 });
+    await seedRoute(db, trunk1, { priority: 1 });
+    await seedRoute(db, trunk2, { priority: 2 });
     fakeAri.answerAfterMs = 60_000;
 
     const { call, finished } = await startDial('+498912345');
@@ -683,8 +627,8 @@ describe('outbound dialing', () => {
   });
 
   it('ends without a second attempt on a 500 that arrives after alerting', async () => {
-    const trunkId = await seedTrunk(db, 1);
-    await seedRoute(db, 1, trunkId);
+    const trunkId = await seedTrunk(db, { priority: 1 });
+    await seedRoute(db, trunkId, { priority: 1 });
     fakeAri.answerAfterMs = 60_000;
 
     const { call, finished } = await startDial('+498912345');
@@ -699,10 +643,10 @@ describe('outbound dialing', () => {
   });
 
   it('hangs up and tries the next route after 8s with no provisional response', async () => {
-    const trunk1 = await seedTrunk(db, 1);
-    const trunk2 = await seedTrunk(db, 2);
-    await seedRoute(db, 1, trunk1);
-    await seedRoute(db, 2, trunk2);
+    const trunk1 = await seedTrunk(db, { priority: 1 });
+    const trunk2 = await seedTrunk(db, { priority: 2 });
+    await seedRoute(db, trunk1, { priority: 1 });
+    await seedRoute(db, trunk2, { priority: 2 });
     fakeAri.answerAfterMs = 60_000;
     vi.useFakeTimers({
       toFake: ['setTimeout', 'clearTimeout'],
@@ -750,8 +694,8 @@ describe('outbound dialing', () => {
   });
 
   it('plays the failed-call announcement before releasing an exhausted route list', async () => {
-    const trunkId = await seedTrunk(db, 1);
-    await seedRoute(db, 1, trunkId);
+    const trunkId = await seedTrunk(db, { priority: 1 });
+    await seedRoute(db, trunkId, { priority: 1 });
     state.trunks.set(trunkId, {
       status: 'unreachable',
       statusChangedAt: nowIso()
@@ -779,8 +723,8 @@ describe('outbound dialing', () => {
   });
 
   it('dials the second trunk in priority order when the first is unreachable', async () => {
-    const trunk1 = await seedTrunk(db, 1);
-    const trunk2 = await seedTrunk(db, 2);
+    const trunk1 = await seedTrunk(db, { priority: 1 });
+    const trunk2 = await seedTrunk(db, { priority: 2 });
     state.trunks.set(trunk1, {
       status: 'unreachable',
       statusChangedAt: nowIso()
@@ -793,8 +737,8 @@ describe('outbound dialing', () => {
   });
 
   it('never dials a trunk without the emergency flag, even ahead in the trunk order (§9.4 "Emergency trunks")', async () => {
-    await seedTrunk(db, 1, { emergency: false });
-    const trunk2 = await seedTrunk(db, 2);
+    await seedTrunk(db, { priority: 1, emergency: 0 });
+    const trunk2 = await seedTrunk(db, { priority: 2 });
 
     const call = await dial('112');
 
@@ -803,7 +747,7 @@ describe('outbound dialing', () => {
   });
 
   it('fails with an ERROR line while only trunks without the emergency flag are live (§10.1)', async () => {
-    await seedTrunk(db, 1, { emergency: false });
+    await seedTrunk(db, { priority: 1, emergency: 0 });
     let loggedError: Record<string, unknown> | string | null = null;
     pipeline.deps.logger = {
       ...noopLogger,
@@ -843,7 +787,7 @@ describe('outbound dialing', () => {
   });
 
   it('logs no ERROR for an emergency call whose live trunks were tried and failed (§10.1)', async () => {
-    await seedTrunk(db, 1);
+    await seedTrunk(db, { priority: 1 });
     let loggedError: Record<string, unknown> | string | null = null;
     pipeline.deps.logger = {
       ...noopLogger,
@@ -867,8 +811,8 @@ describe('outbound dialing', () => {
   });
 
   it('an answered outbound call is recorded, shown up and traced once, like every answer', async () => {
-    const trunkId = await seedTrunk(db, 1);
-    await seedRoute(db, 1, trunkId);
+    const trunkId = await seedTrunk(db, { priority: 1 });
+    await seedRoute(db, trunkId, { priority: 1 });
     const recorder = spyRecorder();
     pipeline.deps.recorder = recorder;
     const states: string[] = [];
@@ -893,8 +837,8 @@ describe('outbound dialing', () => {
   });
 
   it('names the placing user among every call.state event’s participants (§10.6 "own calls")', async () => {
-    const trunkId = await seedTrunk(db, 1);
-    await seedRoute(db, 1, trunkId);
+    const trunkId = await seedTrunk(db, { priority: 1 });
+    await seedRoute(db, trunkId, { priority: 1 });
     const events: { userId: string | null; userIds: string[] }[] = [];
     onEvents(pipeline.deps.bus, envelope => {
       if (envelope.type === 'call.state') {
@@ -914,7 +858,7 @@ describe('outbound dialing', () => {
   });
 
   it('an answered emergency call is recorded and shown up like every answer', async () => {
-    await seedTrunk(db, 1);
+    await seedTrunk(db, { priority: 1 });
     const recorder = spyRecorder();
     pipeline.deps.recorder = recorder;
 
@@ -929,7 +873,7 @@ describe('outbound dialing', () => {
   });
 
   it('tries the second host of an ip trunk before the next route', async () => {
-    const trunk1 = await seedTrunk(db, 1, { authMode: 'ip' });
+    const trunk1 = await seedTrunk(db, { priority: 1, authMode: 'ip' });
     await db
       .insertInto('trunkHosts')
       .values({
@@ -940,9 +884,9 @@ describe('outbound dialing', () => {
         direction: 'both'
       })
       .execute();
-    const trunk2 = await seedTrunk(db, 2);
-    await seedRoute(db, 1, trunk1);
-    await seedRoute(db, 2, trunk2);
+    const trunk2 = await seedTrunk(db, { priority: 2 });
+    await seedRoute(db, trunk1, { priority: 1 });
+    await seedRoute(db, trunk2, { priority: 2 });
     fakeAri.answerAfterMs = 60_000;
 
     const { call, finished } = await startDial('+498912345');
@@ -962,10 +906,10 @@ describe('outbound dialing', () => {
   });
 
   it('does not re-route at 8s once the far end alerted before that', async () => {
-    const trunk1 = await seedTrunk(db, 1);
-    const trunk2 = await seedTrunk(db, 2);
-    await seedRoute(db, 1, trunk1);
-    await seedRoute(db, 2, trunk2);
+    const trunk1 = await seedTrunk(db, { priority: 1 });
+    const trunk2 = await seedTrunk(db, { priority: 2 });
+    await seedRoute(db, trunk1, { priority: 1 });
+    await seedRoute(db, trunk2, { priority: 2 });
     fakeAri.answerAfterMs = 60_000;
     vi.useFakeTimers({
       toFake: ['setTimeout', 'clearTimeout'],
@@ -986,10 +930,10 @@ describe('outbound dialing', () => {
   });
 
   it('keeps an attempt past 8s whose far end answered 183 Session Progress, which leaves the channel Down', async () => {
-    const trunk1 = await seedTrunk(db, 1);
-    const trunk2 = await seedTrunk(db, 2);
-    await seedRoute(db, 1, trunk1);
-    await seedRoute(db, 2, trunk2);
+    const trunk1 = await seedTrunk(db, { priority: 1 });
+    const trunk2 = await seedTrunk(db, { priority: 2 });
+    await seedRoute(db, trunk1, { priority: 1 });
+    await seedRoute(db, trunk2, { priority: 2 });
     fakeAri.answerAfterMs = 60_000;
     vi.useFakeTimers({
       toFake: ['setTimeout', 'clearTimeout'],
@@ -1011,10 +955,10 @@ describe('outbound dialing', () => {
   });
 
   it('keeps an attempt past 8s whose far end answered only 100 Trying, which no event reports', async () => {
-    const trunk1 = await seedTrunk(db, 1);
-    const trunk2 = await seedTrunk(db, 2);
-    await seedRoute(db, 1, trunk1);
-    await seedRoute(db, 2, trunk2);
+    const trunk1 = await seedTrunk(db, { priority: 1 });
+    const trunk2 = await seedTrunk(db, { priority: 2 });
+    await seedRoute(db, trunk1, { priority: 1 });
+    await seedRoute(db, trunk2, { priority: 2 });
     fakeAri.answerAfterMs = 60_000;
     vi.useFakeTimers({
       toFake: ['setTimeout', 'clearTimeout'],
@@ -1065,10 +1009,10 @@ describe('outbound dialing', () => {
   }
 
   it('dials no further route once the caller has hung up (§9.4 "Route fallthrough")', async () => {
-    const trunk1 = await seedTrunk(db, 1);
-    const trunk2 = await seedTrunk(db, 2);
-    await seedRoute(db, 1, trunk1);
-    await seedRoute(db, 2, trunk2);
+    const trunk1 = await seedTrunk(db, { priority: 1 });
+    const trunk2 = await seedTrunk(db, { priority: 2 });
+    await seedRoute(db, trunk1, { priority: 1 });
+    await seedRoute(db, trunk2, { priority: 2 });
     fakeAri.answerAfterMs = 60_000;
 
     const { call, finished } = await startDial('+498912345');
@@ -1083,7 +1027,7 @@ describe('outbound dialing', () => {
   });
 
   it('dials no further host of an ip trunk once the caller has hung up (§9.4 "Hosts")', async () => {
-    const trunk1 = await seedTrunk(db, 1, { authMode: 'ip' });
+    const trunk1 = await seedTrunk(db, { priority: 1, authMode: 'ip' });
     await db
       .insertInto('trunkHosts')
       .values({
@@ -1094,7 +1038,7 @@ describe('outbound dialing', () => {
         direction: 'both'
       })
       .execute();
-    await seedRoute(db, 1, trunk1);
+    await seedRoute(db, trunk1, { priority: 1 });
     fakeAri.answerAfterMs = 60_000;
 
     const { call, finished } = await startDial('+498912345');
@@ -1108,8 +1052,8 @@ describe('outbound dialing', () => {
   });
 
   it('dials no further emergency trunk once the caller has hung up (§10.1 "Emergency calls")', async () => {
-    const trunk1 = await seedTrunk(db, 1);
-    await seedTrunk(db, 2);
+    const trunk1 = await seedTrunk(db, { priority: 1 });
+    await seedTrunk(db, { priority: 2 });
     fakeAri.answerAfterMs = 60_000;
 
     const { call, finished } = await startDial('112');
@@ -1122,8 +1066,8 @@ describe('outbound dialing', () => {
   });
 
   it('never dials a trunk leg still being placed when the caller hangs up (§10.1 step 4)', async () => {
-    const trunk1 = await seedTrunk(db, 1);
-    await seedRoute(db, 1, trunk1);
+    const trunk1 = await seedTrunk(db, { priority: 1 });
+    await seedRoute(db, trunk1, { priority: 1 });
     fakeAri.answerAfterMs = 20;
     const create = Promise.withResolvers<undefined>();
     const createArrived = Promise.withResolvers<undefined>();

@@ -9,13 +9,12 @@ import {
   HTTP_UNAUTHORIZED,
   type StateResponse
 } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { migrateForTest, seedSettings } from '@zamfono/shared/testDb.js';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { getDb } from '#lib/server/db.js';
 import { stubCoreClient } from '#testing/coreClientStub.js';
 import { requestEvent } from '#testing/requestEvent.js';
-import { seedSettings } from '#testing/testDb.js';
 
 import { GET } from './+server.js';
 

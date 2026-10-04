@@ -3,7 +3,7 @@ import { isRedirect } from '@sveltejs/kit';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { migrateForTest, seedSettings } from '@zamfono/shared/testDb.js';
 
 import { MIN_PASSWORD_LENGTH } from '#lib/auth/passwordPolicy.js';
 import { verifyPassword } from '#lib/server/auth/password.js';
@@ -11,7 +11,6 @@ import { issueResetToken } from '#lib/server/auth/tokens.js';
 import { getDb } from '#lib/server/db.js';
 import { sha256Hex } from '#lib/server/hash.js';
 import { jsonPost, requestEvent } from '#testing/requestEvent.js';
-import { seedSettings } from '#testing/testDb.js';
 
 import { POST } from '../reset/+server.js';
 import { load } from './+page.server.js';

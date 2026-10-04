@@ -11,11 +11,10 @@ import path from 'node:path';
 import { beforeEach, describe, expect, it, onTestFinished } from 'vitest';
 
 import { newId, type Db } from '@zamfono/shared';
-import { migratedTestDb } from '@zamfono/shared/testDb.js';
+import { migratedTestDb, seedSettings } from '@zamfono/shared/testDb.js';
 
 import { runRetention } from './retention.js';
 import { noopLogger } from './testing/pipelineDeps.js';
-import { seedSettings } from './testing/seedRows.js';
 
 const NOW = '2026-06-01T00:00:00.000Z';
 const LONG_AGO = '2026-01-01T00:00:00.000Z';

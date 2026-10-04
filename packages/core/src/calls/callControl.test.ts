@@ -29,7 +29,7 @@ import {
   startRig,
   type Rig
 } from '../testing/pipelineRig.js';
-import { seedDevice, seedUser } from '../testing/seedRows.js';
+import { seedUserWithDevice } from '../testing/seedRows.js';
 import { CallActions } from './actions.js';
 import { callerChannel, newCall, type Call } from './call.js';
 import { liveView } from './callState.js';
@@ -37,13 +37,6 @@ import type { GroupLeg } from './groupLegs.js';
 import type { Pipeline } from './pipeline.js';
 
 const RING_TIMER_MS = 60_000;
-
-/** A user at `ext` with one device, reported registered. */
-async function seedUserWithDevice(rig: Rig, ext: string): Promise<string> {
-  const id = await seedUser(rig.db, { ext });
-  await seedDevice(rig, id, `e${ext}-a`);
-  return id;
-}
 
 describe('call control', () => {
   let rig: Rig;

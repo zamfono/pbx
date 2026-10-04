@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db, type MailRequest } from '@zamfono/shared';
+import { seedDid, seedUser } from '@zamfono/shared/testDb.js';
 
 import type { AriClient } from '../ari/client.js';
 import type { AriEventOf } from '../ari/events.js';
@@ -16,7 +17,7 @@ import {
   registerDevice
 } from '../testing/pipelineDeps.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
-import { seedDid, seedUser } from '../testing/seedRows.js';
+import { seedDevice, seedForwardTarget } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
 import { liveView } from './callState.js';
 import type { Pipeline } from './pipeline.js';
@@ -48,12 +49,6 @@ function fakeCdr(): PipelineDeps['cdr'] & { opened: Call[]; finished: Call[] } {
       return Promise.resolve();
     }
   };
-}
-
-async function seedForwardTargetUser(db: Db, userId: string): Promise<string> {
-  const id = newId();
-  await db.insertInto('forwardTargets').values({ id, userId }).execute();
-  return id;
 }
 
 async function seedTrunkWithRoute(db: Db): Promise<string> {
@@ -133,25 +128,6 @@ function ringingCall(
     }
     return call;
   });
-}
-
-async function seedDevice(
-  db: Db,
-  userId: string,
-  sipUsername: string
-): Promise<void> {
-  await db
-    .insertInto('devices')
-    .values({
-      id: newId(),
-      userId,
-      label: sipUsername,
-      kind: 'manual',
-      sipUsername,
-      sipPasswordEnc: Buffer.from('secret'),
-      createdAt: nowIso()
-    })
-    .execute();
 }
 
 async function seedUnconditionalForward(
@@ -261,7 +237,7 @@ describe('Pipeline', () => {
   it("deposits a caller in the target user's mailbox, recording them (§10.1 step 4)", async () => {
     const userId = await seedUser(db, { ringTimeoutS: RING_TIMEOUT_S });
     await seedDevice(db, userId, 'e101-d1');
-    const targetId = await seedForwardTargetUser(db, userId);
+    const targetId = await seedForwardTarget(db, { userId });
     await seedDid(db, '+15551000', targetId);
     fakeAri.answerAfterMs = 60_000;
     await registerDevice(fakeAri, pipeline, 'e101-d1');
@@ -337,7 +313,7 @@ describe('Pipeline', () => {
   it("sets the caller channel's language from the tenant setting (§9.1)", async () => {
     const userId = await seedUser(db, { ringTimeoutS: RING_TIMEOUT_S });
     await seedDevice(db, userId, 'e101-d1');
-    const targetId = await seedForwardTargetUser(db, userId);
+    const targetId = await seedForwardTarget(db, { userId });
     await seedDid(db, '+15551000', targetId);
     await registerDevice(fakeAri, pipeline, 'e101-d1');
     await db.updateTable('settings').set({ language: 'de' }).execute();
@@ -372,7 +348,7 @@ describe('Pipeline', () => {
       .where('id', '=', userId)
       .execute();
     await seedDevice(db, userId, 'e101-d1');
-    const targetId = await seedForwardTargetUser(db, userId);
+    const targetId = await seedForwardTarget(db, { userId });
     await seedDid(db, '+15551000', targetId);
     fakeAri.answerAfterMs = 60_000;
     await registerDevice(fakeAri, pipeline, 'e101-d1');
@@ -421,7 +397,7 @@ describe('Pipeline', () => {
         .set({ notifyMissedCalls: 1 })
         .where('id', '=', userId)
         .execute();
-      const targetId = await seedForwardTargetUser(db, userId);
+      const targetId = await seedForwardTarget(db, { userId });
       await seedDid(db, '+15551000', targetId);
       const callerChannel = fakeAri.addChannel({
         caller: { number: '+15559999', name: '' }
@@ -462,7 +438,7 @@ describe('Pipeline', () => {
     });
     const userId = await seedUser(db, { ringTimeoutS: RING_TIMEOUT_S });
     await seedDevice(db, userId, 'e101-d1');
-    const targetId = await seedForwardTargetUser(db, userId);
+    const targetId = await seedForwardTarget(db, { userId });
     await seedDid(db, '+15551000', targetId);
     await registerDevice(fakeAri, pipeline, 'e101-d1');
 
@@ -483,7 +459,7 @@ describe('Pipeline', () => {
   it('hands the answered participation to the recorder (§10.2 "Call recording")', async () => {
     const userId = await seedUser(db, { ringTimeoutS: RING_TIMEOUT_S });
     await seedDevice(db, userId, 'e101-d1');
-    const targetId = await seedForwardTargetUser(db, userId);
+    const targetId = await seedForwardTarget(db, { userId });
     await seedDid(db, '+15551000', targetId);
     await registerDevice(fakeAri, pipeline, 'e101-d1');
 
@@ -505,7 +481,7 @@ describe('Pipeline', () => {
     const userId = await seedUser(db, { ringTimeoutS: RING_TIMEOUT_S });
     await seedDevice(db, userId, 'e101-d1');
     await seedDevice(db, userId, 'e101-d2');
-    const targetId = await seedForwardTargetUser(db, userId);
+    const targetId = await seedForwardTarget(db, { userId });
     await seedDid(db, '+15551000', targetId);
     await registerDevice(fakeAri, pipeline, 'e101-d1');
     await registerDevice(fakeAri, pipeline, 'e101-d2');
@@ -585,7 +561,7 @@ describe('Pipeline', () => {
       .execute();
     const userId = await seedUser(db, { ringTimeoutS: RING_TIMEOUT_S });
     await seedDevice(db, userId, 'e101-d1');
-    const targetId = await seedForwardTargetUser(db, userId);
+    const targetId = await seedForwardTarget(db, { userId });
     await seedDid(db, '+15551000', targetId);
     await registerDevice(fakeAri, pipeline, 'e101-d1');
 
@@ -603,7 +579,7 @@ describe('Pipeline', () => {
 
   it('releases a blocked caller with cause 603 and records it as blocked', async () => {
     const userId = await seedUser(db, { ringTimeoutS: RING_TIMEOUT_S });
-    const targetId = await seedForwardTargetUser(db, userId);
+    const targetId = await seedForwardTarget(db, { userId });
     await seedDid(db, '+15551000', targetId);
     await db
       .insertInto('blockedNumbers')
@@ -633,11 +609,15 @@ describe('Pipeline', () => {
       mailboxEnabled: 0,
       ringTimeoutS: RING_TIMEOUT_S
     });
-    const offlineTargetId = await seedForwardTargetUser(db, offlineUserId);
+    const offlineTargetId = await seedForwardTarget(db, {
+      userId: offlineUserId
+    });
 
     const primaryUserId = await seedUser(db, { ringTimeoutS: RING_TIMEOUT_S });
     await seedDevice(db, primaryUserId, 'e101-d1');
-    const primaryTargetId = await seedForwardTargetUser(db, primaryUserId);
+    const primaryTargetId = await seedForwardTarget(db, {
+      userId: primaryUserId
+    });
     await seedDid(db, '+15551000', primaryTargetId);
     await registerDevice(fakeAri, pipeline, 'e101-d1');
     await db
@@ -668,11 +648,15 @@ describe('Pipeline', () => {
       mailboxEnabled: 0,
       ringTimeoutS: RING_TIMEOUT_S
     });
-    const closedTargetId = await seedForwardTargetUser(db, closedUserId);
+    const closedTargetId = await seedForwardTarget(db, {
+      userId: closedUserId
+    });
 
     const primaryUserId = await seedUser(db, { ringTimeoutS: RING_TIMEOUT_S });
     await seedDevice(db, primaryUserId, 'e101-d1');
-    const primaryTargetId = await seedForwardTargetUser(db, primaryUserId);
+    const primaryTargetId = await seedForwardTarget(db, {
+      userId: primaryUserId
+    });
     await seedDid(db, '+15551000', primaryTargetId);
     await registerDevice(fakeAri, pipeline, 'e101-d1');
     await seedClosedOpeningHours(db, primaryUserId, closedTargetId);
@@ -694,19 +678,19 @@ describe('Pipeline', () => {
       mailboxEnabled: 0,
       ringTimeoutS: RING_TIMEOUT_S
     });
-    const u4Target = await seedForwardTargetUser(db, u4);
+    const u4Target = await seedForwardTarget(db, { userId: u4 });
     const u3 = await seedUser(db, { ringTimeoutS: RING_TIMEOUT_S });
-    const u3Target = await seedForwardTargetUser(db, u3);
+    const u3Target = await seedForwardTarget(db, { userId: u3 });
     await seedUnconditionalForward(db, u3, u4Target);
     const u2 = await seedUser(db, { ringTimeoutS: RING_TIMEOUT_S });
-    const u2Target = await seedForwardTargetUser(db, u2);
+    const u2Target = await seedForwardTarget(db, { userId: u2 });
     await seedUnconditionalForward(db, u2, u3Target);
     const u1 = await seedUser(db, { ringTimeoutS: RING_TIMEOUT_S });
-    const u1Target = await seedForwardTargetUser(db, u1);
+    const u1Target = await seedForwardTarget(db, { userId: u1 });
     await seedUnconditionalForward(db, u1, u2Target);
     // u4 forwards unconditionally too, which would be the fourth hop.
     const u5 = await seedUser(db, { ringTimeoutS: RING_TIMEOUT_S });
-    const u5Target = await seedForwardTargetUser(db, u5);
+    const u5Target = await seedForwardTarget(db, { userId: u5 });
     await seedUnconditionalForward(db, u4, u5Target);
 
     await seedDid(db, '+15551000', u1Target);
@@ -734,7 +718,7 @@ describe('Pipeline', () => {
       ringTimeoutS: 6,
       findMeJson: JSON.stringify([{ number: '+15557000', delayS: 0 }])
     });
-    const targetId = await seedForwardTargetUser(db, userId);
+    const targetId = await seedForwardTarget(db, { userId });
     await seedDid(db, '+15551000', targetId);
 
     const callerChannel = fakeAri.addChannel({
@@ -770,12 +754,12 @@ describe('Pipeline', () => {
       mailboxEnabled: 0,
       ringTimeoutS: RING_TIMEOUT_S
     });
-    const busyTargetId = await seedForwardTargetUser(db, busyUserId);
+    const busyTargetId = await seedForwardTarget(db, { userId: busyUserId });
     const userId = await seedUser(db, { ringTimeoutS: 30 });
     await seedDevice(db, userId, 'e101-d1');
     await seedDevice(db, userId, 'e101-d2');
     await seedBusyForward(db, userId, busyTargetId);
-    const targetId = await seedForwardTargetUser(db, userId);
+    const targetId = await seedForwardTarget(db, { userId });
     await seedDid(db, '+15551000', targetId);
     fakeAri.answerAfterMs = 60_000;
     await registerDevice(fakeAri, pipeline, 'e101-d1');
@@ -826,11 +810,11 @@ describe('Pipeline', () => {
       mailboxEnabled: 0,
       ringTimeoutS: RING_TIMEOUT_S
     });
-    const busyTargetId = await seedForwardTargetUser(db, busyUserId);
+    const busyTargetId = await seedForwardTarget(db, { userId: busyUserId });
     const userId = await seedUser(db, { ringTimeoutS: 30 });
     await seedDevice(db, userId, 'e101-d1');
     await seedBusyForward(db, userId, busyTargetId);
-    const targetId = await seedForwardTargetUser(db, userId);
+    const targetId = await seedForwardTarget(db, { userId });
     await seedDid(db, '+15551000', targetId);
     fakeAri.answerAfterMs = 60_000;
     await registerDevice(fakeAri, pipeline, 'e101-d1');
@@ -863,7 +847,7 @@ describe('Pipeline', () => {
   it('abandoning the call while ringing cancels the race and finishes the call', async () => {
     const userId = await seedUser(db, { ringTimeoutS: 30 });
     await seedDevice(db, userId, 'e101-d1');
-    const targetId = await seedForwardTargetUser(db, userId);
+    const targetId = await seedForwardTarget(db, { userId });
     await seedDid(db, '+15551000', targetId);
     fakeAri.answerAfterMs = 60_000;
     await registerDevice(fakeAri, pipeline, 'e101-d1');

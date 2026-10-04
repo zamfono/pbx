@@ -2,11 +2,11 @@ import * as privateEnv from '$app/env/private';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Db } from '@zamfono/shared';
-import { defaultFeatureCodes } from '@zamfono/shared/testDb.js';
+import { defaultFeatureCodes, seedSettings } from '@zamfono/shared/testDb.js';
 
 import { propagateConfig } from '#lib/server/propagation.js';
 import { decrypt, encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
-import { asRun, makeTestDb, owner, seedSettings } from '#testing/testDb.js';
+import { asRun, makeTestDb, owner } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 import { type Actor } from '../types.js';

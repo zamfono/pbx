@@ -6,6 +6,7 @@ import {
   nowIso,
   type Db
 } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import type { AriClient } from '../ari/client.js';
 import { AriError } from '../ari/types.js';
@@ -15,7 +16,6 @@ import { isPlacement } from '../testing/ari/fakeDial.js';
 import { eventually, requestTo } from '../testing/eventually.js';
 import { registerDevice } from '../testing/pipelineDeps.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
-import { seedUser } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
 import { playMenu } from './menu.js';
 import type { Pipeline } from './pipeline.js';

@@ -4,8 +4,12 @@ import { isHttpError, isRedirect, type RequestEvent } from '@sveltejs/kit';
 import * as privateEnv from '$app/env/private';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { nowIso, type Db } from '@zamfono/shared';
+import {
+  migrateForTest,
+  seedSettings,
+  seedUser
+} from '@zamfono/shared/testDb.js';
 
 import { encodeMetadataClientId } from '#lib/server/auth/clients.js';
 import { authCodeStore } from '#lib/server/auth/codes.js';
@@ -17,7 +21,6 @@ import { getDb } from '#lib/server/db.js';
 import { accountLockedUntil } from '#lib/server/ops/users/_accountLock.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 import { cookieJar, requestEvent } from '#testing/requestEvent.js';
-import { seedSettings } from '#testing/testDb.js';
 
 import { load } from './+page.server.js';
 import { approveConsentSubmit, denyConsentSubmit } from './consentSubmit.js';
@@ -48,26 +51,20 @@ function testClientId(redirectUri: string): string {
   });
 }
 
-async function seedUser(db: Db, email: string): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id,
-      name: 'Anna',
-      email,
-      role: 'owner',
-      passwordHash: await hashPassword(PASSWORD),
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
+/** An owner `email` signing in with `PASSWORD`. */
+async function seedOwner(db: Db, email: string): Promise<void> {
+  await seedUser(db, {
+    name: 'Anna',
+    email,
+    role: 'owner',
+    passwordHash: await hashPassword(PASSWORD)
+  });
 }
 
 beforeAll(async () => {
   const db = getDb();
   await migrateForTest(db);
-  await seedUser(db, 'owner@example.com');
+  await seedOwner(db, 'owner@example.com');
   await seedSettings(db, { companyName: 'Acme', language: 'en' });
 });
 
@@ -99,7 +96,7 @@ describe('the login step', () => {
   it('increments the lock counter and returns 400 with a generic message on a wrong password', async () => {
     const email = 'lockout-1@example.com';
     const db = getDb();
-    await seedUser(db, email);
+    await seedOwner(db, email);
     const result = await loginSubmit(
       eventFor(),
       loginPayload(email, 'not the password')
@@ -125,7 +122,7 @@ describe('the login step', () => {
   it('answers a locked account exactly like a wrong password (§5.5)', async () => {
     const email = 'lockout-2@example.com';
     const db = getDb();
-    await seedUser(db, email);
+    await seedOwner(db, email);
     const attemptsToLock = 5;
     for (let attempt = 0; attempt < attemptsToLock; attempt += 1) {
       // Each attempt must land before the next, to actually cross the lock threshold
@@ -144,7 +141,7 @@ describe('the login step', () => {
   it('renders the consent step on a correct password, then redirects with code, state and iss once approved', async () => {
     const email = 'success-1@example.com';
     const db = getDb();
-    await seedUser(db, email);
+    await seedOwner(db, email);
     const cookies = cookieJar();
     const authorize = {
       client_id: testClientId('https://client.example.com/callback'),
@@ -181,7 +178,7 @@ describe('the login step', () => {
   it('accepts a request without state and answers without one (OAuth 2.1 §4.1.1: optional)', async () => {
     const email = 'no-state@example.com';
     const db = getDb();
-    await seedUser(db, email);
+    await seedOwner(db, email);
     const cookies = cookieJar();
     const loginResult = await loginSubmit(
       eventFor(cookies),
@@ -208,7 +205,7 @@ describe('the login step', () => {
   it('mints a code redeemable without redirect_uri for a request that sent none (OAuth 2.1 §2.3.2, §10.2)', async () => {
     const email = 'no-redirect@example.com';
     const db = getDb();
-    await seedUser(db, email);
+    await seedOwner(db, email);
     const cookies = cookieJar();
     const clientId = testClientId('https://client.example.com/callback');
     const verifier = 'verifier-no-redirect-uri';
@@ -256,7 +253,7 @@ describe('the login step', () => {
   it('mints no code and redirects with error=access_denied when consent is denied', async () => {
     const email = 'success-3@example.com';
     const db = getDb();
-    await seedUser(db, email);
+    await seedOwner(db, email);
     const cookies = cookieJar();
     await loginSubmit(
       eventFor(cookies),
@@ -286,7 +283,7 @@ describe('the login step', () => {
   it('locks the account for a case variant of an e-mail already locked (§5.5, §11.2 NOCASE)', async () => {
     const email = 'CaseLock@example.com';
     const db = getDb();
-    await seedUser(db, email.toLowerCase());
+    await seedOwner(db, email.toLowerCase());
     const attemptsToLock = 5;
     for (let attempt = 0; attempt < attemptsToLock; attempt += 1) {
       // eslint-disable-next-line no-await-in-loop -- sequential attempts are the point of this loop
@@ -307,7 +304,7 @@ describe('the login step', () => {
 
   it('checks at most five of six parallel wrong passwords against the account (§5.5)', async () => {
     const email = 'parallel@example.com';
-    await seedUser(getDb(), email);
+    await seedOwner(getDb(), email);
     vi.mocked(verifyPassword).mockClear();
     const parallelAttempts = 6;
     await Promise.all(
@@ -324,7 +321,7 @@ describe('the login step', () => {
   it('shows the lock on the user record of an e-mail stored in mixed case (§5.5)', async () => {
     const email = 'Mixed.Case@Example.com';
     const db = getDb();
-    await seedUser(db, email);
+    await seedOwner(db, email);
     const attemptsToLock = 5;
     for (let attempt = 0; attempt < attemptsToLock; attempt += 1) {
       // eslint-disable-next-line no-await-in-loop -- sequential attempts are the point of this loop
@@ -337,7 +334,7 @@ describe('the login step', () => {
   it('renders the error page with status 400, without redirecting, for a rejected redirect_uri', async () => {
     const email = 'success-2@example.com';
     const db = getDb();
-    await seedUser(db, email);
+    await seedOwner(db, email);
     const err = await loginSubmit(
       eventFor(),
       loginPayload(email, PASSWORD, {
@@ -577,7 +574,7 @@ describe("Claude Code's sign-in on a random loopback port (RFC 8252 §7.3)", () 
   /** Logs in and approves for Claude Code at {@link REDIRECT_URI}; the code it is redirected with. */
   async function codeFor(email: string, verifier: string): Promise<string> {
     serveClaudeCodeDocument();
-    await seedUser(getDb(), email);
+    await seedOwner(getDb(), email);
     const cookies = cookieJar();
     const loginResult = await loginSubmit(
       eventFor(cookies),

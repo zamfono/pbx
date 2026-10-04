@@ -2,7 +2,7 @@
 // database and the collaborators `main.ts` wires it with, and the calls those suites start from;
 // the rows they seed are `seedRows.ts`'s.
 import { newId, nowIso, resolveVersion, type Db } from '@zamfono/shared';
-import { migratedTestDb } from '@zamfono/shared/testDb.js';
+import { migratedTestDb, seedSettings } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
 import type { CallActions } from '../calls/actions.js';
@@ -23,7 +23,6 @@ import {
   testPipelineDeps,
   trunkStateFor
 } from './pipelineDeps.js';
-import { seedSettings } from './seedRows.js';
 
 // Any free port, never a fixed one another suite running on the same host may already hold.
 const ANY_FREE_PORT = 0;

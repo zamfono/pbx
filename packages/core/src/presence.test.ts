@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
-import { migratedTestDb } from '@zamfono/shared/testDb.js';
+import {
+  migratedTestDb,
+  seedSettings,
+  seedUser
+} from '@zamfono/shared/testDb.js';
 
 import { AriClient } from './ari/client.js';
 import { EventBus } from './internal/eventBus.js';
@@ -12,38 +16,11 @@ import { FakeAri } from './testing/ari/fake.js';
 import { peerStatusChange } from './testing/ari/fakeChannel.js';
 import { eventually } from './testing/eventually.js';
 import { noopLogger } from './testing/pipelineDeps.js';
-import { seedSettings, seedSlot, seedUser } from './testing/seedRows.js';
+import { seedDevice, seedExtension, seedSlot } from './testing/seedRows.js';
 
 // How long the fake holds a hint PUT to model a slow connection: well past the round trip of the
 // refresh sent after it, so that one lands first unless the pushes are serialized.
 const SLOW_HINT_PUT_MS = 100;
-
-async function seedDevice(
-  db: Db,
-  userId: string,
-  sipUsername: string
-): Promise<void> {
-  await db
-    .insertInto('devices')
-    .values({
-      id: newId(),
-      userId,
-      label: sipUsername,
-      kind: 'manual',
-      sipUsername,
-      sipPasswordEnc: Buffer.from('secret'),
-      createdAt: nowIso()
-    })
-    .execute();
-}
-
-async function seedExtension(
-  db: Db,
-  ext: string,
-  userId: string
-): Promise<void> {
-  await db.insertInto('extensions').values({ ext, userId }).execute();
-}
 
 describe('Presence', () => {
   let db: Db;
@@ -96,7 +73,7 @@ describe('Presence', () => {
   it('registration event flips hint from UNAVAILABLE to NOT_INUSE and appends presence_log', async () => {
     const userId = await seedUser(db);
     await seedDevice(db, userId, 'e101-dabc');
-    await seedExtension(db, '101', userId);
+    await seedExtension(db, '101', { userId });
 
     await presence.resyncOnBoot();
     expect(state.presence.get(userId)?.status).toBe('offline');
@@ -122,7 +99,7 @@ describe('Presence', () => {
   it('setCallState drives RINGING/INUSE hints and appends busy presence_log rows with the call counterpart', async () => {
     const userId = await seedUser(db);
     await seedDevice(db, userId, 'e102-dabc');
-    await seedExtension(db, '102', userId);
+    await seedExtension(db, '102', { userId });
 
     await presence.resyncOnBoot();
     fakeAri.emit(peerStatusChange('e102-dabc'));
@@ -178,7 +155,7 @@ describe('Presence', () => {
   it('setCallState is reference-counted per call id: a second call ending never clears a user still bridged in an earlier one', async () => {
     const userId = await seedUser(db);
     await seedDevice(db, userId, 'e103-dabc');
-    await seedExtension(db, '103', userId);
+    await seedExtension(db, '103', { userId });
     await presence.resyncOnBoot();
     fakeAri.emit(peerStatusChange('e103-dabc'));
     await eventually(() => {
@@ -225,7 +202,7 @@ describe('Presence', () => {
   it('the last computed hint wins even when an earlier PUT reaches Asterisk late (§9.3)', async () => {
     const userId = await seedUser(db);
     await seedDevice(db, userId, 'e105-dabc');
-    await seedExtension(db, '105', userId);
+    await seedExtension(db, '105', { userId });
     await presence.resyncOnBoot();
     fakeAri.emit(peerStatusChange('e105-dabc'));
     await eventually(() => {
@@ -290,7 +267,7 @@ describe('Presence', () => {
     const userId = await seedUser(db);
     await seedDevice(db, userId, 'e106-dabc');
     await seedDevice(db, userId, 'e106-dxyz');
-    await seedExtension(db, '106', userId);
+    await seedExtension(db, '106', { userId });
     fakeAri.registerEndpoint('e106-dabc');
     await presence.resyncOnBoot();
     expect(presence.isRegistered('e106-dabc')).toBe(true);

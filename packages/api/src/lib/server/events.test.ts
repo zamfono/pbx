@@ -10,7 +10,7 @@ import {
   type Db,
   type Envelope
 } from '@zamfono/shared';
-import { migratedTestDb } from '@zamfono/shared/testDb.js';
+import { migratedTestDb, seedUser } from '@zamfono/shared/testDb.js';
 
 import { signAccessToken } from './auth/jwt.js';
 import { EventHub, visibleTo } from './events.js';
@@ -52,16 +52,7 @@ function wait(ms: number): Promise<void> {
 /** A migrated in-memory database with one user, for token verification and membership checks. */
 async function migratedDb(userId: string): Promise<Db> {
   const db = await migratedTestDb();
-  await db
-    .insertInto('users')
-    .values({
-      id: userId,
-      name: 'A User',
-      email: `${userId}@example.com`,
-      role: 'user',
-      createdAt: nowIso()
-    })
-    .execute();
+  await seedUser(db, { id: userId, name: 'A User' });
   return db;
 }
 

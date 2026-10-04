@@ -6,7 +6,7 @@ import {
   type Db,
   type Envelope
 } from '@zamfono/shared';
-import { migratedTestDb } from '@zamfono/shared/testDb.js';
+import { migratedTestDb, seedSettings } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from './ari/client.js';
 import { AriError, type Channel } from './ari/types.js';
@@ -23,7 +23,6 @@ import { onEvents } from './testing/busEvents.js';
 import { eventually } from './testing/eventually.js';
 import { noopLogger } from './testing/pipelineDeps.js';
 import { fixedPoint, ntpMiddle, rtcpPayload } from './testing/rtcpPayload.js';
-import { seedSettings } from './testing/seedRows.js';
 
 const NOW = '2026-01-01T00:05:00.000Z';
 

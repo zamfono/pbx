@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import type { AriClient } from '../ari/client.js';
 import type { Channel } from '../ari/types.js';
@@ -10,7 +11,7 @@ import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { eventually } from '../testing/eventually.js';
 import { registerDevice } from '../testing/pipelineDeps.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
-import { seedDevice, seedUser } from '../testing/seedRows.js';
+import { seedDevice, seedRoute, seedTrunk } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import { ringUser } from './ringUser.js';
@@ -25,44 +26,8 @@ async function seedFindMeUser(rig: Rig, delayS: number): Promise<string> {
     ringTimeoutS: 30,
     findMeJson: JSON.stringify([{ number: FIND_ME_NUMBER, delayS }])
   });
-  await seedDevice(rig, id, 'e101-d1', false);
+  await seedDevice(rig.db, id, 'e101-d1');
   return id;
-}
-
-/** A trunk and an outbound route over it, so the find-me leg can be dialled. */
-async function seedRoute(db: Db): Promise<string> {
-  const trunkId = newId();
-  await db
-    .insertInto('trunks')
-    .values({
-      id: trunkId,
-      name: 'trunk-1',
-      priority: 1,
-      emergency: 1,
-      authMode: 'registration',
-      username: 'user1',
-      passwordEnc: Buffer.from('secret'),
-      inboundAuth: 0,
-      transport: 'udp',
-      callerIdHeader: 'from',
-      createdAt: nowIso()
-    })
-    .execute();
-  await db
-    .insertInto('trunkHosts')
-    .values({
-      trunkId,
-      priority: 1,
-      host: 'sip1.example.com',
-      port: null,
-      direction: 'both'
-    })
-    .execute();
-  await db
-    .insertInto('outboundRoutes')
-    .values({ id: newId(), priority: 1, trunkId, createdAt: nowIso() })
-    .execute();
-  return trunkId;
 }
 
 describe('a find-me leg still to come (§10.1 step 4)', () => {
@@ -122,7 +87,8 @@ describe('a find-me leg still to come (§10.1 step 4)', () => {
   it('keeps the race open after the last device leg ends, and still rings the find-me number', async () => {
     const userId = await seedFindMeUser(rig, 1);
     await registerDevice(fakeAri, pipeline, 'e101-d1');
-    const trunkId = await seedRoute(db);
+    const trunkId = await seedTrunk(db);
+    await seedRoute(db, trunkId);
 
     const finished = ringUser(pipeline, call, userId);
     await eventually(() => {

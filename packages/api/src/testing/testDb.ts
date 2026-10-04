@@ -1,7 +1,5 @@
-import type { Insertable } from 'kysely';
-
-import { newId, nowIso, type DB, type Db } from '@zamfono/shared';
-import { migratedTestDb } from '@zamfono/shared/testDb.js';
+import type { Db } from '@zamfono/shared';
+import { migratedTestDb, seedUser } from '@zamfono/shared/testDb.js';
 
 import type { RunInput } from '#lib/server/ops/runner.js';
 import type { Actor } from '#lib/server/ops/types.js';
@@ -22,46 +20,12 @@ export function asConfirmedRun(overrides: Partial<RunInput> = {}): RunInput {
 /** An in-memory, migrated database seeded with one `owner` user, for operation tests. */
 export async function makeTestDb(): Promise<Db> {
   const db = await migratedTestDb();
-  await db
-    .insertInto('users')
-    .values({
-      id: owner.id,
-      name: owner.name,
-      email: 'owner@x',
-      role: owner.role,
-      passwordHash: 'x',
-      createdAt: nowIso()
-    })
-    .execute();
+  await seedUser(db, {
+    id: owner.id,
+    name: owner.name,
+    email: 'owner@x',
+    role: owner.role,
+    passwordHash: 'x'
+  });
   return db;
-}
-
-/** Adds the tenant `settings` singleton, `settings` on top of a main DID `+490000000` that
- * forwards to the same external number; returns the main DID's id. */
-export async function seedSettings(
-  db: Db,
-  settings: Partial<Insertable<DB['settings']>> = {}
-): Promise<string> {
-  const targetId = newId();
-  await db
-    .insertInto('forwardTargets')
-    .values({ id: targetId, external: '+490000000' })
-    .execute();
-  const didId = newId();
-  await db
-    .insertInto('dids')
-    .values({ id: didId, number: '+490000000', targetId, createdAt: nowIso() })
-    .execute();
-  await db
-    .insertInto('settings')
-    .values({
-      id: 1,
-      companyName: 'Test Co',
-      country: 'DE',
-      emergencyNumbersJson: '["112"]',
-      mainDidId: didId,
-      ...settings
-    })
-    .execute();
-  return didId;
 }

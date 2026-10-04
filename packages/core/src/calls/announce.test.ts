@@ -5,6 +5,7 @@ import { newId, nowIso, type Db } from '@zamfono/shared';
 import type { FakeAri } from '../testing/ari/fake.js';
 import { noopCdr } from '../testing/pipelineDeps.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
+import { seedAudioAsset } from '../testing/seedRows.js';
 import { announce } from './announce.js';
 import { newCall, type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
@@ -21,21 +22,6 @@ function fakeCdr(): PipelineDeps['cdr'] & { finished: Call[] } {
       return Promise.resolve();
     }
   };
-}
-
-async function seedAudioAsset(db: Db, filename: string): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('audioAssets')
-    .values({
-      id,
-      label: 'Sorry',
-      kind: 'announcement',
-      filename,
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
 }
 
 describe('announce', () => {
@@ -56,7 +42,10 @@ describe('announce', () => {
   });
 
   it('answers, plays the announcement, then hangs up and finishes the call', async () => {
-    const audioId = await seedAudioAsset(db, 'sorry.wav');
+    const audioId = await seedAudioAsset(db, {
+      label: 'Sorry',
+      filename: 'sorry.wav'
+    });
     const channel = fakeAri.addChannel({});
     const call = newCall({
       id: newId(),

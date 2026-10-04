@@ -1,31 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import { MAX_HOPS } from '../routing/targets.js';
 import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { eventually } from '../testing/eventually.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
-import { seedUser } from '../testing/seedRows.js';
+import {
+  seedAudioAsset,
+  seedExtension,
+  seedForwardTarget,
+  seedRingGroup
+} from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
 import { playMenu } from './menu.js';
 import type { Pipeline } from './pipeline.js';
-
-async function seedAudioAsset(db: Db): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('audioAssets')
-    .values({
-      id,
-      label: 'Main menu',
-      kind: 'announcement',
-      filename: 'menu.wav',
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
-}
 
 /** A `forward_targets` row that deposits in `userId`'s mailbox: easy to tell apart in assertions. */
 async function seedMailboxTarget(db: Db, userId: string): Promise<string> {
@@ -39,12 +30,6 @@ async function seedMailboxTarget(db: Db, userId: string): Promise<string> {
 
 /** A `forward_targets` row of kind `user` (§10.1 step 6's "Forward targets"), so a match through
  * it re-enters at Entry rather than bypassing hop counting entirely, unlike a mailbox target. */
-async function seedForwardTargetUser(db: Db, userId: string): Promise<string> {
-  const id = newId();
-  await db.insertInto('forwardTargets').values({ id, userId }).execute();
-  return id;
-}
-
 /** A `forward_targets` row of kind `ring_group`, for a menu's "12: group" entry. */
 async function seedForwardTargetRingGroup(
   db: Db,
@@ -53,36 +38,6 @@ async function seedForwardTargetRingGroup(
   const id = newId();
   await db.insertInto('forwardTargets').values({ id, ringGroupId }).execute();
   return id;
-}
-
-async function seedRingGroup(db: Db): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('ringGroups')
-    .values({
-      id,
-      name: `Group ${id}`,
-      strategy: 'simultaneous',
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
-}
-
-/** A live, non-parking-slot extension row (§10.1 step 6 "extension dialling"). */
-async function seedExtension(
-  db: Db,
-  ext: string,
-  owner: { userId: string } | { ringGroupId: string }
-): Promise<void> {
-  await db
-    .insertInto('extensions')
-    .values({
-      ext,
-      userId: 'userId' in owner ? owner.userId : null,
-      ringGroupId: 'ringGroupId' in owner ? owner.ringGroupId : null
-    })
-    .execute();
 }
 
 async function seedMenu(
@@ -189,9 +144,12 @@ describe('playMenu', () => {
     // a hop for it, so re-entering through the pipeline's own `runTarget`, which the menu must not
     // do, is observable, unlike through a mailbox target, which `nextHop` never counts either way.
     // `12` is a ring-group target, as in a `{1: user, 12: group}` map.
-    const targetOne = await seedForwardTargetUser(db, userOne);
+    const targetOne = await seedForwardTarget(db, { userId: userOne });
     const targetTwelve = await seedForwardTargetRingGroup(db, ringGroupTwelve);
-    const audioId = await seedAudioAsset(db);
+    const audioId = await seedAudioAsset(db, {
+      label: 'Main menu',
+      filename: 'menu.wav'
+    });
     const menuId = await seedMenu(db, {
       audioId,
       fallbackTargetId: await seedMailboxTarget(db, userOne),
@@ -227,8 +185,11 @@ describe('playMenu', () => {
 
   it('lets a DTMF digit during the greeting stop it and start collection (barge-in)', async () => {
     const fallbackUser = await seedUser(db);
-    const targetOne = await seedForwardTargetUser(db, fallbackUser);
-    const audioId = await seedAudioAsset(db);
+    const targetOne = await seedForwardTarget(db, { userId: fallbackUser });
+    const audioId = await seedAudioAsset(db, {
+      label: 'Main menu',
+      filename: 'menu.wav'
+    });
     const menuId = await seedMenu(db, {
       audioId,
       fallbackTargetId: await seedMailboxTarget(db, fallbackUser),
@@ -269,10 +230,13 @@ describe('playMenu', () => {
     // A `user` target with no registered device takes the implicit mailbox default; this test is
     // only about when the silence timer starts.
     const fallbackUser = await seedUser(db);
-    const audioId = await seedAudioAsset(db);
+    const audioId = await seedAudioAsset(db, {
+      label: 'Main menu',
+      filename: 'menu.wav'
+    });
     const menuId = await seedMenu(db, {
       audioId,
-      fallbackTargetId: await seedForwardTargetUser(db, fallbackUser),
+      fallbackTargetId: await seedForwardTarget(db, { userId: fallbackUser }),
       maxAttempts: 1,
       timeoutS: 1
     });
@@ -295,8 +259,13 @@ describe('playMenu', () => {
 
   it('replays on silence and applies the fallback target after max_attempts', async () => {
     const fallbackUser = await seedUser(db);
-    const fallbackTargetId = await seedForwardTargetUser(db, fallbackUser);
-    const audioId = await seedAudioAsset(db);
+    const fallbackTargetId = await seedForwardTarget(db, {
+      userId: fallbackUser
+    });
+    const audioId = await seedAudioAsset(db, {
+      label: 'Main menu',
+      filename: 'menu.wav'
+    });
     const menuId = await seedMenu(db, {
       audioId,
       fallbackTargetId,
@@ -320,7 +289,10 @@ describe('playMenu', () => {
   }, 5000);
 
   it('ends the call once two menus falling back to each other exhaust the shared attempts', async () => {
-    const audioId = await seedAudioAsset(db);
+    const audioId = await seedAudioAsset(db, {
+      label: 'Main menu',
+      filename: 'menu.wav'
+    });
     const tempTargetId = await seedMailboxTarget(db, await seedUser(db));
     const menuAId = await seedMenu(db, {
       audioId,
@@ -368,8 +340,11 @@ describe('playMenu', () => {
 
   it('gives a menu entered through a matched key its own full attempts budget, nested or not', async () => {
     const userId = await seedUser(db);
-    const audioId = await seedAudioAsset(db);
-    const targetToUser = await seedForwardTargetUser(db, userId);
+    const audioId = await seedAudioAsset(db, {
+      label: 'Main menu',
+      filename: 'menu.wav'
+    });
+    const targetToUser = await seedForwardTarget(db, { userId });
 
     const menuBId = await seedMenu(db, {
       audioId,
@@ -438,7 +413,10 @@ describe('playMenu', () => {
   it('keeps collecting past a menu-map miss while the digits still prefix a live extension', async () => {
     const targetUser = await seedUser(db);
     const otherUser = await seedUser(db);
-    const audioId = await seedAudioAsset(db);
+    const audioId = await seedAudioAsset(db, {
+      label: 'Main menu',
+      filename: 'menu.wav'
+    });
     // Two extensions sharing the `10` prefix so a single digit can never resolve early, exercising
     // the actual collection wait, not just a length check.
     await seedExtension(db, '100', { userId: targetUser });

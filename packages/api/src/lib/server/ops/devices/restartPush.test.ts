@@ -1,7 +1,8 @@
 import * as privateEnv from '$app/env/private';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { nowIso, type Db } from '@zamfono/shared';
+import { seedSettings, seedUser } from '@zamfono/shared/testDb.js';
 
 import { setPropagationPending } from '#lib/server/propagationPending.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
@@ -9,7 +10,7 @@ import {
   installRingotelFake,
   type RingotelFake
 } from '#testing/ringotelFake.js';
-import { makeTestDb, seedSettings } from '#testing/testDb.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 import { oweDevicePushesAtStart } from './_ringotelPush.js';
@@ -33,19 +34,16 @@ afterEach(() => {
 });
 
 /** A user with extension `ext`, and its `ringotel` device unless `device` is false. */
-async function seedUser(db: Db, ext: string, device = true): Promise<string> {
-  const userId = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id: userId,
-      name: `User ${ext}`,
-      email: `${ext}@example.com`,
-      role: 'user',
-      createdAt: nowIso()
-    })
-    .execute();
-  await db.insertInto('extensions').values({ ext, userId }).execute();
+async function seedRingotelUser(
+  db: Db,
+  ext: string,
+  device = true
+): Promise<string> {
+  const userId = await seedUser(db, {
+    name: `User ${ext}`,
+    email: `${ext}@example.com`,
+    ext
+  });
   if (device) {
     await db
       .insertInto('devices')
@@ -74,8 +72,8 @@ async function seed(db: Db): Promise<RingotelFake> {
     ringotelOrgId: 'org-1',
     ringotelBranchId: 'branch-1'
   });
-  await seedUser(db, '998');
-  await seedUser(db, '997');
+  await seedRingotelUser(db, '998');
+  await seedRingotelUser(db, '997');
   const fake = installRingotelFake();
   installed.fake = fake;
   fake.users.push({
@@ -116,7 +114,7 @@ describe('an api that starts while a propagation is owed', () => {
     const fake = await seed(db);
     await setPropagationPending(db, true);
     await oweDevicePushesAtStart(db);
-    const userId = await seedUser(db, '996', false);
+    const userId = await seedRingotelUser(db, '996', false);
 
     const created = (await runOperation(
       db,

@@ -4,10 +4,9 @@ import type { Transporter } from 'nodemailer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { nowIso, type Db, type MailRequest } from '@zamfono/shared';
-import { migratedTestDb } from '@zamfono/shared/testDb.js';
+import { migratedTestDb, seedSettings } from '@zamfono/shared/testDb.js';
 
 import { testKeyring } from '#testing/fixtures.js';
-import { seedSettings } from '#testing/testDb.js';
 
 import { voicemailAttachment } from '../audio/transcode.js';
 import { relayFromSettings } from './relay.js';

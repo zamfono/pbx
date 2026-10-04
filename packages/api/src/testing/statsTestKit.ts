@@ -1,8 +1,9 @@
 import { newId, type CallStatus, type Db } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
 import { runOperation } from '#lib/server/ops/runner.js';
 
-import { asRun, makeTestDb, seedSettings } from './testDb.js';
+import { asRun, makeTestDb } from './testDb.js';
 
 import '#lib/server/ops/stats/index.js';
 

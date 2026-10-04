@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { seedUser } from '@zamfono/shared/testDb.js';
+
 import { AmiClient } from './ami/client.js';
 import type { Logger } from './ari/types.js';
 import { STOP_DRAIN_MS, stopOnSignal } from './stop.js';
 import { noopLogger } from './testing/pipelineDeps.js';
 import { answeredCall, startRig, type Rig } from './testing/pipelineRig.js';
-import { seedUser } from './testing/seedRows.js';
 
 describe('stopOnSignal', () => {
   let rig: Rig;

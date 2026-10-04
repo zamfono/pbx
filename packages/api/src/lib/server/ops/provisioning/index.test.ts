@@ -3,11 +3,12 @@ import { sql } from 'kysely';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { type Db } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { installRingotelFake } from '#testing/ringotelFake.js';
 import { FAKE_PACKAGES, FAKE_REGIONS } from '#testing/ringotelFakeHandlers.js';
-import { asRun, makeTestDb, seedSettings } from '#testing/testDb.js';
+import { asRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 
@@ -85,7 +86,7 @@ describe('provisioning.ringotelSetup', () => {
     expect(calls[2]).toEqual({
       method: 'createOrganization',
       params: {
-        name: 'Test Co',
+        name: 'Zamfono',
         domain: 'testco',
         region: '3',
         packageid: 1,

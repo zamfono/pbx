@@ -11,6 +11,7 @@ import {
 } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import type { AriClient } from '../ari/client.js';
 import type { FakeAri } from '../testing/ari/fake.js';
@@ -18,7 +19,6 @@ import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { eventually } from '../testing/eventually.js';
 import { noopLogger } from '../testing/pipelineDeps.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
-import { seedUser } from '../testing/seedRows.js';
 import { PARKED_BRIDGE_NAME } from './parkingRingback.js';
 import type { Pipeline } from './pipeline.js';
 import { resyncOnBoot } from './resync.js';

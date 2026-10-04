@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
+import { seedDid, seedUser } from '@zamfono/shared/testDb.js';
 
 import type { AriClient } from '../ari/client.js';
 import type { Channel } from '../ari/types.js';
@@ -11,7 +12,7 @@ import { isPlacement, placedCallerId } from '../testing/ari/fakeDial.js';
 import { eventually } from '../testing/eventually.js';
 import { registerDevice } from '../testing/pipelineDeps.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
-import { seedDid, seedUser } from '../testing/seedRows.js';
+import { seedDevice } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
 import { enterTarget } from './inbound.js';
 import { playMenu } from './menu.js';
@@ -53,25 +54,6 @@ async function seedNumberedUser(
       opts.number === undefined ? null : await seedDid(db, opts.number),
     clir: opts.clir ?? null
   });
-}
-
-async function seedDevice(
-  db: Db,
-  userId: string,
-  sipUsername: string
-): Promise<void> {
-  await db
-    .insertInto('devices')
-    .values({
-      id: newId(),
-      userId,
-      label: sipUsername,
-      kind: 'manual',
-      sipUsername,
-      sipPasswordEnc: Buffer.from('secret'),
-      createdAt: nowIso()
-    })
-    .execute();
 }
 
 /** A `registration` trunk whose one route admits `onlyUserId` alone, or every caller when `null`. */

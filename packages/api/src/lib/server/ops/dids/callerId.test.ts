@@ -1,13 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { type Db } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
-import {
-  asConfirmedRun,
-  asRun,
-  makeTestDb,
-  seedSettings
-} from '#testing/testDb.js';
+import { asConfirmedRun, asRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 

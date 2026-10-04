@@ -7,12 +7,13 @@ import {
   type LiveCall,
   type StateResponse
 } from '@zamfono/shared';
+import { seedSettings, seedUser } from '@zamfono/shared/testDb.js';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { CoreRequestError } from '#lib/server/coreHttp.js';
 import { handleRest } from '#lib/server/rest.js';
 import { stubCoreClient } from '#testing/coreClientStub.js';
-import { asRun, makeTestDb, seedSettings } from '#testing/testDb.js';
+import { asRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 import { type Actor } from '../types.js';
@@ -26,19 +27,6 @@ const NO_REGISTERED_DEVICE = new CoreRequestError('http://core.test', 409, {
 });
 
 const anna: Actor = { id: 'u1', name: 'Anna', role: 'user' };
-
-async function seedUser(db: Db, id: string): Promise<void> {
-  await db
-    .insertInto('users')
-    .values({
-      id,
-      name: id,
-      email: `${id}@x.test`,
-      role: 'user',
-      createdAt: nowIso()
-    })
-    .execute();
-}
 
 async function seedCall(
   db: Db,
@@ -73,9 +61,9 @@ describe('calls', () => {
   it("calls.list as user excludes other users' calls", async () => {
     const db = await makeTestDb();
     await seedSettings(db);
-    await seedUser(db, 'u1');
-    await seedUser(db, 'u2');
-    await seedUser(db, 'u3');
+    await seedUser(db, { id: 'u1', name: 'u1' });
+    await seedUser(db, { id: 'u2', name: 'u2' });
+    await seedUser(db, { id: 'u3', name: 'u3' });
     const asCaller = await seedCall(db, { callerUserId: 'u1' });
     const asCallee = await seedCall(db, { calleeUserId: 'u1' });
     const asAnswerer = await seedCall(db, { answeredByUserId: 'u1' });
@@ -289,7 +277,7 @@ describe('calls', () => {
   });
   it('calls.get carries the call log and its QoS rows (§7)', async () => {
     const db = await makeTestDb();
-    await seedUser(db, anna.id);
+    await seedUser(db, { id: anna.id, name: anna.id });
     const callId = await seedCall(db, { callerUserId: anna.id });
     await db
       .updateTable('calls')
@@ -368,8 +356,8 @@ describe('calls', () => {
 
   it("calls.get refuses a user another user's call, with 403", async () => {
     const db = await makeTestDb();
-    await seedUser(db, anna.id);
-    await seedUser(db, 'u2');
+    await seedUser(db, { id: anna.id, name: anna.id });
+    await seedUser(db, { id: 'u2', name: 'u2' });
     const callId = await seedCall(db, { callerUserId: 'u2' });
 
     const attempt = runOperation(

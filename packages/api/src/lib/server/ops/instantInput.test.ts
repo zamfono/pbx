@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { makeTestDb, seedSettings } from '#testing/testDb.js';
+import { seedSettings } from '@zamfono/shared/testDb.js';
+
+import { makeTestDb } from '#testing/testDb.js';
 
 import {
   instantInput,

@@ -2,11 +2,12 @@ import * as privateEnv from '$app/env/private';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { type Db } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { createUser } from '#testing/fixtures.js';
 import { installRingotelFake } from '#testing/ringotelFake.js';
-import { asConfirmedRun, makeTestDb, seedSettings } from '#testing/testDb.js';
+import { asConfirmedRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 

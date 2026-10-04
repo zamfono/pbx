@@ -7,6 +7,7 @@ import {
   type Envelope,
   type MailRequest
 } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import type { AriClient } from '../ari/client.js';
 import type { EventBus } from '../internal/eventBus.js';
@@ -16,7 +17,7 @@ import { onEvents } from '../testing/busEvents.js';
 import { eventually, requestTo } from '../testing/eventually.js';
 import { noopCdr, stubMailSender } from '../testing/pipelineDeps.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
-import { seedUser } from '../testing/seedRows.js';
+import { seedAudioAsset } from '../testing/seedRows.js';
 import { newCall, type Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 import type { PipelineDeps } from './pipelineDeps.js';
@@ -49,21 +50,6 @@ function fakeCdr(): FakeCdr {
       return Promise.resolve();
     }
   };
-}
-
-async function seedAudioAsset(db: Db): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('audioAssets')
-    .values({
-      id,
-      label: 'Mailbox greeting',
-      kind: 'vmGreeting',
-      filename: 'mailbox.wav',
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
 }
 
 describe('deposit', () => {
@@ -294,7 +280,11 @@ describe('deposit', () => {
   });
 
   it("plays the mailbox's own greeting instead of the language default when mailbox_audio_id is set", async () => {
-    const audioId = await seedAudioAsset(db);
+    const audioId = await seedAudioAsset(db, {
+      label: 'Mailbox greeting',
+      kind: 'vmGreeting',
+      filename: 'mailbox.wav'
+    });
     const userId = await seedUser(db, { mailboxAudioId: audioId });
     const channel = fakeAri.addChannel({});
     const call = newCall({

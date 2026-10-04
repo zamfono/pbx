@@ -8,7 +8,7 @@ import {
   type Db,
   type Envelope
 } from '@zamfono/shared';
-import { migratedTestDb } from '@zamfono/shared/testDb.js';
+import { migratedTestDb, seedSettings } from '@zamfono/shared/testDb.js';
 
 import { AmiClient } from '../ami/client.js';
 import { AriClient } from '../ari/client.js';
@@ -21,7 +21,6 @@ import type { FakeEndpoint } from '../testing/ari/fakeChannel.js';
 import { onEvents } from '../testing/busEvents.js';
 import { eventually } from '../testing/eventually.js';
 import { noopLogger } from '../testing/pipelineDeps.js';
-import { seedSettings } from '../testing/seedRows.js';
 import { TrunkState } from './trunkState.js';
 
 async function seedRegistrationTrunk(

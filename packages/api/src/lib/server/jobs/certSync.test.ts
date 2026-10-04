@@ -12,9 +12,10 @@ import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db, type StateResponse } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
 import { stubCoreClient } from '#testing/coreClientStub.js';
-import { makeTestDb, seedSettings } from '#testing/testDb.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 import type { CoreClient } from '../coreClient.js';
 import {

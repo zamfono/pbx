@@ -4,11 +4,10 @@ import { isHttpError, type RequestEvent } from '@sveltejs/kit';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { nowIso } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { migrateForTest, seedSettings } from '@zamfono/shared/testDb.js';
 
 import { getDb } from '#lib/server/db.js';
 import { requestEvent } from '#testing/requestEvent.js';
-import { seedSettings } from '#testing/testDb.js';
 
 import { login } from './authorize.remote.js';
 

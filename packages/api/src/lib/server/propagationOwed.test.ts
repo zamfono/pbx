@@ -6,10 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import type { Db, ReloadKind } from '@zamfono/shared';
-import { MIGRATIONS_DIR } from '@zamfono/shared/testDb.js';
+import { MIGRATIONS_DIR, seedSettings } from '@zamfono/shared/testDb.js';
 
 import { stubCoreClient } from '#testing/coreClientStub.js';
-import { asRun, makeTestDb, seedSettings } from '#testing/testDb.js';
+import { asRun, makeTestDb } from '#testing/testDb.js';
 
 import { getCoreClient, type CoreClient } from './coreClient.js';
 import { apiHealth } from './health.js';

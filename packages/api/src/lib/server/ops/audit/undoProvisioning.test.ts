@@ -2,11 +2,12 @@ import * as privateEnv from '$app/env/private';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MS_PER_DAY, MS_PER_HOUR, type Db } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
 import { propagateConfig } from '#lib/server/propagation.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { installRingotelFake } from '#testing/ringotelFake.js';
-import { asConfirmedRun, makeTestDb, seedSettings } from '#testing/testDb.js';
+import { asConfirmedRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 

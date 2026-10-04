@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
-import { migratedTestDb } from '@zamfono/shared/testDb.js';
+import {
+  migratedTestDb,
+  seedSettings,
+  seedUser
+} from '@zamfono/shared/testDb.js';
 
 import { ConfigCache } from '../internal/snapshot.js';
-import { seedSettings, seedUser } from '../testing/seedRows.js';
 import type { Pipeline } from './pipeline.js';
 import { buildMemberStates } from './ringGroupState.js';
 

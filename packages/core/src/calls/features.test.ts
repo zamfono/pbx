@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import type { AriClient } from '../ari/client.js';
 import type { AriEventOf } from '../ari/events.js';
@@ -25,7 +26,12 @@ import {
 } from '../testing/eventually.js';
 import { noopRecorder } from '../testing/pipelineDeps.js';
 import { languageSet, startRig, type Rig } from '../testing/pipelineRig.js';
-import { seedExternalRoute, seedUser } from '../testing/seedRows.js';
+import {
+  seedDevice,
+  seedExtension,
+  seedExternalRoute,
+  seedRingGroup
+} from '../testing/seedRows.js';
 import { newCall, type Call, type Leg } from './call.js';
 import { channelOf, otherChannelIn } from './callLookup.js';
 import { callUp, liveView } from './callState.js';
@@ -58,58 +64,6 @@ function memberRinging(call: Call): Promise<void> {
   return eventually(() => {
     expect(traceEvents(call)).toContain('ringGroupMember');
   });
-}
-
-async function seedDevice(
-  db: Db,
-  userId: string,
-  sipUsername: string
-): Promise<void> {
-  await db
-    .insertInto('devices')
-    .values({
-      id: newId(),
-      userId,
-      label: sipUsername,
-      kind: 'manual',
-      sipUsername,
-      sipPasswordEnc: Buffer.from('secret'),
-      createdAt: nowIso()
-    })
-    .execute();
-}
-
-async function seedExtension(
-  db: Db,
-  ext: string,
-  opts: { userId?: string; ringGroupId?: string; isParkingSlot?: boolean }
-): Promise<void> {
-  await db
-    .insertInto('extensions')
-    .values({
-      ext,
-      userId: opts.userId ?? null,
-      ringGroupId: opts.ringGroupId ?? null,
-      isParkingSlot: opts.isParkingSlot === true ? 1 : 0
-    })
-    .execute();
-}
-
-/** A `ring_groups` row plus its single member (§10.1 step 5), for `*8<ext>` on a group member. */
-async function seedRingGroup(db: Db): Promise<string> {
-  const id = newId();
-  await db
-    .insertInto('ringGroups')
-    .values({
-      id,
-      name: `Group ${id}`,
-      strategy: 'simultaneous',
-      allowReject: 1,
-      mailboxEnabled: 0,
-      createdAt: nowIso()
-    })
-    .execute();
-  return id;
 }
 
 async function seedMember(
@@ -1120,7 +1074,7 @@ describe('features', () => {
   it('*5 to a parking slot is refused: a parked call is retrieved, not added', async () => {
     await setUp();
     const { addPartyCall } = await externalAddParty();
-    await seedExtension(db, '701', { isParkingSlot: true });
+    await seedExtension(db, '701', { isParkingSlot: 1 });
     pipeline.deps.cache.invalidate();
     await handleFeature(pipeline, presence, addPartyCall, 'addParty', '701');
     expect(
@@ -1812,7 +1766,7 @@ describe('features', () => {
   }> {
     await setUp();
     pipeline.deps.recorder = options.recorder ?? noopRecorder;
-    await seedExtension(db, '701', { isParkingSlot: true });
+    await seedExtension(db, '701', { isParkingSlot: 1 });
     const parkerUserId = await seedUser(db);
     await seedExtension(db, '100', { userId: parkerUserId });
     const customerChannel = fakeAri.addChannel({
@@ -2021,7 +1975,7 @@ describe('features', () => {
 
   it('dialling an empty parking slot plays a short error tone and releases with 404', async () => {
     await setUp();
-    await seedExtension(db, '701', { isParkingSlot: true });
+    await seedExtension(db, '701', { isParkingSlot: 1 });
     await seedRetriever();
     const channel = fakeAri.addChannel({
       name: 'PJSIP/e200-dabc-00000001',
@@ -2247,7 +2201,7 @@ describe('features', () => {
     // No device for the parker at all: `ringParkerBack` originates nothing and settles the
     // ring-back as unanswered immediately, without needing to wait out its own 30 s race window.
     // Nor a mailbox, which would take the party in the tenant fallback's place.
-    await seedExtension(db, '701', { isParkingSlot: true });
+    await seedExtension(db, '701', { isParkingSlot: 1 });
     const parkerUserId = await seedUser(db);
     await db
       .updateTable('users')
@@ -2325,7 +2279,7 @@ describe('features', () => {
     // this test wants the parker's device to answer promptly once dialled.
     fakeAri.answerAfterMs = 10;
     const parkerDeviceUsername = 'e100-dabc';
-    await seedExtension(db, '701', { isParkingSlot: true });
+    await seedExtension(db, '701', { isParkingSlot: 1 });
     const parkerUserId = await seedUser(db);
     await seedExtension(db, '100', { userId: parkerUserId });
     // the parking ring-back rings the parker, whose device must be reachable (§10.1 step 4).

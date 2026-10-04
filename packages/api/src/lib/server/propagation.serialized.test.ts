@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { seedSettings } from '@zamfono/shared/testDb.js';
+
 import { stubCoreClient } from '#testing/coreClientStub.js';
-import { makeTestDb, seedSettings } from '#testing/testDb.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 import { getCoreClient } from './coreClient.js';
 import { propagateConfig } from './propagation.js';

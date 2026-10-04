@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
-import { makeTestDb, seedSettings } from '#testing/testDb.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 import { buildBranchProvision } from './branchProvision.js';
 import { createRingotelProvider } from './ringotel.js';

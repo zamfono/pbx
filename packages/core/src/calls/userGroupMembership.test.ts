@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { nowIso, type Db } from '@zamfono/shared';
-import { migratedTestDb } from '@zamfono/shared/testDb.js';
+import {
+  migratedTestDb,
+  seedSettings,
+  seedUser
+} from '@zamfono/shared/testDb.js';
 
 import { ConfigCache, type Snapshot } from '../internal/snapshot.js';
-import { seedSettings, seedUser } from '../testing/seedRows.js';
 import { groupMemberUserIds } from './extensionOwner.js';
 import { callerGroupIds } from './outboundLookup.js';
 

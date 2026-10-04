@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import {
   AST_CAUSE_NORMAL_CLEARING,
@@ -14,7 +15,6 @@ import {
   startRig,
   type Rig
 } from '../testing/pipelineRig.js';
-import { seedUser } from '../testing/seedRows.js';
 import { newCall } from './call.js';
 import type { ParticipationRecorder } from './recordParticipation.js';
 import { sipToHangupCause } from './releaseCause.js';

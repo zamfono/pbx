@@ -3,13 +3,14 @@ import { sql } from 'kysely';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
 import { limiter } from '#lib/server/limiter.js';
 import { sendMail } from '#lib/server/mail/index.js';
 import { propagateConfig } from '#lib/server/propagation.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { installRingotelFake } from '#testing/ringotelFake.js';
-import { asRun, makeTestDb, seedSettings } from '#testing/testDb.js';
+import { asRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 import { type Actor } from '../types.js';
@@ -524,7 +525,7 @@ describe('users', () => {
     const did = await db
       .selectFrom('dids')
       .select('id')
-      .where('number', '=', '+490000000')
+      .where('number', '=', '+15551234')
       .executeTakeFirstOrThrow();
     const result = (await runOperation(
       db,

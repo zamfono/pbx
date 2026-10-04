@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
-import { defaultFeatureCodes } from '@zamfono/shared/testDb.js';
+import { type Db } from '@zamfono/shared';
+import {
+  defaultFeatureCodes,
+  seedSettings,
+  seedUser
+} from '@zamfono/shared/testDb.js';
 
-import { makeTestDb, owner, seedSettings } from '#testing/testDb.js';
+import { makeTestDb, owner } from '#testing/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
 import type { ConnectionSettings } from './_connectionSettings.js';
@@ -19,8 +23,8 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-/** The `settings` singleton with non-default codecs and voicemail code, and user `Anna Huber` on 205. */
-async function seedUser(db: Db): Promise<string> {
+/** The tenant, and Anna Huber at extension 205. Returns her id. */
+async function seedAnna(db: Db): Promise<string> {
   await seedSettings(db, {
     codecsJson: '["g722","alaw"]',
     featureCodesJson: JSON.stringify({
@@ -28,19 +32,11 @@ async function seedUser(db: Db): Promise<string> {
       ownVoicemail: '*99'
     })
   });
-  const userId = newId();
-  await db
-    .insertInto('users')
-    .values({
-      id: userId,
-      name: 'Anna Huber',
-      email: 'anna@x.test',
-      role: 'user',
-      createdAt: nowIso()
-    })
-    .execute();
-  await db.insertInto('extensions').values({ ext: '205', userId }).execute();
-  return userId;
+  return seedUser(db, {
+    name: 'Anna Huber',
+    email: 'anna@x.test',
+    ext: '205'
+  });
 }
 
 type CreateOutput = {
@@ -64,7 +60,7 @@ async function createManual(
 describe("devices: a manual device's connection settings (§10.4)", () => {
   it('a tls device: TLS on 5061 with SRTP, every value from env and settings', async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     const { device, connectionSettings } = await createManual(db, userId, {});
     expect(connectionSettings).toEqual({
       server: 'pbx.example.com',
@@ -83,7 +79,7 @@ describe("devices: a manual device's connection settings (§10.4)", () => {
 
   it('a plain device: 5060 without SRTP, over both plain transports or the one enabled', async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     const plain = { transport: 'plain', allowedIps: ['203.0.113.7'] };
     const both = await createManual(db, userId, plain);
     expect(both.connectionSettings).toMatchObject({
@@ -102,7 +98,7 @@ describe("devices: a manual device's connection settings (§10.4)", () => {
 
   it('revealCredentials returns the same set, audited', async () => {
     const db = await makeTestDb();
-    const userId = await seedUser(db);
+    const userId = await seedAnna(db);
     const created = await createManual(db, userId, {});
     const revealed = await runOperation(
       db,

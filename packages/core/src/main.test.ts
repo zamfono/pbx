@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { nowIso, openDb } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { migrateForTest, seedSettings } from '@zamfono/shared/testDb.js';
 
 import { AmiClient } from './ami/client.js';
 import { AriClient } from './ari/client.js';
@@ -16,7 +16,6 @@ import { FakeAmi } from './testing/ami/fake.js';
 import { FakeAri } from './testing/ari/fake.js';
 import { defaultChannel } from './testing/ari/fakeChannel.js';
 import { eventually, flush } from './testing/eventually.js';
-import { seedSettings } from './testing/seedRows.js';
 
 // `startInternalServer` binds the fixed port 3000 (Global Constraints), which a test cannot claim;
 // the real `ConfigCache`, `EventBus` and `StateStore` from the same module are kept.

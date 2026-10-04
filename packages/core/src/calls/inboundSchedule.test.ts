@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
-import { migratedTestDb } from '@zamfono/shared/testDb.js';
+import {
+  migratedTestDb,
+  seedDid,
+  seedSettings,
+  seedUser
+} from '@zamfono/shared/testDb.js';
 
 import { ConfigCache } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
-import { seedDid, seedSettings, seedUser } from '../testing/seedRows.js';
 import { newCall } from './call.js';
 import { applyOooAndHours } from './inboundSchedule.js';
 import type { Pipeline } from './pipeline.js';

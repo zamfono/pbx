@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import type { CdrWriter } from '../cdr.js';
 import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { eventually, requestTo } from '../testing/eventually.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
-import { seedUser } from '../testing/seedRows.js';
 import { callerChannel, newCall, type Call } from './call.js';
 import { ownVoicemail } from './mailbox.js';
 import { introMedia, mainMenuMedia } from './mailboxPrompts.js';

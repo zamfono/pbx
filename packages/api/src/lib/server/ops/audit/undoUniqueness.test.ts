@@ -2,9 +2,10 @@ import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
 import { createTrunk, createUser } from '#testing/fixtures.js';
-import { asConfirmedRun, makeTestDb, seedSettings } from '#testing/testDb.js';
+import { asConfirmedRun, makeTestDb } from '#testing/testDb.js';
 
 import type { HoursWire } from '../hours/get.js';
 import { runOperation } from '../runner.js';

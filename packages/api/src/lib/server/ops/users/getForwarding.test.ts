@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_SIP_HEADERS, type Db } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
 import {
   admin,
@@ -11,7 +12,7 @@ import {
   storedTargetIds,
   type Rule
 } from '#testing/forwardingTestKit.js';
-import { makeTestDb, seedSettings } from '#testing/testDb.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 /** Every audit entry `operation` wrote, which a read must never add to (§5.7). */
 async function auditCount(db: Db, operation: string): Promise<number> {
