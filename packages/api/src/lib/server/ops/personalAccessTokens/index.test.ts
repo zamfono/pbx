@@ -140,6 +140,26 @@ describe('personalAccessTokens', () => {
     ).rejects.toMatchObject({ status: 403 });
   });
 
+  // §5.2: a name is unique among the user's live tokens; an expired token is not live.
+  it('takes the name of an expired token again', async () => {
+    const db = await seededDb();
+    const first = await create(db, anna, anna.id);
+    await db
+      .updateTable('personalAccessTokens')
+      .set({ expiresAt: addMsIso(nowIso(), -MS_PER_DAY) })
+      .where('id', '=', first.id)
+      .execute();
+    await expect(create(db, anna, anna.id)).resolves.toMatchObject({
+      name: 'crm-sync'
+    });
+    const expired = await db
+      .selectFrom('personalAccessTokens')
+      .select('revokedAt')
+      .where('id', '=', first.id)
+      .executeTakeFirstOrThrow();
+    expect(expired.revokedAt).not.toBeNull();
+  });
+
   it('answers 404 for the list of an unknown or deleted user', async () => {
     const db = await seededDb();
     await db

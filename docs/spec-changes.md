@@ -9,6 +9,8 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §10.4 When a device reaches Ringotel.** `PUT /devices/{id}/blf` pushes the panel to Ringotel once its write committed, like a device's other pushes: a refusal is a `warnings` entry and a `ringotel.push` row with trigger `devices.setBlf`, no longer a 502 that rolls the panel back.
 *Why:* the operation held the database's write lock while Ringotel answered, so `core`'s writes and `/events` failed meanwhile; per D14 ("After commit"), a push follows the commit.
+**2026-10-04 · §11.2 Schema.** Product-owner decision (D34): asked how an expired but unrevoked personal access token's name is freed, the user chose "Free the name (Recommended)". Creating a token first revokes the user's expired token of that name in the same transaction; §5.2 ("unique among the user's live tokens") stays.
+*Why:* the unique index covers unrevoked tokens, so an expired token held its name until the daily purge.
 
 **2026-10-04 · §10.3 REST API.** Product-owner decision (D32, follow-up to D31): "currently the JSON is rebuilt in every request. that seems wasteful", then "how about generating it statically during the build process? let's discuss", then "yes, i like the prerender path". `/api/v1/openapi.json` is generated at build time and served as a static file.
 *Why:* the document depends only on the code, so one build produces it for every request of that release.

@@ -2480,7 +2480,8 @@ CREATE INDEX webhook_deliveries_webhook ON webhook_deliveries (webhook_id);
 CREATE UNIQUE INDEX devices_one_ringotel_per_user ON devices (user_id)
   WHERE kind = 'ringotel' AND deleted_at IS NULL;
 
--- personal_access_tokens_name — a name tells a user's live tokens apart (§5.2).
+-- personal_access_tokens_name — a name tells a user's live tokens apart (§5.2); creating a
+-- token first revokes the user's expired one of that name, in the same transaction.
 CREATE UNIQUE INDEX personal_access_tokens_name ON personal_access_tokens (user_id, name)
   WHERE revoked_at IS NULL;
 

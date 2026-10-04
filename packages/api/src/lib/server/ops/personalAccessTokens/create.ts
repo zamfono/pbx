@@ -74,6 +74,16 @@ export const create = defineOperation({
         'personalAccessTokens: expiresAt must lie in the future'
       );
     }
+    // An expired token is not live, so its name is free (§5.2); the index keeps names unique among
+    // the unrevoked (§11.2), so the expired token of this name is revoked first.
+    await ctx.db
+      .updateTable('personalAccessTokens')
+      .set({ revokedAt: ctx.now })
+      .where('userId', '=', input.userId)
+      .where('name', '=', input.name)
+      .where('revokedAt', 'is', null)
+      .where('expiresAt', '<=', ctx.now)
+      .execute();
     const taken = await ctx.db
       .selectFrom('personalAccessTokens')
       .select('id')
