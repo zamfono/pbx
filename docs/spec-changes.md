@@ -4,8 +4,10 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §10.2 Voicemail, §11.2 `users`, `ring_groups`, §11.5, §11.6 Retention.** Every mailbox has a message limit, `mailbox_max_messages`: 100 by default, any positive count, NULL for no limit, set through `users.update` and `ringGroups.update`. A deposit into a mailbox that holds that many voicemails plays Asterisk's `vm-mailboxfull` prompt, takes no message and hangs up; the call is missed.
 *Why:* the product owner asked for it: "Per mailbox limit, but no arbitrary upper limit. Null means “no limit”. 100 as default".
+
 **2026-10-04 · §3.1 Write ownership.** A read-only transaction (`core`'s config snapshot) begins `DEFERRED`; only writing transactions begin `IMMEDIATE`.
 *Why:* an `IMMEDIATE` read took the write lock for nothing, so a config reload held off `api`'s and `core`'s writers.
+
 **2026-10-04 · §10.5 Protocol revision.** A legacy 2025-11-25 session belongs to the user who opened it, and each user holds at most 10, the oldest dropped first.
 *Why:* one global cap let a single user evict every other user's sessions by opening new ones.
 
@@ -14,8 +16,10 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §5.2 Client registration.** A Client ID Metadata Document is cached for at most 24 hours, at most 1000 at a time with the oldest dropped first, and meets the limits `/oauth/register` applies (`client_name` at most 100 characters, at most 5 redirect URIs of at most 512 characters each).
 *Why:* anyone can make the server fetch any URL at `/oauth/authorize`, and a document chose its own cache lifetime and size, so the cache could grow without bound.
+
 **2026-10-04 · §11.1 Column types, §11.2 Schema.** Every timeout in seconds (`users.ring_timeout_s`, `ring_groups.ring_timeout_s` and `ring_total_s`, `menus.timeout_s`, `settings.voicemail_max_s` and `parking_timeout_s`, `trunks.register_expiry_s` and `register_retry_s`, a find-me leg's `delayS`) is at most 86400, a day: the API refuses a larger one, and each column `CHECK`s it.
 *Why:* a larger value overflowed the timer `core` starts from it, which then fired at once; the product owner chose a day as the bound.
+
 **2026-10-04 · §6.3 Environment.** `FQDN` is taken in lower case by `setup.sh`, `api` and `proxy`'s certificate hook.
 *Why:* Caddy names a certificate by the lower-case host, so an `FQDN` typed with capitals left Asterisk on its placeholder certificate and the OAuth issuer unlike the host browsers send.
 
@@ -33,6 +37,7 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §6.3 Environment.** `FQDN` is taken in lower case by `setup.sh`, `api` and `proxy`'s certificate hook.
 *Why:* Caddy names a certificate by the lower-case host, so an `FQDN` typed with capitals left Asterisk on its placeholder certificate and the OAuth issuer unlike the host browsers send.
+
 **2026-10-04 · §6.3 Caddyfile, §10.2 Greetings and audio.** `proxy` holds every request body to 512 KiB (`request_body`), except the audio uploads, which `api` caps at 50 MB: `POST /api/v1/audio`, `PUT /api/v1/users/{id}/voicemailGreeting`, `/upload/*` and the upload page's `upload` remote form.
 *Why:* SvelteKit reads a remote function's body itself under `BODY_SIZE_LIMIT`, so the unauthenticated sign-in and password forms took 50 MB bodies; the proxy is the one layer that sees every request.
 
@@ -43,6 +48,7 @@ Every change made to [the specification](spec.md) during implementation, newest 
 *Why:* `ws` buffers frames up to 100 MiB by default, so a few unauthenticated connections could exhaust `api`'s memory.
 
 **2026-10-04 · §6.3 Compose stack, §10.2 Greetings and audio.** Request bodies are capped at 50 MB (`BODY_SIZE_LIMIT=50M` on `api`), a larger one answering 413; an upload link verifies its token before reading the body, and the upload transcode is killed after two minutes.
+
 **2026-10-04 · §10.6 Realtime events.** An `/events` connection that stops reading is dropped once 1 MiB of events waits unsent on it.
 *Why:* `ws` buffers every unsent frame, so one stalled client kept every later event in `api`'s memory without bound.
 
