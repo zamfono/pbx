@@ -103,7 +103,7 @@ export async function handleToolsCall(
   };
   try {
     if (uploadRoute(name)) {
-      const link = await uploadLink(deps, auth, name, args);
+      const link = await uploadLink(deps, auth, run, name, args);
       return jsonRpcResult(msg.id, toolResult(era.legacy, link));
     }
     const output = await runOperation(deps.db, name, args, run);

@@ -1,16 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { newId } from '@zamfono/shared';
+import { epochSeconds, newId } from '@zamfono/shared';
+import { seedUser } from '@zamfono/shared/testDb.js';
 
 import {
   CLIENT_ID,
+  currentHeaders,
+  currentMeta,
   currentRequest,
+  JWT_SECRET,
+  mcpRequest,
   ORIGIN,
   rpc,
   seededDeps
 } from '#testing/mcp/testKit.js';
 
 import { authenticateLink } from '../auth/bearer.js';
+import { signAccessToken } from '../auth/jwt.js';
 import { runUploadLink } from '../uploadLink.js';
 import type { McpDeps } from './auth.js';
 
@@ -123,5 +129,43 @@ describe('upload tools over MCP (§10.5 "Uploads")', () => {
     const rest = new URL(url);
     rest.pathname = '/api/v1/audio';
     expect(await authenticateLink(deps, 'download', rest)).toBeNull();
+  });
+
+  it("refuse a user a link to another user's upload, as the run would (§5.3)", async () => {
+    const deps = await seededDeps();
+    await seedUser(deps.db, {
+      id: 'user-1',
+      name: 'User',
+      email: 'user@x',
+      role: 'user',
+      passwordHash: 'x'
+    });
+    const token = await signAccessToken(
+      JWT_SECRET,
+      { sub: 'user-1', role: 'user', cid: CLIENT_ID, sid: 'session-2' },
+      epochSeconds(Date.now()),
+      ORIGIN
+    );
+    const params = {
+      name: 'users.setVoicemailGreeting',
+      arguments: { id: 'owner' }
+    };
+    const body = await rpc(
+      deps,
+      mcpRequest(
+        {
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { ...params, _meta: currentMeta() }
+        },
+        currentHeaders('tools/call', params),
+        token
+      )
+    );
+    expect(body.result).toMatchObject({
+      isError: true,
+      structuredContent: { status: 403 }
+    });
   });
 });

@@ -78,6 +78,25 @@ async function writeAuditRow({
   });
 }
 
+function newContext(
+  trx: Context['db'],
+  name: string,
+  run: RunInput,
+  effects: Effects
+): Context {
+  return {
+    operation: name,
+    actor: run.actor,
+    db: trx,
+    now: nowIso(),
+    channel: run.channel,
+    clientId: run.clientId,
+    clientName: run.clientName,
+    requestId: run.requestId,
+    effects
+  };
+}
+
 type Execution = {
   op: ErasedOperation;
   ctx: Context;
@@ -117,23 +136,33 @@ async function executeInTransaction(
     return await db.transaction().execute(async trx =>
       executeOperation({
         ...execution,
-        ctx: {
-          operation: execution.name,
-          actor: execution.run.actor,
-          db: trx,
-          now: nowIso(),
-          channel: execution.run.channel,
-          clientId: execution.run.clientId,
-          clientName: execution.run.clientName,
-          requestId: execution.run.requestId,
-          effects
-        }
+        ctx: newContext(trx, execution.name, execution.run, effects)
       })
     );
   } catch (error) {
     await runRollbackHooks(effects, error);
     throw error;
   }
+}
+
+/**
+ * The role (403) and own-scope (403) gates `runOperation` applies, for `input` already parsed,
+ * without running the operation: what a link to run it later is checked against before it is
+ * handed out (§10.5 "Uploads").
+ */
+export async function checkAccess(
+  db: Db,
+  name: string,
+  input: unknown,
+  run: RunInput
+): Promise<void> {
+  const op = findOperation(name);
+  checkRole(op, run.actor);
+  await db
+    .transaction()
+    .execute(async trx =>
+      checkScope(op, newContext(trx, name, run, newEffects()), input)
+    );
 }
 
 /**

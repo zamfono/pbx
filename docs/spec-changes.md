@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-04 · §10.5 Uploads.** Product-owner decision (D37): asked about MCP upload links ignoring own scope, the user chose "Refuse the link (Recommended)". The upload-link tool applies the operation's own-scope check and refuses a `user`'s link to another user's upload with 403 up front.
+*Why:* a link handed out for an upload its run would refuse can never succeed.
+
 **2026-10-04 · §10.3 REST API.** Product-owner decision (D32, follow-up to D31): "currently the JSON is rebuilt in every request. that seems wasteful", then "how about generating it statically during the build process? let's discuss", then "yes, i like the prerender path". `/api/v1/openapi.json` is generated at build time and served as a static file.
 *Why:* the document depends only on the code, so one build produces it for every request of that release.
 

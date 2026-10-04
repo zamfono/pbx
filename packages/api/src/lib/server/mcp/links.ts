@@ -8,7 +8,8 @@ import {
 
 import { ACCESS_TOKEN_PARAM, type Authenticated } from '../auth/bearer.js';
 import { encodeLinkToken, type LinkKind } from '../auth/jwt.js';
-import { checkRole, findOperation } from '../ops/gates.js';
+import { findOperation } from '../ops/gates.js';
+import { checkAccess, type RunInput } from '../ops/runner.js';
 import { OpError } from '../ops/types.js';
 import {
   API_PREFIX,
@@ -92,12 +93,14 @@ export async function downloadLink(
 
 /**
  * The upload link for upload operation `op` with `args`, its input without the file (§10.5
- * "Uploads"): refused as the run would be for a role below the operation's (403) or input that
- * is invalid even before the file (422), so a link that cannot succeed is never handed out.
+ * "Uploads"): refused as `run` would be for input that is invalid even before the file (422), a
+ * role below the operation's or a target outside the caller's own scope (403), so a link that
+ * cannot succeed is never handed out.
  */
 export async function uploadLink(
   deps: McpDeps,
   auth: Authenticated,
+  run: RunInput,
   op: string,
   args: Record<string, unknown>
 ): Promise<OperationLink> {
@@ -106,7 +109,6 @@ export async function uploadLink(
   if (!route || !(operation.input instanceof z.ZodObject)) {
     throw new Error(`${op} takes no upload to link to`);
   }
-  checkRole(operation, auth.actor);
   const parsed = operation.input.omit({ [UPLOAD_FIELD]: true }).safeParse(args);
   if (!parsed.success) {
     throw new OpError(
@@ -115,5 +117,6 @@ export async function uploadLink(
       parsed.error.issues
     );
   }
+  await checkAccess(deps.db, op, parsed.data, run);
   return signedLink(deps, auth, 'upload', route, args);
 }
