@@ -126,7 +126,7 @@ backup_run_ended() {
 
 # §6.3 "Updates": the updater found its own Compose project and the runtime's socket, so
 # system.info carries its status rather than why it has none, and system.update reaches it with
-# the token api holds: from this checkout, which pins no release, the updater refuses with 409 for
+# the token api holds: from this checkout, which has no VERSION file, the updater refuses with 409 for
 # that reason. api asks it only once a backup has finished ok, so the step backs up first where
 # this run has not (`step_backups`). Selectable as `updater`; after `backups`, on every shard,
 # since it asks for the runtime of this run.
@@ -148,7 +148,7 @@ if not core.get("startedAt") or not core.get("asteriskStartedAt"):
 ' || fail "system.info reports no usable updater, or no core start times"
   refusal=$(api_status POST /system/update '{"confirm":true}')
   case $refusal in
-    409$'\n'*'pins no release'*) echo "   refused as expected: ${refusal#*$'\n'}" ;;
+    409$'\n'*'runs no release to update from'*) echo "   refused as expected: ${refusal#*$'\n'}" ;;
     *) fail "system.update did not answer as expected: $refusal" ;;
   esac
 }
