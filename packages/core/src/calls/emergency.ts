@@ -106,6 +106,7 @@ export async function dialEmergency(
       status: pipeline.deps.state.trunks.get(row.id)?.status ?? 'unknown'
     }))
   );
+  let answeredChannelId: string | undefined;
   for (const trunkId of trunkIds) {
     // eslint-disable-next-line no-await-in-loop -- trunks are tried one at a time, in priority order, until one succeeds
     const outcome = await attemptEmergencyTrunk({
@@ -118,14 +119,17 @@ export async function dialEmergency(
       snapshot
     });
     if (outcome?.kind === 'answered') {
-      // eslint-disable-next-line no-await-in-loop -- the loop returns right after, so this is the loop's last iteration
-      await settleAnswered(pipeline, call, outcome.channelId);
-      return;
+      answeredChannelId = outcome.channelId;
+      break;
     }
     // A caller who hung up is no failed emergency call: nothing more is dialled or released.
     if (outcome?.kind === 'final' && outcome.failure.kind === 'callerGone') {
       return;
     }
+  }
+  if (answeredChannelId !== undefined) {
+    await settleAnswered(pipeline, call, answeredChannelId);
+    return;
   }
   call.log.event({ event: 'emergencyFailed' });
   // §10.1 "Emergency calls": an ERROR log line "only while no live emergency trunk exists",

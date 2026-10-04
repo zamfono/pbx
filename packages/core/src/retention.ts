@@ -64,20 +64,22 @@ async function removeStaleRawFiles(
     (await readdir(dir)
       .catch(ignoreMissing)
       .catch(logFailure(log, 'recordings directory read', { dir }))) ?? [];
-  let removed = 0;
-  for (const name of names.filter(candidate => RAW_FILE.test(candidate))) {
-    const file = path.join(dir, name);
-    // eslint-disable-next-line no-await-in-loop -- one file at a time; the sweep is not latency-bound
-    const info = await stat(file)
-      .catch(ignoreMissing)
-      .catch(logFailure(log, 'raw recording file read', { file }));
-    if (info !== undefined && info.mtime.toISOString() < before) {
-      // eslint-disable-next-line no-await-in-loop -- see above
-      await rm(file, { force: true });
-      removed += 1;
-    }
-  }
-  return removed;
+  const removed = await Promise.all(
+    names
+      .filter(candidate => RAW_FILE.test(candidate))
+      .map(async name => {
+        const file = path.join(dir, name);
+        const info = await stat(file)
+          .catch(ignoreMissing)
+          .catch(logFailure(log, 'raw recording file read', { file }));
+        if (info === undefined || info.mtime.toISOString() >= before) {
+          return false;
+        }
+        await rm(file, { force: true });
+        return true;
+      })
+  );
+  return removed.filter(Boolean).length;
 }
 
 /**
@@ -100,10 +102,9 @@ export async function runRetention(
     .where('createdAt', '<', before)
     .execute();
   const recordingsDir = path.join(mediaDir, RECORDINGS_SUBDIR);
-  for (const row of stale) {
-    // eslint-disable-next-line no-await-in-loop -- one file at a time; the sweep is not latency-bound
-    await removeRecordingFiles(recordingsDir, row.filename);
-  }
+  await Promise.all(
+    stale.map(row => removeRecordingFiles(recordingsDir, row.filename))
+  );
   const recordings = await db
     .deleteFrom('recordings')
     .where('createdAt', '<', before)

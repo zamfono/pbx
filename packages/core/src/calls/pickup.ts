@@ -55,18 +55,20 @@ async function bridgePickup(
   const ari = pipeline.deps.ari;
   await ari.channels.answer(picker.channelId).catch(ignoreGone);
   const joined = await bridgeAnswered(pipeline, target, leg);
-  for (const other of target.legs.values()) {
-    if (other.state === 'ringing') {
+  const ringing = [...target.legs.values()].filter(
+    other => other.state === 'ringing'
+  );
+  await Promise.all(
+    ringing.map(async other => {
       other.state = 'ended';
       pipeline.callByChannel.delete(other.channelId);
-      // eslint-disable-next-line no-await-in-loop -- a handful of legs at most, hung up one at a time
       await ari.channels.hangup(other.channelId).catch(
         logUnlessGone(pipeline.deps.logger, 'ringing leg hangup', {
           callId: target.id
         })
       );
-    }
-  }
+    })
+  );
   // Presence (§9.3, §10.2 "Presence and BLF"): the ringing callee idle, the picker in the call once bridged.
   if (target.calleeUserId !== null) {
     pipeline.deps.presence.setCallState(

@@ -126,16 +126,11 @@ describe('runRetention', () => {
     });
 
     expect(result.rawFiles).toBe(3);
-    for (const gone of [
-      oldRaw,
-      oldRaw16,
-      failedOld,
-      failedOldRight,
-      failedOld16
-    ]) {
-      // eslint-disable-next-line no-await-in-loop -- a handful of files, checked one at a time
-      await expect(access(gone)).rejects.toThrow();
-    }
+    await Promise.all(
+      [oldRaw, oldRaw16, failedOld, failedOldRight, failedOld16].map(gone =>
+        expect(access(gone)).rejects.toThrow()
+      )
+    );
     await expect(access(failedRecent)).resolves.toBeUndefined();
     // Only raw per-leg files are swept by age; a mixed file goes with its row.
     await expect(access(unrelated)).resolves.toBeUndefined();

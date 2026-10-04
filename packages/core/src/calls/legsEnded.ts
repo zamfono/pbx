@@ -132,11 +132,11 @@ async function endCallerCall(
   }
   clearFindMeTimers(pipeline, call.id);
   pipeline.callByChannel.delete(callerChannelId);
+  const hangups: Promise<void>[] = [];
   const recordings: Promise<void>[] = [];
   for (const leg of call.legs.values()) {
     if (leg.state === 'ringing') {
-      // eslint-disable-next-line no-await-in-loop -- at most a handful of legs per call
-      await hangupLeg(pipeline, leg);
+      hangups.push(hangupLeg(pipeline, leg));
     } else if (leg.state === 'up') {
       // §10.2 "Recording semantics": the answered party leaves the bridge with the caller, which
       // ends its participation. Started before `releaseLastParty` hangs its channel up — whose
@@ -155,6 +155,7 @@ async function endCallerCall(
       endLeg(pipeline, leg.channelId, leg);
     }
   }
+  await Promise.all(hangups);
   await releaseLastParty(pipeline, call, callerChannelId);
   await Promise.all(recordings);
   // §10.2 "Voicemail": a caller in a mailbox deposit ends the message by hanging up, and the

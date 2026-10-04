@@ -57,12 +57,12 @@ describe('user-group membership', () => {
     expect(callerGroupIds('u1', snapshot).sort()).toEqual(['child', 'parent']);
   });
 
-  it('skips a soft-deleted user group, nested or not', async () => {
-    for (const deleted of ['child', 'parent']) {
-      // eslint-disable-next-line no-await-in-loop -- one database per case
+  it.each(['child', 'parent'])(
+    'skips a soft-deleted user group (%s)',
+    async deleted => {
       const snapshot = await snapshotWith([deleted]);
       expect(groupMemberUserIds(snapshot, 'rg')).toEqual([]);
       expect(callerGroupIds('u1', snapshot)).not.toContain(deleted);
     }
-  });
+  );
 });

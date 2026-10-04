@@ -218,14 +218,14 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
     ).toBe(false);
   });
 
-  it('refuses a voicemail transfer to an extension with no mailbox with 422, leaving the call as it was', async () => {
-    await setUp();
-    await seedSlot(db, '701');
-    const anna = await seedUser(db, { ext: '101' });
-    const call = await answeredCall(rig, anna);
+  it.each(['999', '701'])(
+    'refuses a voicemail transfer to %s, an extension with no mailbox, with 422, leaving the call as it was',
+    async target => {
+      await setUp();
+      await seedSlot(db, '701');
+      const anna = await seedUser(db, { ext: '101' });
+      const call = await answeredCall(rig, anna);
 
-    for (const target of ['999', '701']) {
-      // eslint-disable-next-line no-await-in-loop -- each refusal is checked in turn
       await expect(
         actions.transfer(call.id, {
           target,
@@ -233,9 +233,9 @@ describe('CallActions: parking, voicemail deposit and per-call CLIR', () => {
           voicemail: true
         })
       ).rejects.toMatchObject({ status: 422, reason: 'noMailbox' });
+      expect(rig.hungUp(legOf(call))).toBe(false);
     }
-    expect(rig.hungUp(legOf(call))).toBe(false);
-  });
+  );
 
   it('withholds the number of a click-to-dial with clir, as #31# would, but never an emergency call’s', async () => {
     await setUp();

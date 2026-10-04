@@ -124,10 +124,9 @@ describe('handleChannelEnded, the caller channel', () => {
   /** The call's own bridge, holding `channels`, as `winLeg`/`settleAnswered` leave it. */
   async function bridged(...channels: string[]): Promise<string> {
     const bridge = await ari.bridges.create({ type: 'mixing' });
-    for (const channelId of channels) {
-      // eslint-disable-next-line no-await-in-loop -- a handful of channels, added in order
-      await ari.bridges.addChannel(bridge.id, channelId);
-    }
+    await Promise.all(
+      channels.map(channelId => ari.bridges.addChannel(bridge.id, channelId))
+    );
     call.bridgeId = bridge.id;
     return bridge.id;
   }

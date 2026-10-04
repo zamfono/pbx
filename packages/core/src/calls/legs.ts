@@ -95,12 +95,13 @@ async function winLeg(
     clearTimeout(pending.timer);
   }
   const joined = await bridgeAnswered(pipeline, call, leg, existingBridgeId);
-  for (const other of call.legs.values()) {
-    if (other.channelId !== leg.channelId && other.state === 'ringing') {
-      // eslint-disable-next-line no-await-in-loop -- losing legs are hung up one at a time; there are at most a handful per call
-      await hangupLeg(pipeline, other);
-    }
-  }
+  await Promise.all(
+    [...call.legs.values()]
+      .filter(
+        other => other.channelId !== leg.channelId && other.state === 'ringing'
+      )
+      .map(other => hangupLeg(pipeline, other))
+  );
   pipeline.pendingRing.delete(call.id);
   // §9.3 "a user: ... INUSE in a call"; a leg whose join failed is hung up.
   if (leg.userId !== null && joined) {
@@ -131,12 +132,11 @@ async function handOverLeg(
   pipeline.pendingRing.delete(call.id);
   call.legs.delete(leg.channelId);
   pipeline.callByChannel.delete(leg.channelId);
-  for (const other of call.legs.values()) {
-    if (other.state === 'ringing') {
-      // eslint-disable-next-line no-await-in-loop -- a user has at most a handful of devices
-      await hangupLeg(pipeline, other);
-    }
-  }
+  await Promise.all(
+    [...call.legs.values()]
+      .filter(other => other.state === 'ringing')
+      .map(other => hangupLeg(pipeline, other))
+  );
   pending.handOver?.(leg);
   pending.resolve('answered');
 }

@@ -25,21 +25,20 @@ async function seedMemberUser(
   sipUsernames: string[]
 ): Promise<string> {
   const userId = await seedUser(db, { name: 'Member' });
-  for (const sipUsername of sipUsernames) {
-    // eslint-disable-next-line no-await-in-loop -- a member has one or two devices
-    await db
-      .insertInto('devices')
-      .values({
+  await db
+    .insertInto('devices')
+    .values(
+      sipUsernames.map(sipUsername => ({
         id: newId(),
         userId,
         label: sipUsername,
-        kind: 'manual',
+        kind: 'manual' as const,
         sipUsername,
         sipPasswordEnc: Buffer.from('secret'),
         createdAt: nowIso()
-      })
-      .execute();
-  }
+      }))
+    )
+    .execute();
   await db
     .insertInto('ringGroupMembers')
     .values({ groupId, position, userId, userGroupId: null })

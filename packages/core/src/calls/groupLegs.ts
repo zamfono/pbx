@@ -40,14 +40,13 @@ export async function hangupAllRinging(
   pipeline: Pipeline,
   tracked: Map<string, GroupLeg>
 ): Promise<void> {
-  for (const [channelId, leg] of tracked) {
-    if (leg.state !== 'ringing') {
-      continue;
-    }
-    leg.state = 'ended';
-    // eslint-disable-next-line no-await-in-loop -- losing legs are hung up one at a time; a batch has at most a handful
-    await pipeline.deps.ari.channels
-      .hangup(channelId)
-      .catch(logUnlessGone(pipeline.deps.logger, 'losing leg hangup'));
-  }
+  const ringing = [...tracked].filter(([, leg]) => leg.state === 'ringing');
+  await Promise.all(
+    ringing.map(([channelId, leg]) => {
+      leg.state = 'ended';
+      return pipeline.deps.ari.channels
+        .hangup(channelId)
+        .catch(logUnlessGone(pipeline.deps.logger, 'losing leg hangup'));
+    })
+  );
 }

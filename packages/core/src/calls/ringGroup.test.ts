@@ -453,14 +453,17 @@ describe('ringGroup', () => {
       await seedUser(db, { name: 'Member' })
     ];
     fakeAri.answerAfterMs = 60_000;
-    for (const [index, userId] of users.entries()) {
-      // eslint-disable-next-line no-await-in-loop -- members keep their positions in order
-      await seedDevice(db, userId, `late-${index}`);
-      // eslint-disable-next-line no-await-in-loop -- members keep their positions in order
-      await registerDevice(fakeAri, pipeline, `late-${index}`);
-      // eslint-disable-next-line no-await-in-loop -- members keep their positions in order
-      await seedMember(db, groupId, index, userId);
-    }
+    await Promise.all(
+      users.flatMap((userId, index) => [
+        seedDevice(db, userId, `late-${index}`),
+        seedMember(db, groupId, index, userId)
+      ])
+    );
+    await Promise.all(
+      [...users.keys()].map(index =>
+        registerDevice(fakeAri, pipeline, `late-${index}`)
+      )
+    );
     // late-1 rings only after the timeout; late-2 is still being placed when late-1 answers.
     const createDelays: Record<string, number> = {
       'PJSIP/late-1': 1500,

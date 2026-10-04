@@ -564,21 +564,19 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
     });
   });
 
-  it('releases with 503 and a sipTarget trace line when the trunk is gone or has no outbound host', async () => {
-    const trunkId = await seedSipTrunk(db, 0);
-    const deleted = await seedSipTrunk(db, 2, 2);
-    await db
-      .updateTable('trunks')
-      .set({ deletedAt: nowIso() })
-      .where('id', '=', deleted)
-      .execute();
+  it.each(['noOutboundHost', 'trunkMissing'] as const)(
+    'releases with 503 and a sipTarget trace line (%s)',
+    async cause => {
+      const id = await seedSipTrunk(db, cause === 'noOutboundHost' ? 0 : 2);
+      if (cause === 'trunkMissing') {
+        await db
+          .updateTable('trunks')
+          .set({ deletedAt: nowIso() })
+          .where('id', '=', id)
+          .execute();
+      }
 
-    for (const [id, cause] of [
-      [trunkId, 'noOutboundHost'],
-      [deleted, 'trunkMissing']
-    ] as const) {
       const call = inboundCall();
-      // eslint-disable-next-line no-await-in-loop -- one call per unusable trunk
       await enterTarget(pipeline, call, sipTarget(id), null);
       expect(traceEvents(call)).toEqual(
         expect.arrayContaining([
@@ -587,9 +585,9 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
         ])
       );
       expect(call.status).toBe('failed');
+      expect(trunkOriginates(fakeAri)).toEqual([]);
     }
-    expect(trunkOriginates(fakeAri)).toEqual([]);
-  });
+  );
   it("maps an offline rule to unavailable, a closed schedule to time_of_day and a group's fallback to its outcome", async () => {
     const trunkId = await seedSipTrunk(db);
     const offline = await seedUser(db, {

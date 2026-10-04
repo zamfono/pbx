@@ -27,10 +27,9 @@ async function seedUserWithDevices(
   sipUsernames: string[]
 ): Promise<string> {
   const userId = await seedUser(rig.db, { name: 'Anna', ringTimeoutS: 1 });
-  for (const sipUsername of sipUsernames) {
-    // eslint-disable-next-line no-await-in-loop -- a user has one or two devices
-    await seedDevice(rig.db, userId, sipUsername);
-  }
+  await Promise.all(
+    sipUsernames.map(sipUsername => seedDevice(rig.db, userId, sipUsername))
+  );
   return userId;
 }
 

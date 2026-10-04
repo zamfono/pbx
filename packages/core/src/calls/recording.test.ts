@@ -476,15 +476,15 @@ describe('Recorder', () => {
       return files;
     };
 
-    for (const file of await participate()) {
-      // eslint-disable-next-line no-await-in-loop -- two files, checked one at a time
-      await expect(access(file)).rejects.toThrow();
-    }
+    const mixed = await participate();
+    await Promise.all(
+      mixed.map(file => expect(access(file)).rejects.toThrow())
+    );
     failMix = true;
-    for (const file of await participate()) {
-      // eslint-disable-next-line no-await-in-loop -- see above
-      await expect(access(file)).resolves.toBeUndefined();
-    }
+    const unmixed = await participate();
+    await Promise.all(
+      unmixed.map(file => expect(access(file)).resolves.toBeUndefined())
+    );
   });
 
   it('a snoop that cannot start logs an error and never fails the call (§10.2 "Best effort")', async () => {
@@ -900,10 +900,9 @@ describe('Recorder', () => {
       }
       await ended;
 
-      for (const file of files) {
-        // eslint-disable-next-line no-await-in-loop -- two files, checked one at a time
-        await expect(access(file)).resolves.toBeUndefined();
-      }
+      await Promise.all(
+        files.map(file => expect(access(file)).resolves.toBeUndefined())
+      );
       const rows = await db
         .selectFrom('recordings')
         .selectAll()
