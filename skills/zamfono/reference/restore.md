@@ -8,6 +8,12 @@ start the stack.
 
 - **`.env`**, preserved from the original host: it holds the secretbox encryption key, the JWT
   secret and the ARI password.
+- **Every retired encryption key** whose snapshots are still retained, kept outside the stack
+  like `.env`: a snapshot made before a key rotation holds the stored secrets (SIP and trunk
+  passwords, webhook, backup and mail credentials) under the key of its day. Restore such a
+  snapshot with that key set as `SECRETBOX_KEY_PREVIOUS` in `.env`; the first start re-encrypts
+  them under the current key, and once `api` logs
+  `key rotation: {n} re-encrypted, 0 remaining`, `SECRETBOX_KEY_PREVIOUS` is emptied again.
 - **The default `local` target** needs nothing beyond `.env`: its repository is `/backups/restic`
   on the `backups` volume and its password is `BACKUP_PASSWORD`. It lives on the same host as the
   stack, so it restores a broken database or a bad upgrade, but a lost host takes it along; that

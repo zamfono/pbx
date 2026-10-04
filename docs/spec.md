@@ -205,7 +205,7 @@ All stored secrets are encrypted at rest with libsodium's XChaCha20-Poly1305 IET
 1. move the old value to `SECRETBOX_KEY_PREVIOUS` and generate the new key into `SECRETBOX_KEY` as `<N+1>:<base64 of 32 random bytes>`, one generation above the old one;
 2. `docker compose up -d`;
 3. confirm the log line reports 0 remaining;
-4. remove `SECRETBOX_KEY_PREVIOUS`.
+4. remove `SECRETBOX_KEY_PREVIOUS`, and keep the retired key outside the stack, like `.env`, for as long as snapshots made under it are retained (§6.5).
 
 Dynamic client ids are encrypted but not stored, so a client whose id was issued under a retired key registers again; that is the one visible effect. Every stored secret is write-only through the API: a read says only whether it is set (§10.3, conventions). ARI and AMI credentials exist only on the internal Docker network; neither port is published.
 
@@ -762,7 +762,7 @@ The sidecar mounts the `db` volume and streams the SQLite WAL continuously to an
 
 Litestream is the sole WAL checkpointer: it holds a long-lived read lock, and the applications' auto-checkpoints skip harmlessly. Exactly one instance runs per stack.
 
-**Moving a stack** to another host is a restore: the release's bundle unpacked into the stack directory, the preserved `.env` (same encryption key, JWT secret and ARI password) beside it with the `compose.override.yaml` link `setup.sh` would make, which refuses an `.env` that holds values, the database from `litestream restore` or the latest restic snapshot (`tmp/zamfono-backup/<targetId>/zamfono.sqlite3` in it) copied into the `db` volume, `media/` from the latest restic snapshot into the `media` volume, both before the first start, then `docker compose up -d`. With replication, configuration, users and history are current to within seconds and media newer than the last restic run is lost; without it, everything is as old as that snapshot.
+**Moving a stack** to another host is a restore: the release's bundle unpacked into the stack directory, the preserved `.env` (same encryption key, JWT secret and ARI password) beside it with the `compose.override.yaml` link `setup.sh` would make, which refuses an `.env` that holds values, the database from `litestream restore` or the latest restic snapshot (`tmp/zamfono-backup/<targetId>/zamfono.sqlite3` in it) copied into the `db` volume, `media/` from the latest restic snapshot into the `media` volume, both before the first start, then `docker compose up -d`. With replication, configuration, users and history are current to within seconds and media newer than the last restic run is lost; without it, everything is as old as that snapshot. A snapshot made under a retired encryption key is restored with that key set as `SECRETBOX_KEY_PREVIOUS`, and the boot sweep re-encrypts its secrets under the current one (§5.4).
 
 **Conditions of the overlay.**
 

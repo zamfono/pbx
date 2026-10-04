@@ -253,6 +253,8 @@ printf '2:%s' "$(openssl rand -base64 32)"    # the new SECRETBOX_KEY
 
 Run `docker compose up -d`, wait for `api`'s log line `key rotation: {n} re-encrypted, 0 remaining`
 (`/healthz` reports the same count as `keyRotationRemaining`), then empty `SECRETBOX_KEY_PREVIOUS`.
+Keep the retired key outside the stack, like `.env`, for as long as snapshots made under it are
+retained: restoring one needs it as `SECRETBOX_KEY_PREVIOUS`.
 `api` refuses to start while both keys carry the same generation.
 
 Fill in `FQDN`, `COMPANY_NAME`, `MAIN_DID`, `COUNTRY`, `BOOTSTRAP_OWNER_EMAIL`,

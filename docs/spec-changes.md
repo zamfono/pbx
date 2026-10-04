@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-04 · §5.4 Key rotation, §6.5 Moving a stack.** A retired `SECRETBOX_KEY` is kept outside the stack for as long as snapshots made under it are retained, and a snapshot made under it is restored with it set as `SECRETBOX_KEY_PREVIOUS`; the boot sweep re-encrypts.
+*Why:* retained snapshots hold secrets encrypted under the key of their day, so removing the retired key after the rotation left them unreadable on restore.
+
 **2026-10-04 · §10.4 When a device reaches Ringotel.** Setup, adoption, `devices.delete`, `users.delete` and `users.erase` call Ringotel before their transaction opens (the operation's `prepare`) and check again inside it: a stack set up meanwhile refuses with 409 and the losing call's organization or connection is deleted; a profile or roster changed meanwhile leaves both pushes pending. A deletion's Ringotel call is ordered with the device pushes, and a deletion that does not commit restores the device's Ringotel user from its stored credentials.
 *Why:* with transactions that begin `IMMEDIATE`, a Ringotel call inside one held the write lock for its whole round trip, so `core` and `/events` writes failed after their busy timeout.
 
