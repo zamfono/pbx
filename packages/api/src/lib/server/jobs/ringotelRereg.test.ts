@@ -248,6 +248,29 @@ describe('watchAsteriskRestarts (§10.4 "After a restart")', () => {
     expect(rows).toHaveLength(2);
   });
 
+  it('retries the pending profile ahead of the re-registration of a start found on reconnect', async () => {
+    const db = await makeTestDb();
+    const order: string[] = [];
+    const watcher = watchAsteriskRestarts({
+      db,
+      lookup: core(RESTARTED),
+      ...ringotel(() => {
+        order.push('rereg');
+        return Promise.resolve();
+      }),
+      retryProfile: trigger => {
+        order.push(trigger);
+        return Promise.resolve();
+      }
+    });
+
+    watcher.streamConnected();
+    watcher.streamConnected();
+    await watcher.idle();
+
+    expect(order).toEqual(['api.start', 'asterisk.started', 'rereg']);
+  });
+
   it('keeps running after a failed check', async () => {
     const db = await makeTestDb();
     const rereg = vi.fn(() => Promise.resolve());

@@ -12,6 +12,7 @@ import { asConfirmedRun, makeTestDb, seedSettings } from '../testDb.js';
 import { runOperation } from './runner.js';
 
 import './audit/index.js';
+import './devices/index.js';
 import './parking/index.js';
 import './ringGroups/index.js';
 import './users/index.js';
@@ -73,6 +74,45 @@ describe('the Ringotel roster follows every user and extension change (§10.4)',
     // Undoing the creation deletes the user again, through users.delete.
     await undoLatest(db, 'users.create');
     expect(roster(ringotel)).toEqual([]);
+  });
+
+  it("users.update carries a new name and e-mail to the person's Ringotel user", async () => {
+    const db = await makeTestDb();
+    await seedSettings(db, {
+      ringotelOrgId: 'org-1',
+      ringotelBranchId: 'branch-1',
+      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    });
+    const ringotel = installRingotelFake();
+    const created = (await runOperation(
+      db,
+      'users.create',
+      { name: 'Anna Huber', email: 'anna@x.test', extension: '101' },
+      asConfirmedRun()
+    )) as { user: { id: string } };
+    await runOperation(
+      db,
+      'devices.create',
+      { userId: created.user.id, label: 'App', kind: 'ringotel' },
+      asConfirmedRun()
+    );
+
+    await runOperation(
+      db,
+      'users.update',
+      { id: created.user.id, name: 'Anna Berger' },
+      asConfirmedRun()
+    );
+    await runOperation(
+      db,
+      'users.update',
+      { id: created.user.id, email: 'anna.berger@x.test' },
+      asConfirmedRun()
+    );
+
+    expect(ringotel.users).toMatchObject([
+      { extension: '101', name: 'Anna Berger', email: 'anna.berger@x.test' }
+    ]);
   });
 
   it('ringGroups.create, a rename, ringGroups.delete and its undo', async () => {

@@ -185,6 +185,73 @@ describe('a ringotel device reaches Ringotel once Asterisk holds it (§10.4)', (
     ]);
   });
 
+  it('audits a Ringotel key it cannot use as a refusal, with a warning', async () => {
+    const db = await makeTestDb();
+    const userId = await seed(db);
+    await db
+      .updateTable('settings')
+      .set({ ringotelApiTokenEnc: null })
+      .execute();
+
+    const output = (await runOperation(
+      db,
+      'devices.create',
+      { userId, label: 'Phone', kind: 'ringotel' },
+      admin
+    )) as { device: { id: string }; warnings?: string[] };
+
+    expect(output.warnings).toEqual([
+      expect.stringMatching(/Ringotel refused it \(ringotel: no API token/u)
+    ]);
+    const rows = await pushRows(db, output.device.id);
+    expect(JSON.parse(rows[0]?.changesJson ?? '[]')).toMatchObject([
+      { field: 'outcome', to: 'refused' },
+      { field: 'trigger', to: 'devices.create' },
+      { field: 'reason', to: expect.stringMatching(/no API token/u) as unknown }
+    ]);
+  });
+
+  it.each([
+    ['devices.rotate', (id: string) => ({ id })],
+    ['devices.setBlf', (id: string) => ({ id, keys: ['998'] })]
+  ])(
+    '%s recovers, rather than recreates, a restored device whose user Ringotel deleted within 24 h',
+    async (operation, input) => {
+      const db = await makeTestDb();
+      const userId = await seed(db);
+      const fake = install();
+      const created = (await runOperation(
+        db,
+        'devices.create',
+        { userId, label: 'Phone', kind: 'ringotel' },
+        admin
+      )) as { device: { id: string } };
+      const remoteId = fake.users[0]?.id;
+      await runOperation(
+        db,
+        'devices.delete',
+        { id: created.device.id },
+        admin
+      );
+      const entry = await db
+        .selectFrom('auditLog')
+        .select('id')
+        .where('operation', '=', 'devices.delete')
+        .executeTakeFirstOrThrow();
+      // The undo's own push is lost, as to a restart, so the next push finds no Ringotel user.
+      fake.failing.add('recoverDeletedUser');
+      await runOperation(db, 'audit.undo', { id: entry.id }, admin);
+      fake.failing.delete('recoverDeletedUser');
+      events.length = 0;
+
+      await runOperation(db, operation, input(created.device.id), admin);
+
+      expect(events).toContain('recoverDeletedUser');
+      expect(events).not.toContain('createUser');
+      expect(fake.users.map(user => user.id)).toEqual([remoteId]);
+    }
+  );
+
   it('warns and audits a skip when Ringotel is not set up', async () => {
     const db = await makeTestDb();
     const userId = await seed(db);

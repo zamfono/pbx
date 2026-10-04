@@ -290,6 +290,8 @@ describe('createRingotelProvider', () => {
       params: {
         orgid: 'org-1',
         id: 'ru-1',
+        name: 'Anna Huber',
+        email: 'anna@x.test',
         extension: '101',
         username: 'e101-abcde',
         authname: 'e101-abcde'
@@ -314,7 +316,13 @@ describe('createRingotelProvider', () => {
 
     expect(calls[2]).toEqual({
       method: 'updateUser',
-      params: { orgid: 'org-1', id: 'ru-1', extension: '101' }
+      params: {
+        orgid: 'org-1',
+        id: 'ru-1',
+        name: 'Anna Huber',
+        email: 'anna@x.test',
+        extension: '101'
+      }
     });
   });
 

@@ -139,6 +139,36 @@ describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile 
     ]);
   });
 
+  it('records a Ringotel key it cannot use as a refusal and keeps the push pending', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db, {
+      ringotelOrgId: 'org-1',
+      ringotelBranchId: 'branch-1',
+      ringotelApiTokenEnc: null
+    });
+    const ringotel = stubRingotel(true);
+
+    const result = (await runOperation(
+      db,
+      'settings.update',
+      { emergencyNumbers: ['112', '110'] },
+      asRun()
+    )) as { warnings?: string[] };
+
+    expect(result.warnings).toEqual([
+      expect.stringMatching(/Ringotel refused the tenant profile/u)
+    ]);
+    expect(ringotel.methods).toEqual([]);
+    expect(await isProfilePending(db)).toBe(true);
+    expect(await profileRows(db)).toMatchObject([
+      {
+        outcome: 'refused',
+        trigger: 'settings.update',
+        reason: 'ringotel: no API token configured (settings.ringotelApiToken)'
+      }
+    ]);
+  });
+
   it('records a push Ringotel takes and leaves nothing pending', async () => {
     const db = await makeTestDb();
     await seedSettings(db, {

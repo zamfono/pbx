@@ -80,13 +80,16 @@ async function auditPush(
   });
 }
 
-/** Runs the push against the tenant's Ringotel provider, never throwing. */
+/**
+ * Runs the push against the tenant's Ringotel provider, never throwing. A Ringotel key that
+ * cannot be used is a refusal like any other.
+ */
 async function attempt(db: Db, push: Push): Promise<PushOutcome> {
-  const provider = await activeRingotelProvider(db);
-  if (provider === null) {
-    return { outcome: 'skipped', reason: 'Ringotel is not set up' };
-  }
   try {
+    const provider = await activeRingotelProvider(db);
+    if (provider === null) {
+      return { outcome: 'skipped', reason: 'Ringotel is not set up' };
+    }
     return { outcome: 'pushed', receipt: await push.push(provider) };
   } catch (error) {
     const reason = errorMessage(error);

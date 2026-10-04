@@ -161,8 +161,9 @@ function resolvedFields(before: UserRow, input: Input): Partial<UserRow> {
 
 /**
  * §10.4 `onRosterChanged`: the branch-wide BLF roster carries every extension with its owner's
- * display name, so an extension rename and a rename of the person both move it. `after` is the
- * stored row, read once the UPDATE has landed, which is what the roster renders from.
+ * display name, and the person's Ringotel user their name and e-mail, so an extension rename, a
+ * rename of the person and a new e-mail address all move it. `after` is the stored row, read once
+ * the UPDATE has landed, which is what the roster renders from.
  */
 async function maybePushRoster(
   ctx: Context,
@@ -170,7 +171,11 @@ async function maybePushRoster(
   after: UserRow,
   extensionRenamed: boolean
 ): Promise<void> {
-  if (!extensionRenamed && after.name === before.name) {
+  if (
+    !extensionRenamed &&
+    after.name === before.name &&
+    after.email === before.email
+  ) {
     return;
   }
   await pushRoster(ctx, [after]);

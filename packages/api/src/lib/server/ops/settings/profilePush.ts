@@ -35,13 +35,16 @@ export type ProfileTrigger =
 type ProfileOutcome =
   { outcome: 'pushed' } | { outcome: 'refused' | 'skipped'; reason: string };
 
-/** Runs the tenant's profile push, never throwing; `skipped` while Ringotel is not set up. */
+/**
+ * Runs the tenant's profile push, never throwing; `skipped` while Ringotel is not set up. A
+ * Ringotel key that cannot be used is a refusal like any other.
+ */
 async function attempt(db: Db): Promise<ProfileOutcome> {
-  const provider = await activeRingotelProvider(db);
-  if (provider === null) {
-    return { outcome: 'skipped', reason: 'Ringotel is not set up' };
-  }
   try {
+    const provider = await activeRingotelProvider(db);
+    if (provider === null) {
+      return { outcome: 'skipped', reason: 'Ringotel is not set up' };
+    }
     await provider.onTenantProfileChanged?.(await loadSettings(db));
     return { outcome: 'pushed' };
   } catch (error) {

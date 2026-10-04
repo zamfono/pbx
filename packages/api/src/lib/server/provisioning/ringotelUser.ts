@@ -7,7 +7,7 @@
  */
 import * as env from '$app/env/private';
 
-import type { Db } from '@zamfono/shared';
+import { MS_PER_DAY, nowIso, type Db } from '@zamfono/shared';
 
 import { errorMessage } from '../errors.js';
 import { decrypt, keyringFromEnv } from '../secretbox.js';
@@ -17,10 +17,16 @@ import {
   blfEntries,
   deviceBlfKeys,
   findRingotelUserId,
+  lastDeviceDeletionAt,
+  resolveDomain,
   resolveIds,
   userProfile
 } from './ringotelRoster.js';
-import type { DeviceRow, SipCredentials } from './types.js';
+import type { DeviceRow, PushReceipt, SipCredentials } from './types.js';
+
+// Ringotel's recoverDeletedUser (§10.4) accepts a deletion only within this window; after it,
+// a device gets a fresh createUser.
+const RECOVER_WINDOW_MS = MS_PER_DAY;
 
 /** `createUser` for `device` with the §10.4 "`createUser` parameters"; returns the new id. */
 export async function createRemoteUser(
@@ -56,6 +62,45 @@ export async function createRemoteUser(
   return created.id;
 }
 
+/**
+ * The Ringotel user for a device that has none (§10.4): `createUser` for a genuinely new device;
+ * `recoverDeletedUser` instead when `device` was deleted within Ringotel's 24 h undo window
+ * (`RECOVER_WINDOW_MS`), so a restored device keeps its Ringotel user and app logins. The
+ * deletion time comes from the append-only `audit_log`, not the device row's own `deletedAt`,
+ * since `audit.undo` (§5.8) clears that column before this would see it.
+ */
+export async function provisionRemoteUser(
+  deps: RingotelProviderDeps,
+  device: DeviceRow,
+  sipCredentials: SipCredentials
+): Promise<PushReceipt> {
+  const { orgId } = await resolveIds(deps.db);
+  const { name, email, ext } = await userProfile(deps.db, device.userId);
+  const nowMs = Date.parse((deps.now ?? nowIso)());
+  const deletedAt = await lastDeviceDeletionAt(deps.db, device);
+  const isRecovery =
+    deletedAt !== null && nowMs - Date.parse(deletedAt) <= RECOVER_WINDOW_MS;
+  if (isRecovery) {
+    const domain = await resolveDomain(deps.client, orgId);
+    const recovered = await deps.client.call<{ id?: unknown } | null>(
+      'recoverDeletedUser',
+      {
+        domain,
+        name,
+        email,
+        extension: ext,
+        username: sipCredentials.username,
+        authname: sipCredentials.username,
+        password: sipCredentials.password
+      }
+    );
+    return typeof recovered?.id === 'string'
+      ? { remoteId: recovered.id }
+      : null;
+  }
+  return { remoteId: await createRemoteUser(deps, device, sipCredentials) };
+}
+
 /** The device's stored SIP credentials, decrypted (§5.4). */
 export function storedCredentials(device: DeviceRow): SipCredentials {
   return {
@@ -67,9 +112,10 @@ export function storedCredentials(device: DeviceRow): SipCredentials {
 }
 
 /**
- * The Ringotel user id of `device`, whose owner holds `ext`; a missing user is created with the
- * device's stored credentials and logged at `warn`, since it means the device was created before
- * `provisioning.ringotelSetup` or its user was removed in the Ringotel Shell.
+ * The Ringotel user id of `device`, whose owner holds `ext`; a missing user is provisioned
+ * (`provisionRemoteUser`) with the device's stored credentials and logged at `warn`, since it
+ * means the device was created before `provisioning.ringotelSetup`, its user was removed in the
+ * Ringotel Shell, or the push of its restoration was lost.
  */
 export async function ensureRemoteUser(
   deps: RingotelProviderDeps,
@@ -85,7 +131,21 @@ export async function ensureRemoteUser(
     { deviceId: device.id, ext },
     'ringotel: no Ringotel user for this ringotel device; creating it'
   );
-  return createRemoteUser(deps, device, storedCredentials(device));
+  const receipt = await provisionRemoteUser(
+    deps,
+    device,
+    storedCredentials(device)
+  );
+  const provisioned =
+    receipt?.remoteId ??
+    (await findRingotelUserId(deps.client, orgId, branchId, ext));
+  if (provisioned === null) {
+    throw new RingotelError(
+      'recoverDeletedUser',
+      'recovered no user at the extension'
+    );
+  }
+  return provisioned;
 }
 
 /** `createUser` for one existing device, then its stored panel as `options.blfs` if it has one. */

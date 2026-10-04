@@ -128,13 +128,26 @@ export async function handleAsteriskStart(
   await reregister(deps.db, onPbxRestarted, asteriskStartedAt);
 }
 
-/** `handleAsteriskStart` for the Asterisk `core` reports running now; nothing while it cannot say. */
+/**
+ * `handleAsteriskStart` for the Asterisk `core` reports running now; nothing while it cannot say.
+ * A start it has not handled went unannounced, so the pending tenant profile gets the retry an
+ * announcement would have given it, ahead of the re-registration.
+ */
 export async function checkAsteriskRestart(
   deps: ReregDeps,
   state: ReregState
 ): Promise<void> {
   const version = await deps.lookup().catch(() => null);
-  await handleAsteriskStart(deps, state, version?.asteriskStartedAt ?? null);
+  const asteriskStartedAt = version?.asteriskStartedAt ?? null;
+  if (
+    deps.retryProfile !== undefined &&
+    asteriskStartedAt !== null &&
+    asteriskStartedAt !== state.lastSeen &&
+    (await restartIsNew(deps.db, asteriskStartedAt))
+  ) {
+    await deps.retryProfile('asterisk.started');
+  }
+  await handleAsteriskStart(deps, state, asteriskStartedAt);
 }
 
 /** What `core`'s internal event stream tells the re-registration (`background.ts`). */

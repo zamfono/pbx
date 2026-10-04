@@ -372,6 +372,17 @@ why the specified behaviour changed; the commit history, how.
   failed, sent a pending tenant profile to Ringotel at once, before Asterisk held it. That retry,
   and the one at an Asterisk start, now waits until a propagation has succeeded, as a device's
   Ringotel push does.
+- A changed name or e-mail address of a person never reached their Ringotel user, so a re-sent
+  activation mail went to the old address. Both now reach Ringotel with the change.
+- A restored Ringotel device whose push was lost, for example to an `api` restart, got a new
+  Ringotel user at its next push, with a new activation mail and the apps logged out. Within 24
+  hours of the deletion, its Ringotel user is now recovered, as an undo's push does.
+- A Ringotel key the stack could not use made a device or tenant profile push fail without a
+  `ringotel.push` or `ringotel.profile` entry, and left the profile pending without a reason. It is
+  now recorded as Ringotel refusing the push, with the reason.
+- An Asterisk start `api` learned of only when its connection to `core` came back re-registered
+  the Ringotel apps but left a pending tenant profile for the next start. The profile is now sent
+  again first, as for an announced start.
 
 ### Upgrade notes
 

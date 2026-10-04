@@ -62,7 +62,8 @@ function remoteUserFor(
 }
 
 /**
- * Pushes `extension` for every `users` row that has a live Ringotel user, alongside the current
+ * Pushes the name, e-mail and `extension` of every `users` row that has a live Ringotel user, so a
+ * re-sent activation mail reaches the person's current address, alongside the current
  * `username`/`authname` when the user's `ringotel` device has one: an extension rename (§10.3
  * `users.update`) also renames the device's SIP username, and the app authenticates against the
  * renamed PJSIP endpoint under that same, current username.
@@ -96,6 +97,8 @@ async function pushRosterExtensions(
     await deps.client.call('updateUser', {
       orgid: orgId,
       id: remote.id,
+      name: user.name,
+      email: user.email,
       extension: ext,
       ...(sipUsername === null
         ? {}

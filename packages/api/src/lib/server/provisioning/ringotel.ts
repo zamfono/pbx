@@ -1,5 +1,3 @@
-import { MS_PER_DAY, nowIso } from '@zamfono/shared';
-
 import {
   ringotelLog,
   ringotelPbxRestarted,
@@ -11,60 +9,16 @@ import {
   blfEntries,
   extensionOfUser,
   findRingotelUserId,
-  lastDeviceDeletionAt,
-  resolveDomain,
   resolveIds,
   userProfile
 } from './ringotelRoster.js';
-import { createRemoteUser, ensureRemoteUser } from './ringotelUser.js';
+import { ensureRemoteUser, provisionRemoteUser } from './ringotelUser.js';
 import type {
   DeviceRow,
   ProvisioningProvider,
   PushReceipt,
   SipCredentials
 } from './types.js';
-
-// Ringotel's recoverDeletedUser (§10.4) accepts a deletion only within this window; after it,
-// onDeviceCreated falls back to a fresh createUser.
-const RECOVER_WINDOW_MS = MS_PER_DAY;
-
-/**
- * `onDeviceCreated` (§10.4): `createUser` for a genuinely new device; `recoverDeletedUser`
- * instead when `device` was deleted within Ringotel's 24 h undo window (`RECOVER_WINDOW_MS`). The
- * deletion time comes from the append-only `audit_log`, not the device row's own `deletedAt`,
- * since `audit.undo` (§5.8) clears that column before this hook would see it.
- */
-async function ringotelDeviceCreated(
-  deps: RingotelProviderDeps,
-  device: DeviceRow,
-  sipCredentials: SipCredentials
-): Promise<PushReceipt> {
-  const { orgId } = await resolveIds(deps.db);
-  const { name, email, ext } = await userProfile(deps.db, device.userId);
-  const nowMs = Date.parse((deps.now ?? nowIso)());
-  const deletedAt = await lastDeviceDeletionAt(deps.db, device);
-  const isRecovery =
-    deletedAt !== null && nowMs - Date.parse(deletedAt) <= RECOVER_WINDOW_MS;
-  if (isRecovery) {
-    const domain = await resolveDomain(deps.client, orgId);
-    const recovered = await deps.client.call<{ id?: unknown } | null>(
-      'recoverDeletedUser',
-      {
-        domain,
-        name,
-        email,
-        extension: ext,
-        username: sipCredentials.username,
-        authname: sipCredentials.username,
-        password: sipCredentials.password
-      }
-    );
-    return typeof recovered?.id === 'string'
-      ? { remoteId: recovered.id }
-      : null;
-  }
-  return { remoteId: await createRemoteUser(deps, device, sipCredentials) };
-}
 
 /**
  * `onDeviceDeleted` (§10.4): `deleteUser`, resolved via `getUsers` since Zamfono keeps no id. A
@@ -93,7 +47,9 @@ async function ringotelDeviceDeleted(
 
 /**
  * `onCredentialsRotated` (§10.4): pushes the new SIP password via `updateUser`; a device without
- * a Ringotel user gets its `createUser` with the new credentials instead, which pushes them too.
+ * a Ringotel user gets the user `onDeviceCreated` would give it, with the new credentials: one
+ * restored within Ringotel's recovery window is recovered, so a restored device whose own push
+ * was lost keeps its app logins.
  */
 async function ringotelCredentialsRotated(
   deps: RingotelProviderDeps,
@@ -108,7 +64,7 @@ async function ringotelCredentialsRotated(
       { deviceId: device.id, ext },
       'ringotel: no Ringotel user for this ringotel device; creating it'
     );
-    return { remoteId: await createRemoteUser(deps, device, sipCredentials) };
+    return provisionRemoteUser(deps, device, sipCredentials);
   }
   await deps.client.call('updateUser', {
     orgid: orgId,
@@ -147,7 +103,7 @@ export function createRingotelProvider(
 ): ProvisioningProvider {
   return {
     onDeviceCreated: (device, sipCredentials) =>
-      ringotelDeviceCreated(deps, device, sipCredentials),
+      provisionRemoteUser(deps, device, sipCredentials),
     onDeviceDeleted: device => ringotelDeviceDeleted(deps, device),
     onCredentialsRotated: (device, sipCredentials) =>
       ringotelCredentialsRotated(deps, device, sipCredentials),
