@@ -7,8 +7,6 @@
 import * as env from '$app/env/private';
 
 import {
-  HTTP_CONFLICT,
-  isRecord,
   type AddPartyRequest,
   type AttendedTransferRequest,
   type ConsultRequest,
@@ -27,22 +25,12 @@ import {
   type TransferRequest
 } from '@zamfono/shared';
 
-import {
-  CoreRequestError,
-  postJson,
-  postJsonChecked,
-  postJsonForBody,
-  throwIfNotOk
-} from './coreHttp.js';
-import { tryReadJson } from './json.js';
+import { postJsonChecked, postJsonForBody, throwIfNotOk } from './coreHttp.js';
 
 // `/healthz`, `/metrics`, `system.info` and the live-call reads answer within this even while
 // `core` hangs (§6.3 "Health", §7, §10.3), and a hung `core` holds up no re-registration check
 // (§10.4).
 const CORE_READ_TIMEOUT_MS = 3000;
-
-export type OriginateOutcome =
-  { callId: string } | { error: 'noRegisteredDevice' };
 
 export type CoreClient = {
   configChanged(kinds: ReloadKind[]): Promise<void>;
@@ -52,7 +40,7 @@ export type CoreClient = {
   health(): Promise<CoreHealth>;
   /** The version `core` runs, since when, and since when its Asterisk runs (§7 "Version"). */
   version(): Promise<CoreVersionResponse>;
-  originate(req: OriginateRequest): Promise<OriginateOutcome>;
+  originate(req: OriginateRequest): Promise<{ callId: string }>;
   transfer(callId: string, req: TransferRequest): Promise<void>;
   pickup(callId: string, req: PickupRequest): Promise<void>;
   hangup(callId: string, req: HangupRequest): Promise<void>;
@@ -66,12 +54,6 @@ export type CoreClient = {
   resume(callId: string, req: HoldRequest): Promise<void>;
   decline(callId: string, req: DeclineRequest): Promise<void>;
 };
-
-/** Whether `body` is the problem whose `detail` names the `noRegisteredDevice` cause of a 409
- * (§10.2 "Click-to-dial", `internalApi.ts`). */
-function namesNoRegisteredDevice(body: unknown): boolean {
-  return isRecord(body) && body.detail === 'noRegisteredDevice';
-}
 
 /** `core`'s internal API at `baseUrl` (default `CORE_URL`). */
 export function createCoreClient(
@@ -104,37 +86,26 @@ export function createCoreClient(
       getJson<CoreVersionResponse>(`${baseUrl}/internal/version`, {
         signal: AbortSignal.timeout(CORE_READ_TIMEOUT_MS)
       }),
-    async originate(req) {
-      const url = `${baseUrl}/internal/calls`;
-      const response = await postJson(fetchFn, url, req);
-      const body: unknown = await tryReadJson(response);
-      if (response.status === HTTP_CONFLICT && namesNoRegisteredDevice(body)) {
-        return { error: 'noRegisteredDevice' };
-      }
-      if (!response.ok) {
-        throw new CoreRequestError(url, response.status, body);
-      }
-      return body as { callId: string };
-    },
+    originate: async req =>
+      postJsonForBody(fetchFn, `${baseUrl}/internal/calls`, req) as Promise<{
+        callId: string;
+      }>,
     transfer: async (callId, req) =>
       postJsonChecked(fetchFn, call(callId, 'transfer'), req),
     pickup: async (callId, req) =>
       postJsonChecked(fetchFn, call(callId, 'pickup'), req),
     hangup: async (callId, req) =>
       postJsonChecked(fetchFn, call(callId, 'hangup'), req),
-    async park(callId, req) {
-      const url = call(callId, 'park');
-      const response = await postJson(fetchFn, url, req);
-      await throwIfNotOk(response, url);
-      return (await response.json()) as { slot: string };
-    },
+    park: async (callId, req) =>
+      postJsonForBody(fetchFn, call(callId, 'park'), req) as Promise<{
+        slot: string;
+      }>,
     parked: async () => getJson<ParkingResponse>(`${baseUrl}/internal/parking`),
     // Not `encodeURIComponent`-escaped: `mailbox` is `user:<id>` or `ringGroup:<id>` by
     // construction (`MwiMailbox`), and escaping its routing colon to `%3A` would change the
     // path segment core matches against.
     mwi: async mailbox =>
       postJsonChecked(fetchFn, `${baseUrl}/internal/mwi/${mailbox}`, undefined),
-    // A route that dials a call answers 201 with its id.
     addParty: async (callId, req) =>
       postJsonForBody(fetchFn, call(callId, 'parties'), req) as Promise<{
         callId: string;

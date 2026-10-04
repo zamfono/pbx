@@ -1,11 +1,9 @@
 import { z } from 'zod';
 
-import { HTTP_CONFLICT } from '@zamfono/shared';
-
 import { getCoreClient } from '#lib/server/coreClient.js';
 
-import { defineOperation, OpError } from '../types.js';
-import { resolveActingUserId } from './_shared.js';
+import { defineOperation } from '../types.js';
+import { proxyCallAction, resolveActingUserId } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -46,21 +44,14 @@ export const originate = defineOperation({
   audit: false,
   run: async (ctx, input) => {
     const userId = resolveActingUserId(ctx, input.userId);
-    const outcome = await getCoreClient().originate({
-      userId,
-      target: input.target,
-      actorUserId: ctx.actor.id,
-      requestId: ctx.requestId,
-      ...(input.clir === undefined ? {} : { clir: input.clir })
-    });
-    if ('error' in outcome) {
-      // A string `detail` is the problem's own RFC 9457 member, which names the cause (§10.2).
-      throw new OpError(
-        HTTP_CONFLICT,
-        'no device is registered for this user',
-        outcome.error
-      );
-    }
-    return outcome;
+    return proxyCallAction(async () =>
+      getCoreClient().originate({
+        userId,
+        target: input.target,
+        actorUserId: ctx.actor.id,
+        requestId: ctx.requestId,
+        ...(input.clir === undefined ? {} : { clir: input.clir })
+      })
+    );
   }
 });

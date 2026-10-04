@@ -6,15 +6,14 @@
  */
 import type http from 'node:http';
 
-import { HTTP_OK, isRecord } from '@zamfono/shared';
+import { HTTP_OK } from '@zamfono/shared';
 
 import { ActionError } from '../calls/actionError.js';
 import type { CallActions } from '../calls/actions.js';
 import {
   CALL_ROUTES,
   ORIGINATE_ROUTE,
-  type ActionRoute,
-  type Body
+  type ActionRoute
 } from './actionTable.js';
 import {
   readJsonBody,
@@ -26,7 +25,7 @@ import {
 const CALL_ACTION_ROUTE =
   /^\/internal\/calls\/(?<callId>[^/]+)\/(?<action>[^/]+)$/u;
 
-/** The route `pathname` names, a call action's run bound to its call; `null` off every action
+/** The route `pathname` names, a call action's bound to its call; `null` off every action
  * route. */
 function matchActionRoute(pathname: string): ActionRoute | null {
   if (pathname === '/internal/calls') {
@@ -42,20 +41,7 @@ function matchActionRoute(pathname: string): ActionRoute | null {
   if (callId === undefined || route === undefined) {
     return null;
   }
-  return {
-    ...route,
-    run: (actions, body) => route.run(actions, callId, body)
-  };
-}
-
-/** Whether `body` carries every string field and every flag `route` names in its shape. */
-function bodyValid(route: ActionRoute, body: Body): boolean {
-  return (
-    route.fields.every(field => typeof body[field] === 'string') &&
-    (route.flags ?? []).every(
-      field => body[field] === undefined || typeof body[field] === 'boolean'
-    )
-  );
+  return route(callId);
 }
 
 /**
@@ -74,13 +60,13 @@ async function serveAction(
     return;
   }
   // An empty body is an action with no fields.
-  const body = parsed.body === undefined ? {} : parsed.body;
-  if (!isRecord(body) || !bodyValid(route, body)) {
+  const accepted = route(parsed.body === undefined ? {} : parsed.body);
+  if (accepted === null) {
     respondInvalidBody(response);
     return;
   }
   try {
-    const answer = await route.run(actions, body);
+    const answer = await accepted(actions);
     if (answer.body === undefined) {
       response.writeHead(answer.status);
       response.end();

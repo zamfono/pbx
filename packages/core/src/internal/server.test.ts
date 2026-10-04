@@ -281,6 +281,21 @@ describe('startInternalServer', () => {
     });
   });
 
+  it.each([
+    ['calls/c1/transfer', { target: 102, actorUserId: 'u1' }],
+    ['calls/c1/transfer', { target: '102', actorUserId: 'u1', voicemail: 1 }],
+    ['calls/c1/hold', {}],
+    ['calls/c1/hold', []],
+    ['calls', { userId: 'u1', target: '102', actorUserId: 'u1' }]
+  ])('answers 400 for a %s body its schema refuses', async (path, body) => {
+    const response = await fetch(`http://127.0.0.1:${port}/internal/${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    expect(response.status).toBe(HTTP_BAD_REQUEST);
+  });
+
   it('parses the *Json config columns into the Snapshot', async () => {
     const snapshot = await cache.get();
     expect(snapshot.settings.emergencyNumbers).toEqual(['112']);

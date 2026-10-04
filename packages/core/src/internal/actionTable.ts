@@ -1,131 +1,114 @@
 /**
- * What each live-call action of the internal API is (§3, §10.3 "Live calls"): the fields its
- * request carries, the `CallActions` method it runs and what it answers. `actionRoutes.ts` serves
- * them.
+ * What each live-call action of the internal API is (§3, §10.3 "Live calls"): the schema of its
+ * request (`internalApi.ts`), the `CallActions` method it runs and what it answers.
+ * `actionRoutes.ts` serves them.
  */
+import type { z } from 'zod';
+
 import {
+  addPartyRequestSchema,
+  attendedTransferRequestSchema,
+  consultRequestSchema,
+  declineRequestSchema,
+  hangupRequestSchema,
+  holdRequestSchema,
   HTTP_CONFLICT,
   HTTP_CREATED,
   HTTP_NO_CONTENT,
   HTTP_OK,
-  type AddPartyRequest,
-  type AttendedTransferRequest,
-  type ConsultRequest,
-  type DeclineRequest,
-  type HangupRequest,
-  type HoldRequest,
-  type OriginateRequest,
-  type ParkRequest,
-  type PickupRequest,
-  type TransferRequest
+  originateRequestSchema,
+  parkRequestSchema,
+  pickupRequestSchema,
+  transferRequestSchema
 } from '@zamfono/shared';
 
 import { ActionError } from '../calls/actionError.js';
 import type { CallActions } from '../calls/actions.js';
 
-export type Body = Record<string, unknown>;
 type Answer = { status: number; body?: unknown };
 
-/** One action's route: the string fields its request carries (`internalApi.ts`), the optional
- * ones that are absent or a boolean, and its run, answering its status and body. */
-export type ActionRoute = {
-  fields: readonly string[];
-  flags?: readonly string[];
-  run: (actions: CallActions, body: Body) => Promise<Answer>;
-};
+/** An action whose request body its schema accepted, ready to run. */
+type AcceptedAction = (actions: CallActions) => Promise<Answer>;
 
-/** An action on the call `callId` names. */
-type CallRoute = Omit<ActionRoute, 'run'> & {
-  run: (actions: CallActions, callId: string, body: Body) => Promise<Answer>;
-};
+/** One action's route: its request body, parsed by the action's schema, as the action to run;
+ * `null` for a body the schema refuses. */
+export type ActionRoute = (body: unknown) => AcceptedAction | null;
+
+/** The route that parses its body with `schema` and runs `run` with it. */
+function route<T>(
+  schema: z.ZodType<T>,
+  run: (actions: CallActions, body: T) => Promise<Answer>
+): ActionRoute {
+  return body => {
+    const parsed = schema.safeParse(body);
+    return parsed.success ? actions => run(actions, parsed.data) : null;
+  };
+}
 
 const NO_CONTENT = { status: HTTP_NO_CONTENT };
 
-/** `POST /internal/calls/{id}/{action}`, by action: park answers its slot, the two that dial a
- * call (`parties`, `consult`) 201 with its id, every other 204. */
-export const CALL_ROUTES: Record<string, CallRoute> = {
-  transfer: {
-    fields: ['target', 'actorUserId'],
-    // A transfer to the target's mailbox (§10.1 "Transfers and pickup").
-    flags: ['voicemail'],
-    run: async (actions, callId, body) => {
-      await actions.transfer(callId, body as TransferRequest);
+/** `POST /internal/calls/{id}/{action}`, by action, each the route on the call `callId` names:
+ * park answers its slot, the two that dial a call (`parties`, `consult`) 201 with its id, every
+ * other 204. */
+export const CALL_ROUTES: Record<string, (callId: string) => ActionRoute> = {
+  transfer: callId =>
+    route(transferRequestSchema, async (actions, body) => {
+      await actions.transfer(callId, body);
       return NO_CONTENT;
-    }
-  },
-  pickup: {
-    fields: ['userId', 'actorUserId'],
-    run: async (actions, callId, body) => {
-      await actions.pickup(callId, body as PickupRequest);
+    }),
+  pickup: callId =>
+    route(pickupRequestSchema, async (actions, body) => {
+      await actions.pickup(callId, body);
       return NO_CONTENT;
-    }
-  },
-  hangup: {
-    fields: ['actorUserId'],
-    run: async (actions, callId, body) => {
-      await actions.hangup(callId, body as HangupRequest);
+    }),
+  hangup: callId =>
+    route(hangupRequestSchema, async (actions, body) => {
+      await actions.hangup(callId, body);
       return NO_CONTENT;
-    }
-  },
-  park: {
-    fields: ['userId', 'actorUserId'],
-    run: async (actions, callId, body) => ({
+    }),
+  park: callId =>
+    route(parkRequestSchema, async (actions, body) => ({
       status: HTTP_OK,
-      body: await actions.park(callId, body as ParkRequest)
-    })
-  },
-  parties: {
-    fields: ['target', 'actorUserId'],
-    run: async (actions, callId, body) => ({
+      body: await actions.park(callId, body)
+    })),
+  parties: callId =>
+    route(addPartyRequestSchema, async (actions, body) => ({
       status: HTTP_CREATED,
-      body: await actions.addParty(callId, body as AddPartyRequest)
-    })
-  },
-  consult: {
-    fields: ['target', 'actorUserId'],
-    run: async (actions, callId, body) => ({
+      body: await actions.addParty(callId, body)
+    })),
+  consult: callId =>
+    route(consultRequestSchema, async (actions, body) => ({
       status: HTTP_CREATED,
-      body: await actions.consult(callId, body as ConsultRequest)
-    })
-  },
-  attendedTransfer: {
-    fields: ['toCallId', 'actorUserId'],
-    run: async (actions, callId, body) => {
-      await actions.attendedTransfer(callId, body as AttendedTransferRequest);
+      body: await actions.consult(callId, body)
+    })),
+  attendedTransfer: callId =>
+    route(attendedTransferRequestSchema, async (actions, body) => {
+      await actions.attendedTransfer(callId, body);
       return NO_CONTENT;
-    }
-  },
-  hold: {
-    fields: ['actorUserId'],
-    run: async (actions, callId, body) => {
-      await actions.hold(callId, body as HoldRequest);
+    }),
+  hold: callId =>
+    route(holdRequestSchema, async (actions, body) => {
+      await actions.hold(callId, body);
       return NO_CONTENT;
-    }
-  },
-  resume: {
-    fields: ['actorUserId'],
-    run: async (actions, callId, body) => {
-      await actions.resume(callId, body as HoldRequest);
+    }),
+  resume: callId =>
+    route(holdRequestSchema, async (actions, body) => {
+      await actions.resume(callId, body);
       return NO_CONTENT;
-    }
-  },
-  decline: {
-    fields: ['actorUserId'],
-    run: (actions, callId, body) => {
-      actions.decline(callId, body as DeclineRequest);
+    }),
+  decline: callId =>
+    route(declineRequestSchema, (actions, body) => {
+      actions.decline(callId, body);
       return Promise.resolve(NO_CONTENT);
-    }
-  }
+    })
 };
 
 /** `POST /internal/calls` (§10.2 "Click-to-dial"): a refused originate answers 409 with its
  * cause, `noRegisteredDevice`, else 201 with the call's id. */
-export const ORIGINATE_ROUTE: ActionRoute = {
-  fields: ['userId', 'target', 'actorUserId', 'requestId'],
-  // The call's own CLIR (§9.4 "Anonymous calls (CLIR)").
-  flags: ['clir'],
-  run: async (actions, body) => {
-    const result = await actions.originate(body as OriginateRequest);
+export const ORIGINATE_ROUTE: ActionRoute = route(
+  originateRequestSchema,
+  async (actions, body) => {
+    const result = await actions.originate(body);
     if ('error' in result) {
       throw new ActionError(
         HTTP_CONFLICT,
@@ -135,4 +118,4 @@ export const ORIGINATE_ROUTE: ActionRoute = {
     }
     return { status: HTTP_CREATED, body: result };
   }
-};
+);

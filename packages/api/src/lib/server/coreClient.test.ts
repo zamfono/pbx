@@ -67,7 +67,7 @@ describe('createCoreClient', () => {
     ).resolves.toEqual({ callId: 'c1' });
   });
 
-  it('originate reports noRegisteredDevice on a 409 naming that cause', async () => {
+  it("originate rejects with core's refusal on a 409 naming its cause", async () => {
     const fetchFn = vi.fn().mockResolvedValue(
       jsonResponse(409, {
         type: 'about:blank',
@@ -85,7 +85,10 @@ describe('createCoreClient', () => {
         actorUserId: 'u1',
         requestId: 'r1'
       })
-    ).resolves.toEqual({ error: 'noRegisteredDevice' });
+    ).rejects.toMatchObject({
+      status: 409,
+      body: { detail: 'noRegisteredDevice' }
+    });
   });
 
   it('pushes MWI for a mailbox', async () => {

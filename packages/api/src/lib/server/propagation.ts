@@ -9,7 +9,7 @@ import path from 'node:path';
 import * as env from '$app/env/private';
 import pino, { type Logger } from 'pino';
 
-import type { Db, ReloadKind } from '@zamfono/shared';
+import { reloadKindSchema, type Db, type ReloadKind } from '@zamfono/shared';
 
 import { getCoreClient } from './coreClient.js';
 import { recordConfigPropagationFailure } from './metricsCounters.js';
@@ -23,7 +23,7 @@ import { loadRenderInput } from './renderInput.js';
 import { keyringFromEnv } from './secretbox.js';
 
 // Every module the render feeds (§9.1): PJSIP, the dialplan's hints include, `res_musiconhold`.
-const ALL_RELOAD_KINDS: ReloadKind[] = ['pjsip', 'dialplan', 'moh'];
+const ALL_RELOAD_KINDS: ReloadKind[] = [...reloadKindSchema.options];
 // The retry of an owed propagation (§3.1): 5 s after the failure, doubling up to a minute.
 const RETRY_FIRST_MS = 5_000;
 const RETRY_MAX_MS = 60_000;

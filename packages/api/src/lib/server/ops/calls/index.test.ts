@@ -10,6 +10,7 @@ import {
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { stubCoreClient } from '#lib/server/coreClientStub.js';
+import { CoreRequestError } from '#lib/server/coreHttp.js';
 import { handleRest } from '#lib/server/rest.js';
 import { asRun, makeTestDb, seedSettings } from '#lib/server/testDb.js';
 
@@ -17,6 +18,12 @@ import { runOperation } from '../runner.js';
 import { type Actor } from '../types.js';
 
 import './index.js';
+
+// `core` refusing an originate for a user with no registered device (`internal/actionTable.ts`).
+const NO_REGISTERED_DEVICE = new CoreRequestError('http://core.test', 409, {
+  title: 'no registered device',
+  detail: 'noRegisteredDevice'
+});
 
 const anna: Actor = { id: 'u1', name: 'Anna', role: 'user' };
 
@@ -210,7 +217,7 @@ describe('calls', () => {
     const db = await makeTestDb();
     vi.mocked(getCoreClient).mockReturnValue(
       stubCoreClient({
-        originate: () => Promise.resolve({ error: 'noRegisteredDevice' })
+        originate: () => Promise.reject(NO_REGISTERED_DEVICE)
       })
     );
     await expect(
@@ -227,7 +234,7 @@ describe('calls', () => {
     const db = await makeTestDb();
     vi.mocked(getCoreClient).mockReturnValue(
       stubCoreClient({
-        originate: () => Promise.resolve({ error: 'noRegisteredDevice' })
+        originate: () => Promise.reject(NO_REGISTERED_DEVICE)
       })
     );
     const response = await handleRest(
@@ -245,7 +252,7 @@ describe('calls', () => {
     );
     await expect(response.json()).resolves.toEqual({
       type: 'about:blank',
-      title: 'no device is registered for this user',
+      title: 'no registered device',
       status: 409,
       detail: 'noRegisteredDevice'
     });

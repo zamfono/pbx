@@ -7,9 +7,8 @@
 import type http from 'node:http';
 
 import {
+  configChangedRequestSchema,
   HTTP_NO_CONTENT,
-  isRecord,
-  type ConfigChangedRequest,
   type ReloadKind
 } from '@zamfono/shared';
 
@@ -23,17 +22,6 @@ const RELOAD_MODULES: Record<ReloadKind, AsteriskModule> = {
   dialplan: 'pbx_config',
   moh: 'res_musiconhold'
 };
-
-function isConfigChangedRequest(body: unknown): body is ConfigChangedRequest {
-  return (
-    isRecord(body) &&
-    Array.isArray(body.reload) &&
-    body.reload.every(
-      (kind: unknown) =>
-        typeof kind === 'string' && Object.hasOwn(RELOAD_MODULES, kind)
-    )
-  );
-}
 
 /** `presence.ts`'s `Presence`, as far as a config change needs it. */
 export type PresenceRefresh = { refreshAll: () => Promise<void> };
@@ -75,14 +63,14 @@ export async function handleConfigChanged(
   if (parsed === null) {
     return;
   }
-  const { body } = parsed;
-  if (!isConfigChangedRequest(body)) {
+  const body = configChangedRequestSchema.safeParse(parsed.body);
+  if (!body.success) {
     respondInvalidBody(response);
     return;
   }
   deps.cache.invalidate();
   await Promise.all(
-    body.reload.map(kind =>
+    body.data.reload.map(kind =>
       deps.ari.asterisk.reloadModule(RELOAD_MODULES[kind])
     )
   );

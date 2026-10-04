@@ -78,6 +78,9 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
+- `calls.originate` (`POST /calls`) refused for a user with no registered device answers the
+  problem title `no registered device`, as `calls.pickup` does; the `detail` stays
+  `noRegisteredDevice`.
 - Only an owner may reset an owner's password (`users.resetPassword`) or change an owner's e-mail
   (`users.update`); an admin gets 403, so an admin can no longer take over an owner account. A
   link from `users.resetPassword` is now valid for 7 days, like the setup link of a new user,
