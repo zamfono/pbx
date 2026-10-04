@@ -5,6 +5,7 @@ import { makeTestDb, seedSettings } from '#lib/server/testDb.js';
 import {
   instantInput,
   tenantInstantReader,
+  toStoredEnd,
   toStoredInstant
 } from './instantInput.js';
 
@@ -13,6 +14,8 @@ describe('instantInput', () => {
     ['2026-10-01T12:00:00+02:00', '2026-10-01T10:00:00.000Z'],
     ['2026-10-01T12:00:00-05:30', '2026-10-01T17:30:00.000Z'],
     ['2026-10-01T12:00:00Z', '2026-10-01T12:00:00.000Z'],
+    ['2026-10-01T12:00Z', '2026-10-01T12:00:00.000Z'],
+    ['2026-10-01T12:00+02:00', '2026-10-01T10:00:00.000Z'],
     ['2026-10-01T12:00:00.5Z', '2026-10-01T12:00:00.500Z'],
     ['2026-10-01T12:00:00.123Z', '2026-10-01T12:00:00.123Z'],
     ['2026-10-01T12:00:00', '2026-10-01T10:00:00.000Z'],
@@ -62,10 +65,30 @@ describe('instantInput', () => {
     '2026-10-01T12:00:00 02:00',
     '2026-10-01T12:00:00+0200',
     '2026-02-30T00:00:00Z',
+    '2026-02-30',
+    '2026-10-01T25:00',
+    '2026-10-01T12:00:00.1234567891Z',
+    '2026-10-01T12:00:00Z[Europe/Berlin]',
+    '2026-10-01+02:00',
+    '2026-10',
     '1790850856445'
   ])('rejects %j', value => {
     expect(instantInput.safeParse(value).success).toBe(false);
   });
+});
+
+describe('toStoredEnd', () => {
+  it.each([
+    ['2026-10-01', 'Europe/Berlin', '2026-10-01T22:00:00.000Z'],
+    ['2026-10-25', 'Europe/Berlin', '2026-10-25T23:00:00.000Z'],
+    ['2026-10-01T12:00', 'Europe/Berlin', '2026-10-01T10:00:00.000Z'],
+    ['2026-10-01T12:00Z', 'Europe/Berlin', '2026-10-01T12:00:00.000Z']
+  ])(
+    'ends the range %s in %s, exclusive, at %s: a date alone at the next midnight',
+    (value, timeZone, end) => {
+      expect(toStoredEnd(value, timeZone)).toBe(end);
+    }
+  );
 });
 
 describe('tenantInstantReader', () => {
@@ -83,8 +106,9 @@ describe('tenantInstantReader', () => {
     const unset = await tenantInstantReader(unsetDb);
     const vienna = await tenantInstantReader(viennaDb);
 
-    expect(unset('2026-10-01T12:00')).toBe('2026-10-01T12:00:00.000Z');
-    expect(vienna('2026-10-01T12:00')).toBe('2026-10-01T10:00:00.000Z');
-    expect(vienna('2026-10-01T12:00Z')).toBe('2026-10-01T12:00:00.000Z');
+    expect(unset.start('2026-10-01T12:00')).toBe('2026-10-01T12:00:00.000Z');
+    expect(vienna.start('2026-10-01T12:00')).toBe('2026-10-01T10:00:00.000Z');
+    expect(vienna.start('2026-10-01T12:00Z')).toBe('2026-10-01T12:00:00.000Z');
+    expect(vienna.end('2026-10-01')).toBe('2026-10-01T22:00:00.000Z');
   });
 });

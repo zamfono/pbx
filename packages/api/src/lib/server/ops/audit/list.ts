@@ -51,7 +51,7 @@ const inputSchema = z
     to: instantInput
       .optional()
       .describe(
-        "Only entries written at or before this ISO 8601 time, any offset (none: the tenant's time zone)."
+        "Only entries written before this ISO 8601 time, any offset (none: the tenant's time zone), or before the end of this date."
       ),
     state: z
       .enum(STATES)
@@ -83,10 +83,10 @@ export const list = defineOperation({
       input.cursor === undefined
         ? undefined
         : decodeIdCursor(ctx.operation, input.cursor);
-    const toStoredInstant = await tenantInstantReader(ctx.db);
+    const instants = await tenantInstantReader(ctx.db);
     const from =
-      input.from === undefined ? undefined : toStoredInstant(input.from);
-    const to = input.to === undefined ? undefined : toStoredInstant(input.to);
+      input.from === undefined ? undefined : instants.start(input.from);
+    const to = input.to === undefined ? undefined : instants.end(input.to);
     let query = ctx.db.selectFrom('auditLog').selectAll();
     if (input.entityKind !== undefined) {
       query = query.where('entityKind', '=', input.entityKind);
@@ -110,7 +110,7 @@ export const list = defineOperation({
       query = query.where('createdAt', '>=', from);
     }
     if (to !== undefined) {
-      query = query.where('createdAt', '<=', to);
+      query = query.where('createdAt', '<', to);
     }
     if (state === 'live') {
       query = query.where('undoneAt', 'is', null);

@@ -36,7 +36,7 @@ export const snapshot = defineOperation({
   run: async (ctx, input) => {
     const offset = decodeOffsetCursor(ctx.operation, input.cursor);
     const { limit } = input;
-    const toStoredInstant = await tenantInstantReader(ctx.db);
+    const instants = await tenantInstantReader(ctx.db);
     let ranked = ctx.db
       .selectFrom('presenceLog')
       .select(eb => [
@@ -55,7 +55,7 @@ export const snapshot = defineOperation({
           )
           .as('rank')
       ])
-      .where('since', '<=', toStoredInstant(input.at));
+      .where('since', '<=', instants.start(input.at));
     if (input.userId !== undefined) {
       ranked = ranked.where('userId', '=', input.userId);
     }

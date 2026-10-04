@@ -120,6 +120,14 @@ why the specified behaviour changed; the commit history, how.
   of audit entries, DIDs, number blocks, blocked numbers, webhooks and backup targets and runs
   already did; without `limit` a page still holds 50. Every list also refuses with 422 a `cursor`
   it did not hand out itself, where most of them answered with a wrong page or a 500.
+- Breaking: the time filters `from` and `to` of `GET /calls`, `GET /audit` and `GET /stats` are
+  one range from `from` up to but not including `to`; a date alone as `to` covers that whole day,
+  so `from=2026-10-01&to=2026-10-01` is October 1st, where calls and audit entries at exactly
+  `to` used to count and a date ended at its midnight. `GET /stats` takes local times and dates
+  like the other filters, and every filter accepts a time without seconds also with an offset
+  (`2026-10-01T09:00Z`). The statistics count each call once, a transfer leg no longer as a call
+  of its own; with `ringGroupId` they count each offer to the group, a call transferred into it
+  included, answered only when a member took it.
 - Breaking: the mail templates, the search, the presence snapshot, the parked calls and the live
   calls are paged like every other list: they take `limit` and `cursor` and return `nextCursor`,
   where they refused `limit` with 422 or returned everything at once. A cursor names the list

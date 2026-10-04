@@ -7,6 +7,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §9.4 Forwarded calls, §10.1 steps 2-3.** A menu hop of an internal call names the tenant's main number as its `REDIRECTING` number, as its `Diversion` entry already did. The once-per-call evaluation covers the tenant's scope too. Opening hours apply to inbound calls only, forwarded ones included.
 *Why:* the menu hop of an internal call had no `REDIRECTING` number and was dropped from the call's hops; a tenant-wide OOO rule was applied again at the target it forwarded to; step 3 said "forwarded calls" though hours describe reachability from outside.
+**2026-10-04 · §10.3 Call history, Statistics.** Product-owner decisions (time filters, stats counting): every time range is half-open, `[from, to)`, and a date alone as `to` covers that whole day; `GET /stats` reads `from` and `to` like the other time filters and states its 10080-bucket cap. Its four metrics are defined: unfiltered, each top-level call once; with `ringGroupId`, each offer to that group, transfers into it included, answered when a member took it.
+*Why:* "Half-open, date = day (Recommended)" and "Caller view + group offers (Recommended)"; `to` was inclusive for calls and audit but exclusive for stats, so `to=2026-10-03` left out the named day, stats refused local times though its buckets are local, and a transferred call counted twice.
+
 **2026-10-04 · §10.2 Search.** A search hit's `matched` names the field as the hit's resource names it on the wire: a user's `extension`, a contact's `displayName` and `phones`.
 *Why:* `matched` said `ext`, `name` and `phone`, names no resource has, so a client could not point at the field that hit.
 

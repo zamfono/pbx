@@ -4,6 +4,7 @@ import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
 import { readTenantTimeZone } from '#lib/server/tenantTimeZone.js';
 
+import { instantInput, toStoredEnd, toStoredInstant } from '../instantInput.js';
 import { defineOperation, OpError } from '../types.js';
 import {
   BUCKET_UNITS,
@@ -15,9 +16,9 @@ import {
   type StatsCallRow
 } from './_shared.js';
 
-// The widest series one request may ask for: a week at minute resolution, and so a year at hour
-// resolution. §10.3 states no bound, but every bucket is materialised in memory, so an unbounded
-// range (1970 to 2100 by minute, some 68 million buckets) would stall `api` for every caller.
+// The widest series one request may ask for (§10.3): a week at minute resolution, and so a year
+// at hour resolution. Every bucket is materialised in memory, so an unbounded range (1970 to 2100
+// by minute, some 68 million buckets) would stall `api` for every caller.
 const MAX_BUCKETS = 10_080;
 
 const inputSchema = z
@@ -25,14 +26,14 @@ const inputSchema = z
     metric: z
       .enum(METRICS)
       .describe(
-        'answerRate: answered of answered, missed and busy calls (0 to 1); ringToAnswer and avgCallLength: mean seconds; callVolume: the call count.'
+        'answerRate: answered of answered, missed and busy calls (0 to 1); ringToAnswer: mean seconds from start to answer; avgCallLength: mean seconds from answer to end; callVolume: the call count. Each call counts once; with ringGroupId, each offer to the group, answered when a member took it.'
       ),
-    from: z.iso
-      .datetime({ offset: true })
-      .describe('Start of the range, inclusive, ISO 8601 with offset.'),
-    to: z.iso
-      .datetime({ offset: true })
-      .describe('End of the range, exclusive, ISO 8601 with offset.'),
+    from: instantInput.describe(
+      "Start of the range, inclusive: an ISO 8601 time, any offset (none: the tenant's time zone), or a date (its midnight)."
+    ),
+    to: instantInput.describe(
+      "End of the range, exclusive: an ISO 8601 time, any offset (none: the tenant's time zone), or a date (the range covers that day)."
+    ),
     bucket: z
       .enum(BUCKET_UNITS)
       .describe(
@@ -41,7 +42,9 @@ const inputSchema = z
     ringGroupId: z
       .string()
       .optional()
-      .describe("Only this ring group's calls; left out, every call.")
+      .describe(
+        'Only the offers to this ring group, transfers into it included; left out, every call.'
+      )
   })
   .strict();
 
@@ -65,8 +68,10 @@ function groupByBucket(
 }
 
 /**
- * `GET /stats` (§10.3 "Statistics"): one metric bucketed over `[from, to)` by `calls.started_at`,
- * optionally scoped to one ring group.
+ * `GET /stats` (§10.3 "Statistics"): one metric bucketed over `[from, to)` by `calls.started_at`.
+ * Without a ring group each call counts once, as its top-level row, answered by its status; with
+ * one, each row offering a call to that group, a transfer leg into it included, answered when a
+ * member took it.
  */
 export const query = defineOperation({
   name: 'stats.query',
@@ -76,11 +81,9 @@ export const query = defineOperation({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    // `calls.started_at` is stored in UTC (§11.1), and compared as a string below, so an input
-    // carrying an offset is brought to the same form first.
-    const from = new Date(input.from).toISOString();
-    const to = new Date(input.to).toISOString();
     const timeZone = await readTenantTimeZone(ctx.db);
+    const from = toStoredInstant(input.from, timeZone);
+    const to = toStoredEnd(input.to, timeZone);
     const starts = bucketStarts(from, to, input.bucket, timeZone, MAX_BUCKETS);
     if (starts.length > MAX_BUCKETS) {
       throw new OpError(
@@ -90,15 +93,29 @@ export const query = defineOperation({
     }
     let callsQuery = ctx.db
       .selectFrom('calls')
-      .select(['startedAt', 'answeredAt', 'endedAt', 'status'])
+      .select([
+        'startedAt',
+        'answeredAt',
+        'answeredByUserId',
+        'endedAt',
+        'status'
+      ])
       // A call in progress has a placeholder row, not an outcome yet (§10.1 "Call aggregate").
       .where('endedAt', 'is not', null)
       .where('startedAt', '>=', from)
       .where('startedAt', '<', to);
-    if (input.ringGroupId !== undefined) {
-      callsQuery = callsQuery.where('ringGroupId', '=', input.ringGroupId);
-    }
-    const rows = await callsQuery.execute();
+    const { ringGroupId } = input;
+    callsQuery =
+      ringGroupId === undefined
+        ? callsQuery.where('parentCallId', 'is', null)
+        : callsQuery.where('ringGroupId', '=', ringGroupId);
+    const rows = (await callsQuery.execute()).map(row => ({
+      ...row,
+      answered:
+        ringGroupId === undefined
+          ? row.status === 'answered'
+          : row.answeredByUserId !== null
+    }));
     const byBucket = groupByBucket(rows, input.bucket, timeZone);
     const buckets = starts.map(startMs => ({
       start: new Date(startMs).toISOString(),

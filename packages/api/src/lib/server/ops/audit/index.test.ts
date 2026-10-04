@@ -400,7 +400,7 @@ describe('audit.list time range', () => {
     const result = (await runOperation(
       db,
       'audit.list',
-      { from: '2026-10-01T12:00:00+02:00', to: '2026-10-01T10:00:00Z' },
+      { from: '2026-10-01T12:00:00+02:00', to: '2026-10-01T11:00:00Z' },
       asConfirmedRun()
     )) as { items: { operation: string }[] };
     const attempt = runOperation(
@@ -414,14 +414,15 @@ describe('audit.list time range', () => {
     await expect(attempt).rejects.toMatchObject({ status: 422 });
   });
 
-  it('reads a `from` and `to` without an offset, and a date alone, in the tenant zone', async () => {
+  it('reads a date alone in the tenant zone, a `to` date covering the whole day', async () => {
     const db = await makeTestDb();
     await seedSettings(db, { timezone: 'Europe/Berlin' });
     const createdAts = [
       '2026-09-30T21:59:59.999Z',
       '2026-09-30T22:00:00.000Z',
       '2026-10-01T10:00:00.000Z',
-      '2026-10-01T10:00:00.001Z'
+      '2026-10-01T21:59:59.999Z',
+      '2026-10-01T22:00:00.000Z'
     ];
     await db
       .insertInto('auditLog')
@@ -446,13 +447,14 @@ describe('audit.list time range', () => {
     const result = (await runOperation(
       db,
       'audit.list',
-      { from: '2026-10-01', to: '2026-10-01T12:00:00' },
+      { from: '2026-10-01', to: '2026-10-01' },
       asConfirmedRun()
     )) as { items: { operation: string }[] };
 
     expect(result.items.map(item => item.operation).sort()).toEqual([
       'op.1',
-      'op.2'
+      'op.2',
+      'op.3'
     ]);
   });
 });

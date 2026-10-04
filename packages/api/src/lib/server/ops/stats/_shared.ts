@@ -76,14 +76,35 @@ export function bucketStarts(
   return starts;
 }
 
+/** A call `stats.query` counts; `answered` as its view defines it (§10.3 "Statistics"). */
 export type StatsCallRow = {
   startedAt: string;
   answeredAt: string | null;
   endedAt: string | null;
   status: string;
+  answered: boolean;
 };
 
-/** §10.3 "Statistics": one metric's value over a bucket's calls, or `null` with nothing to divide. */
+type AnsweredRow = StatsCallRow & { answeredAt: string; endedAt: string };
+
+/** The mean of `durationMs` over `rows` in seconds, or `null` without rows. */
+function meanSeconds(
+  rows: AnsweredRow[],
+  durationMs: (row: AnsweredRow) => number
+): number | null {
+  if (rows.length === 0) {
+    return null;
+  }
+  const totalMs = rows.reduce((sum, row) => sum + durationMs(row), 0);
+  return totalMs / rows.length / MS_PER_SECOND;
+}
+
+/**
+ * §10.3 "Statistics": one metric's value over a bucket's calls, or `null` with nothing to divide.
+ * `answerRate` is the answered among the answered, missed and busy; `ringToAnswer` and
+ * `avgCallLength` are the mean seconds from start to answer and from answer to end of the
+ * answered.
+ */
 export function metricValue(
   rows: StatsCallRow[],
   metric: Metric
@@ -92,37 +113,24 @@ export function metricValue(
     return rows.length;
   }
   if (metric === 'answerRate') {
-    const answered = rows.filter(row => row.status === 'answered').length;
-    const missed = rows.filter(row => row.status === 'missed').length;
-    const busy = rows.filter(row => row.status === 'busy').length;
-    const denominator = answered + missed + busy;
-    return denominator === 0 ? null : answered / denominator;
-  }
-  if (metric === 'ringToAnswer') {
-    const answered = rows.filter(
-      (row): row is StatsCallRow & { answeredAt: string } =>
-        row.answeredAt !== null
+    const offered = rows.filter(row =>
+      ['answered', 'missed', 'busy'].includes(row.status)
     );
-    if (answered.length === 0) {
-      return null;
-    }
-    const totalMs = answered.reduce(
-      (sum, row) =>
-        sum + (Date.parse(row.answeredAt) - Date.parse(row.startedAt)),
-      0
-    );
-    return totalMs / answered.length / MS_PER_SECOND;
+    return offered.length === 0
+      ? null
+      : offered.filter(row => row.answered).length / offered.length;
   }
-  const finished = rows.filter(
-    (row): row is StatsCallRow & { answeredAt: string; endedAt: string } =>
-      row.answeredAt !== null && row.endedAt !== null
+  const answered = rows.filter(
+    (row): row is AnsweredRow =>
+      row.answered && row.answeredAt !== null && row.endedAt !== null
   );
-  if (finished.length === 0) {
-    return null;
-  }
-  const totalMs = finished.reduce(
-    (sum, row) => sum + (Date.parse(row.endedAt) - Date.parse(row.answeredAt)),
-    0
-  );
-  return totalMs / finished.length / MS_PER_SECOND;
+  return metric === 'ringToAnswer'
+    ? meanSeconds(
+        answered,
+        row => Date.parse(row.answeredAt) - Date.parse(row.startedAt)
+      )
+    : meanSeconds(
+        answered,
+        row => Date.parse(row.endedAt) - Date.parse(row.answeredAt)
+      );
 }

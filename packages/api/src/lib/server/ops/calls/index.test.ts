@@ -107,7 +107,7 @@ describe('calls', () => {
     await expect(attempt).rejects.toMatchObject({ status: 404 });
   });
 
-  it('calls.list compares `from` with an offset as the instant it names, and `to` without one in the tenant zone', async () => {
+  it('calls.list compares `from` with an offset as the instant it names, and `to` without one in the tenant zone, exclusive', async () => {
     const db = await makeTestDb();
     await seedSettings(db, { timezone: 'Europe/Berlin' });
     const ids = [newId(), newId(), newId()];
@@ -138,9 +138,7 @@ describe('calls', () => {
       asRun()
     )) as { items: { id: string }[] };
 
-    expect(result.items.map(item => item.id).sort()).toEqual(
-      [ids[1], ids[2]].sort()
-    );
+    expect(result.items.map(item => item.id)).toEqual([ids[1]]);
   });
 
   it('live: true returns the core snapshot, filtered to own calls for a user', async () => {

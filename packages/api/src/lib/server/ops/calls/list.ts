@@ -30,7 +30,7 @@ const inputSchema = z
     to: instantInput
       .optional()
       .describe(
-        "History only: calls started at or before this ISO 8601 time, any offset (none: the tenant's time zone); a time, not a number."
+        "History only: calls started before this ISO 8601 time, any offset (none: the tenant's time zone), or before the end of this date; a time, not a number."
       ),
     userId: z
       .string()
@@ -145,10 +145,10 @@ export const list = defineOperation({
       input.cursor === undefined
         ? undefined
         : decodeIdCursor(ctx.operation, input.cursor);
-    const toStoredInstant = await tenantInstantReader(ctx.db);
+    const instants = await tenantInstantReader(ctx.db);
     const from =
-      input.from === undefined ? undefined : toStoredInstant(input.from);
-    const to = input.to === undefined ? undefined : toStoredInstant(input.to);
+      input.from === undefined ? undefined : instants.start(input.from);
+    const to = input.to === undefined ? undefined : instants.end(input.to);
     let query = ctx.db
       .selectFrom('calls')
       .selectAll()
@@ -166,7 +166,7 @@ export const list = defineOperation({
       query = query.where('startedAt', '>=', from);
     }
     if (to !== undefined) {
-      query = query.where('startedAt', '<=', to);
+      query = query.where('startedAt', '<', to);
     }
     const { userId } = input;
     if (userId !== undefined) {
