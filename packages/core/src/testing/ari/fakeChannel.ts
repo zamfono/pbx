@@ -119,13 +119,21 @@ export function routeMisc(
   return { status: HTTP_NOT_FOUND, body: { message: 'Not found' } };
 }
 
-/** A `ContactStatusChange` for `sipUsername`'s AOR, as Asterisk fires it on registration (§9.3). */
-export function contactReachable(sipUsername: string): AriEvent {
+/** The `PeerStatusChange` Asterisk fires for `sipUsername`'s endpoint: `Reachable` when its AOR's
+ * first contact becomes reachable, `Unreachable` when its last one stops being reachable (§9.3). */
+export function peerStatusChange(
+  sipUsername: string,
+  peerStatus: 'Reachable' | 'Unreachable' = 'Reachable'
+): AriEvent {
   return {
-    type: 'ContactStatusChange',
+    type: 'PeerStatusChange',
     timestamp: new Date().toISOString(),
     application: 'zamfono',
-    contact_info: { aor: sipUsername, contact_status: 'Reachable' }
+    endpoint: {
+      ...fakeEndpoint(sipUsername),
+      state: peerStatus === 'Reachable' ? 'online' : 'offline'
+    },
+    peer: { peer_status: peerStatus }
   };
 }
 

@@ -9,7 +9,10 @@ import type { CdrWriter } from '../cdr.js';
 import type { Presence } from '../presence.js';
 import { defaultPrompt } from '../prompts.js';
 import type { FakeAri } from '../testing/ari/fake.js';
-import { defaultChannel } from '../testing/ari/fakeChannel.js';
+import {
+  defaultChannel,
+  peerStatusChange
+} from '../testing/ari/fakeChannel.js';
 import { isPlacement } from '../testing/ari/fakeDial.js';
 import { onEvents } from '../testing/busEvents.js';
 import {
@@ -182,12 +185,7 @@ describe('features', () => {
       .select('userId')
       .where('sipUsername', '=', sipUsername)
       .executeTakeFirstOrThrow();
-    fakeAri.emit({
-      type: 'ContactStatusChange',
-      timestamp: nowIso(),
-      application: 'zamfono',
-      contact_info: { aor: sipUsername, contact_status: 'Reachable' }
-    });
+    fakeAri.emit(peerStatusChange(sipUsername));
     // `Presence` handles the event off the WebSocket; its refresh PUTs the hint and then logs the
     // user's first status past `offline` (§10.2 "Presence and BLF").
     await eventually(async () => {

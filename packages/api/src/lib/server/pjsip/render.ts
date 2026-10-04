@@ -28,8 +28,9 @@ function assertSafeDevice(device: Device, ringGroupIds: string[]): void {
 }
 
 // PJSIP OPTIONS-probes a registered device at this interval. A contact nobody probes keeps the
-// status `NonQualified`, and the core reads a device as registered from the `Reachable` its
-// `ContactStatusChange` carries (§9.3), so the ring reaches only qualified devices. The probe is
+// status `NonQualified`, and the core reads a device as registered from its endpoint's
+// `PeerStatusChange`, `Reachable` while a contact is (§9.3), so the ring reaches only
+// qualified devices. The probe is
 // also what holds a NAT binding open between calls, which a softphone on a mobile network needs.
 const DEVICE_QUALIFY_FREQUENCY_S = 30;
 

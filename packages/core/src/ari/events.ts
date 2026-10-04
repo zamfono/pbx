@@ -1,5 +1,5 @@
 // ARI's event stream as core reads it (§3, §9.2): the events it handles, typed once.
-import type { Channel, Logger } from './types.js';
+import type { Channel, Endpoint, Logger } from './types.js';
 
 /** ARI's `result` of a bridge transfer. */
 type TransferResult = 'Fail' | 'Invalid' | 'Not Permitted' | 'Success';
@@ -68,6 +68,11 @@ type KnownAriEvent =
   | (EventBase & {
       type: 'ContactStatusChange';
       contact_info: { aor: string; contact_status: string };
+    })
+  | (EventBase & {
+      type: 'PeerStatusChange';
+      endpoint: Omit<Endpoint, 'technology'> & { technology: string };
+      peer: { peer_status: string };
     });
 
 /** One frame of the ARI events WebSocket stream: one of the events core handles, or any other

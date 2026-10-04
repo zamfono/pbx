@@ -104,6 +104,7 @@ export default tseslint.config(
             'destination_link_second_leg',
             'destination_type',
             'is_external',
+            'peer_status',
             'replace_channel',
             'startup_time',
             'tech_cause',

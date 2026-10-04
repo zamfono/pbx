@@ -6,9 +6,9 @@ import type { RtpQos } from '#src/qosFigures.js';
 
 import { routeBridge, type Bridge } from './fakeBridge.js';
 import {
-  contactReachable,
   defaultChannel,
   fakeEndpoint,
+  peerStatusChange,
   readChannelVariable,
   routeMisc,
   scheduleRecordingFinished,
@@ -72,12 +72,12 @@ export class FakeAri {
 
   /**
    * Reports `sipUsername` as online, as a phone that has REGISTERed would appear: both in the
-   * endpoint list a boot resync reads and as the `ContactStatusChange` Asterisk fires at the
+   * endpoint list a boot resync reads and as the `PeerStatusChange` Asterisk fires at the
    * moment of registration, so a listener that is already running sees it without a resync.
    */
   registerEndpoint(sipUsername: string): void {
     this.endpoints.push(fakeEndpoint(sipUsername));
-    this.emit(contactReachable(sipUsername));
+    this.emit(peerStatusChange(sipUsername));
   }
   failOriginate: null | { status: number } = null;
   failDial: null | { status: number; count?: number } = null;

@@ -1,7 +1,7 @@
 /**
  * Presence and BLF (§9.3 "BLF and presence"; §10.2 "Presence and BLF"): per-user device
  * state (`Stasis:presence-<ext>` hints) and presence status derived from registrations (ARI
- * `ContactStatusChange`, `endpoints.list` at boot) and call state, appended to `presence_log` and
+ * `PeerStatusChange`, `endpoints.list` at boot) and call state, appended to `presence_log` and
  * emitted on `/events` only on an actual status transition. `setHint` also carries the ring-group
  * and parking-slot hints of §9.3, whose ext is already known to their own callers. The hint and
  * status a user's state folds into are `presenceState.ts`'s; `presenceHints.ts` delivers the hints
@@ -51,9 +51,12 @@ export class Presence {
   private readonly hints: HintPusher;
 
   /**
-   * Whether `sipUsername`'s AOR currently has a reachable contact (§9.3). The ring skips a device
-   * that is not registered, and the `offline` rule of §10.1 step 4 counts the same devices, so
-   * both read this one view rather than the `devices` rows, which say only that a device exists.
+   * Whether `sipUsername`'s AOR currently has a reachable contact (§9.3): its endpoint's state,
+   * which Asterisk keeps `online` while any of the AOR's contacts is reachable, so a device whose
+   * app is registered on several phones stays registered while one of them expires. The ring
+   * skips a device that is not registered, and the `offline` rule of §10.1 step 4 counts the same
+   * devices, so both read this one view rather than the `devices` rows, which say only that a
+   * device exists.
    */
   isRegistered(sipUsername: string): boolean {
     return this.online.get(sipUsername) === true;
@@ -84,9 +87,9 @@ export class Presence {
     this.deps = deps;
     this.hints = new HintPusher(deps.ari);
     this.deps.ari.on('event', (event: AriEvent) => {
-      if (isEvent(event, 'ContactStatusChange')) {
-        this.handleContactStatusChange(event).catch(
-          logFailure(this.deps.log, 'presence contact status change')
+      if (isEvent(event, 'PeerStatusChange')) {
+        this.handlePeerStatusChange(event).catch(
+          logFailure(this.deps.log, 'presence peer status change')
         );
       }
     });
@@ -112,21 +115,22 @@ export class Presence {
     );
   }
 
-  private async handleContactStatusChange(
-    event: AriEventOf<'ContactStatusChange'>
+  /** Follows the endpoint state Asterisk publishes as `PeerStatusChange` on each transition:
+   * `Reachable` as the AOR's first contact becomes reachable, `Unreachable` once none is. */
+  private async handlePeerStatusChange(
+    event: AriEventOf<'PeerStatusChange'>
   ): Promise<void> {
-    const info = event.contact_info;
+    const { resource } = event.endpoint;
     const snapshot = await this.deps.cache.get();
-    const device = snapshot.devices.find(row => row.sipUsername === info.aor);
+    const device = snapshot.devices.find(row => row.sipUsername === resource);
     if (device === undefined) {
-      // Not one of ours: a trunk contact, matched instead by `TrunkState`.
+      // Not one of ours: a trunk's endpoint, followed instead by `TrunkState`.
       return;
     }
-    const reachable = info.contact_status === 'Reachable';
-    this.online.set(info.aor, reachable);
-    // `last_registered_at` is when the device last became reachable (§3, §11): Asterisk publishes
-    // `ContactStatusChange` only when a contact's status changes (`res_pjsip`'s OPTIONS
-    // qualifier), so a REGISTER refresh of a contact already reachable raises no event to stamp.
+    const reachable = event.peer.peer_status === 'Reachable';
+    this.online.set(resource, reachable);
+    // `last_registered_at` is when the device last became reachable (§3, §11): a REGISTER refresh
+    // of a device already reachable changes no endpoint state, so it has nothing to stamp.
     if (reachable) {
       await this.deps.db
         .updateTable('devices')

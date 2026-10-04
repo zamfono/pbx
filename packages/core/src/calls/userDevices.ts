@@ -24,7 +24,7 @@ export function isUserInCall(pipeline: Pipeline, userId: string): boolean {
 
 /** `userId`'s devices that can ring (§10.1 steps 4 and 5 "offline"; §10.2 "Click-to-dial"
  * `noRegisteredDevice` and pickup): live rows whose AOR is registered. Registration is the AOR's
- * own reachability, which `Presence` tracks from `ContactStatusChange` and the boot endpoint list,
+ * own reachability, which `Presence` tracks from `PeerStatusChange` and the boot endpoint list,
  * not the user's presence status: a user on DND is not thereby unreachable. */
 export function registeredDevices(
   pipeline: Pipeline,

@@ -13,6 +13,7 @@ import { migratedTestDb } from '@zamfono/shared/testDb.js';
 import { AriClient } from '../ari/client.js';
 import { Presence } from '../presence.js';
 import { FakeAri } from '../testing/ari/fake.js';
+import { peerStatusChange } from '../testing/ari/fakeChannel.js';
 import { onEvents } from '../testing/busEvents.js';
 import { eventually } from '../testing/eventually.js';
 import {
@@ -90,12 +91,7 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
       now: nowIso
     });
     await presence.resyncOnBoot();
-    fakeAri.emit({
-      type: 'ContactStatusChange',
-      timestamp: nowIso(),
-      application: 'zamfono',
-      contact_info: { aor: 'e101-dabc', contact_status: 'Reachable' }
-    });
+    fakeAri.emit(peerStatusChange('e101-dabc'));
     await eventually(() => {
       expect(state.presence.get(userId)?.status).toBe('available');
     });

@@ -74,7 +74,7 @@ function createAmiClient(env: CoreEnv, log: Logger): AmiClient {
 }
 
 /**
- * `Presence` (§10.2 "Presence and BLF") wires itself to ARI `ContactStatusChange` in its own
+ * `Presence` (§10.2 "Presence and BLF") wires itself to ARI `PeerStatusChange` in its own
  * constructor and seeds registration state from the boot `endpoints.list` in `resyncOnBoot`;
  * `TrunkState` likewise wires itself to ARI/AMI and resyncs registration trunks from AMI at boot.
  * Both are handed to the `Pipeline` so its dial dispatch (`outboundDispatch.ts`) and feature codes

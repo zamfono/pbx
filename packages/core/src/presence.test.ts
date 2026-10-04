@@ -9,6 +9,7 @@ import { ConfigCache } from './internal/snapshot.js';
 import { StateStore } from './internal/stateStore.js';
 import { Presence } from './presence.js';
 import { FakeAri } from './testing/ari/fake.js';
+import { peerStatusChange } from './testing/ari/fakeChannel.js';
 import { eventually } from './testing/eventually.js';
 import { noopLogger } from './testing/pipelineDeps.js';
 import { seedSettings, seedUser } from './testing/seedRows.js';
@@ -101,12 +102,7 @@ describe('Presence', () => {
     expect(state.presence.get(userId)?.status).toBe('offline');
     expect(hintPuts('101').at(-1)).toEqual({ deviceState: 'UNAVAILABLE' });
 
-    fakeAri.emit({
-      type: 'ContactStatusChange',
-      timestamp: nowIso(),
-      application: 'zamfono',
-      contact_info: { aor: 'e101-dabc', contact_status: 'Reachable' }
-    });
+    fakeAri.emit(peerStatusChange('e101-dabc'));
 
     // The event is handled off the WebSocket: a config read, the hint's PUT, then the status and
     // its presence_log row, each awaited in turn.
@@ -129,12 +125,7 @@ describe('Presence', () => {
     await seedExtension(db, '102', userId);
 
     await presence.resyncOnBoot();
-    fakeAri.emit({
-      type: 'ContactStatusChange',
-      timestamp: nowIso(),
-      application: 'zamfono',
-      contact_info: { aor: 'e102-dabc', contact_status: 'Reachable' }
-    });
+    fakeAri.emit(peerStatusChange('e102-dabc'));
     await eventually(() => {
       expect(state.presence.get(userId)?.status).toBe('available');
     });
@@ -189,12 +180,7 @@ describe('Presence', () => {
     await seedDevice(db, userId, 'e103-dabc');
     await seedExtension(db, '103', userId);
     await presence.resyncOnBoot();
-    fakeAri.emit({
-      type: 'ContactStatusChange',
-      timestamp: nowIso(),
-      application: 'zamfono',
-      contact_info: { aor: 'e103-dabc', contact_status: 'Reachable' }
-    });
+    fakeAri.emit(peerStatusChange('e103-dabc'));
     await eventually(() => {
       expect(state.presence.get(userId)?.status).toBe('available');
     });
@@ -234,12 +220,7 @@ describe('Presence', () => {
     await seedDevice(db, userId, 'e105-dabc');
     await seedExtension(db, '105', userId);
     await presence.resyncOnBoot();
-    fakeAri.emit({
-      type: 'ContactStatusChange',
-      timestamp: nowIso(),
-      application: 'zamfono',
-      contact_info: { aor: 'e105-dabc', contact_status: 'Reachable' }
-    });
+    fakeAri.emit(peerStatusChange('e105-dabc'));
     await eventually(() => {
       expect(state.presence.get(userId)?.status).toBe('available');
     });
@@ -274,39 +255,53 @@ describe('Presence', () => {
     });
   });
 
-  it('counts the live registered devices, which fall when a contact becomes unreachable (§7)', async () => {
+  it('counts the live registered devices, which fall when an endpoint goes offline (§7)', async () => {
     const userId = await seedUser(db);
     await seedDevice(db, userId, 'e104-dabc');
     await seedDevice(db, userId, 'e104-dxyz');
 
-    /** One of the two devices' contacts changing state, as Asterisk reports it (§9.3). */
-    function contact(aor: string, status: string): void {
-      fakeAri.emit({
-        type: 'ContactStatusChange',
-        timestamp: nowIso(),
-        application: 'zamfono',
-        contact_info: { aor, contact_status: status }
-      });
-    }
-
-    contact('e104-dabc', 'Reachable');
-    contact('e104-dxyz', 'Reachable');
+    fakeAri.emit(peerStatusChange('e104-dabc'));
+    fakeAri.emit(peerStatusChange('e104-dxyz'));
     await eventually(async () => {
       expect(await presence.registeredDevices()).toBe(2);
     });
 
-    contact('e104-dabc', 'Unreachable');
+    fakeAri.emit(peerStatusChange('e104-dabc', 'Unreachable'));
     await eventually(async () => {
       expect(await presence.registeredDevices()).toBe(1);
     });
-    // The event's timestamp stays on the row (§3.1) without counting the device as registered.
-    await eventually(async () => {
-      const rows = await db
-        .selectFrom('devices')
-        .select('lastRegisteredAt')
-        .where('sipUsername', '=', 'e104-dabc')
-        .execute();
-      expect(rows[0]?.lastRegisteredAt).not.toBeNull();
+    // The time it became reachable stays on the row (§3.1) without counting it as registered.
+    const rows = await db
+      .selectFrom('devices')
+      .select('lastRegisteredAt')
+      .where('sipUsername', '=', 'e104-dabc')
+      .execute();
+    expect(rows[0]?.lastRegisteredAt).not.toBeNull();
+  });
+
+  it('keeps a device registered while one of its several contacts expires (§9.3)', async () => {
+    const userId = await seedUser(db);
+    await seedDevice(db, userId, 'e106-dabc');
+    await seedDevice(db, userId, 'e106-dxyz');
+    await seedExtension(db, '106', userId);
+    fakeAri.registerEndpoint('e106-dabc');
+    await presence.resyncOnBoot();
+    expect(presence.isRegistered('e106-dabc')).toBe(true);
+
+    // The app on a second phone stops answering; its first contact stays reachable, so Asterisk
+    // keeps the endpoint reachable and raises no `PeerStatusChange`.
+    fakeAri.emit({
+      type: 'ContactStatusChange',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      contact_info: { aor: 'e106-dabc', contact_status: 'Unreachable' }
     });
+    // A later event, handled in order after it: once it shows, the one before has been judged.
+    fakeAri.emit(peerStatusChange('e106-dxyz'));
+    await eventually(() => {
+      expect(presence.isRegistered('e106-dxyz')).toBe(true);
+    });
+    expect(presence.isRegistered('e106-dabc')).toBe(true);
+    expect(state.presence.get(userId)?.status).toBe('available');
   });
 });

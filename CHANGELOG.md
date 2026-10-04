@@ -273,6 +273,9 @@ why the specified behaviour changed; the commit history, how.
 - A caller who hung up while an outgoing call was still ringing had the call dialled again over
   the next host, route or emergency trunk: a 112 hung up within a second reached the next
   emergency centre with nobody on the line. Dialling now stops when the caller hangs up.
+- A user whose app is registered on several phones showed `offline` as soon as one phone's
+  registration expired, and calls to them went to the `offline` rule (often the mailbox) although
+  another phone could still ring. A device now counts as registered while any of its phones is.
 - A dialled number starting with `0` or `00` but carrying `*` or `#` after it went to the trunk
   as an E.164 number with those characters in it; it is now refused with 484 address incomplete,
   as the national number rules leave it incomplete.

@@ -24,6 +24,8 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §9.4 Route fallthrough.** A caller who hangs up ends the dialling: no further host, route or emergency trunk is tried.
 *Why:* the leg the core hangs up for the leaving caller ends like a 500 before alerting, which the fall-through rules took for a trunk failure, so a 112 was sent to the next emergency trunk after the caller had gone.
+**2026-10-04 · §3.1 Process split, §10.2 Presence and BLF, §11.2 devices.** Device registration is read from ARI `PeerStatusChange`, the endpoint state Asterisk keeps `Reachable` while any of the device's contacts is reachable, not from `ContactStatusChange`; `devices.last_registered_at` is stamped when the endpoint becomes `Reachable`.
+*Why:* a `ringotel` device takes several contacts; one contact's `ContactStatusChange` set the whole device unregistered while another was still reachable, and the boot resync already read the endpoint's state.
 
 **2026-10-03 · §6.3 compose.yaml.** The `migrate` service gets no `DB_FILE`: `/data/zamfono.sqlite3` is its own default, as it is `api`'s and `core`'s.
 *Why:* product-owner decision on internal values: "sensible defaults" in code; compose repeated the path for `migrate` alone.
