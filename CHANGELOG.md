@@ -70,6 +70,7 @@ why the specified behaviour changed; the commit history, how.
   or its user's role changes.
 - A renewed certificate and an automatic update wait until no call, voicemail or recording is in
   progress; `core` winds its calls down when stopped; webhook deliveries survive a restart.
+- `GET /api/v1/openapi.json` is served without a token.
 
 ### Removed
 

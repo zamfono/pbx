@@ -1275,7 +1275,7 @@ Every `DELETE` carries `confirm`, as do `users.erase`, `devices.rotate`, `person
 
 #### REST surface
 
-Base: `https://<host>/api/v1`. JSON only. Bearer auth: a JWT access token issued by the OAuth server, or a personal access token (§5.2). RBAC roles: `owner`, `admin`, `user` — any number of owners, at least one; only owners change roles, reset an owner's password or change an owner's e-mail (an admin gets 403), and the last owner cannot be demoted or soft-deleted.
+Base: `https://<host>/api/v1`. JSON only. Bearer auth, on every endpoint but the public OpenAPI document: a JWT access token issued by the OAuth server, or a personal access token (§5.2). RBAC roles: `owner`, `admin`, `user` — any number of owners, at least one; only owners change roles, reset an owner's password or change an owner's e-mail (an admin gets 403), and the last owner cannot be demoted or soft-deleted.
 
 The endpoints by area, as a sketch, each with the minimum role it needs:
 
@@ -1362,7 +1362,7 @@ Conventions: one casing on the wire, camelCase, for every name a client sees: pa
 - List endpoints paginate with `?limit=` (default 50, at most 200, more is refused with 422) and an opaque `?cursor=` and return `{ items, nextCursor }`, every list the same cursor form; a cursor the list did not hand out is refused with 422; errors are RFC 9457 `application/problem+json`.
 - An operation that reads from or acts through `core` (the live calls list, the parked calls, a call action and the own-scope check before it) answers `core`'s refusal with `core`'s status and reason, and any other failure of `core`, `core` not answering included, with 503; `system.info`'s `core: null` and a trunk's `unknown` status are the exceptions their entries name.
 
-An **OpenAPI 3.1 document** is generated from the REST route table and the operations' zod schemas (JSON Schema export) and served at `/api/v1/openapi.json` — the same schemas drive request validation, remote-function validation and the MCP tool definitions (§10.5). Each operation's responses are its `output` (a list's `{ items, nextCursor }` page, a file's bytes in each media type it comes in) and the problem statuses it answers with: its own `problems`, 422, 403 above role `user` or with an own scope, 409 with `confirm`, 401 for a missing token and 400 for a JSON body that is no object.
+An **OpenAPI 3.1 document** is generated from the REST route table and the operations' zod schemas (JSON Schema export) and served at `/api/v1/openapi.json`, public like `/healthz`, since it is the same for every stack and carries no tenant data — the same schemas drive request validation, remote-function validation and the MCP tool definitions (§10.5). Each operation's responses are its `output` (a list's `{ items, nextCursor }` page, a file's bytes in each media type it comes in) and the problem statuses it answers with: its own `problems`, 422, 403 above role `user` or with an own scope, 409 with `confirm`, 401 for a missing token and 400 for a JSON body that is no object.
 
 ### 10.4 Device provisioning (modular)
 

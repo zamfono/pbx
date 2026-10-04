@@ -10,6 +10,7 @@ import { getDb } from '#lib/server/db.js';
 import { requestEvent } from '#testing/requestEvent.js';
 
 import { handle, init as initHooks } from './hooks.server.js';
+import { GET as getOpenApi } from './routes/api/v1/openapi.json/+server.js';
 
 const JWT_SECRET = 'test-secret';
 const KEY_BYTE_LENGTH = 32;
@@ -79,10 +80,14 @@ describe('hooks handle', () => {
     );
   });
 
-  it('answers 401 for the openapi document without a bearer token', async () => {
+  it('serves the openapi document without a bearer token', async () => {
     const event = requestEvent('http://internal/api/v1/openapi.json');
-    const response = await handle({ event, resolve: resolvePassThrough });
-    expect(response.status).toBe(401);
+    const response = await handle({
+      event,
+      resolve: () => Promise.resolve(getOpenApi())
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ openapi: '3.1.0' });
   });
 
   it('answers 429 problem+json once a client address exceeds the token endpoint limit', async () => {

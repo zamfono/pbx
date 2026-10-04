@@ -59,6 +59,9 @@ export const init: ServerInit = async () => {
   });
 };
 
+// The one `/api/v1/*` path served without a bearer token (§10.3).
+const OPENAPI_PATH = `${API_PREFIX}/openapi.json`;
+
 // §5.5's per-address limit for the two endpoints it can be applied to by pathname alone. The
 // login and forgot-password limits key on the account the request body names, and the login's
 // address limit counts submissions rather than views of the page, so both live in the handler
@@ -90,7 +93,7 @@ function rateLimitResponse(
 /**
  * Refuses a cross-site form submission to a browser-served page (`crossSiteFormRejection`);
  * resolves `/api/v1/*`'s bearer token, or a download link's token (§10.5), into
- * `event.locals.auth`, 401 problem+json without one;
+ * `event.locals.auth`, 401 problem+json without one (the OpenAPI document needs neither);
  * refuses `/internal/*` when the request carries `X-Forwarded-For`, since only the proxy hop sets
  * it and that path is reachable from the internal network alone (§3.1); answers 429 problem+json
  * once a client address exceeds the §5.5 limit of the auth endpoint it called.
@@ -111,12 +114,10 @@ const handleRequest: Handle = async ({ event, resolve }) => {
   if (limited) {
     return limited;
   }
-  if (!pathname.startsWith(API_PREFIX)) {
+  if (!pathname.startsWith(API_PREFIX) || pathname === OPENAPI_PATH) {
     event.locals.auth = null;
     return resolve(event);
   }
-  // `/api/v1/openapi.json` is inside this prefix and so requires a bearer token like every other
-  // `/api/v1/*` endpoint; §10.3 lists no separate row for it, so it gets no separate exemption.
   const deps = { db: getDb(), jwtSecret: env.JWT_SECRET };
   const bearer = await authenticateRequest(deps, event.request);
   const link = bearer

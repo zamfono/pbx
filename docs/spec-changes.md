@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-04 · §10.3 REST API.** Product-owner decision (D31): asked whether `/api/v1/openapi.json` (bearer-only until now; the same document for every user and stack, no tenant data) should be public, the user answered "yes, please". `GET /api/v1/openapi.json` is served without authentication; every other `/api/v1/*` endpoint still requires a bearer token.
+*Why:* the document describes the API, not the tenant, so a client or developer can read it before obtaining a token.
+
 **2026-10-04 · §10.3 Operations layer and REST surface, Live calls.** An operation that reads from or acts through `core` (the live calls list, the parked calls, a call action and its own-scope check) answers `core`'s refusal with its status and reason, and any other failure of `core`, `core` not answering included, with 503. The Live calls entry's own-scope sentence, cut off after "or have a leg up in", is completed.
 *Why:* such a failure answered 500, which no operation documents; 503 is what `system.update` answers when the service it hands the request to does not carry it out.
 
