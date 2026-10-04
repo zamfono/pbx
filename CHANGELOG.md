@@ -11,591 +11,6 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
-### Added
-
-- An open `/events` connection ends, with close code 4401, when the login it was opened under is
-  revoked: through `/oauth/revoke`, a reused refresh token, a password reset or the user's deletion.
-  A connection whose login is still valid stays open as long as the client keeps it.
-- Personal access tokens for server applications that cannot log in through OAuth:
-  `personalAccessTokens.create` (`POST /users/{id}/personalAccessTokens`) returns a `zpat_…` token
-  once, with a name and an optional expiry, and the application sends it as its bearer token on the
-  API, MCP and `/events`, acting as that user with their current role. A user creates tokens for
-  themselves, an admin or owner for any user, and only an owner for an owner.
-  `personalAccessTokens.list` shows a user's tokens with their last use, never their values, and
-  `personalAccessTokens.revoke` stops one at once, an open `/events` stream included, as does
-  its expiry; deleting the user revokes them all. Recipe
-  `server-application-access` describes the setup.
-- Every push of the colleague roster to Ringotel is in the audit log as `ringotel.roster`, with
-  its outcome, what triggered it and Ringotel's reason for a refusal, and a roster change that has
-  not reached Ringotel yet shows in `system.info` as `ringotel.rosterPending` and in `/healthz` as
-  `ringotelRosterPending`. A stack no longer set up with Ringotel drops a pending roster at the next
-  start.
-- Call control through the API and the MCP tools, as a phone does it: `calls.consult` puts the
-  other party of a call on hold and dials someone from you, and `calls.transfer` with `toCallId`
-  hands the held party over to them (attended transfer); `calls.addParty` adds a third party to a
-  call, as `*5` does; `calls.hold` and `calls.resume` hold the other party with the hold music,
-  in the PBX, so the phone itself does not show the hold; `calls.decline` declines a call ringing
-  for you, as declining it on your phone does. A user controls only a call they are in, as for
-  hangup and transfer; a caller who parked a call, or handed it on with an attended transfer, no
-  longer controls it. Help topic `call-control` describes each.
-- Help topics `numbers`, `webhooks`, `mail-templates`, `parking`, `user-groups`, `directory` and
-  `call-data` (`zamfono.help`, and `reference/<topic>.md` in the Claude Code skill). `numbers`:
-  DIDs, number blocks of both kinds, a fixed digit count after the base or open-ended, the main
-  number, the block and tenant-wide fallbacks and the most precise match, with a worked example
-  of a German PBX line (Anlagenanschluss). `webhooks`: every event and its payload, the event-type
-  filter and the `active` switch, retries, timeouts and the delivery status, and how to verify
-  `X-Zamfono-Signature`, with code. `mail-templates`: the mail kinds, builtin and tenant templates
-  per language, the Handlebars subset, the placeholders each kind offers and requires, the test
-  send and mail without a relay. `parking`: the slot extensions, park, retrieve, the ring-back to
-  the parker and BLF on slots. `user-groups`: where they are used, nesting, flattening and
-  deletion. `directory`: the phone book, how it names callers, and the search. `call-data`:
-  voicemails and MWI, the presence history and its snapshot, and the call statistics. The
-  glossary, `mental-model` and `routing-order` point to them.
-- Automatic updates, off by default: an owner switches them on with `settings.update`
-  `{ "autoUpdate": true }`, and the stack then installs a newer non-breaking release on its own, as
-  `system.update` would (so it needs `UPDATER_TOKEN`), after backing up every enabled backup target,
-  at the next maintenance moment once nothing is in progress, the same moment and check a renewed
-  TLS certificate waits for; a stack still busy when that wait gives up at 3 maintenance moments in
-  a row counts it as a failed attempt. A failed attempt is tried again at a later maintenance moment, at least
-  20 hours on, up to 3 attempts per release, and then left until a newer release appears or an
-  update succeeds; a refusal because another update is already running counts as no attempt. From
-  the first failure until an update succeeds, `/healthz` has `autoUpdateFailed: true`, `/metrics`
-  has `zamfono_auto_update_failed 1` with `zamfono_auto_update_failed_attempts`, and
-  `system.info` shows the release, the reason and the attempts in `autoUpdate.failed`; every owner
-  gets one mail once the last attempt failed (new template kind `updateFailed`), and the audit log
-  has a `system.autoUpdate` entry for every attempt and outcome. Each failure names its concrete
-  cause in all three places, such as `no enabled backup target`, the target and error of a failed
-  backup, or what kept the stack busy. Whether automatic updates are on or
-  not, a breaking release, which only `update.sh` on the host installs, is announced: `/metrics` has
-  `zamfono_breaking_update_available 1`, `system.info` shows the release in `update.latest`, and
-  every owner gets one mail per release (new template kind `breakingUpdate`). `/healthz`, the
-  public uptime check, says nothing of releases, since anyone can read it; without
-  `UPDATER_TOKEN` it reports no failure, the three gauges are 0 and `system.info` shows no
-  failure. `system.info` names who asked for the last update in
-  `update.last.trigger`: `manual` (with the owner in `by`), `automatic`, or `host` for `update.sh`
-  on the host. Backup runs now take turns: a manual run started during a scheduled one waits for it,
-  as the automatic update's backup does.
-- Parking, voicemail deposit, per-call CLIR and the personal greeting over the API and MCP, as a
-  phone does them with feature codes. `calls.park` (`POST /calls/{id}/park`) parks the other party
-  of a call on the lowest free slot as `*70` does, hangs up the parker's leg and returns the slot;
-  `parking.list` (`GET /parking/calls`) shows every user the parked calls, slot, caller (none when
-  withheld), since when and by whom; `calls.originate` with a slot as target retrieves the call
-  parked there, as dialling the slot does. A parked call is ended over the API by an admin only,
-  until the parker answers the ring-back, which now connects them in the parked call itself, so
-  they can hang it up or transfer it. `calls.transfer` takes `voicemail: true` to put the caller
-  straight through to the target extension's mailbox, as `*97<ext>` does, and `calls.originate`
-  takes `clir` to withhold or present the number on that one call, as `#31#` and `*31#` do.
-  `users.setVoicemailGreeting` (`PUT /users/{id}/voicemailGreeting`, a WAV or MP3 upload) and
-  `users.clearVoicemailGreeting` set and remove the personal mailbox greeting `*96` records, for
-  oneself or, as an admin, for anyone; like the phone's recording, they are not in the audit log.
-  Help topic `click-to-dial`.
-- `update.sh --current` prints the release the stack directory runs, and exits 12 where it names
-  none. The `updater` service asks it, so `system.info` and `update.sh` always agree on the
-  stack's release.
-
-### Changed
-
-- `PATCH /settings` refuses with 422 a `softDeleteRetentionDays` longer than a set
-  `auditRetentionDays`: a deletion stays undoable for the whole soft-delete window only while its
-  audit entry is kept as long.
-- **Breaking:** the first owner's password hash, `BOOTSTRAP_OWNER_PASSWORD_HASH`, is required:
-  `api` refuses its first boot without it, or with a value that is not an Argon2id hash (such as
-  one Compose cut short because it was not quoted), and the first owner no longer gets a
-  set-password mail instead. `setup.sh` always asks for the owner's password, or with
-  `SETUP_NONINTERACTIVE=1` refuses to run without `OWNER_PASSWORD` or the hash.
-- Breaking, API surface: a ring group's forwarding rules can be read back with
-  `ringGroups.getForwarding` (`GET /ringGroups/{id}/forwarding`), in the shape
-  `ringGroups.setForwarding` takes, `sip` targets with their `headers`; the set-password page
-  moves to `/auth/setPassword`, and setup and reset mails link there (`/auth/set-password` is
-  gone); a Ringotel `region` or `packageid` the account does not offer is refused with 422
-  instead of 400; `calls.pickup` (`POST /calls/{id}/pickup`) always takes the call onto the
-  caller's own phones and refuses a `userId` as an unknown field.
-- Breaking: users and outbound routes spell their caller-ID number `callerIdDidId` on the wire,
-  as trunks spell `callerIdFormat` and `callerIdHeader`; `calleridDidId` is refused as an
-  unknown field. The database columns are `caller_id_did_id`, `caller_id_format` and
-  `caller_id_header`.
-- Breaking: a trunk with `inboundNumberFormat` `e164` takes only numbers with a leading `+`;
-  `00…` and bare digits now pass verbatim. Under `national`, the caller-ID's `national` format
-  and in dialling, numbers follow `settings.country`'s own dialling rules: its international
-  prefix (`011` in the US, `0011` in Australia), its trunk prefix, ten-digit dialling in the US,
-  and Italy's leading `0`, which an Italian number now keeps (`06…` becomes `+396…` no more, but
-  `+3906…`). A national number needs the country's trunk prefix where it has one (Germany's `0`),
-  and must be a valid number there; anything else passes verbatim, and is refused when dialled.
-- Breaking: `api` and `core` refuse to start without `EXTERNAL_IPV4` (ports mode) or
-  `STACK_IPV4` (macvlan mode) in `.env`; `system.info`'s `stack.ipv4` is never `null`. A trunk
-  on a transport that `SIP_UDP_ENABLED=false` or `SIP_TCP_ENABLED=false` switches off now shows
-  `unreachable`, also with `qualify` off, so outbound calls skip it instead of trying it.
-- `calls.originate` (`POST /calls`) refused for a user with no registered device answers the
-  problem title `no registered device`, as `calls.pickup` does; the `detail` stays
-  `noRegisteredDevice`.
-- Only an owner may reset an owner's password (`users.resetPassword`) or change an owner's e-mail
-  (`users.update`); an admin gets 403, so an admin can no longer take over an owner account. A
-  link from `users.resetPassword` is now valid for 7 days, like the setup link of a new user,
-  instead of 1 hour.
-- Breaking: `PATCH /settings` (`settings.update`) refuses a `featureCodes` object with a key
-  other than the ten feature codes with 422, instead of ignoring it; the OpenAPI description and
-  the MCP tool now list the ten keys and the rules each code follows.
-- Breaking: `GET /stats` (`stats.query`) aligns `hour`, `day` and `week` buckets to the tenant
-  time zone (`settings.timezone`) instead of UTC: an hour starts on the local hour, a day at local
-  midnight, a week at local Monday midnight, so a day across a daylight-saving change lasts 23 or
-  25 hours; `minute` buckets are unchanged.
-- Breaking: creating a `manual` device (`POST /users/{id}/devices`, `devices.create`) returns
-  `connectionSettings`, everything a phone set up by hand asks for, instead of `sipUsername` and
-  `sipPassword`: `server` and `domain` (the stack's FQDN), `transport` and `port` (TLS on 5061 for
-  a `tls` device; UDP and/or TCP on 5060, as `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED` allow, for a
-  `plain` one), `username` and `password`, `extension` and `displayName`, `mediaEncryption`
-  (`srtp` or `none`), `codecs` and `voicemailCode`. `GET /devices/{id}/credentials` returns the
-  same set for a `manual` device; a `ringotel` device's reveal is unchanged. Help topic
-  `tested-softphones` maps the fields onto Groundwire and MicroSIP.
-- `api` refuses to start while `FQDN`, `JWT_SECRET` or `SECRETBOX_KEY` is unset or empty in
-  `.env`, all of which `setup.sh` writes, and its log names every one that is missing at once;
-  `GET /system/info` therefore always reports `stack.domain`.
-- `proxy` likewise refuses to start while `FQDN` is unset or empty, and says so in its log.
-- Breaking: the public address is required by the overlay of its mode: Compose refuses to start
-  the stack with `compose.ports.yaml` while `.env` sets no `EXTERNAL_IPV4`, and with
-  `compose.macvlan.yaml` while it sets no `STACK_IPV4`, naming the variable.
-- On a DST night, an opening-hours edge or a maintenance hour at a local time the clock change
-  skips or repeats now lies at the earlier of its two possible instants, as the time filters of
-  `GET /calls`, `GET /audit` and `GET /presence/log` already read such a time: the `hours`
-  events and the certificate reload follow it. In zones east of UTC this is an hour earlier than
-  before.
-- The lists of DIDs, number blocks, blocked numbers, webhooks and backup targets and runs return
-  the same opaque `nextCursor` as every other list instead of the last row's id. A row id passed
-  as `cursor`, as these lists returned it up to 0.1.0, is refused with 422: a client holding one
-  starts again from the first page.
-- Breaking: every list takes at most `limit=200` and refuses a larger one with 422, as the lists
-  of audit entries, DIDs, number blocks, blocked numbers, webhooks and backup targets and runs
-  already did; without `limit` a page still holds 50. Every list also refuses with 422 a `cursor`
-  it did not hand out itself, where most of them answered with a wrong page or a 500.
-- Breaking: the time filters `from` and `to` of `GET /calls`, `GET /audit` and `GET /stats` are
-  one range from `from` up to but not including `to`; a date alone as `to` covers that whole day,
-  so `from=2026-10-01&to=2026-10-01` is October 1st, where calls and audit entries at exactly
-  `to` used to count and a date ended at its midnight. `GET /stats` takes local times and dates
-  like the other filters, and every filter accepts a time without seconds also with an offset
-  (`2026-10-01T09:00Z`). The statistics count each call once, a transfer leg no longer as a call
-  of its own; with `ringGroupId` they count each offer to the group, a call transferred into it
-  included, answered only when a member took it.
-- Breaking: the mail templates, the search, the presence snapshot, the parked calls and the live
-  calls are paged like every other list: they take `limit` and `cursor` and return `nextCursor`,
-  where they refused `limit` with 422 or returned everything at once. A cursor names the list
-  that handed it out, and another list's cursor is refused with 422. A search hit's `matched`
-  names the field as its resource does (`extension`, `displayName`, `phones` instead of `ext`,
-  `name`, `phone`), and a pasted number finds the contact in any spelling (`+43 1 234 5678`,
-  `01 2345678`), not only as stored.
-- A renewed TLS certificate is swapped in at the maintenance moment only once nothing is in
-  progress: no call, no parked call, no voicemail being left and no recording being made or
-  mixed. While something is, the stack looks again every 5 minutes for up to two hours, then
-  gives up until the next maintenance moment, which it logs as a warning and enters in the audit
-  log (`system.maintenanceGate`, channel `job`) with what kept it busy: the live calls, Asterisk
-  channels and recordings in progress. `system.info` shows when and why it last gave up, for the
-  certificate and the automatic update each, in `maintenanceGate`. The first certificate replacing a fresh stack's
-  placeholder, and a renewal the current certificate would expire before, still apply at once.
-- MCP clients and the OpenAPI document now describe what an operation's input fields mean, not
-  just their names and types: every tool's input schema carries a one-sentence `description` per
-  field whose meaning is not obvious, and terse tool descriptions say what the operation does.
-- The OpenAPI document now describes what every endpoint answers: the shape of its JSON result
-  (a list's `{ items, nextCursor }` page, a write's `warnings`), an audio download as the file in
-  each format it comes in, and the problem statuses the endpoint can answer with; MCP tools
-  whose result is an object carry it as their `outputSchema`, so clients can read the
-  `structuredContent` of a call.
-- `zamfono.help` with an unknown topic still fails with 404, but its message now lists every
-  topic; `index` lists them like a call without a topic, and the server instructions say so.
-- `zamfono.help` carries an `outputSchema` too: `topics` for the topic list, `topic` and
-  `content` for one topic.
-- Webhook deliveries survive a restart of `api`: an event still queued, or waiting for its retry,
-  when `api` restarts (an update, a crash) is delivered after it, with the attempts it has left,
-  where it used to be lost. Deleting a webhook drops its pending deliveries. A delivery cut off
-  mid-request is sent again, so receivers keep deduplicating on the event `id`.
-- The specification now says exactly when a webhook's `lastStatus` turns `failing`: as soon as
-  one delivery has failed all three attempts; the next delivery that succeeds turns it back to
-  `ok`. Delivery itself is unchanged.
-- A failing webhook leaves a trace: `api` logs a warning with the hook's URL (without credentials or query), the reason (the
-  HTTP status, such as `HTTP 404`, or `timeout`, `DNS lookup failed`, `TLS error <code>`,
-  `connection refused`) and the event type when the hook turns `failing`, again whenever the
-  reason changes while it stays failing, and once a day while it keeps failing for the same
-  reason, and logs when it delivers again. `webhooks.list` shows `lastError` and `lastErrorAt`,
-  and while the hook is failing `failingSince` and `failedDeliveries`. A delivery whose hook
-  secret cannot be decrypted, after `SECRETBOX_KEY` was replaced without keeping the previous key
-  or the database was restored under another `.env`, is dropped at once instead of being retried
-  at every restart, and the hook reads `failing` with `secret unreadable — set a new secret`.
-- The specification and the `call-control` help topic now name what `calls.list` returns for a
-  call in progress, `userIds` among it: the users the call concerns now, its caller, callee and
-  answerer and everyone whose phone rings or is connected in it. The response is unchanged.
-- A time typed without an offset into the `from` and `to` of `calls.list` and `audit.list`, or
-  the `at` of `presenceLog.snapshot`, such as `2026-10-01T09:00`, is now the tenant's local time
-  (`settings.timezone`), and a date alone, `2026-10-01`, its local midnight, where both were read
-  as UTC. A time with an offset or `Z` means what it did. A local time that a daylight-saving
-  change skips or repeats is read as the earlier of its two possible instants.
-- A party added to a call (`*5`, `calls.addParty`, a consultation's `calls.consult`) is not
-  parked from its own call: `calls.park` on that call is refused with 409 `notBridged`, as
-  `calls.transfer`, `calls.consult` and `calls.hold` on it already were, and `*70` dialled by
-  the added party is released, where both took the other party out of the shared conversation.
-- `core` logs an error, with the method and path, when its internal API fails to serve a request
-  `api` made (which `api` sees as a 503), and a warning when its internal event stream fails;
-  neither left a trace before.
-- `core` logs an error, with the call's id where there is one, when a step it runs in the
-  background fails: a voicemail or missed-call mail it could not hand to `api`, the onward call
-  after a transfer, a blind or attended transfer Asterisk carried out, the outcome of a placed
-  call or a pickup, an MWI, presence or trunk status update, a recording. None of these left a
-  trace. An ARI request on a channel or bridge that has already gone is still dropped silently,
-  the expected race with a hangup; any other ARI failure, such as refused credentials or an
-  Asterisk error, is now logged too.
-- `core` logs an error when the sweep that announces out-of-office and opening-hours changes
-  fails, and retries it a minute later as before; until now it retried without a trace.
-- `core` also logs an error, and carries on as before, when a read it falls back from fails: a
-  trunk attempt it could not place, the phone-book lookup of a caller's name, the bridge and
-  channel lists a hangup or a busy check reads, the Call-ID of a leg's SIP dialog, Asterisk's
-  start time and channel count for `api`, and the recordings directory the retention sweep
-  reads. A recordings or voicemail directory that does not exist yet is still no failure.
-- The release bundle carries a `VERSION` file naming its release. `update.sh`, `setup.sh` and
-  the `updater` service read the release a stack runs from it, unless `.env` sets
-  `ZAMFONO_VERSION`; `update.sh` still reads a stack unpacked from an older bundle, which has no
-  `VERSION`, from `compose.yaml`. Where `.env` sets `ZAMFONO_VERSION` more than once, the updater
-  now takes the last line, as Compose and `update.sh` do, and answers with an error for an
-  `.env` it cannot read instead of taking it for one that sets nothing.
-- The stack directory keeps the mode's overlay as `compose.override.yaml`, a link to
-  `compose.ports.yaml` or `compose.macvlan.yaml` that `setup.sh` makes and Compose reads beside
-  `compose.yaml` by itself, so every command is a plain `docker compose up -d`, `pull` or `logs`
-  without `-f`. The Podman boot unit `setup.sh` installs runs `podman compose up -d`; a unit
-  installed earlier keeps working as it is. `update.sh` makes the link for a stack that has none,
-  from the overlay its boot unit names, else from whether `.env` sets `STACK_IPV4`.
-- The continuous-replication overlay (`docs/spec.md` §6.5) has a fixed name, `compose.dr.yaml` in
-  the stack directory. Where it exists, `update.sh`, the `updater` service and the Podman boot
-  unit run Compose on `compose.yaml`, `compose.override.yaml` and `compose.dr.yaml`, so an update
-  or a boot keeps the Litestream sidecar. By hand, `setup/compose.sh <command>` runs Compose on the
-  same files. The boot unit `setup.sh` installs runs `setup/compose.sh up -d`.
-- `update.sh --check` says what an update would do as before, and its exit status now carries
-  the verdict: 0 for an update it would install, 10 for a breaking one, 11 for a release that is
-  not newer than the stack's, 12 when the stack directory names no release, anything else for an
-  error. `system.update` and `system.info` take their verdict from it, so the two can no longer
-  disagree on which releases are breaking.
-- Breaking: `update.sh` reads and moves `ZAMFONO_VERSION` by one rule (`.env.example` lists
-  the forms): a release (`0.3.1`) becomes the release installed, a line (`0.3`, `1`) the new
-  release's line, empty and `latest` stay. On `edge`, `update.sh`, `system.update` and the
-  automatic update pull the newest edge images and recreate the stack, once main has a build
-  newer than the running one, where they used to install a release; a `sha-<commit>` build is
-  immutable and refused; any other value stops `update.sh` with an error. A pull request's
-  images are run with `ZAMFONO_PR=<N>` (or `<N>-<commit>`) and `compose.pr.yaml`, no longer with
-  `ZAMFONO_VERSION`. An update that stopped after installing the new release's files, before its stack
-  reported healthy, is now finished by `system.update` and by the automatic update's next
-  attempt too, where the updater refused it as not newer. The automatic update's runs are
-  recorded with `trigger` `automatic` and no `by`.
-- `trunks.list` and `trunks.get` still answer status `unknown` while `core` does not answer, and
-  `api` now logs a warning saying so, where it said nothing.
-- A frame on `core`'s internal event stream that `api` cannot read is still dropped, and `api`
-  now logs a warning with it.
-- The OpenAPI document no longer lists a `501` response for every endpoint: every REST endpoint
-  runs its operation, so none answers `501`.
-- **Breaking:** the MCP tools `voicemails.audio` and `recordings.audio` return a download link,
-  `{ url, expiresAt }`, instead of the audio itself, which MCP clients could not play: the link
-  opens the file without a token, in a browser or a player, for five minutes. The REST endpoints
-  `GET /voicemails/{id}/audio` and `GET /recordings/{id}/audio` still answer with the file.
-- **Breaking:** a backup target's `secret` in `backups.targets.create` and
-  `backups.targets.update` is an object, no longer a string: `{ "resticPassword": … }` for
-  `local`, plus `username` and `password` for `sftp`, `ftp`, `ftps` and `webdav`, or
-  `accessKeyId` and `secretAccessKey` for `s3`. A plain password, or credentials the kind does
-  not take, is refused with 422, and so is a change of kind whose stored secret does not fit the
-  new kind without a new `secret`. The default `local` target from `BACKUP_PASSWORD` is stored the
-  same way. A backup target created before this release can no longer be read, and its runs fail
-  until it is re-entered: set its secret again with `backups.targets.update`.
-- **Breaking:** no secret is returned any more, not even masked: `GET /settings` carries
-  `smtpPasswordSet`, `ssoClientSecretSet` and `ringotelApiTokenSet` in place of `smtpPassword`,
-  `ssoClientSecret` and `ringotelApiToken` (no longer `"***"`), a trunk carries `passwordSet`, and a
-  webhook and a backup target carry `secretSet`, each saying whether a secret is stored. A write
-  leaves an omitted secret as it is, clears it with `null` (refused with 422 where it is required:
-  a trunk with credentials, a webhook, a backup target) and stores any string as given, `"***"`
-  included.
-- While the updater knows no current release, the automatic update attempts nothing and reports
-  no breaking release, so no audit entry and no mail carry an empty version; `api` logs once why.
-
-### Removed
-
-- `update.sh` no longer fills in `BACKUP_PASSWORD`, `UPDATER_TOKEN` or `CONTAINER_SOCKET` where
-  `.env` lacks one, and no longer links `compose.override.yaml` for a stack without it: it lists
-  a setting a newer `.env.example` names, and `setup.sh` writes all of them and the link. It
-  reads the release a stack runs from `.env`'s `ZAMFONO_VERSION` or the bundle's `VERSION` only,
-  not from `compose.yaml`.
-
-### Fixed
-
-- A live-call action (hang up, transfer, park, pickup, …), the live calls list and the parked
-  calls list answer 503 instead of 500 when `core` fails or does not answer.
-- Undoing the deletion of a DID, number block, IVR menu, out-of-office rule, opening-hours schedule,
-  blocked number or hold-music asset now reaches `core` and Asterisk at once: before, calls kept
-  being routed as if the item were still deleted until some other change went through.
-- An extension change of a user with devices can be undone; the undo was refused with a 409.
-- Undoing a deletion is refused with a 409 while the revived item would point at something deleted
-  since (a menu's greeting, a DID's target user, a forwarding rule's ring group); the answer names
-  what to restore first. Before, the undo went through, and the daily purge then failed every day
-  from the moment the deleted item was due, or cleared the revived item's greeting.
-- A call whose caller hangs up, or that a phone answers, while the user's phones are still being
-  dialled no longer shows as ringing in the live calls (`GET /calls?live=true`, `/events`): it no
-  longer stays listed after it ended, and an answered one shows as answered.
-- A caller who hangs up just as a phone answers (or a pickup is answered) no longer leaves that
-  phone connected to nobody, its user shown busy and the call listed as live: the phone is hung
-  up.
-- `/metrics` keeps reporting `zamfono_backup_last_success_age_seconds` for a backup target whose
-  backups have failed for longer than `recording_retention_days`: the daily purge keeps each
-  target's latest successful run.
-- An `api` restart no longer re-registers every Ringotel app for an Asterisk it already handled
-  once the audit retention (`audit_retention_days`) has purged the earlier re-registration: the
-  time the apps last registered is kept in the settings row instead of read from the audit log.
-- A call whose SIP Call-ID `core` cannot read from Asterisk (Asterisk unreachable or refusing the
-  request as the call comes in) is logged as `SIP dialog join failed` and handled as usual: at call
-  log level `sip` it no longer goes unrecorded, and below it `core` no longer exits with an
-  unhandled rejection.
-- `core` no longer keeps a record of every call that ended for as long as it runs, so its memory
-  stays flat on a busy stack.
-- The restore procedure (`docs/guide/restore.md`) brings a stack up: it unpacks the release's
-  bundle, makes the `compose.override.yaml` link `setup.sh` would make, since `setup.sh` refuses
-  the preserved `.env`, and copies the snapshot's database and media into the stack's volumes
-  with the `api` image's restic before the first start.
-- The `migrate` service retries a briefly locked database five times, 5 s apart, as documented,
-  not four. A voicemail mail's audio is read from `MEDIA_DIR`, not always from `/media`.
-- The `migrate` image creates its database on a fresh `db` volume even when it is the first
-  container to mount it; before, it could not write to the volume until `api` or `core` had.
-- A ring group with neither greeting nor music no longer answers the caller and plays the default
-  hold music: the caller hears ringback until a member answers. A ring group's call recording now
-  covers only the members it rang, not a user its fallback reached afterwards. Dialling an empty
-  parking slot plays a short error tone instead of a spoken prompt. `*90`, `*91`, `*96` and `*70`
-  work only dialled alone: `*901234` is no longer taken as `*90`.
-- Out-of-office and opening hours: `*5` to a colleague now applies their out-of-office rule
-  instead of ringing their phones; a tenant-wide out-of-office rule is applied once per call, not
-  again at the target it forwards to; opening hours that end at a local time the autumn DST
-  change repeats close at its first occurrence, as the open/close events on `/events` already
-  did; a menu an internal call is forwarded through is counted as a hop and named by the main
-  number; a fallback's routing trace names its number block and the called number.
-- Confirmation questions name what they act on ("Delete Anna Huber (extension 101)? The deletion
-  can be undone for 3 days."), where most named only an id, and give the retention period set in
-  `softDeleteRetentionDays` instead of a fixed 30 days. An unknown id answers 404 rather than the
-  question.
-- A user naming a voicemail, device, call, out-of-office rule or other user that is not their own
-  gets 403 before any confirmation question: deleting another user's voicemail or device without
-  `confirm` answered 409 with the question first. An out-of-office rule in another user's scope
-  answers 403, like every other one, instead of 404.
-- `GET /metrics`, `GET /calls?live=true` and the actions on a live call waited as long as a
-  stalled `core` did; they now give up after 3 seconds, as `/healthz` does. A live call id that
-  cannot be one (empty, `.`, `..`, or with characters other than letters, digits, `.`, `_` and
-  `-`) is refused with 422, where it answered 500.
-- The MCP tools `audio.create` and `users.setVoicemailGreeting` could never succeed, since a
-  tool call cannot carry a file. They now take the other fields and answer with an upload link
-  valid for five minutes: post the WAV or MP3 file to it (field `upload`), or open it in a browser
-  and pick the file there.
-- A ring group's greeting, music or mailbox greeting, a mailbox greeting, and an announcement
-  target accepted an audio asset of any kind, so a greeting set as a ring group's music played
-  the default music instead. Each now takes only its own kind (`greeting`, `moh`, `vmGreeting`,
-  `announcement`) and refuses another with 422; a menu's audio of the wrong kind answers 422
-  instead of 404, and an unknown hold-music asset in the settings answers 404 instead of 422.
-- A mailbox greeting replaced by a new one, through `*96` or the API, or removed with
-  `users.clearVoicemailGreeting`, stayed in the audio list and on disk for good; it is now deleted
-  with the usual 30-day undo, unless another mailbox or a menu still uses it. The presence
-  snapshot (`presenceLog.snapshot`) no longer leaves out a user whose last change is older than
-  `recording_retention_days`: the purge keeps each user's latest state.
-- A default `local` backup target an admin deleted came back once the soft-delete retention had
-  passed. The default target is now created at first boot only, when `BACKUP_PASSWORD` is set;
-  setting `BACKUP_PASSWORD` on a running stack creates none, add a target with
-  `backups.targets.create` instead.
-- A parking slot could be an emergency number, such as `110` with three-digit extensions, so
-  retrieving the call parked there dialled the emergency service; it is now refused with 422, as
-  for a user's or ring group's extension. Out-of-office rules and opening hours for a user, ring
-  group or menu that does not exist or was deleted answer 404, where they answered 500 or an
-  empty result, or attached rules to the deleted one; so do changing and deleting a rule whose
-  user, ring group or menu was deleted.
-- A `registration` trunk whose hosts were all `inbound` was accepted, after which every
-  configuration change failed to reach Asterisk and `core` restarted in a loop; it is now refused
-  with 422, as is an IPv6 address as an `outbound` or `both` trunk host, which Asterisk could not
-  dial. A trunk on a transport switched off since it was set up (`SIP_UDP_ENABLED`,
-  `SIP_TCP_ENABLED`) can be edited again; only setting that transport is refused.
-- Undoing the creation of a DID that had become a user's caller ID was refused with 409, since
-  the user still presented it; the undo now gives the user back no caller ID of their own, then
-  deletes the DID. Pointing an existing DID at a user who presents no number of their own now
-  makes it their caller ID, as creating the DID for them does, and undoing that change takes it
-  back.
-- An open `/events` socket kept the role, and the ring groups, its user had when it connected: a
-  demoted or deleted admin went on receiving every event of the tenant until they disconnected.
-  After every write the server now checks each socket again: one whose user was deleted or holds
-  another role is closed with code 4401, so the client reconnects with a fresh token, and a user
-  gets the voicemail events of the ring groups they belong to now.
-- A key rotation whose new `SECRETBOX_KEY` kept the old generation number made every stored
-  secret unreadable, while `/healthz` still reported `keyRotationRemaining: 0`. `api` now refuses
-  to start when `SECRETBOX_KEY` and `SECRETBOX_KEY_PREVIOUS` carry the same generation, and
-  `/healthz` counts what the boot log counts: every secret the current key cannot decrypt.
-  deploy/README.md gives the rotation recipe.
-- OAuth and SSO sign-in: a client whose metadata document cannot be fetched or read is an
-  unknown client (400) instead of a 500, the fetch gives up after 5 seconds or 64 KiB, and a
-  document marked `no-store` or `no-cache` is not cached. `/oauth/register` refuses a redirect URI
-  that is not an absolute `https`/`http` URI (or, for a `native` client, a private-use scheme)
-  with `invalid_client_metadata`, and `/oauth/token` and `/oauth/revoke` answer a body that is not
-  a form with 400 and 200 instead of 500. An SSO user already bound to their identity-provider
-  account signs in by that binding alone, even when the provider sends no or an unverified
-  e-mail. With `ssoAllowedDomain` set, Google sign-in now also requires the account to belong to
-  that domain's Google Workspace: a private Google account on a company address is refused.
-- Login attempts sent in parallel were each checked against the password before the first
-  failure counted, so many addresses at once got past the five-attempt account lock. Every
-  attempt now counts the moment it arrives. A refresh token or set-password link presented twice
-  at the same moment is redeemed once; the second presentation is refused (for a refresh token,
-  as a replay).
-- A parked call whose ring-back nobody answered, on a stack with no fallback target, showed in the
-  history as missed and sent the parker a missed-call mail, though they had talked on it. It now
-  ends as answered, with no mail.
-- A caller who hung up while an outgoing call was still ringing had the call dialled again over
-  the next host, route or emergency trunk: a 112 hung up within a second reached the next
-  emergency centre with nobody on the line. Dialling now stops when the caller hangs up.
-- A caller who hung up in the instant an outgoing call or a forward was being set up still had
-  it dialled: the far end rang, and once answered the call showed as answered with nobody on
-  the line. The call is now not dialled and ends as missed.
-- Busy lamps: a call waiting for a user who is already on the phone now flashes their lamp, so a
-  colleague can see it and pick it up with `*8`; a ring group's lamp stays lit while any of its
-  calls still rings, rather than going dark when the first is answered; and after `core` restarts
-  following a crash, no ring-group or parking-slot lamp stays lit for a call that is gone.
-- After `core` restarted following a crash, a user who had put the other party on hold through the
-  API was hung up as if they were a parked call; only parked calls are hung up now.
-- A user whose app is registered on several phones showed `offline` as soon as one phone's
-  registration expired, and calls to them went to the `offline` rule (often the mailbox) although
-  another phone could still ring. A device now counts as registered while any of its phones is.
-- A dialled number starting with `0` or `00` but carrying `*` or `#` after it went to the trunk
-  as an E.164 number with those characters in it; it is now refused with 484 address incomplete,
-  as the national number rules leave it incomplete.
-- A certificate Caddy had just stored but whose files were not readable yet was never copied for
-  SIP-TLS: the hook gave up at once and Asterisk kept the previous certificate until the next
-  renewal or a `proxy` restart. The hook now waits up to a minute for the files, and if they stay
-  unreadable it fails with the reason in the `proxy` logs.
-- A ring group with `skip_busy` could still ring a member who had just answered as a party added
-  to a call through the API, or as the ring-back of a call they parked, in the moment before
-  their phone joined the conversation. Such a member now counts as busy from the answer on.
-- A trunk refused for a name another trunk already has, or for an inbound-auth username a device
-  or another trunk already uses as its SIP name, answered a bare 409; the 409 now names that
-  device or trunk in `references`, as every other refused duplicate does.
-- `core` ignored the stop signal, so every `docker compose stop`, restart and update waited out
-  the 10 s grace period and then killed it, and the calls it left running died with Asterisk,
-  their history entries marked `interrupted` at the next start. `core` now stops on SIGTERM and
-  SIGINT and winds its calls down first: callers not answered yet, and calls arriving during the
-  stop, are released with SIP 503 so a provider can try another route; answered calls are hung
-  up normally, their recordings and voicemail messages saved; every call's history entry is
-  closed as on any other end, unanswered ones as `failed`. It waits up to 8 s for this, then
-  closes its connections to Asterisk and exits. A `docker compose restart core` therefore ends
-  the calls in progress.
-- REST and `/events` accepted the access token of a user whose stored role is none of `owner`,
-  `admin` and `user`, acting with the role the token was issued with, while MCP refused it. Such a
-  token is now refused everywhere, with 401 on REST and MCP and a closed socket on `/events`.
-- `update.sh --help` run from outside the stack directory, as `/srv/zamfono/update.sh --help`,
-  failed with `sed: can't read`; it prints its usage from anywhere.
-- A `TZ` in `.env` that names no time zone, such as a misspelt `Europe/Viena`, made every
-  opening-hours, backup and maintenance decision of a tenant without its own time zone run in UTC,
-  without a word. `setup.sh` now accepts only a time zone the host's time zone database holds,
-  and `api` and `core` log an error at start when `TZ` names none.
-- A permission fix: a user could hang up or transfer a call in progress they no longer took part
-  in, as an earlier target of a forwarded call or after parking or transferring it, and kept
-  seeing it in `calls.list` (`live: true`) and on `/events` until it ended; the user who
-  forwarded a call could also end or transfer the forwarded call. A user now sees a call in
-  progress they placed, were called on or answered, or that one of their phones rings or is
-  connected in right now, ring-group calls included, and ends or transfers (`calls.hangup`,
-  `calls.transfer`) only one they placed or are connected in; anything else is refused with 403.
-  Once a call stops being theirs while it goes on, they receive its `call.state` `ended`, and
-  nothing of it after. Admins, owners and webhooks see every call as before, and pickup is
-  unchanged.
-- Claude Code could not connect to any Zamfono stack: its sign-in page showed "Something went
-  wrong while signing in." Claude Code receives the sign-in result on `localhost` at a port it
-  picks anew each time, and the stack accepted such a port only from clients registered as
-  `native` and only on `127.0.0.1`. A redirect to `localhost`, `127.0.0.1` or `[::1]` over
-  `http` is now accepted on any port, for every client, when the client registered that host
-  and path; any other redirect URI must still match exactly.
-- The time filters of `presenceLog.snapshot` (`at`), `calls.list` and `audit.list` (`from`,
-  `to`) compared the text they were given with the stored UTC times, so a time with an offset
-  (`2026-10-01T12:00:00+02:00`) or without milliseconds picked the wrong entries. They now
-  compare the instant it names, in any offset, with a time without one read as UTC; a value
-  that is not an ISO 8601 time or date is refused with 422.
-- `system.info` reported the last update the `updater` service ran, not one run with `update.sh`
-  on the host. `update.sh` now records its run in `.update/state.json` as the updater does,
-  `running` while it runs and then `succeeded` or `failed` with both versions and times, and
-  `system.info` shows it; `update.sh --check` records nothing.
-- `calls.pickup` could pick up another call than the one it named: the PBX looked the call up
-  again by the extension it rang, so with two calls ringing the same user (call waiting) it took
-  the first. It now takes the call it names. A phone answered once that call has stopped ringing
-  is hung up, with a line in the call's trace, and a pickup no longer leaves a `*8` call of the
-  picker's in the call history.
-- A party with no user of its own, such as the external number an outbound call reached, could
-  be shown with a parking slot's or ring group's extension as its number: as the caller of the
-  onward call when it was transferred, in `GET /parking/calls` when it was parked, and as the
-  caller of a party added from its side. The first two now show the number the call went to,
-  the last the call's own caller.
-- `POST /users` and `POST /users/{id}/resetPassword` could mail a setup or reset link although
-  the request failed and nothing was stored, for example when Ringotel could not be reached, so
-  the mailed link did not work. The mail now goes out only once the request has succeeded.
-- When `core` did not take the message-waiting update that follows marking a voicemail read or
-  deleting it, the phones' voicemail lamp stayed as it was without a word in any log. `api` now
-  logs a warning, and sends the update only once the change is stored.
-- When a configuration change was stored but did not reach Asterisk, for example because `core`
-  did not answer, the request still succeeded without a word, nothing tried again until the next
-  change, and a new Ringotel device was pushed to Ringotel although Asterisk did not know it yet.
-  The result now carries a warning naming the failure, `api` retries until Asterisk has the
-  configuration, and the Ringotel pushes of such a change wait until it has. `/healthz` shows a
-  propagation still owed as `configPropagationPending`, and `/metrics` as
-  `zamfono_config_propagation_pending`, with the failures in
-  `zamfono_config_propagation_failures_total`.
-- A Ringotel device push waiting for a configuration change to reach Asterisk was lost when `api`
-  restarted before it did, so a new or rotated Ringotel device could stay without its user or
-  password at Ringotel. An `api` that starts while a change is still owed now pushes every
-  Ringotel device once Asterisk has the configuration, each recorded as `ringotel.push` with
-  trigger `api.start`.
-- `/healthz` reported a check whose database query failed as a reassuring default, such as no
-  secrets left to re-encrypt, no Ringotel profile pending or no failed automatic update; it now
-  answers 500, which the uptime check sees. `/metrics` likewise reported an automatic update it
-  could not read as none failed, and now answers 500 too.
-- A certificate sync that failed, such as `core` refusing the PJSIP reload of a new certificate,
-  left no log line; it is now logged as an error and retried at the next hourly poll. A sync
-  whose maintenance-window check failed retried at once, over and over, and now waits for that
-  poll too; a certificate notification arriving while a sync runs is taken up once it ends,
-  rather than in a second sync beside it.
-- A call to an external number that was hung up just as its trunk was being dialled, for
-  example because another of the call's phones answered, could be counted off its trunk twice.
-  The trunk's channels in use in `/metrics` then read one too low, and its `max_channels` let one
-  call too many through. Each call now counts off once.
-- A parked call whose ring-back went unanswered could not reach a tenant fallback target that
-  answers: a user, ring group, external number or SIP target rang, and the parked caller was
-  never connected to whoever picked up. The parked caller is now connected, as after a blind
-  transfer: the parked call ends in the call history, and the call to the fallback target follows
-  it as a call of its own, linked to it.
-- The parking ring-back ignored the parker's forwarding and mailbox: when it went unanswered, the
-  parked caller always went to the tenant fallback target. Where the parker's own rules forward
-  the call or take it to their mailbox, as they would a call to the parker directly, the parked
-  caller now goes there; the tenant fallback takes them otherwise. The ring-back itself still
-  rings only the parker's phones.
-- The members of a soft-deleted ring group, or of a soft-deleted user group in one, still counted
-  as its members until the purge: their phones kept the group mailbox's MWI subscription, they
-  could read and delete the group's voicemails, and they got its `voicemail.new` events and
-  voicemail mails. A soft-deleted group is now skipped until it is restored, as a soft-deleted
-  user already was.
-- A ring group still rang the members of a soft-deleted user group in it, nested or not, and an
-  outbound route naming a soft-deleted user group still let its members call over it, until the
-  purge. A soft-deleted user group is now skipped in both until it is restored.
-- `voicemails.delete` and `recordings.delete` removed the audio file before the row's delete was
-  stored, so a delete that failed left a voicemail or recording without its audio. The file is
-  now removed once the delete is stored.
-- An `api` that started while a config propagation was still owed, or whose boot propagation
-  failed, sent a pending tenant profile to Ringotel at once, before Asterisk held it. That retry,
-  and the one at an Asterisk start, now waits until a propagation has succeeded, as a device's
-  Ringotel push does.
-- A changed name or e-mail address of a person never reached their Ringotel user, so a re-sent
-  activation mail went to the old address. Both now reach Ringotel with the change.
-- A restored Ringotel device whose push was lost, for example to an `api` restart, got a new
-  Ringotel user at its next push, with a new activation mail and the apps logged out. Within 24
-  hours of the deletion, its Ringotel user is now recovered, as an undo's push does.
-- A Ringotel key the stack could not use made a device or tenant profile push fail without a
-  `ringotel.push` or `ringotel.profile` entry, and left the profile pending without a reason. It is
-  now recorded as Ringotel refusing the push, with the reason.
-- An Asterisk start `api` learned of only when its connection to `core` came back re-registered
-  the Ringotel apps but left a pending tenant profile for the next start. The profile is now sent
-  again first, as for an announced start.
-- Creating, renaming or deleting a user, ring group or parking slot failed, and nothing was
-  stored, while Ringotel could not be reached, and an extension rename reached the Ringotel apps
-  before the PBX knew the new name. The change is now stored and in force on the PBX at once;
-  Ringotel gets the colleague roster afterwards, and if Ringotel refuses, the result warns and the
-  stack sends the whole roster again when `api` starts or Asterisk restarts.
-- A Ringotel setup or adoption that failed after provisioning the existing Ringotel devices left
-  their Ringotel users behind, so a retried adoption was refused. Those devices are now provisioned
-  only once the setup or adoption is stored.
-
 ### Upgrade notes
 
 - **0.2.0 is a fresh start: install it anew** (deploy/README.md) on a new stack directory and
@@ -603,6 +18,67 @@ why the specified behaviour changed; the commit history, how.
   database, files, tokens or client state carries over, and its `update.sh` and the updater do
   not install 0.2.0. The database schema starts again from a single migration; `migrate` fails
   on a 0.1.x database.
+
+### Added
+
+- Personal access tokens (`zpat_…`) for server applications that cannot sign in through OAuth:
+  `personalAccessTokens.create`, `list` and `revoke`; recipe `server-application-access`.
+- Call control over the API and MCP, as a phone does it: `calls.consult` with attended
+  `calls.transfer`, `calls.addParty`, `calls.hold` and `calls.resume`, `calls.decline`,
+  `calls.park` with `parking.list`, transfer to voicemail, per-call `clir`, and the mailbox
+  greeting (`users.setVoicemailGreeting`, `users.clearVoicemailGreeting`).
+- Automatic updates, off by default (`settings.update` `{ "autoUpdate": true }`, needs
+  `UPDATER_TOKEN`): a newer non-breaking release installs itself at a maintenance moment after a
+  backup; failures show in `/healthz`, `/metrics`, `system.info`, the audit log and a mail to
+  the owners, and a breaking release is announced. `update.sh --current` prints the release.
+- The OpenAPI document and the MCP tools describe every input field and every response; MCP
+  tools carry an `outputSchema`.
+- Help topics `call-control`, `click-to-dial`, `tested-softphones`, `numbers`, `webhooks`,
+  `mail-templates`, `parking`, `user-groups`, `directory` and `call-data`.
+- More to watch: webhook `lastError` and `failingSince`; `ringotel.roster` audit entries; a
+  configuration change that has not reached Asterisk warns, is retried and shows in `/healthz`
+  and `/metrics`; `api` and `core` log failures that left no trace.
+
+### Changed
+
+- **Breaking:** `api` refuses its first boot without `BOOTSTRAP_OWNER_PASSWORD_HASH`, an
+  Argon2id hash (quote it), and `setup.sh` always asks for the owner's password. `api` refuses to
+  start without `FQDN`, `JWT_SECRET` or `SECRETBOX_KEY`, `proxy` without `FQDN`, and `api`, `core`
+  and Compose without `EXTERNAL_IPV4` (ports mode) or `STACK_IPV4` (macvlan mode).
+- The mode's overlay is linked as `compose.override.yaml`, so commands are a plain
+  `docker compose up -d`; `setup/compose.sh` adds the replication overlay `compose.dr.yaml`.
+  `BACKUP_PASSWORD` creates the default `local` backup target at first boot only.
+- **Breaking:** `ZAMFONO_VERSION` follows one rule (`.env.example`): a release (`0.3.1`), a line
+  (`0.3`, `1`), empty, `latest` or `edge`; anything else is refused, and pull-request images use
+  `ZAMFONO_PR`. `update.sh --check` exits 0 (update), 10 (breaking), 11 (not newer) or 12 (none).
+- **Breaking:** secrets are write-only: settings, trunks, webhooks and backup targets carry
+  `<name>Set` flags (`smtpPasswordSet`, `passwordSet`, `secretSet`, …) instead of a masked value;
+  `null` clears a secret, and any string, `"***"` included, is stored. A backup target's `secret`
+  is an object holding the credentials its kind takes.
+- **Breaking:** a trunk's `inboundNumberFormat` `e164` takes only `+` numbers; `national` and
+  dialling follow `settings.country`'s rules (its prefixes, US ten-digit dialling, Italy's `0`).
+- **Breaking, API:** `callerIdDidId` (not `calleridDidId`); `/auth/setPassword`; `calls.pickup`
+  without `userId`; a `manual` device returns `connectionSettings`; `settings.update` refuses
+  unknown `featureCodes` keys and a `softDeleteRetentionDays` beyond `auditRetentionDays`; MCP
+  `voicemails.audio` and `recordings.audio` return a download link, `audio.create` and
+  `users.setVoicemailGreeting` an upload link.
+- **Breaking, lists and times:** every list pages with `limit` up to 200 and its own opaque
+  `cursor`, search hits name fields as their resources do; `from`/`to` are a half-open range in
+  the tenant's time zone, and `stats.query` buckets follow it and count each call once.
+- Only an owner resets an owner's password or changes their e-mail. A user sees and controls
+  only the live calls they are in; an `/events` socket closes with 4401 when its login is revoked
+  or its user's role changes.
+- A renewed certificate and an automatic update wait until no call, voicemail or recording is in
+  progress; `core` winds its calls down when stopped; webhook deliveries survive a restart.
+
+### Removed
+
+- `update.sh` no longer fills in missing `.env` settings or the `compose.override.yaml` link;
+  `setup.sh` writes them.
+
+### Fixed
+
+- 0.2.0 includes the fixes of a full review of the stack; the commit history has the details.
 
 ## [0.1.0] - 2026-09-30
 
