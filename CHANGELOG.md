@@ -244,6 +244,11 @@ why the specified behaviour changed; the commit history, how.
   the default music instead. Each now takes only its own kind (`greeting`, `moh`, `vmGreeting`,
   `announcement`) and refuses another with 422; a menu's audio of the wrong kind answers 422
   instead of 404, and an unknown hold-music asset in the settings answers 404 instead of 422.
+- A mailbox greeting replaced by a new one, through `*96` or the API, or removed with
+  `users.clearVoicemailGreeting`, stayed in the audio list and on disk for good; it is now deleted
+  with the usual 30-day undo, unless another mailbox or a menu still uses it. The presence
+  snapshot (`presenceLog.snapshot`) no longer leaves out a user whose last change is older than
+  `recording_retention_days`: the purge keeps each user's latest state.
 - A default `local` backup target an admin deleted came back once the soft-delete retention had
   passed. The default target is now created at first boot only, when `BACKUP_PASSWORD` is set;
   setting `BACKUP_PASSWORD` on a running stack creates none, add a target with

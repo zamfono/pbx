@@ -278,6 +278,23 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
   });
 
   it('0 plays the greeting instructions, records after a tone and confirms the greeting was saved', async () => {
+    const previous = newId();
+    await db
+      .insertInto('audioAssets')
+      .values({
+        id: previous,
+        kind: 'vmGreeting',
+        label: 'Mailbox greeting',
+        filename: `${previous}.wav`,
+        uploadedBy: ownerId,
+        createdAt: nowIso()
+      })
+      .execute();
+    await db
+      .updateTable('users')
+      .set({ mailboxAudioId: previous })
+      .where('id', '=', ownerId)
+      .execute();
     const done = ownVoicemail(pipeline, call);
     await nextPlay();
     press('0');
@@ -310,6 +327,12 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
       .where('id', '=', ownerId)
       .executeTakeFirstOrThrow();
     expect(user.mailboxAudioId).toBe(params.name.replace('prompts/', ''));
+    const replaced = await db
+      .selectFrom('audioAssets')
+      .select('deletedAt')
+      .where('id', '=', previous)
+      .executeTakeFirstOrThrow();
+    expect(replaced.deletedAt).not.toBeNull();
   });
 
   it('a caller who hangs up to leave the menu is in the history as answered, not missed', async () => {

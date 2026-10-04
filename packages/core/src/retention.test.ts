@@ -20,6 +20,7 @@ import { seedSettings } from './testing/seedRows.js';
 const NOW = '2026-06-01T00:00:00.000Z';
 const LONG_AGO = '2026-01-01T00:00:00.000Z';
 const YESTERDAY = '2026-05-31T00:00:00.000Z';
+const A_BIT_LATER = '2026-01-02T00:00:00.000Z';
 
 /** One call with its log, a QoS row, a recording and a presence entry, all stamped `at`. */
 async function seedCall(db: Db, at: string, filename: string): Promise<string> {
@@ -165,7 +166,7 @@ describe('runRetention', () => {
     expect(rows.find(row => row.id === recentCall)?.log).not.toBeNull();
   });
 
-  it('removes presence_log rows past retention', async () => {
+  it("removes presence_log rows past retention but each user's latest before the cutoff", async () => {
     const userId = newId();
     await db
       .insertInto('users')
@@ -179,7 +180,7 @@ describe('runRetention', () => {
     await db
       .insertInto('presenceLog')
       .values(
-        [LONG_AGO, YESTERDAY].map(since => ({
+        [LONG_AGO, A_BIT_LATER, YESTERDAY].map(since => ({
           id: newId(),
           userId,
           status: 'available',
@@ -196,7 +197,46 @@ describe('runRetention', () => {
     });
 
     expect(result.presenceLog).toBe(1);
+    const left = await db
+      .selectFrom('presenceLog')
+      .select('since')
+      .orderBy('since')
+      .execute();
+    expect(left.map(row => row.since)).toEqual([A_BIT_LATER, YESTERDAY]);
+  });
+
+  it("keeps a quiet user's latest presence_log row past retention, for the snapshot", async () => {
+    const userId = newId();
+    await db
+      .insertInto('users')
+      .values({
+        id: userId,
+        name: 'A',
+        email: `${userId}@x.test`,
+        createdAt: LONG_AGO
+      })
+      .execute();
+    await db
+      .insertInto('presenceLog')
+      .values(
+        [LONG_AGO, A_BIT_LATER].map(since => ({
+          id: newId(),
+          userId,
+          status: 'dnd',
+          since
+        }))
+      )
+      .execute();
+
+    const result = await runRetention({
+      db,
+      mediaDir,
+      log: noopLogger,
+      now: () => NOW
+    });
+
+    expect(result.presenceLog).toBe(1);
     const left = await db.selectFrom('presenceLog').select('since').execute();
-    expect(left.map(row => row.since)).toEqual([YESTERDAY]);
+    expect(left.map(row => row.since)).toEqual([A_BIT_LATER]);
   });
 });

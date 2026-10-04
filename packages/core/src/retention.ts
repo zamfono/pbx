@@ -110,9 +110,27 @@ export async function runRetention(
     .executeTakeFirst();
   const rawFiles = await removeStaleRawFiles(recordingsDir, before, deps.log);
 
+  // Each user's latest row before the cutoff stays: it is that user's state at every instant from
+  // the cutoff to their next transition, which the snapshot (§10.3 "Presence log") reads.
   const presenceLog = await db
     .deleteFrom('presenceLog')
     .where('since', '<', before)
+    .where(eb =>
+      eb.exists(
+        eb
+          .selectFrom('presenceLog as later')
+          .select('later.id')
+          .whereRef('later.userId', '=', 'presenceLog.userId')
+          .where('later.since', '<', before)
+          .where(later =>
+            later(
+              later.refTuple('later.since', 'later.id'),
+              '>',
+              later.refTuple('presenceLog.since', 'presenceLog.id')
+            )
+          )
+      )
+    )
     .executeTakeFirst();
   const callQos = await db
     .deleteFrom('callQos')

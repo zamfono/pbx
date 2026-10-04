@@ -17,9 +17,10 @@ import './index.js';
 // `mailbox_audio_id`, and like it outside the audit log (§5.7).
 
 vi.mock('#lib/server/audio/store.js', () => ({
-  storeAudio: vi.fn(async () =>
-    Promise.resolve({ id: newId(), filename: 'greeting.wav' })
-  ),
+  storeAudio: vi.fn(async () => {
+    const id = newId();
+    return Promise.resolve({ id, filename: `${id}.wav` });
+  }),
   deleteAudioFile: vi.fn(async () => Promise.resolve())
 }));
 
@@ -54,6 +55,15 @@ async function greetingOf(db: Db, userId: string): Promise<string | null> {
     .where('id', '=', userId)
     .executeTakeFirstOrThrow();
   return row.mailboxAudioId;
+}
+
+async function liveAssetIds(db: Db): Promise<string[]> {
+  const rows = await db
+    .selectFrom('audioAssets')
+    .select('id')
+    .where('deletedAt', 'is', null)
+    .execute();
+  return rows.map(row => row.id);
 }
 
 function as(actor: Actor): RunInput {
@@ -145,7 +155,7 @@ describe('users.setVoicemailGreeting and users.clearVoicemailGreeting', () => {
     expect(storeAudio).not.toHaveBeenCalled();
   });
 
-  it('clears back to the default prompt only once confirmed, keeping the asset', async () => {
+  it('clears back to the default prompt only once confirmed, soft-deleting the greeting', async () => {
     const db = await makeTestDb();
     await seedUsers(db);
     await runOperation(
@@ -164,8 +174,48 @@ describe('users.setVoicemailGreeting and users.clearVoicemailGreeting', () => {
       { ...as(anna), confirm: true }
     );
     await expect(greetingOf(db, 'anna')).resolves.toBeNull();
-    const assets = await db.selectFrom('audioAssets').select('id').execute();
-    expect(assets).toHaveLength(1);
+    await expect(liveAssetIds(db)).resolves.toEqual([]);
+  });
+
+  it('soft-deletes the greeting a new one replaces', async () => {
+    const db = await makeTestDb();
+    await seedUsers(db);
+    await runOperation(
+      db,
+      'users.setVoicemailGreeting',
+      { id: 'anna', upload },
+      as(anna)
+    );
+    const second = (await runOperation(
+      db,
+      'users.setVoicemailGreeting',
+      { id: 'anna', upload },
+      as(anna)
+    )) as { mailboxAudioId: string };
+    await expect(liveAssetIds(db)).resolves.toEqual([second.mailboxAudioId]);
+  });
+
+  it('keeps a replaced greeting another mailbox still uses', async () => {
+    const db = await makeTestDb();
+    await seedUsers(db);
+    const first = (await runOperation(
+      db,
+      'users.setVoicemailGreeting',
+      { id: 'anna', upload },
+      as(anna)
+    )) as { mailboxAudioId: string };
+    await db
+      .updateTable('users')
+      .set({ mailboxAudioId: first.mailboxAudioId })
+      .where('id', '=', 'ben')
+      .execute();
+    await runOperation(
+      db,
+      'users.clearVoicemailGreeting',
+      { id: 'anna' },
+      { ...as(anna), confirm: true }
+    );
+    await expect(liveAssetIds(db)).resolves.toEqual([first.mailboxAudioId]);
   });
 
   it('takes the upload as multipart form data on PUT /users/{id}/voicemailGreeting', async () => {

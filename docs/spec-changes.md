@@ -7,6 +7,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §10.3 Audio, §11.2 users, ring_groups, forward_targets.** Every column referencing an audio asset names its kind: a ring group's greeting `greeting`, its music `moh`, a mailbox greeting `vmGreeting`, an announcement target `announcement`. An asset of another kind is refused with 422, one that is not live with 404.
 *Why:* only menus and the hold-music default checked the kind, with different statuses; a greeting set as a ring group's music rendered no MoH class, so callers heard the default music.
+**2026-10-04 · §10.2 Mailbox access, §11.6 Retention.** A replaced or removed mailbox greeting is soft-deleted in the same transaction, unless another live row still uses it. The retention purge keeps each user's latest `presence_log` row before the cutoff.
+*Why:* replaced greetings stayed live forever, files and `GET /audio` entries included; the purge deleted a quiet user's only rows, so the presence snapshot left that user out for instants within the retention window.
+
 **2026-10-04 · §6.3 First boot, §6.5 Default target.** The default `local` backup target is created by the first-boot seed, in its transaction, when `BACKUP_PASSWORD` is set; no later start creates one.
 *Why:* the start-time check "never had a target, live or deleted" could not see a target the purge had hard-deleted, so the default an admin deleted came back after the soft-delete retention.
 
