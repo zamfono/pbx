@@ -4,21 +4,25 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §6.3 Automatic updates.** On an `edge` stack each of `main`'s builds is a release of its own: the updater's `GET /status` names the newest build's commit, and the failed automatic attempts (with their 20-hour gap) count on that commit, which `autoUpdate.failed` names. `update_state.run_release` records the release an automatic run's failure counts on when it starts, in place of `run_outcome_pending`, so a build published during the run does not take its failure.
 *Why:* keyed on the version `edge`, three failed attempts on one build held off every later build until a manual update succeeded (follows D25).
+
 **2026-10-04 · §5.2 Tokens.** Product-owner decision (D35): asked whether REST/MCP requests should check their session (a JWT access token worked up to 15 minutes after its session ended), the user chose "Check on every request (Recommended)". Every request an access token authenticates checks that its session (`sid`) still lives; one whose session has ended meets a 401 like an expired token.
 *Why:* sign-out, `/oauth/revoke`, refresh-token reuse and a password reset take effect at once on REST and MCP, as they already did on `/events`.
 
 **2026-10-04 · §10.5 Uploads.** Product-owner decision (D37): asked about MCP upload links ignoring own scope, the user chose "Refuse the link (Recommended)". The upload-link tool applies the operation's own-scope check and refuses a `user`'s link to another user's upload with 403 up front.
 *Why:* a link handed out for an upload its run would refuse can never succeed.
+
 **2026-10-04 · §10.4 When a device reaches Ringotel.** Device pushes run one at a time and send the device as stored when their turn comes; a device deleted by then is skipped.
 *Why:* two writes of one device at once pushed concurrently, so Ringotel could keep the older SIP password and the app could no longer register.
 
 **2026-10-04 · §10.4 When a device reaches Ringotel.** `PUT /devices/{id}/blf` pushes the panel to Ringotel once its write committed, like a device's other pushes: a refusal is a `warnings` entry and a `ringotel.push` row with trigger `devices.setBlf`, no longer a 502 that rolls the panel back.
 *Why:* the operation held the database's write lock while Ringotel answered, so `core`'s writes and `/events` failed meanwhile; per D14 ("After commit"), a push follows the commit.
+
 **2026-10-04 · §10.3 REST API.** Product-owner decision (D36): asked what admins may do with owners, the user chose "Both owner-only" — an admin can neither soft-delete an owner nor create (or restore into being) a user with role admin. Soft-deleting an owner, creating an admin and undoing the soft delete of an admin or owner are owner-only; an admin gets 403, before any confirmation.
 *Why:* an admin could remove an owner who is not the last, or make further admins, both above their own role.
 
 **2026-10-04 · §11.2 Schema.** Product-owner decision (D34): asked how an expired but unrevoked personal access token's name is freed, the user chose "Free the name (Recommended)". Creating a token first revokes the user's expired token of that name in the same transaction; §5.2 ("unique among the user's live tokens") stays.
 *Why:* the unique index covers unrevoked tokens, so an expired token held its name until the daily purge.
+
 **2026-10-04 · §11.6 Retention.** A file in `recordings/` or `prompts/` that no `recordings` or `audio_assets` row names is deleted once it is a day old, by `core`'s and `api`'s daily jobs.
 *Why:* a crash between a file and its row left files no sweep ever removed, an admin-deleted recording among them, which is personal data.
 
@@ -42,10 +46,13 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §5.2, §5.5, §5.8, §5.9, §10.3 Operations layer and REST surface, §10.5 Auth, §10.6, §11.1, §11.2 `personal_access_tokens`.** Product-owner decision (new feature): personal access tokens for server applications. An opaque `zpat_…` bearer token, returned once and stored hashed in its own table with name, creator, optional expiry and last use; accepted on REST, MCP and `/events` as its user with their current role and no scopes; created by the user for themselves or by an admin or owner for any user, an owner's only by an owner; listed and revoked through `personalAccessTokens.list` and `personalAccessTokens.revoke`, revoked by the user's soft delete, never undoable, purged by the daily job once revoked or expired. An `/events` socket opened with a PAT is closed with 4401 once the PAT is revoked or reaches its expiry, by the same re-check that closes a deleted or demoted user's socket; §10.6 states what ends a socket. OAuth stays the way for interactive and MCP clients.
 *Why:* "I just got the information, that I will need PATs for server-applications": a server application cannot do the one interactive login a refresh token needs; the user chose "In 0.2.0", "Admins for any user", an "Optional" expiry and "The user's full role".
+
 **2026-10-04 · §10 Package structure.** The in-process ARI and AMI fakes sit under `packages/core/src/testing/` (`ari/`, `ami/`) with the other test rigs, outside the build, instead of beside the clients in `ari/` and `ami/`.
 *Why:* product-owner decision "Move them": every core test double in one directory the build excludes once.
+
 **2026-10-04 · §5.8.** Product-owner decision (undo of a deletion vs rows deleted since): undoing a deletion is refused with a 409 naming each row deleted since that the revived row, or the forward targets it and its own rules route to, points at; that deletion is undone first.
 *Why:* "Refuse with 409 (Recommended)": the undo revived a menu onto a greeting deleted meanwhile, and the daily purge then failed on the menu's `RESTRICT` reference every day, or, for a `SET NULL` one, cleared a live row's setting.
+
 **2026-10-04 · §11.4.** Product-owner decision (soft-delete vs audit retention): `soft_delete_retention_days` may not exceed a set `audit_retention_days`; `PATCH /settings` answers 422 for a pair that would.
 *Why:* "Refuse the setting (Recommended)": with a longer soft-delete window, the audit purge took a deletion's entry while its row still waited, so the undo the confirmation promised for that many days answered 404.
 
@@ -60,18 +67,22 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §5.7, §10.3 Health and System, §10.4 Colleague presence, §11.4.** Product-owner decision (Ringotel roster visibility): every roster push attempt is a sixth outcome operation, `ringotel.roster` on the settings, with `outcome`, `trigger` and `reason` as the profile push's; a pending roster shows in `GET /system/info` as `ringotel.rosterPending` and in `/healthz` as `ringotelRosterPending`.
 *Why:* "Mirror the profile (Recommended)": a refused roster push was only logged, so an operator saw neither that the colleague panel in the apps was stale nor whether a retry reached Ringotel.
+
 **2026-10-04 · §11.2 `oauth_clients`.** The `redirect_uris_json` column goes: the row keeps id, name, kind and the two timestamps.
 *Why:* §5.2 validates a redirect URI against the metadata decrypted from the `client_id` or fetched from its document at every authorization, so the stored copy was written and never read.
+
 **2026-10-04 · §10.3 Operations layer, OpenAPI; §10.5 Tools.** Product-owner decision (OpenAPI responses): every operation declares an `output` schema and the `problems` its `run` answers with; the OpenAPI document generates each route's real responses from them (a list's page, a file's media types, the problem statuses), and an MCP tool whose result is an object publishes it as its `outputSchema`.
 *Why:* "Generate responses": every response was documented as `200` JSON with an empty schema, binary downloads included, and 400 was missing.
 
 **2026-10-04 · §5.4, §10.3 Settings and conventions, §11.2 `settings`, §11.4.** Product-owner decision (secrets on the wire): no secret is ever returned, masked or otherwise; every read carries a read-only `<name>Set` boolean instead, and a write takes the secret as a merge patch, `null` clearing it (422 where required) and any string setting it. §11.4 names `ringotel_roster_pending` among the state columns outside `/settings`.
 *Why:* "I like the “xSet”. Why would the string “***” get any special treatment then?": a `GET /settings` echoed into a `PATCH` stored the mask `***` as the new SMTP, SSO or Ringotel secret.
+
 **2026-10-04 · §6.5 Moving a stack.** A restore unpacks the release's bundle, makes the `compose.override.yaml` link by hand beside the preserved `.env`, and copies the snapshot's database (`tmp/zamfono-backup/<targetId>/zamfono.sqlite3`) and `media/` into the `db` and `media` volumes before the first start.
 *Why:* the procedure as written could not bring a stack up: no files to run, `setup.sh` refuses an `.env` that holds values so the overlay link was missing, and nothing said where the restored files go.
 
 **2026-10-04 · §6.3 Images, Upgrades, Updates.** Product-owner decisions (`ZAMFONO_VERSION` forms, edge, pull request builds): one rule reads the release a stack runs from `ZAMFONO_VERSION` and moves it on an update: `X.Y.Z` pinned, `X.Y` and `X` following a line, empty and `latest` following the releases, `edge` following main, whose update re-pulls the newest edge images, which the updater and the automatic update take once main's newest successful build is not the running commit; an immutable `sha-…` build is not updated; anything else is refused. A pull request's build is named by `ZAMFONO_PR` in `compose.pr.yaml`, never by `ZAMFONO_VERSION`. `--check` of the release an unfinished update installed answers 0, so the updater finishes it. `update.sh`'s steps are listed in their order, the pull before the unpack. An automatic run is recorded without `by`.
 *Why:* "All legitimate ones, including pull request!", then "Re-pull edge on update" and "ZAMFONO_PR (Recommended)", since a bare pull request number and a major line `X` were the same value: `--current` honoured only `X.Y.Z` while the update rewrote any value, so `0.3` became a hard pin and `edge` was silently replaced; a failed automatic update after the unpack was never retried, since the updater saw no newer release; the spec listed the pull last though the script pulls first, so a failed pull changes nothing.
+
 **2026-10-04 · §3.1 Mail, §6.3 Migrations.** A voicemail mail request carries the voicemail's file name, not a path; `api` joins it with its own media mount. The migrate image also holds `packages/shared/src/stackPaths.ts`, the one default of `DB_FILE`.
 *Why:* the request named `/media/voicemail/…` as core and api each hard-coded it, whatever `MEDIA_DIR` said; migrate repeated the database default that api and core take from shared.
 
@@ -80,16 +91,19 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §9.4 Forwarded calls, §10.1 steps 2-3.** A menu hop of an internal call names the tenant's main number as its `REDIRECTING` number, as its `Diversion` entry already did. The once-per-call evaluation covers the tenant's scope too. Opening hours apply to inbound calls only, forwarded ones included.
 *Why:* the menu hop of an internal call had no `REDIRECTING` number and was dropped from the call's hops; a tenant-wide OOO rule was applied again at the target it forwarded to; step 3 said "forwarded calls" though hours describe reachability from outside.
+
 **2026-10-04 · §10.3 Call history, Statistics.** Product-owner decisions (time filters, stats counting): every time range is half-open, `[from, to)`, and a date alone as `to` covers that whole day; `GET /stats` reads `from` and `to` like the other time filters and states its 10080-bucket cap. Its four metrics are defined: unfiltered, each top-level call once; with `ringGroupId`, each offer to that group, transfers into it included, answered when a member took it.
 *Why:* "Half-open, date = day (Recommended)" and "Caller view + group offers (Recommended)"; `to` was inclusive for calls and audit but exclusive for stats, so `to=2026-10-03` left out the named day, stats refused local times though its buckets are local, and a transferred call counted twice.
 
 **2026-10-04 · §10.2 Search.** A search hit's `matched` names the field as the hit's resource names it on the wire: a user's `extension`, a contact's `displayName` and `phones`.
 *Why:* `matched` said `ext`, `name` and `phone`, names no resource has, so a client could not point at the field that hit.
+
 **2026-10-04 · §10.3 Operations layer, Confirmation.** `confirm` takes the `Context` too and builds its question from the rows the input names, after the own-scope check, so an unknown id answers 404 rather than a question; a soft delete's question gives `settings.soft_delete_retention_days`. The confirmation lists name `provisioning.ringotelAdopt` and `system.update`, which already asked.
 *Why:* with only the input, a question could name nothing but an id ("Erase user '0198…'?"), the spec's own example was unreachable, and several questions promised 30 days whatever the retention setting.
 
 **2026-10-04 · §10.3 Operations layer.** Product-owner decision (own scope): every operation a `user` may call declares its `scope`, whether what the input names is the user's own, and the runner checks it before confirmation and before `run` (403 when not). The `Operation`/`Context` sketch lists the fields every operation uses (`scope`, `audit`, `pureAction`, `entity`, `clientName`, `effects`); an operation with a three-part name lives in a subfolder (`backups/targets/create.ts`).
 *Why:* "Runner enforces (Recommended)": each operation re-implemented its own-scope check inside `run`, after the confirmation question, and one forgotten would have opened it to every user; the sketch left out fields that decide the audit row.
+
 **2026-10-04 · §5.2 Authentication pages, §10.3 Ring groups, Provisioning.** The set-password page is `/auth/setPassword`. Ring groups get `GET /ringGroups/{id}/forwarding`, the rules in the shape the `PUT` takes. A Ringotel `region` or `packageid` the account does not offer is refused with 422.
 *Why:* the page's path was the one kebab-case path on the wire; a ring group's forwarding could be written but not read back, so a client edited it blind, `sip` headers included; the Ringotel refusal is a value refusal like its siblings, which answer 422.
 
@@ -98,6 +112,7 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §11.2 forward_targets.** A CHECK sets `sip_headers_json` exactly on the sip rows, `(sip_trunk_id IS NULL) = (sip_headers_json IS NULL)`; the column's own CHECK keeps only the JSON-array shape.
 *Why:* the sentence that the API sets the column on every sip row "since SQLite's ADD COLUMN cannot require it" described a migration the greenfield baseline no longer has; the schema states the pairing itself.
+
 **2026-10-04 · §9.4 Inbound number normalization, Caller-ID, §10.1 Outbound.** `e164` is `+digits` only: `00…` and bare digits pass verbatim. `national`, the caller-ID's `national` and user dialling read a number with libphonenumber's full metadata as dialled in `settings.country`: a valid number with that country's own international prefix, or a national one with its trunk prefix, bare only where the country has none or it is optional; anything else passes verbatim, and dialled is refused with 484.
 *Why:* "Detach (Recommended)" and "Prefix + full validity (Recommended)"; `00` is one international prefix among many, an Italian `06…` became `+396…`, and a German `89123` without its `0` must not become `+4989123`.
 
@@ -109,6 +124,7 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §10.3 Audio, §11.2 users, ring_groups, forward_targets.** Every column referencing an audio asset names its kind: a ring group's greeting `greeting`, its music `moh`, a mailbox greeting `vmGreeting`, an announcement target `announcement`. An asset of another kind is refused with 422, one that is not live with 404.
 *Why:* only menus and the hold-music default checked the kind, with different statuses; a greeting set as a ring group's music rendered no MoH class, so callers heard the default music.
+
 **2026-10-04 · §10.2 Mailbox access, §11.6 Retention.** A replaced or removed mailbox greeting is soft-deleted in the same transaction, unless another live row still uses it. The retention purge keeps each user's latest `presence_log` row before the cutoff.
 *Why:* replaced greetings stayed live forever, files and `GET /audio` entries included; the purge deleted a quiet user's only rows, so the presence snapshot left that user out for instants within the retention window.
 
@@ -120,24 +136,30 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §5.4.** The cipher is named by its libsodium API, `crypto_aead_xchacha20poly1305_ietf`. `api` refuses to start when `SECRETBOX_KEY` and `SECRETBOX_KEY_PREVIOUS` carry the same generation; the new key is `<N+1>:<base64 of 32 random bytes>`; `m` in the sweep's log line, and `/healthz`, count the blobs the current key cannot decrypt.
 *Why:* equal generations were accepted and made every old blob unreadable, the procedure never said the generation must rise, and `/healthz` counted only version bytes, so it reported 0 where the sweep reported unreadable secrets; libsodium's secretbox is XSalsa20-Poly1305, not the construction in use.
+
 **2026-10-04 · §9.4 Hosts, Signaling; §11.2 trunk_hosts.** A dialed trunk host (`outbound`, `both`) is an FQDN or an IPv4 address; an IPv6 literal is `inbound` only. A `registration` trunk needs an `outbound` or `both` host, its registrar, which is the first such host. A disabled transport is refused only when a write sets it; a trunk already on it stays editable.
 *Why:* an inbound-only registration trunk crash-looped `core` and broke every PJSIP render; an IPv6 host rendered an invalid unbracketed SIP URI; a trunk on a since-disabled transport could not be renamed, edited or undone.
+
 **2026-10-04 · §10.4 When a device reaches Ringotel and Colleague presence, §11.2, §11.4.** Product-owner decision (roster timing): the roster push runs after the write committed and propagated; a refusal is a `warnings` entry, the new `settings.ringotel_roster_pending` keeps it owed, and `api` pushes the whole roster again at its start and at each Asterisk start. Setup and adoption provision the devices that existed before them after their commit too. The 502 sentence names the operations that call Ringotel before they commit.
 *Why:* a Ringotel outage blocked every user, ring group and parking slot write, a rename reached Ringotel before Asterisk held the endpoint, and a rolled-back user deletion or adoption left Ringotel changed (deleted or created users) with nothing to undo it.
 
 **2026-10-04 · §10.4 User, Tenant profile push.** A name or e-mail change reaches the person's Ringotel user via `updateUser`; a push that finds a device's Ringotel user missing recovers it within the 24 hours after a deletion, as `onDeviceCreated` does; the pending tenant profile is also retried for an Asterisk start found unhandled when the internal event stream connects.
 *Why:* a corrected e-mail stayed old at Ringotel, so a re-sent activation mail went to the old address; a restored device whose push was lost got a fresh Ringotel user and a new activation mail; a start found on reconnect was re-registered while the pending profile waited for the next one.
+
 **2026-10-04 · §5.2 Tokens, §10.3.** Resetting an owner's password or changing an owner's e-mail is owner-only; an admin gets 403. A link from `POST /users/{id}/resetPassword` is valid 7 days, as a setup link.
 *Why:* an admin could take over an owner account through either route (product-owner decision: "Owner-only"); the admin-issued link's lifetime was unstated, and it is handed on like a setup link (product-owner decision: "7 days").
 
 **2026-10-04 · §5.2 Client registration, SSO rules.** A redirect URI, registered or in a metadata document, must be an absolute `https` or `http` URI, or for a `native` client a private-use scheme (RFC 8252 §7.1). With `sso_allowed_domain` set, a `google` login also needs `hd` to equal it.
 *Why:* a relative or `javascript:` redirect URI registered fine and failed only at the first redirect, as a 500; and the `hd` quirk §5.2 promised was never checked (product-owner decision: "Check hd").
+
 **2026-10-04 · §10.2 Call parking, Mail.** A parked call whose ring-back nobody answers, with no forward, mailbox or tenant fallback target to take the party, ends as answered with no missed-call mail; the party is released with 404. A call that leaves a message sends only the voicemail mail; a caller who hangs up in the mailbox before leaving one is a missed call like any other.
 *Why:* the spec covered only a tenant with a fallback target, and the code marked the call the parker had talked on as missed and mailed them; the mail sentence named every call that reached the mailbox, and the product owner decided a caller who leaves no message counts as missed ("Treat it like a regular missed call (mail or not)").
 
 **2026-10-04 · §9.4 Route fallthrough.** A caller who hangs up ends the dialling: no further host, route or emergency trunk is tried.
 *Why:* the leg the core hangs up for the leaving caller ends like a 500 before alerting, which the fall-through rules took for a trunk failure, so a 112 was sent to the next emergency trunk after the caller had gone.
+
 **2026-10-04 · §3.1 Process split, §10.2 Presence and BLF, §11.2 devices.** Device registration is read from ARI `PeerStatusChange`, the endpoint state Asterisk keeps `Reachable` while any of the device's contacts is reachable, not from `ContactStatusChange`; `devices.last_registered_at` is stamped when the endpoint becomes `Reachable`.
+
 **2026-10-04 · §9.3 BLF and presence, §10.1 Boot and restart.** A user's lamp shows the first state that applies, so a call waiting during a call shows `RINGING`; a ring group's lamp is `RINGING` while any call rings it; the boot resync turns every ring-group and parking-slot lamp to `NOT_INUSE`.
 *Why:* product-owner decision on the lamp during call waiting: "RINGING wins (Recommended)"; the group lamp went dark when one of two ringing calls stopped, and Asterisk kept the lamps a crash left lit.
 
