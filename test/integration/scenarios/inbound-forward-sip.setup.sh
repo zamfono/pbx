@@ -29,6 +29,9 @@ dc cp "$tls_dir/cert.pem" sip-tls:/tmp/sip-target-tls/cert.pem >&2
 # shellcheck disable=SC2086
 dc cp "$tls_dir/key.pem" sip-tls:/tmp/sip-target-tls/key.pem >&2
 rm -rf "$tls_dir"
+# `cp` keeps the host's owner; the front runs as the api image's `node` user.
+# shellcheck disable=SC2086
+dc exec -T -u root sip-tls chown -R node:node /tmp/sip-target-tls
 
 # The UAS's Contact names the front, so Asterisk's BYE takes the TLS connection back through it.
 # shellcheck disable=SC2086

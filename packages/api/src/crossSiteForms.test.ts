@@ -142,6 +142,24 @@ describe('the login and consent page', () => {
     expect(resolved).toBe(false);
   });
 
+  it("refuses a cross-site POST to a login form's remote endpoint with 403", async () => {
+    // The page's script submits a remote `form` to `/_app/remote/<id>` in SvelteKit's own
+    // encoding; the body never matters, since the refusal comes first.
+    const { response, resolved } = await serve(
+      `${ORIGIN}/_app/remote/abc/login`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-sveltekit-formdata',
+          origin: 'https://evil.example'
+        },
+        body: ''
+      }
+    );
+    expect(response.status).toBe(403);
+    expect(resolved).toBe(false);
+  });
+
   it('refuses a form POST without an Origin header with 403', async () => {
     const { response, resolved } = await serve(LOGIN_SUBMISSION, {
       method: 'POST',

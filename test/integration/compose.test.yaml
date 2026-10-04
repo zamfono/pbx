@@ -140,10 +140,10 @@ services:
   # `inbound-forward-sip`'s trunk host (§9.4 "SIP targets"): a TLS front, a few lines of Node the
   # scenario's setup runs, relaying to the `sipp` container over TCP, since the harness's sipp
   # (3.5.1) offers no TLS version Asterisk's transports accept. The scenario's setup copies its self-signed certificate
-  # in and starts it; idle otherwise, like the sipp containers. The image is the one api and core
-  # are built from.
+  # in and starts it; idle otherwise, like the sipp containers. It runs from the api image under
+  # test, which has the Node it needs, so the harness pulls nothing from Docker Hub for it.
   sip-tls:
-    image: ${TLS_FRONT_IMAGE:-node:26-slim}
+    image: ${API_IMAGE:?set by run.sh}
     pull_policy: missing
     networks:
       - internal

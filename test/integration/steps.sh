@@ -55,13 +55,11 @@ step_prompts() {
 
 # §6.1: the stack as every real client reaches it, Caddy on 443 in front of api, at
 # `https://$FQDN` with the certificate it serves trusted (issued by Caddy's local CA here,
-# Caddyfile.local-ca): `/healthz`, a login whose forms are submitted as the page's own script
-# submits them (bootstrap-token.sh `--remote`), and a REST call with the token that got. api checks
-# a remote form's `Origin` against the origin it derives from what Caddy passes on, the `Host`
-# and the scheme, so a proxy that passed either on wrongly would refuse every such login.
+# Caddyfile.local-ca): `/healthz`, a login through the page's forms from the stack's own origin
+# (bootstrap-token.sh), and a REST call with the token that got.
 # Selectable as `caddy`; cheap enough to run on every shard.
 step_caddy() {
-  echo "== §6.1 through Caddy: https://$FQDN, a login as the page's script submits it =="
+  echo "== §6.1 through Caddy: https://$FQDN, a login through the page's forms =="
   # curl's own configuration, for every curl this step runs: the FQDN at the stack's published
   # 443, and Caddy's CA trusted. `api` (test/api.sh) reads this step's api_base and token.
   local -x CURL_HOME=$run_dir/caddy-client
@@ -72,8 +70,8 @@ step_caddy() {
   printf 'resolve = %s:443:127.0.0.1\ncacert = %s\n' "$FQDN" "$CURL_HOME/root.crt" \
     >"$CURL_HOME/.curlrc"
   curl -fsS "$api_base/healthz" >/dev/null || fail "GET /healthz did not answer through Caddy"
-  token=$(bash "$here/bootstrap-token.sh" --remote "$api_base" "$OWNER_EMAIL" "$OWNER_PASSWORD" \
-    "$api_base") || fail "the login's remote forms gave no access token through Caddy"
+  token=$(bash "$here/bootstrap-token.sh" "$api_base" "$OWNER_EMAIL" "$OWNER_PASSWORD" \
+    "$api_base") || fail "the login's forms gave no access token through Caddy"
   api GET /users >/dev/null || fail "GET /users did not answer through Caddy"
   echo '   /healthz, the login and GET /users answered through Caddy'
 }

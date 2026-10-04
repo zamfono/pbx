@@ -3,14 +3,18 @@
 # deploy/README.md step 8 upgrades an operator's stack (§6.3 "Upgrades"). What that release's first
 # boot seeded is read through its API before the upgrade and must read the same after it.
 #
-#   UPGRADE_FROM=latest   the newest vX.Y.Z tag of the repository
+#   UPGRADE_FROM=latest   the newest release of the build's breaking line (§8 "Integration"): the
+#                         line of the newest vX.Y.Z tag in the checkout's history
 #   UPGRADE_FROM=X.Y.Z    that release
 #
 # The release must be one the build under test upgrades from: 0.2.0 or later, since a 0.1.x stack
 # is not upgraded (installed anew instead).
 #
-# Reads and sets `run.sh`'s own compose, run_dir, here, api_base, RUNTIME, FQDN and fail, and
+# Reads and sets `run.sh`'s own compose, repo, run_dir, here, api_base, RUNTIME, FQDN and fail, and
 # test/stack.sh's helpers.
+
+# shellcheck source=../../deploy/setup/versions.sh
+. "$repo/deploy/setup/versions.sh"
 
 UPGRADE_REPO=https://github.com/zamfono/pbx
 UPGRADE_REGISTRY=ghcr.io/zamfono
@@ -18,14 +22,22 @@ UPGRADE_REGISTRY=ghcr.io/zamfono
 # boot"), each through an endpoint every release serves.
 UPGRADE_SNAPSHOT_PATHS=(/settings /users /dids /parking/slots /audio)
 
-# The version `UPGRADE_FROM` names, without its `v`.
+# The version `UPGRADE_FROM` names, without its `v`; for `latest`, the newest published release
+# that is no breaking update from the newest one the build descends from (deploy/setup/versions.sh).
 upgrade_version() {
+  local base version newest=
   if [ "$UPGRADE_FROM" != latest ]; then
     echo "${UPGRADE_FROM#v}"
     return
   fi
-  git ls-remote --tags --refs "$UPGRADE_REPO" 'v*' \
-    | sed -n 's#.*refs/tags/v\([0-9]*\.[0-9]*\.[0-9]*\)$#\1#p' | sort -V | tail -n 1
+  base=$(git -C "$repo" describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*') \
+    || fail 'UPGRADE_FROM=latest needs the release tags in this checkout (git fetch --tags)'
+  base=${base#v}
+  while read -r version; do
+    breaking "$base" "$version" || newest=$version
+  done < <(git ls-remote --tags --refs "$UPGRADE_REPO" 'v*' \
+    | sed -n 's#.*refs/tags/v\([0-9]*\.[0-9]*\.[0-9]*\)$#\1#p' | sort -V)
+  echo "$newest"
 }
 
 # The previous release's API, read with a token of its own, into one JSON document per path.
@@ -51,7 +63,8 @@ upgrade_start_previous() {
   echo "== §6.3 Upgrades: starting v$version from its own bundle and images =="
   ASTERISK_IMAGE=$UPGRADE_REGISTRY/asterisk:$version MIGRATE_IMAGE=$UPGRADE_REGISTRY/migrate:$version \
     CORE_IMAGE=$UPGRADE_REGISTRY/core:$version API_IMAGE=$UPGRADE_REGISTRY/api:$version \
-    PROXY_IMAGE=$UPGRADE_REGISTRY/proxy:$version stack_recreate
+    PROXY_IMAGE=$UPGRADE_REGISTRY/proxy:$version UPDATER_IMAGE=$UPGRADE_REGISTRY/updater:$version \
+    stack_recreate
 }
 
 # The upgrade itself, as deploy/README.md step 8 gives it: the stack directory's own `update.sh`,
@@ -74,11 +87,11 @@ upgrade_to_build() {
   upgrade_assert_images
 }
 
-# Every one of the stack's five services now runs the build's own image, not the release's.
+# Every one of the stack's six services now runs the build's own image, not the release's.
 # Podman names a local image `localhost/…` and a Hub one `docker.io/…`; neither prefix counts.
 upgrade_assert_images() {
   local service var expected running
-  for service in asterisk migrate core api proxy; do
+  for service in asterisk migrate core api proxy updater; do
     var=${service^^}_IMAGE
     expected=${!var}
     running=$(dc ps -a --format '{{.Service}} {{.Image}}' \
