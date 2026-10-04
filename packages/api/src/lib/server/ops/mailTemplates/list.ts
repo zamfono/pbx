@@ -1,4 +1,8 @@
-import { z } from 'zod';
+import {
+  decodeOffsetCursor,
+  offsetPage,
+  pageInput
+} from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
 import {
@@ -14,14 +18,21 @@ import {
 export const list = defineOperation({
   name: 'mailTemplates.list',
   description: 'Lists the effective mail templates in the tenant language',
-  input: z.object({}).strict(),
+  input: pageInput.strict(),
   minRole: 'admin',
   readOnly: true,
-  run: async ctx => {
+  run: async (ctx, input) => {
+    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
+    const { page, nextCursor } = offsetPage(
+      ctx.operation,
+      TEMPLATE_KINDS.slice(offset, offset + input.limit + 1),
+      offset,
+      input.limit
+    );
     const language = await tenantLanguage(ctx.db);
     const items = await Promise.all(
-      TEMPLATE_KINDS.map(kind => effectiveTemplate(ctx.db, kind, language))
+      page.map(kind => effectiveTemplate(ctx.db, kind, language))
     );
-    return { items };
+    return { items, nextCursor };
   }
 });

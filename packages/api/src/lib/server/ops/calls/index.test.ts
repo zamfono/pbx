@@ -199,6 +199,27 @@ describe('calls', () => {
       asRun({ actor: anna })
     )) as { items: LiveCall[] };
     expect(asUser.items.map(item => item.callId)).toEqual(['call-1']);
+
+    const firstPage = (await runOperation(
+      db,
+      'calls.list',
+      { live: true, limit: 1 },
+      asRun()
+    )) as { items: LiveCall[]; nextCursor: string | null };
+    expect(firstPage.items).toHaveLength(1);
+    const secondPage = (await runOperation(
+      db,
+      'calls.list',
+      { live: true, limit: 1, cursor: firstPage.nextCursor },
+      asRun()
+    )) as { items: LiveCall[]; nextCursor: string | null };
+    expect(
+      [...firstPage.items, ...secondPage.items].map(item => item.callId).sort()
+    ).toEqual(['call-1', 'call-2']);
+    expect(secondPage.nextCursor).toBeNull();
+    await expect(
+      runOperation(db, 'calls.list', { live: true, cursor: 'garbage' }, asRun())
+    ).rejects.toMatchObject({ status: 422 });
   });
 
   it('calls.originate by a user for another user is refused', async () => {

@@ -21,6 +21,27 @@ describe('mailTemplates', () => {
     expect(listed.items.every(item => item.source === 'builtin')).toBe(true);
   });
 
+  it('pages the list like every other list (§10.3 "Conventions")', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    type Page = { items: MailTemplateWire[]; nextCursor: string | null };
+    const first = (await runOperation(
+      db,
+      'mailTemplates.list',
+      { limit: 4 },
+      asRun()
+    )) as Page;
+    expect(first.items).toHaveLength(4);
+    const second = (await runOperation(
+      db,
+      'mailTemplates.list',
+      { limit: 4, cursor: first.nextCursor },
+      asRun()
+    )) as Page;
+    expect(second).toMatchObject({ nextCursor: null });
+    expect(second.items).toHaveLength(2);
+  });
+
   it('refuses a template naming a placeholder its kind does not offer', async () => {
     const db = await makeTestDb();
     await seedSettings(db);

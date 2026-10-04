@@ -3,6 +3,17 @@ import { z } from 'zod';
 
 import type { DB } from '@zamfono/shared';
 
+import {
+  decodeOffsetCursor,
+  offsetPage,
+  pageInput
+} from '#lib/server/pagination.js';
+
+import {
+  contactPhoneE164,
+  phoneDigits,
+  tenantCountry
+} from '../contacts/_shared.js';
 import { defineOperation } from '../types.js';
 
 type Hit = {
@@ -16,7 +27,7 @@ function includes(haystack: string | null, needle: string): boolean {
   return haystack?.toLowerCase().includes(needle) ?? false;
 }
 
-/** The first field of `name`, `ext` and, when `email` is searched, `email` that matches `needle`. */
+/** The wire name of the first searched field whose value matches `needle`. */
 function firstMatch(
   fields: { field: string; value: string | null; search: boolean }[],
   needle: string
@@ -63,8 +74,8 @@ async function extensionsByRingGroup(
   return byRingGroup;
 }
 
-// ponytail: matches over every live row in JS rather than a SQL LIKE, since a normalized number
-// match needs the same substring check as a name match; SQLite FTS5 is the spec's own upgrade
+// ponytail: matches over every live row in JS rather than a SQL LIKE, since a pasted number
+// matches through its normalized forms (`phoneNeedles`); SQLite FTS5 is the spec's own upgrade
 // path (§10.2 "Search") once a tenant's row count makes this scan slow.
 async function searchUsers(
   db: Transaction<DB>,
@@ -85,7 +96,7 @@ async function searchUsers(
     const matched = firstMatch(
       [
         { field: 'name', value: user.name, search: true },
-        { field: 'ext', value: ext, search: true },
+        { field: 'extension', value: ext, search: true },
         { field: 'email', value: user.email, search: includeEmail }
       ],
       needle
@@ -153,17 +164,38 @@ async function phonesByContact(
   return byContact;
 }
 
+// A needle of digits and the separators a written number carries: `+`, spaces, `-`, `/`, `.`, `()`.
+const PHONE_LIKE = /^\+?[\d\s()./-]+$/u;
+
+/**
+ * The forms a stored E.164 contact number may contain a pasted `needle` as: its bare digits, and
+ * the number the tenant's dialling rules make of it ("01 2345678" → "+4312345678"). None when the
+ * needle is no number.
+ */
+async function phoneNeedles(
+  db: Transaction<DB>,
+  needle: string
+): Promise<string[]> {
+  if (!PHONE_LIKE.test(needle)) {
+    return [];
+  }
+  const digits = phoneDigits(needle);
+  const e164 = contactPhoneE164(needle, await tenantCountry(db));
+  return [...new Set([digits, e164 ?? digits])];
+}
+
 async function searchContacts(
   db: Transaction<DB>,
   needle: string
 ): Promise<Hit[]> {
-  const [contacts, phones] = await Promise.all([
+  const [contacts, phones, numberNeedles] = await Promise.all([
     db
       .selectFrom('contacts')
       .select(['id', 'displayName', 'company'])
       .where('deletedAt', 'is', null)
       .execute(),
-    phonesByContact(db)
+    phonesByContact(db),
+    phoneNeedles(db, needle)
   ]);
   const hits: Hit[] = [];
   for (const contact of contacts) {
@@ -176,7 +208,7 @@ async function searchContacts(
         kind: 'contact',
         id: contact.id,
         label: displayLabel,
-        matched: 'name'
+        matched: 'displayName'
       });
       continue;
     }
@@ -189,13 +221,15 @@ async function searchContacts(
       });
       continue;
     }
-    const matchedPhone = contactPhones.find(number => includes(number, needle));
+    const matchedPhone = contactPhones.find(number =>
+      numberNeedles.some(numberNeedle => number.includes(numberNeedle))
+    );
     if (matchedPhone) {
       hits.push({
         kind: 'contact',
         id: contact.id,
         label: `${contact.displayName} · ${matchedPhone}`,
-        matched: 'phone'
+        matched: 'phones'
       });
     }
   }
@@ -216,12 +250,14 @@ export const searchQuery = defineOperation({
         .min(1)
         .describe(
           "Text matched case-insensitively against users' names, extensions and (for admins) e-mails, ring groups' names and extensions, and contacts' names, companies and numbers."
-        )
+        ),
+      ...pageInput.shape
     })
     .strict(),
   minRole: 'user',
   readOnly: true,
   run: async (ctx, input) => {
+    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
     const needle = input.q.toLowerCase();
     const includeEmail = ADMIN_ROLES.has(ctx.actor.role);
     const [users, ringGroups, contacts] = await Promise.all([
@@ -229,6 +265,13 @@ export const searchQuery = defineOperation({
       searchRingGroups(ctx.db, needle),
       searchContacts(ctx.db, needle)
     ]);
-    return { items: [...users, ...ringGroups, ...contacts] };
+    const hits = [...users, ...ringGroups, ...contacts];
+    const { page, nextCursor } = offsetPage(
+      ctx.operation,
+      hits.slice(offset, offset + input.limit + 1),
+      offset,
+      input.limit
+    );
+    return { items: page, nextCursor };
   }
 });

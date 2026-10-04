@@ -113,6 +113,66 @@ describe('presenceLog.snapshot', () => {
     expect(result.items.map(item => item.userId)).toEqual(['other']);
   });
 
+  it('pages the snapshot by user like every other list (§10.3 "Conventions")', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    await db
+      .insertInto('users')
+      .values({
+        id: 'other',
+        name: 'Other',
+        email: 'other@x',
+        role: 'user',
+        createdAt: '2026-01-01T00:00:00.000Z'
+      })
+      .execute();
+    await db
+      .insertInto('presenceLog')
+      .values(
+        ['owner', 'other'].flatMap(userId => [
+          {
+            id: newId(),
+            userId,
+            status: 'available',
+            peer: null,
+            ringGroupId: null,
+            since: '2026-01-01T00:00:00.000Z'
+          },
+          {
+            id: newId(),
+            userId,
+            status: 'busy',
+            peer: null,
+            ringGroupId: null,
+            since: '2026-01-01T00:10:00.000Z'
+          }
+        ])
+      )
+      .execute();
+    type Page = { items: SnapshotItem[]; nextCursor: string | null };
+
+    const first = (await runOperation(
+      db,
+      'presenceLog.snapshot',
+      { at: '2026-01-01T00:30:00.000Z', limit: 1 },
+      asRun()
+    )) as Page;
+    const second = (await runOperation(
+      db,
+      'presenceLog.snapshot',
+      { at: '2026-01-01T00:30:00.000Z', limit: 1, cursor: first.nextCursor },
+      asRun()
+    )) as Page;
+
+    expect(
+      [...first.items, ...second.items].map(item => [item.userId, item.status])
+    ).toEqual([
+      ['other', 'busy'],
+      ['owner', 'busy']
+    ]);
+    expect(second.nextCursor).toBeNull();
+  });
+
   it.each([
     ['an offset', '2026-01-01T02:15:00+02:00'],
     ['no milliseconds', '2026-01-01T00:15:00Z'],

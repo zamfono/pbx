@@ -199,6 +199,7 @@ describe('handleRest', () => {
 
   it('does not coerce a digits-only string filter into a number', async () => {
     const deps = await testDeps();
+    await seedSettings(deps.db);
     // `search.query`'s `q` is a string; a number would fail its validation with a 422.
     const response = await rest(deps, '/search?q=101');
     expect(response.status).toBe(200);

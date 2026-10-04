@@ -115,6 +115,7 @@ async function executeInTransaction(
       executeOperation({
         ...execution,
         ctx: {
+          operation: execution.name,
           actor: execution.run.actor,
           db: trx,
           now: nowIso(),

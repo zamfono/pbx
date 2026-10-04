@@ -23,7 +23,9 @@ export const list = defineOperation({
   run: async (ctx, input) => {
     const { limit } = input;
     const cursor =
-      input.cursor === undefined ? undefined : decodeIdCursor(input.cursor);
+      input.cursor === undefined
+        ? undefined
+        : decodeIdCursor(ctx.operation, input.cursor);
     const ringGroupIds =
       ctx.actor.role === 'user'
         ? await ringGroupIdsForUser(ctx.db, ctx.actor.id)
@@ -48,7 +50,7 @@ export const list = defineOperation({
       .orderBy('id', 'desc')
       .limit(limit + 1)
       .execute();
-    const { page, nextCursor } = keysetPage(rows, limit);
+    const { page, nextCursor } = keysetPage(ctx.operation, rows, limit);
     return {
       items: page.map(toVoicemailOut),
       nextCursor

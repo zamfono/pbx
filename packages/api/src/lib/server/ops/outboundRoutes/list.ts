@@ -23,7 +23,7 @@ export const list = defineOperation<Input, Output>({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const offset = decodeOffsetCursor(input.cursor);
+    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
     const { limit } = input;
     const pageRows = await ctx.db
       .selectFrom('outboundRoutes')
@@ -33,7 +33,12 @@ export const list = defineOperation<Input, Output>({
       .offset(offset)
       .limit(limit + 1)
       .execute();
-    const { page: rows, nextCursor } = offsetPage(pageRows, offset, limit);
+    const { page: rows, nextCursor } = offsetPage(
+      ctx.operation,
+      pageRows,
+      offset,
+      limit
+    );
     const children = await loadRouteChildren(
       ctx.db,
       rows.map(row => row.id)

@@ -15,7 +15,7 @@ export const listUserGroups = defineOperation({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
-    const offset = decodeOffsetCursor(input.cursor);
+    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
     const { limit } = input;
     const rows = await ctx.db
       .selectFrom('userGroups')
@@ -25,7 +25,7 @@ export const listUserGroups = defineOperation({
       .offset(offset)
       .limit(limit + 1)
       .execute();
-    const { page, nextCursor } = offsetPage(rows, offset, limit);
+    const { page, nextCursor } = offsetPage(ctx.operation, rows, offset, limit);
     const items = await Promise.all(
       page.map(row => toUserGroupOut(ctx.db, row))
     );

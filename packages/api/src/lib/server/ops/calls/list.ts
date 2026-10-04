@@ -5,7 +5,9 @@ import { CALL_DIRECTIONS, CALL_STATUSES, type LiveCall } from '@zamfono/shared';
 import { getCoreClient } from '#lib/server/coreClient.js';
 import {
   decodeIdCursor,
+  decodeOffsetCursor,
   keysetPage,
+  offsetPage,
   pageInput
 } from '#lib/server/pagination.js';
 
@@ -48,7 +50,7 @@ const inputSchema = z
       .boolean()
       .optional()
       .describe(
-        'true returns the calls in progress now, unpaginated, each with userIds, the users it concerns now, instead of the history of ended calls.'
+        'true returns the calls in progress now, each with userIds, the users it concerns now, instead of the history of ended calls.'
       ),
     ...pageInput.shape
   })
@@ -105,7 +107,7 @@ function matchesLive(
  * `GET /calls` (§10.2 "Call history", "Live calls", §5.3): a `user` sees only calls where they
  * are the caller, the callee or the answering user, and of the calls in progress also those a leg
  * of theirs rings or is up in (§10.3 "Live calls"); `live: true` returns the calls `core`
- * currently has in progress instead of history rows, unpaginated. History holds only ended calls:
+ * currently has in progress instead of history rows. History holds only ended calls:
  * a call in progress already has its row (core's placeholder, so recordings can reference it), but
  * that row is not a durable outcome until the call ends (§10.1 "Call aggregate").
  */
@@ -124,18 +126,25 @@ export const list = defineOperation({
       );
     }
     const ownUserId = ctx.actor.role === 'user' ? ctx.actor.id : null;
-    if (input.live === true) {
-      const state = await getCoreClient().state();
-      return {
-        items: state.calls
-          .filter(call => matchesLive(call, input, ownUserId))
-          .map(listedLiveCall),
-        nextCursor: null
-      };
-    }
     const { limit } = input;
+    if (input.live === true) {
+      const offset = decodeOffsetCursor(ctx.operation, input.cursor);
+      const state = await getCoreClient().state();
+      const matching = state.calls.filter(call =>
+        matchesLive(call, input, ownUserId)
+      );
+      const { page, nextCursor } = offsetPage(
+        ctx.operation,
+        matching.slice(offset, offset + limit + 1),
+        offset,
+        limit
+      );
+      return { items: page.map(listedLiveCall), nextCursor };
+    }
     const cursor =
-      input.cursor === undefined ? undefined : decodeIdCursor(input.cursor);
+      input.cursor === undefined
+        ? undefined
+        : decodeIdCursor(ctx.operation, input.cursor);
     const toStoredInstant = await tenantInstantReader(ctx.db);
     const from =
       input.from === undefined ? undefined : toStoredInstant(input.from);
@@ -173,7 +182,7 @@ export const list = defineOperation({
       .orderBy('id', 'desc')
       .limit(limit + 1)
       .execute();
-    const { page, nextCursor } = keysetPage(rows, limit);
+    const { page, nextCursor } = keysetPage(ctx.operation, rows, limit);
     return {
       items: page.map(toCallOut),
       nextCursor

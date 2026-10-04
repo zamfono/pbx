@@ -15,7 +15,7 @@ export const listContacts = defineOperation({
   minRole: 'user',
   readOnly: true,
   run: async (ctx, input) => {
-    const offset = decodeOffsetCursor(input.cursor);
+    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
     const { limit } = input;
     const rows = await ctx.db
       .selectFrom('contacts')
@@ -25,7 +25,7 @@ export const listContacts = defineOperation({
       .offset(offset)
       .limit(limit + 1)
       .execute();
-    const { page, nextCursor } = offsetPage(rows, offset, limit);
+    const { page, nextCursor } = offsetPage(ctx.operation, rows, offset, limit);
     const items = await Promise.all(page.map(row => toContactOut(ctx.db, row)));
     return { items, nextCursor };
   }

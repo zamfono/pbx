@@ -120,6 +120,13 @@ why the specified behaviour changed; the commit history, how.
   of audit entries, DIDs, number blocks, blocked numbers, webhooks and backup targets and runs
   already did; without `limit` a page still holds 50. Every list also refuses with 422 a `cursor`
   it did not hand out itself, where most of them answered with a wrong page or a 500.
+- Breaking: the mail templates, the search, the presence snapshot, the parked calls and the live
+  calls are paged like every other list: they take `limit` and `cursor` and return `nextCursor`,
+  where they refused `limit` with 422 or returned everything at once. A cursor names the list
+  that handed it out, and another list's cursor is refused with 422. A search hit's `matched`
+  names the field as its resource does (`extension`, `displayName`, `phones` instead of `ext`,
+  `name`, `phone`), and a pasted number finds the contact in any spelling (`+43 1 234 5678`,
+  `01 2345678`), not only as stored.
 - A renewed TLS certificate is swapped in at the maintenance moment only once nothing is in
   progress: no call, no parked call, no voicemail being left and no recording being made or
   mixed. While something is, the stack looks again every 5 minutes for up to two hours, then

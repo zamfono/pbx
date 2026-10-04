@@ -20,7 +20,9 @@ export const list = defineOperation({
   run: async (ctx, input) => {
     const { limit } = input;
     const cursor =
-      input.cursor === undefined ? undefined : decodeIdCursor(input.cursor);
+      input.cursor === undefined
+        ? undefined
+        : decodeIdCursor(ctx.operation, input.cursor);
     let query = ctx.db.selectFrom('recordings').selectAll();
     if (cursor !== undefined) {
       query = query.where('id', '<', cursor);
@@ -29,7 +31,7 @@ export const list = defineOperation({
       .orderBy('id', 'desc')
       .limit(limit + 1)
       .execute();
-    const { page, nextCursor } = keysetPage(rows, limit);
+    const { page, nextCursor } = keysetPage(ctx.operation, rows, limit);
     return {
       items: page.map(toRecordingOut),
       nextCursor

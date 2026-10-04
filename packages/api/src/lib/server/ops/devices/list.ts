@@ -28,7 +28,7 @@ export const list = defineOperation({
       input.userId,
       'devices: may list only your own devices'
     );
-    const offset = decodeOffsetCursor(input.cursor);
+    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
     const { limit } = input;
     const rows = await ctx.db
       .selectFrom('devices')
@@ -39,7 +39,7 @@ export const list = defineOperation({
       .offset(offset)
       .limit(limit + 1)
       .execute();
-    const { page, nextCursor } = offsetPage(rows, offset, limit);
+    const { page, nextCursor } = offsetPage(ctx.operation, rows, offset, limit);
     return { items: page.map(toDeviceOut), nextCursor };
   }
 });

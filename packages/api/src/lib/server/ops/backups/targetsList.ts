@@ -23,13 +23,17 @@ export const targetsList = defineOperation({
       .selectAll()
       .where('deletedAt', 'is', null);
     if (input.cursor !== undefined) {
-      query = query.where('id', '>', decodeIdCursor(input.cursor));
+      query = query.where(
+        'id',
+        '>',
+        decodeIdCursor(ctx.operation, input.cursor)
+      );
     }
     const rows = await query
       .orderBy('id')
       .limit(limit + 1)
       .execute();
-    const { page, nextCursor } = keysetPage(rows, limit);
+    const { page, nextCursor } = keysetPage(ctx.operation, rows, limit);
     return {
       items: page.map(targetToWire),
       nextCursor

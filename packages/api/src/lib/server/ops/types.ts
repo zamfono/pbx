@@ -16,6 +16,8 @@ export type Actor = { id: string; name: string; role: UserRole };
 
 /** Built by the runner for every call; `run` holds only what differs between operations (§10.3). */
 export type Context = {
+  /** The running operation's name, e.g. `users.list`: what its list cursors carry (§10.3). */
+  operation: string;
   actor: Actor;
   db: Transaction<DB>;
   now: string;

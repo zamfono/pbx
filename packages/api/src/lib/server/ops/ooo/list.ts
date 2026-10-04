@@ -36,12 +36,13 @@ export const list = defineOperation({
   run: async (ctx, input) => {
     assertOwnScopeOrAdmin(ctx.actor, input.scope);
     await assertScopeExists(ctx.db, input.scope);
-    const offset = decodeOffsetCursor(input.cursor);
+    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
     const { limit } = input;
     // A scope's rules are few, so the page is cut from the whole ordered set here rather than
     // in SQL, which keeps `liveOooRulesInScope` the one query the overlap checks share.
     const rows = await liveOooRulesInScope(ctx.db, input.scope);
     const { page, nextCursor } = offsetPage(
+      ctx.operation,
       rows.slice(offset, offset + limit + 1),
       offset,
       limit

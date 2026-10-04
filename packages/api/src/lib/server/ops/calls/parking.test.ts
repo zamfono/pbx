@@ -191,6 +191,9 @@ describe('a parked call (§10.2 "Call parking")', () => {
       items: PARKED,
       nextCursor: null
     });
+    await expect(
+      run(user('ben'), 'parking.list', { limit: 1 })
+    ).resolves.toMatchObject({ items: PARKED.slice(0, 1) });
   });
 
   it('is hung up by an admin only, nobody being connected in it', async () => {

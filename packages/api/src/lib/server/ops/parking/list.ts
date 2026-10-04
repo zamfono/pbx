@@ -1,6 +1,9 @@
-import { z } from 'zod';
-
 import { getCoreClient } from '#lib/server/coreClient.js';
+import {
+  decodeOffsetCursor,
+  offsetPage,
+  pageInput
+} from '#lib/server/pagination.js';
 
 import { defineOperation } from '../types.js';
 
@@ -14,11 +17,18 @@ export const list = defineOperation({
   name: 'parking.list',
   description:
     'Lists the calls parked right now: slot, call, caller (null when withheld), parked since and by whom.',
-  input: z.object({}).strict(),
+  input: pageInput.strict(),
   minRole: 'user',
   readOnly: true,
-  run: async () => {
+  run: async (ctx, input) => {
+    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
     const { parked } = await getCoreClient().parked();
-    return { items: parked, nextCursor: null };
+    const { page, nextCursor } = offsetPage(
+      ctx.operation,
+      parked.slice(offset, offset + input.limit + 1),
+      offset,
+      input.limit
+    );
+    return { items: page, nextCursor };
   }
 });

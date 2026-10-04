@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+import {
+  decodeOffsetCursor,
+  offsetPage,
+  pageInput
+} from '#lib/server/pagination.js';
+
 import { instantInput, tenantInstantReader } from '../instantInput.js';
 import { defineOperation } from '../types.js';
 
@@ -11,22 +17,15 @@ const inputSchema = z
     userId: z
       .string()
       .optional()
-      .describe('Only this user; left out, every user.')
+      .describe('Only this user; left out, every user.'),
+    ...pageInput.shape
   })
   .strict();
-
-type PresenceSnapshotItem = {
-  userId: string;
-  status: string;
-  since: string;
-  peer: string | null;
-  ringGroupId: string | null;
-};
 
 /**
  * `GET /presence/log?at=&userId=` (§10.3, §11.2 `presence_log`): each user's latest presence
  * state as of a past instant — the `presence_log` row with the greatest `since` that is still
- * `<= at` — ignoring any row recorded later.
+ * `<= at` — ignoring any row recorded later; paged by user.
  */
 export const snapshot = defineOperation({
   name: 'presenceLog.snapshot',
@@ -35,31 +34,40 @@ export const snapshot = defineOperation({
   minRole: 'admin',
   readOnly: true,
   run: async (ctx, input) => {
+    const offset = decodeOffsetCursor(ctx.operation, input.cursor);
+    const { limit } = input;
     const toStoredInstant = await tenantInstantReader(ctx.db);
-    let query = ctx.db
+    let ranked = ctx.db
       .selectFrom('presenceLog')
-      .selectAll()
+      .select(eb => [
+        'userId',
+        'status',
+        'since',
+        'peer',
+        'ringGroupId',
+        eb.fn
+          .agg<number>('row_number')
+          .over(over =>
+            over
+              .partitionBy('userId')
+              .orderBy('since', 'desc')
+              .orderBy('id', 'desc')
+          )
+          .as('rank')
+      ])
       .where('since', '<=', toStoredInstant(input.at));
     if (input.userId !== undefined) {
-      query = query.where('userId', '=', input.userId);
+      ranked = ranked.where('userId', '=', input.userId);
     }
-    const rows = await query
+    const rows = await ctx.db
+      .selectFrom(ranked.as('ranked'))
+      .select(['userId', 'status', 'since', 'peer', 'ringGroupId'])
+      .where('rank', '=', 1)
       .orderBy('userId')
-      .orderBy('since', 'desc')
-      .orderBy('id', 'desc')
+      .offset(offset)
+      .limit(limit + 1)
       .execute();
-    const latestByUser = new Map<string, PresenceSnapshotItem>();
-    for (const row of rows) {
-      if (!latestByUser.has(row.userId)) {
-        latestByUser.set(row.userId, {
-          userId: row.userId,
-          status: row.status,
-          since: row.since,
-          peer: row.peer,
-          ringGroupId: row.ringGroupId
-        });
-      }
-    }
-    return { items: [...latestByUser.values()] };
+    const { page, nextCursor } = offsetPage(ctx.operation, rows, offset, limit);
+    return { items: page, nextCursor };
   }
 });

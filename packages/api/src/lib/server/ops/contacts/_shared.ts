@@ -58,22 +58,32 @@ export type ContactOut = {
   phones: ContactPhoneOut[];
 };
 
-/**
- * Normalizes a phone-book number to E.164 (§10.2 "Phone book", §9.4): strips everything but an
- * optional leading `+` and digits, then applies the outbound resolution rules of `settings.country`.
- */
-export function normalizeContactPhone(raw: string, country: string): string {
-  const cleaned = raw.startsWith('+')
+/** `raw` with everything but an optional leading `+` and digits stripped. */
+export function phoneDigits(raw: string): string {
+  return raw.startsWith('+')
     ? `+${raw.slice(1).replace(/\D/gu, '')}`
     : raw.replace(/\D/gu, '');
-  const normalized = normalizeDialed(cleaned, country);
-  if (normalized.kind === 'incomplete') {
+}
+
+/**
+ * A phone-book number in E.164 (§10.2 "Phone book", §9.4): `raw`'s `phoneDigits` under the
+ * outbound resolution rules of `settings.country`; `null` when those leave it incomplete.
+ */
+export function contactPhoneE164(raw: string, country: string): string | null {
+  const normalized = normalizeDialed(phoneDigits(raw), country);
+  return normalized.kind === 'e164' ? normalized.number : null;
+}
+
+/** `contactPhoneE164`, refusing a number it cannot resolve with 422. */
+export function normalizeContactPhone(raw: string, country: string): string {
+  const number = contactPhoneE164(raw, country);
+  if (number === null) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
       `contacts: '${raw}' is not a resolvable phone number`
     );
   }
-  return normalized.number;
+  return number;
 }
 
 /** Throws 422 when `phones` holds two entries with the same normalized number or the same label (`contact_phones`' PRIMARY KEY and UNIQUE, §11.2). */

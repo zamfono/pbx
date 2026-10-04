@@ -78,7 +78,7 @@ describe('search', () => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- vitest types expect.any() as `any`
       id: expect.any(String),
       label: 'Huber GmbH',
-      matched: 'name'
+      matched: 'displayName'
     });
     expect(result.items.some(item => item.id === 'bob')).toBe(false);
     expect(result.items.every(item => !('email' in item))).toBe(true);
@@ -125,7 +125,7 @@ describe('search', () => {
       kind: 'contact',
       id: contact.id,
       label: 'Huber Consulting · +4989123',
-      matched: 'name'
+      matched: 'displayName'
     });
   });
 
@@ -152,7 +152,70 @@ describe('search', () => {
       kind: 'contact',
       id: contact.id,
       label: 'Radiologie Nord · +4989123',
-      matched: 'phone'
+      matched: 'phones'
     });
+  });
+
+  it.each(['+49 89 123', '089 123', '(089) 12', '89-123'])(
+    'finds a contact by the pasted number %s',
+    async pasted => {
+      const db = await makeTestDb();
+      await seedSettings(db);
+      const contact = (await runOperation(
+        db,
+        'contacts.create',
+        {
+          displayName: 'Radiologie Nord',
+          phones: [{ label: 'work', number: '089 123' }]
+        },
+        asRun()
+      )) as { id: string };
+      const result = (await runOperation(
+        db,
+        'search.query',
+        // eslint-disable-next-line id-length -- 'q' is the wire query-parameter name fixed by §10.3's `GET /search?q=`
+        { q: pasted },
+        asRun({ actor: user })
+      )) as { items: Item[] };
+      expect(result.items).toContainEqual(
+        expect.objectContaining({ id: contact.id, matched: 'phones' })
+      );
+    }
+  );
+
+  it('names the wire field a user matched on and pages the hits', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    await seedFixtures(db);
+    type Page = { items: Item[]; nextCursor: string | null };
+    const first = (await runOperation(
+      db,
+      'search.query',
+      // eslint-disable-next-line id-length -- 'q' is the wire query-parameter name fixed by §10.3's `GET /search?q=`
+      { q: '10', limit: 1 },
+      asRun({ actor: user })
+    )) as Page;
+    const second = (await runOperation(
+      db,
+      'search.query',
+      // eslint-disable-next-line id-length -- 'q' is the wire query-parameter name fixed by §10.3's `GET /search?q=`
+      { q: '10', limit: 1, cursor: first.nextCursor },
+      asRun({ actor: user })
+    )) as Page;
+    expect([...first.items, ...second.items]).toEqual([
+      {
+        kind: 'user',
+        id: 'anna',
+        label: 'Anna Huber · 101',
+        matched: 'extension'
+      },
+      {
+        kind: 'user',
+        id: 'bob',
+        label: 'Bob Nomatch · 102',
+        matched: 'extension'
+      }
+    ]);
+    expect(second.nextCursor).toBeNull();
   });
 });
