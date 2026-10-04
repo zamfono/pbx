@@ -96,7 +96,8 @@ export const FAKE_ASTERISK_STARTUP_TIME = '2026-09-29T08:00:00.000+0000';
 export function routeMisc(
   method: string,
   path: string,
-  endpoints: readonly unknown[]
+  endpoints: readonly unknown[],
+  startupTime: string
 ): RouteResult {
   if (path.startsWith('deviceStates/') && method === 'PUT') {
     return { status: HTTP_OK, body: {} };
@@ -113,7 +114,7 @@ export function routeMisc(
   if (path === 'asterisk/info' && method === 'GET') {
     return {
       status: HTTP_OK,
-      body: { status: { startup_time: FAKE_ASTERISK_STARTUP_TIME } }
+      body: { status: { startup_time: startupTime } }
     };
   }
   return { status: HTTP_NOT_FOUND, body: { message: 'Not found' } };

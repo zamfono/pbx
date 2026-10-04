@@ -18,6 +18,7 @@ import {
   startHepCollector
 } from './boot.js';
 import { CallActions } from './calls/actions.js';
+import { resyncOnReconnect } from './calls/reconnectResync.js';
 import { resyncOnBoot } from './calls/resync.js';
 import { TrunkState } from './calls/trunkState.js';
 // --- boot environment ---
@@ -169,6 +170,8 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
     // internal server listens, so no action of `api`'s lands on a call the resync then interrupts.
     const actions = new CallActions(pipeline);
     await resyncOnBoot({ db, ari, now: nowIso, pipeline, log });
+    // Every ARI connection after this first one: the calls whose channels went with it end.
+    await resyncOnReconnect(pipeline);
     const server = await startInternalServer(
       {
         db,

@@ -104,6 +104,11 @@ export class TrunkState {
     }
   }
 
+  /** The channels of the legs counted right now. */
+  get countedChannels(): string[] {
+    return [...this.countedLegs.keys()];
+  }
+
   /**
    * Watches `channelId`, a call that arrived from a trunk, for its `ChannelDestroyed` from the
    * moment it enters, before the config read that names its trunk: a caller hanging up during that

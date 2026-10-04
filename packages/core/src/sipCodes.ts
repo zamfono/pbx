@@ -19,3 +19,5 @@ export const AST_CAUSE_NORMAL_CLEARING = 16;
 export const AST_CAUSE_USER_BUSY = 17;
 /** Asterisk's cause for SIP 603 Decline. */
 export const AST_CAUSE_CALL_REJECTED = 21;
+/** Q.850 "network out of order": the cause a channel that went with its Asterisk is ended with. */
+export const AST_CAUSE_NETWORK_OUT_OF_ORDER = 38;

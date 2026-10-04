@@ -8,6 +8,7 @@ import { AST_CAUSE_NORMAL_CLEARING } from '#src/sipCodes.js';
 import { routeBridge, type Bridge } from './fakeBridge.js';
 import {
   defaultChannel,
+  FAKE_ASTERISK_STARTUP_TIME,
   fakeEndpoint,
   hangupEvents,
   peerStatusChange,
@@ -101,6 +102,8 @@ export class FakeAri {
   holdRequest: ((request: FakeRequest) => RequestHold) | null = null;
   /** How long a snoop channel takes to enter Stasis after its creation, `null` for never. */
   snoopStasisAfterMs: number | null = DEFAULT_SNOOP_STASIS_AFTER_MS;
+  /** What `GET /ari/asterisk/info` reports as Asterisk's `startup_time`. */
+  private startupTime = FAKE_ASTERISK_STARTUP_TIME;
   private readonly snoopsOutsideStasis = new Set<string>();
   private readonly channels = new Map<string, Channel>();
   private readonly bridges = new Map<string, Bridge>();
@@ -124,6 +127,15 @@ export class FakeAri {
 
   /** Test-only: drop the connected client's socket so a reconnect can be observed. */
   disconnectClient(): void {
+    this.transport.disconnectClient();
+  }
+
+  /** Asterisk restarting under the connected client: its channels and bridges go without an
+   * event, it reports `startupTime` from now on, and the client's socket drops. */
+  restartAsterisk(startupTime: string): void {
+    this.channels.clear();
+    this.bridges.clear();
+    this.startupTime = startupTime;
     this.transport.disconnectClient();
   }
 
@@ -226,7 +238,7 @@ export class FakeAri {
     if (path.startsWith('playbacks/') && method === 'DELETE') {
       return this.playbacks.stop(path.slice('playbacks/'.length));
     }
-    return routeMisc(method, path, this.endpoints);
+    return routeMisc(method, path, this.endpoints, this.startupTime);
   }
 
   private routeChannel(
