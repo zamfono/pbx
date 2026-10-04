@@ -6,10 +6,13 @@ import {
   BACKUP_TARGET_KINDS,
   backupParamsColumn,
   backupParamsSchema,
+  HTTP_UNPROCESSABLE_CONTENT,
   type Db,
   type DB
 } from '@zamfono/shared';
 
+import { assertValidHost } from '../trunks/hostValidation.js';
+import { OpError } from '../types.js';
 import { targetSecretSchema } from './_secret.js';
 
 export type BackupTargetRow = Selectable<DB['backupTargets']>;
@@ -52,6 +55,29 @@ export function withDefaultForgetPolicy(
   return 'forget' in params
     ? params
     : { ...params, forget: DEFAULT_FORGET_POLICY };
+}
+
+/**
+ * Throws 422 unless a `kind` target's `params` name its server as the backend can take it
+ * (§6.5 "Target kinds"): an sftp, ftp or ftps `host` is an FQDN or an IPv4 address, so it can
+ * never reach ssh as an option, and a webdav `url` is an `http` or `https` URL.
+ */
+export function assertParamsFitKind(
+  kind: string,
+  params: Record<string, unknown>
+): void {
+  if (kind === 'sftp' || kind === 'ftp' || kind === 'ftps') {
+    assertValidHost(typeof params.host === 'string' ? params.host : '', 'both');
+  }
+  if (kind === 'webdav') {
+    const url = typeof params.url === 'string' ? URL.parse(params.url) : null;
+    if (url?.protocol !== 'https:' && url?.protocol !== 'http:') {
+      throw new OpError(
+        HTTP_UNPROCESSABLE_CONTENT,
+        'backups: a webdav target needs an http or https url'
+      );
+    }
+  }
 }
 
 /** A backup target's wire shape (§6.5 "Backups"). */

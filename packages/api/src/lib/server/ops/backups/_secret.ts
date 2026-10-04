@@ -26,6 +26,10 @@ const CREDENTIALS_BY_KIND: Record<string, readonly Credential[]> = {
 
 const credential = z.string().min(1);
 
+// The sftp username is a word of the ssh command restic runs (jobs/backupBackends.ts): a leading
+// `-` would read as an option, and whitespace, a quote or a backslash would split the word.
+const UNSAFE_SFTP_USERNAME_PATTERN = /^-|[\s"'\\]/u;
+
 /** A target's secret, as `secret_enc` holds it in JSON (§6.5, §11.2): write-only. */
 export const targetSecretSchema = z
   .object({
@@ -42,7 +46,10 @@ export const targetSecretSchema = z
 
 export type BackupSecret = z.infer<typeof targetSecretSchema>;
 
-/** Throws 422 unless `secret` carries exactly the backend credentials a `kind` target takes. */
+/**
+ * Throws 422 unless `secret` carries exactly the backend credentials a `kind` target takes, and
+ * an sftp username can be passed to ssh as one argument.
+ */
 export function assertSecretFitsKind(kind: string, secret: BackupSecret): void {
   const wanted = CREDENTIALS_BY_KIND[kind] ?? [];
   const fits = CREDENTIALS.every(
@@ -52,6 +59,15 @@ export function assertSecretFitsKind(kind: string, secret: BackupSecret): void {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
       `backups: the secret of a '${kind}' target is { ${['resticPassword', ...wanted].join(', ')} }`
+    );
+  }
+  if (
+    kind === 'sftp' &&
+    UNSAFE_SFTP_USERNAME_PATTERN.test(secret.username ?? '')
+  ) {
+    throw new OpError(
+      HTTP_UNPROCESSABLE_CONTENT,
+      'backups: an sftp username cannot begin with - or contain whitespace, a quote or a backslash'
     );
   }
 }

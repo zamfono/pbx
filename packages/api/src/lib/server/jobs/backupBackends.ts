@@ -111,12 +111,25 @@ function sshKnownHostsFile(): string {
   return path.join(path.dirname(privateEnv.DB_FILE), 'ssh_known_hosts');
 }
 
+// restic splits `sftp.command` into argv itself, without a shell (`SplitShellStrings`): outside
+// quotes every whitespace and `\` separates words, and a `"…"` word ends at the next `"` that no
+// `\` precedes. A value without `"` or `\` is therefore exactly one word once double-quoted.
+function sshWord(value: string): string {
+  if (/["\\]/u.test(value)) {
+    throw new Error(
+      'backup: an sftp host or username cannot contain a quote or a backslash'
+    );
+  }
+  return `"${value}"`;
+}
+
 /**
  * restic's native sftp backend spawns `ssh`; `sftp.command` replaces that command so the
  * password from `secret_enc` (§11.2 "the backend credentials") reaches ssh through `sshpass -e`,
  * which reads it from `SSHPASS` rather than argv. Nothing in the target model carries a host key,
  * and ssh's default (ask) fails without a terminal, so the first contact's key is accepted and
- * pinned in `sshKnownHostsFile()`.
+ * pinned in `sshKnownHostsFile()`. Every word is quoted and `--` ends ssh's options before the
+ * host, so neither the host nor the username can reach ssh as an option of its own.
  */
 function sftpRepository(
   params: Params,
@@ -125,11 +138,22 @@ function sftpRepository(
   const host = str(params, 'host');
   const user = credential(secret, 'username', 'sftp');
   const command = [
-    'sshpass -e ssh',
-    '-o StrictHostKeyChecking=accept-new',
-    `-o UserKnownHostsFile=${sshKnownHostsFile()}`,
-    `-l ${user} ${host} -s sftp`
-  ].join(' ');
+    'sshpass',
+    '-e',
+    'ssh',
+    '-o',
+    'StrictHostKeyChecking=accept-new',
+    '-o',
+    `UserKnownHostsFile=${sshKnownHostsFile()}`,
+    '-l',
+    user,
+    '-s',
+    '--',
+    host,
+    'sftp'
+  ]
+    .map(sshWord)
+    .join(' ');
   return {
     repository: `sftp:${user}@${host}:${str(params, 'path')}`,
     env: { SSHPASS: credential(secret, 'password', 'sftp') },

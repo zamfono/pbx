@@ -9,6 +9,7 @@ import { keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { assertSecretFitsKind, sealTargetSecret } from '../_secret.js';
 import {
+  assertParamsFitKind,
   backupTargetWire,
   targetFields,
   targetToWire,
@@ -34,6 +35,7 @@ export const targetsCreate = defineOperation({
     const id = newId();
     const enabled = input.enabled ?? true;
     const params = withDefaultForgetPolicy(input.params);
+    assertParamsFitKind(input.kind, params);
     assertSecretFitsKind(input.kind, input.secret);
     const secretEnc = sealTargetSecret(keyringFromEnv(env), input.secret);
     await ctx.db

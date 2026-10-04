@@ -746,7 +746,7 @@ All hours resolve in the tenant's time zone: `settings.timezone` (an IANA name),
 
 **Backups.** A scheduled job in the `api` container (cron expression in `settings.backup_cron`, default nightly) takes a consistent `VACUUM INTO` snapshot of SQLite and backs it up together with `media/` via restic — encrypted, deduplicated, snapshotted — to every enabled `backup_targets` row.
 
-- Target kinds: `local` (host path or volume), `ftp` and `ftps`, `sftp`, `s3`, `webdav`. Local, sftp and s3 use restic's native backends; ftp(s) and webdav go through restic's rclone backend.
+- Target kinds: `local` (host path or volume), `ftp` and `ftps`, `sftp`, `s3`, `webdav`. Local, sftp and s3 use restic's native backends; ftp(s) and webdav go through restic's rclone backend. An sftp, ftp or ftps `host` is an FQDN or an IPv4 address and a webdav `url` an `http` or `https` URL; an sftp username cannot begin with `-` or contain whitespace, a quote or a backslash, since both become arguments of the `ssh` command restic runs.
 - Retention is a per-target restic forget policy in `params_json`, default 7 daily, 4 weekly, 6 monthly.
 - Default target: when `.env` sets `BACKUP_PASSWORD` at first boot, the seed creates a `local` target (§6.3 "First boot"), its repository `/backups/restic` on the `backups` volume and `BACKUP_PASSWORD` its restic password, so a restore needs only `.env` to open it. It shares the host with the stack: it covers a damaged database or a bad upgrade, not the loss of the host.
 - A run creates its target's repository when there is none at the location yet.

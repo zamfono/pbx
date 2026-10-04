@@ -19,6 +19,7 @@ import {
   sealTargetSecret
 } from '../_secret.js';
 import {
+  assertParamsFitKind,
   backupTargetWire,
   targetFields,
   targetToWire,
@@ -52,6 +53,9 @@ export const targetsUpdate = defineOperation({
       input.params === undefined
         ? before.paramsJson
         : JSON.stringify(withDefaultForgetPolicy(input.params));
+    if (input.params !== undefined || kind !== before.kind) {
+      assertParamsFitKind(kind, backupParamsColumn.decode(paramsJson));
+    }
     const kr = keyringFromEnv(env);
     // A new kind takes other credentials: the stored secret must fit it, unless a new one comes.
     if (input.secret !== undefined || kind !== before.kind) {

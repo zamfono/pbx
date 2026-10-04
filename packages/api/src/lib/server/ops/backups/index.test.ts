@@ -82,11 +82,79 @@ describe('backups', () => {
       {
         id: created.id,
         kind: 'sftp',
+        params: { host: 'backup.example.net', path: '/srv/restic' },
         secret: { resticPassword: 'pw', username: 'u', password: 'p' }
       },
       asRun()
     )) as BackupTargetWire;
     expect(updated.kind).toBe('sftp');
+  });
+
+  it('refuses an sftp username or host that would add arguments to the ssh command', async () => {
+    const db = await makeTestDb();
+    // restic splits `sftp.command` into argv at whitespace and runs it without a shell, so a
+    // second word in either value reaches ssh as an option of its own.
+    const proxyCommand = '-oProxyCommand=/tmp/payload.sh';
+    const create = (host: string, username: string): Promise<unknown> =>
+      runOperation(
+        db,
+        'backups.targets.create',
+        {
+          kind: 'sftp',
+          params: { host, path: '/srv/restic' },
+          secret: { resticPassword: 'pw', username, password: 'p' }
+        },
+        asRun()
+      );
+    await expect(
+      create('backup.example.net', `zamfono ${proxyCommand}`)
+    ).rejects.toMatchObject({ status: 422 });
+    await expect(create(proxyCommand, 'zamfono')).rejects.toMatchObject({
+      status: 422
+    });
+    await expect(
+      create('backup.example.net', proxyCommand)
+    ).rejects.toMatchObject({ status: 422 });
+    const created = (await create(
+      'backup.example.net',
+      'zamfono'
+    )) as BackupTargetWire;
+    await expect(
+      runOperation(
+        db,
+        'backups.targets.update',
+        { id: created.id, params: { host: proxyCommand, path: '/srv/restic' } },
+        asRun()
+      )
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('refuses an ftp host that is no FQDN or IPv4 address and a webdav url that is not http(s)', async () => {
+    const db = await makeTestDb();
+    const create = (
+      kind: string,
+      params: Record<string, unknown>
+    ): Promise<unknown> =>
+      runOperation(
+        db,
+        'backups.targets.create',
+        {
+          kind,
+          params,
+          secret: { resticPassword: 'pw', username: 'u', password: 'p' }
+        },
+        asRun()
+      );
+    await expect(create('ftps', { host: '-x y' })).rejects.toMatchObject({
+      status: 422
+    });
+    await expect(
+      create('webdav', { url: 'file:///etc/passwd' })
+    ).rejects.toMatchObject({ status: 422 });
+    await expect(create('ftp', { host: '192.0.2.10' })).resolves.toBeDefined();
+    await expect(
+      create('webdav', { url: 'https://dav.example.net/remote.php/dav' })
+    ).resolves.toBeDefined();
   });
 
   it('defaults the forget policy to 7 daily/4 weekly/6 monthly on create', async () => {

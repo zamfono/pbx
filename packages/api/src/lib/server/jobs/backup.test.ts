@@ -172,6 +172,36 @@ describe('runBackup: command lines per target kind', () => {
     expect(backupCall?.env.AWS_SECRET_ACCESS_KEY).toBe('SECRET');
   });
 
+  it('keeps a stored sftp username with whitespace one word of the ssh command', async () => {
+    vi.stubEnv('DB_FILE', '/data/zamfono.sqlite3');
+    const db = await migratedTestDb();
+    const kr = testKeyring();
+    // restic splits `sftp.command` at unquoted whitespace, so an unquoted second word would reach
+    // ssh as an option of its own.
+    const targetId = await insertTarget(
+      db,
+      kr,
+      'sftp',
+      { host: 'backup.example.net', path: '/srv/restic' },
+      {
+        resticPassword: 'pw',
+        username: 'zamfono -oProxyCommand=/tmp/payload.sh',
+        password: 'p'
+      }
+    );
+    const { exec, calls } = recordingExec('snap-sftp', SNAPSHOT_BYTES);
+    await runBackup(db, kr, targetId, {
+      exec,
+      mediaDir: '/media',
+      bus: fakeBus().bus
+    });
+    const backupCall = calls.find(call => call.args[0] === 'backup');
+    expect(backupCall?.args.at(-1)).toContain(
+      '"-l" "zamfono -oProxyCommand=/tmp/payload.sh" "-s" "--"'
+    );
+    vi.unstubAllEnvs();
+  });
+
   it('builds an sftp repository whose ssh authenticates with the secret’s password', async () => {
     vi.stubEnv('DB_FILE', '/data/zamfono.sqlite3');
     const db = await migratedTestDb();
@@ -198,8 +228,9 @@ describe('runBackup: command lines per target kind', () => {
 
     expect(run.status).toBe('ok');
     const sftpCommand =
-      'sftp.command=sshpass -e ssh -o StrictHostKeyChecking=accept-new ' +
-      '-o UserKnownHostsFile=/data/ssh_known_hosts -l zamfono backup.example.net -s sftp';
+      'sftp.command="sshpass" "-e" "ssh" "-o" "StrictHostKeyChecking=accept-new" ' +
+      '"-o" "UserKnownHostsFile=/data/ssh_known_hosts" "-l" "zamfono" "-s" "--" ' +
+      '"backup.example.net" "sftp"';
     const backupCall = calls.find(call => call.args[0] === 'backup');
     expect(backupCall?.env.RESTIC_REPOSITORY).toBe(
       'sftp:zamfono@backup.example.net:/srv/restic'
