@@ -3,20 +3,20 @@
   §9.4 "Inbound identification", trunks with `inbound_auth`: the second provider sends the call
   from an address no trunk's `identify` names, answers Asterisk's 401 challenge with the trunk's
   username and password (`-au`/`-ap`), and the retried INVITE is identified by its Authorization
-  username. The trunk's `inbound_number_format` is `e164`, where `00` becomes `+`, so the called
-  `0015551002` must reach the DID `+15551002` (§9.4 "Inbound number normalization"), which rings
+  username. The trunk's `inbound_number_format` is `e164`, `+` and digits, so the called
+  `+15551002` must reach the DID `+15551002` (§9.4 "Inbound number normalization"), which rings
   the ring group; the phone answers, and this side hangs up.
 -->
 <scenario name="inbound trunk auth">
   <send retrans="500">
     <![CDATA[
-      INVITE sip:0015551002@[remote_ip]:[remote_port] SIP/2.0
+      INVITE sip:+15551002@[remote_ip]:[remote_port] SIP/2.0
       Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
-      From: <sip:0015559998@[local_ip]>;tag=[call_number]
-      To: <sip:0015551002@[remote_ip]>
+      From: <sip:+15559998@[local_ip]>;tag=[call_number]
+      To: <sip:+15551002@[remote_ip]>
       Call-ID: [call_id]
       CSeq: 1 INVITE
-      Contact: <sip:0015559998@[local_ip]:[local_port];transport=[transport]>
+      Contact: <sip:+15559998@[local_ip]:[local_port];transport=[transport]>
       Max-Forwards: 70
       Content-Type: application/sdp
       Content-Length: [len]
@@ -36,10 +36,10 @@
 
   <send>
     <![CDATA[
-      ACK sip:0015551002@[remote_ip]:[remote_port] SIP/2.0
+      ACK sip:+15551002@[remote_ip]:[remote_port] SIP/2.0
       Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch-3]
-      From: <sip:0015559998@[local_ip]>;tag=[call_number]
-      To: <sip:0015551002@[remote_ip]>[peer_tag_param]
+      From: <sip:+15559998@[local_ip]>;tag=[call_number]
+      To: <sip:+15551002@[remote_ip]>[peer_tag_param]
       Call-ID: [call_id]
       CSeq: 1 ACK
       Max-Forwards: 70
@@ -49,13 +49,13 @@
 
   <send retrans="500">
     <![CDATA[
-      INVITE sip:0015551002@[remote_ip]:[remote_port] SIP/2.0
+      INVITE sip:+15551002@[remote_ip]:[remote_port] SIP/2.0
       Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
-      From: <sip:0015559998@[local_ip]>;tag=[call_number]
-      To: <sip:0015551002@[remote_ip]>
+      From: <sip:+15559998@[local_ip]>;tag=[call_number]
+      To: <sip:+15551002@[remote_ip]>
       Call-ID: [call_id]
       CSeq: 2 INVITE
-      Contact: <sip:0015559998@[local_ip]:[local_port];transport=[transport]>
+      Contact: <sip:+15559998@[local_ip]:[local_port];transport=[transport]>
       [authentication]
       Max-Forwards: 70
       Content-Type: application/sdp
@@ -78,10 +78,10 @@
 
   <send>
     <![CDATA[
-      ACK sip:0015551002@[remote_ip]:[remote_port] SIP/2.0
+      ACK sip:+15551002@[remote_ip]:[remote_port] SIP/2.0
       Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
-      From: <sip:0015559998@[local_ip]>;tag=[call_number]
-      To: <sip:0015551002@[remote_ip]>[peer_tag_param]
+      From: <sip:+15559998@[local_ip]>;tag=[call_number]
+      To: <sip:+15551002@[remote_ip]>[peer_tag_param]
       Call-ID: [call_id]
       CSeq: 2 ACK
       Max-Forwards: 70
@@ -93,10 +93,10 @@
 
   <send retrans="500">
     <![CDATA[
-      BYE sip:0015551002@[remote_ip]:[remote_port] SIP/2.0
+      BYE sip:+15551002@[remote_ip]:[remote_port] SIP/2.0
       Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
-      From: <sip:0015559998@[local_ip]>;tag=[call_number]
-      To: <sip:0015551002@[remote_ip]>[peer_tag_param]
+      From: <sip:+15559998@[local_ip]>;tag=[call_number]
+      To: <sip:+15551002@[remote_ip]>[peer_tag_param]
       Call-ID: [call_id]
       CSeq: 3 BYE
       Max-Forwards: 70

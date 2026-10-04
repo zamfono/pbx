@@ -35,7 +35,7 @@ trunk_id=$(api POST /trunks "{
   \"registerRetryS\": 5,
   \"hosts\": [{ \"host\": \"$provider_ip\", \"direction\": \"outbound\" }]
 }" | jsonfield trunk.id)
-did_id=$(did_to_group +15551077 "$(ci_group)")
+did_id=$(did_to_group +12125551077 "$(ci_group)")
 printf '%s %s\n' "$trunk_id" "$did_id" > "$(state_file registration-to)"
 
 # shellcheck disable=SC2086

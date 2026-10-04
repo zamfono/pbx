@@ -3,8 +3,8 @@
   §9.4 "Inbound number normalization": the registration trunk's provider sends the call to the
   contact the trunk registered, its Request-URI user the account name (`field0`, with its `line`
   tag as `field1`), and the dialled number in `To` alone, as mucpbx does. `To` carries
-  `0015551077`, which the trunk's `national` format reads as `+15551077`, the DID of the ring
-  group; no DID bears the account name. The phone answers, and this side hangs up.
+  `0012125551077`, which the trunk's `national` format reads with Germany's international prefix
+  `00` as `+12125551077`, the DID of the ring group; no DID bears the account name. The phone answers, and this side hangs up.
 -->
 <scenario name="inbound trunk registration">
   <send retrans="500">
@@ -12,7 +12,7 @@
       INVITE sip:[field0]@[remote_ip]:[remote_port];[field1] SIP/2.0
       Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
       From: <sip:0301111@[local_ip]>;tag=[call_number]
-      To: <sip:0015551077@[remote_ip]>
+      To: <sip:0012125551077@[remote_ip]>
       Call-ID: [call_id]
       CSeq: 1 INVITE
       Contact: <sip:0301111@[local_ip]:[local_port];transport=[transport]>
@@ -40,7 +40,7 @@
       ACK sip:[field0]@[remote_ip]:[remote_port];[field1] SIP/2.0
       Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
       From: <sip:0301111@[local_ip]>;tag=[call_number]
-      To: <sip:0015551077@[remote_ip]>[peer_tag_param]
+      To: <sip:0012125551077@[remote_ip]>[peer_tag_param]
       Call-ID: [call_id]
       CSeq: 1 ACK
       Max-Forwards: 70
@@ -55,7 +55,7 @@
       BYE sip:[field0]@[remote_ip]:[remote_port];[field1] SIP/2.0
       Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
       From: <sip:0301111@[local_ip]>;tag=[call_number]
-      To: <sip:0015551077@[remote_ip]>[peer_tag_param]
+      To: <sip:0012125551077@[remote_ip]>[peer_tag_param]
       Call-ID: [call_id]
       CSeq: 2 BYE
       Max-Forwards: 70
