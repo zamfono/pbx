@@ -307,6 +307,24 @@ describe('callerIdHeaders', () => {
 
     expect(result).toEqual({ ok: true, number: '089123', withhold: false });
   });
+
+  it.each([
+    ['+390612345678', 'IT', '0612345678'],
+    ['+12125551234', 'US', '2125551234'],
+    ['+442079460000', 'DE', '+442079460000']
+  ] as const)(
+    "renders %s nationally under %s as the country's own dialling does, a foreign number unchanged",
+    (number, country, presented) => {
+      expect(
+        callerIdHeaders({
+          withhold: false,
+          number,
+          trunk: { callerIdHeader: 'from', callerIdFormat: 'national' },
+          country
+        })
+      ).toEqual({ ok: true, number: presented, withhold: false });
+    }
+  );
 });
 
 it('ATTEMPT_NO_RESPONSE_MS matches the 8-second Route fallthrough budget', () => {

@@ -13,7 +13,6 @@ import {
   type SettingsWire
 } from './_shared.js';
 import { maybePushTenantProfile, reloadKindsFor } from './changeEffects.js';
-import { isKnownCountry } from './country.js';
 import { assertNoExtensionCollision } from './emergencyNumbers.js';
 import { applyFeatureCodes } from './featureCodes.js';
 import { applyPlainFields } from './plainFields.js';
@@ -30,16 +29,6 @@ const inputSchema = settingsInputSchema;
 function assertFieldRoles(input: SettingsInput, role: UserRole): void {
   for (const field of Object.keys(input) as (keyof SettingsWire)[]) {
     checkFieldRole(field, role);
-  }
-}
-
-/** Refuses a `country` outside the ISO 3166-1 alpha-2 set libphonenumber knows (§11.4). */
-function assertKnownCountry(country: SettingsInput['country']): void {
-  if (country !== undefined && !isKnownCountry(country)) {
-    throw new OpError(
-      HTTP_UNPROCESSABLE_CONTENT,
-      `settings: unknown country '${country}'`
-    );
   }
 }
 
@@ -68,7 +57,6 @@ export const update = defineOperation<SettingsInput, SettingsWire>({
   run: async (ctx, input) => {
     assertFieldRoles(input, ctx.actor.role);
     const before = await loadSettings(ctx.db);
-    assertKnownCountry(input.country);
     await assertNoExtensionCollision(ctx, input.emergencyNumbers);
     assertCallLogLevel(input.callLogLevel);
     assertSsoInvariants(before, input);

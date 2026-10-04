@@ -5,7 +5,11 @@
  * endpoint (`send_diversion = no`). Applied beside the leg's other headers by
  * `forwardContext.ts`'s `forwardVariables`.
  */
-import { isE164, type DiversionPolicy } from '@zamfono/shared';
+import {
+  isE164,
+  type CountryCode,
+  type DiversionPolicy
+} from '@zamfono/shared';
 
 import { userById, type Snapshot } from '../internal/snapshot.js';
 import { formatCallerId } from '../routing/trunk.js';
@@ -101,7 +105,7 @@ export type DiversionTrunk = {
   policy: DiversionPolicy;
   host: string | null;
   format: 'e164' | 'national';
-  country: string;
+  country: CountryCode;
 };
 
 /**

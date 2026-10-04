@@ -153,8 +153,16 @@ export default tseslint.config(
       'new-cap': [
         'error',
         {
-          // SvelteKit's route-handler export names, called directly by the route tests
-          capIsNewExceptions: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
+          // SvelteKit's route-handler export names, called directly by the route tests, and
+          // libphonenumber-js's `NumberingPlan.IDDPrefix()`
+          capIsNewExceptions: [
+            'GET',
+            'POST',
+            'PUT',
+            'PATCH',
+            'DELETE',
+            'IDDPrefix'
+          ]
         }
       ],
       'one-var': ['error', 'never'],

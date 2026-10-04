@@ -6,6 +6,7 @@
 import type { AudioKind, AuditChannel, BackupRunStatus, BackupTargetKind, CallDirection, CallerIdHeader, CallLogLevel, CallStatus, DeviceKind, DeviceTransport, DiversionPolicy, HostDirection, Language, LogLevelOverride, MaintenanceWork, NumberFormat, OAuthClientKind, PresenceStatus, QosRole, RingGroupForwardCondition, RingStrategy, SmtpSecurity, SsoProvider, TokenKind, TrunkAuthMode, TrunkTransport, UserForwardCondition, UserRole, WebhookStatus } from "../columnValues.js";
 import type { MailKind } from "../internalApi.js";
 import type { ColumnType } from "kysely";
+import type { CountryCode } from "libphonenumber-js";
 
 export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
   ? ColumnType<S, I | undefined, U>
@@ -333,7 +334,7 @@ export interface Settings {
   codecsJson: Generated<string>;
   companyName: string;
   configPropagationPending: Generated<number>;
-  country: string;
+  country: CountryCode;
   emergencyNumbersJson: string;
   extLength: Generated<number>;
   fallbackTargetId: string | null;

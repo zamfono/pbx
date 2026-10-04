@@ -3,6 +3,7 @@ import type { Selectable, Updateable } from 'kysely';
 import {
   HTTP_FORBIDDEN,
   type CallLogLevel,
+  type CountryCode,
   type Db,
   type DB,
   type FeatureCodes,
@@ -27,7 +28,7 @@ const MASKED = '***';
 export type SettingsWire = {
   companyName: string;
   mainDidId: string;
-  country: string;
+  country: CountryCode;
   timezone: string | null;
   language: Language;
   smtpHost: string | null;

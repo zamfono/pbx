@@ -407,10 +407,11 @@ describe('outbound dialing', () => {
   it('stores an own DID dialled in national form as its E.164 number in calls.to (§10.1 Outbound step 4)', async () => {
     const trunkId = await seedTrunk(db, 1);
     await seedRoute(db, 1, trunkId);
+    await seedDid(db, '+4930123456');
 
-    const call = await dial('01110000');
+    const call = await dial('030123456');
 
-    expect(call.to).toBe('+491110000');
+    expect(call.to).toBe('+4930123456');
   });
 
   it('withholds the number on a both trunk by restricting the presentation of the real number (§9.4 "Anonymous calls (CLIR)")', async () => {

@@ -25,6 +25,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §11.2 forward_targets.** A CHECK sets `sip_headers_json` exactly on the sip rows, `(sip_trunk_id IS NULL) = (sip_headers_json IS NULL)`; the column's own CHECK keeps only the JSON-array shape.
 *Why:* the sentence that the API sets the column on every sip row "since SQLite's ADD COLUMN cannot require it" described a migration the greenfield baseline no longer has; the schema states the pairing itself.
+**2026-10-04 · §9.4 Inbound number normalization, Caller-ID, §10.1 Outbound.** `e164` is `+digits` only: `00…` and bare digits pass verbatim. `national`, the caller-ID's `national` and user dialling read a number with libphonenumber's full metadata as dialled in `settings.country`: a valid number with that country's own international prefix, or a national one with its trunk prefix, bare only where the country has none or it is optional; anything else passes verbatim, and dialled is refused with 484.
+*Why:* "Detach (Recommended)" and "Prefix + full validity (Recommended)"; `00` is one international prefix among many, an Italian `06…` became `+396…`, and a German `89123` without its `0` must not become `+4989123`.
+
 **2026-10-04 · §6.3 compose.yaml, Environment, §9.4 Signaling, Forwarded calls, §10.3 System.** `api` and `core` refuse to start without `EXTERNAL_IPV4` or `STACK_IPV4`, so `system.info`'s `stack.ipv4` is never `null` and a forwarded leg's `Diversion` host is never the trunk's own. `core` reads `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED` and reports a trunk on a switched-off transport `unreachable`, whatever its `qualify` or registration reports.
 *Why:* "Require them. Test should be as close to production as sensibly possible"; an unmonitored trunk on a switched-off transport never turned `unreachable`, so every call over it sent a doomed INVITE.
 

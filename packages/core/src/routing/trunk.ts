@@ -5,7 +5,11 @@
  * pipeline passes in the rows already loaded for a call.
  */
 
-import { callingCode, type TrunkStatus } from '@zamfono/shared';
+import {
+  nationalForm,
+  type CountryCode,
+  type TrunkStatus
+} from '@zamfono/shared';
 
 import {
   SIP_BUSY_EVERYWHERE,
@@ -174,19 +178,13 @@ export function channelCapAllows(
   return maxChannels === null || active < maxChannels;
 }
 
-/** Renders `number` (E.164) per `format` (§9.4 "Caller-ID"): `national` drops the country's calling code for a leading `0`. */
+/** Renders `number` (E.164) per `format` (§9.4 "Caller-ID"): `national` as dialled within `country`. */
 export function formatCallerId(
   number: string,
   format: 'e164' | 'national',
-  country: string
+  country: CountryCode
 ): string {
-  if (format === 'e164') {
-    return number;
-  }
-  const internationalPrefix = `+${callingCode(country)}`;
-  return number.startsWith(internationalPrefix)
-    ? `0${number.slice(internationalPrefix.length)}`
-    : number;
+  return format === 'e164' ? number : nationalForm(number, country);
 }
 
 /**
@@ -203,7 +201,7 @@ export function callerIdHeaders(params: {
     callerIdHeader: 'from' | 'pai' | 'both';
     callerIdFormat: 'e164' | 'national';
   };
-  country: string;
+  country: CountryCode;
 }):
   | { ok: true; number: string; withhold: boolean }
   | { ok: false; code: typeof SIP_FORBIDDEN } {

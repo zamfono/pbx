@@ -16,8 +16,8 @@ same book; there are no personal contacts.
 
 **Numbers are normalized on write**, like a DID's: spaces, dashes and brackets are dropped and a
 national number becomes international with `settings.country`, so `0664 123 45 67` for an
-Austrian tenant is stored as `+436641234567`. A number that cannot be resolved, such as digits
-with neither `+`, `00` nor a leading `0`, is refused with 422, as is a number or a label that
+Austrian tenant is stored as `+436641234567`. A number that cannot be resolved, digits that are no
+valid number as dialled in that country, is refused with 422, as is a number or a label that
 appears twice in one contact. The same number may belong to several contacts.
 
 **`phones` is replaced as a whole.** A `contacts.update` that includes `phones` replaces every

@@ -39,7 +39,7 @@ const FIELD = {
   registerRetryS:
     'Seconds between registration retries after a failure; registration trunks only.',
   inboundNumberFormat:
-    'How the provider sends numbers: e164 (default; + or 00) or national (a leading 0 gets the calling code of settings.country); see zamfono.help numbers.',
+    'How the provider sends numbers: e164 (default; + and digits, anything else verbatim) or national (as dialled in settings.country, with its own international and trunk prefixes); see zamfono.help numbers.',
   callerIdFormat:
     'How the presented caller number is sent: e164 (default) or national.',
   callerIdHeader:

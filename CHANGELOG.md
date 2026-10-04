@@ -89,6 +89,13 @@ why the specified behaviour changed; the commit history, how.
   as trunks spell `callerIdFormat` and `callerIdHeader`; `calleridDidId` is refused as an
   unknown field. The database columns are `caller_id_did_id`, `caller_id_format` and
   `caller_id_header`.
+- Breaking: a trunk with `inboundNumberFormat` `e164` takes only numbers with a leading `+`;
+  `00…` and bare digits now pass verbatim. Under `national`, the caller-ID's `national` format
+  and in dialling, numbers follow `settings.country`'s own dialling rules: its international
+  prefix (`011` in the US, `0011` in Australia), its trunk prefix, ten-digit dialling in the US,
+  and Italy's leading `0`, which an Italian number now keeps (`06…` becomes `+396…` no more, but
+  `+3906…`). A national number needs the country's trunk prefix where it has one (Germany's `0`),
+  and must be a valid number there; anything else passes verbatim, and is refused when dialled.
 - Breaking: `api` and `core` refuse to start without `EXTERNAL_IPV4` (ports mode) or
   `STACK_IPV4` (macvlan mode) in `.env`; `system.info`'s `stack.ipv4` is never `null`. A trunk
   on a transport that `SIP_UDP_ENABLED=false` or `SIP_TCP_ENABLED=false` switches off now shows

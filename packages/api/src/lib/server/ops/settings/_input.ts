@@ -4,6 +4,7 @@ import {
   CALL_LOG_LEVELS,
   featureCodesSchema,
   isIanaTimeZone,
+  isSupportedCountry,
   LANGUAGES,
   MAX_PORT,
   SMTP_SECURITIES,
@@ -36,6 +37,10 @@ export const settingsInputSchema = z
     country: z
       .string()
       .length(COUNTRY_CODE_LENGTH)
+      .refine(
+        isSupportedCountry,
+        'country must be an ISO 3166-1 alpha-2 code with a calling code'
+      )
       .optional()
       .describe(
         'ISO 3166-1 alpha-2 code, such as DE; its calling code turns a national number into the international form.'

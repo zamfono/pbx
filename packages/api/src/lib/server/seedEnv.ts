@@ -5,10 +5,15 @@
 import type * as privateEnv from '$app/env/private';
 import { z } from 'zod';
 
-import { isE164, MAX_PORT, type SmtpSecurity } from '@zamfono/shared';
+import {
+  isE164,
+  isSupportedCountry,
+  MAX_PORT,
+  type CountryCode,
+  type SmtpSecurity
+} from '@zamfono/shared';
 
 import { settingsInputSchema } from './ops/settings/_input.js';
-import { isKnownCountry } from './ops/settings/country.js';
 
 // The extension length's floor (§11.4 `ext_length >= 2`) is what leaves room for the nine parking
 // slots `seedExtensions.ts` numbers.
@@ -90,9 +95,9 @@ export function extLengthFrom(env: SeedEnv): number {
 
 /** `COUNTRY`, required and one `settings.update` would accept (§11.4): a code without a calling
  *  code would make every later number normalization of §9.4 throw. */
-export function countryFrom(env: SeedEnv): string {
+export function countryFrom(env: SeedEnv): CountryCode {
   const value = requiredEnv(env, 'COUNTRY');
-  if (!isKnownCountry(value)) {
+  if (!isSupportedCountry(value)) {
     throw new Error(
       `seed: COUNTRY must be an ISO 3166-1 alpha-2 code, got ${value}`
     );

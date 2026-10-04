@@ -154,14 +154,14 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
     expect(call?.didId).toBe(mainDidId);
   });
 
-  it('turns an e164 trunk’s 00 into + and leaves a leading 0 alone', async () => {
+  it('passes an e164 trunk’s 00 and leading 0 verbatim: e164 is +digits only', async () => {
     const trunkId = await seedTrunk(db, 'e164');
 
     const call = await arrive(trunkId, '004930123456', '08912345');
 
-    expect(call?.to).toBe('+4930123456');
+    expect(call?.to).toBe('004930123456');
     expect(call?.from).toBe('08912345');
-    expect(call?.didId).toBe(mainDidId);
+    expect(call?.didId).toBeNull();
   });
 
   it('does not read an e164 trunk’s national digits as a national number', async () => {

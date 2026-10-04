@@ -4,6 +4,7 @@ import { z } from 'zod';
 import {
   HTTP_UNPROCESSABLE_CONTENT,
   normalizeDialed,
+  type CountryCode,
   type DB
 } from '@zamfono/shared';
 
@@ -69,13 +70,19 @@ export function phoneDigits(raw: string): string {
  * A phone-book number in E.164 (§10.2 "Phone book", §9.4): `raw`'s `phoneDigits` under the
  * outbound resolution rules of `settings.country`; `null` when those leave it incomplete.
  */
-export function contactPhoneE164(raw: string, country: string): string | null {
+export function contactPhoneE164(
+  raw: string,
+  country: CountryCode
+): string | null {
   const normalized = normalizeDialed(phoneDigits(raw), country);
   return normalized.kind === 'e164' ? normalized.number : null;
 }
 
 /** `contactPhoneE164`, refusing a number it cannot resolve with 422. */
-export function normalizeContactPhone(raw: string, country: string): string {
+export function normalizeContactPhone(
+  raw: string,
+  country: CountryCode
+): string {
   const number = contactPhoneE164(raw, country);
   if (number === null) {
     throw new OpError(
@@ -113,7 +120,7 @@ export async function replacePhones(
   db: Transaction<DB>,
   contactId: string,
   phones: PhoneInput[],
-  country: string
+  country: CountryCode
 ): Promise<void> {
   const normalized = phones.map(phone => ({
     contactId,
@@ -159,7 +166,7 @@ export async function toContactOut(
 }
 
 /** The tenant's calling-code country (§9.4), used to normalize a contact's numbers on write. */
-export async function tenantCountry(db: Transaction<DB>): Promise<string> {
+export async function tenantCountry(db: Transaction<DB>): Promise<CountryCode> {
   const settings = await db
     .selectFrom('settings')
     .select('country')

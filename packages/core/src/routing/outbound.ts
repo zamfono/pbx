@@ -7,6 +7,7 @@
 import {
   matchFeatureCode,
   normalizeDialed,
+  type CountryCode,
   type FeatureCodeKey,
   type FeatureCodes
 } from '@zamfono/shared';
@@ -44,7 +45,7 @@ export type ExtensionRow = {
 export type ResolveDialedContext = {
   featureCodes: FeatureCodes;
   emergencyNumbers: string[];
-  country: string;
+  country: CountryCode;
   extLength: number;
   extensions: Map<string, ExtensionRow>;
   dids: Map<string, { id: string; targetId: string }>;
