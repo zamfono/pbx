@@ -116,7 +116,7 @@ export class CdrWriter {
     const joined =
       call.callerChannelId === null
         ? Promise.resolve()
-        : this.dialogs.join(call, call.callerChannelId);
+        : this.dialogs.joinLeg(call, call.callerChannelId);
     // §7 level `qos`: the caller's channel has a `call_qos` row from the start.
     this.qos.note(call);
     if (call.log.level === 'sip') {

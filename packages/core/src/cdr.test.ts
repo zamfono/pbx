@@ -9,7 +9,7 @@ import {
 import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from './ari/client.js';
-import type { Channel } from './ari/types.js';
+import { AriError, type Channel } from './ari/types.js';
 import { callerChannel, newCall, type Call } from './calls/call.js';
 import { CdrWriter } from './cdr.js';
 import { EventBus } from './internal/eventBus.js';
@@ -282,6 +282,42 @@ describe('CdrWriter', () => {
       .executeTakeFirst();
     expect(row?.status).toBe('interrupted');
   });
+
+  it.each(['events', 'sip'] as const)(
+    'logs a SIP dialog join that failed and still writes the calls row (level %s)',
+    async level => {
+      await seedSettings(db, { callLogLevel: level });
+      const call = buildCall(level);
+      const error = vi.fn();
+      vi.spyOn(ari.channels, 'getVariable').mockRejectedValue(
+        new AriError(503, { message: 'Service Unavailable' })
+      );
+      cdr = new CdrWriter({
+        log: { ...noopLogger, error },
+        db,
+        ari,
+        cache: new ConfigCache(db),
+        bus,
+        state: new StateStore(),
+        now: () => NOW
+      });
+
+      await cdr.open(call);
+
+      await eventually(() => {
+        expect(error).toHaveBeenCalledWith(
+          expect.objectContaining({ channelId: call.callerChannelId }),
+          'SIP dialog join failed'
+        );
+      });
+      const row = await db
+        .selectFrom('calls')
+        .select('status')
+        .where('id', '=', call.id)
+        .executeTakeFirst();
+      expect(row?.status).toBe('interrupted');
+    }
+  );
 
   it('routes a HEP message to the call whose SIP Call-ID it carries (§7 level sip)', async () => {
     await seedSettings(db, { callLogLevel: 'sip' });

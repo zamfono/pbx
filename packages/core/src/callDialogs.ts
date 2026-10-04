@@ -45,7 +45,8 @@ export class CallDialogs {
   }
 
   /** `registerLeg`, resolving once the join is in place or has failed: a leg created but not yet
-   * dialled (`legOriginate.ts`) joins before its INVITE leaves. */
+   * dialled (`legOriginate.ts`) joins before its INVITE leaves, and a call's caller as it opens
+   * (`cdr.ts`). */
   joinLeg(call: Call, channelId: string): Promise<void> {
     return this.join(call, channelId).catch(
       logFailure(this.log, 'SIP dialog join', {
@@ -57,7 +58,7 @@ export class CallDialogs {
 
   /** Joins `channelId`'s Call-ID to `call` for its SIP messages, and to the channel for its RTCP
    * reports. */
-  async join(call: Call, channelId: string): Promise<void> {
+  private async join(call: Call, channelId: string): Promise<void> {
     const sipCallId = await this.sip.register(call, channelId);
     if (sipCallId !== null) {
       this.rtcp.join(channelId, sipCallId);

@@ -301,6 +301,10 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- A call whose SIP Call-ID `core` cannot read from Asterisk (Asterisk unreachable or refusing the
+  request as the call comes in) is logged as `SIP dialog join failed` and handled as usual: at call
+  log level `sip` it no longer goes unrecorded, and below it `core` no longer exits with an
+  unhandled rejection.
 - `core` no longer keeps a record of every call that ended for as long as it runs, so its memory
   stays flat on a busy stack.
 - The restore procedure (`docs/guide/restore.md`) brings a stack up: it unpacks the release's
