@@ -52,11 +52,11 @@ describe('Limiter account lock', () => {
   it('locks the account after five failed logins within 15 minutes', () => {
     const limiter = new Limiter(() => 0);
     const account = 'ops@example.com';
-    limiter.loginFailed(account);
-    limiter.loginFailed(account);
-    limiter.loginFailed(account);
-    limiter.loginFailed(account);
-    limiter.loginFailed(account);
+    limiter.countLoginAttempt(account);
+    limiter.countLoginAttempt(account);
+    limiter.countLoginAttempt(account);
+    limiter.countLoginAttempt(account);
+    limiter.countLoginAttempt(account);
     expect(limiter.isLocked(account)).toEqual({ locked: true, until: 900_000 });
   });
 
@@ -64,17 +64,17 @@ describe('Limiter account lock', () => {
     let now = 0;
     const limiter = new Limiter(() => now);
     const account = 'ops@example.com';
-    limiter.loginFailed(account);
-    limiter.loginFailed(account);
-    limiter.loginFailed(account);
-    limiter.loginFailed(account);
-    limiter.loginFailed(account);
+    limiter.countLoginAttempt(account);
+    limiter.countLoginAttempt(account);
+    limiter.countLoginAttempt(account);
+    limiter.countLoginAttempt(account);
+    limiter.countLoginAttempt(account);
     const firstLock = limiter.isLocked(account);
     if (!firstLock.locked) {
       throw new Error('expected the account to be locked');
     }
     now = 1000;
-    limiter.loginFailed(account);
+    expect(limiter.countLoginAttempt(account)).toBe(false);
     expect(limiter.isLocked(account)).toEqual({
       locked: true,
       until: firstLock.until
@@ -85,25 +85,25 @@ describe('Limiter account lock', () => {
     let now = 0;
     const limiter = new Limiter(() => now);
     const account = 'ops@example.com';
-    limiter.loginFailed(account);
-    limiter.loginFailed(account);
-    limiter.loginFailed(account);
-    limiter.loginFailed(account);
-    limiter.loginFailed(account);
+    limiter.countLoginAttempt(account);
+    limiter.countLoginAttempt(account);
+    limiter.countLoginAttempt(account);
+    limiter.countLoginAttempt(account);
+    limiter.countLoginAttempt(account);
     now = 900_000;
     expect(limiter.isLocked(account)).toEqual({ locked: false });
-    limiter.loginFailed(account);
+    limiter.countLoginAttempt(account);
     expect(limiter.isLocked(account)).toEqual({ locked: false });
   });
 
   it('clears the counter and lock on a successful login', () => {
     const limiter = new Limiter(() => 0);
     const account = 'ops@example.com';
-    limiter.loginFailed(account);
-    limiter.loginFailed(account);
-    limiter.loginFailed(account);
-    limiter.loginFailed(account);
-    limiter.loginFailed(account);
+    limiter.countLoginAttempt(account);
+    limiter.countLoginAttempt(account);
+    limiter.countLoginAttempt(account);
+    limiter.countLoginAttempt(account);
+    limiter.countLoginAttempt(account);
     limiter.loginSucceeded(account);
     expect(limiter.isLocked(account)).toEqual({ locked: false });
   });

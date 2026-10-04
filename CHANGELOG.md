@@ -249,6 +249,11 @@ why the specified behaviour changed; the commit history, how.
   to start when `SECRETBOX_KEY` and `SECRETBOX_KEY_PREVIOUS` carry the same generation, and
   `/healthz` counts what the boot log counts: every secret the current key cannot decrypt.
   deploy/README.md gives the rotation recipe.
+- Login attempts sent in parallel were each checked against the password before the first
+  failure counted, so many addresses at once got past the five-attempt account lock. Every
+  attempt now counts the moment it arrives. A refresh token or set-password link presented twice
+  at the same moment is redeemed once; the second presentation is refused (for a refresh token,
+  as a replay).
 - A dialled number starting with `0` or `00` but carrying `*` or `#` after it went to the trunk
   as an E.164 number with those characters in it; it is now refused with 484 address incomplete,
   as the national number rules leave it incomplete.

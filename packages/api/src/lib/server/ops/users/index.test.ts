@@ -1085,7 +1085,7 @@ describe('users', () => {
     const user = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     const lockThreshold = 5;
     for (let attempt = 0; attempt < lockThreshold; attempt += 1) {
-      limiter.loginFailed('anna@x.test');
+      limiter.countLoginAttempt('anna@x.test');
     }
     const locked = limiter.isLocked('anna@x.test');
 

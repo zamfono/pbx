@@ -7,7 +7,7 @@ import {
   type RequestEvent
 } from '@sveltejs/kit';
 import * as privateEnv from '$app/env/private';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 import { migrateForTest } from '@zamfono/shared/testDb.js';
@@ -15,7 +15,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { encodeMetadataClientId } from '#lib/server/auth/clients.js';
 import { authCodeStore } from '#lib/server/auth/codes.js';
 import { CONSENT_COOKIE } from '#lib/server/auth/consent.js';
-import { hashPassword } from '#lib/server/auth/password.js';
+import { hashPassword, verifyPassword } from '#lib/server/auth/password.js';
 import { setSealedCookie } from '#lib/server/auth/sealedCookie.js';
 import { tokenEndpoint } from '#lib/server/auth/tokenEndpoint.js';
 import { getDb } from '#lib/server/db.js';
@@ -26,6 +26,13 @@ import { seedSettings } from '#lib/server/testDb.js';
 import { load } from './+page.server.js';
 import { approveConsentSubmit, denyConsentSubmit } from './consentSubmit.js';
 import { loginSubmit } from './loginSubmit.js';
+
+// The real Argon2id check, observed: a test counts the attempts that reached a stored hash.
+vi.mock('#lib/server/auth/password.js', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('#lib/server/auth/password.js')>();
+  return { ...actual, verifyPassword: vi.fn(actual.verifyPassword) };
+});
 
 const KEY_BYTE_LENGTH = 32;
 const FQDN = 'pbx.example.com';
@@ -319,6 +326,22 @@ describe('the login step', () => {
       message: expect.any(String) as string,
       email: email.toLowerCase()
     });
+  });
+
+  it('checks at most five of six parallel wrong passwords against the account (§5.5)', async () => {
+    const email = 'parallel@example.com';
+    await seedUser(getDb(), email);
+    vi.mocked(verifyPassword).mockClear();
+    const parallelAttempts = 6;
+    await Promise.all(
+      Array.from({ length: parallelAttempts }, () =>
+        loginSubmit(eventFor(), loginPayload(email, 'wrong'))
+      )
+    );
+    const checkedAgainstHash = vi
+      .mocked(verifyPassword)
+      .mock.calls.filter(([hash]) => hash !== null);
+    expect(checkedAgainstHash.length).toBeLessThanOrEqual(5);
   });
 
   it('shows the lock on the user record of an e-mail stored in mixed case (§5.5)', async () => {

@@ -73,8 +73,7 @@ export async function loginSubmit(
   // form, or varying the address's case gives an attacker a fresh 5-attempt budget per variant,
   // and the user record must read it back under that same form (`accountLockKey`).
   const account = accountLockKey(email);
-  const locked = limiter.isLocked(account);
-  if (locked.locked) {
+  if (!limiter.countLoginAttempt(account)) {
     // Costs the same Argon2id pass a wrong-password response costs (`verifyPassword`'s own dummy
     // hash), so a locked account's response time matches a wrong password's (§5.5).
     await verifyPassword(null, password);
@@ -83,7 +82,6 @@ export async function loginSubmit(
   const user = await lookupUser(db, email);
   const verified = await verifyPassword(user?.passwordHash ?? null, password);
   if (!verified || !user) {
-    limiter.loginFailed(account);
     return refused;
   }
   limiter.loginSucceeded(account);

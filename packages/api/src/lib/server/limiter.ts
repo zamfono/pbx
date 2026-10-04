@@ -75,17 +75,19 @@ export class Limiter {
   }
 
   /**
-   * Records a failed login for `account`. Five failures within 15 minutes lock the
-   * account for 15 minutes; attempts made while locked neither count nor extend it.
+   * Counts one login attempt for `account` as failed before its password is checked, so attempts
+   * in flight at the same moment count against the lock together; `loginSucceeded` settles a
+   * correct one. Five failures within 15 minutes lock the account for 15 minutes. Answers false,
+   * counting nothing, while the account is locked: a locked attempt neither counts nor extends it.
    */
-  loginFailed(account: string): void {
+  countLoginAttempt(account: string): boolean {
     const now = this.#now();
     const state = this.#loginFailures.get(account) ?? {
       failures: [],
       lockedUntil: null
     };
     if (state.lockedUntil !== null) {
-      return;
+      return false;
     }
     const cutoff = now - LOGIN_FAILURE_WINDOW_MS;
     const failures = [
@@ -103,6 +105,7 @@ export class Limiter {
     if (locking) {
       logger.warn({ account, lockedUntil }, 'account locked');
     }
+    return true;
   }
 
   /** Clears `account`'s failure counter and any active lock. */

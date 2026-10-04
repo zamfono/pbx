@@ -1,10 +1,11 @@
 import { randomBytes } from 'node:crypto';
+import type { NotNull } from 'kysely';
 
 import { addMsIso, MS_PER_DAY, MS_PER_HOUR, type Db } from '@zamfono/shared';
 
 import { sha256Hex } from '../hash.js';
 
-// §11.2 `tokens`: refresh tokens rotate every 30 days, a setup link is valid 7 days, a
+// §11.2 `tokens`: refresh tokens live 30 days and rotate on every use, a setup link is valid 7 days, a
 // self-requested reset link 1 hour.
 const RAW_TOKEN_BYTES = 32;
 const REFRESH_TOKEN_TTL_DAYS = 30;
@@ -64,7 +65,8 @@ export async function revokeUserTokens(
 
 /**
  * Redeems and rotates a refresh token. A revoked token being presented again is a replay
- * (§5.2): every refresh token of that user and client is revoked, per OAuth 2.1.
+ * (§5.2): every refresh token of that user and client is revoked, per OAuth 2.1. The redemption
+ * is the guarded revoke itself, so of two requests presenting the same token only one rotates it.
  */
 export async function rotateRefresh(
   db: Db,
@@ -80,9 +82,29 @@ export async function rotateRefresh(
   | { ok: false; reason: 'unknown' | 'expired' | 'replayed' }
 > {
   const tokenHash = sha256Hex(raw);
+  const claimed = await db
+    .updateTable('tokens')
+    .set({ revokedAt: now })
+    .where('tokenHash', '=', tokenHash)
+    .where('kind', '=', 'refresh')
+    .where('clientId', 'is not', null)
+    .where('revokedAt', 'is', null)
+    .where('expiresAt', '>', now)
+    .returning(['userId', 'clientId'])
+    .$narrowType<{ clientId: NotNull }>()
+    .executeTakeFirst();
+  if (claimed) {
+    const next = await issueRefresh(db, claimed.userId, claimed.clientId, now);
+    return {
+      ok: true,
+      userId: claimed.userId,
+      clientId: claimed.clientId,
+      next
+    };
+  }
   const row = await db
     .selectFrom('tokens')
-    .select(['userId', 'clientId', 'expiresAt', 'revokedAt'])
+    .select(['userId', 'clientId', 'expiresAt'])
     .where('tokenHash', '=', tokenHash)
     .where('kind', '=', 'refresh')
     .executeTakeFirst();
@@ -98,17 +120,8 @@ export async function rotateRefresh(
   if (row.expiresAt <= now) {
     return { ok: false, reason: 'expired' };
   }
-  if (row.revokedAt !== null) {
-    await revokeUserTokens(db, row.userId, now, row.clientId);
-    return { ok: false, reason: 'replayed' };
-  }
-  await db
-    .updateTable('tokens')
-    .set({ revokedAt: now })
-    .where('tokenHash', '=', tokenHash)
-    .execute();
-  const next = await issueRefresh(db, row.userId, row.clientId, now);
-  return { ok: true, userId: row.userId, clientId: row.clientId, next };
+  await revokeUserTokens(db, row.userId, now, row.clientId);
+  return { ok: false, reason: 'replayed' };
 }
 
 /** Issues a single-use set-password token: 7 days for a setup link, 1 hour for a reset link. */
@@ -153,20 +166,21 @@ export async function liveResetTokenUser(
   return row?.userId ?? null;
 }
 
-/** Redeems a set-password token: a redeemed, expired or unknown token fails; success revokes it. */
+/** Redeems a set-password token: a redeemed, expired or unknown token fails; success revokes it.
+ *  The redemption is the guarded revoke itself, so a token presented twice at once redeems once. */
 export async function redeemResetToken(
   db: Db,
   raw: string,
   now: string
 ): Promise<{ ok: true; userId: string } | { ok: false }> {
-  const userId = await liveResetTokenUser(db, raw, now);
-  if (userId === null) {
-    return { ok: false };
-  }
-  await db
+  const claimed = await db
     .updateTable('tokens')
     .set({ revokedAt: now })
     .where('tokenHash', '=', sha256Hex(raw))
-    .execute();
-  return { ok: true, userId };
+    .where('kind', '=', 'reset')
+    .where('revokedAt', 'is', null)
+    .where('expiresAt', '>', now)
+    .returning('userId')
+    .executeTakeFirst();
+  return claimed ? { ok: true, userId: claimed.userId } : { ok: false };
 }

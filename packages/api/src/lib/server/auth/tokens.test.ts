@@ -61,6 +61,21 @@ describe('issueRefresh / rotateRefresh', () => {
     });
   });
 
+  it('rotates a token presented twice at once only once (§5.2 rotate on use)', async () => {
+    const db = await makeTestDb();
+    await seedClient(db, 'client-1');
+    const issued = await issueRefresh(db, 'owner', 'client-1', NOW);
+    const later = afterMs(NOW, 1000);
+    const results = await Promise.all([
+      rotateRefresh(db, issued.raw, later),
+      rotateRefresh(db, issued.raw, later)
+    ]);
+    expect(results.filter(result => result.ok)).toHaveLength(1);
+    expect(results.filter(result => !result.ok)).toEqual([
+      { ok: false, reason: 'replayed' }
+    ]);
+  });
+
   it('refuses an unknown refresh token', async () => {
     const db = await makeTestDb();
     expect(await rotateRefresh(db, 'never-issued', NOW)).toEqual({
@@ -161,6 +176,16 @@ describe('issueResetToken / redeemResetToken', () => {
       userId: 'owner'
     });
     expect(await redeemResetToken(db, raw, NOW)).toEqual({ ok: false });
+  });
+
+  it('redeems a token presented twice at once only once (§5.2 single-use)', async () => {
+    const db = await makeTestDb();
+    const { raw } = await issueResetToken(db, 'owner', 'reset', NOW);
+    const results = await Promise.all([
+      redeemResetToken(db, raw, NOW),
+      redeemResetToken(db, raw, NOW)
+    ]);
+    expect(results.filter(result => result.ok)).toHaveLength(1);
   });
 
   it('refuses a token past its expiry', async () => {

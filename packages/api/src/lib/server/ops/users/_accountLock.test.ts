@@ -8,7 +8,7 @@ const LOCK_THRESHOLD = 5;
 
 function lock(account: string): void {
   for (let attempt = 0; attempt < LOCK_THRESHOLD; attempt += 1) {
-    limiter.loginFailed(account);
+    limiter.countLoginAttempt(account);
   }
 }
 
