@@ -40,7 +40,6 @@ async function insertClient(
       clientId,
       name: clientId,
       kind: 'cimd',
-      redirectUrisJson: '[]',
       createdAt: lastLoginAt,
       lastLoginAt
     })
@@ -550,7 +549,6 @@ describe('runPurge', () => {
           clientId: client.clientId,
           name: client.clientId,
           kind: 'cimd',
-          redirectUrisJson: '[]',
           createdAt: daysAfter(now, -120),
           lastLoginAt: daysAfter(now, -120)
         })

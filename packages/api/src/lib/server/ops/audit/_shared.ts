@@ -1,16 +1,8 @@
 import type { Selectable } from 'kysely';
 
-import type { DB } from '@zamfono/shared';
+import { changesColumn, type ChangeEntry, type DB } from '@zamfono/shared';
 
 export type AuditLogRow = Selectable<DB['auditLog']>;
-
-/** One field-level change, as `audit_log.changes_json` stores it (§5.7). */
-export type ChangeEntry = { field: string; from: unknown; to: unknown };
-
-/** Parses `changesJson` back into the `ChangeEntry` array it was written from. */
-export function parseChanges(changesJson: string): ChangeEntry[] {
-  return JSON.parse(changesJson) as ChangeEntry[];
-}
 
 /**
  * The table an entity kind's own row lives in, for the generic `deletedAt` revert and the
@@ -65,7 +57,7 @@ export function toAuditEntryOut(row: AuditLogRow): AuditEntryOut {
     operation: row.operation,
     entityKind: row.entityKind,
     entityId: row.entityId,
-    changes: parseChanges(row.changesJson),
+    changes: changesColumn.decode(row.changesJson),
     undoable: row.undoable === 1,
     revertsId: row.revertsId,
     undoneAt: row.undoneAt,

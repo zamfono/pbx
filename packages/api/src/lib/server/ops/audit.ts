@@ -1,8 +1,14 @@
 import { isDeepStrictEqual } from 'node:util';
 
-import { newId, type AuditChannel, type Db } from '@zamfono/shared';
+import {
+  changesColumn,
+  newId,
+  type AuditChannel,
+  type ChangeEntry,
+  type Db
+} from '@zamfono/shared';
 
-import type { ChangeEntry, RevertedEntry } from './effects.js';
+import type { RevertedEntry } from './effects.js';
 import type { Actor, Context } from './types.js';
 
 /**
@@ -157,7 +163,7 @@ export async function insertAuditRow(db: Db, row: AuditRow): Promise<void> {
       operation: row.operation,
       entityKind: row.entity.kind,
       entityId: row.entity.id,
-      changesJson: JSON.stringify(row.changes),
+      changesJson: changesColumn.encode(row.changes),
       undoable: row.undoable ? 1 : 0,
       revertsId: row.revertsId,
       undoneAt: null,

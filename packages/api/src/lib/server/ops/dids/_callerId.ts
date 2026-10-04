@@ -1,7 +1,6 @@
-import { isE164 } from '@zamfono/shared';
+import { isE164, type ChangeEntry } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
-import type { ChangeEntry } from '../audit/_shared.js';
 import { replayOperation } from '../runner.js';
 import type { Context } from '../types.js';
 

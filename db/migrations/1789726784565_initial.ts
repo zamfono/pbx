@@ -1211,7 +1211,6 @@ async function createOauthClientsTable(db: Db): Promise<void> {
     .addColumn('kind', 'text', col =>
       col.notNull().check(sql`kind in ('metadata','cimd')`)
     )
-    .addColumn('redirect_uris_json', 'text', col => col.notNull())
     .addColumn('created_at', 'text', col => col.notNull())
     .addColumn('last_login_at', 'text', col => col.notNull())
     .execute();

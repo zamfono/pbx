@@ -54,7 +54,6 @@ async function seedClient(deps: TokenDeps, clientId: string): Promise<void> {
       clientId,
       name: 'Test Client',
       kind: 'cimd',
-      redirectUrisJson: JSON.stringify(['https://client.test/callback']),
       createdAt: NOW,
       lastLoginAt: NOW
     })

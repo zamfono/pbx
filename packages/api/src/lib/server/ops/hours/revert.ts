@@ -1,6 +1,5 @@
-import { HTTP_CONFLICT } from '@zamfono/shared';
+import { HTTP_CONFLICT, type ChangeEntry } from '@zamfono/shared';
 
-import type { ChangeEntry } from '../audit/_shared.js';
 import { resolveTarget } from '../forwardTargetSpec.js';
 import { replayOperation } from '../runner.js';
 import { scopeFromColumns } from '../scope.js';

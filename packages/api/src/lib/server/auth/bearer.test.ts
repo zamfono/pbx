@@ -51,7 +51,6 @@ describe('authenticateToken', () => {
           clientId: 'client-1',
           name: 'Ops Console',
           kind: 'cimd',
-          redirectUrisJson: '[]',
           createdAt: nowIso(),
           lastLoginAt: nowIso()
         })

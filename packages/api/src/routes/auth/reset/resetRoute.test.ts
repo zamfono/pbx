@@ -69,7 +69,6 @@ describe('POST /auth/reset', () => {
         clientId: 'client-1',
         name: 'Test Client',
         kind: 'cimd',
-        redirectUrisJson: '[]',
         createdAt: nowIso(),
         lastLoginAt: nowIso()
       })

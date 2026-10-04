@@ -1,7 +1,6 @@
-import { HTTP_CONFLICT } from '@zamfono/shared';
+import { HTTP_CONFLICT, type ChangeEntry } from '@zamfono/shared';
 
 import { revertBlfKeys } from '../audit/_cascadeRevert.js';
-import type { ChangeEntry } from '../audit/_shared.js';
 import type { DroppedBlfKey } from '../devices/_shared.js';
 import { replayOperation } from '../runner.js';
 import { OpError, type Context } from '../types.js';

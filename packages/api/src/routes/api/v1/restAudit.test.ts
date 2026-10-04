@@ -33,7 +33,6 @@ beforeAll(async () => {
       clientId: CLIENT_ID,
       name: CLIENT_NAME,
       kind: 'cimd',
-      redirectUrisJson: '[]',
       createdAt: nowIso(),
       lastLoginAt: nowIso()
     })

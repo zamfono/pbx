@@ -192,14 +192,12 @@ export async function upsertClient(
       clientId: meta.clientId,
       name: meta.name,
       kind: meta.kind,
-      redirectUrisJson: JSON.stringify(meta.redirectUris),
       createdAt: now,
       lastLoginAt: now
     })
     .onConflict(oc =>
       oc.column('clientId').doUpdateSet({
         name: meta.name,
-        redirectUrisJson: JSON.stringify(meta.redirectUris),
         lastLoginAt: now
       })
     )

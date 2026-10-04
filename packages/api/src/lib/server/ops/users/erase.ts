@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { changesColumn } from '@zamfono/shared';
+
 import { maskContent } from '../audit.js';
 import { Conflict, defineOperation } from '../types.js';
 import { cascadeSoftDeleteUser } from './_cascade.js';
@@ -21,17 +23,14 @@ const PERSONAL_FIELDS = new Set(['name', 'email', 'findMe', 'rules']);
  * touching the diff of any other entity the same entry might mention.
  */
 function scrubChanges(changesJson: string): string {
-  const changes = JSON.parse(changesJson) as {
-    field: string;
-    from: unknown;
-    to: unknown;
-  }[];
-  return JSON.stringify(
-    changes.map(change =>
-      PERSONAL_FIELDS.has(change.field)
-        ? { field: change.field, from: '***', to: '***' }
-        : change
-    )
+  return changesColumn.encode(
+    changesColumn
+      .decode(changesJson)
+      .map(change =>
+        PERSONAL_FIELDS.has(change.field)
+          ? { field: change.field, from: '***', to: '***' }
+          : change
+      )
   );
 }
 

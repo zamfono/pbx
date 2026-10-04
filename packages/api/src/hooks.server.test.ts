@@ -183,7 +183,6 @@ describe('hooks handle', () => {
         clientId: 'client1',
         name: 'Ops Console',
         kind: 'cimd',
-        redirectUrisJson: '[]',
         createdAt: nowIso(),
         lastLoginAt: nowIso()
       })

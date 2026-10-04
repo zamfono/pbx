@@ -58,6 +58,14 @@ export const eventTypesSchema = z.array(z.enum(EVENT_TYPES));
  * (§6.5 "Backups"). */
 export const backupParamsSchema = z.record(z.string(), z.unknown());
 
+/** One field-level change, as `audit_log.changes_json` stores it (§5.7). */
+export const changeEntrySchema = z.object({
+  field: z.string(),
+  from: z.unknown(),
+  to: z.unknown()
+});
+export type ChangeEntry = z.infer<typeof changeEntrySchema>;
+
 /** `text` parsed as JSON, or an `invalid_format` issue on `ctx`. */
 function parseJson(
   text: string,
@@ -93,6 +101,7 @@ export const allowedIpsColumn = jsonColumn(allowedIpsSchema);
 export const sipHeadersColumn = jsonColumn(sipHeaderTemplatesSchema);
 export const eventTypesColumn = jsonColumn(eventTypesSchema);
 export const backupParamsColumn = jsonColumn(backupParamsSchema);
+export const changesColumn = jsonColumn(z.array(changeEntrySchema));
 
 /** `users.find_me_json`, where NULL means no find-me legs (§11.2): decoded, NULL is the empty list. */
 export const findMeColumn = z.codec(z.string().nullable(), findMeSchema, {

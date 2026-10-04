@@ -215,7 +215,6 @@ export interface OauthClients {
   kind: OAuthClientKind;
   lastLoginAt: string;
   name: string;
-  redirectUrisJson: string;
 }
 
 export interface OooRules {

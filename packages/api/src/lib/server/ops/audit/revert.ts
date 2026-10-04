@@ -1,4 +1,4 @@
-import { HTTP_CONFLICT } from '@zamfono/shared';
+import { HTTP_CONFLICT, type ChangeEntry } from '@zamfono/shared';
 
 import { revertDidCreate, revertDidUpdate } from '../dids/revert.js';
 import { revertHoursSet } from '../hours/revert.js';
@@ -15,7 +15,6 @@ import {
   revertSoftDelete
 } from './_cascadeRevert.js';
 import { LIST_REVERTS, type EntryRevert } from './_listReverts.js';
-import type { ChangeEntry } from './_shared.js';
 import { restoreProvisionedDevices } from './restoreProvisioning.js';
 
 const CREATE_SUFFIX = '.create';

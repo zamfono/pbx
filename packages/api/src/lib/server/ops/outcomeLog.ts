@@ -1,7 +1,6 @@
-import { nowIso, type Db } from '@zamfono/shared';
+import { nowIso, type ChangeEntry, type Db } from '@zamfono/shared';
 
 import { insertAuditRow, type AuditCaller } from './audit.js';
-import type { ChangeEntry } from './effects.js';
 import type { Context } from './types.js';
 
 /**

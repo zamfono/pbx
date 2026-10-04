@@ -144,7 +144,6 @@ export async function seededDeps(): Promise<McpDeps> {
       clientId: CLIENT_ID,
       name: CLIENT_NAME,
       kind: 'cimd',
-      redirectUrisJson: '[]',
       createdAt: nowIso(),
       lastLoginAt: nowIso()
     })

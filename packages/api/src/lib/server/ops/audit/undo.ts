@@ -1,13 +1,18 @@
 import { z } from 'zod';
 
-import { HTTP_CONFLICT, HTTP_NOT_FOUND } from '@zamfono/shared';
+import {
+  changesColumn,
+  HTTP_CONFLICT,
+  HTTP_NOT_FOUND,
+  type ChangeEntry
+} from '@zamfono/shared';
 
 import { recordRevert } from '../audit.js';
 import { OUTCOME_OPERATIONS } from '../outcomeLog.js';
 import { registry } from '../registry.js';
 import { Conflict, defineOperation, OpError, type Context } from '../types.js';
 import { isTenantListOperation, revertTenantList } from './_listReverts.js';
-import { ENTITY_TABLES, parseChanges, type ChangeEntry } from './_shared.js';
+import { ENTITY_TABLES } from './_shared.js';
 import { refuseUniqueViolation } from './_uniqueViolation.js';
 import { revertEntry } from './revert.js';
 
@@ -158,7 +163,7 @@ export const undo = defineOperation({
   run: async (ctx, input) => {
     const entry = await loadUndoableEntry(ctx, input.id);
     await assertNoLaterChange(ctx, entry);
-    const changes = parseChanges(entry.changesJson);
+    const changes = changesColumn.decode(entry.changesJson);
     const { entityId } = entry;
     await refuseUniqueViolation(async () => {
       if (entityId === null) {

@@ -29,7 +29,6 @@ async function setup(): Promise<{ deps: TokenDeps; code: string }> {
       clientId: CLIENT_ID,
       name: 'Test Client',
       kind: 'cimd',
-      redirectUrisJson: JSON.stringify([REDIRECT_URI]),
       createdAt: NOW,
       lastLoginAt: NOW
     })

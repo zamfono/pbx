@@ -1,4 +1,5 @@
-import type { ChangeEntry } from '../audit/_shared.js';
+import type { ChangeEntry } from '@zamfono/shared';
+
 import { replayOperation } from '../runner.js';
 import type { Context } from '../types.js';
 

@@ -1,9 +1,8 @@
-import { HTTP_CONFLICT } from '@zamfono/shared';
+import { HTTP_CONFLICT, type ChangeEntry } from '@zamfono/shared';
 
 import { replayOperation } from '../runner.js';
 import { revertTrunkOrder } from '../trunks/revertOrder.js';
 import { OpError, type Context } from '../types.js';
-import type { ChangeEntry } from './_shared.js';
 
 /** Reverts one entry of an entity, given the entity's id and the entry's recorded changes. */
 export type EntryRevert = (

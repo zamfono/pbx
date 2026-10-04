@@ -1,7 +1,4 @@
-import type { Db, ReloadKind } from '@zamfono/shared';
-
-/** One field-level change, as stored in `audit_log.changes_json` (§5.7). */
-export type ChangeEntry = { field: string; from: unknown; to: unknown };
+import type { ChangeEntry, Db, ReloadKind } from '@zamfono/shared';
 
 /**
  * A step that runs once the operation's write has committed, outside its transaction, which has

@@ -266,7 +266,6 @@ describe('users', () => {
         clientId,
         name: 'Test client',
         kind: 'cimd',
-        redirectUrisJson: '[]',
         createdAt: nowIso(),
         lastLoginAt: nowIso()
       })

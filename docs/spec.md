@@ -2140,16 +2140,13 @@ CREATE TABLE contact_phones (
 -- oauth_clients — every OAuth client a user has logged in with (§5.2); public clients only, PKCE
 -- required — hence no secret column. Rows are upserted on the first successful authorization and
 -- hard-deleted by the daily job 30 days after their last token expired.
---   client_id:          'metadata': the encrypted metadata blob; 'cimd': the metadata document URL
---   redirect_uris_json: JSON array; exact match on /oauth/authorize (a copy of what was validated
---                       at first login)
+--   client_id: 'metadata': the encrypted metadata blob; 'cimd': the metadata document URL
 CREATE TABLE oauth_clients (
-  client_id          TEXT    PRIMARY KEY,
-  name               TEXT    NOT NULL,
-  kind               TEXT    NOT NULL CHECK (kind IN ('metadata','cimd')),
-  redirect_uris_json TEXT    NOT NULL,
-  created_at         TEXT    NOT NULL,
-  last_login_at      TEXT    NOT NULL
+  client_id     TEXT    PRIMARY KEY,
+  name          TEXT    NOT NULL,
+  kind          TEXT    NOT NULL CHECK (kind IN ('metadata','cimd')),
+  created_at    TEXT    NOT NULL,
+  last_login_at TEXT    NOT NULL
 );
 
 -- tokens — refresh and password-reset tokens (§5).
