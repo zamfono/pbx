@@ -811,7 +811,7 @@ The database is therefore never the reason to re-architect; the single-tenant st
 
 ### 9.1 Static configuration
 
-Asterisk's own configuration ships in the image, is mounted read-only, and is templated from environment variables at container start by an `envsubst` entrypoint.
+Asterisk's own configuration ships in the image and is templated from environment variables at container start by an `envsubst` entrypoint; only what `api` renders comes from a volume (`asterisk-config`, mounted at `/etc/asterisk/gen`).
 
 - `pjsip.conf` holds transports only; the public side is IPv4 in the MVP (§6.1 for the IP model, §12 for the IPv6 switch-on):
   - `transport-tls`: SIP over TLS on 5061, for clients, accepting TLS 1.2 or newer and refusing older versions. It has `allow_reload=yes` and reads the stack certificate from the `asterisk-config` volume, where `api` keeps it synced from Caddy (§6.4). It has no switch, since every client depends on it. It also carries the TLS trunks that check their provider's certificate (§9.4 "Signaling"): `verify_server=yes` against the system CA bundle (`ca_list_path=/etc/ssl/certs`, wildcard certificates allowed), which Asterisk applies to outgoing connections alone, so a connecting client is not asked for anything.
@@ -898,7 +898,7 @@ SIP trunks are first-class, admin-configurable objects managed through the REST 
 
 - `ip` trunks are identified by source address: an `identify` section matches every host of the trunk whose `direction` is `inbound` or `both`. A host may be a single IP, a CIDR range or an FQDN (resolved, `srv_lookups=yes`).
 - `registration` trunks are identified primarily by the `line` parameter. The outbound registration carries `line=yes`, Asterisk registers a contact tagged `;line=<id>`, and INVITEs sent to that contact carry the tag back. Calls are thus recognized even when the provider's media gateways send from addresses outside the host list. The source-address match is the fallback.
-- Trunks with `inbound_auth` set are identified by digest authentication: the provider answers Asterisk's 401 challenge with the trunk's username and password, and the retried INVITE is matched by its `Authorization` username (`identify_by=auth_username`, §5.6). The trunk endpoint therefore carries an `auth=` section with the same credentials the trunk uses outbound. Such a trunk needs no `inbound` hosts, since the credential identifies the call wherever it comes from; a host list is still honoured where present. Available in both auth modes.
+- Trunks with `inbound_auth` set are identified by digest authentication: the provider answers Asterisk's 401 challenge with the trunk's username and password, and the retried INVITE is matched by its `Authorization` username (`identify_by=auth_username`, §5.6). Asterisk looks that username up as an endpoint's name, so such a trunk has a second endpoint, named by its username, which carries an `auth=` section with the same credentials the trunk uses outbound and delivers into the same context; the trunk's own `trunk-<id>` endpoint keeps `identify_by=ip` and challenges a call its hosts identify with the same section. `trunks.create` and `trunks.update` keep the username free as an endpoint name: 422 for one with a `;` or the `trunk-` prefix, 409 when a live device or another `inbound_auth` trunk holds it. Such a trunk needs no `inbound` hosts, since the credential identifies the call wherever it comes from; a host list is still honoured where present. Available in both auth modes.
 
 **Hosts.** Every trunk has an ordered list of hosts in `trunk_hosts`, each with a `direction`: `both` (default), `outbound` (a target for our INVITEs and registration only) or `inbound` (a source address the provider sends from, never dialed; typically a media-gateway IP or CIDR). A host that is dialed (`outbound`, `both`) is an FQDN or an IPv4 address, since the public side is IPv4 (§9.1) and the host becomes a `sip:<host>` URI; an IPv6 literal, like a CIDR range, is `inbound` only. A `registration` trunk needs at least one `outbound` or `both` host, its registrar; the API refuses one without.
 
@@ -1007,8 +1007,8 @@ packages/
 ├── core/                # container 1: ARI call handling
 │   └── src/
 │       ├── main.ts      # boot: env, openDb, ARI and AMI connect, internal server; stops on SIGTERM
-│       ├── ari/         # thin ARI client (WebSocket events + REST) and its in-process fake for tests
-│       ├── ami/         # AMI client for outbound registration state (§9.4) and its fake
+│       ├── ari/         # thin ARI client (WebSocket events + REST)
+│       ├── ami/         # AMI client for outbound registration state (§9.4)
 │       ├── routing/     # pure decision functions: schedules, entry, user step, ring groups, menus, dialed strings, trunks; no ARI, no database
 │       ├── calls/       # the Call aggregate and the ARI-driven flows: pipeline, inbound, outbound, ring groups, menus, voicemail, features, recording, actions, transfers, resync
 │       ├── presence.ts  # registrations + call state → device state (BLF), presence_log, events
@@ -1016,7 +1016,8 @@ packages/
 │       ├── hep.ts       # HEP listener for the SIP messages and RTCP reports Asterisk mirrors (§7); off when HEP_ENABLED=false
 │       ├── callLog.ts   # capped per-call log buffer (§7)
 │       ├── sweep.ts     # sweep emitting OOO and opening-hours transitions as they happen (§10.2)
-│       └── internal/    # internal HTTP+WS server for `api` (actions, state, events, reload)
+│       ├── internal/    # internal HTTP+WS server for `api` (actions, state, events, reload)
+│       └── testing/     # test doubles, outside the build: the in-process ARI and AMI fakes (`ari/`, `ami/`) and test rigs
 ├── api/                 # container 2: SvelteKit (adapter-node) — operations, REST, OAuth, MCP, /events
 │   ├── static/              # the logo and favicons, served as they are (§10.3 "Icons")
 │   └── src/
@@ -1078,7 +1079,7 @@ Two processes run for the life of the stack; `migrate` is a third container that
 5. **Target ring group.** Expand the members: users and user groups, nested user groups flattened and deduplicated. Then decide who is ringable:
    - members who are DND, offline or under an in-effect OOO rule are skipped;
    - members already in a call are skipped while the group's `skip_busy` is set (the default); with it cleared they are rung on their other devices as call waiting;
-   - a member's `unconditional` forward to a user, an external number or a SIP target is followed, and that target is rung as the member's leg, a SIP target over its trunk as step 7 dials it, with the member's forward as its last hop (§9.4 Forwarded calls); a forward to a mailbox, an announcement or a ring group skips the member, so a group never drops its caller into one member's voicemail.
+   - a member's `unconditional` forward to an external number, a SIP target or a user with a registered device is followed, and that target is rung as the member's leg, a SIP target over its trunk as step 7 dials it, with the member's forward as its last hop (§9.4 Forwarded calls); a forward to a user with no registered device rings nothing, and a forward to a mailbox, an announcement, a menu or a ring group skips the member, so a group never drops its caller into one member's voicemail.
 
    If no member is ringable, the `unavailable` rule fires immediately without ringing (absent that rule, the `unanswered` rule). Otherwise the group greeting plays to the caller, if configured, and the strategy runs:
    - `simultaneous` rings everyone for `ring_timeout_s`;
@@ -1111,7 +1112,7 @@ Timers, the hop counter and busy handling live entirely in the core.
 **Transfers and pickup.** The softphone sends SIP `REFER`; Asterisk executes it and the core follows the ARI events.
 
 - Blind transfer: `BridgeBlindTransfer` closes the transferrer's participation. Asterisk swaps a Local channel pair in for the transferrer (the event's `replace_channel`) and sends the pair's other half into `from-users`, where it enters Stasis as a new StasisStart, which the core routes through the pipeline as a new `calls` row with `parent_call_id` set to the original call. The Local pair links the two and stands in for the transferee's line: either end hanging up ends the other. A transfer to an external number is routed as the transferrer's call (§9.4).
-- Attended transfer: `BridgeAttendedTransfer` merges the two bridges. The core closes the transferrer's participations in both calls; the consultation call continues as the conversation and receives `parent_call_id` set to the original call.
+- Attended transfer: `BridgeAttendedTransfer` merges the two bridges or, where Asterisk cannot merge two bridges the core controls, links them through a Local channel pair swapped in for the transferrer's two channels; the core then moves the transferee into the consultation's bridge and ends the pair, so the conversation is one bridge of two parties again. The core closes the transferrer's participations in both calls; the consultation call continues as the conversation and receives `parent_call_id` set to the original call.
 - Over the API (§10.3 "Live calls"), `calls.transfer` with a target is the blind transfer. `calls.consult` puts the other party on hold in the core (§10.2 "Hold music") and dials the target from the actor as a three-way call's added leg (§10.2 "Three-way calls"), in the bridge the actor is in; `calls.transfer` with `toCallId` then joins the held party to the consultation in the actor's place, with the same rows, `parent_call_id`, trace and recording rule as the attended transfer above. The consulted party leaving, or the consultation being hung up, leaves the actor with the party still held, to resume; the actor's own channel leaving ends both.
 - Each row keeps its own `answered_by_user_id`. Recordings follow the participation rule (§10.2) per row. History renders the chain through `parent_call_id`.
 - Pickup: `*8<ext>` (§9.3) finds the ringing call for that extension, answers the picker's channel into its bridge and stops the original ring. The `calls` row records the picker as `answered_by_user_id`.
