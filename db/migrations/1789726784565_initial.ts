@@ -950,7 +950,8 @@ function addSettingsRingotelColumns<TB extends string, C extends string>(
         .notNull()
         .defaultTo(0)
         .check(sql`ringotel_roster_pending in (0,1)`)
-    );
+    )
+    .addColumn('ringotel_registered_at', 'text');
 }
 
 async function createSettingsTable(db: Db): Promise<void> {

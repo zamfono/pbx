@@ -151,7 +151,9 @@ export async function storeRingotelIds(
       ringotelOrgId: orgId,
       ringotelBranchId: branchId,
       ringotelProfilePending: 0,
-      ringotelRosterPending: 0
+      ringotelRosterPending: 0,
+      // The apps register against the running Asterisk from here on (§10.4 "After a restart").
+      ringotelRegisteredAt: ctx.now
     })
     .where('id', '=', 1)
     .execute();

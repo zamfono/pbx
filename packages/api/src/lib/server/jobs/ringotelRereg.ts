@@ -7,7 +7,7 @@
  */
 import pino from 'pino';
 
-import type { CoreVersionResponse, Db } from '@zamfono/shared';
+import { nowIso, type CoreVersionResponse, type Db } from '@zamfono/shared';
 
 import { errorMessage } from '../errors.js';
 import {
@@ -22,16 +22,6 @@ import {
 import { serialQueue } from '../serialQueue.js';
 
 const logger = pino({ name: 'ringotel' });
-
-/**
- * The entries after which the Ringotel apps registered against the running Asterisk anyway: the
- * setup or adoption that pointed them at this stack, and an earlier re-registration.
- */
-const REGISTERING_OPERATIONS = [
-  'provisioning.ringotelSetup',
-  'provisioning.ringotelAdopt',
-  'ringotel.rereg'
-];
 
 export type ReregDeps = {
   db: Db;
@@ -51,28 +41,29 @@ export type ReregDeps = {
 export type ReregState = { lastSeen: string | null };
 
 /**
- * Whether the Asterisk that started at `asteriskStartedAt` is newer than the latest entry after
- * which the apps registered anyway. The audit log is the durable memory: an `api` restart alone
- * sees the same Asterisk start and an older `ringotel.rereg` entry, and sends nothing.
+ * Whether the Asterisk that started at `asteriskStartedAt` is newer than the last time the apps
+ * registered against this stack anyway (`settings.ringotel_registered_at`): an `api` restart
+ * alone sees the same Asterisk start and an older registration, and sends nothing.
  */
 async function restartIsNew(
   db: Db,
   asteriskStartedAt: string
 ): Promise<boolean> {
-  const latest = await db
-    .selectFrom('auditLog')
-    .select('createdAt')
-    .where('operation', 'in', REGISTERING_OPERATIONS)
-    .orderBy('createdAt', 'desc')
-    .limit(1)
-    .executeTakeFirst();
+  const { ringotelRegisteredAt } = await db
+    .selectFrom('settings')
+    .select('ringotelRegisteredAt')
+    .where('id', '=', 1)
+    .executeTakeFirstOrThrow();
   return (
-    latest === undefined ||
-    Date.parse(asteriskStartedAt) > Date.parse(latest.createdAt)
+    ringotelRegisteredAt === null ||
+    Date.parse(asteriskStartedAt) > Date.parse(ringotelRegisteredAt)
   );
 }
 
-/** Sends the re-registration and records its outcome as a `ringotel.rereg` entry (§5.7). */
+/**
+ * Sends the re-registration, stamps `settings.ringotel_registered_at`, a refusal included since a
+ * start is never retried, and records the outcome as a `ringotel.rereg` entry (§5.7).
+ */
 async function reregister(
   db: Db,
   onPbxRestarted: () => Promise<void>,
@@ -93,6 +84,11 @@ async function reregister(
       'ringotel: re-registration refused'
     );
   }
+  await db
+    .updateTable('settings')
+    .set({ ringotelRegisteredAt: nowIso() })
+    .where('id', '=', 1)
+    .execute();
   await recordOutcome(db, {
     caller: JOB_CALLER,
     operation: 'ringotel.rereg',
@@ -103,7 +99,7 @@ async function reregister(
 
 /**
  * One check, for the Asterisk that started at `asteriskStartedAt`: for a start it has not handled
- * and that is newer than the last registration the audit log knows of, re-registers the apps
+ * and that is newer than the apps' last registration, re-registers the apps
  * once, while Ringotel is set up. At most one attempt per Asterisk start, whatever Ringotel
  * answers, so a refusal never turns into a loop; a refusal is logged and audited, never thrown.
  */

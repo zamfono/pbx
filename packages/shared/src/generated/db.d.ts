@@ -362,6 +362,7 @@ export interface Settings {
   ringotelMaxRegs: Generated<number>;
   ringotelOrgId: string | null;
   ringotelProfilePending: Generated<number>;
+  ringotelRegisteredAt: string | null;
   ringotelRosterPending: Generated<number>;
   smtpHost: string | null;
   smtpPasswordEnc: Buffer | null;

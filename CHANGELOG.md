@@ -324,6 +324,9 @@ why the specified behaviour changed; the commit history, how.
 - A caller who hangs up just as a phone answers (or a pickup is answered) no longer leaves that
   phone connected to nobody, its user shown busy and the call listed as live: the phone is hung
   up.
+- An `api` restart no longer re-registers every Ringotel app for an Asterisk it already handled
+  once the audit retention (`audit_retention_days`) has purged the earlier re-registration: the
+  time the apps last registered is kept in the settings row instead of read from the audit log.
 - A call whose SIP Call-ID `core` cannot read from Asterisk (Asterisk unreachable or refusing the
   request as the call comes in) is logged as `SIP dialog join failed` and handled as usual: at call
   log level `sip` it no longer goes unrecorded, and below it `core` no longer exits with an

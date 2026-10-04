@@ -124,15 +124,17 @@ describe('provisioning.ringotelSetup', () => {
     // `callpark.slots` above, never as a colleague lamp.
     expect(provision.blfs).toEqual([]);
 
-    const settingsRow = await db
+    const { ringotelRegisteredAt, ...ids } = await db
       .selectFrom('settings')
-      .select(['ringotelOrgId', 'ringotelBranchId'])
+      .select(['ringotelOrgId', 'ringotelBranchId', 'ringotelRegisteredAt'])
       .where('id', '=', 1)
       .executeTakeFirstOrThrow();
-    expect(settingsRow).toEqual({
+    expect(ids).toEqual({
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1'
     });
+    // The apps register against this stack's Asterisk from setup on (§10.4 "After a restart").
+    expect(ringotelRegisteredAt).not.toBeNull();
   });
 
   it('records its entry non-undoable, since no operation writes the ids back', async () => {

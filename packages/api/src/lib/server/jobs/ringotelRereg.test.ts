@@ -3,10 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   MS_PER_HOUR,
   MS_PER_MINUTE,
-  newId,
   type CoreVersionResponse,
   type Db
 } from '@zamfono/shared';
+import { seedSettings } from '@zamfono/shared/testDb.js';
 
 import { makeTestDb } from '#testing/testDb.js';
 
@@ -53,21 +53,11 @@ function ringotel(onPbxRestarted: () => Promise<void>): {
   };
 }
 
-async function auditRow(db: Db, operation: string, createdAt: string) {
-  await db
-    .insertInto('auditLog')
-    .values({
-      id: newId(),
-      actorUserId: 'owner',
-      actorUserName: 'Owner',
-      channel: 'mcp',
-      operation,
-      entityKind: 'settings',
-      entityId: 'settings',
-      changesJson: '[]',
-      createdAt
-    })
-    .execute();
+/** A tenant whose Ringotel apps last registered at `registeredAt`, by setup or adoption. */
+async function stackDb(registeredAt: string | null = null): Promise<Db> {
+  const db = await makeTestDb();
+  await seedSettings(db, { ringotelRegisteredAt: registeredAt });
+  return db;
 }
 
 async function reregRows(db: Db) {
@@ -80,8 +70,7 @@ async function reregRows(db: Db) {
 
 describe('checkAsteriskRestart (§10.4 "After a restart")', () => {
   it('re-registers once per Asterisk start, and audits it as a job', async () => {
-    const db = await makeTestDb();
-    await auditRow(db, 'provisioning.ringotelSetup', at(-120));
+    const db = await stackDb(at(-120));
     const rereg = vi.fn(() => Promise.resolve());
     const state: ReregState = { lastSeen: null };
     const deps = { db, lookup: core(STARTED), ...ringotel(rereg) };
@@ -104,14 +93,14 @@ describe('checkAsteriskRestart (§10.4 "After a restart")', () => {
   });
 
   it('sends nothing again after an api restart that saw the same Asterisk', async () => {
-    const db = await makeTestDb();
+    const db = await stackDb();
     const rereg = vi.fn(() => Promise.resolve());
     await checkAsteriskRestart(
       { db, lookup: core(STARTED), ...ringotel(rereg) },
       { lastSeen: null }
     );
 
-    // A fresh process: nothing in memory, the audit entry is what remembers.
+    // A fresh process: nothing in memory, settings.ringotel_registered_at is what remembers.
     await checkAsteriskRestart(
       { db, lookup: core(STARTED), ...ringotel(rereg) },
       { lastSeen: null }
@@ -121,7 +110,7 @@ describe('checkAsteriskRestart (§10.4 "After a restart")', () => {
   });
 
   it('re-registers again for the next Asterisk start', async () => {
-    const db = await makeTestDb();
+    const db = await stackDb();
     const rereg = vi.fn(() => Promise.resolve());
     const state: ReregState = { lastSeen: null };
     await checkAsteriskRestart(
@@ -140,8 +129,7 @@ describe('checkAsteriskRestart (§10.4 "After a restart")', () => {
   });
 
   it('sends nothing for an Asterisk that ran before Ringotel was set up', async () => {
-    const db = await makeTestDb();
-    await auditRow(db, 'provisioning.ringotelAdopt', at(-30));
+    const db = await stackDb(at(-30));
     const rereg = vi.fn(() => Promise.resolve());
 
     await checkAsteriskRestart(
@@ -158,7 +146,7 @@ describe('checkAsteriskRestart (§10.4 "After a restart")', () => {
   });
 
   it('sends nothing while Ringotel is not set up, or core does not say', async () => {
-    const db = await makeTestDb();
+    const db = await stackDb();
     const state: ReregState = { lastSeen: null };
 
     await checkAsteriskRestart(
@@ -186,7 +174,7 @@ describe('checkAsteriskRestart (§10.4 "After a restart")', () => {
   });
 
   it('audits a refusal without throwing, and does not retry it', async () => {
-    const db = await makeTestDb();
+    const db = await stackDb();
     const rereg = vi.fn(() => Promise.reject(new Error('ringotel: down')));
     const state: ReregState = { lastSeen: null };
     const deps = { db, lookup: core(STARTED), ...ringotel(rereg) };
@@ -206,7 +194,7 @@ describe('checkAsteriskRestart (§10.4 "After a restart")', () => {
 
 describe('watchAsteriskRestarts (§10.4 "After a restart")', () => {
   it('asks core once per stream connection, and never on its own', async () => {
-    const db = await makeTestDb();
+    const db = await stackDb();
     vi.useFakeTimers();
     try {
       const lookup = vi.fn(core(STARTED));
@@ -229,7 +217,7 @@ describe('watchAsteriskRestarts (§10.4 "After a restart")', () => {
   });
 
   it('re-registers on an announced start without asking core, once per start', async () => {
-    const db = await makeTestDb();
+    const db = await stackDb();
     const lookup = vi.fn(core(STARTED));
     const rereg = vi.fn(() => Promise.resolve());
     const watcher = watchAsteriskRestarts({ db, lookup, ...ringotel(rereg) });
@@ -250,7 +238,7 @@ describe('watchAsteriskRestarts (§10.4 "After a restart")', () => {
   });
 
   it('retries the pending profile ahead of the re-registration of a start found on reconnect', async () => {
-    const db = await makeTestDb();
+    const db = await stackDb();
     const order: string[] = [];
     const watcher = watchAsteriskRestarts({
       db,
@@ -273,7 +261,7 @@ describe('watchAsteriskRestarts (§10.4 "After a restart")', () => {
   });
 
   it('keeps running after a failed check', async () => {
-    const db = await makeTestDb();
+    const db = await stackDb();
     const rereg = vi.fn(() => Promise.resolve());
     let calls = 0;
     const watcher = watchAsteriskRestarts({
