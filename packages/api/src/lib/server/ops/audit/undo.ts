@@ -147,6 +147,26 @@ async function assertRowNotPurged(
 }
 
 /**
+ * The `ownerOnly` of `audit.undo`: undoing a user's soft delete brings an admin or owner back into
+ * being, which only an owner does (§10.3). A purged row is `run`'s 409 to answer.
+ */
+async function restoresAnAdmin(
+  ctx: Context,
+  input: { id: string }
+): Promise<boolean> {
+  const entry = await loadUndoableEntry(ctx, input.id);
+  if (entry.operation !== 'users.delete' || entry.entityId === null) {
+    return false;
+  }
+  const user = await ctx.db
+    .selectFrom('users')
+    .select('role')
+    .where('id', '=', entry.entityId)
+    .executeTakeFirst();
+  return user !== undefined && user.role !== 'user';
+}
+
+/**
  * `POST /audit/{id}/undo` (§5.8): reverts one `audit_log` entry by writing its `changes_json`
  * `from` values back, through the reverted entity's own operation; its own entry is the reverse
  * of the reverted one (`recordRevert`). Never asks confirmation (§10.3).
@@ -163,6 +183,7 @@ export const undo = defineOperation({
   output: idOutput,
   problems: [HTTP_NOT_FOUND, HTTP_CONFLICT],
   minRole: 'admin',
+  ownerOnly: restoresAnAdmin,
   run: async (ctx, input) => {
     const entry = await loadUndoableEntry(ctx, input.id);
     await assertNoLaterChange(ctx, entry);

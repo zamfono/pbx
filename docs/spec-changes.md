@@ -9,6 +9,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §10.4 When a device reaches Ringotel.** `PUT /devices/{id}/blf` pushes the panel to Ringotel once its write committed, like a device's other pushes: a refusal is a `warnings` entry and a `ringotel.push` row with trigger `devices.setBlf`, no longer a 502 that rolls the panel back.
 *Why:* the operation held the database's write lock while Ringotel answered, so `core`'s writes and `/events` failed meanwhile; per D14 ("After commit"), a push follows the commit.
+**2026-10-04 · §10.3 REST API.** Product-owner decision (D36): asked what admins may do with owners, the user chose "Both owner-only" — an admin can neither soft-delete an owner nor create (or restore into being) a user with role admin. Soft-deleting an owner, creating an admin and undoing the soft delete of an admin or owner are owner-only; an admin gets 403, before any confirmation.
+*Why:* an admin could remove an owner who is not the last, or make further admins, both above their own role.
+
 **2026-10-04 · §11.2 Schema.** Product-owner decision (D34): asked how an expired but unrevoked personal access token's name is freed, the user chose "Free the name (Recommended)". Creating a token first revokes the user's expired token of that name in the same transaction; §5.2 ("unique among the user's live tokens") stays.
 *Why:* the unique index covers unrevoked tokens, so an expired token held its name until the daily purge.
 

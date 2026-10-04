@@ -7,7 +7,7 @@ import { Conflict, defineOperation } from '../types.js';
 import { cascadeSoftDeleteUser } from './_cascade.js';
 import { userExtension } from './_extensions.js';
 import { findUserReferences } from './_references.js';
-import { assertNotLastOwner, liveUser } from './_shared.js';
+import { assertNotLastOwner, liveUser, namesAnOwner } from './_shared.js';
 
 /** `DELETE /users/{id}` (§10.3, §5.9): soft-deletes a user and cascades their devices and extension. */
 export const deleteUser = defineOperation({
@@ -18,6 +18,7 @@ export const deleteUser = defineOperation({
   output: idOutput,
   problems: [HTTP_NOT_FOUND],
   minRole: 'admin',
+  ownerOnly: namesAnOwner,
   confirm: async (ctx, input) => {
     const user = await liveUser(ctx.db, input.id);
     const ext = await userExtension(ctx.db, input.id);

@@ -40,7 +40,7 @@ const inputSchema = z
       .enum(CREATABLE_ROLES)
       .optional()
       .describe(
-        "admin configures the stack, user only their own self-service fields; 'user' by default, owner only by promotion through users.update."
+        "admin, given by an owner only, configures the stack, user only their own self-service fields; 'user' by default, owner only by promotion through users.update."
       ),
     extension: z.string().min(1).describe(EXTENSION_DESCRIPTION),
     ...userCallFields,
@@ -104,6 +104,8 @@ export const create = defineOperation({
   output: outputSchema,
   problems: [HTTP_CONFLICT],
   minRole: 'admin',
+  // Only an owner brings an admin into being (§10.3).
+  ownerOnly: (_ctx, input) => input.role === 'admin',
   entity: (_input, out: Output) => ({ kind: 'user', id: out.user.id }),
   run: async (ctx, input) => {
     await assertValidExtension(ctx.db, input.extension);

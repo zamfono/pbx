@@ -45,6 +45,7 @@ why the specified behaviour changed; the commit history, how.
   Argon2id hash (quote it), and `setup.sh` always asks for the owner's password. `api` refuses to
   start without `FQDN`, `JWT_SECRET` or `SECRETBOX_KEY`, `proxy` without `FQDN`, and `api`, `core`
   and Compose without `EXTERNAL_IPV4` (ports mode) or `STACK_IPV4` (macvlan mode).
+- **Breaking:** only owners create admins and soft-delete owners; an admin gets 403.
 - The mode's overlay is linked as `compose.override.yaml`, so commands are a plain
   `docker compose up -d`; `setup/compose.sh` adds the replication overlay `compose.dr.yaml`.
   `BACKUP_PASSWORD` creates the default `local` backup target at first boot only.

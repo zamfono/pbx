@@ -1275,7 +1275,7 @@ Every `DELETE` carries `confirm`, as do `users.erase`, `devices.rotate`, `person
 
 #### REST surface
 
-Base: `https://<host>/api/v1`. JSON only. Bearer auth, on every endpoint but the public OpenAPI document: a JWT access token issued by the OAuth server, or a personal access token (§5.2). RBAC roles: `owner`, `admin`, `user` — any number of owners, at least one; only owners change roles, reset an owner's password or change an owner's e-mail (an admin gets 403), and the last owner cannot be demoted or soft-deleted.
+Base: `https://<host>/api/v1`. JSON only. Bearer auth, on every endpoint but the public OpenAPI document: a JWT access token issued by the OAuth server, or a personal access token (§5.2). RBAC roles: `owner`, `admin`, `user` — any number of owners, at least one; only owners change roles, reset an owner's password, change an owner's e-mail, soft-delete an owner, or create an admin or undo the soft delete of an admin or owner (an admin gets 403, before any confirmation), and the last owner cannot be demoted or soft-deleted.
 
 The endpoints by area, as a sketch, each with the minimum role it needs:
 

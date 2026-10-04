@@ -3,11 +3,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { MS_PER_DAY, type Db } from '@zamfono/shared';
 import { seedSettings } from '@zamfono/shared/testDb.js';
 
-import { asRun, makeTestDb, owner } from '#testing/testDb.js';
+import { asConfirmedRun, asRun, makeTestDb, owner } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
 import type { Actor } from '../types.js';
 
+import '../audit/index.js';
 import './index.js';
 
 vi.mock('#lib/server/mail/index.js', async importOriginal => {
@@ -33,6 +34,19 @@ async function ownerAndAdmin(): Promise<Db> {
     })
     .execute();
   return db;
+}
+
+/** Creates the admin Ada as `actor`. */
+function createAdmin(
+  db: Db,
+  actor: Actor
+): Promise<{ user: { id: string; role: string } }> {
+  return runOperation(
+    db,
+    'users.create',
+    { name: 'Ada', email: 'ada@x.test', role: 'admin', extension: '120' },
+    asRun({ actor })
+  ) as Promise<{ user: { id: string; role: string } }>;
 }
 
 /** The lifetime of the newest set-password link of `userId`, in days. */
@@ -76,6 +90,43 @@ describe("an owner's account (§10.3)", () => {
     const db = await ownerAndAdmin();
     await runOperation(db, 'users.resetPassword', { id: owner.id }, asRun());
     expect(await linkLifetimeDays(db, owner.id)).toBe(7);
+  });
+
+  it('refuses an admin the soft delete of an owner before asking', async () => {
+    const db = await ownerAndAdmin();
+    await expect(
+      runOperation(
+        db,
+        'users.delete',
+        { id: owner.id },
+        asRun({ actor: admin })
+      )
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('lets only an owner create an admin', async () => {
+    const db = await ownerAndAdmin();
+    await expect(createAdmin(db, admin)).rejects.toMatchObject({
+      status: 403
+    });
+    await expect(createAdmin(db, owner)).resolves.toMatchObject({
+      user: { role: 'admin' }
+    });
+  });
+
+  it('lets only an owner undo the soft delete of an admin', async () => {
+    const db = await ownerAndAdmin();
+    const { user } = await createAdmin(db, owner);
+    await runOperation(db, 'users.delete', { id: user.id }, asConfirmedRun());
+    const entry = await db
+      .selectFrom('auditLog')
+      .select('id')
+      .where('operation', '=', 'users.delete')
+      .executeTakeFirstOrThrow();
+    await expect(
+      runOperation(db, 'audit.undo', entry, asRun({ actor: admin }))
+    ).rejects.toMatchObject({ status: 403 });
+    await runOperation(db, 'audit.undo', entry, asRun());
   });
 });
 
