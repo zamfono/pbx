@@ -4,6 +4,8 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §6.3 Automatic updates.** On an `edge` stack each of `main`'s builds is a release of its own: the updater's `GET /status` names the newest build's commit, and the failed automatic attempts (with their 20-hour gap) count on that commit, which `autoUpdate.failed` names. `update_state.run_release` records the release an automatic run's failure counts on when it starts, in place of `run_outcome_pending`, so a build published during the run does not take its failure.
 *Why:* keyed on the version `edge`, three failed attempts on one build held off every later build until a manual update succeeded (follows D25).
+**2026-10-04 · §5.2 Tokens.** Product-owner decision (D35): asked whether REST/MCP requests should check their session (a JWT access token worked up to 15 minutes after its session ended), the user chose "Check on every request (Recommended)". Every request an access token authenticates checks that its session (`sid`) still lives; one whose session has ended meets a 401 like an expired token.
+*Why:* sign-out, `/oauth/revoke`, refresh-token reuse and a password reset take effect at once on REST and MCP, as they already did on `/events`.
 
 **2026-10-04 · §10.5 Uploads.** Product-owner decision (D37): asked about MCP upload links ignoring own scope, the user chose "Refuse the link (Recommended)". The upload-link tool applies the operation's own-scope check and refuses a `user`'s link to another user's upload with 403 up front.
 *Why:* a link handed out for an upload its run would refuse can never succeed.

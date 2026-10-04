@@ -17,6 +17,7 @@ import {
   PAT_PREFIX,
   type PersonalAccessTokenGrant
 } from './personalAccessTokens.js';
+import { liveSessionIds } from './tokens.js';
 
 export const BEARER_PREFIX = 'Bearer ';
 /** The query parameter a download or upload link carries its token in (RFC 6750 §2.3, §10.5). */
@@ -66,8 +67,9 @@ async function liveAuthenticated(
 /**
  * The live user behind bearer token `token`, read fresh from `users` so a role change takes
  * effect at once: a personal access token's user (§5.2), or an access token's, which fails
- * unless issued for `audience` when one is given; `null` for a token that fails verification, a
- * soft-deleted user, or a stored role that is none of the three (§5.3).
+ * unless issued for `audience` when one is given; `null` for a token that fails verification, an
+ * access token whose session has ended (§5.2), a soft-deleted user, or a stored role that is none
+ * of the three (§5.3).
  */
 export async function authenticateToken(
   deps: BearerDeps,
@@ -92,8 +94,13 @@ export async function authenticateToken(
   if (!claims) {
     return null;
   }
-  const auth = await liveAuthenticated(deps, claims);
-  return auth && { ...auth, sessionId: claims.sid };
+  const [auth, liveSessions] = await Promise.all([
+    liveAuthenticated(deps, claims),
+    liveSessionIds(deps.db, [claims.sid], nowIso())
+  ]);
+  return auth && liveSessions.has(claims.sid)
+    ? { ...auth, sessionId: claims.sid }
+    : null;
 }
 
 /**

@@ -72,6 +72,8 @@ why the specified behaviour changed; the commit history, how.
 - A renewed certificate and an automatic update wait until no call, voicemail or recording is in
   progress; `core` winds its calls down when stopped; webhook deliveries survive a restart.
 - `GET /api/v1/openapi.json` is served without a token.
+- Signing out, revoking a token or resetting a password ends that session's API and MCP access
+  at once, not after its access token's 15 minutes.
 
 ### Removed
 

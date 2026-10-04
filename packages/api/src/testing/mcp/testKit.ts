@@ -8,7 +8,7 @@ import { serverInfo } from '#lib/server/mcp/results.js';
 import { register } from '#lib/server/ops/registry.js';
 import { defineOperation } from '#lib/server/ops/types.js';
 
-import { makeTestDb } from '../testDb.js';
+import { makeTestDb, seedSession } from '../testDb.js';
 
 // Fixtures the MCP endpoint's tests share (`../mcp.test.ts` and the focused `*.test.ts` beside
 // it): the test operations, a seeded database, and requests shaped as each protocol era sends
@@ -153,6 +153,7 @@ export async function seededDeps(): Promise<McpDeps> {
       lastLoginAt: nowIso()
     })
     .execute();
+  await seedSession(db, 'owner', CLIENT_ID, 'session-1');
   return { db, jwtSecret: JWT_SECRET, origin: ORIGIN };
 }
 

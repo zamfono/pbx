@@ -8,6 +8,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { encodeLinkToken, signAccessToken } from '#lib/server/auth/jwt.js';
 import { getDb } from '#lib/server/db.js';
 import { requestEvent } from '#testing/requestEvent.js';
+import { seedSession } from '#testing/testDb.js';
 
 import { handle, init as initHooks } from './hooks.server.js';
 import { GET as getOpenApi } from './routes/api/v1/openapi.json/+server.js';
@@ -51,6 +52,7 @@ beforeAll(async () => {
       createdAt: nowIso()
     })
     .execute();
+  await seedSession(db, 'admin1', 'console', 'session-1');
 });
 
 const resolvePassThrough = (): Promise<Response> =>

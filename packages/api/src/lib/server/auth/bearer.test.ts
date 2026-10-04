@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { epochSeconds, nowIso, type Db } from '@zamfono/shared';
 
-import { makeTestDb } from '#testing/testDb.js';
+import { makeTestDb, seedSession } from '#testing/testDb.js';
 
 import { authenticateRequest, authenticateToken } from './bearer.js';
 import { signAccessToken } from './jwt.js';
@@ -28,6 +28,7 @@ async function depsWith(seed?: (db: Db) => Promise<unknown>): Promise<{
 }> {
   const db = await makeTestDb();
   await seed?.(db);
+  await seedSession(db, 'owner', 'console', SESSION_ID);
   return { db, jwtSecret: JWT_SECRET };
 }
 
@@ -87,6 +88,17 @@ describe('authenticateToken', () => {
       await sql`update users set role = 'root' where id = 'owner'`.execute(db);
     });
     expect(await authenticateToken(deps, await tokenFor('owner'))).toBeNull();
+  });
+
+  it('refuses a token whose session ended since it was issued (§5.2)', async () => {
+    const deps = await depsWith();
+    const token = await tokenFor('owner');
+    await deps.db
+      .updateTable('tokens')
+      .set({ revokedAt: nowIso() })
+      .where('sessionId', '=', SESSION_ID)
+      .execute();
+    expect(await authenticateToken(deps, token)).toBeNull();
   });
 
   it('refuses a token not issued for the audience asked for', async () => {

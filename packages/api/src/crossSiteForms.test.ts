@@ -7,6 +7,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { signAccessToken } from '#lib/server/auth/jwt.js';
 import { getDb } from '#lib/server/db.js';
 import { requestEvent } from '#testing/requestEvent.js';
+import { seedSession } from '#testing/testDb.js';
 
 import { handle } from './hooks.server.js';
 
@@ -50,6 +51,7 @@ beforeAll(async () => {
       createdAt: nowIso()
     })
     .execute();
+  await seedSession(db, 'admin1', 'console', 'session-1');
 });
 
 /** `handle`'s response, and whether it passed the request on to the route. */

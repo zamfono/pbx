@@ -1,4 +1,4 @@
-import type { Db } from '@zamfono/shared';
+import { addMsIso, newId, nowIso, type Db } from '@zamfono/shared';
 import { migratedTestDb, seedUser } from '@zamfono/shared/testDb.js';
 
 import type { RunInput } from '#lib/server/ops/runner.js';
@@ -28,4 +28,41 @@ export async function makeTestDb(): Promise<Db> {
     passwordHash: 'x'
   });
   return db;
+}
+
+/**
+ * A live session `sessionId` of `userId` through OAuth client `clientId` (created if absent): one
+ * unrevoked refresh token, as the token endpoint starts a session on a login (§5.2).
+ */
+export async function seedSession(
+  db: Db,
+  userId: string,
+  clientId: string,
+  sessionId: string
+): Promise<void> {
+  const now = nowIso();
+  await db
+    .insertInto('oauthClients')
+    .values({
+      clientId,
+      name: clientId,
+      kind: 'cimd',
+      createdAt: now,
+      lastLoginAt: now
+    })
+    .onConflict(oc => oc.column('clientId').doNothing())
+    .execute();
+  await db
+    .insertInto('tokens')
+    .values({
+      tokenHash: newId(),
+      userId,
+      kind: 'refresh',
+      clientId,
+      sessionId,
+      createdAt: now,
+      expiresAt: addMsIso(now, 60 * 60 * 1000),
+      revokedAt: null
+    })
+    .execute();
 }

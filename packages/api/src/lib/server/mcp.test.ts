@@ -23,6 +23,7 @@ import {
   legacySession,
   readSseEvents
 } from '#testing/mcp/testKitLegacy.js';
+import { seedSession } from '#testing/testDb.js';
 
 import { signAccessToken } from './auth/jwt.js';
 import { handleMcpRequest } from './mcp.js';
@@ -476,7 +477,7 @@ describe('handleMcpRequest, legacy 2025-11-25', () => {
 
     const otherActorToken = await signAccessToken(
       JWT_SECRET,
-      { sub: 'someone-else', role: 'owner', cid: CLIENT_ID, sid: 'session-1' },
+      { sub: 'someone-else', role: 'owner', cid: CLIENT_ID, sid: 'session-2' },
       epochSeconds(Date.now()),
       ORIGIN
     );
@@ -491,6 +492,7 @@ describe('handleMcpRequest, legacy 2025-11-25', () => {
         createdAt: nowIso()
       })
       .execute();
+    await seedSession(deps.db, 'someone-else', CLIENT_ID, 'session-2');
     const wrongActorAnswer = await handleMcpRequest(
       deps,
       mcpRequest(

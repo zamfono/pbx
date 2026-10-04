@@ -73,8 +73,8 @@ export function issueRefresh(
 
 /**
  * Which of the sessions `ids` are live at `now`: holding a refresh token neither revoked nor
- * expired. A session ends when its tokens are revoked, which an `/events` socket it opened
- * follows (§10.6).
+ * expired. A session ends when its tokens are revoked, which its access tokens (§5.2) and an
+ * `/events` socket it opened (§10.6) follow.
  */
 export async function liveSessionIds(
   db: Db,

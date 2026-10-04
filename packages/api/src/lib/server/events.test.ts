@@ -63,6 +63,21 @@ async function migratedDb(userId: string): Promise<Db> {
   return db;
 }
 
+/** A session of `u1` with an OAuth client, as the token endpoint starts it on a login. */
+async function seedSession(db: Db): Promise<IssuedRefresh> {
+  await db
+    .insertInto('oauthClients')
+    .values({
+      clientId: 'client-1',
+      name: 'Ops Console',
+      kind: 'cimd',
+      createdAt: nowIso(),
+      lastLoginAt: nowIso()
+    })
+    .execute();
+  return issueRefresh(db, 'u1', 'client-1', nowIso());
+}
+
 describe('visibleTo', () => {
   const admin: Actor = { id: 'admin-1', name: 'Admin', role: 'admin' };
   const user: Actor = { id: 'user-1', name: 'User', role: 'user' };
@@ -228,6 +243,7 @@ describe('authenticateEventsSocket', () => {
 
   it('resolves the actor a valid auth frame names', async () => {
     const db = await migratedDb('u1');
+    const { sessionId } = await seedSession(db);
     wss = await listeningServer();
     const serverResult = new Promise<Authenticated | null>(resolve => {
       wss.once('connection', socket => {
@@ -245,14 +261,14 @@ describe('authenticateEventsSocket', () => {
     });
     const token = await signAccessToken(
       JWT_SECRET,
-      { sub: 'u1', role: 'user', cid: null, sid: 'session-1' },
+      { sub: 'u1', role: 'user', cid: null, sid: sessionId },
       NOW_S,
       'https://pbx.example.com'
     );
     client.send(JSON.stringify({ type: 'auth', token }));
     expect(await serverResult).toEqual({
       actor: { id: 'u1', name: 'A User', role: 'user' },
-      sessionId: 'session-1'
+      sessionId
     });
     client.close();
   });
@@ -557,21 +573,6 @@ describe('EventHub.usersChanged (§10.6)', () => {
   }
 
   const U1: Actor = { id: 'u1', name: 'A User', role: 'user' };
-
-  /** A session of `u1` with an OAuth client, as the token endpoint starts it on a login. */
-  async function seedSession(db: Db): Promise<IssuedRefresh> {
-    await db
-      .insertInto('oauthClients')
-      .values({
-        clientId: 'client-1',
-        name: 'Ops Console',
-        kind: 'cimd',
-        createdAt: nowIso(),
-        lastLoginAt: nowIso()
-      })
-      .execute();
-    return issueRefresh(db, 'u1', 'client-1', nowIso());
-  }
 
   /** `u1` on a live session, as an access token's handshake hands it to the hub. */
   async function sessionAuth(

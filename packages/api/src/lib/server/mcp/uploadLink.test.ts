@@ -14,6 +14,7 @@ import {
   rpc,
   seededDeps
 } from '#testing/mcp/testKit.js';
+import { seedSession } from '#testing/testDb.js';
 
 import { authenticateLink } from '../auth/bearer.js';
 import { signAccessToken } from '../auth/jwt.js';
@@ -140,6 +141,7 @@ describe('upload tools over MCP (§10.5 "Uploads")', () => {
       role: 'user',
       passwordHash: 'x'
     });
+    await seedSession(deps.db, 'user-1', CLIENT_ID, 'session-2');
     const token = await signAccessToken(
       JWT_SECRET,
       { sub: 'user-1', role: 'user', cid: CLIENT_ID, sid: 'session-2' },

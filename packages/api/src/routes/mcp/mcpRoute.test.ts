@@ -8,6 +8,7 @@ import { migrateForTest } from '@zamfono/shared/testDb.js';
 import { signAccessToken } from '#lib/server/auth/jwt.js';
 import { getDb } from '#lib/server/db.js';
 import { requestEvent } from '#testing/requestEvent.js';
+import { seedSession } from '#testing/testDb.js';
 
 import { POST } from './+server.js';
 
@@ -34,6 +35,7 @@ beforeAll(async () => {
       createdAt: nowIso()
     })
     .execute();
+  await seedSession(db, 'admin1', 'console', 'session-1');
 });
 
 /** A 2026-07-28 `POST /mcp`: `_meta` and the standard headers as a conforming client sends them. */
