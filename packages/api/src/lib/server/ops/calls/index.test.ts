@@ -10,21 +10,21 @@ import {
 import { seedSettings, seedUser } from '@zamfono/shared/testDb.js';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
-import { CoreRequestError } from '#lib/server/coreHttp.js';
 import { handleRest } from '#lib/server/rest.js';
 import { stubCoreClient } from '#testing/coreClientStub.js';
 import { asRun, makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
-import { type Actor } from '../types.js';
+import { OpError, type Actor } from '../types.js';
 
 import './index.js';
 
 // `core` refusing an originate for a user with no registered device (`internal/actionTable.ts`).
-const NO_REGISTERED_DEVICE = new CoreRequestError('http://core.test', 409, {
-  title: 'no registered device',
-  detail: 'noRegisteredDevice'
-});
+const NO_REGISTERED_DEVICE = new OpError(
+  409,
+  'no registered device',
+  'noRegisteredDevice'
+);
 
 const anna: Actor = { id: 'u1', name: 'Anna', role: 'user' };
 

@@ -3,12 +3,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nowIso, type LiveCall, type StateResponse } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
-import { CoreRequestError } from '#lib/server/coreHttp.js';
 import { stubCoreClient } from '#testing/coreClientStub.js';
 import { makeTestDb } from '#testing/testDb.js';
 
 import { runOperation } from '../runner.js';
-import { type Actor } from '../types.js';
+import { OpError, type Actor } from '../types.js';
 
 import './index.js';
 
@@ -200,17 +199,15 @@ describe('call control over the API (§10.3 "Live calls")', () => {
       ...getCoreClient(),
       addParty: () =>
         Promise.reject(
-          new CoreRequestError('http://core.test', 422, {
-            title: 'no party answers on this target',
-            detail: 'invalidTarget'
-          })
+          new OpError(422, 'no party answers on this target', 'invalidTarget')
         ),
       decline: () =>
         Promise.reject(
-          new CoreRequestError('http://core.test', 409, {
-            title: 'nothing of yours is ringing for this call',
-            detail: 'notRinging'
-          })
+          new OpError(
+            409,
+            'nothing of yours is ringing for this call',
+            'notRinging'
+          )
         )
     });
     await expect(

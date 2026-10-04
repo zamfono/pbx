@@ -7,7 +7,7 @@ import {
 } from '@zamfono/shared';
 
 import { createCoreClient } from './coreClient.js';
-import { coreRefusal } from './coreHttp.js';
+import { OpError } from './ops/types.js';
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -60,7 +60,8 @@ describe('createCoreClient call control', () => {
     const error: unknown = await client
       .addParty('c1', { target: '799', actorUserId: 'u1' })
       .catch((caught: unknown) => caught);
-    expect(coreRefusal(error)).toEqual({
+    expect(error).toBeInstanceOf(OpError);
+    expect(error).toMatchObject({
       status: HTTP_UNPROCESSABLE_CONTENT,
       title: 'no party answers on this target',
       detail: 'invalidTarget'

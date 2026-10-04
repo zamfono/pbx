@@ -7,8 +7,7 @@ import {
   CALL_ACTION_PROBLEMS,
   callActionOutput,
   liveCallIdInput,
-  ownLiveCall,
-  proxyCallAction
+  ownLiveCall
 } from './_shared.js';
 
 const inputSchema = z.object({ id: liveCallIdInput }).strict();
@@ -27,9 +26,7 @@ export const hangup = defineOperation({
   scope: ownLiveCall,
   audit: false,
   run: async (ctx, input) => {
-    await proxyCallAction(() =>
-      getCoreClient().hangup(input.id, { actorUserId: ctx.actor.id })
-    );
+    await getCoreClient().hangup(input.id, { actorUserId: ctx.actor.id });
     return { id: input.id };
   }
 });

@@ -23,6 +23,15 @@ function coreRefusing(status: number, title: string, reason: string): void {
   );
 }
 
+/** A real `CoreClient` over a `fetch` that never reaches `core`. */
+function coreSilent(): void {
+  vi.mocked(getCoreClient).mockReturnValue(
+    createCoreClient('http://core.test', () =>
+      Promise.reject(new TypeError('fetch failed'))
+    )
+  );
+}
+
 async function post(path: string, body: unknown): Promise<Response> {
   return handleRest(
     new Request(`http://pbx.test/api/v1/calls/${CALL_ID}/${path}`, {
@@ -40,7 +49,7 @@ afterEach(() => {
 });
 
 // §10.3: errors are RFC 9457 problems; a refusal `core` answers keeps its status and reason, as
-// `calls.originate`'s `noRegisteredDevice` does (§10.2 "Click-to-dial"), rather than a 500.
+// `calls.originate`'s `noRegisteredDevice` does (§10.2 "Click-to-dial"); any other failure is a 503.
 describe('a live-call action core refuses', () => {
   it('answers a transfer of an unbridged call with 409 notBridged', async () => {
     coreRefusing(409, 'call is not bridged', 'notBridged');
@@ -80,9 +89,27 @@ describe('a live-call action core refuses', () => {
     });
   });
 
-  it('keeps any other core failure a 500', async () => {
+  it('answers any other core failure with 503', async () => {
     coreRefusing(500, 'internal', 'boom');
     const response = await post('hangup', {});
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(503);
+  });
+
+  it('answers 503 while core does not answer', async () => {
+    coreSilent();
+    const response = await post('hangup', {});
+    expect(response.status).toBe(503);
+  });
+});
+
+describe('a read from core while core does not answer', () => {
+  it('answers the live calls list with 503', async () => {
+    coreSilent();
+    const response = await handleRest(
+      new Request('http://pbx.test/api/v1/calls?live=true'),
+      owner,
+      { db: await makeTestDb(), requestId: 'req-1' }
+    );
+    expect(response.status).toBe(503);
   });
 });

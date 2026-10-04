@@ -4,7 +4,7 @@ import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { ownActingUser } from '../gates.js';
 import { defineOperation } from '../types.js';
-import { CALL_ACTION_PROBLEMS, proxyCallAction } from './_shared.js';
+import { CALL_ACTION_PROBLEMS } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -52,14 +52,12 @@ export const originate = defineOperation({
   audit: false,
   run: async (ctx, input) => {
     const userId = input.userId ?? ctx.actor.id;
-    return proxyCallAction(async () =>
-      getCoreClient().originate({
-        userId,
-        target: input.target,
-        actorUserId: ctx.actor.id,
-        requestId: ctx.requestId,
-        ...(input.clir === undefined ? {} : { clir: input.clir })
-      })
-    );
+    return getCoreClient().originate({
+      userId,
+      target: input.target,
+      actorUserId: ctx.actor.id,
+      requestId: ctx.requestId,
+      ...(input.clir === undefined ? {} : { clir: input.clir })
+    });
   }
 });

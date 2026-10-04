@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
-import { CALL_DIRECTIONS, CALL_STATUSES, type LiveCall } from '@zamfono/shared';
+import {
+  CALL_DIRECTIONS,
+  CALL_STATUSES,
+  HTTP_SERVICE_UNAVAILABLE,
+  type LiveCall
+} from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import {
@@ -132,6 +137,8 @@ export const list = defineOperation({
   description: 'Lists call history, or the calls currently in progress.',
   input: inputSchema,
   output: pageOutput(z.union([callOut, liveCallOut])),
+  // `live=true` reads `core`, which may fail or not answer (`coreHttp.ts`).
+  problems: [HTTP_SERVICE_UNAVAILABLE],
   minRole: 'user',
   scope: ownActingUser,
   readOnly: true,

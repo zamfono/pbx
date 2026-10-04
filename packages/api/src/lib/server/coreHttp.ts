@@ -1,78 +1,19 @@
 /**
- * The transport under `coreClient.ts`: JSON over HTTP to `core`'s internal API, a non-2xx answer
- * as a `CoreRequestError`, and the call-action refusals read back out of one.
+ * The transport under `coreClient.ts`: JSON over HTTP to `core`'s internal API, every failure as
+ * the problem an operation answers with (§10.3): `core`'s refusal keeps its status and reason,
+ * anything else, `core` not answering included, is a 503.
  */
 
 import {
   HTTP_CONFLICT,
   HTTP_NOT_FOUND,
+  HTTP_SERVICE_UNAVAILABLE,
   HTTP_UNPROCESSABLE_CONTENT
 } from '@zamfono/shared';
 
+import { errorMessage } from './errors.js';
 import { tryReadJson } from './json.js';
-
-/** A non-2xx response from `core`'s internal API, carrying the status and, if parseable, the body. */
-export class CoreRequestError extends Error {
-  readonly status: number;
-  readonly body: unknown;
-
-  constructor(url: string, status: number, body: unknown) {
-    super(`core request to ${url} failed with status ${status}`);
-    this.name = 'CoreRequestError';
-    this.status = status;
-    this.body = body;
-  }
-}
-
-export async function postJson(
-  fetchFn: typeof fetch,
-  url: string,
-  body: unknown
-): Promise<Response> {
-  return fetchFn(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body)
-  });
-}
-
-/** Throws `CoreRequestError` for a non-2xx `response`; callers get a rejected promise instead of silently treating a failed reload or call action as having succeeded. */
-export async function throwIfNotOk(
-  response: Response,
-  url: string
-): Promise<void> {
-  if (!response.ok) {
-    throw new CoreRequestError(
-      url,
-      response.status,
-      await tryReadJson(response)
-    );
-  }
-}
-
-/** POSTs `body` to `url` and throws on a non-2xx response. */
-export async function postJsonChecked(
-  fetchFn: typeof fetch,
-  url: string,
-  body: unknown
-): Promise<void> {
-  const response = await postJson(fetchFn, url, body);
-  await throwIfNotOk(response, url);
-}
-
-/** POSTs `body` to `url` and answers its JSON body, throwing on a non-2xx response. */
-export async function postJsonForBody(
-  fetchFn: typeof fetch,
-  url: string,
-  body: unknown
-): Promise<unknown> {
-  const response = await postJson(fetchFn, url, body);
-  const parsed = await tryReadJson(response);
-  if (!response.ok) {
-    throw new CoreRequestError(url, response.status, parsed);
-  }
-  return parsed;
-}
+import { OpError } from './ops/types.js';
 
 /** The statuses `core` refuses a call action with (`calls/actionError.ts`'s `ActionError`): 404
  * for a call it holds no live state for, 409 for one in the wrong state or a picker without a
@@ -84,30 +25,71 @@ const REFUSAL_STATUSES = [
   HTTP_UNPROCESSABLE_CONTENT
 ] as const;
 
-/** A call action `core` refused: its status and the RFC 9457 problem's `title` and `detail`. */
-export type CoreRefusal = {
-  status: (typeof REFUSAL_STATUSES)[number];
-  title: string;
-  detail: string;
-};
-
 /**
- * The refusal `error` carries, when it is `core` answering a call action with its RFC 9457
- * problem, whose `detail` is the reason (`internal/actionRoutes.ts`); `null` for any other
- * failure, a malformed body or `core` being unreachable included, which stays a 500.
+ * The problem for `core`'s non-2xx answer to `url`: a refusal, one of `REFUSAL_STATUSES` with an
+ * RFC 9457 body whose `detail` is the reason (`internal/actionRoutes.ts`), keeps its status,
+ * `title` and `detail`; any other answer, a malformed body included, is a 503.
  */
-export function coreRefusal(error: unknown): CoreRefusal | null {
-  if (!(error instanceof CoreRequestError)) {
-    return null;
-  }
-  const status = REFUSAL_STATUSES.find(candidate => candidate === error.status);
-  const body = error.body as { title?: unknown; detail?: unknown } | undefined;
+function failure(url: string, status: number, body: unknown): OpError {
+  const refusal = REFUSAL_STATUSES.find(candidate => candidate === status);
+  const problem = body as { title?: unknown; detail?: unknown } | undefined;
   if (
-    status === undefined ||
-    typeof body?.title !== 'string' ||
-    typeof body.detail !== 'string'
+    refusal !== undefined &&
+    typeof problem?.title === 'string' &&
+    typeof problem.detail === 'string'
   ) {
-    return null;
+    return new OpError(refusal, problem.title, problem.detail);
   }
-  return { status, title: body.title, detail: body.detail };
+  return new OpError(
+    HTTP_SERVICE_UNAVAILABLE,
+    `core request to ${url} failed with status ${status}`
+  );
+}
+
+/** Every request to `core`: its 2xx response, else the problem `failure` makes of it, or a 503
+ * when `core` does not answer. */
+export async function coreFetch(
+  fetchFn: typeof fetch,
+  url: string,
+  init?: RequestInit
+): Promise<Response> {
+  let response: Response;
+  try {
+    response = await fetchFn(url, init);
+  } catch (error) {
+    throw new OpError(
+      HTTP_SERVICE_UNAVAILABLE,
+      `core did not answer ${url}: ${errorMessage(error)}`
+    );
+  }
+  if (!response.ok) {
+    throw failure(url, response.status, await tryReadJson(response));
+  }
+  return response;
+}
+
+function postInit(body: unknown): RequestInit {
+  return {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  };
+}
+
+/** POSTs `body` to `url`. */
+export async function postJsonChecked(
+  fetchFn: typeof fetch,
+  url: string,
+  body: unknown
+): Promise<void> {
+  await coreFetch(fetchFn, url, postInit(body));
+}
+
+/** POSTs `body` to `url` and answers its JSON body. */
+export async function postJsonForBody(
+  fetchFn: typeof fetch,
+  url: string,
+  body: unknown
+): Promise<unknown> {
+  return tryReadJson(await coreFetch(fetchFn, url, postInit(body)));
 }

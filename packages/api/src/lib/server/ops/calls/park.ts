@@ -8,8 +8,7 @@ import {
   CALL_ACTION_PROBLEMS,
   callActionOutput,
   isOwnLiveCall,
-  liveCallIdInput,
-  proxyCallAction
+  liveCallIdInput
 } from './_shared.js';
 
 const inputSchema = z
@@ -50,9 +49,10 @@ export const park = defineOperation({
   audit: false,
   run: async (ctx, input) => {
     const userId = input.userId ?? ctx.actor.id;
-    const { slot } = await proxyCallAction(() =>
-      getCoreClient().park(input.id, { userId, actorUserId: ctx.actor.id })
-    );
+    const { slot } = await getCoreClient().park(input.id, {
+      userId,
+      actorUserId: ctx.actor.id
+    });
     return { id: input.id, slot };
   }
 });

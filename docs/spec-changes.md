@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-04 · §10.3 Operations layer and REST surface, Live calls.** An operation that reads from or acts through `core` (the live calls list, the parked calls, a call action and its own-scope check) answers `core`'s refusal with its status and reason, and any other failure of `core`, `core` not answering included, with 503. The Live calls entry's own-scope sentence, cut off after "or have a leg up in", is completed.
+*Why:* such a failure answered 500, which no operation documents; 503 is what `system.update` answers when the service it hands the request to does not carry it out.
+
 **2026-10-04 · §5.2 Tokens, §10.6 Authentication, §11.2 `tokens`.** Product-owner decision (`/events` lifetime for OAuth sockets): a login starts a session, `tokens.session_id`, kept by every rotation and carried by the access token as `sid`; when the session's tokens are revoked (`/oauth/revoke`, a replay, a password reset, the user's soft delete), the `/events` re-check closes the sockets it opened with 4401. A live session's socket stays open as long as it likes, with no re-authentication.
 *Why:* "End on session revoke (Recommended)": the access token is checked only at the handshake, so a socket outlived the revocation of the session that opened it.
 

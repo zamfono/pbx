@@ -9,8 +9,7 @@ import {
   CALL_ACTION_PROBLEMS,
   callActionOutput,
   isOwnLiveCall,
-  liveCallIdInput,
-  proxyCallAction
+  liveCallIdInput
 } from './_shared.js';
 
 const inputSchema = z
@@ -61,13 +60,11 @@ export const transfer = defineOperation({
     const { target, toCallId, voicemail } = input;
     const actorUserId = ctx.actor.id;
     if (target !== undefined && toCallId === undefined) {
-      await proxyCallAction(() =>
-        getCoreClient().transfer(input.id, {
-          target,
-          actorUserId,
-          ...(voicemail === undefined ? {} : { voicemail })
-        })
-      );
+      await getCoreClient().transfer(input.id, {
+        target,
+        actorUserId,
+        ...(voicemail === undefined ? {} : { voicemail })
+      });
       return { id: input.id };
     }
     if (
@@ -75,12 +72,10 @@ export const transfer = defineOperation({
       target === undefined &&
       voicemail === undefined
     ) {
-      await proxyCallAction(() =>
-        getCoreClient().attendedTransfer(input.id, {
-          toCallId,
-          actorUserId
-        })
-      );
+      await getCoreClient().attendedTransfer(input.id, {
+        toCallId,
+        actorUserId
+      });
       return { id: input.id };
     }
     throw new OpError(

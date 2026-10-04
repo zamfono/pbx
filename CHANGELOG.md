@@ -316,6 +316,8 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- A live-call action (hang up, transfer, park, pickup, …), the live calls list and the parked
+  calls list answer 503 instead of 500 when `core` fails or does not answer.
 - Undoing the deletion of a DID, number block, IVR menu, out-of-office rule, opening-hours schedule,
   blocked number or hold-music asset now reaches `core` and Asterisk at once: before, calls kept
   being routed as if the item were still deleted until some other change went through.

@@ -7,8 +7,7 @@ import {
   CALL_ACTION_PROBLEMS,
   callActionOutput,
   liveCallIdInput,
-  ownLiveCall,
-  proxyCallAction
+  ownLiveCall
 } from './_shared.js';
 
 const inputSchema = z
@@ -34,9 +33,7 @@ export const hold = defineOperation({
   scope: ownLiveCall,
   audit: false,
   run: async (ctx, input) => {
-    await proxyCallAction(() =>
-      getCoreClient().hold(input.id, { actorUserId: ctx.actor.id })
-    );
+    await getCoreClient().hold(input.id, { actorUserId: ctx.actor.id });
     return { id: input.id };
   }
 });

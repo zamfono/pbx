@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { HTTP_SERVICE_UNAVAILABLE } from '@zamfono/shared';
+
 import { getCoreClient } from '#lib/server/coreClient.js';
 import {
   decodeOffsetCursor,
@@ -35,6 +37,8 @@ export const list = defineOperation({
       parkedByUserId: z.string()
     })
   ),
+  // Read from `core`, which may fail or not answer (`coreHttp.ts`).
+  problems: [HTTP_SERVICE_UNAVAILABLE],
   minRole: 'user',
   scope: 'any',
   readOnly: true,

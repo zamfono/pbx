@@ -25,7 +25,7 @@ import {
   type TransferRequest
 } from '@zamfono/shared';
 
-import { postJsonChecked, postJsonForBody, throwIfNotOk } from './coreHttp.js';
+import { coreFetch, postJsonChecked, postJsonForBody } from './coreHttp.js';
 
 // `/healthz`, `/metrics`, `system.info` and the live-call reads answer within this even while
 // `core` hangs (§6.3 "Health", §7, §10.3), and a hung `core` holds up no re-registration check
@@ -63,8 +63,7 @@ export function createCoreClient(
   const call = (callId: string, action: string): string =>
     `${baseUrl}/internal/calls/${encodeURIComponent(callId)}/${action}`;
   const getJson = async <T>(url: string, init?: RequestInit): Promise<T> => {
-    const response = await fetchFn(url, init);
-    await throwIfNotOk(response, url);
+    const response = await coreFetch(fetchFn, url, init);
     return (await response.json()) as T;
   };
   return {

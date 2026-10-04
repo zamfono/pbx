@@ -3,11 +3,7 @@ import { z } from 'zod';
 import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { defineOperation } from '../types.js';
-import {
-  CALL_ACTION_PROBLEMS,
-  callActionOutput,
-  proxyCallAction
-} from './_shared.js';
+import { CALL_ACTION_PROBLEMS, callActionOutput } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -35,9 +31,7 @@ export const decline = defineOperation({
   scope: 'any',
   audit: false,
   run: async (ctx, input) => {
-    await proxyCallAction(() =>
-      getCoreClient().decline(input.id, { actorUserId: ctx.actor.id })
-    );
+    await getCoreClient().decline(input.id, { actorUserId: ctx.actor.id });
     return { id: input.id };
   }
 });

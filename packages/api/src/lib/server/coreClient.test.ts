@@ -6,7 +6,7 @@ import {
 } from '@zamfono/shared';
 
 import { createCoreClient } from './coreClient.js';
-import { CoreRequestError } from './coreHttp.js';
+import { OpError } from './ops/types.js';
 
 const HANG_TIMEOUT_MS = 10;
 
@@ -87,7 +87,8 @@ describe('createCoreClient', () => {
       })
     ).rejects.toMatchObject({
       status: 409,
-      body: { detail: 'noRegisteredDevice' }
+      title: 'no registered device',
+      detail: 'noRegisteredDevice'
     });
   });
 
@@ -103,7 +104,7 @@ describe('createCoreClient', () => {
     );
   });
 
-  it('rejects with CoreRequestError on a 500, one per verb', async () => {
+  it('rejects with a 503 problem on a 500, one per verb', async () => {
     const fetchFn = vi.fn().mockResolvedValue(serverErrorResponse());
     const client = createCoreClient('http://core:3000', fetchFn);
     const calls: (() => Promise<unknown>)[] = [
@@ -132,10 +133,8 @@ describe('createCoreClient', () => {
     );
 
     for (const outcome of outcomes) {
-      expect(outcome).toBeInstanceOf(CoreRequestError);
-      expect((outcome as CoreRequestError).status).toBe(
-        HTTP_INTERNAL_SERVER_ERROR
-      );
+      expect(outcome).toBeInstanceOf(OpError);
+      expect(outcome).toMatchObject({ status: HTTP_SERVICE_UNAVAILABLE });
     }
   });
 

@@ -6,8 +6,7 @@ import { defineOperation } from '../types.js';
 import {
   CALL_ACTION_PROBLEMS,
   callActionOutput,
-  liveCallIdInput,
-  proxyCallAction
+  liveCallIdInput
 } from './_shared.js';
 
 const inputSchema = z.object({ id: liveCallIdInput }).strict();
@@ -28,9 +27,7 @@ export const pickup = defineOperation({
   scope: 'any',
   audit: false,
   run: async (ctx, input) => {
-    await proxyCallAction(() =>
-      getCoreClient().pickup(input.id, { actorUserId: ctx.actor.id })
-    );
+    await getCoreClient().pickup(input.id, { actorUserId: ctx.actor.id });
     return { id: input.id };
   }
 });

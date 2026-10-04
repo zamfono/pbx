@@ -6,14 +6,14 @@ import {
   CALL_STATUSES,
   HTTP_CONFLICT,
   HTTP_NOT_FOUND,
+  HTTP_SERVICE_UNAVAILABLE,
   QOS_ROLES,
   type DB
 } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
-import { coreRefusal } from '#lib/server/coreHttp.js';
 
-import { OpError, type Context } from '../types.js';
+import { type Context } from '../types.js';
 
 /** A `calls` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type CallRow = Selectable<DB['calls']>;
@@ -83,8 +83,20 @@ export const dialledCallOutput = callActionOutput.extend({
   callId: z.string()
 });
 
-/** The problems `proxyCallAction` turns `core`'s refusals into, besides the input's 422. */
-export const CALL_ACTION_PROBLEMS = [HTTP_NOT_FOUND, HTTP_CONFLICT] as const;
+/**
+ * The problems a call action answers with through `core` (`coreHttp.ts`), besides the input's
+ * 422 (§10.2 "Click-to-dial", §10.3): a call `core` holds no live state for is a 404, one it
+ * cannot act on in its current state or a user without a registered device a 409, a target it
+ * cannot act on a 422, each with `core`'s reason as `detail` (`notFound`, `notBridged`,
+ * `notInCall`, `notRinging`, `noRegisteredDevice`, `noFreeSlot`, `noMailbox`, `held`, `notHeld`,
+ * `consulting`, `notConsultation`, `notAnswered`, `invalidTarget`); any other failure of `core`,
+ * not answering included, is a 503.
+ */
+export const CALL_ACTION_PROBLEMS = [
+  HTTP_NOT_FOUND,
+  HTTP_CONFLICT,
+  HTTP_SERVICE_UNAVAILABLE
+] as const;
 
 /** A `calls` row's list wire shape; `calls.get` carries the diagnostics of one call on top. */
 export function toCallOut(row: CallRow): CallOut {
@@ -173,24 +185,4 @@ export function ownLiveCall(
   input: { id: string }
 ): Promise<boolean> {
   return isOwnLiveCall(ctx, input.id);
-}
-
-/**
- * Runs a call action through `core`, turning its refusal into the matching problem (§10.2
- * "Click-to-dial", §10.3): a call `core` holds no live state for is a 404, one it cannot act on in
- * its current state or a user without a registered device a 409, a target it cannot act on a 422,
- * each with `core`'s reason as `detail` (`notFound`, `notBridged`, `notInCall`, `notRinging`,
- * `noRegisteredDevice`, `noFreeSlot`, `noMailbox`, `held`, `notHeld`, `consulting`,
- * `notConsultation`, `notAnswered`, `invalidTarget`). Resolves with what the action answered.
- */
-export async function proxyCallAction<T>(action: () => Promise<T>): Promise<T> {
-  try {
-    return await action();
-  } catch (error) {
-    const refusal = coreRefusal(error);
-    if (refusal === null) {
-      throw error;
-    }
-    throw new OpError(refusal.status, refusal.title, refusal.detail);
-  }
 }

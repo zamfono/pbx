@@ -8,8 +8,7 @@ import {
   dialledCallOutput,
   dialTargetInput,
   liveCallIdInput,
-  ownLiveCall,
-  proxyCallAction
+  ownLiveCall
 } from './_shared.js';
 
 const inputSchema = z
@@ -37,12 +36,10 @@ export const consult = defineOperation({
   scope: ownLiveCall,
   audit: false,
   run: async (ctx, input) => {
-    const { callId } = await proxyCallAction(() =>
-      getCoreClient().consult(input.id, {
-        target: input.target,
-        actorUserId: ctx.actor.id
-      })
-    );
+    const { callId } = await getCoreClient().consult(input.id, {
+      target: input.target,
+      actorUserId: ctx.actor.id
+    });
     return { id: input.id, callId };
   }
 });
