@@ -13,6 +13,7 @@ import {
 import { isCronExpression } from '#lib/server/jobs/cronExpression.js';
 
 import { targetSpecSchema } from '../forwardTargetSchema.js';
+import { timeoutSeconds } from '../timeoutInput.js';
 import {
   mailInputFields,
   ringotelInputFields,
@@ -101,16 +102,10 @@ export const settingsInputSchema = z
       .describe(
         'A moh audio asset played to parties on hold; null: the built-in default music (see zamfono.help music-licensing).'
       ),
-    voicemailMaxS: z
-      .number()
-      .int()
-      .positive()
+    voicemailMaxS: timeoutSeconds
       .optional()
       .describe('Maximum length of one voicemail in seconds, 180 by default.'),
-    parkingTimeoutS: z
-      .number()
-      .int()
-      .positive()
+    parkingTimeoutS: timeoutSeconds
       .optional()
       .describe(
         'Seconds a parked call waits before ringing the parker back, 300 by default.'

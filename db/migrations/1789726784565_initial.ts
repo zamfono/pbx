@@ -43,7 +43,7 @@ async function createUsersTable(db: Db): Promise<void> {
       col
         .notNull()
         .defaultTo(DEFAULT_USER_RING_TIMEOUT_S)
-        .check(sql`ring_timeout_s > 0`)
+        .check(sql`ring_timeout_s between 1 and 86400`)
     )
     .addColumn('dnd', 'integer', col =>
       col
@@ -207,6 +207,23 @@ function addTrunksSignalingColumns<TB extends string, C extends string>(
     );
 }
 
+// A 'registration' trunk's registration expiry and retry interval, NULL on an 'ip' trunk (§9.4).
+function addTrunksRegistrationColumns<TB extends string, C extends string>(
+  builder: CreateTableBuilder<TB, C>
+) {
+  return builder
+    .addColumn('register_expiry_s', 'integer', col =>
+      col.check(sql`register_expiry_s between 1 and 86400`)
+    )
+    .addColumn('register_retry_s', 'integer', col =>
+      col.check(sql`register_retry_s between 1 and 86400`)
+    )
+    .addCheckConstraint(
+      'trunks_register_fields_need_registration',
+      sql`auth_mode = 'registration' or (register_expiry_s is null and register_retry_s is null)`
+    );
+}
+
 async function createTrunksTable(db: Db): Promise<void> {
   await db.schema
     .createTable('trunks')
@@ -237,8 +254,7 @@ async function createTrunksTable(db: Db): Promise<void> {
     )
     .$call(addTrunksSignalingColumns)
     .addColumn('outbound_proxy', 'text')
-    .addColumn('register_expiry_s', 'integer')
-    .addColumn('register_retry_s', 'integer')
+    .$call(addTrunksRegistrationColumns)
     .addColumn('inbound_number_format', 'text', col =>
       col
         .notNull()
@@ -271,10 +287,6 @@ async function createTrunksTable(db: Db): Promise<void> {
     .addCheckConstraint(
       'trunks_auth_credentials',
       sql`(auth_mode = 'registration' or inbound_auth = 1) = (username is not null and password_enc is not null)`
-    )
-    .addCheckConstraint(
-      'trunks_register_fields_need_registration',
-      sql`auth_mode = 'registration' or (register_expiry_s is null and register_retry_s is null)`
     )
     .addCheckConstraint(
       'trunks_clir_needs_caller_id_header',
@@ -458,10 +470,10 @@ async function createRingGroupsTable(db: Db): Promise<void> {
       col
         .notNull()
         .defaultTo(DEFAULT_RING_GROUP_RING_TIMEOUT_S)
-        .check(sql`ring_timeout_s > 0`)
+        .check(sql`ring_timeout_s between 1 and 86400`)
     )
     .addColumn('ring_total_s', 'integer', col =>
-      col.check(sql`ring_total_s > 0`)
+      col.check(sql`ring_total_s between 1 and 86400`)
     )
     .addColumn('skip_busy', 'integer', col =>
       col
@@ -693,7 +705,7 @@ async function createMenusTable(db: Db): Promise<void> {
       col
         .notNull()
         .defaultTo(DEFAULT_MENU_TIMEOUT_S)
-        .check(sql`timeout_s > 0`)
+        .check(sql`timeout_s between 1 and 86400`)
     )
     .addColumn('max_attempts', 'integer', col =>
       col
@@ -867,13 +879,13 @@ function addSettingsCallColumns<TB extends string, C extends string>(
       col
         .notNull()
         .defaultTo(DEFAULT_VOICEMAIL_MAX_S)
-        .check(sql`voicemail_max_s > 0`)
+        .check(sql`voicemail_max_s between 1 and 86400`)
     )
     .addColumn('parking_timeout_s', 'integer', col =>
       col
         .notNull()
         .defaultTo(DEFAULT_PARKING_TIMEOUT_S)
-        .check(sql`parking_timeout_s > 0`)
+        .check(sql`parking_timeout_s between 1 and 86400`)
     )
     .addColumn('call_log_level', 'text', col =>
       col

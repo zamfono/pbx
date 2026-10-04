@@ -16,6 +16,7 @@ import { assertNoLiveHolder } from '../liveHolder.js';
 import { mailboxMaxMessagesField } from '../mailbox.js';
 import { liveRow } from '../rows.js';
 import { logLevelOutputFields, logLevelWire } from '../settings/logLevel.js';
+import { timeoutSeconds } from '../timeoutInput.js';
 import { OpError, type Context } from '../types.js';
 import { accountLockedUntil } from './_accountLock.js';
 import { userExtension } from './_extensions.js';
@@ -29,10 +30,7 @@ export const EXTENSION_DESCRIPTION =
 
 /** The call-handling fields `users.create` and `users.update` share, each optional (§11.2 `users`). */
 export const userCallFields = {
-  ringTimeoutS: z
-    .number()
-    .int()
-    .positive()
+  ringTimeoutS: timeoutSeconds
     .optional()
     .describe(
       "Seconds the user's devices ring before the noAnswer rule applies; 25 by default; self-service."

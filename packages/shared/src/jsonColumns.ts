@@ -8,6 +8,7 @@ import { EVENT_TYPES } from './events.js';
 import { featureCodesSchema } from './featureCodes.js';
 import { isE164 } from './numbers.js';
 import type { SipHeaderTemplate } from './sipHeaders.js';
+import { MAX_TIMEOUT_S } from './time.js';
 
 /** The codecs the image ships (§9.1): every name a `codecs_json` list may hold. */
 export const CODECS = ['opus', 'g722', 'amrwb', 'amr', 'alaw', 'ulaw'] as const;
@@ -33,6 +34,7 @@ export const findMeSchema = z
         .number()
         .int()
         .min(0)
+        .max(MAX_TIMEOUT_S)
         .describe(
           'Seconds after ringing begins before this leg starts; 0 rings with the devices.'
         )

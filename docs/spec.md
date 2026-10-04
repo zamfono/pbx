@@ -1507,7 +1507,7 @@ WAL mode, `foreign_keys=ON`, write ownership split per §3.1 (`api` = config tab
 
 **Column order** serves the reader. Every table lists its primary key first, then what identifies the row (natural key, name, label, kind), then its structural references (owner, scope, parent), then its own configuration grouped by topic, with a reference that belongs to a setting next to that setting (`greeting_audio_id` with the greeting options, `fallback_target_id` with the fallback rule), then secrets (`*_enc`), then the status columns the core writes at runtime, then the timestamps (`created_at`, `updated_at`, `deleted_at`), and finally the table constraints. `settings` marks its groups with comments.
 
-**Column types.** IP addresses and CIDR ranges are `TEXT` and are validated and matched as either family, IPv4 or IPv6, everywhere the application handles them (`devices.allowed_ips_json`, `trunk_hosts.host`, the rate limiter's client key, §5.5), so enabling IPv6 (§12) is a deployment change and never a migration. Timestamps are `TEXT` in ISO 8601 UTC, in columns suffixed `_at` (plus `since` in `presence_log`). Booleans are `INTEGER` 0 or 1; the `CHECK (col IN (0,1))` constraints are implied and omitted below. Enums are `TEXT` with an inline `CHECK`, their values camelCase (`noAnswer`, `vmGreeting`), the one spelling that the wire and the generated TypeScript types share (§10.3, conventions). `*_enc` columns are `BLOB` holding libsodium secretbox ciphertext with a leading key-generation byte (§5.4). `*_json` columns are `TEXT` holding JSON.
+**Column types.** IP addresses and CIDR ranges are `TEXT` and are validated and matched as either family, IPv4 or IPv6, everywhere the application handles them (`devices.allowed_ips_json`, `trunk_hosts.host`, the rate limiter's client key, §5.5), so enabling IPv6 (§12) is a deployment change and never a migration. Timestamps are `TEXT` in ISO 8601 UTC, in columns suffixed `_at` (plus `since` in `presence_log`). Booleans are `INTEGER` 0 or 1; the `CHECK (col IN (0,1))` constraints are implied and omitted below. Enums are `TEXT` with an inline `CHECK`, their values camelCase (`noAnswer`, `vmGreeting`), the one spelling that the wire and the generated TypeScript types share (§10.3, conventions). `*_enc` columns are `BLOB` holding libsodium secretbox ciphertext with a leading key-generation byte (§5.4). `*_json` columns are `TEXT` holding JSON. A timeout in seconds (a `*_s` column other than a `duration_s`, and a find-me leg's `delayS`) is at most 86400, a day, so every timer it starts fits; the API refuses a larger one, and the database `CHECK`s it where it is a column.
 
 **References.** Unordered M:N memberships use one link table per member type: `user_group_users`, `user_group_groups`, `outbound_route_users`, `outbound_route_user_groups`. A single-valued reference to one of several tables uses an exclusive arc: one nullable FK column per target type plus a `CHECK` on how many may be set. A ring group's members are one ordered list, so `ring_group_members` is a single table whose rows carry that arc over user and user group: the primary key on group and position is what keeps the order unique, which two per-type tables could only promise. `audit_log` is the one table whose references (`entity_kind`, `entity_id`, `actor_user_id`, `client_id`) carry no FK, because it must keep describing rows, and identifying actors and clients, after their hard purge (§5.10).
 
@@ -1559,7 +1559,7 @@ CREATE TABLE users (
   role                 TEXT    NOT NULL DEFAULT 'user' CHECK (role IN ('owner','admin','user')),
   password_hash        TEXT,
   sso_subject          TEXT    UNIQUE,
-  ring_timeout_s       INTEGER NOT NULL DEFAULT 25 CHECK (ring_timeout_s > 0),
+  ring_timeout_s       INTEGER NOT NULL DEFAULT 25 CHECK (ring_timeout_s BETWEEN 1 AND 86400),
   dnd                  INTEGER NOT NULL DEFAULT 0,
   find_me_json         TEXT,
   caller_id_did_id     TEXT    REFERENCES dids(id) ON DELETE SET NULL,
@@ -1666,8 +1666,8 @@ CREATE TABLE trunks (
   qualify               INTEGER NOT NULL DEFAULT 1 CHECK (qualify IN (0,1)),
   diversion             TEXT    NOT NULL DEFAULT 'off' CHECK (diversion IN ('off','last','all')),
   outbound_proxy        TEXT,
-  register_expiry_s     INTEGER,
-  register_retry_s      INTEGER,
+  register_expiry_s     INTEGER CHECK (register_expiry_s BETWEEN 1 AND 86400),
+  register_retry_s      INTEGER CHECK (register_retry_s BETWEEN 1 AND 86400),
   inbound_number_format TEXT    NOT NULL DEFAULT 'e164' CHECK (inbound_number_format IN ('e164','national')),
   caller_id_format      TEXT    NOT NULL DEFAULT 'e164' CHECK (caller_id_format IN ('e164','national')),
   caller_id_header      TEXT    NOT NULL DEFAULT 'from' CHECK (caller_id_header IN ('from','pai','both')),
@@ -1789,8 +1789,8 @@ CREATE TABLE ring_groups (
   id                   TEXT    PRIMARY KEY,
   name                 TEXT    NOT NULL UNIQUE,
   strategy             TEXT    NOT NULL CHECK (strategy IN ('simultaneous','sequential','random')),
-  ring_timeout_s       INTEGER NOT NULL DEFAULT 20 CHECK (ring_timeout_s > 0),
-  ring_total_s         INTEGER CHECK (ring_total_s > 0),
+  ring_timeout_s       INTEGER NOT NULL DEFAULT 20 CHECK (ring_timeout_s BETWEEN 1 AND 86400),
+  ring_total_s         INTEGER CHECK (ring_total_s BETWEEN 1 AND 86400),
   skip_busy            INTEGER NOT NULL DEFAULT 1,
   allow_reject         INTEGER NOT NULL DEFAULT 1,
   greeting_audio_id    TEXT    REFERENCES audio_assets(id) ON DELETE SET NULL,
@@ -1923,7 +1923,7 @@ CREATE TABLE menus (
   id                      TEXT    PRIMARY KEY,
   name                    TEXT    NOT NULL UNIQUE,
   audio_id                TEXT    NOT NULL REFERENCES audio_assets(id) ON DELETE RESTRICT,
-  timeout_s               INTEGER NOT NULL DEFAULT 5 CHECK (timeout_s > 0),
+  timeout_s               INTEGER NOT NULL DEFAULT 5 CHECK (timeout_s BETWEEN 1 AND 86400),
   max_attempts            INTEGER NOT NULL DEFAULT 3 CHECK (max_attempts > 0),
   allow_extension_dialing INTEGER NOT NULL DEFAULT 0,
   fallback_target_id      TEXT    NOT NULL REFERENCES forward_targets(id) ON DELETE RESTRICT,
@@ -2001,8 +2001,8 @@ CREATE TABLE settings (
   clir                       INTEGER NOT NULL DEFAULT 0,
   reject_anonymous           INTEGER NOT NULL DEFAULT 0,
   hold_moh_audio_id          TEXT    REFERENCES audio_assets(id) ON DELETE SET NULL,
-  voicemail_max_s            INTEGER NOT NULL DEFAULT 180 CHECK (voicemail_max_s > 0),
-  parking_timeout_s          INTEGER NOT NULL DEFAULT 300 CHECK (parking_timeout_s > 0),
+  voicemail_max_s            INTEGER NOT NULL DEFAULT 180 CHECK (voicemail_max_s BETWEEN 1 AND 86400),
+  parking_timeout_s          INTEGER NOT NULL DEFAULT 300 CHECK (parking_timeout_s BETWEEN 1 AND 86400),
   -- diagnostics and retention
   call_log_level             TEXT    NOT NULL DEFAULT 'events' CHECK (call_log_level IN ('none','events','qos','sip')),
   recording_retention_days   INTEGER NOT NULL DEFAULT 90 CHECK (recording_retention_days > 0),

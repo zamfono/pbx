@@ -7,6 +7,7 @@ import { targetSpecSchema } from '../forwardTargetSchema.js';
 import { rowToTarget } from '../forwardTargetSpec.js';
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { liveRow } from '../rows.js';
+import { timeoutSeconds } from '../timeoutInput.js';
 
 /** A `menus` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type MenuRow = Selectable<DB['menus']>;
@@ -45,10 +46,7 @@ export const menuFields = {
   audioId: z
     .string()
     .describe('The greeting, an audio asset of kind announcement.'),
-  timeoutS: z
-    .number()
-    .int()
-    .positive()
+  timeoutS: timeoutSeconds
     .optional()
     .describe(
       'Seconds to wait for the first key after the greeting; 5 by default.'

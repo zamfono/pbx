@@ -4,6 +4,7 @@ import { RING_STRATEGIES } from '@zamfono/shared';
 
 import { mailboxMaxMessagesField } from '../mailbox.js';
 import { memberSchema } from '../members.js';
+import { timeoutSeconds } from '../timeoutInput.js';
 
 /**
  * The fields `ringGroups.create` takes and `ringGroups.update` takes each optionally (§10.1 step 5,
@@ -16,18 +17,12 @@ export const ringGroupFields = {
     .describe(
       'simultaneous rings every ringable member at once; sequential one at a time in member order; random one at a time in a shuffled order.'
     ),
-  ringTimeoutS: z
-    .number()
-    .int()
-    .positive()
+  ringTimeoutS: timeoutSeconds
     .optional()
     .describe(
       'Seconds of ringing before the unanswered rule: in total for simultaneous, per member for sequential and random; 20 by default.'
     ),
-  ringTotalS: z
-    .number()
-    .int()
-    .positive()
+  ringTotalS: timeoutSeconds
     .nullish()
     .describe(
       'Overall cap in seconds for sequential and random; null: no cap.'

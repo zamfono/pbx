@@ -14,6 +14,8 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §5.2 Client registration.** A Client ID Metadata Document is cached for at most 24 hours, at most 1000 at a time with the oldest dropped first, and meets the limits `/oauth/register` applies (`client_name` at most 100 characters, at most 5 redirect URIs of at most 512 characters each).
 *Why:* anyone can make the server fetch any URL at `/oauth/authorize`, and a document chose its own cache lifetime and size, so the cache could grow without bound.
+**2026-10-04 · §11.1 Column types, §11.2 Schema.** Every timeout in seconds (`users.ring_timeout_s`, `ring_groups.ring_timeout_s` and `ring_total_s`, `menus.timeout_s`, `settings.voicemail_max_s` and `parking_timeout_s`, `trunks.register_expiry_s` and `register_retry_s`, a find-me leg's `delayS`) is at most 86400, a day: the API refuses a larger one, and each column `CHECK`s it.
+*Why:* a larger value overflowed the timer `core` starts from it, which then fired at once; the product owner chose a day as the bound.
 
 **2026-10-04 · §6.5 Target kinds.** A target's `host` (sftp, ftp, ftps) is an FQDN or an IPv4 address, a webdav `url` an `http` or `https` URL, and an sftp username cannot begin with `-` or contain whitespace, a quote or a backslash; anything else is refused with 422.
 *Why:* the sftp host and username reach `ssh` as arguments through restic's `sftp.command`, which restic splits at whitespace itself, so an admin could add `-oProxyCommand=…` and run a command in `api`.

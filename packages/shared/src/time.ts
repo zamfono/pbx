@@ -15,6 +15,9 @@ export const MINUTES_PER_HOUR = 60;
 /** The longest delay `setTimeout` takes; a later instant is waited for in slices of at most this. */
 export const MAX_TIMER_MS = 2_147_483_647;
 
+/** The longest any seconds-valued timeout may be, a day (§11.1), so every timer it starts fits. */
+export const MAX_TIMEOUT_S = 86_400;
+
 /** The current instant as an ISO 8601 UTC timestamp, the format stored in every `_at` column (§11.1). */
 export function nowIso(): string {
   return new Date().toISOString();

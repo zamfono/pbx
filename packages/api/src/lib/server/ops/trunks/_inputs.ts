@@ -10,6 +10,7 @@ import {
 } from '@zamfono/shared';
 
 import { logLevelInputFields } from '../settings/logLevel.js';
+import { timeoutSeconds } from '../timeoutInput.js';
 import { hostInputSchema } from './_shared.js';
 
 /**
@@ -75,18 +76,8 @@ export const createInputSchema = z
     // (§9.4 "Forwarded calls").
     diversion: z.enum(DIVERSION_POLICIES).optional().describe(FIELD.diversion),
     outboundProxy: z.string().min(1).optional().describe(FIELD.outboundProxy),
-    registerExpiryS: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(FIELD.registerExpiryS),
-    registerRetryS: z
-      .number()
-      .int()
-      .positive()
-      .optional()
-      .describe(FIELD.registerRetryS),
+    registerExpiryS: timeoutSeconds.optional().describe(FIELD.registerExpiryS),
+    registerRetryS: timeoutSeconds.optional().describe(FIELD.registerRetryS),
     inboundNumberFormat: z
       .enum(NUMBER_FORMATS)
       .optional()
@@ -132,17 +123,11 @@ export const updateInputSchema = z
       .nullable()
       .optional()
       .describe(FIELD.outboundProxy),
-    registerExpiryS: z
-      .number()
-      .int()
-      .positive()
+    registerExpiryS: timeoutSeconds
       .nullable()
       .optional()
       .describe(FIELD.registerExpiryS),
-    registerRetryS: z
-      .number()
-      .int()
-      .positive()
+    registerRetryS: timeoutSeconds
       .nullable()
       .optional()
       .describe(FIELD.registerRetryS),
