@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { keyringFromEnv } from '../secretbox.js';
 import { makeTestDb } from '../testDb.js';
 import { AuthCodeStore } from './codes.js';
+import { revokeEndpoint } from './oauth.js';
 import { registerEndpoint, type RegisterDeps } from './registerEndpoint.js';
 import { tokenEndpoint, type TokenDeps } from './tokenEndpoint.js';
 
@@ -140,6 +141,28 @@ describe('tokenEndpoint (authorization_code)', () => {
   });
 });
 
+describe('a body that is not a form', () => {
+  function jsonRequest(path: string): Request {
+    return new Request(`http://test${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ grant_type: 'refresh_token', token: 'x' })
+    });
+  }
+
+  it('answers the token endpoint with a 400 error response (RFC 6749 §5.2)', async () => {
+    const { deps } = await tokenDeps();
+    const response = await tokenEndpoint(deps, jsonRequest('/oauth/token'));
+    expect(response.status).toBe(400);
+  });
+
+  it('answers the revocation endpoint with 200, as for any token (RFC 7009)', async () => {
+    const { deps } = await tokenDeps();
+    const response = await revokeEndpoint(deps, jsonRequest('/oauth/revoke'));
+    expect(response.status).toBe(200);
+  });
+});
+
 describe('tokenEndpoint (rate limit)', () => {
   // §5.5: "An in-memory limiter in the server hooks covers the login, token, password-reset and
   // client-registration endpoints"; the endpoint keeps no second counter of its own.
@@ -192,6 +215,49 @@ describe('registerEndpoint', () => {
     expect(await response.json()).toEqual({
       error: 'invalid_client_metadata'
     });
+  });
+
+  it.each([
+    ['a relative URI', 'web', 'callback'],
+    ['a data: URI', 'web', 'data:text/html,hello'],
+    ['a private-use scheme for a web client', 'web', 'com.example.app:/cb'],
+    ['a private-use scheme without a domain', 'native', 'myapp:/cb']
+  ])(
+    'refuses %s as a redirect URI with invalid_client_metadata',
+    async (_case, applicationType, redirectUri) => {
+      const response = await registerEndpoint(
+        await registerDeps(),
+        new Request('http://test/oauth/register', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            client_name: 'Odd Redirect',
+            redirect_uris: [redirectUri],
+            application_type: applicationType
+          })
+        })
+      );
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: 'invalid_client_metadata'
+      });
+    }
+  );
+
+  it("registers a native client's private-use scheme (RFC 8252 §7.1)", async () => {
+    const response = await registerEndpoint(
+      await registerDeps(),
+      new Request('http://test/oauth/register', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          client_name: 'An App',
+          redirect_uris: ['com.example.app:/callback'],
+          application_type: 'native'
+        })
+      })
+    );
+    expect(response.status).toBe(201);
   });
 
   it('registers a valid client without writing anything', async () => {

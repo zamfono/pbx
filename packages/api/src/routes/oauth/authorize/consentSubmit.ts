@@ -5,11 +5,8 @@ import pino from 'pino';
 import { HTTP_BAD_REQUEST, HTTP_FOUND, nowIso } from '@zamfono/shared';
 
 import { authorizationErrorRedirect } from '#lib/server/auth/authorizationResponse.js';
-import {
-  clientMetaFor,
-  requestState
-} from '#lib/server/auth/authorizeRequest.js';
-import { upsertClient } from '#lib/server/auth/clients.js';
+import { requestState } from '#lib/server/auth/authorizeRequest.js';
+import { clientMetaFor, upsertClient } from '#lib/server/auth/clients.js';
 import { authCodeStore } from '#lib/server/auth/codes.js';
 import {
   CONSENT_COOKIE,

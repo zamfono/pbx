@@ -27,8 +27,6 @@ import {
 } from './tokens.js';
 
 const logger = pino({ name: 'auth-reset-request' });
-// Where `src/routes/auth/set-password` is mounted; a self-service reset mail's link opens this
-// page directly (§5.2 "Set password", §10.2 "Mail").
 
 /** `true` while `settings.smtp_host` is set (§10.2 "Without a relay"). */
 export async function relayConfigured(db: Db): Promise<boolean> {

@@ -15,7 +15,7 @@ import {
   type Discovery,
   type SsoConfig
 } from './oidc.js';
-import { matchSsoAccount } from './ssoAccount.js';
+import { matchSsoAccount, type SsoClaims } from './ssoAccount.js';
 
 type FinishLoginFailure =
   | 'issuer'
@@ -31,41 +31,50 @@ type FinishLoginFailure =
 type FinishLoginResult =
   { ok: true; userId: string } | { ok: false; reason: FinishLoginFailure };
 
-/** `true` while the domain of `email` matches `allowedDomain` (case-insensitive), or while
- *  `allowedDomain` is `null` (§5.2 "SSO rules": NULL accepts any domain). */
-function domainAllowed(email: string, allowedDomain: string | null): boolean {
-  if (allowedDomain === null) {
+/** `true` while `allowedDomain` is `null` (§5.2 "SSO rules": NULL accepts any domain), or while
+ *  the domain of `email` matches it (case-insensitive) and, for `google`, so does the token's
+ *  `hd`, the Workspace the account belongs to: a private Google account registered under a
+ *  company address carries none. */
+function domainAllowed(
+  payload: JWTPayload,
+  email: string | null,
+  cfg: SsoConfig
+): boolean {
+  if (cfg.allowedDomain === null) {
     return true;
   }
-  return email.toLowerCase().split('@').pop() === allowedDomain.toLowerCase();
+  const allowed = cfg.allowedDomain.toLowerCase();
+  if (email?.toLowerCase().split('@').pop() !== allowed) {
+    return false;
+  }
+  return (
+    cfg.provider !== 'google' ||
+    (typeof payload.hd === 'string' && payload.hd.toLowerCase() === allowed)
+  );
 }
 
-/** `payload`'s verified claims once its `nonce`, e-mail-verification and domain checks all
- *  pass; the specific `FinishLoginFailure` otherwise. */
+/** `payload`'s claims once its `nonce` and domain checks pass, with whether the issuer vouches
+ *  for its e-mail (§5.2: `email_verified` for `google` and `oidc`, the pinned tenant for
+ *  `microsoft`); the specific `FinishLoginFailure` otherwise. */
 function checkClaims(
   payload: JWTPayload,
   cfg: SsoConfig,
   nonce: string
-): { email: string; sub: string } | FinishLoginFailure {
+): SsoClaims | FinishLoginFailure {
   if (payload.nonce !== nonce) {
     return 'nonce';
   }
   const email = emailClaim(payload, cfg.provider);
-  if (email === null) {
-    return 'noUser';
-  }
-  const { email_verified: emailVerified } = payload;
-  if (cfg.provider !== 'microsoft' && emailVerified !== true) {
-    return 'unverifiedEmail';
-  }
-  if (!domainAllowed(email, cfg.allowedDomain)) {
+  if (!domainAllowed(payload, email, cfg)) {
     return 'domain';
   }
   const sub = payload.sub;
   if (typeof sub !== 'string') {
     return 'noUser';
   }
-  return { email, sub };
+  const emailVouched =
+    cfg.provider === 'microsoft' || payload.email_verified === true;
+  return { sub, email, emailVouched };
 }
 
 /** What the SSO callback hands `finishLogin`: the upstream code and the login's own values. */
@@ -103,5 +112,5 @@ export async function finishLogin(
   if (typeof claims === 'string') {
     return { ok: false, reason: claims };
   }
-  return matchSsoAccount(db, claims.sub, claims.email);
+  return matchSsoAccount(db, claims);
 }

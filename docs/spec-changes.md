@@ -14,6 +14,8 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §10.4 User, Tenant profile push.** A name or e-mail change reaches the person's Ringotel user via `updateUser`; a push that finds a device's Ringotel user missing recovers it within the 24 hours after a deletion, as `onDeviceCreated` does; the pending tenant profile is also retried for an Asterisk start found unhandled when the internal event stream connects.
 *Why:* a corrected e-mail stayed old at Ringotel, so a re-sent activation mail went to the old address; a restored device whose push was lost got a fresh Ringotel user and a new activation mail; a start found on reconnect was re-registered while the pending profile waited for the next one.
+**2026-10-04 · §5.2 Client registration, SSO rules.** A redirect URI, registered or in a metadata document, must be an absolute `https` or `http` URI, or for a `native` client a private-use scheme (RFC 8252 §7.1). With `sso_allowed_domain` set, a `google` login also needs `hd` to equal it.
+*Why:* a relative or `javascript:` redirect URI registered fine and failed only at the first redirect, as a 500; and the `hd` quirk §5.2 promised was never checked (product-owner decision: "Check hd").
 
 **2026-10-03 · §6.3 compose.yaml.** The `migrate` service gets no `DB_FILE`: `/data/zamfono.sqlite3` is its own default, as it is `api`'s and `core`'s.
 *Why:* product-owner decision on internal values: "sensible defaults" in code; compose repeated the path for `migrate` alone.

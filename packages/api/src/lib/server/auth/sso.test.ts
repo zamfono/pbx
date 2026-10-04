@@ -41,6 +41,7 @@ type TestClaims = {
   email?: string;
   emailVerified?: boolean;
   preferredUsername?: string;
+  hd?: string;
 };
 
 /** A self-signed id_token plus the JWKS its `kid` resolves against (§5.2 "id_token validated
@@ -58,7 +59,8 @@ async function issueIdToken(
     sub: claims.sub,
     email: claims.email,
     email_verified: claims.emailVerified,
-    preferred_username: claims.preferredUsername
+    preferred_username: claims.preferredUsername,
+    hd: claims.hd
   };
   const idToken = await new SignJWT(payload)
     .setProtectedHeader({ alg: 'RS256', kid: KEY_ID })
@@ -284,6 +286,107 @@ describe('finishLogin', () => {
       fetchFor(disc, jwks, idToken)
     );
     expect(result).toEqual({ ok: false, reason: 'domain' });
+  });
+
+  /** `finishLogin` for an id_token carrying `claims`, issued by `cfg`'s issuer. */
+  async function loginWith(
+    db: Db,
+    cfg: SsoConfig,
+    claims: TestClaims
+  ): Promise<Awaited<ReturnType<typeof finishLogin>>> {
+    const disc = discoveryFor(cfg.issuer);
+    const { idToken, jwks } = await issueIdToken(disc.issuer, claims);
+    return finishLogin(
+      db,
+      cfg,
+      disc,
+      {
+        code: AUTH_CODE,
+        codeVerifier: NONCE,
+        nonce: NONCE,
+        origin: ORIGIN,
+        now: NOW
+      },
+      fetchFor(disc, jwks, idToken)
+    );
+  }
+
+  it('matches a bound user by sub alone, with no e-mail in the token (§5.2)', async () => {
+    const db = await makeTestDb();
+    await insertUser(db, {
+      id: 'alice',
+      email: 'alice@example.com',
+      ssoSubject: 'sub-1'
+    });
+    expect(await loginWith(db, oidcConfig(), { sub: 'sub-1' })).toEqual({
+      ok: true,
+      userId: 'alice'
+    });
+  });
+
+  it('matches a bound user by sub alone, with an unverified e-mail (§5.2)', async () => {
+    const db = await makeTestDb();
+    await insertUser(db, {
+      id: 'alice',
+      email: 'alice@example.com',
+      ssoSubject: 'sub-1'
+    });
+    const result = await loginWith(db, oidcConfig(), {
+      sub: 'sub-1',
+      email: 'alice.pending@example.com',
+      emailVerified: false
+    });
+    expect(result).toEqual({ ok: true, userId: 'alice' });
+  });
+
+  it('refuses a token with no e-mail for a user not yet bound', async () => {
+    const db = await makeTestDb();
+    await insertUser(db, { id: 'alice', email: 'alice@example.com' });
+    expect(await loginWith(db, oidcConfig(), { sub: 'sub-1' })).toEqual({
+      ok: false,
+      reason: 'noUser'
+    });
+  });
+
+  const GOOGLE = {
+    provider: 'google',
+    issuer: 'https://accounts.google.com',
+    allowedDomain: 'customer.example'
+  } as const;
+
+  it('refuses a private Google account on an allowed company address (no hd)', async () => {
+    const db = await makeTestDb();
+    await insertUser(db, { id: 'alice', email: 'alice@customer.example' });
+    const result = await loginWith(db, oidcConfig(GOOGLE), {
+      sub: 'sub-1',
+      email: 'alice@customer.example',
+      emailVerified: true
+    });
+    expect(result).toEqual({ ok: false, reason: 'domain' });
+  });
+
+  it('refuses a Google account of another workspace on an allowed address', async () => {
+    const db = await makeTestDb();
+    await insertUser(db, { id: 'alice', email: 'alice@customer.example' });
+    const result = await loginWith(db, oidcConfig(GOOGLE), {
+      sub: 'sub-1',
+      email: 'alice@customer.example',
+      emailVerified: true,
+      hd: 'other.example'
+    });
+    expect(result).toEqual({ ok: false, reason: 'domain' });
+  });
+
+  it("accepts a Google account of the allowed domain's workspace", async () => {
+    const db = await makeTestDb();
+    await insertUser(db, { id: 'alice', email: 'alice@customer.example' });
+    const result = await loginWith(db, oidcConfig(GOOGLE), {
+      sub: 'sub-1',
+      email: 'alice@customer.example',
+      emailVerified: true,
+      hd: 'Customer.Example'
+    });
+    expect(result).toEqual({ ok: true, userId: 'alice' });
   });
 
   it('refuses an id_token issued for another Microsoft tenant', async () => {

@@ -249,6 +249,15 @@ why the specified behaviour changed; the commit history, how.
   to start when `SECRETBOX_KEY` and `SECRETBOX_KEY_PREVIOUS` carry the same generation, and
   `/healthz` counts what the boot log counts: every secret the current key cannot decrypt.
   deploy/README.md gives the rotation recipe.
+- OAuth and SSO sign-in: a client whose metadata document cannot be fetched or read is an
+  unknown client (400) instead of a 500, the fetch gives up after 5 seconds or 64 KiB, and a
+  document marked `no-store` or `no-cache` is not cached. `/oauth/register` refuses a redirect URI
+  that is not an absolute `https`/`http` URI (or, for a `native` client, a private-use scheme)
+  with `invalid_client_metadata`, and `/oauth/token` and `/oauth/revoke` answer a body that is not
+  a form with 400 and 200 instead of 500. An SSO user already bound to their identity-provider
+  account signs in by that binding alone, even when the provider sends no or an unverified
+  e-mail. With `ssoAllowedDomain` set, Google sign-in now also requires the account to belong to
+  that domain's Google Workspace: a private Google account on a company address is refused.
 - Login attempts sent in parallel were each checked against the password before the first
   failure counted, so many addresses at once got past the five-attempt account lock. Every
   attempt now counts the moment it arrives. A refresh token or set-password link presented twice

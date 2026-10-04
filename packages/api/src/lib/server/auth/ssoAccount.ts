@@ -9,12 +9,21 @@ const NO_ROWS_UPDATED = 0n;
 /** The account an SSO login resolves to, or why none does (§5.2 "SSO rules"). */
 export type SsoAccountResult =
   | { ok: true; userId: string }
-  | { ok: false; reason: 'noUser' | 'subMismatch' };
+  | { ok: false; reason: 'noUser' | 'unverifiedEmail' | 'subMismatch' };
+
+/** What an SSO login's checked `id_token` says about the person: `email` is `null` when it
+ *  carries none, `emailVouched` whether the issuer vouches for it (§5.2 "SSO rules"). */
+export type SsoClaims = {
+  sub: string;
+  email: string | null;
+  emailVouched: boolean;
+};
 
 /**
- * Matches `sub`/`email` against `users` (§5.2 "SSO rules"): a bound `sso_subject` wins outright;
- * an unbound live user with the same e-mail is bound to `sub` on first login; an e-mail already
- * bound to a different `sub` is refused and logged, never silently re-bound.
+ * Matches `claims` against `users` (§5.2 "SSO rules"): a bound `sso_subject` wins outright,
+ * whatever the e-mail; otherwise only a vouched e-mail counts, and an unbound live user with that
+ * e-mail is bound to `sub` on first login; an e-mail already bound to a different `sub` is refused
+ * and logged, never silently re-bound.
  *
  * The select-then-bind runs in one transaction, and the bind's own `WHERE` re-checks
  * `sso_subject IS NULL` rather than trusting the `SELECT` above it: `users_sso_subject` is a
@@ -24,8 +33,7 @@ export type SsoAccountResult =
  */
 export async function matchSsoAccount(
   db: Db,
-  sub: string,
-  email: string
+  { sub, email, emailVouched }: SsoClaims
 ): Promise<SsoAccountResult> {
   return db.transaction().execute(async trx => {
     const bySub = await trx
@@ -36,6 +44,12 @@ export async function matchSsoAccount(
       .executeTakeFirst();
     if (bySub) {
       return { ok: true, userId: bySub.id };
+    }
+    if (email === null) {
+      return { ok: false, reason: 'noUser' };
+    }
+    if (!emailVouched) {
+      return { ok: false, reason: 'unverifiedEmail' };
     }
     const unbound = await trx
       .selectFrom('users')

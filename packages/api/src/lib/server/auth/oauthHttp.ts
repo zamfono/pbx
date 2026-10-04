@@ -29,10 +29,14 @@ export function oauthError(status: number, error: string): Response {
   });
 }
 
-/** The request's `application/x-www-form-urlencoded` body; file fields are dropped. */
+/** The request's `application/x-www-form-urlencoded` body; file fields are dropped. A body that
+ *  is not a form reads as no parameters, which the endpoint answers as a request missing them. */
 export async function readForm(req: Request): Promise<URLSearchParams> {
-  const formData = await req.formData();
   const params = new URLSearchParams();
+  const formData = await req.formData().catch(() => null);
+  if (formData === null) {
+    return params;
+  }
   for (const [key, value] of formData) {
     if (typeof value === 'string') {
       params.append(key, value);

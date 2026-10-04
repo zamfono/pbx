@@ -6,12 +6,8 @@ import { HTTP_BAD_REQUEST, type Db } from '@zamfono/shared';
 import type { Keyring } from '../secretbox.js';
 import { originFromEnv } from '../stackAddress.js';
 import { authorizationErrorRedirect } from './authorizationResponse.js';
-import {
-  decodeMetadataClientId,
-  fetchCimd,
-  redirectUriAllowed,
-  type ClientMeta
-} from './clients.js';
+import { clientMetaFor, type ClientMeta } from './clients.js';
+import { redirectUriAllowed } from './redirectUris.js';
 import { requestedResourceAcceptable } from './resource.js';
 import type { PendingAuthorize } from './ssoCookie.js';
 import { ssoConfigFromSettings } from './ssoSettings.js';
@@ -22,10 +18,6 @@ import { ssoConfigFromSettings } from './ssoSettings.js';
 // later at the token endpoint.
 const VALID_RESPONSE_TYPE = 'code';
 const VALID_CODE_CHALLENGE_METHOD = 'S256';
-
-/** A metadata `client_id` (§5.2 "Client registration" mechanism 2) is HTTPS-URL-shaped; every
- *  other `client_id` is a Client ID Metadata Document URL (mechanism 1) instead. */
-export const HTTPS_PREFIX = 'https://';
 
 const AUTHORIZE_PARAM_NAMES = [
   'client_id',
@@ -68,17 +60,6 @@ export function paramsFromPayload(payload: AuthorizePayload): URLSearchParams {
 export function requestState(params: URLSearchParams): string | null {
   const state = params.get('state');
   return state === null || state === '' ? null : state;
-}
-
-/** `clientId`'s metadata, decoded (mechanism 2) or fetched (mechanism 1); `null` for an unknown
- *  or unreachable client (§5.2 "Client registration"). */
-export async function clientMetaFor(
-  kr: Keyring,
-  clientId: string
-): Promise<ClientMeta | null> {
-  return clientId.startsWith(HTTPS_PREFIX)
-    ? fetchCimd(clientId)
-    : decodeMetadataClientId(kr, clientId);
 }
 
 /**

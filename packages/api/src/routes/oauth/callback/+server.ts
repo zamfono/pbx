@@ -4,7 +4,7 @@ import pino from 'pino';
 
 import { HTTP_FOUND, nowIso, type Db } from '@zamfono/shared';
 
-import { clientMetaFor } from '#lib/server/auth/authorizeRequest.js';
+import { clientMetaFor } from '#lib/server/auth/clients.js';
 import { authCodeStore } from '#lib/server/auth/codes.js';
 import { CONSENT_COOKIE } from '#lib/server/auth/consent.js';
 import { loginRedirect } from '#lib/server/auth/loginRedirect.js';

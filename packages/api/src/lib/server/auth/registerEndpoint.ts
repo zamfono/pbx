@@ -6,20 +6,27 @@ import { tryReadJson } from '../json.js';
 import type { Keyring } from '../secretbox.js';
 import { encodeMetadataClientId } from './clients.js';
 import { NO_AUTH_METHOD, oauthError, type BaseDeps } from './oauthHttp.js';
+import { redirectUriAcceptable } from './redirectUris.js';
 
 // RFC 7591 dynamic client registration limits (§5.2).
 const MAX_CLIENT_NAME_LENGTH = 100;
 const MAX_REDIRECT_URIS = 5;
 const MAX_REDIRECT_URI_LENGTH = 512;
 
-const RegisterRequestSchema = z.object({
-  client_name: z.string().min(1).max(MAX_CLIENT_NAME_LENGTH),
-  redirect_uris: z
-    .array(z.string().max(MAX_REDIRECT_URI_LENGTH))
-    .min(1)
-    .max(MAX_REDIRECT_URIS),
-  application_type: z.enum(['native', 'web'])
-});
+const RegisterRequestSchema = z
+  .object({
+    client_name: z.string().min(1).max(MAX_CLIENT_NAME_LENGTH),
+    redirect_uris: z
+      .array(z.string().max(MAX_REDIRECT_URI_LENGTH))
+      .min(1)
+      .max(MAX_REDIRECT_URIS),
+    application_type: z.enum(['native', 'web'])
+  })
+  .refine(request =>
+    request.redirect_uris.every(uri =>
+      redirectUriAcceptable(uri, request.application_type)
+    )
+  );
 
 export type RegisterDeps = BaseDeps & { keyring: Keyring };
 

@@ -3,18 +3,38 @@ import { describe, expect, it } from 'vitest';
 
 import { keyringFromEnv } from '../secretbox.js';
 import {
+  clientMetaFor,
   decodeMetadataClientId,
   encodeMetadataClientId,
   fetchCimd,
-  redirectUriAllowed,
   type ClientMeta
 } from './clients.js';
+import { redirectUriAllowed } from './redirectUris.js';
 
 const KEY_BYTE_LENGTH = 32;
 
 function keySpec(generation: number): string {
   return `${generation}:${randomBytes(KEY_BYTE_LENGTH).toString('base64')}`;
 }
+
+/** A valid Client ID Metadata Document served at `url`. */
+function cimdDocument(url: string): Record<string, unknown> {
+  return {
+    client_id: url,
+    client_name: 'Client',
+    redirect_uris: ['https://client.example/callback'],
+    application_type: 'web'
+  };
+}
+
+describe('clientMetaFor', () => {
+  it('decodes, never fetches, a client id that is not an https URL', async () => {
+    const kr = keyringFromEnv({ SECRETBOX_KEY: keySpec(1) });
+    expect(
+      await clientMetaFor(kr, 'http://client.example/metadata.json')
+    ).toBeNull();
+  });
+});
 
 describe('encodeMetadataClientId / decodeMetadataClientId', () => {
   it('round-trips the metadata through encode and decode', () => {
@@ -63,8 +83,69 @@ describe('fetchCimd', () => {
     expect(await fetchCimd(url, fetchImpl)).toBeNull();
   });
 
-  it('refuses a non-HTTPS client id', async () => {
-    expect(await fetchCimd('http://client.example/metadata.json')).toBeNull();
+  it('answers null for a document whose host is unreachable', async () => {
+    const fetchImpl = (() =>
+      Promise.reject(new TypeError('fetch failed'))) as typeof fetch;
+    expect(
+      await fetchCimd('https://down.example/metadata.json', fetchImpl)
+    ).toBeNull();
+  });
+
+  it('answers null for a document that is not JSON', async () => {
+    const fetchImpl = (() =>
+      Promise.resolve(new Response('<html>oops</html>'))) as typeof fetch;
+    expect(
+      await fetchCimd('https://html.example/metadata.json', fetchImpl)
+    ).toBeNull();
+  });
+
+  it('answers null for a document larger than the size cap', async () => {
+    const url = 'https://big.example/metadata.json';
+    const fetchImpl = (() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ ...cimdDocument(url), padding: 'x'.repeat(65_536) })
+        )
+      )) as typeof fetch;
+    expect(await fetchCimd(url, fetchImpl)).toBeNull();
+  });
+
+  it('gives the fetch a deadline', async () => {
+    const url = 'https://slow.example/metadata.json';
+    let signal: AbortSignal | null | undefined;
+    const fetchImpl = ((_input: unknown, init?: RequestInit) => {
+      signal = init?.signal;
+      return Promise.resolve(new Response(JSON.stringify(cimdDocument(url))));
+    }) as typeof fetch;
+    await fetchCimd(url, fetchImpl);
+    expect(signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('does not cache a document marked no-store, whatever its max-age', async () => {
+    const url = 'https://nostore.example/metadata.json';
+    let fetches = 0;
+    const fetchImpl = (() => {
+      fetches += 1;
+      return Promise.resolve(
+        new Response(JSON.stringify(cimdDocument(url)), {
+          headers: { 'cache-control': 'no-store, max-age=3600' }
+        })
+      );
+    }) as typeof fetch;
+    await fetchCimd(url, fetchImpl);
+    await fetchCimd(url, fetchImpl);
+    expect(fetches).toBe(2);
+  });
+
+  it('refuses a document whose redirect URI is not an absolute http(s) URI', async () => {
+    const url = 'https://relative.example/metadata.json';
+    const fetchImpl = (() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ ...cimdDocument(url), redirect_uris: ['callback'] })
+        )
+      )) as typeof fetch;
+    expect(await fetchCimd(url, fetchImpl)).toBeNull();
   });
 
   it('reads a document without application_type as a web client', async () => {
