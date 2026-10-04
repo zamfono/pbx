@@ -6,6 +6,8 @@ Every change made to [the specification](spec.md) during implementation, newest 
 *Why:* "I just got the information, that I will need PATs for server-applications": a server application cannot do the one interactive login a refresh token needs; the user chose "In 0.2.0", "Admins for any user", an "Optional" expiry and "The user's full role".
 **2026-10-04 · §10 Package structure.** The in-process ARI and AMI fakes sit under `packages/core/src/testing/` (`ari/`, `ami/`) with the other test rigs, outside the build, instead of beside the clients in `ari/` and `ami/`.
 *Why:* product-owner decision "Move them": every core test double in one directory the build excludes once.
+**2026-10-04 · §5.8.** Product-owner decision (undo of a deletion vs rows deleted since): undoing a deletion is refused with a 409 naming each row deleted since that the revived row, or the forward targets it and its own rules route to, points at; that deletion is undone first.
+*Why:* "Refuse with 409 (Recommended)": the undo revived a menu onto a greeting deleted meanwhile, and the daily purge then failed on the menu's `RESTRICT` reference every day, or, for a `SET NULL` one, cleared a live row's setting.
 
 **2026-10-04 · §5.2, §6.3 First boot and the `compose.yaml` listing, §10.2 Mail.** Product-owner decision (first owner without a password): `BOOTSTRAP_OWNER_PASSWORD_HASH` is required, an Argon2id PHC string, and `api` refuses the first boot without it; the set-password mail to the first owner and the `compose.yaml` comment offering it go.
 *Why:* "Hash always required": the owner seeded without a hash held an undocumented placeholder that satisfied the owner-has-a-password check but was no password, a third state the spec did not know.

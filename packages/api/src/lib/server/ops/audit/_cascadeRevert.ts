@@ -2,6 +2,7 @@ import { HTTP_CONFLICT, type ReloadKind } from '@zamfono/shared';
 
 import { propagate } from '../propagate.js';
 import { Conflict, OpError, type Context } from '../types.js';
+import { refuseDeletedReferences } from './_deletedReferences.js';
 import { guardReuseConflict } from './_reuseConflicts.js';
 import { ENTITY_TABLES } from './_shared.js';
 
@@ -132,6 +133,7 @@ export async function revertSoftDelete(
     .set({ deletedAt: null })
     .where('id', '=', entityId)
     .execute();
+  await refuseDeletedReferences(ctx, table, entityId);
   const kinds =
     entityKind === 'audio'
       ? await audioReloadKinds(ctx, entityId)

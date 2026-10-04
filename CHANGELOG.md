@@ -314,6 +314,10 @@ why the specified behaviour changed; the commit history, how.
   blocked number or hold-music asset now reaches `core` and Asterisk at once: before, calls kept
   being routed as if the item were still deleted until some other change went through.
 - An extension change of a user with devices can be undone; the undo was refused with a 409.
+- Undoing a deletion is refused with a 409 while the revived item would point at something deleted
+  since (a menu's greeting, a DID's target user, a forwarding rule's ring group); the answer names
+  what to restore first. Before, the undo went through, and the daily purge then failed every day
+  from the moment the deleted item was due, or cleared the revived item's greeting.
 - A call whose SIP Call-ID `core` cannot read from Asterisk (Asterisk unreachable or refusing the
   request as the call comes in) is logged as `SIP dialog join failed` and handled as usual: at call
   log level `sip` it no longer goes unrecorded, and below it `core` no longer exits with an
