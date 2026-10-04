@@ -7,6 +7,7 @@ export * from './timezone.js';
 export * from './openingHours.js';
 export * from './numbers.js';
 export * from './featureCodes.js';
+export * from './jsonColumns.js';
 export * from './trunks.js';
 export * from './cidr.js';
 export * from './columnValues.js';

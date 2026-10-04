@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 import {
   BACKUP_TARGET_KINDS,
+  backupParamsColumn,
+  backupParamsSchema,
   type BackupRunStatus,
   type BackupTargetKind,
   type Db,
@@ -25,11 +27,9 @@ export const targetFields = {
     .describe(
       'The restic backend: local (a host path or volume), ftp, ftps, sftp, s3 or webdav.'
     ),
-  params: z
-    .record(z.string(), z.unknown())
-    .describe(
-      'The repository location per kind: local { path }, s3 { endpoint, bucket, path? }, sftp { host, path }, ftp and ftps { host, path? }, webdav { url, path? }; optional forget { keepDaily, keepWeekly, keepMonthly }, default 7/4/6.'
-    ),
+  params: backupParamsSchema.describe(
+    'The repository location per kind: local { path }, s3 { endpoint, bucket, path? }, sftp { host, path }, ftp and ftps { host, path? }, webdav { url, path? }; optional forget { keepDaily, keepWeekly, keepMonthly }, default 7/4/6.'
+  ),
   secret: targetSecretSchema,
   enabled: z
     .boolean()
@@ -70,7 +70,7 @@ export function targetToWire(row: BackupTargetRow): BackupTargetWire {
   return {
     id: row.id,
     kind: row.kind,
-    params: JSON.parse(row.paramsJson) as Record<string, unknown>,
+    params: backupParamsColumn.decode(row.paramsJson),
     secretSet: true,
     enabled: row.enabled === 1,
     createdAt: row.createdAt

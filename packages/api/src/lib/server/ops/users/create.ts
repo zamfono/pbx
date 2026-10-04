@@ -2,7 +2,7 @@ import * as env from '$app/env/private';
 import pino from 'pino';
 import { z } from 'zod';
 
-import { newId } from '@zamfono/shared';
+import { findMeSchema, newId } from '@zamfono/shared';
 
 import { issueResetToken } from '#lib/server/auth/tokens.js';
 import { sendMail } from '#lib/server/mail/index.js';
@@ -21,7 +21,6 @@ import { setupLinkFor } from './_setupMail.js';
 import {
   assertEmailAvailable,
   EXTENSION_DESCRIPTION,
-  findMeSchema,
   toUserOut,
   userCallFields,
   type UserOut

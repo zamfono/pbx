@@ -2,20 +2,27 @@
  * The config snapshot the ARI routing pipeline reads, and the cache that loads it (§3.1
  * "Config propagation").
  */
-import type { Selectable, Transaction } from 'kysely';
+import type { Transaction } from 'kysely';
+
+import type { Db, DB } from '@zamfono/shared';
 
 import {
-  featureCodesSchema,
-  type Db,
-  type DB,
-  type FeatureCodes,
-  type SipHeaderTemplate
-} from '@zamfono/shared';
+  parseDevice,
+  parseForwardTarget,
+  parseSettings,
+  parseTrunk,
+  parseUser,
+  type ConfigRow,
+  type ParsedDevice,
+  type ParsedForwardTarget,
+  type ParsedSettings,
+  type ParsedTrunk,
+  type ParsedUser
+} from './snapshotRows.js';
 
 // The tables the ARI routing pipeline reads; the tables `api` alone consults (auth, audit,
 // webhooks, backups, contacts, BLF-key programming, mail templates) stay out of `core`'s cache.
-// Each table's own `*Json` columns (`findMeJson`, `codecsJson`, …) are parsed below, into the
-// same-named field without the `Json` suffix, so the pipeline never re-parses them.
+// Each table's own `*Json` columns are decoded by `snapshotRows.ts`.
 const CONFIG_TABLES = [
   'users',
   'devices',
@@ -66,29 +73,7 @@ const SOFT_DELETED_TABLES = new Set<string>([
 ]);
 
 type ConfigTable = (typeof CONFIG_TABLES)[number];
-type Row<K extends ConfigTable> = Omit<Selectable<DB[K]>, 'deletedAt'>;
-type RawTableRows = { [K in ConfigTable]: Row<K>[] };
-
-type ParsedUser = Omit<Row<'users'>, 'findMeJson'> & {
-  findMe: { number: string; delayS: number }[];
-};
-type ParsedDevice = Omit<Row<'devices'>, 'allowedIpsJson'> & {
-  allowedIps: string[] | null;
-};
-type ParsedTrunk = Omit<Row<'trunks'>, 'codecsJson'> & {
-  codecs: string[] | null;
-};
-type ParsedForwardTarget = Omit<Row<'forwardTargets'>, 'sipHeadersJson'> & {
-  sipHeaders: SipHeaderTemplate[] | null;
-};
-type ParsedSettings = Omit<
-  Selectable<DB['settings']>,
-  'codecsJson' | 'emergencyNumbersJson' | 'featureCodesJson'
-> & {
-  codecs: string[];
-  emergencyNumbers: string[];
-  featureCodes: FeatureCodes;
-};
+type RawTableRows = { [K in ConfigTable]: ConfigRow<K>[] };
 
 type TableRows = Omit<
   RawTableRows,
@@ -111,77 +96,6 @@ export function userById(
   return id === null
     ? null
     : (snapshot.users.find(row => row.id === id) ?? null);
-}
-
-/** Parses one `*Json` column; `null` passes through unchanged. */
-function parseNullableJson(column: string, value: string | null): unknown {
-  if (value === null) {
-    return null;
-  }
-  try {
-    return JSON.parse(value) as unknown;
-  } catch (error) {
-    throw new Error(
-      `config snapshot: invalid JSON in ${column}: ${(error as Error).message}`,
-      { cause: error }
-    );
-  }
-}
-
-function parseUser(row: Row<'users'>): ParsedUser {
-  const { findMeJson, ...rest } = row;
-  return {
-    ...rest,
-    // `NULL` and an empty list both mean "no find-me numbers".
-    findMe: (parseNullableJson('users.findMeJson', findMeJson) ?? []) as {
-      number: string;
-      delayS: number;
-    }[]
-  };
-}
-
-function parseDevice(row: Row<'devices'>): ParsedDevice {
-  const { allowedIpsJson, ...rest } = row;
-  return {
-    ...rest,
-    allowedIps: parseNullableJson('devices.allowedIpsJson', allowedIpsJson) as
-      string[] | null
-  };
-}
-
-function parseTrunk(row: Row<'trunks'>): ParsedTrunk {
-  const { codecsJson, ...rest } = row;
-  return {
-    ...rest,
-    codecs: parseNullableJson('trunks.codecsJson', codecsJson) as
-      string[] | null
-  };
-}
-
-function parseForwardTarget(row: Row<'forwardTargets'>): ParsedForwardTarget {
-  const { sipHeadersJson, ...rest } = row;
-  return {
-    ...rest,
-    sipHeaders: parseNullableJson(
-      'forwardTargets.sipHeadersJson',
-      sipHeadersJson
-    ) as SipHeaderTemplate[] | null
-  };
-}
-
-function parseSettings(row: Selectable<DB['settings']>): ParsedSettings {
-  const { codecsJson, emergencyNumbersJson, featureCodesJson, ...rest } = row;
-  return {
-    ...rest,
-    codecs: parseNullableJson('settings.codecsJson', codecsJson) as string[],
-    emergencyNumbers: parseNullableJson(
-      'settings.emergencyNumbersJson',
-      emergencyNumbersJson
-    ) as string[],
-    featureCodes: featureCodesSchema.parse(
-      parseNullableJson('settings.featureCodesJson', featureCodesJson)
-    )
-  };
 }
 
 async function loadSnapshot(trx: Transaction<DB>): Promise<Snapshot> {

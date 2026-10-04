@@ -59,10 +59,4 @@ describe('targetFromRow', () => {
       headers: [{ name: 'X-Called', value: '{{calledExtension}}' }]
     });
   });
-
-  it('reads a sip row without headers as sending none', () => {
-    expect(targetFromRow({ ...sipRow, sipHeaders: null })).toMatchObject({
-      headers: []
-    });
-  });
 });

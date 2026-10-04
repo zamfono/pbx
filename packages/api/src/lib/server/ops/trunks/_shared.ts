@@ -2,9 +2,11 @@ import type { Selectable } from 'kysely';
 import { z } from 'zod';
 
 import {
+  codecsColumn,
   HOST_DIRECTIONS,
   MAX_PORT,
   type CallerIdHeader,
+  type Codec,
   type Db,
   type DB,
   type DiversionPolicy,
@@ -18,10 +20,6 @@ import {
 
 import { liveRow } from '../rows.js';
 import { logLevelWire } from '../settings/logLevel.js';
-
-/** The trunk offer codecs a client or trunk list may name (§9.1, §9.4); the image ships no others. */
-export const CODECS = ['opus', 'g722', 'amrwb', 'amr', 'alaw', 'ulaw'] as const;
-export type Codec = (typeof CODECS)[number];
 
 export type TrunkRow = Selectable<DB['trunks']>;
 export type TrunkHostRow = Selectable<DB['trunkHosts']>;
@@ -177,8 +175,7 @@ export function scalarsFromRow(row: TrunkRow): TrunkScalars {
     callerIdFormat: row.callerIdFormat,
     callerIdHeader: row.callerIdHeader,
     clir: row.clir === null ? null : row.clir === 1,
-    codecs:
-      row.codecsJson === null ? null : (JSON.parse(row.codecsJson) as Codec[]),
+    codecs: codecsColumn.nullable().decode(row.codecsJson),
     maxChannels: row.maxChannels
   };
 }

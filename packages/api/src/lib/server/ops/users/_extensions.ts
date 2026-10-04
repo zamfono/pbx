@@ -1,6 +1,10 @@
 import type { Transaction } from 'kysely';
 
-import { HTTP_UNPROCESSABLE_CONTENT, type DB } from '@zamfono/shared';
+import {
+  emergencyNumbersColumn,
+  HTTP_UNPROCESSABLE_CONTENT,
+  type DB
+} from '@zamfono/shared';
 
 import { Conflict, OpError } from '../types.js';
 
@@ -38,7 +42,9 @@ export async function assertValidExtension(
       `extension must be ${settings.extLength} digits`
     );
   }
-  const emergency = JSON.parse(settings.emergencyNumbersJson) as string[];
+  const emergency = emergencyNumbersColumn.decode(
+    settings.emergencyNumbersJson
+  );
   if (emergency.includes(ext)) {
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,

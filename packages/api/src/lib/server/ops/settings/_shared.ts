@@ -1,8 +1,12 @@
 import type { Selectable, Updateable } from 'kysely';
 
 import {
+  codecsColumn,
+  emergencyNumbersColumn,
+  featureCodesColumn,
   HTTP_FORBIDDEN,
   type CallLogLevel,
+  type Codec,
   type CountryCode,
   type Db,
   type DB,
@@ -15,7 +19,6 @@ import {
 
 import { type TargetSpec } from '../forwardTargetSchema.js';
 import { resolveOptionalTarget } from '../forwardTargetSpec.js';
-import type { Codec } from '../trunks/_shared.js';
 import { OpError } from '../types.js';
 import type { SettingsInput } from './_input.js';
 
@@ -129,10 +132,10 @@ export async function rowToWire(
     smtpPasswordSet: row.smtpPasswordEnc !== null,
     mailFrom: row.mailFrom,
     extLength: row.extLength,
-    emergencyNumbers: JSON.parse(row.emergencyNumbersJson) as string[],
-    featureCodes: JSON.parse(row.featureCodesJson) as FeatureCodes,
+    emergencyNumbers: emergencyNumbersColumn.decode(row.emergencyNumbersJson),
+    featureCodes: featureCodesColumn.decode(row.featureCodesJson),
     fallbackTarget: await resolveOptionalTarget(db, row.fallbackTargetId),
-    codecs: JSON.parse(row.codecsJson) as Codec[],
+    codecs: codecsColumn.decode(row.codecsJson),
     clir: row.clir === 1,
     rejectAnonymous: row.rejectAnonymous === 1,
     holdMohAudioId: row.holdMohAudioId,

@@ -2,10 +2,12 @@ import type { Selectable, Transaction } from 'kysely';
 import { z } from 'zod';
 
 import {
+  findMeColumn,
   HTTP_CONFLICT,
   HTTP_UNPROCESSABLE_CONTENT,
   isE164,
   type DB,
+  type FindMeLeg,
   type LogLevelColumns,
   type UserRole
 } from '@zamfono/shared';
@@ -19,28 +21,6 @@ import { userExtension } from './_extensions.js';
 
 /** A `users` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type UserRow = Selectable<DB['users']>;
-
-export type FindMeLeg = { number: string; delayS: number };
-/** Shared by `users.create` and `users.update`: each leg dials out (§10.1), so its number is E.164. */
-export const findMeSchema = z
-  .array(
-    z.object({
-      number: z
-        .string()
-        .refine(isE164, 'number must be E.164')
-        .describe('The external number this leg rings, E.164.'),
-      delayS: z
-        .number()
-        .int()
-        .min(0)
-        .describe(
-          'Seconds after ringing begins before this leg starts; 0 rings with the devices.'
-        )
-    })
-  )
-  .describe(
-    "External numbers rung alongside the user's devices on direct calls, never through a ring group; the answerer presses 1 to accept; self-service."
-  );
 
 /** The user extension's meaning (§11.2 `users`), required on create and optional on update. */
 export const EXTENSION_DESCRIPTION =
@@ -122,9 +102,7 @@ export async function toUserOut(
     extension: await userExtension(db, row.id),
     ringTimeoutS: row.ringTimeoutS,
     dnd: row.dnd === 1,
-    findMe: row.findMeJson
-      ? findMeSchema.parse(JSON.parse(row.findMeJson))
-      : [],
+    findMe: findMeColumn.decode(row.findMeJson),
     callerIdDidId: row.callerIdDidId,
     clir: row.clir === null ? null : row.clir === 1,
     rejectAnonymous:

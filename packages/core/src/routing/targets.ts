@@ -51,14 +51,18 @@ export function targetFromRow(row: ForwardTargetsRow): ForwardTarget {
   if (row.external !== null) {
     return { id, kind: 'external', number: row.external };
   }
-  if (row.sipTrunkId !== null && row.sipUser !== null) {
-    // `api` sets the headers on every sip row; one without sends none.
+  // The table's CHECKs set `sip_user` and `sip_headers_json` exactly when `sip_trunk_id` is set.
+  if (
+    row.sipTrunkId !== null &&
+    row.sipUser !== null &&
+    row.sipHeaders !== null
+  ) {
     return {
       id,
       kind: 'sip',
       trunkId: row.sipTrunkId,
       user: row.sipUser,
-      headers: row.sipHeaders ?? []
+      headers: row.sipHeaders
     };
   }
   if (row.mailboxUserId !== null) {

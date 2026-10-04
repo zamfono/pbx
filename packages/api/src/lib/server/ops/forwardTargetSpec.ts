@@ -1,11 +1,6 @@
 import type { Transaction } from 'kysely';
 
-import {
-  newId,
-  type Db,
-  type DB,
-  type SipHeaderTemplate
-} from '@zamfono/shared';
+import { newId, sipHeadersColumn, type Db, type DB } from '@zamfono/shared';
 
 import { noteWarning } from './afterCommit.js';
 import { assertAudioOfKind } from './audio/_shared.js';
@@ -68,14 +63,17 @@ export function rowToTarget(row: ForwardTargetColumns): TargetSpec {
   if (row.external !== null) {
     return { kind: 'external', external: row.external };
   }
-  // The table's CHECK sets `sip_user` exactly when `sip_trunk_id` is set, and this module sets
-  // `sip_headers_json` with them.
-  if (row.sipTrunkId !== null && row.sipUser !== null) {
+  // The table's CHECKs set `sip_user` and `sip_headers_json` exactly when `sip_trunk_id` is set.
+  if (
+    row.sipTrunkId !== null &&
+    row.sipUser !== null &&
+    row.sipHeadersJson !== null
+  ) {
     return {
       kind: 'sip',
       trunkId: row.sipTrunkId,
       user: row.sipUser,
-      headers: JSON.parse(row.sipHeadersJson ?? '[]') as SipHeaderTemplate[]
+      headers: sipHeadersColumn.decode(row.sipHeadersJson)
     };
   }
   if (row.mailboxUserId !== null) {

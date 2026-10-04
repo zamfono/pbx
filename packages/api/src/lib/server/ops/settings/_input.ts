@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import {
   CALL_LOG_LEVELS,
+  codecsSchema,
+  emergencyNumbersSchema,
   featureCodesSchema,
   isIanaTimeZone,
   isSupportedCountry,
@@ -11,7 +13,6 @@ import {
 import { isCronExpression } from '#lib/server/jobs/cronExpression.js';
 
 import { targetSpecSchema } from '../forwardTargetSchema.js';
-import { CODECS } from '../trunks/_shared.js';
 import {
   mailInputFields,
   ringotelInputFields,
@@ -61,9 +62,7 @@ export const settingsInputSchema = z
         'The language of the prompts callers hear, the mails and the sign-in pages.'
       ),
     ...mailInputFields,
-    emergencyNumbers: z
-      .array(z.string().regex(/^[0-9]+$/u))
-      .min(1)
+    emergencyNumbers: emergencyNumbersSchema
       .optional()
       .describe(
         'Digit strings always dialled out as emergency calls and never valid as extensions (see zamfono.help emergency-calls). Owner-only.'
@@ -79,9 +78,7 @@ export const settingsInputSchema = z
       .describe(
         'The tenant-wide fallback for a number in a block that no DID holds and for a number outside every DID and block; null: such calls are released with 404 (see zamfono.help numbers).'
       ),
-    codecs: z
-      .array(z.enum(CODECS))
-      .min(1)
+    codecs: codecsSchema
       .optional()
       .describe(
         'The ordered codec offer to devices and to trunks without their own list.'

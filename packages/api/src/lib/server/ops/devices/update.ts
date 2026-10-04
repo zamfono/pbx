@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
+import { allowedIpsColumn, HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import { propagate } from '../propagate.js';
@@ -53,9 +53,7 @@ export const update = defineOperation({
     if (allowedIpsJson !== before.allowedIpsJson) {
       recordChange(ctx, {
         field: 'allowedIps',
-        from: before.allowedIpsJson
-          ? (JSON.parse(before.allowedIpsJson) as string[])
-          : null,
+        from: allowedIpsColumn.nullable().decode(before.allowedIpsJson),
         to: input.allowedIps ?? null
       });
       propagate(ctx, ['pjsip']);

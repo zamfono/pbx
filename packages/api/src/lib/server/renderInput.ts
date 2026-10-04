@@ -2,7 +2,7 @@
  * The render's input (§9.1, §9.3, §9.4): every live user, device, ring group, parking slot, trunk
  * and hold-music asset the generated Asterisk configuration names, read from the database.
  */
-import type { Db } from '@zamfono/shared';
+import { allowedIpsColumn, codecsColumn, type Db } from '@zamfono/shared';
 
 import { loadParkingSlots } from './ops/parking/_shared.js';
 import { loadSettings } from './ops/settings/_shared.js';
@@ -57,10 +57,7 @@ async function loadDevices(
     userId: row.userId,
     kind: row.kind,
     transport: row.transport,
-    allowedIps:
-      row.allowedIpsJson === null
-        ? null
-        : (JSON.parse(row.allowedIpsJson) as string[]),
+    allowedIps: allowedIpsColumn.nullable().decode(row.allowedIpsJson),
     sipUsername: row.sipUsername,
     sipPassword: decrypt(kr, row.sipPasswordEnc).toString('utf8')
   }));
@@ -116,8 +113,7 @@ async function loadTrunks(db: Db, kr: Keyring): Promise<RenderInput['trunks']> {
     registerExpiryS: row.registerExpiryS,
     registerRetryS: row.registerRetryS,
     callerIdHeader: row.callerIdHeader,
-    codecs:
-      row.codecsJson === null ? null : (JSON.parse(row.codecsJson) as string[]),
+    codecs: codecsColumn.nullable().decode(row.codecsJson),
     hosts: hostsByTrunk.get(row.id) ?? []
   }));
 }
@@ -164,7 +160,7 @@ export async function loadRenderInput(
     ]);
   return {
     settings: {
-      codecs: JSON.parse(settings.codecsJson) as string[],
+      codecs: codecsColumn.decode(settings.codecsJson),
       ringotelMaxRegs: settings.ringotelMaxRegs,
       extLength: settings.extLength,
       holdMohClass: holdMohClass(settings.holdMohAudioId, moh)

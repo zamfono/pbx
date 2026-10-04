@@ -2,7 +2,8 @@ import path from 'node:path';
 import { sql } from 'kysely';
 
 import { migrator, openDb, type Db } from './db.js';
-import { featureCodesSchema, type FeatureCodes } from './featureCodes.js';
+import type { FeatureCodes } from './featureCodes.js';
+import { featureCodesColumn } from './jsonColumns.js';
 
 /** db/migrations, found from this file in a checkout. */
 export const MIGRATIONS_DIR = path.resolve(
@@ -46,7 +47,7 @@ export async function defaultFeatureCodes(): Promise<FeatureCodes> {
     if (json === undefined) {
       throw new Error('settings.feature_codes_json default did not evaluate');
     }
-    return featureCodesSchema.parse(JSON.parse(json));
+    return featureCodesColumn.decode(json);
   } finally {
     await db.destroy();
   }

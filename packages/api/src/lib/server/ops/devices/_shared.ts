@@ -1,6 +1,7 @@
 import type { Selectable, Transaction } from 'kysely';
 
 import {
+  allowedIpsColumn,
   type DB,
   type DeviceKind,
   type DeviceTransport
@@ -51,9 +52,7 @@ export function toDeviceOut(row: DeviceRow): DeviceOut {
     label: row.label,
     kind: row.kind,
     transport: row.transport,
-    allowedIps: row.allowedIpsJson
-      ? (JSON.parse(row.allowedIpsJson) as string[])
-      : null,
+    allowedIps: allowedIpsColumn.nullable().decode(row.allowedIpsJson),
     sipUsername: row.sipUsername,
     lastRegisteredAt: row.lastRegisteredAt,
     createdAt: row.createdAt

@@ -1,3 +1,5 @@
+import { codecsColumn, emergencyNumbersColumn } from '@zamfono/shared';
+
 import { recordFieldChanges } from '../audit.js';
 import type { Context } from '../types.js';
 import type { SettingsInput } from './_input.js';
@@ -6,7 +8,6 @@ import type { SettingsColumns, SettingsRow } from './_shared.js';
 const toBit = (value: unknown): number => (value ? 1 : 0);
 const fromBit = (stored: number): boolean => stored === 1;
 const toJson = (value: unknown): string => JSON.stringify(value);
-const fromJson = (stored: string): unknown => JSON.parse(stored);
 
 /**
  * Every plain settings column: where the wire and column representations differ, the wire field
@@ -50,9 +51,13 @@ const PLAIN_COLUMNS: {
   emergencyNumbersJson: {
     field: 'emergencyNumbers',
     encode: toJson,
-    decode: fromJson
+    decode: stored => emergencyNumbersColumn.decode(stored)
   },
-  codecsJson: { field: 'codecs', encode: toJson, decode: fromJson }
+  codecsJson: {
+    field: 'codecs',
+    encode: toJson,
+    decode: stored => codecsColumn.decode(stored)
+  }
 };
 
 /** Applies every `PLAIN_COLUMNS` column whose wire field is present in `input` and whose encoded

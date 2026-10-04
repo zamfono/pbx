@@ -1,7 +1,12 @@
 import * as env from '$app/env/private';
 import type { Transaction } from 'kysely';
 
-import type { DB, FeatureCodes } from '@zamfono/shared';
+import {
+  codecsColumn,
+  featureCodesColumn,
+  type Codec,
+  type DB
+} from '@zamfono/shared';
 
 import {
   plainSipTransports,
@@ -11,7 +16,6 @@ import {
 } from '#lib/server/stackAddress.js';
 
 import { loadSettings } from '../settings/_shared.js';
-import type { Codec } from '../trunks/_shared.js';
 import { userExtension } from '../users/_extensions.js';
 import { liveUser } from '../users/_shared.js';
 import type { DeviceRow } from './_shared.js';
@@ -62,8 +66,8 @@ export async function connectionSettings(
     extension,
     displayName: user.name,
     mediaEncryption: tls ? 'srtp' : 'none',
-    codecs: JSON.parse(settings.codecsJson) as Codec[],
-    voicemailCode: (JSON.parse(settings.featureCodesJson) as FeatureCodes)
+    codecs: codecsColumn.decode(settings.codecsJson),
+    voicemailCode: featureCodesColumn.decode(settings.featureCodesJson)
       .ownVoicemail
   };
 }

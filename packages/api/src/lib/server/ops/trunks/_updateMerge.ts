@@ -1,10 +1,10 @@
 import * as env from '$app/env/private';
 
-import type { TrunkAuthMode } from '@zamfono/shared';
+import { codecsColumn, type Codec, type TrunkAuthMode } from '@zamfono/shared';
 
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
-import type { Codec, TrunkRow, TrunkScalars } from './_shared.js';
+import type { TrunkRow, TrunkScalars } from './_shared.js';
 
 /** The scalar fields of a `trunks.update` request the merge reads, plus its write-only password. */
 export type MergeInput = Partial<TrunkScalars> & { password?: string | null };
@@ -39,10 +39,7 @@ function mergedCodecs(row: TrunkRow, input: MergeInput): Codec[] | null {
   if (input.codecs !== undefined) {
     return input.codecs;
   }
-  if (row.codecsJson === null) {
-    return null;
-  }
-  return JSON.parse(row.codecsJson) as Codec[];
+  return codecsColumn.nullable().decode(row.codecsJson);
 }
 
 /** `row`'s value unless `input` sets this field, `undefined` meaning "keep it" — `null` clears it. */

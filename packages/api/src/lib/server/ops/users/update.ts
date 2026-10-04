@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { findMeSchema } from '@zamfono/shared';
+
 import { assertAudioOfKind } from '../audio/_shared.js';
 import { recordFieldChanges } from '../audit.js';
 import { ownUserId } from '../gates.js';
@@ -16,7 +18,6 @@ import {
   assertCallerIdDidValid,
   assertEmailAvailable,
   EXTENSION_DESCRIPTION,
-  findMeSchema,
   liveUser,
   toUserOut,
   userCallFields,

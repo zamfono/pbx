@@ -1,4 +1,4 @@
-import type { FeatureCodes } from '@zamfono/shared';
+import { featureCodesColumn, type FeatureCodes } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import type { Context } from '../types.js';
@@ -18,7 +18,7 @@ export function applyFeatureCodes(
   if (json !== before.featureCodesJson) {
     recordChange(ctx, {
       field: 'featureCodes',
-      from: JSON.parse(before.featureCodesJson) as FeatureCodes,
+      from: featureCodesColumn.decode(before.featureCodesJson),
       to: featureCodes
     });
     columns.featureCodesJson = json;

@@ -1,6 +1,8 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
+import { backupParamsColumn } from '@zamfono/shared';
+
 import { recordChange } from '#lib/server/ops/audit.js';
 import { orBefore } from '#lib/server/ops/patch.js';
 import { liveRow } from '#lib/server/ops/rows.js';
@@ -71,8 +73,8 @@ export const targetsUpdate = defineOperation<Input, BackupTargetWire>({
     if (paramsJson !== before.paramsJson) {
       recordChange(ctx, {
         field: 'params',
-        from: JSON.parse(before.paramsJson) as Record<string, unknown>,
-        to: JSON.parse(paramsJson) as Record<string, unknown>
+        from: backupParamsColumn.decode(before.paramsJson),
+        to: backupParamsColumn.decode(paramsJson)
       });
     }
     if (input.secret !== undefined) {

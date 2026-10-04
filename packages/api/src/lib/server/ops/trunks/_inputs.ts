@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import {
   CALLERID_HEADERS,
+  codecsSchema,
   DIVERSION_POLICIES,
   NUMBER_FORMATS,
   TRUNK_AUTH_MODES,
@@ -9,7 +10,7 @@ import {
 } from '@zamfono/shared';
 
 import { logLevelInputFields } from '../settings/logLevel.js';
-import { CODECS, hostInputSchema } from './_shared.js';
+import { hostInputSchema } from './_shared.js';
 
 /**
  * What each trunk field means (§9.4), one sentence each, which `trunks.create` and
@@ -99,7 +100,7 @@ export const createInputSchema = z
       .optional()
       .describe(FIELD.callerIdHeader),
     clir: z.boolean().nullable().optional().describe(FIELD.clir),
-    codecs: z.array(z.enum(CODECS)).min(1).optional().describe(FIELD.codecs),
+    codecs: codecsSchema.optional().describe(FIELD.codecs),
     maxChannels: z
       .number()
       .int()
@@ -158,12 +159,7 @@ export const updateInputSchema = z
       .optional()
       .describe(FIELD.callerIdHeader),
     clir: z.boolean().nullable().optional().describe(FIELD.clir),
-    codecs: z
-      .array(z.enum(CODECS))
-      .min(1)
-      .nullable()
-      .optional()
-      .describe(FIELD.codecs),
+    codecs: codecsSchema.nullable().optional().describe(FIELD.codecs),
     maxChannels: z
       .number()
       .int()

@@ -25,7 +25,7 @@ async function seedUser(db: Db): Promise<string> {
     codecsJson: '["g722","alaw"]',
     featureCodesJson: JSON.stringify({
       ...(await defaultFeatureCodes()),
-      ownVoicemail: '*86'
+      ownVoicemail: '*99'
     })
   });
   const userId = newId();
@@ -77,7 +77,7 @@ describe("devices: a manual device's connection settings (§10.4)", () => {
       displayName: 'Anna Huber',
       mediaEncryption: 'srtp',
       codecs: ['g722', 'alaw'],
-      voicemailCode: '*86'
+      voicemailCode: '*99'
     });
   });
 

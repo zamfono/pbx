@@ -1,6 +1,7 @@
 import type { Selectable, Transaction } from 'kysely';
 
 import {
+  emergencyNumbersColumn,
   HTTP_UNPROCESSABLE_CONTENT,
   type AudioKind,
   type DB,
@@ -75,8 +76,8 @@ export async function nextExtension(db: Transaction<DB>): Promise<string> {
       row => row.ext
     )
   );
-  const emergency = new Set<string>(
-    JSON.parse(settings.emergencyNumbersJson) as string[]
+  const emergency = new Set(
+    emergencyNumbersColumn.decode(settings.emergencyNumbersJson)
   );
   const max = DECIMAL_BASE ** settings.extLength;
   for (let candidate = 1; candidate < max; candidate += 1) {

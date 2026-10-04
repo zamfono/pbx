@@ -1,3 +1,5 @@
+import { findMeColumn } from '@zamfono/shared';
+
 import type { WireColumns } from '../audit.js';
 import type { UserRow } from './_shared.js';
 
@@ -14,7 +16,7 @@ const fromFlag = (stored: number | null): boolean | null =>
 export const USER_WIRE_COLUMNS: WireColumns<UserRow> = {
   findMeJson: {
     field: 'findMe',
-    decode: (stored): unknown => (stored ? JSON.parse(stored) : [])
+    decode: stored => findMeColumn.decode(stored)
   },
   clir: { decode: fromFlag },
   rejectAnonymous: { decode: fromFlag },

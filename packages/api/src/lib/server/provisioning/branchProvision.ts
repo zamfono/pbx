@@ -1,4 +1,8 @@
-import { featureCodesSchema } from '@zamfono/shared';
+import {
+  codecsColumn,
+  emergencyNumbersColumn,
+  featureCodesColumn
+} from '@zamfono/shared';
 
 import type { SettingsRow } from './types.js';
 
@@ -77,7 +81,8 @@ export function buildBranchProvision(
   parkingSlots: string[],
   blfs: { number: string; title: string }[]
 ): BranchProvision {
-  const codecs = (JSON.parse(settings.codecsJson) as string[])
+  const codecs = codecsColumn
+    .decode(settings.codecsJson)
     .filter(
       (codec): codec is keyof typeof RINGOTEL_CODEC_NAMES =>
         codec in RINGOTEL_CODEC_NAMES
@@ -86,9 +91,7 @@ export function buildBranchProvision(
       codec: RINGOTEL_CODEC_NAMES[codec],
       frame: CODEC_FRAME_MS
     }));
-  const featureCodes = featureCodesSchema.parse(
-    JSON.parse(settings.featureCodesJson)
-  );
+  const featureCodes = featureCodesColumn.decode(settings.featureCodesJson);
   return {
     protocol: 'sips',
     nosrtp: false,
@@ -120,9 +123,9 @@ export function buildBranchProvision(
     regexpires: REGISTRATION_TTL_S,
     inboundFormat: '',
     displayname: '',
-    emergency: (JSON.parse(settings.emergencyNumbersJson) as string[]).map(
-      number => ({ title: number, number })
-    ),
+    emergency: emergencyNumbersColumn
+      .decode(settings.emergencyNumbersJson)
+      .map(number => ({ title: number, number })),
     maxregs: settings.ringotelMaxRegs,
     blfs
   };

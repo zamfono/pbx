@@ -8,6 +8,8 @@ import path from 'node:path';
 import process from 'node:process';
 import * as privateEnv from '$app/env/private';
 
+import { backupParamsColumn } from '@zamfono/shared';
+
 import type { BackupSecret } from '../ops/backups/_secret.js';
 import type { BackupTargetRow } from '../ops/backups/_shared.js';
 
@@ -36,7 +38,7 @@ function optStr(params: Params, key: string): string | undefined {
   return typeof params[key] === 'string' ? params[key] : undefined;
 }
 export function loadParams(target: BackupTargetRow): Params {
-  return JSON.parse(target.paramsJson) as Params;
+  return backupParamsColumn.decode(target.paramsJson);
 }
 
 type Credential = 'accessKeyId' | 'password' | 'secretAccessKey' | 'username';
