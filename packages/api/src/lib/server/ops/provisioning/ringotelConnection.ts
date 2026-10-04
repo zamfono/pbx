@@ -165,7 +165,7 @@ export async function storeRingotelIds(
         what: `device ${device.id} has no Ringotel user yet`,
         retry: 'devices.rotate on the device creates it'
       },
-      provision: db => provisionExistingDevice({ client, db }, device)
+      provision: (db, stored) => provisionExistingDevice({ client, db }, stored)
     });
   }
   recordChange(ctx, { field: 'ringotelOrgId', from: null, to: orgId });

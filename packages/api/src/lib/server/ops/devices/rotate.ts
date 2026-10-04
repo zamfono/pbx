@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
+import { storedCredentials } from '#lib/server/provisioning/ringotelUser.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { newSipPassword } from '#lib/server/sip.js';
 
@@ -37,11 +38,8 @@ export const rotate = defineOperation({
       pushToRingotel(ctx, {
         trigger: 'devices.rotate',
         deviceId: input.id,
-        push: provider =>
-          provider.onCredentialsRotated(row, {
-            username: row.sipUsername,
-            password
-          }),
+        push: (provider, device) =>
+          provider.onCredentialsRotated(device, storedCredentials(device)),
         failure: {
           what: `device ${input.id}'s new password is stored`,
           retry: 'rotating again retries it'

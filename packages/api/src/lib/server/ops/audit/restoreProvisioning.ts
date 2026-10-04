@@ -5,10 +5,8 @@
  * that, because it already chooses between recovering a user deleted within Ringotel's own 24-hour
  * window and creating a fresh one after it.
  */
-import * as env from '$app/env/private';
-
+import { storedCredentials } from '#lib/server/provisioning/ringotelUser.js';
 import type { DeviceRow } from '#lib/server/provisioning/types.js';
-import { decrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 
 import { pushToRingotel } from '../devices/_ringotelPush.js';
 import type { Context } from '../types.js';
@@ -58,14 +56,8 @@ export async function restoreProvisionedDevices(
     pushToRingotel(ctx, {
       trigger: 'audit.undo',
       deviceId: device.id,
-      push: provider =>
-        provider.onDeviceCreated(device, {
-          username: device.sipUsername,
-          password: decrypt(
-            keyringFromEnv(env),
-            device.sipPasswordEnc
-          ).toString()
-        }),
+      push: (provider, stored) =>
+        provider.onDeviceCreated(stored, storedCredentials(stored)),
       failure: {
         what: `device ${device.id} is restored, but it has no Ringotel user yet`,
         retry: 'devices.rotate on the device creates it'

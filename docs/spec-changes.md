@@ -4,6 +4,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §10.5 Uploads.** Product-owner decision (D37): asked about MCP upload links ignoring own scope, the user chose "Refuse the link (Recommended)". The upload-link tool applies the operation's own-scope check and refuses a `user`'s link to another user's upload with 403 up front.
 *Why:* a link handed out for an upload its run would refuse can never succeed.
+**2026-10-04 · §10.4 When a device reaches Ringotel.** Device pushes run one at a time and send the device as stored when their turn comes; a device deleted by then is skipped.
+*Why:* two writes of one device at once pushed concurrently, so Ringotel could keep the older SIP password and the app could no longer register.
+
 **2026-10-04 · §10.4 When a device reaches Ringotel.** `PUT /devices/{id}/blf` pushes the panel to Ringotel once its write committed, like a device's other pushes: a refusal is a `warnings` entry and a `ringotel.push` row with trigger `devices.setBlf`, no longer a 502 that rolls the panel back.
 *Why:* the operation held the database's write lock while Ringotel answered, so `core`'s writes and `/events` failed meanwhile; per D14 ("After commit"), a push follows the commit.
 

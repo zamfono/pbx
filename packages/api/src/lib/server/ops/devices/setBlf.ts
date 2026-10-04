@@ -7,6 +7,8 @@ import {
   type DB
 } from '@zamfono/shared';
 
+import { deviceBlfKeys } from '#lib/server/provisioning/ringotelRoster.js';
+
 import { recordChange } from '../audit.js';
 import { defineOperation, OpError } from '../types.js';
 import { pushToRingotel } from './_ringotelPush.js';
@@ -97,8 +99,11 @@ export const setBlf = defineOperation({
     pushToRingotel(ctx, {
       trigger: 'devices.setBlf',
       deviceId: input.id,
-      push: async provider => {
-        await provider.onDeviceBlfChanged?.(device, input.keys);
+      push: async (provider, stored, db) => {
+        await provider.onDeviceBlfChanged?.(
+          stored,
+          await deviceBlfKeys(db, stored.id)
+        );
         return null;
       },
       failure: {

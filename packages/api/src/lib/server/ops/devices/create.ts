@@ -10,6 +10,7 @@ import {
   newId
 } from '@zamfono/shared';
 
+import { storedCredentials } from '#lib/server/provisioning/ringotelUser.js';
 import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { newSipPassword } from '#lib/server/sip.js';
 
@@ -129,7 +130,8 @@ export const create = defineOperation({
       pushToRingotel(ctx, {
         trigger: 'devices.create',
         deviceId: id,
-        push: provider => provider.onDeviceCreated(row, { username, password }),
+        push: (provider, device) =>
+          provider.onDeviceCreated(device, storedCredentials(device)),
         failure: {
           what: `device ${id} is created, but it has no Ringotel user yet`,
           retry: 'devices.rotate on the device creates it'

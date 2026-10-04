@@ -12,11 +12,12 @@ import {
   seedUser
 } from '@zamfono/shared/testDb.js';
 
-import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
+import { decrypt, encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import {
   installRingotelFake,
   type RingotelFake
 } from '#testing/ringotelFake.js';
+import { makeTestDb } from '#testing/testDb.js';
 
 import { runOperation, type RunInput } from './runner.js';
 
@@ -151,5 +152,40 @@ describe('devices.setBlf', () => {
     );
 
     expect(outcome).toBe('written');
+  });
+});
+
+describe('two writes of one device at once', () => {
+  it('leave Ringotel holding the SIP password the database stores', async () => {
+    const db = await makeTestDb();
+    const { fake, deviceId } = await ringotelDevice(db);
+    // The first rotation's request reaches Ringotel after the second's, as on any network.
+    let pushes = 0;
+    delayRingotel(method => {
+      if (method !== 'updateUser') {
+        return null;
+      }
+      pushes += 1;
+      return pushes === 1
+        ? new Promise(resolve => {
+            setTimeout(resolve, 50);
+          })
+        : null;
+    });
+
+    await Promise.all([
+      runOperation(db, 'devices.rotate', { id: deviceId }, owner),
+      runOperation(db, 'devices.rotate', { id: deviceId }, owner)
+    ]);
+    const stored = await db
+      .selectFrom('devices')
+      .select('sipPasswordEnc')
+      .where('id', '=', deviceId)
+      .executeTakeFirstOrThrow();
+
+    expect(pushes).toBe(2);
+    expect(fake.users[0]?.password).toBe(
+      decrypt(keyringFromEnv(privateEnv), stored.sipPasswordEnc).toString()
+    );
   });
 });

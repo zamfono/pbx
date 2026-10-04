@@ -14,6 +14,7 @@ import {
   liveRingotelDevices,
   storedCredentials
 } from '#lib/server/provisioning/ringotelUser.js';
+import { serialQueue } from '#lib/server/serialQueue.js';
 
 import { afterPropagation, oweRestartPush } from '../afterCommit.js';
 import type { AuditCaller } from '../audit.js';
@@ -26,6 +27,10 @@ import {
 import type { Context } from '../types.js';
 
 const log = pino({ name: 'ringotel' });
+
+// Every device push, one at a time (§10.4): each sends the device as the database holds it when
+// its turn comes, so the last push Ringotel takes carries the last committed write.
+const inTurn = serialQueue();
 
 export type PushOutcome =
   | { outcome: 'pushed'; receipt: PushReceipt }
@@ -40,8 +45,26 @@ type PushTarget = {
 };
 
 type Push = PushTarget & {
-  push: (provider: ProvisioningProvider) => Promise<PushReceipt>;
+  /** Sends `device`, as stored when the push runs, through `provider`. */
+  push: (
+    provider: ProvisioningProvider,
+    device: DeviceRow,
+    db: Db
+  ) => Promise<PushReceipt>;
 };
+
+/** The live device `deviceId` names, as stored now, or `undefined` once it is deleted. */
+function storedDevice(
+  db: Db,
+  deviceId: string
+): Promise<DeviceRow | undefined> {
+  return db
+    .selectFrom('devices')
+    .selectAll()
+    .where('id', '=', deviceId)
+    .where('deletedAt', 'is', null)
+    .executeTakeFirst();
+}
 
 /**
  * The `ringotel.push` audit row (§5.7, §10.4): what Ringotel answered, attributed to the caller of
@@ -80,13 +103,20 @@ async function auditPush(
  * Runs the push against the tenant's Ringotel provider, never throwing. A Ringotel key that
  * cannot be used is a refusal like any other.
  */
-async function attempt(db: Db, push: Push): Promise<PushOutcome> {
+async function attempt(
+  db: Db,
+  push: Push,
+  device: DeviceRow
+): Promise<PushOutcome> {
   try {
     const provider = await activeRingotelProvider(db);
     if (provider === null) {
       return { outcome: 'skipped', reason: 'Ringotel is not set up' };
     }
-    return { outcome: 'pushed', receipt: await push.push(provider) };
+    return {
+      outcome: 'pushed',
+      receipt: await push.push(provider, device, db)
+    };
   } catch (error) {
     const reason = errorMessage(error);
     return { outcome: 'refused', reason };
@@ -105,6 +135,29 @@ function pushWarning(push: PushTarget, result: PushOutcome): string | null {
 }
 
 /**
+ * Runs `push` in its turn (`inTurn`) against the device as stored then, audits its outcome as
+ * `caller`'s and returns its warning. A device deleted meanwhile is not pushed: its deletion is
+ * the newer write, so the row records the skip and there is nothing to warn about.
+ */
+function pushInTurn(
+  db: Db,
+  caller: AuditCaller,
+  push: PushTarget & {
+    attempt: (db: Db, device: DeviceRow) => Promise<PushOutcome>;
+  }
+): Promise<string | null> {
+  return inTurn(async () => {
+    const device = await storedDevice(db, push.deviceId);
+    const result: PushOutcome =
+      device === undefined
+        ? { outcome: 'skipped', reason: 'the device is deleted' }
+        : await push.attempt(db, device);
+    await auditPush(db, caller, push, result);
+    return device === undefined ? null : pushWarning(push, result);
+  });
+}
+
+/**
  * Pushes a `ringotel` device's change to Ringotel once its write has committed and Asterisk holds
  * it (§10.4): an activated Ringotel user registers against the PBX with its SIP credentials
  * before Ringotel accepts it, and fails with "Unauthorized" while Asterisk does not know them
@@ -116,20 +169,25 @@ function pushWarning(push: PushTarget, result: PushOutcome): string | null {
  */
 export function pushToRingotel(ctx: Context, push: Push): void {
   const caller = callerOf(ctx);
-  afterPropagation(ctx, async db => {
-    const result = await attempt(db, push);
-    await auditPush(db, caller, push, result);
-    return pushWarning(push, result);
-  });
+  afterPropagation(ctx, db =>
+    pushInTurn(db, caller, {
+      ...push,
+      attempt: (later, device) => attempt(later, push, device)
+    })
+  );
 }
 
 /** `provision`'s answer as the push's outcome, never throwing. */
 async function provisioned(
   db: Db,
-  provision: (db: Db) => Promise<string>
+  device: DeviceRow,
+  provision: (db: Db, device: DeviceRow) => Promise<string>
 ): Promise<PushOutcome> {
   try {
-    return { outcome: 'pushed', receipt: { remoteId: await provision(db) } };
+    return {
+      outcome: 'pushed',
+      receipt: { remoteId: await provision(db, device) }
+    };
   } catch (error) {
     return { outcome: 'refused', reason: errorMessage(error) };
   }
@@ -143,14 +201,17 @@ async function provisioned(
  */
 export function pushExistingDevice(
   ctx: Context,
-  push: PushTarget & { provision: (db: Db) => Promise<string> }
+  push: PushTarget & {
+    provision: (db: Db, device: DeviceRow) => Promise<string>;
+  }
 ): void {
   const caller = callerOf(ctx);
-  afterPropagation(ctx, async db => {
-    const result = await provisioned(db, push.provision);
-    await auditPush(db, caller, push, result);
-    return pushWarning(push, result);
-  });
+  afterPropagation(ctx, db =>
+    pushInTurn(db, caller, {
+      ...push,
+      attempt: (later, device) => provisioned(later, device, push.provision)
+    })
+  );
 }
 
 /** One device's stored credentials, pushed again as the job (`pushEveryDevice`). */
@@ -158,16 +219,17 @@ async function pushStoredCredentials(db: Db, device: DeviceRow): Promise<void> {
   const push: Push = {
     trigger: 'api.start',
     deviceId: device.id,
-    push: provider =>
-      provider.onCredentialsRotated(device, storedCredentials(device)),
+    push: (provider, stored) =>
+      provider.onCredentialsRotated(stored, storedCredentials(stored)),
     failure: {
       what: `device ${device.id}'s credentials are stored`,
       retry: 'devices.rotate on the device pushes them again'
     }
   };
-  const result = await attempt(db, push);
-  await auditPush(db, JOB_CALLER, push, result);
-  const warning = pushWarning(push, result);
+  const warning = await pushInTurn(db, JOB_CALLER, {
+    ...push,
+    attempt: (later, stored) => attempt(later, push, stored)
+  });
   if (warning !== null) {
     log.error(
       { deviceId: device.id, warning },
