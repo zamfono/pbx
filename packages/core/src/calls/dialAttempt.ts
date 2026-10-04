@@ -175,7 +175,9 @@ async function attemptOnce(
       endpoint,
       cause: 'placementFailed'
     });
-    return { kind: 'failure', failure: PLACEMENT_FAILED };
+    return call.callerEnded === true
+      ? CALLER_GONE
+      : { kind: 'failure', failure: PLACEMENT_FAILED };
   }
   // The live view (§10.6) shows the call ringing its external target from the first INVITE on.
   callRinging(pipeline.deps, call);

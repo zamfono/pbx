@@ -290,6 +290,9 @@ why the specified behaviour changed; the commit history, how.
 - A caller who hung up while an outgoing call was still ringing had the call dialled again over
   the next host, route or emergency trunk: a 112 hung up within a second reached the next
   emergency centre with nobody on the line. Dialling now stops when the caller hangs up.
+- A caller who hung up in the instant an outgoing call or a forward was being set up still had
+  it dialled: the far end rang, and once answered the call showed as answered with nobody on
+  the line. The call is now not dialled and ends as missed.
 - Busy lamps: a call waiting for a user who is already on the phone now flashes their lamp, so a
   colleague can see it and pick it up with `*8`; a ring group's lamp stays lit while any of its
   calls still rings, rather than going dark when the first is answered; and after `core` restarts

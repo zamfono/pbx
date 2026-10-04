@@ -27,7 +27,7 @@
  * answer arrives.
  *
  * A leg that cannot be placed (`core` stopping, §3.1 "Independence"; the create or the dial
- * refused, the channel gone or never in the app) throws `PlacementError`; every caller takes it as a leg that ended at once, so a refusal
+ * refused, the channel gone or never in the app; the call's caller gone meanwhile) throws `PlacementError`; every caller takes it as a leg that ended at once, so a refusal
  * never escapes the ring or the attempt it belongs to. A refused dial's channel is hung up without
  * waiting for the answer, so the caller has settled the leg before that hangup's
  * `ChannelDestroyed` can arrive.
@@ -43,10 +43,10 @@ const NO_DIAL_TIMEOUT = 0;
 // How long a created channel may take to enter the app before it counts as not placed.
 export const STASIS_WAIT_MS = 5000;
 
-/** Why a leg could not be placed: its create or dial refused, or its channel gone or never in
- * the app before the dial. */
+/** Why a leg could not be placed: its create or dial refused, its channel gone or never in the
+ * app before the dial, or the call's caller gone by then. */
 export class PlacementError extends Error {
-  readonly step: 'stopping' | 'create' | 'stasis' | 'dial';
+  readonly step: 'stopping' | 'create' | 'stasis' | 'callerGone' | 'dial';
 
   constructor(step: PlacementError['step'], cause?: unknown) {
     super(`leg placement failed at ${step}`, { cause });
@@ -101,13 +101,16 @@ export async function originateLeg(
   if (call.log.level === 'sip') {
     await joined;
   }
-  if ((await stasis.promise) !== 'entered') {
+  const entered = (await stasis.promise) === 'entered';
+  // The caller hanging up ends every leg of the call (`legsEnded.ts`), this one included while
+  // it is still being placed: it is hung up before its INVITE leaves.
+  if (!entered || call.callerEnded === true) {
     await ari.channels.hangup(channel.id).catch(
       logUnlessGone(pipeline.deps.logger, 'unplaced leg hangup', {
         callId: call.id
       })
     );
-    throw new PlacementError('stasis');
+    throw new PlacementError(entered ? 'callerGone' : 'stasis');
   }
   dialling(channel);
   try {

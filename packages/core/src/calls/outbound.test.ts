@@ -1120,6 +1120,45 @@ describe('outbound dialing', () => {
     expect(traceEvents(call)).not.toContain('emergencyFailed');
   });
 
+  it('never dials a trunk leg still being placed when the caller hangs up (§10.1 step 4)', async () => {
+    const trunk1 = await seedTrunk(db, 1);
+    await seedRoute(db, 1, trunk1);
+    fakeAri.answerAfterMs = 20;
+    const create = Promise.withResolvers<undefined>();
+    const createArrived = Promise.withResolvers<undefined>();
+    fakeAri.holdRequest = request => {
+      if (request.path !== 'channels/create') {
+        return 0;
+      }
+      createArrived.resolve(undefined);
+      return create.promise;
+    };
+
+    const { call, finished } = await startDial('+498912345');
+    await createArrived.promise;
+    emitDestroyed(fakeAri, callerChannel(call), 16);
+    await eventually(() => {
+      expect(call.callerEnded).toBe(true);
+    });
+    create.resolve(undefined);
+    await finished;
+
+    const legId = (
+      fakeAri.calls.find(entry => isPlacement(entry))?.body as {
+        channelId: string;
+      }
+    ).channelId;
+    expect(
+      fakeAri.calls.some(entry => entry.path === `channels/${legId}/dial`)
+    ).toBe(false);
+    expect(
+      fakeAri.calls.some(
+        entry => entry.method === 'DELETE' && entry.path === `channels/${legId}`
+      )
+    ).toBe(true);
+    expect(call.status).toBe('missed');
+  });
+
   it('does not count a hop for an internal-extension or own-DID dispatch', async () => {
     const targetUserId = newId();
     await db
