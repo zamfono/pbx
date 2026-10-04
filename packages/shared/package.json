@@ -4,7 +4,7 @@
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
-    "db:generate": "kysely-generate",
+    "db:generate": "sh scripts/db-generate.sh",
     "test": "vitest run"
   },
   "exports": {

@@ -42,6 +42,13 @@ jobs:
       # a copy-pasted listing in step with the file it quotes.
       - name: The compose listings in docs/spec.md §6.3 match deploy/
         run: node scripts/check-spec-compose-listings.mjs
+      # The Kysely types are generated from the migrations; a migration without a regenerated
+      # db.d.ts fails here.
+      - name: packages/shared's db.d.ts matches db/migrations
+        run: npm run db:generate -w packages/shared -- --verify
+      # The skill's reference copies the admin guide; tools.md is the catalog test's.
+      - name: The skill's reference matches docs/guide
+        run: scripts/build-skill.sh --check
       # eslint-plugin-prettier covers only the code ESLint lints; this covers everything else
       # (Markdown, YAML, CSS, JSON), with the deliberate exceptions listed in .prettierignore.
       - run: npm run format:check

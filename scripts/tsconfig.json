@@ -4,8 +4,6 @@
     "allowJs": true,
     "checkJs": true,
     "noEmit": true,
-    "composite": false,
-    "declaration": false,
     "types": ["node"]
   },
   "include": ["*.mjs"]

@@ -12,6 +12,15 @@
     },
     {
       "path": "packages/updater"
+    },
+    {
+      "path": "db"
+    },
+    {
+      "path": "scripts"
+    },
+    {
+      "path": ".github/scripts"
     }
   ]
 }

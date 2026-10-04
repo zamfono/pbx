@@ -3,24 +3,17 @@
 import eslint from '@eslint/js';
 import prettier from 'eslint-plugin-prettier/recommended';
 import svelte from 'eslint-plugin-svelte';
+import { defineConfig } from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-export default tseslint.config(
+export default defineConfig(
   {
     ignores: [
-      'node_modules',
-      'build',
-      '*.*',
-      // `*.*` matches the directory name too; the CI scripts in it are linted like any other.
-      '!.github',
       '**/generated/**',
       '**/build/**',
       '**/dist/**',
-      '**/.svelte-kit/**',
-      // Each package's tsconfig `include`/`rootDir` covers only its own src,
-      // so these per-package vitest configs have no TS project.
-      'packages/*/vitest.config.ts'
+      '**/.svelte-kit/**'
     ]
   },
   eslint.configs.all,
@@ -31,7 +24,12 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        projectService: true,
+        projectService: {
+          // The root and vitest configs, which no project includes, are Node modules checked with
+          // the Node scripts' compiler options.
+          allowDefaultProject: ['*.mjs', 'packages/*/vitest.config.ts'],
+          defaultProject: 'scripts/tsconfig.json'
+        },
         tsconfigRootDir: import.meta.dirname
       }
     },
@@ -144,9 +142,6 @@ export default tseslint.config(
           allowArrowFunctions: true
         }
       ],
-      // Note: The first element of the array is for the rule severity!
-      // The other elements in the array are the identifiers that you want to disallow.
-      'id-denylist': ['error'],
       'max-params': [
         'error',
         {

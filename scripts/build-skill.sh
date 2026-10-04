@@ -2,6 +2,8 @@
 # Rebuilds skills/zamfono/reference/ (§12 "Admin skill"): the admin guide sections that
 # zamfono.help also serves, plus a tool catalog generated from the operations registry, so the
 # skill's reference cannot drift from either source. SKILL.md itself is hand-written and untouched.
+# With --check it rebuilds the guide copies aside and fails if the committed ones differ; the
+# catalog test checks tools.md.
 set -e
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -19,6 +21,11 @@ for recipe in "$repo_root"/docs/guide/recipes/*.md; do
     cp "$recipe" "$target"
   fi
 done
+if [ "$1" = --check ]; then
+  cp "$reference_dir/tools.md" "$tmp_dir/tools.md"
+  diff -r "$reference_dir" "$tmp_dir"
+  exit
+fi
 # The catalog test's file snapshot is the catalog: updating it rewrites the committed copy.
 (cd "$repo_root/packages/api" && npx vitest run catalogDrift --update)
 cp "$reference_dir/tools.md" "$tmp_dir/tools.md"
