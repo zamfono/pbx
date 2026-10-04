@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db, type Envelope } from '@zamfono/shared';
 import { migratedTestDb, seedSettings } from '@zamfono/shared/testDb.js';
@@ -94,22 +94,20 @@ function wait(ms: number): Promise<void> {
   });
 }
 
-/** Resolves once `backup_runs.status` of `runId` leaves `running`, or after `WAIT_MS`. */
+/** Resolves to `backup_runs.status` of `runId` once it leaves `running`; fails after `WAIT_MS`. */
 async function waitForRun(db: Db, runId: string): Promise<string> {
-  const deadline = Date.now() + WAIT_MS;
-  for (;;) {
-    // eslint-disable-next-line no-await-in-loop -- polling the row the scheduler updates
-    const row = await db
-      .selectFrom('backupRuns')
-      .select(['status'])
-      .where('id', '=', runId)
-      .executeTakeFirstOrThrow();
-    if (row.status !== 'running' || Date.now() > deadline) {
-      return row.status;
-    }
-    // eslint-disable-next-line no-await-in-loop -- one interval between reads
-    await wait(READ_INTERVAL_MS);
-  }
+  return vi.waitFor(
+    async () => {
+      const { status } = await db
+        .selectFrom('backupRuns')
+        .select(['status'])
+        .where('id', '=', runId)
+        .executeTakeFirstOrThrow();
+      expect(status).not.toBe('running');
+      return status;
+    },
+    { timeout: WAIT_MS, interval: READ_INTERVAL_MS }
+  );
 }
 
 describe('scheduleBackups: the manual runs handed over', () => {

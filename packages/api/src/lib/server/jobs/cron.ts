@@ -66,7 +66,7 @@ async function runEnabledTargets(
   deps: BackupJobDeps
 ): Promise<void> {
   for (const targetId of await enabledTargetIds(db)) {
-    // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; runs must serialize
+    // eslint-disable-next-line no-await-in-loop -- backup runs take turns: one target's run ends before the next one starts
     await runTarget(db, kr, deps, targetId).catch((error: unknown) => {
       // The failure already lives in the run row and `backup.failed` event; this is a trace.
       logger.error({ error, targetId }, 'scheduled backup run failed');

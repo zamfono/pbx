@@ -246,14 +246,15 @@ describe('handleMcpRequest, 2026-07-28', () => {
       confirm: { action: 'accept', content: { confirm: true } }
     });
     expect(accepted.result).toEqual(currentToolResult({ deleted: 't2' }));
-    for (const answer of [
-      { action: 'accept', content: { confirm: false } },
-      { action: 'decline' },
-      { action: 'cancel' }
-    ]) {
-      // eslint-disable-next-line no-await-in-loop -- each answer is its own retry of the call
-      const refused = await call({ confirm: answer });
-      expect(refused.result).toEqual(
+    const refused = await Promise.all(
+      [
+        { action: 'accept', content: { confirm: false } },
+        { action: 'decline' },
+        { action: 'cancel' }
+      ].map(answer => call({ confirm: answer }))
+    );
+    for (const { result } of refused) {
+      expect(result).toEqual(
         currentToolResult(confirmationProblem('Delete t2?'), true)
       );
     }

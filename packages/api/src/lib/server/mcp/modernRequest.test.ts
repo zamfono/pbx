@@ -133,11 +133,12 @@ describe('2026-07-28 request validation', () => {
   });
 
   it('rejects a missing, mismatched or malformed Mcp-Name header as HeaderMismatch', async () => {
-    for (const name of [undefined, 'test.delete', '=?base64?not base64?=']) {
-      // eslint-disable-next-line no-await-in-loop -- each header value is its own request
-      const outcome = await send('tools/call', TOOL_CALL, {
-        headers: { 'mcp-name': name }
-      });
+    const outcomes = await Promise.all(
+      [undefined, 'test.delete', '=?base64?not base64?='].map(name =>
+        send('tools/call', TOOL_CALL, { headers: { 'mcp-name': name } })
+      )
+    );
+    for (const outcome of outcomes) {
       expectRejected(outcome, -32020);
     }
     expectRejected(

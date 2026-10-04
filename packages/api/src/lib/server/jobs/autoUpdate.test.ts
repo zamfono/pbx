@@ -53,23 +53,24 @@ const TOMORROW = new Date('2026-10-02T03:00:00.000Z');
 async function seed(db: Db, autoUpdate: boolean): Promise<void> {
   await sql`PRAGMA foreign_keys = OFF`.execute(db);
   await seedSettings(db, { autoUpdate: autoUpdate ? 1 : 0 });
-  for (const [id, role] of [
-    ['o2', 'owner'],
-    ['a1', 'admin']
-  ] as const) {
-    // eslint-disable-next-line no-await-in-loop -- two fixture rows, inserted in order
-    await db
-      .insertInto('users')
-      .values({
+  await db
+    .insertInto('users')
+    .values(
+      (
+        [
+          ['o2', 'owner'],
+          ['a1', 'admin']
+        ] as const
+      ).map(([id, role]) => ({
         id,
         name: id,
         email: `${id}@x`,
         role,
         passwordHash: 'x',
         createdAt: nowIso()
-      })
-      .execute();
-  }
+      }))
+    )
+    .execute();
 }
 
 function status(overrides: Partial<UpdaterStatus> = {}): UpdaterStatus {

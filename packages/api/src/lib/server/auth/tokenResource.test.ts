@@ -105,17 +105,28 @@ describe('tokenEndpoint (resource, RFC 8707)', () => {
 
   it('refuses a foreign resource with invalid_target, leaving the code redeemable', async () => {
     const { deps, code } = await setup();
-    for (const foreign of [
-      'https://other.example/mcp',
-      `${ORIGIN}/api/v1`,
-      `${MCP_RESOURCE}#frag`,
-      'not a uri'
-    ]) {
-      // eslint-disable-next-line no-await-in-loop -- one code, refused request by request
-      const response = await tokenEndpoint(deps, codeRequest(code, [foreign]));
-      expect(response.status).toBe(400);
-      // eslint-disable-next-line no-await-in-loop -- as above
-      expect(await response.json()).toEqual({ error: 'invalid_target' });
+    const refusals = await Promise.all(
+      [
+        'https://other.example/mcp',
+        `${ORIGIN}/api/v1`,
+        `${MCP_RESOURCE}#frag`,
+        'not a uri'
+      ].map(async foreign => {
+        const response = await tokenEndpoint(
+          deps,
+          codeRequest(code, [foreign])
+        );
+        return {
+          status: response.status,
+          body: (await response.json()) as unknown
+        };
+      })
+    );
+    for (const refusal of refusals) {
+      expect(refusal).toEqual({
+        status: 400,
+        body: { error: 'invalid_target' }
+      });
     }
     const mixed = await tokenEndpoint(
       deps,

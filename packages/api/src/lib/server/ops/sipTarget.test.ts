@@ -92,12 +92,13 @@ describe('sip forward targets', () => {
     const db = await makeTestDb();
     await seedSettings(db);
     const trunkId = await createOpenAiTrunk(db);
-    for (const user of ['', 'a@b', 'a/b', 'a;b', 'a b', 'x'.repeat(65)]) {
-      // eslint-disable-next-line no-await-in-loop -- each user part is refused on its own
-      await expect(
-        createDid(db, { kind: 'sip', trunkId, user })
-      ).rejects.toMatchObject({ status: 422 });
-    }
+    await Promise.all(
+      ['', 'a@b', 'a/b', 'a;b', 'a b', 'x'.repeat(65)].map(user =>
+        expect(
+          createDid(db, { kind: 'sip', trunkId, user })
+        ).rejects.toMatchObject({ status: 422 })
+      )
+    );
     await expect(
       createDid(db, { kind: 'sip', trunkId: 'nope', user: 'proj_1' })
     ).rejects.toMatchObject({ status: 404 });

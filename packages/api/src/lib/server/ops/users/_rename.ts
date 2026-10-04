@@ -37,22 +37,19 @@ export async function renameExtension(
     .where('deletedAt', 'is', null)
     .execute();
   const oldPrefix = `e${oldExt}-`;
-  const renamed: AffectedDevice[] = [];
-  for (const device of devices) {
-    if (!device.sipUsername.startsWith(oldPrefix)) {
-      renamed.push({ id: device.id, sipUsername: device.sipUsername });
-      continue;
-    }
-    const candidate = `e${newExt}-${device.sipUsername.slice(oldPrefix.length)}`;
-    // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; renames must serialize
-    const sipUsername = await sipUsernameOrFresh(
-      ctx.db,
-      newExt,
-      device.id,
-      candidate
-    );
-    renamed.push({ id: device.id, sipUsername });
-  }
+  const renamed: AffectedDevice[] = await Promise.all(
+    devices.map(async device => ({
+      id: device.id,
+      sipUsername: device.sipUsername.startsWith(oldPrefix)
+        ? await sipUsernameOrFresh(
+            ctx.db,
+            newExt,
+            device.id,
+            `e${newExt}-${device.sipUsername.slice(oldPrefix.length)}`
+          )
+        : device.sipUsername
+    }))
+  );
   await sql`PRAGMA defer_foreign_keys = ON`.execute(ctx.db);
   await ctx.db
     .updateTable('deviceBlfKeys')
@@ -64,14 +61,15 @@ export async function renameExtension(
     .set({ ext: newExt })
     .where('ext', '=', oldExt)
     .execute();
-  for (const device of renamed) {
-    // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; renames must serialize
-    await ctx.db
-      .updateTable('devices')
-      .set({ sipUsername: device.sipUsername })
-      .where('id', '=', device.id)
-      .execute();
-  }
+  await Promise.all(
+    renamed.map(device =>
+      ctx.db
+        .updateTable('devices')
+        .set({ sipUsername: device.sipUsername })
+        .where('id', '=', device.id)
+        .execute()
+    )
+  );
   return renamed;
 }
 

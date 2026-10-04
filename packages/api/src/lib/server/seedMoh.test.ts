@@ -25,15 +25,13 @@ async function tempDir(prefix: string): Promise<string> {
 /** A source directory holding both variants of each bundled track. */
 async function mohSourceFixture(): Promise<string> {
   const dir = await tempDir('zamfono-moh-src-');
-  for (const basename of MOH_TRACK_BASENAMES) {
-    for (const ext of [MOH_NARROWBAND_EXT, MOH_WIDEBAND_EXT]) {
-      // eslint-disable-next-line no-await-in-loop -- a fixture of ten small files, written in order
-      await writeFile(
-        path.join(dir, `${basename}.${ext}`),
-        `${basename} ${ext}`
-      );
-    }
-  }
+  await Promise.all(
+    MOH_TRACK_BASENAMES.flatMap(basename =>
+      [MOH_NARROWBAND_EXT, MOH_WIDEBAND_EXT].map(ext =>
+        writeFile(path.join(dir, `${basename}.${ext}`), `${basename} ${ext}`)
+      )
+    )
+  );
   return dir;
 }
 

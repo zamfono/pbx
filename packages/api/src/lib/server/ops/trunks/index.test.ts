@@ -562,18 +562,19 @@ describe('trunks operations', () => {
 
   it('refuses a username or password beginning or ending with whitespace, which Asterisk would trim, on create and update', async () => {
     const db = await makeTestDb();
-    for (const credentials of [
-      { username: ' bob', password: 'secret' },
-      { username: 'bob\t', password: 'secret' },
-      { username: 'bob', password: ' secret' },
-      { username: 'bob', password: 'secret ' },
-      { username: 'bob', password: 'secret\t' }
-    ]) {
-      // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; each create is refused before it writes
-      await expect(
-        createTrunk(db, { authMode: 'registration', ...credentials })
-      ).rejects.toMatchObject({ status: 422 });
-    }
+    await Promise.all(
+      [
+        { username: ' bob', password: 'secret' },
+        { username: 'bob\t', password: 'secret' },
+        { username: 'bob', password: ' secret' },
+        { username: 'bob', password: 'secret ' },
+        { username: 'bob', password: 'secret\t' }
+      ].map(credentials =>
+        expect(
+          createTrunk(db, { authMode: 'registration', ...credentials })
+        ).rejects.toMatchObject({ status: 422 })
+      )
+    );
 
     const { trunk } = await createTrunk(db, {
       name: 'Provider D',

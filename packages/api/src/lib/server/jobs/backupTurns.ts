@@ -41,7 +41,7 @@ export async function backupEnabledTargets(
   return inTurn(async () => {
     const runs: BackupRunRow[] = [];
     for (const targetId of await enabledTargetIds(db)) {
-      // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; runs must serialize
+      // eslint-disable-next-line no-await-in-loop -- backup runs take turns: one target's run ends before the next one starts
       const { run, target } = await createBackupRun(db, targetId, deps);
       // eslint-disable-next-line no-await-in-loop -- see above
       runs.push(await performBackup(db, kr, run, target, deps));

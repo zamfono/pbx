@@ -114,12 +114,13 @@ export async function restoreSsoSubjects(
   ctx: Context,
   bindings: SsoBinding[]
 ): Promise<void> {
-  for (const binding of bindings) {
-    // eslint-disable-next-line no-await-in-loop -- one row per binding in the shared transaction
-    await ctx.db
-      .updateTable('users')
-      .set({ ssoSubject: binding.ssoSubject })
-      .where('id', '=', binding.userId)
-      .execute();
-  }
+  await Promise.all(
+    bindings.map(binding =>
+      ctx.db
+        .updateTable('users')
+        .set({ ssoSubject: binding.ssoSubject })
+        .where('id', '=', binding.userId)
+        .execute()
+    )
+  );
 }

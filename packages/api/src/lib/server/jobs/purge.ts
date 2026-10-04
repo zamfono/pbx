@@ -219,12 +219,11 @@ export async function runPurge(db: Db, now: string): Promise<void> {
     await purgeBackupRuns(trx, cutoffIso(now, settings.recordingRetentionDays));
     return { audioFilenames, voicemailFilenames };
   });
-  for (const filename of purgedFiles.audioFilenames) {
-    // eslint-disable-next-line no-await-in-loop -- files are removed in turn once their rows are safely committed
-    await deleteAudioFile(filename);
-  }
-  for (const filename of purgedFiles.voicemailFilenames) {
-    // eslint-disable-next-line no-await-in-loop -- files are removed in turn once their rows are safely committed
-    await deleteVoicemailFile(filename);
-  }
+  // Only once their rows are safely committed.
+  await Promise.all([
+    ...purgedFiles.audioFilenames.map(filename => deleteAudioFile(filename)),
+    ...purgedFiles.voicemailFilenames.map(filename =>
+      deleteVoicemailFile(filename)
+    )
+  ]);
 }

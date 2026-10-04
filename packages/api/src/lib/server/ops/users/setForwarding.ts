@@ -80,12 +80,11 @@ export const setForwarding = defineOperation({
       .deleteFrom('userForwardRules')
       .where('userId', '=', input.id)
       .execute();
-    for (const rule of existing) {
-      if (!keptIds.has(rule.targetId)) {
-        // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; deletes must serialize
-        await deleteTargetIfOrphan(ctx, rule.targetId);
-      }
-    }
+    await Promise.all(
+      existing
+        .filter(rule => !keptIds.has(rule.targetId))
+        .map(rule => deleteTargetIfOrphan(ctx, rule.targetId))
+    );
     const rows: {
       userId: string;
       condition: UserForwardCondition;
@@ -94,7 +93,7 @@ export const setForwarding = defineOperation({
     for (const rule of input.rules) {
       const targetId =
         kept.get(rule.condition) ??
-        // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; inserts must serialize
+        // eslint-disable-next-line no-await-in-loop -- in input order, so the first invalid target is the one refused and warnings follow the input
         (await createTarget(ctx, rule.target));
       rows.push({ userId: input.id, condition: rule.condition, targetId });
     }

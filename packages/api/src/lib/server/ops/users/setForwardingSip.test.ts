@@ -135,17 +135,18 @@ describe('users.setForwarding, an admin-set sip rule', () => {
       { ...target, headers: [] }
     ];
     const before = await getForwarding(db, anna.id, anna);
-    for (const variant of variants) {
-      // eslint-disable-next-line no-await-in-loop -- each attempt must see the untouched rules
-      await expect(
-        setForwarding(
-          db,
-          anna.id,
-          [{ condition: 'noAnswer', target: variant }],
-          anna
-        )
-      ).rejects.toMatchObject({ status: 403 });
-    }
+    await Promise.all(
+      variants.map(variant =>
+        expect(
+          setForwarding(
+            db,
+            anna.id,
+            [{ condition: 'noAnswer', target: variant }],
+            anna
+          )
+        ).rejects.toMatchObject({ status: 403 })
+      )
+    );
     expect(await getForwarding(db, anna.id, anna)).toEqual(before);
   });
 

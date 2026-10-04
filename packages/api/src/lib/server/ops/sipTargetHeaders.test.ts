@@ -104,12 +104,13 @@ describe('sip target headers', () => {
         nameHeader(`X-Name-${String(index)}`, 5)
       )
     ];
-    for (const headers of refused) {
-      // eslint-disable-next-line no-await-in-loop -- each list is refused on its own
-      await expect(createDid(db, trunkId, headers)).rejects.toMatchObject({
-        status: 422
-      });
-    }
+    await Promise.all(
+      refused.map(headers =>
+        expect(createDid(db, trunkId, headers)).rejects.toMatchObject({
+          status: 422
+        })
+      )
+    );
   });
 
   it('limits the size, not the count', async () => {

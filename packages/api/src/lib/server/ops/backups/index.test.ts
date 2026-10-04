@@ -49,15 +49,16 @@ describe('backups', () => {
         { kind, params: { path: '/backups' }, secret },
         asRun()
       );
-    for (const secret of [
-      'restic-repo-password',
-      { resticPassword: 'pw', username: 'u', password: 'p' }
-    ]) {
-      // eslint-disable-next-line no-await-in-loop -- one refusal at a time
-      await expect(create('local', secret)).rejects.toMatchObject({
-        status: 422
-      });
-    }
+    await Promise.all(
+      [
+        'restic-repo-password',
+        { resticPassword: 'pw', username: 'u', password: 'p' }
+      ].map(secret =>
+        expect(create('local', secret)).rejects.toMatchObject({
+          status: 422
+        })
+      )
+    );
     await expect(
       create('s3', { resticPassword: 'pw', accessKeyId: 'AKID' })
     ).rejects.toMatchObject({ status: 422 });

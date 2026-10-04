@@ -63,19 +63,18 @@ describe('runPurge against the history other jobs read', () => {
   it("keeps each backup target's latest successful run past retention, for its age in /metrics", async () => {
     const db = await makeTestDb();
     await seedSettings(db, { recordingRetentionDays: RETENTION_DAYS });
-    for (const id of ['quiet', 'busy']) {
-      // eslint-disable-next-line no-await-in-loop -- two rows, the runs below reference them
-      await db
-        .insertInto('backupTargets')
-        .values({
+    await db
+      .insertInto('backupTargets')
+      .values(
+        ['quiet', 'busy'].map(id => ({
           id,
           kind: 'local',
           paramsJson: '{}',
           secretEnc: Buffer.from(''),
           createdAt: daysAgo(100)
-        })
-        .execute();
-    }
+        }))
+      )
+      .execute();
     const runs = [
       { id: 'quiet-old-ok', targetId: 'quiet', status: 'ok', age: 50 },
       { id: 'quiet-last-ok', targetId: 'quiet', status: 'ok', age: 40 },

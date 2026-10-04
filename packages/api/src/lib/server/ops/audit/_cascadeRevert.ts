@@ -91,16 +91,16 @@ export async function revertDevices(
   ctx: Context,
   devices: { id: string }[]
 ): Promise<void> {
-  for (const device of devices) {
-    // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; each row updates in turn
-    await guardReuseConflict(ctx, 'device', device.id);
-    // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; each row updates in turn
-    await ctx.db
-      .updateTable('devices')
-      .set({ deletedAt: null })
-      .where('id', '=', device.id)
-      .execute();
+  if (devices.length === 0) {
+    return;
   }
+  const ids = devices.map(device => device.id);
+  await Promise.all(ids.map(id => guardReuseConflict(ctx, 'device', id)));
+  await ctx.db
+    .updateTable('devices')
+    .set({ deletedAt: null })
+    .where('id', 'in', ids)
+    .execute();
 }
 
 /** Re-inserts the `device_blf_keys` rows the extension's own removal cascaded away (§5.9). */

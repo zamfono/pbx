@@ -71,15 +71,11 @@ describe('prompts/get, 2026-07-28', () => {
     });
   });
 
-  it('answers a missing required argument, blank or absent, with -32602', async () => {
-    const deps = await seededDeps();
-    for (const args of [
-      { employeeName: 'Jane' },
-      { employeeName: 'Jane', email: '' }
-    ]) {
-      // eslint-disable-next-line no-await-in-loop -- each case is its own request
+  it.each([{ employeeName: 'Jane' }, { employeeName: 'Jane', email: '' }])(
+    'answers a missing required argument, blank or absent, with -32602: %o',
+    async args => {
       const body = await rpc(
-        deps,
+        await seededDeps(),
         currentRequest(3, 'prompts/get', {
           name: 'onboard-employee',
           arguments: args
@@ -90,21 +86,23 @@ describe('prompts/get, 2026-07-28', () => {
         message: 'Missing required argument: email'
       });
     }
-  });
+  );
 
-  it('answers an undeclared or non-string argument, or no name, with -32602', async () => {
-    const deps = await seededDeps();
-    for (const params of [
-      { name: 'undo', arguments: { colour: 'blue' } },
-      { name: 'undo', arguments: { entityId: 5 } },
-      { name: 'undo', arguments: ['entityId'] },
-      {}
-    ]) {
-      // eslint-disable-next-line no-await-in-loop -- each case is its own request
-      const body = await rpc(deps, currentRequest(4, 'prompts/get', params));
+  it.each([
+    { name: 'undo', arguments: { colour: 'blue' } },
+    { name: 'undo', arguments: { entityId: 5 } },
+    { name: 'undo', arguments: ['entityId'] },
+    {}
+  ])(
+    'answers an undeclared or non-string argument, or no name, with -32602: %o',
+    async params => {
+      const body = await rpc(
+        await seededDeps(),
+        currentRequest(4, 'prompts/get', params)
+      );
       expect(body.error?.code).toBe(-32602);
     }
-  });
+  );
 
   it('needs no arguments for a recipe whose parameters are all optional', async () => {
     const body = await rpc(

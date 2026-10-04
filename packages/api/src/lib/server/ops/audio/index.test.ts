@@ -87,19 +87,20 @@ describe('audio', () => {
 
   it('accepts an MP3 upload and a WAV type in any case', async () => {
     const db = await makeTestDb();
-    for (const mimeType of ['audio/mpeg', 'Audio/WAV']) {
-      // eslint-disable-next-line no-await-in-loop -- one upload after the other
-      await runOperation(
-        db,
-        'audio.create',
-        {
-          kind: 'greeting',
-          label: mimeType,
-          upload: { ...upload, filename: `${mimeType}.upload`, mimeType }
-        },
-        asRun()
-      );
-    }
+    await Promise.all(
+      ['audio/mpeg', 'Audio/WAV'].map(mimeType =>
+        runOperation(
+          db,
+          'audio.create',
+          {
+            kind: 'greeting',
+            label: mimeType,
+            upload: { ...upload, filename: `${mimeType}.upload`, mimeType }
+          },
+          asRun()
+        )
+      )
+    );
     expect(storeAudio).toHaveBeenCalledTimes(2);
   });
 

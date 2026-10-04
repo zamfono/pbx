@@ -75,14 +75,17 @@ async function pushRosterExtensions(
   remoteUsers: RemoteUser[],
   liveExts: Set<string>
 ): Promise<void> {
-  for (const user of users) {
-    // eslint-disable-next-line no-await-in-loop -- the Ringotel RPC has no batch update; sequential pushes are the plain reading of the API
-    const ext = await extensionOfUser(deps.db, user.id);
+  const pushes = await Promise.all(
+    users.map(async user => ({
+      user,
+      ext: await extensionOfUser(deps.db, user.id),
+      sipUsername: await ringotelSipUsername(deps.db, user.id)
+    }))
+  );
+  for (const { user, ext, sipUsername } of pushes) {
     if (ext === null) {
       continue;
     }
-    // eslint-disable-next-line no-await-in-loop -- each push depends on the previous lookup's result, not on unrelated work
-    const sipUsername = await ringotelSipUsername(deps.db, user.id);
     const remote = remoteUserFor(remoteUsers, liveExts, ext, sipUsername);
     if (remote === undefined) {
       if (sipUsername !== null) {
@@ -93,7 +96,7 @@ async function pushRosterExtensions(
       }
       continue;
     }
-    // eslint-disable-next-line no-await-in-loop -- each push depends on the previous lookup's result, not on unrelated work
+    // eslint-disable-next-line no-await-in-loop -- one Ringotel request at a time: no roster-sized burst against the provider's API
     await deps.client.call('updateUser', {
       orgid: orgId,
       id: remote.id,
@@ -129,21 +132,22 @@ async function pushDevicePanels(
     .where('devices.deletedAt', 'is', null)
     .orderBy('extensions.ext')
     .execute();
-  for (const device of devices) {
-    const remote = remoteUserFor(
-      remoteUsers,
-      liveExts,
-      device.ext,
-      device.sipUsername
-    );
+  const panels = await Promise.all(
+    devices.map(async device => ({
+      remote: remoteUserFor(
+        remoteUsers,
+        liveExts,
+        device.ext,
+        device.sipUsername
+      ),
+      blfs: await blfEntries(deps.db, await deviceBlfKeys(deps.db, device.id))
+    }))
+  );
+  for (const { remote, blfs } of panels) {
     if (remote === undefined) {
       continue;
     }
-    // eslint-disable-next-line no-await-in-loop -- the Ringotel RPC has no batch update; sequential pushes are the plain reading of the API
-    const keys = await deviceBlfKeys(deps.db, device.id);
-    // eslint-disable-next-line no-await-in-loop -- as above
-    const blfs = await blfEntries(deps.db, keys);
-    // eslint-disable-next-line no-await-in-loop -- as above
+    // eslint-disable-next-line no-await-in-loop -- one Ringotel request at a time: no roster-sized burst against the provider's API
     await deps.client.call('updateUser', {
       orgid: orgId,
       id: remote.id,

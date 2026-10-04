@@ -420,12 +420,13 @@ describe('settings', () => {
     const db = await makeTestDb();
     await seedSettings(db);
 
-    for (const timezone of ['Mars/Olympus', '+01:00', '']) {
-      // eslint-disable-next-line no-await-in-loop -- each refusal is asserted in turn
-      await expect(
-        runOperation(db, 'settings.update', { timezone }, asRun())
-      ).rejects.toMatchObject({ status: 422 });
-    }
+    await Promise.all(
+      ['Mars/Olympus', '+01:00', ''].map(timezone =>
+        expect(
+          runOperation(db, 'settings.update', { timezone }, asRun())
+        ).rejects.toMatchObject({ status: 422 })
+      )
+    );
     await expect(
       runOperation(
         db,
@@ -443,12 +444,13 @@ describe('settings', () => {
     const db = await makeTestDb();
     await seedSettings(db);
 
-    for (const backupCron of ['bogus', '61 * * * *', '0 0 30 2 *']) {
-      // eslint-disable-next-line no-await-in-loop -- each refusal is asserted in turn
-      await expect(
-        runOperation(db, 'settings.update', { backupCron }, asRun())
-      ).rejects.toMatchObject({ status: 422 });
-    }
+    await Promise.all(
+      ['bogus', '61 * * * *', '0 0 30 2 *'].map(backupCron =>
+        expect(
+          runOperation(db, 'settings.update', { backupCron }, asRun())
+        ).rejects.toMatchObject({ status: 422 })
+      )
+    );
     await expect(
       runOperation(
         db,

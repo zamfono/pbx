@@ -199,10 +199,12 @@ export async function insertForwardTarget(
   return id;
 }
 
-/** Deletes a `forward_targets` row an operation no longer owns, e.g. one it is about to replace. */
-export async function deleteForwardTarget(
+/** Deletes the `forward_targets` rows an operation no longer owns, e.g. ones it is about to replace. */
+export async function deleteForwardTargets(
   db: Transaction<DB>,
-  id: string
+  ids: string[]
 ): Promise<void> {
-  await db.deleteFrom('forwardTargets').where('id', '=', id).execute();
+  if (ids.length > 0) {
+    await db.deleteFrom('forwardTargets').where('id', 'in', ids).execute();
+  }
 }

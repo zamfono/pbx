@@ -491,22 +491,23 @@ describe('runPurge', () => {
         createdAt: now
       })
       .execute();
-    for (const [id, ageDays] of [
-      ['old-run', 31],
-      ['young-run', 29]
-    ] as const) {
-      // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; inserts serialize
-      await db
-        .insertInto('backupRuns')
-        .values({
+    await db
+      .insertInto('backupRuns')
+      .values(
+        (
+          [
+            ['old-run', 31],
+            ['young-run', 29]
+          ] as const
+        ).map(([id, ageDays]) => ({
           id,
           targetId: 'target-1',
           status: 'ok',
           startedAt: daysAfter(now, -ageDays),
           finishedAt: daysAfter(now, -ageDays)
-        })
-        .execute();
-    }
+        }))
+      )
+      .execute();
 
     await runPurge(db, now);
 
@@ -529,22 +530,22 @@ describe('runPurge', () => {
       // Still holds a live refresh token, whatever its last login.
       { clientId: 'live', tokenExpiresInDays: 20 }
     ];
-    for (const client of clients) {
-      // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; inserts serialize
-      await db
-        .insertInto('oauthClients')
-        .values({
+    await db
+      .insertInto('oauthClients')
+      .values(
+        clients.map(client => ({
           clientId: client.clientId,
           name: client.clientId,
           kind: 'cimd',
           createdAt: daysAfter(now, -120),
           lastLoginAt: daysAfter(now, -120)
-        })
-        .execute();
-      // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; inserts serialize
-      await db
-        .insertInto('tokens')
-        .values({
+        }))
+      )
+      .execute();
+    await db
+      .insertInto('tokens')
+      .values(
+        clients.map(client => ({
           tokenHash: `token-${client.clientId}`,
           userId,
           kind: 'refresh',
@@ -552,9 +553,9 @@ describe('runPurge', () => {
           sessionId: client.clientId,
           createdAt: daysAfter(now, client.tokenExpiresInDays - 30),
           expiresAt: daysAfter(now, client.tokenExpiresInDays)
-        })
-        .execute();
-    }
+        }))
+      )
+      .execute();
 
     await runPurge(db, now);
 

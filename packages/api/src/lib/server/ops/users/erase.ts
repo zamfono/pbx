@@ -86,14 +86,15 @@ export const erase = defineOperation({
       .where('entityKind', '=', 'user')
       .where('entityId', '=', input.id)
       .execute();
-    for (const entry of entries) {
-      // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; scrubs must serialize
-      await ctx.db
-        .updateTable('auditLog')
-        .set({ changesJson: scrubChanges(entry.changesJson), undoable: 0 })
-        .where('id', '=', entry.id)
-        .execute();
-    }
+    await Promise.all(
+      entries.map(entry =>
+        ctx.db
+          .updateTable('auditLog')
+          .set({ changesJson: scrubChanges(entry.changesJson), undoable: 0 })
+          .where('id', '=', entry.id)
+          .execute()
+      )
+    );
     return { id: input.id };
   }
 });

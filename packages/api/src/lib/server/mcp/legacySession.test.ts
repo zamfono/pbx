@@ -33,17 +33,16 @@ describe('legacy initialize, version negotiation', () => {
     expect(body.result?.protocolVersion).toBe(LEGACY);
   });
 
-  it('answers any other version with the latest legacy one it supports', async () => {
-    const deps = await seededDeps();
-    for (const requested of ['2025-06-18', '2024-11-05', CURRENT, 'draft']) {
-      // eslint-disable-next-line no-await-in-loop -- each version is its own handshake
+  it.each(['2025-06-18', '2024-11-05', CURRENT, 'draft'])(
+    'answers any other version, here %s, with the latest legacy one it supports',
+    async requested => {
       const body = await rpc(
-        deps,
+        await seededDeps(),
         initialize({ protocolVersion: requested, capabilities: {} })
       );
       expect(body.result?.protocolVersion).toBe(LEGACY);
     }
-  });
+  );
 
   it('answers an initialize without a protocolVersion with -32602 and no session', async () => {
     const response = await handleMcpRequest(

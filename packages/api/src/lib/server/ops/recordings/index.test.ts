@@ -123,10 +123,9 @@ describe('recordings', () => {
     }
 
     await expect(access(filePath)).rejects.toThrow();
-    for (const rawPath of rawPaths) {
-      // eslint-disable-next-line no-await-in-loop -- two files, checked one at a time
-      await expect(access(rawPath)).rejects.toThrow();
-    }
+    await Promise.all(
+      rawPaths.map(rawPath => expect(access(rawPath)).rejects.toThrow())
+    );
     const row = await db
       .selectFrom('recordings')
       .selectAll()

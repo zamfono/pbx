@@ -9,7 +9,7 @@ import {
   type WireColumns
 } from '../audit.js';
 import {
-  deleteForwardTarget,
+  deleteForwardTargets,
   insertForwardTarget,
   rowToTarget
 } from '../forwardTargetSpec.js';
@@ -114,7 +114,7 @@ export const updateMenu = defineOperation({
       .where('id', '=', input.id)
       .execute();
     if (input.fallbackTarget) {
-      await deleteForwardTarget(ctx.db, before.fallbackTargetId);
+      await deleteForwardTargets(ctx.db, [before.fallbackTargetId]);
     }
     const row = await ctx.db
       .selectFrom('menus')

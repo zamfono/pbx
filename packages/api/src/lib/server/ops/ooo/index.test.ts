@@ -59,22 +59,22 @@ describe('ooo', () => {
   it('list pages through a scope with limit and cursor, answering { items, nextCursor }', async () => {
     const db = await makeTestDb();
     const starts = ['2026-08-01', '2026-08-10', '2026-08-20'];
-    const ids: string[] = [];
-    for (const day of starts) {
-      // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; creates must serialize
-      const created = (await runOperation(
-        db,
-        'ooo.create',
-        {
-          scope: { kind: 'tenant' },
-          startsAt: `${day}T00:00:00Z`,
-          expiresAt: `${day}T12:00:00Z`,
-          target: { kind: 'external', external: '+491234567' }
-        },
-        asRun()
-      )) as OooOutput;
-      ids.push(created.id);
-    }
+    const ids = await Promise.all(
+      starts.map(async day => {
+        const created = (await runOperation(
+          db,
+          'ooo.create',
+          {
+            scope: { kind: 'tenant' },
+            startsAt: `${day}T00:00:00Z`,
+            expiresAt: `${day}T12:00:00Z`,
+            target: { kind: 'external', external: '+491234567' }
+          },
+          asRun()
+        )) as OooOutput;
+        return created.id;
+      })
+    );
     type Page = { items: OooOutput[]; nextCursor: string | null };
     const first = (await runOperation(
       db,

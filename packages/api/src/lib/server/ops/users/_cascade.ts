@@ -61,7 +61,7 @@ async function releaseProvisionedDevices(
     return;
   }
   for (const device of provisioned) {
-    // eslint-disable-next-line no-await-in-loop -- the Ringotel RPC has no batch delete; sequential pushes are the plain reading of the API
+    // eslint-disable-next-line no-await-in-loop -- one Ringotel request at a time: no roster-sized burst against the provider's API
     await provider.onDeviceDeleted(device);
   }
 }

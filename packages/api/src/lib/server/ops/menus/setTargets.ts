@@ -2,7 +2,7 @@ import { HTTP_NOT_FOUND, HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
 import { recordChange } from '../audit.js';
 import {
-  deleteForwardTarget,
+  deleteForwardTargets,
   insertForwardTarget,
   rowToTarget
 } from '../forwardTargetSpec.js';
@@ -53,13 +53,13 @@ export const setMenuTargets = defineOperation({
       .deleteFrom('menuTargets')
       .where('menuId', '=', input.id)
       .execute();
-    for (const row of existing) {
-      // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; deletes must serialize
-      await deleteForwardTarget(ctx.db, row.targetId);
-    }
+    await deleteForwardTargets(
+      ctx.db,
+      existing.map(row => row.targetId)
+    );
     const rows: { menuId: string; digits: string; targetId: string }[] = [];
     for (const option of input.targets) {
-      // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; inserts must serialize
+      // eslint-disable-next-line no-await-in-loop -- in input order, so the first invalid target is the one refused and warnings follow the input
       const targetId = await insertForwardTarget(ctx, option.target);
       rows.push({ menuId: input.id, digits: option.digits, targetId });
     }

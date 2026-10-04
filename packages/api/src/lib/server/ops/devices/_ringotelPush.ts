@@ -187,7 +187,7 @@ async function pushEveryDevice(db: Db): Promise<void> {
     return;
   }
   for (const device of await liveRingotelDevices(db)) {
-    // eslint-disable-next-line no-await-in-loop -- the Ringotel RPC has no batch update; sequential pushes are the plain reading of the API
+    // eslint-disable-next-line no-await-in-loop -- one Ringotel request at a time: no roster-sized burst against the provider's API
     await pushStoredCredentials(db, device);
   }
 }

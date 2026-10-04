@@ -6,7 +6,7 @@ import {
 
 import { recordChange } from '../audit.js';
 import {
-  deleteForwardTarget,
+  deleteForwardTargets,
   insertForwardTarget
 } from '../forwardTargetSpec.js';
 import { propagate } from '../propagate.js';
@@ -44,17 +44,17 @@ export const setRingGroupForwarding = defineOperation({
       .deleteFrom('ringGroupForwardRules')
       .where('groupId', '=', input.id)
       .execute();
-    for (const rule of existing) {
-      // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; deletes must serialize
-      await deleteForwardTarget(ctx.db, rule.targetId);
-    }
+    await deleteForwardTargets(
+      ctx.db,
+      existing.map(rule => rule.targetId)
+    );
     const rows: {
       groupId: string;
       condition: RingGroupForwardCondition;
       targetId: string;
     }[] = [];
     for (const rule of input.rules) {
-      // eslint-disable-next-line no-await-in-loop -- sqlite has one writer; inserts must serialize
+      // eslint-disable-next-line no-await-in-loop -- in input order, so the first invalid target is the one refused and warnings follow the input
       const targetId = await insertForwardTarget(ctx, rule.target);
       rows.push({ groupId: input.id, condition: rule.condition, targetId });
     }

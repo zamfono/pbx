@@ -69,13 +69,10 @@ async function seedTenantSchedule(
       createdAt: nowIso()
     })
     .execute();
-  for (const interval of intervals) {
-    // eslint-disable-next-line no-await-in-loop -- a handful of fixture rows, inserted in order
-    await db
-      .insertInto('openingHoursIntervals')
-      .values({ openingHoursId: id, ...interval })
-      .execute();
-  }
+  await db
+    .insertInto('openingHoursIntervals')
+    .values(intervals.map(interval => ({ openingHoursId: id, ...interval })))
+    .execute();
 }
 
 const MON_FRI_9_TO_5 = [1, 2, 3, 4, 5].map(weekday => ({

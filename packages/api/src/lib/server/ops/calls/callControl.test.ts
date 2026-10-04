@@ -119,18 +119,21 @@ describe('call control over the API (§10.3 "Live calls")', () => {
   it('refuses another user with 403, and lets an admin control any call', async () => {
     const requests = coreWith(CALLS);
     const stranger = user('stranger');
-    for (const [name, input] of [
-      ['calls.consult', { id: 'answered', target: '102' }],
-      ['calls.addParty', { id: 'answered', target: '102' }],
-      ['calls.hold', { id: 'answered' }],
-      ['calls.resume', { id: 'answered' }],
-      ['calls.transfer', { id: 'answered', toCallId: 'consultation' }]
-    ] as const) {
-      // eslint-disable-next-line no-await-in-loop -- one refusal at a time, each its own case
-      await expect(run(stranger, name, input)).rejects.toMatchObject({
-        status: 403
-      });
-    }
+    await Promise.all(
+      (
+        [
+          ['calls.consult', { id: 'answered', target: '102' }],
+          ['calls.addParty', { id: 'answered', target: '102' }],
+          ['calls.hold', { id: 'answered' }],
+          ['calls.resume', { id: 'answered' }],
+          ['calls.transfer', { id: 'answered', toCallId: 'consultation' }]
+        ] as const
+      ).map(([name, input]) =>
+        expect(run(stranger, name, input)).rejects.toMatchObject({
+          status: 403
+        })
+      )
+    );
     expect(requests).toEqual([]);
     await run(admin, 'calls.hold', { id: 'other' });
     expect(requests).toEqual(['hold other {"actorUserId":"admin"}']);
@@ -153,18 +156,18 @@ describe('call control over the API (§10.3 "Live calls")', () => {
     ]);
   });
 
-  it('takes either a target or a consultation to transfer to, not both or neither', async () => {
-    coreWith(CALLS);
-    for (const input of [
-      { id: 'answered' },
-      { id: 'answered', target: '102', toCallId: 'consultation' }
-    ]) {
-      // eslint-disable-next-line no-await-in-loop -- one refusal at a time, each its own case
+  it.each([
+    { id: 'answered' },
+    { id: 'answered', target: '102', toCallId: 'consultation' }
+  ])(
+    'takes either a target or a consultation to transfer to, not both or neither: %o',
+    async input => {
+      coreWith(CALLS);
       await expect(
         run(user('answerer'), 'calls.transfer', input)
       ).rejects.toMatchObject({ status: 422 });
     }
-  });
+  );
 
   // An id that is not one `core` could hold would otherwise reach its URL path, where a dot
   // segment is normalised away and `core` answers a 404 with no reason, which is no refusal.
