@@ -167,6 +167,9 @@ function spawnUpdate(
 export async function createRunner(options: RunnerOptions): Promise<Runner> {
   const now = options.now ?? isoNow;
   let state = await loadState(options.stackDir, now);
+  // Whether `state` is the updater's own run, still running; any other state, a host run's
+  // included, is read again from `.update/state.json`, where `update.sh` writes its end.
+  let ownRun = false;
   const logFile = path.join(options.stackDir, '.update', 'update.log');
   const script = path.join(options.project.workingDir, 'update.sh');
 
@@ -189,18 +192,17 @@ export async function createRunner(options: RunnerOptions): Promise<Runner> {
           })
     };
     await persist(options.stackDir, state);
+    ownRun = false;
   }
 
   return {
-    current: () =>
-      state.state === 'running'
-        ? state
-        : readState(options.stackDir, state, now()),
+    current: () => (ownRun ? state : readState(options.stackDir, state, now())),
     async start(from, to, requester) {
       const done = Promise.withResolvers<undefined>();
       const startedAt = now();
       const run = { from, to, ...requester };
       state = { state: 'running', ...run, startedAt };
+      ownRun = true;
       await persist(options.stackDir, state);
       const log = await open(logFile, 'w');
       const child = spawnUpdate(script, to, options, log.fd);

@@ -120,6 +120,34 @@ describe('createRunner', () => {
 
     expect(runner.current()).toEqual(hostRun);
   });
+
+  it('reports the end of a host run it started during', async () => {
+    const stackDir = await tempDir();
+    const file = path.join(stackDir, '.update', 'state.json');
+    const hostRun = {
+      state: 'running',
+      from: '0.2.0',
+      to: '0.2.1',
+      trigger: 'host',
+      startedAt: new Date().toISOString()
+    };
+    await mkdir(path.dirname(file));
+    await writeFile(file, `${JSON.stringify(hostRun, null, 2)}\n`);
+    // update.sh on the host recreates the updater while its run is still `running`.
+    const runner = await createRunner({
+      stackDir,
+      project: project(stackDir),
+      socketPath: '/s'
+    });
+    const ended = {
+      ...hostRun,
+      state: 'succeeded',
+      finishedAt: new Date().toISOString()
+    };
+    await writeFile(file, `${JSON.stringify(ended, null, 2)}\n`);
+
+    expect(runner.current()).toEqual(ended);
+  });
 });
 
 describe('loadState', () => {
