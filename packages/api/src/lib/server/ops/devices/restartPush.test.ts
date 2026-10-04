@@ -13,7 +13,7 @@ import {
 import { makeTestDb } from '#testing/testDb.js';
 
 import { runOperation, type RunInput } from '../runner.js';
-import { oweDevicePushesAtStart } from './_ringotelPush.js';
+import { oweDevicePushesAtStart } from './_restartPush.js';
 
 import '../index.js';
 

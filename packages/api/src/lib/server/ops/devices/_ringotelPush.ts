@@ -3,27 +3,17 @@ import pino from 'pino';
 import type { Db } from '@zamfono/shared';
 
 import { errorMessage } from '#lib/server/errors.js';
-import { isPropagationPending } from '#lib/server/propagationPending.js';
 import {
   activeRingotelProvider,
   type DeviceRow,
   type ProvisioningProvider,
   type PushReceipt
 } from '#lib/server/provisioning/index.js';
-import {
-  liveRingotelDevices,
-  storedCredentials
-} from '#lib/server/provisioning/ringotelUser.js';
 import { serialQueue } from '#lib/server/serialQueue.js';
 
-import { afterPropagation, oweRestartPush } from '../afterCommit.js';
+import { afterPropagation } from '../afterCommit.js';
 import type { AuditCaller } from '../audit.js';
-import {
-  callerOf,
-  JOB_CALLER,
-  outcomeChanges,
-  recordOutcome
-} from '../outcomeLog.js';
+import { callerOf, outcomeChanges, recordOutcome } from '../outcomeLog.js';
 import type { Context } from '../types.js';
 
 const log = pino({ name: 'ringotel' });
@@ -44,7 +34,7 @@ type PushTarget = {
   failure: { what: string; retry: string };
 };
 
-type Push = PushTarget & {
+export type Push = PushTarget & {
   /** Sends `device`, as stored when the push runs, through `provider`. */
   push: (
     provider: ProvisioningProvider,
@@ -157,6 +147,18 @@ function pushInTurn(
   });
 }
 
+/** Runs `push` in its turn now, as `caller`, and returns its warning (`pushInTurn`). */
+export function runPush(
+  db: Db,
+  caller: AuditCaller,
+  push: Push
+): Promise<string | null> {
+  return pushInTurn(db, caller, {
+    ...push,
+    attempt: (later, device) => attempt(later, push, device)
+  });
+}
+
 /**
  * Pushes a `ringotel` device's change to Ringotel once its write has committed and Asterisk holds
  * it (§10.4): an activated Ringotel user registers against the PBX with its SIP credentials
@@ -169,12 +171,7 @@ function pushInTurn(
  */
 export function pushToRingotel(ctx: Context, push: Push): void {
   const caller = callerOf(ctx);
-  afterPropagation(ctx, db =>
-    pushInTurn(db, caller, {
-      ...push,
-      attempt: (later, device) => attempt(later, push, device)
-    })
-  );
+  afterPropagation(ctx, db => runPush(db, caller, push));
 }
 
 /** `provision`'s answer as the push's outcome, never throwing. */
@@ -212,55 +209,4 @@ export function pushExistingDevice(
       attempt: (later, device) => provisioned(later, device, push.provision)
     })
   );
-}
-
-/** One device's stored credentials, pushed again as the job (`pushEveryDevice`). */
-async function pushStoredCredentials(db: Db, device: DeviceRow): Promise<void> {
-  const push: Push = {
-    trigger: 'api.start',
-    deviceId: device.id,
-    push: (provider, stored) =>
-      provider.onCredentialsRotated(stored, storedCredentials(stored)),
-    failure: {
-      what: `device ${device.id}'s credentials are stored`,
-      retry: 'devices.rotate on the device pushes them again'
-    }
-  };
-  const warning = await pushInTurn(db, JOB_CALLER, {
-    ...push,
-    attempt: (later, stored) => attempt(later, push, stored)
-  });
-  if (warning !== null) {
-    log.error(
-      { deviceId: device.id, warning },
-      'ringotel: a device push failed'
-    );
-  }
-}
-
-/**
- * Pushes every live `ringotel` device's stored credentials (`onCredentialsRotated`, which creates
- * a Ringotel user that is missing), as the job, with trigger `api.start`: what the pushes the
- * `api` before this one held for an owed propagation were to send (§3.1, §10.4). Every outcome is
- * a `ringotel.push` row; a refusal is logged. A stack without Ringotel pushes nothing.
- */
-async function pushEveryDevice(db: Db): Promise<void> {
-  if ((await activeRingotelProvider(db)) === null) {
-    return;
-  }
-  for (const device of await liveRingotelDevices(db)) {
-    // eslint-disable-next-line no-await-in-loop -- one Ringotel request at a time: no roster-sized burst against the provider's API
-    await pushStoredCredentials(db, device);
-  }
-}
-
-/**
- * At `api`'s start, while a propagation is owed: the device pushes that waited for it were held
- * in memory and went with the `api` before this one, so the first propagation that succeeds
- * pushes every device again (`pushEveryDevice`).
- */
-export async function oweDevicePushesAtStart(db: Db): Promise<void> {
-  if (await isPropagationPending(db)) {
-    oweRestartPush(pushEveryDevice);
-  }
 }

@@ -24,7 +24,7 @@ import { connectCoreEvents } from '../coreEvents.js';
 import { publishEvent } from '../eventSink.js';
 import { updateMailSender } from '../mail/owners.js';
 import { onceConfigPropagated } from '../ops/afterCommit.js';
-import { oweDevicePushesAtStart } from '../ops/devices/_ringotelPush.js';
+import { oweDevicePushesAtStart } from '../ops/devices/_restartPush.js';
 import { retryPendingRoster } from '../ops/roster.js';
 import { retryPendingProfile } from '../ops/settings/profilePush.js';
 import { updaterClient } from '../ops/system/_updater.js';
