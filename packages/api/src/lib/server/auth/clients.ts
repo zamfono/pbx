@@ -1,5 +1,8 @@
+import { z } from 'zod';
+
 import {
   isRecord,
+  MS_PER_DAY,
   MS_PER_SECOND,
   type Db,
   type OAuthClientKind
@@ -16,6 +19,10 @@ import { redirectUriAcceptable } from './redirectUris.js';
 // is fetched every time.
 const CACHE_CONTROL_MAX_AGE = /max-age=(?<seconds>\d+)/u;
 const CACHE_CONTROL_NO_CACHE = /\bno-(?:store|cache)\b/u;
+// Anyone can name any URL at `/oauth/authorize`, and a document picks its own max-age: the cache
+// holds this many documents, for at most a day each.
+const CIMD_CACHE_MAX_ENTRIES = 1000;
+const CIMD_CACHE_MAX_TTL_MS = MS_PER_DAY;
 // Anyone can make the server fetch a metadata document, unauthenticated: the fetch is bounded.
 const CIMD_FETCH_TIMEOUT_MS = 5000;
 const CIMD_MAX_BYTES = 65_536;
@@ -26,6 +33,36 @@ const HTTPS_SCHEME = 'https://';
 // specification requires it only of `/oauth/register` (§5.2); a metadata document may omit it,
 // as claude.ai's does.
 const DEFAULT_APPLICATION_TYPE = 'web';
+// RFC 7591 dynamic client registration limits (§5.2), which a metadata document meets too.
+const MAX_CLIENT_NAME_LENGTH = 100;
+const MAX_REDIRECT_URIS = 5;
+const MAX_REDIRECT_URI_LENGTH = 512;
+
+/** The client metadata both registration mechanisms carry (§5.2), in its wire spelling. */
+export const ClientMetadataSchema = z.object({
+  client_name: z.string().min(1).max(MAX_CLIENT_NAME_LENGTH),
+  redirect_uris: z
+    .array(z.string().max(MAX_REDIRECT_URI_LENGTH))
+    .min(1)
+    .max(MAX_REDIRECT_URIS),
+  application_type: z.enum(['native', 'web'])
+});
+
+/** Every redirect URI of `metadata` may be registered for its `application_type` (§5.2). */
+export function redirectUrisAcceptable(
+  metadata: z.infer<typeof ClientMetadataSchema>
+): boolean {
+  return metadata.redirect_uris.every(uri =>
+    redirectUriAcceptable(uri, metadata.application_type)
+  );
+}
+
+const CimdDocumentSchema = ClientMetadataSchema.extend({
+  client_id: z.string(),
+  application_type: ClientMetadataSchema.shape.application_type.default(
+    DEFAULT_APPLICATION_TYPE
+  )
+}).refine(redirectUrisAcceptable);
 
 /** An OAuth client, however it registered (§5.2). */
 export type ClientMeta = {
@@ -36,7 +73,10 @@ export type ClientMeta = {
   applicationType: 'native' | 'web';
 };
 
-const cimdCache = new TtlMap<string, ClientMeta>();
+const cimdCache = new TtlMap<string, ClientMeta>(
+  () => Date.now(),
+  CIMD_CACHE_MAX_ENTRIES
+);
 
 /** Encodes `meta` as a `client_id`: the JSON metadata, secretbox-encrypted and base64url'd. */
 export function encodeMetadataClientId(
@@ -84,38 +124,25 @@ function cacheTtlMs(headers: Headers): number | null {
   }
   const match = CACHE_CONTROL_MAX_AGE.exec(cacheControl);
   const seconds = match?.groups?.seconds;
-  return seconds === undefined ? null : Number(seconds) * MS_PER_SECOND;
+  return seconds === undefined
+    ? null
+    : Math.min(Number(seconds) * MS_PER_SECOND, CIMD_CACHE_MAX_TTL_MS);
 }
 
 function parseCimdDocument(
   clientIdUrl: string,
   body: unknown
 ): ClientMeta | null {
-  if (!isRecord(body)) {
-    return null;
-  }
-  const {
-    client_id: docClientId,
-    client_name: name,
-    redirect_uris: redirectUris,
-    application_type: applicationType = DEFAULT_APPLICATION_TYPE
-  } = body;
-  if (
-    docClientId !== clientIdUrl ||
-    typeof name !== 'string' ||
-    (applicationType !== 'native' && applicationType !== 'web') ||
-    !Array.isArray(redirectUris) ||
-    !redirectUris.every(uri => typeof uri === 'string') ||
-    !redirectUris.every(uri => redirectUriAcceptable(uri, applicationType))
-  ) {
+  const parsed = CimdDocumentSchema.safeParse(body);
+  if (!parsed.success || parsed.data.client_id !== clientIdUrl) {
     return null;
   }
   return {
     clientId: clientIdUrl,
     kind: 'cimd',
-    name,
-    redirectUris,
-    applicationType
+    name: parsed.data.client_name,
+    redirectUris: parsed.data.redirect_uris,
+    applicationType: parsed.data.application_type
   };
 }
 

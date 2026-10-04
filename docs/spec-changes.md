@@ -6,9 +6,12 @@ Every change made to [the specification](spec.md) during implementation, newest 
 *Why:* the product owner asked for it: "Per mailbox limit, but no arbitrary upper limit. Null means “no limit”. 100 as default".
 **2026-10-04 · §3.1 Write ownership.** A read-only transaction (`core`'s config snapshot) begins `DEFERRED`; only writing transactions begin `IMMEDIATE`.
 *Why:* an `IMMEDIATE` read took the write lock for nothing, so a config reload held off `api`'s and `core`'s writers.
+**2026-10-04 · §5.2 Client registration.** A Client ID Metadata Document is cached for at most 24 hours, at most 1000 at a time with the oldest dropped first, and meets the limits `/oauth/register` applies (`client_name` at most 100 characters, at most 5 redirect URIs of at most 512 characters each).
+*Why:* anyone can make the server fetch any URL at `/oauth/authorize`, and a document chose its own cache lifetime and size, so the cache could grow without bound.
 
 **2026-10-04 · §6.5 Target kinds.** A target's `host` (sftp, ftp, ftps) is an FQDN or an IPv4 address, a webdav `url` an `http` or `https` URL, and an sftp username cannot begin with `-` or contain whitespace, a quote or a backslash; anything else is refused with 422.
 *Why:* the sftp host and username reach `ssh` as arguments through restic's `sftp.command`, which restic splits at whitespace itself, so an admin could add `-oProxyCommand=…` and run a command in `api`.
+
 **2026-10-04 · §6.5 Backups.** Every snapshot carries the fixed host `zamfono`.
 *Why:* restic records the container's hostname and `forget` groups by host, so each recreated `api` container started a group of its own whose snapshots were never forgotten.
 

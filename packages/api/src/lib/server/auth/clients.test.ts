@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { keySpec } from '#testing/fixtures.js';
 
@@ -130,6 +130,79 @@ describe('fetchCimd', () => {
     await fetchCimd(url, fetchImpl);
     await fetchCimd(url, fetchImpl);
     expect(fetches).toBe(2);
+  });
+
+  // Anyone can name any URL as `client_id` at `/oauth/authorize`, and the document chooses its
+  // own max-age: an unbounded cache lets one client fill api's memory with distinct documents.
+  it('keeps a bounded number of documents cached, whatever max-age they ask for', async () => {
+    const documents = 20_000;
+    const urlOf = (index: number): string =>
+      `https://flood.example/${index}.json`;
+    const fetched = new Set<string>();
+    const fetchImpl = ((input: string) => {
+      fetched.add(input);
+      return Promise.resolve(
+        new Response(JSON.stringify(cimdDocument(input)), {
+          headers: { 'cache-control': 'max-age=999999999' }
+        })
+      );
+    }) as typeof fetch;
+    for (let index = 0; index < documents; index += 1) {
+      // eslint-disable-next-line no-await-in-loop -- one document after another, as a flood of page loads would
+      await fetchCimd(urlOf(index), fetchImpl);
+    }
+    fetched.clear();
+    await fetchCimd(urlOf(0), fetchImpl);
+    expect(fetched.has(urlOf(0))).toBe(true);
+  });
+
+  it('caches a document for at most a day, whatever max-age it asks for', async () => {
+    const url = 'https://forever.example/metadata.json';
+    let fetches = 0;
+    const fetchImpl = (() => {
+      fetches += 1;
+      return Promise.resolve(
+        new Response(JSON.stringify(cimdDocument(url)), {
+          headers: { 'cache-control': 'max-age=999999999' }
+        })
+      );
+    }) as typeof fetch;
+    vi.useFakeTimers();
+    try {
+      await fetchCimd(url, fetchImpl);
+      vi.advanceTimersByTime(24 * 60 * 60 * 1000);
+      await fetchCimd(url, fetchImpl);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(fetches).toBe(2);
+  });
+
+  // §5.2: a metadata document meets the limits `/oauth/register` applies.
+  it.each([
+    ['a client_name over 100 characters', { client_name: 'x'.repeat(101) }],
+    ['an empty client_name', { client_name: '' }],
+    [
+      'more than 5 redirect URIs',
+      {
+        redirect_uris: Array.from(
+          { length: 6 },
+          (_entry, index) => `https://client.example/callback/${index}`
+        )
+      }
+    ],
+    [
+      'a redirect URI over 512 characters',
+      { redirect_uris: [`https://client.example/${'x'.repeat(512)}`] }
+    ],
+    ['no redirect URI', { redirect_uris: [] }]
+  ])('refuses a document with %s', async (_case, override) => {
+    const url = 'https://limits.example/metadata.json';
+    const fetchImpl = (() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ ...cimdDocument(url), ...override }))
+      )) as typeof fetch;
+    expect(await fetchCimd(url, fetchImpl)).toBeNull();
   });
 
   it('refuses a document whose redirect URI is not an absolute http(s) URI', async () => {
