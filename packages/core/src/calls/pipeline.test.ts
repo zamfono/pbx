@@ -921,6 +921,17 @@ describe('Pipeline', () => {
     const newCall = delivered(ari, 'StasisStart', 'next-caller');
     fakeAri.emit(inboundEvent(defaultChannel({ id: 'next-caller' }), '100'));
     await newCall;
+    // The refusal hangs the new caller up over ARI; under load that request is still in flight
+    // well after the event was delivered.
+    await eventually(() => {
+      expect(pipeline.handling).toHaveLength(1);
+    });
+    expect(fakeAri.calls).toContainEqual(
+      expect.objectContaining({
+        method: 'DELETE',
+        path: 'channels/next-caller'
+      })
+    );
     fakeAri.emit({
       type: 'StasisStart',
       timestamp: nowIso(),
