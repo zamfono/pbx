@@ -83,6 +83,7 @@
 | `ringGroups.create` | `POST /ringGroups` | Creates a ring group and assigns it a tenant extension. | admin | no |
 | `ringGroups.delete` | `DELETE /ringGroups/{id}` | Soft-deletes a ring group. | admin | yes |
 | `ringGroups.get` | `GET /ringGroups/{id}` | Reads one live ring group by id. | admin | no |
+| `ringGroups.getForwarding` | `GET /ringGroups/{id}/forwarding` | Reads a ring group's 'unanswered' and 'unavailable' forwarding rules in the shape ringGroups.setForwarding takes. | admin | no |
 | `ringGroups.list` | `GET /ringGroups` | Lists the tenant's live ring groups. | admin | no |
 | `ringGroups.setForwarding` | `PUT /ringGroups/{id}/forwarding` | Replaces a ring group's 'unanswered' and 'unavailable' forwarding rules as a whole. | admin | no |
 | `ringGroups.update` | `PATCH /ringGroups/{id}` | Updates a ring group's configuration. | admin | no |

@@ -17,6 +17,9 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §10.3 Operations layer.** Product-owner decision (own scope): every operation a `user` may call declares its `scope`, whether what the input names is the user's own, and the runner checks it before confirmation and before `run` (403 when not). The `Operation`/`Context` sketch lists the fields every operation uses (`scope`, `audit`, `pureAction`, `entity`, `clientName`, `effects`); an operation with a three-part name lives in a subfolder (`backups/targets/create.ts`).
 *Why:* "Runner enforces (Recommended)": each operation re-implemented its own-scope check inside `run`, after the confirmation question, and one forgotten would have opened it to every user; the sketch left out fields that decide the audit row.
+**2026-10-04 · §5.2 Authentication pages, §10.3 Ring groups, Provisioning.** The set-password page is `/auth/setPassword`. Ring groups get `GET /ringGroups/{id}/forwarding`, the rules in the shape the `PUT` takes. A Ringotel `region` or `packageid` the account does not offer is refused with 422.
+*Why:* the page's path was the one kebab-case path on the wire; a ring group's forwarding could be written but not read back, so a client edited it blind, `sip` headers included; the Ringotel refusal is a value refusal like its siblings, which answer 422.
+
 **2026-10-04 · §9.4 Caller-ID, §10.3, §11.2 users, trunks, outbound_routes.** Product-owner decision (caller-ID spelling): the columns `callerid_did_id`, `callerid_format` and `callerid_header` become `caller_id_did_id`, `caller_id_format` and `caller_id_header`, so the wire spells every one `callerId…` (`callerIdDidId` on users and outbound routes, as trunks already had `callerIdFormat` and `callerIdHeader`).
 *Why:* "callerId… (Recommended)"; one word was spelled two ways on the wire, and a client guessing one spelling got 422 "unknown field" on the other resource.
 

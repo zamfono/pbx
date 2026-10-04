@@ -143,6 +143,7 @@ const STATIC_ROUTES: RouteTuple[] = [
   ...crud('dids', '/dids', NO_GET),
   ...crud('didBlocks', '/didBlocks', NO_GET),
   ...crud('ringGroups', '/ringGroups', ALL_CRUD),
+  ['GET', '/ringGroups/{id}/forwarding', 'ringGroups.getForwarding'],
   ['PUT', '/ringGroups/{id}/forwarding', 'ringGroups.setForwarding'],
   ...crud('userGroups', '/userGroups', ALL_CRUD),
   ...crud('audio', '/audio', ['list', 'update', 'delete']),

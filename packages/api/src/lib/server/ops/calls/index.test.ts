@@ -232,6 +232,17 @@ describe('calls', () => {
     ).rejects.toMatchObject({ status: 403 });
   });
 
+  it("calls.pickup takes the call onto the caller's own phones and names no other user", async () => {
+    const db = await makeTestDb();
+    const pickup = vi.fn(() => Promise.resolve());
+    vi.mocked(getCoreClient).mockReturnValue(stubCoreClient({ pickup }));
+    await runOperation(db, 'calls.pickup', { id: 'call-1' }, asRun());
+    expect(pickup.mock.calls).toEqual([['call-1', { actorUserId: 'owner' }]]);
+    await expect(
+      runOperation(db, 'calls.pickup', { id: 'call-1', userId: 'u1' }, asRun())
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
   it('calls.originate proxies to core and reports a missing device as 409', async () => {
     const db = await makeTestDb();
     vi.mocked(getCoreClient).mockReturnValue(

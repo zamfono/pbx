@@ -8,7 +8,7 @@ import { getDb } from '#lib/server/db.js';
 import type { PageServerLoad } from './$types.js';
 
 /**
- * `GET /auth/set-password?token=…`: the target of a setup or reset mail link (§5.2, §10.2
+ * `GET /auth/setPassword?token=…`: the target of a setup or reset mail link (§5.2, §10.2
  * "Mail"). A missing, expired or already-redeemed token sends the visitor straight to the plain
  * error page (§5.2 "Authentication pages": "an expired link"), rather than showing a form whose
  * submission can only fail; a live token is passed through to the page's `setPassword` form,

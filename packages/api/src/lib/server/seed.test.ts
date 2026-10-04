@@ -589,7 +589,7 @@ describe('seedIfEmpty', () => {
 
     expect(sentMail.messages).toHaveLength(1);
     const message = sentMail.messages[0] as { text: string };
-    expect(message.text).toContain('https://pbx.test/auth/set-password?token=');
+    expect(message.text).toContain('https://pbx.test/auth/setPassword?token=');
   });
 
   it('leaves the database empty for a retry when the setup mail fails to send', async () => {

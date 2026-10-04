@@ -160,6 +160,29 @@ describe('provisioning.ringotelSetup', () => {
     expect(entry.undoable).toBe(0);
   });
 
+  it.each([
+    { region: 'nowhere', packageid: 1 },
+    { region: '3', packageid: 999 }
+  ])(
+    'refuses a region or package the account does not offer with 422, creating nothing: %o',
+    async offer => {
+      const db = await makeTestDb();
+      await seedTenant(db);
+      const ringotel = installRingotelFake([]);
+
+      await expect(
+        runOperation(
+          db,
+          'provisioning.ringotelSetup',
+          { domain: 'testco', ...offer },
+          asRun()
+        )
+      ).rejects.toMatchObject({ status: 422 });
+
+      expect(ringotel.organizations).toHaveLength(0);
+    }
+  );
+
   it('refuses a second run with 409, creating no second organization', async () => {
     const db = await makeTestDb();
     await seedTenant(db);

@@ -77,7 +77,7 @@ async function tokenRevoked(raw: string): Promise<boolean> {
 
 function pageEvent(search: string): Parameters<typeof load>[0] {
   return {
-    url: new URL(`https://pbx.example.com/auth/set-password${search}`)
+    url: new URL(`https://pbx.example.com/auth/setPassword${search}`)
   } as unknown as Parameters<typeof load>[0];
 }
 
@@ -96,7 +96,7 @@ describe('the set-password form', () => {
       await redirectOf(submit({ token: raw, _password: PASSWORD }))
     ).toEqual({
       status: 303,
-      location: '/auth/set-password?done'
+      location: '/auth/setPassword?done'
     });
     const user = await getDb()
       .selectFrom('users')
@@ -149,7 +149,7 @@ describe('the set-password form', () => {
   });
 });
 
-describe('GET /auth/set-password (load)', () => {
+describe('GET /auth/setPassword (load)', () => {
   it('renders the confirmation the form redirects to, without a token', async () => {
     const data = await load(pageEvent('?done'));
     expect(data).toEqual({ token: null, done: true });

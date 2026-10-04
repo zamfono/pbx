@@ -117,7 +117,7 @@ describe('createCoreClient', () => {
           requestId: 'r1'
         }),
       () => client.transfer('c1', { target: '102', actorUserId: 'u1' }),
-      () => client.pickup('c1', { userId: 'u2', actorUserId: 'u2' }),
+      () => client.pickup('c1', { actorUserId: 'u2' }),
       () => client.hangup('c1', { actorUserId: 'u1' }),
       () => client.mwi('user:u1')
     ];
@@ -144,7 +144,7 @@ describe('createCoreClient', () => {
     const client = createCoreClient('http://core:3000', fetchFn);
 
     await client.transfer('c1', { target: '102', actorUserId: 'u1' });
-    await client.pickup('c1', { userId: 'u2', actorUserId: 'u2' });
+    await client.pickup('c1', { actorUserId: 'u2' });
     await client.hangup('c1', { actorUserId: 'u1' });
 
     expect(fetchFn).toHaveBeenNthCalledWith(

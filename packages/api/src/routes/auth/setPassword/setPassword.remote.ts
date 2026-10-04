@@ -12,7 +12,7 @@ import { getDb } from '#lib/server/db.js';
 
 // Where a set password lands: this same page's confirmation (`+page.server.ts`'s `done`), reached
 // by a redirect because the link it came from no longer redeems once it has been used.
-const PASSWORD_SET_LOCATION = '/auth/set-password?done';
+const PASSWORD_SET_LOCATION = '/auth/setPassword?done';
 
 /** The leading underscore keeps the password out of the re-rendered page: SvelteKit repopulates
  *  a non-enhanced submission's fields from the submitted values, and skips the underscored ones.

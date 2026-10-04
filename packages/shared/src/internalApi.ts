@@ -108,7 +108,7 @@ const targetRequestSchema = z.object({
 const actorRequestSchema = z.object({ actorUserId: z.string() });
 
 /** `POST /internal/calls/{id}/pickup` → 204. */
-export const pickupRequestSchema = forUserRequestSchema;
+export const pickupRequestSchema = actorRequestSchema;
 export type PickupRequest = z.infer<typeof pickupRequestSchema>;
 
 /** `POST /internal/calls/{id}/hangup` → 204. */

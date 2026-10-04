@@ -18,8 +18,8 @@
 #              /calls`);
 #   deposit    transfers the call into 101's own mailbox (`POST /calls/{id}/transfer` with
 #              `voicemail`) once 101 answered;
-#   pickup     picks the call up for the colleague (`POST /calls/{id}/pickup`) while it rings the
-#              group's member.
+#   pickup     the colleague picks the call up (`POST /calls/{id}/pickup`) with their own token,
+#              `$5`, while it rings the group's member.
 #
 # The live listing reports a call `up` once it is answered and bridged, so each action is asked
 # for once, as soon as the call is in the state it needs, and its status is recorded as it came.
@@ -27,14 +27,14 @@
 # HTTP statuses, then the call ids and the counts, `none` when the call never came; its log is
 # scenario state `api-control.log`.
 #
-# Usage: _api-control.sh <api-base> <token> <compose> <mode> [<user-id>]
+# Usage: _api-control.sh <api-base> <token> <compose> <mode> [<arg>]
 set -uo pipefail
 
 api_base=$1
 token=$2
 compose=$3
 mode=$4
-user_id=${5:-}
+arg=${5:-}
 # shellcheck source=_colleague.sh
 . "$(dirname "$0")/_colleague.sh"
 
@@ -101,7 +101,7 @@ case $mode in
       "$(bridge_channels)" > "$result"
     ;;
   decline)
-    call_id=$(await_live_call ringing '' "$user_id") || { echo none > "$result"; exit 1; }
+    call_id=$(await_live_call ringing '' "$arg") || { echo none > "$result"; exit 1; }
     { read -r code; read -r _; } < <(post "/$call_id/decline")
     printf '%s %s\n' "$code" "$call_id" > "$result"
     ;;
@@ -123,8 +123,7 @@ case $mode in
     ;;
   pickup)
     call_id=$(await_live_call ringing) || { echo none > "$result"; exit 1; }
-    { read -r code; read -r _; } < <(post "/$call_id/pickup" \
-      "{\"userId\":\"$(colleague_id colleague)\"}")
+    { read -r code; read -r _; } < <(token=$arg post "/$call_id/pickup")
     printf '%s %s\n' "$code" "$call_id" > "$result"
     ;;
 esac

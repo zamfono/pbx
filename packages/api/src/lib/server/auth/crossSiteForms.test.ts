@@ -26,7 +26,7 @@ const SUBMISSIONS = [
   },
   {
     name: 'a no-JavaScript set-password submission',
-    url: 'https://pbx.example.com/auth/set-password?token=t&/remote=abc/setPassword',
+    url: 'https://pbx.example.com/auth/setPassword?token=t&/remote=abc/setPassword',
     type: 'multipart/form-data; boundary=x'
   },
   {

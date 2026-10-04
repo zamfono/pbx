@@ -1,7 +1,7 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
-import { HTTP_BAD_REQUEST } from '@zamfono/shared';
+import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 
 import {
   createRingotelClient,
@@ -52,14 +52,14 @@ export async function assertOffered(
     items.map(item => `${item.id} (${item.name})`).join(', ');
   if (!offer.regions.some(item => item.id === region)) {
     throw new OpError(
-      HTTP_BAD_REQUEST,
+      HTTP_UNPROCESSABLE_CONTENT,
       `provisioning: Ringotel offers no region ${region}; choose one of ${list(offer.regions)}`
     );
   }
   const chosen = offer.packages.find(item => item.id === packageid);
   if (chosen === undefined) {
     throw new OpError(
-      HTTP_BAD_REQUEST,
+      HTTP_UNPROCESSABLE_CONTENT,
       `provisioning: Ringotel offers no package ${packageid}; choose one of ${list(offer.packages)}`
     );
   }

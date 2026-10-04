@@ -932,7 +932,7 @@ describe('users', () => {
     await seedSettings(db);
     const result = await createUser(db, 'Anna Huber', 'anna@x.test', '101');
     expect(result.setupLink).toMatch(
-      /^https:\/\/pbx\.test\/auth\/set-password\?token=/u
+      /^https:\/\/pbx\.test\/auth\/setPassword\?token=/u
     );
   });
   it('a name change re-pushes the roster with the stored display name (§10.4)', async () => {

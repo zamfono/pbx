@@ -2,7 +2,7 @@
  * `POST /internal/calls/{id}/pickup` (§10.1 "Pickup" over the API): rings the picker's own phones
  * as any user's ring does (`ownDevices.ts`), and the one that answers takes the call the request
  * names, the way `*8<ext>` takes the call it finds (`pickup.ts`). `pickup`'s own trace line on
- * that call names the actor.
+ * that call names the picker, the user who asked.
  */
 import { HTTP_CONFLICT, newId, type PickupRequest } from '@zamfono/shared';
 
@@ -46,7 +46,7 @@ async function takeOnAnswer(
   await pipeline.deps.ari.channels.hangup(channelId).catch(ignoreGone);
 }
 
-/** `req.userId` picks up `target`: 409 `notRinging` for a call that rings nobody, 409
+/** `req.actorUserId` picks up `target` on their own phones: 409 `notRinging` for a call that rings nobody, 409
  * `noRegisteredDevice` for a picker without a registered phone. */
 export async function pickupOnRequest(
   pipeline: Pipeline,
@@ -58,7 +58,8 @@ export async function pickupOnRequest(
   if (ext === null) {
     throw new ActionError(HTTP_CONFLICT, 'notRinging', 'call is not ringing');
   }
-  const devices = registeredDevices(pipeline, snapshot, req.userId);
+  const userId = req.actorUserId;
+  const devices = registeredDevices(pipeline, snapshot, userId);
   if (devices.length === 0) {
     throw new ActionError(
       HTTP_CONFLICT,
@@ -66,12 +67,7 @@ export async function pickupOnRequest(
       'no registered device'
     );
   }
-  target.log.event({
-    event: 'pickup',
-    userId: req.userId,
-    actorUserId: req.actorUserId,
-    ext
-  });
+  target.log.event({ event: 'pickup', userId, ext });
   // The ring's own race, on a call of its own that is never written: the answered phone becomes
   // `target`'s answering leg. Its trace (the devices rung, declined or never placed) lands in
   // `target`'s own, so a pickup that failed is explained in the history of the call it was for
@@ -97,10 +93,10 @@ export async function pickupOnRequest(
     // §7 level `sip`: each device's dialog rings for the picked-up call and, answered, becomes
     // its leg, so it is joined to that call's SIP log as a ring race's legs are.
     sipCall: target,
-    userId: req.userId,
+    userId,
     devices,
     callerId: target.from,
-    timeoutS: ringTimeoutOf(snapshot, req.userId),
+    timeoutS: ringTimeoutOf(snapshot, userId),
     language: snapshot.settings.language,
     peer: target.from,
     // A key of its own: the answered phone sets the picker in `target`'s call itself.
@@ -109,11 +105,11 @@ export async function pickupOnRequest(
   ring.outcome
     .then(async outcome => {
       if (outcome.kind === 'answered') {
-        await takeOnAnswer(pipeline, target, req.userId, outcome.channel.id);
+        await takeOnAnswer(pipeline, target, userId, outcome.channel.id);
       } else if (outcome.kind === 'unanswered') {
         target.log.event({
           event: 'pickup',
-          userId: req.userId,
+          userId,
           result: 'unanswered'
         });
       }

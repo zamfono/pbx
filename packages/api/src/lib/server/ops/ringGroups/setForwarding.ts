@@ -10,11 +10,11 @@ import { recordChange } from '../audit.js';
 import { targetSpecSchema } from '../forwardTargetSchema.js';
 import {
   deleteForwardTarget,
-  insertForwardTarget,
-  rowToTarget
+  insertForwardTarget
 } from '../forwardTargetSpec.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, OpError } from '../types.js';
+import { storedRingGroupForwardRules } from './_forwarding.js';
 import { liveRingGroup } from './_shared.js';
 
 const forwardingRuleSchema = z.object({
@@ -56,24 +56,8 @@ export const setRingGroupForwarding = defineOperation({
       }
       seenConditions.add(rule.condition);
     }
-    const existing = await ctx.db
-      .selectFrom('ringGroupForwardRules')
-      .select(['condition', 'targetId'])
-      .where('groupId', '=', input.id)
-      .execute();
-    // Resolved before the delete below, since `forwardTargets` rows are gone once it runs.
-    const existingRules = await Promise.all(
-      existing.map(async rule => ({
-        condition: rule.condition,
-        target: rowToTarget(
-          await ctx.db
-            .selectFrom('forwardTargets')
-            .selectAll()
-            .where('id', '=', rule.targetId)
-            .executeTakeFirstOrThrow()
-        )
-      }))
-    );
+    // Read before the delete below, since `forwardTargets` rows are gone once it runs.
+    const existing = await storedRingGroupForwardRules(ctx.db, input.id);
     await ctx.db
       .deleteFrom('ringGroupForwardRules')
       .where('groupId', '=', input.id)
@@ -99,7 +83,7 @@ export const setRingGroupForwarding = defineOperation({
     // one replace (§5.8).
     recordChange(ctx, {
       field: 'rules',
-      from: existingRules,
+      from: existing.map(({ condition, target }) => ({ condition, target })),
       to: input.rules
     });
     // Read by the routing pipeline (§3.1), and nothing in it reaches Asterisk's own

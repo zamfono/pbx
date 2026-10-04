@@ -78,6 +78,13 @@ why the specified behaviour changed; the commit history, how.
 
 ### Changed
 
+- Breaking, API surface: a ring group's forwarding rules can be read back with
+  `ringGroups.getForwarding` (`GET /ringGroups/{id}/forwarding`), in the shape
+  `ringGroups.setForwarding` takes, `sip` targets with their `headers`; the set-password page
+  moves to `/auth/setPassword`, and setup and reset mails link there (`/auth/set-password` is
+  gone); a Ringotel `region` or `packageid` the account does not offer is refused with 422
+  instead of 400; `calls.pickup` (`POST /calls/{id}/pickup`) always takes the call onto the
+  caller's own phones and refuses a `userId` as an unknown field.
 - Breaking: users and outbound routes spell their caller-ID number `callerIdDidId` on the wire,
   as trunks spell `callerIdFormat` and `callerIdHeader`; `calleridDidId` is refused as an
   unknown field. The database columns are `caller_id_did_id`, `caller_id_format` and

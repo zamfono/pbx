@@ -769,10 +769,9 @@ describe('CallActions', () => {
     await seedDevice(rig, pickerId, 'e102-a');
     await seedDevice(rig, pickerId, 'e102-b');
     await rig.devicesUp();
-    const actorUserId = newId();
     const ringing = ringingCall(calleeId);
 
-    await actions.pickup(ringing.id, { userId: pickerId, actorUserId });
+    await actions.pickup(ringing.id, { actorUserId: pickerId });
     const dialled = originates();
     expect(dialled.map(entry => entry.endpoint)).toEqual([
       'PJSIP/e102-a',
@@ -791,12 +790,12 @@ describe('CallActions', () => {
 
     const answered = await answeredCall(rig, calleeId);
     await expect(
-      actions.pickup(answered.id, { userId: pickerId, actorUserId })
+      actions.pickup(answered.id, { actorUserId: pickerId })
     ).rejects.toMatchObject({ status: HTTP_CONFLICT, reason: 'notRinging' });
     const nobodyId = await seedUser(db, { ext: '103' });
     const stillRinging = ringingCall(calleeId);
     await expect(
-      actions.pickup(stillRinging.id, { userId: nobodyId, actorUserId })
+      actions.pickup(stillRinging.id, { actorUserId: nobodyId })
     ).rejects.toMatchObject({
       status: HTTP_CONFLICT,
       reason: 'noRegisteredDevice'
@@ -809,7 +808,7 @@ describe('CallActions', () => {
       .where('id', '=', ringing.id)
       .executeTakeFirstOrThrow();
     expect(row.log).toContain(
-      `"event":"pickup","userId":"${pickerId}","actorUserId":"${actorUserId}","ext":"101"`
+      `"event":"pickup","userId":"${pickerId}","ext":"101"`
     );
   });
 
@@ -822,7 +821,7 @@ describe('CallActions', () => {
     const waiting = ringingCall(calleeId);
     const named = ringingCall(calleeId);
 
-    await actions.pickup(named.id, { userId: pickerId, actorUserId: pickerId });
+    await actions.pickup(named.id, { actorUserId: pickerId });
 
     const [picker] = originates();
     await eventually(() => {
@@ -845,10 +844,7 @@ describe('CallActions', () => {
     await rig.devicesUp();
     const ringing = ringingCall(calleeId);
 
-    await actions.pickup(ringing.id, {
-      userId: pickerId,
-      actorUserId: pickerId
-    });
+    await actions.pickup(ringing.id, { actorUserId: pickerId });
     const [picker] = originates();
     clearTimeout(pipeline.pendingRing.get(ringing.id)?.timer);
     pipeline.pendingRing.delete(ringing.id);
@@ -886,10 +882,7 @@ describe('CallActions', () => {
     const ringing = ringingCall(calleeId);
     const joinLeg = vi.spyOn(cdr, 'joinLeg');
 
-    await actions.pickup(ringing.id, {
-      userId: pickerId,
-      actorUserId: newId()
-    });
+    await actions.pickup(ringing.id, { actorUserId: pickerId });
 
     const rung = originates().map(entry => entry.channelId);
     expect(rung).toHaveLength(2);
@@ -910,10 +903,7 @@ describe('CallActions', () => {
     await rig.devicesUp();
     const ringing = ringingCall(calleeId);
 
-    await actions.pickup(ringing.id, {
-      userId: pickerId,
-      actorUserId: pickerId
-    });
+    await actions.pickup(ringing.id, { actorUserId: pickerId });
     // The ring's outcome settles in promise callbacks after the placement; let them run.
     await flush();
     clearTimeout(pipeline.pendingRing.get(ringing.id)?.timer);
@@ -1001,10 +991,7 @@ describe('CallActions', () => {
     await rig.devicesUp();
     const ringing = ringingCall(calleeId);
 
-    await actions.pickup(ringing.id, {
-      userId: pickerId,
-      actorUserId: pickerId
-    });
+    await actions.pickup(ringing.id, { actorUserId: pickerId });
     await eventually(() => {
       expect(hintStates('102').at(-1)).toBe('RINGING');
     });
