@@ -1,17 +1,11 @@
 import type { ExpressionBuilder, Selectable, Transaction } from 'kysely';
 import { z } from 'zod';
 
-import {
-  HTTP_FORBIDDEN,
-  type CallDirection,
-  type CallStatus,
-  type DB
-} from '@zamfono/shared';
+import { type CallDirection, type CallStatus, type DB } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { coreRefusal } from '#lib/server/coreHttp.js';
 
-import { assertSelfOrAdmin } from '../gates.js';
 import { OpError, type Context } from '../types.js';
 
 /** A `calls` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
@@ -138,39 +132,26 @@ export function isOwnCall(actorId: string, row: CallRow): boolean {
 }
 
 /**
- * Throws 403 for a `user` actor naming another user in `userId` (§10.3 "Click-to-dial"): a
- * `user` may act only for themselves, an admin for any user. Returns the effective user id.
+ * Whether the live call `callId` is `ctx.actor`'s own to act on (§10.3 "Live calls"): one they
+ * placed or have a leg up in, not one they only see (as its callee, or rung for it). A call absent
+ * from `core`'s live state is not, since a `user` has no standing over a call that either already
+ * ended or never existed.
  */
-export function resolveActingUserId(
-  ctx: Context,
-  userId: string | undefined
-): string {
-  const effective = userId ?? ctx.actor.id;
-  assertSelfOrAdmin(ctx.actor, effective, 'calls: may act only for yourself');
-  return effective;
-}
-
-/**
- * Throws 403 unless `ctx.actor` may end or transfer the live call `callId` (§10.3 "Live calls"):
- * an admin/owner any call, a `user` one they placed or have a leg up in, not one they only see
- * (as its callee, or rung for it). A call absent from `core`'s live state answers 403 too, since a
- * `user` has no standing over a call that either already ended or never existed.
- */
-export async function assertOwnLiveCall(
+export async function isOwnLiveCall(
   ctx: Context,
   callId: string
-): Promise<void> {
-  if (ctx.actor.role !== 'user') {
-    return;
-  }
+): Promise<boolean> {
   const state = await getCoreClient().state();
   const call = state.calls.find(candidate => candidate.callId === callId);
-  if (!call?.connectedUserIds.includes(ctx.actor.id)) {
-    throw new OpError(
-      HTTP_FORBIDDEN,
-      'calls: may act only on your own live call'
-    );
-  }
+  return call?.connectedUserIds.includes(ctx.actor.id) ?? false;
+}
+
+/** The `scope` of an action on the live call `id`: the caller's own live call alone. */
+export function ownLiveCall(
+  ctx: Context,
+  input: { id: string }
+): Promise<boolean> {
+  return isOwnLiveCall(ctx, input.id);
 }
 
 /**

@@ -6,8 +6,8 @@ import { recordChange } from '../audit.js';
 import { createTarget } from '../forwardTargets.js';
 import { propagate } from '../propagate.js';
 import {
-  assertOwnScopeOrAdmin,
   assertScopeExists,
+  ownScopeInput,
   scopeColumns,
   scopeInputSchema
 } from '../scope.js';
@@ -36,9 +36,9 @@ export const create = defineOperation<Input, OooRuleOut>({
     "Adds an out-of-office rule to a scope: while in effect, its calls go to the rule's target, ahead of opening hours",
   input: inputSchema,
   minRole: 'user',
+  scope: ownScopeInput,
   entity: (_input, output: OooRuleOut) => ({ kind: 'oooRule', id: output.id }),
   run: async (ctx, input) => {
-    assertOwnScopeOrAdmin(ctx.actor, input.scope);
     await assertScopeExists(ctx.db, input.scope);
     const active = input.active ?? true;
     const startsAt = normalizeIsoOrNull(input.startsAt) ?? null;

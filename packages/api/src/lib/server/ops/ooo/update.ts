@@ -5,11 +5,7 @@ import { assertMayHoldTarget, createTarget } from '../forwardTargets.js';
 import { resolveTarget } from '../forwardTargetSpec.js';
 import { orBefore } from '../patch.js';
 import { propagate } from '../propagate.js';
-import {
-  assertScopeExists,
-  assertVisibleScope,
-  scopeFromColumns
-} from '../scope.js';
+import { assertScopeExists, isOwnScope, scopeFromColumns } from '../scope.js';
 import { defineOperation } from '../types.js';
 import {
   assertExpiryAfterStart,
@@ -53,11 +49,12 @@ export const update = defineOperation<Input, OooRuleOut>({
     "Changes an out-of-office rule's activity, start, expiry or target",
   input: inputSchema,
   minRole: 'user',
+  scope: async (ctx, input) =>
+    isOwnScope(ctx, scopeFromColumns(await liveOooRule(ctx.db, input.id))),
   entity: input => ({ kind: 'oooRule', id: input.id }),
   run: async (ctx, input) => {
     const before = await liveOooRule(ctx.db, input.id);
     const scope = scopeFromColumns(before);
-    assertVisibleScope(ctx.actor, scope, 'ooo: rule not found');
     await assertScopeExists(ctx.db, scope);
     const active = orBefore(input.active, before.active === 1);
     const { startsAt, expiresAt } = resolveSchedule(input, before);

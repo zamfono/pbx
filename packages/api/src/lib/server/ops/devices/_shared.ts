@@ -1,7 +1,6 @@
 import type { Selectable, Transaction } from 'kysely';
 
 import {
-  HTTP_FORBIDDEN,
   type DB,
   type DeviceKind,
   type DeviceTransport
@@ -9,7 +8,7 @@ import {
 
 import { assertNoLiveHolder } from '../liveHolder.js';
 import { liveRow } from '../rows.js';
-import { OpError, type Context } from '../types.js';
+import type { Context } from '../types.js';
 
 /** A `devices` row as Kysely's `CamelCasePlugin` maps it (§11.2); never carries the raw password. */
 export type DeviceRow = Selectable<DB['devices']>;
@@ -69,42 +68,13 @@ export async function liveDevice(
   return liveRow(db, 'devices', id, `device '${id}' not found`);
 }
 
-/** Throws 403 unless `ctx.actor` may act on `device`: its own `tls` device, or an admin (§10.3). */
-export function assertDeviceScope(
-  actorRole: string,
-  actorId: string,
-  device: DeviceRow
-): void {
-  if (actorRole !== 'user') {
-    return;
-  }
-  if (device.userId !== actorId || device.transport !== 'tls') {
-    throw new OpError(
-      HTTP_FORBIDDEN,
-      'devices: may act only on your own tls device'
-    );
-  }
-}
-
-/**
- * Throws 403 unless `actorRole`/`actorId` may create a device for `userId` on `transport`: a
- * `user` actor only their own `tls` device, an admin any (§10.3 Devices row).
- */
-export function assertDeviceCreateScope(
-  actorRole: string,
-  actorId: string,
-  userId: string,
-  transport: DeviceTransport
-): void {
-  if (actorRole !== 'user') {
-    return;
-  }
-  if (userId !== actorId || transport !== 'tls') {
-    throw new OpError(
-      HTTP_FORBIDDEN,
-      'devices: may create only your own tls device'
-    );
-  }
+/** The `scope` of an operation on device `id`: the caller's own `tls` device alone (§10.3 "Devices"). */
+export async function ownTlsDevice(
+  ctx: Context,
+  input: { id: string }
+): Promise<boolean> {
+  const device = await liveDevice(ctx.db, input.id);
+  return device.userId === ctx.actor.id && device.transport === 'tls';
 }
 
 /**

@@ -8,6 +8,7 @@ export const getContact = defineOperation({
   description: 'Reads one live contact by id.',
   input: z.object({ id: z.string() }).strict(),
   minRole: 'user',
+  scope: 'any',
   readOnly: true,
   run: async (ctx, input) => {
     const row = await liveContact(ctx.db, input.id);

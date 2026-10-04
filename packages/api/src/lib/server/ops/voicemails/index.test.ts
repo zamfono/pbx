@@ -113,6 +113,21 @@ describe('voicemails', () => {
     );
   });
 
+  it("refuses a user another's voicemail with 403 before asking to confirm its deletion", async () => {
+    const db = await makeTestDb();
+    await seedUser(db, 'u1', 'Anna');
+    await seedUser(db, 'u2', 'Ben');
+    const otherId = await seedVoicemail(db, { mailboxUserId: 'u2' });
+    await expect(
+      runOperation(
+        db,
+        'voicemails.delete',
+        { id: otherId },
+        asRun({ actor: anna })
+      )
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
   it('markRead writes no audit row and triggers one mwi call', async () => {
     const db = await makeTestDb();
     await seedUser(db, 'u1', 'Anna');

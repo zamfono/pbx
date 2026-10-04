@@ -255,6 +255,7 @@ export const searchQuery = defineOperation({
     })
     .strict(),
   minRole: 'user',
+  scope: 'any',
   readOnly: true,
   run: async (ctx, input) => {
     const offset = decodeOffsetCursor(ctx.operation, input.cursor);

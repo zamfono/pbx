@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { type TargetSpec } from '../forwardTargetSchema.js';
 import { resolveTarget } from '../forwardTargetSpec.js';
 import {
-  assertOwnScopeOrAdmin,
   assertScopeExists,
+  ownScopeInput,
   scopeInputSchema,
   type ScopeInput
 } from '../scope.js';
@@ -31,9 +31,9 @@ export const get = defineOperation({
   description: "Reads a scope's opening-hours schedule",
   input: inputSchema,
   minRole: 'user',
+  scope: ownScopeInput,
   readOnly: true,
   run: async (ctx, input) => {
-    assertOwnScopeOrAdmin(ctx.actor, input.scope);
     await assertScopeExists(ctx.db, input.scope);
     const schedule = await loadSchedule(ctx.db, input.scope);
     if (!schedule) {

@@ -3,11 +3,7 @@ import { z } from 'zod';
 import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { defineOperation } from '../types.js';
-import {
-  assertOwnLiveCall,
-  liveCallIdInput,
-  proxyCallAction
-} from './_shared.js';
+import { liveCallIdInput, ownLiveCall, proxyCallAction } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -27,9 +23,9 @@ export const hold = defineOperation({
     'Puts the other party of a live call on hold: they hear the hold music, and you and they no longer hear each other; calls.resume ends it. The hold happens in the PBX, so the phone does not show it. Hangup, transfer and park work as usual while held.',
   input: inputSchema,
   minRole: 'user',
+  scope: ownLiveCall,
   audit: false,
   run: async (ctx, input) => {
-    await assertOwnLiveCall(ctx, input.id);
     await proxyCallAction(() =>
       getCoreClient().hold(input.id, { actorUserId: ctx.actor.id })
     );

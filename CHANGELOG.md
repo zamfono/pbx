@@ -257,6 +257,10 @@ why the specified behaviour changed; the commit history, how.
   change repeats close at its first occurrence, as the open/close events on `/events` already
   did; a menu an internal call is forwarded through is counted as a hop and named by the main
   number; a fallback's routing trace names its number block and the called number.
+- A user naming a voicemail, device, call, out-of-office rule or other user that is not their own
+  gets 403 before any confirmation question: deleting another user's voicemail or device without
+  `confirm` answered 409 with the question first. An out-of-office rule in another user's scope
+  answers 403, like every other one, instead of 404.
 - `GET /metrics`, `GET /calls?live=true` and the actions on a live call waited as long as a
   stalled `core` did; they now give up after 3 seconds, as `/healthz` does. A live call id that
   cannot be one (empty, `.`, `..`, or with characters other than letters, digits, `.`, `_` and

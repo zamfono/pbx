@@ -26,6 +26,7 @@ export const decline = defineOperation({
     'Declines a call ringing for you, as declining it on your phone would: your phones stop ringing, and the call goes on to your no-answer rule, or a ring group rings its other members.',
   input: inputSchema,
   minRole: 'user',
+  scope: 'any',
   audit: false,
   run: async (ctx, input) => {
     await proxyCallAction(() =>

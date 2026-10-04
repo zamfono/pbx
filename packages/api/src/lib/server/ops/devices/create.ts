@@ -12,6 +12,7 @@ import { encrypt, keyringFromEnv } from '#lib/server/secretbox.js';
 import { newSipPassword } from '#lib/server/sip.js';
 
 import { recordChange } from '../audit.js';
+import { ownActingUser } from '../gates.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, OpError } from '../types.js';
 import { userExtension } from '../users/_extensions.js';
@@ -22,7 +23,6 @@ import {
 } from './_connectionSettings.js';
 import { pushToRingotel } from './_ringotelPush.js';
 import {
-  assertDeviceCreateScope,
   assertNoExistingRingotelDevice,
   liveDevice,
   toDeviceOut
@@ -77,15 +77,11 @@ export const create = defineOperation({
     "Creates a SIP device for a user; a manual device's connection settings are returned once.",
   input: inputSchema,
   minRole: 'user',
+  scope: (ctx, input) =>
+    ownActingUser(ctx, input) && (input.transport ?? 'tls') === 'tls',
   entity: (_input, out: Output) => ({ kind: 'device', id: out.device.id }),
   run: async (ctx, input) => {
     const transport = input.transport ?? 'tls';
-    assertDeviceCreateScope(
-      ctx.actor.role,
-      ctx.actor.id,
-      input.userId,
-      transport
-    );
     await liveUser(ctx.db, input.userId);
     assertKindTransport(input.kind, transport);
     if (transport === 'plain') {

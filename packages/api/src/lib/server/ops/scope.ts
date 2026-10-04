@@ -1,16 +1,10 @@
 import { expressionBuilder, type Expression, type SqlBool } from 'kysely';
 import { z } from 'zod';
 
-import {
-  HTTP_FORBIDDEN,
-  HTTP_NOT_FOUND,
-  type DB,
-  type Db
-} from '@zamfono/shared';
+import { type DB, type Db } from '@zamfono/shared';
 
-import { isSelfOrAdmin } from './gates.js';
 import { liveRow } from './rows.js';
-import { OpError, type Actor } from './types.js';
+import type { Context } from './types.js';
 
 /**
  * The wire shape of an `ooo_rules`/`opening_hours` scope (§11.2): the path a `GET/POST
@@ -82,21 +76,20 @@ export function scopeFromColumns(row: ScopeColumns): ScopeInput {
   return { kind: 'tenant' };
 }
 
-/** Whether `actor` may act on `scope`: a `user` only their own user scope, `admin`/`owner` any. */
-function ownsScope(actor: Actor, scope: ScopeInput): boolean {
-  return isSelfOrAdmin(actor, scope.kind === 'user' ? scope.id : undefined);
+/** Whether `scope` is the caller's own user scope (§5.3). */
+export function isOwnScope(ctx: Context, scope: ScopeInput): boolean {
+  return scope.kind === 'user' && scope.id === ctx.actor.id;
 }
 
 /**
- * §10.3 "Out of Office"/"Opening hours": a `user` acts only on their own user scope; `admin` and
- * `owner` act on any scope. `minRole: 'user'` on these operations defers the rest of RBAC here.
- * For a scope-addressed route (the scope itself is the input, nothing to enumerate) a mismatch is
- * a plain 403.
+ * The `scope` of an operation addressing a scope (§10.3 "Out of Office", "Opening hours"): the
+ * caller's own user scope alone.
  */
-export function assertOwnScopeOrAdmin(actor: Actor, scope: ScopeInput): void {
-  if (!ownsScope(actor, scope)) {
-    throw new OpError(HTTP_FORBIDDEN, 'forbidden');
-  }
+export function ownScopeInput(
+  ctx: Context,
+  input: { scope: ScopeInput }
+): boolean {
+  return isOwnScope(ctx, input.scope);
 }
 
 /** The live table each non-tenant scope kind names its owner in. */
@@ -108,7 +101,7 @@ const SCOPE_TABLES = {
 
 /**
  * Throws 404 unless `scope` names a live user, ring group or menu; the tenant scope always
- * exists. A scope-addressed route checks it after `assertOwnScopeOrAdmin`, so a `user` learns
+ * exists. The runner checks a `user`'s own scope first (`ownScopeInput`), so a `user` learns
  * nothing about someone else's scope.
  */
 export async function assertScopeExists(
@@ -124,19 +117,4 @@ export async function assertScopeExists(
     scope.id,
     `${scope.kind} '${scope.id}' not found`
   );
-}
-
-/**
- * `assertOwnScopeOrAdmin`, for an id-addressed route: `update`/`delete` already resolved `scope`
- * from a rule the caller named by id, so a 403 there would let a `user` tell an existing rule in
- * someone else's scope apart from an unknown id. Both answer `notFoundMessage` (404) instead.
- */
-export function assertVisibleScope(
-  actor: Actor,
-  scope: ScopeInput,
-  notFoundMessage: string
-): void {
-  if (!ownsScope(actor, scope)) {
-    throw new OpError(HTTP_NOT_FOUND, notFoundMessage);
-  }
 }

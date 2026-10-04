@@ -107,6 +107,7 @@ export const info = defineOperation<Record<string, never>, Output>({
     'Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update with who asked for it, whether automatic updates are on and why and how often the last one failed, when and why the maintenance gate last gave up, whether a tenant profile change still waits for Ringotel, and the domain of the stack and the public IPv4 address its SIP and media use.',
   input: z.object({}).strict(),
   minRole: 'user',
+  scope: 'any',
   readOnly: true,
   run: async ctx => {
     const [core, update, autoUpdate, maintenanceGate, profilePending] =

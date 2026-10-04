@@ -5,8 +5,8 @@ import { HTTP_NOT_FOUND } from '@zamfono/shared';
 import { propagate } from '../propagate.js';
 import { softDelete } from '../rows.js';
 import {
-  assertOwnScopeOrAdmin,
   assertScopeExists,
+  ownScopeInput,
   scopeInputSchema
 } from '../scope.js';
 import { defineOperation, OpError } from '../types.js';
@@ -23,13 +23,13 @@ export const del = defineOperation({
   description: "Removes a scope's opening-hours schedule",
   input: inputSchema,
   minRole: 'user',
+  scope: ownScopeInput,
   confirm: () => 'Delete this opening-hours schedule?',
   entity: (_input, output: { id: string }) => ({
     kind: 'openingHours',
     id: output.id
   }),
   run: async (ctx, input) => {
-    assertOwnScopeOrAdmin(ctx.actor, input.scope);
     await assertScopeExists(ctx.db, input.scope);
     const schedule = await loadSchedule(ctx.db, input.scope);
     if (!schedule) {

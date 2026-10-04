@@ -7,7 +7,7 @@ import { activeRingotelProvider } from '#lib/server/provisioning/index.js';
 
 import { recordChange } from '../audit.js';
 import { defineOperation, OpError } from '../types.js';
-import { assertDeviceScope, liveDevice } from './_shared.js';
+import { liveDevice, ownTlsDevice } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -50,10 +50,10 @@ export const setBlf = defineOperation({
   description: "Replaces a ringotel device's BLF panel as a whole.",
   input: inputSchema,
   minRole: 'user',
+  scope: ownTlsDevice,
   entity: input => ({ kind: 'device', id: input.id }),
   run: async (ctx, input) => {
     const device = await liveDevice(ctx.db, input.id);
-    assertDeviceScope(ctx.actor.role, ctx.actor.id, device);
     if (device.kind !== 'ringotel') {
       throw new OpError(
         HTTP_UNPROCESSABLE_CONTENT,

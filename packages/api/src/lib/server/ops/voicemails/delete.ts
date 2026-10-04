@@ -5,9 +5,10 @@ import { setUndoable } from '../audit.js';
 import { defineOperation } from '../types.js';
 import {
   deleteVoicemailFile,
-  loadVisibleVoicemail,
+  loadVoicemail,
   mailboxKey,
-  notifyMwi
+  notifyMwi,
+  ownVoicemail
 } from './_shared.js';
 
 const inputSchema = z.object({ id: z.string() }).strict();
@@ -22,11 +23,12 @@ export const deleteVoicemail = defineOperation({
   description: 'Permanently deletes a voicemail and its audio file.',
   input: inputSchema,
   minRole: 'user',
+  scope: ownVoicemail,
   confirm: input =>
     `Delete this voicemail? This cannot be undone. (${input.id})`,
   entity: input => ({ kind: 'voicemail', id: input.id }),
   run: async (ctx, input) => {
-    const row = await loadVisibleVoicemail(ctx, input.id);
+    const row = await loadVoicemail(ctx, input.id);
     await ctx.db.deleteFrom('voicemails').where('id', '=', input.id).execute();
     // Only once the row's delete has committed: a rolled-back one keeps its audio.
     afterCommit(ctx, async () => {

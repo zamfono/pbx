@@ -4,9 +4,9 @@ import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { defineOperation } from '../types.js';
 import {
-  assertOwnLiveCall,
   dialTargetInput,
   liveCallIdInput,
+  ownLiveCall,
   proxyCallAction
 } from './_shared.js';
 
@@ -29,9 +29,9 @@ export const addParty = defineOperation({
     "Three-way call: dials the target from you and, once answered, adds them to a live call so all three talk; returns the added party's own call id (callId). It only rings the target: no forward or mailbox of theirs applies.",
   input: inputSchema,
   minRole: 'user',
+  scope: ownLiveCall,
   audit: false,
   run: async (ctx, input) => {
-    await assertOwnLiveCall(ctx, input.id);
     const { callId } = await proxyCallAction(() =>
       getCoreClient().addParty(input.id, {
         target: input.target,

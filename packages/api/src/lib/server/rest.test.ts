@@ -87,6 +87,17 @@ describe('the REST route table', () => {
   it('names a registered operation on every row', () => {
     expect(routes.filter(route => !registry.has(route.op))).toEqual([]);
   });
+
+  it('routes every registered operation exactly once, a scope route once per scope area', () => {
+    const counts = new Map<string, number>();
+    for (const route of routes) {
+      const key = `${route.op} ${route.scope ?? ''}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const routed = new Set(routes.map(route => route.op));
+    expect([...registry.keys()].filter(name => !routed.has(name))).toEqual([]);
+    expect([...counts].filter(([, count]) => count !== 1)).toEqual([]);
+  });
 });
 
 describe('handleRest', () => {

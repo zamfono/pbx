@@ -5,7 +5,7 @@ import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 import { recordChange } from '../audit.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, OpError } from '../types.js';
-import { assertDeviceScope, liveDevice, toDeviceOut } from './_shared.js';
+import { liveDevice, ownTlsDevice, toDeviceOut } from './_shared.js';
 import { assertNonEmptyIps, assertValidIps } from './_transportPolicy.js';
 
 const inputSchema = z
@@ -28,10 +28,10 @@ export const update = defineOperation({
     "Updates a device's label or, for a plain device, its IP allowlist.",
   input: inputSchema,
   minRole: 'user',
+  scope: ownTlsDevice,
   entity: input => ({ kind: 'device', id: input.id }),
   run: async (ctx, input) => {
     const before = await liveDevice(ctx.db, input.id);
-    assertDeviceScope(ctx.actor.role, ctx.actor.id, before);
     if (input.allowedIps !== undefined && before.transport !== 'plain') {
       throw new OpError(
         HTTP_UNPROCESSABLE_CONTENT,

@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { downloadAudio } from '#lib/server/audio/transcode.js';
 
 import { defineOperation } from '../types.js';
-import { loadVisibleVoicemail, VOICEMAIL_SUBDIR } from './_shared.js';
+import { loadVoicemail, ownVoicemail, VOICEMAIL_SUBDIR } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -29,9 +29,10 @@ export const audio = defineOperation({
     "Returns a voicemail's recorded audio; over MCP, a download link that opens for five minutes.",
   input: inputSchema,
   minRole: 'user',
+  scope: ownVoicemail,
   readOnly: true,
   run: async (ctx, input) => {
-    const row = await loadVisibleVoicemail(ctx, input.id);
+    const row = await loadVoicemail(ctx, input.id);
     return downloadAudio(
       path.join(env.MEDIA_DIR, VOICEMAIL_SUBDIR, row.filename),
       input.format

@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { assertAudioOfKind } from '../audio/_shared.js';
 import { recordFieldChanges } from '../audit.js';
+import { ownUserId } from '../gates.js';
 import { propagate } from '../propagate.js';
 import { pushRoster } from '../roster.js';
 import {
@@ -139,6 +140,7 @@ export const update = defineOperation({
     "Updates a user's profile; admins write every field, a user only their self-service subset.",
   input: inputSchema,
   minRole: 'user',
+  scope: ownUserId,
   entity: input => ({ kind: 'user', id: input.id }),
   run: async (ctx, input) => {
     assertAllowedFields(ctx, input);

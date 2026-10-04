@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { assertSelfOrAdmin } from '../gates.js';
+import { ownUserId } from '../gates.js';
 import { defineOperation } from '../types.js';
 import { liveUser, toUserOut } from './_shared.js';
 
@@ -10,13 +10,9 @@ export const get = defineOperation({
   description: 'Reads one live user by id.',
   input: z.object({ id: z.string() }).strict(),
   minRole: 'user',
+  scope: ownUserId,
   readOnly: true,
   run: async (ctx, input) => {
-    assertSelfOrAdmin(
-      ctx.actor,
-      input.id,
-      'users: may read only your own profile'
-    );
     const row = await liveUser(ctx.db, input.id);
     return toUserOut(ctx.db, row);
   }

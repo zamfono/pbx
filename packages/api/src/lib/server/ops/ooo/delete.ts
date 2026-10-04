@@ -2,11 +2,7 @@ import { z } from 'zod';
 
 import { propagate } from '../propagate.js';
 import { softDelete } from '../rows.js';
-import {
-  assertScopeExists,
-  assertVisibleScope,
-  scopeFromColumns
-} from '../scope.js';
+import { assertScopeExists, isOwnScope, scopeFromColumns } from '../scope.js';
 import { defineOperation } from '../types.js';
 import { liveOooRule } from './_shared.js';
 
@@ -18,12 +14,13 @@ export const del = defineOperation({
   description: 'Removes an out-of-office rule',
   input: inputSchema,
   minRole: 'user',
+  scope: async (ctx, input) =>
+    isOwnScope(ctx, scopeFromColumns(await liveOooRule(ctx.db, input.id))),
   confirm: input => `Delete out-of-office rule ${input.id}?`,
   entity: input => ({ kind: 'oooRule', id: input.id }),
   run: async (ctx, input) => {
     const rule = await liveOooRule(ctx.db, input.id);
     const scope = scopeFromColumns(rule);
-    assertVisibleScope(ctx.actor, scope, 'ooo: rule not found');
     await assertScopeExists(ctx.db, scope);
     await softDelete(ctx, 'oooRules', input.id);
     // Read by the routing pipeline (§3.1), and nothing in it reaches Asterisk's own

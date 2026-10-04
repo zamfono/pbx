@@ -1,23 +1,23 @@
 import * as env from '$app/env/private';
 import { z } from 'zod';
 
+import { recordChange } from '#lib/server/ops/audit.js';
+import { orBefore } from '#lib/server/ops/patch.js';
+import { liveRow } from '#lib/server/ops/rows.js';
+import { defineOperation } from '#lib/server/ops/types.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
-import { recordChange } from '../audit.js';
-import { orBefore } from '../patch.js';
-import { liveRow } from '../rows.js';
-import { defineOperation } from '../types.js';
 import {
   assertSecretFitsKind,
   openTargetSecret,
   sealTargetSecret
-} from './_secret.js';
+} from '../_secret.js';
 import {
   targetFields,
   targetToWire,
   withDefaultForgetPolicy,
   type BackupTargetWire
-} from './_shared.js';
+} from '../_shared.js';
 
 const inputSchema = z
   .object({ id: z.string(), ...z.object(targetFields).partial().shape })

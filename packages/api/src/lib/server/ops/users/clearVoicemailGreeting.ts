@@ -2,9 +2,9 @@ import { z } from 'zod';
 
 import { retireGreeting } from '@zamfono/shared';
 
+import { ownUserId } from '../gates.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
-import { assertOwnGreeting } from './_greeting.js';
 import { liveUser } from './_shared.js';
 
 /**
@@ -23,11 +23,11 @@ export const clearVoicemailGreeting = defineOperation({
     })
     .strict(),
   minRole: 'user',
+  scope: ownUserId,
   audit: false,
   confirm: () =>
     "Remove this user's voicemail greeting? Callers then hear the default prompt.",
   run: async (ctx, input) => {
-    assertOwnGreeting(ctx, input.id);
     const user = await liveUser(ctx.db, input.id);
     await ctx.db
       .updateTable('users')

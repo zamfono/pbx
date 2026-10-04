@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-import { liveRow, softDelete } from '../rows.js';
-import { defineOperation } from '../types.js';
+import { liveRow, softDelete } from '#lib/server/ops/rows.js';
+import { defineOperation } from '#lib/server/ops/types.js';
 
 const inputSchema = z.object({ id: z.string() }).strict();
 

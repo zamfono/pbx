@@ -30,14 +30,24 @@ export type Context = {
 };
 
 /**
+ * §5.3 own scope, which the runner checks for a `user` caller before confirmation and before
+ * `run`: `'any'` when the input names nothing of another user's (a tenant-wide read, the caller's
+ * own ringing call, or a list `run` narrows to the caller's own), else whether what the input
+ * names is the caller's own, refused with 403 when it is not. It may throw the 404 of what the
+ * input names not existing.
+ */
+export type OwnScope<In> =
+  'any' | ((ctx: Context, input: In) => boolean | Promise<boolean>);
+
+/**
  * One operation module's export (§10.3). The REST route table, the MCP tool list and the
- * OpenAPI document are all generated from the registry these fill.
+ * OpenAPI document are all generated from the registry these fill. An operation a `user` may
+ * call declares its `scope`; above that role every caller acts on anything (§5.3).
  */
 export type Operation<In, Out> = {
   name: string;
   description: string;
   input: z.ZodType<In>;
-  minRole: UserRole;
   readOnly?: boolean;
   confirm?: (input: In) => string;
   /** `false` opts a write out of the audit log: presence, read flags, live-call actions (§5.7). */
@@ -55,7 +65,10 @@ export type Operation<In, Out> = {
    */
   entity?: (input: In, out: Out) => { kind: string; id: string | null };
   run(ctx: Context, input: In): Promise<Out>;
-};
+} & (
+  | { minRole: Exclude<UserRole, 'user'> }
+  | { minRole: 'user'; scope: OwnScope<In> }
+);
 
 /** Identity function that lets an operation module's `In`/`Out` be inferred from its body. */
 export function defineOperation<In, Out>(

@@ -5,9 +5,10 @@ import { retireGreeting } from '@zamfono/shared';
 import { deleteAudioFile, storeAudio } from '#lib/server/audio/store.js';
 
 import { uploadSchema } from '../audio/create.js';
+import { ownUserId } from '../gates.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
-import { assertOwnGreeting, GREETING_LABEL } from './_greeting.js';
+import { GREETING_LABEL } from './_greeting.js';
 import { liveUser } from './_shared.js';
 
 /**
@@ -31,9 +32,9 @@ export const setVoicemailGreeting = defineOperation({
     })
     .strict(),
   minRole: 'user',
+  scope: ownUserId,
   audit: false,
   run: async (ctx, input) => {
-    assertOwnGreeting(ctx, input.id);
     const user = await liveUser(ctx.db, input.id);
     const stored = await storeAudio('vmGreeting', input.upload);
     try {

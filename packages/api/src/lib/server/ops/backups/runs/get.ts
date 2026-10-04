@@ -2,8 +2,9 @@ import { z } from 'zod';
 
 import { HTTP_NOT_FOUND } from '@zamfono/shared';
 
-import { defineOperation, OpError } from '../types.js';
-import { runToWire } from './_shared.js';
+import { defineOperation, OpError } from '#lib/server/ops/types.js';
+
+import { runToWire } from '../_shared.js';
 
 const inputSchema = z.object({ id: z.string() }).strict();
 

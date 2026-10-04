@@ -6,7 +6,7 @@ import {
   pageInput
 } from '#lib/server/pagination.js';
 
-import { assertSelfOrAdmin } from '../gates.js';
+import { ownActingUser } from '../gates.js';
 import { defineOperation } from '../types.js';
 import { toDeviceOut } from './_shared.js';
 
@@ -21,13 +21,9 @@ export const list = defineOperation({
     })
     .strict(),
   minRole: 'user',
+  scope: ownActingUser,
   readOnly: true,
   run: async (ctx, input) => {
-    assertSelfOrAdmin(
-      ctx.actor,
-      input.userId,
-      'devices: may list only your own devices'
-    );
     const offset = decodeOffsetCursor(ctx.operation, input.cursor);
     const { limit } = input;
     const rows = await ctx.db

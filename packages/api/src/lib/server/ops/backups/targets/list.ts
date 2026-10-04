@@ -1,11 +1,11 @@
+import { defineOperation } from '#lib/server/ops/types.js';
 import {
   decodeIdCursor,
   keysetPage,
   pageInput
 } from '#lib/server/pagination.js';
 
-import { defineOperation } from '../types.js';
-import { targetToWire } from './_shared.js';
+import { targetToWire } from '../_shared.js';
 
 const inputSchema = pageInput.strict();
 

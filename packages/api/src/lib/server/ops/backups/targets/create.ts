@@ -3,17 +3,17 @@ import { z } from 'zod';
 
 import { newId } from '@zamfono/shared';
 
+import { recordChange } from '#lib/server/ops/audit.js';
+import { defineOperation } from '#lib/server/ops/types.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 
-import { recordChange } from '../audit.js';
-import { defineOperation } from '../types.js';
-import { assertSecretFitsKind, sealTargetSecret } from './_secret.js';
+import { assertSecretFitsKind, sealTargetSecret } from '../_secret.js';
 import {
   targetFields,
   targetToWire,
   withDefaultForgetPolicy,
   type BackupTargetWire
-} from './_shared.js';
+} from '../_shared.js';
 
 const inputSchema = z.object(targetFields).strict();
 

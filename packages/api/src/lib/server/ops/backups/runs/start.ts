@@ -2,12 +2,12 @@ import { z } from 'zod';
 
 import { insertRunningRun } from '#lib/server/jobs/backup.js';
 import { queueRun } from '#lib/server/jobs/cron.js';
+import { afterCommit } from '#lib/server/ops/afterCommit.js';
+import { setUndoable } from '#lib/server/ops/audit.js';
+import { liveRow } from '#lib/server/ops/rows.js';
+import { defineOperation } from '#lib/server/ops/types.js';
 
-import { afterCommit } from '../afterCommit.js';
-import { setUndoable } from '../audit.js';
-import { liveRow } from '../rows.js';
-import { defineOperation } from '../types.js';
-import { runToWire, type BackupRunWire } from './_shared.js';
+import { runToWire, type BackupRunWire } from '../_shared.js';
 
 const inputSchema = z
   .object({

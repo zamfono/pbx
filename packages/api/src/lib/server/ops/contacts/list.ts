@@ -13,6 +13,7 @@ export const listContacts = defineOperation({
   description: "Lists the tenant's live phone-book contacts.",
   input: pageInput.strict(),
   minRole: 'user',
+  scope: 'any',
   readOnly: true,
   run: async (ctx, input) => {
     const offset = decodeOffsetCursor(ctx.operation, input.cursor);

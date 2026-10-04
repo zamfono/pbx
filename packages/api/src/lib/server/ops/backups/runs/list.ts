@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
+import { defineOperation } from '#lib/server/ops/types.js';
 import {
   decodeIdCursor,
   keysetPage,
   pageInput
 } from '#lib/server/pagination.js';
 
-import { defineOperation } from '../types.js';
-import { runToWire } from './_shared.js';
+import { runToWire } from '../_shared.js';
 
 const inputSchema = z
   .object({

@@ -2,8 +2,9 @@ import { z } from 'zod';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 
+import { ownActingUser } from '../gates.js';
 import { defineOperation } from '../types.js';
-import { proxyCallAction, resolveActingUserId } from './_shared.js';
+import { proxyCallAction } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -41,9 +42,10 @@ export const originate = defineOperation({
     "Click-to-dial: rings a user's devices, then dials the target on answer, as that phone would; a parking slot as target retrieves the call parked there.",
   input: inputSchema,
   minRole: 'user',
+  scope: ownActingUser,
   audit: false,
   run: async (ctx, input) => {
-    const userId = resolveActingUserId(ctx, input.userId);
+    const userId = input.userId ?? ctx.actor.id;
     return proxyCallAction(async () =>
       getCoreClient().originate({
         userId,

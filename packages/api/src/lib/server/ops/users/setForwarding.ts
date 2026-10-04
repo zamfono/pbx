@@ -9,7 +9,7 @@ import {
 import { recordChange } from '../audit.js';
 import { createTarget, deleteTargetIfOrphan } from '../forwardTargets.js';
 import { targetSpecSchema } from '../forwardTargetSchema.js';
-import { assertSelfOrAdmin } from '../gates.js';
+import { ownUserId } from '../gates.js';
 import { propagate } from '../propagate.js';
 import { defineOperation, OpError, type Context } from '../types.js';
 import {
@@ -76,13 +76,9 @@ export const setForwarding = defineOperation({
     "Replaces a user's call-forwarding rules as a whole; a user sets their own, without new sip targets, an admin anyone's.",
   input: inputSchema,
   minRole: 'user',
+  scope: ownUserId,
   entity: input => ({ kind: 'user', id: input.id }),
   run: async (ctx, input) => {
-    assertSelfOrAdmin(
-      ctx.actor,
-      input.id,
-      'users: may set only your own forwarding'
-    );
     await liveUser(ctx.db, input.id);
     const seenConditions = new Set<string>();
     for (const rule of input.rules) {

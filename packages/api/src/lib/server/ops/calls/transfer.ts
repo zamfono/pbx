@@ -5,11 +5,7 @@ import { HTTP_UNPROCESSABLE_CONTENT } from '@zamfono/shared';
 import { getCoreClient } from '#lib/server/coreClient.js';
 
 import { defineOperation, OpError } from '../types.js';
-import {
-  assertOwnLiveCall,
-  liveCallIdInput,
-  proxyCallAction
-} from './_shared.js';
+import { isOwnLiveCall, liveCallIdInput, proxyCallAction } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -48,12 +44,15 @@ export const transfer = defineOperation({
     "Transfers a live call: blind to an extension or number (target), or with voicemail into an extension's mailbox, where the transferee is routed as a new call; or attended to the consultation calls.consult started (toCallId), where the held party and the consulted party talk on without you.",
   input: inputSchema,
   minRole: 'user',
+  scope: async (ctx, input) =>
+    (await isOwnLiveCall(ctx, input.id)) &&
+    (input.toCallId === undefined ||
+      (await isOwnLiveCall(ctx, input.toCallId))),
   audit: false,
   run: async (ctx, input) => {
     const { target, toCallId, voicemail } = input;
     const actorUserId = ctx.actor.id;
     if (target !== undefined && toCallId === undefined) {
-      await assertOwnLiveCall(ctx, input.id);
       await proxyCallAction(() =>
         getCoreClient().transfer(input.id, {
           target,
@@ -68,8 +67,6 @@ export const transfer = defineOperation({
       target === undefined &&
       voicemail === undefined
     ) {
-      await assertOwnLiveCall(ctx, input.id);
-      await assertOwnLiveCall(ctx, toCallId);
       await proxyCallAction(() =>
         getCoreClient().attendedTransfer(input.id, {
           toCallId,

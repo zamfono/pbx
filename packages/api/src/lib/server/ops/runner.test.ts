@@ -22,6 +22,7 @@ describe('runOperation', () => {
         description: 'echoes num',
         input: z.object({ num: z.number() }),
         minRole: 'user',
+        scope: 'any',
         readOnly: true,
         run: (ctx, input) => Promise.resolve(input.num)
       })
@@ -59,6 +60,7 @@ describe('runOperation', () => {
         description: 'deletes a thing',
         input: z.object({}),
         minRole: 'user',
+        scope: 'any',
         readOnly: true,
         confirm: () => 'Delete the thing?',
         run: () => Promise.resolve('deleted')
@@ -81,6 +83,52 @@ describe('runOperation', () => {
     ).resolves.toBe('deleted');
   });
 
+  it("refuses a user another's input with 403 before confirmation and before running; an admin acts on any", async () => {
+    const db = await makeTestDb();
+    const run = vi.fn(() => Promise.resolve('deleted'));
+    register(
+      defineOperation({
+        name: 'test.deleteOwnThing',
+        description: "deletes a user's thing",
+        input: z.object({ userId: z.string() }),
+        minRole: 'user',
+        scope: (ctx, input) => input.userId === ctx.actor.id,
+        audit: false,
+        confirm: () => 'Delete the thing?',
+        run
+      })
+    );
+    const others = { userId: 'someone-else' };
+    await expect(
+      runOperation(
+        db,
+        'test.deleteOwnThing',
+        others,
+        asRun({ actor: plainUser })
+      )
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      runOperation(
+        db,
+        'test.deleteOwnThing',
+        others,
+        asRun({ actor: plainUser, confirm: true })
+      )
+    ).rejects.toMatchObject({ status: 403 });
+    expect(run).not.toHaveBeenCalled();
+    await expect(
+      runOperation(
+        db,
+        'test.deleteOwnThing',
+        { userId: plainUser.id },
+        asRun({ actor: plainUser })
+      )
+    ).rejects.toBeInstanceOf(ConfirmationRequired);
+    await expect(
+      runOperation(db, 'test.deleteOwnThing', others, asRun({ confirm: true }))
+    ).resolves.toBe('deleted');
+  });
+
   it('writes one audit_log row for a successful, audited write', async () => {
     const db = await makeTestDb();
     register(
@@ -89,6 +137,7 @@ describe('runOperation', () => {
         description: 'renames a thing',
         input: z.object({ id: z.string() }),
         minRole: 'user',
+        scope: 'any',
         entity: input => ({ kind: 'thing', id: input.id }),
         run: (ctx, input) => {
           recordChange(ctx, { field: 'name', from: 'a', to: 'b' });
@@ -116,6 +165,7 @@ describe('runOperation', () => {
         description: 'reads a thing',
         input: z.object({}),
         minRole: 'user',
+        scope: 'any',
         readOnly: true,
         run: () => Promise.resolve('ok')
       })
@@ -126,6 +176,7 @@ describe('runOperation', () => {
         description: 'writes without an audit trail',
         input: z.object({}),
         minRole: 'user',
+        scope: 'any',
         audit: false,
         run: () => Promise.resolve('ok')
       })
@@ -232,6 +283,7 @@ describe('runOperation', () => {
         description: 'a readOnly op that still requests a reload kind',
         input: z.object({}),
         minRole: 'user',
+        scope: 'any',
         readOnly: true,
         run: ctx => {
           propagate(ctx, ['pjsip']);

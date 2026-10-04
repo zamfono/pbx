@@ -12,6 +12,8 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-04 · §10.2 Search.** A search hit's `matched` names the field as the hit's resource names it on the wire: a user's `extension`, a contact's `displayName` and `phones`.
 *Why:* `matched` said `ext`, `name` and `phone`, names no resource has, so a client could not point at the field that hit.
+**2026-10-04 · §10.3 Operations layer.** Product-owner decision (own scope): every operation a `user` may call declares its `scope`, whether what the input names is the user's own, and the runner checks it before confirmation and before `run` (403 when not). The `Operation`/`Context` sketch lists the fields every operation uses (`scope`, `audit`, `pureAction`, `entity`, `clientName`, `effects`); an operation with a three-part name lives in a subfolder (`backups/targets/create.ts`).
+*Why:* "Runner enforces (Recommended)": each operation re-implemented its own-scope check inside `run`, after the confirmation question, and one forgotten would have opened it to every user; the sketch left out fields that decide the audit row.
 
 **2026-10-04 · §10.5 Uploads.** Product-owner decision (MCP uploads): `audio.create` and `users.setVoicemailGreeting` over MCP take their fields without the file and return a five-minute upload link (`/upload/<path>`, token `typ` `upload+jwt`, `aud` the REST path); a `POST` of the file to it runs the operation as the call's user and client with channel `mcp`, and a browser opening it gets a file-picker page.
 *Why:* "Upload link + page (Recommended)"; the tools were listed with a `data` field no JSON argument can fill, so every call failed with 422.

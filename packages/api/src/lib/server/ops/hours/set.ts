@@ -8,8 +8,8 @@ import { targetSpecSchema } from '../forwardTargetSchema.js';
 import { resolveTarget } from '../forwardTargetSpec.js';
 import { propagate } from '../propagate.js';
 import {
-  assertOwnScopeOrAdmin,
   assertScopeExists,
+  ownScopeInput,
   scopeColumns,
   scopeInputSchema
 } from '../scope.js';
@@ -115,12 +115,12 @@ export const set = defineOperation<Input, HoursWire>({
     "Replaces a scope's weekly opening-hours schedule and the target its calls go to while closed",
   input: inputSchema,
   minRole: 'user',
+  scope: ownScopeInput,
   entity: (_input, output: HoursWire) => ({
     kind: 'openingHours',
     id: output.id
   }),
   run: async (ctx, input) => {
-    assertOwnScopeOrAdmin(ctx.actor, input.scope);
     await assertScopeExists(ctx.db, input.scope);
     const intervals = validateIntervals(input.intervals);
     const active = input.active ?? true;

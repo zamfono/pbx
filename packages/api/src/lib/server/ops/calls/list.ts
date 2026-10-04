@@ -11,7 +11,7 @@ import {
   pageInput
 } from '#lib/server/pagination.js';
 
-import { assertSelfOrAdmin } from '../gates.js';
+import { ownActingUser } from '../gates.js';
 import { instantInput, tenantInstantReader } from '../instantInput.js';
 import { defineOperation } from '../types.js';
 import { ownCallWhere, toCallOut } from './_shared.js';
@@ -116,15 +116,9 @@ export const list = defineOperation({
   description: 'Lists call history, or the calls currently in progress.',
   input: inputSchema,
   minRole: 'user',
+  scope: ownActingUser,
   readOnly: true,
   run: async (ctx, input) => {
-    if (input.userId !== undefined) {
-      assertSelfOrAdmin(
-        ctx.actor,
-        input.userId,
-        'calls: may list only your own calls'
-      );
-    }
     const ownUserId = ctx.actor.role === 'user' ? ctx.actor.id : null;
     const { limit } = input;
     if (input.live === true) {

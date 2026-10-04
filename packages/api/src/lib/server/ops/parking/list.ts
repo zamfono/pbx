@@ -19,6 +19,7 @@ export const list = defineOperation({
     'Lists the calls parked right now: slot, call, caller (null when withheld), parked since and by whom.',
   input: pageInput.strict(),
   minRole: 'user',
+  scope: 'any',
   readOnly: true,
   run: async (ctx, input) => {
     const offset = decodeOffsetCursor(ctx.operation, input.cursor);

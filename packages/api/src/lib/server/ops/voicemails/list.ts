@@ -19,6 +19,7 @@ export const list = defineOperation({
     "Lists voicemails newest first: a user's own mailbox and their ring groups', every mailbox for an admin.",
   input: inputSchema,
   minRole: 'user',
+  scope: 'any',
   readOnly: true,
   run: async (ctx, input) => {
     const { limit } = input;

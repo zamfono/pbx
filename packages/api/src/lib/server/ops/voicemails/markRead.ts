@@ -1,7 +1,12 @@
 import { z } from 'zod';
 
 import { defineOperation } from '../types.js';
-import { loadVisibleVoicemail, mailboxKey, notifyMwi } from './_shared.js';
+import {
+  loadVoicemail,
+  mailboxKey,
+  notifyMwi,
+  ownVoicemail
+} from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -23,9 +28,10 @@ export const markRead = defineOperation({
   description: 'Marks a voicemail read or unread.',
   input: inputSchema,
   minRole: 'user',
+  scope: ownVoicemail,
   audit: false,
   run: async (ctx, input) => {
-    const row = await loadVisibleVoicemail(ctx, input.id);
+    const row = await loadVoicemail(ctx, input.id);
     await ctx.db
       .updateTable('voicemails')
       .set({ read: Number(input.read) })

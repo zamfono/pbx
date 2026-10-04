@@ -5,7 +5,6 @@ import type { Selectable, Transaction } from 'kysely';
 import pino from 'pino';
 
 import {
-  HTTP_FORBIDDEN,
   HTTP_NOT_FOUND,
   mwiMailboxOf,
   type DB,
@@ -56,12 +55,8 @@ export async function ringGroupIdsForUser(
   return rows.map(row => row.ringGroupId);
 }
 
-/**
- * The voicemail with `id` that `ctx.actor` may act on: its own mailbox, the mailbox of a ring group
- * it belongs to, or any mailbox for an admin/owner (§5.3). Throws `OpError(404)` for an unknown id
- * (`voicemails` carries no soft delete, §11.2) and `OpError(403)` for another's mailbox.
- */
-export async function loadVisibleVoicemail(
+/** The voicemail with `id`, or `OpError(404)`: `voicemails` carries no soft delete (§11.2). */
+export async function loadVoicemail(
   ctx: Context,
   id: string
 ): Promise<VoicemailRow> {
@@ -73,21 +68,26 @@ export async function loadVisibleVoicemail(
   if (!row) {
     throw new OpError(HTTP_NOT_FOUND, `voicemail '${id}' not found`);
   }
-  if (ctx.actor.role !== 'user') {
-    return row;
+  return row;
+}
+
+/**
+ * The `scope` of an operation on voicemail `id`: one in the caller's own mailbox or the mailbox
+ * of a ring group they belong to (§5.3).
+ */
+export async function ownVoicemail(
+  ctx: Context,
+  input: { id: string }
+): Promise<boolean> {
+  const row = await loadVoicemail(ctx, input.id);
+  if (row.mailboxUserId === ctx.actor.id) {
+    return true;
   }
   const ringGroupIds = await ringGroupIdsForUser(ctx.db, ctx.actor.id);
-  const own =
-    row.mailboxUserId === ctx.actor.id ||
-    (row.mailboxRingGroupId !== null &&
-      ringGroupIds.includes(row.mailboxRingGroupId));
-  if (!own) {
-    throw new OpError(
-      HTTP_FORBIDDEN,
-      'voicemails: may act only on your own mailbox'
-    );
-  }
-  return row;
+  return (
+    row.mailboxRingGroupId !== null &&
+    ringGroupIds.includes(row.mailboxRingGroupId)
+  );
 }
 
 /** The `MwiMailbox` a voicemail row's owning mailbox is addressed as (§3.1, §9.3, `mwiMailboxOf`). */

@@ -8,8 +8,8 @@ import {
 
 import { resolveTarget } from '../forwardTargetSpec.js';
 import {
-  assertOwnScopeOrAdmin,
   assertScopeExists,
+  ownScopeInput,
   scopeInputSchema
 } from '../scope.js';
 import { defineOperation } from '../types.js';
@@ -32,9 +32,9 @@ export const list = defineOperation({
   description: "Lists a scope's out-of-office rules",
   input: inputSchema,
   minRole: 'user',
+  scope: ownScopeInput,
   readOnly: true,
   run: async (ctx, input) => {
-    assertOwnScopeOrAdmin(ctx.actor, input.scope);
     await assertScopeExists(ctx.db, input.scope);
     const offset = decodeOffsetCursor(ctx.operation, input.cursor);
     const { limit } = input;

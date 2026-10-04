@@ -18,6 +18,7 @@ import { absorbEffects, newEffects, type Effects } from './effects.js';
 import {
   checkConfirmation,
   checkRole,
+  checkScope,
   findOperation,
   parseInput
 } from './gates.js';
@@ -92,6 +93,8 @@ async function executeOperation({
   name,
   input
 }: Execution): Promise<unknown> {
+  await checkScope(op, ctx, input);
+  checkConfirmation(op, run, input);
   const output = await op.run(ctx, input);
   if (!op.readOnly && op.audit !== false) {
     await writeAuditRow({ ctx, op, name, run, input, output });
@@ -134,10 +137,10 @@ async function executeInTransaction(
 }
 
 /**
- * Validates `input` against the named operation's schema (422), enforces its `minRole` (403)
- * and its confirmation gate (409), runs it in one transaction with its audit row, then, for a
- * non-`readOnly` operation that called `propagate()`, propagates the deduplicated reload kinds
- * once the transaction has committed (§10.3, §3.1). The operation's own result is returned once
+ * Validates `input` against the named operation's schema (422), enforces its `minRole` (403),
+ * then, in one transaction with its audit row, its own scope (403) and its confirmation gate
+ * (409) before running it; then, for a non-`readOnly` operation that called `propagate()`,
+ * propagates the deduplicated reload kinds once the transaction has committed (§10.3, §3.1). The operation's own result is returned once
  * the commit succeeds, whatever follows it reports; a failed propagation is a warning of it.
  */
 export async function runOperation(
@@ -149,7 +152,6 @@ export async function runOperation(
   const op = findOperation(name);
   const parsedInput = parseInput(op, input);
   checkRole(op, run.actor);
-  checkConfirmation(op, run, parsedInput);
   const effects = newEffects();
   const output = await executeInTransaction(db, effects, {
     op,

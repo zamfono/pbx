@@ -1,11 +1,11 @@
 import { register } from '../registry.js';
-import { runsGet } from './runsGet.js';
-import { runsList } from './runsList.js';
-import { runsStart } from './runsStart.js';
-import { targetsCreate } from './targetsCreate.js';
-import { targetsDelete } from './targetsDelete.js';
-import { targetsList } from './targetsList.js';
-import { targetsUpdate } from './targetsUpdate.js';
+import { runsGet } from './runs/get.js';
+import { runsList } from './runs/list.js';
+import { runsStart } from './runs/start.js';
+import { targetsCreate } from './targets/create.js';
+import { targetsDelete } from './targets/delete.js';
+import { targetsList } from './targets/list.js';
+import { targetsUpdate } from './targets/update.js';
 
 register(targetsList);
 register(targetsCreate);

@@ -7,7 +7,12 @@ import {
 } from '@zamfono/shared';
 
 import { registry, type ErasedOperation } from './registry.js';
-import { ConfirmationRequired, OpError, type Actor } from './types.js';
+import {
+  ConfirmationRequired,
+  OpError,
+  type Actor,
+  type Context
+} from './types.js';
 
 /** Owner outranks admin outranks user (§5.3); a lower number is more privileged. */
 const ROLE_RANK: Record<UserRole, number> = { owner: 0, admin: 1, user: 2 };
@@ -32,32 +37,42 @@ export function parseInput(op: ErasedOperation, input: unknown): unknown {
   return parsed.data;
 }
 
-// Only `minRole` is enforced here. §5.3's own-scope rules (e.g. a `user` reading only their own
-// voicemails) have no field on `Operation` to declare them and are each operation's own concern,
-// inside its `run`, through `isSelfOrAdmin`/`assertSelfOrAdmin` where the scope is one user.
 export function checkRole(op: ErasedOperation, actor: Actor): void {
   if (ROLE_RANK[actor.role] > ROLE_RANK[op.minRole]) {
     throw new OpError(HTTP_FORBIDDEN, 'forbidden');
   }
 }
 
-/** Whether `actor` may act on user `userId`: a `user` only on themselves, `admin`/`owner` on anyone (§5.3). */
-export function isSelfOrAdmin(
-  actor: Actor,
-  userId: string | undefined
-): boolean {
-  return actor.role !== 'user' || actor.id === userId;
+/** Throws 403 unless what the input names is a `user` caller's own (`Operation.scope`, §5.3); an
+ *  `admin` or `owner` acts on anything. */
+export async function checkScope(
+  op: ErasedOperation,
+  ctx: Context,
+  input: unknown
+): Promise<void> {
+  if (
+    ctx.actor.role !== 'user' ||
+    op.minRole !== 'user' ||
+    op.scope === 'any'
+  ) {
+    return;
+  }
+  if (!(await op.scope(ctx, input))) {
+    throw new OpError(HTTP_FORBIDDEN, `${op.name}: not your own`);
+  }
 }
 
-/** Throws `OpError(403, message)` unless `actor` may act on user `userId` (`isSelfOrAdmin`). */
-export function assertSelfOrAdmin(
-  actor: Actor,
-  userId: string,
-  message: string
-): void {
-  if (!isSelfOrAdmin(actor, userId)) {
-    throw new OpError(HTTP_FORBIDDEN, message);
-  }
+/** The `scope` of an operation addressing a user by `id`: the caller's own id alone. */
+export function ownUserId(ctx: Context, input: { id: string }): boolean {
+  return input.id === ctx.actor.id;
+}
+
+/** The `scope` of an operation acting for `userId`, the caller themselves when left out. */
+export function ownActingUser(
+  ctx: Context,
+  input: { userId?: string }
+): boolean {
+  return input.userId === undefined || input.userId === ctx.actor.id;
 }
 
 /** MCP elicitation, the REST `confirm: true` body field and the UI dialog share this gate (§10.3); undo and jobs never ask. */

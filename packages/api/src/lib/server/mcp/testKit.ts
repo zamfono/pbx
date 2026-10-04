@@ -27,6 +27,7 @@ register(
     description: 'writes a thing',
     input: z.object({ value: z.string() }),
     minRole: 'user',
+    scope: 'any',
     entity: (_input, out) => ({ kind: 'test', id: out.id }),
     run: (_ctx, input) => Promise.resolve({ id: 'w1', value: input.value })
   })
@@ -37,6 +38,7 @@ register(
     description: 'deletes a thing',
     input: z.object({ id: z.string() }).strict(),
     minRole: 'user',
+    scope: 'any',
     confirm: input => `Delete ${input.id}?`,
     entity: input => ({ kind: 'test', id: input.id }),
     run: (_ctx, input) => Promise.resolve({ deleted: input.id })
@@ -48,6 +50,7 @@ register(
     description: 'lists names',
     input: z.object({}),
     minRole: 'user',
+    scope: 'any',
     readOnly: true,
     run: () => Promise.resolve(['a', 'b'])
   })
@@ -58,6 +61,7 @@ register(
     description: 'fails unexpectedly',
     input: z.object({}),
     minRole: 'user',
+    scope: 'any',
     readOnly: true,
     run: () => Promise.reject(new Error('database on fire'))
   })

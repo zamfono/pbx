@@ -5,7 +5,7 @@ import { activeRingotelProvider } from '#lib/server/provisioning/index.js';
 import { propagate } from '../propagate.js';
 import { softDelete } from '../rows.js';
 import { defineOperation } from '../types.js';
-import { assertDeviceScope, liveDevice } from './_shared.js';
+import { liveDevice, ownTlsDevice } from './_shared.js';
 
 /** `DELETE /devices/{id}` (§10.3): soft-deletes a device. */
 export const deleteDevice = defineOperation({
@@ -13,11 +13,11 @@ export const deleteDevice = defineOperation({
   description: 'Soft-deletes a device.',
   input: z.object({ id: z.string() }).strict(),
   minRole: 'user',
+  scope: ownTlsDevice,
   confirm: input => `Delete this device? (${input.id})`,
   entity: input => ({ kind: 'device', id: input.id }),
   run: async (ctx, input) => {
     const before = await liveDevice(ctx.db, input.id);
-    assertDeviceScope(ctx.actor.role, ctx.actor.id, before);
     await softDelete(ctx, 'devices', input.id);
     propagate(ctx, ['pjsip']);
     if (before.kind === 'ringotel') {

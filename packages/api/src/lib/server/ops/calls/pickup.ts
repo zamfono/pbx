@@ -2,12 +2,9 @@ import { z } from 'zod';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 
+import { ownActingUser } from '../gates.js';
 import { defineOperation } from '../types.js';
-import {
-  liveCallIdInput,
-  proxyCallAction,
-  resolveActingUserId
-} from './_shared.js';
+import { liveCallIdInput, proxyCallAction } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -32,9 +29,10 @@ export const pickup = defineOperation({
     "Picks up a call ringing for another party, on the picking user's devices.",
   input: inputSchema,
   minRole: 'user',
+  scope: ownActingUser,
   audit: false,
   run: async (ctx, input) => {
-    const userId = resolveActingUserId(ctx, input.userId);
+    const userId = input.userId ?? ctx.actor.id;
     await proxyCallAction(() =>
       getCoreClient().pickup(input.id, { userId, actorUserId: ctx.actor.id })
     );

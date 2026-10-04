@@ -17,15 +17,9 @@ const SELF_SERVICE_FIELDS = new Set([
 ]);
 
 /** Throws 403 unless `ctx.actor` may write every field `input` carries (§5.3, §10.3). */
-export function assertAllowedFields(ctx: Context, input: { id: string }): void {
+export function assertAllowedFields(ctx: Context, input: object): void {
   if (ctx.actor.role !== 'user') {
     return;
-  }
-  if (ctx.actor.id !== input.id) {
-    throw new OpError(
-      HTTP_FORBIDDEN,
-      'users: may update only your own profile'
-    );
   }
   for (const key of Object.keys(input)) {
     if (key !== 'id' && !SELF_SERVICE_FIELDS.has(key)) {

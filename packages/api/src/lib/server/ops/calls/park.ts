@@ -2,13 +2,9 @@ import { z } from 'zod';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 
+import { ownActingUser } from '../gates.js';
 import { defineOperation } from '../types.js';
-import {
-  assertOwnLiveCall,
-  liveCallIdInput,
-  proxyCallAction,
-  resolveActingUserId
-} from './_shared.js';
+import { isOwnLiveCall, liveCallIdInput, proxyCallAction } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -35,10 +31,11 @@ export const park = defineOperation({
     'Parks the other party of a live call on the lowest free parking slot, as *70 does, and returns the slot; anyone retrieves it by dialling the slot (calls.originate with the slot as target).',
   input: inputSchema,
   minRole: 'user',
+  scope: async (ctx, input) =>
+    ownActingUser(ctx, input) && (await isOwnLiveCall(ctx, input.id)),
   audit: false,
   run: async (ctx, input) => {
-    await assertOwnLiveCall(ctx, input.id);
-    const userId = resolveActingUserId(ctx, input.userId);
+    const userId = input.userId ?? ctx.actor.id;
     const { slot } = await proxyCallAction(() =>
       getCoreClient().park(input.id, { userId, actorUserId: ctx.actor.id })
     );

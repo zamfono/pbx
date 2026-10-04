@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { assertSelfOrAdmin } from '../gates.js';
+import { ownUserId } from '../gates.js';
 import { propagate } from '../propagate.js';
 import { defineOperation } from '../types.js';
 import { liveUser } from './_shared.js';
@@ -25,13 +25,9 @@ export const setPresence = defineOperation({
     })
     .strict(),
   minRole: 'user',
+  scope: ownUserId,
   audit: false,
   run: async (ctx, input) => {
-    assertSelfOrAdmin(
-      ctx.actor,
-      input.id,
-      'users: may set only your own presence'
-    );
     await liveUser(ctx.db, input.id);
     await ctx.db
       .updateTable('users')
