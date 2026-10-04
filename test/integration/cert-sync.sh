@@ -72,23 +72,25 @@ cert_sync_caddy_fingerprint() {
 }
 
 # Diagnostics beyond `dump_diagnostics` (already called by `fail`): the three places §6.4's sync
-# reads or writes, since Caddy's on-disk layout is exactly the thing this exists to pin down.
+# reads or writes, since Caddy's on-disk layout is exactly the thing this exists to pin down. Best
+# effort, run without errexit as `fail` runs its own.
 cert_sync_dump_extra_diagnostics() {
   echo '-- caddy-data certificates tree --' >&2
-  dc exec -T proxy find /data/caddy/certificates >&2 2>&1 || true
+  dc exec -T proxy find /data/caddy/certificates >&2 2>&1
   echo '-- caddy-data zamfono/ (the hook copy, §6.4) --' >&2
-  dc exec -T proxy ls -la /data/zamfono >&2 2>&1 || true
+  dc exec -T proxy ls -la /data/zamfono >&2 2>&1
   echo '-- proxy log lines from the hook --' >&2
-  dc logs --no-color proxy 2>&1 | grep zamfono-cert-hook >&2 || true
+  dc logs --no-color proxy 2>&1 | grep zamfono-cert-hook >&2
   echo '-- api healthz body --' >&2
-  curl -fsS "${FWD[@]}" "$api_base/healthz" >&2 2>&1 || true
+  curl -fsS "${FWD[@]}" "$api_base/healthz" >&2 2>&1
   echo '-- api log lines mentioning "cert" --' >&2
-  dc logs --no-color api 2>&1 | grep -i cert >&2 || true
+  dc logs --no-color api 2>&1 | grep -i cert >&2
   echo '-- asterisk-config tls dir --' >&2
-  dc exec -T asterisk ls -la "$CERT_SYNC_TLS_DIR" >&2 2>&1 || true
+  dc exec -T asterisk ls -la "$CERT_SYNC_TLS_DIR" >&2 2>&1
 }
 
 cert_sync_fail() {
+  set +e
   cert_sync_dump_extra_diagnostics
   fail "$@"
 }

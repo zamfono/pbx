@@ -35,10 +35,12 @@ cd "$STACK_DIR" || exit 1
 
 log() { echo "== $* ==" | tee -a "$OUT_DIR/session.log" >&2; }
 
+# Without errexit, as run.sh's `fail`: a write that fails must not end the run before the logs.
 fail() {
+  set +e
   echo "FAIL: $*" | tee -a "$OUT_DIR/session.log" >&2
-  dc ps >&2 || true
-  dc logs --tail 80 >&2 || true
+  dc ps >&2
+  dc logs --tail 80 >&2
   exit 1
 }
 

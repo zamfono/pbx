@@ -89,7 +89,10 @@ use_run_dir() {
 
 # shellcheck source=diagnostics.sh
 . "$here/diagnostics.sh"
+# The failure path runs without errexit: a write that fails, the log's own on a full disk among
+# them, must neither end the run before the diagnostics nor turn it into a silent exit.
 fail() {
+  set +e
   echo "FAIL: $*" >&2
   dump_diagnostics
   exit 1

@@ -3,8 +3,8 @@
 # runs with its working directory, the stack directory.
 #
 # The directory is `DIAG_DIR` when set (CI points it at an artifact path), else a fresh temporary
-# one; `run.sh` prints where it went. Every step is best effort: a container that already exited
-# must not keep the rest from being collected.
+# one; `run.sh` prints where it went. Every step is best effort, as `fail` runs this without
+# errexit: a container that already exited must not keep the rest from being collected.
 
 # The newest calls, with their `calls.log` trace (§7), read from the core's own database. A call
 # still in progress has no trace yet: the core writes it once, at call end.
@@ -31,35 +31,38 @@ diag_compose() {
 # `run.sh`'s `fail`: the stack's state and a log tail on stderr, so a CI job's own output stays
 # readable on its own, then the full set into the directory.
 dump_diagnostics() {
-  diag_compose ps >&2 || true
-  diag_compose logs --tail 120 >&2 || true
+  diag_compose ps >&2
+  diag_compose logs --tail 120 >&2
   local dir=${DIAG_DIR:-}
   if [ -z "$dir" ]; then
     dir=$(mktemp -d "${TMPDIR:-/tmp}/zamfono-diagnostics.XXXXXX")
   fi
-  mkdir -p "$dir"
-  diag_compose ps -a > "$dir/ps.txt" 2>&1 || true
+  if [ -z "$dir" ] || ! mkdir -p "$dir"; then
+    echo "diagnostics: no directory to write them to" >&2
+    return
+  fi
+  diag_compose ps -a > "$dir/ps.txt" 2>&1
   local service
   for service in migrate core asterisk api proxy sipp sipp-phone sipp-provider sip-tls devices; do
-    diag_compose logs --no-color --timestamps "$service" > "$dir/$service.log" 2>&1 || true
+    diag_compose logs --no-color --timestamps "$service" > "$dir/$service.log" 2>&1
   done
-  diag_compose exec -T core node -e "$recent_calls_js" > "$dir/calls.jsonl" 2>&1 || true
-  diag_compose exec -T core node -e "$presence_log_js" > "$dir/presence-log.jsonl" 2>&1 || true
+  diag_compose exec -T core node -e "$recent_calls_js" > "$dir/calls.jsonl" 2>&1
+  diag_compose exec -T core node -e "$presence_log_js" > "$dir/presence-log.jsonl" 2>&1
   diag_compose exec -T asterisk asterisk -rx 'core show channels verbose' \
-    > "$dir/channels.txt" 2>&1 || true
+    > "$dir/channels.txt" 2>&1
   diag_compose exec -T asterisk asterisk -rx 'pjsip show contacts' \
-    > "$dir/contacts.txt" 2>&1 || true
+    > "$dir/contacts.txt" 2>&1
   # The sipp sides' own screens and message traces (`phone.sh`, `run-scenarios.sh`, the
   # registration scenarios' `-message_file /tmp/registrar-messages.log`).
   for service in sipp sipp-phone sipp-provider; do
     diag_compose exec -T "$service" sh -c \
       'for f in /tmp/*.log /tmp/*.exit; do [ -f "$f" ] && { echo "### $f"; cat "$f"; }; done' \
-      > "$dir/$service-files.txt" 2>&1 || true
+      > "$dir/$service-files.txt" 2>&1
   done
   # `device-tls-srtp`'s baresip device: its own SIP trace, over the TLS/SRTP transport its
   # signalling never appears in the sipp logs above.
   diag_compose exec -T devices sh -c \
     '[ -f /root/.baresip/baresip.log ] && cat /root/.baresip/baresip.log' \
-    > "$dir/devices-baresip.log" 2>&1 || true
+    > "$dir/devices-baresip.log" 2>&1
   echo "diagnostics: $dir" >&2
 }
