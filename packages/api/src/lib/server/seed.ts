@@ -8,6 +8,7 @@ import rawEmergencyNumbers from './data/emergencyNumbers.json' with { type: 'jso
 import { sendMail } from './mail/index.js';
 import { setupLinkFor } from './ops/users/_setupMail.js';
 import { encrypt, type Keyring } from './secretbox.js';
+import { createDefaultBackupTarget } from './seedBackupTarget.js';
 import {
   assertHashOrRelay,
   assertMailFromPresence,
@@ -193,6 +194,7 @@ export async function seedIfEmpty(
     });
     await createParkingSlots(trx, extLength);
     await createMohAssets(trx, env, mediaDir, now, log);
+    await createDefaultBackupTarget(trx, env, kr, now, log);
     if (!created.hasPasswordHash) {
       await sendSetupMail(trx, kr, { ownerId: created.id, now });
     }

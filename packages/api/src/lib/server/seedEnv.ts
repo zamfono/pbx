@@ -20,6 +20,7 @@ const DEFAULT_SMTP_SECURITY = 'tls';
 type PrivateEnv = typeof privateEnv;
 
 type SeedVariable =
+  | 'BACKUP_PASSWORD'
   | 'BOOTSTRAP_OWNER_EMAIL'
   | 'BOOTSTRAP_OWNER_NAME'
   | 'BOOTSTRAP_OWNER_PASSWORD_HASH'

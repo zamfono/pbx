@@ -22,9 +22,6 @@ import { scheduleRetention } from './retention.js';
 vi.mock('../seed.js', () => ({
   seedIfEmpty: vi.fn(() => Promise.resolve('seeded'))
 }));
-vi.mock('../seedBackupTarget.js', () => ({
-  seedBackupTarget: vi.fn(() => Promise.resolve('skipped'))
-}));
 vi.mock('../ops/devices/_ringotelPush.js', () => ({
   oweDevicePushesAtStart: vi.fn(() => Promise.resolve())
 }));

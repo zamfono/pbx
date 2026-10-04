@@ -466,6 +466,22 @@ describe('seedIfEmpty', () => {
     expect(second).toBe('skipped');
   });
 
+  it('seeds the default backup target once: a later start brings back none the purge removed', async () => {
+    const db = await migratedTestDb();
+    const mediaDir = await tempMediaDir();
+    const kr = testKeyring();
+    const env = baseEnv({ BACKUP_PASSWORD: 'from-env' });
+    await seedIfEmpty(db, env, kr, mediaDir, silentLogger);
+    expect(
+      await db.selectFrom('backupTargets').select('id').execute()
+    ).toHaveLength(1);
+    await db.deleteFrom('backupTargets').execute();
+    await seedIfEmpty(db, env, kr, mediaDir, silentLogger);
+    expect(await db.selectFrom('backupTargets').select('id').execute()).toEqual(
+      []
+    );
+  });
+
   it('falls back to ["112"] for a country without an entry', async () => {
     const db = await migratedTestDb();
     const mediaDir = await tempMediaDir();

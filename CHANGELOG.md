@@ -244,6 +244,10 @@ why the specified behaviour changed; the commit history, how.
   the default music instead. Each now takes only its own kind (`greeting`, `moh`, `vmGreeting`,
   `announcement`) and refuses another with 422; a menu's audio of the wrong kind answers 422
   instead of 404, and an unknown hold-music asset in the settings answers 404 instead of 422.
+- A default `local` backup target an admin deleted came back once the soft-delete retention had
+  passed. The default target is now created at first boot only, when `BACKUP_PASSWORD` is set;
+  setting `BACKUP_PASSWORD` on a running stack creates none, add a target with
+  `backups.targets.create` instead.
 - A parking slot could be an emergency number, such as `110` with three-digit extensions, so
   retrieving the call parked there dialled the emergency service; it is now refused with 422, as
   for a user's or ring group's extension. Out-of-office rules and opening hours for a user, ring

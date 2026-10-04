@@ -1,10 +1,11 @@
 import type { Logger } from 'pino';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { newId, type Db } from '@zamfono/shared';
 
 import { sealTargetSecret } from './ops/backups/_secret.js';
 import { DEFAULT_FORGET_POLICY } from './ops/backups/_shared.js';
 import type { Keyring } from './secretbox.js';
+import type { SeedEnv } from './seedEnv.js';
 
 /**
  * The restic repository of the default `local` target, on the `backups` volume `compose.yaml`
@@ -13,28 +14,21 @@ import type { Keyring } from './secretbox.js';
 export const LOCAL_BACKUP_REPOSITORY = '/backups/restic';
 
 /**
- * Creates the default `local` backup target (§6.5 "Default target") when `BACKUP_PASSWORD` is set
- * and the stack has never had a target: none live, none deleted. So a fresh stack, and one
- * upgraded from a release without the default, back up from their first night on, while a target
- * an admin deleted stays deleted. The password comes from `.env`, not from the database the
- * repository backs up, so a restore that has `.env` can open the repository.
+ * Creates the default `local` backup target (§6.5 "Default target") in the first-boot seed's
+ * transaction when `BACKUP_PASSWORD` is set, so a stack backs up from its first night on and a
+ * target an admin deletes later stays deleted. The password comes from `.env`, not from the
+ * database the repository backs up, so a restore that has `.env` can open the repository.
  */
-export async function seedBackupTarget(
+export async function createDefaultBackupTarget(
   db: Db,
-  env: { BACKUP_PASSWORD?: string | undefined },
+  env: SeedEnv,
   kr: Keyring,
+  now: string,
   log: Logger
-): Promise<'seeded' | 'skipped'> {
+): Promise<void> {
   const password = env.BACKUP_PASSWORD;
   if (password === undefined) {
-    return 'skipped';
-  }
-  const existing = await db
-    .selectFrom('backupTargets')
-    .select('id')
-    .executeTakeFirst();
-  if (existing) {
-    return 'skipped';
+    return;
   }
   const id = newId();
   await db
@@ -48,12 +42,11 @@ export async function seedBackupTarget(
       }),
       enabled: 1,
       secretEnc: sealTargetSecret(kr, { resticPassword: password }),
-      createdAt: nowIso()
+      createdAt: now
     })
     .execute();
   log.info(
     { targetId: id, path: LOCAL_BACKUP_REPOSITORY },
-    'boot: default local backup target created'
+    'seed: default local backup target created'
   );
-  return 'seeded';
 }

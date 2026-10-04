@@ -2,14 +2,14 @@ import { randomBytes } from 'node:crypto';
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { nowIso, type Db } from '@zamfono/shared';
 import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
-import { openTargetSecret, sealTargetSecret } from './ops/backups/_secret.js';
+import { openTargetSecret } from './ops/backups/_secret.js';
 import { keyringFromEnv } from './secretbox.js';
 import {
-  LOCAL_BACKUP_REPOSITORY,
-  seedBackupTarget
+  createDefaultBackupTarget,
+  LOCAL_BACKUP_REPOSITORY
 } from './seedBackupTarget.js';
 
 const logger = pino({ level: 'silent' });
@@ -23,16 +23,16 @@ async function migratedDb(): Promise<Db> {
   return db;
 }
 
-describe('seedBackupTarget', () => {
+describe('createDefaultBackupTarget', () => {
   it('creates a local target on the backups volume, keyed by BACKUP_PASSWORD', async () => {
     const db = await migratedDb();
-    const result = await seedBackupTarget(
+    await createDefaultBackupTarget(
       db,
-      { BACKUP_PASSWORD: 'from-env' },
+      { BACKUP_PASSWORD: 'from-env', MOH_SOURCE_DIR: '' },
       kr,
+      nowIso(),
       logger
     );
-    expect(result).toBe('seeded');
     const rows = await db.selectFrom('backupTargets').selectAll().execute();
     expect(rows).toHaveLength(1);
     const [row] = rows;
@@ -49,38 +49,15 @@ describe('seedBackupTarget', () => {
 
   it('creates nothing without BACKUP_PASSWORD', async () => {
     const db = await migratedDb();
-    expect(await seedBackupTarget(db, {}, kr, logger)).toBe('skipped');
+    await createDefaultBackupTarget(
+      db,
+      { MOH_SOURCE_DIR: '' },
+      kr,
+      nowIso(),
+      logger
+    );
     expect(await db.selectFrom('backupTargets').selectAll().execute()).toEqual(
       []
     );
-  });
-
-  it('runs once: a second start adds no second target', async () => {
-    const db = await migratedDb();
-    const env = { BACKUP_PASSWORD: 'from-env' };
-    await seedBackupTarget(db, env, kr, logger);
-    expect(await seedBackupTarget(db, env, kr, logger)).toBe('skipped');
-    expect(
-      await db.selectFrom('backupTargets').selectAll().execute()
-    ).toHaveLength(1);
-  });
-
-  it('does not bring back a target an admin deleted', async () => {
-    const db = await migratedDb();
-    await db
-      .insertInto('backupTargets')
-      .values({
-        id: newId(),
-        kind: 'local',
-        paramsJson: '{"path":"/backups/restic"}',
-        enabled: 1,
-        secretEnc: sealTargetSecret(kr, { resticPassword: 'old' }),
-        createdAt: nowIso(),
-        deletedAt: nowIso()
-      })
-      .execute();
-    expect(
-      await seedBackupTarget(db, { BACKUP_PASSWORD: 'x' }, kr, logger)
-    ).toBe('skipped');
   });
 });
