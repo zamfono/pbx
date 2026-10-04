@@ -10,14 +10,19 @@ import { MOH_CLASSES_DIR } from './mohLayout.js';
 // young may still be about to get one.
 const MIN_ORPHAN_AGE_MS = MS_PER_DAY;
 
-/** The names in `dir`, none for a directory that does not exist (a volume no audio reached yet). */
-async function namesIn(dir: string): Promise<string[]> {
-  return readdir(dir).catch((error: unknown) => {
+/** A rejection handler answering `none` for a path that does not exist, rethrowing the rest. */
+function unlessGone<T>(none: T): (error: unknown) => T {
+  return error => {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return [];
+      return none;
     }
     throw error;
-  });
+  };
+}
+
+/** The names in `dir`, none for a directory that does not exist (a volume no audio reached yet). */
+async function namesIn(dir: string): Promise<string[]> {
+  return readdir(dir).catch(unlessGone([]));
 }
 
 /** Removes each of `names` in `dir` whose asset id (the name up to its first `.`) is not in
@@ -33,8 +38,9 @@ async function removeOrphans(
       .filter(name => !known.has(name.split('.')[0] ?? name))
       .map(async name => {
         const entry = path.join(dir, name);
-        const info = await stat(entry);
-        if (info.mtimeMs >= before) {
+        // Gone since the listing: nothing left to remove.
+        const info = await stat(entry).catch(unlessGone(null));
+        if (info === null || info.mtimeMs >= before) {
           return false;
         }
         await rm(entry, { recursive: true, force: true });

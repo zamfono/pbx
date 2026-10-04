@@ -18,6 +18,8 @@ const log = pino({ name: 'ringotel' });
  * The calls take the device pushes' turn (`inTurn`), after any push already queued, and keep it
  * until the deletion's `run` calls the returned `release`, inside its transaction: a push queued
  * meanwhile reads its device only once the deletion committed, so it cannot re-create the user.
+ * The turn is taken whenever Ringotel is set up, with no Ringotel user to delete too: a device
+ * created before the deletion's `run` goes with it, and its push finds it deleted.
  * Should the deletion not commit, its rollback releases the turn and pushes each device's stored
  * credentials, so a device that stays live keeps its Ringotel user.
  */
@@ -26,8 +28,7 @@ export async function releaseRingotelUsers(
   devices: DeviceRow[]
 ): Promise<() => void> {
   const provisioned = devices.filter(device => device.kind === 'ringotel');
-  const provider =
-    provisioned.length === 0 ? null : await activeRingotelProvider(ctx.db);
+  const provider = await activeRingotelProvider(ctx.db);
   if (provider === null) {
     return () => undefined;
   }

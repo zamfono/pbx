@@ -1,4 +1,12 @@
-import { mkdir, mkdtemp, rm, stat, utimes, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  rm,
+  stat,
+  symlink,
+  utimes,
+  writeFile
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, onTestFinished } from 'vitest';
@@ -91,6 +99,20 @@ describe('deleteOrphanedAudioFiles', () => {
   it('finds nothing on a volume no audio reached yet', async () => {
     const mediaDir = await tempMediaDir();
     const db = await migratedTestDb();
+
+    expect(await deleteOrphanedAudioFiles(db, nowIso(), mediaDir)).toBe(0);
+  });
+
+  it('passes over a file gone between the listing and its look at it', async () => {
+    const mediaDir = await tempMediaDir();
+    const prompts = path.join(mediaDir, 'prompts');
+    const db = await migratedTestDb();
+    await mkdir(prompts, { recursive: true });
+    // A link to nothing: the listing names it, and looking at it finds no file.
+    await symlink(
+      path.join(prompts, 'removed.wav'),
+      path.join(prompts, `${newId()}.wav16`)
+    );
 
     expect(await deleteOrphanedAudioFiles(db, nowIso(), mediaDir)).toBe(0);
   });

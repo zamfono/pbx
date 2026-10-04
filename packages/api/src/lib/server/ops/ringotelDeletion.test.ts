@@ -173,4 +173,55 @@ describe("a deletion of a ringotel device's Ringotel user", () => {
     expect(outcome).toBe('settled');
     await expect(undoing).resolves.toBeDefined();
   });
+
+  it('of a user with none yet waits for a push under way, so a device created meanwhile goes with the user', async () => {
+    const { db, deviceId } = await ringotelDevice();
+    const otherUser = await seedUser(db, { ext: '997', passwordHash: 'x' });
+    const pushUnderWay = Promise.withResolvers<undefined>();
+    const release = Promise.withResolvers<undefined>();
+    let held = false;
+    aroundRingotel(async (method, answer) => {
+      if (method === 'getUsers' && !held) {
+        held = true;
+        pushUnderWay.resolve(undefined);
+        await release.promise;
+      }
+      return answer();
+    });
+
+    const rotating = runOperation(
+      db,
+      'devices.rotate',
+      { id: deviceId },
+      owner
+    );
+    await pushUnderWay.promise;
+    let deleted = false;
+    const deleting = runOperation(
+      db,
+      'users.delete',
+      { id: otherUser },
+      owner
+    ).then(() => {
+      deleted = true;
+    });
+    await new Promise(resolve => {
+      setTimeout(resolve, 50);
+    });
+    const creating = runOperation(
+      db,
+      'devices.create',
+      { userId: otherUser, label: 'Tablet', kind: 'ringotel' },
+      owner
+    );
+    await new Promise(resolve => {
+      setTimeout(resolve, 50);
+    });
+    const deletedWhilePushing = deleted;
+    release.resolve(undefined);
+    await Promise.all([rotating, deleting, creating]);
+
+    expect(deletedWhilePushing).toBe(false);
+    expect(fake?.users).toHaveLength(1);
+  });
 });
