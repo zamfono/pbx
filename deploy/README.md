@@ -381,9 +381,11 @@ names the ones `.env` lacks. If `ZAMFONO_VERSION` in `.env` pins a release (`0.3
 `edge` it pulls the newest edge images instead, and it refuses an immutable `sha-` build; by
 hand, change it yourself.
 
-Migrations only go forward. A bad release is undone by restoring the snapshot the upgrade began
-with ([`docs/guide/restore.md`](https://github.com/zamfono/pbx/blob/main/docs/guide/restore.md)) and unpacking the previous release's
-bundle (`download/vX.Y.Z`) before `up -d`.
+Migrations only go forward. A bad release is undone by stopping the stack, unpacking the previous
+release's bundle (`download/vX.Y.Z`) and restoring the snapshot the upgrade began with, by its id
+and without Litestream's copy, before `up -d`
+([`docs/guide/restore.md`](https://github.com/zamfono/pbx/blob/main/docs/guide/restore.md),
+"Rolling back a release").
 
 Always `up -d` the whole stack, never `asterisk` alone: `proxy` lives in `asterisk`'s network
 namespace, and a recreated `asterisk` leaves it on the old one.

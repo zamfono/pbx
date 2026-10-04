@@ -25,7 +25,10 @@ start the stack.
 
 ## Procedure
 
-The commands are Docker's; on Podman, `podman compose` takes the same arguments.
+The commands are Docker's; on Podman, `podman compose` takes the same arguments. On a host
+where the stack still runs, stop it first and skip steps 1 to 3: `docker compose down`, which
+keeps every volume, or `./setup/compose.sh down` with `compose.dr.yaml`; on Podman with the boot
+unit of step 7, `systemctl stop zamfono.service`.
 
 1. Provision the new host as `deploy/README.md` steps 1 to 4 describe, with the same mode, FQDN
    and public address.
@@ -40,28 +43,47 @@ The commands are Docker's; on Podman, `podman compose` takes the same arguments.
 4. Restore the database and the media into the stack's volumes before the first start, with the
    restic and rclone of the `api` image, which runs as the uid the volumes belong to. A restic
    snapshot holds the database as `tmp/zamfono-backup/<targetId>/zamfono.sqlite3` and the media
-   as `media/`:
+   as `media/`. The database's `-wal` and `-shm` files go first: SQLite would otherwise replay
+   the old write-ahead log onto the restored file.
 
    ```bash
    docker compose run --rm --no-deps --entrypoint sh \
      -e RESTIC_REPOSITORY='<repository>' -e RESTIC_PASSWORD='<password>' api -c '
        restic restore latest --target /tmp/restore &&
+       rm -f /data/zamfono.sqlite3-wal /data/zamfono.sqlite3-shm &&
        cp /tmp/restore/tmp/zamfono-backup/*/zamfono.sqlite3 /data/zamfono.sqlite3 &&
        cp -a /tmp/restore/media/. /media/'
    ```
 
-   For the default `local` target, which only a surviving host still has, the repository is
-   `/backups/restic` and the password `BACKUP_PASSWORD` from `.env`. For another target, add the
-   backend's variables as restic documents them (for `s3`, `AWS_ACCESS_KEY_ID` and
-   `AWS_SECRET_ACCESS_KEY`).
+   The repository and the backend's variables (`-e NAME='<value>'` each) depend on the target's
+   kind, with the values entered when it was created:
+
+   | Kind          | Repository                        | Variables                                                                                         |
+   | ------------- | --------------------------------- | ------------------------------------------------------------------------------------------------- |
+   | `local`       | `/backups/restic`                 | none; the password is `BACKUP_PASSWORD` from `.env`                                               |
+   | `s3`          | `s3:<endpoint>/<bucket>[/<path>]` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`                                                      |
+   | `sftp`        | `sftp:<username>@<host>:<path>`   | `SSHPASS` (the password)                                                                          |
+   | `ftp`, `ftps` | `rclone:zamfono:<path>`           | `RCLONE_CONFIG_ZAMFONO_TYPE=ftp`, `_HOST`, `_USER`, `_PASS`; for `ftps` also `_EXPLICIT_TLS=true` |
+   | `webdav`      | `rclone:zamfono:<path>`           | `RCLONE_CONFIG_ZAMFONO_TYPE=webdav`, `_URL`, `_USER`, `_PASS`                                     |
+
+   Only a surviving host still has the `local` repository. `_HOST` and the other short names stand
+   for `RCLONE_CONFIG_ZAMFONO_HOST` and so on. rclone takes `_PASS` obscured, never plain:
+   `docker compose run --rm --no-deps --entrypoint rclone api obscure '<password>'` prints the
+   value to set. For `sftp`, ssh gets the password through `sshpass`, which restic is told about
+   with an option after `restic restore latest`:
+   `-o "sftp.command=sshpass -e ssh -o StrictHostKeyChecking=accept-new -l <username> <host> -s sftp"`.
 
 5. With continuous replication, replace the database with Litestream's newer copy, through the
    sidecar of `compose.dr.yaml`, which mounts the `db` volume at `/data`, as uid 1000 like every
-   container writing that volume. The restic step above still brings the media.
+   container writing that volume. The restic step above still brings the media. Litestream
+   refuses to restore over an existing database, so the restic copy and its `-wal` and `-shm`
+   files go first:
 
    ```bash
-   ./setup/compose.sh run --rm --no-deps --user 1000:1000 <sidecar> \
-     litestream restore -o /data/zamfono.sqlite3 '<replica URL>'
+   ./setup/compose.sh run --rm --no-deps --entrypoint rm api \
+     -f /data/zamfono.sqlite3 /data/zamfono.sqlite3-wal /data/zamfono.sqlite3-shm
+   ./setup/compose.sh run --rm --no-deps --user 1000:1000 --entrypoint litestream <sidecar> \
+     restore -o /data/zamfono.sqlite3 '<replica URL>'
    ```
 
 6. Start the stack: `docker compose up -d`, or `./setup/compose.sh up -d` with `compose.dr.yaml`;
@@ -71,6 +93,20 @@ The commands are Docker's; on Podman, `podman compose` takes the same arguments.
 With continuous replication, configuration, users and call history are current to within
 seconds, and media newer than the last restic run is lost. Without it, everything is as old as
 the last restic snapshot.
+
+## Rolling back a release
+
+Migrations only go forward, so a bad release is undone on its own host by restoring the
+snapshot the upgrade began with, the backup run taken right before it:
+
+1. Note that run's `snapshotId` from `backups.runs.list` (`GET /backups/runs`), or find the
+   snapshot in the list `restic snapshots` prints in place of the `restic restore` command of
+   step 4.
+2. Stop the stack, as above, and unpack the previous release's bundle (step 2). Where `.env`
+   pins `ZAMFONO_VERSION`, set it to that release.
+3. Run step 4 with the snapshot's id in place of `latest`. Skip step 5: Litestream's copy already
+   holds the bad release's migrations.
+4. Start the stack (step 6).
 
 ## Conditions
 
