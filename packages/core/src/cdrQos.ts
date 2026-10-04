@@ -89,11 +89,6 @@ export class QosRows {
     this.rtcp = rtcp;
   }
 
-  /** How many channels' rows are still awaited; a test seam. */
-  get awaited(): number {
-    return this.callsByChannel.size;
-  }
-
   /**
    * Notes `call`'s channels as they are now, each under its role: the caller's own and every leg
    * that is up. Safe to call any number of times for a call; a channel keeps the role it was last

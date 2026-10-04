@@ -45,7 +45,7 @@ async function joinRetriever(
     presence.setCallState(call.callerUserId, 'idle', null, null, call.id);
   }
   // §7 level `sip`: the retriever's dialog is the parked call's leg now, not the slot dial's.
-  pipeline.deps.cdr.registerLeg(parked, callerChannel(call));
+  pipeline.deps.cdr.dialogs.registerLeg(parked, callerChannel(call));
   await pipeline.deps.recorder.onLegUp(parked, leg);
 }
 

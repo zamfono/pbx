@@ -446,7 +446,7 @@ describe('CallActions', () => {
     await seedDevice(rig, callerId, 'e101-a');
     await seedDevice(rig, callerId, 'e101-b');
     await rig.devicesUp();
-    const joinLeg = vi.spyOn(cdr, 'joinLeg');
+    const joinLeg = vi.spyOn(cdr.dialogs, 'joinLeg');
 
     const result = await actions.originate({
       userId: callerId,
@@ -522,10 +522,12 @@ describe('CallActions', () => {
     await seedDevice(rig, callerId, 'e101-a');
     await rig.devicesUp();
     const trail: string[] = [];
-    const joinLeg = vi.spyOn(cdr, 'joinLeg').mockImplementation((_call, id) => {
-      trail.push(`join ${id}`);
-      return Promise.resolve();
-    });
+    const joinLeg = vi
+      .spyOn(cdr.dialogs, 'joinLeg')
+      .mockImplementation((_call, id) => {
+        trail.push(`join ${id}`);
+        return Promise.resolve();
+      });
     fakeAri.onOriginate = channel => {
       trail.push(`dial ${channel.id}`);
       fakeAri.emit({
@@ -880,7 +882,7 @@ describe('CallActions', () => {
     await seedDevice(rig, pickerId, 'e102-b');
     await rig.devicesUp();
     const ringing = ringingCall(calleeId);
-    const joinLeg = vi.spyOn(cdr, 'joinLeg');
+    const joinLeg = vi.spyOn(cdr.dialogs, 'joinLeg');
 
     await actions.pickup(ringing.id, { actorUserId: pickerId });
 

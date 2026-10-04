@@ -26,9 +26,12 @@ export type PipelineDeps = {
     noteQosLegs(call: Call): void;
     /** §7 level `qos`: a channel's `ChannelDestroyed`, carrying its `RTPAUDIOQOS`. */
     channelEnded(channel: Channel): Promise<void>;
-    registerLeg(call: Call, channelId: string): void;
-    /** `registerLeg`, resolving once the join is in place (`legOriginate.ts`). */
-    joinLeg(call: Call, channelId: string): Promise<void>;
+    /** §7: joins a leg's SIP dialog to its call (`callDialogs.ts`). */
+    dialogs: {
+      registerLeg(call: Call, channelId: string): void;
+      /** `registerLeg`, resolving once the join is in place (`legOriginate.ts`). */
+      joinLeg(call: Call, channelId: string): Promise<void>;
+    };
   };
   // §10.2 "Call recording": the answer and end points below hand every participation to the
   // recorder, which decides per participation whether the effective flag is set.

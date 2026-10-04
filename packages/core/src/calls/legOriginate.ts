@@ -97,7 +97,7 @@ export async function originateLeg(
       stasis.settle('gone');
       throw new PlacementError('create', error);
     });
-  const joined = cdr.joinLeg(call, channel.id);
+  const joined = cdr.dialogs.joinLeg(call, channel.id);
   if (call.log.level === 'sip') {
     await joined;
   }

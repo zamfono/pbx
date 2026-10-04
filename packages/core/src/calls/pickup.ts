@@ -87,7 +87,7 @@ async function bridgePickup(
     );
   }
   // §7 level `sip`: the picker's dialog is `target`'s answered leg now.
-  pipeline.deps.cdr.registerLeg(target, picker.channelId);
+  pipeline.deps.cdr.dialogs.registerLeg(target, picker.channelId);
 }
 
 /**

@@ -358,7 +358,7 @@ describe('outbound dialing', () => {
     await seedRoute(db, 1, trunkId);
     const joined: { callId: string; channelId: string; dialled: boolean }[] =
       [];
-    pipeline.deps.cdr.joinLeg = (joinedCall, channelId) => {
+    pipeline.deps.cdr.dialogs.joinLeg = (joinedCall, channelId) => {
       joined.push({
         callId: joinedCall.id,
         channelId,

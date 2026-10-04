@@ -125,10 +125,10 @@ export async function startHepCollector(
     addresses,
     {
       sip: message => {
-        cdr.sipMessage(message);
+        cdr.dialogs.sipMessage(message);
       },
       rtcp: report => {
-        cdr.rtcpReport(report);
+        cdr.dialogs.rtcpReport(report);
       }
     },
     log

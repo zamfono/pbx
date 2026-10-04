@@ -275,6 +275,8 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
+- `core` no longer keeps a record of every call that ended for as long as it runs, so its memory
+  stays flat on a busy stack.
 - A ring group with neither greeting nor music no longer answers the caller and plays the default
   hold music: the caller hears ringback until a member answers. A ring group's call recording now
   covers only the members it rang, not a user its fallback reached afterwards. Dialling an empty

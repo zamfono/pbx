@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   newId,
@@ -292,11 +292,9 @@ describe('CdrWriter', () => {
       'call-id-abc@10.0.0.1'
     );
 
+    // At level `sip` the caller's dialog is joined once `open` resolves.
     await cdr.open(call);
-    await eventually(() => {
-      expect(cdr.knowsCallId('call-id-abc@10.0.0.1')).toBe(true);
-    });
-    cdr.sipMessage({
+    cdr.dialogs.sipMessage({
       callId: 'call-id-abc@10.0.0.1',
       at: '2026-01-01T00:00:01.000Z',
       direction: 'in',
@@ -329,9 +327,8 @@ describe('CdrWriter', () => {
     });
 
     await cdr.open(call);
-    expect(cdr.knowsCallId('call-id-404@10.0.0.1')).toBe(true);
     const finishing = cdr.finish(call);
-    cdr.sipMessage({
+    cdr.dialogs.sipMessage({
       callId: 'call-id-404@10.0.0.1',
       at: '2026-01-01T00:00:01.000Z',
       direction: 'out',
@@ -350,7 +347,7 @@ describe('CdrWriter', () => {
   it('drops a HEP message whose Call-ID belongs to no open call', () => {
     const call = buildCall('sip');
 
-    cdr.sipMessage({
+    cdr.dialogs.sipMessage({
       callId: 'not-a-call@10.0.0.1',
       at: '2026-01-01T00:00:01.000Z',
       direction: 'in',
@@ -389,8 +386,17 @@ describe('CdrWriter', () => {
       'call-id-rtcp@10.0.0.1'
     );
     await cdr.open(call);
+    // Below level `sip` the caller's join runs on; a message of its dialog reaching the call shows
+    // it in place.
+    const logged = vi.spyOn(call.log, 'sip');
+    cdr.dialogs.sipMessage({
+      callId: 'call-id-rtcp@10.0.0.1',
+      at: '2026-01-01T00:00:01.000Z',
+      direction: 'in',
+      payload: 'INVITE sip:101@pbx SIP/2.0'
+    });
     await eventually(() => {
-      expect(cdr.knowsCallId('call-id-rtcp@10.0.0.1')).toBe(true);
+      expect(logged).toHaveBeenCalled();
     });
     const sentAt = 1_790_000_000_000;
     const report = parseRtcpReport(
@@ -404,7 +410,7 @@ describe('CdrWriter', () => {
     if (report === null) {
       throw new Error('not a report');
     }
-    cdr.rtcpReport({
+    cdr.dialogs.rtcpReport({
       callId: 'call-id-rtcp@10.0.0.1',
       atMs: sentAt + 150,
       sender: 'peer',

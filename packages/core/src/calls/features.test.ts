@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { newId, nowIso, type Db } from '@zamfono/shared';
 
@@ -8,6 +8,7 @@ import type { Channel } from '../ari/types.js';
 import type { CdrWriter } from '../cdr.js';
 import { ERROR_TONE_MEDIA } from '../indications.js';
 import type { Presence } from '../presence.js';
+import type { SipMessage } from '../sipCapture.js';
 import type { FakeAri } from '../testing/ari/fake.js';
 import {
   defaultChannel,
@@ -377,15 +378,28 @@ describe('features', () => {
       'picker-dialog@10.0.0.2'
     );
 
+    const logged = vi.spyOn(target.log, 'sip');
+    const message = (payload: string): SipMessage => ({
+      callId: 'picker-dialog@10.0.0.2',
+      at: '2026-01-01T00:00:01.000Z',
+      direction: 'in',
+      payload
+    });
+
     await handleFeature(pipeline, presence, pickerCall, 'pickup', '101');
+    cdr.dialogs.sipMessage(message('BYE sip:e102@pbx SIP/2.0'));
 
     // The join reads the picker channel's Call-ID off ARI first.
     await eventually(() => {
-      expect(cdr.knowsCallId('picker-dialog@10.0.0.2')).toBe(true);
+      expect(logged).toHaveBeenCalledWith(
+        expect.objectContaining({ raw: 'BYE sip:e102@pbx SIP/2.0' })
+      );
     });
     target.status = 'answered';
     await cdr.finish(target);
-    expect(cdr.knowsCallId('picker-dialog@10.0.0.2')).toBe(false);
+    logged.mockClear();
+    cdr.dialogs.sipMessage(message('SIP/2.0 200 OK'));
+    expect(logged).not.toHaveBeenCalled();
   });
 
   it("*8101: the pickup is recorded, shown up and traced as the call's one answer, like every answer", async () => {

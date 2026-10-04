@@ -70,11 +70,13 @@ function stubPipeline(
         }
       },
       cdr: {
-        joinLeg: (_call: unknown, channelId: string) => {
-          steps.push(`join ${channelId}`);
-          return join.promise.then(() => {
-            steps.push('joined');
-          });
+        dialogs: {
+          joinLeg: (_call: unknown, channelId: string) => {
+            steps.push(`join ${channelId}`);
+            return join.promise.then(() => {
+              steps.push('joined');
+            });
+          }
         }
       }
     }

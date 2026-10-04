@@ -185,7 +185,6 @@ describe('RtcpQos (§7 level qos)', () => {
     rtcp.join('leg', CALL_ID);
     expect(rtcp.take('leg')).not.toBeNull();
     expect(rtcp.take('leg')).toBeNull();
-    expect(rtcp.size).toBe(0);
   });
 
   it('drops a leg whose reports stopped long ago, and the joins of channels gone', () => {
@@ -200,7 +199,6 @@ describe('RtcpQos (§7 level qos)', () => {
     now = 6 * 60_000;
     rtcp.report(mirrored('asterisk', T0, rtcpPayload({ ssrc: 2, sent: 1 })));
 
-    expect(rtcp.size).toBe(1);
     expect(rtcp.take('old')).toBeNull();
 
     rtcp.join('gone', 'gone-call-id');

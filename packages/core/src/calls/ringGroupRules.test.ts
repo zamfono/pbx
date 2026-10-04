@@ -398,7 +398,7 @@ describe('ring-group ringability and fallback rules', () => {
     await register('e101-da');
     await register('e102-db');
     const joined: string[] = [];
-    pipeline.deps.cdr.joinLeg = (joinedCall, channelId) => {
+    pipeline.deps.cdr.dialogs.joinLeg = (joinedCall, channelId) => {
       expect(joinedCall).toBe(call);
       // Joined before its INVITE leaves (§7 level `sip`): created, not dialled yet.
       expect(

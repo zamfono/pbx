@@ -52,11 +52,6 @@ export class SipCapture {
     this.now = now;
   }
 
-  /** Whether a Call-ID is registered; the HEP correlation's own test seam. */
-  knowsCallId(callId: string): boolean {
-    return this.callsByCallId.has(callId);
-  }
-
   /** Appends one mirrored SIP message to its call's log, holding one whose call is not known yet. */
   message(message: SipMessage): void {
     const call = this.callsByCallId.get(message.callId);

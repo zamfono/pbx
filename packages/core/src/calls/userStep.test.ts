@@ -337,7 +337,7 @@ describe('user step against registration', () => {
     await register('e101-da');
     await register('e101-db');
     const joined: string[] = [];
-    pipeline.deps.cdr.joinLeg = (joinedCall, channelId) => {
+    pipeline.deps.cdr.dialogs.joinLeg = (joinedCall, channelId) => {
       expect(joinedCall).toBe(call);
       // Joined before its INVITE leaves (§7 level `sip`): created, not dialled yet.
       expect(
@@ -367,7 +367,7 @@ describe('user step against registration', () => {
     await register('e101-db');
     const bothJoining = Promise.withResolvers<undefined>();
     let joining = 0;
-    pipeline.deps.cdr.joinLeg = async () => {
+    pipeline.deps.cdr.dialogs.joinLeg = async () => {
       joining += 1;
       if (joining === 2) {
         bothJoining.resolve(undefined);

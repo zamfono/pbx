@@ -83,7 +83,7 @@ function takeOverAnsweredLeg(
     presence.setCallState(leg.userId, 'idle', null, null, ringback.id);
   }
   // §7 level `sip`: the parker's dialog is the parked call's leg now, not the ring-back's.
-  cdr.registerLeg(parked, leg.channelId);
+  cdr.dialogs.registerLeg(parked, leg.channelId);
   recorder.onLegMoved(ringback, parked, leg);
 }
 

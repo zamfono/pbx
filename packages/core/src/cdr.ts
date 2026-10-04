@@ -11,6 +11,7 @@ import type { Db } from '@zamfono/shared';
 import type { AriClient } from './ari/client.js';
 import { logFailure } from './ari/failures.js';
 import type { Channel, Logger } from './ari/types.js';
+import { CallDialogs } from './callDialogs.js';
 import type { Call } from './calls/call.js';
 import { callEnded } from './calls/callState.js';
 import { QosRows } from './cdrQos.js';
@@ -18,8 +19,6 @@ import type { EventBus } from './internal/eventBus.js';
 import type { ConfigCache } from './internal/snapshot.js';
 import type { StateStore } from './internal/stateStore.js';
 import { RtcpQos } from './rtcpQos.js';
-import type { RtcpHepReport } from './rtcpReport.js';
-import { SipCapture, type SipMessage } from './sipCapture.js';
 
 type CdrWriterDeps = {
   db: Db;
@@ -78,77 +77,30 @@ export class CdrWriter {
 
   private readonly qos: QosRows;
 
-  /** §7 level `qos`: the RTCP reports Asterisk mirrors, by the Call-ID of the channel they are
-   * about, for the rows `qos` writes. */
-  private readonly rtcp = new RtcpQos();
+  /** §7: each channel's SIP dialog joined to its call and its RTCP reports to the channel. */
+  readonly dialogs: CallDialogs;
+
+  // Several paths end a call — the mailbox storing a message, a leg's own hangup, the caller's
+  // channel going — and more than one runs for the same call. `history.appended` and the ended
+  // `call.state` event are emitted once per call, so the first `finish` is the one that counts.
+  // Weakly held: a call's entry goes with the call.
+  private readonly finished = new WeakSet<Call>();
 
   constructor(deps: CdrWriterDeps) {
     this.deps = deps;
+    const rtcp = new RtcpQos();
     this.qos = new QosRows(
       deps.db,
       deps.ari.channels,
       deps.log,
       undefined,
-      this.rtcp
+      rtcp
     );
-    this.sip = new SipCapture(deps.ari);
+    this.dialogs = new CallDialogs(deps.ari, rtcp, deps.log);
     // §7 level `qos`: a `ChannelDestroyed` sent while the connection was down never arrives.
     deps.ari.on('connected', () => {
       this.qos.resync().catch(logFailure(this.deps.log, 'qos resync'));
     });
-  }
-
-  /** §7 level `sip`: the mirrored SIP messages, joined to their call by Call-ID. */
-  private readonly sip: SipCapture;
-  // Several paths end a call — the mailbox storing a message, a leg's own hangup, the caller's
-  // channel going — and more than one runs for the same call. `history.appended` and the ended
-  // `call.state` event are emitted once per call, so the first `finish` is the one that counts.
-  private readonly finished = new Set<string>();
-
-  /** Whether a Call-ID is registered; the HEP correlation's own test seam. */
-  knowsCallId(callId: string): boolean {
-    return this.sip.knowsCallId(callId);
-  }
-
-  /** Appends one mirrored SIP message to its call's log (§7 level `sip`). */
-  sipMessage(message: SipMessage): void {
-    this.sip.message(message);
-  }
-
-  /** One RTCP report Asterisk mirrored, for its leg's `call_qos` row (§7 level `qos`). */
-  rtcpReport(report: RtcpHepReport): void {
-    this.rtcp.report(report);
-  }
-
-  /** Joins a leg's SIP dialog to `call` (§7 level `sip`: the call's SIP messages are every
-   * dialog's, not the caller's alone). */
-  registerLeg(call: Call, channelId: string): void {
-    this.join(call, channelId).catch(
-      logFailure(this.deps.log, 'SIP dialog join', {
-        callId: call.id,
-        channelId
-      })
-    );
-  }
-
-  /** `registerLeg`, resolving once the join is in place or has failed: a leg created but not yet
-   * dialled (`legOriginate.ts`) joins before its INVITE leaves. */
-  joinLeg(call: Call, channelId: string): Promise<void> {
-    return this.join(call, channelId).catch(
-      logFailure(this.deps.log, 'SIP dialog join', {
-        callId: call.id,
-        channelId
-      })
-    );
-  }
-
-  /** Joins `channelId`'s Call-ID to `call` for its SIP messages, and to the channel for its RTCP
-   * reports. */
-  private async join(call: Call, channelId: string): Promise<void> {
-    const sipCallId = await this.sip.register(call, channelId);
-    if (sipCallId !== null) {
-      this.rtcp.join(channelId, sipCallId);
-    }
   }
 
   /** Inserts `call`'s `calls` row now, under the placeholder status, so anything that references
@@ -164,7 +116,7 @@ export class CdrWriter {
     const joined =
       call.callerChannelId === null
         ? Promise.resolve()
-        : this.join(call, call.callerChannelId);
+        : this.dialogs.join(call, call.callerChannelId);
     // §7 level `qos`: the caller's channel has a `call_qos` row from the start.
     this.qos.note(call);
     if (call.log.level === 'sip') {
@@ -198,16 +150,16 @@ export class CdrWriter {
   /** Closes out `call`: the `calls` row (upserted, since `open()` may already have inserted its
    * placeholder), its `call_qos` rows, and the `history.appended` event. */
   async finish(call: Call): Promise<void> {
-    if (this.finished.has(call.id)) {
+    if (this.finished.has(call)) {
       return;
     }
-    this.finished.add(call.id);
+    this.finished.add(call);
     if (call.log.level === 'sip') {
       await new Promise(resolve => {
         setTimeout(resolve, this.deps.sipTailMs ?? SIP_TAIL_MS);
       });
     }
-    this.sip.forget(call);
+    this.dialogs.forget(call);
     callEnded(this.deps, call);
     const { log, truncated } = call.log.finish();
     const row = {
@@ -241,7 +193,7 @@ export class CdrWriter {
    * its `call_qos` rows come from (§7 level `qos`). */
   noteQosLegs(call: Call): void {
     // An event reaching a call already closed out has nothing left to add to it.
-    if (this.finished.has(call.id)) {
+    if (this.finished.has(call)) {
       return;
     }
     this.qos.note(call);

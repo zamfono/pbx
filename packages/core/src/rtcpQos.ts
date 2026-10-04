@@ -129,11 +129,6 @@ export class RtcpQos {
     this.now = now;
   }
 
-  /** How many legs' reports are kept; a test seam. */
-  get size(): number {
-    return this.legs.size;
-  }
-
   /** Joins `channelId` to its SIP Call-ID, under which its reports arrive. */
   join(channelId: string, sipCallId: string): void {
     this.sipCallIds.set(channelId, sipCallId);

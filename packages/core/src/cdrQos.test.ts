@@ -348,20 +348,21 @@ describe('QosRows (§7 level qos)', () => {
 
   // A `ChannelDestroyed` lost while the ARI connection was down never arrives.
   it('lets go of a written call’s channel Asterisk no longer holds once the tail has passed, and keeps one that lives on', async () => {
-    const live = ['caller'];
-    const qos = new QosRows(db, holding(live), noopLogger, 20);
+    const channels = holding(['caller']);
+    const listed = vi.spyOn(channels, 'list');
+    const qos = new QosRows(db, channels, noopLogger, 20);
     const call = await openCall(db);
     qos.note(call);
     answerWith(call, 'leg');
     await qos.write(call);
-    expect(qos.awaited).toBe(2);
 
     await vi.waitFor(() => {
-      expect(qos.awaited).toBe(1);
+      expect(listed).toHaveBeenCalled();
     });
-    // The caller lives on (a transferred caller in the call it was handed to) and still has its row.
+    // The leg's `ChannelDestroyed`, arriving after it was let go, gives no row; the caller lives on
+    // (a transferred caller in the call it was handed to) and still has its row.
+    await qos.channelEnded(ended('leg'));
     await qos.channelEnded(ended('caller'));
-    expect(qos.awaited).toBe(0);
     expect(await rowsOf(call)).toEqual([
       expect.objectContaining({ channelId: 'caller', role: 'caller' })
     ]);
@@ -376,15 +377,20 @@ describe('QosRows (§7 level qos)', () => {
     answerWith(call, 'leg');
     qos.note(call);
     qos.note(other);
-    expect(qos.awaited).toBe(3);
 
     await qos.resync();
 
-    expect(qos.awaited).toBe(1);
-    // The gone channel was let go for good: noted again, it is not awaited a second time.
+    // The gone channels were let go for good: noted again, they are not awaited a second time,
+    // and their late `ChannelDestroyed`s give no row; the caller Asterisk still holds keeps its.
     qos.note(other);
-    expect(qos.awaited).toBe(1);
+    await qos.write(call);
     await qos.write(other);
+    await qos.channelEnded(ended('leg'));
+    await qos.channelEnded(ended('caller-2'));
+    await qos.channelEnded(ended('caller'));
+    expect(await rowsOf(call)).toEqual([
+      expect.objectContaining({ channelId: 'caller', role: 'caller' })
+    ]);
     expect(await rowsOf(other)).toEqual([]);
   });
 
