@@ -370,6 +370,7 @@ export interface Settings {
   sipBanStepsJson: Generated<string>;
   sipBanSuccessExemptS: Generated<number>;
   sipBanWindowS: Generated<number>;
+  smtpCheckIntervalS: Generated<number | null>;
   smtpHost: string | null;
   smtpPasswordEnc: Buffer | null;
   smtpPort: Generated<number>;

@@ -5,7 +5,7 @@ import { migrateForTest, MIGRATIONS_DIR } from './testDb.js';
 
 test('migrates and enforces the schema', async () => {
   const db = openDb(':memory:');
-  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(2);
+  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(3);
   await migrateForTest(db);
   expect(await pendingMigrations(db, MIGRATIONS_DIR)).toEqual([]);
 
@@ -13,6 +13,14 @@ test('migrates and enforces the schema', async () => {
     .map(table => table.name)
     .sort();
   expect(tables).toHaveLength(48);
+
+  // settings.smtp_check_interval_s: 900 by default, NULL for no periodic relay check (§11.4)
+  const settings = (await db.introspection.getTables()).find(
+    table => table.name === 'settings'
+  );
+  expect(
+    settings?.columns.find(column => column.name === 'smtp_check_interval_s')
+  ).toMatchObject({ isNullable: true, hasDefaultValue: true });
 
   // partial unique: two soft-deleted users may share an e-mail with a live one
   await db
