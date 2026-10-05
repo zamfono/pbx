@@ -10,7 +10,7 @@
 #   bash test/integration/run.sh
 #     A full run: every prerequisite (bring-up, tenant configuration), every named step
 #     (steps.sh, trunk-status.sh, propagation-owed.sh, asterisk-started.sh, host-update.sh,
-#     cert-sync.sh) and every scenario under scenarios/, in this file's order. cert-sync always
+#     sip-ban.sh, cert-sync.sh) and every scenario under scenarios/, in this file's order. cert-sync always
 #     runs last.
 #
 #   ONLY=<glob>[,<glob>...] bash test/integration/run.sh
@@ -64,6 +64,8 @@ CERT_SYNC_CADDYFILE="$here/Caddyfile.local-ca"
 export API_PORT SCENARIOS_DIR CERT_SYNC_CADDYFILE FQDN
 api_base=http://127.0.0.1:$API_PORT
 MAIN_DID=+15551000
+# The stack's /metrics token (steps.sh writes it into .env), a constant so REUSE reads it too.
+METRICS_TOKEN=ci-metrics-token
 # shellcheck source=../api.sh
 . "$here/../api.sh"
 # shellcheck source=../stack.sh
@@ -137,6 +139,8 @@ RUNTIME=${COMPOSE%% *}
 . "$here/asterisk-started.sh"
 # shellcheck source=host-update.sh
 . "$here/host-update.sh"
+# shellcheck source=sip-ban.sh
+. "$here/sip-ban.sh"
 # shellcheck source=cert-sync.sh
 . "$here/cert-sync.sh"
 # shellcheck source=upgrade.sh
@@ -202,6 +206,10 @@ fi
 
 if shard_owns_steps && name_selected host-update; then
   run_host_update_step
+fi
+
+if shard_owns_steps && name_selected sip-ban; then
+  run_sip_ban_step
 fi
 
 # Last (see cert-sync.sh's own comment for why): every sipp scenario, including device-tls-srtp,

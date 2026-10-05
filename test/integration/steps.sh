@@ -27,6 +27,11 @@ bring_up_stack() {
   # sipp peers send their media.
   echo '== writing .env with setup.sh =='
   stack_write_env "$run_dir" CI 10.213.47.10
+  # /metrics behind the harness's own token, set the way deploy/README.md tells an operator to,
+  # so `sip-ban.sh` can read it (§7).
+  # shellcheck source=../../deploy/setup/envfile.sh
+  (. "$repo/deploy/setup/envfile.sh" && set_env_line "$run_dir/.env" METRICS_TOKEN "$METRICS_TOKEN") \
+    || fail 'could not set METRICS_TOKEN in .env'
 
   if [ -n "${UPGRADE_FROM:-}" ]; then
     upgrade_from_release

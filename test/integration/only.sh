@@ -1,7 +1,7 @@
 # Sourced by `run.sh`: whether a scenario or named step called `$1` is one this run selected.
 # `ONLY=<glob>[,<glob>...]` (run.sh's own usage block) selects among the sipp scenarios
 # (run-scenarios.sh) and the named steps (steps.sh, trunk-status.sh, propagation-owed.sh,
-# asterisk-started.sh, host-update.sh, cert-sync.sh) alike, by the same mechanism; unset or
+# asterisk-started.sh, host-update.sh, sip-ban.sh, cert-sync.sh) alike, by the same mechanism; unset or
 # empty, everything matches, the way a bare `ONLY=*` would. The stack's own prerequisites (bring-up, tenant configuration) are not names
 # this selects among at all — run.sh runs them unconditionally, REUSE aside.
 
@@ -19,7 +19,7 @@ name_selected() {
 # `SHARD=<k>/<n>` splits the sipp scenarios over n runs of their own stacks, CI's way of playing
 # them in parallel: this run plays every n-th one, from the k-th on, in the scenarios' own order,
 # so the split does not depend on ONLY. The named steps after the scenarios (`trunk-status`,
-# `propagation-owed`, `asterisk-started`, `host-update`, `cert-sync`) run on the last shard
+# `propagation-owed`, `asterisk-started`, `host-update`, `sip-ban`, `cert-sync`) run on the last shard
 # alone; the stack's prerequisites run on every shard.
 SHARD=${SHARD:-1/1}
 [[ $SHARD =~ ^([1-9][0-9]*)/([1-9][0-9]*)$ ]] && ((BASH_REMATCH[1] <= BASH_REMATCH[2])) || {

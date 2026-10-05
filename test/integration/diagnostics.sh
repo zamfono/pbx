@@ -43,7 +43,8 @@ dump_diagnostics() {
   fi
   diag_compose ps -a > "$dir/ps.txt" 2>&1
   local service
-  for service in migrate core asterisk api proxy sipp sipp-phone sipp-provider sip-tls devices; do
+  for service in migrate core asterisk api proxy sipp sipp-phone sipp-provider sipp-outside sip-tls \
+    devices; do
     diag_compose logs --no-color --timestamps "$service" > "$dir/$service.log" 2>&1
   done
   diag_compose exec -T core node -e "$recent_calls_js" > "$dir/calls.jsonl" 2>&1
@@ -54,7 +55,7 @@ dump_diagnostics() {
     > "$dir/contacts.txt" 2>&1
   # The sipp sides' own screens and message traces (`phone.sh`, `run-scenarios.sh`, the
   # registration scenarios' `-message_file /tmp/registrar-messages.log`).
-  for service in sipp sipp-phone sipp-provider; do
+  for service in sipp sipp-phone sipp-provider sipp-outside; do
     diag_compose exec -T "$service" sh -c \
       'for f in /tmp/*.log /tmp/*.exit; do [ -f "$f" ] && { echo "### $f"; cat "$f"; }; done' \
       > "$dir/$service-files.txt" 2>&1

@@ -20,6 +20,14 @@ networks:
     ipam:
       config:
         - subnet: 10.213.47.0/24
+  # The network a scanner reaches Asterisk from in `sip-ban.sh` (§5.6): outside the stack's own
+  # `internal` network, whose every address `core` exempts as the stack's own. `asterisk` joins it
+  # only for that step (`network connect`): on two networks from its start its entrypoint could
+  # bind ARI and AMI to this network's address instead of `internal`'s.
+  outside:
+    ipam:
+      config:
+        - subnet: 10.213.48.0/24
 
 # Every service's image is the build under test, or a third-party one pinned here, and the run
 # starts with them present: `pull_policy: missing` keeps a `pull` (update.sh's, host-update.sh)
@@ -166,6 +174,22 @@ services:
     pull_policy: missing
     networks:
       - internal
+    entrypoint: ['sleep', 'infinity']
+    init: true
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # `sip-ban.sh`'s scanner (§5.6), the one container on `outside` alone: a source address `core`
+  # neither exempts as the stack's own nor shares with any device the scenarios register.
+  sipp-outside:
+    image: *sipp-image
+    pull_policy: missing
+    networks:
+      outside:
+        ipv4_address: 10.213.48.20
+    volumes:
+      - ${SCENARIOS_DIR:?set by run.sh}:/scenarios:ro
     entrypoint: ['sleep', 'infinity']
     init: true
     depends_on:
