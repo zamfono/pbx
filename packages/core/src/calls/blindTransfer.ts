@@ -88,8 +88,7 @@ async function onBlindTransfer(
       });
     }
   }
-  await closeCall(pipeline, call, 'answered', false);
-  await pipeline.deps.ari.channels.hangup(transferrer.id).catch(ignoreGone);
+  await closeCall(pipeline, call, 'answered', [transferrer.id]);
 }
 
 /** One end of a Local line went: the other end is hung up, and the bridge they shared destroyed. */

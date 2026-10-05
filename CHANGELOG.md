@@ -30,6 +30,7 @@ why the specified behaviour changed; the commit history, how.
 - `/healthz` reports `database:status` `closed` when the database cannot be opened or read,
   instead of answering 500.
 - A click-to-dial lists the user's ringing phone as the caller's leg, under one id throughout.
+- A transferred call's SIP log holds the BYE that releases the transferrer, and its answer.
 
 ## [0.3.0] - 2026-10-05
 

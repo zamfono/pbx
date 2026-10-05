@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Undoes `inbound-api-leg-transfer.setup.sh`: the DID is deleted, and the background action's
-# state is gone (`_api-control-teardown.sh`).
+# Undoes `inbound-api-leg-transfer.setup.sh`: the DID is deleted, the tenant's level restored
+# (`_sip-log-teardown.sh`), and the background action's state is gone (`_api-control-teardown.sh`).
 set -euo pipefail
 
 api_base=$1
@@ -10,4 +10,5 @@ token=$2
 
 api_delete "/dids/$(cat "$(state_file leg-transfer-did)")"
 rm -f "$(state_file leg-transfer-did)"
+bash "$(dirname "$0")/_sip-log-teardown.sh" "$api_base" "$token" leg-transfer
 bash "$(dirname "$0")/_api-control-teardown.sh" "$api_base" "$token"

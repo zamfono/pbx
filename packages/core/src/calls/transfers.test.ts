@@ -188,7 +188,7 @@ describe('transfers', () => {
       appArgs: `leg,${child?.id ?? ''}`
     });
     if (child !== undefined) {
-      await closeCall(pipeline, child, 'answered', true);
+      await closeCall(pipeline, child, 'answered', 'all');
     }
     const childRow = await db
       .selectFrom('calls')

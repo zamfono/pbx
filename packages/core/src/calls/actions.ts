@@ -98,7 +98,7 @@ export class CallActions {
           );
         } else if (outcome.kind === 'unanswered') {
           call.log.event({ event: 'originate', result: 'unanswered' });
-          await closeCall(this.pipeline, call, 'failed', false);
+          await closeCall(this.pipeline, call, 'failed', []);
         }
       })
       .catch(
@@ -132,7 +132,7 @@ export class CallActions {
     if (call.callerChannelId === null) {
       abandonOwnRing(this.pipeline, call);
     }
-    await closeCall(this.pipeline, call, 'missed', true);
+    await closeCall(this.pipeline, call, 'missed', 'all');
   }
 
   /** `POST /internal/calls/{id}/transfer` (§10.1 "Transfers and pickup"): with `voicemail`,

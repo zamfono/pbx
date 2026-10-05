@@ -177,7 +177,6 @@ export async function onAttendedTransfer(
     // A transferee held through the API (`hold.ts`) is in neither bridge Asterisk joined.
     await endHold(pipeline, heldIn, consultation.bridgeId);
   }
-  await closeCall(pipeline, original, 'answered', false);
   // The transferrer's first channel is left with nobody; Asterisk ends the second itself.
-  await pipeline.deps.ari.channels.hangup(first.id).catch(ignoreGone);
+  await closeCall(pipeline, original, 'answered', [first.id]);
 }

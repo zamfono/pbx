@@ -96,7 +96,7 @@ describe('closeCall', () => {
   it('notes the QoS legs and ends each recorded participation of a call hung up over the API (§7, §10.2)', async () => {
     const [legId] = [...call.legs.keys()];
 
-    await closeCall(pipeline, call, 'answered', true);
+    await closeCall(pipeline, call, 'answered', 'all');
 
     expect(trail).toEqual([
       'qos after 0 hangups',
@@ -108,7 +108,7 @@ describe('closeCall', () => {
   });
 
   it('ends the recorded participations of a call a transfer closes, its channels left up', async () => {
-    await closeCall(pipeline, call, 'answered', false);
+    await closeCall(pipeline, call, 'answered', []);
 
     expect(trail).toContain(`caller ${call.callerChannelId} ended after 0`);
     expect(trail.at(0)).toBe('qos after 0 hangups');
@@ -178,7 +178,7 @@ describe('closeCall, on a call not yet answered', () => {
       });
     });
 
-    await closeCall(pipeline, call, 'missed', true);
+    await closeCall(pipeline, call, 'missed', 'all');
 
     await expect(outcome).resolves.toBe('abandoned');
     expect(finished).toEqual(['missed']);
@@ -190,7 +190,7 @@ describe('closeCall, on a call not yet answered', () => {
     const call = inboundCall();
     call.status = 'answered';
 
-    await closeCall(pipeline, call, 'missed', true);
+    await closeCall(pipeline, call, 'missed', 'all');
 
     expect(finished).toEqual(['answered']);
     expect(mails).toHaveLength(0);
@@ -200,7 +200,7 @@ describe('closeCall, on a call not yet answered', () => {
     const call = inboundCall();
     call.depositing = true;
 
-    await closeCall(pipeline, call, 'missed', true);
+    await closeCall(pipeline, call, 'missed', 'all');
 
     expect(finished).toEqual([]);
     expect(mails).toHaveLength(0);

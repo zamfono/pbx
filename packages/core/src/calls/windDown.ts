@@ -44,7 +44,7 @@ export async function windDown(pipeline: Pipeline, call: Call): Promise<void> {
     pipeline,
     call,
     'failed',
-    true,
+    'all',
     answered ? AST_CAUSE_NORMAL_CLEARING : STOPPING_CAUSE
   );
 }

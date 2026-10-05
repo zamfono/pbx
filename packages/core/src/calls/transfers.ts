@@ -133,12 +133,7 @@ export async function transferCall(
       callId: call.id
     })
   );
-  await closeCall(pipeline, call, 'answered', false);
-  await ari.channels.hangup(transferrer).catch(
-    logUnlessGone(pipeline.deps.logger, 'transferrer hangup', {
-      callId: call.id
-    })
-  );
+  await closeCall(pipeline, call, 'answered', [transferrer]);
   await ari.bridges
     .destroy(bridgeId)
     .catch(

@@ -126,13 +126,8 @@ export async function transferToConsultation(
     })
   );
   await endHold(pipeline, bridgeId, bridgeId);
-  await closeCall(pipeline, call, 'answered', false);
   // The actor's channel is left with nobody, as a phone's first channel is after its transfer.
-  await ari.channels.hangup(hold.byChannelId).catch(
-    logUnlessGone(pipeline.deps.logger, 'transferrer hangup', {
-      callId: call.id
-    })
-  );
+  await closeCall(pipeline, call, 'answered', [hold.byChannelId]);
   await pipeline.deps.recorder.onTransfereeUp(consultation, transferee).catch(
     logFailure(pipeline.deps.logger, 'transferee recording', {
       callId: consultation.id

@@ -146,7 +146,7 @@ async function routeParkedParty(
   }
   const result = undone?.kind ?? 'fallback';
   parked.log.event({ event: 'parkingTimeout', result });
-  await closeCall(pipeline, parked, 'answered', false);
+  await closeCall(pipeline, parked, 'answered', []);
   const entry: OnwardEntry = {
     to: onward.to,
     direction: 'internal',

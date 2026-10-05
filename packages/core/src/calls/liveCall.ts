@@ -89,6 +89,23 @@ async function dropStrandedHold(pipeline: Pipeline, call: Call): Promise<void> {
   );
 }
 
+/** Hangs up the channels a call closed with the rest of its channels left up is `leaving`. */
+async function hangUpLeaving(
+  pipeline: Pipeline,
+  call: Call,
+  leaving: readonly string[]
+): Promise<void> {
+  await Promise.all(
+    leaving.map(channelId =>
+      pipeline.deps.ari.channels.hangup(channelId).catch(
+        logUnlessGone(pipeline.deps.logger, 'transferrer hangup', {
+          callId: call.id
+        })
+      )
+    )
+  );
+}
+
 /** Hangs up `call`'s `live` channels, the caller's with `callerCause` where one is given, and
  * the rest of its conversation (`endConversation`). */
 async function hangUpLive(
@@ -121,16 +138,19 @@ async function hangUpLive(
  * channels, returns its participants to idle (§9.3), ends every recorded participation in it
  * (§10.2 "Recording semantics") and writes its history entry (§10.2 "Call history") under the
  * status it already reached, else `status`, sending the missed-call mail for a call it ends as
- * missed. With `hangupChannels` every channel still live is hung up, with the rest of its
+ * missed. With `hangup` `'all'` every channel still live is hung up, with the rest of its
  * conversation (`endConversation`), the caller's with the Q.850 `callerCause` where one is given;
- * without, they stay up for whoever now carries them (a transfer's transferee, a bridge Asterisk
- * merged). A caller in a voicemail deposit is only hung up, the deposit closing its row.
+ * with a list, only those channels are (a transfer's transferrer, left with nobody), and the rest
+ * stay up for whoever now carries them (a transfer's transferee, a bridge Asterisk merged). Either
+ * way the hangups go out before the history entry is written, so the messages ending their SIP
+ * dialogs are in the call's log (§7 level `sip`). A caller in a voicemail deposit is only hung up,
+ * the deposit closing its row.
  */
 export async function closeCall(
   pipeline: Pipeline,
   call: Call,
   status: CallsRow['status'],
-  hangupChannels: boolean,
+  hangup: 'all' | readonly string[],
   callerCause?: number
 ): Promise<void> {
   // §7: the channels whose `call_qos` rows this call has are noted before the legs below stop
@@ -184,9 +204,10 @@ export async function closeCall(
   ]).catch(
     logFailure(pipeline.deps.logger, 'recording stop', { callId: call.id })
   );
-  if (hangupChannels) {
+  if (hangup === 'all') {
     await hangUpLive(pipeline, call, live, callerCause);
   } else {
+    await hangUpLeaving(pipeline, call, hangup);
     await dropStrandedHold(pipeline, call);
   }
   await recordings;
