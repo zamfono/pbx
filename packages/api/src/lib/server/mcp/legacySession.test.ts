@@ -19,6 +19,7 @@ import { legacyRequest, legacySession } from '#testing/mcp/testKitLegacy.js';
 import { seedSession } from '#testing/testDb.js';
 
 import { handleMcpRequest, type McpDeps } from '../mcp.js';
+import { startLegacySession } from './era.js';
 
 // A legacy session's handshake and the requests that follow it, per
 // https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle#version-negotiation and
@@ -170,9 +171,15 @@ describe('legacy sessions per user', () => {
     const deps = await seededDeps();
     const ownerSession = await openSession(deps);
     const token = await otherUserToken(deps);
-    for (let index = 0; index < 1000; index += 1) {
+    // Past the other user's cap of 10 over the full path, so their own oldest is dropped.
+    for (let index = 0; index < 11; index += 1) {
       // eslint-disable-next-line no-await-in-loop -- one initialize after another, as a client restarting would
       await openSession(deps, token);
+    }
+    // A thousand more straight on the store: as many round trips would time the test by the
+    // host's load, and the store is where one user's sessions could evict another's.
+    for (let index = 0; index < 1000; index += 1) {
+      startLegacySession('user-1', {}, LEGACY);
     }
     expect(await status(deps, ownerSession)).toBe(200);
   });
