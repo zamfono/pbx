@@ -845,7 +845,7 @@ Dynamic SIP objects use generated configuration plus reload. `api` renders `pjsi
 
 ```
 [from-trunk]      ; inbound from provider
-exten => _[+0-9a-zA-Z*#].,1,Stasis(zamfono,inbound,${EXTEN})   ; any user part: E.164, national digits, or an account name
+exten => _[+0-9a-zA-Z*#]!,1,Stasis(zamfono,inbound,${EXTEN})   ; any user part: E.164, national digits, an account name, or `s` for none
  same => n,Congestion()                                          ; reached only when the core is down: Stasis() returns at once
 
 [from-users]      ; anything a registered client dials

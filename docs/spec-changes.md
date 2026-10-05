@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-05 · §9.2.** `[from-trunk]` matches every user part of one character or more, `s` included, which Asterisk gives an INVITE whose Request-URI has no user part.
+*Why:* the pattern needed two characters, so such a call was refused with 404 before the core could take the called number from `To` (§9.4).
+
 **2026-10-05 · §10.1 step 7.** An external forward target, a ring-group member's forward or a find-me entry that is one of the tenant's own DIDs is never dialled through a trunk: a forward enters the DID's target internally, counting a hop, a member's forward is followed to that target, and a find-me entry naming one is not rung.
 *Why:* the product owner chose "Route internally": dialling an own number out looped through the provider and was billed on every hop.
 

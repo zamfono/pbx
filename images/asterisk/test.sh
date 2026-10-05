@@ -184,6 +184,13 @@ echo "$MANAGER_USER" | grep -q 'write perm: reporting' \
 docker exec "$CONTAINER" asterisk -rx 'dialplan show from-trunk' \
   | grep 'Stasis(zamfono,inbound,${EXTEN})' >/dev/null \
   || fail "from-trunk dialplan is missing Stasis(zamfono,inbound,\${EXTEN})"
+# A Request-URI without a user part arrives as `s`, a one-character one as itself; both reach the
+# core, which takes the called number from `To` instead (§9.2, §9.4).
+for exten in s 4; do
+  docker exec "$CONTAINER" asterisk -rx "dialplan show $exten@from-trunk" \
+    | grep 'Stasis(zamfono,inbound,${EXTEN})' >/dev/null \
+    || fail "from-trunk dialplan does not route exten $exten to Stasis"
+done
 
 # An ARI `record` name resolves against Asterisk's recording directory, and `core` names its
 # recordings `voicemail/<id>`, `prompts/<id>` and `recordings/<id>-{l,r}` for `api` to read back
