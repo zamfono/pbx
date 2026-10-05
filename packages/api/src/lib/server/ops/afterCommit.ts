@@ -101,7 +101,7 @@ export async function runRestartPush(db: Db): Promise<void> {
   restartPush = null;
   if (push !== null) {
     await push(db).catch((error: unknown) => {
-      log.error({ error }, 'the push owed since api started failed');
+      log.error({ err: error }, 'the push owed since api started failed');
     });
   }
 }

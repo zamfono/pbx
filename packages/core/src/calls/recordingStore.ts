@@ -42,7 +42,7 @@ async function mixedDurationS(
   } catch (error) {
     deps.log.error(
       {
-        error,
+        err: error,
         callId: participation.callId,
         recordingId: participation.id
       },
@@ -84,7 +84,7 @@ export async function storeParticipation(
         // The recording itself is stored; the retention sweep removes a raw file left behind.
         deps.log.warn(
           {
-            error,
+            err: error,
             callId: participation.callId,
             recordingId: participation.id,
             file

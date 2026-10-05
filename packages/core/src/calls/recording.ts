@@ -148,7 +148,7 @@ export class Recorder {
       format
     }).catch((error: unknown) => {
       this.deps.log.error(
-        { error, callId, channelId },
+        { err: error, callId, channelId },
         'recording could not start; the call goes on unrecorded'
       );
       return null;

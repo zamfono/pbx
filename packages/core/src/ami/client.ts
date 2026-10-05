@@ -45,7 +45,7 @@ export class AmiClient extends EventEmitter {
     this.reconnect = reconnectBackoff(
       () => (this.closing ? Promise.resolve() : this.connectOnce()),
       (error: unknown) => {
-        this.options.log.error({ error }, 'AMI reconnect failed');
+        this.options.log.error({ err: error }, 'AMI reconnect failed');
       }
     );
   }
@@ -134,7 +134,7 @@ export class AmiClient extends EventEmitter {
         }
       });
       socket.on('error', (error: Error) => {
-        this.options.log.error({ error: error.message }, 'AMI socket error');
+        this.options.log.error({ err: error }, 'AMI socket error');
       });
     });
   }

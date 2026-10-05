@@ -219,7 +219,7 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
 
 /** The fatal-boot handler: logs and exits so a failed boot restarts under `restart: unless-stopped` (§6.3). */
 export function reportFatalBoot(error: unknown): void {
-  createLogger().error({ error }, 'core failed to start');
+  createLogger().error({ err: error }, 'core failed to start');
   process.exit(1);
 }
 

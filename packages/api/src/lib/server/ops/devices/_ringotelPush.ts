@@ -85,7 +85,7 @@ async function auditPush(
     changes
   }).catch((error: unknown) => {
     log.error(
-      { error, deviceId: push.deviceId, outcome: result.outcome },
+      { err: error, deviceId: push.deviceId, outcome: result.outcome },
       'ringotel: the push outcome could not be audited'
     );
   });

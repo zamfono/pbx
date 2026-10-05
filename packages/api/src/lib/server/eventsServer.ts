@@ -36,7 +36,7 @@ async function acceptEventsSocket(
       await hub.subscribeWs(socket, auth);
     }
   } catch (error) {
-    logger.error({ error }, '/events socket setup failed');
+    logger.error({ err: error }, '/events socket setup failed');
     socket.terminate();
   }
 }
@@ -51,7 +51,7 @@ export function attachEventsServer(
     maxPayload: MAX_FRAME_BYTES
   });
   wss.on('error', (error: unknown) => {
-    logger.error({ error }, '/events WebSocket server error');
+    logger.error({ err: error }, '/events WebSocket server error');
   });
   server.on('upgrade', (request, socket, head) => {
     if (request.url !== EVENTS_PATH) {
@@ -60,7 +60,7 @@ export function attachEventsServer(
     }
     wss.handleUpgrade(request, socket, head, ws => {
       acceptEventsSocket(ws, deps).catch((error: unknown) => {
-        logger.error({ error }, '/events socket accept failed');
+        logger.error({ err: error }, '/events socket accept failed');
       });
     });
   });

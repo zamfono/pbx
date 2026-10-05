@@ -219,7 +219,7 @@ export function startRetention(
           deps.log.info(result, 'retention sweep');
         })
         .catch((error: unknown) => {
-          deps.log.error({ error }, 'retention sweep failed');
+          deps.log.error({ err: error }, 'retention sweep failed');
         }),
     intervalMs,
     { unref: true }

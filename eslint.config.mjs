@@ -201,6 +201,15 @@ export default defineConfig(
           ]
         }
       ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.property.name=/^(trace|debug|info|warn|error|fatal)$/] > ObjectExpression:first-child > Property[key.name='error']",
+          message:
+            "Log an error under pino's `err` key, the one its serializer turns into type, message and stack: `{ err: error }`."
+        }
+      ],
       '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
       '@typescript-eslint/restrict-template-expressions': [
         'error',

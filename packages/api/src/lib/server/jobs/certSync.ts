@@ -204,7 +204,10 @@ export function startCertSync(deps: CertSyncDeps): CertSyncScheduler {
       return sync.nextCheckAt();
     },
     failed: error => {
-      logger.error({ error }, 'certSync: the pass failed; the next retries');
+      logger.error(
+        { err: error },
+        'certSync: the pass failed; the next retries'
+      );
     },
     now: deps.now
   });

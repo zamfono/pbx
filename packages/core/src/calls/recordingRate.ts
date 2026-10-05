@@ -68,7 +68,7 @@ export async function recordFormatFor(
     return formats.some(isWidebandFormat) ? 'wav16' : 'wav';
   } catch (error) {
     log.debug(
-      { error, channelId },
+      { err: error, channelId },
       'recording codec lookup failed; recording at 8 kHz'
     );
     return 'wav';

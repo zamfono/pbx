@@ -82,7 +82,7 @@ export function stopOnSignal(running: Running): {
         process.exit(0);
       },
       (error: unknown) => {
-        log.error({ error }, 'core failed to stop');
+        log.error({ err: error }, 'core failed to stop');
         process.exit(1);
       }
     );

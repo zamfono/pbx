@@ -174,7 +174,7 @@ export function watchAsteriskRestarts(deps: ReregDeps): ReregWatcher {
   const inQueue = serialQueue();
   const enqueue = (check: () => Promise<void>): void => {
     inQueue(check).catch((error: unknown) => {
-      logger.error({ error }, 'ringotel: re-registration check failed');
+      logger.error({ err: error }, 'ringotel: re-registration check failed');
     });
   };
   const { retryPending } = deps;

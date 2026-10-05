@@ -97,7 +97,7 @@ describe('reloadHepOnConnect (§7 level sip, §9.1)', () => {
     stub.emit('connected');
     await vi.waitFor(() => {
       expect(log.warn).toHaveBeenCalledWith(
-        { module: 'res_hep', error: refused },
+        { module: 'res_hep', err: refused },
         expect.stringContaining('res_hep reload failed')
       );
     });

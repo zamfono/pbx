@@ -243,7 +243,7 @@ export class EventHub {
     );
     this.expiryTimer = setTimeout(() => {
       this.usersChanged().catch((error: unknown) => {
-        logger.error({ error }, '/events token expiry re-check failed');
+        logger.error({ err: error }, '/events token expiry re-check failed');
       });
     }, delayMs);
     // A pending expiry keeps no process alive on its own.

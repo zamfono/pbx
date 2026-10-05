@@ -97,7 +97,7 @@ describe('announceAsteriskStartOnConnect (§10.4 "After a restart")', () => {
       stub.emit('connected');
       await vi.advanceTimersByTimeAsync(0);
       expect(log.warn).toHaveBeenCalledWith(
-        { error: failure },
+        { err: failure },
         expect.stringContaining('asterisk start time unavailable')
       );
       expect(frames).toEqual([]);

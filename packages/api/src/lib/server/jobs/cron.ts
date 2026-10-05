@@ -69,7 +69,7 @@ async function runEnabledTargets(
     // eslint-disable-next-line no-await-in-loop -- backup runs take turns: one target's run ends before the next one starts
     await runTarget(db, kr, deps, targetId).catch((error: unknown) => {
       // The failure already lives in the run row and `backup.failed` event; this is a trace.
-      logger.error({ error, targetId }, 'scheduled backup run failed');
+      logger.error({ err: error, targetId }, 'scheduled backup run failed');
     });
   }
 }
@@ -134,7 +134,7 @@ function manualRunQueue(
     inTurn(async () => executeRun(db, kr, deps, run)).catch(
       (error: unknown) => {
         // The failure already lives in the run row and `backup.failed` event; this is a trace.
-        logger.error({ error, runId: run.id }, 'queued backup run failed');
+        logger.error({ err: error, runId: run.id }, 'queued backup run failed');
       }
     );
   };
@@ -155,7 +155,10 @@ export function scheduleBackups(
   const bootAt = (deps.now ?? nowIso)();
   markInterruptedRuns(db, deps.now, bootAt).catch((error: unknown) => {
     // Best-effort boot sweep; a run left `running` is retried by the operator, not by this job.
-    logger.error({ error }, 'failed to sweep interrupted backup runs at boot');
+    logger.error(
+      { err: error },
+      'failed to sweep interrupted backup runs at boot'
+    );
   });
 
   const stopper = new AbortController();
@@ -185,7 +188,7 @@ export function scheduleBackups(
       } catch (error) {
         // The loop retries after a fixed backoff on any cycle failure, for the process's life.
         logger.error(
-          { error },
+          { err: error },
           'backup schedule cycle failed; retrying after a delay'
         );
         // eslint-disable-next-line no-await-in-loop -- a fixed backoff before the next attempt
@@ -194,7 +197,7 @@ export function scheduleBackups(
     }
   };
   loop().catch((error: unknown) => {
-    logger.error({ error }, 'backup schedule loop stopped unexpectedly');
+    logger.error({ err: error }, 'backup schedule loop stopped unexpectedly');
   });
 
   const scheduler: BackupScheduler = {

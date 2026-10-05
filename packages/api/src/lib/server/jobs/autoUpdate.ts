@@ -237,7 +237,10 @@ export function scheduleAutoUpdate(deps: AutoUpdateDeps): AutoUpdateScheduler {
   return scheduleDrawnIn({
     pass: async () => runAutoUpdatePass(deps),
     failed: error => {
-      logger.warn({ error }, 'autoUpdate: the pass failed; the next retries');
+      logger.warn(
+        { err: error },
+        'autoUpdate: the pass failed; the next retries'
+      );
     },
     now: deps.now
   });

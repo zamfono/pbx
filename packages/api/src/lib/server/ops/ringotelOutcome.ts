@@ -68,7 +68,7 @@ export async function settleRingotel(
     });
   } catch (error) {
     log.error(
-      { error, operation, trigger, outcome: result.outcome },
+      { err: error, operation, trigger, outcome: result.outcome },
       'ringotel: the push outcome could not be recorded'
     );
   }

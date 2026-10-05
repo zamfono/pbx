@@ -73,7 +73,10 @@ function syncCertificates(db: Db, log: Logger): CertSyncScheduler | null {
   try {
     return startCertSync({ db, coreClient: getCoreClient() });
   } catch (error) {
-    log.error({ error }, 'boot: certificate-sync scheduler failed to start');
+    log.error(
+      { err: error },
+      'boot: certificate-sync scheduler failed to start'
+    );
     return null;
   }
 }
@@ -99,7 +102,10 @@ function startAutoUpdate(
       send: updateMailSender(db, kr)
     });
   } catch (error) {
-    log.error({ error }, 'boot: automatic-update scheduler failed to start');
+    log.error(
+      { err: error },
+      'boot: automatic-update scheduler failed to start'
+    );
     return null;
   }
 }
@@ -155,7 +161,10 @@ function relayCoreEvents(
     onEvent: envelope => {
       publishEvent(envelope);
       dispatcher.enqueue(envelope).catch((error: unknown) => {
-        log.error({ error, eventId: envelope.id }, 'webhook delivery failed');
+        log.error(
+          { err: error, eventId: envelope.id },
+          'webhook delivery failed'
+        );
       });
     }
   });
@@ -177,13 +186,13 @@ export async function startBackgroundJobs(
   try {
     await reencryptSweep(db, kr, log);
   } catch (error) {
-    log.error({ error }, 'boot: key-rotation sweep failed');
+    log.error({ err: error }, 'boot: key-rotation sweep failed');
   }
   const certSync = syncCertificates(db, log);
   const dispatcher = new WebhookDispatcher({ db, kr });
   // The deliveries the previous process left pending (§10.6), alongside the new ones.
   dispatcher.resume().catch((error: unknown) => {
-    log.error({ error }, 'webhook delivery failed');
+    log.error({ err: error }, 'webhook delivery failed');
   });
   const bus: Bus = {
     publish: (envelope: Envelope) => {

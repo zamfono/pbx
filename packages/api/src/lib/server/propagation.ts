@@ -89,7 +89,7 @@ function scheduleRetry(db: Db): void {
         await runRestartPush(db);
       },
       (error: unknown) => {
-        log.warn({ error }, 'the owed config propagation failed again');
+        log.warn({ err: error }, 'the owed config propagation failed again');
       }
     );
   }, retryDelayMs);
@@ -157,7 +157,7 @@ export async function propagateAtBoot(db: Db, bootLog: Logger): Promise<void> {
     try {
       await renderConfig(db);
     } catch (error) {
-      bootLog.error({ error }, 'boot: config render failed');
+      bootLog.error({ err: error }, 'boot: config render failed');
       await owe(db);
       return false;
     }
@@ -165,7 +165,7 @@ export async function propagateAtBoot(db: Db, bootLog: Logger): Promise<void> {
       await getCoreClient().configChanged(ALL_RELOAD_KINDS);
     } catch (error) {
       bootLog.info(
-        { error },
+        { err: error },
         'boot: core not reachable; it reloads the rendered config at its own start'
       );
       if (await isPropagationPending(db)) {

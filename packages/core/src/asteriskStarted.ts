@@ -23,7 +23,7 @@ export function announceAsteriskStartOnConnect(
   let reads: ReconnectBackoff | null = null;
   const unreadable = (error: unknown): void => {
     log.warn(
-      { error },
+      { err: error },
       'asterisk start time unavailable: read again before api is told of this ARI connection'
     );
   };

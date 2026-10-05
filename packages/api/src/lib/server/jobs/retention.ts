@@ -22,7 +22,7 @@ export function scheduleRetention(
   return repeat(
     () =>
       runPurge(db, now()).catch((error: unknown) => {
-        logger.error({ error }, 'retention purge failed');
+        logger.error({ err: error }, 'retention purge failed');
       }),
     intervalMs
   );

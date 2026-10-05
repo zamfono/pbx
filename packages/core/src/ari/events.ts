@@ -99,7 +99,7 @@ export function tryParseAriEvent(raw: string, log: Logger): AriEvent | null {
   try {
     return JSON.parse(raw) as AriEvent;
   } catch (error) {
-    log.error({ raw, error }, 'received a malformed ARI event');
+    log.error({ raw, err: error }, 'received a malformed ARI event');
     return null;
   }
 }

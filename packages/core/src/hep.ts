@@ -186,7 +186,7 @@ function safeParseHep(
   try {
     return parseHep(datagram, ownAddresses);
   } catch (err) {
-    log.error({ error: err }, 'HEP listener failed to parse a datagram');
+    log.error({ err }, 'HEP listener failed to parse a datagram');
     return null;
   }
 }
@@ -204,7 +204,7 @@ export function startHepListener(
 ): { close(): void; listening: Promise<number> } {
   const socket = createSocket('udp4');
   socket.on('error', err => {
-    log.error({ error: err }, 'HEP listener socket error');
+    log.error({ err }, 'HEP listener socket error');
     socket.close();
   });
   socket.on('message', datagram => {

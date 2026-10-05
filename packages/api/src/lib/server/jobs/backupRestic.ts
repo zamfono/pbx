@@ -128,6 +128,6 @@ export async function pruneSnapshots(
   // Best-effort: the backup itself already succeeded, but a repository that stops pruning
   // (lock contention, credentials, full disk) needs a trace somewhere.
   await exec(RESTIC_BIN, args, { env: fullEnv }).catch((error: unknown) => {
-    logger.warn({ error }, 'restic forget --prune failed');
+    logger.warn({ err: error }, 'restic forget --prune failed');
   });
 }

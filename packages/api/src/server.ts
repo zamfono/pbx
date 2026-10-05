@@ -74,7 +74,7 @@ async function main(): Promise<void> {
     },
     usersChanged: () => {
       hub.usersChanged().catch((error: unknown) => {
-        logger.error({ error }, '/events user re-check failed');
+        logger.error({ err: error }, '/events user re-check failed');
       });
     }
   });

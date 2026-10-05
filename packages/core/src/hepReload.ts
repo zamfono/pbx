@@ -29,7 +29,7 @@ export function reloadHepOnConnect(
       },
       (error: unknown) => {
         log.warn(
-          { module: 'res_hep', error },
+          { module: 'res_hep', err: error },
           'res_hep reload failed: level sip may record no SIP message until the next ARI connection'
         );
       }
