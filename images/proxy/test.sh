@@ -162,6 +162,11 @@ for case in 'POST /api/v1/audio' 'POST /api/v1/audio chunked' \
   [ "$(status $case)" = 200 ] || fail "$case: a 600 KB audio upload was refused"
 done
 
+echo "==> no page may be framed (§5.1)"
+curl -sk -D - -o /dev/null "https://localhost:$port/auth/login" \
+  | grep -ix "content-security-policy: frame-ancestors 'none'"$'\r' >/dev/null \
+  || fail "a page was answered without Content-Security-Policy: frame-ancestors 'none'"
+
 echo "==> the access log keeps no credential a URI carries in its query (§7)"
 curl -sk -o /dev/null -H "Referer: https://localhost/auth/setPassword?token=secret-referer" \
   "https://localhost:$port/upload/audio?token=secret-t&access_token=secret-a&code=secret-c&kept=1"

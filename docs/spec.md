@@ -141,7 +141,7 @@ Three long-running application services run per stack, plus the TLS proxy, the `
 
 ### 5.1 Transport
 
-- HTTPS and WSS only, terminated by the reverse proxy: TLS 1.2 or newer, HSTS.
+- HTTPS and WSS only, terminated by the reverse proxy: TLS 1.2 or newer, HSTS. No page may be shown in a frame: every response carries `Content-Security-Policy: frame-ancestors 'none'`.
 - SIP over TLS with SRTP for clients: TLS 1.2 or newer.
 - Trunks follow the provider's requirements (§9.4).
 
@@ -663,6 +663,7 @@ services:
 		}
 	}
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	header Content-Security-Policy "frame-ancestors 'none'"   # no page is shown in a frame (§5.1)
 
 	# Request bodies (§10.2): 512 KiB, refused with 413 once api has read past it, except an
 	# audio upload — the REST upload endpoints, an upload link and its page's `upload` remote

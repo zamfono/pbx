@@ -34,6 +34,7 @@
 		}
 	}
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	header Content-Security-Policy "frame-ancestors 'none'"   # no page is shown in a frame (§5.1)
 
 	# Request bodies (§10.2): 512 KiB, refused with 413 once api has read past it, except an
 	# audio upload — the REST upload endpoints, an upload link and its page's `upload` remote
