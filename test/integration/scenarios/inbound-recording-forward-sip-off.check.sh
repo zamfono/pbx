@@ -24,7 +24,9 @@ print(sum(1 for r in json.load(sys.stdin)["items"] if r["callId"] == sys.argv[1]
   echo "call $call_id left $rows recordings rows though 181 records no calls" >&2
   exit 1
 }
-files=$(dc exec -T core ls /media/recordings)
+# Asterisk creates the directory with the first recording, so on a stack no recorded call has
+# reached yet it is missing, which holds no raw pair either.
+files=$(dc exec -T core sh -c '[ ! -d /media/recordings ] || ls /media/recordings')
 if printf '%s\n' "$files" | grep -q -- '-[lr]\.'; then
   echo "call $call_id left raw recording files though 181 records no calls: $files" >&2
   exit 1
