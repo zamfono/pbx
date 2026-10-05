@@ -13,7 +13,11 @@ protocol = tls
 bind = ${TLS_BIND_ADDR}:5061
 cert_file = /etc/asterisk/gen/tls/cert.pem
 priv_key_file = /etc/asterisk/gen/tls/privkey.pem
-allow_reload = yes
+; No `allow_reload`: a PJSIP reload restarts the listener of a TLS transport whose certificate or
+; key file changed at the same path (spec §6.4) and keeps the transport. `allow_reload = yes`
+; destroys and recreates it instead, on every reload where `external_signaling_address` is set
+; (res_pjsip/config_transport.c compares it before resolving it), and an outgoing connection
+; still in its handshake then reads the freed listener: Asterisk crashes in transport_tls_verify.
 ; `method` unset (or `unspecified`/`default`) pins pjproject's bundled OpenSSL to TLSv1.0 only
 ; ("config show help res_pjsip transport method": "The default...is currently TLSv1"), which a
 ; TLS 1.2/1.3 client refuses to speak. The per-version choices (`tlsv1_2`, `tlsv1_3`, ...) each
@@ -47,7 +51,6 @@ protocol = tls
 bind = ${TLS_BIND_ADDR}:5062
 cert_file = /etc/asterisk/gen/tls/cert.pem
 priv_key_file = /etc/asterisk/gen/tls/privkey.pem
-allow_reload = yes
 method = sslv23
 verify_server = no
 ${EXTERNAL_ADDRESS_LINES}

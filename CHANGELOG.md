@@ -22,6 +22,7 @@ why the specified behaviour changed; the commit history, how.
 - The call history names that user as the answerer of such a forwarded call.
 - A restart of `asterisk` alone no longer leaves HTTPS dead: the new `netns` service holds the
   stack's address and ports, and `asterisk` and `proxy` join it.
+- Asterisk no longer crashes on a configuration change while a TLS trunk connects.
 
 ## [0.3.0] - 2026-10-05
 

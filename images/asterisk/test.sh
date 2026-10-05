@@ -167,6 +167,31 @@ docker exec "$CONTAINER" grep -q '^OPTIONS sip:' /tmp/s_server-5071.log \
 docker exec "$CONTAINER" sh -c ': > /etc/asterisk/gen/pjsip_trunks.conf'
 docker exec "$CONTAINER" asterisk -rx 'module reload res_pjsip.so' > /dev/null
 
+# The PJSIP reload behind every config propagation (§3.1) leaves the TLS listeners on 5061 and
+# 5062 (hex 13C5, 13C6) in place: a listener torn down and recreated under an outgoing connection
+# still in its handshake leaves that connection pointing at freed memory, and Asterisk crashes.
+# Each listening socket's inode tells a kept listener from a recreated one.
+tls_listeners() {
+  docker exec "$CONTAINER" cat /proc/net/tcp /proc/net/tcp6 \
+    | awk '$2 ~ /:13C[56]$/ && $4 == "0A" { print $2, $10 }' | sort
+}
+listeners_before=$(tls_listeners)
+docker exec "$CONTAINER" asterisk -rx 'module reload res_pjsip.so' > /dev/null
+[ "$(tls_listeners)" = "$listeners_before" ] \
+  || fail "a PJSIP reload with an unchanged configuration recreated the TLS listeners"
+
+# A certificate replaced at the same paths reaches both TLS transports on the next PJSIP reload,
+# as api's certificate sync relies on (§6.4).
+docker exec "$CONTAINER" openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+  -keyout /etc/asterisk/gen/tls/privkey.pem -out /etc/asterisk/gen/tls/cert.pem \
+  -subj /CN=renewed.invalid > /dev/null 2>&1
+docker exec "$CONTAINER" asterisk -rx 'module reload res_pjsip.so' > /dev/null
+for port in 5061 5062; do
+  docker exec "$CONTAINER" sh -c "echo | openssl s_client -connect 127.0.0.1:$port 2>/dev/null" \
+    | grep 'subject=CN *= *renewed.invalid' > /dev/null \
+    || fail "the TLS transport on $port does not present the certificate replaced before the reload"
+done
+
 HEP_MODULES=$(docker exec "$CONTAINER" asterisk -rx 'module show like res_hep')
 echo "$HEP_MODULES" | grep -q '^0 modules loaded' \
   || fail "a res_hep module is loaded while HEP_ENABLED=false"
