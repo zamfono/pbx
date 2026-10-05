@@ -5,16 +5,34 @@
  * every read sees the case's values as the server would. In the built server it is the
  * environment adapter-node starts with, which nothing changes after boot.
  */
-import { vi } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, vi } from 'vitest';
 
 // `FQDN`, `SECRETBOX_KEY` (a fixed 32-byte test key) and the ports mode's public address, a
-// documentation-range one, which `api` requires and `.env` always has (§6.3 "Environment"), and the directories no suite may write to the host's real
-// ones of; a suite that needs a particular one, such as a media directory of its own, sets it.
+// documentation-range one, which `api` requires and `.env` always has (§6.3 "Environment").
 process.env.FQDN ??= 'pbx.test';
 process.env.SECRETBOX_KEY ??= '1:BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=';
 process.env.EXTERNAL_IPV4 ??= '192.0.2.10';
-process.env.MEDIA_DIR ??= '/nonexistent/media';
-process.env.ASTERISK_GEN_DIR ??= '/nonexistent/asterisk-gen';
+
+// The directories `api` writes to, the OS temp dir (`os.tmpdir()`, `TMPDIR`) among them, are in a
+// temporary directory of the test file's own, removed after it, never a host path; a suite that
+// needs a particular one, such as a media directory of its own, sets it.
+const hostTmpdir = process.env.TMPDIR;
+const scratchDir = mkdtempSync(join(tmpdir(), 'zamfono-api-test-'));
+afterAll(() => {
+  if (hostTmpdir === undefined) {
+    delete process.env.TMPDIR;
+  } else {
+    process.env.TMPDIR = hostTmpdir;
+  }
+  rmSync(scratchDir, { recursive: true, force: true });
+});
+process.env.MEDIA_DIR = join(scratchDir, 'media');
+process.env.ASTERISK_GEN_DIR = join(scratchDir, 'asterisk-gen');
+process.env.TMPDIR = join(scratchDir, 'tmp');
+mkdirSync(process.env.TMPDIR);
 
 vi.mock('$app/env/private', async () => {
   const [{ env }, { variables }] = await Promise.all([

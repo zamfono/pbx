@@ -1,7 +1,10 @@
 // Test-only: a complete `PipelineDeps` over a fake Asterisk and an in-memory database, every
 // collaborator a suite does not supply itself standing in as `main.ts` would wire it, or as a
 // no-op where it would reach outside the process.
-import { expect } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, expect } from 'vitest';
 
 import { nowIso, type Db, type MailRequest } from '@zamfono/shared';
 
@@ -22,6 +25,13 @@ import { Presence } from '../presence.js';
 import { FakeContacts } from './ami/contacts.js';
 import type { FakeAri } from './ari/fake.js';
 import { eventually } from './eventually.js';
+
+// The media volume is an empty temporary directory of the test file's own, removed after it,
+// never a host path.
+const mediaDir = mkdtempSync(join(tmpdir(), 'zamfono-core-test-media-'));
+afterAll(() => {
+  rmSync(mediaDir, { recursive: true, force: true });
+});
 
 export const noopLogger: Logger = {
   debug: () => undefined,
@@ -112,7 +122,7 @@ export function testPipelineDeps(
     stackSipHost: '192.0.2.10',
     legStasisWaitMs: STASIS_WAIT_MS,
     callLogMaxBytes: 1_048_576,
-    mediaDir: '/nonexistent',
+    mediaDir,
     db,
     apiClient: { mail: () => Promise.resolve() },
     logger: noopLogger,
