@@ -22,8 +22,15 @@
 
 	# Request bodies (§10.2): 512 KiB, refused with 413 once api has read past it, except an
 	# audio upload — the REST upload endpoints, an upload link and its page's `upload` remote
-	# form — which api caps at 50 MB
-	@notUpload not expression `method('POST') && path('/api/v1/audio') || method('PUT') && path('/api/v1/users/*/voicemailGreeting') || path('/upload/*', '/_app/remote/*/upload')`
+	# form — which api caps at 50 MB. A post to an upload link is one only while its `/remote`
+	# query, SvelteKit's remote form posted without JavaScript, is absent or names that form.
+	@notUpload {
+		not expression `method('POST') && path('/api/v1/audio') || method('PUT') && path('/api/v1/users/*/voicemailGreeting') || path('/_app/remote/*/upload')`
+		not {
+			path /upload/*
+			vars_regexp {http.request.uri.query./remote} ^(.*/upload)?$
+		}
+	}
 	request_body @notUpload {
 		max_size 512KiB
 	}
