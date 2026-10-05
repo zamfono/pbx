@@ -87,12 +87,12 @@ describe('an owed config propagation', () => {
     const health = await apiHealth({
       db,
       migrationsDir: MIGRATIONS_DIR,
-      checkCore: () => Promise.resolve({ reachable: false, ari: false }),
+      coreChecks: () => Promise.resolve(null),
       keyring: kr,
-      certificateSync: 'unknown',
-      sipBanHelperRunning: false
+      certificateSync: { state: 'unknown', at: null },
+      sipBanHelper: { running: false, heartbeat: null }
     });
-    expect(health.configPropagationPending).toBe(true);
+    expect(health.checks['config:propagation']).toEqual([{ status: 'warn' }]);
     const metrics = await renderMetrics({
       db,
       dbFile: ':memory:',

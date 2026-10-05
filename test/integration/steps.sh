@@ -74,7 +74,8 @@ step_caddy() {
     >"$CURL_HOME/root.crt" || fail "Caddy's local CA has no root certificate"
   printf 'resolve = %s:443:127.0.0.1\ncacert = %s\n' "$FQDN" "$CURL_HOME/root.crt" \
     >"$CURL_HOME/.curlrc"
-  curl -fsS "$api_base/healthz" >/dev/null || fail "GET /healthz did not answer through Caddy"
+  [[ $(curl -sS -o /dev/null -w '%{http_code} %{content_type}' "$api_base/healthz") \
+    == @(200|503)' application/health+json' ]] || fail "GET /healthz did not answer through Caddy"
   [ "$(curl -sS -o /dev/null -w '%{http_code}' "$api_base/readyz")" = 404 ] \
     || fail 'GET /readyz answered through Caddy, not 404'
   token=$(bash "$here/bootstrap-token.sh" "$api_base" "$OWNER_EMAIL" "$OWNER_PASSWORD" \

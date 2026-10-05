@@ -16,10 +16,12 @@ run_propagation_owed_step() {
   warning=$(printf '%s' "$created" | jsonfield warnings.0)
   [[ $warning == *'has not reached Asterisk'* ]] \
     || fail "the write without core carried no propagation warning: $created"
-  reads True healthz_field configPropagationPending \
+  reads warn healthz_check config:propagation \
     || fail '/healthz did not show the owed propagation'
+  reads 503 healthz_http_status \
+    || fail "/healthz answered $last_read, not 503, while core:reachable fails"
   dc start core >/dev/null
-  poll $PROPAGATION_OWED_ATTEMPTS 1 reads False healthz_field configPropagationPending \
+  poll $PROPAGATION_OWED_ATTEMPTS 1 reads pass healthz_check config:propagation \
     || fail 'the owed propagation was never retried successfully'
   api_delete "/blockedNumbers/$id"
 }

@@ -20,6 +20,7 @@ import { makeTestDb } from '#testing/testDb.js';
 import type { CoreClient } from '../coreClient.js';
 import {
   CertSync,
+  certSyncLastPass,
   certSyncStatus,
   notifyCertSync,
   startCertSync
@@ -542,13 +543,22 @@ describe('startCertSync', () => {
     const db = await makeTestDb();
     const coreClient = stubCore();
     expect(certSyncStatus()).toBe('unknown');
+    const passedAt = new Date('2026-10-05T12:00:00.000Z');
 
-    const scheduler = startCertSync({ db, coreClient, genDir, caddyDataDir });
+    const scheduler = startCertSync({
+      db,
+      coreClient,
+      genDir,
+      caddyDataDir,
+      now: () => passedAt
+    });
+    expect(certSyncLastPass()).toBeNull();
     try {
       // Nothing under caddyDataDir yet: the start-of-process pass finds no hook copy.
       await vi.waitFor(() => {
         expect(scheduler.status()).toBe('missing');
       });
+      expect(certSyncLastPass()).toBe(passedAt.toISOString());
       expect(coreClient.configChangedCalls).toEqual([]);
 
       const source = caIssuedCert(workDir, 3650);

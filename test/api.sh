@@ -88,9 +88,14 @@ api_delete() {
   api DELETE "$1" '{"confirm":true}' >/dev/null
 }
 
-# `/healthz`'s field `$1`, as `jsonfield` prints it: `True` or `False` for a flag.
-healthz_field() {
-  curl -fsS "${FWD[@]}" "$api_base/healthz" | jsonfield "$1"
+# The status of `/healthz`'s check `$1` (`pass`, `warn` or `fail`); a 503 carries the document too.
+healthz_check() {
+  curl -sS "${FWD[@]}" "$api_base/healthz" | jsonfield "checks.$1.0.status"
+}
+
+# `/healthz`'s HTTP status: 200 for `pass` and `warn`, 503 for `fail` (§6.3 "Health").
+healthz_http_status() {
+  curl -sS -o /dev/null -w '%{http_code}' "${FWD[@]}" "$api_base/healthz"
 }
 
 # One field out of a JSON object on stdin, by a dotted path (`user.id`, `items.0.id`).

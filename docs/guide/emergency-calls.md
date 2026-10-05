@@ -17,7 +17,7 @@ provider is in another country than the company must not be flagged: a US provid
 `112`, and a German number has no E911 record there, so the call would be rejected or reach the
 wrong emergency centre. Without any flagged trunk, every emergency call fails: a trunk create,
 update or delete that leaves the tenant in that state returns the warning
-`no emergency trunk; emergency calls will fail`, and `GET /healthz` reports `emergencyTrunk: false`
+`no emergency trunk; emergency calls will fail`, and `GET /healthz` fails its check `trunks:emergency`
 until one is flagged.
 
 ## Where the call is answered
@@ -37,7 +37,7 @@ no call-history entry, uses no emergency trunk and leaves no trace.
 A change to the emergency numbers is stored and in force on the PBX as soon as `settings.update`
 returns, even while Ringotel is unreachable; the mobile apps get it afterwards. If Ringotel
 refuses it, the response carries a `warnings` entry, `system.info` shows
-`ringotel.profilePending: true` (and `/healthz` `ringotelProfilePending: true`), and the stack
+`ringotel.profilePending: true` (and `/healthz` warns `ringotel:profile`), and the stack
 sends it again with the next change to the apps' profile, when `api` starts or when Asterisk
 restarts, until Ringotel takes all of it. Until then the apps dial the old numbers through the cellular
 network, and every other device already dials the new ones through the PBX.

@@ -82,7 +82,7 @@ cert_sync_dump_extra_diagnostics() {
   echo '-- proxy log lines from the hook --' >&2
   dc logs --no-color proxy 2>&1 | grep zamfono-cert-hook >&2
   echo '-- api healthz body --' >&2
-  curl -fsS "${FWD[@]}" "$api_base/healthz" >&2 2>&1
+  curl -sS "${FWD[@]}" "$api_base/healthz" >&2 2>&1
   echo '-- api log lines mentioning "cert" --' >&2
   dc logs --no-color api 2>&1 | grep -i cert >&2
   echo '-- asterisk-config tls dir --' >&2

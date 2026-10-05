@@ -16,6 +16,11 @@ why the specified behaviour changed; the commit history, how.
 - Sources of repeated failed SIP attempts are banned by nftables, a day, a year, then for good;
   the thresholds and steps are settings, bans and an allowlist are at `/sipBans` and `/sipAllowlist`.
 
+### Changed
+
+- **Breaking:** `/healthz` answers `application/health+json` and 503 on any failing check; point
+  uptime checks at its HTTP status or its `status`/`checks`, the old body fields are gone.
+
 ### Fixed
 
 - Asterisk no longer fills the disk with uncapped `full` and `messages` log files; its log is the

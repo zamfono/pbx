@@ -7,13 +7,14 @@
 import * as env from '$app/env/private';
 
 import {
+  healthDocumentSchema,
   type AddPartyRequest,
   type AttendedTransferRequest,
   type ConsultRequest,
-  type CoreHealth,
   type CoreVersionResponse,
   type DeclineRequest,
   type HangupRequest,
+  type HealthDocument,
   type HoldRequest,
   type MwiMailbox,
   type OriginateRequest,
@@ -35,9 +36,9 @@ const CORE_READ_TIMEOUT_MS = 3000;
 export type CoreClient = {
   configChanged(kinds: ReloadKind[]): Promise<void>;
   state(): Promise<StateResponse>;
-  /** `core`'s own `GET /healthz`, whatever the status, since a 503 still says which of the
-   * database and ARI is down; rejects when `core` does not answer within the health timeout. */
-  health(): Promise<CoreHealth>;
+  /** `core`'s own health document (`GET /healthz`), whatever the status, since a 503 still says
+   * which check fails; rejects when `core` does not answer it within the health timeout. */
+  health(): Promise<HealthDocument>;
   /** The version `core` runs, since when, and since when its Asterisk runs (§7 "Version"). */
   version(): Promise<CoreVersionResponse>;
   originate(req: OriginateRequest): Promise<{ callId: string }>;
@@ -79,7 +80,7 @@ export function createCoreClient(
       const response = await fetchFn(`${baseUrl}/healthz`, {
         signal: AbortSignal.timeout(CORE_READ_TIMEOUT_MS)
       });
-      return (await response.json()) as CoreHealth;
+      return healthDocumentSchema.parse(await response.json());
     },
     version: async () =>
       getJson<CoreVersionResponse>(`${baseUrl}/internal/version`, {

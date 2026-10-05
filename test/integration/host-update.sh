@@ -158,7 +158,7 @@ PY
   # answer, and the updater, recreated while the run ran, reports the host's run as finished.
   host_update_assert_images
   host_update_assert_healthy
-  curl -fsS "${FWD[@]}" "$api_base/healthz" >/dev/null || fail "/healthz did not answer after the update"
+  [[ $(healthz_http_status) == @(200|503) ]] || fail "/healthz did not answer after the update"
   api GET /system/info | python3 -c '
 import json, sys
 info = json.load(sys.stdin)

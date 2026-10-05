@@ -12,16 +12,10 @@ import {
   vi
 } from 'vitest';
 
-import { HTTP_OK, HTTP_SERVICE_UNAVAILABLE, openDb } from '@zamfono/shared';
-import {
-  migratedTestDb,
-  MIGRATIONS_DIR,
-  seedSettings
-} from '@zamfono/shared/testDb.js';
+import { migratedTestDb } from '@zamfono/shared/testDb.js';
 
 import { testKeyring } from '#testing/fixtures.js';
 
-import { apiHealth, healthStatus } from './health.js';
 import { decrypt } from './secretbox.js';
 import { seedIfEmpty } from './seed.js';
 import type { SeedEnv } from './seedEnv.js';
@@ -547,49 +541,4 @@ describe('seedIfEmpty', () => {
       expect(owner).toBeUndefined();
     }
   );
-});
-
-describe('apiHealth', () => {
-  it('reports the expected shape and 503 while a migration is pending', async () => {
-    const db = openDb(':memory:');
-    const health = await apiHealth({
-      db,
-      migrationsDir: MIGRATIONS_DIR,
-      checkCore: () => Promise.resolve({ reachable: false, ari: false }),
-      keyring: testKeyring(),
-      certificateSync: 'unknown',
-      sipBanHelperRunning: false
-    });
-    expect(health).toEqual({
-      ok: false,
-      db: true,
-      migrated: false,
-      core: { reachable: false, ari: false },
-      mail: 'notConfigured',
-      keyRotationRemaining: 0,
-      certificateSync: 'unknown',
-      emergencyTrunk: false,
-      ringotelProfilePending: false,
-      ringotelRosterPending: false,
-      configPropagationPending: false,
-      autoUpdateFailed: false,
-      sipBanHelperRunning: false
-    });
-    expect(healthStatus(health)).toBe(HTTP_SERVICE_UNAVAILABLE);
-  });
-
-  it('reports ok once the database is open and migrated', async () => {
-    const db = await migratedTestDb();
-    await seedSettings(db);
-    const health = await apiHealth({
-      db,
-      migrationsDir: MIGRATIONS_DIR,
-      checkCore: () => Promise.resolve({ reachable: true, ari: true }),
-      keyring: testKeyring(),
-      certificateSync: 'ok',
-      sipBanHelperRunning: false
-    });
-    expect(health.ok).toBe(true);
-    expect(healthStatus(health)).toBe(HTTP_OK);
-  });
 });

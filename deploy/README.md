@@ -256,7 +256,7 @@ printf '2:%s' "$(openssl rand -base64 32)"    # the new SECRETBOX_KEY
 ```
 
 Run `docker compose up -d`, wait for `api`'s log line `key rotation: {n} re-encrypted, 0 remaining`
-(`/healthz` reports the same count as `keyRotationRemaining`), then empty `SECRETBOX_KEY_PREVIOUS`.
+(`/healthz` reports the same count as `secrets:keyRotation`), then empty `SECRETBOX_KEY_PREVIOUS`.
 Keep the retired key outside the stack, like `.env`, for as long as snapshots made under it are
 retained: restoring one needs it as `SECRETBOX_KEY_PREVIOUS`.
 `api` refuses to start while both keys carry the same generation.
@@ -294,10 +294,11 @@ The first boot seeds the owner, the settings, `MAIN_DID`, nine parking slots and
 music, and never seeds again. Check it, from outside in mode B:
 
 ```bash
-curl -fsS https://<your FQDN>/healthz
+curl -sS https://<your FQDN>/healthz | jq .
 ```
 
-If it fails, `docker compose logs proxy api` shows whether the
+Until a trunk carrying emergency calls exists, its check `trunks:emergency` fails, and with it the
+whole document (503); every other check should pass. If the request fails, `docker compose logs proxy api` shows whether the
 certificate or the application is the problem; a certificate failure is almost always DNS or
 port 80.
 
@@ -445,16 +446,16 @@ exists.
 
 ## Monitoring
 
-Point an uptime check at `https://<FQDN>/healthz`. Its HTTP status reflects `api` alone, so a
-stack whose `core` or Asterisk is down still answers 200: assert the body too.
+Point an uptime check at `https://<FQDN>/healthz`; its HTTP status suffices. The body is
+`application/health+json`: one entry per check under `checks`, and a `status` that is the worst
+of theirs. `fail` (a closed or unmigrated database, `core` or its Asterisk down, no emergency
+trunk, no usable certificate, a stopped SIP ban helper) answers 503; `warn` (an owed config
+propagation or Ringotel push, a failed automatic update, an expiring certificate, secrets left
+under a retired key) answers 200 and is worth an alert of its own.
 
 ```bash
-curl -fsS https://pbx.example.com/healthz | jq -e '.ok and .core.reachable and .core.ari'
+curl -sS https://pbx.example.com/healthz | jq -e '.status == "pass"'
 ```
-
-The body's other fields are worth a warning: `certificateSync` other than `ok`, `emergencyTrunk`
-or `sipBanHelperRunning` false, `configPropagationPending` or `autoUpdateFailed` true,
-`keyRotationRemaining` above 0 for long after a key rotation.
 
 For Prometheus, set `METRICS_TOKEN` in `.env` and scrape `https://<FQDN>/metrics` with
 `Authorization: Bearer <METRICS_TOKEN>`; without the variable `/metrics` answers 404. The

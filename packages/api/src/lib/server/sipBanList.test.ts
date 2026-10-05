@@ -7,7 +7,7 @@ import { seedSettings } from '@zamfono/shared/testDb.js';
 
 import { makeTestDb } from '#testing/testDb.js';
 
-import { renderSipBanList, sipBanHelperRunning } from './sipBanList.js';
+import { renderSipBanList, sipBanHelperState } from './sipBanList.js';
 
 const genDir = (): string => process.env.ASTERISK_GEN_DIR ?? '';
 const statusFile = (): string => path.join(genDir(), 'sip_ban_helper.status');
@@ -27,26 +27,37 @@ beforeEach(async () => {
   await rm(statusFile(), { force: true });
 });
 
-describe('sipBanHelperRunning (§9.1, §10.3)', () => {
-  it('is true for a fresh heartbeat naming the list api last rendered', async () => {
+describe('sipBanHelperState (§9.1, §10.3)', () => {
+  it('runs with a fresh heartbeat naming the list api last rendered', async () => {
     await writeStatus(`2026-10-05T11:59:01Z ${EMPTY_HASH}\n`);
-    expect(await sipBanHelperRunning(NOW)).toBe(true);
+    expect(await sipBanHelperState(NOW)).toEqual({
+      running: true,
+      heartbeat: '2026-10-05T11:59:01Z'
+    });
   });
 
   it.each([
     [
       'a heartbeat older than 60 seconds',
-      `2026-10-05T11:58:59Z ${EMPTY_HASH}\n`
+      `2026-10-05T11:58:59Z ${EMPTY_HASH}\n`,
+      '2026-10-05T11:58:59Z'
     ],
-    ['another list', `2026-10-05T11:59:30Z ${'0'.repeat(64)}\n`],
-    ['an unreadable line', 'garbage\n'],
-    ['an unparsable time', `yesterday ${EMPTY_HASH}\n`]
-  ])('is false for %s', async (_case, text) => {
+    [
+      'another list',
+      `2026-10-05T11:59:30Z ${'0'.repeat(64)}\n`,
+      '2026-10-05T11:59:30Z'
+    ],
+    ['an unreadable line', 'garbage\n', null],
+    ['an unparsable time', `yesterday ${EMPTY_HASH}\n`, null]
+  ])('does not run for %s', async (_case, text, heartbeat) => {
     await writeStatus(text);
-    expect(await sipBanHelperRunning(NOW)).toBe(false);
+    expect(await sipBanHelperState(NOW)).toEqual({ running: false, heartbeat });
   });
 
-  it('is false while the file is missing', async () => {
-    expect(await sipBanHelperRunning(NOW)).toBe(false);
+  it('does not run, with no heartbeat, while the file is missing', async () => {
+    expect(await sipBanHelperState(NOW)).toEqual({
+      running: false,
+      heartbeat: null
+    });
   });
 });

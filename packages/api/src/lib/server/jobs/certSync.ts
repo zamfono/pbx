@@ -216,6 +216,8 @@ export class CertSync {
 
 export type CertSyncScheduler = {
   status(): CertSyncStatus;
+  /** When the last pass ended, in ISO 8601 UTC; `null` before the first. */
+  lastPass(): string | null;
   /** Runs a pass right away (§6.4: the `POST /internal/certificate` notification), instead of
    * waiting for the next poll; the poll timer is reset around it. */
   notify(): void;
@@ -233,13 +235,19 @@ let running: CertSyncScheduler | undefined;
 export function startCertSync(deps: CertSyncDeps): CertSyncScheduler {
   const sync = new CertSync(deps);
   let status: CertSyncStatus = 'unknown';
+  let lastPass: string | null = null;
+  const passed = (): void => {
+    lastPass = (deps.now ?? (() => new Date()))().toISOString();
+  };
   const schedule = scheduleDrawnIn({
     pass: async () => {
       status = await sync.run();
+      passed();
       return sync.nextCheckAt();
     },
     failed: error => {
       status = 'failed';
+      passed();
       logger.error(
         { err: error },
         'certSync: the pass failed; the next retries'
@@ -249,6 +257,7 @@ export function startCertSync(deps: CertSyncDeps): CertSyncScheduler {
   });
   running = {
     status: () => status,
+    lastPass: () => lastPass,
     notify: schedule.runNow,
     stop: schedule.stop
   };
@@ -258,6 +267,11 @@ export function startCertSync(deps: CertSyncDeps): CertSyncScheduler {
 /** The running sync's status (§6.4, §7); `'unknown'` before its first pass, or with none started. */
 export function certSyncStatus(): CertSyncStatus {
   return running?.status() ?? 'unknown';
+}
+
+/** When the running sync's last pass ended (§10.3 "Health"); `null` before its first, or with none started. */
+export function certSyncLastPass(): string | null {
+  return running?.lastPass() ?? null;
 }
 
 /** Runs the running sync's pass at once; does nothing with none started. */

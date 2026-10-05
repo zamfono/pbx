@@ -98,27 +98,28 @@ export function renderedSipBanListHash(): string | null {
   return renderedHash;
 }
 
+/** Whether the ban helper runs, and its last heartbeat, `null` while none is readable. */
+export type SipBanHelperState = { running: boolean; heartbeat: string | null };
+
 /**
- * Whether the ban helper runs (§9.1, §10.3 `sipBanHelperRunning`): its heartbeat in
+ * The ban helper's state (§9.1, §10.3 `sipBan:helper`): it runs while its heartbeat in
  * `sip_ban_helper.status` is at most 60 seconds old and names the list this process last
- * rendered. A missing or unreadable file is a helper that does not run.
+ * rendered. A missing or unreadable file is a helper that does not run, with no heartbeat.
  */
-export async function sipBanHelperRunning(
+export async function sipBanHelperState(
   nowMs: number = Date.now()
-): Promise<boolean> {
+): Promise<SipBanHelperState> {
   const text = await readFile(
     path.join(env.ASTERISK_GEN_DIR, HELPER_STATUS_FILE),
     'utf8'
   ).catch(() => '');
-  const match = HELPER_STATUS_LINE.exec(text.trim());
-  if (!match) {
-    return false;
+  const { time, hash } = HELPER_STATUS_LINE.exec(text.trim())?.groups ?? {};
+  const heartbeatMs = Date.parse(time ?? '');
+  if (time === undefined || Number.isNaN(heartbeatMs)) {
+    return { running: false, heartbeat: null };
   }
-  const { time = '', hash } = match.groups ?? {};
-  const heartbeatMs = Date.parse(time);
-  return (
-    !Number.isNaN(heartbeatMs) &&
-    nowMs - heartbeatMs <= HELPER_STALE_MS &&
-    hash === renderedHash
-  );
+  return {
+    running: nowMs - heartbeatMs <= HELPER_STALE_MS && hash === renderedHash,
+    heartbeat: time
+  };
 }

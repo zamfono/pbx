@@ -28,11 +28,11 @@ run_asterisk_started_step() {
 const { DatabaseSync } = require('node:sqlite');
 new DatabaseSync('/data/zamfono.sqlite3').exec('UPDATE settings SET ringotel_profile_pending = 1');
 " || fail 'could not seed the pending tenant profile'
-  reads True healthz_field ringotelProfilePending \
+  reads warn healthz_check ringotel:profile \
     || fail '/healthz does not show the seeded pending profile'
   since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   dc restart asterisk >/dev/null || fail 'asterisk did not restart'
-  poll $ASTERISK_STARTED_ATTEMPTS 1 reads False healthz_field ringotelProfilePending \
+  poll $ASTERISK_STARTED_ATTEMPTS 1 reads pass healthz_check ringotel:profile \
     || fail "api never acted on the restart: the pending profile is still set"
   api GET "/audit?operation=ringotel.profile&from=$since" | python3 -c '
 import json, sys

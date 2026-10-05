@@ -176,9 +176,6 @@ export type CoreVersionResponse = ZamfonoVersion & {
   asteriskStartedAt: string | null;
 };
 
-/** `GET /healthz` (200 iff `ok`). */
-export type CoreHealth = { ok: boolean; ari: boolean; db: boolean };
-
 /**
  * A frame for `api` alone on `core`'s internal stream, never relayed to `/events` or webhooks:
  * the ARI connection opened to the Asterisk that started at `asteriskStartedAt`, a new one after

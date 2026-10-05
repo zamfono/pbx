@@ -100,7 +100,7 @@ print(json.dumps({k: s[k] for k in ("sipBanFailures", "sipBanWindowS", "sipBanSu
   [ "$step" = 1 ] && [ "$expires" != None ] \
     || fail "the first ban is step $step, expiring $expires, not step 1 for a day"
   reads 1 sip_ban_metric || fail "zamfono_sip_bans_active reads '$last_read', not 1"
-  reads True healthz_field sipBanHelperRunning || fail '/healthz reports the ban helper stopped'
+  reads pass healthz_check sipBan:helper || fail '/healthz reports the ban helper stopped'
   poll $SIP_BAN_POLLS 1 sip_ban_dropped || fail "the banned scanner's REGISTER is still answered"
   sip_ban_http_answered || fail "the banned scanner's HTTP request is not answered"
   echo '   banned at step 1: its SIP is dropped, HTTP answers'

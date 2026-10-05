@@ -165,23 +165,35 @@ describe('createCoreClient', () => {
 });
 
 describe('CoreClient.health', () => {
-  it("returns core's body on a 503 too, since it says which check is down", async () => {
+  const failing = {
+    status: 'fail',
+    checks: {
+      'core:database': [{ status: 'pass' }],
+      'core:ari': [{ status: 'fail' }]
+    }
+  };
+
+  it("returns core's document on a 503 too, since it says which check fails", async () => {
     const fetchFn = vi.fn(() =>
-      Promise.resolve(
-        jsonResponse(HTTP_SERVICE_UNAVAILABLE, {
-          ok: false,
-          ari: false,
-          db: true
-        })
-      )
+      Promise.resolve(jsonResponse(HTTP_SERVICE_UNAVAILABLE, failing))
     );
 
     const health = await createCoreClient('http://core:3000', fetchFn).health();
 
-    expect(health).toEqual({ ok: false, ari: false, db: true });
+    expect(health).toEqual(failing);
     expect(fetchFn).toHaveBeenCalledWith('http://core:3000/healthz', {
       signal: expect.any(AbortSignal) as unknown
     });
+  });
+
+  it('rejects a body that is no health document', async () => {
+    const fetchFn = vi.fn(() =>
+      Promise.resolve(jsonResponse(HTTP_SERVICE_UNAVAILABLE, { ok: false }))
+    );
+
+    await expect(
+      createCoreClient('http://core:3000', fetchFn).health()
+    ).rejects.toThrow();
   });
 });
 

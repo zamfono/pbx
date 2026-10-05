@@ -1,9 +1,12 @@
 import {
-  HTTP_OK,
-  HTTP_SERVICE_UNAVAILABLE,
+  healthDocument,
   isDbOpen,
   pendingMigrations,
-  type Db
+  type Db,
+  type HealthCheck,
+  type HealthChecks,
+  type HealthDocument,
+  type HealthStatus
 } from '@zamfono/shared';
 
 import type { CertSyncStatus } from './jobs/certSync.js';
@@ -14,142 +17,109 @@ import { hasEmergencyTrunk } from './ops/trunks/_shared.js';
 import { isPropagationPending } from './propagationPending.js';
 import { isProfilePending } from './provisioning/profilePending.js';
 import type { Keyring } from './secretbox.js';
+import type { SipBanHelperState } from './sipBanList.js';
 
-/** `core`'s own reachability and ARI connection, as seen from `api` (§6.3 "Health"). */
-export type CoreReachability = { reachable: boolean; ari: boolean };
+/** The certificate sync's state and the time of its last pass, `null` before the first (§6.4). */
+export type CertificateSyncState = { state: CertSyncStatus; at: string | null };
 
-/**
- * `GET /healthz`'s body (§6.3 "Health", §10.3 Health row): the HTTP status reflects only
- * `ok`, so every other field is informational.
- */
-export type ApiHealth = {
-  ok: boolean;
-  db: boolean;
-  migrated: boolean;
-  core: CoreReachability;
-  mail: 'configured' | 'notConfigured';
-  keyRotationRemaining: number;
-  certificateSync: CertSyncStatus;
-  /** Whether a live trunk carries emergency calls (§9.4 "Emergency trunks"). */
-  emergencyTrunk: boolean;
-  /**
-   * Whether a tenant profile change, the emergency numbers among them, has not reached Ringotel
-   * yet (§10.4 "Tenant profile push").
-   */
-  ringotelProfilePending: boolean;
-  /** Whether a roster change has not reached Ringotel yet (§10.4 "Colleague presence"). */
-  ringotelRosterPending: boolean;
-  /**
-   * Whether a config propagation failed and none has succeeded since, so Asterisk may run on an
-   * older configuration than the one stored (§3.1 "Config propagation").
-   */
-  configPropagationPending: boolean;
-  /**
-   * Whether an automatic update failed, from its first failed attempt until an update succeeds;
-   * `false` without an updater, which automatic updates need (§6.3 "Automatic updates"). What
-   * else is known of releases is `system.info`'s, which needs a login, and `/metrics`'.
-   */
-  autoUpdateFailed: boolean;
-  /**
-   * Whether the ban helper in the `asterisk` container runs: its heartbeat is fresh and names the
-   * ban list `api` last rendered, since enforcement stops with it (§5.6, §9.1).
-   */
-  sipBanHelperRunning: boolean;
-};
-
-/** What `apiHealth` needs to compute a body; a caller resolves each check its own way. */
+/** What `apiHealth` needs to compute the document; a caller resolves each check its own way. */
 export type ApiHealthDeps = {
   db: Db;
   migrationsDir: string;
-  checkCore: () => Promise<CoreReachability>;
+  /** `core`'s own checks, `null` while `core` does not answer. */
+  coreChecks: () => Promise<HealthChecks | null>;
   keyring: Keyring;
-  certificateSync: CertSyncStatus;
-  sipBanHelperRunning: boolean;
+  certificateSync: CertificateSyncState;
+  sipBanHelper: SipBanHelperState;
 };
 
-/** `settings.smtp_host` set means a relay is configured (§11.4). */
-async function mailConfigured(db: Db): Promise<'configured' | 'notConfigured'> {
-  const settings = await db
-    .selectFrom('settings')
-    .select('smtpHost')
-    .where('id', '=', 1)
-    .executeTakeFirstOrThrow();
-  return settings.smtpHost ? 'configured' : 'notConfigured';
-}
-
-/** The body fields read from the tables, which only a migrated database holds. */
-type TableChecks = Pick<
-  ApiHealth,
-  | 'mail'
-  | 'keyRotationRemaining'
-  | 'emergencyTrunk'
-  | 'ringotelProfilePending'
-  | 'ringotelRosterPending'
-  | 'configPropagationPending'
-  | 'autoUpdateFailed'
->;
-
-/** What `apiHealth` reports for the table checks while `migrated` is false. */
-const UNMIGRATED_CHECKS: TableChecks = {
-  mail: 'notConfigured',
-  keyRotationRemaining: 0,
-  emergencyTrunk: false,
-  ringotelProfilePending: false,
-  ringotelRosterPending: false,
-  configPropagationPending: false,
-  autoUpdateFailed: false
+/** `certificate:sync`'s status per state of the sync (§10.3 "Health"). */
+const CERTIFICATE_SYNC_STATUS: Record<CertSyncStatus, HealthStatus> = {
+  ok: 'pass',
+  unknown: 'warn',
+  expiring: 'warn',
+  missing: 'fail',
+  failed: 'fail'
 };
 
-async function tableChecks(db: Db, kr: Keyring): Promise<TableChecks> {
-  return {
-    mail: await mailConfigured(db),
-    keyRotationRemaining: await countKeyRotationRemaining(db, kr),
-    emergencyTrunk: await hasEmergencyTrunk(db),
-    ringotelProfilePending: await isProfilePending(db),
-    ringotelRosterPending: await isRosterPending(db),
-    configPropagationPending: await isPropagationPending(db),
-    autoUpdateFailed: (await updateNews(db)).autoUpdateFailed
-  };
+/** A check's entry: `status` while `bad`, else `pass`. */
+function check(
+  bad: boolean,
+  status: HealthStatus,
+  more: Omit<HealthCheck, 'status'> = {}
+): [HealthCheck] {
+  return [{ status: bad ? status : 'pass', ...more }];
 }
 
 /**
- * `api`'s readiness (`GET /readyz`, §6.3 "Health"): the database is open and holds no pending
- * migration, since `api` never runs one itself (§6.3 "Migrations").
+ * `database:status`: `fail` while the database is closed or a migration is pending, `api`'s
+ * readiness too (`GET /readyz`, §6.3 "Health").
  */
-export async function apiReady(
+export async function databaseCheck(
   db: Db,
   migrationsDir: string
-): Promise<boolean> {
-  return (
-    (await isDbOpen(db)) &&
-    (await pendingMigrations(db, migrationsDir)).length === 0
-  );
+): Promise<[HealthCheck]> {
+  if (!(await isDbOpen(db))) {
+    return [{ status: 'fail', output: 'closed' }];
+  }
+  const pending = await pendingMigrations(db, migrationsDir);
+  return pending.length > 0
+    ? [{ status: 'fail', output: 'migrationPending' }]
+    : [{ status: 'pass' }];
 }
 
-/**
- * `api`'s own liveness plus the fields a client cannot otherwise observe (§6.3 "Health"):
- * `ok` is true only while the database is open and holds no pending migration, since `api`
- * never runs one itself (§6.3 "Migrations"). The table checks run only then; a query that
- * fails on a migrated database rejects.
- */
-export async function apiHealth(deps: ApiHealthDeps): Promise<ApiHealth> {
-  const dbOpen = await isDbOpen(deps.db);
-  const migrated = dbOpen && (await apiReady(deps.db, deps.migrationsDir));
-  const checks = migrated
-    ? await tableChecks(deps.db, deps.keyring)
-    : UNMIGRATED_CHECKS;
+/** `core:reachable`, joined by `core`'s own `core:*` checks while it answers. */
+async function coreChecks(deps: ApiHealthDeps): Promise<HealthChecks> {
+  const checks = await deps.coreChecks();
+  if (!checks) {
+    return { 'core:reachable': [{ status: 'fail' }] };
+  }
+  const own = Object.entries(checks).filter(([key]) => key.startsWith('core:'));
+  return { 'core:reachable': [{ status: 'pass' }], ...Object.fromEntries(own) };
+}
+
+/** The checks read from the tables, which only a migrated database holds. */
+async function tableChecks(db: Db, kr: Keyring): Promise<HealthChecks> {
+  const remaining = await countKeyRotationRemaining(db, kr);
   return {
-    ok: migrated,
-    db: dbOpen,
-    migrated,
-    core: await deps.checkCore(),
-    certificateSync: deps.certificateSync,
-    sipBanHelperRunning: deps.sipBanHelperRunning,
-    ...checks
+    'trunks:emergency': check(!(await hasEmergencyTrunk(db)), 'fail'),
+    'secrets:keyRotation': check(remaining > 0, 'warn', {
+      observedValue: remaining
+    }),
+    'config:propagation': check(await isPropagationPending(db), 'warn'),
+    'ringotel:profile': check(await isProfilePending(db), 'warn'),
+    'ringotel:roster': check(await isRosterPending(db), 'warn'),
+    'update:automatic': check((await updateNews(db)).autoUpdateFailed, 'warn')
   };
 }
 
-/** The `/healthz` HTTP status: `200` iff `ApiHealth.ok`, else `503` (§6.3 "Health"). */
-export function healthStatus(health: ApiHealth): number {
-  return health.ok ? HTTP_OK : HTTP_SERVICE_UNAVAILABLE;
+/**
+ * `GET /healthz`'s document (§6.3 "Health", §10.3 "Health"): one check per measurement and
+ * nothing configurational or versioned, since it is public. The table checks are left out while
+ * `database:status` fails, since `api` never runs a migration itself (§6.3 "Migrations"); a
+ * query that fails on a migrated database rejects.
+ */
+export async function apiHealth(deps: ApiHealthDeps): Promise<HealthDocument> {
+  const database = await databaseCheck(deps.db, deps.migrationsDir);
+  const { state, at } = deps.certificateSync;
+  const { running, heartbeat } = deps.sipBanHelper;
+  return healthDocument({
+    'database:status': database,
+    ...(await coreChecks(deps)),
+    'certificate:sync': [
+      {
+        status: CERTIFICATE_SYNC_STATUS[state],
+        observedValue: state,
+        ...(at === null ? {} : { time: at })
+      }
+    ],
+    'sipBan:helper': check(
+      !running,
+      'fail',
+      heartbeat === null ? {} : { time: heartbeat }
+    ),
+    ...(database[0].status === 'pass'
+      ? await tableChecks(deps.db, deps.keyring)
+      : {})
+  });
 }

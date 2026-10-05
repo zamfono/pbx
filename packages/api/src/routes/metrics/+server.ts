@@ -17,10 +17,10 @@ import { renderMetrics } from '#lib/server/metrics.js';
 
 const PROMETHEUS_CONTENT_TYPE = 'text/plain; version=0.0.4';
 
-/** `core`'s own ARI connection state (§7), read the same way `/healthz` reads it. */
+/** `core`'s own ARI connection state (§7): its health document's `core:ari` check. */
 async function checkAri(): Promise<boolean> {
-  const body = await getCoreClient().health();
-  return body.ari;
+  const { checks } = await getCoreClient().health();
+  return checks['core:ari']?.[0].status === 'pass';
 }
 
 /** Whether `authorization` is exactly `Bearer <token>`, compared in constant time (§7 `METRICS_TOKEN`: a static shared secret, so a byte-by-byte comparison would leak it through timing). */

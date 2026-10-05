@@ -45,7 +45,14 @@ afterEach(() => {
 function stubCore(): void {
   vi.mocked(getCoreClient).mockReturnValue(
     stubCoreClient({
-      health: () => Promise.resolve({ ok: true, ari: true, db: true }),
+      health: () =>
+        Promise.resolve({
+          status: 'pass',
+          checks: {
+            'core:database': [{ status: 'pass' }],
+            'core:ari': [{ status: 'pass' }]
+          }
+        }),
       state: () => Promise.resolve(EMPTY_STATE)
     })
   );
