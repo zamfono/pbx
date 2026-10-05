@@ -443,6 +443,45 @@ container. Where that log survives depends on the runtime's log driver:
 The journal survives a reboot only where it is persistent, which it is when `/var/log/journal`
 exists.
 
+## Monitoring
+
+Point an uptime check at `https://<FQDN>/healthz`. Its HTTP status reflects `api` alone, so a
+stack whose `core` or Asterisk is down still answers 200: assert the body too.
+
+```bash
+curl -fsS https://pbx.example.com/healthz | jq -e '.ok and .core.reachable and .core.ari'
+```
+
+The body's other fields are worth a warning: `certificateSync` other than `ok`, `emergencyTrunk`
+false, `configPropagationPending` or `autoUpdateFailed` true, `keyRotationRemaining` above 0 for
+long after a key rotation.
+
+For Prometheus, set `METRICS_TOKEN` in `.env` and scrape `https://<FQDN>/metrics` with
+`Authorization: Bearer <METRICS_TOKEN>`; without the variable `/metrics` answers 404. The
+Litestream overlay adds `/metrics/litestream` under the same token.
+
+```yaml
+scrape_configs:
+  - job_name: zamfono
+    scheme: https
+    authorization: { credentials: <METRICS_TOKEN> }
+    static_configs: [{ targets: [pbx.example.com] }]
+```
+
+| Metric                                                                            | Alert when                                                                 |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `zamfono_ari_connected`                                                           | 0: `core` has lost Asterisk, no call works                                 |
+| `zamfono_trunk_registered{trunk}`                                                 | 0 for a trunk that registers                                               |
+| `zamfono_trunk_channels{trunk}` / `zamfono_trunk_max_channels{trunk}`             | in use reaches the maximum                                                 |
+| `zamfono_backup_last_success_age_seconds{target}`                                 | above your backup interval plus a few hours (26 h for the nightly default) |
+| `zamfono_certificate_sync_ok`                                                     | 0 for more than an hour                                                    |
+| `zamfono_config_propagation_pending`, `zamfono_config_propagation_failures_total` | pending is 1                                                               |
+| `zamfono_auto_update_failed`, `zamfono_auto_update_failed_attempts`               | 1                                                                          |
+| `zamfono_breaking_update_available`                                               | 1: a release waits for `update.sh`                                         |
+| `zamfono_recording_mix_failures_total`                                            | it increases: raw recording files await salvage                            |
+| `zamfono_active_calls`, `zamfono_registered_devices`, `zamfono_db_bytes`          | for dashboards                                                             |
+| `zamfono_api_request_seconds`, `zamfono_build_info{version, revision}`            | for dashboards                                                             |
+
 ## Next
 
 Connect an MCP client and read [`docs/guide/`](https://github.com/zamfono/pbx/blob/main/docs/guide) — both are described in the
