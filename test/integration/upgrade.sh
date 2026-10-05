@@ -18,6 +18,8 @@
 
 UPGRADE_REPO=https://github.com/zamfono/pbx
 UPGRADE_REGISTRY=ghcr.io/zamfono
+# Where a release's tagged files are served one by one.
+UPGRADE_RAW=https://raw.githubusercontent.com/zamfono/pbx
 # What the survival check reads: the rows the previous release's first boot seeded (§6.3 "First
 # boot"), each through an endpoint every release serves.
 UPGRADE_SNAPSHOT_PATHS=(/settings /users /dids /parking/slots /audio)
@@ -54,17 +56,30 @@ upgrade_snapshot() {
 }
 
 # Starts `$1`'s stack: its bundle unpacked into the stack directory, its images from the
-# registry, and the overlay and `.env` this run uses for the build under test.
+# registry, the `.env` this run wrote, and the integration overlay of its own tag, which fits its
+# compose.yaml as this checkout's fits the build's. `compose` names that overlay in place of this
+# checkout's for the caller (`upgrade_previous`).
 upgrade_start_previous() {
-  local version=$1
+  local version=$1 overlay=$run_dir/upgrade-compose.test.yaml
   curl -fsSL "$UPGRADE_REPO/releases/download/v$version/zamfono-deploy.tar.gz" \
     | tar xz -C "$run_dir" --strip-components=1 \
     || fail "could not download the v$version release bundle"
+  curl -fsSL -o "$overlay" "$UPGRADE_RAW/v$version/test/integration/compose.test.yaml" \
+    || fail "could not download v$version's test/integration/compose.test.yaml"
+  compose=${compose/"$here/compose.test.yaml"/"$overlay"}
   echo "== §6.3 Upgrades: starting v$version from its own bundle and images =="
   ASTERISK_IMAGE=$UPGRADE_REGISTRY/asterisk:$version MIGRATE_IMAGE=$UPGRADE_REGISTRY/migrate:$version \
     CORE_IMAGE=$UPGRADE_REGISTRY/core:$version API_IMAGE=$UPGRADE_REGISTRY/api:$version \
     PROXY_IMAGE=$UPGRADE_REGISTRY/proxy:$version UPDATER_IMAGE=$UPGRADE_REGISTRY/updater:$version \
     stack_recreate
+}
+
+# `$1`'s stack up and ready on its own overlay, and its data read into UPGRADE_BEFORE.
+upgrade_previous() {
+  local compose=$compose
+  upgrade_start_previous "$1"
+  stack_assert_migrated
+  upgrade_snapshot "$UPGRADE_BEFORE"
 }
 
 # The upgrade itself, as deploy/README.md step 8 gives it: the stack directory's own `update.sh`,
@@ -145,8 +160,6 @@ upgrade_from_release() {
   version=$(upgrade_version)
   [ -n "$version" ] || fail "UPGRADE_FROM=$UPGRADE_FROM names no release"
   UPGRADE_BEFORE=$run_dir/upgrade-before.tsv
-  upgrade_start_previous "$version"
-  stack_assert_migrated
-  upgrade_snapshot "$UPGRADE_BEFORE"
+  upgrade_previous "$version"
   upgrade_to_build "$version"
 }
