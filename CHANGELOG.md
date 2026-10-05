@@ -11,6 +11,11 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Added
+
+- Sources of repeated failed SIP attempts are banned by nftables, a day, a year, then for good;
+  the thresholds and steps are settings, bans and an allowlist are at `/sipBans` and `/sipAllowlist`.
+
 ### Fixed
 
 - Asterisk no longer fills the disk with uncapped `full` and `messages` log files; its log is the

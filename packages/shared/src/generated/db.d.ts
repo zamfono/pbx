@@ -365,6 +365,11 @@ export interface Settings {
   ringotelProfilePending: Generated<number>;
   ringotelRegisteredAt: string | null;
   ringotelRosterPending: Generated<number>;
+  sipBanFailures: Generated<number>;
+  sipBanLookbackS: Generated<number>;
+  sipBanStepsJson: Generated<string>;
+  sipBanSuccessExemptS: Generated<number>;
+  sipBanWindowS: Generated<number>;
   smtpHost: string | null;
   smtpPasswordEnc: Buffer | null;
   smtpPort: Generated<number>;
@@ -381,6 +386,26 @@ export interface Settings {
   timezone: string | null;
   tlsReloadHour: number | null;
   voicemailMaxS: Generated<number>;
+}
+
+export interface SipAllowlist {
+  address: string;
+  createdAt: string;
+  createdBy: string | null;
+  deletedAt: string | null;
+  id: string;
+  label: string | null;
+}
+
+export interface SipBans {
+  address: string;
+  createdAt: string;
+  expiresAt: string | null;
+  failures: number;
+  id: string;
+  liftedAt: string | null;
+  liftedBy: string | null;
+  step: number;
 }
 
 export interface Tokens {
@@ -562,6 +587,8 @@ export interface DB {
   ringGroupMembers: RingGroupMembers;
   ringGroups: RingGroups;
   settings: Settings;
+  sipAllowlist: SipAllowlist;
+  sipBans: SipBans;
   tokens: Tokens;
   trunkHosts: TrunkHosts;
   trunks: Trunks;

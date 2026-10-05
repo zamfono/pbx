@@ -5,14 +5,14 @@ import { migrateForTest, MIGRATIONS_DIR } from './testDb.js';
 
 test('migrates and enforces the schema', async () => {
   const db = openDb(':memory:');
-  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(1);
+  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(2);
   await migrateForTest(db);
   expect(await pendingMigrations(db, MIGRATIONS_DIR)).toEqual([]);
 
   const tables = (await db.introspection.getTables())
     .map(table => table.name)
     .sort();
-  expect(tables).toHaveLength(46);
+  expect(tables).toHaveLength(48);
 
   // partial unique: two soft-deleted users may share an e-mail with a live one
   await db
@@ -73,6 +73,20 @@ test('migrates and enforces the schema', async () => {
       } as never)
       .execute()
   ).rejects.toThrow(/NOT NULL constraint failed: trunks\.emergency/u);
+
+  // sip_bans.address is lower-case: the /64 key core and api compare (§11.2)
+  await expect(
+    db
+      .insertInto('sipBans')
+      .values({
+        id: 'b1',
+        address: '2001:DB8::/64',
+        step: 1,
+        failures: 10,
+        createdAt: 't'
+      })
+      .execute()
+  ).rejects.toThrow(/CHECK/u);
 
   // foreign keys on
   await expect(
