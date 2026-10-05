@@ -29,7 +29,7 @@ async function coreChecks(): Promise<HealthChecks | null> {
  */
 export async function GET(): Promise<Response> {
   const document = await apiHealth({
-    db: getDb(),
+    db: getDb,
     migrationsDir: env.MIGRATIONS_DIR,
     coreChecks,
     keyring: keyringFromEnv(env),

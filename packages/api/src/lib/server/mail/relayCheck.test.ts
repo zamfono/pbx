@@ -137,7 +137,7 @@ describe('the relay check (§10.2 "Relay check")', () => {
 describe('mail:relay and system.info mail', () => {
   const health = (db: Db): Promise<HealthDocument> =>
     apiHealth({
-      db,
+      db: () => db,
       migrationsDir: MIGRATIONS_DIR,
       coreChecks: () => Promise.resolve(null),
       keyring: testKeyring(),

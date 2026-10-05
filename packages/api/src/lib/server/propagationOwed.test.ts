@@ -85,7 +85,7 @@ describe('an owed config propagation', () => {
 
     expect(await isPropagationPending(db)).toBe(true);
     const health = await apiHealth({
-      db,
+      db: () => db,
       migrationsDir: MIGRATIONS_DIR,
       coreChecks: () => Promise.resolve(null),
       keyring: kr,

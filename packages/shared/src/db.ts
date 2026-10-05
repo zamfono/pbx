@@ -75,10 +75,11 @@ export function openDb(file: string): Db {
   });
 }
 
-/** Whether `db` answers a trivial query, the database check of `api`'s and core's `/healthz` (§7). */
+/** Whether `db` reads its schema, the database check of `api`'s and core's `/healthz` (§7): a
+ * read of the file's first page, which fails once the file is unreadable or no database. */
 export async function isDbOpen(db: Db): Promise<boolean> {
   try {
-    await sql`select 1`.execute(db);
+    await sql`select count(*) from sqlite_schema`.execute(db);
     return true;
   } catch {
     return false;

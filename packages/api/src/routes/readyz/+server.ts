@@ -11,7 +11,7 @@ import { databaseCheck } from '#lib/server/health.js';
  * the hook refuses it when it carries `X-Forwarded-For`.
  */
 export async function GET(): Promise<Response> {
-  const [database] = await databaseCheck(getDb(), env.MIGRATIONS_DIR);
+  const [database] = await databaseCheck(getDb, env.MIGRATIONS_DIR);
   return new Response(null, {
     status: database.status === 'pass' ? HTTP_OK : HTTP_SERVICE_UNAVAILABLE
   });

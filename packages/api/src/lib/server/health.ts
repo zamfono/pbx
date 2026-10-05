@@ -26,7 +26,8 @@ export type CertificateSyncState = { state: CertSyncStatus; at: string | null };
 
 /** What `apiHealth` needs to compute the document; a caller resolves each check its own way. */
 export type ApiHealthDeps = {
-  db: Db;
+  /** The database handle; throws while the database cannot be opened. */
+  db: () => Db;
   migrationsDir: string;
   /** `core`'s own checks, `null` while `core` does not answer. */
   coreChecks: () => Promise<HealthChecks | null>;
@@ -57,16 +58,24 @@ function check(
   return [{ status: bad ? status : 'pass', ...more }];
 }
 
+const CLOSED: [HealthCheck] = [{ status: 'fail', output: 'closed' }];
+
 /**
- * `database:status`: `fail` while the database is closed or a migration is pending, `api`'s
- * readiness too (`GET /readyz`, §6.3 "Health").
+ * `database:status`: `fail` while the database cannot be opened or read (`closed`) or a migration
+ * is pending, `api`'s readiness too (`GET /readyz`, §6.3 "Health").
  */
 export async function databaseCheck(
-  db: Db,
+  open: () => Db,
   migrationsDir: string
 ): Promise<[HealthCheck]> {
+  let db: Db;
+  try {
+    db = open();
+  } catch {
+    return CLOSED;
+  }
   if (!(await isDbOpen(db))) {
-    return [{ status: 'fail', output: 'closed' }];
+    return CLOSED;
   }
   const pending = await pendingMigrations(db, migrationsDir);
   return pending.length > 0
@@ -109,7 +118,8 @@ async function relayCheck(
 
 /** The checks read from the tables, which only a migrated database holds. */
 async function tableChecks(deps: ApiHealthDeps): Promise<HealthChecks> {
-  const { db, keyring: kr } = deps;
+  const { keyring: kr } = deps;
+  const db = deps.db();
   const remaining = await countKeyRotationRemaining(db, kr);
   return {
     'trunks:emergency': check(!(await hasEmergencyTrunk(db)), 'fail'),

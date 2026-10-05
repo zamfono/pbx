@@ -47,7 +47,7 @@ async function healthOf(
   deps: Partial<ApiHealthDeps> = {}
 ): Promise<HealthDocument> {
   return apiHealth({
-    db,
+    db: () => db,
     migrationsDir: MIGRATIONS_DIR,
     coreChecks: () => Promise.resolve(CORE_PASSING),
     keyring: kr,
