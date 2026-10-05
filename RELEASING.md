@@ -65,7 +65,7 @@ The step from `0.X.Y` to `1.0.0` is a decision, made when the project is ready, 
    sha256sum -c --ignore-missing SHA256SUMS
    gh attestation verify zamfono-deploy.tar.gz --repo zamfono/pbx
    tar xzf zamfono-deploy.tar.gz --strip-components=1
-   grep -c ':-X.Y.Z}' compose.yaml    # 8: six images and the two ZAMFONO_VERSION defaults
+   grep -c ':-X.Y.Z}' compose.yaml    # 9: six images, netns's proxy image and the two ZAMFONO_VERSION defaults
    export DOCKER_CONFIG=$(mktemp -d)   # no stored registry login
    for n in asterisk migrate core api proxy updater; do docker manifest inspect ghcr.io/zamfono/$n:X.Y.Z >/dev/null && echo "$n ok"; done
    ```
