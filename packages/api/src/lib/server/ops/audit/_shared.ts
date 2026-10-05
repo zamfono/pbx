@@ -31,6 +31,7 @@ export const ENTITY_TABLES: Partial<Record<string, keyof DB>> = {
   oooRule: 'oooRules',
   backupTarget: 'backupTargets',
   blockedNumber: 'blockedNumbers',
+  sipAllowlistEntry: 'sipAllowlist',
   openingHours: 'openingHours'
 };
 

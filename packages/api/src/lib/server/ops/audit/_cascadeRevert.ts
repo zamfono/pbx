@@ -1,6 +1,8 @@
 import { HTTP_CONFLICT, type ReloadKind } from '@zamfono/shared';
 
 import { propagate } from '../propagate.js';
+import { liftCoveredBans } from '../sipAllowlist/_shared.js';
+import { renderSipBanListAfterCommit } from '../sipBans/_shared.js';
 import { Conflict, OpError, type Context } from '../types.js';
 import { refuseDeletedReferences } from './_deletedReferences.js';
 import { guardReuseConflict } from './_reuseConflicts.js';
@@ -24,6 +26,7 @@ const DELETE_PROPAGATE_KINDS: Partial<Record<string, ReloadKind[]>> = {
   didBlock: [],
   oooRule: [],
   blockedNumber: [],
+  sipAllowlistEntry: [],
   openingHours: []
 };
 
@@ -140,5 +143,14 @@ export async function revertSoftDelete(
       : DELETE_PROPAGATE_KINDS[entityKind];
   if (kinds) {
     propagate(ctx, kinds);
+  }
+  if (entityKind === 'sipAllowlistEntry') {
+    const entry = await ctx.db
+      .selectFrom('sipAllowlist')
+      .select('address')
+      .where('id', '=', entityId)
+      .executeTakeFirstOrThrow();
+    await liftCoveredBans(ctx, entry.address);
+    renderSipBanListAfterCommit(ctx);
   }
 }

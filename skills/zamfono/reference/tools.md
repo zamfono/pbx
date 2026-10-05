@@ -93,6 +93,11 @@
 | `search.query` | `GET /search` | The type-ahead behind the search bar: users, ring groups and contacts. | user | no |
 | `settings.get` | `GET /settings` | Reads the tenant settings row, each secret only as whether it is set | admin | no |
 | `settings.update` | `PATCH /settings` | Updates tenant-wide settings: main number, fallback, country, language, mail relay, feature codes, retention, SSO and more; owner-only fields say so | admin | no |
+| `sipAllowlist.create` | `POST /sipAllowlist` | Exempts a source address or range from SIP bans, ending every active ban it covers | admin | no |
+| `sipAllowlist.delete` | `DELETE /sipAllowlist/{id}` | Removes a source from the SIP ban allowlist | admin | yes |
+| `sipAllowlist.list` | `GET /sipAllowlist` | Lists the source addresses and ranges never banned for failed SIP attempts | admin | no |
+| `sipBans.lift` | `DELETE /sipBans/{id}` | Ends an active SIP ban now, a permanent one included; the ban stays listed as ended | admin | yes |
+| `sipBans.list` | `GET /sipBans` | Lists the bans of sources of failed SIP attempts, the active ones unless state says otherwise | admin | no |
 | `stats.query` | `GET /stats` | Buckets a call metric (answerRate, ringToAnswer, avgCallLength, callVolume) over a time range. | admin | no |
 | `system.info` | `GET /system/info` | Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update with who asked for it, whether automatic updates are on and why and how often the last one failed, when and why the maintenance gate last gave up, whether a tenant profile or roster change still waits for Ringotel, and the domain of the stack and the public IPv4 address its SIP and media use. | user | no |
 | `system.update` | `POST /system/update` | Updates the stack to the latest release, or to version, if newer and non-breaking; needs a backup run finished ok within the last hour. system.info reports the progress. | owner | yes |

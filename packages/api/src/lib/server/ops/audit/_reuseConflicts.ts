@@ -140,6 +140,12 @@ const REUSE_CONFLICT_CHECKS: Partial<Record<string, ReuseCheck>> = {
     'number',
     'isPrefix'
   ]),
+  sipAllowlistEntry: uniqueAmongLive(
+    'sipAllowlist',
+    'sipAllowlistEntry',
+    'address',
+    ['address']
+  ),
   openingHours: scheduleReuseConflict
 };
 

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { isCidr, isSipBanAddress } from './cidr.js';
+import { addressRangesOverlap, isCidr, isSipBanAddress } from './cidr.js';
 
 test.each([
   ['10.0.0.0/8', true],
@@ -28,4 +28,18 @@ test.each([
   ['', false]
 ])('isSipBanAddress(%s) is %s', (value, expected) => {
   expect(isSipBanAddress(value)).toBe(expected);
+});
+
+test.each([
+  ['203.0.113.0/24', '203.0.113.7', true],
+  ['203.0.113.7', '203.0.113.7', true],
+  ['203.0.113.8', '203.0.113.7', false],
+  ['10.1.2.3/8', '10.200.0.1', true],
+  ['2001:db8::/48', '2001:db8:0:5::/64', true],
+  ['2001:DB8:0:5::1', '2001:db8:0:5::/64', true],
+  ['2001:db8:0:6::/64', '2001:db8:0:5::/64', false],
+  ['203.0.113.7', '2001:db8:0:5::/64', false]
+])('addressRangesOverlap(%s, %s) is %s', (left, right, expected) => {
+  expect(addressRangesOverlap(left, right)).toBe(expected);
+  expect(addressRangesOverlap(right, left)).toBe(expected);
 });

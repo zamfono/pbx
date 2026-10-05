@@ -90,7 +90,8 @@ const CREATION_DELETE_OPERATIONS: Partial<Record<string, string>> = {
   userGroup: 'userGroups.delete',
   oooRule: 'ooo.delete',
   backupTarget: 'backups.targets.delete',
-  blockedNumber: 'blockedNumbers.delete'
+  blockedNumber: 'blockedNumbers.delete',
+  sipAllowlistEntry: 'sipAllowlist.delete'
 };
 
 /**
