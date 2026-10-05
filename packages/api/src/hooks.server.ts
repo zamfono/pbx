@@ -95,6 +95,22 @@ function rateLimitResponse(
   });
 }
 
+// `src/app.html`'s placeholder for the page language.
+const LANG_PLACEHOLDER = '%lang%';
+
+/** Fills `<html lang>` with `settings.language`, the language every page renders in (§5.2). */
+async function fillLanguage({ html }: { html: string }): Promise<string> {
+  if (!html.includes(LANG_PLACEHOLDER)) {
+    return html;
+  }
+  const { language } = await getDb()
+    .selectFrom('settings')
+    .select('language')
+    .where('id', '=', 1)
+    .executeTakeFirstOrThrow();
+  return html.replace(LANG_PLACEHOLDER, language);
+}
+
 /**
  * Refuses a cross-site form submission to a browser-served page (`crossSiteFormRejection`);
  * resolves `/api/v1/*`'s bearer token, or a download link's token (§10.5), into
@@ -121,7 +137,7 @@ const handleRequest: Handle = async ({ event, resolve }) => {
   }
   if (!pathname.startsWith(API_PREFIX) || pathname === OPENAPI_PATH) {
     event.locals.auth = null;
-    return resolve(event);
+    return resolve(event, { transformPageChunk: fillLanguage });
   }
   const deps = { db: getDb(), jwtSecret: env.JWT_SECRET };
   const bearer = await authenticateRequest(deps, event.request);

@@ -3,7 +3,7 @@ import process from 'node:process';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { epochSeconds, nowIso } from '@zamfono/shared';
-import { migrateForTest } from '@zamfono/shared/testDb.js';
+import { migrateForTest, seedSettings } from '@zamfono/shared/testDb.js';
 
 import { encodeLinkToken, signAccessToken } from '#lib/server/auth/jwt.js';
 import { getDb } from '#lib/server/db.js';
@@ -53,6 +53,7 @@ beforeAll(async () => {
     })
     .execute();
   await seedSession(db, 'admin1', 'console', 'session-1');
+  await seedSettings(db, { language: 'de' });
 });
 
 const resolvePassThrough = (): Promise<Response> =>
@@ -229,5 +230,21 @@ describe('hooks handle', () => {
       resolve: resolvePassThrough
     });
     expect(viaBearer.headers.get('cache-control')).toBeNull();
+  });
+
+  // §5.2 "Authentication pages": every page is in `settings.language`, its `<html lang>` too.
+  it("fills a page's html lang with the tenant's language", async () => {
+    const event = requestEvent('http://internal/oauth/authorize');
+    const response = await handle({
+      event,
+      resolve: async (_event, options) =>
+        new Response(
+          await options?.transformPageChunk?.({
+            html: '<html lang="%lang%">',
+            done: true
+          })
+        )
+    });
+    expect(await response.text()).toBe('<html lang="de">');
   });
 });
