@@ -26,7 +26,7 @@ const FIELD = {
     'The provider account name, for registration and digest auth; callerIdHeader pai needs one.',
   password: 'The provider account password; write-only, read as passwordSet.',
   inboundAuth:
-    "Challenges the provider's INVITEs and identifies the trunk by its username, so it needs no inbound hosts; either auth mode.",
+    "Challenges the provider's INVITEs and identifies the trunk by its username, so it needs no inbound hosts; with inbound or both hosts, only calls from them are taken. Either auth mode.",
   transport: 'SIP signalling transport: udp (default), tcp or tls.',
   srtp: 'Encrypts the media with SDES-SRTP, for a provider that requires it; tls trunks only.',
   tlsVerify:

@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-05 · §5.6, §9.4 Inbound identification.** An `inbound_auth` trunk with `inbound` or `both` hosts has no endpoint named by its username, so its credential is accepted only on calls its hosts or `line` tag identify; one without hosts accepts it from any address, a risk §5.6 names.
+*Why:* the product owner chose "Restrict to trunk hosts": the username endpoint took the provider's credential from any address, unthrottled, open to online guessing. An endpoint ACL (`permit`) cannot carry an FQDN host, which `identify` resolves.
+
 **2026-10-05 · §9.4 Signaling.** `trunks.outbound_proxy` is a `sip:`/`sips:` URI, a value without a scheme refused with 422, and is used as a loose route, `;lr` added where missing.
 *Why:* a scheme-less proxy left PJSIP no `Route` to parse, and one without `;lr` was strict-routed, the proxy's URI replacing the Request-URI.
 

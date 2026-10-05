@@ -162,26 +162,47 @@ describe('render', () => {
     );
   });
 
-  test('the ip trunk with inbound_auth and a host list is identified by both auth username and source address', () => {
-    // Trunk B (t2) has `inbound_auth` and an `inbound`/`both` host list, so the `identify`
-    // section's source-address match must stay live alongside the digest match (§9.4 "Inbound
-    // identification": "a host list is still honoured where present").
+  test('the ip trunk with inbound_auth and a host list takes its credential only from those hosts', () => {
+    // Trunk B (t2) has `inbound_auth` and an `inbound`/`both` host list: the `identify` section's
+    // source-address match leads to `trunk-<id>`, which challenges, and no endpoint named by the
+    // username takes the credential from elsewhere (§5.6, §9.4 "Inbound identification").
     const trunksConf = rendered['pjsip_trunks.conf'];
     expect(trunksConf).toContain(
       '[trunk-t2]\ntype = identify\nendpoint = trunk-t2\n'
     );
     expect(trunksConf).toContain('auth = trunk-t2\nidentify_by = ip\n');
-    expect(trunksConf).toContain(
-      '[ipuser]\ntype = endpoint\ncontext = from-trunk\n'
-    );
+    expect(trunksConf).not.toContain('[ipuser]\ntype = endpoint\n');
+    expect(trunksConf).not.toContain('identify_by = auth_username');
   });
 
-  test('an inbound_auth trunk is identified by an endpoint named by its username', () => {
+  // Trunk B with its one dialled host alone, so no source address identifies its calls.
+  const noHosts: RenderInput = {
+    ...input,
+    users: [],
+    devices: [],
+    ringGroups: [],
+    parkingSlots: [],
+    trunks: [
+      {
+        ...trunkB,
+        hosts: [
+          {
+            priority: 1,
+            host: '203.0.113.10',
+            port: null,
+            direction: 'outbound'
+          }
+        ]
+      }
+    ]
+  };
+
+  test('an inbound_auth trunk without source hosts is identified by an endpoint named by its username', () => {
     // Asterisk's `identify_by = auth_username` finds the endpoint whose name is the
     // Authorization username; `trunk-<id>` never is, so the digest match needs a section named
     // by the trunk's username, bound to the trunk's own auth section (§9.4, §5.6).
-    const section = rendered['pjsip_trunks.conf']
-      .split('\n\n')
+    const section = render(noHosts)
+      ['pjsip_trunks.conf'].split('\n\n')
       .find(block => block.startsWith('[ipuser]\n'))
       ?.trimEnd();
     expect(section).toBe(
@@ -211,26 +232,6 @@ describe('render', () => {
   });
 
   test('an inbound_auth trunk with no host list is identified by auth username alone', () => {
-    const noHosts: RenderInput = {
-      ...input,
-      users: [],
-      devices: [],
-      ringGroups: [],
-      parkingSlots: [],
-      trunks: [
-        {
-          ...trunkB,
-          hosts: [
-            {
-              priority: 1,
-              host: '203.0.113.10',
-              port: null,
-              direction: 'outbound'
-            }
-          ]
-        }
-      ]
-    };
     const trunksConf = render(noHosts)['pjsip_trunks.conf'];
     expect(trunksConf).toContain('[ipuser]\n');
     expect(trunksConf).toContain('identify_by = auth_username');

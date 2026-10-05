@@ -58,6 +58,14 @@ const registrationTrunk: Trunk = {
   ]
 };
 
+// The registrar alone, a host that is dialled but never a source address (§9.4 "Hosts").
+const registrarOnly: Pick<Trunk, 'hosts'> = {
+  hosts: registrationTrunk.hosts.map(host => ({
+    ...host,
+    direction: 'outbound'
+  }))
+};
+
 function renderTrunk(trunk: Trunk): string {
   const input: RenderInput = {
     settings: {
@@ -155,6 +163,7 @@ describe('renderTrunksConf connected line and redirecting', () => {
     for (const callerIdHeader of ['from', 'pai', 'both'] as const) {
       const conf = renderTrunk({
         ...registrationTrunk,
+        ...registrarOnly,
         username: 'trunkuser',
         inboundAuth: true,
         callerIdHeader
@@ -172,6 +181,43 @@ describe('renderTrunksConf connected line and redirecting', () => {
         expect(parsedValues(endpoint, 'send_history_info')).toEqual([]);
       }
     }
+  });
+});
+
+// §5.6, §9.4 "Inbound identification": an `inbound_auth` trunk's credential identifies a call from
+// anywhere only while no source host is listed; with one, the call must come from a listed host.
+describe('renderTrunksConf inbound_auth source restriction', () => {
+  const authTrunk: Trunk = {
+    ...registrationTrunk,
+    username: 'trunkuser',
+    inboundAuth: true
+  };
+  const endpointNames = (trunk: Trunk): (string | undefined)[] =>
+    renderTrunk(trunk)
+      .split('\n\n')
+      .filter(block => block.split('\n').includes('type = endpoint'))
+      .map(block => block.split('\n')[0]);
+
+  test('with an inbound or both host, only the host-identified endpoint takes the credential', () => {
+    for (const direction of ['both', 'inbound'] as const) {
+      const trunk: Trunk = {
+        ...authTrunk,
+        hosts: [
+          ...registrarOnly.hosts,
+          { priority: 2, host: '192.0.2.7', port: null, direction }
+        ]
+      };
+      expect(endpointNames(trunk)).toEqual(['[trunk-t1]']);
+      expect(renderTrunk(trunk)).toContain(
+        'auth = trunk-t1\nidentify_by = ip\n'
+      );
+    }
+  });
+
+  test('without one, the endpoint named by the username takes it from any address', () => {
+    expect(endpointNames({ ...authTrunk, hosts: registrarOnly.hosts })).toEqual(
+      ['[trunk-t1]', '[trunkuser]']
+    );
   });
 });
 
@@ -204,7 +250,11 @@ describe('renderTrunksConf TLS and SRTP', () => {
   });
 
   test('an srtp trunk encrypts its media on both of its endpoints; without srtp neither does', () => {
-    const withAuthEndpoint: Trunk = { ...tlsTrunk, inboundAuth: true };
+    const withAuthEndpoint: Trunk = {
+      ...tlsTrunk,
+      ...registrarOnly,
+      inboundAuth: true
+    };
     const conf = renderTrunk({ ...withAuthEndpoint, srtp: true });
     const endpoints = conf
       .split('\n\n')

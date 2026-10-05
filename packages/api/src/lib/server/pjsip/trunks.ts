@@ -192,17 +192,24 @@ function renderTrunkEndpoint(trunk: Trunk, tenantCodecs: string[]): string {
 }
 
 /**
- * The endpoint an `inboundAuth` trunk's digest credential identifies (§9.4 "Inbound
- * identification", `identify_by = auth_username`). Asterisk looks the Authorization username up
- * as an endpoint's *name*, so this second endpoint of the trunk is named by its username, where
- * the trunk's own `trunk-<id>` endpoint could never match; it carries the same `auth` section and
- * delivers into the same context. The operations layer keeps the name free (`trunks.create`).
+ * The endpoint an `inboundAuth` trunk's digest credential identifies from any address (§9.4
+ * "Inbound identification", `identify_by = auth_username`). Asterisk looks the Authorization
+ * username up as an endpoint's *name*, so this second endpoint of the trunk is named by its
+ * username, where the trunk's own `trunk-<id>` endpoint could never match; it carries the same
+ * `auth` section and delivers into the same context. The operations layer keeps the name free
+ * (`trunks.create`). A trunk with source hosts gets none (§5.6): its `trunk-<id>` endpoint, which
+ * those hosts (and a registration's `line` tag) identify, challenges with the same section, so
+ * the credential is accepted only there. An endpoint ACL could not say this: it takes no FQDN.
  */
 function renderTrunkAuthEndpoint(
   trunk: Trunk,
   tenantCodecs: string[]
 ): string | null {
-  if (!trunk.inboundAuth || trunk.username === null) {
+  if (
+    !trunk.inboundAuth ||
+    trunk.username === null ||
+    trunkIdentifyHosts(trunk).length > 0
+  ) {
     return null;
   }
   if (trunk.username.includes(';')) {
