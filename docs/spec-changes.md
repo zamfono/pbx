@@ -6,6 +6,8 @@ Every change made to [the specification](spec.md) during implementation, newest 
 *Why:* the product owner, on the finding that anyone could make `api` buffer 50 MB through that form: "I now understand the problem. Let us accept the potential shortcoming for now and add it to the “later” to do list with a reference to “UI session”."
 **2026-10-05 · §6.4, §7.** The certificate sync's status reads `failed` after a failed pass until one succeeds, and `expiring` while the certificate on `asterisk-config` expires within 14 days; `/metrics` exports it as `zamfono_certificate_sync_ok`.
 *Why:* a failed pass kept the last status, so a sync failing for good, or a certificate Caddy stopped renewing, read as `ok` until clients saw it expire.
+**2026-10-05 · §10.1 steps 4 and 7, §11.2 `users`.** A find-me list with an entry that is one of the tenant's own DIDs is refused with 422 naming it, on `POST /users` and `PATCH /users/{id}`; the core still never rings one.
+*Why:* the product owner chose "Refuse at save (Recommended)": an own DID as a find-me entry was saved and then silently skipped at ring time.
 
 **2026-10-05 · §5.6, §9.1.** SIP requests and responses carry `User-Agent`/`Server: Zamfono`, set in `pjsip.conf`'s `global` section, never the Asterisk release.
 *Why:* Asterisk's default header named its exact release, telling a scanner what it runs.

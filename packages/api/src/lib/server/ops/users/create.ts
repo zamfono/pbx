@@ -20,6 +20,7 @@ import {
 import { setupLinkFor } from './_setupMail.js';
 import {
   assertEmailAvailable,
+  assertFindMeNotOwnDid,
   EXTENSION_DESCRIPTION,
   toUserOut,
   userCallFields,
@@ -112,6 +113,7 @@ export const create = defineOperation({
     await assertValidExtension(ctx.db, input.extension);
     await assertExtensionAvailable(ctx.db, input.extension);
     await assertEmailAvailable(ctx.db, input.email);
+    await assertFindMeNotOwnDid(ctx.db, input.findMe ?? []);
 
     const id = newId();
     await insertUserRow(ctx, id, input);

@@ -18,6 +18,7 @@ import { affectedDevice, maybeRenameExtension } from './_rename.js';
 import {
   assertCallerIdDidValid,
   assertEmailAvailable,
+  assertFindMeNotOwnDid,
   EXTENSION_DESCRIPTION,
   liveUser,
   toUserOut,
@@ -169,6 +170,9 @@ export const update = defineOperation({
     }
     if (input.callerIdDidId !== undefined && input.callerIdDidId !== null) {
       await assertCallerIdDidValid(ctx.db, input.callerIdDidId);
+    }
+    if (input.findMe !== undefined) {
+      await assertFindMeNotOwnDid(ctx.db, input.findMe);
     }
     if (input.mailboxAudioId !== undefined && input.mailboxAudioId !== null) {
       await assertAudioOfKind(ctx.db, input.mailboxAudioId, 'vmGreeting');

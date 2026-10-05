@@ -9,7 +9,8 @@ import {
   isE164,
   USER_ROLES,
   type DB,
-  type Db
+  type Db,
+  type FindMeLeg
 } from '@zamfono/shared';
 
 import { assertNoLiveHolder } from '../liveHolder.js';
@@ -166,6 +167,33 @@ export async function assertCallerIdDidValid(
     throw new OpError(
       HTTP_UNPROCESSABLE_CONTENT,
       `callerIdDidId must be a numeric DID: ${id}`
+    );
+  }
+}
+
+/** Throws `OpError(422)` naming the first find-me entry that is one of the tenant's own live DIDs,
+ *  which is never dialled (§10.1 step 4): the user behind it is added instead. */
+export async function assertFindMeNotOwnDid(
+  db: Db,
+  findMe: FindMeLeg[]
+): Promise<void> {
+  if (findMe.length === 0) {
+    return;
+  }
+  const own = await db
+    .selectFrom('dids')
+    .select('number')
+    .where(
+      'number',
+      'in',
+      findMe.map(leg => leg.number)
+    )
+    .where('deletedAt', 'is', null)
+    .executeTakeFirst();
+  if (own) {
+    throw new OpError(
+      HTTP_UNPROCESSABLE_CONTENT,
+      `findMe: ${own.number} is one of your own numbers; add the user instead`
     );
   }
 }
