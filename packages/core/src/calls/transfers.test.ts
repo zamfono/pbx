@@ -312,6 +312,37 @@ describe('transfers', () => {
     });
   });
 
+  it('records no onward call for a REFER from the trunk side, which re-enters from-trunk (§10.1)', async () => {
+    await setUp();
+    const answererId = await seedUserWithDevice(rig, '101');
+    const { call, callerId, legId } = await answered(
+      answererId,
+      'PJSIP/e101-a-00000002'
+    );
+
+    // The outside caller transfers the user: the onward call runs the trunk's `from-trunk`.
+    fakeAri.emit({
+      type: 'BridgeBlindTransfer',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: { id: callerId, name: 'PJSIP/trunk-1-00000001' },
+      transferee: { id: legId, name: 'PJSIP/e101-a-00000002' },
+      exten: '+15557777',
+      context: 'from-trunk',
+      result: 'Success',
+      is_external: false
+    });
+    await transferFollowed(callerId);
+
+    const original = await db
+      .selectFrom('calls')
+      .select('endedAt')
+      .where('id', '=', call.id)
+      .executeTakeFirstOrThrow();
+    expect(original.endedAt).not.toBeNull();
+    expect(pipeline.pendingTransfers.entries.size).toBe(0);
+  });
+
   it('follows a blind transfer out of a Stasis bridge, where a Local pair dials the target for the transferee', async () => {
     await setUp();
     const transferrerId = await seedUserWithDevice(rig, '101');

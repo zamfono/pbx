@@ -55,6 +55,7 @@ async function onBlindTransfer(
   const transferee = ev.transferee;
   const replacement = ev.replace_channel;
   const bridgeId = call.bridgeId;
+  const transferrerUserId = userOfChannel(call, transferrer.id);
   if (transferee !== undefined) {
     const snapshot = await pipeline.deps.cache.get();
     const diallingHalf =
@@ -74,15 +75,18 @@ async function onBlindTransfer(
     }
     // §10.1: the onward call is routed as the transferrer's, so it carries their identity into
     // `handleOutbound` rather than the transferee's own (§9.4 route and caller-ID selection), and
-    // its parent.
-    setPendingTransfer(pipeline, diallingHalf ?? transferee.id, {
-      parentCallId: call.id,
-      transferrerUserId: userOfChannel(call, transferrer.id),
-      transfereeUserId: userOfChannel(call, transferee.id),
-      from: fromOf(call, transferee.id, snapshot),
-      // The same row a transfer over the API gives the transferee (`transfers.ts`).
-      ...transfereeEntry(call, transferee.id)
-    });
+    // its parent. A trunk-side transferrer's onward call re-enters `from-trunk` as an inbound
+    // call of its own, so it has nothing to take.
+    if (transferrerUserId !== null) {
+      setPendingTransfer(pipeline, diallingHalf ?? transferee.id, {
+        parentCallId: call.id,
+        transferrerUserId,
+        transfereeUserId: userOfChannel(call, transferee.id),
+        from: fromOf(call, transferee.id, snapshot),
+        // The same row a transfer over the API gives the transferee (`transfers.ts`).
+        ...transfereeEntry(call, transferee.id)
+      });
+    }
   }
   await closeCall(pipeline, call, 'answered', false);
   await pipeline.deps.ari.channels.hangup(transferrer.id).catch(ignoreGone);

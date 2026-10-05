@@ -21,8 +21,8 @@ import type { Pipeline } from './pipeline.js';
 
 type PendingTransfer = {
   parentCallId: string;
-  /** The user whose routes, caller-ID and CLIR the onward call uses; `null` for an outside party. */
-  transferrerUserId: string | null;
+  /** The user whose routes, caller-ID and CLIR the onward call uses. */
+  transferrerUserId: string;
   /** The transferee, the onward call's caller: their user, `null` for an outside party. */
   transfereeUserId: string | null;
   /** The number the onward call is from: the transferee's. */
