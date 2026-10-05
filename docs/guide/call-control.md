@@ -16,9 +16,25 @@ else is refused with 403 (`guardrails`). Declining is different: it acts only on
 user's own ringing phones.
 
 Each call in progress that `calls.list` (`GET /calls?live=true`) returns carries `callId`,
-`direction`, `from`, `to`, `state` (`ringing` or `up`), `startedAt`, `ringGroupId` and `userIds`:
+`direction`, `from`, `to`, `state` (`ringing` or `up`), `startedAt`, `ringGroupId`, `userIds`:
 the users the call concerns now, its caller, callee and answerer and everyone whose phone rings
-or is connected in it, so a CRM can tell whose call it is.
+or is connected in it, so a CRM can tell whose call it is, and `legs`, the parties in it now.
+Each leg has an `id`, a `role` (`caller`, `callee`, or `added` for a party added to the call), a
+`state` (`ringing`, `up`, `held`) and whichever applies of `userId`, `deviceId`, `trunkId` and
+`target`, the number or SIP target a trunk leg dials. A call a number forwards to a SIP target
+has legs but no user.
+
+## Naming the leg
+
+`calls.transfer`, `calls.park`, `calls.consult` and `calls.hold` take `legId`, one of the call's
+`legs`: the party that moves, is parked or is held. The other side then acts as you would: it is
+released by a transfer, is the parker the ring-back rings, holds the call or dials the
+consultation. Without `legId` they take your own other party, so an admin or owner who is not in
+the call must name a leg (422 otherwise); that is how a call with no user in it, such as one a
+number forwards to a SIP target, is transferred. `calls.hangup` with `legId` hangs up that leg
+alone, as its phone hanging up would. A `user` names legs only of calls they control. A leg the
+call does not hold is 404 `legNotFound`, one still ringing 409 `legNotUp`, an added party's 409
+`notBridged`; with `toCallId`, a leg other than the held party is 409 `notHeld`.
 
 A refused action names its reason in the problem's `detail`: 404 `notFound` for a call no longer
 in progress, 409 for a call in the wrong state (`notBridged`, not answered yet; `held`;

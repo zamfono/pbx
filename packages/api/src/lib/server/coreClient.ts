@@ -22,6 +22,7 @@ import {
   type ParkRequest,
   type PickupRequest,
   type ReloadKind,
+  type ResumeRequest,
   type StateResponse,
   type TransferRequest
 } from '@zamfono/shared';
@@ -52,7 +53,7 @@ export type CoreClient = {
   consult(callId: string, req: ConsultRequest): Promise<{ callId: string }>;
   attendedTransfer(callId: string, req: AttendedTransferRequest): Promise<void>;
   hold(callId: string, req: HoldRequest): Promise<void>;
-  resume(callId: string, req: HoldRequest): Promise<void>;
+  resume(callId: string, req: ResumeRequest): Promise<void>;
   decline(callId: string, req: DeclineRequest): Promise<void>;
 };
 

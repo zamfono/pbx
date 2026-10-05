@@ -7,6 +7,9 @@ import {
   HTTP_CONFLICT,
   HTTP_NOT_FOUND,
   HTTP_SERVICE_UNAVAILABLE,
+  HTTP_UNPROCESSABLE_CONTENT,
+  LIVE_LEG_ROLES,
+  LIVE_LEG_STATES,
   QOS_ROLES,
   type DB,
   type Db
@@ -14,7 +17,7 @@ import {
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 
-import { type Context } from '../types.js';
+import { OpError, type Context } from '../types.js';
 
 /** A `calls` row as Kysely's `CamelCasePlugin` maps it (§11.2). */
 export type CallRow = Selectable<DB['calls']>;
@@ -26,6 +29,34 @@ export const liveCallIdInput = z
   // the URL normalises away, could only ever reach some other route.
   .regex(/^(?!\.{1,2}$)[A-Za-z0-9._-]+$/u)
   .describe("The live call's id, as calls.list with live=true lists it.");
+
+/** The `legId` input of an action on a live call (§10.3 "Live calls"): `what` says what the
+ * named leg does. */
+export function legIdInput(what: string) {
+  return z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      `The leg ${what}, by its id in the call's legs as calls.list with live=true lists them; left out, your own other party. Required when you are not in the call yourself.`
+    );
+}
+
+/** One leg of a live call, as `calls.list` with `live=true` lists it (§10.3 "Live calls"). */
+export const liveLegOut = z.object({
+  id: z
+    .string()
+    .describe("The leg's id, which legId names in the call actions."),
+  role: z.enum(LIVE_LEG_ROLES),
+  state: z.enum(LIVE_LEG_STATES),
+  userId: z.string().optional(),
+  deviceId: z.string().optional(),
+  trunkId: z.string().optional(),
+  target: z
+    .string()
+    .optional()
+    .describe('The number or SIP target a trunk leg dials.')
+});
 
 /** The `target` input of an action that dials from the caller's own phone: `verb` names whom. */
 export function dialTargetInput(verb: string): z.ZodString {
@@ -186,4 +217,26 @@ export function ownLiveCall(
   input: { id: string }
 ): Promise<boolean> {
   return isOwnLiveCall(ctx, input.id);
+}
+
+/**
+ * Refuses with 422 an action that takes the actor's own other party (no `legId`) from an actor
+ * with no channel in the live call `id` (§10.3 "Live calls"): an admin acting on someone else's
+ * call names the leg. A call `core` does not hold is left to `core`'s 404.
+ */
+export async function requireLegOrPresence(
+  ctx: Context,
+  input: { id: string; legId?: string | undefined }
+): Promise<void> {
+  if (input.legId !== undefined) {
+    return;
+  }
+  const state = await getCoreClient().state();
+  const call = state.calls.find(candidate => candidate.callId === input.id);
+  if (call !== undefined && !call.connectedUserIds.includes(ctx.actor.id)) {
+    throw new OpError(
+      HTTP_UNPROCESSABLE_CONTENT,
+      'calls: you are not in this call; name the leg with legId'
+    );
+  }
 }

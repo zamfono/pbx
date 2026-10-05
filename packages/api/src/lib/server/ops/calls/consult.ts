@@ -7,14 +7,17 @@ import {
   CALL_ACTION_PROBLEMS,
   dialledCallOutput,
   dialTargetInput,
+  legIdInput,
   liveCallIdInput,
-  ownLiveCall
+  ownLiveCall,
+  requireLegOrPresence
 } from './_shared.js';
 
 const inputSchema = z
   .object({
     id: liveCallIdInput,
-    target: dialTargetInput('consult')
+    target: dialTargetInput('consult'),
+    legId: legIdInput('held, the target dialled from its other side')
   })
   .strict();
 
@@ -37,9 +40,11 @@ export const consult = defineOperation({
   audit: false,
   writesDatabase: false,
   run: async (ctx, input) => {
+    await requireLegOrPresence(ctx, input);
     const { callId } = await getCoreClient().consult(input.id, {
       target: input.target,
-      actorUserId: ctx.actor.id
+      actorUserId: ctx.actor.id,
+      ...(input.legId === undefined ? {} : { legId: input.legId })
     });
     return { id: input.id, callId };
   }

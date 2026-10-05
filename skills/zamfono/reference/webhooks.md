@@ -33,23 +33,24 @@ goes on for others, as when their phone stops ringing; a hook never receives tha
 Every event is one JSON object with `type`, a unique `id` (UUIDv7) and `at` (ISO 8601, UTC), plus
 the fields of its type:
 
-| `type`             | Fields                                                                            | When                                                      |
-| ------------------ | --------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `presence`         | `userId`, `status` (`available`, `busy`, `offline`, `dnd`), `peer`, `ringGroupId` | a user's presence changes; `peer` and group while busy    |
-| `call.state`       | `callId`, `state` (`ringing`, `up`, `ended`), `peer`, `ringGroupId`, `userId`     | a call starts ringing, is answered or ends                |
-| `voicemail.new`    | `voicemailId`, `mailbox` (`user:<id>` or `ringGroup:<id>`)                        | a message is left (`call-data`)                           |
-| `ooo`              | `scope`, `active`, `startsAt`, `expiresAt`                                        | an out-of-office rule starts or ends                      |
-| `hours`            | `scope`, `open`                                                                   | an opening-hours interval opens or closes                 |
-| `trunk.status`     | `trunkId`, `status` (`registered`, `unreachable`, `unmonitored`, `unknown`)       | a trunk's status changes                                  |
-| `sipBan.added`     | `banId`, `address`, `expiresAt` (`null`: permanent)                               | a source of failed SIP attempts is banned                 |
-| `history.appended` | `callId`                                                                          | a call's history row is written; read it with `calls.get` |
-| `backup.started`   | `targetId`, `runId`                                                               | a backup run starts                                       |
-| `backup.finished`  | `targetId`, `runId`, `snapshotId`, `bytesAdded`, `bytesTotal`, `durationS`        | a backup run succeeds                                     |
-| `backup.failed`    | `targetId`, `runId`, `error`                                                      | a backup run fails                                        |
+| `type`             | Fields                                                                                | When                                                            |
+| ------------------ | ------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `presence`         | `userId`, `status` (`available`, `busy`, `offline`, `dnd`), `peer`, `ringGroupId`     | a user's presence changes; `peer` and group while busy          |
+| `call.state`       | `callId`, `state` (`ringing`, `up`, `ended`), `peer`, `ringGroupId`, `userId`, `legs` | a call starts ringing, is answered, is held or resumed, or ends |
+| `voicemail.new`    | `voicemailId`, `mailbox` (`user:<id>` or `ringGroup:<id>`)                            | a message is left (`call-data`)                                 |
+| `ooo`              | `scope`, `active`, `startsAt`, `expiresAt`                                            | an out-of-office rule starts or ends                            |
+| `hours`            | `scope`, `open`                                                                       | an opening-hours interval opens or closes                       |
+| `trunk.status`     | `trunkId`, `status` (`registered`, `unreachable`, `unmonitored`, `unknown`)           | a trunk's status changes                                        |
+| `sipBan.added`     | `banId`, `address`, `expiresAt` (`null`: permanent)                                   | a source of failed SIP attempts is banned                       |
+| `history.appended` | `callId`                                                                              | a call's history row is written; read it with `calls.get`       |
+| `backup.started`   | `targetId`, `runId`                                                                   | a backup run starts                                             |
+| `backup.finished`  | `targetId`, `runId`, `snapshotId`, `bytesAdded`, `bytesTotal`, `durationS`            | a backup run succeeds                                           |
+| `backup.failed`    | `targetId`, `runId`, `error`                                                          | a backup run fails                                              |
 
 A `scope` is `tenant`, `user:<id>`, `ringGroup:<id>` or `menu:<id>`. `peer` is the other party
 as the routing pipeline sees it: an extension, an international number, a provider's verbatim
-string or `anonymous`. Fields that do not apply are `null`.
+string or `anonymous`. `legs` are the call's parties as `calls.list` with `live: true` lists them
+(`call-control`), empty once it ended. Fields that do not apply are `null`.
 
 ```json
 {

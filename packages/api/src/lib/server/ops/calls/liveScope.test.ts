@@ -82,9 +82,11 @@ function coreWith(calls: LiveCall[]): string[] {
 async function act(
   actor: Actor,
   action: 'hangup' | 'transfer',
-  id: string
+  id: string,
+  extra: Record<string, string> = {}
 ): Promise<unknown> {
-  const input = action === 'hangup' ? { id } : { id, target: '102' };
+  const input =
+    action === 'hangup' ? { id, ...extra } : { id, target: '102', ...extra };
   return runOperation(await makeTestDb(), `calls.${action}`, input, {
     actor,
     channel: 'rest',
@@ -155,7 +157,8 @@ describe('who may see and control a live call (§10.3 "Live calls")', () => {
   it('lets an admin control any call', async () => {
     const actions = coreWith(CALLS);
     await act(admin, 'hangup', 'forwarded');
-    await act(admin, 'transfer', 'answered');
+    // Not in the call, the admin names the leg that moves (§10.3 "Live calls").
+    await act(admin, 'transfer', 'answered', { legId: 'leg-1' });
     expect(actions).toEqual(['hangup forwarded', 'transfer answered']);
   });
 

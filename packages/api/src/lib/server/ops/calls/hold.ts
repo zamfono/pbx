@@ -6,13 +6,16 @@ import { defineOperation } from '../types.js';
 import {
   CALL_ACTION_PROBLEMS,
   callActionOutput,
+  legIdInput,
   liveCallIdInput,
-  ownLiveCall
+  ownLiveCall,
+  requireLegOrPresence
 } from './_shared.js';
 
 const inputSchema = z
   .object({
-    id: liveCallIdInput
+    id: liveCallIdInput,
+    legId: legIdInput('held, the other side holding it')
   })
   .strict();
 
@@ -34,7 +37,11 @@ export const hold = defineOperation({
   audit: false,
   writesDatabase: false,
   run: async (ctx, input) => {
-    await getCoreClient().hold(input.id, { actorUserId: ctx.actor.id });
+    await requireLegOrPresence(ctx, input);
+    await getCoreClient().hold(input.id, {
+      actorUserId: ctx.actor.id,
+      ...(input.legId === undefined ? {} : { legId: input.legId })
+    });
     return { id: input.id };
   }
 });

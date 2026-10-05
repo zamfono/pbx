@@ -9,7 +9,9 @@ import {
   CALL_ACTION_PROBLEMS,
   callActionOutput,
   isOwnLiveCall,
-  liveCallIdInput
+  legIdInput,
+  liveCallIdInput,
+  requireLegOrPresence
 } from './_shared.js';
 
 const inputSchema = z
@@ -32,7 +34,10 @@ const inputSchema = z
       .optional()
       .describe(
         "Attended transfer: the consultation call's id calls.consult returned; the held party joins whoever answered it, and you leave both calls. Give this or target."
-      )
+      ),
+    legId: legIdInput(
+      'that moves to the target, the other side released as you are; with toCallId, the held one'
+    )
   })
   .strict();
 
@@ -46,7 +51,7 @@ const inputSchema = z
 export const transfer = defineOperation({
   name: 'calls.transfer',
   description:
-    "Transfers a live call: blind to an extension or number (target), or with voicemail into an extension's mailbox, where the transferee is routed as a new call; or attended to the consultation calls.consult started (toCallId), where the held party and the consulted party talk on without you.",
+    "Transfers a live call: blind to an extension or number (target), or with voicemail into an extension's mailbox, where the transferee is routed as a new call; or attended to the consultation calls.consult started (toCallId), where the held party and the consulted party talk on without you. legId names the leg that moves, which an admin not in the call must give.",
   input: inputSchema,
   output: callActionOutput,
   problems: CALL_ACTION_PROBLEMS,
@@ -58,12 +63,15 @@ export const transfer = defineOperation({
   audit: false,
   writesDatabase: false,
   run: async (ctx, input) => {
-    const { target, toCallId, voicemail } = input;
+    const { target, toCallId, voicemail, legId } = input;
     const actorUserId = ctx.actor.id;
+    const leg = legId === undefined ? {} : { legId };
     if (target !== undefined && toCallId === undefined) {
+      await requireLegOrPresence(ctx, input);
       await getCoreClient().transfer(input.id, {
         target,
         actorUserId,
+        ...leg,
         ...(voicemail === undefined ? {} : { voicemail })
       });
       return { id: input.id };
@@ -73,9 +81,11 @@ export const transfer = defineOperation({
       target === undefined &&
       voicemail === undefined
     ) {
+      await requireLegOrPresence(ctx, input);
       await getCoreClient().attendedTransfer(input.id, {
         toCallId,
-        actorUserId
+        actorUserId,
+        ...leg
       });
       return { id: input.id };
     }

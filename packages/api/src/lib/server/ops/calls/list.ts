@@ -20,7 +20,7 @@ import {
 import { ownActingUser } from '../gates.js';
 import { instantInput, tenantInstantReader } from '../instantInput.js';
 import { defineOperation } from '../types.js';
-import { callOut, ownCallWhere, toCallOut } from './_shared.js';
+import { callOut, liveLegOut, ownCallWhere, toCallOut } from './_shared.js';
 
 const inputSchema = z
   .object({
@@ -56,7 +56,7 @@ const inputSchema = z
       .boolean()
       .optional()
       .describe(
-        'true returns the calls in progress now, each with userIds, the users it concerns now, instead of the history of ended calls.'
+        'true returns the calls in progress now, each with userIds, the users it concerns now, and legs, the parties in it, instead of the history of ended calls.'
       ),
     ...pageInput.shape
   })
@@ -77,6 +77,11 @@ const liveCallOut = z.object({
     .array(z.string())
     .describe(
       'The users the call concerns now: caller, callee, answerer and every user it rings.'
+    ),
+  legs: z
+    .array(liveLegOut)
+    .describe(
+      'The parties in the call now, each with the id the call actions take as legId.'
     )
 });
 
@@ -89,7 +94,8 @@ function listedLiveCall(call: LiveCall): z.infer<typeof liveCallOut> {
     state,
     startedAt,
     ringGroupId,
-    userIds
+    userIds,
+    legs
   } = call;
   return {
     callId,
@@ -99,7 +105,8 @@ function listedLiveCall(call: LiveCall): z.infer<typeof liveCallOut> {
     state,
     startedAt,
     ringGroupId,
-    userIds
+    userIds,
+    legs
   };
 }
 

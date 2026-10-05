@@ -19,11 +19,15 @@ why the specified behaviour changed; the commit history, how.
   endpoint, the OpenAPI document among them, is open to browsers on any origin (CORS).
 - A configured mail relay is checked in the background (`smtpCheckIntervalS`, 900 s by default);
   `/healthz` warns `mail:relay` while it fails, `/system/info` says why.
+- Live calls list their `legs`, also on `call.state`; transfer, park, consult, hold and hangup take
+  a `legId`, so an admin transfers any call, one a number forwards to a SIP target included.
 
 ### Changed
 
 - **Breaking:** `/healthz` answers `application/health+json` and 503 on any failing check; point
   uptime checks at its HTTP status or its `status`/`checks`, the old body fields are gone.
+- **Breaking:** `calls.park` no longer takes `userId`, and an admin not in a call names the leg
+  (`legId`) to transfer, park, consult on or hold, 422 otherwise.
 
 ### Fixed
 

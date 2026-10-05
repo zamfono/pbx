@@ -156,22 +156,30 @@ describe('calls.park', () => {
     ]);
   });
 
-  it('refuses a user not connected in the call, and a user parking for someone else', async () => {
+  it('refuses a user not connected in the call, and a userId, which it no longer takes', async () => {
     const requests = core();
     await expect(
       run(user('ben'), 'calls.park', { id: 'answered' })
     ).rejects.toMatchObject({ status: 403 });
     await expect(
       run(user('anna'), 'calls.park', { id: 'answered', userId: 'ben' })
-    ).rejects.toMatchObject({ status: 403 });
+    ).rejects.toMatchObject({ status: 422 });
     expect(requests).toEqual([]);
   });
 
-  it('lets an admin park on behalf of the user in the call', async () => {
+  it('lets an admin not in the call park the leg they name, and no other way', async () => {
     const requests = core();
-    await run(admin, 'calls.park', { id: 'answered', userId: 'anna' });
+    await expect(
+      run(admin, 'calls.park', { id: 'answered' })
+    ).rejects.toMatchObject({ status: 422 });
+    await run(admin, 'calls.park', { id: 'answered', legId: 'leg-1' });
     expect(requests).toEqual([
-      { park: 'answered', userId: 'anna', actorUserId: 'admin' }
+      {
+        park: 'answered',
+        userId: 'admin',
+        actorUserId: 'admin',
+        legId: 'leg-1'
+      }
     ]);
   });
 

@@ -135,8 +135,10 @@ describe('call control over the API (§10.3 "Live calls")', () => {
       )
     );
     expect(requests).toEqual([]);
-    await run(admin, 'calls.hold', { id: 'other' });
-    expect(requests).toEqual(['hold other {"actorUserId":"admin"}']);
+    await run(admin, 'calls.hold', { id: 'other', legId: 'leg-1' });
+    expect(requests).toEqual([
+      'hold other {"actorUserId":"admin","legId":"leg-1"}'
+    ]);
   });
 
   it('transfers to the consultation only for one who controls both calls', async () => {

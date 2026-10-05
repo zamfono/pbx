@@ -223,6 +223,19 @@ await_live_call() {
   printf '%s\n' "$id"
 }
 
+# The id of live call `$1`'s first leg of role `$2` (caller, callee, added), as `GET
+# /calls?live=true` lists it (§10.3 "Live calls"); fails when it lists none.
+live_leg() {
+  local leg
+  leg=$(api GET '/calls?live=true' | python3 -c '
+import json, sys
+call_id, role = sys.argv[1:3]
+for call in json.load(sys.stdin)["items"]:
+    if call["callId"] == call_id:
+        print(next((leg["id"] for leg in call["legs"] if leg["role"] == role), ""))
+' "$1" "$2") && [ -n "$leg" ] && printf '%s\n' "$leg"
+}
+
 # Whether a call `await_live_call` waits for is in progress, its id left in `id`.
 live_call() {
   id=$(api GET '/calls?live=true' | python3 -c '

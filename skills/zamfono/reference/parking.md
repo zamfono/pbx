@@ -51,11 +51,11 @@ The same park and retrieve, for an integration or the MCP assistant:
 - `calls.park` (`POST /calls/{id}/park`) parks the other party of a live call exactly as `*70`
   does: the hold music, the lowest free slot, the parker's leg hung up, the ring-back on timeout.
   No phone hears the slot read out, so the result carries it: `{ "id": "…", "slot": "71" }`. A
-  `user` parks a call they are connected in; an admin names the user in the call who parks it with
-  `userId`, since the parker is who the ring-back rings. Refused with 409 `noFreeSlot` when every
-  slot is taken, `notInCall` when that user is not in the call, `notBridged` for a call not
-  yet answered or for the call of a party added to another, which shares that call's
-  conversation.
+  `user` parks a call they are connected in; `legId` names the leg parked, its other side the
+  parker the ring-back rings, which an admin not in the call must give (`call-control`). Refused
+  with 409 `noFreeSlot` when every slot is taken, `noParker` when the named leg's other side is no
+  user's, `notBridged` for a call not yet answered or for the call of a party added to another,
+  which shares that call's conversation.
 - `parking.list` (`GET /parking/calls`) lists the calls parked right now to every user, as every
   phone's BLF shows every slot: `slot`, `callId`, `caller` (the parked party's number, `null` when
   they withheld it), `parkedAt` and `parkedByUserId`.

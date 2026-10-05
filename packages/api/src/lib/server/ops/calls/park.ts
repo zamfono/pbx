@@ -2,24 +2,22 @@ import { z } from 'zod';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
 
-import { ownActingUser } from '../gates.js';
 import { defineOperation } from '../types.js';
 import {
   CALL_ACTION_PROBLEMS,
   callActionOutput,
-  isOwnLiveCall,
-  liveCallIdInput
+  legIdInput,
+  liveCallIdInput,
+  ownLiveCall,
+  requireLegOrPresence
 } from './_shared.js';
 
 const inputSchema = z
   .object({
     id: liveCallIdInput,
-    userId: z
-      .string()
-      .optional()
-      .describe(
-        'The user in the call who parks it; left out, the caller themselves (admins only for another user).'
-      )
+    legId: legIdInput(
+      'that is parked; the other side is the parker, whose user the ring-back rings'
+    )
   })
   .strict();
 
@@ -44,15 +42,15 @@ export const park = defineOperation({
   }),
   problems: CALL_ACTION_PROBLEMS,
   minRole: 'user',
-  scope: async (ctx, input) =>
-    ownActingUser(ctx, input) && (await isOwnLiveCall(ctx, input.id)),
+  scope: ownLiveCall,
   audit: false,
   writesDatabase: false,
   run: async (ctx, input) => {
-    const userId = input.userId ?? ctx.actor.id;
+    await requireLegOrPresence(ctx, input);
     const { slot } = await getCoreClient().park(input.id, {
-      userId,
-      actorUserId: ctx.actor.id
+      userId: ctx.actor.id,
+      actorUserId: ctx.actor.id,
+      ...(input.legId === undefined ? {} : { legId: input.legId })
     });
     return { id: input.id, slot };
   }
