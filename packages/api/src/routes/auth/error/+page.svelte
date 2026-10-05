@@ -23,7 +23,9 @@
       signature: dict.signature,
       nonce: dict.nonce
     };
-    return (reason === null ? undefined : known[reason]) ?? dict.generic;
+    return reason !== null && Object.hasOwn(known, reason)
+      ? known[reason]
+      : dict.generic;
   });
 </script>
 
