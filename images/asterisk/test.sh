@@ -194,6 +194,10 @@ for exten in s 4; do
     | grep 'Stasis(zamfono,inbound,${EXTEN})' >/dev/null \
     || fail "from-trunk dialplan does not route exten $exten to Stasis"
 done
+# Asterisk runs a context's `h` extension once a channel hangs up, so the pattern above would send
+# every ended trunk call back into Stasis as a new call; `h` matches an extension of its own first.
+docker exec "$CONTAINER" asterisk -rx 'dialplan show h@from-trunk' | grep -m1 '=>' | grep -q "^ *'h' =>" \
+  || fail "from-trunk's h extension reaches the Stasis pattern"
 
 # An ARI `record` name resolves against Asterisk's recording directory, and `core` names its
 # recordings `voicemail/<id>`, `prompts/<id>` and `recordings/<id>-{l,r}` for `api` to read back

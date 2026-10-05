@@ -4,6 +4,8 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-05 · §5.2 Tokens.** Redeeming a set-password link revokes every other live set-password token of that user, in the same transaction as the new password and the session revocation.
 *Why:* a reset left the user's other setup and reset links live, so an older mailed link could set the password again after the user had reset it.
+**2026-10-05 · §9.2.** `[from-trunk]` has an explicit `h` extension, so the one-character pattern no longer matches it.
+*Why:* Asterisk runs `h` on every hung-up channel; matched by the pattern, each ended trunk call re-entered Stasis as a new failed call.
 
 **2026-10-05 · §10.2 Mail.** A withheld caller's `callerNumber` in the `voicemail` and `missedCall` mails is empty, and the shipped templates name a withheld number in their language.
 *Why:* the mails said "from anonymous", the pipeline's internal marker, in English in every language.
