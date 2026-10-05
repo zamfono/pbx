@@ -11,6 +11,8 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-05
+
 ### Upgrade notes
 
 - **0.2.0 is a fresh start: install it anew** (deploy/README.md) on a new stack directory and
@@ -42,6 +44,8 @@ why the specified behaviour changed; the commit history, how.
   and `/metrics`; `api` and `core` log failures that left no trace.
 - `recordingRetentionDays` and `softDeleteRetentionDays` take `null` to keep forever; every
   retention is at most 36500 days.
+- Monitoring: deploy/README.md says what an uptime check and a scrape should watch;
+  `/healthz` `certificateSync` also reads `failed` and `expiring` (under 14 days).
 
 ### Changed
 
@@ -83,6 +87,8 @@ why the specified behaviour changed; the commit history, how.
 - Signing out, revoking a token or resetting a password ends that session's API and MCP access
   at once, not after its access token's 15 minutes.
 - Audio uploads (hold music, greetings) take files up to 50 MB; a larger one answers 413.
+- The access log drops `token`, `access_token` and `code` query parameters; SIP answers name
+  `Zamfono`, not the Asterisk release, and a SIP `MESSAGE` is refused.
 
 ### Removed
 
@@ -506,7 +512,8 @@ why the specified behaviour changed; the commit history, how.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/zamfono/pbx/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/zamfono/pbx/compare/v0.0.7...v0.1.0
 [0.0.7]: https://github.com/zamfono/pbx/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/zamfono/pbx/compare/v0.0.5...v0.0.6
