@@ -3,7 +3,8 @@
  * config rows once `settings.soft_delete_retention_days` has passed, stale `oauth_clients` and
  * expired `tokens` (§5.2), `audit_log` beyond `settings.audit_retention_days` (§5.7) and
  * `backup_runs` beyond `settings.recording_retention_days` but each target's latest successful one
- * (§11.6), then the audio files no `audio_assets` row names. A `NULL` retention keeps its rows.
+ * (§11.6) and the SIP bans that ended longer ago than `settings.sip_ban_lookback_s` (§5.6), then the
+ * audio files no `audio_assets` row names. A `NULL` retention keeps its rows.
  */
 import { sql, type Transaction } from 'kysely';
 
@@ -23,6 +24,7 @@ import {
   purgeOauthClients,
   purgePersonalAccessTokens
 } from './purgeOauthTokens.js';
+import { purgeEndedSipBans } from './purgeSipBans.js';
 
 /** The files of the rows a purge hard-deleted, removed once its transaction has committed. */
 type PurgedFiles = {
@@ -213,6 +215,7 @@ async function purgeSoftDeletedRows(
   await purgeSoftDeleted(trx, 'contacts', softDeleteCutoff);
   await purgeSoftDeleted(trx, 'webhooks', softDeleteCutoff);
   await purgeSoftDeleted(trx, 'blockedNumbers', softDeleteCutoff);
+  await purgeSoftDeleted(trx, 'sipAllowlist', softDeleteCutoff);
   const audioFilenames = await purgeAudioAssets(trx, softDeleteCutoff);
 
   await purgeSoftDeleted(trx, 'outboundRoutes', softDeleteCutoff);
@@ -248,6 +251,7 @@ export async function runPurge(db: Db, now: string): Promise<void> {
     await purgePersonalAccessTokens(trx, now);
     await purgeAuditLog(trx, settings.auditRetentionDays, now);
     await purgeBackupRuns(trx, settings.recordingRetentionDays, now);
+    await purgeEndedSipBans(trx, settings.sipBanLookbackS, now);
     return files;
   });
   // Only once their rows are safely committed.

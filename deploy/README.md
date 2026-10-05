@@ -453,8 +453,8 @@ curl -fsS https://pbx.example.com/healthz | jq -e '.ok and .core.reachable and .
 ```
 
 The body's other fields are worth a warning: `certificateSync` other than `ok`, `emergencyTrunk`
-false, `configPropagationPending` or `autoUpdateFailed` true, `keyRotationRemaining` above 0 for
-long after a key rotation.
+or `sipBanHelperRunning` false, `configPropagationPending` or `autoUpdateFailed` true,
+`keyRotationRemaining` above 0 for long after a key rotation.
 
 For Prometheus, set `METRICS_TOKEN` in `.env` and scrape `https://<FQDN>/metrics` with
 `Authorization: Bearer <METRICS_TOKEN>`; without the variable `/metrics` answers 404. The

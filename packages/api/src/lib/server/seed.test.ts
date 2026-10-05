@@ -557,7 +557,8 @@ describe('apiHealth', () => {
       migrationsDir: MIGRATIONS_DIR,
       checkCore: () => Promise.resolve({ reachable: false, ari: false }),
       keyring: testKeyring(),
-      certificateSync: 'unknown'
+      certificateSync: 'unknown',
+      sipBanHelperRunning: false
     });
     expect(health).toEqual({
       ok: false,
@@ -571,7 +572,8 @@ describe('apiHealth', () => {
       ringotelProfilePending: false,
       ringotelRosterPending: false,
       configPropagationPending: false,
-      autoUpdateFailed: false
+      autoUpdateFailed: false,
+      sipBanHelperRunning: false
     });
     expect(healthStatus(health)).toBe(HTTP_SERVICE_UNAVAILABLE);
   });
@@ -584,7 +586,8 @@ describe('apiHealth', () => {
       migrationsDir: MIGRATIONS_DIR,
       checkCore: () => Promise.resolve({ reachable: true, ari: true }),
       keyring: testKeyring(),
-      certificateSync: 'ok'
+      certificateSync: 'ok',
+      sipBanHelperRunning: false
     });
     expect(health.ok).toBe(true);
     expect(healthStatus(health)).toBe(HTTP_OK);

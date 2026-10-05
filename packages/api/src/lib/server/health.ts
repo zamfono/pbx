@@ -50,6 +50,11 @@ export type ApiHealth = {
    * else is known of releases is `system.info`'s, which needs a login, and `/metrics`'.
    */
   autoUpdateFailed: boolean;
+  /**
+   * Whether the ban helper in the `asterisk` container runs: its heartbeat is fresh and names the
+   * ban list `api` last rendered, since enforcement stops with it (§5.6, §9.1).
+   */
+  sipBanHelperRunning: boolean;
 };
 
 /** What `apiHealth` needs to compute a body; a caller resolves each check its own way. */
@@ -59,6 +64,7 @@ export type ApiHealthDeps = {
   checkCore: () => Promise<CoreReachability>;
   keyring: Keyring;
   certificateSync: CertSyncStatus;
+  sipBanHelperRunning: boolean;
 };
 
 /** `settings.smtp_host` set means a relay is configured (§11.4). */
@@ -126,6 +132,7 @@ export async function apiHealth(deps: ApiHealthDeps): Promise<ApiHealth> {
     migrated,
     core: await deps.checkCore(),
     certificateSync: deps.certificateSync,
+    sipBanHelperRunning: deps.sipBanHelperRunning,
     ...checks
   };
 }

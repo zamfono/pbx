@@ -9,6 +9,7 @@ import {
 } from '#lib/server/health.js';
 import { certSyncStatus } from '#lib/server/jobs/certSync.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
+import { sipBanHelperRunning } from '#lib/server/sipBanList.js';
 
 /**
  * `core`'s own `/healthz` (`CoreHealth`), reached over the internal Docker network
@@ -35,7 +36,8 @@ export async function GET(): Promise<Response> {
     migrationsDir: env.MIGRATIONS_DIR,
     checkCore,
     keyring: keyringFromEnv(env),
-    certificateSync: certSyncStatus()
+    certificateSync: certSyncStatus(),
+    sipBanHelperRunning: await sipBanHelperRunning()
   });
   return Response.json(health, { status: healthStatus(health) });
 }

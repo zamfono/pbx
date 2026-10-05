@@ -89,7 +89,8 @@ describe('an owed config propagation', () => {
       migrationsDir: MIGRATIONS_DIR,
       checkCore: () => Promise.resolve({ reachable: false, ari: false }),
       keyring: kr,
-      certificateSync: 'unknown'
+      certificateSync: 'unknown',
+      sipBanHelperRunning: false
     });
     expect(health.configPropagationPending).toBe(true);
     const metrics = await renderMetrics({

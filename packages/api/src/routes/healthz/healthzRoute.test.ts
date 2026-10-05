@@ -53,6 +53,12 @@ describe('GET /healthz', () => {
     expect(body.core).toEqual({ reachable: true, ari: false });
   });
 
+  it('reports the ban helper not running while it wrote no heartbeat (§9.1)', async () => {
+    const response = await GET();
+    const body = (await response.json()) as { sipBanHelperRunning: unknown };
+    expect(body.sipBanHelperRunning).toBe(false);
+  });
+
   it('reports core unreachable when the request itself fails', async () => {
     const response = await GET();
     const body = (await response.json()) as { core: unknown };

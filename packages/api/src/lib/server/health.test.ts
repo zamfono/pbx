@@ -33,7 +33,8 @@ async function healthOf(db: Db): Promise<ApiHealth> {
     migrationsDir: MIGRATIONS_DIR,
     checkCore: () => Promise.resolve({ reachable: true, ari: true }),
     keyring: kr,
-    certificateSync: 'ok'
+    certificateSync: 'ok',
+    sipBanHelperRunning: false
   });
 }
 
