@@ -1298,7 +1298,7 @@ type Context = {
 
 A registry, filled by each area's `index.ts`, maps every name to its object; the REST route table, the MCP tool list and the OpenAPI document are all generated from that one map, which is what keeps the three surfaces from drifting. One runner wraps every `run` and does the four things they share: it validates the input against `input`, enforces `minRole` and the own-scope rules of §5.3 (a `user` reading only their own voicemails) through `scope`, for a `user` before confirmation and before `run` (403 when not their own), writes the `audit_log` entry with the field-level diff, and performs config propagation (§3.1) after a config write. It also builds the `Context`: it opens the transaction that `run` and the audit entry share (none for a call that writes nothing to the database, so `api`'s connection serves other requests while it waits on `core`), fixes `now`, and records how the call arrived, so the trail can tell a person's own change from their assistant's. `run` holds only what differs between operations.
 
-**Confirmation.** An operation with `confirm` runs only after a human has answered its question, built from the rows the input names, after the own-scope check and a 404 for an unknown id, for example "Delete Anna Huber (extension 101)? The deletion can be undone for 30 days.", the days being `settings.soft_delete_retention_days`. The runner enforces it per channel:
+**Confirmation.** An operation with `confirm` runs only after a human has answered its question, built from the rows the input names, after the own-scope check and a 404 for an unknown id, for example "Delete Anna Huber (extension 101)? The deletion can be undone for 30 days.", the days being `settings.soft_delete_retention_days` ("at any time" while that is NULL). The runner enforces it per channel:
 
 - MCP: elicitation where the client supports it, else a `confirm: true` tool input (§10.5);
 - REST: the request body carries `confirm: true`; without it the answer is 409 with the question text, so a client can show it and retry;
@@ -2045,9 +2045,9 @@ CREATE TABLE settings (
   parking_timeout_s          INTEGER NOT NULL DEFAULT 300 CHECK (parking_timeout_s BETWEEN 1 AND 86400),
   -- diagnostics and retention
   call_log_level             TEXT    NOT NULL DEFAULT 'events' CHECK (call_log_level IN ('none','events','qos','sip')),
-  recording_retention_days   INTEGER NOT NULL DEFAULT 90 CHECK (recording_retention_days > 0),
-  soft_delete_retention_days INTEGER NOT NULL DEFAULT 30 CHECK (soft_delete_retention_days >= 1),
-  audit_retention_days       INTEGER CHECK (audit_retention_days >= 30),
+  recording_retention_days   INTEGER DEFAULT 90 CHECK (recording_retention_days BETWEEN 1 AND 36500),
+  soft_delete_retention_days INTEGER DEFAULT 30 CHECK (soft_delete_retention_days BETWEEN 1 AND 36500),
+  audit_retention_days       INTEGER CHECK (audit_retention_days BETWEEN 30 AND 36500),
   -- operations
   backup_cron                TEXT    NOT NULL DEFAULT '0 3 * * *',
   tls_reload_hour            INTEGER CHECK (tls_reload_hour BETWEEN 0 AND 23),
@@ -2613,9 +2613,9 @@ A DID's `number` is what the trunk boundary produces (§9.4): the international 
 | `voicemail_max_s` | maximum length of one voicemail recording in seconds | `180` | §10.2 |
 | `parking_timeout_s` | seconds a parked call waits before ringing the parker back; five minutes covers the walk to a colleague's desk that parking exists for | `300` | §10.2 |
 | `call_log_level` | tenant diagnostics default; `sip` is rejected while `HEP_ENABLED=false` | `events` | §7 |
-| `recording_retention_days` | purge age for recordings, `calls.log`, `call_qos`, `presence_log` and `backup_runs` | `90` | §11.6 |
-| `soft_delete_retention_days` | days a soft-deleted row and its files survive before the hard purge; bounds the undo of deletions; at least 1 and at most `audit_retention_days` when that is set, since the undo reverts the deletion's audit entry: `PATCH /settings` refuses a pair that breaks this with 422 | `30` | §5 |
-| `audit_retention_days` 👑 | purge age for audit entries; NULL = kept forever. The floor of 30 keeps even an owner from erasing the trail of a recent change | NULL | §5 |
+| `recording_retention_days` | purge age for recordings, `calls.log`, `call_qos`, `presence_log` and `backup_runs`; at most 36500; NULL = kept forever | `90` | §11.6 |
+| `soft_delete_retention_days` | days a soft-deleted row and its files survive before the hard purge; bounds the undo of deletions; NULL = kept forever; at least 1, at most 36500 and at most `audit_retention_days` when that is set (so not NULL then), since the undo reverts the deletion's audit entry: `PATCH /settings` refuses a pair that breaks this with 422 | `30` | §5 |
+| `audit_retention_days` 👑 | purge age for audit entries, at most 36500; NULL = kept forever. The floor of 30 keeps even an owner from erasing the trail of a recent change | NULL | §5 |
 | `backup_cron` | cron expression of the restic backup job | `0 3 * * *` | §6.5 |
 | `tls_reload_hour` | hour `0`–`23` for certificate swaps when the tenant schedule offers no closed period (priority chain in §6.4) | NULL | §6.4 |
 | `auto_update` 👑 | 1 = install newer non-breaking releases on their own, after a backup, through the maintenance gate | `0` | §6.3 |
@@ -2646,7 +2646,7 @@ One named volume, `media/`, is shared between `asterisk`, `core` and `api`:
 - `media/voicemail/`: voicemail recordings; Asterisk writes them via ARI record, `api` reads and serves them;
 - `media/recordings/`: raw per-leg call recordings and the mixed stereo output.
 
-**Retention.** Voicemails are kept until the user deletes them; a full mailbox takes no new one (§11.5). Recordings are purged after `settings.recording_retention_days` (default 90) by a daily job in `core`; `presence_log` rows, `calls.log` content and `call_qos` rows are purged by the same job on the same schedule, except each user's latest `presence_log` row before the cutoff, which is still their state from then on, and `backup_runs` rows by `api`'s daily job (§5.9), except each target's latest successful run, whose age `/metrics` reports however old it is (§7). A file in `recordings/` or `prompts/` that no `recordings` or `audio_assets` row names (its row never written, or the row gone before the file) is deleted once it is a day old, by `core`'s daily job and `api`'s respectively. Call recording is off by default and enabled per user or per ring group by an admin (§10.2, "Recording semantics"). Recordings and voicemails are personal data under GDPR; the operator is responsible for consent and announcement, as documented in the admin guide.
+**Retention.** Voicemails are kept until the user deletes them; a full mailbox takes no new one (§11.5). Recordings are purged after `settings.recording_retention_days` (default 90; NULL keeps them and everything purged with them) by a daily job in `core`; `presence_log` rows, `calls.log` content and `call_qos` rows are purged by the same job on the same schedule, except each user's latest `presence_log` row before the cutoff, which is still their state from then on, and `backup_runs` rows by `api`'s daily job (§5.9), except each target's latest successful run, whose age `/metrics` reports however old it is (§7). A file in `recordings/` or `prompts/` that no `recordings` or `audio_assets` row names (its row never written, or the row gone before the file) is deleted once it is a day old, by `core`'s daily job and `api`'s respectively. Call recording is off by default and enabled per user or per ring group by an admin (§10.2, "Recording semantics"). Recordings and voicemails are personal data under GDPR; the operator is responsible for consent and announcement, as documented in the admin guide.
 
 **Audio formats.** Masters are stored as uploaded. Playback uses 16-bit 8 kHz or 16 kHz WAV for Asterisk, and Opus or MP3 for downloads through `api`.
 

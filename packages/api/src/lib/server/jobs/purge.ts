@@ -3,7 +3,7 @@
  * config rows once `settings.soft_delete_retention_days` has passed, stale `oauth_clients` and
  * expired `tokens` (§5.2), `audit_log` beyond `settings.audit_retention_days` (§5.7) and
  * `backup_runs` beyond `settings.recording_retention_days` but each target's latest successful one
- * (§11.6), then the audio files no `audio_assets` row names.
+ * (§11.6), then the audio files no `audio_assets` row names. A `NULL` retention keeps its rows.
  */
 import { sql, type Transaction } from 'kysely';
 
@@ -23,6 +23,12 @@ import {
   purgeOauthClients,
   purgePersonalAccessTokens
 } from './purgeOauthTokens.js';
+
+/** The files of the rows a purge hard-deleted, removed once its transaction has committed. */
+type PurgedFiles = {
+  audioFilenames: string[];
+  voicemailFilenames: string[];
+};
 
 /** Every table with both an `id` and a `deleted_at` column, the shape the purge sweeps by age. */
 type SoftDeleteTable = {
@@ -130,16 +136,21 @@ async function purgeAuditLog(
 }
 
 /**
- * §11.6 "Retention": `backup_runs` rows beyond `recording_retention_days`, except each target's
- * latest successful run, whose age `/metrics` reports however long ago it was (§7).
+ * §11.6 "Retention": `backup_runs` rows beyond `recording_retention_days` (`NULL` keeps every
+ * run), except each target's latest successful run, whose age `/metrics` reports however long
+ * ago it was (§7).
  */
 async function purgeBackupRuns(
   trx: Transaction<DB>,
-  cutoff: string
+  recordingRetentionDays: number | null,
+  now: string
 ): Promise<void> {
+  if (recordingRetentionDays === null) {
+    return;
+  }
   await trx
     .deleteFrom('backupRuns')
-    .where('startedAt', '<', cutoff)
+    .where('startedAt', '<', cutoffIso(now, recordingRetentionDays))
     .where(eb =>
       eb.or([
         eb('status', '!=', 'ok'),
@@ -157,11 +168,11 @@ async function purgeBackupRuns(
 }
 
 /**
- * Runs the full daily purge in one transaction (§5.9 last paragraph): an about-to-be-purged
- * entity's own forward-rule rows and stale schedules first, then orphaned `forward_targets`,
- * then the config entities and their files, then the remaining entities in FK order, a second
- * orphan sweep for targets the entity purge just freed, the trunks no route or target references
- * any more, and finally the security and history retention windows.
+ * Hard-deletes the rows soft-deleted before `softDeleteCutoff` (§5.9 last paragraph): an
+ * about-to-be-purged entity's own forward-rule rows and stale schedules first, then orphaned
+ * `forward_targets`, then the config entities and their files, then the remaining entities in FK
+ * order, a second orphan sweep for targets the entity purge just freed, and the trunks no route
+ * or target references any more. Returns the files of the purged rows.
  *
  * A due DID, block or menu is only hard-deleted later in this same pass (`dueIds` only computes
  * users/ring groups/menus up front; dids/blocks purge further down), so at the first orphan sweep
@@ -173,52 +184,71 @@ async function purgeBackupRuns(
  * already used in `users/update.ts`'s extension rename). The two orphan sweeps then differ only
  * in what the entity purges between them have freed.
  */
+async function purgeSoftDeletedRows(
+  trx: Transaction<DB>,
+  softDeleteCutoff: string
+): Promise<PurgedFiles> {
+  await sql`PRAGMA defer_foreign_keys = ON`.execute(trx);
+  const [dueUserIds, dueRingGroupIds, dueMenuIds] = await Promise.all([
+    dueIds(trx, 'users', softDeleteCutoff),
+    dueIds(trx, 'ringGroups', softDeleteCutoff),
+    dueIds(trx, 'menus', softDeleteCutoff)
+  ]);
+  const voicemailFilenames = await dueVoicemailFilenames(
+    trx,
+    dueUserIds,
+    dueRingGroupIds
+  );
+  await purgeOwnRuleRows(trx, dueUserIds, dueRingGroupIds, dueMenuIds);
+  await purgeSoftDeleted(trx, 'oooRules', softDeleteCutoff);
+  await purgeSoftDeleted(trx, 'openingHours', softDeleteCutoff);
+
+  await purgeOrphanForwardTargets(trx);
+
+  await purgeSoftDeleted(trx, 'menus', softDeleteCutoff);
+  await purgeSoftDeleted(trx, 'ringGroups', softDeleteCutoff);
+  await purgeSoftDeleted(trx, 'users', softDeleteCutoff);
+  await purgeSoftDeleted(trx, 'devices', softDeleteCutoff);
+  await purgeSoftDeleted(trx, 'userGroups', softDeleteCutoff);
+  await purgeSoftDeleted(trx, 'contacts', softDeleteCutoff);
+  await purgeSoftDeleted(trx, 'webhooks', softDeleteCutoff);
+  await purgeSoftDeleted(trx, 'blockedNumbers', softDeleteCutoff);
+  const audioFilenames = await purgeAudioAssets(trx, softDeleteCutoff);
+
+  await purgeSoftDeleted(trx, 'outboundRoutes', softDeleteCutoff);
+  await purgeSoftDeleted(trx, 'dids', softDeleteCutoff);
+  await purgeDidBlocks(trx, softDeleteCutoff);
+  await purgeSoftDeleted(trx, 'backupTargets', softDeleteCutoff);
+
+  await purgeOrphanForwardTargets(trx);
+  // After the sweep, so a `sip` target the purges above just orphaned no longer holds it.
+  await purgeTrunks(trx, softDeleteCutoff);
+  return { audioFilenames, voicemailFilenames };
+}
+
+/**
+ * Runs the full daily purge in one transaction (§5.9 last paragraph): the soft-deleted rows past
+ * `soft_delete_retention_days` (while that is `NULL`, only the orphaned `forward_targets`), then
+ * the security and history retention windows.
+ */
 export async function runPurge(db: Db, now: string): Promise<void> {
   const settings = await loadSettings(db);
-  const softDeleteCutoff = cutoffIso(now, settings.softDeleteRetentionDays);
   const purgedFiles = await db.transaction().execute(async trx => {
-    await sql`PRAGMA defer_foreign_keys = ON`.execute(trx);
-    const [dueUserIds, dueRingGroupIds, dueMenuIds] = await Promise.all([
-      dueIds(trx, 'users', softDeleteCutoff),
-      dueIds(trx, 'ringGroups', softDeleteCutoff),
-      dueIds(trx, 'menus', softDeleteCutoff)
-    ]);
-    const voicemailFilenames = await dueVoicemailFilenames(
-      trx,
-      dueUserIds,
-      dueRingGroupIds
-    );
-    await purgeOwnRuleRows(trx, dueUserIds, dueRingGroupIds, dueMenuIds);
-    await purgeSoftDeleted(trx, 'oooRules', softDeleteCutoff);
-    await purgeSoftDeleted(trx, 'openingHours', softDeleteCutoff);
-
-    await purgeOrphanForwardTargets(trx);
-
-    await purgeSoftDeleted(trx, 'menus', softDeleteCutoff);
-    await purgeSoftDeleted(trx, 'ringGroups', softDeleteCutoff);
-    await purgeSoftDeleted(trx, 'users', softDeleteCutoff);
-    await purgeSoftDeleted(trx, 'devices', softDeleteCutoff);
-    await purgeSoftDeleted(trx, 'userGroups', softDeleteCutoff);
-    await purgeSoftDeleted(trx, 'contacts', softDeleteCutoff);
-    await purgeSoftDeleted(trx, 'webhooks', softDeleteCutoff);
-    await purgeSoftDeleted(trx, 'blockedNumbers', softDeleteCutoff);
-    const audioFilenames = await purgeAudioAssets(trx, softDeleteCutoff);
-
-    await purgeSoftDeleted(trx, 'outboundRoutes', softDeleteCutoff);
-    await purgeSoftDeleted(trx, 'dids', softDeleteCutoff);
-    await purgeDidBlocks(trx, softDeleteCutoff);
-    await purgeSoftDeleted(trx, 'backupTargets', softDeleteCutoff);
-
-    await purgeOrphanForwardTargets(trx);
-    // After the sweep, so a `sip` target the purges above just orphaned no longer holds it.
-    await purgeTrunks(trx, softDeleteCutoff);
-
+    let files: PurgedFiles = { audioFilenames: [], voicemailFilenames: [] };
+    if (settings.softDeleteRetentionDays === null) {
+      await purgeOrphanForwardTargets(trx);
+    } else {
+      files = await purgeSoftDeletedRows(
+        trx,
+        cutoffIso(now, settings.softDeleteRetentionDays)
+      );
+    }
     await purgeExpiredTokens(trx, now);
     await purgeOauthClients(trx, now);
     await purgePersonalAccessTokens(trx, now);
     await purgeAuditLog(trx, settings.auditRetentionDays, now);
-    await purgeBackupRuns(trx, cutoffIso(now, settings.recordingRetentionDays));
-    return { audioFilenames, voicemailFilenames };
+    await purgeBackupRuns(trx, settings.recordingRetentionDays, now);
+    return files;
   });
   // Only once their rows are safely committed.
   await Promise.all([

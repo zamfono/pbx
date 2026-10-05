@@ -47,7 +47,8 @@ export async function softDelete(
 
 /**
  * The confirmation question of a soft delete (§10.3 "Confirmation"): `what` goes, and its
- * deletion can be undone until `settings.soft_delete_retention_days` purge it (§11.6).
+ * deletion can be undone until `settings.soft_delete_retention_days` purge it (§11.6), at any time
+ * while that is `NULL`.
  */
 export async function softDeleteQuestion(
   ctx: Context,
@@ -57,7 +58,11 @@ export async function softDeleteQuestion(
     .selectFrom('settings')
     .select('softDeleteRetentionDays')
     .executeTakeFirstOrThrow();
-  return `Delete ${what}? The deletion can be undone for ${softDeleteRetentionDays} days.`;
+  const limit =
+    softDeleteRetentionDays === null
+      ? 'at any time'
+      : `for ${softDeleteRetentionDays} days`;
+  return `Delete ${what}? The deletion can be undone ${limit}.`;
 }
 
 /** A table whose live rows each hold a distinct `priority` (§11.2 "trunks", "outbound_routes"). */

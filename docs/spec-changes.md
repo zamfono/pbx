@@ -4,6 +4,8 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-05 · §10.2 Mail.** A withheld caller's `callerNumber` in the `voicemail` and `missedCall` mails is empty, and the shipped templates name a withheld number in their language.
 *Why:* the mails said "from anonymous", the pipeline's internal marker, in English in every language.
+**2026-10-05 · §10.3 Confirmation, §11.2, §11.4, §11.6 Retention.** `recording_retention_days`, `soft_delete_retention_days` and `audit_retention_days` are at most 36500 days (input and `CHECK`), and NULL keeps that data forever, its purge skipped; a NULL soft-delete retention needs a NULL audit retention, and its confirmation question says the deletion "can be undone at any time".
+*Why:* the product owner chose "an upper bound of 100 years" and "null to signify keep forever": an unbounded retention made the cutoff date invalid and the daily purges fail.
 
 **2026-10-05 · §10.2 Greetings and audio, §12 Tenant UI.** The upload page's `upload` remote form reads the body (up to 50 MB) before it can check the link's token, since the token travels inside that body; the gap is named in §10.2 and closed with the tenant UI's session (§12).
 *Why:* the product owner, on the finding that anyone could make `api` buffer 50 MB through that form: "I now understand the problem. Let us accept the potential shortcoming for now and add it to the “later” to do list with a reference to “UI session”."

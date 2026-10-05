@@ -40,6 +40,8 @@ why the specified behaviour changed; the commit history, how.
 - More to watch: webhook `lastError` and `failingSince`; `ringotel.roster` audit entries; a
   configuration change that has not reached Asterisk warns, is retried and shows in `/healthz`
   and `/metrics`; `api` and `core` log failures that left no trace.
+- `recordingRetentionDays` and `softDeleteRetentionDays` take `null` to keep forever; every
+  retention is at most 36500 days.
 
 ### Changed
 

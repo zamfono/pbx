@@ -260,4 +260,47 @@ describe('runRetention', () => {
     const left = await db.selectFrom('presenceLog').select('since').execute();
     expect(left.map(row => row.since)).toEqual([A_BIT_LATER]);
   });
+
+  it('keeps every recording and its call history while recording_retention_days is NULL (§11.6)', async () => {
+    await db
+      .updateTable('settings')
+      .set({ recordingRetentionDays: null })
+      .execute();
+    await seedCall(db, LONG_AGO, 'old.wav');
+
+    const result = await runRetention({
+      db,
+      mediaDir,
+      log: noopLogger,
+      now: () => NOW
+    });
+
+    expect(result).toMatchObject({ recordings: 0, callQos: 0, callLogs: 0 });
+    expect(
+      await db.selectFrom('recordings').select('id').execute()
+    ).toHaveLength(1);
+  });
+
+  it('sweeps at the longest retention the settings row takes, a hundred years (§11.6)', async () => {
+    await db
+      .updateTable('settings')
+      .set({ recordingRetentionDays: 36_500 })
+      .execute();
+    await seedCall(db, LONG_AGO, 'old.wav');
+
+    const result = await runRetention({
+      db,
+      mediaDir,
+      log: noopLogger,
+      now: () => NOW
+    });
+
+    expect(result.recordings).toBe(0);
+    await expect(
+      db
+        .updateTable('settings')
+        .set({ recordingRetentionDays: 36_501 })
+        .execute()
+    ).rejects.toThrow(/CHECK constraint/u);
+  });
 });

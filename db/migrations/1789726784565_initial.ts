@@ -901,18 +901,16 @@ function addSettingsRetentionColumns<TB extends string, C extends string>(
   return builder
     .addColumn('recording_retention_days', 'integer', col =>
       col
-        .notNull()
         .defaultTo(DEFAULT_RECORDING_RETENTION_DAYS)
-        .check(sql`recording_retention_days > 0`)
+        .check(sql`recording_retention_days BETWEEN 1 AND 36500`)
     )
     .addColumn('soft_delete_retention_days', 'integer', col =>
       col
-        .notNull()
         .defaultTo(DEFAULT_SOFT_DELETE_RETENTION_DAYS)
-        .check(sql`soft_delete_retention_days >= 1`)
+        .check(sql`soft_delete_retention_days BETWEEN 1 AND 36500`)
     )
     .addColumn('audit_retention_days', 'integer', col =>
-      col.check(sql`audit_retention_days >= 30`)
+      col.check(sql`audit_retention_days BETWEEN 30 AND 36500`)
     )
     .addColumn('backup_cron', 'text', col =>
       col.notNull().defaultTo(DEFAULT_BACKUP_CRON)

@@ -3,7 +3,8 @@
  * `settings.recording_retention_days` lose their files and their row, the raw per-leg files a
  * failed mix left behind (§10.2 "Best effort") go once they are as old, and `presence_log` rows,
  * `calls.log` content and `call_qos` rows go on the same schedule. A mixed file no row names goes
- * once it is a day old. Voicemails are not touched — they are kept until their owner deletes them.
+ * once it is a day old. A `NULL` retention keeps everything but those orphans. Voicemails are not
+ * touched — they are kept until their owner deletes them.
  */
 import { readdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -129,38 +130,12 @@ async function removeOrphanedMixedFiles(
 }
 
 /**
- * Runs one sweep. A recording's file is removed before its row, so a failure leaves a row pointing
- * at a file that may be gone rather than a file nothing references; the next sweep retries the row.
+ * Deletes the `presence_log` rows before `before` but each user's latest one: it is that user's
+ * state at every instant from the cutoff to their next transition, which the snapshot (§10.3
+ * "Presence log") reads. Returns how many went.
  */
-export async function runRetention(
-  deps: RetentionDeps
-): Promise<RetentionResult> {
-  const { db, mediaDir, now } = deps;
-  const settings = await db
-    .selectFrom('settings')
-    .select('recordingRetentionDays')
-    .executeTakeFirstOrThrow();
-  const before = cutoffIso(now(), settings.recordingRetentionDays);
-
-  const stale = await db
-    .selectFrom('recordings')
-    .select(['id', 'filename'])
-    .where('createdAt', '<', before)
-    .execute();
-  const recordingsDir = path.join(mediaDir, RECORDINGS_SUBDIR);
-  await Promise.all(
-    stale.map(row => removeRecordingFiles(recordingsDir, row.filename))
-  );
-  const recordings = await db
-    .deleteFrom('recordings')
-    .where('createdAt', '<', before)
-    .executeTakeFirst();
-  const rawFiles = await removeStaleRawFiles(recordingsDir, before, deps.log);
-  const orphanedFiles = await removeOrphanedMixedFiles(deps, recordingsDir);
-
-  // Each user's latest row before the cutoff stays: it is that user's state at every instant from
-  // the cutoff to their next transition, which the snapshot (§10.3 "Presence log") reads.
-  const presenceLog = await db
+async function purgePresenceLog(db: Db, before: string): Promise<number> {
+  const result = await db
     .deleteFrom('presenceLog')
     .where('since', '<', before)
     .where(eb =>
@@ -180,6 +155,51 @@ export async function runRetention(
       )
     )
     .executeTakeFirst();
+  return Number(result.numDeletedRows);
+}
+
+/**
+ * Runs one sweep. A recording's file is removed before its row, so a failure leaves a row pointing
+ * at a file that may be gone rather than a file nothing references; the next sweep retries the row.
+ */
+export async function runRetention(
+  deps: RetentionDeps
+): Promise<RetentionResult> {
+  const { db, mediaDir, now } = deps;
+  const settings = await db
+    .selectFrom('settings')
+    .select('recordingRetentionDays')
+    .executeTakeFirstOrThrow();
+  const recordingsDir = path.join(mediaDir, RECORDINGS_SUBDIR);
+  if (settings.recordingRetentionDays === null) {
+    // Kept forever: nothing ages out, but a file no row names is still no recording.
+    return {
+      recordings: 0,
+      rawFiles: 0,
+      orphanedFiles: await removeOrphanedMixedFiles(deps, recordingsDir),
+      presenceLog: 0,
+      callQos: 0,
+      callLogs: 0
+    };
+  }
+  const before = cutoffIso(now(), settings.recordingRetentionDays);
+
+  const stale = await db
+    .selectFrom('recordings')
+    .select(['id', 'filename'])
+    .where('createdAt', '<', before)
+    .execute();
+  await Promise.all(
+    stale.map(row => removeRecordingFiles(recordingsDir, row.filename))
+  );
+  const recordings = await db
+    .deleteFrom('recordings')
+    .where('createdAt', '<', before)
+    .executeTakeFirst();
+  const rawFiles = await removeStaleRawFiles(recordingsDir, before, deps.log);
+  const orphanedFiles = await removeOrphanedMixedFiles(deps, recordingsDir);
+
+  const presenceLog = await purgePresenceLog(db, before);
   const callQos = await db
     .deleteFrom('callQos')
     .where(
@@ -201,7 +221,7 @@ export async function runRetention(
     recordings: Number(recordings.numDeletedRows),
     rawFiles,
     orphanedFiles,
-    presenceLog: Number(presenceLog.numDeletedRows),
+    presenceLog,
     callQos: Number(callQos.numDeletedRows),
     callLogs: Number(callLogs.numUpdatedRows)
   };

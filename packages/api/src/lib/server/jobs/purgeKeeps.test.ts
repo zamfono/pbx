@@ -104,4 +104,42 @@ describe('runPurge against the history other jobs read', () => {
       .execute();
     expect(kept.map(row => row.id)).toEqual(['busy-last-ok', 'quiet-last-ok']);
   });
+
+  it('keeps soft-deleted rows and backup runs of any age while their retention is NULL (§11.6)', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db, {
+      softDeleteRetentionDays: null,
+      recordingRetentionDays: null
+    });
+    await db
+      .insertInto('backupTargets')
+      .values({
+        id: 'gone',
+        kind: 'local',
+        paramsJson: '{}',
+        secretEnc: Buffer.from(''),
+        createdAt: daysAgo(40_000),
+        deletedAt: daysAgo(40_000)
+      })
+      .execute();
+    await db
+      .insertInto('backupRuns')
+      .values({
+        id: 'failed',
+        targetId: 'gone',
+        status: 'failed',
+        startedAt: daysAgo(40_000),
+        finishedAt: daysAgo(40_000)
+      })
+      .execute();
+
+    await runPurge(db, nowIso());
+
+    expect(
+      await db.selectFrom('backupTargets').select('id').execute()
+    ).toHaveLength(1);
+    expect(
+      await db.selectFrom('backupRuns').select('id').execute()
+    ).toHaveLength(1);
+  });
 });

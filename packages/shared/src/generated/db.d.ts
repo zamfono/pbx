@@ -356,7 +356,7 @@ export interface Settings {
   mailFrom: string | null;
   mainDidId: string;
   parkingTimeoutS: Generated<number>;
-  recordingRetentionDays: Generated<number>;
+  recordingRetentionDays: Generated<number | null>;
   rejectAnonymous: Generated<number>;
   ringotelApiTokenEnc: Buffer | null;
   ringotelBranchId: string | null;
@@ -370,7 +370,7 @@ export interface Settings {
   smtpPort: Generated<number>;
   smtpSecurity: Generated<SmtpSecurity>;
   smtpUser: string | null;
-  softDeleteRetentionDays: Generated<number>;
+  softDeleteRetentionDays: Generated<number | null>;
   ssoAllowedDomain: string | null;
   ssoClientId: string | null;
   ssoClientSecretEnc: Buffer | null;

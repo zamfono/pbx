@@ -473,7 +473,8 @@ describe('settings', () => {
   it.each([
     { patch: { softDeleteRetentionDays: 61 } },
     { patch: { auditRetentionDays: 44 } },
-    { patch: { softDeleteRetentionDays: 90, auditRetentionDays: 89 } }
+    { patch: { softDeleteRetentionDays: 90, auditRetentionDays: 89 } },
+    { patch: { softDeleteRetentionDays: null } }
   ])(
     'refuses $patch, a soft-delete retention beyond the audit retention, with 422',
     async ({ patch }) => {
@@ -503,6 +504,27 @@ describe('settings', () => {
       await expect(
         runOperation(db, 'settings.update', patch, asRun())
       ).resolves.toMatchObject(patch);
+    }
+  );
+
+  it.each([
+    'recordingRetentionDays',
+    'softDeleteRetentionDays',
+    'auditRetentionDays'
+  ])(
+    'takes %s up to a hundred years or null for forever, and refuses more with 422 (§11.4)',
+    async field => {
+      const db = await makeTestDb();
+      await seedSettings(db);
+      await expect(
+        runOperation(db, 'settings.update', { [field]: 36_500 }, asRun())
+      ).resolves.toMatchObject({ [field]: 36_500 });
+      await expect(
+        runOperation(db, 'settings.update', { [field]: null }, asRun())
+      ).resolves.toMatchObject({ [field]: null });
+      await expect(
+        runOperation(db, 'settings.update', { [field]: 36_501 }, asRun())
+      ).rejects.toMatchObject({ status: 422 });
     }
   );
 });

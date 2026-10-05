@@ -22,6 +22,7 @@ import {
 
 const MAX_TLS_RELOAD_HOUR = 23;
 const MIN_AUDIT_RETENTION_DAYS = 30;
+const MAX_RETENTION_DAYS = 36_500;
 const COUNTRY_CODE_LENGTH = 2;
 
 /**
@@ -120,25 +121,28 @@ export const settingsInputSchema = z
       .number()
       .int()
       .positive()
-      .optional()
+      .max(MAX_RETENTION_DAYS)
+      .nullish()
       .describe(
-        'Days recordings, call logs, QoS, presence log and backup runs are kept, 90 by default.'
+        'Days recordings, call logs, QoS, presence log and backup runs are kept, at most 36500, 90 by default; null: forever.'
       ),
     softDeleteRetentionDays: z
       .number()
       .int()
       .min(1)
-      .optional()
+      .max(MAX_RETENTION_DAYS)
+      .nullish()
       .describe(
-        'Days a soft-deleted row survives before the hard purge, which bounds undoing a deletion; 30 by default.'
+        'Days a soft-deleted row survives before the hard purge, which bounds undoing a deletion; at most 36500, 30 by default; null: forever.'
       ),
     auditRetentionDays: z
       .number()
       .int()
       .min(MIN_AUDIT_RETENTION_DAYS)
+      .max(MAX_RETENTION_DAYS)
       .nullish()
       .describe(
-        'Days audit entries are kept, at least 30; null: forever. Owner-only.'
+        'Days audit entries are kept, at least 30 and at most 36500; null: forever. Owner-only.'
       ),
     backupCron: z
       .string()

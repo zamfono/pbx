@@ -46,6 +46,23 @@ describe('confirmation questions (§10.3 "Confirmation")', () => {
     });
   });
 
+  it('names no limit while soft-deleted rows are kept forever', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db, { softDeleteRetentionDays: null });
+    const contact = (await runOperation(
+      db,
+      'contacts.create',
+      { displayName: 'Max Muster', phones: [] },
+      asRun()
+    )) as { id: string };
+    await expect(
+      runOperation(db, 'contacts.delete', { id: contact.id }, asRun())
+    ).rejects.toMatchObject({
+      question:
+        'Delete the contact Max Muster? The deletion can be undone at any time.'
+    });
+  });
+
   it('answers 404, not the question, for an unknown id', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
