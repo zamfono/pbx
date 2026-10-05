@@ -17,7 +17,22 @@
 }
 
 {$FQDN} {
-	log                                      # access log to stdout, shipped with the container logs (§7)
+	# access log to stdout, shipped with the container logs (§7), without the credentials a URI
+	# carries in its query: a set-password token, an upload link's access token, an SSO code
+	log {
+		format filter {
+			request>uri query {
+				delete token
+				delete access_token
+				delete code
+			}
+			request>headers>Referer query {
+				delete token
+				delete access_token
+				delete code
+			}
+		}
+	}
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
 
 	# Request bodies (§10.2): 512 KiB, refused with 413 once api has read past it, except an

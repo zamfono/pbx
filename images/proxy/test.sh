@@ -162,4 +162,13 @@ for case in 'POST /api/v1/audio' 'POST /api/v1/audio chunked' \
   [ "$(status $case)" = 200 ] || fail "$case: a 600 KB audio upload was refused"
 done
 
+echo "==> the access log keeps no credential a URI carries in its query (§7)"
+curl -sk -o /dev/null -H "Referer: https://localhost/auth/setPassword?token=secret-referer" \
+  "https://localhost:$port/upload/audio?token=secret-t&access_token=secret-a&code=secret-c&kept=1"
+logged=$(docker logs "$tag-proxy" 2>&1 | grep '"uri":"/upload/audio?.*kept=1"') \
+  || fail "the access log has no line for the request with its query's other parameters"
+if grep -q secret <<<"$logged"; then
+  fail "the access log kept a credential: $logged"
+fi
+
 echo "PASS: images/proxy"

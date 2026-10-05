@@ -646,7 +646,22 @@ services:
 }
 
 {$FQDN} {
-	log                                      # access log to stdout, shipped with the container logs (§7)
+	# access log to stdout, shipped with the container logs (§7), without the credentials a URI
+	# carries in its query: a set-password token, an upload link's access token, an SSO code
+	log {
+		format filter {
+			request>uri query {
+				delete token
+				delete access_token
+				delete code
+			}
+			request>headers>Referer query {
+				delete token
+				delete access_token
+				delete code
+			}
+		}
+	}
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
 
 	# Request bodies (§10.2): 512 KiB, refused with 413 once api has read past it, except an
@@ -802,7 +817,7 @@ The database is therefore never the reason to re-architect; the single-tenant st
 
 ## 7. Observability
 
-**Logs.** Both Node processes write structured JSON logs (pino) to stdout, where `docker logs` and the host log shipper pick them up. Every call-related line carries the per-call correlation id, which is `calls.id` (§11). Asterisk logs are captured the same way, with its `full` log at `notice` level by default. Shipping the logs off the host is the operator's concern; the stack's only requirement on a shipper is that it reads container stdout.
+**Logs.** Both Node processes write structured JSON logs (pino) to stdout, where `docker logs` and the host log shipper pick them up. Every call-related line carries the per-call correlation id, which is `calls.id` (§11). Asterisk logs are captured the same way, with its `full` log at `notice` level by default. `proxy`'s access log leaves out the `token`, `access_token` and `code` query parameters, of the request URI and of its `Referer`, since each is a credential (§6.3 Caddyfile). Shipping the logs off the host is the operator's concern; the stack's only requirement on a shipper is that it reads container stdout.
 
 **Version.** `api` and `core` report the stack's version as `<ZAMFONO_VERSION> (<short ZAMFONO_REVISION>)`, the tag the deployment pulled and the commit its images were built from: `1.2.3 (a1b2c3d)` for a release, `edge (a1b2c3d)` for main's latest build. A stack on `latest` knows its commit but not the release number, which the release that names the commit supplies. Both processes log it in their first line at start; `api` also exports it in `/metrics` as `zamfono_build_info{version, revision} 1` and as the MCP `serverInfo.version` (§10.5), and `GET /system/info` returns `api`'s and `core`'s each, with when each process and the Asterisk `core` is connected to started (§10.3), for any signed-in user: the handshake's `serverInfo` reaches no tool, and the two can differ while one container still runs an older image. `/healthz` never shows it (§10.3), and neither do SIP headers.
 
