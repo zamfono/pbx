@@ -13,7 +13,7 @@ import path from 'node:path';
 import * as env from '$app/env/private';
 import pino from 'pino';
 
-import type { Db } from '@zamfono/shared';
+import { MS_PER_DAY, type Db } from '@zamfono/shared';
 
 import type { CoreClient } from '../coreClient.js';
 import { sha256Hex } from '../hash.js';
@@ -32,7 +32,15 @@ import {
 
 const logger = pino({ name: 'certSync' });
 
-export type CertSyncStatus = 'missing' | 'ok' | 'unknown';
+/**
+ * The sync's state (§6.4): `'failed'` after a pass that failed, `'expiring'` while the copy on
+ * `asterisk-config` expires within `EXPIRY_ALERT_MS`; only `'ok'` is all clear.
+ */
+export type CertSyncStatus =
+  'expiring' | 'failed' | 'missing' | 'ok' | 'unknown';
+
+const EXPIRY_ALERT_DAYS = 14;
+const EXPIRY_ALERT_MS = EXPIRY_ALERT_DAYS * MS_PER_DAY;
 
 export type CertSyncDeps = {
   db: Db;
@@ -49,6 +57,18 @@ function isSelfSigned(certPem: Buffer): boolean {
     return cert.issuer === cert.subject;
   } catch {
     return true;
+  }
+}
+
+/** Whether `certPem` expires before `atMs`; an unparsable certificate tells nothing. */
+function expiresBefore(certPem: Buffer | null, atMs: number): boolean {
+  if (certPem === null) {
+    return false;
+  }
+  try {
+    return Date.parse(new X509Certificate(certPem).validTo) < atMs;
+  } catch {
+    return false;
   }
 }
 
@@ -87,12 +107,29 @@ export class CertSync {
   /**
    * One check-and-act pass (§6.4): `'missing'` while the hook's copy does not exist yet on
    * `caddy-data` (the alert case: a fresh stack before its first certificate, or a `proxy`
-   * upgrade gone wrong); `'ok'` otherwise, whether nothing had changed, the change was applied
-   * now, or it was left for a later pass to apply once due.
+   * upgrade gone wrong); `'expiring'` while the copy on `asterisk-config` expires within
+   * `EXPIRY_ALERT_MS` once the pass is done; `'ok'` otherwise, whether nothing had changed, the
+   * change was applied now, or it was left for a later pass to apply once due.
    */
   async run(): Promise<CertSyncStatus> {
+    const genDir = this.#deps.genDir ?? env.ASTERISK_GEN_DIR;
+    const currentCrtPath = path.join(genDir, 'tls', TLS_CERT_FILENAME);
+    const status = await this.#sync(genDir, currentCrtPath);
+    if (status !== 'ok') {
+      return status;
+    }
+    const now = (this.#deps.now ?? (() => new Date()))();
+    const installed = await readFile(currentCrtPath).catch(() => null);
+    return expiresBefore(installed, now.getTime() + EXPIRY_ALERT_MS)
+      ? 'expiring'
+      : 'ok';
+  }
+
+  async #sync(
+    genDir: string,
+    currentCrtPath: string
+  ): Promise<'missing' | 'ok'> {
     const deps = this.#deps;
-    const genDir = deps.genDir ?? env.ASTERISK_GEN_DIR;
     const caddyDataDir = deps.caddyDataDir ?? env.CADDY_DATA_DIR;
     const source = await findCaddyCert(caddyDataDir);
     if (!source) {
@@ -100,7 +137,6 @@ export class CertSync {
       this.#reloadPendingHash = undefined;
       return 'missing';
     }
-    const currentCrtPath = path.join(genDir, 'tls', TLS_CERT_FILENAME);
     const [sourceCrt, sourceKey, currentCrt] = await Promise.all([
       readFile(source.crt),
       readFile(source.key),
@@ -170,8 +206,7 @@ export class CertSync {
     if (verdict.open) {
       return true;
     }
-    const expiresAtMs = Date.parse(new X509Certificate(currentCrt).validTo);
-    if (expiresAtMs < verdict.nextCheckAt.getTime()) {
+    if (expiresBefore(currentCrt, verdict.nextCheckAt.getTime())) {
       return true;
     }
     pending.nextCheckMs = verdict.nextCheckAt.getTime();
@@ -193,7 +228,7 @@ let running: CertSyncScheduler | undefined;
  * Starts the process's certificate sync, which `startBackgroundJobs` does once at boot (§6.4
  * "The same sync runs at `api` start"): a pass at once, then on the drawn-in poll (`drawnIn.ts`),
  * which lands on a pending change's next gate check. A failed pass is logged, and the status
- * `/healthz` and `/metrics` read stays the last one known.
+ * `/healthz` and `/metrics` read is `'failed'` until a pass succeeds.
  */
 export function startCertSync(deps: CertSyncDeps): CertSyncScheduler {
   const sync = new CertSync(deps);
@@ -204,6 +239,7 @@ export function startCertSync(deps: CertSyncDeps): CertSyncScheduler {
       return sync.nextCheckAt();
     },
     failed: error => {
+      status = 'failed';
       logger.error(
         { err: error },
         'certSync: the pass failed; the next retries'

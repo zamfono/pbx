@@ -6,6 +6,7 @@ import {
   type Db
 } from '@zamfono/shared';
 
+import type { CertSyncStatus } from './jobs/certSync.js';
 import { countKeyRotationRemaining } from './jobs/keyRotation.js';
 import { isRosterPending } from './ops/roster.js';
 import { updateNews } from './ops/system/_state.js';
@@ -28,7 +29,7 @@ export type ApiHealth = {
   core: CoreReachability;
   mail: 'configured' | 'notConfigured';
   keyRotationRemaining: number;
-  certificateSync: 'ok' | 'missing' | 'unknown';
+  certificateSync: CertSyncStatus;
   /** Whether a live trunk carries emergency calls (§9.4 "Emergency trunks"). */
   emergencyTrunk: boolean;
   /**
@@ -57,7 +58,7 @@ export type ApiHealthDeps = {
   migrationsDir: string;
   checkCore: () => Promise<CoreReachability>;
   keyring: Keyring;
-  certificateSync: 'ok' | 'missing' | 'unknown';
+  certificateSync: CertSyncStatus;
 };
 
 /** `settings.smtp_host` set means a relay is configured (§11.4). */

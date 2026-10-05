@@ -263,6 +263,18 @@ describe('CertSync', () => {
     expect(coreClient.configChangedCalls).toEqual([]);
   });
 
+  it('reports expiring while the installed certificate expires within 14 days', async () => {
+    const { genDir, caddyDataDir, workDir } = await makeDirs();
+    const lapsing = caIssuedCert(workDir, 10);
+    await seedCaddyCert(caddyDataDir, lapsing.crt, lapsing.key);
+    await seedCurrentCert(genDir, lapsing.crt, lapsing.key);
+    const db = await makeTestDb();
+
+    await expect(
+      new CertSync({ db, coreClient: stubCore(), genDir, caddyDataDir }).run()
+    ).resolves.toBe('expiring');
+  });
+
   it('copies immediately when no certificate is installed yet (fresh stack)', async () => {
     const { genDir, caddyDataDir, workDir } = await makeDirs();
     const source = caIssuedCert(workDir, 3650);
@@ -549,6 +561,35 @@ describe('startCertSync', () => {
       expect(coreClient.configChangedCalls).toEqual([['pjsip']]);
       const installed = await readFile(path.join(genDir, 'tls', 'cert.pem'));
       expect(installed.equals(source.crt)).toBe(true);
+    } finally {
+      scheduler.stop();
+    }
+  });
+
+  it('reports failed after a pass that fails, instead of the last status', async () => {
+    const workDir = await mkdtemp(path.join(tmpdir(), 'zamfono-certsync-'));
+    work.dir = workDir;
+    const genDir = path.join(workDir, 'gen');
+    const caddyDataDir = path.join(workDir, 'caddy-data');
+    await mkdir(genDir, { recursive: true });
+    await mkdir(caddyDataDir, { recursive: true });
+    const db = await makeTestDb();
+    const coreClient = stubCore();
+    coreClient.configChanged = () =>
+      Promise.reject(new Error('core unavailable'));
+
+    const scheduler = startCertSync({ db, coreClient, genDir, caddyDataDir });
+    try {
+      await vi.waitFor(() => {
+        expect(scheduler.status()).toBe('missing');
+      });
+      const source = caIssuedCert(workDir, 3650);
+      await seedCaddyCert(caddyDataDir, source.crt, source.key);
+      notifyCertSync();
+
+      await vi.waitFor(() => {
+        expect(certSyncStatus()).toBe('failed');
+      });
     } finally {
       scheduler.stop();
     }
