@@ -55,7 +55,8 @@ function fakeRunner(): Runner & { started: string[][] } {
       started.push([from, to]);
       state = { state: 'running', from, to, ...requester };
       return Promise.resolve({ finished: Promise.resolve() });
-    }
+    },
+    idle: () => Promise.resolve()
   };
 }
 

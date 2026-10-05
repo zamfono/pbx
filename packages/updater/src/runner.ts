@@ -34,6 +34,8 @@ export type Runner = {
     to: string,
     requester: RunRequester
   ) => Promise<{ finished: Promise<void> }>;
+  /** Resolves once the updater's own run, if one is running, has its outcome on disk. */
+  idle: () => Promise<void>;
 };
 
 export type RunnerOptions = {
@@ -170,6 +172,7 @@ export async function createRunner(options: RunnerOptions): Promise<Runner> {
   // Whether `state` is the updater's own run, still running; any other state, a host run's
   // included, is read again from `.update/state.json`, where `update.sh` writes its end.
   let ownRun = false;
+  let ownRunFinished = Promise.resolve();
   const logFile = path.join(options.stackDir, '.update', 'update.log');
   const script = path.join(options.project.workingDir, 'update.sh');
 
@@ -197,8 +200,10 @@ export async function createRunner(options: RunnerOptions): Promise<Runner> {
 
   return {
     current: () => (ownRun ? state : readState(options.stackDir, state, now())),
+    idle: () => ownRunFinished,
     async start(from, to, requester) {
       const done = Promise.withResolvers<undefined>();
+      ownRunFinished = done.promise;
       const startedAt = now();
       const run = { from, to, ...requester };
       state = { state: 'running', ...run, startedAt };

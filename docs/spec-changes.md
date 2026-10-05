@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-05 · §6.3 Updates.** On SIGTERM or SIGINT the updater takes no new request, waits up to a bound below the container's stop grace period for a run of `update.sh` of its own to end, and exits; a run still going is cut off with it, and the next start marks it failed.
+*Why:* the product owner showed `podman restart zamfono-updater-1` ending in "StopSignal SIGTERM failed to stop container zamfono-updater-1 in 10 seconds, resorting to SIGKILL": `node` as PID 1 ignores SIGTERM without a handler of its own.
+
 **2026-10-05 · §10.2.** A call answered on the trunk leg of a user's `unconditional` forward to an external number or a SIP target, a ring-group member's followed forward included, records that user as `answered_by_user_id`; any other forward's trunk leg answers as nobody, as before.
 *Why:* the product owner, on applying the same "de facto the user" rule as the recording to the call history: "yes, set `answeredByUserId`".
 

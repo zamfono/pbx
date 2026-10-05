@@ -33,7 +33,8 @@ function edgeDeps(running: string | undefined): ServerDeps & {
     runningRevision: () => Promise.resolve(running),
     runner: {
       current: () => ({ state: 'idle' }),
-      start: () => Promise.reject(new Error())
+      start: () => Promise.reject(new Error()),
+      idle: () => Promise.resolve()
     }
   };
 }

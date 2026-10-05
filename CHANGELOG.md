@@ -11,6 +11,10 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Fixed
+
+- The updater stops on SIGTERM, so a restart of it no longer waits 10 seconds for a kill.
+
 ## [0.3.1] - 2026-10-05
 
 ### Added

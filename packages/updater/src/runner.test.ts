@@ -57,6 +57,20 @@ describe('createRunner', () => {
     expect((await loadState(stackDir)).state).toBe('succeeded');
   });
 
+  it('is idle once its own run has its outcome on disk', async () => {
+    const stackDir = await tempDir();
+    const runner = await createRunner({
+      stackDir,
+      project: project(stackDir),
+      socketPath: '/s'
+    });
+    await runner.idle();
+    await fakeScript(stackDir, 0);
+    await runner.start('0.0.6', '0.0.7', { trigger: 'automatic' });
+    await runner.idle();
+    expect((await loadState(stackDir)).state).toBe('succeeded');
+  });
+
   it('keeps who asked for the run in its record', async () => {
     const stackDir = await tempDir();
     const runner = await createRunner({

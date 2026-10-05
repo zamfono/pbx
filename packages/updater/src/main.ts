@@ -12,6 +12,7 @@ import { createReleases } from './releases.js';
 import { createRunner, type Runner } from './runner.js';
 import { createServer } from './server.js';
 import { checkUpdate, stackVersion } from './stack.js';
+import { stopOnSignal } from './stop.js';
 
 /**
  * The updater service (§6.3 "Updates"): the stack directory is mounted at `/stack`, the
@@ -94,7 +95,7 @@ const token =
 if (token === undefined) {
   log('UPDATER_TOKEN is not set: every request is refused');
 }
-createServer({
+const server = createServer({
   token,
   releases: createReleases(),
   currentVersion: async () => stackVersion(STACK_DIR),
@@ -104,3 +105,4 @@ createServer({
   runner,
   ...(unavailable === undefined ? {} : { unavailable })
 }).listen(PORT);
+stopOnSignal(server, runner, log);
