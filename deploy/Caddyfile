@@ -66,8 +66,10 @@
 		}
 	}
 
-	# /internal/*: the process-to-process endpoints of §3.1 are served on the internal network only
-	handle /internal/* {
+	# /internal/* and /readyz: the process-to-process endpoints of §3.1 and the compose healthcheck's
+	# readiness (§6.3 "Health") are served on the internal network only
+	@internal path /internal/* /readyz
+	handle @internal {
 		respond 404
 	}
 

@@ -75,10 +75,12 @@ step_caddy() {
   printf 'resolve = %s:443:127.0.0.1\ncacert = %s\n' "$FQDN" "$CURL_HOME/root.crt" \
     >"$CURL_HOME/.curlrc"
   curl -fsS "$api_base/healthz" >/dev/null || fail "GET /healthz did not answer through Caddy"
+  [ "$(curl -sS -o /dev/null -w '%{http_code}' "$api_base/readyz")" = 404 ] \
+    || fail 'GET /readyz answered through Caddy, not 404'
   token=$(bash "$here/bootstrap-token.sh" "$api_base" "$OWNER_EMAIL" "$OWNER_PASSWORD" \
     "$api_base") || fail "the login's forms gave no access token through Caddy"
   api GET /users >/dev/null || fail "GET /users did not answer through Caddy"
-  echo '   /healthz, the login and GET /users answered through Caddy'
+  echo '   /healthz, the login and GET /users answered through Caddy, /readyz 404'
 }
 
 # The tenant §8's scenarios are played against, built over the REST API the way an operator

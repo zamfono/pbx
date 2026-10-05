@@ -113,6 +113,20 @@ async function tableChecks(db: Db, kr: Keyring): Promise<TableChecks> {
 }
 
 /**
+ * `api`'s readiness (`GET /readyz`, §6.3 "Health"): the database is open and holds no pending
+ * migration, since `api` never runs one itself (§6.3 "Migrations").
+ */
+export async function apiReady(
+  db: Db,
+  migrationsDir: string
+): Promise<boolean> {
+  return (
+    (await isDbOpen(db)) &&
+    (await pendingMigrations(db, migrationsDir)).length === 0
+  );
+}
+
+/**
  * `api`'s own liveness plus the fields a client cannot otherwise observe (§6.3 "Health"):
  * `ok` is true only while the database is open and holds no pending migration, since `api`
  * never runs one itself (§6.3 "Migrations"). The table checks run only then; a query that
@@ -120,9 +134,7 @@ async function tableChecks(db: Db, kr: Keyring): Promise<TableChecks> {
  */
 export async function apiHealth(deps: ApiHealthDeps): Promise<ApiHealth> {
   const dbOpen = await isDbOpen(deps.db);
-  const migrated =
-    dbOpen &&
-    (await pendingMigrations(deps.db, deps.migrationsDir)).length === 0;
+  const migrated = dbOpen && (await apiReady(deps.db, deps.migrationsDir));
   const checks = migrated
     ? await tableChecks(deps.db, deps.keyring)
     : UNMIGRATED_CHECKS;

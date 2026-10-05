@@ -72,6 +72,15 @@ describe('hooks handle', () => {
     expect(response.status).toBe(404);
   });
 
+  it('refuses /readyz carrying X-Forwarded-For with 404', async () => {
+    const event = requestEvent('http://internal/readyz', {
+      routeId: '/readyz',
+      init: { headers: { 'x-forwarded-for': '203.0.113.9' } }
+    });
+    const response = await handle({ event, resolve: resolvePassThrough });
+    expect(response.status).toBe(404);
+  });
+
   it('resolves /internal/* through without the header', async () => {
     const event = requestEvent('http://internal/internal/mail', {
       routeId: '/internal/mail'

@@ -33,6 +33,9 @@ import { stackIpv4 } from '#lib/server/stackAddress.js';
 
 const jobsLogger = pino({ name: 'hooks' });
 
+// The compose healthcheck's readiness, internal like `/internal/*` (§6.3 "Health").
+const READYZ_ROUTE = '/readyz';
+
 /**
  * Refuses to start without the mode's public address, which `src/env.ts` cannot require of either
  * variable alone; logs a stack `TZ` that names no IANA time zone, then starts every background job
@@ -115,8 +118,8 @@ async function fillLanguage({ html }: { html: string }): Promise<string> {
  * Refuses a cross-site form submission to a browser-served page (`crossSiteFormRejection`);
  * resolves `/api/v1/*`'s bearer token, or a download link's token (§10.5), into
  * `event.locals.auth`, 401 problem+json without one (the OpenAPI document needs neither);
- * refuses `/internal/*` when the request carries `X-Forwarded-For`, since only the proxy hop sets
- * it and that path is reachable from the internal network alone (§3.1); answers 429 problem+json
+ * refuses `/internal/*` and `/readyz` when the request carries `X-Forwarded-For`, since only the
+ * proxy hop sets it and those paths are reachable from the internal network alone (§3.1); answers 429 problem+json
  * once a client address exceeds the §5.5 limit of the auth endpoint it called. Each check keys on
  * the route SvelteKit matched, which it finds on the decoded path, so a percent-encoded spelling
  * of a path meets the same checks as the route it runs.
@@ -128,7 +131,8 @@ const handleRequest: Handle = async ({ event, resolve }) => {
     return crossSite;
   }
   if (
-    routeId?.startsWith(INTERNAL_PREFIX) === true &&
+    (routeId?.startsWith(INTERNAL_PREFIX) === true ||
+      routeId === READYZ_ROUTE) &&
     event.request.headers.has('x-forwarded-for')
   ) {
     return new Response(null, { status: HTTP_NOT_FOUND });
