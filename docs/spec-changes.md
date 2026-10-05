@@ -10,6 +10,7 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-05 · §9.4 Signaling.** `trunks.outbound_proxy` is a `sip:`/`sips:` URI, a value without a scheme refused with 422, and is used as a loose route, `;lr` added where missing.
 *Why:* a scheme-less proxy left PJSIP no `Route` to parse, and one without `;lr` was strict-routed, the proxy's URI replacing the Request-URI.
+
 **2026-10-05 · §5.1, §6.3 Caddyfile.** Every response carries `Content-Security-Policy: frame-ancestors 'none'`, set by `proxy`.
 *Why:* the sign-in, consent and set-password pages could be framed by another site (clickjacking, RFC 9700 §4.16).
 
@@ -18,8 +19,10 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-05 · §6.3 Caddyfile.** A post to an upload link is exempt from the 512 KiB body limit only while its `/remote` query is absent or names the page's `upload` form.
 *Why:* the exemption went by path alone, so `/upload/x?/remote=<another form>` ran any remote form with a 50 MB body.
+
 **2026-10-05 · §10.1 Outbound.** While a trunk attempt is out, the caller's channel indicates ringing from the far end's first alert, and a far end answering 183 is bridged with the caller at once, so its early media reaches them; the answer keeps that bridge.
 *Why:* the product owner chose "Pass ringing + early media": the caller heard silence while an external leg rang.
+
 **2026-10-05 · §4 Control protocol, §6.3, §9.1, §9.3 One endpoint per device.** A device registered several times rings on each reachable contact, as a leg of that device's: the core reads the contacts over AMI (`PJSIPShowEndpoint`) and dials each at `PJSIP/<endpoint>/<contact URI>`. The AMI user's write class is `system`, which that action needs and which covers `PJSIPShowRegistrationsOutbound` too, in place of `reporting`.
 *Why:* `PJSIP/<endpoint>` alone dials only the AOR's first reachable contact, so a Ringotel app registered on desktop and mobile rang on one of them.
 
@@ -43,6 +46,7 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-05 · §5.4.** Every secretbox blob is bound to its purpose as the AEAD's additional data (a stored secret's `<table>.<column>`, a sealed cookie's name, the client ids' own label), so a blob made for one purpose never decrypts as another.
 *Why:* an admin could choose a webhook secret's plaintext, read its blob back through a backup of their own and present it as a sealed consent cookie naming the owner.
+
 **2026-10-04 · §10.2 Voicemail, §11.2 `users`, `ring_groups`, §11.5, §11.6 Retention.** Every mailbox has a message limit, `mailbox_max_messages`: 100 by default, any positive count, NULL for no limit, set through `users.update` and `ringGroups.update`. A deposit into a mailbox that holds that many voicemails plays Asterisk's `vm-mailboxfull` prompt, takes no message and hangs up; the call is missed.
 *Why:* the product owner asked for it: "Per mailbox limit, but no arbitrary upper limit. Null means “no limit”. 100 as default".
 
