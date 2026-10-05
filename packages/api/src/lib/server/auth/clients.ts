@@ -1,6 +1,9 @@
+import type { IncomingMessage } from 'node:http';
+import { request } from 'node:https';
 import { z } from 'zod';
 
 import {
+  HTTP_OK,
   isRecord,
   MS_PER_DAY,
   MS_PER_SECOND,
@@ -10,7 +13,7 @@ import {
 
 import { attempt } from '../errors.js';
 import { tryParseJson } from '../json.js';
-import { resolvesToPublicAddresses } from '../publicHost.js';
+import { isNonPublicLiteral, publicLookup } from '../publicHost.js';
 import { decrypt, encrypt, type Keyring } from '../secretbox.js';
 import { TtlMap } from '../ttlMap.js';
 import { redirectUriAcceptable } from './redirectUris.js';
@@ -122,8 +125,7 @@ export function decodeMetadataClientId(
   };
 }
 
-function cacheTtlMs(headers: Headers): number | null {
-  const cacheControl = headers.get('cache-control') ?? '';
+function cacheTtlMs(cacheControl: string): number | null {
   if (CACHE_CONTROL_NO_CACHE.test(cacheControl)) {
     return null;
   }
@@ -153,15 +155,13 @@ function parseCimdDocument(
 
 /** `response`'s body parsed as JSON, or `undefined` when it is not JSON or exceeds
  *  `CIMD_MAX_BYTES`, which is checked while it streams in rather than once it is all held. */
-async function cappedJson(response: Response): Promise<unknown> {
-  if (response.body === null) {
-    return undefined;
-  }
-  const chunks: Uint8Array[] = [];
+async function cappedJson(response: IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = [];
   let size = 0;
-  for await (const chunk of response.body) {
+  for await (const chunk of response as AsyncIterable<Buffer>) {
     size += chunk.byteLength;
     if (size > CIMD_MAX_BYTES) {
+      response.destroy();
       return undefined;
     }
     chunks.push(chunk);
@@ -169,44 +169,56 @@ async function cappedJson(response: Response): Promise<unknown> {
   return tryParseJson(Buffer.concat(chunks).toString('utf8'));
 }
 
+/** The response to a GET of `url`, its host resolved only as the socket connects, through
+ *  `publicLookup`; rejects on a refused address, a failed connection or the deadline. */
+function getDocument(url: URL): Promise<IncomingMessage> {
+  return new Promise((resolve, reject) => {
+    request(
+      url,
+      {
+        lookup: publicLookup,
+        signal: AbortSignal.timeout(CIMD_FETCH_TIMEOUT_MS)
+      },
+      resolve
+    )
+      .on('error', reject)
+      .end();
+  });
+}
+
 /**
  * Fetches a Client ID Metadata Document (§5.2), refusing it unless its own `client_id` equals the
  * URL it was fetched from; caches the result per `Cache-Control`. `null` for a document that
  * cannot be fetched in time, redirects, is not JSON, is too large or does not describe a client,
- * and, without a fetch, for a host that resolves to a loopback, private or link-local address.
+ * and for a host on a loopback, private or link-local address, which is never connected to.
  */
 export async function fetchCimd(
-  clientIdUrl: string,
-  fetchImpl: typeof fetch = fetch
+  clientIdUrl: string
 ): Promise<ClientMeta | null> {
   const cached = cimdCache.get(clientIdUrl);
   if (cached) {
     return cached;
   }
-  // ponytail: the host is resolved here and again by `fetch`, so a name whose answer changes in
-  // between (DNS rebinding) slips through; checking at connect time needs an undici dispatcher
-  // with its own `lookup`, which the global `fetch` does not expose.
   const url = URL.parse(clientIdUrl);
-  if (url === null || !(await resolvesToPublicAddresses(url))) {
+  if (url === null || isNonPublicLiteral(url)) {
     return null;
   }
   try {
-    // A redirect could lead where the address check did not look.
-    const response = await fetchImpl(clientIdUrl, {
-      redirect: 'error',
-      signal: AbortSignal.timeout(CIMD_FETCH_TIMEOUT_MS)
-    });
-    if (!response.ok) {
+    const response = await getDocument(url);
+    // A redirect is not followed: it could lead where the address check did not look.
+    if (response.statusCode !== HTTP_OK) {
+      response.destroy();
       return null;
     }
     const meta = parseCimdDocument(clientIdUrl, await cappedJson(response));
-    const ttlMs = cacheTtlMs(response.headers);
+    const ttlMs = cacheTtlMs(response.headers['cache-control'] ?? '');
     if (meta && ttlMs !== null) {
       cimdCache.set(clientIdUrl, meta, Date.now() + ttlMs);
     }
     return meta;
   } catch {
-    // A refused connection, a failed TLS handshake or the deadline: an unreachable client.
+    // A non-public address, a refused connection, a failed TLS handshake or the deadline: an
+    // unreachable client.
     return null;
   }
 }

@@ -1,8 +1,9 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { request } from 'node:https';
 import process from 'node:process';
 import { isHttpError, isRedirect, type RequestEvent } from '@sveltejs/kit';
 import * as privateEnv from '$app/env/private';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { nowIso, type Db } from '@zamfono/shared';
 import {
@@ -20,6 +21,7 @@ import { tokenEndpoint } from '#lib/server/auth/tokenEndpoint.js';
 import { getDb } from '#lib/server/db.js';
 import { accountLockedUntil } from '#lib/server/ops/users/_accountLock.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
+import { fakeHttpsRequest } from '#testing/httpsFake.js';
 import { cookieJar, requestEvent } from '#testing/requestEvent.js';
 
 import { load } from './+page.server.js';
@@ -30,9 +32,21 @@ import {
 } from './consentSubmit.js';
 import { loginSubmit, type LoginResult } from './loginSubmit.js';
 
-// A metadata document's host resolves to a public documentation-range address, with no network.
-vi.mock('node:dns/promises', () => ({
-  lookup: () => Promise.resolve([{ address: '203.0.113.10', family: 4 }])
+// A metadata document's host resolves to a public documentation-range address, and its request
+// is answered in process (`#testing/httpsFake.js`), with no network.
+vi.mock('node:dns', async importOriginal => ({
+  ...(await importOriginal<typeof import('node:dns')>()),
+  lookup: (
+    _host: string,
+    _options: unknown,
+    callback: (err: null, addresses: object[]) => void
+  ) => {
+    callback(null, [{ address: '203.0.113.10', family: 4 }]);
+  }
+}));
+vi.mock('node:https', async importOriginal => ({
+  ...(await importOriginal<typeof import('node:https')>()),
+  request: vi.fn()
 }));
 
 // The real Argon2id check, observed: a test counts the attempts that reached a stored hash.
@@ -540,33 +554,26 @@ describe("Claude Code's sign-in on a random loopback port (RFC 8252 §7.3)", () 
   const CLAUDE_CODE_CLIENT_ID =
     'https://claude.ai/oauth/claude-code-client-metadata';
   const REDIRECT_URI = 'http://localhost:49536/callback';
-  const realFetch = globalThis.fetch;
-
-  afterEach(() => {
-    globalThis.fetch = realFetch;
-  });
-
   /** Serves Claude Code's metadata document as it did on 2026-10-01: no `application_type`, and
    *  redirect URIs without a port. */
   function serveClaudeCodeDocument(): void {
-    globalThis.fetch = () =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify({
-            client_id: CLAUDE_CODE_CLIENT_ID,
-            client_name: 'Claude Code',
-            client_uri: 'https://claude.ai',
-            redirect_uris: [
-              'http://localhost/callback',
-              'http://127.0.0.1/callback'
-            ],
-            grant_types: ['authorization_code', 'refresh_token'],
-            response_types: ['code'],
-            token_endpoint_auth_method: 'none'
-          }),
-          { headers: { 'content-type': 'application/json' } }
-        )
-      );
+    vi.mocked(request).mockImplementation(
+      fakeHttpsRequest(() => ({
+        body: JSON.stringify({
+          client_id: CLAUDE_CODE_CLIENT_ID,
+          client_name: 'Claude Code',
+          client_uri: 'https://claude.ai',
+          redirect_uris: [
+            'http://localhost/callback',
+            'http://127.0.0.1/callback'
+          ],
+          grant_types: ['authorization_code', 'refresh_token'],
+          response_types: ['code'],
+          token_endpoint_auth_method: 'none'
+        }),
+        headers: { 'content-type': 'application/json' }
+      }))
+    );
   }
 
   /** Logs in and approves for Claude Code at {@link REDIRECT_URI}; the code it is redirected with. */

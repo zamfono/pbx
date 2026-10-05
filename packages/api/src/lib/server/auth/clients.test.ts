@@ -1,7 +1,9 @@
-import { isIP } from 'node:net';
+import { request } from 'node:https';
+import { createServer, isIP, type AddressInfo } from 'node:net';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { keySpec } from '#testing/fixtures.js';
+import { fakeHttpsRequest, type FakeResponse } from '#testing/httpsFake.js';
 
 import { keyringFromEnv } from '../secretbox.js';
 import {
@@ -16,18 +18,46 @@ import { redirectUriAllowed } from './redirectUris.js';
 // A documentation-range address stands for every name a test resolves; an IP literal resolves to
 // itself, as the real lookup does.
 const PUBLIC_ADDRESS = '203.0.113.10';
-const lookup = vi.hoisted(() => vi.fn());
-vi.mock('node:dns/promises', () => ({ lookup }));
+type Answer = { address: string; family: number };
+/** What the mocked lookup answers for a host; each test's `beforeEach` sets it. */
+const answers: { for: (host: string) => Answer[] } = vi.hoisted(() => ({
+  for: () => []
+}));
+vi.mock('node:dns', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:dns')>();
+  return {
+    ...actual,
+    lookup: (
+      host: string,
+      _options: unknown,
+      callback: (err: Error | null, addresses: Answer[]) => void
+    ) => {
+      callback(null, answers.for(host));
+    }
+  };
+});
+vi.mock('node:https', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:https')>();
+  return { ...actual, request: vi.fn(actual.request) };
+});
 
 beforeEach(() => {
-  lookup.mockImplementation((host: string) =>
-    Promise.resolve([
-      isIP(host) === 0
-        ? { address: PUBLIC_ADDRESS, family: 4 }
-        : { address: host, family: isIP(host) }
-    ])
-  );
+  vi.mocked(request).mockReset();
+  answers.for = host =>
+    isIP(host) === 0
+      ? [{ address: PUBLIC_ADDRESS, family: 4 }]
+      : [{ address: host, family: isIP(host) }];
 });
+
+/** Answers every metadata-document request with `handler`'s response. */
+function serve(handler: Parameters<typeof fakeHttpsRequest>[0]): void {
+  vi.mocked(request).mockImplementation(fakeHttpsRequest(handler));
+}
+
+/** Answers every request with `body` as JSON, plus `headers`. */
+function serveJson(body: unknown, headers: FakeResponse['headers'] = {}): void {
+  serve(() => ({ body: JSON.stringify(body), headers }));
+}
 
 /** A valid Client ID Metadata Document served at `url`. */
 function cimdDocument(url: string): Record<string, unknown> {
@@ -80,72 +110,56 @@ describe('encodeMetadataClientId / decodeMetadataClientId', () => {
 describe('fetchCimd', () => {
   it('rejects a document whose client_id differs from its own URL', async () => {
     const url = 'https://client.example/metadata.json';
-    const fetchImpl = (() =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify({
-            client_id: 'https://attacker.example/metadata.json',
-            client_name: 'Impostor',
-            redirect_uris: ['https://client.example/callback'],
-            application_type: 'web'
-          }),
-          { headers: { 'content-type': 'application/json' } }
-        )
-      )) as typeof fetch;
-    expect(await fetchCimd(url, fetchImpl)).toBeNull();
+    serveJson({
+      client_id: 'https://attacker.example/metadata.json',
+      client_name: 'Impostor',
+      redirect_uris: ['https://client.example/callback'],
+      application_type: 'web'
+    });
+    expect(await fetchCimd(url)).toBeNull();
   });
 
   it('answers null for a document whose host is unreachable', async () => {
-    const fetchImpl = (() =>
-      Promise.reject(new TypeError('fetch failed'))) as typeof fetch;
-    expect(
-      await fetchCimd('https://down.example/metadata.json', fetchImpl)
-    ).toBeNull();
+    serve(() => {
+      throw new Error('connect ECONNREFUSED');
+    });
+    expect(await fetchCimd('https://down.example/metadata.json')).toBeNull();
   });
 
   it('answers null for a document that is not JSON', async () => {
-    const fetchImpl = (() =>
-      Promise.resolve(new Response('<html>oops</html>'))) as typeof fetch;
-    expect(
-      await fetchCimd('https://html.example/metadata.json', fetchImpl)
-    ).toBeNull();
+    serve(() => ({ body: '<html>oops</html>' }));
+    expect(await fetchCimd('https://html.example/metadata.json')).toBeNull();
   });
 
   it('answers null for a document larger than the size cap', async () => {
     const url = 'https://big.example/metadata.json';
-    const fetchImpl = (() =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify({ ...cimdDocument(url), padding: 'x'.repeat(65_536) })
-        )
-      )) as typeof fetch;
-    expect(await fetchCimd(url, fetchImpl)).toBeNull();
+    serveJson({ ...cimdDocument(url), padding: 'x'.repeat(65_536) });
+    expect(await fetchCimd(url)).toBeNull();
   });
 
   it('gives the fetch a deadline', async () => {
     const url = 'https://slow.example/metadata.json';
-    let signal: AbortSignal | null | undefined;
-    const fetchImpl = ((_input: unknown, init?: RequestInit) => {
-      signal = init?.signal;
-      return Promise.resolve(new Response(JSON.stringify(cimdDocument(url))));
-    }) as typeof fetch;
-    await fetchCimd(url, fetchImpl);
+    let signal: AbortSignal | undefined;
+    serve((_url, options) => {
+      ({ signal } = options);
+      return { body: JSON.stringify(cimdDocument(url)) };
+    });
+    await fetchCimd(url);
     expect(signal).toBeInstanceOf(AbortSignal);
   });
 
   it('does not cache a document marked no-store, whatever its max-age', async () => {
     const url = 'https://nostore.example/metadata.json';
     let fetches = 0;
-    const fetchImpl = (() => {
+    serve(() => {
       fetches += 1;
-      return Promise.resolve(
-        new Response(JSON.stringify(cimdDocument(url)), {
-          headers: { 'cache-control': 'no-store, max-age=3600' }
-        })
-      );
-    }) as typeof fetch;
-    await fetchCimd(url, fetchImpl);
-    await fetchCimd(url, fetchImpl);
+      return {
+        body: JSON.stringify(cimdDocument(url)),
+        headers: { 'cache-control': 'no-store, max-age=3600' }
+      };
+    });
+    await fetchCimd(url);
+    await fetchCimd(url);
     expect(fetches).toBe(2);
   });
 
@@ -156,39 +170,37 @@ describe('fetchCimd', () => {
     const urlOf = (index: number): string =>
       `https://flood.example/${index}.json`;
     const fetched = new Set<string>();
-    const fetchImpl = ((input: string) => {
-      fetched.add(input);
-      return Promise.resolve(
-        new Response(JSON.stringify(cimdDocument(input)), {
-          headers: { 'cache-control': 'max-age=999999999' }
-        })
-      );
-    }) as typeof fetch;
+    serve(url => {
+      fetched.add(url);
+      return {
+        body: JSON.stringify(cimdDocument(url)),
+        headers: { 'cache-control': 'max-age=999999999' }
+      };
+    });
     for (let index = 0; index < documents; index += 1) {
       // eslint-disable-next-line no-await-in-loop -- one document after another, as a flood of page loads would
-      await fetchCimd(urlOf(index), fetchImpl);
+      await fetchCimd(urlOf(index));
     }
     fetched.clear();
-    await fetchCimd(urlOf(0), fetchImpl);
+    await fetchCimd(urlOf(0));
     expect(fetched.has(urlOf(0))).toBe(true);
   });
 
   it('caches a document for at most a day, whatever max-age it asks for', async () => {
     const url = 'https://forever.example/metadata.json';
     let fetches = 0;
-    const fetchImpl = (() => {
+    serve(() => {
       fetches += 1;
-      return Promise.resolve(
-        new Response(JSON.stringify(cimdDocument(url)), {
-          headers: { 'cache-control': 'max-age=999999999' }
-        })
-      );
-    }) as typeof fetch;
+      return {
+        body: JSON.stringify(cimdDocument(url)),
+        headers: { 'cache-control': 'max-age=999999999' }
+      };
+    });
     vi.useFakeTimers();
     try {
-      await fetchCimd(url, fetchImpl);
+      await fetchCimd(url);
       vi.advanceTimersByTime(24 * 60 * 60 * 1000);
-      await fetchCimd(url, fetchImpl);
+      await fetchCimd(url);
     } finally {
       vi.useRealTimers();
     }
@@ -215,22 +227,18 @@ describe('fetchCimd', () => {
     ['no redirect URI', { redirect_uris: [] }]
   ])('refuses a document with %s', async (_case, override) => {
     const url = 'https://limits.example/metadata.json';
-    const fetchImpl = (() =>
-      Promise.resolve(
-        new Response(JSON.stringify({ ...cimdDocument(url), ...override }))
-      )) as typeof fetch;
-    expect(await fetchCimd(url, fetchImpl)).toBeNull();
+    serveJson({ ...cimdDocument(url), ...override });
+    expect(await fetchCimd(url)).toBeNull();
   });
 
   it('does not follow a redirect', async () => {
     const url = 'https://moved.example/metadata.json';
-    let redirect: RequestRedirect | undefined;
-    const fetchImpl = ((_input: unknown, init?: RequestInit) => {
-      ({ redirect } = init ?? {});
-      return Promise.resolve(new Response(JSON.stringify(cimdDocument(url))));
-    }) as typeof fetch;
-    await fetchCimd(url, fetchImpl);
-    expect(redirect).toBe('error');
+    serve(() => ({
+      status: 302,
+      headers: { location: 'https://elsewhere.example/metadata.json' },
+      body: JSON.stringify(cimdDocument(url))
+    }));
+    expect(await fetchCimd(url)).toBeNull();
   });
 
   // Anyone can make the server fetch a URL: it never reaches the stack's own network.
@@ -247,60 +255,51 @@ describe('fetchCimd', () => {
     ['IPv6 unique local', 'fd00::1'],
     ['IPv4-mapped loopback', '::ffff:127.0.0.1']
   ])('refuses a host that resolves to a %s address', async (_case, address) => {
-    lookup.mockResolvedValue([
+    answers.for = () => [
       { address: PUBLIC_ADDRESS, family: 4 },
       { address, family: isIP(address) }
-    ]);
-    const fetchImpl = vi.fn<typeof fetch>();
-    expect(
-      await fetchCimd('https://inside.example/metadata.json', fetchImpl)
-    ).toBeNull();
-    expect(fetchImpl).not.toHaveBeenCalled();
+    ];
+    const served = vi.fn(() => ({ body: '{}' }));
+    serve(served);
+    expect(await fetchCimd('https://inside.example/metadata.json')).toBeNull();
+    expect(served).not.toHaveBeenCalled();
   });
 
   it.each(['https://127.0.0.1/metadata.json', 'https://[::1]/metadata.json'])(
     'refuses an IP literal %s on a loopback address',
     async url => {
-      const fetchImpl = vi.fn<typeof fetch>();
-      expect(await fetchCimd(url, fetchImpl)).toBeNull();
-      expect(fetchImpl).not.toHaveBeenCalled();
+      serve(() => ({ body: '{}' }));
+      expect(await fetchCimd(url)).toBeNull();
+      expect(request).not.toHaveBeenCalled();
     }
   );
 
   it('refuses a document whose redirect URI is not an absolute http(s) URI', async () => {
     const url = 'https://relative.example/metadata.json';
-    const fetchImpl = (() =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify({ ...cimdDocument(url), redirect_uris: ['callback'] })
-        )
-      )) as typeof fetch;
-    expect(await fetchCimd(url, fetchImpl)).toBeNull();
+    serveJson({ ...cimdDocument(url), redirect_uris: ['callback'] });
+    expect(await fetchCimd(url)).toBeNull();
   });
 
   it('reads a document without application_type as a web client', async () => {
     // claude.ai's own document, as it served it on 2026-09-29.
     const url = 'https://claude.ai/oauth/mcp-oauth-client-metadata';
-    const fetchImpl = (() =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify({
-            client_id: url,
-            client_name: 'Claude',
-            client_uri: 'https://claude.ai',
-            redirect_uris: ['https://claude.ai/api/mcp/auth_callback'],
-            grant_types: [
-              'authorization_code',
-              'refresh_token',
-              'urn:ietf:params:oauth:grant-type:jwt-bearer'
-            ],
-            response_types: ['code'],
-            token_endpoint_auth_method: 'none'
-          }),
-          { headers: { 'content-type': 'application/json' } }
-        )
-      )) as typeof fetch;
-    expect(await fetchCimd(url, fetchImpl)).toEqual({
+    serveJson(
+      {
+        client_id: url,
+        client_name: 'Claude',
+        client_uri: 'https://claude.ai',
+        redirect_uris: ['https://claude.ai/api/mcp/auth_callback'],
+        grant_types: [
+          'authorization_code',
+          'refresh_token',
+          'urn:ietf:params:oauth:grant-type:jwt-bearer'
+        ],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none'
+      },
+      { 'content-type': 'application/json' }
+    );
+    expect(await fetchCimd(url)).toEqual({
       clientId: url,
       kind: 'cimd',
       name: 'Claude',
@@ -311,19 +310,34 @@ describe('fetchCimd', () => {
 
   it('still refuses an application_type other than native or web', async () => {
     const url = 'https://client.example/other-type.json';
-    const fetchImpl = (() =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify({
-            client_id: url,
-            client_name: 'Odd',
-            redirect_uris: ['https://client.example/callback'],
-            application_type: 'service'
-          }),
-          { headers: { 'content-type': 'application/json' } }
-        )
-      )) as typeof fetch;
-    expect(await fetchCimd(url, fetchImpl)).toBeNull();
+    serveJson({
+      client_id: url,
+      client_name: 'Odd',
+      redirect_uris: ['https://client.example/callback'],
+      application_type: 'service'
+    });
+    expect(await fetchCimd(url)).toBeNull();
+  });
+
+  // The address checked is the one the socket connects to, whatever an earlier resolution of
+  // the name answered, so a name rebound to a loopback address stays out of reach.
+  it('never connects to a host whose answer for the connection is private', async () => {
+    answers.for = () => [{ address: '127.0.0.1', family: 4 }];
+    let connections = 0;
+    const server = createServer(socket => {
+      connections += 1;
+      socket.destroy();
+    });
+    await new Promise<void>(resolve => {
+      server.listen(0, '127.0.0.1', resolve);
+    });
+    const { port } = server.address() as AddressInfo;
+    try {
+      expect(await fetchCimd(`https://localhost:${port}/x.json`)).toBeNull();
+    } finally {
+      server.close();
+    }
+    expect(connections).toBe(0);
   });
 });
 
@@ -333,25 +347,16 @@ describe('redirectUriAllowed', () => {
 
   /** Claude Code's own document, as it served it on 2026-10-01: no `application_type`, no port. */
   async function claudeCodeMeta(): Promise<ClientMeta> {
-    const fetchImpl = (() =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify({
-            client_id: CLAUDE_CODE_CLIENT_ID,
-            client_name: 'Claude Code',
-            client_uri: 'https://claude.ai',
-            redirect_uris: [
-              'http://localhost/callback',
-              'http://127.0.0.1/callback'
-            ],
-            grant_types: ['authorization_code', 'refresh_token'],
-            response_types: ['code'],
-            token_endpoint_auth_method: 'none'
-          }),
-          { headers: { 'content-type': 'application/json' } }
-        )
-      )) as typeof fetch;
-    const meta = await fetchCimd(CLAUDE_CODE_CLIENT_ID, fetchImpl);
+    serveJson({
+      client_id: CLAUDE_CODE_CLIENT_ID,
+      client_name: 'Claude Code',
+      client_uri: 'https://claude.ai',
+      redirect_uris: ['http://localhost/callback', 'http://127.0.0.1/callback'],
+      grant_types: ['authorization_code', 'refresh_token'],
+      response_types: ['code'],
+      token_endpoint_auth_method: 'none'
+    });
+    const meta = await fetchCimd(CLAUDE_CODE_CLIENT_ID);
     if (meta === null) {
       throw new Error("expected Claude Code's document to parse");
     }

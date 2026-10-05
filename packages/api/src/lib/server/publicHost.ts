@@ -1,5 +1,5 @@
-import { lookup } from 'node:dns/promises';
-import { BlockList, isIPv6 } from 'node:net';
+import { lookup } from 'node:dns';
+import { BlockList, isIP, isIPv6, type LookupFunction } from 'node:net';
 
 // The ranges a URL anyone can name must not reach (RFC 6890): unspecified, loopback, private,
 // shared (carrier-grade NAT), link-local (cloud metadata services among them) and unique local.
@@ -18,7 +18,7 @@ const NON_PUBLIC_NETWORKS = [
   'fe80::/10'
 ];
 const IPV6_FAMILY = 6;
-// `URL.hostname` brackets an IPv6 literal; `lookup` takes it bare.
+// `URL.hostname` brackets an IPv6 literal; `isIP` takes it bare.
 const IPV6_BRACKETS = /^\[(?<address>.*)\]$/u;
 
 const nonPublic = new BlockList();
@@ -31,17 +31,43 @@ for (const cidr of NON_PUBLIC_NETWORKS) {
   );
 }
 
-/** Every address `url`'s host resolves to is public; `false` too when it does not resolve. An IP
- *  literal resolves to itself. */
-export async function resolvesToPublicAddresses(url: URL): Promise<boolean> {
-  const host = url.hostname.replace(IPV6_BRACKETS, '$<address>');
-  try {
-    const addresses = await lookup(host, { all: true });
-    return addresses.every(
-      ({ address, family }) =>
-        !nonPublic.check(address, family === IPV6_FAMILY ? 'ipv6' : 'ipv4')
-    );
-  } catch {
-    return false;
-  }
+function isPublicAddress(address: string, family: number): boolean {
+  return !nonPublic.check(address, family === IPV6_FAMILY ? 'ipv6' : 'ipv4');
 }
+
+/** `url`'s host is an IP literal on a non-public address. A connection to an IP literal resolves
+ *  nothing, so {@link publicLookup} never sees it: this is its check for that case. */
+export function isNonPublicLiteral(url: URL): boolean {
+  const host = url.hostname.replace(IPV6_BRACKETS, '$<address>');
+  const family = isIP(host);
+  return family !== 0 && !isPublicAddress(host, family);
+}
+
+/**
+ * A socket `lookup` that resolves like the default one but fails for a host with any non-public
+ * address. The check holds for the very answer the socket connects to, so a name whose answer
+ * changes between a check and the connection (DNS rebinding) cannot slip a private one in.
+ */
+export const publicLookup: LookupFunction = (hostname, options, callback) => {
+  lookup(hostname, { ...options, all: true }, (err, addresses) => {
+    if (err !== null) {
+      callback(err, []);
+      return;
+    }
+    const [first] = addresses;
+    if (
+      first === undefined ||
+      !addresses.every(({ address, family }) =>
+        isPublicAddress(address, family)
+      )
+    ) {
+      callback(new Error(`${hostname} resolves to a non-public address`), []);
+      return;
+    }
+    if (options.all === true) {
+      callback(null, addresses);
+    } else {
+      callback(null, first.address, first.family);
+    }
+  });
+};
