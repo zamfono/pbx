@@ -194,6 +194,41 @@ describe('a withheld caller', () => {
   }
 });
 
+describe('the voicemail length', () => {
+  // The unit's abbreviation reads right for every count, one second included.
+  const LENGTH: Record<Language, string> = {
+    de: '1 Sek.',
+    en: '1 s.',
+    es: '1 s.',
+    fr: '1 s.',
+    it: '1 s.',
+    ru: '1 сек.'
+  };
+
+  for (const language of BUILTIN_LANGUAGES) {
+    it(`is given with the unit abbreviated in ${language}`, () => {
+      const source = loadBuiltinTemplate('voicemail', language);
+      const mail = compileTemplate(
+        'voicemail',
+        source.subject,
+        source.bodyText,
+        source.bodyHtml
+      ).render(
+        {
+          callerNumber: '+491111111',
+          callerName: '',
+          mailboxName: 'Eva',
+          receivedAt: '2026-10-01T09:00:00Z',
+          durationS: 1
+        },
+        { language, timezone: 'UTC' }
+      );
+      expect(mail.text).toContain(LENGTH[language]);
+      expect(mail.html).toContain(LENGTH[language]);
+    });
+  }
+});
+
 describe('resolveTemplate', () => {
   it('prefers the tenant row over the shipped built-in', async () => {
     const db = await migratedTestDb();
