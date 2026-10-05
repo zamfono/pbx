@@ -17,6 +17,7 @@ export const EVENT_TYPES = [
   'ooo',
   'hours',
   'trunk.status',
+  'sipBan.added',
   'history.appended',
   'backup.started',
   'backup.finished',
@@ -62,6 +63,8 @@ type EventFields = {
   };
   hours: { scope: Scope; open: boolean };
   'trunk.status': { trunkId: string; status: TrunkStatus['status'] };
+  /** `expiresAt` `null`: a permanent ban (§5.6). */
+  'sipBan.added': { banId: string; address: string; expiresAt: string | null };
   'history.appended': { callId: string };
   'backup.started': { targetId: string; runId: string };
   'backup.finished': {

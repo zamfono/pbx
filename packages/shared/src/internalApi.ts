@@ -5,6 +5,7 @@
  */
 import { z } from 'zod';
 
+import { isSipBanAddress } from './cidr.js';
 import type { CallDirection, PresenceStatus } from './columnValues.js';
 import type { Envelope } from './events.js';
 import type { ZamfonoVersion } from './version.js';
@@ -234,8 +235,9 @@ export type MailRequest = z.infer<typeof mailRequestSchema>;
 /** `POST /internal/sipBan` (api) → 204, whether a ban was written, the address already had an
  * active ban or banning is off; 400 for a request this schema refuses (§5.6, §3.1). */
 export const sipBanReportSchema = z.object({
-  /** An IPv4 address, or an IPv6 /64 in CIDR form, lower case: what `sip_bans.address` holds (§11.2). */
-  address: z.string(),
+  /** An IPv4 address, or an IPv6 /64 in CIDR form, lower case: what `sip_bans.address` holds (§11.2);
+   * the ban helper refuses a list with a line of any other form (§9.1). */
+  address: z.string().refine(isSipBanAddress),
   /** The failed attempts `core` counted within the window. */
   failures: z.number().int().min(1)
 });

@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-05 · §9.1.** `api` renders `sip_bans.list` also at each change of `settings.sip_ban_steps_json`.
+*Why:* an empty list switches banning off and renders an empty ban list, and switching it on again renders the active bans (§5.6); without a render at that change the helper would keep applying the previous list until the next ban.
+
 **2026-10-05 · §10.** The repository layout lists `core`'s `sipBan/`, the count of failed SIP attempts, and its `ami/` client reading the security events beside the registration state.
 *Why:* the layout named `ami/` for the registration state alone and had no place for the count §5.6 gives `core`.
 

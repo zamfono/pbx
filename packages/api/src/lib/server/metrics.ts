@@ -20,6 +20,7 @@ import {
 } from './metricsCounters.js';
 import { updateNews } from './ops/system/_state.js';
 import { isPropagationPending } from './propagationPending.js';
+import { countSipBansInForce } from './sipBanList.js';
 
 export type MetricsDeps = {
   db: Db;
@@ -199,6 +200,10 @@ export async function renderMetrics(deps: MetricsDeps): Promise<string> {
     ...gaugeLines(
       'zamfono_certificate_sync_ok',
       deps.certSyncStatus() === 'ok' ? 1 : 0
+    ),
+    ...gaugeLines(
+      'zamfono_sip_bans_active',
+      await countSipBansInForce(deps.db)
     ),
     ...recordingMixFailureLines(state),
     ...(await configPropagationLines(deps.db)),

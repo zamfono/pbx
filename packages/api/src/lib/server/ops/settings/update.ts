@@ -16,7 +16,11 @@ import {
   settingsWire,
   type SettingsColumns
 } from './_shared.js';
-import { maybePushTenantProfile, reloadKindsFor } from './changeEffects.js';
+import {
+  maybePushTenantProfile,
+  maybeRenderSipBanList,
+  reloadKindsFor
+} from './changeEffects.js';
 import { assertNoExtensionCollision } from './emergencyNumbers.js';
 import { applyPlainFields } from './plainFields.js';
 import {
@@ -117,6 +121,7 @@ export const update = defineOperation({
       propagate(ctx, reloadKindsFor(columns));
     }
     await maybePushTenantProfile(ctx, columns);
+    maybeRenderSipBanList(ctx, columns);
     return rowToWire(ctx.db, await loadSettings(ctx.db));
   }
 });

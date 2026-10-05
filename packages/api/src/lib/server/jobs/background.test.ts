@@ -8,6 +8,7 @@ import { connectCoreEvents } from '../coreEvents.js';
 import { propagateAtBoot } from '../propagation.js';
 import type { Keyring } from '../secretbox.js';
 import { seedIfEmpty } from '../seed.js';
+import { renderSipBanList } from '../sipBanList.js';
 import { scheduleAutoUpdate } from './autoUpdate.js';
 import {
   execCommand,
@@ -27,6 +28,9 @@ vi.mock('../ops/devices/_restartPush.js', () => ({
 }));
 vi.mock('../propagation.js', () => ({
   propagateAtBoot: vi.fn(() => Promise.resolve())
+}));
+vi.mock('../sipBanList.js', () => ({
+  renderSipBanList: vi.fn(() => Promise.resolve())
 }));
 vi.mock('./keyRotation.js', () => ({
   reencryptSweep: vi.fn(() => Promise.resolve({ reencrypted: 0, remaining: 0 }))
@@ -107,6 +111,23 @@ describe('runBootSteps', () => {
 
     expect(order).toEqual(['seed', 'render']);
     expect(vi.mocked(propagateAtBoot).mock.calls[0]?.[0]).toBe(FAKE_DB);
+  });
+
+  // A restart of either container rebuilds the nftables sets from the database (§9.1).
+  it('renders the SIP ban list after the seed', async () => {
+    const order: string[] = [];
+    vi.mocked(seedIfEmpty).mockImplementationOnce(() => {
+      order.push('seed');
+      return Promise.resolve('seeded');
+    });
+    vi.mocked(renderSipBanList).mockImplementationOnce(() => {
+      order.push('banList');
+      return Promise.resolve();
+    });
+
+    await runBootSteps(FAKE_DB, FAKE_KR, log);
+
+    expect(order).toEqual(['seed', 'banList']);
   });
 });
 

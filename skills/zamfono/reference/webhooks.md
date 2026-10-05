@@ -41,6 +41,7 @@ the fields of its type:
 | `ooo`              | `scope`, `active`, `startsAt`, `expiresAt`                                        | an out-of-office rule starts or ends                      |
 | `hours`            | `scope`, `open`                                                                   | an opening-hours interval opens or closes                 |
 | `trunk.status`     | `trunkId`, `status` (`registered`, `unreachable`, `unmonitored`, `unknown`)       | a trunk's status changes                                  |
+| `sipBan.added`     | `banId`, `address`, `expiresAt` (`null`: permanent)                               | a source of failed SIP attempts is banned                 |
 | `history.appended` | `callId`                                                                          | a call's history row is written; read it with `calls.get` |
 | `backup.started`   | `targetId`, `runId`                                                               | a backup run starts                                       |
 | `backup.finished`  | `targetId`, `runId`, `snapshotId`, `bytesAdded`, `bytesTotal`, `durationS`        | a backup run succeeds                                     |

@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import type { Db } from '@zamfono/shared';
@@ -110,5 +112,27 @@ describe('settings: SIP bans (§5.6, §11.4)', () => {
       sipBanFailures: 10,
       sipBanSteps: [86_400, 31_536_000, null]
     });
+  });
+
+  it('renders the ban list empty when the steps switch banning off, and the active bans again when they switch it on', async () => {
+    const db = await seededDb();
+    await db
+      .insertInto('sipBans')
+      .values({
+        id: 'ban-1',
+        address: '203.0.113.7',
+        step: 3,
+        failures: 10,
+        createdAt: '2026-01-01T00:00:00.000Z'
+      })
+      .execute();
+    const listFile = path.join(
+      process.env.ASTERISK_GEN_DIR ?? '',
+      'sip_bans.list'
+    );
+    await update(db, { sipBanSteps: [] });
+    await expect(readFile(listFile, 'utf8')).resolves.toBe('');
+    await update(db, { sipBanSteps: [86_400] });
+    await expect(readFile(listFile, 'utf8')).resolves.toBe('203.0.113.7\n');
   });
 });

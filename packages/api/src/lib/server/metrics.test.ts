@@ -279,6 +279,41 @@ describe('renderMetrics', () => {
     expect(parseMetrics(missing).get('zamfono_certificate_sync_ok')).toBe('0');
   });
 
+  it('counts the SIP bans in force, neither a lifted nor an expired one, and none while banning is off (§7)', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    const ban = {
+      address: '203.0.113.7',
+      step: 1,
+      failures: 10,
+      createdAt: '2026-01-01T00:00:00.000Z'
+    };
+    await db
+      .insertInto('sipBans')
+      .values([
+        { ...ban, id: 'permanent' },
+        { ...ban, id: 'running', expiresAt: '2999-01-01T00:00:00.000Z' },
+        { ...ban, id: 'expired', expiresAt: '2026-01-02T00:00:00.000Z' },
+        {
+          ...ban,
+          id: 'lifted',
+          liftedAt: '2026-01-01T01:00:00.000Z',
+          liftedBy: 'owner'
+        }
+      ])
+      .execute();
+
+    const text = await renderMetrics(stubDeps({ db }));
+
+    expect(text).toContain('# TYPE zamfono_sip_bans_active gauge');
+    expect(parseMetrics(text).get('zamfono_sip_bans_active')).toBe('2');
+
+    // Banning off: no ban is in force, as the rendered list holds none (§5.6).
+    await db.updateTable('settings').set({ sipBanStepsJson: '[]' }).execute();
+    const off = await renderMetrics(stubDeps({ db }));
+    expect(parseMetrics(off).get('zamfono_sip_bans_active')).toBe('0');
+  });
+
   it('renders the update gauges from update_state, all 0 without an updater (§6.3)', async () => {
     const updater: UpdaterClient = {
       status: () => Promise.reject(new Error('not asked')),

@@ -1,3 +1,6 @@
+import { renderSipBanList } from '#lib/server/sipBanList.js';
+
+import { afterCommit } from '../afterCommit.js';
 import type { Context } from '../types.js';
 import type { SettingsColumns } from './_shared.js';
 import { pushProfileAfterCommit } from './profilePush.js';
@@ -51,4 +54,20 @@ export async function maybePushTenantProfile(
     return;
   }
   await pushProfileAfterCommit(ctx);
+}
+
+/**
+ * Renders the ban list once a change of the escalation steps has committed: `[]` switches banning
+ * off and renders the list empty, and switching it on again renders the active bans (§5.6, §9.1).
+ */
+export function maybeRenderSipBanList(
+  ctx: Context,
+  columns: SettingsColumns
+): void {
+  if ('sipBanStepsJson' in columns) {
+    afterCommit(ctx, async db => {
+      await renderSipBanList(db);
+      return null;
+    });
+  }
 }
