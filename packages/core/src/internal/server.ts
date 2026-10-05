@@ -1,19 +1,23 @@
 /**
- * `core`'s internal HTTP+WS API on the Docker `internal` network (§3, §3.1): health, the
+ * `core`'s internal HTTP+WS API on the Docker `internal` network (§3, §3.1): health, readiness, the
  * config-reload trigger and a live-state and event-stream surface for `api`. No authentication:
  * the internal network is the trust boundary.
  */
 import http from 'node:http';
 
 import {
+  HEALTH_CONTENT_TYPE,
+  healthDocument,
+  healthHttpStatus,
   HTTP_NOT_FOUND,
   HTTP_OK,
   HTTP_SERVICE_UNAVAILABLE,
   isDbOpen,
   processStartedAtIso,
-  type CoreHealth,
   type CoreVersionResponse,
   type Db,
+  type HealthCheck,
+  type HealthChecks,
   type StateResponse,
   type ZamfonoVersion
 } from '@zamfono/shared';
@@ -61,18 +65,39 @@ type InternalDeps = {
   version: ZamfonoVersion;
 };
 
+/** `core:database` and `core:ari`, each `fail` while down (§6.3 "Health"). */
+async function healthChecks(deps: InternalDeps): Promise<HealthChecks> {
+  const passOrFail = (up: boolean): [HealthCheck] => [
+    { status: up ? 'pass' : 'fail' }
+  ];
+  return {
+    'core:database': passOrFail(await isDbOpen(deps.db)),
+    'core:ari': passOrFail(deps.ari.connected)
+  };
+}
+
+/** `GET /healthz`: the health document whose checks `api` copies into its own (§6.3 "Health"). */
 async function handleHealthz(
   deps: InternalDeps,
   response: http.ServerResponse
 ): Promise<void> {
-  const ariConnected = deps.ari.connected;
-  const dbOk = await isDbOpen(deps.db);
-  const body: CoreHealth = {
-    ok: dbOk && ariConnected,
-    ari: ariConnected,
-    db: dbOk
-  };
-  respondJson(response, body.ok ? HTTP_OK : HTTP_SERVICE_UNAVAILABLE, body);
+  const document = healthDocument(await healthChecks(deps));
+  response.writeHead(healthHttpStatus(document), {
+    'Content-Type': HEALTH_CONTENT_TYPE,
+    'Cache-Control': 'no-store'
+  });
+  response.end(JSON.stringify(document));
+}
+
+/** `GET /readyz`, the compose healthcheck's: 200 with an empty body while the database is open
+ * and ARI connected, else 503 (§6.3 "Health"). */
+async function handleReadyz(
+  deps: InternalDeps,
+  response: http.ServerResponse
+): Promise<void> {
+  const ready = healthDocument(await healthChecks(deps)).status === 'pass';
+  response.writeHead(ready ? HTTP_OK : HTTP_SERVICE_UNAVAILABLE);
+  response.end();
 }
 
 /**
@@ -150,6 +175,7 @@ function at(
 const ROUTES: Partial<Record<string, Route[]>> = {
   GET: [
     at('/healthz', handleHealthz),
+    at('/readyz', handleReadyz),
     at('/internal/state', handleState),
     at('/internal/version', handleVersion),
     at('/internal/parking', handleParkingRead)

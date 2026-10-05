@@ -14,6 +14,7 @@ export * from './addressKey.js';
 export * from './columnValues.js';
 export * from './sipHeaders.js';
 export * from './events.js';
+export * from './health.js';
 export * from './internalApi.js';
 export * from './updaterApi.js';
 export * from './mwiMailbox.js';

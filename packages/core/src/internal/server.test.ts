@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 
 import {
+  HEALTH_CONTENT_TYPE,
   HTTP_BAD_REQUEST,
   HTTP_CONTENT_TOO_LARGE,
   HTTP_NO_CONTENT,
@@ -109,13 +110,17 @@ describe('startInternalServer', () => {
     await db.destroy();
   });
 
-  it('answers /healthz 200 while ARI is connected, 503 once it drops', async () => {
+  it('answers /healthz as health+json with core:database and core:ari, 503 once ARI drops', async () => {
     const healthy = await fetch(`http://127.0.0.1:${port}/healthz`);
     expect(healthy.status).toBe(HTTP_OK);
-    await expect(healthy.json()).resolves.toMatchObject({
-      ok: true,
-      ari: true,
-      db: true
+    expect(healthy.headers.get('content-type')).toBe(HEALTH_CONTENT_TYPE);
+    expect(healthy.headers.get('cache-control')).toBe('no-store');
+    await expect(healthy.json()).resolves.toEqual({
+      status: 'pass',
+      checks: {
+        'core:database': [{ status: 'pass' }],
+        'core:ari': [{ status: 'pass' }]
+      }
     });
 
     const disconnected = new Promise<void>(resolve => {
@@ -128,7 +133,47 @@ describe('startInternalServer', () => {
 
     const unhealthy = await fetch(`http://127.0.0.1:${port}/healthz`);
     expect(unhealthy.status).toBe(HTTP_SERVICE_UNAVAILABLE);
-    await expect(unhealthy.json()).resolves.toMatchObject({ ari: false });
+    await expect(unhealthy.json()).resolves.toEqual({
+      status: 'fail',
+      checks: {
+        'core:database': [{ status: 'pass' }],
+        'core:ari': [{ status: 'fail' }]
+      }
+    });
+  });
+
+  it('answers /healthz with core:database failing once the database is closed', async () => {
+    await db.destroy();
+    const response = await fetch(`http://127.0.0.1:${port}/healthz`);
+    expect(response.status).toBe(HTTP_SERVICE_UNAVAILABLE);
+    await expect(response.json()).resolves.toMatchObject({
+      status: 'fail',
+      checks: { 'core:database': [{ status: 'fail' }] }
+    });
+  });
+
+  it('answers /readyz 200 with an empty body while ready, 503 once ARI drops', async () => {
+    const ready = await fetch(`http://127.0.0.1:${port}/readyz`);
+    expect(ready.status).toBe(HTTP_OK);
+    expect(await ready.text()).toBe('');
+
+    const disconnected = new Promise<void>(resolve => {
+      ari.once('disconnected', () => {
+        resolve();
+      });
+    });
+    await fakeAri.close();
+    await disconnected;
+
+    const unready = await fetch(`http://127.0.0.1:${port}/readyz`);
+    expect(unready.status).toBe(HTTP_SERVICE_UNAVAILABLE);
+    expect(await unready.text()).toBe('');
+  });
+
+  it('answers /readyz 503 once the database is closed', async () => {
+    await db.destroy();
+    const response = await fetch(`http://127.0.0.1:${port}/readyz`);
+    expect(response.status).toBe(HTTP_SERVICE_UNAVAILABLE);
   });
 
   it('answers 503 for a request whose route failed, and logs the failure with the request', async () => {
