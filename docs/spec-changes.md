@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-05 · §7 Metrics.** `zamfono_backup_last_success_age_seconds` covers exactly the enabled targets; one with no successful backup yet reports its age since it was created.
+*Why:* a disabled target kept an ever-growing age, and a target whose runs all failed had no sample, so no age alert could fire for it.
+
 **2026-10-05 · §6.3 Proxy.** The `litestream.caddy` snippet rewrites the request path to `/metrics` before proxying to the sidecar.
 *Why:* Litestream serves its metrics at `/metrics` only, so the unrewritten `/metrics/litestream` got a 404.
 

@@ -439,7 +439,7 @@ describe('renderMetrics', () => {
     );
   });
 
-  it('reports an enabled backup target whose runs all failed, so an age alert can fire for it', async () => {
+  it('reports an enabled backup target whose runs all failed with its age since creation, so an age alert can fire for it', async () => {
     const db = await makeTestDb();
     await seedSettings(db);
     const targetId = newId();
@@ -466,10 +466,18 @@ describe('renderMetrics', () => {
       })
       .execute();
 
-    const text = await renderMetrics(stubDeps({ db }));
+    const text = await renderMetrics(stubDeps({ db, now: () => new Date() }));
 
-    expect(text).toContain(
-      `zamfono_backup_last_success_age_seconds{target="${targetId}"}`
-    );
+    const line = text
+      .split('\n')
+      .find(entry =>
+        entry.startsWith(
+          `zamfono_backup_last_success_age_seconds{target="${targetId}"}`
+        )
+      );
+    expect(line).toBeDefined();
+    const age = Number((line ?? '').split(' ').at(-1));
+    expect(age).toBeGreaterThanOrEqual(86_399);
+    expect(age).toBeLessThan(86_405);
   });
 });

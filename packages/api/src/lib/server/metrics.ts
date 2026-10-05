@@ -126,29 +126,36 @@ async function dbSizeBytes(dbFile: string): Promise<number> {
   }
 }
 
-/** The age, in seconds, of each enabled backup target's latest successful run (§6.5, §7). */
+/**
+ * The age, in seconds, of each enabled backup target's latest successful run, or of the target
+ * itself while it has none (§6.5, §7).
+ */
 async function backupAgeLines(db: Db, now: () => Date): Promise<string[]> {
   const latest = await db
     .selectFrom('backupTargets')
-    .innerJoin('backupRuns', 'backupRuns.targetId', 'backupTargets.id')
+    .leftJoin('backupRuns', join =>
+      join
+        .onRef('backupRuns.targetId', '=', 'backupTargets.id')
+        .on('backupRuns.status', '=', 'ok')
+    )
     .select(eb => [
       'backupTargets.id',
-      eb.fn.max('backupRuns.finishedAt').as('lastOkAt')
+      eb.fn
+        .coalesce(eb.fn.max('backupRuns.finishedAt'), 'backupTargets.createdAt')
+        .as('since')
     ])
     .where('backupTargets.deletedAt', 'is', null)
-    .where('backupRuns.status', '=', 'ok')
-    .groupBy('backupTargets.id')
+    .where('backupTargets.enabled', '=', 1)
+    .groupBy(['backupTargets.id', 'backupTargets.createdAt'])
     .orderBy('backupTargets.id')
     .execute();
   const lines = ['# TYPE zamfono_backup_last_success_age_seconds gauge'];
   for (const target of latest) {
-    if (target.lastOkAt) {
-      const ageSeconds =
-        (now().getTime() - Date.parse(target.lastOkAt)) / MS_PER_SECOND;
-      lines.push(
-        `zamfono_backup_last_success_age_seconds{target="${escapeLabel(target.id)}"} ${ageSeconds}`
-      );
-    }
+    const ageSeconds =
+      (now().getTime() - Date.parse(target.since)) / MS_PER_SECOND;
+    lines.push(
+      `zamfono_backup_last_success_age_seconds{target="${escapeLabel(target.id)}"} ${ageSeconds}`
+    );
   }
   return lines;
 }
