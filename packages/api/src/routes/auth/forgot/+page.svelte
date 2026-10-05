@@ -20,7 +20,7 @@
 <div class="auth-card">
   <h1 class="auth-title">{dict.title}</h1>
   {#if sent}
-    <p class="auth-note">{dict.sent}</p>
+    <p class="auth-note" role="status">{dict.sent}</p>
   {:else}
     <p class="auth-intro">{dict.intro}</p>
     <form {...requestReset}>

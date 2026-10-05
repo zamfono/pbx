@@ -8,6 +8,9 @@
 
   const dict = $derived(data.dictionary.upload);
   const outcome = $derived(upload.result ?? null);
+  const refusal = $derived(
+    outcome !== null && 'refusal' in outcome ? outcome.refusal : null
+  );
   const busy = $derived(upload.pending > 0);
   const link = $derived(`${page.url.pathname}${page.url.search}`);
   // A submission without JavaScript posts to the form's `?/remote=…` action, which replaces this
@@ -27,12 +30,12 @@
 <div class="auth-card">
   <h1 class="auth-title">{dict.title}</h1>
   {#if outcome !== null && 'uploaded' in outcome}
-    <p class="auth-note">{dict.uploaded}</p>
+    <p class="auth-note" role="status">{dict.uploaded}</p>
   {:else if !data.live}
     <p class="auth-error">{dict.expired}</p>
   {:else}
-    {#if outcome !== null}
-      <p class="auth-error">{outcome.refusal}</p>
+    {#if refusal !== null}
+      <p class="auth-error" id="refusal" role="alert">{refusal}</p>
     {/if}
     <form {...upload} {action} enctype="multipart/form-data">
       <input {...upload.fields.link.as('hidden', link)} />
@@ -43,6 +46,8 @@
           accept="audio/wav,audio/mpeg,.wav,.mp3"
           required
           {...upload.fields.upload.as('file')}
+          aria-invalid={refusal === null ? undefined : 'true'}
+          aria-describedby={refusal === null ? undefined : 'refusal'}
         />
       </div>
       <button

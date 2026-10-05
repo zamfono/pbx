@@ -33,13 +33,13 @@
 <div class="auth-card">
   <h1 class="auth-title">{dict.title}</h1>
   {#if data.done}
-    <p class="auth-note">{dict.success}</p>
+    <p class="auth-note" role="status">{dict.success}</p>
     <a class="auth-link" href={resolve('/oauth/authorize')}
       >{dict.successLoginLink}</a
     >
   {:else}
     {#if refusal !== null}
-      <p class="auth-error">{refusal.message}</p>
+      <p class="auth-error" id="refusal" role="alert">{refusal.message}</p>
     {/if}
     <form {...setPassword} {action}>
       <input {...setPassword.fields.token.as('hidden', data.token ?? '')} />
@@ -51,6 +51,8 @@
           minlength={MIN_PASSWORD_LENGTH}
           required
           {...passwordField.as('password')}
+          aria-invalid={refusal === null ? undefined : 'true'}
+          aria-describedby={refusal === null ? undefined : 'refusal'}
         />
       </div>
       <button

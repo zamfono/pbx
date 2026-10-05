@@ -25,6 +25,14 @@
       : format(dict.consentIntro, { client: data.clientName })
   );
   const busy = $derived(login.pending > 0);
+  // A login answered by the consent step re-renders the card in place; focus moves to its heading
+  // so a keyboard or screen-reader user lands on the step rather than on a removed button.
+  let heading: HTMLHeadingElement | undefined = $state();
+  $effect(() => {
+    if (result && 'needsConsent' in result) {
+      heading?.focus();
+    }
+  });
   // The underscored field name keeps the password out of the re-rendered page: SvelteKit
   // repopulates a non-enhanced submission's fields from the submitted values, and skips the
   // underscored ones (§5.2).
@@ -37,7 +45,7 @@
 </svelte:head>
 
 <div class="auth-card">
-  <h1 class="auth-title">{dict.title}</h1>
+  <h1 class="auth-title" tabindex="-1" bind:this={heading}>{dict.title}</h1>
   {#if consent !== null}
     <p class="auth-intro">
       {format(dict.consentIntro, { client: consent.clientName })}
@@ -62,7 +70,7 @@
       <p class="auth-intro">{consentText}</p>
     {/if}
     {#if refusal !== null}
-      <p class="auth-error">{refusal.message}</p>
+      <p class="auth-error" id="refusal" role="alert">{refusal.message}</p>
     {/if}
     <form {...login}>
       {#if data.authorize !== null}
@@ -97,6 +105,8 @@
           autocomplete="username"
           required
           {...login.fields.email.as('email', refusal?.email ?? '')}
+          aria-invalid={refusal === null ? undefined : 'true'}
+          aria-describedby={refusal === null ? undefined : 'refusal'}
         />
       </div>
       <div class="auth-field">
@@ -106,6 +116,8 @@
           autocomplete="current-password"
           required
           {...passwordField.as('password')}
+          aria-invalid={refusal === null ? undefined : 'true'}
+          aria-describedby={refusal === null ? undefined : 'refusal'}
         />
       </div>
       <button
