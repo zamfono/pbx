@@ -24,6 +24,8 @@ why the specified behaviour changed; the commit history, how.
   stack's address and ports, and `asterisk` and `proxy` join it.
 - Asterisk no longer crashes on a configuration change while a TLS trunk connects.
 - Asterisk no longer logs an error about a missing `pjsip_wizard.conf` on every PJSIP reload.
+- The OpenAPI document and the MCP tools list every placeholder a mail template and a `sip`
+  forward target's header may use.
 
 ## [0.3.0] - 2026-10-05
 

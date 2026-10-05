@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+import {
+  SIP_HEADER_NAME_PATTERN,
+  SIP_HEADER_PLACEHOLDERS
+} from '@zamfono/shared';
+
+import { PLACEHOLDERS } from './mail/index.js';
 import { buildOpenApiDocument } from './openapi.js';
 // The real registry, as `/api/v1/openapi.json` serves it.
 import './ops/index.js';
@@ -139,4 +145,53 @@ describe('the OpenAPI responses describe what each operation answers (§10.3)', 
       }
     }
   );
+});
+
+/** Every schema in `node` with a `properties` map, however deep. */
+function schemasWithProperties(node: unknown): Schema[] {
+  if (typeof node !== 'object' || node === null) {
+    return [];
+  }
+  const own = 'properties' in node ? [node as Schema] : [];
+  return [...own, ...Object.values(node).flatMap(schemasWithProperties)];
+}
+
+describe('the OpenAPI descriptions list every placeholder a template may name', () => {
+  it("names each mail kind's placeholders and required ones in PUT /mailTemplates/{kind}/{language}", () => {
+    const body = bodySchema('/mailTemplates/{kind}/{language}', 'put');
+    const { description } = body.properties?.bodyText as {
+      description: string;
+    };
+    for (const [kind, { offered, required }] of Object.entries(PLACEHOLDERS)) {
+      const entry = new RegExp(`${kind}: ([^;]*)`, 'u').exec(description)?.[1];
+      expect(entry, kind).toBeDefined();
+      for (const name of offered) {
+        expect(entry, `${kind} ${name}`).toMatch(
+          new RegExp(`\\b${name}\\b`, 'u')
+        );
+      }
+      for (const name of required) {
+        expect(entry, `${kind} requires ${name}`).toContain(
+          `required: ${name}`
+        );
+      }
+    }
+  });
+
+  it('names every SIP header placeholder in each header value of a forward target', () => {
+    const headers = schemasWithProperties(buildOpenApiDocument()).filter(
+      schema =>
+        (schema.properties?.name as { pattern?: string } | undefined)
+          ?.pattern === SIP_HEADER_NAME_PATTERN.source
+    );
+    expect(headers.length).toBeGreaterThan(0);
+    for (const header of headers) {
+      const { description } = header.properties?.value as {
+        description: string;
+      };
+      for (const name of Object.keys(SIP_HEADER_PLACEHOLDERS)) {
+        expect(description).toContain(`{{${name}}}`);
+      }
+    }
+  });
 });

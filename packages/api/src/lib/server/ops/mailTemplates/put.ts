@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { compileTemplate } from '#lib/server/mail/index.js';
+import { compileTemplate, PLACEHOLDERS } from '#lib/server/mail/index.js';
 
 import { recordChange } from '../audit.js';
 import { defineOperation } from '../types.js';
@@ -12,6 +12,15 @@ import {
   loadOverride,
   mailTemplateWire
 } from './_shared.js';
+
+/** Each kind's placeholders, and the ones it requires, for the bodies' description. */
+const PLACEHOLDER_LIST = Object.entries(PLACEHOLDERS)
+  .map(([kind, { offered, required }]) => {
+    const must =
+      required.length > 0 ? ` (required: ${required.join(', ')})` : '';
+    return `${kind}: ${offered.join(', ')}${must}`;
+  })
+  .join('; ');
 
 const inputSchema = z
   .object({
@@ -25,7 +34,7 @@ const inputSchema = z
       .string()
       .min(1)
       .describe(
-        'The plain-text body: Handlebars {{placeholder}}, if/unless/each/with and {{date value}}; every kind offers companyName, recipientName and fqdn, voicemail adds callerNumber, callerName, mailboxName, receivedAt, durationS, missedCall callerNumber, callerName, receivedAt, didLabel, setup and reset require link (with linkExpiresAt, setup also invitedBy), updateFailed adds fromVersion, toVersion, reason, failedAt, and breakingUpdate currentVersion, version, releaseUrl, publishedAt.'
+        `The plain-text body: Handlebars {{placeholder}}, if/unless/each/with and {{date value}}. The placeholders per kind, which the subject and the bodies share, a required one used in at least one of them: ${PLACEHOLDER_LIST}.`
       ),
     bodyHtml: z
       .string()

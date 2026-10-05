@@ -9,6 +9,7 @@ import { z } from 'zod';
 import {
   parseSipHeaderValue,
   SIP_HEADER_NAME_PATTERN,
+  SIP_HEADER_PLACEHOLDERS,
   SIP_HEADERS_MAX_BYTES,
   sipHeadersSize,
   type SipHeaderTemplate
@@ -24,6 +25,11 @@ const INVITE_BASELINE_BYTES = 1150;
 export const UDP_HEADERS_ROOM_BYTES =
   UDP_INVITE_SAFE_BYTES - INVITE_BASELINE_BYTES;
 
+/** Every placeholder a value may name, as `{{name}}`, for the value's description. */
+const PLACEHOLDER_LIST = Object.keys(SIP_HEADER_PLACEHOLDERS)
+  .map(name => `{{${name}}}`)
+  .join(', ');
+
 const headerSchema = z.object({
   name: z
     .string()
@@ -38,7 +44,7 @@ const headerSchema = z.object({
       }
     })
     .describe(
-      'Literal text with {{placeholder}} substitutions such as {{callerNumber}}, {{did}} or {{calledExtension}}.'
+      `Literal text with {{placeholder}} substitutions, no blocks or helpers; the placeholders: ${PLACEHOLDER_LIST} (see zamfono.help forward-to-ai-agent).`
     )
 });
 
