@@ -15,12 +15,13 @@ arguments:
 # Undo a change
 
 1. If the entry's id is not already known, find it: `audit.list`
-   (`GET /audit?entityKind=&entityId=`) (add `actorUserId`, `channel` or a time range to narrow
-   further). Entries are newest first; `state` defaults to `live` (undone entries are hidden).
-2. Revert it: `audit.undo` (`POST /audit/{id}/undo`). This writes the entry's recorded `from` values
-   back through the entity's own operation, stamps the reverted entry `undoneAt`, and appends a new
-   `audit.undo` entry with the reverse diff — history stays one chronological, append-only sequence;
-   an undo is a revert, never a branch.
+   (`GET /api/v1/audit?entityKind=&entityId=`) (add `actorUserId`, `channel` or a time range to
+   narrow further). Entries are newest first; `state` defaults to `live` (undone entries are
+   hidden).
+2. Revert it: `audit.undo` (`POST /api/v1/audit/{id}/undo`). This writes the entry's recorded `from`
+   values back through the entity's own operation, stamps the reverted entry `undoneAt`, and appends
+   a new `audit.undo` entry with the reverse diff — history stays one chronological, append-only
+   sequence; an undo is a revert, never a branch.
 3. A 409 names why it was refused:
    - a later live change exists for the same entity — undo that one first, then this one;
    - the reverted state would recreate a duplicate (a reused extension, e-mail or DID number) —
@@ -42,4 +43,4 @@ Six operations record what an effect outside Zamfono answered rather than a chan
 blocks undoing an entity's earlier entries.
 
 Several consecutive changes to one entity are peeled back by repeated calls to `audit.undo`
-(`POST /audit/{id}/undo`), oldest surviving change last.
+(`POST /api/v1/audit/{id}/undo`), oldest surviving change last.

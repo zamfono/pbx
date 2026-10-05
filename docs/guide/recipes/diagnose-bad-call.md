@@ -17,14 +17,15 @@ arguments:
 
 # Diagnose a bad call
 
-1. Find the call: `calls.list` (`GET /calls?direction=&from=&to=&userId=&ringGroupId=&status=`).
-   `status` distinguishes answered from missed; a live call in progress is `calls.list`
-   (`GET /calls?live=true`).
+1. Find the call: `calls.list`
+   (`GET /api/v1/calls?direction=&from=&to=&userId=&ringGroupId=&status=`). `status` distinguishes
+   answered from missed; a live call in progress is `calls.list` (`GET /api/v1/calls?live=true`).
 2. Read its routing trace. At the tenant's default diagnostics level (`events`) each call's
    `calls.log` already carries the DID match, the out-of-office and opening-hours evaluation, the
    members rung, who answered or declined, and the fallback taken — narrow the same `calls.list`
-   (`GET /calls`) listing with `from`/`to` and `userId`/`ringGroupId` until the one call stands out,
-   then read it with `calls.get` (`GET /calls/{id}`). The lines that answer the usual questions:
+   (`GET /api/v1/calls`) listing with `from`/`to` and `userId`/`ringGroupId` until the one call
+   stands out, then read it with `calls.get` (`GET /api/v1/calls/{id}`). The lines that answer the
+   usual questions:
    - `ooo`, `hours`: whether an out-of-office rule or opening hours applied; `hours` with
      `schedule: <scope>` names whose opening hours decided (the target's own, or the tenant's it
      falls back to) and `open`; `schedule: null` means no opening hours cover the target.
@@ -71,13 +72,13 @@ arguments:
      `txPackets` counts what Asterisk sent, not what arrived. The far end hears nothing while its
      own leg reads a healthy `txPackets`; ask the person on that side, or read the other leg's
      `rxPackets`, which shows whether audio reached Asterisk to be relayed at all.
-4. For a trunk suspected of failing calls outbound, check `trunks.get` (`GET /trunks/{id}`) for its
-   registration and reachability status before reading its call log; an `unreachable` trunk is
-   skipped in trunk-order failover and in emergency-call dialling alike, and a trunk without
+4. For a trunk suspected of failing calls outbound, check `trunks.get` (`GET /api/v1/trunks/{id}`)
+   for its registration and reachability status before reading its call log; an `unreachable` trunk
+   is skipped in trunk-order failover and in emergency-call dialling alike, and a trunk without
    `emergency` set never carries an emergency call at all (see `emergency-calls`).
 5. Reproduce the call at the raised level, then re-read its trace; drop the override back to the
    tenant default once done, since a diagnostics override left on is a bigger `calls.log` for
    every call the entity takes part in.
 
-`audit.list` (`GET /audit`) shows who raised or lowered the level and when, since a diagnostics
-change is a normal audited mutation.
+`audit.list` (`GET /api/v1/audit`) shows who raised or lowered the level and when, since a
+diagnostics change is a normal audited mutation.

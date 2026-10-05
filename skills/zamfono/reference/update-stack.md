@@ -11,19 +11,19 @@ arguments:
 The owner installs a newer release without a shell on the host. The stack's `updater` service does
 the work; it takes only a published release that is newer than the running one and not breaking.
 
-1. Check what is available: `system.info` (`GET /system/info`). Its `update` field names the
+1. Check what is available: `system.info` (`GET /api/v1/system/info`). Its `update` field names the
    `current` and the `latest` release. `updatable: true` means `system.update` can install it.
    `breaking: true` means the release needs the operator: it is installed on the host with
    `update.sh`, after reading its upgrade notes. `unavailable` says why the updater cannot run at
    all, usually a missing `UPDATER_TOKEN` or `CONTAINER_SOCKET` in `.env`. On a test stack whose
    `ZAMFONO_VERSION` is `edge`, `current` and `latest` both say `edge`, `latest` naming main's
    newest build; `updatable: true` means the stack runs an older one, and the update pulls it.
-2. Back up first: `backups.runs.start` (`POST /backups/runs`) on a target from
-   `backups.targets.list` (`GET /backups/targets`), then read the run with `backups.runs.get`
-   (`GET /backups/runs/{id}`) until its `status` is `ok`. The update is refused without a backup
-   finished `ok` within the last hour, since migrations only go forward and the backup is the way
-   back.
-3. Update: `system.update` (`POST /system/update`), optionally with `version`. It asks for
+2. Back up first: `backups.runs.start` (`POST /api/v1/backups/runs`) on a target from
+   `backups.targets.list` (`GET /api/v1/backups/targets`), then read the run with `backups.runs.get`
+   (`GET /api/v1/backups/runs/{id}`) until its `status` is `ok`. The update is refused without a
+   backup finished `ok` within the last hour, since migrations only go forward and the backup is the
+   way back.
+3. Update: `system.update` (`POST /api/v1/system/update`), optionally with `version`. It asks for
    confirmation and answers as soon as the updater has begun.
 4. Follow it with `system.info`: `update.last.state` goes from `running` to `succeeded` or `failed`,
    with the end of the updater's log in `error`, and `update.last.trigger` says who asked:
@@ -37,19 +37,19 @@ the work; it takes only a published release that is newer than the running one a
 ## Automatic updates
 
 An owner can let the stack take newer non-breaking releases on its own: `settings.update`
-(`PATCH /settings`) with `{ "autoUpdate": true }`; it is off by default. The stack then asks the
-updater every hour. When a release is available, it waits for the next maintenance moment, the
+(`PATCH /api/v1/settings`) with `{ "autoUpdate": true }`; it is off by default. The stack then asks
+the updater every hour. When a release is available, it waits for the next maintenance moment, the
 same quiet time a renewed TLS certificate is swapped in at: the middle of a tenant-wide
 out-of-office period, else of the longest closed period of the opening hours, else
-`settings.tlsReloadHour`, else the hour `TLS_RELOAD_HOUR` in `.env` names, else 03:00. Then it waits until nothing is in progress (no call, no
-parked call, no voicemail being left, no recording), looking again every 5 minutes for up to two
-hours, after which it gives up and waits for the next maintenance moment: it logs a warning and
-writes a `system.maintenanceGate` entry to the audit log with what kept the stack busy (the live
-calls, Asterisk channels and recordings in progress), and `system.info` shows the last such give-up
-in `maintenanceGate.autoUpdate` (`maintenanceGate.certSync` for the certificate). Once the moment
-comes and the stack is idle, it backs up every enabled backup target and then updates exactly as
-`system.update` does; without an enabled target there is no backup, and the update fails with
-`no enabled backup target`.
+`settings.tlsReloadHour`, else the hour `TLS_RELOAD_HOUR` in `.env` names, else 03:00. Then it waits
+until nothing is in progress (no call, no parked call, no voicemail being left, no recording),
+looking again every 5 minutes for up to two hours, after which it gives up and waits for the next
+maintenance moment: it logs a warning and writes a `system.maintenanceGate` entry to the audit log
+with what kept the stack busy (the live calls, Asterisk channels and recordings in progress), and
+`system.info` shows the last such give-up in `maintenanceGate.autoUpdate`
+(`maintenanceGate.certSync` for the certificate). Once the moment comes and the stack is idle, it
+backs up every enabled backup target and then updates exactly as `system.update` does; without an
+enabled target there is no backup, and the update fails with `no enabled backup target`.
 
 A stack still busy when the gate gives up at 3 maintenance moments in a row counts that as a
 failed attempt. A failed automatic update is tried again at a later maintenance moment, at least

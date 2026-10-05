@@ -19,7 +19,7 @@ start the stack.
   stack, so it restores a broken database or a bad upgrade, but a lost host takes it along; that
   is what a target elsewhere is for.
 - **The restic repository location and password for each other target**, from the operator's own record of
-  what was entered in `backups.targets.create` (`POST /backups/targets`) when the target was
+  what was entered in `backups.targets.create` (`POST /api/v1/backups/targets`) when the target was
   created, or an out-of-band copy kept alongside `.env` — a target's encrypted repository password
   lives inside the database itself, so it is not available until after a restic-based restore has
   already produced that database.
@@ -105,7 +105,7 @@ the last restic snapshot.
 Migrations only go forward, so a bad release is undone on its own host by restoring the
 snapshot the upgrade began with, the backup run taken right before it:
 
-1. Note that run's `snapshotId` from `backups.runs.list` (`GET /backups/runs`), or find the
+1. Note that run's `snapshotId` from `backups.runs.list` (`GET /api/v1/backups/runs`), or find the
    snapshot in the list `restic snapshots` prints in place of the `restic restore` command of
    step 4.
 2. Stop the stack, as above, and unpack the previous release's bundle (step 2). Where `.env`
@@ -122,7 +122,7 @@ snapshot the upgrade began with, the backup run taken right before it:
   updates.
 - The replication bucket needs server-side encryption — the WAL stream itself is not
   client-side encrypted, unlike the restic repository.
-- `backups.runs.list` (`GET /backups/runs`) and the `backup.finished`/`backup.failed` events show
-  the age and status of the restic runs a restore would fall back to. A run's `bytesTotal` is its
-  snapshot's full size; `bytesAdded` is only what it uploaded after deduplication, so a run far
+- `backups.runs.list` (`GET /api/v1/backups/runs`) and the `backup.finished`/`backup.failed` events
+  show the age and status of the restic runs a restore would fall back to. A run's `bytesTotal` is
+  its snapshot's full size; `bytesAdded` is only what it uploaded after deduplication, so a run far
   smaller than the one before it is the usual case, not an incomplete backup.

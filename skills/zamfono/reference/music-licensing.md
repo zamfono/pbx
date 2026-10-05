@@ -17,7 +17,7 @@ fees.
 | Morning Coffee | Manolo Camp  | `manolo_camp-morning_coffee` |
 | System         | Reno Project | `reno_project-system`        |
 
-Music a tenant uploads through `audio.create` (`POST /audio`) (kind `moh`) and sets as
+Music a tenant uploads through `audio.create` (`POST /api/v1/audio`) (kind `moh`) and sets as
 `settings.holdMohAudioId` or a ring group's `mohAudioId` is the tenant's own licensing matter — a
 track from a personal music library, a jingle a marketing agency produced, or anything else the
 tenant did not clear for commercial phone-system playback can attract a GEMA/AKM claim or a

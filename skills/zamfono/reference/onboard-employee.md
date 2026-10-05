@@ -14,30 +14,30 @@ arguments:
 
 # Onboard an employee
 
-1. Create the user: `users.create` (`POST /users`) with `name`, `email` and, optionally,
+1. Create the user: `users.create` (`POST /api/v1/users`) with `name`, `email` and, optionally,
    `extension`. The response carries a one-time set-password link; with no mail relay configured,
    pass that link on to the employee yourself.
-2. Create their first device: `devices.create` (`POST /users/{id}/devices`).
-   - With the `manual` provisioning provider, the response carries the device's
-     `connectionSettings` (server, transport and port, SIP username and password, and the rest a
-     phone asks for) once — record them now, or use `devices.revealCredentials`
-     (`GET /devices/{id}/credentials`) later, which is audited as a reveal — and hand them to the
-     employee for their softphone (see `tested-softphones`) or desk phone.
+2. Create their first device: `devices.create` (`POST /api/v1/users/{id}/devices`).
+   - With the `manual` provisioning provider, the response carries the device's `connectionSettings`
+     (server, transport and port, SIP username and password, and the rest a phone asks for) once —
+     record them now, or use `devices.revealCredentials` (`GET /api/v1/devices/{id}/credentials`)
+     later, which is audited as a reveal — and hand them to the employee for their softphone (see
+     `tested-softphones`) or desk phone.
    - With `ringotel`, the credentials are pushed to Ringotel instead of returned, and the device
      onboards through Ringotel's own activation e-mail and QR code; no credentials need to be
      typed in by hand. The stack must be connected to Ringotel first (`ringotel-setup`). A
      `warnings` entry in the response means the device did not reach Ringotel: Ringotel refused
      it, or Ringotel is not set up yet; it says which. Either way `audit.list` holds a
      `ringotel.push` entry on the device with the outcome.
-3. Set forwarding, if the role needs it, with `users.setForwarding` (`PUT /users/{id}/forwarding`) —
-   the classic unconditional/busy/no-answer/DND/offline rules, each a forward target
-   (`mental-model`). The employee can read theirs with `users.getForwarding`
-   (`GET /users/{id}/forwarding`) and set their own later with the same `PUT`, any target but a
-   new `sip` one (`guardrails`); an external forward is dialled as their own call, so it reaches
-   only numbers their outbound routes carry.
+3. Set forwarding, if the role needs it, with `users.setForwarding`
+   (`PUT /api/v1/users/{id}/forwarding`) — the classic unconditional/busy/no-answer/DND/offline
+   rules, each a forward target (`mental-model`). The employee can read theirs with
+   `users.getForwarding` (`GET /api/v1/users/{id}/forwarding`) and set their own later with the same
+   `PUT`, any target but a new `sip` one (`guardrails`); an external forward is dialled as their own
+   call, so it reaches only numbers their outbound routes carry.
 4. Add the employee to any ring group they belong to via `ringGroups.update`
-   (`PATCH /ringGroups/{id}`) with the group's updated `members` list.
+   (`PATCH /api/v1/ringGroups/{id}`) with the group's updated `members` list.
 
 Every step above is one audited, undoable operation (`guardrails`); a mistake in extension,
-forwarding or group membership is undone with `audit.undo` (`POST /audit/{id}/undo`) rather than
-redone by hand.
+forwarding or group membership is undone with `audit.undo` (`POST /api/v1/audit/{id}/undo`) rather
+than redone by hand.

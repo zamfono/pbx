@@ -18,7 +18,7 @@ the call and tells the model what to do. That webhook and the accept call are yo
 outside the stack; this recipe gets the call to OpenAI. OpenAI's guide:
 <https://developers.openai.com/api/docs/guides/realtime-sip>.
 
-1. Create a trunk for the endpoint: `trunks.create` (`POST /trunks`) with
+1. Create a trunk for the endpoint: `trunks.create` (`POST /api/v1/trunks`) with
    - `"name": "OpenAI Realtime"`, `"emergency": false` (it carries no emergency calls),
      `"authMode": "ip"`;
    - `"transport": "tls"`, `"tlsVerify": true` (OpenAI presents a publicly trusted certificate;
@@ -31,25 +31,25 @@ outside the stack; this recipe gets the call to OpenAI. OpenAI's guide:
      `outbound`, since OpenAI never calls the stack, and the port given, since the endpoint is
      reached on 5061 directly.
 
-   The trunk needs no outbound route, and should get none: a `sip` target dials it directly, and
-   a route would let ordinary outbound calls leave over it. If it is the tenant's first trunk, the
+   The trunk needs no outbound route, and should get none: a `sip` target dials it directly, and a
+   route would let ordinary outbound calls leave over it. If it is the tenant's first trunk, the
    catch-all route created with it points at it; move that route to the carrier's trunk with
-   `outboundRoutes.replace` (`PUT /outboundRoutes`). Check the trunk's `status` with `trunks.get`
-   (`GET /trunks/{id}`) a minute after creating it: an `ip` trunk whose host does not answer the
-   stack's OPTIONS probe, sent every 60 seconds, turns `unreachable`, and calls are then not sent
-   to it. If it stays `unreachable` although OpenAI takes calls, the endpoint ignores OPTIONS:
-   a test call (step 6) then shows an `attempt` line with the cause `unreachable` and no SIP
-   code, since no INVITE was sent. Switch the probe off with `trunks.update`
-   (`PATCH /trunks/{id}`) and `"qualify": false`; the trunk then reads `unmonitored`, every call
-   is sent to it, and a call OpenAI refuses fails with OpenAI's own answer. Leave `qualify` on
+   `outboundRoutes.replace` (`PUT /api/v1/outboundRoutes`). Check the trunk's `status` with
+   `trunks.get` (`GET /api/v1/trunks/{id}`) a minute after creating it: an `ip` trunk whose host
+   does not answer the stack's OPTIONS probe, sent every 60 seconds, turns `unreachable`, and calls
+   are then not sent to it. If it stays `unreachable` although OpenAI takes calls, the endpoint
+   ignores OPTIONS: a test call (step 6) then shows an `attempt` line with the cause `unreachable`
+   and no SIP code, since no INVITE was sent. Switch the probe off with `trunks.update`
+   (`PATCH /api/v1/trunks/{id}`) and `"qualify": false`; the trunk then reads `unmonitored`, every
+   call is sent to it, and a call OpenAI refuses fails with OpenAI's own answer. Leave `qualify` on
    while the trunk reads `registered`: it is what tells you the endpoint is down.
 
 2. Point a forward target at the agent: `{ "kind": "sip", "trunkId": "<the trunk's id>", "user":
 "<project id>" }`. The `user` is the part before the `@`, 1 to 64 letters, digits and
    `. _ ~ + -`. It works wherever a target does, for example
-   - a number answered by the agent: `dids.update` (`PATCH /dids/{id}`) with it as `target`;
+   - a number answered by the agent: `dids.update` (`PATCH /api/v1/dids/{id}`) with it as `target`;
    - a person's calls when they do not pick up: `users.setForwarding`
-     (`PUT /users/{id}/forwarding`) with a `noAnswer` rule to it;
+     (`PUT /api/v1/users/{id}/forwarding`) with a `noAnswer` rule to it;
    - an out-of-office rule, closed opening hours, a menu option or a ring group's fallback.
 
    Only an admin or owner sets one; a user editing their own forwarding, out-of-office rule or
@@ -90,7 +90,7 @@ outside the stack; this recipe gets the call to OpenAI. OpenAI's guide:
    | `{{forwardedByName}}`      | their name                                                                              |
    | `{{forwardReason}}`        | why: `outOfOffice`, `closed`, `unconditional`, `busy`, `noAnswer`, `unavailable`, `dnd` |
    | `{{hopCount}}`             | how many times the call was forwarded                                                   |
-   | `{{callId}}`               | the call's id, as `calls.get` (`GET /calls/{id}`) knows it                              |
+   | `{{callId}}`               | the call's id, as `calls.get` (`GET /api/v1/calls/{id}`) knows it                       |
    | `{{direction}}`            | `inbound` or `internal`                                                                 |
    | `{{language}}`             | the company's language, such as `de`                                                    |
    | `{{startedAt}}`            | when the call started, such as `2026-09-30T12:00:00.000Z`                               |
@@ -130,7 +130,7 @@ outside the stack; this recipe gets the call to OpenAI. OpenAI's guide:
 
    A call from a DID straight to the agent carries no `Diversion`, since nobody forwarded it.
 
-6. Test it: call the number, then read the call with `calls.get` (`GET /calls/{id}`). Its trace
-   has one `attempt` line with `"routeId": null`, the trunk's id and the outcome (`answered`, or
-   the SIP code OpenAI refused with). A `sipTarget` line with `trunkMissing` or `noOutboundHost`
+6. Test it: call the number, then read the call with `calls.get` (`GET /api/v1/calls/{id}`). Its
+   trace has one `attempt` line with `"routeId": null`, the trunk's id and the outcome (`answered`,
+   or the SIP code OpenAI refused with). A `sipTarget` line with `trunkMissing` or `noOutboundHost`
    means the trunk was deleted or lost its outbound host, and the call was released with 503.

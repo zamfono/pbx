@@ -10,16 +10,17 @@ that keeps a connection open.
 
 All webhook operations are `admin`.
 
-- `webhooks.create` (`POST /webhooks`) takes `url` (`http` or `https`), `secret` (any non-empty
-  string, write-only) and an optional `eventTypes` filter. A new hook is always created
+- `webhooks.create` (`POST /api/v1/webhooks`) takes `url` (`http` or `https`), `secret` (any
+  non-empty string, write-only) and an optional `eventTypes` filter. A new hook is always created
   **inactive**, so nothing is POSTed to a receiver that is not deployed yet.
-- `webhooks.update` (`PATCH /webhooks/{id}`) changes `url`, `secret` or `eventTypes`, and switches
-  delivery on and off with `active`. `{ "active": true }` once the receiver verifies signatures.
-- `webhooks.list` (`GET /webhooks`) lists the hooks with `eventTypes`, `active`, `lastStatus`,
-  `lastDeliveryAt` and the failure fields below; the secret never appears in a read, only
-  `secretSet`.
-- `webhooks.delete` (`DELETE /webhooks/{id}`) soft-deletes a hook (`guardrails`); nothing more is
-  delivered to it.
+- `webhooks.update` (`PATCH /api/v1/webhooks/{id}`) changes `url`, `secret` or `eventTypes`, and
+  switches delivery on and off with `active`. `{ "active": true }` once the receiver verifies
+  signatures.
+- `webhooks.list` (`GET /api/v1/webhooks`) lists the hooks with `eventTypes`, `active`,
+  `lastStatus`, `lastDeliveryAt` and the failure fields below; the secret never appears in a read,
+  only `secretSet`.
+- `webhooks.delete` (`DELETE /api/v1/webhooks/{id}`) soft-deletes a hook (`guardrails`); nothing
+  more is delivered to it.
 
 `eventTypes` is a list of the type names below, such as `["call.state", "voicemail.new"]`; `null`
 or left out delivers every event. On `webhooks.update`, `null` clears the filter and leaving the

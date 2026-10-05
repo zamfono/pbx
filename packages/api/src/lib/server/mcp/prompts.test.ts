@@ -40,7 +40,9 @@ describe('prompts/get, 2026-07-28', () => {
       _meta: SERVER_INFO_META
     });
     const text = (body.result as PromptBody).messages[0]?.content.text;
-    expect(text).toContain('Create the user: `users.create` (`POST /users`)');
+    expect(text).toContain(
+      'Create the user: `users.create` (`POST /api/v1/users`)'
+    );
     expect(text).not.toContain('required: true');
     expect(text).toMatch(
       /Parameters:\n- employeeName: "Jane Doe"\n- email: "jane@example\.com"$/u

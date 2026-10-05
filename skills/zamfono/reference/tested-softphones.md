@@ -1,10 +1,10 @@
 # Tested bring-your-own softphones
 
 The `manual` provisioning provider works with any SIP softphone or desk phone: `devices.create`
-(`POST /users/{id}/devices`) returns the device's `connectionSettings` once, and they are entered
-into the client by hand. `devices.revealCredentials` (`GET /devices/{id}/credentials`, admin,
-audited) returns the same set later; after `devices.rotate` (`POST /devices/{id}/rotate`) only the
-`password` changes.
+(`POST /api/v1/users/{id}/devices`) returns the device's `connectionSettings` once, and they are
+entered into the client by hand. `devices.revealCredentials`
+(`GET /api/v1/devices/{id}/credentials`, admin, audited) returns the same set later; after
+`devices.rotate` (`POST /api/v1/devices/{id}/rotate`) only the `password` changes.
 
 | Field             | Meaning                                                                    |
 | ----------------- | -------------------------------------------------------------------------- |

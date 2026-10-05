@@ -10,8 +10,8 @@ and of the same length (`settings.extLength`). Nine are seeded at first boot: `7
 zeros and the digits 1 to 9, so `71` to `79` for two-digit extensions, `701` to `709` for three,
 `7001` to `7009` for four. Slots are tenant-wide; nobody owns one.
 
-- `parking.get` (`GET /parking/slots`) returns `{ "slots": ["71", …] }`.
-- `parking.set` (`PUT /parking/slots`) replaces the set as a whole with
+- `parking.get` (`GET /api/v1/parking/slots`) returns `{ "slots": ["71", …] }`.
+- `parking.set` (`PUT /api/v1/parking/slots`) replaces the set as a whole with
   `{ "slots": [...] }`. A slot of the wrong length or listed twice is refused with 422, and one
   that is already a user's or ring group's extension with 409 naming its owner. Removing a slot
   also removes the BLF keys devices had for it; the audit entry records them and `audit.undo`
@@ -48,19 +48,19 @@ calls whose parker it no longer knows. The parker appears in the call's routing 
 
 The same park and retrieve, for an integration or the MCP assistant:
 
-- `calls.park` (`POST /calls/{id}/park`) parks the other party of a live call exactly as `*70`
-  does: the hold music, the lowest free slot, the parker's leg hung up, the ring-back on timeout.
-  No phone hears the slot read out, so the result carries it: `{ "id": "…", "slot": "71" }`. A
-  `user` parks a call they are connected in; `legId` names the leg parked, its other side the
-  parker the ring-back rings, which an admin not in the call must give (`call-control`). Refused
-  with 409 `noFreeSlot` when every slot is taken, `noParker` when the named leg's other side is no
-  user's, `notBridged` for a call not yet answered or for the call of a party added to another,
-  which shares that call's conversation.
-- `parking.list` (`GET /parking/calls`) lists the calls parked right now to every user, as every
-  phone's BLF shows every slot: `slot`, `callId`, `caller` (the parked party's number, `null` when
-  they withheld it), `parkedAt` and `parkedByUserId`.
-- Retrieve by dialling the slot: `calls.originate` (`POST /calls`) with the slot as `target` rings
-  the user's own phones, and the one that answers takes the call, as dialling the slot from it
+- `calls.park` (`POST /api/v1/calls/{id}/park`) parks the other party of a live call exactly as
+  `*70` does: the hold music, the lowest free slot, the parker's leg hung up, the ring-back on
+  timeout. No phone hears the slot read out, so the result carries it:
+  `{ "id": "…", "slot": "71" }`. A `user` parks a call they are connected in; `legId` names the leg
+  parked, its other side the parker the ring-back rings, which an admin not in the call must give
+  (`call-control`). Refused with 409 `noFreeSlot` when every slot is taken, `noParker` when the
+  named leg's other side is no user's, `notBridged` for a call not yet answered or for the call of a
+  party added to another, which shares that call's conversation.
+- `parking.list` (`GET /api/v1/parking/calls`) lists the calls parked right now to every user, as
+  every phone's BLF shows every slot: `slot`, `callId`, `caller` (the parked party's number, `null`
+  when they withheld it), `parkedAt` and `parkedByUserId`.
+- Retrieve by dialling the slot: `calls.originate` (`POST /api/v1/calls`) with the slot as `target`
+  rings the user's own phones, and the one that answers takes the call, as dialling the slot from it
   would (`click-to-dial`). Any user may.
 
 A parked call has nobody connected in it, the parker having left, so `calls.hangup` ends it for an
@@ -72,4 +72,4 @@ parked call itself again and may hang it up or transfer it like any call they ar
 Each slot has a BLF hint that reads in use while a call is parked there, so a lamp per slot shows
 where the waiting callers are. On a `manual` device the lamps are configured on the phone itself;
 on a Ringotel device, add the slots to the device's BLF list with `devices.setBlf`
-(`PUT /devices/{id}/blf`).
+(`PUT /api/v1/devices/{id}/blf`).

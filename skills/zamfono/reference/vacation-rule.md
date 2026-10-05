@@ -24,16 +24,16 @@ arguments:
 calls too — a colleague dialling an absent person's extension reaches the same target an outside
 caller would.
 
-1. Check for an overlapping active period first with `ooo.list` (`GET /users/{id}/ooo`) (or the
-   `ringGroups`, `menus` or `tenant` equivalent) — active periods in one scope must not overlap, and
-   the write is refused if they do.
-2. Create the rule: `ooo.create` (`POST /users/{id}/ooo`) (or the matching scoped path) with
+1. Check for an overlapping active period first with `ooo.list` (`GET /api/v1/users/{id}/ooo`) (or
+   the `ringGroups`, `menus` or `tenant` equivalent) — active periods in one scope must not overlap,
+   and the write is refused if they do.
+2. Create the rule: `ooo.create` (`POST /api/v1/users/{id}/ooo`) (or the matching scoped path) with
    `active: true`, optional `startsAt`/`expiresAt`, and `target`. Most often that is a mailbox,
    `{ "kind": "mailboxUser", "userId": "…" }`, or a colleague covering the desk,
    `{ "kind": "external", "external": "+49…" }`.
-3. To end the vacation early, `ooo.update` (`PATCH /ooo/{id}`) with `active: false`, or `ooo.delete`
-   (`DELETE /ooo/{id}`).
+3. To end the vacation early, `ooo.update` (`PATCH /api/v1/ooo/{id}`) with `active: false`, or
+   `ooo.delete` (`DELETE /api/v1/ooo/{id}`).
 
 Every write is undoable (`guardrails`): reactivating an ended rule, or restoring the previous
-target, is `audit.undo` (`POST /audit/{id}/undo`) on the corresponding entry rather than a fresh
-write.
+target, is `audit.undo` (`POST /api/v1/audit/{id}/undo`) on the corresponding entry rather than a
+fresh write.

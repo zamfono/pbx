@@ -9,10 +9,10 @@ A contact is a tenant-wide phone-book entry: `displayName`, optional `company` a
 `phones`, a list of `{ "label": "Mobile", "number": "+43 664 1234567" }`. Every user sees the
 same book; there are no personal contacts.
 
-- `contacts.list` (`GET /contacts`, paginated, by name) and `contacts.get` (`GET /contacts/{id}`)
-  are open to every user.
-- `contacts.create` (`POST /contacts`), `contacts.update` (`PATCH /contacts/{id}`) and
-  `contacts.delete` (`DELETE /contacts/{id}`, a soft delete, `guardrails`) are `admin`.
+- `contacts.list` (`GET /api/v1/contacts`, paginated, by name) and `contacts.get`
+  (`GET /api/v1/contacts/{id}`) are open to every user.
+- `contacts.create` (`POST /api/v1/contacts`), `contacts.update` (`PATCH /api/v1/contacts/{id}`) and
+  `contacts.delete` (`DELETE /api/v1/contacts/{id}`, a soft delete, `guardrails`) are `admin`.
 
 **Numbers are normalized on write**, like a DID's: spaces, dashes and brackets are dropped and a
 national number becomes international with `settings.country`, so `0664 123 45 67` for an
@@ -42,8 +42,8 @@ instance with `search.query`.
 
 ## Search
 
-`search.query` (`GET /search?q=`, role `user`) is the type-ahead behind a search bar: one query,
-matched case-insensitively as a substring, against
+`search.query` (`GET /api/v1/search?q=`, role `user`) is the type-ahead behind a search bar: one
+query, matched case-insensitively as a substring, against
 
 - users: name and extension, and e-mail for an `admin` or `owner`;
 - ring groups: name and extension;

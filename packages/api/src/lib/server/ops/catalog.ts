@@ -2,14 +2,14 @@
 // the catalog below reflects every operation regardless of what else has run first.
 import './index.js';
 
-import { routes } from '../restRoutes.js';
+import { API_PREFIX, routes } from '../restRoutes.js';
 import { registry } from './registry.js';
 
 /** The REST endpoints (§10.3) that reach `op`, or a dash for an operation only MCP and the UI call. */
 function restColumn(op: string): string {
   const endpoints = routes
     .filter(route => route.op === op)
-    .map(route => `\`${route.method} ${route.pattern}\``);
+    .map(route => `\`${route.method} ${API_PREFIX}${route.pattern}\``);
   return endpoints.length === 0 ? '—' : endpoints.join(', ');
 }
 

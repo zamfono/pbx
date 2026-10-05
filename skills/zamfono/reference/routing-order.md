@@ -5,10 +5,10 @@ Every call — inbound from a trunk, internal between colleagues, or re-entering
 
 ## Inbound and internal pipeline
 
-1. **Entry.** A caller on the blocklist, which `blockedNumbers.create` (`POST /blockedNumbers`)
-   fills, is rejected outright. An inbound call resolves its DID to a forward target, or falls to
-   the fallback of the number block it lies in or the tenant fallback when no `dids` row matches,
-   most precise match first (`numbers`). An internal call targets the
+1. **Entry.** A caller on the blocklist, which `blockedNumbers.create`
+   (`POST /api/v1/blockedNumbers`) fills, is rejected outright. An inbound call resolves its DID to
+   a forward target, or falls to the fallback of the number block it lies in or the tenant fallback
+   when no `dids` row matches, most precise match first (`numbers`). An internal call targets the
    dialled extension directly. A withheld caller number is checked against the target's
    `rejectAnonymous` setting (self-service per user, tenant-wide default otherwise) before anything
    else runs.

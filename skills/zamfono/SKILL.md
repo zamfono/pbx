@@ -31,8 +31,8 @@ this paragraph.
 
 `reference/tools.md` lists every operation, generated from the stack's own operation registry and
 REST route table so it never drifts from either. An operation's name is the MCP tool's name: the
-guide writes a step as `` `users.create` (`POST /users`) ``, where the first is the tool to call
-and the parenthesis the same call over REST. The `zamfono.help` tool itself is not an operation
+guide writes a step as `` `users.create` (`POST /api/v1/users`) ``, where the first is the tool to
+call and the parenthesis the same call over REST. The `zamfono.help` tool itself is not an operation
 and so is not in that list; see below for it.
 
 ## Working with the stack

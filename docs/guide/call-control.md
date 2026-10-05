@@ -15,7 +15,7 @@ the history still names them as its caller. `admin` and `owner` control every ca
 else is refused with 403 (`guardrails`). Declining is different: it acts only on the requesting
 user's own ringing phones.
 
-Each call in progress that `calls.list` (`GET /calls?live=true`) returns carries `callId`,
+Each call in progress that `calls.list` (`GET /api/v1/calls?live=true`) returns carries `callId`,
 `direction`, `from`, `to`, `state` (`ringing` or `up`), `startedAt`, `ringGroupId`, `userIds`:
 the users the call concerns now, its caller, callee and answerer and everyone whose phone rings
 or is connected in it, so a CRM can tell whose call it is, and `legs`, the parties in it now.
@@ -43,18 +43,19 @@ a target nobody could answer on, such as a parking slot or a feature code.
 
 ## Blind transfer, pickup, hangup
 
-- `calls.transfer` (`POST /calls/{id}/transfer`) with `{ "target": "102" }` hands the other party
-  on to an extension or number as a new call, routed as yours.
-- `calls.pickup` (`POST /calls/{id}/pickup`) takes a call ringing for someone else on your phones,
-  as `*8` does.
-- `calls.hangup` (`POST /calls/{id}/hangup`) ends a call for everyone in it.
-- `calls.originate` (`POST /calls`) is click-to-dial: your phones ring first, then the target.
+- `calls.transfer` (`POST /api/v1/calls/{id}/transfer`) with `{ "target": "102" }` hands the other
+  party on to an extension or number as a new call, routed as yours.
+- `calls.pickup` (`POST /api/v1/calls/{id}/pickup`) takes a call ringing for someone else on your
+  phones, as `*8` does.
+- `calls.hangup` (`POST /api/v1/calls/{id}/hangup`) ends a call for everyone in it.
+- `calls.originate` (`POST /api/v1/calls`) is click-to-dial: your phones ring first, then the
+  target.
 
 ## Hold and resume
 
-`calls.hold` (`POST /calls/{id}/hold`) puts the other party on hold: they hear the hold music
+`calls.hold` (`POST /api/v1/calls/{id}/hold`) puts the other party on hold: they hear the hold music
 (`settings.holdMohAudioId`, else the built-in default), and you and they no longer hear each
-other. `calls.resume` (`POST /calls/{id}/resume`) brings them back.
+other. `calls.resume` (`POST /api/v1/calls/{id}/resume`) brings them back.
 
 The hold happens in the PBX, not on the phone, so the phone does not show it, and its own hold
 button is a separate matter: pressing it, or resuming on the phone, does not end a hold made
@@ -64,11 +65,11 @@ would otherwise.
 
 ## Attended transfer
 
-1. `calls.consult` (`POST /calls/{id}/consult`) with `{ "target": "102" }` puts the other party
-   on hold and dials the target from you, an extension or a number, as your phone would dial it.
-   The answer carries `callId`, the consultation call's id. You hear nothing while it rings.
+1. `calls.consult` (`POST /api/v1/calls/{id}/consult`) with `{ "target": "102" }` puts the other
+   party on hold and dials the target from you, an extension or a number, as your phone would dial
+   it. The answer carries `callId`, the consultation call's id. You hear nothing while it rings.
 2. Once the target answers, you talk to them; the other party still hears the hold music.
-3. `calls.transfer` (`POST /calls/{id}/transfer`) with `{ "toCallId": "<callId>" }` joins the
+3. `calls.transfer` (`POST /api/v1/calls/{id}/transfer`) with `{ "toCallId": "<callId>" }` joins the
    held party to the target and takes you out of both calls. As with a phone's own attended
    transfer, the original call's history entry closes, and the consultation's entry carries the
    conversation on with `parentCallId` set to the original call.
@@ -86,19 +87,19 @@ line of yours would hear it. A second `calls.consult` while one is in progress i
 
 ## Three-way calls
 
-`calls.addParty` (`POST /calls/{id}/parties`) with `{ "target": "103" }` does what `*5103` does
-from a phone: it dials the target from you and, once they answer, adds them to the call, so all
+`calls.addParty` (`POST /api/v1/calls/{id}/parties`) with `{ "target": "103" }` does what `*5103`
+does from a phone: it dials the target from you and, once they answer, adds them to the call, so all
 three talk. The answer carries `callId`, the added party's own call, whose history entry has
 `parentCallId` set to the call they joined ("Ben joined at 14:02"), and whose recording follows
-their own flags. The added party hanging up leaves the other two talking; you hanging up ends
-the call for everyone. Like the consultation, it only rings its target.
+their own flags. The added party hanging up leaves the other two talking; you hanging up ends the
+call for everyone. Like the consultation, it only rings its target.
 
 ## Declining a call
 
-`calls.decline` (`POST /calls/{id}/decline`) declines a call ringing for you, as declining it on
-your phone would: your phones stop ringing for it. A call to you directly then goes on to your
+`calls.decline` (`POST /api/v1/calls/{id}/decline`) declines a call ringing for you, as declining it
+on your phone would: your phones stop ringing for it. A call to you directly then goes on to your
 `noAnswer` rule (your mailbox by default, `routing-order`). A ring group drops you and rings its
-other members: with the group's `allowReject` on, the default, a sequential group moves on at
-once and the group's fallback comes early once every member declined; with it off, the group
-rings on to its timeout. It acts only on your own ring, never someone else's, and answers 409
-`notRinging` when none of your phones rings for the call.
+other members: with the group's `allowReject` on, the default, a sequential group moves on at once
+and the group's fallback comes early once every member declined; with it off, the group rings on to
+its timeout. It acts only on your own ring, never someone else's, and answers 409 `notRinging` when
+none of your phones rings for the call.

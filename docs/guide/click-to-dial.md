@@ -6,7 +6,7 @@ exactly as if the user had dialled it there.
 
 ## Placing the call
 
-`calls.originate` (`POST /calls`) with `{ "target": "+43 1 2345678" }` rings every registered
+`calls.originate` (`POST /api/v1/calls`) with `{ "target": "+43 1 2345678" }` rings every registered
 phone of the caller, for their own `ringTimeoutS`. Once one answers, the stack dials `target` from
 it: an extension rings that colleague or ring group, an external number leaves through the
 outbound routes with the user's caller ID, CLIR and the trunk's channel cap, and an emergency

@@ -2,14 +2,15 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { routes } from '../restRoutes.js';
+import { API_PREFIX, routes } from '../restRoutes.js';
 
 /**
  * The admin guide (`docs/guide`, served by `zamfono.help` and copied into the skill) names each
  * step by its operation, which is the MCP tool's name (§10.5), with the REST call in parentheses:
- * `` `users.create` (`POST /users`) ``. A REST call the route table does not have, or one named
- * without its operation, or with another operation's, fails here, so an MCP client reading the
- * guide always learns which tool to call.
+ * `` `users.create` (`POST /api/v1/users`) ``, the path as a client sends it. A REST call the route
+ * table does not have, one without the `/api/v1` prefix, one named without its operation, or with
+ * another operation's, fails here, so an MCP client reading the guide always learns which tool to
+ * call and where to send the request.
  */
 const GUIDE_DIR = path.resolve(
   import.meta.dirname,
@@ -60,7 +61,8 @@ describe('the admin guide’s REST references', () => {
         return [];
       }
       const route = routes.find(
-        candidate => `${candidate.method} ${candidate.pattern}` === endpoint
+        candidate =>
+          `${candidate.method} ${API_PREFIX}${candidate.pattern}` === endpoint
       );
       if (route === undefined) {
         return [`${file}: ${endpoint} is not a REST route`];

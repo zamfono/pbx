@@ -26,6 +26,7 @@ why the specified behaviour changed; the commit history, how.
 - Asterisk no longer logs an error about a missing `pjsip_wizard.conf` on every PJSIP reload.
 - The OpenAPI document and the MCP tools list every placeholder a mail template and a `sip`
   forward target's header may use.
+- The help topics (`zamfono.help`) and the admin skill name REST calls with their `/api/v1` prefix.
 
 ## [0.3.0] - 2026-10-05
 

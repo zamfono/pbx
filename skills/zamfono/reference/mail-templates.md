@@ -16,16 +16,17 @@ language is kept but used only once `settings.language` is switched to it.
 
 All template operations are `admin`.
 
-- `mailTemplates.list` (`GET /mailTemplates`) returns the effective template of every kind in the
-  tenant language, each with `source` `builtin` or `tenant`.
-- `mailTemplates.get` (`GET /mailTemplates/{kind}/{language}`) returns one, in any language.
-- `mailTemplates.put` (`PUT /mailTemplates/{kind}/{language}`) stores an override with `subject`,
-  `bodyText` and optionally `bodyHtml` (`null` or left out sends text only). It replaces any
-  earlier override of that kind and language as a whole.
-- `mailTemplates.delete` (`DELETE /mailTemplates/{kind}/{language}`) removes the override, so the
-  builtin template applies again; 404 when there is none. Both writes are undoable (`guardrails`).
-- `mailTemplates.test` (`POST /mailTemplates/{kind}/test`) sends the effective template, in the
-  tenant language, to the caller's own address with sample values, and answers `status`.
+- `mailTemplates.list` (`GET /api/v1/mailTemplates`) returns the effective template of every kind in
+  the tenant language, each with `source` `builtin` or `tenant`.
+- `mailTemplates.get` (`GET /api/v1/mailTemplates/{kind}/{language}`) returns one, in any language.
+- `mailTemplates.put` (`PUT /api/v1/mailTemplates/{kind}/{language}`) stores an override with
+  `subject`, `bodyText` and optionally `bodyHtml` (`null` or left out sends text only). It replaces
+  any earlier override of that kind and language as a whole.
+- `mailTemplates.delete` (`DELETE /api/v1/mailTemplates/{kind}/{language}`) removes the override, so
+  the builtin template applies again; 404 when there is none. Both writes are undoable
+  (`guardrails`).
+- `mailTemplates.test` (`POST /api/v1/mailTemplates/{kind}/test`) sends the effective template, in
+  the tenant language, to the caller's own address with sample values, and answers `status`.
 
 Read the builtin template with `mailTemplates.get` before writing an override: it is the best
 starting point and shows the branches the kind needs.
@@ -78,8 +79,8 @@ A user's mailbox mails its user; a ring-group mailbox mails every member, nested
 included, in blind copy. Mail needs a relay (`settings.smtpHost` and the related settings, owner
 only). Without one nothing is sent, `mailTemplates.test` answers `skipped`, voicemail and
 missed-call mails are dropped (MWI and the `voicemail.new` event still happen, `webhooks`), and
-`users.create` (`POST /users`) and `users.resetPassword` (`POST /users/{id}/resetPassword`) return
-the set-password link for the admin to pass on, as they do with a relay too. A failing relay is
-retried in process over about three and a half minutes before the mail is dropped and `test`
-answers `failed`, so a test against a broken relay takes that long to return. `sent` means the
-relay accepted the mail, not that it arrived.
+`users.create` (`POST /api/v1/users`) and `users.resetPassword`
+(`POST /api/v1/users/{id}/resetPassword`) return the set-password link for the admin to pass on, as
+they do with a relay too. A failing relay is retried in process over about three and a half minutes
+before the mail is dropped and `test` answers `failed`, so a test against a broken relay takes that
+long to return. `sent` means the relay accepted the mail, not that it arrived.

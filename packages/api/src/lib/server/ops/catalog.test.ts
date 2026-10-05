@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { routes } from '../restRoutes.js';
+import { API_PREFIX, routes } from '../restRoutes.js';
 import { catalogLines } from './catalog.js';
 import { registry } from './registry.js';
 
@@ -22,7 +22,7 @@ describe('catalogLines', () => {
     expect(registry.size).toBeGreaterThan(0);
     expect(registry.has('users.create')).toBe(true);
     expect(catalogLines()).toContain(
-      '| `users.create` | `POST /users` | Creates a user, assigns their extension and returns a setup link. | admin | no |'
+      '| `users.create` | `POST /api/v1/users` | Creates a user, assigns their extension and returns a setup link. | admin | no |'
     );
   });
 
@@ -40,7 +40,7 @@ describe('catalogLines', () => {
       const row = lines.find(line => line.startsWith(`| \`${op.name}\` |`));
       const endpoints = routes
         .filter(route => route.op === op.name)
-        .map(route => `\`${route.method} ${route.pattern}\``);
+        .map(route => `\`${route.method} ${API_PREFIX}${route.pattern}\``);
       const rest = endpoints.length === 0 ? '—' : endpoints.join(', ');
       expect(row).toBe(
         `| \`${op.name}\` | ${rest} | ${op.description} | ${op.minRole} | ${op.confirm ? 'yes' : 'no'} |`
@@ -50,7 +50,7 @@ describe('catalogLines', () => {
 
   it('names every scoped route of an operation that has several', () => {
     const row = catalogLines().find(line => line.startsWith('| `ooo.list` |'));
-    expect(row).toContain('`GET /users/{id}/ooo`');
-    expect(row).toContain('`GET /tenant/ooo`');
+    expect(row).toContain('`GET /api/v1/users/{id}/ooo`');
+    expect(row).toContain('`GET /api/v1/tenant/ooo`');
   });
 });
