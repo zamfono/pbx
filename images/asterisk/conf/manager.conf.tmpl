@@ -1,5 +1,6 @@
-; AMI for outbound registration state (spec §9.4) and device contacts (spec §9.3): `system`
-; read for the Registry events, `system` write for the PJSIPShowRegistrationsOutbound and
+; AMI for outbound registration state (spec §9.4), device contacts (spec §9.3) and failed SIP
+; attempts (spec §5.6): `system` read for the Registry events, `security` read for the security
+; events, `system` write for the PJSIPShowRegistrationsOutbound and
 ; PJSIPShowEndpoint actions, since Asterisk authorises actions against the write classes. Bound to the `internal` network address alone,
 ; never 0.0.0.0 (spec §9.1).
 [general]
@@ -9,5 +10,5 @@ port = 5038
 
 [zamfono]
 secret = ${AMI_PASSWORD}
-read = system
+read = system,security
 write = system

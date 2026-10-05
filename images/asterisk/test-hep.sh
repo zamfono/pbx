@@ -9,7 +9,7 @@
 # The astdb, where registrations live, sits on a volume and must outlive the container (§9.1).
 docker volume create "$ASTDB_VOLUME" > /dev/null
 start_hep_container() {
-  docker run -d --name "$HEP_CONTAINER" --platform linux/amd64 \
+  docker run -d --name "$HEP_CONTAINER" --platform linux/amd64 --cap-add NET_ADMIN \
     "$@" \
     -e ARI_PASSWORD=x \
     -e AMI_PASSWORD=y \

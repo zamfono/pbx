@@ -132,4 +132,21 @@ chown -R asterisk:asterisk "$GEN_DIR"
 mkdir -p "$ASTDB_DIR"
 chown asterisk:asterisk "$ASTDB_DIR"
 
+# The ban list (spec §5.6 "Enforcement", §9.1): a set per family, whose elements time out on their
+# own, and a rule dropping their packets to the SIP ports in this network namespace alone. The
+# ban helper fills the sets from sip_bans.list; it and this load need the container's
+# CAP_NET_ADMIN, which Asterisk, running as user `asterisk`, does not hold.
+nft -f - <<'NFT'
+table inet zamfono {
+  set sip_ban_v4 { type ipv4_addr; flags timeout; }
+  set sip_ban_v6 { type ipv6_addr; flags interval, timeout; }
+  chain input {
+    type filter hook input priority filter; policy accept;
+    meta l4proto { tcp, udp } th dport 5060-5062 ip saddr @sip_ban_v4 drop
+    meta l4proto { tcp, udp } th dport 5060-5062 ip6 saddr @sip_ban_v6 drop
+  }
+}
+NFT
+/usr/local/bin/sip-ban-helper &
+
 exec asterisk -f -U asterisk

@@ -29,7 +29,7 @@ cleanup() {
 trap cleanup EXIT
 
 # EXTERNAL_IPV4 as in the ports mode (§6.1), for the TLS transports' Contact and Via below.
-docker run -d --name "$CONTAINER" --platform linux/amd64 \
+docker run -d --name "$CONTAINER" --platform linux/amd64 --cap-add NET_ADMIN \
   -e HEP_ENABLED=false \
   -e SIP_UDP_ENABLED=false \
   -e EXTERNAL_IPV4=192.0.2.10 \
@@ -187,6 +187,8 @@ done
 MANAGER_USER=$(docker exec "$CONTAINER" asterisk -rx 'manager show user zamfono')
 echo "$MANAGER_USER" | grep -q 'read perm: system' \
   || fail "AMI user zamfono does not have read perm: system"
+echo "$MANAGER_USER" | grep -q 'read perm:.*security' \
+  || fail "AMI user zamfono does not have read perm: security (§5.6)"
 echo "$MANAGER_USER" | grep -q 'write perm: system' \
   || fail "AMI user zamfono does not have write perm: system"
 
@@ -241,6 +243,9 @@ echo "$INDICATION_ITU" \
 
 docker exec "$CONTAINER" grep -qx 'enabled = no' /etc/asterisk/hep.conf \
   || fail "hep.conf is not enabled = no while HEP_ENABLED=false"
+
+# shellcheck source=test-ban.sh
+. ./test-ban.sh
 
 # shellcheck source=test-hep.sh
 . ./test-hep.sh

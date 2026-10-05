@@ -7,7 +7,8 @@ LABEL org.opencontainers.image.source=https://github.com/zamfono/pbx
 
 # Zamfono APT repository (built by the sibling asterisk-builder repo for Debian 13, spec §4):
 # fetch its archive keyring package, register the source, install Asterisk 22 plus the module
-# and sound packages the stack needs (spec §9.1, §9.3, §9.4). ca-certificates stays installed:
+# and sound packages the stack needs (spec §9.1, §9.3, §9.4), and nftables and inotify-tools for
+# the ban helper (§5.6). ca-certificates stays installed:
 # transport-tls checks a trunk provider's certificate against its bundle (§9.4 "Signaling").
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl \
@@ -33,6 +34,8 @@ RUN apt-get update \
        asterisk-moh-opsound-wav \
        asterisk-moh-opsound-g722 \
        gettext-base \
+       inotify-tools \
+       nftables \
        openssl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -80,7 +83,11 @@ COPY conf/musiconhold.conf.static /etc/asterisk/musiconhold.conf
 COPY entrypoint.sh /entrypoint.sh
 # Run by Asterisk itself through hep.conf's `#exec` (spec §7, §9.1).
 COPY hep-capture-address.sh /usr/local/bin/hep-capture-address
-RUN chmod +x /entrypoint.sh /usr/local/bin/hep-capture-address
+# The ban helper and the container's healthcheck, its heartbeat (spec §6.3, §9.1).
+COPY sip-ban-helper.sh /usr/local/bin/sip-ban-helper
+COPY ban-helper-alive.sh /usr/local/bin/ban-helper-alive
+RUN chmod +x /entrypoint.sh /usr/local/bin/hep-capture-address /usr/local/bin/sip-ban-helper \
+    /usr/local/bin/ban-helper-alive
 
 # The commit this image was built from (§6.3 "Images", §7 "Version"), passed by
 # docker-bake.hcl's REVISION variable. Declared this late so a value that changes on every build

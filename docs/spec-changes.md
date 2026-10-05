@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-05 · §9.1.** `sip_ban_helper.status` is one line, the time in ISO 8601 UTC to the second, a space and the hex SHA-256 of the list applied; the ban helper refuses a `sip_bans.list` with any unparsable line as a whole, keeping the sets, and reads a missing file as the empty list.
+*Why:* `api` reads the file the helper writes, so its format has to be fixed, and a list the helper cannot parse in full must leave enforcement as it was rather than apply a part of it.
+
 **2026-10-05 · §7.** Asterisk logs to its console alone, the container log, at `notice` level and up plus `security` and without colour codes; the `full` and `messages` log files are gone.
 *Why:* nothing capped or rotated the two files in the container's writable layer, which filled a host's disk within days, and the container log already holds the same lines, capped by the runtime; colour codes were noise in every log reader (product owner, 2026-10-05).
 
