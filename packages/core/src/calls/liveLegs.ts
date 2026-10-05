@@ -65,7 +65,7 @@ function dialledLegs(
       channelId: leg.channelId,
       leg: {
         id: leg.id,
-        role,
+        role: 'callerSide' in leg && leg.callerSide === true ? 'caller' : role,
         state: stateOf(leg.channelId, heldChannelId, leg.state === 'up'),
         ...legFacts(leg)
       }
@@ -76,8 +76,9 @@ function dialledLegs(
 
 /**
  * The parties in `call` now: its caller's channel while it is in the call (`ringing` until the
- * call is answered), every leg ringing or up for it, and every party added to its conversation,
- * whose own row shares its bridge (§10.2 "Three-way calls").
+ * call is answered), or, before it has one, the caller's own phones ringing; every leg ringing or
+ * up for it; and every party added to its conversation, whose own row shares its bridge (§10.2
+ * "Three-way calls").
  */
 export function legsWithChannels(store: StateStore, call: Call): ChannelLeg[] {
   const bridgeId = ownBridge(call);

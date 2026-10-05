@@ -83,7 +83,8 @@ export class CallActions {
       language: snapshot.settings.language,
       peer: resolved.to,
       // Keyed by the call, so a REST hangup's `closeCall` clears it with the rest of the call.
-      presenceKey: call.id
+      presenceKey: call.id,
+      callerSide: true
     });
     ring.outcome
       .then(async outcome => {
@@ -92,6 +93,7 @@ export class CallActions {
             this.pipeline,
             call,
             outcome.channel,
+            outcome.legId,
             resolved.action
           );
         } else if (outcome.kind === 'unanswered') {

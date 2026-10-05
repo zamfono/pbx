@@ -29,6 +29,7 @@ why the specified behaviour changed; the commit history, how.
 - The help topics (`zamfono.help`) and the admin skill name REST calls with their `/api/v1` prefix.
 - `/healthz` reports `database:status` `closed` when the database cannot be opened or read,
   instead of answering 500.
+- A click-to-dial lists the user's ringing phone as the caller's leg, under one id throughout.
 
 ## [0.3.0] - 2026-10-05
 

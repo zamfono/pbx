@@ -54,12 +54,14 @@ type OwnRingParams = {
    * which per-call presence key, until the ring settles. */
   peer: string;
   presenceKey: string;
+  /** Whether the devices are the host call's calling side (click-to-dial), not its answering one. */
+  callerSide: boolean;
 };
 
-/** How the ring ended: the answered device's channel, no answer, or the ring stopped outright
+/** How the ring ended: the answered device's channel and its leg's id, no answer, or the ring stopped outright
  * (`abandoned`, a REST hangup), after which nothing follows. */
 type OwnRingOutcome =
-  | { kind: 'answered'; channel: Channel }
+  | { kind: 'answered'; channel: Channel; legId: string }
   | { kind: 'unanswered' }
   | { kind: 'abandoned' };
 
@@ -92,7 +94,8 @@ async function placeDevice(
     userId,
     state: 'placing',
     endCause: null,
-    deviceId: device.id
+    deviceId: device.id,
+    callerSide: params.callerSide
   };
   trackLeg(pipeline, host, leg);
   const ok = await originateLeg(
@@ -186,8 +189,12 @@ export function ringOwnDevices(
     presence.setCallState(userId, 'idle', null, null, presenceKey);
     const leg = answered;
     const channel = leg === null ? undefined : placed.get(leg.channelId);
-    if (result === 'answered' && channel !== undefined) {
-      return { kind: 'answered', channel: { ...channel, state: 'Up' } };
+    if (result === 'answered' && leg !== null && channel !== undefined) {
+      return {
+        kind: 'answered',
+        channel: { ...channel, state: 'Up' },
+        legId: leg.id
+      };
     }
     return result === 'abandoned'
       ? { kind: 'abandoned' }

@@ -100,7 +100,8 @@ export async function pickupOnRequest(
     language: snapshot.settings.language,
     peer: target.from,
     // A key of its own: the answered phone sets the picker in `target`'s call itself.
-    presenceKey: `pickup:${target.id}`
+    presenceKey: `pickup:${target.id}`,
+    callerSide: false
   });
   ring.outcome
     .then(async outcome => {

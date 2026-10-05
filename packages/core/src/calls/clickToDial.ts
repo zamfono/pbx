@@ -68,7 +68,8 @@ export function newOriginatedCall(
 }
 
 /** The originated call's device answered: that channel is the call's own from here on (it leaves
- * `Pipeline.channelless` for `callByChannel`), and the target is dialled as the device would have
+ * `Pipeline.channelless` for `callByChannel`), its ringing leg's id `legId` the caller's leg's
+ * (§10.3 "Live calls"), and the target is dialled as the device would have
  * dialled it (§10.2 "Click-to-dial"), including the user's presence: in a call from the dial on
  * (§9.3 "a user: ... INUSE in a call"), except for a feature-code dial or a refused string, which
  * is no call of the user's. */
@@ -76,9 +77,11 @@ export async function beginOriginatedCall(
   pipeline: Pipeline,
   call: Call,
   channel: Channel,
+  legId: string,
   action: DialAction
 ): Promise<void> {
   call.callerChannelId = channel.id;
+  call.callerLegId = legId;
   pipeline.registerCall(call);
   call.log.event({ event: 'deviceAnswered', channelId: channel.id });
   // §9.1: every channel's language is the tenant's, so the prompts this call plays follow it.
