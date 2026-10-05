@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-05 · §10.1 step 7.** An external forward target, a ring-group member's forward or a find-me entry that is one of the tenant's own DIDs is never dialled through a trunk: a forward enters the DID's target internally, counting a hop, a member's forward is followed to that target, and a find-me entry naming one is not rung.
+*Why:* the product owner chose "Route internally": dialling an own number out looped through the provider and was billed on every hop.
+
 **2026-10-05 · §10.1 Transfers and pickup.** A blind `REFER` from the trunk side re-enters `from-trunk` as an inbound call to the number it names, without `parent_call_id`.
 *Why:* the spec named only `from-users` re-entry; the core held what such a transfer's onward call would need for one that never came, once per transfer.
 

@@ -208,6 +208,18 @@ export async function ringExternalLeg(
     return;
   }
   const snapshot = await pipeline.deps.cache.get();
+  // The tenant's own numbers never leave through a trunk (§10.1 Outbound step 5).
+  if (
+    target.trunkId === undefined &&
+    snapshot.dids.some(did => did.number === target.number)
+  ) {
+    call.log.event({
+      event: 'externalLegUnrouted',
+      number: target.number,
+      cause: 'ownDid'
+    });
+    return;
+  }
   const leg: ExternalLeg = {
     ...openCursor(
       {

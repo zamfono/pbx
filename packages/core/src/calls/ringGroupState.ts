@@ -10,6 +10,7 @@ import { buildOooRules } from '../routing/scheduleRows.js';
 import {
   buildUserRules,
   findForwardTarget,
+  ownDidTarget,
   type ForwardTarget
 } from '../routing/targets.js';
 import { groupMemberUserIds } from './extensionOwner.js';
@@ -31,8 +32,10 @@ export function buildMemberStates(
   const userIds = groupMemberUserIds(snapshot, groupId);
   const oooRules = buildOooRules(snapshot.oooRules);
   return userIds.map(userId => {
+    const rule = buildUserRules(snapshot, userId).unconditional ?? null;
+    // A forward to an own DID is followed to the DID's target (§10.1 Outbound step 5).
     const unconditional =
-      buildUserRules(snapshot, userId).unconditional ?? null;
+      rule === null ? null : (ownDidTarget(snapshot, rule) ?? rule);
     const devices = registeredDevices(pipeline, snapshot, userId);
     return {
       userId,

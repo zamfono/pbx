@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { newId, nowIso, type Db } from '@zamfono/shared';
 import {
   migratedTestDb,
+  seedDid,
   seedSettings,
   seedUser
 } from '@zamfono/shared/testDb.js';
@@ -89,6 +90,56 @@ describe('buildMemberStates', () => {
     ).toStrictEqual([
       [present, false],
       [absent, true]
+    ]);
+  });
+
+  it("follows a member's unconditional forward to an own DID to that DID's target (§10.1 step 5, Outbound step 5)", async () => {
+    const groupId = newId();
+    await db
+      .insertInto('ringGroups')
+      .values({
+        id: groupId,
+        name: 'Sales',
+        strategy: 'simultaneous',
+        createdAt: nowIso()
+      })
+      .execute();
+    const member = await seedUser(db);
+    const colleague = await seedUser(db);
+    await db
+      .insertInto('ringGroupMembers')
+      .values({ groupId, position: 0, userId: member, userGroupId: null })
+      .execute();
+    const colleagueTarget = newId();
+    const didTarget = newId();
+    await db
+      .insertInto('forwardTargets')
+      .values([
+        { id: colleagueTarget, userId: colleague },
+        { id: didTarget, external: '+491110300' }
+      ])
+      .execute();
+    await seedDid(db, '+491110300', colleagueTarget);
+    await db
+      .insertInto('userForwardRules')
+      .values({
+        userId: member,
+        condition: 'unconditional',
+        targetId: didTarget
+      })
+      .execute();
+    const snapshot = await new ConfigCache(db).get();
+
+    const states = buildMemberStates(
+      idlePipeline,
+      snapshot,
+      groupId,
+      nowIso(),
+      new Set()
+    );
+
+    expect(states.map(state => state.unconditional)).toStrictEqual([
+      { kind: 'user', userId: colleague }
     ]);
   });
 });
