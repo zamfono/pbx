@@ -1,7 +1,8 @@
 import {
   codecsColumn,
   emergencyNumbersColumn,
-  featureCodesColumn
+  featureCodesColumn,
+  sipBanStepsColumn
 } from '@zamfono/shared';
 
 import { fromFlag, recordFieldChanges } from '../audit.js';
@@ -48,6 +49,10 @@ const PLAIN_COLUMNS: {
   ssoTenantId: {},
   ssoAllowedDomain: {},
   ringotelMaxRegs: {},
+  sipBanFailures: {},
+  sipBanWindowS: {},
+  sipBanSuccessExemptS: {},
+  sipBanLookbackS: {},
   clir: { encode: toBit, decode: fromFlag },
   rejectAnonymous: { encode: toBit, decode: fromFlag },
   autoUpdate: { encode: toBit, decode: fromFlag },
@@ -65,6 +70,11 @@ const PLAIN_COLUMNS: {
     field: 'featureCodes',
     encode: toJson,
     decode: stored => featureCodesColumn.decode(stored)
+  },
+  sipBanStepsJson: {
+    field: 'sipBanSteps',
+    encode: toJson,
+    decode: stored => sipBanStepsColumn.decode(stored)
   }
 };
 

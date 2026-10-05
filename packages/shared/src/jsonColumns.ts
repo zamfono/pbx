@@ -22,6 +22,36 @@ export const emergencyNumbersSchema = z
   .array(z.string().regex(/^[0-9]+$/u))
   .min(1);
 
+/** The longest SIP ban period, step or look-back, in seconds: 100 years (§11.4). */
+export const MAX_SIP_BAN_PERIOD_S = 3_153_600_000;
+
+/** The shortest finite SIP ban step, in seconds (§11.4). */
+export const MIN_SIP_BAN_STEP_S = 60;
+
+/**
+ * `settings.sip_ban_steps_json`: the ban lengths in seconds, each longer than the one before,
+ * `null` (permanent) only as the last; `[]` switches banning off (§5.6, §11.4).
+ */
+export const sipBanStepsSchema = z
+  .array(
+    z
+      .number()
+      .int()
+      .min(MIN_SIP_BAN_STEP_S)
+      .max(MAX_SIP_BAN_PERIOD_S)
+      .nullable()
+  )
+  .refine(
+    steps =>
+      steps.every((step, index) => {
+        const previous = steps[index - 1];
+        return step === null
+          ? index === steps.length - 1
+          : previous === undefined || (previous !== null && step > previous);
+      }),
+    'each step must be longer than the one before, and null only the last'
+  );
+
 /** `users.find_me_json`: each leg dials out (§10.1), so its number is E.164. */
 export const findMeSchema = z
   .array(
@@ -102,6 +132,7 @@ export const featureCodesColumn = jsonColumn(featureCodesSchema);
 export const allowedIpsColumn = jsonColumn(allowedIpsSchema);
 export const sipHeadersColumn = jsonColumn(sipHeaderTemplatesSchema);
 export const eventTypesColumn = jsonColumn(eventTypesSchema);
+export const sipBanStepsColumn = jsonColumn(sipBanStepsSchema);
 export const backupParamsColumn = jsonColumn(backupParamsSchema);
 export const changesColumn = jsonColumn(z.array(changeEntrySchema));
 

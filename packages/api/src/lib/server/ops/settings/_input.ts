@@ -7,7 +7,9 @@ import {
   featureCodesSchema,
   isIanaTimeZone,
   isSupportedCountry,
-  LANGUAGES
+  LANGUAGES,
+  MAX_SIP_BAN_PERIOD_S,
+  sipBanStepsSchema
 } from '@zamfono/shared';
 
 import { isCronExpression } from '#lib/server/jobs/cronExpression.js';
@@ -24,6 +26,9 @@ const MAX_TLS_RELOAD_HOUR = 23;
 const MIN_AUDIT_RETENTION_DAYS = 30;
 const MAX_RETENTION_DAYS = 36_500;
 const COUNTRY_CODE_LENGTH = 2;
+
+/** A SIP ban period in whole seconds, at most 100 years (§11.4); each field sets its floor. */
+const sipBanPeriodSeconds = z.number().int().max(MAX_SIP_BAN_PERIOD_S);
 
 /**
  * `PATCH /settings`'s body (§10.3, §11.4): every writable column under its wire name, each
@@ -143,6 +148,37 @@ export const settingsInputSchema = z
       .nullish()
       .describe(
         'Days audit entries are kept, at least 30 and at most 36500; null: forever. Owner-only.'
+      ),
+    sipBanFailures: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe(
+        'Failed SIP attempts from one source address within sipBanWindowS that ban it, 10 by default.'
+      ),
+    sipBanWindowS: sipBanPeriodSeconds
+      .min(1)
+      .optional()
+      .describe(
+        "Seconds over which an address's failed SIP attempts are counted, 3600 by default."
+      ),
+    sipBanSuccessExemptS: sipBanPeriodSeconds
+      .min(0)
+      .optional()
+      .describe(
+        'Seconds after a successful SIP authentication during which its address is never banned, 86400 by default; 0: no exemption.'
+      ),
+    sipBanLookbackS: sipBanPeriodSeconds
+      .min(1)
+      .optional()
+      .describe(
+        "Seconds after a ban ended within which the address's next ban takes the next step, and after which the ended ban is deleted; 2592000 (30 days) by default."
+      ),
+    sipBanSteps: sipBanStepsSchema
+      .optional()
+      .describe(
+        "Ban lengths in seconds for an address's first, second, … consecutive ban, each 60 to 3153600000 and longer than the one before, null (permanent) only as the last; [] switches banning off; [86400,31536000,null] by default. Applies to new bans only."
       ),
     backupCron: z
       .string()
