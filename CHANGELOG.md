@@ -11,6 +11,21 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-05
+
+### Upgrade notes
+
+- **A breaking release: run `./update.sh` on the host.** Automatic updates and `system.update`
+  do not install it. `update.sh` brings the new `compose.yaml`, and `migrate` applies the two
+  new migrations.
+- **Uptime checks:** `/healthz` now answers `application/health+json` and 503 whenever a check
+  fails, a stack without an emergency trunk included. Point the check at the HTTP status, or at
+  `status`/`checks`; the old body fields are gone.
+- **Integrations:** `calls.park` no longer takes `userId`. A token whose user is not in the call
+  names the leg with `legId` (from `GET /calls?live=true`) to transfer, park, consult on or hold.
+- **`asterisk` now needs `NET_ADMIN`** for the SIP bans' packet filter in its own network
+  namespace; `compose.yaml` grants it. Asterisk does not start where the runtime cannot grant it.
+
 ### Added
 
 - Sources of repeated failed SIP attempts are banned by nftables, a day, a year, then for good;
@@ -539,7 +554,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/zamfono/pbx/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/zamfono/pbx/compare/v0.1.0...v0.2.1
 [0.1.0]: https://github.com/zamfono/pbx/compare/v0.0.7...v0.1.0
 [0.0.7]: https://github.com/zamfono/pbx/compare/v0.0.6...v0.0.7
