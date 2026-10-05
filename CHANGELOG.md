@@ -14,6 +14,8 @@ why the specified behaviour changed; the commit history, how.
 ### Added
 
 - `GET /calls?parentCallId=` lists a call's transfer, added and park legs; `GET /calls/{id}` names them in `childCallIds`.
+- `trunks.reregister` re-registers a registration trunk on demand, and trunk reads carry
+  `registeredAt`, when its last REGISTER succeeded.
 
 ### Fixed
 

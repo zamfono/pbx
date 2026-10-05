@@ -124,6 +124,16 @@ trunk_status() {
   api GET "/trunks/$1" | jsonfield status
 }
 
+# Whether trunk `$1`'s last REGISTER succeeded after ISO 8601 UTC time `$2` (§9.4 "Provisioning
+# and status", `registeredAt`).
+registered_since() {
+  api GET "/trunks/$1" | python3 -c "
+import json, sys
+at = json.load(sys.stdin)['registeredAt']
+sys.exit(0 if at is not None and at > sys.argv[1] else 1)
+" "$2"
+}
+
 # Waits up to `$3` seconds for trunk `$1` to read status `$2`.
 await_trunk_status() {
   poll "$3" 1 reads "$2" trunk_status "$1" \
@@ -139,6 +149,7 @@ import json, sys
 trunk = [t for t in json.load(sys.stdin)['items'] if t['id'] == sys.argv[1]][0]
 trunk.pop('status', None)
 trunk.pop('statusChangedAt', None)
+trunk.pop('registeredAt', None)
 print(json.dumps(trunk, sort_keys=True))
 " "$1"
 }

@@ -151,6 +151,7 @@ const STATIC_ROUTES: RouteTuple[] = [
   ['GET', '/provisioning/ringotel/options', 'provisioning.ringotelOptions'],
   ...crud('trunks', '/trunks', ALL_CRUD),
   ['PUT', '/trunks/order', 'trunks.setOrder'],
+  ['POST', '/trunks/{id}/reregister', 'trunks.reregister'],
   ['GET', '/outboundRoutes', 'outboundRoutes.list'],
   ['PUT', '/outboundRoutes', 'outboundRoutes.replace'],
   ...crud('dids', '/dids', NO_GET),

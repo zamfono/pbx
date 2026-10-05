@@ -356,7 +356,11 @@ describe('trunks operations', () => {
       }[];
     };
     expect(items).toEqual([
-      expect.objectContaining({ status: 'unknown', statusChangedAt: null })
+      expect.objectContaining({
+        status: 'unknown',
+        statusChangedAt: null,
+        registeredAt: null
+      })
     ]);
 
     const one = (await runOperation(
@@ -365,7 +369,11 @@ describe('trunks operations', () => {
       { id: trunk.id },
       asRun()
     )) as { status: string; statusChangedAt: string | null };
-    expect(one).toMatchObject({ status: 'unknown', statusChangedAt: null });
+    expect(one).toMatchObject({
+      status: 'unknown',
+      statusChangedAt: null,
+      registeredAt: null
+    });
   });
 
   it("answers the core's own status through the core's state (§9.4 Provisioning and status)", async () => {
@@ -398,10 +406,7 @@ describe('trunks operations', () => {
         { id: trunk.id },
         asRun()
       )) as { status: string; statusChangedAt: string | null };
-      expect(one).toMatchObject({
-        status: reported.status,
-        statusChangedAt: reported.statusChangedAt
-      });
+      expect(one).toMatchObject(reported);
     } finally {
       vi.mocked(getCoreClient).mockReset();
     }

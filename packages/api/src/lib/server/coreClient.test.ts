@@ -104,6 +104,18 @@ describe('createCoreClient', () => {
     );
   });
 
+  it('has core re-register a trunk', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(noContentResponse());
+    const client = createCoreClient('http://core:3000', fetchFn);
+
+    await client.reregisterTrunk('t1');
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      'http://core:3000/internal/trunks/t1/reregister',
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
   it('rejects with a 503 problem on a 500, one per verb', async () => {
     const fetchFn = vi.fn().mockResolvedValue(serverErrorResponse());
     const client = createCoreClient('http://core:3000', fetchFn);
@@ -120,7 +132,8 @@ describe('createCoreClient', () => {
       () => client.transfer('c1', { target: '102', actorUserId: 'u1' }),
       () => client.pickup('c1', { actorUserId: 'u2' }),
       () => client.hangup('c1', { actorUserId: 'u1' }),
-      () => client.mwi('user:u1')
+      () => client.mwi('user:u1'),
+      () => client.reregisterTrunk('t1')
     ];
 
     const outcomes = await Promise.all(

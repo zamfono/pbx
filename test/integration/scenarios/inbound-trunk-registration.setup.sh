@@ -49,10 +49,13 @@ await_sipp_run sipp-provider provider-refuse-register $ATTEMPTS || {
   echo "the provider never saw the trunk's first two REGISTERs" >&2
   exit 1
 }
+# Asterisk sends every REGISTER of the registration under one Call-ID, and sipp drops a request on
+# the Call-ID of a call it ended within `-deadcall_wait` (33 s by default): with none kept, the
+# REGISTERs `trunks.reregister` sends below are each a call of their own.
 # shellcheck disable=SC2086
 dc exec -T -d sipp-provider sh -c \
   'sh /scenarios/_sipp-run.sh provider-registrar \
-    -sf /scenarios/uas/registrar.xml -p 5060 -aa -nostdin \
+    -sf /scenarios/uas/registrar.xml -p 5060 -aa -nostdin -deadcall_wait 0 \
     -trace_msg -message_file /tmp/registrar-messages.log \
     asterisk:5060 > /tmp/registrar.log 2>&1'
 
@@ -60,3 +63,13 @@ dc exec -T -d sipp-provider sh -c \
 await_trunk_status "$trunk_id" registered $ATTEMPTS \
   && poll $ATTEMPTS 1 dc exec -T sipp-provider test -s /tmp/registrar-line.csv \
   || { echo "the registration trunk never registered after its refusals" >&2; exit 1; }
+
+# `trunks.reregister` (§9.4 "Provisioning and status"): the trunk unregisters and registers afresh
+# with the registrar, and `registeredAt` moves past the moment it was asked, as `statusChangedAt`
+# does not for a trunk that stays `registered`.
+asked=$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)
+api POST "/trunks/$trunk_id/reregister" '{}' >/dev/null \
+  || { echo "trunks.reregister refused the registration trunk" >&2; exit 1; }
+poll $ATTEMPTS 1 registered_since "$trunk_id" "$asked" \
+  && await_trunk_status "$trunk_id" registered $ATTEMPTS \
+  || { echo "the registration trunk never registered afresh after trunks.reregister" >&2; exit 1; }

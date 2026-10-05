@@ -105,6 +105,7 @@
 | `trunks.delete` | `DELETE /api/v1/trunks/{id}` | Soft-deletes a SIP trunk once no outbound route or sip forward target uses it (409 names them). | admin | yes |
 | `trunks.get` | `GET /api/v1/trunks/{id}` | Reads one SIP trunk. | admin | no |
 | `trunks.list` | `GET /api/v1/trunks` | Lists SIP trunks in trunk order, with their live status merged in. | admin | no |
+| `trunks.reregister` | `POST /api/v1/trunks/{id}/reregister` | Has a registration trunk unregister and register afresh with its provider; trunks.get's status and registeredAt show the outcome. Refused for an ip trunk. | admin | no |
 | `trunks.setOrder` | `PUT /api/v1/trunks/order` | Rewrites the tenant trunk order, the order emergency calls try emergency trunks in (§9.4 "Trunk order"). | admin | no |
 | `trunks.update` | `PATCH /api/v1/trunks/{id}` | Updates a SIP trunk; hosts replace the list as a whole, password is write-only. | admin | no |
 | `userGroups.create` | `POST /api/v1/userGroups` | Creates a user group, a nestable set of users for ring-group membership and outbound-route caller lists. | admin | no |

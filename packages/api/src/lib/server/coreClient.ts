@@ -1,7 +1,8 @@
 /**
  * The HTTP client for `core`'s internal API (§3, §3.1; `@zamfono/shared`'s `internalApi.ts`):
- * config-reload triggers, live state, health and version, call actions and MWI, reached over the
- * Docker `internal` network with no authentication, since that network is the trust boundary.
+ * config-reload triggers, live state, health and version, call actions, MWI and a trunk's
+ * re-registration, reached over the Docker `internal` network with no authentication, since that
+ * network is the trust boundary.
  */
 
 import * as env from '$app/env/private';
@@ -55,6 +56,8 @@ export type CoreClient = {
   hold(callId: string, req: HoldRequest): Promise<void>;
   resume(callId: string, req: ResumeRequest): Promise<void>;
   decline(callId: string, req: DeclineRequest): Promise<void>;
+  /** Has Asterisk register the `registration` trunk afresh (§9.4 "Provisioning and status"). */
+  reregisterTrunk(trunkId: string): Promise<void>;
 };
 
 /** `core`'s internal API at `baseUrl` (default `CORE_URL`). */
@@ -122,7 +125,13 @@ export function createCoreClient(
     resume: async (callId, req) =>
       postJsonChecked(fetchFn, call(callId, 'resume'), req),
     decline: async (callId, req) =>
-      postJsonChecked(fetchFn, call(callId, 'decline'), req)
+      postJsonChecked(fetchFn, call(callId, 'decline'), req),
+    reregisterTrunk: async trunkId =>
+      postJsonChecked(
+        fetchFn,
+        `${baseUrl}/internal/trunks/${encodeURIComponent(trunkId)}/reregister`,
+        undefined
+      )
   };
 }
 

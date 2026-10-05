@@ -17,9 +17,9 @@ export const UNKNOWN_STATUS: TrunkStatus = {
 };
 
 /**
- * `status`/`statusChangedAt` per id, as `core` reports them in its internal state (§9.4: "`api`
- * merges `status` and `statusChangedAt` into `GET /trunks` responses at read time from the core's
- * internal API"); `unknown` for a trunk it does not report, and for every trunk, logged, while
+ * `status`/`statusChangedAt`/`registeredAt` per id, as `core` reports them in its internal state
+ * (§9.4: "`api` merges `status`, `statusChangedAt` and `registeredAt` into `GET /trunks` responses
+ * at read time from the core's internal API"); `unknown` for a trunk it does not report, and for every trunk, logged, while
  * `core` is unreachable.
  */
 export async function getTrunkStatuses(

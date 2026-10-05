@@ -122,7 +122,13 @@ export const trunkWire = trunkScalars.extend({
   hosts: z.array(hostWire),
   ...logLevelOutputFields,
   status: z.enum(TRUNK_STATUSES),
-  statusChangedAt: z.string().nullable()
+  statusChangedAt: z.string().nullable(),
+  registeredAt: z
+    .string()
+    .nullable()
+    .describe(
+      'When the last REGISTER succeeded, a refresh included; null for an ip trunk and until core sees one succeed after its connection to Asterisk opened.'
+    )
 });
 export type TrunkWire = z.infer<typeof trunkWire>;
 
@@ -230,6 +236,7 @@ export function mapTrunkRow(
     hosts: hostsToWire(hosts),
     ...logLevelWire(row),
     status: status.status,
-    statusChangedAt: status.statusChangedAt
+    statusChangedAt: status.statusChangedAt,
+    registeredAt: status.registeredAt
   };
 }
