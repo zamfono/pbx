@@ -3,13 +3,13 @@
  * templates"), read from the call, its forward hops and the config snapshot, and the headers the
  * leg sends with them. `forwardHeaders.ts` renders them; this gathers them.
  */
-import { ANONYMOUS, isE164 } from '@zamfono/shared';
+import { isE164 } from '@zamfono/shared';
 
 import { logFailure } from '../ari/failures.js';
 import { userById, type Snapshot } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import type { Call } from './call.js';
-import { contactName } from './contactName.js';
+import { callerNumber, contactName } from './contactName.js';
 import type {
   Diversion,
   ForwardLeg,
@@ -47,7 +47,7 @@ export function forwardValues(
   const called = diversions.find(hop => hop.party !== 'menu');
   const last = diversions.at(-1);
   return {
-    callerNumber: call.from === ANONYMOUS ? '' : call.from,
+    callerNumber: callerNumber(call.from),
     callerName,
     did: call.direction === 'inbound' && isE164(call.to) ? call.to : '',
     calledExtension: called?.extension ?? '',

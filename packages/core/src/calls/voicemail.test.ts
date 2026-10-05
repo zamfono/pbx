@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  ANONYMOUS,
   newId,
   nowIso,
   type Db,
@@ -279,6 +280,39 @@ describe('deposit', () => {
     });
   });
 
+  it('sends a withheld caller as an empty callerNumber', async () => {
+    const userId = await seedUser(db);
+    const channel = fakeAri.addChannel({});
+    const call = newCall({
+      id: newId(),
+      direction: 'inbound',
+      callerChannelId: channel.id,
+      from: ANONYMOUS,
+      to: '+15551000',
+      startedAt: nowIso(),
+      logLevel: 'events',
+      callLogMaxBytes: 1_048_576
+    });
+
+    const started = deposit(pipeline, call, { userId });
+    const recordCall = await requestTo(
+      fakeAri,
+      'POST',
+      `channels/${channel.id}/record`
+    );
+    fakeAri.emit({
+      type: 'RecordingFinished',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      recording: { name: (recordCall.body as { name: string }).name }
+    });
+    await started;
+
+    expect(apiClient.sent[0]).toMatchObject({
+      values: { callerNumber: '', callerName: '' }
+    });
+  });
+
   it("plays the mailbox's own greeting instead of the language default when mailbox_audio_id is set", async () => {
     const audioId = await seedAudioAsset(db, {
       label: 'Mailbox greeting',
@@ -398,12 +432,16 @@ describe('deposit', () => {
 
   /** An inbound call to `userId`, registered with the pipeline like every live call, so the
    * caller's own `ChannelDestroyed` reaches `legsEnded.ts` as well as the deposit. */
-  function registeredCall(channelId: string, userId: string): Call {
+  function registeredCall(
+    channelId: string,
+    userId: string,
+    from = '+15559999'
+  ): Call {
     const call = newCall({
       id: newId(),
       direction: 'inbound',
       callerChannelId: channelId,
-      from: '+15559999',
+      from,
       to: '+15551000',
       startedAt: nowIso(),
       logLevel: 'events',
@@ -511,5 +549,32 @@ describe('deposit', () => {
 
     expect(cdr.statuses).toEqual(['missed']);
     expect(apiClient.sent.map(request => request.kind)).toEqual(['missedCall']);
+  });
+
+  it("sends a withheld caller's missed-call mail an empty callerNumber", async () => {
+    const userId = await seedUser(db, { notifyMissedCalls: 1 });
+    const channel = fakeAri.addChannel({});
+    const call = registeredCall(channel.id, userId, ANONYMOUS);
+
+    const started = deposit(pipeline, call, { userId });
+    await requestTo(fakeAri, 'POST', `channels/${channel.id}/play`);
+    await ari.channels.hangup(channel.id);
+    fakeAri.emit({
+      type: 'PlaybackFinished',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      playback: { id: `${channel.id}:vmGreeting`, state: 'failed' }
+    });
+    fakeAri.emit({
+      type: 'ChannelDestroyed',
+      timestamp: nowIso(),
+      application: 'zamfono',
+      channel: defaultChannel({ id: channel.id })
+    });
+    await started;
+
+    expect(apiClient.sent).toMatchObject([
+      { kind: 'missedCall', values: { callerNumber: '', callerName: '' } }
+    ]);
   });
 });

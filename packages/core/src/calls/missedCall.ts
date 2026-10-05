@@ -8,7 +8,7 @@ import type { MailRequest } from '@zamfono/shared';
 import { logFailure } from '../ari/failures.js';
 import { userById } from '../internal/snapshot.js';
 import type { Call, CallsRow } from './call.js';
-import { contactName } from './contactName.js';
+import { callerNumber, contactName } from './contactName.js';
 import type { Pipeline } from './pipeline.js';
 
 /**
@@ -40,7 +40,7 @@ export async function notifyMissedCall(
     callId: call.id,
     to: { userId },
     values: {
-      callerNumber: call.from,
+      callerNumber: callerNumber(call.from),
       callerName: await contactName(db, call.from),
       receivedAt: call.startedAt,
       didLabel: did?.label ?? did?.number ?? ''

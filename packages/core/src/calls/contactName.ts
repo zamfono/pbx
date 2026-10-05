@@ -10,6 +10,12 @@ import { logFailure } from '../ari/failures.js';
 import type { Call } from './call.js';
 import type { Pipeline } from './pipeline.js';
 
+/** The caller as the mails and header templates name them (§9.4 "Header templates"): `from`,
+ * empty for a withheld number. */
+export function callerNumber(from: string): string {
+  return from === ANONYMOUS ? '' : from;
+}
+
 /** The live contact's display name for `from`, empty when none matches or the caller withheld
  * their number, so a mail template's `{{#if callerName}}` picks the wording. */
 export async function contactName(db: Db, from: string): Promise<string> {

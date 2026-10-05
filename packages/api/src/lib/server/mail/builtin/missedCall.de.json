@@ -1,5 +1,5 @@
 {
   "subject": "Verpasster Anruf auf {{didLabel}}",
-  "bodyText": "Hallo {{recipientName}},\n\nSie haben einen Anruf auf {{didLabel}} verpasst, von {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}} um {{date receivedAt}}.\n\n{{companyName}} · {{fqdn}}",
-  "bodyHtml": "<p>Hallo {{recipientName}},</p><p>Sie haben einen Anruf auf {{didLabel}} verpasst, von {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}} um {{date receivedAt}}.</p><p>{{companyName}} · {{fqdn}}</p>"
+  "bodyText": "Hallo {{recipientName}},\n\nSie haben einen Anruf auf {{didLabel}} verpasst, von {{#if callerName}}{{callerName}} ({{callerNumber}}){{else if callerNumber}}{{callerNumber}}{{else}}einer unterdrückten Nummer{{/if}} um {{date receivedAt}}.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Hallo {{recipientName}},</p><p>Sie haben einen Anruf auf {{didLabel}} verpasst, von {{#if callerName}}{{callerName}} ({{callerNumber}}){{else if callerNumber}}{{callerNumber}}{{else}}einer unterdrückten Nummer{{/if}} um {{date receivedAt}}.</p><p>{{companyName}} · {{fqdn}}</p>"
 }

@@ -1,5 +1,5 @@
 {
-  "subject": "Neue Sprachnachricht von {{#if callerName}}{{callerName}}{{else}}{{callerNumber}}{{/if}}",
-  "bodyText": "Hallo {{recipientName}},\n\nSie haben eine neue Sprachnachricht in {{mailboxName}} von {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}}, empfangen am {{date receivedAt}}. Länge: {{durationS}} Sekunden.\n\nDie Aufnahme ist dieser E-Mail angehängt.\n\n{{companyName}} · {{fqdn}}",
-  "bodyHtml": "<p>Hallo {{recipientName}},</p><p>Sie haben eine neue Sprachnachricht in {{mailboxName}} von {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}}, empfangen am {{date receivedAt}}. Länge: {{durationS}} Sekunden.</p><p>Die Aufnahme ist dieser E-Mail angehängt.</p><p>{{companyName}} · {{fqdn}}</p>"
+  "subject": "Neue Sprachnachricht von {{#if callerName}}{{callerName}}{{else if callerNumber}}{{callerNumber}}{{else}}einer unterdrückten Nummer{{/if}}",
+  "bodyText": "Hallo {{recipientName}},\n\nSie haben eine neue Sprachnachricht in {{mailboxName}} von {{#if callerName}}{{callerName}} ({{callerNumber}}){{else if callerNumber}}{{callerNumber}}{{else}}einer unterdrückten Nummer{{/if}}, empfangen am {{date receivedAt}}. Länge: {{durationS}} Sekunden.\n\nDie Aufnahme ist dieser E-Mail angehängt.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Hallo {{recipientName}},</p><p>Sie haben eine neue Sprachnachricht in {{mailboxName}} von {{#if callerName}}{{callerName}} ({{callerNumber}}){{else if callerNumber}}{{callerNumber}}{{else}}einer unterdrückten Nummer{{/if}}, empfangen am {{date receivedAt}}. Länge: {{durationS}} Sekunden.</p><p>Die Aufnahme ist dieser E-Mail angehängt.</p><p>{{companyName}} · {{fqdn}}</p>"
 }

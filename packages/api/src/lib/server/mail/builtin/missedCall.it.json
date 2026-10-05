@@ -1,5 +1,5 @@
 {
   "subject": "Chiamata persa su {{didLabel}}",
-  "bodyText": "Ciao {{recipientName}},\n\nHai perso una chiamata su {{didLabel}} da {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}} alle {{date receivedAt}}.\n\n{{companyName}} · {{fqdn}}",
-  "bodyHtml": "<p>Ciao {{recipientName}},</p><p>Hai perso una chiamata su {{didLabel}} da {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}} alle {{date receivedAt}}.</p><p>{{companyName}} · {{fqdn}}</p>"
+  "bodyText": "Ciao {{recipientName}},\n\nHai perso una chiamata su {{didLabel}} da {{#if callerName}}{{callerName}} ({{callerNumber}}){{else if callerNumber}}{{callerNumber}}{{else}}un numero privato{{/if}} alle {{date receivedAt}}.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Ciao {{recipientName}},</p><p>Hai perso una chiamata su {{didLabel}} da {{#if callerName}}{{callerName}} ({{callerNumber}}){{else if callerNumber}}{{callerNumber}}{{else}}un numero privato{{/if}} alle {{date receivedAt}}.</p><p>{{companyName}} · {{fqdn}}</p>"
 }

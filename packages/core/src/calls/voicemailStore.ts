@@ -9,7 +9,7 @@ import { mwiMailboxOf, type Db, type MailRequest } from '@zamfono/shared';
 import type { AriClient } from '../ari/client.js';
 import { logFailure } from '../ari/failures.js';
 import { type Call } from './call.js';
-import { contactName } from './contactName.js';
+import { callerNumber, contactName } from './contactName.js';
 import type { Pipeline } from './pipeline.js';
 import { endCall, type Owner } from './release.js';
 import type { MailSender } from './voicemail.js';
@@ -104,7 +104,7 @@ export async function persistVoicemail(ctx: DepositContext): Promise<void> {
     callId: call.id,
     to: mailbox,
     values: {
-      callerNumber: call.from,
+      callerNumber: callerNumber(call.from),
       callerName: await contactName(db, call.from),
       mailboxName: owner.name,
       receivedAt: createdAt,

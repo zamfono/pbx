@@ -1,5 +1,5 @@
 {
-  "subject": "Новое голосовое сообщение от {{#if callerName}}{{callerName}}{{else}}{{callerNumber}}{{/if}}",
-  "bodyText": "Здравствуйте, {{recipientName}}!\n\nВам поступило новое голосовое сообщение в {{mailboxName}} от {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}}, получено {{date receivedAt}}. Длительность: {{durationS}} сек.\n\nЗапись прикреплена к этому письму.\n\n{{companyName}} · {{fqdn}}",
-  "bodyHtml": "<p>Здравствуйте, {{recipientName}}!</p><p>Вам поступило новое голосовое сообщение в {{mailboxName}} от {{#if callerName}}{{callerName}} ({{callerNumber}}){{else}}{{callerNumber}}{{/if}}, получено {{date receivedAt}}. Длительность: {{durationS}} сек.</p><p>Запись прикреплена к этому письму.</p><p>{{companyName}} · {{fqdn}}</p>"
+  "subject": "Новое голосовое сообщение от {{#if callerName}}{{callerName}}{{else if callerNumber}}{{callerNumber}}{{else}}скрытого номера{{/if}}",
+  "bodyText": "Здравствуйте, {{recipientName}}!\n\nВам поступило новое голосовое сообщение в {{mailboxName}} от {{#if callerName}}{{callerName}} ({{callerNumber}}){{else if callerNumber}}{{callerNumber}}{{else}}скрытого номера{{/if}}, получено {{date receivedAt}}. Длительность: {{durationS}} сек.\n\nЗапись прикреплена к этому письму.\n\n{{companyName}} · {{fqdn}}",
+  "bodyHtml": "<p>Здравствуйте, {{recipientName}}!</p><p>Вам поступило новое голосовое сообщение в {{mailboxName}} от {{#if callerName}}{{callerName}} ({{callerNumber}}){{else if callerNumber}}{{callerNumber}}{{else}}скрытого номера{{/if}}, получено {{date receivedAt}}. Длительность: {{durationS}} сек.</p><p>Запись прикреплена к этому письму.</p><p>{{companyName}} · {{fqdn}}</p>"
 }

@@ -1225,6 +1225,8 @@ The API parses a template on write and rejects one that names a placeholder its 
 
 Per kind, the placeholders a template may use and the ones it must use:
 
+A withheld caller's `callerNumber` is empty, as in the header templates (§9.4), and the shipped `voicemail` and `missedCall` templates name a withheld number in their language.
+
 **`voicemail`** — placeholders: `callerNumber`, `callerName` (phone book, else empty, so `{{#if callerName}}` chooses the wording), `mailboxName`, `receivedAt`, `durationS`; the audio is attached.
 
 **`missedCall`** — placeholders: `callerNumber`, `callerName`, `receivedAt`, `didLabel`.

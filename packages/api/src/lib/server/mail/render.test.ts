@@ -152,6 +152,48 @@ describe('the update mails', () => {
   });
 });
 
+describe('a withheld caller', () => {
+  // `core` sends a withheld caller as an empty `callerNumber` with no phone-book name (§10.2
+  // "Mail"); the shipped templates say so in the mail's language.
+  const WITHHELD: Record<Language, string> = {
+    de: 'einer unterdrückten Nummer',
+    en: 'a withheld number',
+    es: 'un número oculto',
+    fr: 'un numéro masqué',
+    it: 'un numero privato',
+    ru: 'скрытого номера'
+  };
+
+  for (const kind of ['voicemail', 'missedCall'] as const) {
+    for (const language of BUILTIN_LANGUAGES) {
+      it(`is named as withheld in the ${language} ${kind} mail`, () => {
+        const source = loadBuiltinTemplate(kind, language);
+        const mail = compileTemplate(
+          kind,
+          source.subject,
+          source.bodyText,
+          source.bodyHtml
+        ).render(
+          {
+            callerNumber: '',
+            callerName: '',
+            mailboxName: 'Eva',
+            didLabel: 'Zentrale',
+            receivedAt: '2026-10-01T09:00:00Z',
+            durationS: 12
+          },
+          { language, timezone: 'UTC' }
+        );
+        expect(mail.text).toContain(WITHHELD[language]);
+        expect(mail.html).toContain(WITHHELD[language]);
+        if (kind === 'voicemail') {
+          expect(mail.subject).toContain(WITHHELD[language]);
+        }
+      });
+    }
+  }
+});
+
 describe('resolveTemplate', () => {
   it('prefers the tenant row over the shipped built-in', async () => {
     const db = await migratedTestDb();
