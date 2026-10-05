@@ -11,14 +11,16 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-10-05
+## [0.2.1] - 2026-10-05
+
+The first 0.2 release; its `v0.2.0` tag was never published.
 
 ### Upgrade notes
 
-- **0.2.0 is a fresh start: install it anew** (deploy/README.md) on a new stack directory and
+- **0.2.1 is a fresh start: install it anew** (deploy/README.md) on a new stack directory and
   data volumes. There is no upgrade from 0.1.x or earlier: nothing of an older release's
   database, files, tokens or client state carries over, and its `update.sh` and the updater do
-  not install 0.2.0. The database schema starts again from a single migration; `migrate` fails
+  not install 0.2.1. The database schema starts again from a single migration; `migrate` fails
   on a 0.1.x database.
 
 ### Added
@@ -97,7 +99,7 @@ why the specified behaviour changed; the commit history, how.
 
 ### Fixed
 
-- 0.2.0 includes the fixes of a full review of the stack; the commit history has the details.
+- 0.2.1 includes the fixes of a full review of the stack; the commit history has the details.
 
 ## [0.1.0] - 2026-09-30
 
@@ -512,8 +514,8 @@ why the specified behaviour changed; the commit history, how.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/zamfono/pbx/compare/v0.1.0...v0.2.0
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/zamfono/pbx/compare/v0.1.0...v0.2.1
 [0.1.0]: https://github.com/zamfono/pbx/compare/v0.0.7...v0.1.0
 [0.0.7]: https://github.com/zamfono/pbx/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/zamfono/pbx/compare/v0.0.5...v0.0.6
