@@ -182,6 +182,15 @@ await_ended_call() {
     || { echo "call $1 never ended within $2 s" >&2; return 1; }
 }
 
+# Whether the onward call of call `$1`, the one whose `parentCallId` it is, has reached the
+# history, which lists a call once it has ended.
+onward_ended() {
+  api GET /calls | python3 -c '
+import json, sys
+sys.exit(not any(c["parentCallId"] == sys.argv[1] for c in json.load(sys.stdin)["items"]))
+' "$1"
+}
+
 # Prints sipp message trace `$2` in container `$1`. The run that wrote it has ended, as every
 # sipp run of a scenario has by the time its check runs (`run-scenarios.sh`'s
 # `finish_sipp_runs`), so the trace is whole.

@@ -19,7 +19,11 @@
 #   deposit    transfers the call into 101's own mailbox (`POST /calls/{id}/transfer` with
 #              `voicemail`) once 101 answered;
 #   pickup     the colleague picks the call up (`POST /calls/{id}/pickup`) with their own token,
-#              `$5`, while it rings the group's member.
+#              `$5`, while it rings the group's member;
+#   leg-transfer
+#              `$5` is `<to>,<role>,<target>`: once the call to `<to>` is bridged, its legs all
+#              up, lists them (scenario state `api-control.legs`) and transfers its first leg of
+#              `<role>` to `<target>` (`POST /calls/{id}/transfer` with `legId`).
 #
 # The live listing reports a call `up` once it is answered and bridged, so each action is asked
 # for once, as soon as the call is in the state it needs, and its status is recorded as it came.
@@ -59,6 +63,25 @@ bridge_channels() {
       }
     }
     END { print max + 0 }'
+}
+
+# Whether the live call to `$1` is bridged, two legs or more and all of them up: the call's id
+# and that of its first leg of role `$2` are left in `call_id` and `leg`, the call's legs in
+# scenario state `api-control.legs`.
+bridged_leg() {
+  local found
+  found=$(api GET '/calls?live=true' | python3 -c '
+import json, sys
+to, role, legs_file = sys.argv[1:4]
+for call in json.load(sys.stdin)["items"]:
+    leg = next((leg for leg in call["legs"] if leg["role"] == role), None)
+    bridged = len(call["legs"]) > 1 and all(l["state"] == "up" for l in call["legs"])
+    if call["to"] == to and leg is not None and bridged:
+        with open(legs_file, "w") as out:
+            json.dump(call["legs"], out)
+        print(call["callId"], leg["id"])
+        break
+' "$1" "$2" "$(state_file api-control.legs)") && [ -n "$found" ] && read -r call_id leg <<<"$found"
 }
 
 # POSTs `$2` to `/calls$1`, logging the answer, and prints its status, then its body on a line of
@@ -132,5 +155,12 @@ case $mode in
     call_id=$(await_live_call ringing) || { echo none > "$result"; exit 1; }
     { read -r code; read -r _; } < <(token=$arg post "/$call_id/pickup")
     printf '%s %s\n' "$code" "$call_id" > "$result"
+    ;;
+  leg-transfer)
+    IFS=, read -r to role target <<<"$arg"
+    poll 150 0.2 bridged_leg "$to" "$role" || { echo none > "$result"; exit 1; }
+    { read -r code; read -r _; } < <(post "/$call_id/transfer" \
+      "{\"target\":\"$target\",\"legId\":\"$leg\"}")
+    printf '%s %s %s\n' "$code" "$call_id" "$leg" > "$result"
     ;;
 esac

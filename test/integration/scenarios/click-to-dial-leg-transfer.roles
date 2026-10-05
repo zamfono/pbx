@@ -1,0 +1,5 @@
+# shellcheck shell=bash disable=SC2034
+# Where the sides of `click-to-dial-leg-transfer` differ from run-scenarios.sh's defaults: 101's
+# phone answers and takes the BYE its release sends; the trunk side answers, speaks and waits for
+# the BYE the colleague's hangup sends it.
+TRUNK_UAS=answer-speak

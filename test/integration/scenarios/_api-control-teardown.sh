@@ -12,4 +12,4 @@ if [ -f "$(state_file colleague)" ]; then
   remove_colleague colleague
 fi
 rm -f "$(state_file api-control)" "$(state_file api-control.log)" \
-  "$(state_file api-control.parked)"
+  "$(state_file api-control.parked)" "$(state_file api-control.legs)"

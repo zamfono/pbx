@@ -1,0 +1,4 @@
+# shellcheck shell=bash disable=SC2034
+# Where the sides of `inbound-api-leg-transfer` differ from run-scenarios.sh's defaults: the trunk
+# side answers the SIP target's leg and takes the BYE its release sends.
+TRUNK_UAS=answer-outbound
