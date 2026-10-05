@@ -34,6 +34,7 @@ const PLAIN_COLUMNS: {
   smtpSecurity: {},
   smtpUser: {},
   mailFrom: {},
+  smtpCheckIntervalS: {},
   voicemailMaxS: {},
   parkingTimeoutS: {},
   recordingRetentionDays: {},

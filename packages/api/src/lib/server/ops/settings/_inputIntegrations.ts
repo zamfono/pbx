@@ -2,6 +2,9 @@ import { z } from 'zod';
 
 import { MAX_PORT, SMTP_SECURITIES, SSO_PROVIDERS } from '@zamfono/shared';
 
+const MIN_SMTP_CHECK_INTERVAL_S = 60;
+const MAX_SMTP_CHECK_INTERVAL_S = 86_400;
+
 /** The mail relay fields of `PATCH /settings` (§10.2, §11.4). */
 export const mailInputFields = {
   smtpHost: z
@@ -34,6 +37,15 @@ export const mailInputFields = {
     .nullish()
     .describe(
       'Sender address of every mail; the relay must be allowed to send for its domain; null: no mail. Owner-only.'
+    ),
+  smtpCheckIntervalS: z
+    .number()
+    .int()
+    .min(MIN_SMTP_CHECK_INTERVAL_S)
+    .max(MAX_SMTP_CHECK_INTERVAL_S)
+    .nullish()
+    .describe(
+      'Seconds between background checks of the mail relay, 60 to 86400, 900 by default; null: none besides those at start and after a relay change. Owner-only.'
     )
 };
 
