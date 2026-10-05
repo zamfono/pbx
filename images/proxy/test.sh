@@ -45,7 +45,7 @@ run 'caddy version' | grep -q '^v2\.11\.4' \
   || fail "caddy version does not start with v2.11.4, the pin in images/proxy/Dockerfile"
 
 echo "==> the caddy-events-exec plugin is built in"
-run 'caddy list-modules' | grep -qx 'events.handlers.exec' \
+run 'caddy list-modules' | grep -x 'events.handlers.exec' >/dev/null \
   || fail "events.handlers.exec is not among the built-in modules"
 
 echo "==> the entrypoint runs the start-up sync and keeps Caddy's own command"
@@ -101,7 +101,7 @@ run 'export FQDN=Pbx.Example.Test; src=/data/caddy/certificates/local/pbx.exampl
 echo "==> the shipped Caddyfile validates (production shape: no global.d snippet)"
 docker run --rm -e FQDN=x -v "$repo_root/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" "$PROXY_IMAGE" \
   caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 \
-  | grep -q "Valid configuration" \
+  | grep "Valid configuration" >/dev/null \
   || fail "deploy/Caddyfile did not validate inside the built image"
 
 echo "==> the shipped Caddyfile still validates with the test harness's global.d snippet"
@@ -109,7 +109,7 @@ docker run --rm -e FQDN=x \
   -v "$repo_root/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
   -v "$repo_root/test/integration/Caddyfile.local-ca:/etc/caddy/global.d/local-certs.caddy:ro" \
   "$PROXY_IMAGE" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 \
-  | grep -q "Valid configuration" \
+  | grep "Valid configuration" >/dev/null \
   || fail "deploy/Caddyfile did not validate with the test harness's global.d/local-certs.caddy mounted"
 
 echo "==> request bodies: 512 KiB outside the audio upload paths, which api caps at 50 MB (§10.2)"
