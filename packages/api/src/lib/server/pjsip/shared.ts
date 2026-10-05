@@ -144,6 +144,22 @@ export function trunkTransport(trunk: Trunk): string {
   return `transport-${trunk.transport}`;
 }
 
+/**
+ * The `outbound_proxy` line of a trunk's aor, endpoint and registration, when it has a proxy.
+ * PJSIP sends the URI as a `Route`; one without `;lr` would be strict-routed (RFC 3261 §16.12),
+ * the proxy's URI replacing the Request-URI, so `;lr` is added where the stored URI lacks it.
+ */
+export function outboundProxyLines(trunk: Trunk): string[] {
+  if (trunk.outboundProxy === null) {
+    return [];
+  }
+  const params = trunk.outboundProxy.split(';').slice(1);
+  const uri = params.some(param => param.toLowerCase() === 'lr')
+    ? trunk.outboundProxy
+    : `${trunk.outboundProxy};lr`;
+  return [`outbound_proxy = ${escapeConfigValue(uri)}`];
+}
+
 export function hostsByDirection(
   trunk: Trunk,
   directions: readonly TrunkHost['direction'][]

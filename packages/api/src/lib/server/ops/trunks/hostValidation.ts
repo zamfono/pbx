@@ -50,20 +50,24 @@ export function assertValidHosts(
 }
 
 // A SIP URI parameter this outbound proxy accepts: loose routing or an explicit transport
-// (pjsip/trunks.ts writes the value into `outbound_proxy`, its `;` escaped for Asterisk's config
-// parser, and PJSIP parses it as a URI).
+// (pjsip/trunks.ts writes the value into `outbound_proxy`, `;lr` added where it is missing, and
+// PJSIP parses it as the URI of the `Route` it sends).
 const SIP_URI_PARAM_PATTERN = /^(?:lr|transport=(?:udp|tcp|tls))$/iu;
 
+const SIP_URI_SCHEME_PATTERN = /^sips?:/iu;
+
 /**
- * Whether `value` is a SIP URI PJSIP's `outbound_proxy` accepts: an optional `sip:`/`sips:`
- * scheme, an FQDN or IPv4 host, an optional `:port`, and any number of `;lr`/`;transport=`
- * parameters.
+ * Whether `value` is a SIP URI PJSIP's `outbound_proxy` accepts: a `sip:`/`sips:` scheme, an
+ * FQDN or IPv4 host, an optional `:port`, and any number of `;lr`/`;transport=` parameters.
  *
  * ponytail: no bracketed-IPv6 host, since brackets are refused up front as unsafe for generated
  * config; add `[::1]`-style support only if an IPv6 outbound proxy is actually needed.
  */
 function isValidOutboundProxyUri(value: string): boolean {
-  const withoutScheme = value.replace(/^sips?:/iu, '');
+  if (!SIP_URI_SCHEME_PATTERN.test(value)) {
+    return false;
+  }
+  const withoutScheme = value.replace(SIP_URI_SCHEME_PATTERN, '');
   const [hostPort, ...params] = withoutScheme.split(';');
   // `String.split` always returns at least one element.
   if (hostPort === undefined) {

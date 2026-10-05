@@ -7,6 +7,7 @@ import {
   formatAllow,
   hostsByDirection,
   joinSections,
+  outboundProxyLines,
   trunkTransport,
   type RenderInput,
   type Trunk,
@@ -85,9 +86,7 @@ function renderTrunkAor(trunk: Trunk): string {
     const frequency = trunk.qualify ? TRUNK_QUALIFY_FREQUENCY_S : 0;
     lines.push(`qualify_frequency = ${frequency}`);
   }
-  if (trunk.outboundProxy !== null) {
-    lines.push(`outbound_proxy = ${escapeConfigValue(trunk.outboundProxy)}`);
-  }
+  lines.push(...outboundProxyLines(trunk));
   return lines.join('\n');
 }
 
@@ -180,9 +179,7 @@ function renderTrunkEndpoint(trunk: Trunk, tenantCodecs: string[]): string {
     TRUNK_DIVERSION,
     ...mediaEncryptionLines(trunk)
   ];
-  if (trunk.outboundProxy !== null) {
-    lines.push(`outbound_proxy = ${escapeConfigValue(trunk.outboundProxy)}`);
-  }
+  lines.push(...outboundProxyLines(trunk));
   if (trunkNeedsAuthSection(trunk)) {
     lines.push(`outbound_auth = ${name}`);
   }

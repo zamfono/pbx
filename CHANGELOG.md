@@ -62,6 +62,7 @@ why the specified behaviour changed; the commit history, how.
   is an object holding the credentials its kind takes.
 - **Breaking:** a trunk's `inboundNumberFormat` `e164` takes only `+` numbers; `national` and
   dialling follow `settings.country`'s rules (its prefixes, US ten-digit dialling, Italy's `0`).
+- **Breaking:** a trunk's `outboundProxy` is a `sip:`/`sips:` URI, used with `;lr` where it lacks it.
 - **Breaking, API:** `callerIdDidId` (not `calleridDidId`); `/auth/setPassword`; `calls.pickup`
   without `userId`; a `manual` device returns `connectionSettings`; `settings.update` refuses
   unknown `featureCodes` keys and a `softDeleteRetentionDays` beyond `auditRetentionDays`; MCP

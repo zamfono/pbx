@@ -7,6 +7,7 @@ import { registrationUris, trunkSectionName } from '@zamfono/shared';
 import {
   escapeConfigValue,
   hostsByDirection,
+  outboundProxyLines,
   trunkTransport,
   type Trunk
 } from './shared.js';
@@ -69,9 +70,7 @@ export function renderTrunkRegistration(trunk: Trunk): string | null {
     lines.push(`expiration = ${trunk.registerExpiryS}`);
   }
   lines.push(...retryLines(trunk));
-  if (trunk.outboundProxy !== null) {
-    lines.push(`outbound_proxy = ${escapeConfigValue(trunk.outboundProxy)}`);
-  }
+  lines.push(...outboundProxyLines(trunk));
   lines.push(`endpoint = ${name}`);
   return lines.join('\n');
 }

@@ -214,7 +214,7 @@ describe('trunks operations', () => {
       {
         id: trunk.id,
         hosts: [{ host: 'h2', port: 5060 }],
-        outboundProxy: 'p.example'
+        outboundProxy: 'sip:p.example'
       },
       asRun()
     );
@@ -524,7 +524,17 @@ describe('trunks operations', () => {
     ).rejects.toMatchObject({ status: 422 });
   });
 
-  it('accepts a SIP-URI outboundProxy, the shape the pjsip renderer writes verbatim', async () => {
+  it('refuses an outboundProxy without a sip: or sips: scheme', async () => {
+    const db = await makeTestDb();
+    await expect(
+      createTrunk(db, { outboundProxy: 'sbc.provider-a.example' })
+    ).rejects.toMatchObject({ status: 422 });
+    await expect(
+      createTrunk(db, { outboundProxy: 'sbc.provider-a.example:5060;lr' })
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('accepts a SIP-URI outboundProxy, with or without its loose-routing parameter', async () => {
     const db = await makeTestDb();
     await expect(
       createTrunk(db, { outboundProxy: 'sip:sbc.provider-a.example' })
@@ -540,7 +550,7 @@ describe('trunks operations', () => {
   it('refuses a CIDR outboundProxy: a proxy is always a dial target, never a source address', async () => {
     const db = await makeTestDb();
     await expect(
-      createTrunk(db, { outboundProxy: '10.0.0.0/8' })
+      createTrunk(db, { outboundProxy: 'sip:10.0.0.0/8' })
     ).rejects.toMatchObject({ status: 422 });
   });
 

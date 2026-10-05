@@ -36,7 +36,7 @@ const FIELD = {
   diversion:
     'What a call forwarded out over this trunk tells the far end about who forwarded it: off (default) nothing, last the newest forward, all every forward.',
   outboundProxy:
-    'A SIP outbound proxy every request goes through, such as sip:proxy.example.com;lr.',
+    'The outbound proxy every request goes through: a sip: or sips: URI such as sip:proxy.example.com, written with ;lr where it lacks it.',
   registerExpiryS: 'Registration expiry in seconds; registration trunks only.',
   registerRetryS:
     'Seconds between registration retries after a failure; registration trunks only.',

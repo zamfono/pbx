@@ -105,12 +105,22 @@ describe('renderTrunksConf escaping', () => {
     const conf = renderTrunk({
       ...registrationTrunk,
       username: 'trunkuser',
-      password: 'pass\\word',
-      outboundProxy: 'sip:sbc.provider-a.example'
+      password: 'pass\\word'
     });
     expect(conf).toContain('username = trunkuser');
     expect(conf).toContain('password = pass\\word');
-    expect(conf).toContain('outbound_proxy = sip:sbc.provider-a.example\n');
+  });
+
+  test('an outbound proxy without `;lr` is written loose-routing, in every outbound_proxy line', () => {
+    const conf = renderTrunk({
+      ...registrationTrunk,
+      outboundProxy: 'sips:sbc.provider-a.example:5061;transport=tls'
+    });
+    expect(parsedValues(conf, 'outbound_proxy')).toEqual([
+      'sips:sbc.provider-a.example:5061;transport=tls;lr',
+      'sips:sbc.provider-a.example:5061;transport=tls;lr',
+      'sips:sbc.provider-a.example:5061;transport=tls;lr'
+    ]);
   });
 });
 

@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-05 · §9.4 Signaling.** `trunks.outbound_proxy` is a `sip:`/`sips:` URI, a value without a scheme refused with 422, and is used as a loose route, `;lr` added where missing.
+*Why:* a scheme-less proxy left PJSIP no `Route` to parse, and one without `;lr` was strict-routed, the proxy's URI replacing the Request-URI.
+
 **2026-10-05 · §9.2.** `[from-trunk]` matches every user part of one character or more, `s` included, which Asterisk gives an INVITE whose Request-URI has no user part.
 *Why:* the pattern needed two characters, so such a call was refused with 404 before the core could take the called number from `To` (§9.4).
 
