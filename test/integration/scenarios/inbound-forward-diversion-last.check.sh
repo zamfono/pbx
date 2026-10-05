@@ -4,7 +4,8 @@
 # field with one entry, the newest hop's alone: 178's unconditional forward by the main number,
 # 178 having none of its own, never 178's extension; 177's out-of-office hop, which `all` would
 # add after it, is left out. No custom header: an external forward carries none. The history
-# records the call answered over the trunk, by no user.
+# records the call answered over the trunk, by 178, whose unconditional forward's leg stands in for
+# them (§10.2 "Call history").
 set -euo pipefail
 
 api_base=$1
@@ -14,6 +15,7 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck source=_lib.sh
 . "$here/_lib.sh"
 
+read -r _ _ agent _ < "$(state_file inbound-forward-diversion-last)"
 sipp_trace sipp /tmp/trunk-messages.log \
   | python3 "$here/_forward-context-check.py" "sip:+15557301@$(container_ip sipp)" \
     '^"CI Agent" <sip:\+15551000@[^>]+>;reason=unconditional$'
@@ -28,10 +30,10 @@ attempts = [event for event in events if event.get("event") == "attempt"]
 problems = []
 if call["status"] != "answered":
     problems.append("the call ended " + call["status"] + ", not answered")
-if call["answeredByUserId"]:
-    problems.append("a user answered the call, instead of the external number over the trunk")
+if call["answeredByUserId"] != sys.argv[1]:
+    problems.append("the call was not answered as 178, whose forward the trunk leg is")
 if len(attempts) != 1 or attempts[0].get("cause") != "answered":
     problems.append("not one answered attempt: " + json.dumps(attempts))
 if problems:
     sys.exit("; ".join(problems) + ": " + json.dumps(call)[:800])
-'
+' "$agent"

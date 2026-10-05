@@ -10,12 +10,12 @@ import type { AriClient } from '../ari/client.js';
 import { logUnlessGone } from '../ari/failures.js';
 import type { Logger } from '../ari/types.js';
 import type { ConfigCache } from '../internal/snapshot.js';
-import type { Call, Leg } from './call.js';
+import { legParticipant, type Call, type Leg } from './call.js';
 import {
   startSnoopPair,
   waitForRecordingFinished
 } from './recordingChannels.js';
-import { legParticipant, legRecords, userRecords } from './recordingFlags.js';
+import { legRecords, userRecords } from './recordingFlags.js';
 import { ffmpegMix, type Mixer } from './recordingMix.js';
 import { recordFormatFor } from './recordingRate.js';
 import { storeParticipation } from './recordingStore.js';

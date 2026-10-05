@@ -7,7 +7,8 @@
 # written; and, the trunk's `diversion` being `all`, one `Diversion` field with both hops, newest
 # first, each by the party's own number and never its extension: 178's unconditional forward by
 # the main number, 178 having none of its own, then 177's out-of-office by 177's own number, the
-# DID the call dialled. The history names 177 as the callee it was placed to. The trunk is
+# DID the call dialled. The history names 177 as the callee it was placed to, and 178 as its
+# answerer, whose unconditional forward's leg stands in for them (§10.2 "Call history"). The trunk is
 # `unmonitored` by then (`qualify` off, §9.4 "Provisioning and status"), so one answered attempt
 # also shows the core tried a trunk nothing probes.
 set -euo pipefail
@@ -19,6 +20,7 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck source=_lib.sh
 . "$here/_lib.sh"
 
+read -r _ _ agent _ < "$(state_file inbound-forward-sip)"
 # shellcheck disable=SC2016 # the `${EXTEN}` is the literal text under test
 sipp_trace sipp /tmp/sip-target-messages.log \
   | python3 "$here/_forward-context-check.py" 'sip:proj_ci123@sip-tls:5061' \
@@ -36,11 +38,11 @@ attempts = [event for event in events if event.get("event") == "attempt"]
 problems = []
 if call["status"] != "answered":
     problems.append("the call ended " + call["status"] + ", not answered")
-if call["answeredByUserId"]:
-    problems.append("a user answered the call, instead of the sip target over the trunk")
+if call["answeredByUserId"] != sys.argv[1]:
+    problems.append("the call was not answered as 178, whose forward the sip target is")
 if len(attempts) != 1 or attempts[0].get("routeId") is not None \
         or attempts[0].get("cause") != "answered":
     problems.append("not one route-less answered attempt: " + json.dumps(attempts))
 if problems:
     sys.exit("; ".join(problems) + ": " + json.dumps(call)[:800])
-'
+' "$agent"

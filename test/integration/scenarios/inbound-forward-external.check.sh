@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # §8 "forwarding chains", §10.1 step 5: the ring group's only member forwards unconditionally to
 # an external number (inbound-forward-external.setup.sh), so the call still reaches the group but
-# is answered over the trunk rather than by any user — the call history still carries the group
-# that routed it, but no answering user (§10.2 "Call history"). The leg carries no custom header,
+# is answered over the trunk rather than on the member's phone — the call history carries the
+# group that routed it, and the member as its answerer, whose unconditional forward's leg stands in
+# for them (§10.2 "Call history"). The leg carries no custom header,
 # which an external forward's carrier has no use for, and no `Diversion` (§9.4 "Forwarded calls"):
 # the trunk's `diversion` is `off`, the default, and chan_pjsip sends none of its own.
 set -euo pipefail
@@ -18,6 +19,7 @@ sipp_trace sipp /tmp/trunk-messages.log \
   | python3 "$here/_forward-context-check.py" "sip:+15557777@$(container_ip sipp)" -
 
 group_id=$(ci_group)
+member_id=$(user_with_ext 101)
 newest_call | python3 -c '
 import json, sys
 
@@ -29,8 +31,8 @@ if call["ringGroupId"] != group:
     problems.append("the call did not reach the group")
 if call["status"] != "answered":
     problems.append("the call ended " + call["status"] + ", not answered")
-if call["answeredByUserId"]:
-    problems.append("a member answered the call directly, instead of the forward leaving it over the trunk")
+if call["answeredByUserId"] != sys.argv[2]:
+    problems.append("the call was not answered as the member, whose forward the trunk leg is")
 if problems:
     sys.exit("; ".join(problems) + ": " + json.dumps(call)[:600])
-' "$group_id"
+' "$group_id" "$member_id"

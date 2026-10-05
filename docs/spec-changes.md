@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-05 · §10.2.** A call answered on the trunk leg of a user's `unconditional` forward to an external number or a SIP target, a ring-group member's followed forward included, records that user as `answered_by_user_id`; any other forward's trunk leg answers as nobody, as before.
+*Why:* the product owner, on applying the same "de facto the user" rule as the recording to the call history: "yes, set `answeredByUserId`".
+
 **2026-10-05 · §10.2.** A user's `unconditional` forward to an external number or a SIP target makes its answered trunk leg that user's participation, a ring-group member's followed forward included: it is recorded under the user's effective flag, its row naming the user. Other forward conditions, OOO rules, schedules and ring-group, menu or DID forwards leave the trunk leg nobody's.
 *Why:* the product owner: "i just noticed, that unconditional SIP forwarding doesn't trigger recordings. but it should respect the user's recording setting.", "with an unconditional SIP forward, the external target _becomes_ de facto the user and should be recorded according to the user's settings.", and, asked "Should I extend its scope to "unconditional forward to a `sip` or `external` target"? The other forward conditions would stay out.", "yes, please".
 

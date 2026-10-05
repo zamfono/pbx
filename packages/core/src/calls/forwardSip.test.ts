@@ -598,6 +598,21 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
       expect(trunkLeg(call)?.standsInFor).toBe(user);
     });
 
+    it('answers the call as the user whose unconditional forward it dials (§10.2 "Call history")', async () => {
+      fakeAri.answerAfterMs = 10;
+      const user = await seedForwarder('unconditional');
+      const call = inboundCall();
+
+      enterTarget(pipeline, call, { kind: 'user', userId: user }, null).catch(
+        () => undefined
+      );
+
+      await eventually(() => {
+        expect(call.status).toBe('answered');
+      });
+      expect(call.answeredByUserId).toBe(user);
+    });
+
     it("is nobody for the user's offline forward", async () => {
       const user = await seedForwarder('offline');
       const call = inboundCall();
@@ -677,6 +692,8 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
         return leg;
       });
       expect(won).toMatchObject({ ringGroupId: groupId, standsInFor: member });
+      // §10.2 "Call history": the member answered it.
+      expect(call.answeredByUserId).toBe(member);
     });
   });
 

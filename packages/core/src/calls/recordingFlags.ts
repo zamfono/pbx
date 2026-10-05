@@ -3,18 +3,11 @@
  * own `record_calls` and that of the ring group that routed the participation.
  */
 import { userById, type Snapshot } from '../internal/snapshot.js';
-import type { Leg } from './call.js';
+import { legParticipant, type Leg } from './call.js';
 
 /** Whether `userId`'s own `record_calls` flag is set. */
 export function userRecords(snapshot: Snapshot, userId: string): boolean {
   return userById(snapshot, userId)?.recordCalls === 1;
-}
-
-/** The user whose participation `leg` is: its own user's, or that of the user whose
- * unconditional forward it dials (`Leg.standsInFor`); `null` for a leg with no user behind it,
- * such as an outbound call's trunk leg ("A recording captures one user's participation"). */
-export function legParticipant(leg: Leg): string | null {
-  return leg.userId ?? leg.standsInFor ?? null;
 }
 
 /** Whether `leg`'s participation is recorded: its participant's own flag, or the flag of the ring

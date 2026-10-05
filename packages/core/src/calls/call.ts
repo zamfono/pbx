@@ -32,7 +32,7 @@ export type Leg = {
    * "Recording semantics"). */
   ringGroupId?: string;
   /** The user whose `unconditional` forward this `trunk` leg, or external `member` leg, dials:
-   * its participation is theirs (§10.2 "Effective flag"). */
+   * its participation and its answer are theirs (§10.2 "Effective flag", "Call history"). */
   standsInFor?: string;
 };
 
@@ -123,6 +123,13 @@ type NewCallParams = {
   logLevel: CallLogLevel;
   callLogMaxBytes: number;
 };
+
+/** The user whose participation `leg` is (§10.2 "Recording semantics", "Call history"): its own
+ * user's, or that of the user whose unconditional forward it dials (`Leg.standsInFor`); `null`
+ * for a leg with no user behind it, such as an outbound call's trunk leg. */
+export function legParticipant(leg: Leg): string | null {
+  return leg.userId ?? leg.standsInFor ?? null;
+}
 
 /** Builds a fresh `Call` aggregate at the start of routing, before any target is resolved. */
 export function newCall(params: NewCallParams): Call {

@@ -12,6 +12,7 @@ import { newId } from '@zamfono/shared';
 import { isGone, logUnlessGone } from '../ari/failures.js';
 import {
   callerChannel,
+  legParticipant,
   takeEarlyBridge,
   takeJoinBridge,
   type Call,
@@ -53,7 +54,7 @@ export function claimAnswer(
     return false;
   }
   call.answeredAt = pipeline.deps.now();
-  call.answeredByUserId = leg.userId;
+  call.answeredByUserId = legParticipant(leg);
   call.status = 'answered';
   leg.state = 'up';
   call.legs.set(leg.channelId, leg);
