@@ -53,15 +53,29 @@ export function consentForRequest(
   return sameRequest(pending.authorize, params) ? pending : null;
 }
 
-/** The sealed decision this consent step acts on, consumed: the cookie is dropped either way, so
- *  a reload cannot approve twice. A cookie that is absent, sealed under a retired key or
- *  malformed reads as an expired session. */
-function takePendingConsent(event: RequestEvent): PendingConsent {
+/** The request the consent form shows, carried by its hidden fields. */
+export type ConsentShown = { client_id: string; code_challenge: string };
+
+/** The sealed decision this consent step acts on, consumed: the cookie is dropped, so a reload
+ *  cannot approve twice. A cookie that is absent, sealed under a retired key or malformed reads as
+ *  an expired session. A cookie sealed for another request than the form `shown` — a login in a
+ *  second tab re-sealed it — is refused and left for the tab that shows its request. */
+function takePendingConsent(
+  event: RequestEvent,
+  shown: ConsentShown
+): PendingConsent {
   const pending = unsealCookie(
     event.cookies,
     keyringFromEnv(env),
     CONSENT_COOKIE
   );
+  if (
+    pending !== null &&
+    (pending.authorize.clientId !== shown.client_id ||
+      pending.authorize.codeChallenge !== shown.code_challenge)
+  ) {
+    error(HTTP_BAD_REQUEST, 'oauth/authorize: consent for another request');
+  }
   event.cookies.delete(CONSENT_COOKIE.name, { path: CONSENT_COOKIE.path });
   if (pending === null) {
     error(HTTP_BAD_REQUEST, 'oauth/authorize: consent session expired');
@@ -97,9 +111,10 @@ async function writeClientRow(authorize: Authorize): Promise<boolean> {
  * exchange could not redeem.
  */
 export async function approveConsentSubmit(
-  event: RequestEvent
+  event: RequestEvent,
+  shown: ConsentShown
 ): Promise<never> {
-  const pending = takePendingConsent(event);
+  const pending = takePendingConsent(event, shown);
   if (!(await writeClientRow(pending.authorize))) {
     authorizationErrorRedirect(pending.authorize, SERVER_ERROR);
   }
@@ -120,7 +135,10 @@ export async function approveConsentSubmit(
  *  `await`, so `redirect()`'s throw becomes a rejected promise like every other handler here,
  *  rather than an exception a caller's `.catch()` never gets the chance to see. */
 // eslint-disable-next-line @typescript-eslint/require-await -- see above: the `async` itself is the point
-export async function denyConsentSubmit(event: RequestEvent): Promise<never> {
-  const pending = takePendingConsent(event);
+export async function denyConsentSubmit(
+  event: RequestEvent,
+  shown: ConsentShown
+): Promise<never> {
+  const pending = takePendingConsent(event, shown);
   authorizationErrorRedirect(pending.authorize, ACCESS_DENIED);
 }

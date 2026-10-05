@@ -37,7 +37,13 @@ export type LoginPayload = z.infer<typeof LoginPayloadSchema>;
  *  carries the submitted address back, so only the password has to be typed again. */
 export type LoginResult =
   | { message: string; email: string }
-  | { needsConsent: true; clientName: string; redirectUri: string };
+  | {
+      needsConsent: true;
+      clientName: string;
+      redirectUri: string;
+      clientId: string;
+      codeChallenge: string;
+    };
 
 // A well-formed address and a non-empty password, checked here rather than in the form schema:
 // every refusal this page renders carries the same generic message (§5.5), so field-level
@@ -98,6 +104,8 @@ export async function loginSubmit(
   return {
     needsConsent: true,
     clientName: resolved.meta.name,
-    redirectUri: resolved.authorize.redirectUri
+    redirectUri: resolved.authorize.redirectUri,
+    clientId: resolved.authorize.clientId,
+    codeChallenge: resolved.authorize.codeChallenge
   };
 }

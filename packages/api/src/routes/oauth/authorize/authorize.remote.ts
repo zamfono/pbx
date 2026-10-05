@@ -29,21 +29,24 @@ export const login = form(
 );
 
 const ConsentPayloadSchema = z.object({
-  action: z.enum(['approve', 'deny'])
+  action: z.enum(['approve', 'deny']),
+  client_id: z.string(),
+  code_challenge: z.string()
 });
 
 /**
  * The consent step (§5.2 "Authentication pages"): approving mints the authorization code and
  * redirects to the client, denying redirects with the standard `access_denied` error. Both
- * outcomes are a 302 to the client's own `redirect_uri`, so neither returns to this page.
+ * outcomes are a 302 to the client's own `redirect_uri`, so neither returns to this page. The
+ * form carries the request it shows, so either acts only on that one.
  */
 export const consent = form(
   ConsentPayloadSchema,
-  async ({ action }): Promise<never> => {
+  async ({ action, ...shown }): Promise<never> => {
     const event = getRequestEvent();
     if (action === 'deny') {
-      return denyConsentSubmit(event);
+      return denyConsentSubmit(event, shown);
     }
-    return approveConsentSubmit(event);
+    return approveConsentSubmit(event, shown);
   }
 );

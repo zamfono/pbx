@@ -34,7 +34,9 @@ export const load = (async event => {
       authorize: null,
       consent: {
         clientName: pendingConsent.clientName,
-        redirectUri: pendingConsent.authorize.redirectUri
+        redirectUri: pendingConsent.authorize.redirectUri,
+        clientId: pendingConsent.authorize.clientId,
+        codeChallenge: pendingConsent.authorize.codeChallenge
       }
     };
   }

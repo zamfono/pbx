@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import process from 'node:process';
-import { isRedirect } from '@sveltejs/kit';
+import { isHttpError, isRedirect } from '@sveltejs/kit';
 import * as privateEnv from '$app/env/private';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -19,7 +19,7 @@ import {
 } from '#testing/requestEvent.js';
 
 import { load } from './+page.server.js';
-import { approveConsentSubmit } from './consentSubmit.js';
+import { approveConsentSubmit, denyConsentSubmit } from './consentSubmit.js';
 
 const KEY_BYTE_LENGTH = 32;
 const FQDN = 'pbx.example.com';
@@ -124,7 +124,9 @@ describe('GET /oauth/authorize with a pending consent cookie', () => {
     const data = await loadFor(url, jar);
     expect(data.consent).toEqual({
       clientName: 'Client A',
-      redirectUri: REDIRECT_A
+      redirectUri: REDIRECT_A,
+      clientId: clientA,
+      codeChallenge: 'challenge-a'
     });
   });
 
@@ -140,17 +142,22 @@ describe('GET /oauth/authorize with a pending consent cookie', () => {
     const data = await loadFor(url, jar);
     expect(data.consent).toEqual({
       clientName: 'Client A',
-      redirectUri: REDIRECT_A
+      redirectUri: REDIRECT_A,
+      clientId: clientA,
+      codeChallenge: 'challenge-a'
     });
   });
 
   it('renders the sealed consent step for the bare return from the SSO callback', async () => {
     const jar = cookieJar();
-    sealConsent(jar, clientIdFor('Client A', REDIRECT_A), 'Client A');
+    const clientA = clientIdFor('Client A', REDIRECT_A);
+    sealConsent(jar, clientA, 'Client A');
     const data = await loadFor(new URL(`${ORIGIN}/oauth/authorize`), jar);
     expect(data.consent).toEqual({
       clientName: 'Client A',
-      redirectUri: REDIRECT_A
+      redirectUri: REDIRECT_A,
+      clientId: clientA,
+      codeChallenge: 'challenge-a'
     });
   });
 });
@@ -162,7 +169,11 @@ describe('the consent step, approved', () => {
     // here would be redeemed against a `tokens.client_id` with nothing to reference (§5.2).
     sealConsent(jar, 'not-a-resolvable-client-id', 'Client A');
     const err = await approveConsentSubmit(
-      requestEvent(`${ORIGIN}/oauth/authorize`, { cookies: jar })
+      requestEvent(`${ORIGIN}/oauth/authorize`, { cookies: jar }),
+      {
+        client_id: 'not-a-resolvable-client-id',
+        code_challenge: 'challenge-a'
+      }
     ).catch((caught: unknown) => caught);
     if (!isRedirect(err)) {
       throw new Error('expected a redirect');
@@ -175,4 +186,31 @@ describe('the consent step, approved', () => {
     // RFC 9207: an error response names its issuer just as a success does (§5.2).
     expect(location.searchParams.get('iss')).toBe(ORIGIN);
   });
+});
+
+describe("the consent step, submitted from another tab's page", () => {
+  // Two tabs: the second login re-sealed `zamfono_consent` for client B while the first still
+  // shows client A, so acting on what the first shows must not decide client B's request.
+  it.each([
+    ['approved', approveConsentSubmit],
+    ['denied', denyConsentSubmit]
+  ])(
+    'refuses with 400, without redirecting, a step %s for a client the cookie does not name',
+    async (_label, submit) => {
+      const jar = cookieJar();
+      sealConsent(jar, clientIdFor('Client B', REDIRECT_A), 'Client B');
+      const err = await submit(
+        requestEvent(`${ORIGIN}/oauth/authorize`, { cookies: jar }),
+        {
+          client_id: clientIdFor('Client A', REDIRECT_A),
+          code_challenge: 'challenge-a'
+        }
+      ).catch((caught: unknown) => caught);
+      expect(isRedirect(err)).toBe(false);
+      if (!isHttpError(err)) {
+        throw new Error('expected an HttpError');
+      }
+      expect(err.status).toBe(400);
+    }
+  );
 });

@@ -52,6 +52,13 @@
     </p>
     <p class="auth-note">{consent.redirectUri}</p>
     <form {...consentForm}>
+      <input {...consentForm.fields.client_id.as('hidden', consent.clientId)} />
+      <input
+        {...consentForm.fields.code_challenge.as(
+          'hidden',
+          consent.codeChallenge
+        )}
+      />
       <button
         class="auth-button auth-button--primary"
         {...consentForm.fields.action.as('submit', 'approve')}

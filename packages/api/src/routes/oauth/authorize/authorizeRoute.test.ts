@@ -23,8 +23,12 @@ import { keyringFromEnv } from '#lib/server/secretbox.js';
 import { cookieJar, requestEvent } from '#testing/requestEvent.js';
 
 import { load } from './+page.server.js';
-import { approveConsentSubmit, denyConsentSubmit } from './consentSubmit.js';
-import { loginSubmit } from './loginSubmit.js';
+import {
+  approveConsentSubmit,
+  denyConsentSubmit,
+  type ConsentShown
+} from './consentSubmit.js';
+import { loginSubmit, type LoginResult } from './loginSubmit.js';
 
 // A metadata document's host resolves to a public documentation-range address, with no network.
 vi.mock('node:dns/promises', () => ({
@@ -54,6 +58,14 @@ function testClientId(redirectUri: string): string {
     redirectUris: [redirectUri],
     applicationType: 'web'
   });
+}
+
+/** The request the consent step `result` renders carries in its form's hidden fields. */
+function consentShown(result: LoginResult): ConsentShown {
+  if (!('needsConsent' in result)) {
+    throw new Error('expected the consent step');
+  }
+  return { client_id: result.clientId, code_challenge: result.codeChallenge };
 }
 
 /** An owner `email` signing in with `PASSWORD`. */
@@ -162,13 +174,16 @@ describe('the login step', () => {
     expect(loginResult).toEqual({
       needsConsent: true,
       clientName: 'Test Client',
-      redirectUri: 'https://client.example.com/callback'
+      redirectUri: 'https://client.example.com/callback',
+      clientId: authorize.client_id,
+      codeChallenge: 'challenge-1'
     });
     // The login step authenticates and seals a consent decision; it never redirects with a code
     // on its own (§5.2 "Authentication pages": login → consent step → 302).
-    const err = await approveConsentSubmit(eventFor(cookies)).catch(
-      (caught: unknown) => caught
-    );
+    const err = await approveConsentSubmit(
+      eventFor(cookies),
+      consentShown(loginResult)
+    ).catch((caught: unknown) => caught);
     if (!isRedirect(err)) {
       throw new Error('expected a redirect');
     }
@@ -195,9 +210,10 @@ describe('the login step', () => {
       })
     );
     expect(loginResult).toMatchObject({ needsConsent: true });
-    const err = await approveConsentSubmit(eventFor(cookies)).catch(
-      (caught: unknown) => caught
-    );
+    const err = await approveConsentSubmit(
+      eventFor(cookies),
+      consentShown(loginResult)
+    ).catch((caught: unknown) => caught);
     if (!isRedirect(err)) {
       throw new Error('expected a redirect');
     }
@@ -214,7 +230,7 @@ describe('the login step', () => {
     const cookies = cookieJar();
     const clientId = testClientId('https://client.example.com/callback');
     const verifier = 'verifier-no-redirect-uri';
-    await loginSubmit(
+    const loginResult = await loginSubmit(
       eventFor(cookies),
       loginPayload(email, PASSWORD, {
         client_id: clientId,
@@ -224,9 +240,10 @@ describe('the login step', () => {
         scope: 'openid'
       })
     );
-    const err = await approveConsentSubmit(eventFor(cookies)).catch(
-      (caught: unknown) => caught
-    );
+    const err = await approveConsentSubmit(
+      eventFor(cookies),
+      consentShown(loginResult)
+    ).catch((caught: unknown) => caught);
     if (!isRedirect(err)) {
       throw new Error('expected a redirect');
     }
@@ -260,7 +277,7 @@ describe('the login step', () => {
     const db = getDb();
     await seedOwner(db, email);
     const cookies = cookieJar();
-    await loginSubmit(
+    const loginResult = await loginSubmit(
       eventFor(cookies),
       loginPayload(email, PASSWORD, {
         client_id: testClientId('https://client.example.com/callback'),
@@ -270,9 +287,10 @@ describe('the login step', () => {
         scope: 'openid'
       })
     );
-    const err = await denyConsentSubmit(eventFor(cookies)).catch(
-      (caught: unknown) => caught
-    );
+    const err = await denyConsentSubmit(
+      eventFor(cookies),
+      consentShown(loginResult)
+    ).catch((caught: unknown) => caught);
     if (!isRedirect(err)) {
       throw new Error('expected a redirect');
     }
@@ -389,7 +407,9 @@ describe('GET /oauth/authorize (load)', () => {
     expect(data.authorize).toBeNull();
     expect(data.consent).toEqual({
       clientName: 'Callback Client',
-      redirectUri: 'https://client.example.com/callback'
+      redirectUri: 'https://client.example.com/callback',
+      clientId: 'client-1',
+      codeChallenge: 'challenge-1'
     });
   });
 
@@ -569,11 +589,14 @@ describe("Claude Code's sign-in on a random loopback port (RFC 8252 §7.3)", () 
     expect(loginResult).toEqual({
       needsConsent: true,
       clientName: 'Claude Code',
-      redirectUri: REDIRECT_URI
+      redirectUri: REDIRECT_URI,
+      clientId: CLAUDE_CODE_CLIENT_ID,
+      codeChallenge: expect.any(String) as string
     });
-    const err = await approveConsentSubmit(eventFor(cookies)).catch(
-      (caught: unknown) => caught
-    );
+    const err = await approveConsentSubmit(
+      eventFor(cookies),
+      consentShown(loginResult)
+    ).catch((caught: unknown) => caught);
     if (!isRedirect(err)) {
       throw new Error('expected a redirect');
     }
