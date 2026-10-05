@@ -452,10 +452,24 @@ networks:
   internal:
 
 services:
-  asterisk:
-    image: ghcr.io/zamfono/asterisk:${ZAMFONO_VERSION:-latest}   # debian:trixie-slim + asterisk from the Zamfono APT repo + envsubst entrypoint
+  # Owns the stack's network namespace and its address (§6.1): asterisk and proxy join it, so
+  # either restarts or is recreated alone and finds the namespace where it left it. The proxy
+  # image, idle; SIGKILL, since it holds no state and `sleep` as PID 1 ignores SIGTERM.
+  netns:
+    image: ghcr.io/zamfono/proxy:${ZAMFONO_VERSION:-latest}
+    entrypoint: ["sleep", "infinity"]
+    stop_signal: SIGKILL
     networks:
       internal:
+        aliases:
+          - asterisk                            # ARI, AMI and SIP keep Asterisk's name on internal
+    restart: unless-stopped
+
+  asterisk:
+    image: ghcr.io/zamfono/asterisk:${ZAMFONO_VERSION:-latest}   # debian:trixie-slim + asterisk from the Zamfono APT repo + envsubst entrypoint
+    network_mode: service:netns                 # the stack's address; reaches core over internal
+    depends_on:
+      - netns
     environment:
       RTP_PORT_START: ${RTP_PORT_START:-}
       RTP_PORT_END: ${RTP_PORT_END:-}
@@ -560,9 +574,9 @@ services:
 
   proxy:
     image: ghcr.io/zamfono/proxy:${ZAMFONO_VERSION:-latest}   # Caddy, built with caddy-events-exec (images/proxy/Dockerfile), uid 1000
-    network_mode: service:asterisk   # binds :80 and :443 on the stack IP; reaches api over internal
+    network_mode: service:netns      # binds :80 and :443 on the stack IP; reaches api over internal
     depends_on:
-      - asterisk
+      - netns
     environment:
       FQDN: ${FQDN}                             # Caddyfile site address, Let's Encrypt; also read by the cert_obtained hook (§6.4)
       METRICS_TOKEN: ${METRICS_TOKEN:-}         # Caddyfile refuses /metrics while unset (§7)
@@ -594,19 +608,21 @@ volumes:
 **Attachment overlays.** Exactly one of the two is in use: `setup.sh` links it as `compose.override.yaml`, which Compose reads beside `compose.yaml` without any `-f` (§6.1).
 
 ```yaml
-# compose.macvlan.yaml — the asterisk container owns a public address on the host's `public` network
+# compose.macvlan.yaml — the netns container owns a public address on the host's `public` network
 networks:
   public:
     external: true
 
 # STACK_IPV4, the stack's own address in the routed block, is required in this mode (§6.1).
 services:
-  asterisk:
-    environment:
-      STACK_IPV4: ${STACK_IPV4:?the macvlan mode needs the stack's own IPv4}   # transports bind this address (§9.1)
+  netns:
     networks:
       public:
         ipv4_address: ${STACK_IPV4:?the macvlan mode needs the stack's own IPv4}
+
+  asterisk:
+    environment:
+      STACK_IPV4: ${STACK_IPV4:?the macvlan mode needs the stack's own IPv4}   # transports bind this address (§9.1)
 
   core:
     environment:
@@ -618,13 +634,11 @@ services:
 ```
 
 ```yaml
-# compose.ports.yaml — the stack uses the host's address; ports are published on asterisk, the owner
-# of the shared namespace, so they cover Caddy as well. Every port maps 1:1.
+# compose.ports.yaml — the stack uses the host's address; ports are published on netns, the owner
+# of the shared namespace, so they cover Asterisk and Caddy alike. Every port maps 1:1.
 # EXTERNAL_IPV4, the host's public IPv4, is required in this mode (§6.1).
 services:
-  asterisk:
-    environment:
-      EXTERNAL_IPV4: ${EXTERNAL_IPV4:?the ports mode needs the host's public IPv4}   # written into SIP and SDP (§9.1)
+  netns:
     ports:
       - "80:80/tcp"
       - "443:443/tcp"
@@ -633,6 +647,10 @@ services:
       - "5061:5061/tcp"
       - "${RTP_PORT_START:-10000}-${RTP_PORT_END:-10200}:\
          ${RTP_PORT_START:-10000}-${RTP_PORT_END:-10200}/udp"   # one string; the escaped line break joins it
+
+  asterisk:
+    environment:
+      EXTERNAL_IPV4: ${EXTERNAL_IPV4:?the ports mode needs the host's public IPv4}   # written into SIP and SDP (§9.1)
 
   core:
     environment:

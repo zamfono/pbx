@@ -13,10 +13,24 @@ networks:
   internal:
 
 services:
-  asterisk:
-    image: ghcr.io/zamfono/asterisk:${ZAMFONO_VERSION:-latest}   # debian:trixie-slim + asterisk from the Zamfono APT repo + envsubst entrypoint
+  # Owns the stack's network namespace and its address (§6.1): asterisk and proxy join it, so
+  # either restarts or is recreated alone and finds the namespace where it left it. The proxy
+  # image, idle; SIGKILL, since it holds no state and `sleep` as PID 1 ignores SIGTERM.
+  netns:
+    image: ghcr.io/zamfono/proxy:${ZAMFONO_VERSION:-latest}
+    entrypoint: ["sleep", "infinity"]
+    stop_signal: SIGKILL
     networks:
       internal:
+        aliases:
+          - asterisk                            # ARI, AMI and SIP keep Asterisk's name on internal
+    restart: unless-stopped
+
+  asterisk:
+    image: ghcr.io/zamfono/asterisk:${ZAMFONO_VERSION:-latest}   # debian:trixie-slim + asterisk from the Zamfono APT repo + envsubst entrypoint
+    network_mode: service:netns                 # the stack's address; reaches core over internal
+    depends_on:
+      - netns
     environment:
       RTP_PORT_START: ${RTP_PORT_START:-}
       RTP_PORT_END: ${RTP_PORT_END:-}
@@ -121,9 +135,9 @@ services:
 
   proxy:
     image: ghcr.io/zamfono/proxy:${ZAMFONO_VERSION:-latest}   # Caddy, built with caddy-events-exec (images/proxy/Dockerfile), uid 1000
-    network_mode: service:asterisk   # binds :80 and :443 on the stack IP; reaches api over internal
+    network_mode: service:netns      # binds :80 and :443 on the stack IP; reaches api over internal
     depends_on:
-      - asterisk
+      - netns
     environment:
       FQDN: ${FQDN}                             # Caddyfile site address, Let's Encrypt; also read by the cert_obtained hook (§6.4)
       METRICS_TOKEN: ${METRICS_TOKEN:-}         # Caddyfile refuses /metrics while unset (§7)

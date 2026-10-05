@@ -7,8 +7,9 @@
 # being banned; once that entry is gone its next ban takes the second, permanent step; and an
 # empty step list lifts enforcement.
 # Reads `run.sh`'s own compose, RUNTIME, api_base, METRICS_TOKEN and fail, and api.sh's helpers.
-# Self-contained: it connects `asterisk` to `outside` for its own run and disconnects it again,
-# lifts the bans it caused and restores the settings it changed, so REUSE may select it freely.
+# Self-contained: it connects `netns`, Asterisk's namespace, to `outside` for its own run and
+# disconnects it again, lifts the bans it caused and restores the settings it changed, so REUSE
+# may select it freely.
 
 SIP_BAN_ADDRESS=10.213.48.20
 SIP_BAN_TARGET=10.213.48.10
@@ -73,7 +74,7 @@ sip_ban_metric() {
     | awk '$1 == "zamfono_sip_bans_active" { print $2 }'
 }
 
-# The `outside` network's name and `asterisk`'s container, for the runtime's `network` command.
+# The `outside` network's name, for the runtime's `network` command.
 sip_ban_network() {
   local id
   id=$(dc ps -q sipp-outside)
@@ -82,11 +83,12 @@ sip_ban_network() {
 
 run_sip_ban_step() {
   echo '== §5.6 failed SIP attempts ban their source, nftables drops it =='
-  local network asterisk settings id step expires allow attempt
+  local network netns settings id step expires allow attempt
   network=$(sip_ban_network) || fail "could not find sipp-outside's network"
-  asterisk=$(dc ps -q asterisk)
-  "$RUNTIME" network connect --ip "$SIP_BAN_TARGET" "$network" "$asterisk" \
-    || fail "could not connect asterisk to $network"
+  # Asterisk's namespace is netns's (§6.1).
+  netns=$(dc ps -q netns)
+  "$RUNTIME" network connect --ip "$SIP_BAN_TARGET" "$network" "$netns" \
+    || fail "could not connect netns to $network"
   settings=$(api GET /settings | python3 -c '
 import json, sys
 s = json.load(sys.stdin)
@@ -136,6 +138,6 @@ print(json.dumps({k: s[k] for k in ("sipBanFailures", "sipBanWindowS", "sipBanSu
   sip_ban_lift "$id"
   api PATCH /settings "$settings" >/dev/null
   sip_ban_answered || fail 'the scanner is dropped once the settings are restored'
-  "$RUNTIME" network disconnect "$network" "$asterisk" \
-    || fail "could not disconnect asterisk from $network"
+  "$RUNTIME" network disconnect "$network" "$netns" \
+    || fail "could not disconnect netns from $network"
 }

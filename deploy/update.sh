@@ -42,7 +42,7 @@ cd "$(dirname "$0")"
 REPO=${ZAMFONO_REPO_URL:-https://github.com/zamfono/pbx}
 # The services a release replaces; the updater's run leaves out the updater itself, which the
 # next update from the host, or any `up -d`, brings to its new image.
-STACK_SERVICES=(asterisk migrate core api proxy)
+STACK_SERVICES=(netns asterisk migrate core api proxy)
 # How long `up` waits for the recreated services to report healthy.
 WAIT_SECONDS=180
 # Names the release an update installed until its stack reports healthy, so that a rerun after a

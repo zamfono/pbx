@@ -370,9 +370,9 @@ docker compose pull
 docker compose up -d
 ```
 
-**Podman** refuses to replace `asterisk` while `proxy` still shares its network namespace, so
-`up -d` after a pull fails with "has dependent containers which must be removed before it".
-Remove the containers first — `down` keeps every volume — or, with the boot unit of step 7,
+**Podman** refuses to replace `netns` while `asterisk` and `proxy` still share its network
+namespace, so `up -d` after a pull fails with "has dependent containers which must be removed
+before it". Remove the containers first — `down` keeps every volume — or, with the boot unit of step 7,
 restart it, which does the same:
 
 ```bash
@@ -394,8 +394,9 @@ and without Litestream's copy, before `up -d`
 ([`docs/guide/restore.md`](https://github.com/zamfono/pbx/blob/main/docs/guide/restore.md),
 "Rolling back a release").
 
-Always `up -d` the whole stack, never `asterisk` alone: `proxy` lives in `asterisk`'s network
-namespace, and a recreated `asterisk` leaves it on the old one.
+`asterisk` and `proxy` live in the network namespace of `netns`, which holds the stack's address
+and published ports: either may restart or be recreated alone. Recreate `netns` only with the
+whole stack (`up -d`), since both would stay on the old namespace.
 
 ## Continuous replication
 

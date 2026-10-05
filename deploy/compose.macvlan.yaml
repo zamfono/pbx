@@ -1,16 +1,18 @@
-# compose.macvlan.yaml — the asterisk container owns a public address on the host's `public` network
+# compose.macvlan.yaml — the netns container owns a public address on the host's `public` network
 networks:
   public:
     external: true
 
 # STACK_IPV4, the stack's own address in the routed block, is required in this mode (§6.1).
 services:
-  asterisk:
-    environment:
-      STACK_IPV4: ${STACK_IPV4:?the macvlan mode needs the stack's own IPv4}   # transports bind this address (§9.1)
+  netns:
     networks:
       public:
         ipv4_address: ${STACK_IPV4:?the macvlan mode needs the stack's own IPv4}
+
+  asterisk:
+    environment:
+      STACK_IPV4: ${STACK_IPV4:?the macvlan mode needs the stack's own IPv4}   # transports bind this address (§9.1)
 
   core:
     environment:

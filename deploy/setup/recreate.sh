@@ -37,11 +37,12 @@ await_healthy() {
 }
 
 # `--wait` returns once every service it starts is healthy, or running where it has no
-# healthcheck, and `migrate` has exited 0. Podman refuses to replace `asterisk` while `proxy`
-# shares its network namespace (§6.3), so on Podman the old containers go first: the boot unit's
-# restart does that with `down`, and its `up -d` does not wait, so an `up` that recreates nothing
-# waits for it; without the unit, `down` here, which podman-compose has where it has no `rm`. The
-# updater's run, whose `docker compose` has `rm`, must not take itself down, so it removes proxy.
+# healthcheck, and `migrate` has exited 0. Podman refuses to replace `netns` while `asterisk` and
+# `proxy` share its network namespace (§6.3), so on Podman the old containers go first: the boot
+# unit's restart does that with `down`, and its `up -d` does not wait, so an `up` that recreates
+# nothing waits for it; without the unit, `down` here, which podman-compose has where it has no
+# `rm`. The updater's run, whose `docker compose` has `rm`, must not take itself down, so it removes
+# asterisk and proxy.
 recreate_stack() {
   local -a wait_args=()
   if compose_waits; then
@@ -58,7 +59,7 @@ recreate_stack() {
     fi
   else
     if [[ -n $updater ]]; then
-      "${compose[@]}" rm -sf proxy
+      "${compose[@]}" rm -sf asterisk proxy
     elif [[ $runtime == podman ]]; then
       "${compose[@]}" down
     fi

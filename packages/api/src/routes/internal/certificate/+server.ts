@@ -10,8 +10,8 @@ import { notifyCertSync } from '#lib/server/jobs/certSync.js';
  * keeps §6.4's reload-timing rules — a notification only makes that pass run sooner, it never
  * skips them.
  *
- * The hook reaches `api` directly: the `proxy` container shares Asterisk's network namespace
- * (network_mode: service:asterisk, §6.3) and is on the `internal` network `api` is too, with no
+ * The hook reaches `api` directly: the `proxy` container shares the stack's network namespace
+ * (network_mode: service:netns, §6.3) and is on the `internal` network `api` is too, with no
  * proxy hop, so `hooks.server.ts` lets it through.
  *
  * A failed or missed notification is not fatal (§6.4: hourly poll plus the sync at `api` start

@@ -23,7 +23,7 @@ bring_up_stack() {
   # owner's password is hashed by the api image under test, and the updater drives the runtime
   # this run brings the stack up on (§6.3 "Updates"). The defaults compose.yaml gives everything
   # else hold for the scenarios: HEP_ENABLED is on (§7), as the `*-sip-log-*` scenarios need.
-  # EXTERNAL_IPV4 is `asterisk`'s own fixed address on `internal` (compose.test.yaml), where the
+  # EXTERNAL_IPV4 is `netns`'s fixed address on `internal` (compose.test.yaml), Asterisk's, where the
   # sipp peers send their media.
   echo '== writing .env with setup.sh =='
   stack_write_env "$run_dir" CI 10.213.47.10
@@ -65,23 +65,34 @@ step_prompts() {
 # Selectable as `caddy`; cheap enough to run on every shard.
 step_caddy() {
   echo "== §6.1 through Caddy: https://$FQDN, a login through the page's forms =="
-  # curl's own configuration, for every curl this step runs: the FQDN at the stack's published
-  # 443, and Caddy's CA trusted. `api` (test/api.sh) reads this step's api_base and token.
-  local -x CURL_HOME=$run_dir/caddy-client
+  # `api` (test/api.sh) reads this step's api_base and token.
+  local -x CURL_HOME
   local api_base=https://$FQDN token
-  mkdir -p "$CURL_HOME"
-  dc exec -T proxy cat /data/caddy/pki/authorities/local/root.crt \
-    >"$CURL_HOME/root.crt" || fail "Caddy's local CA has no root certificate"
-  printf 'resolve = %s:443:127.0.0.1\ncacert = %s\n' "$FQDN" "$CURL_HOME/root.crt" \
-    >"$CURL_HOME/.curlrc"
-  [[ $(curl -sS -o /dev/null -w '%{http_code} %{content_type}' "$api_base/healthz") \
-    == @(200|503)' application/health+json' ]] || fail "GET /healthz did not answer through Caddy"
+  caddy_client
+  caddy_healthz || fail "GET /healthz did not answer through Caddy"
   [ "$(curl -sS -o /dev/null -w '%{http_code}' "$api_base/readyz")" = 404 ] \
     || fail 'GET /readyz answered through Caddy, not 404'
   token=$(bash "$here/bootstrap-token.sh" "$api_base" "$OWNER_EMAIL" "$OWNER_PASSWORD" \
     "$api_base") || fail "the login's forms gave no access token through Caddy"
   api GET /users >/dev/null || fail "GET /users did not answer through Caddy"
   echo '   /healthz, the login and GET /users answered through Caddy, /readyz 404'
+}
+
+# curl's own configuration, for every curl its caller runs, which declares CURL_HOME `local -x`:
+# the FQDN at the stack's published 443, and Caddy's CA trusted.
+caddy_client() {
+  CURL_HOME=$run_dir/caddy-client
+  mkdir -p "$CURL_HOME"
+  dc exec -T proxy cat /data/caddy/pki/authorities/local/root.crt \
+    >"$CURL_HOME/root.crt" || fail "Caddy's local CA has no root certificate"
+  printf 'resolve = %s:443:127.0.0.1\ncacert = %s\n' "$FQDN" "$CURL_HOME/root.crt" \
+    >"$CURL_HOME/.curlrc"
+}
+
+# Whether Caddy answers `GET /healthz` with the health document, through `caddy_client`'s curl.
+caddy_healthz() {
+  [[ $(curl -sS -o /dev/null -w '%{http_code} %{content_type}' "https://$FQDN/healthz") \
+    == @(200|503)' application/health+json' ]]
 }
 
 # The tenant §8's scenarios are played against, built over the REST API the way an operator

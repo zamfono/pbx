@@ -89,8 +89,8 @@ mv -f "$tmp_key" "$dest_dir/privkey.pem"
 trap - EXIT
 log "copy complete"
 
-# Reaches `api` directly: the `proxy` container shares Asterisk's network namespace
-# (network_mode: service:asterisk, §6.3), which is on the `internal` network `api` is too, the
+# Reaches `api` directly: the `proxy` container shares the stack's network namespace
+# (network_mode: service:netns, §6.3), which is on the `internal` network `api` is too, the
 # same path deploy/Caddyfile's own `reverse_proxy api:3000` already uses. On a first boot Caddy
 # can issue before `api` listens, after its start sync has already found no copy, so the
 # notification is retried for a minute (caddy-events-exec runs this in the background); a

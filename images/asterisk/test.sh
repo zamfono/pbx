@@ -5,6 +5,9 @@ cd "$(dirname "$0")"
 repo_root=$(CDPATH='' cd -- ../.. && pwd)
 
 CONTAINER=zamfono-asterisk-test
+# The stack's `netns` service (§6.1): an idle container that owns the network namespace the one
+# under test joins, so the namespace and its nftables table outlive a restart (test-ban.sh).
+NETNS_CONTAINER=zamfono-asterisk-test-netns
 STARTUP_TIMEOUT_S=30
 
 # CI passes the image it built and labelled as ASTERISK_IMAGE, docker-bake.hcl's variable, and
@@ -23,13 +26,16 @@ HEP_CONTAINER=zamfono-asterisk-test-hep
 ASTDB_VOLUME=zamfono-asterisk-test-astdb
 
 cleanup() {
-  docker rm -f "$CONTAINER" "$HEP_CONTAINER" > /dev/null 2>&1 || true
+  docker rm -f "$CONTAINER" "$HEP_CONTAINER" "$NETNS_CONTAINER" > /dev/null 2>&1 || true
   docker volume rm "$ASTDB_VOLUME" > /dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
+docker run -d --name "$NETNS_CONTAINER" --platform linux/amd64 --entrypoint sleep \
+  "$ASTERISK_IMAGE" infinity > /dev/null
 # EXTERNAL_IPV4 as in the ports mode (§6.1), for the TLS transports' Contact and Via below.
 docker run -d --name "$CONTAINER" --platform linux/amd64 --cap-add NET_ADMIN \
+  --network "container:$NETNS_CONTAINER" \
   -e HEP_ENABLED=false \
   -e SIP_UDP_ENABLED=false \
   -e EXTERNAL_IPV4=192.0.2.10 \
@@ -169,7 +175,7 @@ PJSIP_MODULES=$(docker exec "$CONTAINER" asterisk -rx 'module show like res_pjsi
 echo "$PJSIP_MODULES" | grep -q 'Not Running' \
   && fail "a res_pjsip module declined to load"
 
-INTERNAL_ADDR=$(docker exec "$CONTAINER" hostname -i | awk '{ print $1 }')
+INTERNAL_ADDR=$(docker exec "$CONTAINER" hostname -I | awk '{ print $1 }')
 ARI_STATUS=$(docker exec "$CONTAINER" curl -s -o /dev/null -w '%{http_code}' \
   -u "zamfono:x" "http://${INTERNAL_ADDR}:8088/ari/asterisk/info")
 [ "$ARI_STATUS" = "200" ] || fail "GET /ari/asterisk/info returned $ARI_STATUS, expected 200"

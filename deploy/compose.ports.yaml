@@ -1,10 +1,8 @@
-# compose.ports.yaml — the stack uses the host's address; ports are published on asterisk, the owner
-# of the shared namespace, so they cover Caddy as well. Every port maps 1:1.
+# compose.ports.yaml — the stack uses the host's address; ports are published on netns, the owner
+# of the shared namespace, so they cover Asterisk and Caddy alike. Every port maps 1:1.
 # EXTERNAL_IPV4, the host's public IPv4, is required in this mode (§6.1).
 services:
-  asterisk:
-    environment:
-      EXTERNAL_IPV4: ${EXTERNAL_IPV4:?the ports mode needs the host's public IPv4}   # written into SIP and SDP (§9.1)
+  netns:
     ports:
       - "80:80/tcp"
       - "443:443/tcp"
@@ -13,6 +11,10 @@ services:
       - "5061:5061/tcp"
       - "${RTP_PORT_START:-10000}-${RTP_PORT_END:-10200}:\
          ${RTP_PORT_START:-10000}-${RTP_PORT_END:-10200}/udp"   # one string; the escaped line break joins it
+
+  asterisk:
+    environment:
+      EXTERNAL_IPV4: ${EXTERNAL_IPV4:?the ports mode needs the host's public IPv4}   # written into SIP and SDP (§9.1)
 
   core:
     environment:

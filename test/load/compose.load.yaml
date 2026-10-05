@@ -16,9 +16,9 @@
 #   - sipp-provider alone also gets /load-gen, a session-scratch directory holding the ulaw pcap
 #     make_ulaw_pcap.py generates at run time (not committed -- it is a derived binary, rebuilt
 #     from sipp's own shipped g711a.pcap every session)
-#   - `internal` gets a fixed subnet and asterisk a static address on it, so session.sh can put a
-#     known-good EXTERNAL_IPV4 in .env before the stack ever comes up. "ports" mode's
-#     EXTERNAL_IPV4 (images/asterisk/entrypoint.sh: external_media_address/
+#   - `internal` gets a fixed subnet and netns, Asterisk's namespace, a static address on it, so
+#     session.sh can put a known-good EXTERNAL_IPV4 in .env before the stack ever comes up.
+#     "ports" mode's EXTERNAL_IPV4 (images/asterisk/entrypoint.sh: external_media_address/
 #     external_signaling_address) is meant for the host's real public/LAN address, reachable by a
 #     genuine external SIP client through the published RTP port range; sipp/sipp-provider here
 #     are containers on this same `internal` bridge, not on the host's network namespace at all,
@@ -40,14 +40,17 @@ networks:
         - subnet: 172.28.0.0/24
 
 services:
+  netns:
+    image: ${PROXY_IMAGE:?set by session.sh}
+    networks:
+      internal:
+        ipv4_address: 172.28.0.10
+
   asterisk:
     image: ${ASTERISK_IMAGE:?set by session.sh}
     environment:
       SIP_UDP_ENABLED: 'true'
       SIP_TCP_ENABLED: 'true'
-    networks:
-      internal:
-        ipv4_address: 172.28.0.10
 
   migrate:
     image: ${MIGRATE_IMAGE:?set by session.sh}

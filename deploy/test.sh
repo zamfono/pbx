@@ -33,6 +33,17 @@ required=$(grep -ohE '\$\{[A-Z0-9_]+(:?\?[^}]*)?\}' "$script_dir/compose.yaml" "
 sed -E "s/^($required)=\$/\1=placeholder/" "$script_dir/.env.example" >"$env_file"
 (cd "$script_dir" && docker compose --env-file "$env_file" -f compose.yaml -f compose.ports.yaml config) >/dev/null
 
+echo "==> compose config: netns holds the namespace and its ports, asterisk and proxy join it (§6.1)"
+(cd "$script_dir" && docker compose --env-file "$env_file" -f compose.yaml -f compose.ports.yaml \
+  config --format json) | python3 -c '
+import json, sys
+s = json.load(sys.stdin)["services"]
+for name in ("asterisk", "proxy"):
+    assert s[name].get("network_mode") == "service:netns", name + " does not join netns"
+    assert not s[name].get("ports") and not s[name].get("networks"), name + " has a network of its own"
+assert s["netns"].get("ports"), "netns publishes no port"
+'
+
 echo "==> compose config (reviewer override, compose.pr.yaml)"
 pr_config=$(cd "$script_dir" && ZAMFONO_PR=1-0123abc docker compose --env-file "$env_file" \
   -f compose.yaml -f compose.ports.yaml -f compose.pr.yaml config)

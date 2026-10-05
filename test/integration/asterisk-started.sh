@@ -7,8 +7,10 @@
 # (`settings.ringotel_profile_pending`), is dropped as `skipped` with `trigger` `asterisk.started`.
 # `system.info` dates the new start (`core.asteriskStartedAt`).
 #
-# Compose restarts `proxy` along with `asterisk`, whose network namespace it shares (§6.3).
-# Reads `run.sh`'s own compose, api_base and fail, and api.sh's helpers.
+# The runtime restarts the `asterisk` container itself, not Compose: `proxy` stays as it is, in
+# the namespace `netns` holds (§6.1), and Caddy still answers once Asterisk is back.
+# Reads `run.sh`'s own compose, RUNTIME, api_base, FQDN and fail, api.sh's helpers and steps.sh's
+# `caddy_client` and `caddy_healthz`.
 
 ASTERISK_STARTED_ATTEMPTS=90
 
@@ -31,7 +33,7 @@ new DatabaseSync('/data/zamfono.sqlite3').exec('UPDATE settings SET ringotel_pro
   reads warn healthz_check ringotel:profile \
     || fail '/healthz does not show the seeded pending profile'
   since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-  dc restart asterisk >/dev/null || fail 'asterisk did not restart'
+  "$RUNTIME" restart "$(dc ps -q asterisk)" >/dev/null || fail 'asterisk did not restart'
   poll $ASTERISK_STARTED_ATTEMPTS 1 reads pass healthz_check ringotel:profile \
     || fail "api never acted on the restart: the pending profile is still set"
   api GET "/audit?operation=ringotel.profile&from=$since" | python3 -c '
@@ -45,4 +47,8 @@ if not any(f.get("trigger") == "asterisk.started" and f.get("outcome") == "skipp
   [ -n "$after" ] && [ "$after" != "$before" ] \
     || fail "system.info still dates Asterisk's start $before after the restart (now '$after')"
   echo "   Asterisk started again at $after; api retried the pending profile on core's announcement"
+  local -x CURL_HOME
+  caddy_client
+  caddy_healthz || fail "after Asterisk's restart Caddy does not answer GET /healthz"
+  echo '   proxy kept its namespace: Caddy answers GET /healthz'
 }

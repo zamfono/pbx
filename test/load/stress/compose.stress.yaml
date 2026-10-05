@@ -1,6 +1,6 @@
 # test/load/stress: layered over deploy/compose.yaml + compose.ports.yaml (as the stack's
 # compose.override.yaml link) + test/load's own
-# compose.load.yaml (network, static asterisk address, sipp containers). Adds what the
+# compose.load.yaml (network, static netns address, sipp containers). Adds what the
 # heavy-codec profile needs on top:
 #   - sipp (the trunk side, UDP) also mounts /load-gen, where the session puts the AMR-WB pcap
 #     and the -inf DID file
@@ -9,8 +9,8 @@
 services:
   # The stack's placeholder TLS certificate (images/asterisk/entrypoint.sh) is CN=zamfono; the
   # devices dial asterisk by that name (baresip resolves through Docker's DNS, not /etc/hosts),
-  # so their server verification can pass against it.
-  asterisk:
+  # so their server verification can pass against it. netns holds Asterisk's namespace.
+  netns:
     networks:
       internal:
         aliases:

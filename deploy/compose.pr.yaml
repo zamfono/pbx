@@ -9,6 +9,8 @@
 # it has no default, so a forgotten value stops Compose instead of running a release. api and core
 # report it as their version. ZAMFONO_VERSION never names a pull request's build.
 services:
+  netns:
+    image: ghcr.io/zamfono/proxy-pr:${ZAMFONO_PR:?set it to the PR number}
   asterisk:
     image: ghcr.io/zamfono/asterisk-pr:${ZAMFONO_PR:?set it to the PR number}
   migrate:

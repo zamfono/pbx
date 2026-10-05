@@ -16,6 +16,8 @@ why the specified behaviour changed; the commit history, how.
 - A user's unconditional forward to an external number or SIP target is recorded when the
   user's recording is on.
 - The call history names that user as the answerer of such a forwarded call.
+- A restart of `asterisk` alone no longer leaves HTTPS dead: the new `netns` service holds the
+  stack's address and ports, and `asterisk` and `proxy` join it.
 
 ## [0.3.0] - 2026-10-05
 

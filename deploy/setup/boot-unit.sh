@@ -3,8 +3,8 @@
 # The Podman boot unit setup.sh offers (README.md, step 7): Podman restarts nothing after a reboot
 # for a stack on `unless-stopped`, so a systemd unit runs `compose up -d` instead, through
 # setup/compose.sh, which names a compose.dr.yaml when the stack has one. It stops with `down`, not
-# `stop`: Podman refuses to replace `asterisk` while `proxy` still shares its network namespace, so
-# a restart after a pull must remove both first; the volumes stay. Reads setup.sh's `compose`, and
+# `stop`: Podman refuses to replace `netns` while `asterisk` and `proxy` still share its network
+# namespace, so a restart after a pull must remove all three first; the volumes stay. Reads setup.sh's `compose`, and
 # sets `boot_unit` to the unit's name once one exists.
 
 # How to run the stack once systemd owns it: independent of the SSH session, and again at boot.

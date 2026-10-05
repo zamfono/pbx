@@ -23,17 +23,18 @@ assert_runtime_ordering() {
     || fail "§6.3 Runtimes depends_on ordering did not hold (see above)"
 }
 
-# §6.3 Runtimes: "the shared network namespace of `proxy` and `asterisk` (`network_mode:
-# service:`)". The namespace's identity (`net:[inode]`), not the contents of `/proc/net/dev`:
+# §6.3 Runtimes: "the shared network namespace of `asterisk` and `proxy`, which both join `netns`
+# (`network_mode: service:`)". The namespace's identity (`net:[inode]`), not the contents of `/proc/net/dev`:
 # its byte counters move between the two execs whenever the stack is talking, which failed the
 # check at random.
 assert_shared_namespace() {
-  echo '== §6.3 Runtimes: proxy shares the asterisk network namespace =='
-  local proxy_ns asterisk_ns
+  echo '== §6.3 Runtimes: asterisk and proxy share the netns network namespace =='
+  local netns_ns proxy_ns asterisk_ns
+  netns_ns=$(dc exec -T netns readlink /proc/self/ns/net)
   proxy_ns=$(dc exec -T proxy readlink /proc/self/ns/net)
   asterisk_ns=$(dc exec -T asterisk readlink /proc/self/ns/net)
-  [ -n "$proxy_ns" ] && [ "$proxy_ns" = "$asterisk_ns" ] \
-    || fail "proxy and asterisk do not share a network namespace (network_mode: service:)"
+  [ -n "$netns_ns" ] && [ "$proxy_ns" = "$netns_ns" ] && [ "$asterisk_ns" = "$netns_ns" ] \
+    || fail "asterisk and proxy do not share netns's network namespace (network_mode: service:)"
 }
 
 # §6.3 Runtimes: "the static address on the `public` network". `compose.macvlan.yaml` names an
@@ -41,7 +42,8 @@ assert_shared_namespace() {
 # a host interface carrying routed public addresses (§6.2.1) — not something a CI runner has. The
 # file itself is exercised unchanged; only the network's driver differs, a bridge standing in for
 # the macvlan/ipvlan the host would otherwise provide, which is exactly what `external: true`
-# leaves to the host to decide. Brings up `asterisk` alone, the only service the overlay touches.
+# leaves to the host to decide. Brings up `asterisk` alone, with the `netns` it joins, which holds
+# the address.
 # §9.1 "Binding": in the macvlan mode both TLS transports bind the stack address, the trunks'
 # transport-tls-noverify included, since an outgoing connection leaves from its transport's
 # address. Polled for up to 30 s, as PJSIP loads a few seconds after the container starts.
@@ -59,7 +61,7 @@ public_tls_transports_listed() {
 }
 
 assert_public_network_address() {
-  echo '== §6.3 Runtimes: asterisk holds STACK_IPV4 on the public network (compose.macvlan.yaml) =='
+  echo '== §6.3 Runtimes: netns holds STACK_IPV4 on the public network (compose.macvlan.yaml) =='
   local macvlan_files=(-p "$(stack_project "$run_dir")" -f compose.yaml -f compose.macvlan.yaml
     -f "$here/compose.test.yaml")
   local subnet=198.51.100.0/29 gateway=198.51.100.1 stack_ip=198.51.100.2
@@ -76,12 +78,12 @@ assert_public_network_address() {
   # when it caught one of the restarts' brief moments up. Throwaway values keep it running.
   if STACK_IPV4=$stack_ip ARI_PASSWORD=unused AMI_PASSWORD=unused \
     $COMPOSE "${macvlan_files[@]}" up -d asterisk; then
-    cid=$(STACK_IPV4=$stack_ip $COMPOSE "${macvlan_files[@]}" ps -q asterisk)
+    cid=$(STACK_IPV4=$stack_ip $COMPOSE "${macvlan_files[@]}" ps -q netns)
     addr=$("$RUNTIME" inspect "$cid" \
       --format '{{(index .NetworkSettings.Networks "public").IPAddress}}' 2>/dev/null || true)
     if [ "$addr" != "$stack_ip" ]; then
       ok=false
-      reason="asterisk's address on 'public' was '${addr:-none}', not $stack_ip"
+      reason="netns's address on 'public' was '${addr:-none}', not $stack_ip"
     elif ! public_tls_transports_bound "$stack_ip"; then
       ok=false
       reason="transport-tls and transport-tls-noverify are not bound to $stack_ip:5061/5062 (§9.1)"

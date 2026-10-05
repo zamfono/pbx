@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """test/load: host-side veth byte counters for one or more containers, since `docker stats`'s NET
-I/O column is a formatted string (units vary) rather than raw counters, and proxy shares
-asterisk's network namespace (compose.yaml `network_mode: service:asterisk`) so its own veth
-lookup resolves to the same interface as asterisk's -- exactly what we want, since it means their
-combined traffic is already counted once, not twice.
+I/O column is a formatted string (units vary) rather than raw counters, and asterisk and proxy
+share netns's network namespace (compose.yaml `network_mode: service:netns`) so their veth
+lookups resolve to the same interface -- exactly what we want, since it means their combined
+traffic is already counted once, not twice.
 
 For a container, its own `/sys/class/net/eth0/iflink` names the ifindex of the host-side veth
 peer; this walks `/sys/class/net/veth*/ifindex` on the host to find the matching interface, then

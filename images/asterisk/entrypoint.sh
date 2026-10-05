@@ -7,12 +7,12 @@ GEN_DIR=/etc/asterisk/gen
 TLS_DIR="$GEN_DIR/tls"
 ASTDB_DIR=/var/lib/asterisk/astdb
 
-# The container owns the public IP, so ARI and AMI bind to the `internal` network address
-# alone, never 0.0.0.0 (spec §9.1). `hostname -i` lists every address of every attached
-# network with no ordering guarantee; in macvlan mode that includes the public `STACK_IPV4`
-# address, so it is excluded explicitly rather than trusted to sort last.
+# The namespace holds the public IP, so ARI and AMI bind to the `internal` network address
+# alone, never 0.0.0.0 (spec §9.1). `hostname -I` lists the addresses of the namespace's own
+# interfaces, which `netns` owns (§6.1), with no ordering guarantee; in macvlan mode that includes
+# the public `STACK_IPV4` address, so it is excluded explicitly rather than trusted to sort last.
 INTERNAL_ADDR=""
-for addr in $(hostname -i); do
+for addr in $(hostname -I); do
   if [ "$addr" != "${STACK_IPV4:-}" ]; then
     INTERNAL_ADDR=$addr
     break
@@ -135,8 +135,12 @@ chown asterisk:asterisk "$ASTDB_DIR"
 # The ban list (spec §5.6 "Enforcement", §9.1): a set per family, whose elements time out on their
 # own, and a rule dropping their packets to the SIP ports in this network namespace alone. The
 # ban helper fills the sets from sip_bans.list; it and this load need the container's
-# CAP_NET_ADMIN, which Asterisk, running as user `asterisk`, does not hold.
+# CAP_NET_ADMIN, which Asterisk, running as user `asterisk`, does not hold. The namespace outlives
+# this container (§6.1), so a restart finds the table it loaded: one transaction creates it where
+# it is missing, deletes it and loads it anew, and the helper fills the empty sets again.
 nft -f - <<'NFT'
+table inet zamfono
+delete table inet zamfono
 table inet zamfono {
   set sip_ban_v4 { type ipv4_addr; flags timeout; }
   set sip_ban_v6 { type ipv6_addr; flags interval, timeout; }

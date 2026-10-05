@@ -36,7 +36,7 @@ grep -qx 'compose up -d' "$work/runtime.log" ||
 echo "  - on Podman without a boot unit"
 fresh_stack
 podman_update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update on Podman failed"; }
-# Podman will not replace asterisk while proxy shares its network namespace (§6.3): down, then up.
+# Podman will not replace netns while asterisk and proxy share its network namespace (§6.3): down, then up.
 [[ $(grep -E ' (down|up -d|rm)' "$work/runtime.log") == "compose down
 compose up -d --wait --wait-timeout 180" ]] ||
   fail "no down before up -d on Podman: $(cat "$work/runtime.log")"
@@ -81,10 +81,10 @@ fresh_stack
 (cd "$work/stack" && ZAMFONO_UPDATER=1 \
   PATH="$work/bin:$PATH" STUB_LOG="$work/runtime.log" ZAMFONO_REPO_URL="http://127.0.0.1:$port" \
   ./update.sh 1.2.4 </dev/null >"$work/out" 2>&1) || { cat "$work/out"; fail "the updater's run failed"; }
-grep -qx 'compose pull asterisk migrate core api proxy' \
+grep -qx 'compose pull netns asterisk migrate core api proxy' \
   "$work/runtime.log" || fail "the updater pulled more than the stack: $(cat "$work/runtime.log")"
-grep -qx 'compose rm -sf proxy' "$work/runtime.log" ||
-  fail "the updater did not remove proxy first"
-grep -qx 'compose up -d --wait --wait-timeout 180 asterisk'\
+grep -qx 'compose rm -sf asterisk proxy' "$work/runtime.log" ||
+  fail "the updater did not remove asterisk and proxy first"
+grep -qx 'compose up -d --wait --wait-timeout 180 netns asterisk'\
 ' migrate core api proxy' "$work/runtime.log" || fail "the updater recreated more than the stack"
 [[ ! -e $work/stack/.update ]] || fail "the updater's run wrote the record the updater keeps itself"

@@ -45,7 +45,7 @@ fail() {
 }
 
 # The stack's .env, then the stack itself, up once healthy and migrated; EXTERNAL_IPV4 is
-# `asterisk`'s fixed address in compose.load.yaml.
+# `netns`'s fixed address in compose.load.yaml, Asterisk's.
 stack_up() {
   stack_port_free "$API_PORT"
   stack_write_env "$STACK_DIR" Load 172.28.0.10

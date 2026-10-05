@@ -48,6 +48,21 @@ grep -q '203\.0\.113\.8 timeout' <<< "$v4" && fail "a permanent ban's set elemen
 docker exec "$CONTAINER" nft list set inet zamfono sip_ban_v6 | grep '2001:db8:1:2::/64 timeout' > /dev/null \
   || fail "an IPv6 /64 ban is not an element of the IPv6 set"
 
+# The namespace, and with it the table, outlives a restart of the container (§6.1): the entrypoint
+# loads the table again as it was, two drop rules, and the helper fills the sets from the list.
+docker restart "$CONTAINER" > /dev/null
+await_ready
+for _ in $(seq 1 20); do
+  docker exec "$CONTAINER" nft list set inet zamfono sip_ban_v4 | grep '203\.0\.113\.7' > /dev/null \
+    && break
+  sleep 0.5
+done
+docker exec "$CONTAINER" nft list set inet zamfono sip_ban_v4 | grep '203\.0\.113\.7' > /dev/null \
+  || fail "after a restart the helper did not fill the set from sip_bans.list"
+rules=$(docker exec "$CONTAINER" nft list chain inet zamfono input | grep -c ' drop$')
+[ "$rules" = 2 ] || fail "after a restart the table holds $rules drop rules, not 2"
+docker exec "$CONTAINER" ban-helper-alive || fail "the healthcheck fails after a restart"
+
 applied=$(status_digest)
 printf '203.0.113.9; flush ruleset\n' | put_list
 [ "$(status_digest)" = "$applied" ] || fail "the helper's status names a list it refused"
