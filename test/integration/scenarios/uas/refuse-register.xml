@@ -3,22 +3,15 @@
   §9.4 "Auth mode": the second provider's registrar refusing the trunk's first two REGISTERs with
   403, as a provider does while an account is locked or not yet provisioned, before the real
   registrar (`registrar.xml`) takes the port over. Asterisk retries a registration under the same
-  Call-ID, so both REGISTERs are one sipp call: run with `-m 1`.
+  Call-ID, so both REGISTERs are one sipp call, whose end stops the run.
 -->
 <scenario name="refuse-register">
-  <recv request="REGISTER" />
-
-  <send>
-    <![CDATA[
-      SIP/2.0 403 Forbidden
-      [last_Via:]
-      [last_From:]
-      [last_To:];tag=[call_number]
-      [last_Call-ID:]
-      [last_CSeq:]
-      Content-Length: 0
-    ]]>
-  </send>
+  <!-- A stray OPTIONS/NOTIFY/INFO (an `ip` trunk's qualify probe to this host, or another
+       request reaching port 5060) opens a call of its own, answered and ended here without
+       stopping the run, as in `registrar.xml`. -->
+  <recv request="OPTIONS" optional="true" next="probe" />
+  <recv request="NOTIFY" optional="true" next="probe" />
+  <recv request="INFO" optional="true" next="probe" />
 
   <recv request="REGISTER" />
 
@@ -33,4 +26,39 @@
       Content-Length: 0
     ]]>
   </send>
+
+  <recv request="REGISTER" />
+
+  <send>
+    <![CDATA[
+      SIP/2.0 403 Forbidden
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[call_number]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <nop next="done">
+    <action>
+      <exec int_cmd="stop_gracefully" />
+    </action>
+  </nop>
+
+  <label id="probe" />
+  <send>
+    <![CDATA[
+      SIP/2.0 200 OK
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[call_number]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Content-Length: 0
+    ]]>
+  </send>
+
+  <label id="done" />
 </scenario>

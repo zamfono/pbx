@@ -23,7 +23,7 @@ dc exec -T sipp-provider rm -f /tmp/registrar-line.csv /tmp/registrar-messages.l
 # shellcheck disable=SC2086
 dc exec -T -d sipp-provider sh -c \
   "sh /scenarios/_sipp-run.sh provider-refuse-register \
-    -sf /scenarios/uas/refuse-register.xml -p 5060 -m 1 -nostdin asterisk:5060 \
+    -sf /scenarios/uas/refuse-register.xml -p 5060 -nostdin asterisk:5060 \
     > /tmp/refuse-register.log 2>&1"
 
 provider_ip=$(container_ip sipp-provider)
@@ -40,6 +40,9 @@ trunk_id=$(api POST /trunks "{
 }" | jsonfield trunk.id)
 did_id=$(did_to_group ci-reg-acct "$(ci_group)")
 printf '%s %s\n' "$trunk_id" "$did_id" > "$(state_file registration)"
+# A provider's host takes qualify probes too, from whichever `ip` trunk dials it: one arrives while
+# the refusals are under way, and the refusing run answers it without losing their place.
+asterisk_cli "pjsip qualify trunk-$trunk_id" >/dev/null
 
 # The refusing run ends once it has answered its REGISTERs; the registrar then takes the port.
 await_sipp_run sipp-provider provider-refuse-register $ATTEMPTS || {
