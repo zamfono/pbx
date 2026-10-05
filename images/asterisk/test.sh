@@ -187,17 +187,18 @@ echo "$MANAGER_USER" | grep -q 'write perm: system' \
 docker exec "$CONTAINER" asterisk -rx 'dialplan show from-trunk' \
   | grep 'Stasis(zamfono,inbound,${EXTEN})' >/dev/null \
   || fail "from-trunk dialplan is missing Stasis(zamfono,inbound,\${EXTEN})"
-# A Request-URI without a user part arrives as `s`, a one-character one as itself; both reach the
-# core, which takes the called number from `To` instead (§9.2, §9.4).
-for exten in s 4; do
-  docker exec "$CONTAINER" asterisk -rx "dialplan show $exten@from-trunk" \
-    | grep 'Stasis(zamfono,inbound,${EXTEN})' >/dev/null \
-    || fail "from-trunk dialplan does not route exten $exten to Stasis"
+# A Request-URI without a user part arrives as `s` and reaches the core, which takes the called
+# number from `To` instead (§9.2, §9.4).
+docker exec "$CONTAINER" asterisk -rx 'dialplan show s@from-trunk' \
+  | grep 'Stasis(zamfono,inbound,s)' >/dev/null \
+  || fail "from-trunk dialplan does not route exten s to Stasis"
+# Asterisk's other one-character extensions match nothing: `h`, which runs once a channel hangs up,
+# would send every ended trunk call back into Stasis as a new call.
+for exten in h 4; do
+  if docker exec "$CONTAINER" asterisk -rx "dialplan show $exten@from-trunk" | grep -q 'Stasis('; then
+    fail "from-trunk dialplan routes exten $exten to Stasis"
+  fi
 done
-# Asterisk runs a context's `h` extension once a channel hangs up, so the pattern above would send
-# every ended trunk call back into Stasis as a new call; `h` matches an extension of its own first.
-docker exec "$CONTAINER" asterisk -rx 'dialplan show h@from-trunk' | grep -m1 '=>' | grep -q "^ *'h' =>" \
-  || fail "from-trunk's h extension reaches the Stasis pattern"
 
 # An ARI `record` name resolves against Asterisk's recording directory, and `core` names its
 # recordings `voicemail/<id>`, `prompts/<id>` and `recordings/<id>-{l,r}` for `api` to read back

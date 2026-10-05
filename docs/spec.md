@@ -872,16 +872,17 @@ Dynamic SIP objects use generated configuration plus reload. `api` renders `pjsi
 
 ```
 [from-trunk]      ; inbound from provider
-exten => _[+0-9a-zA-Z*#]!,1,Stasis(zamfono,inbound,${EXTEN})   ; any user part: E.164, national digits, an account name, or `s` for none
+exten => _[+0-9a-zA-Z*#].,1,Stasis(zamfono,inbound,${EXTEN})   ; a user part: E.164, national digits or an account name
  same => n,Congestion()                                          ; reached only when the core is down: Stasis() returns at once
-exten => h,1,NoOp()                                             ; a hung-up channel runs `h`: matched here, not by the pattern above
+exten => s,1,Stasis(zamfono,inbound,s)                          ; no user part
+ same => n,Congestion()
 
 [from-users]      ; anything a registered client dials
 exten => _[0-9*#+]!,1,Stasis(zamfono,outbound,${EXTEN})
  same => n,Congestion()
 ```
 
-While the core is down, `Stasis()` returns immediately and the next priority releases the call with congestion, so a caller hears a busy tone. SIP `MESSAGE` is outside the MVP: `res_pjsip_messaging` is not loaded, and the core enters no call for a `from-users` channel that is neither a device nor a transferee, nor for a `from-trunk` channel that is neither a chan_pjsip leg nor a transfer's Local channel. All routing decisions (DID → ring group → user → voicemail, OOO, forwarding, permissions) are made in the Node core.
+A Request-URI without a user part arrives in `from-trunk` as `s`. A provider's user part, a number or an account name, has at least two characters, so Asterisk's other one-character extensions (`h`, run when a channel hangs up, `i`, `t`) match nothing there. While the core is down, `Stasis()` returns immediately and the next priority releases the call with congestion, so a caller hears a busy tone. SIP `MESSAGE` is outside the MVP: `res_pjsip_messaging` is not loaded, and the core enters no call for a `from-users` channel that is neither a device nor a transferee, nor for a `from-trunk` channel that is neither a chan_pjsip leg nor a transfer's Local channel. All routing decisions (DID → ring group → user → voicemail, OOO, forwarding, permissions) are made in the Node core.
 
 ### 9.3 SIP endpoints
 

@@ -200,26 +200,23 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
   });
 
   // §9.2: an INVITE whose Request-URI has no user part reaches Stasis as `s`.
-  it.each(['s', 'a'])(
-    'takes the dialled number from To when the Request-URI user part is %s',
-    async exten => {
-      const trunkId = await seedInboundTrunk(db, 'e164');
-      const channel = fakeAri.addChannel({
-        name: `PJSIP/trunk-${trunkId}-0000002a`,
-        caller: { number: '+49892315194925', name: '' }
-      });
-      fakeAri.channelVariables.set(
-        `${channel.id}:PJSIP_HEADER(read,To)`,
-        '<sip:+4930123456@192.0.2.1>'
-      );
+  it('takes the dialled number from To when the Request-URI has no user part', async () => {
+    const trunkId = await seedInboundTrunk(db, 'e164');
+    const channel = fakeAri.addChannel({
+      name: `PJSIP/trunk-${trunkId}-0000002a`,
+      caller: { number: '+49892315194925', name: '' }
+    });
+    fakeAri.channelVariables.set(
+      `${channel.id}:PJSIP_HEADER(read,To)`,
+      '<sip:+4930123456@192.0.2.1>'
+    );
 
-      await pipeline.handleStasisStart(inboundEvent(channel, exten));
-      const call = cdr.opened.find(item => item.callerChannelId === channel.id);
+    await pipeline.handleStasisStart(inboundEvent(channel, 's'));
+    const call = cdr.opened.find(item => item.callerChannelId === channel.id);
 
-      expect(call?.to).toBe('+4930123456');
-      expect(call?.didId).toBe(mainDidId);
-    }
-  );
+    expect(call?.to).toBe('+4930123456');
+    expect(call?.didId).toBe(mainDidId);
+  });
 
   it('normalizes a national number in To with the trunk’s format', async () => {
     const trunkId = await seedInboundTrunk(db, 'national');

@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-05 · §9.2.** `[from-trunk]` matches a user part of at least two characters plus the exact extension `s`, a Request-URI without a user part; the `h` extension is gone, since no pattern matches `h`, `i`, `t` or any other one-character extension.
+*Why:* the one-character pattern, added so that `s` reaches the core's `To` fallback, matched every special extension Asterisk runs, `h` re-entering Stasis on each hangup; internal extensions and a provider's user part are never one character, so only `s` needs to match.
+
 **2026-10-05 · §5.2 Client registration.** An `/oauth/authorize` request that fails validation shows the error page on this origin, never redirecting to the client; the OAuth error redirect follows only the person's action at the consent step.
 *Why:* a client anyone can register statelessly made the endpoint an open redirector before login (RFC 9700 §4.11.2).
 
