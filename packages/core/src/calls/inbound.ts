@@ -4,6 +4,7 @@
 import { newId } from '@zamfono/shared';
 
 import type { AriEventOf } from '../ari/events.js';
+import { ignoreGone } from '../ari/failures.js';
 import { userById, type Snapshot } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import {
@@ -20,6 +21,7 @@ import { dialForwardTarget } from './forwardDial.js';
 import { applyOooAndHours, targetIdentity } from './inboundSchedule.js';
 import { inboundBoundary } from './inboundTrunk.js';
 import { playMenu } from './menu.js';
+import { isLocalDiallingHalf } from './pendingTransfer.js';
 import type { Pipeline } from './pipeline.js';
 import { endTargetOwner, release } from './release.js';
 import { ringGroup } from './ringGroup.js';
@@ -163,6 +165,19 @@ export async function handleInboundStart(
   ev: AriEventOf<'StasisStart'>
 ): Promise<void> {
   const channel = ev.channel;
+  // §9.2: only a trunk's chan_pjsip leg or the Local half a trunk-side transfer dials through
+  // enters `from-trunk` as a call. Any other channel is refused before it reaches a target.
+  if (
+    !channel.name.startsWith('PJSIP/') &&
+    !isLocalDiallingHalf(channel.name)
+  ) {
+    pipeline.deps.logger.warn(
+      { channel: channel.name },
+      'inbound entry from a channel that is no trunk leg'
+    );
+    await pipeline.deps.ari.channels.hangup(channel.id).catch(ignoreGone);
+    return;
+  }
   // §9.4 "Channels": the leg occupies one of the delivering trunk's channels for its lifetime,
   // watched from here so a hangup during the config read below is not missed.
   const countInboundLeg = pipeline.deps.trunkState.watchInboundLeg(channel.id);

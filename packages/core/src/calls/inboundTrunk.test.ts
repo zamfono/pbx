@@ -468,4 +468,19 @@ describe('inbound number normalization at the trunk boundary (§9.4)', () => {
 
     expect(trunkState.activeChannels(trunkId)).toBe(0);
   });
+
+  // A SIP MESSAGE from a trunk peer runs `from-trunk` on Asterisk's `Message/ast_msg_queue`
+  // channel, so it enters Stasis as `inbound,<to>` too: no call is entered for it.
+  it('enters no call for a channel that is neither a chan_pjsip leg nor a transfer', async () => {
+    await seedInboundTrunk(db, 'e164');
+    const channel = fakeAri.addChannel({
+      name: 'Message/ast_msg_queue',
+      caller: { number: '+49892315194925', name: '' }
+    });
+
+    await pipeline.handleStasisStart(inboundEvent(channel, '+4930123456'));
+
+    expect(cdr.opened).toEqual([]);
+    expect(rig.hungUp(channel.id)).toBe(true);
+  });
 });

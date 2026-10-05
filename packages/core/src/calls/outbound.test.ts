@@ -1148,4 +1148,21 @@ describe('outbound dialing', () => {
 
     expect(call.hops).toBe(0);
   });
+
+  // A SIP MESSAGE an authenticated device sends runs the endpoint's context, `from-users`, on
+  // Asterisk's `Message/ast_msg_queue` channel, so it enters Stasis as `outbound,<to>` too (§9.2
+  // "anything a registered client dials"). That channel is no device and no transferee: it must
+  // place no trunk call, least of all one under no user's identity.
+  it('places no trunk call for a channel that is neither a device nor a transferee', async () => {
+    const trunkId = await seedTrunk(db);
+    await seedRoute(db, trunkId, { priority: 1 });
+    const channel = fakeAri.addChannel({
+      name: 'Message/ast_msg_queue',
+      caller: { number: 'e101-d1', name: '' }
+    });
+
+    await handleOutbound(pipeline, outboundEvent(channel, '+499001234567'));
+
+    expect(attemptEndpoints(fakeAri)).toEqual([]);
+  });
 });

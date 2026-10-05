@@ -50,7 +50,8 @@ export function localDiallingHalf(firstHalf: string): string | null {
     : null;
 }
 
-function isLocalDiallingHalf(name: string): boolean {
+/** Whether `name` is a Local pair's dialling half, the one Asterisk sends into the dialplan. */
+export function isLocalDiallingHalf(name: string): boolean {
   return name.startsWith('Local/') && name.endsWith(';2');
 }
 

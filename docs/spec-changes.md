@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-05 · §9.2 Dialplan.** SIP `MESSAGE` is outside the MVP: `res_pjsip_messaging` is not loaded, and the core enters no call for a channel that is neither a device or transferee (`from-users`) nor a chan_pjsip leg or transfer's Local channel (`from-trunk`).
+*Why:* a device's `MESSAGE` ran `from-users` on Asterisk's message channel, which the core took for a call and dialled out through a trunk under no user's identity, to any number.
+
 **2026-10-05 · §7 Metrics.** `zamfono_backup_last_success_age_seconds` covers exactly the enabled targets; one with no successful backup yet reports its age since it was created.
 *Why:* a disabled target kept an ever-growing age, and a target whose runs all failed had no sample, so no age alert could fire for it.
 

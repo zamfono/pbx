@@ -22,4 +22,7 @@ noload => cel_tds.so
 noload => res_phoneprov.so
 noload => res_pjsip_phoneprov_provider.so
 noload => res_pjsip_notify.so
+; SIP MESSAGE is outside the MVP (spec §9.2): without this module the stack refuses it, so
+; no message reaches the dialplan.
+noload => res_pjsip_messaging.so
 ${HEP_NOLOAD_LINES}

@@ -7,6 +7,7 @@
 import { newId } from '@zamfono/shared';
 
 import type { AriEventOf } from '../ari/events.js';
+import { ignoreGone } from '../ari/failures.js';
 import { userById } from '../internal/snapshot.js';
 import { setChannelLanguage } from '../prompts.js';
 import type { DialAction } from '../routing/outbound.js';
@@ -60,6 +61,20 @@ export async function handleOutbound(
   // direction and DID come from the transfer rather than from this channel, which may be the
   // Local channel Asterisk dials the target through.
   const transfer = await takePendingTransfer(pipeline, channel);
+  const callerUserId =
+    transfer === null
+      ? identifyCallerUserId(channel, snapshot)
+      : transfer.transfereeUserId;
+  // §9.2: only a user's device or a transferee dials. Any other channel in `from-users` is
+  // refused before it can place a call under no user's identity.
+  if (transfer === null && callerUserId === null) {
+    pipeline.deps.logger.warn(
+      { channel: channel.name },
+      'outbound entry from a channel that is no device'
+    );
+    await pipeline.deps.ari.channels.hangup(channel.id).catch(ignoreGone);
+    return;
+  }
   const call = newCall({
     id: newId(),
     direction: transfer?.inbound === true ? 'inbound' : direction,
@@ -70,10 +85,7 @@ export async function handleOutbound(
     logLevel: logLevelFor(snapshot, action, pipeline.deps.now()),
     callLogMaxBytes: pipeline.deps.callLogMaxBytes
   });
-  call.callerUserId =
-    transfer === null
-      ? identifyCallerUserId(channel, snapshot)
-      : transfer.transfereeUserId;
+  call.callerUserId = callerUserId;
   call.parentCallId = transfer?.parentCallId ?? null;
   call.didId = transfer?.didId ?? null;
   const asUser =

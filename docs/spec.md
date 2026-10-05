@@ -853,7 +853,7 @@ exten => _[0-9*#+]!,1,Stasis(zamfono,outbound,${EXTEN})
  same => n,Congestion()
 ```
 
-While the core is down, `Stasis()` returns immediately and the next priority releases the call with congestion, so a caller hears a busy tone. All routing decisions (DID → ring group → user → voicemail, OOO, forwarding, permissions) are made in the Node core.
+While the core is down, `Stasis()` returns immediately and the next priority releases the call with congestion, so a caller hears a busy tone. SIP `MESSAGE` is outside the MVP: `res_pjsip_messaging` is not loaded, and the core enters no call for a `from-users` channel that is neither a device nor a transferee, nor for a `from-trunk` channel that is neither a chan_pjsip leg nor a transfer's Local channel. All routing decisions (DID → ring group → user → voicemail, OOO, forwarding, permissions) are made in the Node core.
 
 ### 9.3 SIP endpoints
 
