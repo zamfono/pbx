@@ -10,6 +10,7 @@ import { SIP_FORBIDDEN, SIP_NOT_FOUND } from '../sipCodes.js';
 import { callerChannel, type Call } from './call.js';
 import { ownerForExt, ringGroupMemberIds } from './extensionOwner.js';
 import { concludeFeature } from './featureCall.js';
+import { introMedia } from './mailboxGrammar.js';
 import { recordGreeting } from './mailboxGreeting.js';
 import type { MenuInput } from './mailboxInput.js';
 import {
@@ -22,12 +23,7 @@ import {
   type MailboxSession,
   type MenuEnd
 } from './mailboxMessages.js';
-import {
-  introMedia,
-  MAILBOX_KEYS,
-  mainMenuMedia,
-  promptMedia
-} from './mailboxPrompts.js';
+import { MAILBOX_KEYS, mainMenuMedia, promptMedia } from './mailboxPrompts.js';
 import { loadMessages } from './mailboxStore.js';
 import type { Pipeline } from './pipeline.js';
 import { release, type Owner } from './release.js';
@@ -99,7 +95,7 @@ async function mainMenu(session: MailboxSession): Promise<MenuEnd> {
   for (;;) {
     const { newCount, oldCount } = folderCounts(session);
     const media = [
-      ...(withIntro ? introMedia(newCount, oldCount) : []),
+      ...(withIntro ? introMedia(session.language, newCount, oldCount) : []),
       ...mainMenuMedia(newCount, oldCount)
     ];
     // eslint-disable-next-line no-await-in-loop -- one key at a time, from the same caller
@@ -157,6 +153,7 @@ async function runMailboxMenu(
     pipeline,
     call,
     owner,
+    language: (await pipeline.deps.cache.get()).settings.language,
     messages: await loadMessages(pipeline.deps.db, owner),
     playbacks: 0,
     hungUp: false

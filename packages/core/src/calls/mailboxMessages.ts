@@ -4,15 +4,15 @@
  * per-message keys — previous, repeat, next, delete, back to the main menu. A new message is
  * marked read as soon as it starts playing (`mailboxStore.ts`).
  */
-import { VOICEMAIL_SUBDIR, type Db } from '@zamfono/shared';
+import { VOICEMAIL_SUBDIR, type Db, type Language } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import { ASTERISK_MEDIA_DIR } from '../prompts.js';
 import { callerChannel, type Call } from './call.js';
+import { messageHeaderMedia } from './mailboxGrammar.js';
 import { playForDigit, type MenuInput } from './mailboxInput.js';
 import {
   MAILBOX_KEYS,
-  messageHeaderMedia,
   messageOptionsMedia,
   promptMedia
 } from './mailboxPrompts.js';
@@ -39,6 +39,8 @@ export type MailboxSession = {
   pipeline: Pipeline;
   call: Call;
   owner: Owner;
+  /** The tenant's, which is the channel's (§9.1): the counted phrases' grammar follows it. */
+  language: Language;
   messages: MailboxMessage[];
   playbacks: number;
   hungUp: boolean;
@@ -132,6 +134,7 @@ async function playMessage(
     session,
     [
       ...messageHeaderMedia(
+        session.language,
         message.folder,
         positionInFolder(session.messages, index)
       ),

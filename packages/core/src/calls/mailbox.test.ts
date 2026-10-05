@@ -10,7 +10,8 @@ import { eventually, requestTo } from '../testing/eventually.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
 import { callerChannel, newCall, type Call } from './call.js';
 import { ownVoicemail } from './mailbox.js';
-import { introMedia, mainMenuMedia } from './mailboxPrompts.js';
+import { introMedia } from './mailboxGrammar.js';
+import { mainMenuMedia } from './mailboxPrompts.js';
 import type { Pipeline } from './pipeline.js';
 
 // A prompt "plays" until the test barges in with a key or ends it itself, so every step of the
@@ -141,10 +142,10 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
 
     // "You have 2 new messages and 1 old message", then the main menu.
     expect((await nextPlay()).media).toEqual([
-      ...introMedia(2, 1),
+      ...introMedia('en', 2, 1),
       ...mainMenuMedia(2, 1)
     ]);
-    expect(introMedia(2, 1)).toEqual([
+    expect(introMedia('en', 2, 1)).toEqual([
       'sound:vm-youhave',
       'number:2',
       'sound:vm-INBOX',
@@ -182,7 +183,7 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
     press('*');
     // Back in the main menu, which repeats the counts on `*`.
     expect((await nextPlay()).media).toEqual([
-      ...introMedia(1, 1),
+      ...introMedia('en', 1, 1),
       ...mainMenuMedia(1, 1)
     ]);
     press('#');
@@ -218,7 +219,7 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
     const only = await seedMessage(db, ownerId, 10, 0);
     const done = ownVoicemail(pipeline, call);
     expect((await nextPlay()).media).toEqual([
-      ...introMedia(1, 0),
+      ...introMedia('en', 1, 0),
       ...mainMenuMedia(1, 0)
     ]);
     press('1');
@@ -251,7 +252,10 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
     await seedMessage(db, ownerId, 10, 0);
     const done = ownVoicemail(pipeline, call);
     const menu = await nextPlay();
-    expect(menu.media).toEqual([...introMedia(1, 0), ...mainMenuMedia(1, 0)]);
+    expect(menu.media).toEqual([
+      ...introMedia('en', 1, 0),
+      ...mainMenuMedia(1, 0)
+    ]);
     expect(mainMenuMedia(1, 0)).toEqual([
       'sound:vm-onefor',
       'sound:vm-INBOX',
@@ -272,6 +276,30 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
     expect(sorry.media).toBe('sound:vm-sorry');
     finish(sorry);
     expect((await nextPlay()).media).toEqual(mainMenuMedia(1, 0));
+    press('#');
+    finish(await nextPlay());
+    await done;
+  });
+
+  it("counts and names messages in the tenant language's grammar (§9.1)", async () => {
+    await db.updateTable('settings').set({ language: 'es' }).execute();
+    const id = await seedMessage(db, ownerId, 10, 0);
+    const done = ownVoicemail(pipeline, call);
+    // "Tiene un mensaje nuevo": noun before adjective, the singular adjective.
+    expect((await nextPlay()).media).toEqual([
+      'sound:vm-youhave',
+      'sound:digits/1M',
+      'sound:vm-message',
+      'sound:vm-INBOXs',
+      ...mainMenuMedia(1, 0)
+    ]);
+    press('1');
+    expect((await nextPlay()).media).toEqual([
+      'sound:vm-message',
+      'sound:vm-INBOXs',
+      'number:1',
+      `sound:/media/voicemail/${id}`
+    ]);
     press('#');
     finish(await nextPlay());
     await done;
@@ -367,7 +395,7 @@ describe('mailbox menu (§10.2 "Mailbox access")', () => {
       )
       .map(entry => (entry.body as Play).media);
     expect(media).toEqual([
-      [...introMedia(0, 0), ...mainMenuMedia(0, 0)],
+      [...introMedia('en', 0, 0), ...mainMenuMedia(0, 0)],
       mainMenuMedia(0, 0),
       mainMenuMedia(0, 0),
       'sound:vm-goodbye'
