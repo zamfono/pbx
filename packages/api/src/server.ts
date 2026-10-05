@@ -1,6 +1,7 @@
 /**
  * `api`'s process entry point (§10, §3.1): wraps the SvelteKit adapter-node build's request
- * handler in a plain HTTP server so a WebSocket can be attached for `/events` (§10.6). Every
+ * handler in a plain HTTP server so a WebSocket can be attached for `/events` (§10.6), and opens
+ * the public endpoints to every origin in front of it (`answerCors`, §10.3 "CORS"). Every
  * event reaches those sockets from the SvelteKit bundle, where the background jobs run
  * (`lib/server/jobs/background.ts`), through the sink this file provides
  * (`lib/server/eventSink.ts`). It runs outside that bundle, where SvelteKit's `$app/env/private` does not
@@ -14,6 +15,7 @@ import pino from 'pino';
 
 import { dbFileFrom, openDb, resolveVersion } from '@zamfono/shared';
 
+import { answerCors } from '#lib/server/cors.js';
 import { EventHub } from '#lib/server/events.js';
 import { provideEventSink } from '#lib/server/eventSink.js';
 import { attachEventsServer } from '#lib/server/eventsServer.js';
@@ -81,7 +83,11 @@ async function main(): Promise<void> {
   const handler = await loadHandler();
   // After the handler, whose load validates `src/env.ts` and names every required variable missing.
   const jwtSecret = requireEnv('JWT_SECRET');
-  const server = http.createServer(handler);
+  const server = http.createServer((req, res) => {
+    if (!answerCors(req, res)) {
+      handler(req, res);
+    }
+  });
   attachEventsServer(server, { hub, db, jwtSecret });
   exitOnSignal(server);
   await new Promise<void>(resolve => {
