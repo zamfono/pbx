@@ -196,6 +196,10 @@ HEP_MODULES=$(docker exec "$CONTAINER" asterisk -rx 'module show like res_hep')
 echo "$HEP_MODULES" | grep -q '^0 modules loaded' \
   || fail "a res_hep module is loaded while HEP_ENABLED=false"
 
+# Every PJSIP load and reload above read the image's empty pjsip_wizard.conf.
+docker logs "$CONTAINER" 2>&1 | grep "Unable to load config file 'pjsip_wizard.conf'" > /dev/null \
+  && fail "res_pjsip_config_wizard found no pjsip_wizard.conf"
+
 PJSIP_MODULES=$(docker exec "$CONTAINER" asterisk -rx 'module show like res_pjsip')
 echo "$PJSIP_MODULES" | grep -q 'Not Running' \
   && fail "a res_pjsip module declined to load"

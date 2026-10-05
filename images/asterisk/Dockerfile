@@ -77,7 +77,7 @@ COPY conf/pjsip.conf.tmpl conf/ari.conf.tmpl conf/http.conf.tmpl conf/manager.co
 # is not a loadable module (main/indications.c is linked into the core binary), so there is
 # nothing to keep out of modules.conf's noload list for it.
 COPY conf/asterisk.conf conf/extensions.conf conf/logger.conf conf/sorcery.conf \
-     conf/indications.conf /etc/asterisk/
+     conf/indications.conf conf/pjsip_wizard.conf /etc/asterisk/
 COPY conf/musiconhold.conf.static /etc/asterisk/musiconhold.conf
 
 COPY entrypoint.sh /entrypoint.sh
