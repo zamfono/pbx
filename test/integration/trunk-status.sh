@@ -6,7 +6,7 @@
 # `GET /trunks` must still report the trunk `registered` from the boot resync, which `core`
 # finishes before it serves anything (packages/core/src/main.ts), so before it reports healthy.
 # Reads `run.sh`'s own compose and fail, scenarios/_lib.sh's helpers and
-# run-scenarios.sh's `end_trunk_idle`. Self-contained and idempotent: it starts and ends its own
+# run-scenarios.sh's `hand_trunk_host`. Self-contained and idempotent: it starts and ends its own
 # trunk-side sipp run in place of the idle one, the way a scenario does, and touches no tenant state, so REUSE may select it freely, same as a fresh run.
 
 STATUS_ATTEMPTS=60
@@ -20,10 +20,8 @@ run_trunk_status_step() {
   echo '== §9.4 trunk status resyncs at boot =='
   local aor
   aor=trunk-$(trunk_named ci-trunk)
-  end_trunk_idle
-  dc exec -T -d sipp sh -c \
-    'sh /scenarios/_sipp-run.sh trunk-status -sf /scenarios/uas/answer-outbound.xml -p 5060 -aa \
-      -nostdin asterisk:5060 > /tmp/status.log 2>&1'
+  hand_trunk_host trunk-status /tmp/status.log -sf /scenarios/uas/answer-outbound.xml \
+    || fail "the trunk's idle host did not end"
   if ! await_bound sipp 5060 || ! await_contact_avail "$aor"; then
     fail "the trunk's contact never became reachable before the restart"
   fi

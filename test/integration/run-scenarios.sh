@@ -62,23 +62,28 @@ trunk_aors() {
     | awk '$1 == "Contact:" && $2 ~ /^trunk-/ { split($2, aor, "/"); print aor[1] }'
 }
 
-# The trunk's host answers its qualify between scenarios too, as a provider's does, and refuses
-# any call (`uas/refuse-403.xml`, which no scenario expects): Asterisk probes the `ip` trunks every
-# 60 s and on every PJSIP reload, so a configuration write, and a probe nothing answered times
-# out `qualify_timeout` later and is applied when it lands, after a later probe's answer too,
-# leaving the trunk unreachable for a call (§9.4 "Provisioning and status").
-start_trunk_idle() {
-  dc exec -T -d sipp sh -c \
-    'sh /scenarios/_sipp-run.sh trunk-idle -sf /scenarios/uas/refuse-403.xml -p 5060 -aa \
-      -nostdin asterisk:5060 > /tmp/trunk-idle.log 2>&1'
-  await_bound sipp 5060 || fail "the trunk's host did not start answering"
+# Hands the port the trunk endpoint dials, 5060 in `sipp`, to a new sipp run tagged `$1`, logging
+# to `$2`, with the further arguments added to its command line, inside one `exec`
+# (`_sipp-handover.sh`, whose report this prints and whose failure it returns). Asterisk probes
+# the `ip` trunks every 60 s and on every PJSIP reload, so a configuration write, and a probe
+# nothing answered times out `qualify_timeout` later and is applied when it lands, after a later
+# probe's answer too, leaving the trunk unreachable for a call (§9.4 "Provisioning and status").
+# The port answers nothing between the two runs: in one `exec` that is a moment the probe's first
+# retransmission outlasts, where `compose exec` round trips between them can outlast the probe's
+# whole `qualify_timeout`.
+hand_trunk_host() {
+  dc exec -T sipp sh /scenarios/_sipp-handover.sh "$FINISH_SECONDS" "$@"
 }
 
-# Ends the idle run of `start_trunk_idle` (`_sipp-finish.sh`), for a run of a scenario's own to
-# take the port over; the probe a gap of a moment may miss is answered by its retransmission.
-end_trunk_idle() {
-  dc exec -T sipp sh /scenarios/_sipp-finish.sh "$FINISH_SECONDS" \
-    || fail "the trunk's idle host did not end"
+# The trunk's host answers its qualify between scenarios too, as a provider's does, and refuses
+# any call (`uas/refuse-403.xml`, which no scenario expects), in place of whatever ran in `sipp`
+# (`hand_trunk_host`, whose report this prints and whose failure it returns, starting nothing).
+start_trunk_idle() {
+  hand_trunk_host trunk-idle /tmp/trunk-idle.log -sf /scenarios/uas/refuse-403.xml
+}
+
+await_trunk_idle() {
+  await_bound sipp 5060 || fail "the trunk's host did not start answering"
 }
 
 # Starts the trunk side answering on the port the trunk endpoint dials, in place of the idle
@@ -88,11 +93,10 @@ end_trunk_idle() {
 # is probed, the setup's own among them, and the call waits until the core itself reports every
 # `ip` trunk reachable, or unmonitored where its qualify is off.
 start_trunk_side() {
-  end_trunk_idle
   dc exec -T sipp rm -f /tmp/trunk-messages.log
-  dc exec -T -d sipp sh -c \
-    "sh /scenarios/_sipp-run.sh trunk-$1 -sf /scenarios/uas/$1.xml -p 5060 -aa -nostdin \
-      -trace_msg -message_file /tmp/trunk-messages.log asterisk:5060 > /tmp/$1.log 2>&1"
+  hand_trunk_host "trunk-$1" "/tmp/$1.log" -sf "/scenarios/uas/$1.xml" \
+    -trace_msg -message_file /tmp/trunk-messages.log \
+    || fail "the trunk's idle host did not end"
   await_bound sipp 5060 || fail "the trunk side did not start"
   local aor
   for aor in $(trunk_aors); do
@@ -117,15 +121,19 @@ no_channels() {
 # A SIP dialog ends with its scenario: every sipp run the scenario started, on whichever side, is
 # asked to end once its calls have, and one still in a call, or one that broke a call off, fails
 # the scenario (`_sipp-finish.sh`) instead of carrying its dialog over to the next scenario's run
-# on the same address, which would answer a retransmission of it as a call of its own.
+# on the same address, which would answer a retransmission of it as a call of its own. The runs in
+# `sipp` end as the trunk's host goes back to its idle run (`start_trunk_idle`).
 finish_sipp_runs() {
   local service report leftovers=''
   for service in "${SIPP_SERVICES[@]}"; do
-    report=$(dc exec -T "$service" \
-      sh /scenarios/_sipp-finish.sh "$FINISH_SECONDS" 2>&1) \
-      || leftovers="$leftovers"$'\n'"$service: $report"
+    if [ "$service" = sipp ]; then
+      report=$(start_trunk_idle 2>&1)
+    else
+      report=$(dc exec -T "$service" sh /scenarios/_sipp-finish.sh "$FINISH_SECONDS" 2>&1)
+    fi || leftovers="$leftovers"$'\n'"$service: $report"
   done
   [ -z "$leftovers" ] || fail "a SIP dialog outlived $1:$leftovers"
+  await_trunk_idle
 }
 
 # The phone's own call is up once both of its legs are: the phone's and the trunk's.
@@ -176,7 +184,8 @@ for service in "${SIPP_SERVICES[@]}"; do
   dc exec -T "$service" \
     sh -c 'pkill -9 -x sipp; rm -rf /tmp/sipp-runs' || true
 done
-start_trunk_idle
+start_trunk_idle || fail "the trunk's host did not start answering"
+await_trunk_idle
 position=-1
 for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
   position=$((position + 1))
@@ -232,7 +241,6 @@ for scenario in "$here"/scenarios/*.xml "$here"/scenarios/[!_]*.call.sh; do
   fi
   assert_no_channels "$name"
   finish_sipp_runs "$name"
-  start_trunk_idle
   check="$here/scenarios/$name.check.sh"
   if [ -f "$check" ]; then
     bash "$check" "$api_base" "$token" "$compose" || fail "the history check for $name failed"
