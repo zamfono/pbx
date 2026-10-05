@@ -106,4 +106,31 @@ describe('POST /auth/reset', () => {
       .executeTakeFirstOrThrow();
     expect(refreshRow.revokedAt).not.toBeNull();
   });
+
+  it('revokes every other live set-password token of the user', async () => {
+    const db = getDb();
+    const userId = newId();
+    await db
+      .insertInto('users')
+      .values({
+        id: userId,
+        name: 'Cleo',
+        email: 'siblings@example.com',
+        role: 'user',
+        passwordHash: 'x',
+        createdAt: nowIso()
+      })
+      .execute();
+    const setup = await issueResetToken(db, userId, 'setup', nowIso());
+    const reset = await issueResetToken(db, userId, 'reset', nowIso());
+
+    const first = await POST(
+      eventFor({ token: reset.raw, password: PASSWORD })
+    );
+    expect(first.status).toBe(200);
+    const sibling = await POST(
+      eventFor({ token: setup.raw, password: 'an attacker password' })
+    );
+    expect(sibling.status).toBe(400);
+  });
 });

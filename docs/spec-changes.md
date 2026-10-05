@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-05 · §5.2 Tokens.** Redeeming a set-password link revokes every other live set-password token of that user, in the same transaction as the new password and the session revocation.
+*Why:* a reset left the user's other setup and reset links live, so an older mailed link could set the password again after the user had reset it.
+
 **2026-10-05 · §10.2 Mail.** A withheld caller's `callerNumber` in the `voicemail` and `missedCall` mails is empty, and the shipped templates name a withheld number in their language.
 *Why:* the mails said "from anonymous", the pipeline's internal marker, in English in every language.
 **2026-10-05 · §10.3 Confirmation, §11.2, §11.4, §11.6 Retention.** `recording_retention_days`, `soft_delete_retention_days` and `audit_retention_days` are at most 36500 days (input and `CHECK`), and NULL keeps that data forever, its purge skipped; a NULL soft-delete retention needs a NULL audit retention, and its confirmation question says the deletion "can be undone at any time".
@@ -13,6 +16,7 @@ Every change made to [the specification](spec.md) during implementation, newest 
 *Why:* a failed pass kept the last status, so a sync failing for good, or a certificate Caddy stopped renewing, read as `ok` until clients saw it expire.
 **2026-10-05 · §10.1 steps 4 and 7, §11.2 `users`.** A find-me list with an entry that is one of the tenant's own DIDs is refused with 422 naming it, on `POST /users` and `PATCH /users/{id}`; the core still never rings one.
 *Why:* the product owner chose "Refuse at save (Recommended)": an own DID as a find-me entry was saved and then silently skipped at ring time.
+
 **2026-10-05 · §5.6, §9.1.** SIP requests and responses carry `User-Agent`/`Server: Zamfono`, set in `pjsip.conf`'s `global` section, never the Asterisk release.
 *Why:* Asterisk's default header named its exact release, telling a scanner what it runs.
 

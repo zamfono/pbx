@@ -214,6 +214,21 @@ export async function issueResetToken(
   return { raw, expiresAt };
 }
 
+/** Revokes every live set-password token of `userId`. */
+export async function revokeResetTokens(
+  db: Db,
+  userId: string,
+  now: string
+): Promise<void> {
+  await db
+    .updateTable('tokens')
+    .set({ revokedAt: now })
+    .where('userId', '=', userId)
+    .where('kind', '=', 'reset')
+    .where('revokedAt', 'is', null)
+    .execute();
+}
+
 /** The user a set-password token redeems for, `null` for a redeemed, expired or unknown one. */
 export async function liveResetTokenUser(
   db: Db,

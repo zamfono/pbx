@@ -23,7 +23,9 @@ import { keyringFromEnv } from '../secretbox.js';
 import { hashPassword } from './password.js';
 import {
   issueResetToken,
+  liveResetTokenUser,
   redeemResetToken,
+  revokeResetTokens,
   revokeUserTokens
 } from './tokens.js';
 
@@ -125,8 +127,11 @@ export type RedeemOutcome =
 
 /**
  * Redeems a single-use set-password token (§5.2 "Tokens"), sets the new Argon2id hash and revokes
- * every refresh token the user held, so no earlier session survives a password reset. Outside the
- * §5.5 rate limits: the token itself is the guard.
+ * every refresh token and every other set-password token the user held, in one transaction, so
+ * neither an earlier session nor an earlier link survives a password reset. Outside the §5.5
+ * rate limits: the token itself is the guard. The password is hashed once the token is seen to
+ * be live, before the transaction, so no guessed token costs a hash and no hash holds the
+ * database's write lock.
  */
 export async function redeemPasswordReset(
   db: Db,
@@ -136,28 +141,36 @@ export async function redeemPasswordReset(
   if (!parsed.success) {
     return { kind: 'invalidRequest' };
   }
+  const { token, password } = parsed.data;
+  if ((await liveResetTokenUser(db, token, nowIso())) === null) {
+    return { kind: 'invalidLink' };
+  }
+  const passwordHash = await hashPassword(password);
   const now = nowIso();
-  const redeemed = await redeemResetToken(db, parsed.data.token, now);
-  if (!redeemed.ok) {
-    return { kind: 'invalidLink' };
+  const outcome = await db
+    .transaction()
+    .execute(async (trx): Promise<RedeemOutcome> => {
+      const redeemed = await redeemResetToken(trx, token, now);
+      if (!redeemed.ok) {
+        return { kind: 'invalidLink' };
+      }
+      const user = await trx
+        .updateTable('users')
+        .set({ passwordHash })
+        .where('id', '=', redeemed.userId)
+        .where('deletedAt', 'is', null)
+        .returning('id')
+        .executeTakeFirst();
+      if (!user) {
+        return { kind: 'invalidLink' };
+      }
+      await revokeUserTokens(trx, user.id, now);
+      await revokeResetTokens(trx, user.id, now);
+      return { kind: 'passwordSet' };
+    });
+  if (outcome.kind === 'passwordSet') {
+    // §10.6: the revoked sessions' `/events` sockets close.
+    notifyUsersChanged();
   }
-  const user = await db
-    .selectFrom('users')
-    .select('id')
-    .where('id', '=', redeemed.userId)
-    .where('deletedAt', 'is', null)
-    .executeTakeFirst();
-  if (!user) {
-    return { kind: 'invalidLink' };
-  }
-  const passwordHash = await hashPassword(parsed.data.password);
-  await db
-    .updateTable('users')
-    .set({ passwordHash })
-    .where('id', '=', user.id)
-    .execute();
-  await revokeUserTokens(db, user.id, now);
-  // §10.6: the revoked sessions' `/events` sockets close.
-  notifyUsersChanged();
-  return { kind: 'passwordSet' };
+  return outcome;
 }
