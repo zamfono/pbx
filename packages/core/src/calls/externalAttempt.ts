@@ -16,7 +16,12 @@ import {
 import { SIP_SERVER_ERROR } from '../sipCodes.js';
 import { waitForEvent, type EventWait } from './ariWaits.js';
 import type { Candidate, RouteCursor } from './externalLegRoutes.js';
-import { alertsOn, provisionalArrived, type TrunkLeg } from './provisional.js';
+import {
+  alertsOn,
+  progressOn,
+  provisionalArrived,
+  type TrunkLeg
+} from './provisional.js';
 import { endedSipStatus, originateTrunkLeg } from './trunkDial.js';
 
 // An attempt Asterisk would not place (its create or dial refused, `legOriginate.ts`) fails as a
@@ -34,6 +39,10 @@ export type AttemptEnd = { failure: AttemptFailure; cause: number | null };
 /** One attempt's channel, watched from before its create. */
 export type Attempt = {
   channelId: string;
+  /** Resolves once the far end first alerts, with a 180 or a 183. */
+  alerted: Promise<void>;
+  /** Resolves once the far end answers 183, which may carry early media. */
+  progressed: Promise<void>;
   /** Resolves once the far end answers. */
   answered: Promise<void>;
   /** Resolves once the attempt is over: its channel ended, the budget ran out, or it was never
@@ -125,6 +134,8 @@ function watchAttempt(
   const { ari } = pipeline.deps;
   let dialled = false;
   let alerted = false;
+  const alert = Promise.withResolvers<undefined>();
+  const progress = Promise.withResolvers<undefined>();
   const answered = Promise.withResolvers<undefined>();
   const trace = attemptTracer(call, candidate);
   const wait = waitForEvent<AttemptEnd>(ari, (event, waiting) => {
@@ -135,6 +146,10 @@ function watchAttempt(
       // The no-response budget covers only the interval before the first provisional response.
       alerted = true;
       waiting.disarm();
+      alert.resolve(undefined);
+      if (progressOn(event, channelId)) {
+        progress.resolve(undefined);
+      }
       return;
     }
     const channel = event.channel;
@@ -161,6 +176,8 @@ function watchAttempt(
   });
   return {
     channelId,
+    alerted: alert.promise,
+    progressed: progress.promise,
     answered: answered.promise,
     ended,
     trace,

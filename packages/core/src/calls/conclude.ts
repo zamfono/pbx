@@ -50,8 +50,8 @@ export async function concludeFinal(
 
 /** Answers and plays the failed-call announcement, or — where the tenant's `language` (§11.4) has
  * no such prompt — ITU-T E.180's special information tone, to completion (§9.4 "Cross-trunk
- * failover"), the same answer-then-play order `announce.ts` uses, since this ARI layer has no
- * early media. A call with no caller channel (a party `api` adds) has nobody to play to. */
+ * failover"), the same answer-then-play order `announce.ts` uses, since a playback reaches no
+ * unanswered caller. A call with no caller channel (a party `api` adds) has nobody to play to. */
 async function playFailedCallAnnouncement(
   pipeline: Pipeline,
   call: Call

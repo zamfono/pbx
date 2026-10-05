@@ -4,7 +4,7 @@
   carry. The first route's trunk refuses it with 403 before alerting, a provider rejecting the
   call (`uas/refuse-403.xml`), so the core tries the second route; that provider answers 100 and
   183 at once and 200 only 10 seconds later (`uas/answer-progress.xml`), and the call is up when
-  it does. The device's SIP username arrives as `-key user`, its credentials through `-au`/`-ap`.
+  it does; the phone is rung and gets that provider's early media from its 183 on. The device's SIP username arrives as `-key user`, its credentials through `-au`/`-ap`.
 -->
 <scenario name="outbound-fallthrough">
   <send retrans="500">
@@ -71,8 +71,15 @@
   </send>
 
   <recv response="100" optional="true" />
-  <recv response="180" optional="true" />
-  <recv response="183" optional="true" />
+  <!-- The core rings the phone on the provider's 183 and passes its early media on, a 183 with
+       SDP of its own (§10.1 "Outbound"). -->
+  <recv response="180" />
+  <recv response="183">
+    <action>
+      <ereg regexp="m=audio" search_in="body" check_it="true" assign_to="early_sdp" />
+    </action>
+  </recv>
+  <Reference variables="early_sdp" />
   <recv response="200" rtd="true" timeout="30000" />
 
   <send>

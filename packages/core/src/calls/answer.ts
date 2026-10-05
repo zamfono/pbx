@@ -8,7 +8,13 @@
  * told the call is up (§10.6).
  */
 import { isGone, logUnlessGone } from '../ari/failures.js';
-import { callerChannel, takeJoinBridge, type Call, type Leg } from './call.js';
+import {
+  callerChannel,
+  takeEarlyBridge,
+  takeJoinBridge,
+  type Call,
+  type Leg
+} from './call.js';
 import { callUp } from './callState.js';
 import { traceCodecs } from './codecTrace.js';
 import type { Pipeline } from './pipeline.js';
@@ -99,11 +105,17 @@ async function bridgeWithCaller(
   let bridgeId: string | null = null;
   try {
     await ari.channels.answer(callerChannelId);
-    ({ id: bridgeId } = await ari.bridges.create({ type: 'mixing' }));
-    await ari.bridges.addChannel(bridgeId, callerChannelId);
-    // eslint-disable-next-line require-atomic-updates -- the answer is this caller's own claim (`claimAnswer`); nothing else writes bridgeId
-    call.bridgeId = bridgeId;
-    await ari.bridges.addChannel(bridgeId, leg.channelId);
+    // A waiting dial's early bridge already holds the caller and the leg that answered.
+    bridgeId = takeEarlyBridge(call);
+    if (bridgeId === null) {
+      ({ id: bridgeId } = await ari.bridges.create({ type: 'mixing' }));
+      await ari.bridges.addChannel(bridgeId, callerChannelId);
+      // eslint-disable-next-line require-atomic-updates -- the answer is this caller's own claim (`claimAnswer`); nothing else writes bridgeId
+      call.bridgeId = bridgeId;
+      await ari.bridges.addChannel(bridgeId, leg.channelId);
+    } else {
+      call.bridgeId = bridgeId;
+    }
     if (call.callerEnded !== true) {
       return true;
     }

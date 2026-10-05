@@ -68,6 +68,7 @@ function buildChannelsApi(rest: AriRequests): ChannelsApi {
       rest.void('POST', `channels/${id}/continue`, params),
     list: () => rest.json('GET', 'channels'),
     ring: id => rest.void('POST', `channels/${id}/ring`),
+    progress: id => rest.void('POST', `channels/${id}/progress`),
     startMoh: (id, mohClass) =>
       rest.void('POST', `channels/${id}/moh`, { mohClass }),
     stopMoh: id => rest.void('DELETE', `channels/${id}/moh`),

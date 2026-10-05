@@ -73,8 +73,8 @@
   </send>
 
   <recv response="100" optional="true" />
-  <recv response="180" optional="true" />
-  <recv response="183" optional="true" />
+  <!-- The core rings the phone once the trunk side alerts (§10.1 "Outbound"). -->
+  <recv response="180" />
   <recv response="200" rtd="true" timeout="30000" />
 
   <send>

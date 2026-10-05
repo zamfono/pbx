@@ -108,6 +108,8 @@ export type ChannelsApi = {
   ) => Promise<void>;
   list: () => Promise<Channel[]>;
   ring: (id: string) => Promise<void>;
+  /** Indicates progress, a 183 with SDP, so media reaches the unanswered caller. */
+  progress: (id: string) => Promise<void>;
   startMoh: (id: string, mohClass?: string) => Promise<void>;
   stopMoh: (id: string) => Promise<void>;
   sendDtmf: (id: string, dtmf: string) => Promise<void>;

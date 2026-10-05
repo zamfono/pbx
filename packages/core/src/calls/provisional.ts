@@ -13,6 +13,15 @@ import { isEvent, type AriEvent } from '../ari/events.js';
 /** The `Dial` statuses of the far end alerting: `180 Ringing` and `183 Session Progress`. */
 const ALERTING_DIAL_STATUSES = new Set(['RINGING', 'PROGRESS']);
 
+/** Whether `event` is the far end of `channelId` answering `183 Session Progress`. */
+export function progressOn(event: AriEvent, channelId: string): boolean {
+  return (
+    isEvent(event, 'Dial') &&
+    event.peer.id === channelId &&
+    event.dialstatus === 'PROGRESS'
+  );
+}
+
 /** A provisional response, as `HANGUPCAUSE(<channel>,tech)` renders the last one received. */
 const PROVISIONAL_TECH_CAUSE = /^SIP 1\d\d\b/u;
 

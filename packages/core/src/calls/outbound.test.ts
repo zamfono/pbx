@@ -146,6 +146,20 @@ function emitDialStatus(
   });
 }
 
+/** How many `method` requests for `path` the core sent Asterisk. */
+function requested(fakeAri: FakeAri, method: string, path: string): number {
+  return fakeAri.calls.filter(
+    entry => entry.method === method && entry.path === path
+  ).length;
+}
+
+/** The channels the core added to `bridgeId`, in order. */
+function addedTo(fakeAri: FakeAri, bridgeId: string): string[] {
+  return fakeAri.calls
+    .filter(entry => entry.path === `bridges/${bridgeId}/addChannel`)
+    .map(entry => String((entry.body as { channel?: string }).channel));
+}
+
 /** A recorder that only notes which participations each answer offered it (§10.2). */
 function spyRecorder(): ParticipationRecorder & {
   callers: Call[];
@@ -952,6 +966,71 @@ describe('outbound dialing', () => {
     expect(attemptEndpoints(fakeAri)).toEqual([
       `PJSIP/+498912345@trunk-${trunk1}`
     ]);
+  });
+
+  it('rings the caller once the trunk leg alerts with a 180 (§10.1 "Outbound")', async () => {
+    const trunkId = await seedTrunk(db, { priority: 1 });
+    await seedRoute(db, trunkId, { priority: 1 });
+    fakeAri.answerAfterMs = 60_000;
+
+    const { call, finished } = await startDial('+498912345');
+    const callerId = callerChannel(call);
+    const leg = await ringingLeg(call);
+    expect(requested(fakeAri, 'POST', `channels/${callerId}/ring`)).toBe(0);
+    emitState(fakeAri, leg.channelId, 'Ringing');
+    await eventually(() => {
+      expect(requested(fakeAri, 'POST', `channels/${callerId}/ring`)).toBe(1);
+    });
+    emitState(fakeAri, leg.channelId, 'Up');
+    await finished;
+
+    expect(call.status).toBe('answered');
+    expect(requested(fakeAri, 'POST', `channels/${callerId}/progress`)).toBe(0);
+  });
+
+  it('early-bridges the caller with a trunk leg that answers 183, and bridges the answer there (§10.1 "Outbound")', async () => {
+    const trunkId = await seedTrunk(db, { priority: 1 });
+    await seedRoute(db, trunkId, { priority: 1 });
+    fakeAri.answerAfterMs = 60_000;
+
+    const { call, finished } = await startDial('+498912345');
+    const callerId = callerChannel(call);
+    const leg = await ringingLeg(call);
+    emitDialStatus(fakeAri, leg.channelId, 'PROGRESS');
+    const bridgeId = await eventually(() => {
+      const [id = ''] = fakeAri.bridgeIds;
+      expect(addedTo(fakeAri, id)).toEqual([callerId, leg.channelId]);
+      return id;
+    });
+    expect(requested(fakeAri, 'POST', `channels/${callerId}/ring`)).toBe(1);
+    expect(requested(fakeAri, 'POST', `channels/${callerId}/progress`)).toBe(1);
+    expect(requested(fakeAri, 'POST', `channels/${callerId}/answer`)).toBe(0);
+    emitState(fakeAri, leg.channelId, 'Up');
+    await finished;
+
+    expect(call.status).toBe('answered');
+    expect(call.bridgeId).toBe(bridgeId);
+    expect(requested(fakeAri, 'POST', 'bridges')).toBe(1);
+  });
+
+  it('ends an early bridge with the attempt that failed after its 183', async () => {
+    const trunkId = await seedTrunk(db, { priority: 1 });
+    await seedRoute(db, trunkId, { priority: 1 });
+    fakeAri.answerAfterMs = 60_000;
+
+    const { call, finished } = await startDial('+498912345');
+    const leg = await ringingLeg(call);
+    emitDialStatus(fakeAri, leg.channelId, 'PROGRESS');
+    const bridgeId = await eventually(() => {
+      const [id = ''] = fakeAri.bridgeIds;
+      expect(addedTo(fakeAri, id)).toHaveLength(2);
+      return id;
+    });
+    emitDestroyed(fakeAri, leg.channelId, 17);
+    await finished;
+
+    expect(call.status).toBe('busy');
+    expect(requested(fakeAri, 'DELETE', `bridges/${bridgeId}`)).toBe(1);
   });
 
   it('keeps an attempt past 8s whose far end answered only 100 Trying, which no event reports', async () => {

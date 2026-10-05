@@ -67,6 +67,10 @@ export type Call = {
    * (§10.2 "Three-way calls"). Read once by the answer it is for (`takeJoinBridge`), and
    * cleared by its writer once the dial settles. */
   joinBridgeId?: string;
+  /** The bridge a waiting dial's caller and its current trunk attempt share once that attempt
+   * answered 183, so its early media reaches the caller (§10.1 "Outbound"). The attempt's answer
+   * keeps it as the call's bridge (`takeEarlyBridge`); the attempt ending destroys it. */
+  earlyBridgeId?: string;
   /** The caller ID a softphone leg presents for this call, once looked up (`contactName.ts`). */
   softphoneCallerId?: Promise<string>;
   /** §10.2 "Three-way calls": the channel through which the user who added a party to this
@@ -138,6 +142,13 @@ export function callerChannel(call: Call): string {
     throw new Error(`call ${call.id} has no caller channel`);
   }
   return call.callerChannelId;
+}
+
+/** Reads and clears `call.earlyBridgeId`, the bridge the answer of a waiting dial keeps. */
+export function takeEarlyBridge(call: Call): string | null {
+  const bridgeId = call.earlyBridgeId ?? null;
+  delete call.earlyBridgeId;
+  return bridgeId;
 }
 
 /** Reads and clears `call.joinBridgeId`, so the bridge is joined by one answer only. */

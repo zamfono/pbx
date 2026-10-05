@@ -47,6 +47,7 @@ const ACKED_CHANNEL_ACTIONS = new Set([
   'POST variable',
   'POST continue',
   'POST ring',
+  'POST progress',
   'POST moh',
   'POST dtmf',
   'DELETE moh'
