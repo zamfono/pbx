@@ -111,6 +111,11 @@ update 1.2.4 >"$work/out" 2>&1 || { cat "$work/out"; fail "the update to 1.2.4 f
 grep -q 'new setting UPDATER_TOKEN, unset' "$work/out" || fail "UPDATER_TOKEN was not listed as new"
 grep -q '^UPDATER_TOKEN=' "$work/stack/.env" && fail "the update filled in UPDATER_TOKEN"
 [[ $(stat -c %a "$work/stack/.env") == 600 ]] || fail ".env is no longer private"
+# The bundle's files keep the modes it ships, whoever runs update.sh: proxy (uid 1000) reads the
+# Caddyfile through its bind mount.
+modes=$(cd "$work/stack" && stat -c '%a %n' Caddyfile compose.yaml setup/compose.sh | tr '\n' ' ')
+[[ $modes == '644 Caddyfile 644 compose.yaml 755 setup/compose.sh ' ]] ||
+  fail "the update did not install the bundle's modes: $modes"
 grep -qx 'compose pull' "$work/runtime.log" ||
   fail "no pull of the whole stack: $(cat "$work/runtime.log")"
 grep -qx 'compose up -d --wait --wait-timeout 180' \

@@ -28,7 +28,6 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
-umask 077
 # shellcheck source=setup/checks.sh
 . setup/checks.sh
 # shellcheck source=setup/envfile.sh
@@ -260,7 +259,9 @@ main() {
   (cd "$work" && grep ' zamfono-deploy.tar.gz$' SHA256SUMS | sha256sum -c --quiet -) ||
     fail "the bundle does not match the release's SHA256SUMS; nothing was changed"
   mkdir "$work/x"
-  tar -xzf "$work/zamfono-deploy.tar.gz" -C "$work/x" --strip-components=1
+  # With the modes the bundle ships, whatever the umask: proxy (uid 1000) reads the Caddyfile
+  # through its bind mount, whoever owns it.
+  tar -xzpf "$work/zamfono-deploy.tar.gz" -C "$work/x" --strip-components=1
 
   if [[ $kind != update ]]; then
     echo
