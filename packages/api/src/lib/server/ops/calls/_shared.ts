@@ -10,9 +10,7 @@ import {
   HTTP_UNPROCESSABLE_CONTENT,
   LIVE_LEG_ROLES,
   LIVE_LEG_STATES,
-  QOS_ROLES,
-  type DB,
-  type Db
+  type DB
 } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
@@ -87,26 +85,6 @@ export const callOut = z.object({
 });
 export type CallOut = z.infer<typeof callOut>;
 
-/** One `call_qos` row, the per-leg RTCP summary of a call at diagnostics level `qos` (§7, §11.2).
- * `rxPackets` and `txPackets` are the packets the leg's RTP instance received from the peer and
- * sent to it: 0 received on an answered leg means no audio arrived from that side. */
-const callQosOut = z.object({
-  channelId: z.string(),
-  role: z.enum(QOS_ROLES),
-  jitterMs: z.number().nullable(),
-  lossPct: z.number().nullable(),
-  rttMs: z.number().nullable(),
-  rxPackets: z.number().nullable(),
-  txPackets: z.number().nullable()
-});
-
-/** A call with the §7 diagnostics it recorded: its `calls.log` and its per-leg `call_qos` rows. */
-export const callDetailOut = callOut.extend({
-  log: z.string().nullable(),
-  qos: z.array(callQosOut)
-});
-export type CallDetailOut = z.infer<typeof callDetailOut>;
-
 /** The `output` of an action on the live call `id`. */
 export const callActionOutput = z.object({ id: z.string() });
 
@@ -130,7 +108,7 @@ export const CALL_ACTION_PROBLEMS = [
   HTTP_SERVICE_UNAVAILABLE
 ] as const;
 
-/** A `calls` row's list wire shape; `calls.get` carries the diagnostics of one call on top. */
+/** A `calls` row's list wire shape; `calls.get` carries more of one call on top. */
 export function toCallOut(row: CallRow): CallOut {
   return {
     id: row.id,
@@ -148,31 +126,6 @@ export function toCallOut(row: CallRow): CallOut {
     answeredAt: row.answeredAt,
     endedAt: row.endedAt
   };
-}
-
-/**
- * A call with its §7 diagnostics: the `calls.log` JSON lines written at call end and the
- * `call_qos` rows of the legs, queryable alongside the call history.
- */
-export async function toCallDetailOut(
-  db: Db,
-  row: CallRow
-): Promise<CallDetailOut> {
-  const qos = await db
-    .selectFrom('callQos')
-    .select([
-      'channelId',
-      'role',
-      'jitterMs',
-      'lossPct',
-      'rttMs',
-      'rxPackets',
-      'txPackets'
-    ])
-    .where('callId', '=', row.id)
-    .orderBy('channelId')
-    .execute();
-  return { ...toCallOut(row), log: row.log, qos };
 }
 
 /** `calls` rows `userId` is the caller, the callee or the answering user of (§5.3, §10.3). */

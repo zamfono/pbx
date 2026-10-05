@@ -46,6 +46,12 @@ const inputSchema = z
       .string()
       .optional()
       .describe('Only calls that rang this ring group.'),
+    parentCallId: z
+      .string()
+      .optional()
+      .describe(
+        'History only: the calls whose parentCallId is this call, its transfer, added and park legs.'
+      ),
     status: z
       .enum(CALL_STATUSES)
       .optional()
@@ -186,6 +192,9 @@ export const list = defineOperation({
     }
     if (input.ringGroupId !== undefined) {
       query = query.where('ringGroupId', '=', input.ringGroupId);
+    }
+    if (input.parentCallId !== undefined) {
+      query = query.where('parentCallId', '=', input.parentCallId);
     }
     if (from !== undefined) {
       query = query.where('startedAt', '>=', from);

@@ -11,6 +11,10 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Added
+
+- `GET /calls?parentCallId=` lists a call's transfer, added and park legs; `GET /calls/{id}` names them in `childCallIds`.
+
 ### Fixed
 
 - A user's unconditional forward to an external number or SIP target is recorded when the

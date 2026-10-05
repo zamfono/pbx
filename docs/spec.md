@@ -1397,7 +1397,7 @@ A `sip` target's `headers` is a list of `{ name, value }` (§9.4 Header template
 
 **Recordings** (min. role: admin) — `GET /recordings`, `GET /recordings/{id}/audio` (the file; over MCP a download link, §10.5), `DELETE`
 
-**Call history** (min. role: user (own: caller, callee or answerer) / admin (all)) — `GET /calls?direction=&from=&to=&userId=&ringGroupId=&status=`, `GET /calls/{id}` (one ended call with its `log` and its `qos` rows, §7: each leg's `channelId`, `role`, `jitterMs`, `lossPct`, `rttMs`, `rxPackets` and `txPackets`, §11.2 `call_qos`)
+**Call history** (min. role: user (own: caller, callee or answerer) / admin (all)) — `GET /calls?direction=&from=&to=&userId=&ringGroupId=&status=&parentCallId=` (`parentCallId`: the rows whose `parent_call_id` is that call, its transfer, added and park legs, §10.2; for a `user` only those in their own scope, so another's call yields an empty list; history only, as `from`, `to` and `status` are, ignored with `live=true`), `GET /calls/{id}` (one ended call with its `log`, its `qos` rows, §7: each leg's `channelId`, `role`, `jitterMs`, `lossPct`, `rttMs`, `rxPackets` and `txPackets`, §11.2 `call_qos`, and `childCallIds`, the ids of the ended rows whose `parent_call_id` is this call, its direct children only, by `started_at`, for a `user` only those in their own scope)
 
 **Presence log** (min. role: admin) — `GET /presence/log?at=&userId=` (status snapshot at a past timestamp)
 
