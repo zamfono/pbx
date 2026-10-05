@@ -36,9 +36,9 @@ export function authorizationResponseUrl(
 }
 
 /** The standard OAuth 2.1 error response (§4.1.2.1), delivered to the request's own validated
- *  `redirect_uri` so the client learns the outcome on its own channel. Only for a request whose
- *  client and `redirect_uri` have been validated: one that failed on either gets a page on this
- *  origin instead, never a redirect. */
+ *  `redirect_uri` so the client learns the outcome on its own channel. Only once the person has
+ *  acted on the consent step: every failure before that gets a page on this origin instead, never
+ *  a redirect (§5.2, RFC 9700 §4.11.2). */
 export function authorizationErrorRedirect(
   request: AuthorizationRequestEcho,
   code: string

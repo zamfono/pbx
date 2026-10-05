@@ -5,7 +5,6 @@ import { HTTP_BAD_REQUEST, type Db } from '@zamfono/shared';
 
 import type { Keyring } from '../secretbox.js';
 import { originFromEnv } from '../stackAddress.js';
-import { authorizationErrorRedirect } from './authorizationResponse.js';
 import { clientMetaFor, type ClientMeta } from './clients.js';
 import { redirectUriAllowed } from './redirectUris.js';
 import { requestedResourceAcceptable } from './resource.js';
@@ -87,11 +86,10 @@ function validatedRedirectUri(
  * registration", "Client rows"): `null` for a bare login with no `client_id`; otherwise the
  * client's metadata and the `PendingAuthorize` to resume after login.
  *
- * An unknown client, or a `redirect_uri` {@link validatedRedirectUri} refuses, is a thrown
- * `error(400)` — never a redirect, since the `redirect_uri` is exactly what could not be trusted.
- * Every later failure is the OAuth 2.1 error response at that validated `redirect_uri`
- * (§4.1.2.1), carrying `iss` like every authorization response (§5.2): a missing `response_type`
- * too, which OAuth 2.1 §4.1.1 makes required.
+ * Every failure is a thrown `error(400)`, the error page on this origin, never a redirect: the
+ * person has not acted yet, and a client anyone can register statelessly would otherwise turn
+ * this endpoint into an open redirector (§5.2, RFC 9700 §4.11.2). A missing `response_type`
+ * fails too, which OAuth 2.1 §4.1.1 makes required.
  */
 export async function resolveClient(
   kr: Keyring,
@@ -114,16 +112,13 @@ export async function resolveClient(
         : 'oauth/authorize: missing redirect_uri'
     );
   }
-  const { redirectUri } = redirect;
-  const state = requestState(params);
   const responseType = params.get('response_type');
-  if (responseType === null) {
-    authorizationErrorRedirect({ redirectUri, state }, 'invalid_request');
-  }
   if (responseType !== VALID_RESPONSE_TYPE) {
-    authorizationErrorRedirect(
-      { redirectUri, state },
-      'unsupported_response_type'
+    error(
+      HTTP_BAD_REQUEST,
+      responseType === null
+        ? 'oauth/authorize: missing response_type'
+        : 'oauth/authorize: unsupported response_type'
     );
   }
   const codeChallenge = params.get('code_challenge');
@@ -133,12 +128,12 @@ export async function resolveClient(
     (codeChallengeMethod !== null &&
       codeChallengeMethod !== VALID_CODE_CHALLENGE_METHOD)
   ) {
-    authorizationErrorRedirect({ redirectUri, state }, 'invalid_request');
+    error(HTTP_BAD_REQUEST, 'oauth/authorize: PKCE S256 challenge required');
   }
-  // RFC 8707 §2: a `resource` this server issues no tokens for is refused as `invalid_target`
-  // before the person logs in; the token request checks it again (`tokenEndpoint.ts`).
+  // RFC 8707 §2: a `resource` this server issues no tokens for is refused before the person logs
+  // in; the token request checks it again (`tokenEndpoint.ts`).
   if (!requestedResourceAcceptable(originFromEnv(), params)) {
-    authorizationErrorRedirect({ redirectUri, state }, 'invalid_target');
+    error(HTTP_BAD_REQUEST, 'oauth/authorize: unknown resource');
   }
   return {
     meta,
@@ -147,7 +142,7 @@ export async function resolveClient(
       ...redirect,
       codeChallenge,
       scope: params.get('scope') ?? '',
-      state
+      state: requestState(params)
     }
   };
 }

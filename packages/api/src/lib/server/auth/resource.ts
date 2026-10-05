@@ -38,7 +38,8 @@ function isMcpResource(origin: string, value: string): boolean {
 
 /**
  * Whether every `resource` parameter of an authorization or token request names this stack's MCP
- * server; one naming anything else is refused with RFC 8707 §2's `invalid_target`, and a request
+ * server; one naming anything else is refused (by the token endpoint with RFC 8707 §2's
+ * `invalid_target`, by `/oauth/authorize` with its error page), and a request
  * that sends none is accepted for the default resource.
  */
 export function requestedResourceAcceptable(

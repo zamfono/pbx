@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-05 · §5.2 Client registration.** An `/oauth/authorize` request that fails validation shows the error page on this origin, never redirecting to the client; the OAuth error redirect follows only the person's action at the consent step.
+*Why:* a client anyone can register statelessly made the endpoint an open redirector before login (RFC 9700 §4.11.2).
+
 **2026-10-05 · §5.2 Tokens.** Redeeming a set-password link revokes every other live set-password token of that user, in the same transaction as the new password and the session revocation.
 *Why:* a reset left the user's other setup and reset links live, so an older mailed link could set the password again after the user had reset it.
 **2026-10-05 · §9.2.** `[from-trunk]` has an explicit `h` extension, so the one-character pattern no longer matches it.

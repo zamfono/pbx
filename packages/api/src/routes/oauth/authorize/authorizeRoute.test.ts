@@ -406,15 +406,16 @@ describe('GET /oauth/authorize (load)', () => {
     expect(data.authorize).toMatchObject({ state: null });
   });
 
-  /** `load`'s thrown redirect for `url`, failing the test on anything else. */
-  async function loadRedirect(url: URL): Promise<URL> {
+  /** The status of `load`'s thrown error page for `url`, failing the test on a redirect. */
+  async function loadErrorStatus(url: URL): Promise<number> {
     const err = await load(requestEvent(url, { cookies: cookieJar() })).catch(
       (caught: unknown) => caught
     );
-    if (!isRedirect(err)) {
-      throw new Error('expected a redirect');
+    expect(isRedirect(err)).toBe(false);
+    if (!isHttpError(err)) {
+      throw new Error('expected an HttpError');
     }
-    return new URL(err.location);
+    return err.status;
   }
 
   function requestUrl(overrides: Record<string, string | null>): URL {
@@ -437,25 +438,23 @@ describe('GET /oauth/authorize (load)', () => {
     return url;
   }
 
-  it('answers an unsupported response_type at the redirect_uri, with state and iss (OAuth 2.1 §4.1.2.1, RFC 9207)', async () => {
-    const location = await loadRedirect(requestUrl({ response_type: 'token' }));
-    expect(location.origin).toBe('https://client.example.com');
-    expect(location.searchParams.get('error')).toBe(
-      'unsupported_response_type'
-    );
-    expect(location.searchParams.get('state')).toBe('state-1');
-    expect(location.searchParams.get('iss')).toBe(ORIGIN);
-    expect(location.searchParams.get('code')).toBeNull();
-  });
-
-  it('answers a foreign resource at the redirect_uri with invalid_target (RFC 8707 §2)', async () => {
-    const location = await loadRedirect(
-      requestUrl({ resource: 'https://other.example/mcp' })
-    );
-    expect(location.searchParams.get('error')).toBe('invalid_target');
-    expect(location.searchParams.get('iss')).toBe(ORIGIN);
-    expect(location.searchParams.get('code')).toBeNull();
-  });
+  // RFC 9700 §4.11.2: before the person has acted, no request redirects to the client, so
+  // `/oauth/authorize` serves as no open redirector, even for a statelessly registered client.
+  it.each([
+    ['an unsupported response_type', { response_type: 'token' }],
+    ['a request without response_type', { response_type: null }],
+    ['a foreign resource', { resource: 'https://other.example/mcp' }],
+    [
+      'an unsupported code_challenge_method',
+      { code_challenge_method: 'plain' }
+    ],
+    ['a request without a PKCE challenge', { code_challenge: null }]
+  ])(
+    'renders the error page with status 400, without redirecting, for %s',
+    async (_label, overrides: Record<string, string | null>) => {
+      expect(await loadErrorStatus(requestUrl(overrides))).toBe(400);
+    }
+  );
 
   it("proceeds to the login form for this stack's own MCP resource", async () => {
     const data = await load(
@@ -466,15 +465,6 @@ describe('GET /oauth/authorize (load)', () => {
     expect(data.authorize).toMatchObject({
       redirectUri: 'https://client.example.com/callback'
     });
-  });
-
-  it('answers a request without response_type at the redirect_uri with invalid_request (OAuth 2.1 §4.1.1: required)', async () => {
-    const location = await loadRedirect(requestUrl({ response_type: null }));
-    expect(location.origin).toBe('https://client.example.com');
-    expect(location.searchParams.get('error')).toBe('invalid_request');
-    expect(location.searchParams.get('state')).toBe('state-1');
-    expect(location.searchParams.get('iss')).toBe(ORIGIN);
-    expect(location.searchParams.get('code')).toBeNull();
   });
 
   it('resumes a request without redirect_uri at the single registered one (OAuth 2.1 §2.3.2)', async () => {
@@ -506,23 +496,6 @@ describe('GET /oauth/authorize (load)', () => {
       throw new Error('expected an HttpError');
     }
     expect(err.status).toBe(400);
-  });
-
-  it('answers an unsupported code_challenge_method at the redirect_uri, with iss', async () => {
-    const location = await loadRedirect(
-      requestUrl({ code_challenge_method: 'plain' })
-    );
-    expect(location.searchParams.get('error')).toBe('invalid_request');
-    expect(location.searchParams.get('iss')).toBe(ORIGIN);
-  });
-
-  it('answers a request without a PKCE challenge at the redirect_uri, with iss', async () => {
-    const location = await loadRedirect(
-      requestUrl({ code_challenge: null, state: null })
-    );
-    expect(location.searchParams.get('error')).toBe('invalid_request');
-    expect(location.searchParams.get('iss')).toBe(ORIGIN);
-    expect(location.searchParams.has('state')).toBe(false);
   });
 
   it('never redirects to an unregistered redirect_uri, whatever else is wrong', async () => {
