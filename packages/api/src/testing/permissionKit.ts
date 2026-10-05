@@ -191,7 +191,8 @@ export function restEvent(route: RouteEntry, token: string): RequestEvent {
     body = JSON.stringify({ role: TARGET_INPUT.role });
   }
   return requestEvent(`${ORIGIN}/api/v1${path}`, {
-    init: { method: route.method, headers, body }
+    init: { method: route.method, headers, body },
+    routeId: '/api/v1/[...path]'
   });
 }
 

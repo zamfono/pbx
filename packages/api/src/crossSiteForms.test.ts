@@ -54,14 +54,16 @@ beforeAll(async () => {
   await seedSession(db, 'admin1', 'console', 'session-1');
 });
 
-/** `handle`'s response, and whether it passed the request on to the route. */
+/** `handle`'s response to a request to `url`, which SvelteKit matched to `routeId`, and whether
+ *  it passed the request on to the route. */
 async function serve(
   url: string,
+  routeId: string | null,
   init: RequestInit
 ): Promise<{ response: Response; resolved: boolean }> {
   let resolved = false;
   const response = await handle({
-    event: requestEvent(url, { init }),
+    event: requestEvent(url, { init, routeId }),
     resolve: () => {
       resolved = true;
       return Promise.resolve(new Response('ok'));
@@ -93,20 +95,28 @@ describe('form submissions without an Origin header', () => {
       epochSeconds(Date.now()),
       ORIGIN
     );
-    const { resolved } = await serve(`${ORIGIN}/api/v1/audio`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${token}` },
-      body: audioUpload()
-    });
+    const { resolved } = await serve(
+      `${ORIGIN}/api/v1/audio`,
+      '/api/v1/[...path]',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+        body: audioUpload()
+      }
+    );
     expect(resolved).toBe(true);
   });
 
   it('answers a multipart POST /api/v1/audio without a token with 401, not a CSRF refusal', async () => {
     expect(svelteKitChecksOrigin).toBe(false);
-    const { response } = await serve(`${ORIGIN}/api/v1/audio`, {
-      method: 'POST',
-      body: audioUpload()
-    });
+    const { response } = await serve(
+      `${ORIGIN}/api/v1/audio`,
+      '/api/v1/[...path]',
+      {
+        method: 'POST',
+        body: audioUpload()
+      }
+    );
     expect(response.status).toBe(401);
   });
 
@@ -114,7 +124,7 @@ describe('form submissions without an Origin header', () => {
     'lets a form-encoded POST %s through to the endpoint',
     async path => {
       expect(svelteKitChecksOrigin).toBe(false);
-      const { resolved } = await serve(`${ORIGIN}${path}`, {
+      const { resolved } = await serve(`${ORIGIN}${path}`, path, {
         method: 'POST',
         headers: FORM,
         body: 'grant_type=refresh_token&refresh_token=x&token=x'
@@ -126,11 +136,15 @@ describe('form submissions without an Origin header', () => {
 
 describe('the login and consent page', () => {
   it('refuses a cross-site form POST with 403', async () => {
-    const { response, resolved } = await serve(LOGIN_SUBMISSION, {
-      method: 'POST',
-      headers: { ...FORM, origin: 'https://evil.example' },
-      body: 'action=approve'
-    });
+    const { response, resolved } = await serve(
+      LOGIN_SUBMISSION,
+      '/oauth/authorize',
+      {
+        method: 'POST',
+        headers: { ...FORM, origin: 'https://evil.example' },
+        body: 'action=approve'
+      }
+    );
     expect(response.status).toBe(403);
     expect(resolved).toBe(false);
   });
@@ -140,6 +154,7 @@ describe('the login and consent page', () => {
     // encoding; the body never matters, since the refusal comes first.
     const { response, resolved } = await serve(
       `${ORIGIN}/_app/remote/abc/login`,
+      null,
       {
         method: 'POST',
         headers: {
@@ -154,17 +169,21 @@ describe('the login and consent page', () => {
   });
 
   it('refuses a form POST without an Origin header with 403', async () => {
-    const { response, resolved } = await serve(LOGIN_SUBMISSION, {
-      method: 'POST',
-      headers: { 'content-type': 'multipart/form-data; boundary=x' },
-      body: '--x--'
-    });
+    const { response, resolved } = await serve(
+      LOGIN_SUBMISSION,
+      '/oauth/authorize',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'multipart/form-data; boundary=x' },
+        body: '--x--'
+      }
+    );
     expect(response.status).toBe(403);
     expect(resolved).toBe(false);
   });
 
   it('lets a same-origin login submission through to the page', async () => {
-    const { resolved } = await serve(LOGIN_SUBMISSION, {
+    const { resolved } = await serve(LOGIN_SUBMISSION, '/oauth/authorize', {
       method: 'POST',
       headers: { ...FORM, origin: ORIGIN },
       body: 'email=admin%40x&_password=x&action=password'
@@ -173,9 +192,13 @@ describe('the login and consent page', () => {
   });
 
   it('lets the page itself load without an Origin header', async () => {
-    const { resolved } = await serve(`${ORIGIN}/oauth/authorize`, {
-      method: 'GET'
-    });
+    const { resolved } = await serve(
+      `${ORIGIN}/oauth/authorize`,
+      '/oauth/authorize',
+      {
+        method: 'GET'
+      }
+    );
     expect(resolved).toBe(true);
   });
 });

@@ -56,12 +56,16 @@ beforeAll(async () => {
   await seedSettings(db, { language: 'de' });
 });
 
+// The route SvelteKit matches for every REST operation.
+const API_ROUTE = '/api/v1/[...path]';
+
 const resolvePassThrough = (): Promise<Response> =>
   Promise.resolve(new Response('ok'));
 
 describe('hooks handle', () => {
   it('refuses /internal/* carrying X-Forwarded-For with 404', async () => {
     const event = requestEvent('http://internal/internal/mail', {
+      routeId: '/internal/mail',
       init: { headers: { 'x-forwarded-for': '203.0.113.9' } }
     });
     const response = await handle({ event, resolve: resolvePassThrough });
@@ -69,13 +73,17 @@ describe('hooks handle', () => {
   });
 
   it('resolves /internal/* through without the header', async () => {
-    const event = requestEvent('http://internal/internal/mail');
+    const event = requestEvent('http://internal/internal/mail', {
+      routeId: '/internal/mail'
+    });
     const response = await handle({ event, resolve: resolvePassThrough });
     expect(await response.text()).toBe('ok');
   });
 
   it('answers 401 problem+json for /api/v1/* without a bearer token', async () => {
-    const event = requestEvent('http://internal/api/v1/users');
+    const event = requestEvent('http://internal/api/v1/users', {
+      routeId: API_ROUTE
+    });
     const response = await handle({ event, resolve: resolvePassThrough });
     expect(response.status).toBe(401);
     expect(response.headers.get('content-type')).toBe(
@@ -84,7 +92,9 @@ describe('hooks handle', () => {
   });
 
   it('serves the openapi document without a bearer token', async () => {
-    const event = requestEvent('http://internal/api/v1/openapi.json');
+    const event = requestEvent('http://internal/api/v1/openapi.json', {
+      routeId: '/api/v1/openapi.json'
+    });
     const response = await handle({
       event,
       resolve: () => Promise.resolve(getOpenApi())
@@ -99,6 +109,7 @@ describe('hooks handle', () => {
     const responses: Response[] = [];
     for (let attempt = 0; attempt < TOKEN_LIMIT_PER_MINUTE + 1; attempt += 1) {
       const event = requestEvent('http://internal/oauth/token', {
+        routeId: '/oauth/token',
         clientAddress: address
       });
       // eslint-disable-next-line no-await-in-loop -- each request must count before the next is made
@@ -108,6 +119,40 @@ describe('hooks handle', () => {
     expect(last?.status).toBe(429);
     expect(last?.headers.get('content-type')).toBe('application/problem+json');
     expect(last?.headers.get('retry-after')).toBeTruthy();
+  });
+
+  // SvelteKit routes on the decoded path (`decode_pathname`), so each percent-encoded spelling
+  // below runs the route its decoded path names.
+  it('counts a percent-encoded spelling of the token endpoint against its limit', async () => {
+    const TOKEN_LIMIT_PER_MINUTE = 60;
+    const address = '203.0.113.53';
+    const responses: Response[] = [];
+    for (let attempt = 0; attempt < TOKEN_LIMIT_PER_MINUTE + 1; attempt += 1) {
+      const event = requestEvent('http://internal/oauth/%74oken', {
+        routeId: '/oauth/token',
+        clientAddress: address
+      });
+      // eslint-disable-next-line no-await-in-loop -- each request must count before the next is made
+      responses.push(await handle({ event, resolve: resolvePassThrough }));
+    }
+    expect(responses.at(-1)?.status).toBe(429);
+  });
+
+  it('refuses a percent-encoded /internal/* spelling carrying X-Forwarded-For with 404', async () => {
+    const event = requestEvent('http://internal/%69nternal/mail', {
+      routeId: '/internal/mail',
+      init: { headers: { 'x-forwarded-for': '203.0.113.9' } }
+    });
+    const response = await handle({ event, resolve: resolvePassThrough });
+    expect(response.status).toBe(404);
+  });
+
+  it('answers 401 for a percent-encoded /api/v1/* spelling without a bearer token', async () => {
+    const event = requestEvent('http://internal/%61pi/v1/users', {
+      routeId: API_ROUTE
+    });
+    const response = await handle({ event, resolve: resolvePassThrough });
+    expect(response.status).toBe(401);
   });
 
   it('answers 429 problem+json once a client address exceeds the registration limit', async () => {
@@ -120,6 +165,7 @@ describe('hooks handle', () => {
       attempt += 1
     ) {
       const event = requestEvent('http://internal/oauth/register', {
+        routeId: '/oauth/register',
         clientAddress: address
       });
       // eslint-disable-next-line no-await-in-loop -- each request must count before the next is made
@@ -131,6 +177,7 @@ describe('hooks handle', () => {
 
   it('does not rate limit a client registration request under the limit', async () => {
     const event = requestEvent('http://internal/oauth/register', {
+      routeId: '/oauth/register',
       clientAddress: '203.0.113.51'
     });
     const response = await handle({ event, resolve: resolvePassThrough });
@@ -187,6 +234,7 @@ describe('hooks handle', () => {
       'https://pbx.example.com'
     );
     const event = requestEvent('http://internal/api/v1/users', {
+      routeId: API_ROUTE,
       init: { headers: { authorization: `Bearer ${token}` } }
     });
     await handle({ event, resolve: resolvePassThrough });
@@ -209,7 +257,8 @@ describe('hooks handle', () => {
       exp: nowS + 300
     });
     const linked = requestEvent(
-      `http://internal${path}?access_token=${linkToken}`
+      `http://internal${path}?access_token=${linkToken}`,
+      { routeId: API_ROUTE }
     );
     const viaLink = await handle({
       event: linked,
@@ -225,6 +274,7 @@ describe('hooks handle', () => {
     );
     const viaBearer = await handle({
       event: requestEvent(`http://internal${path}`, {
+        routeId: API_ROUTE,
         init: { headers: { authorization: `Bearer ${bearerToken}` } }
       }),
       resolve: resolvePassThrough

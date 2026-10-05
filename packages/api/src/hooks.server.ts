@@ -64,25 +64,25 @@ export const init: ServerInit = async () => {
   });
 };
 
-// The one `/api/v1/*` path served without a bearer token (§10.3).
-const OPENAPI_PATH = `${API_PREFIX}/openapi.json`;
+// The one `/api/v1/*` route served without a bearer token (§10.3).
+const OPENAPI_ROUTE = `${API_PREFIX}/openapi.json`;
 
-// §5.5's per-address limit for the two endpoints it can be applied to by pathname alone. The
+// §5.5's per-address limit for the two endpoints it can be applied to by route alone. The
 // login and forgot-password limits key on the account the request body names, and the login's
 // address limit counts submissions rather than views of the page, so both live in the handler
 // that reads that body (the `login` form in `authorize.remote.ts`; `requestPasswordReset`, which
 // `POST /auth/resetRequest` and the forgot-password page's form share).
-const RATE_LIMITED_PATHS: Partial<Record<string, LimitKind>> = {
+const RATE_LIMITED_ROUTES: Partial<Record<string, LimitKind>> = {
   '/oauth/token': 'token',
   '/oauth/register': 'register'
 };
 
-/** 429 problem+json once `pathname`'s own §5.5 address limit is exceeded, else `null` to let the request through. */
+/** 429 problem+json once the route's own §5.5 address limit is exceeded, else `null` to let the request through. */
 function rateLimitResponse(
-  pathname: string,
+  routeId: string | null,
   event: RequestEvent
 ): Response | null {
-  const kind = RATE_LIMITED_PATHS[pathname];
+  const kind = routeId === null ? undefined : RATE_LIMITED_ROUTES[routeId];
   if (!kind) {
     return null;
   }
@@ -117,25 +117,30 @@ async function fillLanguage({ html }: { html: string }): Promise<string> {
  * `event.locals.auth`, 401 problem+json without one (the OpenAPI document needs neither);
  * refuses `/internal/*` when the request carries `X-Forwarded-For`, since only the proxy hop sets
  * it and that path is reachable from the internal network alone (§3.1); answers 429 problem+json
- * once a client address exceeds the §5.5 limit of the auth endpoint it called.
+ * once a client address exceeds the §5.5 limit of the auth endpoint it called. Each check keys on
+ * the route SvelteKit matched, which it finds on the decoded path, so a percent-encoded spelling
+ * of a path meets the same checks as the route it runs.
  */
 const handleRequest: Handle = async ({ event, resolve }) => {
-  const { pathname } = event.url;
-  const crossSite = crossSiteFormRejection(event.request, pathname);
+  const routeId = event.route.id;
+  const crossSite = crossSiteFormRejection(event.request, routeId);
   if (crossSite) {
     return crossSite;
   }
   if (
-    pathname.startsWith(INTERNAL_PREFIX) &&
+    routeId?.startsWith(INTERNAL_PREFIX) === true &&
     event.request.headers.has('x-forwarded-for')
   ) {
     return new Response(null, { status: HTTP_NOT_FOUND });
   }
-  const limited = rateLimitResponse(pathname, event);
+  const limited = rateLimitResponse(routeId, event);
   if (limited) {
     return limited;
   }
-  if (!pathname.startsWith(API_PREFIX) || pathname === OPENAPI_PATH) {
+  if (
+    routeId?.startsWith(`${API_PREFIX}/`) !== true ||
+    routeId === OPENAPI_ROUTE
+  ) {
     event.locals.auth = null;
     return resolve(event, { transformPageChunk: fillLanguage });
   }

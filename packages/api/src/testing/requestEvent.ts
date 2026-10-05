@@ -39,12 +39,14 @@ type EventInit = {
   locals?: App.Locals;
   cookies?: Cookies;
   clientAddress?: string;
+  /** `event.route.id`: the route SvelteKit matched, `null` for none. */
+  routeId?: string | null;
 };
 
 /**
  * A `RequestEvent` for a request to `url`, typed as the event `E` the code under test takes (a
  * route's own `RequestEvent`, a `load`'s `ServerLoadEvent` …). The members no code under test
- * reads (`fetch`, `params`, `route`, `parent` …) stay unset, which is why the object is asserted
+ * reads (`fetch`, `params`, `parent` …) stay unset, which is why the object is asserted
  * to the type.
  */
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- `E` is the event type the caller's handler declares; the one assertion to it lives here instead of at every call site
@@ -54,7 +56,8 @@ export function requestEvent<E extends RequestEvent = RequestEvent>(
     init,
     locals = { auth: null },
     cookies = cookieJar(),
-    clientAddress = '198.51.100.1'
+    clientAddress = '198.51.100.1',
+    routeId = null
   }: EventInit = {}
 ): E {
   return {
@@ -62,6 +65,7 @@ export function requestEvent<E extends RequestEvent = RequestEvent>(
     url: new URL(url),
     locals,
     cookies,
+    route: { id: routeId },
     getClientAddress: () => clientAddress
   } as E;
 }

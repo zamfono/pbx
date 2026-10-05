@@ -30,7 +30,7 @@ const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 // ambient authority there. REST authenticates by bearer token, the OAuth endpoints by the grant
 // or token in the body, an upload link by the token in its URL, and `/mcp` validates `Origin`
 // itself (`#lib/server/mcp/origin.ts`).
-const CLIENT_PATHS = new Set([
+const CLIENT_ROUTES = new Set([
   '/oauth/token',
   '/oauth/revoke',
   '/oauth/register',
@@ -43,12 +43,13 @@ const CLIENT_PREFIX = `${API_PREFIX}/`;
 // browser reaches it.
 export const INTERNAL_PREFIX = '/internal/';
 
-function isClientEndpoint(pathname: string): boolean {
+function isClientEndpoint(routeId: string | null): boolean {
   return (
-    CLIENT_PATHS.has(pathname) ||
-    pathname.startsWith(CLIENT_PREFIX) ||
-    pathname.startsWith(`${UPLOAD_PREFIX}/`) ||
-    pathname.startsWith(INTERNAL_PREFIX)
+    routeId !== null &&
+    (CLIENT_ROUTES.has(routeId) ||
+      routeId.startsWith(CLIENT_PREFIX) ||
+      routeId.startsWith(`${UPLOAD_PREFIX}/`) ||
+      routeId.startsWith(INTERNAL_PREFIX))
   );
 }
 
@@ -61,13 +62,14 @@ function isFormSubmission(request: Request): boolean {
   );
 }
 
-/** The 403 refusing a form submission to a browser-served route whose `Origin` is missing or
- *  is not the stack's own, else `null` to let the request through. */
+/** The 403 refusing a form submission to a browser-served route, or to no route, whose `Origin`
+ *  is missing or is not the stack's own, else `null` to let the request through. `routeId` is
+ *  `event.route.id`. */
 export function crossSiteFormRejection(
   request: Request,
-  pathname: string
+  routeId: string | null
 ): Response | null {
-  if (isClientEndpoint(pathname) || !isFormSubmission(request)) {
+  if (isClientEndpoint(routeId) || !isFormSubmission(request)) {
     return null;
   }
   // `Origin` is serialised canonically (RFC 6454 §6.1), so it is compared with the stack's

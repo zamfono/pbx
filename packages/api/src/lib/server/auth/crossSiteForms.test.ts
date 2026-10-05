@@ -17,46 +17,45 @@ function post(url: string, contentType: string, origin?: string): Request {
 
 // The two ways a remote `form` submits (§5.2 "Authentication pages"): without JavaScript the
 // browser posts the form itself to the page's own URL with a `?/remote=` action; with it,
-// SvelteKit posts its own encoding to `/_app/remote/<id>`.
+// SvelteKit posts its own encoding to `/_app/remote/<id>`, which matches no route.
 const SUBMISSIONS = [
   {
     name: 'a no-JavaScript forgot-password submission',
     url: 'https://pbx.example.com/auth/forgot?/remote=abc/requestReset',
+    routeId: '/auth/forgot',
     type: 'application/x-www-form-urlencoded'
   },
   {
     name: 'a no-JavaScript set-password submission',
     url: 'https://pbx.example.com/auth/setPassword?token=t&/remote=abc/setPassword',
+    routeId: '/auth/setPassword',
     type: 'multipart/form-data; boundary=x'
   },
   {
     name: 'an enhanced remote-form submission',
     url: 'https://pbx.example.com/_app/remote/abc/requestReset',
+    routeId: null,
     type: 'application/x-sveltekit-formdata'
   }
 ];
 
 describe('crossSiteFormRejection', () => {
-  for (const { name, url, type } of SUBMISSIONS) {
+  for (const { name, url, routeId, type } of SUBMISSIONS) {
     it(`refuses ${name} from another origin or with none`, () => {
-      const pathname = new URL(url).pathname;
       expect(
-        crossSiteFormRejection(
-          post(url, type, 'https://evil.example'),
-          pathname
-        )?.status
+        crossSiteFormRejection(post(url, type, 'https://evil.example'), routeId)
+          ?.status
       ).toBe(HTTP_FORBIDDEN);
-      expect(crossSiteFormRejection(post(url, type), pathname)?.status).toBe(
+      expect(crossSiteFormRejection(post(url, type), routeId)?.status).toBe(
         HTTP_FORBIDDEN
       );
     });
 
     it(`lets ${name} from the stack's own origin through`, () => {
-      const pathname = new URL(url).pathname;
       expect(
         crossSiteFormRejection(
           post(url, type, 'https://pbx.example.com'),
-          pathname
+          routeId
         )
       ).toBeNull();
     });
