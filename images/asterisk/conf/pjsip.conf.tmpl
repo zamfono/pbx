@@ -1,5 +1,12 @@
-; Transports only (spec §9.1). Dynamic endpoints and trunks are rendered by `api` onto the
-; `asterisk-config` volume and pulled in through the includes below.
+; Global settings and transports only (spec §9.1). Dynamic endpoints and trunks are rendered by
+; `api` onto the `asterisk-config` volume and pulled in through the includes below.
+
+; `User-Agent` and `Server` name the product; Asterisk's default names its release, which tells a
+; scanner what it runs (spec §5.6).
+[global]
+type = global
+user_agent = Zamfono
+
 [transport-tls]
 type = transport
 protocol = tls

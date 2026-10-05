@@ -147,6 +147,9 @@ docker exec "$CONTAINER" grep -q '^OPTIONS sip:' /tmp/s_server-5072.log \
 # for the provider to connect back to (entrypoint.sh, spec §9.4 "Flows").
 docker exec "$CONTAINER" grep -q '^Via: SIP/2.0/TLS 192.0.2.10:5061;' /tmp/s_server-5072.log \
   || fail "transport-tls-noverify's Via does not name the external address with port 5061"
+# Requests name the product alone, never the Asterisk release behind it (§5.6).
+docker exec "$CONTAINER" sh -c "tr -d '\r' < /tmp/s_server-5072.log | grep -qx 'User-Agent: Zamfono'" \
+  || fail "the OPTIONS' User-Agent is not 'Zamfono'"
 docker exec "$CONTAINER" grep -q '^OPTIONS sip:' /tmp/s_server-5071.log \
   && fail "transport-tls sent OPTIONS to a server whose certificate it cannot verify"
 docker exec "$CONTAINER" sh -c ': > /etc/asterisk/gen/pjsip_trunks.conf'

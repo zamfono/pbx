@@ -241,6 +241,7 @@ Every request reaches `api` from Caddy's address on the `internal` network. The 
 ### 5.6 SIP hardening
 
 - No `anonymous` endpoint is defined, so a request that matches no endpoint is rejected before any dialplan runs.
+- Requests and responses name `Zamfono` in `User-Agent` and `Server`, never the Asterisk release.
 - Endpoints are bound to auth and identified by auth username (`identify_by=auth_username`).
 - Trunks are identified by source address, by the registered contact's `line` tag for registration trunks, or by digest authentication where `inbound_auth` is set (§9.4).
 - An `inbound_auth` trunk with `inbound` or `both` hosts accepts its credential only from them. One without accepts it from any address, so its provider credential is open to online guessing, unthrottled; this remains a risk the operator takes by listing no host.
@@ -825,7 +826,7 @@ The database is therefore never the reason to re-architect; the single-tenant st
 
 Asterisk's own configuration ships in the image and is templated from environment variables at container start by an `envsubst` entrypoint; only what `api` renders comes from a volume (`asterisk-config`, mounted at `/etc/asterisk/gen`).
 
-- `pjsip.conf` holds transports only; the public side is IPv4 in the MVP (§6.1 for the IP model, §12 for the IPv6 switch-on):
+- `pjsip.conf` holds its `global` section (§5.6) and the transports only; the public side is IPv4 in the MVP (§6.1 for the IP model, §12 for the IPv6 switch-on):
   - `transport-tls`: SIP over TLS on 5061, for clients, accepting TLS 1.2 or newer and refusing older versions. It has `allow_reload=yes` and reads the stack certificate from the `asterisk-config` volume, where `api` keeps it synced from Caddy (§6.4). It has no switch, since every client depends on it. It also carries the TLS trunks that check their provider's certificate (§9.4 "Signaling"): `verify_server=yes` against the system CA bundle (`ca_list_path=/etc/ssl/certs`, wildcard certificates allowed), which Asterisk applies to outgoing connections alone, so a connecting client is not asked for anything.
   - `transport-tls-noverify`: the same TLS server on 5062 with `verify_server=no`, for the TLS trunks that do not check their provider's certificate; PJSIP checks certificates per transport, not per endpoint. The ports mode does not publish 5062, so there its Contact and Via name port 5061 (`external_signaling_port`), where a provider opening its own connection reaches `transport-tls`; in the macvlan mode 5062 is reachable at the stack address.
   - `transport-udp` and `transport-tcp`: port 5060, for trunks per provider requirement and for allowlisted desk-phone registration (§9.3). `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED` (`.env`, default `true`) switch them individually; a disabled transport is still defined but bound to `127.0.0.1`, so the rendered configuration stays valid under every flag combination while nothing outside the container reaches the port. A macvlan stack (§6.2.1) has no host firewall in front of it, so these flags are how such a stack becomes TLS-only.
