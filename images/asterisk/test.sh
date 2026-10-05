@@ -63,6 +63,12 @@ await_ready() {
 }
 await_ready
 
+# Asterisk logs to its console alone, the container log, which the runtime caps (spec §7): no log
+# file grows in the writable layer, and no colour code reaches a log reader.
+logs=$(docker exec "$CONTAINER" find /var/log/asterisk -type f)
+[ -z "$logs" ] || fail "asterisk writes log files: $logs"
+docker logs "$CONTAINER" 2>&1 | grep $'\e' > /dev/null && fail "the container log carries ANSI escape codes"
+
 TRANSPORTS=$(docker exec "$CONTAINER" asterisk -rx 'pjsip show transports')
 echo "$TRANSPORTS" | grep -q 'transport-udp.*127.0.0.1:5060' \
   || fail "transport-udp is not bound to 127.0.0.1:5060 while SIP_UDP_ENABLED=false"

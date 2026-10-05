@@ -11,6 +11,11 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Fixed
+
+- Asterisk no longer fills the disk with uncapped `full` and `messages` log files; its log is the
+  container log alone, without colour codes.
+
 ## [0.2.1] - 2026-10-05
 
 The first 0.2 release; its `v0.2.0` tag was never published.

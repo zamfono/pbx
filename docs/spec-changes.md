@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-05 · §7.** Asterisk logs to its console alone, the container log, at `notice` level and up plus `security` and without colour codes; the `full` and `messages` log files are gone.
+*Why:* nothing capped or rotated the two files in the container's writable layer, which filled a host's disk within days, and the container log already holds the same lines, capped by the runtime; colour codes were noise in every log reader (product owner, 2026-10-05).
+
 **2026-10-05 · §9.2.** `[from-trunk]` matches a user part of at least two characters plus the exact extension `s`, a Request-URI without a user part; the `h` extension is gone, since no pattern matches `h`, `i`, `t` or any other one-character extension.
 *Why:* the one-character pattern, added so that `s` reaches the core's `To` fallback, matched every special extension Asterisk runs, `h` re-entering Stasis on each hangup; internal extensions and a provider's user part are never one character, so only `s` needs to match.
 
