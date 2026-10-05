@@ -95,13 +95,18 @@ describe('transfers', () => {
   }
 
   /**
-   * Waits until the core has followed a `REFER` transfer: hanging up the transferrer's channel,
-   * left with nobody, is the last thing either kind of transfer does (`blindTransfer.ts`,
+   * Waits until the core has followed a `REFER` transfer: closing `call`, the one the transferrer
+   * left, its row written, is the last thing either kind of transfer does (`blindTransfer.ts`,
    * `attendedTransfer.ts`).
    */
-  function transferFollowed(transferrerChannelId: string): Promise<void> {
-    return eventually(() => {
-      expect(rig.hungUp(transferrerChannelId)).toBe(true);
+  function transferFollowed(call: Call): Promise<void> {
+    return eventually(async () => {
+      const row = await db
+        .selectFrom('calls')
+        .select('endedAt')
+        .where('id', '=', call.id)
+        .executeTakeFirstOrThrow();
+      expect(row.endedAt).not.toBeNull();
     });
   }
 
@@ -136,12 +141,11 @@ describe('transfers', () => {
       is_external: false
     });
 
-    // Asterisk executes the REFER itself; the core closes the call and then ends the
-    // transferrer's participation, whose channel is left with nobody, and leaves the transferee
-    // to the onward call.
-    await eventually(() => {
-      expect(rig.hungUp(legId)).toBe(true);
-    });
+    // Asterisk executes the REFER itself; the core closes the call, ending the transferrer's
+    // participation, whose channel is left with nobody, and leaves the transferee to the onward
+    // call.
+    await transferFollowed(call);
+    expect(rig.hungUp(legId)).toBe(true);
     const original = await db
       .selectFrom('calls')
       .select(['status', 'endedAt', 'log'])
@@ -210,7 +214,7 @@ describe('transfers', () => {
     // The transferrer's own outbound route and presented number; the transferee is an outside
     // caller with neither.
     const trunkId = await seedTrunkWithRoute(db, transferrerId);
-    const { callerId, legId } = await answered(
+    const { call, callerId, legId } = await answered(
       transferrerId,
       'PJSIP/e101-a-00000002'
     );
@@ -226,7 +230,7 @@ describe('transfers', () => {
       result: 'Success',
       is_external: false
     });
-    await transferFollowed(legId);
+    await transferFollowed(call);
 
     fakeAri.emit({
       type: 'StasisStart',
@@ -283,7 +287,7 @@ describe('transfers', () => {
       result: 'Success',
       is_external: false
     });
-    await transferFollowed(callerId);
+    await transferFollowed(call);
 
     fakeAri.emit({
       type: 'StasisStart',
@@ -333,7 +337,7 @@ describe('transfers', () => {
       result: 'Success',
       is_external: false
     });
-    await transferFollowed(callerId);
+    await transferFollowed(call);
 
     const original = await db
       .selectFrom('calls')
@@ -425,7 +429,7 @@ describe('transfers', () => {
   it('hangs up the transferee once the onward call through its Local pair ends', async () => {
     await setUp();
     const transferrerId = await seedUserWithDevice(rig, '101');
-    const { callerId, legId } = await answered(
+    const { call, callerId, legId } = await answered(
       transferrerId,
       'PJSIP/e101-a-00000002'
     );
@@ -445,7 +449,7 @@ describe('transfers', () => {
       result: 'Success',
       is_external: true
     });
-    await transferFollowed(legId);
+    await transferFollowed(call);
     // The onward call ended: its Local pair goes with it, the first half included.
     fakeAri.emit({
       type: 'ChannelDestroyed',
@@ -702,7 +706,7 @@ describe('transfers', () => {
       destination_bridge: bridge2,
       result: 'Success'
     });
-    await transferFollowed(original.legId);
+    await transferFollowed(original.call);
 
     const originalRow = await db
       .selectFrom('calls')
@@ -758,7 +762,7 @@ describe('transfers', () => {
       destination_bridge: bridge2,
       result: 'Success'
     });
-    await transferFollowed(original.legId);
+    await transferFollowed(original.call);
     // Asterisk ends the transferrer's second channel itself; that ends nothing else.
     const arrived = delivered(ari, 'ChannelDestroyed', secondId);
     destroyed(secondId);
@@ -903,7 +907,7 @@ describe('transfers', () => {
       destination_bridge: bridge2,
       result: 'Success'
     });
-    await transferFollowed(original.legId);
+    await transferFollowed(original.call);
     destroyed(secondId);
 
     // The transferee hangs up, which ends the consultation, and the core hangs up the target.
@@ -967,7 +971,7 @@ describe('transfers', () => {
       destination_link_second_leg: { id: localTwo.id },
       result: 'Success'
     });
-    await transferFollowed(original.legId);
+    await transferFollowed(original.call);
 
     const posted = (path: string): string[] =>
       fakeAri.calls
