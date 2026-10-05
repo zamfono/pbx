@@ -69,7 +69,7 @@ async function setUp(secretKeyring?: Keyring): Promise<{
       url: URL,
       eventTypesJson: null,
       active: 1,
-      secretEnc: encrypt(secretKeyring ?? kr, 'shh'),
+      secretEnc: encrypt(secretKeyring ?? kr, 'webhooks.secretEnc', 'shh'),
       createdAt: nowIso()
     })
     .execute();

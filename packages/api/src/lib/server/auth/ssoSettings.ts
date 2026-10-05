@@ -80,7 +80,11 @@ export async function ssoConfigFromSettings(
     clientSecret:
       row.ssoClientSecretEnc === null
         ? null
-        : decrypt(kr, row.ssoClientSecretEnc).toString('utf8'),
+        : decrypt(
+            kr,
+            'settings.ssoClientSecretEnc',
+            row.ssoClientSecretEnc
+          ).toString('utf8'),
     tenantId: row.ssoTenantId,
     allowedDomain: row.ssoAllowedDomain,
     label: buttonLabel(provider, row.ssoLabel)

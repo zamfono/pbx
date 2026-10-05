@@ -57,7 +57,11 @@ afterEach(() => {
 async function seed(db: Db): Promise<string> {
   await seedSettings(db, {
     language: 'de',
-    ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key'),
+    ringotelApiTokenEnc: encrypt(
+      keyringFromEnv(privateEnv),
+      'settings.ringotelApiTokenEnc',
+      'ringotel-key'
+    ),
     ringotelOrgId: 'org-1',
     ringotelBranchId: 'branch-1'
   });

@@ -45,7 +45,11 @@ async function setUpRingotel(db: Db): Promise<void> {
   await seedSettings(db, {
     ringotelOrgId: 'org-1',
     ringotelBranchId: 'branch-1',
-    ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    ringotelApiTokenEnc: encrypt(
+      keyringFromEnv(privateEnv),
+      'settings.ringotelApiTokenEnc',
+      'ringotel-key'
+    )
   });
 }
 

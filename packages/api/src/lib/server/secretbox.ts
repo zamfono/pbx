@@ -4,6 +4,8 @@
 // `module.exports` itself.
 import sodium from 'sodium-native';
 
+import type { DB } from '@zamfono/shared';
+
 // §5.4: every secretbox blob is version(1) || nonce(24) || ciphertext, where the version
 // byte is the generation of the key it was written under.
 const VERSION_LENGTH = 1;
@@ -25,6 +27,14 @@ export type Keyring = {
 };
 
 type KeySpec = { generation: number; key: Buffer };
+
+/**
+ * What a blob is for (§5.4): a stored secret by its `<table>.<column>`, a sealed cookie by its
+ * name, a dynamic OAuth client id. It is the AEAD's additional data, so a blob made for one
+ * purpose never opens as another.
+ */
+export type Purpose =
+  `${keyof DB}.${string}Enc` | `cookie.${string}` | 'oauth.clientId';
 
 /**
  * Parses a `SECRETBOX_KEY`-shaped value, `"<generation>:<base64 32 bytes>"`.
@@ -89,8 +99,13 @@ function keyForGeneration(kr: Keyring, generation: number): Buffer {
   throw new Error(`secretbox: unknown key generation ${generation}`);
 }
 
-/** Encrypts `plain` under the keyring's current key into a `version || nonce || ciphertext` blob. */
-export function encrypt(kr: Keyring, plain: string | Buffer): Buffer {
+/** Encrypts `plain` for `purpose` under the keyring's current key into a
+ *  `version || nonce || ciphertext` blob. */
+export function encrypt(
+  kr: Keyring,
+  purpose: Purpose,
+  plain: string | Buffer
+): Buffer {
   const message =
     typeof plain === 'string' ? Buffer.from(plain, 'utf8') : plain;
   const nonce = Buffer.alloc(NONCE_LENGTH);
@@ -99,7 +114,7 @@ export function encrypt(kr: Keyring, plain: string | Buffer): Buffer {
   sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
     ciphertext,
     message,
-    null,
+    Buffer.from(purpose, 'utf8'),
     null,
     nonce,
     kr.current.key
@@ -111,8 +126,9 @@ export function encrypt(kr: Keyring, plain: string | Buffer): Buffer {
   ]);
 }
 
-/** Decrypts a `version || nonce || ciphertext` blob, picking the key its version byte names. */
-export function decrypt(kr: Keyring, blob: Buffer): Buffer {
+/** Decrypts a `version || nonce || ciphertext` blob made for `purpose`, picking the key its
+ *  version byte names. */
+export function decrypt(kr: Keyring, purpose: Purpose, blob: Buffer): Buffer {
   if (blob.length < MIN_BLOB_LENGTH) {
     throw new Error('secretbox: malformed blob');
   }
@@ -125,7 +141,7 @@ export function decrypt(kr: Keyring, blob: Buffer): Buffer {
     plain,
     null,
     ciphertext,
-    null,
+    Buffer.from(purpose, 'utf8'),
     nonce,
     key
   );

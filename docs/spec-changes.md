@@ -7,6 +7,8 @@ Every change made to [the specification](spec.md) during implementation, newest 
 
 **2026-10-05 · §6.3 Proxy.** The `litestream.caddy` snippet rewrites the request path to `/metrics` before proxying to the sidecar.
 *Why:* Litestream serves its metrics at `/metrics` only, so the unrewritten `/metrics/litestream` got a 404.
+**2026-10-05 · §5.4.** Every secretbox blob is bound to its purpose as the AEAD's additional data (a stored secret's `<table>.<column>`, a sealed cookie's name, the client ids' own label), so a blob made for one purpose never decrypts as another.
+*Why:* an admin could choose a webhook secret's plaintext, read its blob back through a backup of their own and present it as a sealed consent cookie naming the owner.
 
 **2026-10-04 · §10.2 Voicemail, §11.2 `users`, `ring_groups`, §11.5, §11.6 Retention.** Every mailbox has a message limit, `mailbox_max_messages`: 100 by default, any positive count, NULL for no limit, set through `users.update` and `ringGroups.update`. A deposit into a mailbox that holds that many voicemails plays Asterisk's `vm-mailboxfull` prompt, takes no message and hangs up; the call is missed.
 *Why:* the product owner asked for it: "Per mailbox limit, but no arbitrary upper limit. Null means “no limit”. 100 as default".

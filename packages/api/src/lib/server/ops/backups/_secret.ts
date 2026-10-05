@@ -74,12 +74,14 @@ export function assertSecretFitsKind(kind: string, secret: BackupSecret): void {
 
 /** `secret` encrypted for `secret_enc`. */
 export function sealTargetSecret(kr: Keyring, secret: BackupSecret): Buffer {
-  return encrypt(kr, JSON.stringify(secret));
+  return encrypt(kr, 'backupTargets.secretEnc', JSON.stringify(secret));
 }
 
 /** The secret `secret_enc` holds; throws on anything but the JSON `sealTargetSecret` wrote. */
 export function openTargetSecret(kr: Keyring, secretEnc: Buffer): BackupSecret {
   return targetSecretSchema.parse(
-    JSON.parse(decrypt(kr, secretEnc).toString('utf8'))
+    JSON.parse(
+      decrypt(kr, 'backupTargets.secretEnc', secretEnc).toString('utf8')
+    )
   );
 }

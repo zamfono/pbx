@@ -30,9 +30,11 @@ export const revealCredentials = defineOperation({
   run: async (ctx, input) => {
     const row = await liveDevice(ctx.db, input.id);
     setUndoable(ctx, false);
-    const password = decrypt(keyringFromEnv(env), row.sipPasswordEnc).toString(
-      'utf8'
-    );
+    const password = decrypt(
+      keyringFromEnv(env),
+      'devices.sipPasswordEnc',
+      row.sipPasswordEnc
+    ).toString('utf8');
     if (row.kind === 'manual') {
       return connectionSettings(ctx.db, row, password);
     }

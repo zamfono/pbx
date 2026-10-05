@@ -70,7 +70,11 @@ async function ringotel(
   organizations?: FakeRingotelOrganization[]
 ): Promise<RingotelFake> {
   await seedSettings(db, {
-    ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key'),
+    ringotelApiTokenEnc: encrypt(
+      keyringFromEnv(privateEnv),
+      'settings.ringotelApiTokenEnc',
+      'ringotel-key'
+    ),
     ...settings
   });
   const fake = installRingotelFake(organizations);
@@ -265,7 +269,11 @@ describe('two writes of one device at once', () => {
 
     expect(pushes).toBe(2);
     expect(fake.users[0]?.password).toBe(
-      decrypt(keyringFromEnv(privateEnv), stored.sipPasswordEnc).toString()
+      decrypt(
+        keyringFromEnv(privateEnv),
+        'devices.sipPasswordEnc',
+        stored.sipPasswordEnc
+      ).toString()
     );
   });
 });

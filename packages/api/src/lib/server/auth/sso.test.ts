@@ -635,7 +635,7 @@ describe('ssoConfigFromSettings', () => {
       ssoClientId: 'oidc-client',
       ssoIssuer: 'https://idp.example.com',
       ssoLabel: 'Company IdP',
-      ssoClientSecretEnc: encrypt(kr, 'shh')
+      ssoClientSecretEnc: encrypt(kr, 'settings.ssoClientSecretEnc', 'shh')
     });
     const cfg = await ssoConfigFromSettings(db, kr);
     expect(cfg?.clientSecret).toBe('shh');

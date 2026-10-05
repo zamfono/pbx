@@ -117,7 +117,11 @@ export const create = defineOperation({
         allowedIpsJson:
           transport === 'plain' ? JSON.stringify(input.allowedIps) : null,
         sipUsername: username,
-        sipPasswordEnc: encrypt(keyringFromEnv(env), password),
+        sipPasswordEnc: encrypt(
+          keyringFromEnv(env),
+          'devices.sipPasswordEnc',
+          password
+        ),
         createdAt: ctx.now
       })
       .execute();

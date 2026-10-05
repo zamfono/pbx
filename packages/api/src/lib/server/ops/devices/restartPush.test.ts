@@ -53,7 +53,11 @@ async function seedRingotelUser(
         label: 'App',
         kind: 'ringotel',
         sipUsername: `e${ext}`,
-        sipPasswordEnc: encrypt(kr, `password-${ext}`),
+        sipPasswordEnc: encrypt(
+          kr,
+          'devices.sipPasswordEnc',
+          `password-${ext}`
+        ),
         createdAt: nowIso()
       })
       .execute();
@@ -68,7 +72,11 @@ async function seedRingotelUser(
  */
 async function seed(db: Db): Promise<RingotelFake> {
   await seedSettings(db, {
-    ringotelApiTokenEnc: encrypt(kr, 'ringotel-key'),
+    ringotelApiTokenEnc: encrypt(
+      kr,
+      'settings.ringotelApiTokenEnc',
+      'ringotel-key'
+    ),
     ringotelOrgId: 'org-1',
     ringotelBranchId: 'branch-1'
   });

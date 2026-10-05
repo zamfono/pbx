@@ -39,7 +39,11 @@ export const create = defineOperation({
   run: async (ctx, input) => {
     const id = newId();
     const eventTypes = input.eventTypes ?? null;
-    const secretEnc = encrypt(keyringFromEnv(env), input.secret);
+    const secretEnc = encrypt(
+      keyringFromEnv(env),
+      'webhooks.secretEnc',
+      input.secret
+    );
     await ctx.db
       .insertInto('webhooks')
       .values({

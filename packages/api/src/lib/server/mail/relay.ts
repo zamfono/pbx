@@ -37,7 +37,11 @@ export async function relayFromSettings(
     password:
       settings.smtpPasswordEnc === null
         ? null
-        : decrypt(kr, settings.smtpPasswordEnc).toString('utf8'),
+        : decrypt(
+            kr,
+            'settings.smtpPasswordEnc',
+            settings.smtpPasswordEnc
+          ).toString('utf8'),
     from: settings.mailFrom,
     fromName: settings.companyName
   };

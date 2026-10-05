@@ -71,7 +71,11 @@ describe('a ringotel device created before provisioning.ringotelSetup (§10.4)',
   it('is provisioned by the setup, with its stored credentials', async () => {
     const db = await makeTestDb();
     await seedSettings(db, {
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake([]);
     const { userId, device } = await deviceBeforeSetup(db);
@@ -101,7 +105,11 @@ describe('a ringotel device created before provisioning.ringotelSetup (§10.4)',
   it('pushes its stored BLF panel at setup', async () => {
     const db = await makeTestDb();
     await seedSettings(db, {
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake([]);
     const { device } = await deviceBeforeSetup(db);
@@ -124,7 +132,11 @@ describe('a ringotel device created before provisioning.ringotelSetup (§10.4)',
   it('ends its ringotel.push trail with what the setup pushed (§5.7)', async () => {
     const db = await makeTestDb();
     await seedSettings(db, {
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake([]);
     const { device } = await deviceBeforeSetup(db);
@@ -142,7 +154,11 @@ describe('a ringotel device created before provisioning.ringotelSetup (§10.4)',
   it('stands when Ringotel refuses the device, with a warning and a refused row', async () => {
     const db = await makeTestDb();
     await seedSettings(db, {
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake([]);
     const { device } = await deviceBeforeSetup(db);
@@ -175,7 +191,11 @@ describe('a ringotel device created before provisioning.ringotelAdopt (§10.4)',
     process.env.FQDN = 'pbx.example.com';
     const db = await makeTestDb();
     await seedSettings(db, {
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake(
       [{ id: 'org-9', domain: 'zamfono-test' }],
@@ -209,7 +229,11 @@ describe('a ringotel device whose Ringotel user is missing (§10.4, §5.2)', () 
     db: Db
   ): Promise<{ ringotel: ReturnType<typeof installRingotelFake>; id: string }> {
     await seedSettings(db, {
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake([]);
     await setup(db);

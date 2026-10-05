@@ -109,7 +109,9 @@ async function createSettings(
       smtpSecurity: smtpSecurityFrom(env),
       smtpUser: env.SMTP_USER ?? null,
       smtpPasswordEnc:
-        env.SMTP_PASSWORD === undefined ? null : encrypt(kr, env.SMTP_PASSWORD),
+        env.SMTP_PASSWORD === undefined
+          ? null
+          : encrypt(kr, 'settings.smtpPasswordEnc', env.SMTP_PASSWORD),
       mailFrom: smtpHost === null ? null : requiredEnv(env, 'MAIL_FROM')
     })
     .execute();

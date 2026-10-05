@@ -59,7 +59,11 @@ async function loadDevices(
     transport: row.transport,
     allowedIps: allowedIpsColumn.nullable().decode(row.allowedIpsJson),
     sipUsername: row.sipUsername,
-    sipPassword: decrypt(kr, row.sipPasswordEnc).toString('utf8')
+    sipPassword: decrypt(
+      kr,
+      'devices.sipPasswordEnc',
+      row.sipPasswordEnc
+    ).toString('utf8')
   }));
 }
 
@@ -103,7 +107,7 @@ async function loadTrunks(db: Db, kr: Keyring): Promise<RenderInput['trunks']> {
     password:
       row.passwordEnc === null
         ? null
-        : decrypt(kr, row.passwordEnc).toString('utf8'),
+        : decrypt(kr, 'trunks.passwordEnc', row.passwordEnc).toString('utf8'),
     inboundAuth: row.inboundAuth === 1,
     transport: row.transport,
     srtp: row.srtp === 1,

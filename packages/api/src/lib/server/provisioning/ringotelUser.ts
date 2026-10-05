@@ -104,9 +104,11 @@ export async function provisionRemoteUser(
 export function storedCredentials(device: DeviceRow): SipCredentials {
   return {
     username: device.sipUsername,
-    password: decrypt(keyringFromEnv(env), device.sipPasswordEnc).toString(
-      'utf8'
-    )
+    password: decrypt(
+      keyringFromEnv(env),
+      'devices.sipPasswordEnc',
+      device.sipPasswordEnc
+    ).toString('utf8')
   };
 }
 

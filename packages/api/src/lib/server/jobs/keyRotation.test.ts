@@ -29,7 +29,11 @@ describe('reencryptSweep', () => {
     const db = await migratedTestDb();
     const previousSpec = keySpec(1);
     const previousRing = keyringFromEnv({ SECRETBOX_KEY: previousSpec });
-    await insertWebhook(db, 'wh1', encrypt(previousRing, 'shh'));
+    await insertWebhook(
+      db,
+      'wh1',
+      encrypt(previousRing, 'webhooks.secretEnc', 'shh')
+    );
 
     const currentRing = keyringFromEnv({
       SECRETBOX_KEY: keySpec(2),
@@ -47,13 +51,15 @@ describe('reencryptSweep', () => {
     if (row === undefined) {
       throw new Error('keyRotation test: expected a row for wh1');
     }
-    expect(decrypt(currentRing, row.secretEnc).toString('utf8')).toBe('shh');
+    expect(
+      decrypt(currentRing, 'webhooks.secretEnc', row.secretEnc).toString('utf8')
+    ).toBe('shh');
   });
 
   it('counts a blob under a generation the keyring does not hold as remaining', async () => {
     const db = await migratedTestDb();
     const staleRing = keyringFromEnv({ SECRETBOX_KEY: keySpec(0) });
-    const staleBlob = encrypt(staleRing, 'stuck');
+    const staleBlob = encrypt(staleRing, 'webhooks.secretEnc', 'stuck');
     await insertWebhook(db, 'wh2', staleBlob);
 
     const currentRing = keyringFromEnv({ SECRETBOX_KEY: keySpec(1) });
@@ -85,7 +91,7 @@ describe('reencryptSweep', () => {
     const db = await migratedTestDb();
     const currentSpec = keySpec(1);
     const currentRing = keyringFromEnv({ SECRETBOX_KEY: currentSpec });
-    const goodBlob = encrypt(currentRing, 'shh');
+    const goodBlob = encrypt(currentRing, 'webhooks.secretEnc', 'shh');
     const corruptBlob = Buffer.from(goodBlob);
     const lastByteIndex = corruptBlob.length - 1;
     const BYTE_MODULUS = 256;
@@ -105,7 +111,7 @@ describe('countKeyRotationRemaining', () => {
   it('counts zero when every blob decrypts under the current key', async () => {
     const db = await migratedTestDb();
     const kr = keyringFromEnv({ SECRETBOX_KEY: keySpec(1) });
-    await insertWebhook(db, 'wh1', encrypt(kr, 'shh'));
+    await insertWebhook(db, 'wh1', encrypt(kr, 'webhooks.secretEnc', 'shh'));
     await expect(countKeyRotationRemaining(db, kr)).resolves.toBe(0);
   });
 
@@ -115,7 +121,11 @@ describe('countKeyRotationRemaining', () => {
     await insertWebhook(
       db,
       'wh2',
-      encrypt(keyringFromEnv({ SECRETBOX_KEY: previousSpec }), 'shh')
+      encrypt(
+        keyringFromEnv({ SECRETBOX_KEY: previousSpec }),
+        'webhooks.secretEnc',
+        'shh'
+      )
     );
     const kr = keyringFromEnv({
       SECRETBOX_KEY: keySpec(2),
@@ -131,7 +141,11 @@ describe('countKeyRotationRemaining', () => {
     await insertWebhook(
       db,
       'wh3',
-      encrypt(keyringFromEnv({ SECRETBOX_KEY: keySpec(1) }), 'lost')
+      encrypt(
+        keyringFromEnv({ SECRETBOX_KEY: keySpec(1) }),
+        'webhooks.secretEnc',
+        'lost'
+      )
     );
     const kr = keyringFromEnv({ SECRETBOX_KEY: keySpec(1) });
     const { remaining } = await reencryptSweep(db, kr, silentLog);

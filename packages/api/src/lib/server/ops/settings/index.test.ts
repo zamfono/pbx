@@ -23,7 +23,11 @@ async function enableRingotel(db: Db): Promise<void> {
     .set({
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     })
     .where('id', '=', 1)
     .execute();
@@ -87,7 +91,11 @@ describe('settings', () => {
       throw new Error('expected smtp_password_enc to be set');
     }
     expect(
-      decrypt(keyringFromEnv(privateEnv), row.smtpPasswordEnc).toString()
+      decrypt(
+        keyringFromEnv(privateEnv),
+        'settings.smtpPasswordEnc',
+        row.smtpPasswordEnc
+      ).toString()
     ).toBe('***');
     await runOperation(
       db,

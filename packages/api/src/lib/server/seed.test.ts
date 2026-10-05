@@ -242,9 +242,13 @@ describe('seedIfEmpty', () => {
     if (settings.smtpPasswordEnc === null) {
       throw new Error('expected smtp_password_enc to be set');
     }
-    expect(decrypt(kr, settings.smtpPasswordEnc).toString('utf8')).toBe(
-      'relay-secret'
-    );
+    expect(
+      decrypt(
+        kr,
+        'settings.smtpPasswordEnc',
+        settings.smtpPasswordEnc
+      ).toString('utf8')
+    ).toBe('relay-secret');
   });
 
   it('gives the owner the highest extension less one, leaving all-nines free', async () => {

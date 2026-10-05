@@ -45,7 +45,13 @@ describe('createRingotelClient', () => {
       status: -1
     });
     const client = createRingotelClient(
-      { ringotelApiTokenEnc: encrypt(keyring, API_TOKEN) },
+      {
+        ringotelApiTokenEnc: encrypt(
+          keyring,
+          'settings.ringotelApiTokenEnc',
+          API_TOKEN
+        )
+      },
       keyring,
       fetchImpl
     );
@@ -72,7 +78,13 @@ describe('createRingotelClient', () => {
         )
       )) as typeof fetch;
     const client = createRingotelClient(
-      { ringotelApiTokenEnc: encrypt(keyring, API_TOKEN) },
+      {
+        ringotelApiTokenEnc: encrypt(
+          keyring,
+          'settings.ringotelApiTokenEnc',
+          API_TOKEN
+        )
+      },
       keyring,
       fetchImpl
     );
@@ -87,7 +99,13 @@ describe('createRingotelClient', () => {
     const keyring = testKeyring();
     const { fetchImpl, calls } = fakeFetch({ id: 'org-1' });
     const client = createRingotelClient(
-      { ringotelApiTokenEnc: encrypt(keyring, API_TOKEN) },
+      {
+        ringotelApiTokenEnc: encrypt(
+          keyring,
+          'settings.ringotelApiTokenEnc',
+          API_TOKEN
+        )
+      },
       keyring,
       fetchImpl
     );
@@ -125,7 +143,13 @@ describe('createRingotelClient', () => {
         })
       )) as typeof fetch;
     const client = createRingotelClient(
-      { ringotelApiTokenEnc: encrypt(keyring, API_TOKEN) },
+      {
+        ringotelApiTokenEnc: encrypt(
+          keyring,
+          'settings.ringotelApiTokenEnc',
+          API_TOKEN
+        )
+      },
       keyring,
       fetchImpl
     );
@@ -145,7 +169,13 @@ describe('createRingotelClient', () => {
         });
       })) as typeof fetch;
     const client = createRingotelClient(
-      { ringotelApiTokenEnc: encrypt(keyring, API_TOKEN) },
+      {
+        ringotelApiTokenEnc: encrypt(
+          keyring,
+          'settings.ringotelApiTokenEnc',
+          API_TOKEN
+        )
+      },
       keyring,
       fetchImpl,
       TEST_TIMEOUT_MS

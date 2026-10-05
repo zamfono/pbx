@@ -33,7 +33,11 @@ export function setSealedCookie<T extends object>(
   payload: T
 ): void {
   const expiresAtS = epochSeconds(Date.now()) + cookie.ttlS;
-  const sealed = encrypt(kr, JSON.stringify({ ...payload, expiresAtS }));
+  const sealed = encrypt(
+    kr,
+    `cookie.${cookie.name}`,
+    JSON.stringify({ ...payload, expiresAtS })
+  );
   cookies.set(cookie.name, sealed.toString('base64url'), {
     path: cookie.path,
     httpOnly: true,
@@ -55,7 +59,11 @@ export function unsealCookie<T extends object>(
     return null;
   }
   const json = attempt(() =>
-    decrypt(kr, Buffer.from(value, 'base64url')).toString('utf8')
+    decrypt(
+      kr,
+      `cookie.${cookie.name}`,
+      Buffer.from(value, 'base64url')
+    ).toString('utf8')
   );
   const sealed = json === undefined ? undefined : tryParseJson(json);
   const expiry = ExpirySchema.safeParse(sealed);

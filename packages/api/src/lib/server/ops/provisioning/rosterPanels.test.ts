@@ -18,7 +18,11 @@ import './index.js';
 /** Seeds `settings` with a Ringotel API token, then runs the Ringotel setup. */
 async function seedRingotel(db: Db): Promise<void> {
   await seedSettings(db, {
-    ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    ringotelApiTokenEnc: encrypt(
+      keyringFromEnv(privateEnv),
+      'settings.ringotelApiTokenEnc',
+      'ringotel-key'
+    )
   });
   await runOperation(
     db,

@@ -10,7 +10,10 @@ import type { SettingsColumns } from './_shared.js';
 type SecretField = 'smtpPassword' | 'ssoClientSecret' | 'ringotelApiToken';
 
 /** The column `secretbox` encrypts each wire secret field into (§5.4, §11.4). */
-const SECRET_COLUMNS: Record<SecretField, keyof SettingsColumns> = {
+const SECRET_COLUMNS: Record<
+  SecretField,
+  Extract<keyof SettingsColumns, `${string}Enc`>
+> = {
   smtpPassword: 'smtpPasswordEnc',
   ssoClientSecret: 'ssoClientSecretEnc',
   ringotelApiToken: 'ringotelApiTokenEnc'
@@ -32,8 +35,10 @@ export function applySecretFields(
   for (const field of present) {
     const value = input[field] ?? null;
     recordChange(ctx, { field, from: null, to: value });
+    const column = SECRET_COLUMNS[field];
     Object.assign(columns, {
-      [SECRET_COLUMNS[field]]: value === null ? null : encrypt(keyring, value)
+      [column]:
+        value === null ? null : encrypt(keyring, `settings.${column}`, value)
     });
   }
 }

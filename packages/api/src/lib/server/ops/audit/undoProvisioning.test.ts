@@ -90,7 +90,11 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake();
     await userWithRingotelDevice(db, 'ben@x.test', '102');
@@ -120,7 +124,11 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake();
     const { deviceId } = await userWithRingotelDevice(db, 'anna@x.test', '101');
@@ -147,7 +155,11 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake();
     const { deviceId } = await userWithRingotelDevice(db, 'anna@x.test', '101');
@@ -178,7 +190,11 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake();
     const created = (await runOperation(
@@ -211,7 +227,11 @@ describe('audit.undo of a Ringotel-provisioned deletion (§10.4)', () => {
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake();
     const { deviceId } = await userWithRingotelDevice(db, 'anna@x.test', '101');

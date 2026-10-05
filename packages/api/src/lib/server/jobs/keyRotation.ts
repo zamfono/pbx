@@ -58,9 +58,9 @@ async function readEncBlobs(db: Db): Promise<EncBlob[]> {
 }
 
 /** `blob`'s plaintext, or `null` when the keyring cannot decrypt it. */
-function tryDecrypt(kr: Keyring, blob: Buffer): Buffer | null {
+function tryDecrypt(kr: Keyring, entry: EncBlob): Buffer | null {
   try {
-    return decrypt(kr, blob);
+    return decrypt(kr, `${entry.table}.${entry.column}`, entry.blob);
   } catch {
     return null;
   }
@@ -70,9 +70,10 @@ function tryDecrypt(kr: Keyring, blob: Buffer): Buffer | null {
  * Whether `blob` is still to be brought forward or lost (§5.4): anything the keyring's current
  * key cannot decrypt. The one definition of "remaining" the sweep logs and `/healthz` reports.
  */
-function isRemaining(kr: Keyring, blob: Buffer): boolean {
+function isRemaining(kr: Keyring, entry: EncBlob): boolean {
   return (
-    tryDecrypt(kr, blob) === null || blob.readUInt8(0) !== kr.current.generation
+    tryDecrypt(kr, entry) === null ||
+    entry.blob.readUInt8(0) !== kr.current.generation
   );
 }
 
@@ -86,7 +87,7 @@ export async function countKeyRotationRemaining(
   kr: Keyring
 ): Promise<number> {
   const blobs = await readEncBlobs(db);
-  return blobs.filter(({ blob }) => isRemaining(kr, blob)).length;
+  return blobs.filter(entry => isRemaining(kr, entry)).length;
 }
 
 /**
@@ -99,18 +100,18 @@ export async function reencryptSweep(
   kr: Keyring,
   log: Logger
 ): Promise<{ reencrypted: number; remaining: number }> {
-  const stale = (await readEncBlobs(db)).filter(({ blob }) =>
-    isRemaining(kr, blob)
+  const stale = (await readEncBlobs(db)).filter(entry =>
+    isRemaining(kr, entry)
   );
   const readable = stale.flatMap(entry => {
-    const plain = tryDecrypt(kr, entry.blob);
+    const plain = tryDecrypt(kr, entry);
     return plain === null ? [] : [{ ...entry, plain }];
   });
   await Promise.all(
     readable.map(({ table, column, id, plain }) =>
       db
         .updateTable(table)
-        .set(db.dynamic.ref(column), encrypt(kr, plain))
+        .set(db.dynamic.ref(column), encrypt(kr, `${table}.${column}`, plain))
         .where('id', '=', id)
         .execute()
     )

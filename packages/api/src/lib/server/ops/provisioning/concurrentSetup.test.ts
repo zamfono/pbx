@@ -29,7 +29,11 @@ afterEach(() => {
 async function unsetStack(): Promise<Db> {
   const db = await makeTestDb();
   await seedSettings(db, {
-    ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    ringotelApiTokenEnc: encrypt(
+      keyringFromEnv(privateEnv),
+      'settings.ringotelApiTokenEnc',
+      'ringotel-key'
+    )
   });
   fake = installRingotelFake([]);
   return db;

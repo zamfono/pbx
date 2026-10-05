@@ -86,7 +86,7 @@ async function insertWebhook(
       url: options.url,
       eventTypesJson: options.eventTypesJson ?? null,
       active: options.active ?? 1,
-      secretEnc: encrypt(kr, options.secret ?? 'shh'),
+      secretEnc: encrypt(kr, 'webhooks.secretEnc', options.secret ?? 'shh'),
       createdAt: nowIso()
     })
     .execute();

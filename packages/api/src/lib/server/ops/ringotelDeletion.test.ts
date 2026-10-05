@@ -35,7 +35,11 @@ async function ringotelDevice(
 ): Promise<{ db: Db; userId: string; deviceId: string }> {
   const db = await makeTestDb();
   await seedSettings(db, {
-    ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key'),
+    ringotelApiTokenEnc: encrypt(
+      keyringFromEnv(privateEnv),
+      'settings.ringotelApiTokenEnc',
+      'ringotel-key'
+    ),
     ringotelOrgId: 'org-1',
     ringotelBranchId: 'branch-1'
   });

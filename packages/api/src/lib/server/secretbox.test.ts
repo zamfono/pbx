@@ -12,14 +12,22 @@ const TAG_BYTE_LENGTH = 16;
 describe('secretbox', () => {
   it('round-trips a plaintext through encrypt and decrypt', () => {
     const kr = keyringFromEnv({ SECRETBOX_KEY: keySpec(1) });
-    const blob = encrypt(kr, 'hunter2');
-    expect(decrypt(kr, blob).toString('utf8')).toBe('hunter2');
+    const blob = encrypt(kr, 'webhooks.secretEnc', 'hunter2');
+    expect(decrypt(kr, 'webhooks.secretEnc', blob).toString('utf8')).toBe(
+      'hunter2'
+    );
+  });
+
+  it('refuses a blob made for another purpose', () => {
+    const kr = keyringFromEnv({ SECRETBOX_KEY: keySpec(1) });
+    const blob = encrypt(kr, 'webhooks.secretEnc', 'hunter2');
+    expect(() => decrypt(kr, 'trunks.passwordEnc', blob)).toThrow();
   });
 
   it('lays out the blob as version(1) || nonce(24) || ciphertext', () => {
     const kr = keyringFromEnv({ SECRETBOX_KEY: keySpec(3) });
     const plain = 'a somewhat longer secret value';
-    const blob = encrypt(kr, plain);
+    const blob = encrypt(kr, 'webhooks.secretEnc', plain);
     expect(blob[0]).toBe(3);
     expect(blob.length).toBe(
       1 + NONCE_BYTE_LENGTH + plain.length + TAG_BYTE_LENGTH
@@ -29,30 +37,32 @@ describe('secretbox', () => {
   it('decrypts a blob written under the previous generation', () => {
     const previousSpec = keySpec(1);
     const previousRing = keyringFromEnv({ SECRETBOX_KEY: previousSpec });
-    const blob = encrypt(previousRing, 'rotated');
+    const blob = encrypt(previousRing, 'webhooks.secretEnc', 'rotated');
 
     const currentRing = keyringFromEnv({
       SECRETBOX_KEY: keySpec(2),
       SECRETBOX_KEY_PREVIOUS: previousSpec
     });
-    expect(decrypt(currentRing, blob).toString('utf8')).toBe('rotated');
+    expect(
+      decrypt(currentRing, 'webhooks.secretEnc', blob).toString('utf8')
+    ).toBe('rotated');
   });
 
   it('throws for a blob under a generation the keyring does not hold', () => {
     const staleRing = keyringFromEnv({ SECRETBOX_KEY: keySpec(1) });
-    const blob = encrypt(staleRing, 'lost');
+    const blob = encrypt(staleRing, 'webhooks.secretEnc', 'lost');
     const currentRing = keyringFromEnv({ SECRETBOX_KEY: keySpec(2) });
-    expect(() => decrypt(currentRing, blob)).toThrow(
+    expect(() => decrypt(currentRing, 'webhooks.secretEnc', blob)).toThrow(
       'secretbox: unknown key generation 1'
     );
   });
 
   it('throws for a blob shorter than version + nonce + tag', () => {
     const kr = keyringFromEnv({ SECRETBOX_KEY: keySpec(1) });
-    expect(() => decrypt(kr, Buffer.alloc(0))).toThrow(
+    expect(() => decrypt(kr, 'webhooks.secretEnc', Buffer.alloc(0))).toThrow(
       'secretbox: malformed blob'
     );
-    expect(() => decrypt(kr, Buffer.alloc(10))).toThrow(
+    expect(() => decrypt(kr, 'webhooks.secretEnc', Buffer.alloc(10))).toThrow(
       'secretbox: malformed blob'
     );
   });

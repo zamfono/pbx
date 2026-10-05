@@ -79,7 +79,11 @@ describe('sealed cookies', () => {
     const kr = testKeyring();
     const jar = cookieJar();
     const expiresAtS = NOW_MS / MS_PER_SECOND + 600;
-    const value = encrypt(kr, JSON.stringify({ ...login, expiresAtS }));
+    const value = encrypt(
+      kr,
+      'cookie.zamfono_sso',
+      JSON.stringify({ ...login, expiresAtS })
+    );
     jar.set('zamfono_sso', value.toString('base64url'), { path: '/oauth' });
     expect(unsealCookie(jar, kr, SSO_COOKIE)).toEqual(login);
   });
@@ -87,8 +91,34 @@ describe('sealed cookies', () => {
   it('refuses a sealed payload that names no expiry at all', () => {
     const kr = testKeyring();
     const jar = cookieJar();
-    const value = encrypt(kr, JSON.stringify(consent)).toString('base64url');
+    const value = encrypt(
+      kr,
+      'cookie.zamfono_consent',
+      JSON.stringify(consent)
+    ).toString('base64url');
     jar.set('zamfono_consent', value, { path: '/' });
+    expect(unsealCookie(jar, kr, CONSENT_COOKIE)).toBeNull();
+  });
+
+  it('refuses a blob the keyring encrypted for a stored secret, whatever its plaintext', () => {
+    vi.useFakeTimers({ now: NOW_MS });
+    const kr = testKeyring();
+    // An admin chooses a webhook secret's plaintext (`webhooks.create` stores it encrypted)
+    // and reads the blob back from a backup run to a target of their own: the blob must not
+    // pass as a consent decision naming another user.
+    const secret = JSON.stringify({
+      ...consent,
+      userId: 'owner-1',
+      expiresAtS: NOW_MS / MS_PER_SECOND + 86_400
+    });
+    const jar = cookieJar();
+    jar.set(
+      'zamfono_consent',
+      encrypt(kr, 'webhooks.secretEnc', secret).toString('base64url'),
+      {
+        path: '/'
+      }
+    );
     expect(unsealCookie(jar, kr, CONSENT_COOKIE)).toBeNull();
   });
 

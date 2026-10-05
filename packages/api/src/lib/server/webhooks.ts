@@ -191,7 +191,9 @@ export class WebhookDispatcher {
       return null;
     }
     const secret = attempt(() =>
-      decrypt(this.deps.kr, hook.secretEnc).toString('utf8')
+      decrypt(this.deps.kr, 'webhooks.secretEnc', hook.secretEnc).toString(
+        'utf8'
+      )
     );
     if (secret === undefined) {
       return { failure: SECRET_UNREADABLE, retryable: false };

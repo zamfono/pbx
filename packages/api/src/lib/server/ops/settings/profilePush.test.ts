@@ -93,7 +93,11 @@ describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile 
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = stubRingotel(false);
     // How many Ringotel calls had been made when the write propagated: none, since the push
@@ -175,7 +179,11 @@ describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile 
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = stubRingotel(true);
 
@@ -199,7 +207,11 @@ describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile 
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     await changeDuringOutage(db);
     const ringotel = stubRingotel(true);
@@ -225,7 +237,11 @@ describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile 
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     await changeDuringOutage(db);
     const ringotel = stubRingotel(false);
@@ -267,7 +283,11 @@ describe('tenant profile push (§10.1 "Emergency calls", §10.4 "Tenant profile 
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = stubRingotel(true);
 

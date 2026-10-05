@@ -89,9 +89,11 @@ export function createRingotelClient(
       'ringotel: no API token configured (settings.ringotelApiToken)'
     );
   }
-  const apiToken = decrypt(keyring, settings.ringotelApiTokenEnc).toString(
-    'utf8'
-  );
+  const apiToken = decrypt(
+    keyring,
+    'settings.ringotelApiTokenEnc',
+    settings.ringotelApiTokenEnc
+  ).toString('utf8');
   return {
     async call<T>(
       method: string,

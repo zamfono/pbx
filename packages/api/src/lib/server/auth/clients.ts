@@ -84,7 +84,9 @@ export function encodeMetadataClientId(
   kr: Keyring,
   meta: Omit<ClientMeta, 'clientId' | 'kind'>
 ): string {
-  return encrypt(kr, JSON.stringify(meta)).toString('base64url');
+  return encrypt(kr, 'oauth.clientId', JSON.stringify(meta)).toString(
+    'base64url'
+  );
 }
 
 /** Decodes a metadata `client_id`; `null` on a malformed blob or an unreadable key generation. */
@@ -92,7 +94,9 @@ export function decodeMetadataClientId(
   kr: Keyring,
   id: string
 ): ClientMeta | null {
-  const plain = attempt(() => decrypt(kr, Buffer.from(id, 'base64url')));
+  const plain = attempt(() =>
+    decrypt(kr, 'oauth.clientId', Buffer.from(id, 'base64url'))
+  );
   if (plain === undefined) {
     return null;
   }

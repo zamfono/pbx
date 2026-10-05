@@ -55,7 +55,11 @@ describe('settings.ringotel_profile_pending (§10.4 "Tenant profile push", §11.
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     fake = installRingotelFake();
     fake.failing.add('updateOrganization');
@@ -81,7 +85,11 @@ describe('settings.ringotel_profile_pending (§10.4 "Tenant profile push", §11.
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     fake = installRingotelFake();
     fake.failing.add('updateOrganization');
@@ -111,7 +119,11 @@ describe('settings.ringotel_profile_pending (§10.4 "Tenant profile push", §11.
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     fake = installRingotelFake();
     fake.failing.add('updateOrganization');
@@ -128,7 +140,11 @@ describe('settings.ringotel_profile_pending (§10.4 "Tenant profile push", §11.
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     fake = installRingotelFake();
 

@@ -56,7 +56,11 @@ async function seedUserWithDevice(db: Db, kr: Keyring): Promise<void> {
       transport: 'plain',
       allowedIpsJson: '["10.0.0.0/8"]',
       sipUsername: 'e101-abcde',
-      sipPasswordEnc: encrypt(kr, 'a1B2c3D4e5F6g7H8i9J0k1L2'),
+      sipPasswordEnc: encrypt(
+        kr,
+        'devices.sipPasswordEnc',
+        'a1B2c3D4e5F6g7H8i9J0k1L2'
+      ),
       createdAt: nowIso()
     })
     .execute();

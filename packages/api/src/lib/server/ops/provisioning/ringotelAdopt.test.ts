@@ -68,7 +68,11 @@ describe('provisioning.ringotelAdopt', () => {
     const db = await makeTestDb();
     await seedSettings(db, {
       language: 'de',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const fake = install([OTHER_CUSTOMER, TARGET], [SHELL_BRANCH]);
 
@@ -100,7 +104,11 @@ describe('provisioning.ringotelAdopt', () => {
     const db = await makeTestDb();
     await seedSettings(db, {
       language: 'de',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const fake = install([TARGET]);
 
@@ -128,7 +136,11 @@ describe('provisioning.ringotelAdopt', () => {
     const db = await makeTestDb();
     await seedSettings(db, {
       language: 'de',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const fake = install([OTHER_CUSTOMER, TARGET]);
 
@@ -151,7 +163,11 @@ describe('provisioning.ringotelAdopt', () => {
     const db = await makeTestDb();
     await seedSettings(db, {
       language: 'de',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const fake = install([TARGET]);
     fake.users.push({
@@ -179,7 +195,11 @@ describe('provisioning.ringotelAdopt', () => {
     const db = await makeTestDb();
     await seedSettings(db, {
       language: 'de',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const fake = install([TARGET], [SHELL_BRANCH]);
 
@@ -198,7 +218,11 @@ describe('provisioning.ringotelAdopt', () => {
     const db = await makeTestDb();
     await seedSettings(db, {
       language: 'de',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     await db
       .updateTable('settings')
@@ -221,7 +245,11 @@ describe('provisioning.ringotelAdopt', () => {
     const db = await makeTestDb();
     await seedSettings(db, {
       language: 'de',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const fake = install([TARGET]);
     fake.failing.add('updateOrganization');
@@ -247,7 +275,11 @@ describe('provisioning.ringotelOptions', () => {
     const db = await makeTestDb();
     await seedSettings(db, {
       language: 'de',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     install();
 
@@ -267,7 +299,11 @@ describe('provisioning.ringotelSetup with a region the account does not offer', 
     const db = await makeTestDb();
     await seedSettings(db, {
       language: 'de',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const fake = install([]);
 
@@ -297,7 +333,11 @@ describe('the registrations per user follow the package (§10.4, §11.4)', () =>
     const db = await makeTestDb();
     await seedSettings(db, {
       language: 'de',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     install([]);
 
@@ -315,7 +355,11 @@ describe('the registrations per user follow the package (§10.4, §11.4)', () =>
     const db = await makeTestDb();
     await seedSettings(db, {
       language: 'de',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     install([{ ...TARGET, packageid: 2 }]);
 
@@ -333,7 +377,11 @@ describe('the registrations per user follow the package (§10.4, §11.4)', () =>
     const db = await makeTestDb();
     await seedSettings(db, {
       language: 'de',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     await db.updateTable('settings').set({ ringotelMaxRegs: 4 }).execute();
     install([]);
@@ -354,7 +402,11 @@ describe('provisioning.ringotelSetup with a domain the account already has', () 
     const db = await makeTestDb();
     await seedSettings(db, {
       language: 'de',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const fake = install([TARGET]);
 
@@ -385,7 +437,11 @@ describe("the connection carries the tenant's country (§10.4)", () => {
     const db = await makeTestDb();
     await seedSettings(db, {
       language: 'de',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const fake = install([]);
 

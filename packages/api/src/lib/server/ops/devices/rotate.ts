@@ -29,7 +29,13 @@ export const rotate = defineOperation({
     const password = newSipPassword();
     await ctx.db
       .updateTable('devices')
-      .set({ sipPasswordEnc: encrypt(keyringFromEnv(env), password) })
+      .set({
+        sipPasswordEnc: encrypt(
+          keyringFromEnv(env),
+          'devices.sipPasswordEnc',
+          password
+        )
+      })
       .where('id', '=', input.id)
       .execute();
     recordChange(ctx, { field: 'sipPassword', from: null, to: password });

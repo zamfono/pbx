@@ -157,7 +157,11 @@ export async function expectUndoRestores(undoCase: UndoCase): Promise<void> {
   await seedSettings(db, {
     ringotelOrgId: 'org-1',
     ringotelBranchId: 'branch-1',
-    ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    ringotelApiTokenEnc: encrypt(
+      keyringFromEnv(privateEnv),
+      'settings.ringotelApiTokenEnc',
+      'ringotel-key'
+    )
   });
   const ringotel = installRingotelFake();
   try {

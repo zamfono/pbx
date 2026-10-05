@@ -20,7 +20,7 @@ function mergedPasswordEnc(row: TrunkRow, input: MergeInput): Buffer | null {
   if (input.password === null) {
     return null;
   }
-  return encrypt(keyringFromEnv(env), input.password);
+  return encrypt(keyringFromEnv(env), 'trunks.passwordEnc', input.password);
 }
 
 /** `row.clir` as the wire's tri-state boolean, unless `input` overrides it. */

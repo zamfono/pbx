@@ -20,7 +20,11 @@ process.env.FQDN = 'pbx.example.com';
 async function seedTenant(db: Db): Promise<void> {
   await seedSettings(db, {
     language: 'de',
-    ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+    ringotelApiTokenEnc: encrypt(
+      keyringFromEnv(privateEnv),
+      'settings.ringotelApiTokenEnc',
+      'ringotel-key'
+    )
   });
   await db
     .insertInto('extensions')

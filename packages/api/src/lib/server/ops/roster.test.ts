@@ -61,7 +61,11 @@ describe('the Ringotel roster follows every user and extension change (§10.4)',
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake();
 
@@ -94,7 +98,11 @@ describe('the Ringotel roster follows every user and extension change (§10.4)',
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake();
     const created = (await runOperation(
@@ -133,7 +141,11 @@ describe('the Ringotel roster follows every user and extension change (§10.4)',
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake();
     ringotel.failing.add('updateBranch');
@@ -165,7 +177,11 @@ describe('the Ringotel roster follows every user and extension change (§10.4)',
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake();
     const created = (await runOperation(
@@ -206,7 +222,11 @@ describe('the Ringotel roster follows every user and extension change (§10.4)',
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake();
     const callsAtPropagation: number[] = [];
@@ -231,7 +251,11 @@ describe('the Ringotel roster follows every user and extension change (§10.4)',
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake();
 
@@ -272,7 +296,11 @@ describe('the Ringotel roster follows every user and extension change (§10.4)',
     await seedSettings(db, {
       ringotelOrgId: 'org-1',
       ringotelBranchId: 'branch-1',
-      ringotelApiTokenEnc: encrypt(keyringFromEnv(privateEnv), 'ringotel-key')
+      ringotelApiTokenEnc: encrypt(
+        keyringFromEnv(privateEnv),
+        'settings.ringotelApiTokenEnc',
+        'ringotel-key'
+      )
     });
     const ringotel = installRingotelFake();
 

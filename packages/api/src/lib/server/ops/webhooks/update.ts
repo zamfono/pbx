@@ -68,7 +68,7 @@ export const update = defineOperation({
     const secretEnc =
       input.secret === undefined
         ? before.secretEnc
-        : encrypt(keyringFromEnv(env), input.secret);
+        : encrypt(keyringFromEnv(env), 'webhooks.secretEnc', input.secret);
     const columns = { url, active: active ? 1 : 0, eventTypesJson };
     recordFieldChanges(ctx, before, columns, {
       active: { decode: fromFlag },
