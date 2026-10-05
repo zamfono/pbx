@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-05 · §10.** The repository layout lists `core`'s `sipBan/`, the count of failed SIP attempts, and its `ami/` client reading the security events beside the registration state.
+*Why:* the layout named `ami/` for the registration state alone and had no place for the count §5.6 gives `core`.
+
 **2026-10-05 · §9.1.** `sip_ban_helper.status` is one line, the time in ISO 8601 UTC to the second, a space and the hex SHA-256 of the list applied; the ban helper refuses a `sip_bans.list` with any unparsable line as a whole, keeping the sets, and reads a missing file as the empty list.
 *Why:* `api` reads the file the helper writes, so its format has to be fixed, and a list the helper cannot parse in full must leave enforcement as it was rather than apply a part of it.
 

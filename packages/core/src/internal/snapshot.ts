@@ -20,8 +20,9 @@ import {
   type ParsedUser
 } from './snapshotRows.js';
 
-// The tables the ARI routing pipeline reads; the tables `api` alone consults (auth, audit,
-// webhooks, backups, contacts, BLF-key programming, mail templates) stay out of `core`'s cache.
+// The tables the ARI routing pipeline and the SIP ban count (§5.6) read; the tables `api` alone
+// consults (auth, audit, webhooks, backups, contacts, BLF-key programming, mail templates, SIP
+// bans) stay out of `core`'s cache.
 // Each table's own `*Json` columns are decoded by `snapshotRows.ts`.
 const CONFIG_TABLES = [
   'users',
@@ -49,7 +50,8 @@ const CONFIG_TABLES = [
   'outboundRouteUsers',
   'outboundRouteUserGroups',
   'outboundRouteNumbers',
-  'audioAssets'
+  'audioAssets',
+  'sipAllowlist'
 ] as const;
 
 // The subset of CONFIG_TABLES carrying `deleted_at` (§11.1 "Soft delete"). A soft-deleted row
@@ -69,7 +71,8 @@ const SOFT_DELETED_TABLES = new Set<string>([
   'menus',
   'trunks',
   'outboundRoutes',
-  'audioAssets'
+  'audioAssets',
+  'sipAllowlist'
 ]);
 
 type ConfigTable = (typeof CONFIG_TABLES)[number];

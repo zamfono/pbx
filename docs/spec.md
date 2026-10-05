@@ -1068,7 +1068,7 @@ packages/
 │   └── src/
 │       ├── main.ts      # boot: env, openDb, ARI and AMI connect, internal server; stops on SIGTERM
 │       ├── ari/         # thin ARI client (WebSocket events + REST)
-│       ├── ami/         # AMI client for outbound registration state (§9.4)
+│       ├── ami/         # AMI client for outbound registration state (§9.4) and the security events (§5.6)
 │       ├── routing/     # pure decision functions: schedules, entry, user step, ring groups, menus, dialed strings, trunks; no ARI, no database
 │       ├── calls/       # the Call aggregate and the ARI-driven flows: pipeline, inbound, outbound, ring groups, menus, voicemail, features, recording, actions, transfers, resync
 │       ├── presence.ts  # registrations + call state → device state (BLF), presence_log, events
@@ -1076,6 +1076,7 @@ packages/
 │       ├── hep.ts       # HEP listener for the SIP messages and RTCP reports Asterisk mirrors (§7); off when HEP_ENABLED=false
 │       ├── callLog.ts   # capped per-call log buffer (§7)
 │       ├── sweep.ts     # sweep emitting OOO and opening-hours transitions as they happen (§10.2)
+│       ├── sipBan/      # count of failed SIP attempts per source address, its exemptions, reports to `api` (§5.6)
 │       ├── internal/    # internal HTTP+WS server for `api` (actions, state, events, reload)
 │       └── testing/     # test doubles, outside the build: the in-process ARI and AMI fakes (`ari/`, `ami/`) and test rigs
 ├── api/                 # container 2: SvelteKit (adapter-node) — operations, REST, OAuth, MCP, /events

@@ -46,10 +46,12 @@ export type ParsedHep = {
   payload: string;
 };
 
-type LookupFn = (host: string) => Promise<{ address: string }[]>;
+export type LookupFn = (host: string) => Promise<{ address: string }[]>;
 
 /** node:dns's own resolver, returning every address of the host regardless of family. */
-async function defaultLookup(host: string): Promise<{ address: string }[]> {
+export async function defaultLookup(
+  host: string
+): Promise<{ address: string }[]> {
   return dnsLookup(host, { all: true });
 }
 

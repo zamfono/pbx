@@ -205,7 +205,7 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
     );
     // The OOO/hours sweep (§3.1 "Events", §10.2) is the only source of `ooo` and `hours` events: it
     // evaluates every scope against the clock and emits on a transition, which no call path does.
-    const jobs = startBackgroundJobs({ db, cache, bus, log, env });
+    const jobs = startBackgroundJobs({ db, ami, cache, bus, log, env });
     const hep = await startHepCollector(env, cdr, log);
     log.info(
       { port: CORE_INTERNAL_PORT, hepEnabled: env.hepEnabled },

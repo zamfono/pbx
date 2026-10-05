@@ -1,7 +1,7 @@
 /**
  * The core↔api internal API (§3, §3.1). `core` serves these on its internal HTTP+WS port; `api`
- * serves `/internal/mail`. Each request body either serves is a zod schema here, which the server
- * parses it with; its type is the schema's.
+ * serves `/internal/mail` and `/internal/sipBan`. Each request body either serves is a zod schema
+ * here, which the server parses it with; its type is the schema's.
  */
 import { z } from 'zod';
 
@@ -230,3 +230,13 @@ export const mailRequestSchema = z.discriminatedUnion('kind', [
   })
 ]);
 export type MailRequest = z.infer<typeof mailRequestSchema>;
+
+/** `POST /internal/sipBan` (api) → 204, whether a ban was written, the address already had an
+ * active ban or banning is off; 400 for a request this schema refuses (§5.6, §3.1). */
+export const sipBanReportSchema = z.object({
+  /** An IPv4 address, or an IPv6 /64 in CIDR form, lower case: what `sip_bans.address` holds (§11.2). */
+  address: z.string(),
+  /** The failed attempts `core` counted within the window. */
+  failures: z.number().int().min(1)
+});
+export type SipBanReport = z.infer<typeof sipBanReportSchema>;

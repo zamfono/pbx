@@ -20,6 +20,8 @@ import type { ConfigCache } from './internal/snapshot.js';
 import type { StateStore } from './internal/stateStore.js';
 import type { Presence } from './presence.js';
 import { startRetention } from './retention.js';
+import { ownAddresses } from './sipBan/exempt.js';
+import { startSipBanCount } from './sipBan/report.js';
 import { startSweep } from './sweep.js';
 
 // §6.3: the HEP collector's port, fixed in the images alongside the other internal ports.
@@ -76,11 +78,13 @@ export function buildPipeline(deps: {
 }
 
 /**
- * The timers `core` owns: the sweep that emits `ooo`/`hours` transitions (§3.1 "Events")
- * and the daily retention sweep (§11.6). Neither is driven by a call, so nothing else starts them.
+ * The jobs no call drives, so nothing else starts them: the sweep that emits `ooo`/`hours`
+ * transitions (§3.1 "Events"), the daily retention sweep (§11.6) and the count of failed SIP
+ * attempts that reports a source to ban (§5.6).
  */
 export function startBackgroundJobs(deps: {
   db: Db;
+  ami: AmiClient;
   cache: ConfigCache;
   bus: EventBus;
   log: Logger;
@@ -99,10 +103,18 @@ export function startBackgroundJobs(deps: {
     log: deps.log,
     now: nowIso
   });
+  const sipBanCount = startSipBanCount({
+    ami: deps.ami,
+    cache: deps.cache,
+    api: new ApiClient(deps.env.apiInternalUrl),
+    own: ownAddresses(deps.env),
+    log: deps.log
+  });
   return {
     stop: () => {
       sweep.stop();
       retention.stop();
+      sipBanCount.stop();
     }
   };
 }

@@ -87,4 +87,32 @@ describe('ApiClient', () => {
       await stub.close();
     }
   });
+
+  it('POSTs a SIP ban report as JSON to /internal/sipBan', async () => {
+    const stub = await startStub(204);
+    try {
+      await new ApiClient(stub.url).sipBan({
+        address: '203.0.113.7',
+        failures: 10
+      });
+      expect(stub.requests[0]?.path).toBe('/internal/sipBan');
+      expect(JSON.parse(stub.requests[0]?.body ?? '')).toEqual({
+        address: '203.0.113.7',
+        failures: 10
+      });
+    } finally {
+      await stub.close();
+    }
+  });
+
+  it('throws when api refuses a SIP ban report', async () => {
+    const stub = await startStub(400);
+    try {
+      await expect(
+        new ApiClient(stub.url).sipBan({ address: 'x', failures: 1 })
+      ).rejects.toThrow('/internal/sipBan responded 400');
+    } finally {
+      await stub.close();
+    }
+  });
 });
