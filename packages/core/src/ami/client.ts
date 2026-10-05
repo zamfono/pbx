@@ -38,6 +38,7 @@ export class AmiClient extends EventEmitter {
   private readonly pending = new Map<string, PendingAction>();
   private readonly reconnect: ReconnectBackoff;
   private closing = false;
+  private loggedIn = false;
 
   constructor(options: AmiClientOptions) {
     super();
@@ -48,6 +49,11 @@ export class AmiClient extends EventEmitter {
         this.options.log.error({ err: error }, 'AMI reconnect failed');
       }
     );
+  }
+
+  /** Whether a connection is open and logged in right now. */
+  get connected(): boolean {
+    return this.loggedIn;
   }
 
   connect(): Promise<void> {
@@ -112,12 +118,11 @@ export class AmiClient extends EventEmitter {
         port: this.options.port
       });
       this.socket = socket;
-      let loggedIn = false;
 
       socket.on('connect', () => {
         this.login()
           .then(() => {
-            loggedIn = true;
+            this.loggedIn = true;
             this.reconnect.reset();
             this.emit('connected');
             resolve();
@@ -129,6 +134,8 @@ export class AmiClient extends EventEmitter {
       });
       socket.on('close', () => {
         this.socket = null;
+        const loggedIn = this.loggedIn;
+        this.loggedIn = false;
         this.rejectPending(new Error('AMI connection closed'));
         this.emit('disconnected');
         if (!this.closing) {

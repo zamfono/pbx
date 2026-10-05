@@ -21,6 +21,7 @@ import { CallActions } from './calls/actions.js';
 import type { Pipeline } from './calls/pipeline.js';
 import { resyncOnReconnect } from './calls/reconnectResync.js';
 import { resyncOnBoot } from './calls/resync.js';
+import { registerTrunksAfterAsteriskStart } from './calls/trunkRestartRegistration.js';
 import { TrunkState } from './calls/trunkState.js';
 // --- boot environment ---
 import { readEnv, type CoreEnv } from './env.js';
@@ -78,7 +79,8 @@ function createAmiClient(env: CoreEnv, log: Logger): AmiClient {
 /**
  * `Presence` (§10.2 "Presence and BLF") wires itself to ARI `PeerStatusChange` in its own
  * constructor and seeds registration state from the boot `endpoints.list` in `resyncOnBoot`;
- * `TrunkState` likewise wires itself to ARI/AMI and resyncs registration trunks from AMI at boot.
+ * `TrunkState` likewise wires itself to ARI/AMI and resyncs registration trunks from AMI at boot;
+ * the TCP and TLS ones then register afresh for each Asterisk start.
  * Both are handed to the `Pipeline` so its dial dispatch (`outboundDispatch.ts`) and feature codes
  * (`features.ts`) can reach them.
  */
@@ -114,6 +116,13 @@ async function startLiveState(deps: {
     plainTransports: env
   });
   await trunkState.resyncOnBoot();
+  await registerTrunksAfterAsteriskStart({
+    ari,
+    ami,
+    cache,
+    trunks: trunkState,
+    log
+  });
   return { presence, trunkState };
 }
 

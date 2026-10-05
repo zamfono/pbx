@@ -14,6 +14,7 @@ why the specified behaviour changed; the commit history, how.
 ### Fixed
 
 - The updater stops on SIGTERM, so a restart of it no longer waits 10 seconds for a kill.
+- Registration trunks over TCP or TLS register afresh after every Asterisk restart or update.
 
 ## [0.3.1] - 2026-10-05
 
