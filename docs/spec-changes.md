@@ -2,6 +2,9 @@
 
 Every change made to [the specification](spec.md) during implementation, newest first, one paragraph per change. A change is made only when the text as written cannot be implemented, or when the product owner asks for it, and then as the smallest edit that can.
 
+**2026-10-05 · §10.2 Greetings and audio, §12 Tenant UI.** The upload page's `upload` remote form reads the body (up to 50 MB) before it can check the link's token, since the token travels inside that body; the gap is named in §10.2 and closed with the tenant UI's session (§12).
+*Why:* the product owner, on the finding that anyone could make `api` buffer 50 MB through that form: "I now understand the problem. Let us accept the potential shortcoming for now and add it to the “later” to do list with a reference to “UI session”."
+
 **2026-10-05 · §5.6, §9.1.** SIP requests and responses carry `User-Agent`/`Server: Zamfono`, set in `pjsip.conf`'s `global` section, never the Asterisk release.
 *Why:* Asterisk's default header named its exact release, telling a scanner what it runs.
 
