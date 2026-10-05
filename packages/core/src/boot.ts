@@ -4,6 +4,7 @@
  */
 import { nowIso, type Db } from '@zamfono/shared';
 
+import type { AmiClient } from './ami/client.js';
 import { ApiClient } from './apiClient.js';
 import type { AriClient } from './ari/client.js';
 import type { Logger } from './ari/types.js';
@@ -32,6 +33,7 @@ const HEP_PORT = 9060;
 export function buildPipeline(deps: {
   db: Db;
   ari: AriClient;
+  ami: AmiClient;
   cache: ConfigCache;
   state: StateStore;
   bus: EventBus;
@@ -40,7 +42,7 @@ export function buildPipeline(deps: {
   trunkState: TrunkState;
   presence: Presence;
 }): { pipeline: Pipeline; cdr: CdrWriter; recorder: Recorder } {
-  const { db, ari, cache, state, bus, log, env } = deps;
+  const { db, ari, ami, cache, state, bus, log, env } = deps;
   const cdr = new CdrWriter({ db, ari, cache, bus, state, log, now: nowIso });
   const recorder = new Recorder({
     ari,
@@ -52,6 +54,7 @@ export function buildPipeline(deps: {
   });
   const pipeline = new Pipeline({
     ari,
+    ami,
     cache,
     state,
     bus,

@@ -4,6 +4,7 @@ import { newId, nowIso, type CallLogLevel, type Db } from '@zamfono/shared';
 
 import type { AriClient } from '../ari/client.js';
 import type { CdrWriter } from '../cdr.js';
+import { contactEndpoint } from '../testing/ami/contacts.js';
 import { type FakeAri } from '../testing/ari/fake.js';
 import { isPlacement } from '../testing/ari/fakeDial.js';
 import { delivered, eventually } from '../testing/eventually.js';
@@ -183,7 +184,7 @@ describe('transfers', () => {
     expect(child?.didId).toBe(call.didId);
     expect(child?.callerUserId).toBeNull();
     expect(originatedEndpoints().at(-1)).toMatchObject({
-      endpoint: 'PJSIP/e102-a',
+      endpoint: contactEndpoint('e102-a'),
       appArgs: `leg,${child?.id ?? ''}`
     });
     if (child !== undefined) {
@@ -476,7 +477,7 @@ describe('transfers', () => {
     // The child call rings the target in the background, which answers `answerAfterMs` later.
     await eventually(() => {
       expect(originatedEndpoints().at(-1)).toMatchObject({
-        endpoint: 'PJSIP/e102-a',
+        endpoint: contactEndpoint('e102-a'),
         appArgs: `leg,${child.id}`
       });
       expect(child.status).toBe('answered');
@@ -497,7 +498,7 @@ describe('transfers', () => {
       )
     ).toBe(true);
     expect(originatedEndpoints().at(-1)).toMatchObject({
-      endpoint: 'PJSIP/e102-a',
+      endpoint: contactEndpoint('e102-a'),
       appArgs: `leg,${child.id}`
     });
     expect(child.status).toBe('answered');

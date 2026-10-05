@@ -107,7 +107,7 @@ Three long-running application services run per stack, plus the TLS proxy, the `
 
 **Telephony core:** Asterisk 22 (current LTS) — chan_pjsip only; chan_sip removed upstream in Asterisk 21
 
-**Control protocol:** ARI (WebSocket events + REST); AMI for outbound registration state (§9.4) — Stasis app name: `zamfono`; AMI user `zamfono` with the `system` read class and the `reporting` write class for `PJSIPShowRegistrationsOutbound` (§9.1)
+**Control protocol:** ARI (WebSocket events + REST); AMI for outbound registration state (§9.4) and device contacts (§9.3) — Stasis app name: `zamfono`; AMI user `zamfono` with the `system` read class and the `system` write class for `PJSIPShowRegistrationsOutbound` and `PJSIPShowEndpoint` (§9.1)
 
 **App runtime:** Node.js 26, TypeScript — two processes: `core` + `api`
 
@@ -445,7 +445,7 @@ services:
       RTP_PORT_START: ${RTP_PORT_START:-}
       RTP_PORT_END: ${RTP_PORT_END:-}
       ARI_PASSWORD: ${ARI_PASSWORD}             # ARI user is 'zamfono', fixed in ari.conf
-      AMI_PASSWORD: ${AMI_PASSWORD}             # AMI user is 'zamfono', fixed in manager.conf: system read, reporting write (§9.1)
+      AMI_PASSWORD: ${AMI_PASSWORD}             # AMI user is 'zamfono', fixed in manager.conf: system read, system write (§9.1)
       HEP_ENABLED: ${HEP_ENABLED:-}             # hep.conf enabled=…; collector = core's current address (§7)
       SIP_UDP_ENABLED: ${SIP_UDP_ENABLED:-}     # false binds transport-udp to loopback (§9.1)
       SIP_TCP_ENABLED: ${SIP_TCP_ENABLED:-}     # false binds transport-tcp to loopback (§9.1)
@@ -855,7 +855,7 @@ Asterisk's own configuration ships in the image and is templated from environmen
   - `transport-udp` and `transport-tcp`: port 5060, for trunks per provider requirement and for allowlisted desk-phone registration (§9.3). `SIP_UDP_ENABLED` and `SIP_TCP_ENABLED` (`.env`, default `true`) switch them individually; a disabled transport is still defined but bound to `127.0.0.1`, so the rendered configuration stays valid under every flag combination while nothing outside the container reaches the port. A macvlan stack (§6.2.1) has no host firewall in front of it, so these flags are how such a stack becomes TLS-only.
   - Binding: `STACK_IPV4` when set, else `0.0.0.0`. When `EXTERNAL_IPV4` is set, every transport carries it as `external_media_address` and `external_signaling_address`, so SIP and SDP name the host's public address in the ports mode (§6.1).
   - The RTP port range.
-- `ari.conf` and `http.conf` enable ARI with credentials from the environment, `ari.conf` naming `RTPAUDIOQOS` in `channelvars` (§7 level `qos`), and `manager.conf` enables AMI for one user, `zamfono`, with `AMI_PASSWORD` from the environment, the `system` read class for the `Registry` events and the `reporting` write class for the `PJSIPShowRegistrationsOutbound` action the core uses (§9.4), since Asterisk authorises AMI actions against the write classes. The container owns the public IP, so `bindaddr` is never `0.0.0.0`: the entrypoint resolves the container's address on the `internal` network at start and binds ARI and AMI to it alone.
+- `ari.conf` and `http.conf` enable ARI with credentials from the environment, `ari.conf` naming `RTPAUDIOQOS` in `channelvars` (§7 level `qos`), and `manager.conf` enables AMI for one user, `zamfono`, with `AMI_PASSWORD` from the environment, the `system` read class for the `Registry` events and the `system` write class for the `PJSIPShowRegistrationsOutbound` and `PJSIPShowEndpoint` actions the core uses (§9.4, §9.3), since Asterisk authorises AMI actions against the write classes. The container owns the public IP, so `bindaddr` is never `0.0.0.0`: the entrypoint resolves the container's address on the `internal` network at start and binds ARI and AMI to it alone.
 - `hep.conf` names `core`'s UDP listener on the internal network as HEP collector, with `enabled=no` when `HEP_ENABLED=false` (§7). `res_hep` takes a numeric address only, and `core` starts after Asterisk and gets a new address whenever it is recreated, so the file names none itself: its `#exec` (`execincludes` in `asterisk.conf`) has Asterisk run a script that prints the address `core` resolves to each time it loads the file, or the loopback, with a warning in the log, while `core` does not resolve. `core` reloads `res_hep` over ARI each time its ARI connection opens, which covers a first boot, where Asterisk starts before `core`, and a `core` recreated at another address; nothing polls for the address.
 - `asterisk.conf` puts the astdb, where the PJSIP contacts live (`sorcery.conf`), in a directory of its own on the `astdb` volume, so registrations over UDP survive a recreated container. Those over TLS or TCP do not, in any Asterisk: `rewrite_contact` makes such a contact the connection's source address, which dies with the connection, so `res_pjsip_registrar` marks it `prune_on_boot` and Asterisk removes it at start. Those devices register again, and the Ringotel apps, which register over TLS, are told to at once (§10.4 "After a restart").
 - `indications.conf` holds one tone zone, ITU-T E.180's, whose special information tone the core plays for a failed call (§9.4 "Cross-trunk failover").
@@ -884,7 +884,7 @@ While the core is down, `Stasis()` returns immediately and the next priority rel
 
 Clients are third-party classic SIP softphones such as Ringotel; desk phones are possible too. Zamfono provisions standard SIP accounts. Anything a client needs beyond SIP, such as push wake-up or its own call history, is the softphone vendor's concern.
 
-**One endpoint per device.** A user may have several devices, and each is its own PJSIP endpoint. An inbound call to the user rings all registered devices of that user; the core dials them in parallel.
+**One endpoint per device.** A user may have several devices, and each is its own PJSIP endpoint. An inbound call to the user rings all registered devices of that user; the core dials them in parallel. A device registered several times (a Ringotel app on desktop and mobile, §10.4) rings on each reachable contact, as a leg of that device's: the core reads the contacts over AMI (`PJSIPShowEndpoint`) and dials each at `PJSIP/<endpoint>/<contact URI>`, since `PJSIP/<endpoint>` alone reaches only one.
 
 **Naming.** Endpoints are named `e<ext>-d<slug>`, for example `e101-d3kx7`; the slug is a short random identifier generated once per device. A user has exactly one extension (§11.2), so all their devices share the `e<ext>` part and differ only by slug. SIP passwords are 24 random characters generated by the application. Changing a user's extension renames their endpoints: the configuration is regenerated and reloaded, the provisioning provider re-pushes the new names (§10.4), and `manual` devices must be updated by hand. The `PATCH /users/{id}` response and the audit entry list the affected devices.
 

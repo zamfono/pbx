@@ -7,6 +7,7 @@ import type { AriClient } from '../ari/client.js';
 import type { Channel } from '../ari/types.js';
 import { ATTEMPT_NO_RESPONSE_MS } from '../routing/trunk.js';
 import { AST_CAUSE_CALL_REJECTED, AST_CAUSE_USER_BUSY } from '../sipCodes.js';
+import { contactEndpoint } from '../testing/ami/contacts.js';
 import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../testing/ari/fakeDial.js';
@@ -216,7 +217,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       const external = `PJSIP/+15557777@trunk-${trunkId}/sip:sip1.example.com`;
       expect(originates(fakeAri).map(body => body.endpoint)).toEqual([
         external,
-        'PJSIP/member-other'
+        contactEndpoint('member-other')
       ]);
       const leg = originates(fakeAri).at(0);
       expect(leg?.callerId).toBe('+491230000');
@@ -508,7 +509,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       });
 
       expect(originates(fakeAri).map(body => body.endpoint)).toEqual([
-        'PJSIP/e101-d1',
+        contactEndpoint('e101-d1'),
         `PJSIP/+15557000@trunk-${trunkId}`
       ]);
       expect(originates(fakeAri).at(1)?.callerId).toBe('+491230000');
@@ -712,7 +713,7 @@ describe('external ring-race legs (§10.1 steps 4 and 5)', () => {
       });
 
       expect(originates(fakeAri).map(body => body.endpoint)).toEqual([
-        'PJSIP/e101-d1'
+        contactEndpoint('e101-d1')
       ]);
       expect(findMeLegs()).toHaveLength(0);
       expect(pipeline.pendingRing.has(call.id)).toBe(true);

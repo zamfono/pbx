@@ -14,7 +14,7 @@ import type { GroupLeg } from './groupLegs.js';
 import { originateLeg } from './legOriginate.js';
 import type { Pipeline } from './pipeline.js';
 import { originateExternalLeg } from './ringGroupExternal.js';
-import { devicesToRing } from './userDevices.js';
+import { contactLegs, devicesToRing, type ContactLeg } from './userDevices.js';
 
 /** A member leg's owner: whose devices ring (`userId`) and which member it counts against for
  * `allow_reject` purposes (`memberKey`) — the same member, unless a forward rings someone else. */
@@ -39,12 +39,13 @@ function hangUpIfAlreadyWon(
   );
 }
 
-/** Originates one of `owner`'s devices, tracked under `owner.memberKey`: placing, then ringing. */
+/** Originates a contact of one of `owner`'s devices, tracked under `owner.memberKey`: placing,
+ * then ringing. */
 async function originateDevice(
   pipeline: Pipeline,
   call: Call,
   member: { owner: LegOwner; callerId: string; language: string },
-  device: { id: string; sipUsername: string },
+  { device, endpoint }: ContactLeg,
   tracked: Map<string, GroupLeg>
 ): Promise<void> {
   const { owner } = member;
@@ -61,7 +62,7 @@ async function originateDevice(
     call,
     {
       channelId: leg.channelId,
-      endpoint: `PJSIP/${device.sipUsername}`,
+      endpoint,
       app: 'zamfono',
       appArgs: `leg,${call.id}`,
       callerId: member.callerId,
@@ -94,8 +95,8 @@ async function originateDevice(
   hangUpIfAlreadyWon(pipeline, call, leg);
 }
 
-/** Originates every registered device of `owner.userId` at once (§9.3 "One endpoint per device"),
- * tagging each channel under `owner.memberKey`; for a member already in a call, the devices other
+/** Originates every reachable contact of each registered device of `owner.userId` at once (§9.3
+ * "One endpoint per device"), tagging each channel under `owner.memberKey`; for a member already in a call, the devices other
  * than the one carrying it (§10.1 step 5, with `skip_busy` cleared: "rung on their other devices
  * as call waiting"). */
 async function originateDevices(
@@ -109,14 +110,13 @@ async function originateDevices(
   const devices = await devicesToRing(pipeline, snapshot, owner.userId);
   // §10.2 "Phone book": the contact's display name is the caller-ID name on the member legs.
   const callerId = await softphoneCallerId(pipeline, call);
+  const legs = await contactLegs(pipeline, devices);
   if (call.answeredAt !== null) {
     return;
   }
   const member = { owner, callerId, language: snapshot.settings.language };
   await Promise.all(
-    devices.map(device =>
-      originateDevice(pipeline, call, member, device, tracked)
-    )
+    legs.map(leg => originateDevice(pipeline, call, member, leg, tracked))
   );
 }
 

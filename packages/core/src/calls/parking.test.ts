@@ -9,6 +9,7 @@ import type { Channel } from '../ari/types.js';
 import type { CdrWriter } from '../cdr.js';
 import { ERROR_TONE_MEDIA } from '../indications.js';
 import type { Presence } from '../presence.js';
+import { contactEndpoint } from '../testing/ami/contacts.js';
 import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { isPlacement } from '../testing/ari/fakeDial.js';
@@ -627,7 +628,7 @@ describe('parking', () => {
         entry =>
           isPlacement(entry) &&
           (entry.body as { endpoint?: string }).endpoint ===
-            `PJSIP/${parkerDeviceUsername}`
+            contactEndpoint(parkerDeviceUsername)
       );
       expect(rangParker).toBe(true);
       // §10.2 "Call parking": "whose answer lands in the parked bridge" — the bridge the customer

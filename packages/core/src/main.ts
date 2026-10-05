@@ -176,6 +176,7 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
     const { pipeline, cdr, recorder } = buildPipeline({
       db,
       ari,
+      ami,
       cache,
       state,
       bus,

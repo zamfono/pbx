@@ -19,6 +19,7 @@ import { EventBus } from '../internal/eventBus.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { Presence } from '../presence.js';
+import { FakeContacts } from './ami/contacts.js';
 import type { FakeAri } from './ari/fake.js';
 import { eventually } from './eventually.js';
 
@@ -100,6 +101,7 @@ export function testPipelineDeps(
   const bus = overrides.bus ?? new EventBus();
   return {
     ari,
+    ami: new FakeContacts(),
     cache,
     state,
     bus,

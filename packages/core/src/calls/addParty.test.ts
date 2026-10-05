@@ -6,6 +6,7 @@ import { seedUser } from '@zamfono/shared/testDb.js';
 import type { AriClient } from '../ari/client.js';
 import type { CdrWriter } from '../cdr.js';
 import type { Presence } from '../presence.js';
+import { contactEndpoint } from '../testing/ami/contacts.js';
 import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { isPlacement } from '../testing/ari/fakeDial.js';
@@ -515,7 +516,7 @@ describe('add party', () => {
     const endpoints = fakeAri.calls
       .filter(entry => isPlacement(entry))
       .map(entry => (entry.body as { endpoint?: string }).endpoint);
-    expect(endpoints).toEqual(['PJSIP/e300-dabc']);
+    expect(endpoints).toEqual([contactEndpoint('e300-dabc')]);
     await addedPartyLeaves(rig, addPartyCall);
     const row = await db
       .selectFrom('calls')

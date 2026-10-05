@@ -72,6 +72,9 @@ type PlaceBody = {
   variables?: Record<string, string>;
 };
 
+// `PJSIP/<endpoint>/<contact URI>`'s contact part: Asterisk names the channel after the endpoint.
+const DIALLED_CONTACT = /^(?<name>PJSIP\/[^/@]+)\/.*$/u;
+
 /** `POST /channels/create`: the channel, in the app and not dialled yet. */
 export function fakeCreate(
   host: DialHost,
@@ -85,7 +88,7 @@ export function fakeCreate(
   const params = body as PlaceBody;
   const channel = defaultChannel({
     id: params.channelId,
-    name: params.endpoint,
+    name: params.endpoint?.replace(DIALLED_CONTACT, '$<name>'),
     state: 'Down',
     caller: callerOf(params.variables?.['CALLERID(all)'])
   });

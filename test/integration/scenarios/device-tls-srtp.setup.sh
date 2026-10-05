@@ -28,6 +28,8 @@ compose=$3
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck source=_lib.sh
 . "$here/_lib.sh"
+# shellcheck source=_baresip.sh
+. "$here/_baresip.sh"
 
 DID=+15551009
 EXT=106
@@ -50,59 +52,9 @@ newest_call_id > "$(state_file recording-before)"
 printf '%s %s %s %s\n' "$user_id" "$did_id" "$sip_username" "$sip_password" \
   > "$(state_file tls-srtp)"
 
-# The issuer of the certificate Asterisk presents (cert-sync.sh's `await_certificate_synced`):
-# Caddy's own local CA root, read from its storage on the `proxy` container, copied in for
-# baresip to verify the server it dials.
-capem=$(mktemp)
-baresip_config=$(mktemp)
-baresip_accounts=$(mktemp)
-trap 'rm -f "$capem" "$baresip_config" "$baresip_accounts"' EXIT
-dc exec -T proxy cat /data/caddy/pki/authorities/local/root.crt > "$capem"
-# shellcheck disable=SC2086
-dc exec -T devices mkdir -p /root/.baresip
-# shellcheck disable=SC2086
-dc cp "$capem" devices:/root/.baresip/asterisk-ca.pem
-
-cat > "$baresip_config" <<CONFIG
-poll_method		epoll
-sip_listen		0.0.0.0:$BARESIP_PORT
-sip_cafile		/root/.baresip/asterisk-ca.pem
-call_local_timeout	120
-call_max_calls		4
-audio_player		aufile,/dev/null
-audio_source		ausine,440
-audio_alert		aufile,/dev/null
-audio_level		no
-ausrc_srate		48000
-auplay_srate		48000
-ausrc_channels		1
-auplay_channels		1
-audio_buffer		20-160
-rtp_ports		40000-49999
-opus_bitrate		28000
-opus_complexity		0
-opus_stereo		no
-opus_sprop_stereo	no
-module_path		/usr/lib/baresip/modules
-module			opus.so
-module			srtp.so
-module			ausine.so
-module_app		account.so
-module_app		menu.so
-CONFIG
-cat > "$baresip_accounts" <<ACCOUNTS
-<sip:$sip_username@$FQDN:5061;transport=tls>;auth_pass=$sip_password;answermode=auto;mediaenc=srtp-mand;regint=600;ptime=20
-ACCOUNTS
-# shellcheck disable=SC2086
-dc cp "$baresip_config" devices:/root/.baresip/config
-# shellcheck disable=SC2086
-dc cp "$baresip_accounts" devices:/root/.baresip/accounts
-# shellcheck disable=SC2086
-dc exec -T devices sh -c ': > /root/.baresip/contacts'
-
-# shellcheck disable=SC2086
-dc exec -T -d devices sh -c \
-  'baresip -f /root/.baresip -s > /root/.baresip/baresip.log 2>&1'
+account="<sip:$sip_username@$FQDN:5061;transport=tls>;auth_pass=$sip_password"
+start_baresip /root/.baresip "$BARESIP_PORT" \
+  "$account;answermode=auto;mediaenc=srtp-mand;regint=600;ptime=20"
 
 # The contact is reachable once baresip has registered and answered the probe Asterisk sends a
 # new contact, which baresip, already up when it registers, always does.

@@ -5,6 +5,7 @@ import { seedUser } from '@zamfono/shared/testDb.js';
 
 import type { Channel } from '../ari/types.js';
 import type { Presence } from '../presence.js';
+import { contactEndpoint } from '../testing/ami/contacts.js';
 import type { FakeAri } from '../testing/ari/fake.js';
 import { isPlacement } from '../testing/ari/fakeDial.js';
 import { eventually } from '../testing/eventually.js';
@@ -196,7 +197,7 @@ describe('ring-group ringability and fallback rules', () => {
 
     await ringGroup(pipeline, call, groupId);
 
-    expect(originatedEndpoints(fakeAri)).toEqual(['PJSIP/e101-db']);
+    expect(originatedEndpoints(fakeAri)).toEqual([contactEndpoint('e101-db')]);
     expect(playedMedia(fakeAri, callerChannel.id)).toEqual([
       'sound:/media/prompts/noanswer'
     ]);
@@ -212,7 +213,7 @@ describe('ring-group ringability and fallback rules', () => {
 
     await ringGroup(pipeline, call, groupId);
 
-    expect(originatedEndpoints(fakeAri)).toEqual(['PJSIP/e101-da']);
+    expect(originatedEndpoints(fakeAri)).toEqual([contactEndpoint('e101-da')]);
     expect(call.status).toBe('voicemail');
     const rows = await db.selectFrom('voicemails').selectAll().execute();
     expect(rows.map(row => row.mailboxRingGroupId)).toEqual([groupId]);
@@ -229,7 +230,7 @@ describe('ring-group ringability and fallback rules', () => {
 
     await ringGroup(pipeline, call, groupId);
 
-    expect(originatedEndpoints(fakeAri)).toEqual(['PJSIP/e102-db']);
+    expect(originatedEndpoints(fakeAri)).toEqual([contactEndpoint('e102-db')]);
   });
 
   it('skips a member whose answer on a party api added is still joining while skip_busy is set', async () => {
@@ -262,7 +263,7 @@ describe('ring-group ringability and fallback rules', () => {
 
     await ringGroup(pipeline, call, groupId);
 
-    expect(originatedEndpoints(fakeAri)).toEqual(['PJSIP/e102-db']);
+    expect(originatedEndpoints(fakeAri)).toEqual([contactEndpoint('e102-db')]);
   });
 
   it('rings a member on a call they placed as call waiting while skip_busy is cleared', async () => {
@@ -273,7 +274,7 @@ describe('ring-group ringability and fallback rules', () => {
 
     await ringGroup(pipeline, call, groupId);
 
-    expect(originatedEndpoints(fakeAri)).toEqual(['PJSIP/e101-da']);
+    expect(originatedEndpoints(fakeAri)).toEqual([contactEndpoint('e101-da')]);
   });
 
   it('skips a member on DND though they forward unconditionally to a reachable user', async () => {
@@ -325,7 +326,7 @@ describe('ring-group ringability and fallback rules', () => {
 
     await ringGroup(pipeline, call, groupId);
 
-    expect(originatedEndpoints(fakeAri)).toEqual(['PJSIP/e102-db']);
+    expect(originatedEndpoints(fakeAri)).toEqual([contactEndpoint('e102-db')]);
   });
 
   it('rings a busy member only on the devices not carrying their call while skip_busy is cleared', async () => {
@@ -339,7 +340,7 @@ describe('ring-group ringability and fallback rules', () => {
 
     await ringGroup(pipeline, call, groupId);
 
-    expect(originatedEndpoints(fakeAri)).toEqual(['PJSIP/e101-db']);
+    expect(originatedEndpoints(fakeAri)).toEqual([contactEndpoint('e101-db')]);
   });
 
   it('applies the unavailable rule at once when a busy member has no other device while skip_busy is cleared', async () => {

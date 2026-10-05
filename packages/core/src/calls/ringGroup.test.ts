@@ -13,6 +13,7 @@ import { seedUser } from '@zamfono/shared/testDb.js';
 import type { AriClient } from '../ari/client.js';
 import type { Channel } from '../ari/types.js';
 import { AST_CAUSE_USER_BUSY } from '../sipCodes.js';
+import { contactEndpoint } from '../testing/ami/contacts.js';
 import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../testing/ari/fakeDial.js';
@@ -466,8 +467,8 @@ describe('ringGroup', () => {
     );
     // late-1 rings only after the timeout; late-2 is still being placed when late-1 answers.
     const createDelays: Record<string, number> = {
-      'PJSIP/late-1': 1500,
-      'PJSIP/late-2': 2500
+      [contactEndpoint('late-1')]: 1500,
+      [contactEndpoint('late-2')]: 2500
     };
     fakeAri.holdRequest = request => {
       const endpoint = (request.body as { endpoint?: string } | undefined)
@@ -832,7 +833,7 @@ describe('ringGroup', () => {
     const firstOriginate = fakeAri.calls.find(entry => isPlacement(entry));
     expect(
       (firstOriginate?.body as { endpoint?: string } | undefined)?.endpoint
-    ).toBe('PJSIP/rand-b');
+    ).toBe(contactEndpoint('rand-b'));
     expect(call.answeredByUserId).toBe(userB);
   });
 

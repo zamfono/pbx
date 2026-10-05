@@ -6,6 +6,7 @@ import { seedUser } from '@zamfono/shared/testDb.js';
 import type { CdrWriter } from '../cdr.js';
 import type { Presence } from '../presence.js';
 import type { SipMessage } from '../sipCapture.js';
+import { contactEndpoint } from '../testing/ami/contacts.js';
 import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { isPlacement } from '../testing/ari/fakeDial.js';
@@ -357,7 +358,7 @@ describe('pickup', () => {
         entry =>
           isPlacement(entry) &&
           (entry.body as { endpoint?: string }).endpoint ===
-            `PJSIP/${memberDeviceUsername}`
+            contactEndpoint(memberDeviceUsername)
       )
     ).toBe(true);
 

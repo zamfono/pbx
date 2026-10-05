@@ -46,6 +46,7 @@ describe('buildPipeline', () => {
     const deps = { ari, cache, state, bus, now: nowIso };
     const built = buildPipeline({
       ...deps,
+      ami,
       db,
       log: noopLogger,
       env: {

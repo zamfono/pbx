@@ -16,6 +16,7 @@ import { startInternalServer } from '../internal/server.js';
 import { ConfigCache } from '../internal/snapshot.js';
 import { StateStore } from '../internal/stateStore.js';
 import { Presence } from '../presence.js';
+import { FakeContacts } from './ami/contacts.js';
 import { FakeAri } from './ari/fake.js';
 import {
   idleRecorder,
@@ -37,6 +38,8 @@ export type Rig = {
   bus: EventBus;
   cdr: CdrWriter;
   presence: Presence;
+  /** The AMI a ring reads each device's registered contacts through. */
+  contacts: FakeContacts;
   pipeline: Pipeline;
   /** Reads the endpoint list and the config snapshot once every row a test needs exists. */
   devicesUp: () => Promise<void>;
@@ -78,6 +81,7 @@ export async function startRig(
   const live = { db, ari, cache, bus, state, log: noopLogger, now: nowIso };
   const cdr = new CdrWriter(live);
   const presence = new Presence(live);
+  const contacts = new FakeContacts();
   const pipeline = new Pipeline(
     testPipelineDeps(ari, db, {
       cache,
@@ -85,6 +89,7 @@ export async function startRig(
       bus,
       cdr,
       presence,
+      ami: contacts,
       ...overrides
     })
   );
@@ -98,6 +103,7 @@ export async function startRig(
     bus,
     cdr,
     presence,
+    contacts,
     pipeline,
     devicesUp: async () => {
       cache.invalidate();

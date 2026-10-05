@@ -181,8 +181,8 @@ done
 MANAGER_USER=$(docker exec "$CONTAINER" asterisk -rx 'manager show user zamfono')
 echo "$MANAGER_USER" | grep -q 'read perm: system' \
   || fail "AMI user zamfono does not have read perm: system"
-echo "$MANAGER_USER" | grep -q 'write perm: reporting' \
-  || fail "AMI user zamfono does not have write perm: reporting"
+echo "$MANAGER_USER" | grep -q 'write perm: system' \
+  || fail "AMI user zamfono does not have write perm: system"
 
 docker exec "$CONTAINER" asterisk -rx 'dialplan show from-trunk' \
   | grep 'Stasis(zamfono,inbound,${EXTEN})' >/dev/null \

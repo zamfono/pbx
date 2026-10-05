@@ -6,6 +6,7 @@ import { seedUser } from '@zamfono/shared/testDb.js';
 import type { Channel } from '../ari/types.js';
 import type { Presence } from '../presence.js';
 import { AST_CAUSE_USER_BUSY } from '../sipCodes.js';
+import { contactEndpoint } from '../testing/ami/contacts.js';
 import type { FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { isPlacement } from '../testing/ari/fakeDial.js';
@@ -200,7 +201,7 @@ describe('user step against registration', () => {
 
     await runUserStep(pipeline, call, await pipeline.deps.cache.get(), userId);
 
-    expect(originatedEndpoints(fakeAri)).toEqual(['PJSIP/e101-db']);
+    expect(originatedEndpoints(fakeAri)).toEqual([contactEndpoint('e101-db')]);
     expect(playedMedia(fakeAri, callerChannel.id)).toEqual([
       'sound:/media/prompts/noanswer'
     ]);
@@ -274,7 +275,7 @@ describe('user step against registration', () => {
 
     await runUserStep(pipeline, call, await pipeline.deps.cache.get(), userId);
 
-    expect(originatedEndpoints(fakeAri)).toEqual(['PJSIP/e101-db']);
+    expect(originatedEndpoints(fakeAri)).toEqual([contactEndpoint('e101-db')]);
   });
 
   it('applies the busy rule at once when the only registered device carries a call', async () => {

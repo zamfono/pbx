@@ -20,6 +20,8 @@ Every change made to [the specification](spec.md) during implementation, newest 
 *Why:* the exemption went by path alone, so `/upload/x?/remote=<another form>` ran any remote form with a 50 MB body.
 **2026-10-05 · §10.1 Outbound.** While a trunk attempt is out, the caller's channel indicates ringing from the far end's first alert, and a far end answering 183 is bridged with the caller at once, so its early media reaches them; the answer keeps that bridge.
 *Why:* the product owner chose "Pass ringing + early media": the caller heard silence while an external leg rang.
+**2026-10-05 · §4 Control protocol, §6.3, §9.1, §9.3 One endpoint per device.** A device registered several times rings on each reachable contact, as a leg of that device's: the core reads the contacts over AMI (`PJSIPShowEndpoint`) and dials each at `PJSIP/<endpoint>/<contact URI>`. The AMI user's write class is `system`, which that action needs and which covers `PJSIPShowRegistrationsOutbound` too, in place of `reporting`.
+*Why:* `PJSIP/<endpoint>` alone dials only the AOR's first reachable contact, so a Ringotel app registered on desktop and mobile rang on one of them.
 
 **2026-10-05 · §9.2.** `[from-trunk]` matches every user part of one character or more, `s` included, which Asterisk gives an INVITE whose Request-URI has no user part.
 *Why:* the pattern needed two characters, so such a call was refused with 404 before the core could take the called number from `To` (§9.4).

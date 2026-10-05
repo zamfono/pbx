@@ -5,7 +5,7 @@
 import { MS_PER_SECOND, newId } from '@zamfono/shared';
 
 import { ignoreGone } from '../ari/failures.js';
-import { userById } from '../internal/snapshot.js';
+import { userById, type Snapshot } from '../internal/snapshot.js';
 import { channelLanguageVariable } from '../prompts.js';
 import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { takeJoinBridge, type Call, type Leg } from './call.js';
@@ -23,7 +23,12 @@ import {
 import type { Pipeline } from './pipeline.js';
 import { release } from './release.js';
 import { concludeRing, placeAll } from './ringConclusion.js';
-import { devicesToRing, registeredDevices } from './userDevices.js';
+import {
+  contactLegs,
+  devicesToRing,
+  registeredDevices,
+  type ContactLeg
+} from './userDevices.js';
 import { applyRingOutcome, type UnappliedDecision } from './userStep.js';
 
 type DeviceRing = {
@@ -32,12 +37,13 @@ type DeviceRing = {
   language: string;
 };
 
-/** Originates one leg for `device`, tracked on `call` as a device leg: placing, then ringing. */
+/** Originates one leg for a contact of `device`'s, tracked on `call` as a device leg: placing,
+ * then ringing. */
 async function ringDevice(
   pipeline: Pipeline,
   call: Call,
   ring: DeviceRing,
-  device: { id: string; sipUsername: string }
+  { device, endpoint }: ContactLeg
 ): Promise<void> {
   const { userId } = ring;
   const leg: Leg = {
@@ -54,7 +60,7 @@ async function ringDevice(
     call,
     {
       channelId: leg.channelId,
-      endpoint: `PJSIP/${device.sipUsername}`,
+      endpoint,
       app: 'zamfono',
       appArgs: `leg,${call.id}`,
       callerId: ring.callerId,
@@ -91,20 +97,21 @@ async function ringDevice(
   }
 }
 
-/** Originates one leg per device of `userId`'s, all at once (`placeAll`), each placed in its own
- * order (created, joined, dialled, `legOriginate.ts`). */
+/** Originates one leg per reachable contact of each device of `userId`'s, all at once
+ * (`placeAll`), each placed in its own order (created, joined, dialled, `legOriginate.ts`). */
 async function ringDevices(
   pipeline: Pipeline,
   call: Call,
   userId: string,
-  devices: readonly { id: string; sipUsername: string }[],
+  devices: Snapshot['devices'],
   language: string
 ): Promise<void> {
   // §10.2 "Phone book": the contact's display name is the caller-ID name on the device legs.
   const callerId = await softphoneCallerId(pipeline, call);
   const ring: DeviceRing = { userId, callerId, language };
-  await placeAll(pipeline, call, devices, device =>
-    ringDevice(pipeline, call, ring, device)
+  const legs = await contactLegs(pipeline, devices);
+  await placeAll(pipeline, call, legs, leg =>
+    ringDevice(pipeline, call, ring, leg)
   );
 }
 

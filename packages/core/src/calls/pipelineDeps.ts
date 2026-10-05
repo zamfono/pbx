@@ -2,6 +2,7 @@
 // `pipeline.deps`.
 import type { Db } from '@zamfono/shared';
 
+import type { AmiClient } from '../ami/client.js';
 import type { AriClient } from '../ari/client.js';
 import type { Channel, Logger } from '../ari/types.js';
 import type { EventBus } from '../internal/eventBus.js';
@@ -15,6 +16,9 @@ import type { MailSender } from './voicemail.js';
 
 export type PipelineDeps = {
   ari: AriClient;
+  // The part of `AmiClient` the pipeline uses (`userDevices.ts`'s contact reads), typed
+  // structurally so a test can stand in for it.
+  ami: Pick<AmiClient, 'action'>;
   cache: ConfigCache;
   state: StateStore;
   bus: EventBus;

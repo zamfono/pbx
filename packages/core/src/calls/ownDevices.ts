@@ -25,6 +25,7 @@ import {
 } from './legs.js';
 import type { Pipeline } from './pipeline.js';
 import { concludeRing, placeAll } from './ringConclusion.js';
+import { contactLegs, type ContactLeg } from './userDevices.js';
 
 export type Device = Snapshot['devices'][number];
 
@@ -72,14 +73,15 @@ type OwnRing = {
  * `pendingRing`, which the call's next ring replaces once this one has handed its answer over. */
 type OwnRingState = { placed: Map<string, Channel>; ring: RingResolver };
 
-/** Places one leg for `device` on `host`, tracked as a device leg: placing, then ringing. A
+/** Places one leg for a contact of `device`'s on `host`, tracked as a device leg: placing, then
+ * ringing. A
  * placement that fails leaves the ring; one placed after the race settled is hung up, even once
  * the host call rings on for its next party. */
 async function placeDevice(
   pipeline: Pipeline,
   params: OwnRingParams,
   own: OwnRingState,
-  device: Device
+  { device, endpoint }: ContactLeg
 ): Promise<void> {
   const { placed } = own;
   const { host, sipCall, userId, callerId, language } = params;
@@ -97,7 +99,7 @@ async function placeDevice(
     sipCall,
     {
       channelId: leg.channelId,
-      endpoint: `PJSIP/${device.sipUsername}`,
+      endpoint,
       app: 'zamfono',
       appArgs: `leg,${host.id}`,
       callerId,
@@ -132,15 +134,16 @@ async function placeDevice(
   }
 }
 
-/** Places one leg per device on `host`, all at once (`placeAll`), each in its own order (created,
- * joined, dialled). */
+/** Places one leg per reachable contact of each device on `host`, all at once (`placeAll`), each in
+ * its own order (created, joined, dialled). */
 async function placeDevices(
   pipeline: Pipeline,
   params: OwnRingParams,
   own: OwnRingState
 ): Promise<void> {
-  await placeAll(pipeline, params.host, params.devices, device =>
-    placeDevice(pipeline, params, own, device)
+  const legs = await contactLegs(pipeline, params.devices);
+  await placeAll(pipeline, params.host, legs, leg =>
+    placeDevice(pipeline, params, own, leg)
   );
   // Nothing rings: no device could be placed, or each ended before the last was. Only this ring
   // is concluded, never the call's next one begun meanwhile.

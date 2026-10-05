@@ -14,6 +14,7 @@ import { seedUser } from '@zamfono/shared/testDb.js';
 import type { AriEvent } from '../ari/events.js';
 import type { CdrWriter } from '../cdr.js';
 import { SIP_ADDRESS_INCOMPLETE } from '../sipCodes.js';
+import { contactEndpoint } from '../testing/ami/contacts.js';
 import { type FakeAri } from '../testing/ari/fake.js';
 import { defaultChannel } from '../testing/ari/fakeChannel.js';
 import { isPlacement, placedCallerId } from '../testing/ari/fakeDial.js';
@@ -137,8 +138,8 @@ describe('CallActions', () => {
     await eventually(() => {
       const dialled = originates();
       expect(dialled.slice(0, 2).map(entry => entry.endpoint)).toEqual([
-        'PJSIP/e101-a',
-        'PJSIP/e101-b'
+        contactEndpoint('e101-a'),
+        contactEndpoint('e101-b')
       ]);
       // Placed as any leg of the call is (§7 level `sip`: created, joined, then dialled).
       expect(dialled.slice(0, 2).map(entry => entry.appArgs)).toEqual([
@@ -152,7 +153,7 @@ describe('CallActions', () => {
       expect(deviceChannelIds.filter(id => rig.hungUp(id))).toHaveLength(1);
       // Then 102 rings exactly as it would for a dial from that device (§10.1 step 4).
       expect(dialled.at(2)).toMatchObject({
-        endpoint: 'PJSIP/e102-a',
+        endpoint: contactEndpoint('e102-a'),
         appArgs: `leg,${callId}`
       });
       const live = [...pipeline.callByChannel.values()].find(
@@ -214,7 +215,7 @@ describe('CallActions', () => {
     const answerArrived = Promise.withResolvers<undefined>();
     const targetRinging = Promise.withResolvers<undefined>();
     const targetDialAnswered = Promise.withResolvers<undefined>();
-    const firstId = (): string => channelOf('PJSIP/e101-a');
+    const firstId = (): string => channelOf(contactEndpoint('e101-a'));
     rig.ari.on('event', (event: AriEvent) => {
       if (
         event.type === 'ChannelStateChange' &&
@@ -227,7 +228,7 @@ describe('CallActions', () => {
       const created = request.body as { endpoint?: string } | undefined;
       if (
         request.path === 'channels/create' &&
-        created?.endpoint === 'PJSIP/e101-b'
+        created?.endpoint === contactEndpoint('e101-b')
       ) {
         // Still being placed once the target's ring has begun.
         return targetRinging.promise;
@@ -244,7 +245,10 @@ describe('CallActions', () => {
         });
         return answerArrived.promise;
       }
-      if (channelId !== '' && channelId === channelOf('PJSIP/e102-a')) {
+      if (
+        channelId !== '' &&
+        channelId === channelOf(contactEndpoint('e102-a'))
+      ) {
         // The target's ring has begun; the still-placing phone's dial is refused, and the
         // target's own dial answers only once that refusal has been handled.
         fakeAri.failDial = { status: 409, count: 1 };
@@ -275,19 +279,19 @@ describe('CallActions', () => {
       actorUserId: newId(),
       requestId: 'req-1'
     });
-    const refused = await dialOf('PJSIP/e101-b');
+    const refused = await dialOf(contactEndpoint('e101-b'));
     await expect(refused.dialling).rejects.toMatchObject({ status: 409 });
     await flush();
     targetDialAnswered.resolve(undefined);
     // Past the dial's response, where a ring already over hangs the target's phone up.
     await (
-      await dialOf('PJSIP/e102-a')
+      await dialOf(contactEndpoint('e102-a'))
     ).dialling;
     await flush();
 
     const result = await originated;
     const callId = 'callId' in result ? result.callId : '';
-    const targetId = channelOf('PJSIP/e102-a');
+    const targetId = channelOf(contactEndpoint('e102-a'));
     const live = [...pipeline.callByChannel.values()].find(
       call => call.id === callId
     );
@@ -315,7 +319,7 @@ describe('CallActions', () => {
     // The originate returns as soon as the call exists; its legs, trace and release follow.
     await eventually(() => {
       const dialled = originates();
-      expect(dialled[0]).toMatchObject({ endpoint: 'PJSIP/e101-a' });
+      expect(dialled[0]).toMatchObject({ endpoint: contactEndpoint('e101-a') });
       // §9.4 "Hosts": `PJSIP/<number>@trunk-<id>` for the trunk's first host.
       expect(
         dialled
@@ -777,17 +781,21 @@ describe('CallActions', () => {
     await actions.pickup(ringing.id, { actorUserId: pickerId });
     const dialled = originates();
     expect(dialled.map(entry => entry.endpoint)).toEqual([
-      'PJSIP/e102-a',
-      'PJSIP/e102-b'
+      contactEndpoint('e102-a'),
+      contactEndpoint('e102-b')
     ]);
     // Both ring in a race of their own; the first to answer is the picked-up call's answer.
     const [first, second] = dialled.map(entry => entry.appArgs);
     expect(first).toMatch(/^leg,/u);
     expect(second).toBe(first);
+    // Whichever phone the fake answers first takes the call; the other is hung up.
+    const legIds = dialled.map(entry => entry.channelId ?? '');
     await eventually(() => {
       expect(ringing.answeredByUserId).toBe(pickerId);
-      expect(ringing.legs.get(dialled[0]?.channelId ?? '')?.state).toBe('up');
-      expect(rig.hungUp(dialled[1]?.channelId ?? '')).toBe(true);
+      const winner = legIds.filter(id => ringing.legs.get(id)?.state === 'up');
+      expect(winner).toHaveLength(1);
+      const loser = legIds.find(id => id !== winner[0]) ?? '';
+      expect(rig.hungUp(loser)).toBe(true);
     });
     expect(pipeline.pendingRing.has(ringing.id)).toBe(false);
 

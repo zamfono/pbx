@@ -74,3 +74,44 @@ export async function devicesToRing(
   const busy = await busyDevices(pipeline);
   return devices.filter(device => !busy.has(device.sipUsername));
 }
+
+/** One leg a ring places for `device`: a reachable contact of its AOR, dialled at its own URI. */
+export type ContactLeg = {
+  device: Snapshot['devices'][number];
+  endpoint: string;
+};
+
+/**
+ * One `ContactLeg` per reachable contact of each of `devices` (§9.3 "rings all registered
+ * devices"): `PJSIP/<endpoint>` alone dials only the AOR's first reachable contact, so an app
+ * registered from several phones is dialled at `PJSIP/<endpoint>/<contact URI>` per contact, the
+ * contacts `PJSIP_DIAL_CONTACTS` lists (all but those `qualify` found unreachable). A device
+ * whose contacts cannot be read rings nowhere, as one with none.
+ */
+export async function contactLegs(
+  pipeline: Pipeline,
+  devices: readonly Snapshot['devices'][number][]
+): Promise<ContactLeg[]> {
+  const { ami, logger } = pipeline.deps;
+  const perDevice = await Promise.all(
+    devices.map(async device => {
+      const frames =
+        (await ami
+          .action('PJSIPShowEndpoint', { Endpoint: device.sipUsername })
+          .catch(
+            logFailure(logger, 'contact list', { deviceId: device.id })
+          )) ?? [];
+      return frames
+        .filter(
+          frame =>
+            frame.Event === 'ContactStatusDetail' &&
+            frame.Status !== 'Unreachable'
+        )
+        .map(frame => ({
+          device,
+          endpoint: `PJSIP/${device.sipUsername}/${frame.URI ?? ''}`
+        }));
+    })
+  );
+  return perDevice.flat();
+}
