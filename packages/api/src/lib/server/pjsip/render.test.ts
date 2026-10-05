@@ -215,6 +215,7 @@ describe('render', () => {
         'direct_media = no',
         'send_connected_line = no',
         'send_diversion = no',
+        'dtmf_mode = auto',
         'auth = trunk-t2',
         'identify_by = auth_username'
       ].join('\n')

@@ -221,6 +221,20 @@ describe('renderTrunksConf inbound_auth source restriction', () => {
   });
 });
 
+// A caller on a provider without `telephone-event` reaches a menu (§10.1 "Target menu") with
+// in-band DTMF.
+describe('renderTrunksConf DTMF', () => {
+  test('both endpoints of a trunk take RFC 4733 DTMF where offered and in-band DTMF otherwise', () => {
+    const conf = renderTrunk({
+      ...registrationTrunk,
+      ...registrarOnly,
+      username: 'trunkuser',
+      inboundAuth: true
+    });
+    expect(parsedValues(conf, 'dtmf_mode')).toEqual(['auto', 'auto']);
+  });
+});
+
 describe('renderTrunksConf TLS and SRTP', () => {
   const tlsTrunk: Trunk = {
     ...registrationTrunk,

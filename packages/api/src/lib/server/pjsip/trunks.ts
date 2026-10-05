@@ -150,6 +150,10 @@ const TRUNK_CONNECTED_LINE = 'send_connected_line = no';
 // which builds `History-Info` from the same party, is off by default and stays so.
 const TRUNK_DIVERSION = 'send_diversion = no';
 
+// RFC 4733 where the provider's SDP offers `telephone-event`, in-band audio where it does not: the
+// default, `rfc4733` alone, would leave a menu deaf to a caller on such a provider. Both endpoints.
+const TRUNK_DTMF = 'dtmf_mode = auto';
+
 // SDES-SRTP media for an `srtp` trunk, as on a `tls` device (§9.3 "Transport policy"): the keys
 // travel in the SDP, which only TLS keeps private, hence `tls` trunks alone carry it (§9.4
 // "Signaling"). Both endpoints of the trunk carry it, since either may answer the provider.
@@ -177,6 +181,7 @@ function renderTrunkEndpoint(trunk: Trunk, tenantCodecs: string[]): string {
     'direct_media = no',
     TRUNK_CONNECTED_LINE,
     TRUNK_DIVERSION,
+    TRUNK_DTMF,
     ...mediaEncryptionLines(trunk)
   ];
   lines.push(...outboundProxyLines(trunk));
@@ -224,6 +229,7 @@ function renderTrunkAuthEndpoint(
     'direct_media = no',
     TRUNK_CONNECTED_LINE,
     TRUNK_DIVERSION,
+    TRUNK_DTMF,
     ...mediaEncryptionLines(trunk),
     `auth = ${trunkSectionName(trunk.id)}`,
     'identify_by = auth_username'
