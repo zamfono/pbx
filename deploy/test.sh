@@ -157,4 +157,11 @@ echo "==> Caddyfile"
 docker run --rm -e FQDN=x -v "$script_dir/Caddyfile:/etc/caddy/Caddyfile:ro" "$PROXY_IMAGE" \
   caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 | grep -q "Valid configuration"
 
+echo "==> Caddyfile with litestream.caddy (the DR overlay's mount)"
+# Litestream serves its metrics at /metrics only, so the route hands it that path.
+docker run --rm -e FQDN=x -v "$script_dir/Caddyfile:/etc/caddy/Caddyfile:ro" \
+  -v "$script_dir/litestream.caddy:/etc/caddy/conf.d/litestream.caddy:ro" "$PROXY_IMAGE" \
+  caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile 2>/dev/null |
+  grep -qF '{"handler":"rewrite","uri":"/metrics"}]},{"handle":[{"handler":"reverse_proxy","upstreams":[{"dial":"litestream:9090"}]'
+
 echo "OK"

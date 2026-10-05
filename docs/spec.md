@@ -687,6 +687,7 @@ The DR overlay (§6.5) mounts one more file into the proxy, `litestream.caddy` a
 ```caddyfile
 # litestream.caddy — mounted into /etc/caddy/conf.d/ by compose.dr.yaml (§6.5)
 handle /metrics/litestream {
+	rewrite * /metrics     # Litestream serves its metrics at /metrics
 	reverse_proxy litestream:9090
 }
 ```

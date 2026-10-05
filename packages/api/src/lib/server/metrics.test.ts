@@ -404,4 +404,72 @@ describe('renderMetrics', () => {
     expect(age).toBeGreaterThanOrEqual(59);
     expect(age).toBeLessThan(65);
   });
+
+  it('leaves a disabled backup target out of zamfono_backup_last_success_age_seconds, since it is backed up no more', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    const targetId = newId();
+    await db
+      .insertInto('backupTargets')
+      .values({
+        id: targetId,
+        kind: 'local',
+        paramsJson: '{}',
+        enabled: 0,
+        secretEnc: Buffer.from(''),
+        createdAt: nowIso()
+      })
+      .execute();
+    const finishedAt = new Date(Date.now() - 60_000).toISOString();
+    await db
+      .insertInto('backupRuns')
+      .values({
+        id: newId(),
+        targetId,
+        status: 'ok',
+        startedAt: finishedAt,
+        finishedAt
+      })
+      .execute();
+
+    const text = await renderMetrics(stubDeps({ db }));
+
+    expect(text).not.toContain(
+      `zamfono_backup_last_success_age_seconds{target="${targetId}"}`
+    );
+  });
+
+  it('reports an enabled backup target whose runs all failed, so an age alert can fire for it', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    const targetId = newId();
+    await db
+      .insertInto('backupTargets')
+      .values({
+        id: targetId,
+        kind: 'local',
+        paramsJson: '{}',
+        secretEnc: Buffer.from(''),
+        createdAt: new Date(Date.now() - 86_400_000).toISOString()
+      })
+      .execute();
+    const at = new Date(Date.now() - 60_000).toISOString();
+    await db
+      .insertInto('backupRuns')
+      .values({
+        id: newId(),
+        targetId,
+        status: 'failed',
+        error: 'repository unreachable',
+        startedAt: at,
+        finishedAt: at
+      })
+      .execute();
+
+    const text = await renderMetrics(stubDeps({ db }));
+
+    expect(text).toContain(
+      `zamfono_backup_last_success_age_seconds{target="${targetId}"}`
+    );
+  });
 });
