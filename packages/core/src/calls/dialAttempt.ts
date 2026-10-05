@@ -96,6 +96,27 @@ function followAlerts(
   return () => (progressed ? bridged : Promise.resolve());
 }
 
+/** The `trunk` leg `channelId` of an attempt to `candidate`, still placing; a forward's stands in
+ * for the user whose unconditional rule it is (§10.2 "Effective flag"). */
+function placingLeg(
+  cursor: RouteCursor,
+  candidate: Candidate,
+  channelId: string
+): Leg {
+  const standsInFor = cursor.forward?.standsInFor;
+  return {
+    id: newId(),
+    channelId,
+    kind: 'trunk',
+    userId: null,
+    state: 'placing',
+    endCause: null,
+    trunkId: candidate.trunk.id,
+    target: cursor.number,
+    ...(standsInFor === undefined ? {} : { standsInFor })
+  };
+}
+
 /** One INVITE to `candidate`: placed and tracked as a `trunk` leg of the call, its outcome awaited
  * (§9.4). A caller who hung up ended the leg (`legsEnded.ts`, `legOriginate.ts`): its end is no
  * failure of the far end's. */
@@ -109,16 +130,7 @@ async function attemptOnce(
     cursor,
     candidate,
     channelId => {
-      leg = {
-        id: newId(),
-        channelId,
-        kind: 'trunk',
-        userId: null,
-        state: 'placing',
-        endCause: null,
-        trunkId: candidate.trunk.id,
-        target: cursor.number
-      };
+      leg = placingLeg(cursor, candidate, channelId);
       call.legs.set(channelId, leg);
     },
     () => {

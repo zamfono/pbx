@@ -42,7 +42,10 @@ export async function winBatch(
             : { deviceId: winner.deviceId }),
           ...(call.ringGroupId === null
             ? {}
-            : { ringGroupId: call.ringGroupId })
+            : { ringGroupId: call.ringGroupId }),
+          ...(winner.standsInFor === undefined
+            ? {}
+            : { standsInFor: winner.standsInFor })
         };
   // Claimed before the first await, so a second member's `Up` landing while this one is still
   // bridging loses here rather than bridging the caller a second time.

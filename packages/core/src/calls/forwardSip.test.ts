@@ -18,7 +18,7 @@ import { isPlacement } from '../testing/ari/fakeDial.js';
 import { eventually } from '../testing/eventually.js';
 import { registerDevice } from '../testing/pipelineDeps.js';
 import { startRig, type Rig } from '../testing/pipelineRig.js';
-import { newCall, type Call } from './call.js';
+import { newCall, type Call, type Leg } from './call.js';
 import { enterTarget } from './inbound.js';
 import type { Pipeline } from './pipeline.js';
 import { ringGroup } from './ringGroup.js';
@@ -561,6 +561,122 @@ describe('sip forward targets and the forwarding context (§9.4, §10.1 step 7)'
       'REDIRECTING(from-num,i)': '177',
       'REDIRECTING(reason,i)': 'cfu',
       'REDIRECTING(count,i)': '1'
+    });
+  });
+
+  // §10.2 "Effective flag": the leg of a user's unconditional forward is their participation.
+  describe('the user a sip leg stands in for', () => {
+    async function seedForwarder(
+      condition: 'unconditional' | 'offline'
+    ): Promise<string> {
+      const user = await seedUser(db, {
+        name: 'Bea',
+        ext: '177',
+        mailboxEnabled: 0
+      });
+      await seedRule(
+        db,
+        user,
+        condition,
+        await sipTargetId(db, await seedSipTrunk(db))
+      );
+      return user;
+    }
+
+    function trunkLeg(call: Call): Leg | undefined {
+      return [...call.legs.values()].find(leg => leg.kind === 'trunk');
+    }
+
+    it('is the user whose unconditional forward dials it', async () => {
+      const user = await seedForwarder('unconditional');
+      const call = inboundCall();
+
+      await dialled(
+        enterTarget(pipeline, call, { kind: 'user', userId: user }, null)
+      );
+
+      expect(trunkLeg(call)?.standsInFor).toBe(user);
+    });
+
+    it("is nobody for the user's offline forward", async () => {
+      const user = await seedForwarder('offline');
+      const call = inboundCall();
+
+      await dialled(
+        enterTarget(pipeline, call, { kind: 'user', userId: user }, null)
+      );
+
+      expect(trunkLeg(call)).toBeDefined();
+      expect(trunkLeg(call)?.standsInFor).toBeUndefined();
+    });
+
+    it("is nobody for the user's OOO rule", async () => {
+      const user = await seedUser(db, { name: 'Bea', mailboxEnabled: 0 });
+      await db
+        .insertInto('oooRules')
+        .values({
+          id: newId(),
+          scopeUserId: user,
+          active: 1,
+          targetId: await sipTargetId(db, await seedSipTrunk(db)),
+          createdAt: nowIso()
+        })
+        .execute();
+      const call = inboundCall();
+
+      await dialled(
+        enterTarget(pipeline, call, { kind: 'user', userId: user }, null)
+      );
+
+      expect(trunkLeg(call)).toBeDefined();
+      expect(trunkLeg(call)?.standsInFor).toBeUndefined();
+    });
+
+    it('is the ring-group member whose followed forward won the batch', async () => {
+      fakeAri.answerAfterMs = 10;
+      const member = await seedForwarder('unconditional');
+      // A member with no registered device is no ringable member at all (§10.1 step 5).
+      await db
+        .insertInto('devices')
+        .values({
+          id: newId(),
+          userId: member,
+          label: 'phone',
+          kind: 'manual',
+          sipUsername: 'e177-d1',
+          sipPasswordEnc: Buffer.from('secret'),
+          createdAt: nowIso()
+        })
+        .execute();
+      await registerDevice(fakeAri, pipeline, 'e177-d1');
+      const groupId = newId();
+      await db
+        .insertInto('ringGroups')
+        .values({
+          id: groupId,
+          name: 'Support',
+          strategy: 'simultaneous',
+          ringTimeoutS: 30,
+          createdAt: nowIso()
+        })
+        .execute();
+      await db
+        .insertInto('ringGroupMembers')
+        .values({ groupId, position: 1, userId: member })
+        .execute();
+      const call = inboundCall();
+      call.ringGroupId = groupId;
+
+      ringGroup(pipeline, call, groupId).catch(() => undefined);
+
+      const won = await eventually(() => {
+        const leg = [...call.legs.values()].find(
+          entry => entry.kind === 'member'
+        );
+        expect(leg).toBeDefined();
+        return leg;
+      });
+      expect(won).toMatchObject({ ringGroupId: groupId, standsInFor: member });
     });
   });
 

@@ -3,7 +3,11 @@
 import { MAX_HOPS, nextHop, type ForwardTarget } from '../routing/targets.js';
 import { SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { type Call } from './call.js';
-import { noteDiversion, type Diversion } from './forwardContext.js';
+import {
+  noteDiversion,
+  type Diversion,
+  type Forwarder
+} from './forwardContext.js';
 import { enterTarget } from './inbound.js';
 import type { Pipeline } from './pipeline.js';
 import { endTargetOwner, type Owner } from './release.js';
@@ -26,14 +30,14 @@ async function endAtHopLimit(pipeline: Pipeline, call: Call): Promise<void> {
 }
 
 /** Step 7 "Forward targets": hop counting, then dispatch, or the hop-limit mailbox fallback.
- * `asUser` is `enterTarget`'s: the forwarding user, `null` for a forward nobody's own rule made.
+ * `forwarder` is `enterTarget`'s: the forwarding user, `null` for a forward nobody's own rule made.
  * `diversion` is the forward hop this is, `null` for a forward that diverts nobody (a menu's
  * fallback, a parked call's), recorded once the hop limit let it through. */
 export async function runTarget(
   pipeline: Pipeline,
   call: Call,
   target: ForwardTarget,
-  asUser: string | null,
+  forwarder: Forwarder | null,
   diversion: Diversion | null
 ): Promise<void> {
   const hop = nextHop(call.hops, target);
@@ -43,7 +47,7 @@ export async function runTarget(
   }
   call.hops = hop.hops;
   noteDiversion(call, diversion);
-  await enterTarget(pipeline, call, target, asUser);
+  await enterTarget(pipeline, call, target, forwarder);
 }
 
 /** An external target that is one of the tenant's own DIDs (§10.1 step 7): the DID's `target`

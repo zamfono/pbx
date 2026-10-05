@@ -15,7 +15,7 @@ import {
   startSnoopPair,
   waitForRecordingFinished
 } from './recordingChannels.js';
-import { legRecords, userRecords } from './recordingFlags.js';
+import { legParticipant, legRecords, userRecords } from './recordingFlags.js';
 import { ffmpegMix, type Mixer } from './recordingMix.js';
 import { recordFormatFor } from './recordingRate.js';
 import { storeParticipation } from './recordingStore.js';
@@ -79,7 +79,7 @@ export class Recorder {
     if (!legRecords(snapshot, leg)) {
       return;
     }
-    await this.start(call.id, leg.userId, leg.channelId);
+    await this.start(call.id, legParticipant(leg), leg.channelId);
   }
 
   /** Starts recording the calling party's own participation when their `record_calls` flag is

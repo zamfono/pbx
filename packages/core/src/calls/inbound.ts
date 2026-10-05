@@ -17,6 +17,7 @@ import { SIP_DECLINE, SIP_SERVER_ERROR } from '../sipCodes.js';
 import { announce } from './announce.js';
 import { newCall, type Call } from './call.js';
 import { raiseLogLevel } from './callLogLevel.js';
+import type { Forwarder } from './forwardContext.js';
 import { dialForwardTarget } from './forwardDial.js';
 import { applyOooAndHours, targetIdentity } from './inboundSchedule.js';
 import { inboundBoundary } from './inboundTrunk.js';
@@ -31,14 +32,14 @@ import { deposit } from './voicemail.js';
 /** Step 1 "Entry" for an already-resolved target (§10.1): reject-anonymous, OOO/hours, then the
  * target's own step. Exported for outbound dialling of an internal extension or own DID, which
  * enters here directly, without `runTarget`'s hop counting (§10.1 Outbound steps 3 and 5).
- * `asUser` is the user whose own rule forwarded here, whose call an external target is dialled as
- * (§10.1 step 7), or `null` when a DID, menu, ring group or tenant rule forwards; no other target
- * kind reads it. */
+ * `forwarder` is the user whose own rule forwarded here, whose call an external target is dialled
+ * as (§10.1 step 7), or `null` when a DID, menu, ring group or tenant rule forwards; no other
+ * target kind reads it. */
 export async function enterTarget(
   pipeline: Pipeline,
   call: Call,
   target: ForwardTarget,
-  asUser: string | null
+  forwarder: Forwarder | null
 ): Promise<void> {
   if (target.kind === 'mailboxUser') {
     await deposit(pipeline, call, { userId: target.userId }, 'target');
@@ -58,7 +59,7 @@ export async function enterTarget(
     return;
   }
   if (target.kind === 'external' || target.kind === 'sip') {
-    await dialForwardTarget(pipeline, call, target, asUser);
+    await dialForwardTarget(pipeline, call, target, forwarder);
     return;
   }
 

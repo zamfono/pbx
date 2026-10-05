@@ -64,7 +64,8 @@ export async function originateExternalLeg(
           userId: null,
           memberKey,
           state: 'placing',
-          external: true
+          external: true,
+          standsInFor: memberKey
         });
       },
       track: channelId => {

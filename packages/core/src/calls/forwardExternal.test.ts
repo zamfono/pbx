@@ -311,6 +311,29 @@ describe('an external forward target is dialled as the forwarding user (§10.1 s
       ]);
     });
 
+    // §10.2 "Effective flag": the leg of a user's unconditional forward is their participation.
+    it.each([
+      ['unconditional', true],
+      ['offline', false]
+    ] as const)(
+      'the trunk leg of an %s forward stands in for the forwarder: %s',
+      async (condition, standsIn) => {
+        const forwarder = await seedNumberedUser(db, { number: '+491110202' });
+        await seedUserRule(db, forwarder, condition);
+        await seedTrunkRoute(db, 1, null);
+
+        await dialled(
+          enterTarget(pipeline, call, { kind: 'user', userId: forwarder }, null)
+        );
+
+        const leg = [...call.legs.values()].find(
+          entry => entry.kind === 'trunk'
+        );
+        expect(leg).toBeDefined();
+        expect(leg?.standsInFor).toBe(standsIn ? forwarder : undefined);
+      }
+    );
+
     it("a busy forward, applied once the forwarder's device answers 486, is the forwarder's call", async () => {
       const forwarder = await seedNumberedUser(db, { number: '+491110202' });
       await seedDevice(db, forwarder, 'e102-d1');

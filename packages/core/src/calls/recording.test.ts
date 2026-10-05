@@ -230,6 +230,100 @@ describe('Recorder', () => {
     expect(snoopCalls()).toHaveLength(0);
   });
 
+  it("records the trunk leg of a flagged user's unconditional forward as that user's participation", async () => {
+    const userId = await seedUser(db, { recordCalls: 1 });
+    const targetId = await seedForwardTarget(db, { userId });
+    const didId = await seedDid(db, '+15551000', targetId);
+    await seedSettings(db, { mainDidId: didId });
+    const recorder = new Recorder({
+      ari,
+      cache,
+      db,
+      mediaDir: MEDIA_DIR,
+      mix: () => Promise.resolve(7.4),
+      log: fakeLogger(),
+      now: () => NOW
+    });
+    const call = buildCall(null);
+    await cdr.open(call);
+    fakeAri.addChannel({ id: 'trunk-channel' });
+    const leg = buildLeg({
+      channelId: 'trunk-channel',
+      kind: 'trunk',
+      standsInFor: userId
+    });
+
+    await recorder.onLegUp(call, leg);
+    expect(snoopCalls().map(body => body.spy)).toEqual(['in', 'out']);
+    const [leftName, rightName] = recordCalls().map(body => body.name);
+    const ended = recorder.onLegEnded(call, leg);
+    emitRecordingFinished(leftName, 7);
+    emitRecordingFinished(rightName, 7);
+    await ended;
+
+    const rows = await db
+      .selectFrom('recordings')
+      .select('userId')
+      .where('callId', '=', call.id)
+      .execute();
+    expect(rows).toEqual([{ userId }]);
+  });
+
+  it("records a member's followed forward under the group's flag, the member's own being off", async () => {
+    const userId = await seedUser(db, { recordCalls: 0 });
+    await seedSettings(db, { mainDidId: await seedDid(db, '+15551000') });
+    const groupId = await seedRingGroup(db, { recordCalls: 1 });
+    const recorder = new Recorder({
+      ari,
+      cache,
+      db,
+      mediaDir: MEDIA_DIR,
+      mix: () => Promise.resolve(0),
+      log: fakeLogger(),
+      now: () => NOW
+    });
+    const call = buildCall(groupId);
+    fakeAri.addChannel({ id: 'trunk-channel' });
+
+    await recorder.onLegUp(
+      call,
+      buildLeg({
+        channelId: 'trunk-channel',
+        kind: 'member',
+        ringGroupId: groupId,
+        standsInFor: userId
+      })
+    );
+
+    expect(snoopCalls()).toHaveLength(2);
+  });
+
+  it("starts no snoop for the trunk leg of an unflagged user's unconditional forward", async () => {
+    const userId = await seedUser(db, { recordCalls: 0 });
+    await seedSettings(db, { mainDidId: await seedDid(db, '+15551000') });
+    const recorder = new Recorder({
+      ari,
+      cache,
+      db,
+      mediaDir: MEDIA_DIR,
+      mix: () => Promise.resolve(0),
+      log: fakeLogger(),
+      now: () => NOW
+    });
+    fakeAri.addChannel({ id: 'trunk-channel' });
+
+    await recorder.onLegUp(
+      buildCall(null),
+      buildLeg({
+        channelId: 'trunk-channel',
+        kind: 'trunk',
+        standsInFor: userId
+      })
+    );
+
+    expect(snoopCalls()).toHaveLength(0);
+  });
+
   it("does not record a leg the group did not place, after the group's fallback routed elsewhere", async () => {
     const userId = await seedUser(db, { recordCalls: 0 });
     const groupId = await seedRingGroup(db, { recordCalls: 1 });

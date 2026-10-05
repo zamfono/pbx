@@ -37,7 +37,8 @@ export type UnappliedDecision =
   | { kind: 'mailbox'; userId: string; reason: DepositReason };
 
 /** Applies `decision` to `call`'s caller: the forward is the user's own rule, so an external target
- * is dialled as their call, and a hop of theirs (§10.1 step 7); the mailbox takes a message. */
+ * is dialled as their call, and a hop of theirs (§10.1 step 7), whose leg an unconditional rule's
+ * stands in for them (§10.2 "Effective flag"); the mailbox takes a message. */
 export async function applyUserDecision(
   pipeline: Pipeline,
   call: Call,
@@ -58,7 +59,13 @@ export async function applyUserDecision(
           { userId },
           CONDITION_REASONS[decision.condition]
         );
-  await runTarget(pipeline, call, decision.target, userId, diversion);
+  await runTarget(
+    pipeline,
+    call,
+    decision.target,
+    { userId, standsIn: decision.condition === 'unconditional' },
+    diversion
+  );
 }
 
 /** Applies `decision`, or hands it back for a call with no caller channel. */

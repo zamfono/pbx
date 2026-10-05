@@ -11,7 +11,11 @@ import { type Call } from './call.js';
 import type { TrunkRow } from './callerIdentity.js';
 import { dialRoutes } from './dialAttempt.js';
 import { openCursor, trunkWay } from './externalLegRoutes.js';
-import type { ForwardLeg } from './forwardContext.js';
+import {
+  standInOf,
+  type Forwarder,
+  type ForwardLeg
+} from './forwardContext.js';
 import { sipForwardLeg } from './forwardValues.js';
 import { dialExternal, settleDial } from './outboundExternal.js';
 import type { Pipeline } from './pipeline.js';
@@ -44,7 +48,7 @@ async function dialSipTarget(
   ctx: { pipeline: Pipeline; trunkState: TrunkState },
   call: Call,
   target: SipTarget,
-  asUser: string | null
+  forwarder: Forwarder | null
 ): Promise<void> {
   const { pipeline, trunkState } = ctx;
   const snapshot = await pipeline.deps.cache.get();
@@ -59,13 +63,16 @@ async function dialSipTarget(
     await release(pipeline, call, SIP_SERVICE_UNAVAILABLE, 'failed');
     return;
   }
-  const forward = await sipForwardLeg(
-    pipeline,
-    call,
-    target,
-    [...call.diversions],
-    snapshot
-  );
+  const forward: ForwardLeg = {
+    ...(await sipForwardLeg(
+      pipeline,
+      call,
+      target,
+      [...call.diversions],
+      snapshot
+    )),
+    ...standInOf(forwarder)
+  };
   const cursor = openCursor(
     {
       pipeline,
@@ -73,7 +80,7 @@ async function dialSipTarget(
       call,
       snapshot,
       number: target.user,
-      callerUser: userById(snapshot, asUser),
+      callerUser: userById(snapshot, forwarder?.userId ?? null),
       clirPerCall: null,
       forward
     },
@@ -84,21 +91,22 @@ async function dialSipTarget(
 
 /**
  * §10.1 step 7: an external or SIP forward target, dialled "as the forwarding user's call":
- * `asUser` is the user whose own rule forwarded, not the original caller, and `null` when a DID,
+ * `forwarder` is the user whose own rule forwarded, not the original caller, and `null` when a DID,
  * menu, ring group or tenant rule forwards, which picks the routes of an external number and the
  * presented number and CLIR of either (§9.4). An own DID is entered internally instead (`enterOwnDid`).
- * The leg carries the hops so far. A pipeline with no
+ * The leg carries the hops so far, and stands in for a forwarder whose unconditional rule it is
+ * (§10.2 "Effective flag"). A pipeline with no
  * trunk state cannot reach a trunk at all, and releases rather than pretending to try.
  */
 export async function dialForwardTarget(
   pipeline: Pipeline,
   call: Call,
   target: Extract<ForwardTarget, { kind: 'external' | 'sip' }>,
-  asUser: string | null
+  forwarder: Forwarder | null
 ): Promise<void> {
   const { trunkState } = pipeline.deps;
   if (target.kind === 'sip') {
-    await dialSipTarget({ pipeline, trunkState }, call, target, asUser);
+    await dialSipTarget({ pipeline, trunkState }, call, target, forwarder);
     return;
   }
   const own = ownDidTarget(await pipeline.deps.cache.get(), target);
@@ -107,12 +115,16 @@ export async function dialForwardTarget(
     return;
   }
   // An external forward carries `Diversion` alone (§9.4 "Forwarded calls").
-  const forward: ForwardLeg = { diversions: [...call.diversions], headers: [] };
+  const forward: ForwardLeg = {
+    diversions: [...call.diversions],
+    headers: [],
+    ...standInOf(forwarder)
+  };
   await dialExternal(
     { pipeline, trunkState, forward },
     call,
     target.number,
-    asUser,
+    forwarder?.userId ?? null,
     null
   );
 }

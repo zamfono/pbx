@@ -12,6 +12,7 @@ import { type Call } from './call.js';
 import {
   diversionFor,
   type DivertingParty,
+  type Forwarder,
   type RedirectingReason
 } from './forwardContext.js';
 import type { Pipeline } from './pipeline.js';
@@ -39,9 +40,12 @@ export function targetIdentity(target: ScopedTarget): {
 }
 
 /** The user whose own rule a `scope`'s OOO rule or schedule is, whose call an external target it
- * forwards to is dialled as (§10.1 step 7); `null` for a ring group, menu or tenant rule. */
-function scopeUser(scope: Scope): string | null {
-  return scope.startsWith('user:') ? scope.slice('user:'.length) : null;
+ * forwards to is dialled as (§10.1 step 7); `null` for a ring group, menu or tenant rule. No such
+ * rule is an unconditional forward, so its leg stands in for nobody. */
+function scopeForwarder(scope: Scope): Forwarder | null {
+  return scope.startsWith('user:')
+    ? { userId: scope.slice('user:'.length), standsIn: false }
+    : null;
 }
 
 /** The hop an OOO rule or a closed schedule makes (§9.4 "Forwarded calls"): the call's target,
@@ -92,7 +96,7 @@ export async function applyOooAndHours(
       pipeline,
       call,
       findForwardTarget(snapshot, ooo.targetId),
-      scopeUser(ooo.scope),
+      scopeForwarder(ooo.scope),
       scheduleDiversion(snapshot, call, scope, 'away')
     );
     return true;
@@ -123,7 +127,7 @@ export async function applyOooAndHours(
     pipeline,
     call,
     findForwardTarget(snapshot, schedule.closedTargetId),
-    scopeUser(schedule.scope),
+    scopeForwarder(schedule.scope),
     scheduleDiversion(snapshot, call, scope, 'time_of_day')
   );
   return true;

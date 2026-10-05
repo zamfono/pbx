@@ -176,7 +176,24 @@ export function redirectingVariables(
 /** A trunk leg dialled for a forward target: the hops that led to it, the call's own and, for a
  * ring-group member's followed forward, the member's (§10.1 step 5), and the headers it sends, a
  * `sip` target's rendered for it and none for an `external` one (§9.4 "Forwarded calls"). */
-export type ForwardLeg = { diversions: Diversion[]; headers: SipHeader[] };
+export type ForwardLeg = {
+  diversions: Diversion[];
+  headers: SipHeader[];
+  /** The user whose unconditional forward the leg dials (`Leg.standsInFor`). */
+  standsInFor?: string;
+};
+
+/** The user whose own rule forwards a call (§10.1 step 7), whose call an external or SIP target is
+ * dialled as; `standsIn` for their `unconditional` rule, whose trunk leg then is their
+ * participation (§10.2 "Effective flag"). */
+export type Forwarder = { userId: string; standsIn: boolean };
+
+/** The `ForwardLeg.standsInFor` of a leg `forwarder` forwards to. */
+export function standInOf(
+  forwarder: Forwarder | null
+): Pick<ForwardLeg, 'standsInFor'> {
+  return forwarder?.standsIn === true ? { standsInFor: forwarder.userId } : {};
+}
 
 /** The forwarding context `forward`'s leg carries over `trunk` (§9.4 "Forwarded calls"): its
  * `REDIRECTING` data, the `Diversion` the trunk's policy sends and its headers, every header the

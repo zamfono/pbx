@@ -11,6 +11,11 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+### Fixed
+
+- A user's unconditional forward to an external number or SIP target is recorded when the
+  user's recording is on.
+
 ## [0.3.0] - 2026-10-05
 
 ### Upgrade notes

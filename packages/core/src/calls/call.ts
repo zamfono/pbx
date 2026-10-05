@@ -31,6 +31,9 @@ export type Leg = {
   /** The ring group that placed a `member` leg, whose `record_calls` counts for it (§10.2
    * "Recording semantics"). */
   ringGroupId?: string;
+  /** The user whose `unconditional` forward this `trunk` leg, or external `member` leg, dials:
+   * its participation is theirs (§10.2 "Effective flag"). */
+  standsInFor?: string;
 };
 
 export type Call = {
