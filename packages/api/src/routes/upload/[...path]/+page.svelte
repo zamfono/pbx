@@ -12,15 +12,14 @@
     outcome !== null && 'refusal' in outcome ? outcome.refusal : null
   );
   const busy = $derived(upload.pending > 0);
-  const link = $derived(`${page.url.pathname}${page.url.search}`);
-  // A submission without JavaScript posts to the form's `?/remote=…` action, which replaces this
-  // page's query string; carrying the link's own query in it as well lets the re-rendered page's
-  // `load` find the token it is answering.
-  const action = $derived(
-    page.url.search === ''
-      ? upload.action
-      : `${page.url.search}&${upload.action.slice(1)}`
-  );
+  // The link the page was opened at, without the `/remote` action parameter of the form
+  // submission a page re-rendered without JavaScript answers.
+  const link = $derived.by(() => {
+    const search = new URLSearchParams(
+      [...page.url.searchParams].filter(([name]) => name !== '/remote')
+    ).toString();
+    return search === '' ? page.url.pathname : `${page.url.pathname}?${search}`;
+  });
 </script>
 
 <svelte:head>
@@ -37,7 +36,7 @@
     {#if refusal !== null}
       <p class="auth-error" id="refusal" role="alert">{refusal}</p>
     {/if}
-    <form {...upload} {action} enctype="multipart/form-data">
+    <form {...upload} enctype="multipart/form-data">
       <input {...upload.fields.link.as('hidden', link)} />
       <div class="auth-field">
         <label for="upload">{dict.file}</label>

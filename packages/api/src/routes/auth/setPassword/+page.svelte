@@ -16,14 +16,6 @@
   // underscored ones (§5.2).
   // eslint-disable-next-line no-underscore-dangle -- that prefix is what carries the rule above
   const passwordField = $derived(setPassword.fields._password);
-  // A submission without JavaScript posts to the form's `?/remote=…` action, which replaces this
-  // page's query string; carrying the token in it as well lets the re-rendered page's `load` find
-  // the link it is answering, so a refusal shows the form again rather than the expired-link page.
-  const action = $derived(
-    data.token === null
-      ? setPassword.action
-      : `?token=${encodeURIComponent(data.token)}&${setPassword.action.slice(1)}`
-  );
 </script>
 
 <svelte:head>
@@ -41,7 +33,7 @@
     {#if refusal !== null}
       <p class="auth-error" id="refusal" role="alert">{refusal.message}</p>
     {/if}
-    <form {...setPassword} {action}>
+    <form {...setPassword}>
       <input {...setPassword.fields.token.as('hidden', data.token ?? '')} />
       <div class="auth-field">
         <label for="password">{dict.password}</label>
