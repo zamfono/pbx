@@ -198,8 +198,16 @@ describe('renderMetrics', () => {
     const state: StateResponse = {
       ...EMPTY_STATE,
       trunks: {
-        [upId]: { status: 'registered', statusChangedAt: null },
-        [unprobedId]: { status: 'unmonitored', statusChangedAt: null }
+        [upId]: {
+          status: 'registered',
+          statusChangedAt: null,
+          registeredAt: null
+        },
+        [unprobedId]: {
+          status: 'unmonitored',
+          statusChangedAt: null,
+          registeredAt: null
+        }
       }
     };
 

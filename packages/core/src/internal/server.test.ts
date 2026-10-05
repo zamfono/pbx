@@ -6,6 +6,7 @@ import WebSocket from 'ws';
 import {
   HEALTH_CONTENT_TYPE,
   HTTP_BAD_REQUEST,
+  HTTP_CONFLICT,
   HTTP_CONTENT_TOO_LARGE,
   HTTP_NO_CONTENT,
   HTTP_OK,
@@ -22,11 +23,13 @@ import { migratedTestDb, seedSettings } from '@zamfono/shared/testDb.js';
 
 import { AriClient } from '../ari/client.js';
 import type { Logger } from '../ari/types.js';
+import { ActionError } from '../calls/actionError.js';
 import { newCall } from '../calls/call.js';
 import { FakeAri } from '../testing/ari/fake.js';
 import {
   idlePresence,
   idleRecorder,
+  idleTrunks,
   noopLogger,
   testActions
 } from '../testing/pipelineDeps.js';
@@ -64,6 +67,8 @@ describe('startInternalServer', () => {
   let recorder: typeof idleRecorder;
   let close: () => Promise<void>;
   let port: number;
+  // The trunks the server had re-register, in order.
+  let reregistered: string[];
 
   beforeEach(async () => {
     db = await migratedTestDb();
@@ -83,6 +88,7 @@ describe('startInternalServer', () => {
     presence = idlePresence();
     recorder = { ...idleRecorder };
     errorsLogged.length = 0;
+    reregistered = [];
     const started = await startInternalServer(
       {
         db,
@@ -94,7 +100,21 @@ describe('startInternalServer', () => {
         actions: testActions(ari, db),
         presence,
         recorder,
-        trunks: { refreshMonitoring: () => Promise.resolve() },
+        trunks: {
+          ...idleTrunks,
+          reregister: trunkId => {
+            reregistered.push(trunkId);
+            return trunkId === 'ipTrunk'
+              ? Promise.reject(
+                  new ActionError(
+                    HTTP_CONFLICT,
+                    'noRegistration',
+                    'trunk has no registration'
+                  )
+                )
+              : Promise.resolve();
+          }
+        },
         version: VERSION
       },
       ANY_FREE_PORT
@@ -206,7 +226,8 @@ describe('startInternalServer', () => {
     });
     const trunk: TrunkStatus = {
       status: 'registered',
-      statusChangedAt: nowIso()
+      statusChangedAt: nowIso(),
+      registeredAt: nowIso()
     };
     const available: Presence = {
       status: 'available',
@@ -294,6 +315,24 @@ describe('startInternalServer', () => {
     expect(third).not.toBe(second);
   });
 
+  it('has a trunk re-register on POST /internal/trunks/{id}/reregister, 204, and answers its refusal as a problem', async () => {
+    const accepted = await fetch(
+      `http://127.0.0.1:${port}/internal/trunks/regTrunk/reregister`,
+      { method: 'POST' }
+    );
+    expect(accepted.status).toBe(HTTP_NO_CONTENT);
+
+    const refused = await fetch(
+      `http://127.0.0.1:${port}/internal/trunks/ipTrunk/reregister`,
+      { method: 'POST' }
+    );
+    expect(refused.status).toBe(HTTP_CONFLICT);
+    await expect(refused.json()).resolves.toMatchObject({
+      detail: 'noRegistration'
+    });
+    expect(reregistered).toEqual(['regTrunk', 'ipTrunk']);
+  });
+
   it('answers 400 for a malformed configChanged body without crashing the server', async () => {
     const response = await fetch(
       `http://127.0.0.1:${port}/internal/configChanged`,
@@ -360,7 +399,7 @@ describe('startInternalServer', () => {
         actions: testActions(ari, db),
         presence: idlePresence(),
         recorder: idleRecorder,
-        trunks: { refreshMonitoring: () => Promise.resolve() },
+        trunks: idleTrunks,
         version: VERSION
       },
       ANY_FREE_PORT
@@ -409,7 +448,7 @@ describe('startInternalServer', () => {
         actions: testActions(ari, db),
         presence: idlePresence(),
         recorder: idleRecorder,
-        trunks: { refreshMonitoring: () => Promise.resolve() },
+        trunks: idleTrunks,
         version: VERSION
       },
       ANY_FREE_PORT
@@ -449,7 +488,7 @@ describe('startInternalServer', () => {
         actions: testActions(ari, db),
         presence: idlePresence(),
         recorder: idleRecorder,
-        trunks: { refreshMonitoring: () => Promise.resolve() },
+        trunks: idleTrunks,
         version: VERSION
       },
       ANY_FREE_PORT
@@ -498,7 +537,7 @@ describe('startInternalServer', () => {
         actions: testActions(ari, db),
         presence: idlePresence(),
         recorder: idleRecorder,
-        trunks: { refreshMonitoring: () => Promise.resolve() },
+        trunks: idleTrunks,
         version: VERSION
       },
       ANY_FREE_PORT

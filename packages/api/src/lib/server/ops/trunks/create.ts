@@ -23,6 +23,7 @@ import {
   replaceTrunkHosts,
   trunkWriteOutput
 } from './_shared.js';
+import { UNKNOWN_STATUS } from './_status.js';
 import {
   assertClirAllowed,
   assertCredentialsConsistency,
@@ -228,10 +229,7 @@ export const create = defineOperation({
 
     const row = await liveTrunk(ctx.db, id);
     const hosts = await loadTrunkHosts(ctx.db, id);
-    const trunk = mapTrunkRow(row, hosts, {
-      status: 'unknown',
-      statusChangedAt: null
-    });
+    const trunk = mapTrunkRow(row, hosts, UNKNOWN_STATUS);
     return {
       trunk,
       warnings: [

@@ -373,7 +373,8 @@ describe('trunks operations', () => {
     const { trunk } = await createTrunk(db);
     const reported = {
       status: 'registered' as const,
-      statusChangedAt: '2026-09-23T00:00:00.000Z'
+      statusChangedAt: '2026-09-23T00:00:00.000Z',
+      registeredAt: '2026-09-23T00:00:30.000Z'
     };
     vi.mocked(getCoreClient).mockReturnValue(
       stubCoreClient({
@@ -397,7 +398,10 @@ describe('trunks operations', () => {
         { id: trunk.id },
         asRun()
       )) as { status: string; statusChangedAt: string | null };
-      expect(one).toMatchObject(reported);
+      expect(one).toMatchObject({
+        status: reported.status,
+        statusChangedAt: reported.statusChangedAt
+      });
     } finally {
       vi.mocked(getCoreClient).mockReset();
     }

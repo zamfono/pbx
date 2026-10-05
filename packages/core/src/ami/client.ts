@@ -75,12 +75,17 @@ export class AmiClient extends EventEmitter {
     return this.sendAction(name, params, true);
   }
 
+  /** An action Asterisk answers with its response alone, no event list (`PJSIPRegister`):
+   * resolves on `Success`, rejects with an `Error` response's message. */
+  async send(name: string, params?: Record<string, string>): Promise<void> {
+    await this.sendAction(name, params, false);
+  }
+
   private login(): Promise<void> {
-    return this.sendAction(
-      'Login',
-      { Username: this.options.username, Secret: this.options.password },
-      false
-    ).then(() => undefined);
+    return this.send('Login', {
+      Username: this.options.username,
+      Secret: this.options.password
+    });
   }
 
   private sendAction(

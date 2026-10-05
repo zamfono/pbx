@@ -3,10 +3,12 @@
  * and followed by events: `ip` trunks from the ARI endpoint list and `ContactStatusChange` on the
  * first host's contact, `registration` trunks from the AMI `PJSIPShowRegistrationsOutbound`
  * action (at boot and on AMI reconnect) and `Registry` events; `trunkStatus.ts` reads each of
- * them as a status. Also the per-trunk active-channel count `outbound.ts`'s channel cap (§9.4
+ * them as a status, and every `Registered` one as the trunk's `registeredAt`. Also the per-trunk active-channel count `outbound.ts`'s channel cap (§9.4
  * "Channels") reads, since nothing else in the process tracks it; it lives in the `StateStore`,
  * whose `trunkChannels` `api` exports in `/metrics` (§7).
  */
+import { HTTP_CONFLICT, trunkSectionName } from '@zamfono/shared';
+
 import type { AmiClient } from '../ami/client.js';
 import type { AmiEvent } from '../ami/frame.js';
 import type { AriClient } from '../ari/client.js';
@@ -16,6 +18,7 @@ import type { Logger } from '../ari/types.js';
 import type { EventBus } from '../internal/eventBus.js';
 import type { ConfigCache, Snapshot } from '../internal/snapshot.js';
 import type { StateStore } from '../internal/stateStore.js';
+import { ActionError } from './actionError.js';
 import { waitForEvent } from './ariWaits.js';
 import {
   contactEventStatus,
@@ -64,6 +67,7 @@ export class TrunkState {
       }
     });
     this.deps.ami.on('connected', () => {
+      this.forgetRegistrationTimes();
       this.resyncRegistrations().catch(
         logFailure(this.deps.log, 'trunk registration resync')
       );
@@ -185,31 +189,75 @@ export class TrunkState {
     );
   }
 
-  private apply(snapshot: Snapshot, changes: (StatusChange | null)[]): void {
-    for (const change of onEnabledTransports(
+  /**
+   * Has Asterisk register `trunkId` afresh (`trunks.reregister`, §9.4 "Provisioning and
+   * status"): `PJSIPRegister` unregisters the trunk's registration, then registers it and
+   * reschedules its refreshes; resolves once Asterisk queued both, the outcome following as
+   * `Registry` events. A trunk the config holds no registration for is refused, so only a
+   * registration's own section name reaches the AMI frame.
+   */
+  async reregister(trunkId: string): Promise<void> {
+    const snapshot = await this.deps.cache.get();
+    if (!registrationTrunks(snapshot).some(trunk => trunk.id === trunkId)) {
+      throw new ActionError(
+        HTTP_CONFLICT,
+        'noRegistration',
+        'trunk has no registration'
+      );
+    }
+    await this.deps.ami.send('PJSIPRegister', {
+      Registration: trunkSectionName(trunkId)
+    });
+  }
+
+  /** On a new AMI connection: a REGISTER that succeeded while none was open raised a `Registry`
+   * event nobody read, so no `registeredAt` from before it still says when the last one did. */
+  private forgetRegistrationTimes(): void {
+    for (const [trunkId, current] of this.deps.state.trunks) {
+      this.deps.state.trunks.set(trunkId, { ...current, registeredAt: null });
+    }
+  }
+
+  /** Applies `changes`; with `registered`, each that leaves its trunk `registered` reports a
+   * REGISTER that succeeded just now. */
+  private apply(
+    snapshot: Snapshot,
+    changes: (StatusChange | null)[],
+    registered = false
+  ): void {
+    for (const [trunkId, status] of onEnabledTransports(
       snapshot,
       this.deps.plainTransports,
       changes
     )) {
-      this.setStatus(...change);
+      this.setStatus(trunkId, status, registered && status === 'registered');
     }
   }
 
-  private setStatus(trunkId: string, status: TrunkStatus): void {
+  private setStatus(
+    trunkId: string,
+    status: TrunkStatus,
+    registered: boolean
+  ): void {
     const current = this.deps.state.trunks.get(trunkId);
-    if (current?.status === status) {
+    const changed = current?.status !== status;
+    if (!changed && !registered) {
       return;
     }
+    const now = this.deps.now();
     this.deps.state.trunks.set(trunkId, {
       status,
-      statusChangedAt: this.deps.now()
+      statusChangedAt: changed ? now : current.statusChangedAt,
+      registeredAt: registered ? now : (current?.registeredAt ?? null)
     });
-    this.deps.bus.emit({ type: 'trunk.status', trunkId, status });
+    if (changed) {
+      this.deps.bus.emit({ type: 'trunk.status', trunkId, status });
+    }
   }
 
   private async handleRegistry(event: AmiEvent): Promise<void> {
     const snapshot = await this.deps.cache.get();
-    this.apply(snapshot, [registryEventStatus(snapshot, event)]);
+    this.apply(snapshot, [registryEventStatus(snapshot, event)], true);
   }
 
   private async handleContactStatusChange(

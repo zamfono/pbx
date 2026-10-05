@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  HTTP_CONFLICT,
   newId,
   nowIso,
   registrationUris,
@@ -101,6 +102,8 @@ describe('TrunkState', () => {
   let bus: EventBus;
   let cache: ConfigCache;
   let trunkState: TrunkState;
+  // What `TrunkState`'s clock reads.
+  let clock: string;
 
   beforeEach(async () => {
     db = await migratedTestDb();
@@ -127,6 +130,7 @@ describe('TrunkState', () => {
     state = new StateStore();
     bus = new EventBus();
     cache = new ConfigCache(db);
+    clock = nowIso();
     trunkState = new TrunkState({
       log: noopLogger,
       ari,
@@ -134,7 +138,7 @@ describe('TrunkState', () => {
       cache,
       state,
       bus,
-      now: nowIso,
+      now: () => clock,
       plainTransports: { sipUdpEnabled: true, sipTcpEnabled: true }
     });
   });
@@ -222,6 +226,133 @@ describe('TrunkState', () => {
       { trunkId, status: 'registered' }
     ]);
     unsubscribe();
+  });
+
+  describe('registeredAt (§9.4 "Provisioning and status")', () => {
+    let trunkId: string;
+    let uris: { clientUri: string; serverUri: string };
+
+    beforeEach(async () => {
+      await seedSettings(db);
+      trunkId = await seedRegistrationTrunk(db, 'acct1', 'sip.example.com');
+      uris = registrationUris({
+        username: 'acct1',
+        hosts: [{ priority: 1, host: 'sip.example.com', port: null }]
+      });
+      fakeAmi.registrations.push({
+        ObjectName: trunkSectionName(trunkId),
+        ClientUri: uris.clientUri,
+        ServerUri: uris.serverUri,
+        Status: 'Registered'
+      });
+      clock = '2026-10-05T10:00:00.000Z';
+    });
+
+    function registry(status: string): void {
+      fakeAmi.emit({
+        Event: 'Registry',
+        Username: uris.clientUri,
+        Domain: uris.serverUri,
+        Status: status
+      });
+    }
+
+    it('moves on every Registered Registry event, a refresh that keeps the status included', async () => {
+      const emitted: Envelope[] = [];
+      const unsubscribe = onEvents(bus, envelope => {
+        emitted.push(envelope);
+      });
+      registry('Registered');
+      await eventually(() => {
+        expect(state.trunks.get(trunkId)).toEqual({
+          status: 'registered',
+          statusChangedAt: '2026-10-05T10:00:00.000Z',
+          registeredAt: '2026-10-05T10:00:00.000Z'
+        });
+      });
+
+      clock = '2026-10-05T10:01:45.000Z';
+      registry('Registered');
+      await eventually(() => {
+        expect(state.trunks.get(trunkId)).toEqual({
+          status: 'registered',
+          statusChangedAt: '2026-10-05T10:00:00.000Z',
+          registeredAt: '2026-10-05T10:01:45.000Z'
+        });
+      });
+
+      // A failed REGISTER keeps the last one that succeeded.
+      clock = '2026-10-05T10:03:30.000Z';
+      registry('Rejected');
+      await eventually(() => {
+        expect(state.trunks.get(trunkId)).toEqual({
+          status: 'unreachable',
+          statusChangedAt: '2026-10-05T10:03:30.000Z',
+          registeredAt: '2026-10-05T10:01:45.000Z'
+        });
+      });
+      expect(emitted).toMatchObject([
+        { trunkId, status: 'registered' },
+        { trunkId, status: 'unreachable' }
+      ]);
+      unsubscribe();
+    });
+
+    it('is null at the boot resync, which tells no time, and again once the AMI connection reopens', async () => {
+      await trunkState.resyncRegistrations();
+      expect(state.trunks.get(trunkId)).toMatchObject({
+        status: 'registered',
+        registeredAt: null
+      });
+      registry('Registered');
+      await eventually(() => {
+        expect(state.trunks.get(trunkId)?.registeredAt).toBe(clock);
+      });
+
+      const reconnected = new Promise<void>(resolve => {
+        ami.once('connected', () => {
+          resolve();
+        });
+      });
+      fakeAmi.disconnectClient();
+      await reconnected;
+
+      await eventually(() => {
+        expect(state.trunks.get(trunkId)).toMatchObject({
+          status: 'registered',
+          registeredAt: null
+        });
+      });
+    });
+
+    it("reregister has Asterisk register the trunk's registration afresh", async () => {
+      await trunkState.reregister(trunkId);
+
+      expect(fakeAmi.actions).toContainEqual(
+        expect.objectContaining({
+          Action: 'PJSIPRegister',
+          Registration: trunkSectionName(trunkId)
+        })
+      );
+    });
+
+    it('reregister refuses a trunk without a registration with 409 noRegistration', async () => {
+      const ipTrunkId = await seedIpTrunk(db, 'carrier', 2);
+
+      await expect(trunkState.reregister(ipTrunkId)).rejects.toMatchObject({
+        status: HTTP_CONFLICT,
+        reason: 'noRegistration'
+      });
+      await expect(
+        trunkState.reregister('no-such-trunk')
+      ).rejects.toMatchObject({
+        status: HTTP_CONFLICT,
+        reason: 'noRegistration'
+      });
+      expect(
+        fakeAmi.actions.filter(frame => frame.Action === 'PJSIPRegister')
+      ).toEqual([]);
+    });
   });
 
   it("follows an ip trunk's qualify reachability from ContactStatusChange, once per change", async () => {

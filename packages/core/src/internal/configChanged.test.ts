@@ -22,6 +22,7 @@ import { eventually } from '../testing/eventually.js';
 import {
   idlePresence,
   idleRecorder,
+  idleTrunks,
   noopLogger,
   testActions
 } from '../testing/pipelineDeps.js';
@@ -98,7 +99,7 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
         actions: testActions(ari, db),
         presence,
         recorder: idleRecorder,
-        trunks: { refreshMonitoring: () => Promise.resolve() },
+        trunks: idleTrunks,
         version: resolveVersion({})
       },
       ANY_FREE_PORT
@@ -167,6 +168,7 @@ describe('POST /internal/configChanged and presence (§3.1, §10.2)', () => {
         presence: idlePresence(),
         recorder: idleRecorder,
         trunks: {
+          ...idleTrunks,
           refreshMonitoring: () => {
             invalidatedFirst = invalidated;
             return Promise.resolve();

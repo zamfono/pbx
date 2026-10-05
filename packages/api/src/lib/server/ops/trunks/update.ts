@@ -24,6 +24,7 @@ import {
   type HostWire,
   type TrunkRow
 } from './_shared.js';
+import { UNKNOWN_STATUS } from './_status.js';
 import {
   assertNoStrayCredentials,
   assertNoStrayRegistrationFields,
@@ -186,10 +187,7 @@ export const update = defineOperation({
     propagate(ctx, ['pjsip']);
 
     const hosts = await loadTrunkHosts(ctx.db, input.id);
-    const trunk = mapTrunkRow(updatedRow, hosts, {
-      status: 'unknown',
-      statusChangedAt: null
-    });
+    const trunk = mapTrunkRow(updatedRow, hosts, UNKNOWN_STATUS);
     return {
       trunk,
       warnings: [

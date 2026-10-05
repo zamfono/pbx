@@ -52,6 +52,32 @@ describe('AmiClient', () => {
     ]);
   });
 
+  it('resolves send() on the Success response of an action that lists no events', async () => {
+    fake.registrations.push({
+      ObjectName: 'trunk-1',
+      ClientUri: 'sip:acct@sip.example.com',
+      ServerUri: 'sip:sip.example.com',
+      Status: 'Registered'
+    });
+    await client.connect();
+    await expect(
+      client.send('PJSIPRegister', { Registration: 'trunk-1' })
+    ).resolves.toBeUndefined();
+    expect(fake.actions).toEqual([
+      expect.objectContaining({
+        Action: 'PJSIPRegister',
+        Registration: 'trunk-1'
+      })
+    ]);
+  });
+
+  it('rejects send() with the message of an Error response', async () => {
+    await client.connect();
+    await expect(
+      client.send('PJSIPRegister', { Registration: 'trunk-unknown' })
+    ).rejects.toThrow('Unable to retrieve registration entry');
+  });
+
   it('delivers an emitted Registry frame as an event', async () => {
     await client.connect();
     const received = new Promise<AmiEvent>(resolve => {

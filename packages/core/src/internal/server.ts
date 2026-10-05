@@ -40,6 +40,7 @@ import { respondJson, respondProblem } from './http.js';
 import { handleMwiRoute } from './mwiRoute.js';
 import { ConfigCache } from './snapshot.js';
 import { StateStore } from './stateStore.js';
+import { handleTrunkRoute, type TrunkReregister } from './trunkRoute.js';
 
 // When this process started, however late this module loads: `system.info` shows it (§10.3), so
 // a restart is visible.
@@ -59,8 +60,8 @@ type InternalDeps = {
   presence: PresenceRefresh & Pick<Presence, 'registeredDevices'>;
   /** The recordings in progress and the failed mixes `/internal/state` serves (§6.4, §10.2). */
   recorder: Pick<Recorder, 'inProgressCount' | 'mixFailureCount'>;
-  /** The `unmonitored` trunk statuses, likewise. */
-  trunks: TrunkMonitoringRefresh;
+  /** The `unmonitored` trunk statuses, likewise, and a trunk's re-registration. */
+  trunks: TrunkMonitoringRefresh & TrunkReregister;
   /** The version `/internal/version` reports (§7 "Version"), `CoreEnv.version`. */
   version: ZamfonoVersion;
 };
@@ -183,6 +184,7 @@ const ROUTES: Partial<Record<string, Route[]>> = {
   POST: [
     at('/internal/configChanged', handleConfigChanged),
     handleMwiRoute,
+    handleTrunkRoute,
     handleActionRoute
   ]
 };

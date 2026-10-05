@@ -164,6 +164,12 @@ export function idlePresence(): Pick<
 /** The internal server's recorder for a suite that records nothing. */
 export const idleRecorder = { inProgressCount: 0, mixFailureCount: 0 };
 
+/** The internal server's trunk dependency where a test exercises none of it. */
+export const idleTrunks = {
+  refreshMonitoring: () => Promise.resolve(),
+  reregister: () => Promise.resolve()
+};
+
 /** Registers `sipUsername`, whose `devices` row is seeded along with the `settings` row, the way a
  * phone's REGISTER reaches the pipeline's `Presence`: a device rings only while registered
  * (§10.1 step 4). */

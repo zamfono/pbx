@@ -712,7 +712,8 @@ describe('outbound dialing', () => {
     await seedRoute(db, trunkId, { priority: 1 });
     state.trunks.set(trunkId, {
       status: 'unreachable',
-      statusChangedAt: nowIso()
+      statusChangedAt: nowIso(),
+      registeredAt: null
     });
 
     const call = await dial('+498912345');
@@ -741,7 +742,8 @@ describe('outbound dialing', () => {
     const trunk2 = await seedTrunk(db, { priority: 2 });
     state.trunks.set(trunk1, {
       status: 'unreachable',
-      statusChangedAt: nowIso()
+      statusChangedAt: nowIso(),
+      registeredAt: null
     });
 
     const call = await dial('112');

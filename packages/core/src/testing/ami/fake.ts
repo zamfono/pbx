@@ -12,6 +12,8 @@ type Registration = {
 
 export class FakeAmi {
   readonly registrations: Registration[] = [];
+  /** Every action received after login, in order. */
+  readonly actions: AmiEvent[] = [];
   private server: Server | null = null;
   private readonly sockets = new Set<Socket>();
 
@@ -79,6 +81,23 @@ export class FakeAmi {
           Response: 'Success',
           ActionID: actionId,
           Message: 'Authentication accepted'
+        })
+      );
+      return;
+    }
+    this.actions.push(frame);
+    if (
+      frame.Action === 'PJSIPRegister' &&
+      !this.registrations.some(
+        registration => registration.ObjectName === frame.Registration
+      )
+    ) {
+      // Asterisk's answer for a registration it holds no state for.
+      socket.write(
+        writeFrame({
+          Response: 'Error',
+          ActionID: actionId,
+          Message: 'Unable to retrieve registration entry'
         })
       );
       return;

@@ -12,7 +12,8 @@ const logger = pino({ name: 'trunks' });
  * map is known to hold. */
 export const UNKNOWN_STATUS: TrunkStatus = {
   status: 'unknown',
-  statusChangedAt: null
+  statusChangedAt: null,
+  registeredAt: null
 };
 
 /**

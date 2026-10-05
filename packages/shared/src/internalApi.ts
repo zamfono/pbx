@@ -23,7 +23,14 @@ export type ConfigChangedRequest = z.infer<typeof configChangedRequestSchema>;
 export type TrunkStatus = {
   status: 'registered' | 'unreachable' | 'unmonitored' | 'unknown';
   statusChangedAt: string | null;
+  /** The last REGISTER the core saw succeed, a refresh included (§9.4 "Provisioning and status");
+   * `null` for an `ip` trunk and until one succeeds after the core's AMI connection opened. */
+  registeredAt: string | null;
 };
+
+// `POST /internal/trunks/{id}/reregister` → 204 once Asterisk queued the fresh registration
+// (§9.4 "Provisioning and status"); 409 `noRegistration` for a trunk the core's config holds no
+// registration for. It takes no body.
 
 /** A live leg's side of its call (§10.3 "Live calls"): the caller's own channel, a leg dialled
  * for the call, or a party added to its conversation (§10.2 "Three-way calls"). */
