@@ -106,6 +106,7 @@ export class AriClient extends EventEmitter {
       socket.on('open', () => {
         opened = true;
         this.reconnect.reset();
+        this.options.log.info('ARI connected');
         this.emit('connected');
         resolve();
       });
@@ -114,6 +115,9 @@ export class AriClient extends EventEmitter {
       });
       socket.on('close', () => {
         this.socket = null;
+        if (opened && !this.closing) {
+          this.options.log.warn('ARI disconnected; reconnecting');
+        }
         this.emit('disconnected');
         if (!this.closing) {
           this.reconnect.schedule();

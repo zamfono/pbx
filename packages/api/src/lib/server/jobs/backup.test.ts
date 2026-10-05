@@ -21,6 +21,22 @@ import type { ExecFn } from './backupBackends.js';
 import { markInterruptedRuns } from './cron.js';
 import { nextRun } from './cronExpression.js';
 
+type Logged = { level: string; fields: unknown; msg?: string };
+
+const logged = vi.hoisted((): Logged[] => []);
+
+vi.mock('pino', () => ({
+  default: () =>
+    Object.fromEntries(
+      ['debug', 'info', 'warn', 'error'].map(level => [
+        level,
+        (fields: unknown, msg?: string) => {
+          logged.push({ level, fields, msg });
+        }
+      ])
+    )
+}));
+
 const SNAPSHOT_BYTES = 12345;
 const SNAPSHOT_TOTAL_BYTES = 27_000_000;
 
@@ -507,6 +523,15 @@ describe('failBackupRun', () => {
     );
 
     expect(result.status).toBe('failed');
+    expect(logged).toContainEqual({
+      level: 'warn',
+      fields: {
+        targetId,
+        runId,
+        reason: "backup: target 'gone' not found"
+      },
+      msg: 'backup run failed'
+    });
     const row = await db
       .selectFrom('backupRuns')
       .selectAll()

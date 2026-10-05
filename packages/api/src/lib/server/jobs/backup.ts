@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { sql } from 'kysely';
+import pino from 'pino';
 
 import {
   MS_PER_SECOND,
@@ -36,6 +37,8 @@ import {
 
 // 0700: the snapshot is a full-database VACUUM, secrets and password hashes included.
 const SNAPSHOT_DIR_MODE = 0o700;
+
+const logger = pino({ name: 'backup' });
 
 /** The two sinks a `backup.*` event is fanned out to (§6.5, §10.6): `/events` and webhooks. */
 export type Bus = {
@@ -73,6 +76,10 @@ export async function failBackupRun(
     .set({ status: 'failed', error, finishedAt })
     .where('id', '=', run.id)
     .execute();
+  logger.warn(
+    { targetId: run.targetId, runId: run.id, reason: error },
+    'backup run failed'
+  );
   await emit(deps.bus, now, {
     type: 'backup.failed',
     targetId: run.targetId,

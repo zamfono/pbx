@@ -41,6 +41,9 @@ export type CoreEventsDeps = {
 export function connectCoreEvents(deps: CoreEventsDeps): { close: () => void } {
   let closed = false;
   let socket: WebSocket | null = null;
+  // Set from the first failed or dropped connection to the next open, so a `core` outage logs
+  // once each way rather than on every reconnect attempt.
+  let down = false;
 
   function scheduleReconnect(): void {
     if (closed) {
@@ -57,6 +60,10 @@ export function connectCoreEvents(deps: CoreEventsDeps): { close: () => void } {
     const ws = new WebSocket(deps.url);
     socket = ws;
     ws.on('open', () => {
+      if (down) {
+        down = false;
+        logger.info("core's event stream is open again");
+      }
       deps.onOpen?.();
     });
     ws.on('message', raw => {
@@ -76,7 +83,13 @@ export function connectCoreEvents(deps: CoreEventsDeps): { close: () => void } {
       }
       deps.onEvent(frame);
     });
-    ws.on('close', scheduleReconnect);
+    ws.on('close', () => {
+      if (!closed && !down) {
+        down = true;
+        logger.warn("core's event stream is down; reconnecting");
+      }
+      scheduleReconnect();
+    });
     ws.on('error', () => {
       ws.terminate();
     });

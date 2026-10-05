@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net';
-import { afterEach, describe, expect, it } from 'vitest';
-import { WebSocketServer } from 'ws';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { WebSocketServer, type ServerOptions } from 'ws';
 
 import { nowIso, type Envelope } from '@zamfono/shared';
 
@@ -9,12 +9,34 @@ import { connectCoreEvents } from './coreEvents.js';
 const RECONNECT_DELAY_MS = 20;
 const WAIT_MS = 200;
 
+type Logged = { level: string; msg: string };
+
+const logged = vi.hoisted((): Logged[] => []);
+
+vi.mock('pino', () => ({
+  default: () =>
+    Object.fromEntries(
+      ['debug', 'info', 'warn', 'error'].map(level => [
+        level,
+        (fieldsOrMsg: unknown, msg?: string) => {
+          logged.push({ level, msg: msg ?? String(fieldsOrMsg) });
+        }
+      ])
+    )
+}));
+
 /**
  * A WebSocket server on whatever port is free, once it listens: a fixed port can already be held
  * by another suite running on the same host.
  */
-async function listeningServer(): Promise<WebSocketServer> {
-  const server = new WebSocketServer({ port: 0, host: '127.0.0.1' });
+async function listeningServer(
+  options: ServerOptions = {}
+): Promise<WebSocketServer> {
+  const server = new WebSocketServer({
+    ...options,
+    port: 0,
+    host: '127.0.0.1'
+  });
   await new Promise<void>(resolve => {
     server.once('listening', () => {
       resolve();
@@ -132,5 +154,37 @@ describe('connectCoreEvents', () => {
     expect(opens).toBe(2);
 
     connection.close();
+  });
+
+  it('logs the first loss of the stream as a warning and its reopening once, not every attempt', async () => {
+    let accepting = true;
+    wss = await listeningServer({
+      verifyClient: () => accepting
+    });
+    logged.length = 0;
+    const connection = connectCoreEvents({
+      url: serverUrl(wss),
+      onEvent: () => undefined,
+      reconnectDelayMs: RECONNECT_DELAY_MS
+    });
+    await wait(WAIT_MS);
+
+    accepting = false;
+    for (const client of wss.clients) {
+      client.terminate();
+    }
+    // Several refused reconnects, RECONNECT_DELAY_MS apart.
+    await wait(WAIT_MS);
+    accepting = true;
+    await wait(WAIT_MS);
+    connection.close();
+
+    expect(logged).toEqual([
+      {
+        level: 'warn',
+        msg: "core's event stream is down; reconnecting"
+      },
+      { level: 'info', msg: "core's event stream is open again" }
+    ]);
   });
 });

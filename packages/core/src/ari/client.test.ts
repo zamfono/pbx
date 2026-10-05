@@ -1,26 +1,35 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { FakeAri } from '../testing/ari/fake.js';
-import { noopLogger } from '../testing/pipelineDeps.js';
 import { AriClient } from './client.js';
 import type { AriEvent } from './events.js';
-import { AriError } from './types.js';
+import { AriError, type Logger } from './types.js';
 
 const TEST_APP = 'zamfono';
 
 describe('AriClient', () => {
   let fake: FakeAri;
   let client: AriClient;
+  let logged: { level: string; msg: string }[];
 
   beforeEach(async () => {
     fake = new FakeAri();
     const { url } = await fake.listen();
+    logged = [];
+    const log = Object.fromEntries(
+      ['debug', 'info', 'warn', 'error'].map(level => [
+        level,
+        (fieldsOrMsg: unknown, msg?: string) => {
+          logged.push({ level, msg: msg ?? String(fieldsOrMsg) });
+        }
+      ])
+    ) as Logger;
     client = new AriClient({
       url,
       user: 'zamfono',
       password: 'secret',
       app: TEST_APP,
-      log: noopLogger
+      log
     });
   });
 
@@ -58,6 +67,11 @@ describe('AriClient', () => {
     fake.disconnectClient();
     await disconnected;
     await reconnected;
+    expect(logged).toEqual([
+      { level: 'info', msg: 'ARI connected' },
+      { level: 'warn', msg: 'ARI disconnected; reconnecting' },
+      { level: 'info', msg: 'ARI connected' }
+    ]);
   });
 
   it('hangs up with a Q.850 cause as the reason_code query parameter', async () => {
