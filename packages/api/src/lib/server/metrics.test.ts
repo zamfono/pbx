@@ -274,9 +274,13 @@ describe('renderMetrics', () => {
     const missing = await renderMetrics(
       stubDeps({ db, certSyncStatus: () => 'missing' })
     );
+    const pending = await renderMetrics(
+      stubDeps({ db, certSyncStatus: () => 'pending' })
+    );
 
     expect(parseMetrics(ok).get('zamfono_certificate_sync_ok')).toBe('1');
     expect(parseMetrics(missing).get('zamfono_certificate_sync_ok')).toBe('0');
+    expect(parseMetrics(pending).get('zamfono_certificate_sync_ok')).toBe('0');
   });
 
   it('counts the SIP bans in force, neither a lifted nor an expired one, and none while banning is off (§7)', async () => {

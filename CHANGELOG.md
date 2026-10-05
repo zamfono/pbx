@@ -25,6 +25,8 @@ why the specified behaviour changed; the commit history, how.
 
 - Asterisk no longer fills the disk with uncapped `full` and `messages` log files; its log is the
   container log alone, without colour codes.
+- A fresh stack no longer reports its certificate sync `failed` until the next hourly pass; a
+  reload `core` does not take yet reads `pending` and is retried.
 
 ## [0.2.1] - 2026-10-05
 

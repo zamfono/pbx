@@ -3,11 +3,10 @@
  * hook's copy on `caddy-data` (`zamfono/cert.pem`/`privkey.pem`, images/proxy/zamfono-cert-hook)
  * with the copy on the `asterisk-config` volume, and on a change copies chain and key across —
  * at once for a fresh stack's self-signed placeholder or an expiring current certificate,
- * otherwise once the maintenance gate opens (`maintenanceWindow.ts`) — then triggers the PJSIP
- * reload through `core`. Runs on a poll, and can be run early by `notifyCertSync()` when the
+ * otherwise once the maintenance gate opens (`maintenanceWindow.ts`) — then propagates the
+ * configuration (§3.1), which reloads PJSIP through `core`. Runs on a poll, and can be run early by `notifyCertSync()` when the
  * hook's own `POST /internal/certificate` reaches `api` (routes/internal/certificate/+server.ts).
  */
-import { X509Certificate } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import * as env from '$app/env/private';
@@ -17,10 +16,14 @@ import { MS_PER_DAY, type Db } from '@zamfono/shared';
 
 import type { CoreClient } from '../coreClient.js';
 import { sha256Hex } from '../hash.js';
+import { onceConfigPropagated } from '../ops/afterCommit.js';
+import { propagateConfig, runWhatWaited } from '../propagation.js';
 import {
   copyCertificate,
+  expiresBefore,
   findCaddyCert,
   isMatchingPair,
+  isSelfSigned,
   TLS_CERT_FILENAME
 } from './certSyncFiles.js';
 import { scheduleDrawnIn } from './drawnIn.js';
@@ -32,12 +35,15 @@ import {
 
 const logger = pino({ name: 'certSync' });
 
+/** What a pass found (§6.4): no copy on `caddy-data`, or the state of the copy on `asterisk-config`. */
+type PassStatus = 'expired' | 'expiring' | 'missing' | 'ok';
+
 /**
- * The sync's state (§6.4): `'failed'` after a pass that failed, `'expiring'` while the copy on
- * `asterisk-config` expires within `EXPIRY_ALERT_MS`; only `'ok'` is all clear.
+ * The sync's state (§6.4): `'failed'` after a pass that could not read, check or copy the
+ * certificate, `'pending'` while the reload of a copied certificate is owed (§3.1); only `'ok'`
+ * is all clear.
  */
-export type CertSyncStatus =
-  'expiring' | 'failed' | 'missing' | 'ok' | 'unknown';
+export type CertSyncStatus = PassStatus | 'failed' | 'pending' | 'unknown';
 
 const EXPIRY_ALERT_DAYS = 14;
 const EXPIRY_ALERT_MS = EXPIRY_ALERT_DAYS * MS_PER_DAY;
@@ -50,28 +56,6 @@ export type CertSyncDeps = {
   now?: () => Date;
 };
 
-/** Whether `certPem` is self-signed (its own issuer, §6.4 "Fresh stack" placeholder), or unparsable. */
-function isSelfSigned(certPem: Buffer): boolean {
-  try {
-    const cert = new X509Certificate(certPem);
-    return cert.issuer === cert.subject;
-  } catch {
-    return true;
-  }
-}
-
-/** Whether `certPem` expires before `atMs`; an unparsable certificate tells nothing. */
-function expiresBefore(certPem: Buffer | null, atMs: number): boolean {
-  if (certPem === null) {
-    return false;
-  }
-  try {
-    return Date.parse(new X509Certificate(certPem).validTo) < atMs;
-  } catch {
-    return false;
-  }
-}
-
 /** A change waiting for its gate, and when that gate is next worth asking. */
 type PendingChange = {
   sourceHash: string;
@@ -81,20 +65,25 @@ type PendingChange = {
 
 /**
  * The certificate sync over its deps, which keeps between its passes what it learnt: a change
- * waiting for its gate, and a copy whose reload `core` has not confirmed yet. Its owner runs
- * one pass at a time (`drawnIn.ts`).
+ * waiting for its gate, and whether the reload of a copy is owed. Its owner runs one pass at a
+ * time (`drawnIn.ts`).
  */
 export class CertSync {
   readonly #deps: CertSyncDeps;
   // A source certificate's gate, which holds its resolved maintenance moment across passes,
   // until the change is applied or superseded.
   #pending: PendingChange | undefined;
-  // The hash of a certificate copied onto the volume whose reload `core` has not confirmed yet,
-  // so a pass that finds the file already up to date still retries the reload.
-  #reloadPendingHash: string | undefined;
+  // Set while the propagation of a copied certificate is owed (§3.1), cleared by the first
+  // propagation that succeeds after it.
+  #reloadOwed = false;
 
   constructor(deps: CertSyncDeps) {
     this.#deps = deps;
+  }
+
+  /** Whether the reload of a copied certificate is owed (§6.4 `pending`). */
+  reloadOwed(): boolean {
+    return this.#reloadOwed;
   }
 
   /** When the change waiting for its gate is next worth checking; `null` while none waits. */
@@ -107,20 +96,24 @@ export class CertSync {
   /**
    * One check-and-act pass (§6.4): `'missing'` while the hook's copy does not exist yet on
    * `caddy-data` (the alert case: a fresh stack before its first certificate, or a `proxy`
-   * upgrade gone wrong); `'expiring'` while the copy on `asterisk-config` expires within
-   * `EXPIRY_ALERT_MS` once the pass is done; `'ok'` otherwise, whether nothing had changed, the
-   * change was applied now, or it was left for a later pass to apply once due.
+   * upgrade gone wrong); once the pass is done, `'expired'` while the copy on `asterisk-config`
+   * has expired, `'expiring'` while it expires within `EXPIRY_ALERT_MS`; `'ok'` otherwise,
+   * whether nothing had changed, the change was applied now, or it was left for a later pass to
+   * apply once due. A propagation of the copy that fails is owed (`reloadOwed`), not a failure.
    */
-  async run(): Promise<CertSyncStatus> {
+  async run(): Promise<PassStatus> {
     const genDir = this.#deps.genDir ?? env.ASTERISK_GEN_DIR;
     const currentCrtPath = path.join(genDir, 'tls', TLS_CERT_FILENAME);
     const status = await this.#sync(genDir, currentCrtPath);
     if (status !== 'ok') {
       return status;
     }
-    const now = (this.#deps.now ?? (() => new Date()))();
+    const nowMs = (this.#deps.now ?? (() => new Date()))().getTime();
     const installed = await readFile(currentCrtPath).catch(() => null);
-    return expiresBefore(installed, now.getTime() + EXPIRY_ALERT_MS)
+    if (expiresBefore(installed, nowMs)) {
+      return 'expired';
+    }
+    return expiresBefore(installed, nowMs + EXPIRY_ALERT_MS)
       ? 'expiring'
       : 'ok';
   }
@@ -134,7 +127,7 @@ export class CertSync {
     const source = await findCaddyCert(caddyDataDir);
     if (!source) {
       this.#pending = undefined;
-      this.#reloadPendingHash = undefined;
+      this.#reloadOwed = false;
       return 'missing';
     }
     const [sourceCrt, sourceKey, currentCrt] = await Promise.all([
@@ -152,28 +145,46 @@ export class CertSync {
     const sourceHash = sha256Hex(sourceCrt);
     const upToDate =
       currentCrt !== null && sha256Hex(currentCrt) === sourceHash;
-    if (upToDate && this.#reloadPendingHash !== sourceHash) {
+    if (upToDate) {
       this.#pending = undefined;
       return 'ok';
     }
-    if (!upToDate) {
-      if (!(await this.#dueNow(sourceHash, currentCrt))) {
-        return 'ok';
-      }
-      this.#pending = undefined;
-      await copyCertificate(genDir, { crt: sourceCrt, key: sourceKey });
-      this.#reloadPendingHash = sourceHash;
-      logger.info(
-        { sourceHash },
-        'certSync: copied a new certificate onto asterisk-config'
-      );
+    if (!(await this.#dueNow(sourceHash, currentCrt))) {
+      return 'ok';
     }
-    // `configChanged` rejecting here (a non-2xx from `core`) leaves `#reloadPendingHash` set, so
-    // the next pass retries this call alone, without re-copying an already up-to-date file.
-    await deps.coreClient.configChanged(['pjsip']);
-    this.#reloadPendingHash = undefined;
-    logger.info({ sourceHash }, 'certSync: triggered the pjsip reload');
+    this.#pending = undefined;
+    await copyCertificate(genDir, { crt: sourceCrt, key: sourceKey });
+    logger.info(
+      { sourceHash },
+      'certSync: copied a new certificate onto asterisk-config'
+    );
+    await this.#reload(sourceHash);
     return 'ok';
+  }
+
+  /**
+   * Propagates the copied certificate (§3.1): a propagation that fails is owed, and its retry or
+   * any later success reloads every module, the certificate included.
+   */
+  async #reload(sourceHash: string): Promise<void> {
+    const { db } = this.#deps;
+    try {
+      await propagateConfig(db, ['pjsip']);
+    } catch (error) {
+      this.#reloadOwed = true;
+      logger.warn(
+        { err: error, sourceHash },
+        'certSync: the pjsip reload is owed until a config propagation succeeds'
+      );
+      await onceConfigPropagated(db, () => {
+        this.#reloadOwed = false;
+        return Promise.resolve();
+      });
+      return;
+    }
+    this.#reloadOwed = false;
+    logger.info({ sourceHash }, 'certSync: triggered the pjsip reload');
+    await runWhatWaited(db);
   }
 
   /**
@@ -230,11 +241,12 @@ let running: CertSyncScheduler | undefined;
  * Starts the process's certificate sync, which `startBackgroundJobs` does once at boot (§6.4
  * "The same sync runs at `api` start"): a pass at once, then on the drawn-in poll (`drawnIn.ts`),
  * which lands on a pending change's next gate check. A failed pass is logged, and the status
- * `/healthz` and `/metrics` read is `'failed'` until a pass succeeds.
+ * `/healthz` and `/metrics` read is `'failed'` until a pass succeeds; after one, `'pending'`
+ * while the reload of its copy is owed.
  */
 export function startCertSync(deps: CertSyncDeps): CertSyncScheduler {
   const sync = new CertSync(deps);
-  let status: CertSyncStatus = 'unknown';
+  let status: PassStatus | 'failed' | 'unknown' = 'unknown';
   let lastPass: string | null = null;
   const passed = (): void => {
     lastPass = (deps.now ?? (() => new Date()))().toISOString();
@@ -256,7 +268,8 @@ export function startCertSync(deps: CertSyncDeps): CertSyncScheduler {
     now: deps.now
   });
   running = {
-    status: () => status,
+    status: () =>
+      status !== 'failed' && sync.reloadOwed() ? 'pending' : status,
     lastPass: () => lastPass,
     notify: schedule.runNow,
     stop: schedule.stop

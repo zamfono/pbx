@@ -2,7 +2,7 @@
  * The certificate files on both sides of the sync (§6.4 "TLS certificates"): the fixed copy the
  * `proxy` image's `cert_obtained` hook writes to `caddy-data` (images/proxy/zamfono-cert-hook),
  * and the fixed copy on the `asterisk-config` volume that `transport-tls` reads. `certSync.ts`
- * decides when to copy; this file finds, reads and writes the files.
+ * decides when to copy; this file finds, reads, checks and writes the files.
  */
 import { createPrivateKey, X509Certificate } from 'node:crypto';
 import { mkdir, stat } from 'node:fs/promises';
@@ -57,6 +57,28 @@ export async function findCaddyCert(
 export function isMatchingPair(crt: Buffer, key: Buffer): boolean {
   try {
     return new X509Certificate(crt).checkPrivateKey(createPrivateKey(key));
+  } catch {
+    return false;
+  }
+}
+
+/** Whether `certPem` is self-signed (its own issuer, §6.4 "Fresh stack" placeholder), or unparsable. */
+export function isSelfSigned(certPem: Buffer): boolean {
+  try {
+    const cert = new X509Certificate(certPem);
+    return cert.issuer === cert.subject;
+  } catch {
+    return true;
+  }
+}
+
+/** Whether `certPem` expires before `atMs`; an unparsable certificate tells nothing. */
+export function expiresBefore(certPem: Buffer | null, atMs: number): boolean {
+  if (certPem === null) {
+    return false;
+  }
+  try {
+    return Date.parse(new X509Certificate(certPem).validTo) < atMs;
   } catch {
     return false;
   }

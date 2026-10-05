@@ -68,6 +68,15 @@ async function renderConfig(db: Db): Promise<void> {
   );
 }
 
+/**
+ * Runs what waited for an owed propagation, once one outside an operation succeeded (§3.1): the
+ * steps that waited for it, then the push owed since `api` started.
+ */
+export async function runWhatWaited(db: Db): Promise<void> {
+  await runWaitingHooks(db);
+  await runRestartPush(db);
+}
+
 let retryTimer: NodeJS.Timeout | undefined;
 let retryDelayMs = RETRY_FIRST_MS;
 
@@ -84,10 +93,7 @@ function scheduleRetry(db: Db): void {
     retryDelayMs = Math.min(retryDelayMs * RETRY_BACKOFF_FACTOR, RETRY_MAX_MS);
     // eslint-disable-next-line no-use-before-define -- the retry is a propagation, and a failed propagation schedules the retry
     propagateConfig(db, []).then(
-      async () => {
-        await runWaitingHooks(db);
-        await runRestartPush(db);
-      },
+      async () => runWhatWaited(db),
       (error: unknown) => {
         log.warn({ err: error }, 'the owed config propagation failed again');
       }

@@ -37,9 +37,11 @@ export type ApiHealthDeps = {
 const CERTIFICATE_SYNC_STATUS: Record<CertSyncStatus, HealthStatus> = {
   ok: 'pass',
   unknown: 'warn',
+  pending: 'warn',
   expiring: 'warn',
   missing: 'fail',
-  failed: 'fail'
+  failed: 'fail',
+  expired: 'fail'
 };
 
 /** A check's entry: `status` while `bad`, else `pass`. */

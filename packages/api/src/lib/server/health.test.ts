@@ -169,9 +169,11 @@ describe('apiHealth (§6.3 "Health", §10.3 "Health")', () => {
   it.each([
     ['ok', 'pass'],
     ['unknown', 'warn'],
+    ['pending', 'warn'],
     ['expiring', 'warn'],
     ['missing', 'fail'],
-    ['failed', 'fail']
+    ['failed', 'fail'],
+    ['expired', 'fail']
   ] as const)(
     'maps the certificate sync state %s to %s',
     async (state, status) => {
