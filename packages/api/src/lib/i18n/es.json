@@ -51,6 +51,9 @@
     "file": "Archivo WAV o MP3",
     "submit": "Subir",
     "uploaded": "El archivo se ha subido. Puede cerrar esta página.",
-    "expired": "Este enlace de subida ha caducado. Solicite uno nuevo."
+    "expired": "Este enlace de subida ha caducado. Solicite uno nuevo.",
+    "forbidden": "Su cuenta no tiene permiso para subir este archivo.",
+    "invalid": "Solo se pueden subir archivos WAV y MP3.",
+    "failed": "No se pudo subir el archivo. Inténtelo de nuevo."
   }
 }

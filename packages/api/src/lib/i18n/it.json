@@ -51,6 +51,9 @@
     "file": "File WAV o MP3",
     "submit": "Carica",
     "uploaded": "Il file è stato caricato. Puoi chiudere questa pagina.",
-    "expired": "Questo link di caricamento è scaduto. Richiedine uno nuovo."
+    "expired": "Questo link di caricamento è scaduto. Richiedine uno nuovo.",
+    "forbidden": "Il tuo account non è autorizzato a caricare questo file.",
+    "invalid": "Si possono caricare solo file WAV e MP3.",
+    "failed": "Non è stato possibile caricare il file. Riprova."
   }
 }

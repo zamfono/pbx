@@ -2,8 +2,14 @@ import * as env from '$app/env/private';
 import { form } from '$app/server';
 import { z } from 'zod';
 
-import { isRecord } from '@zamfono/shared';
+import {
+  HTTP_FORBIDDEN,
+  HTTP_UNAUTHORIZED,
+  HTTP_UNPROCESSABLE_CONTENT
+} from '@zamfono/shared';
 
+import type { Dictionary } from '#lib/i18n/index.js';
+import { loadBranding } from '#lib/server/auth/branding.js';
 import { getDb } from '#lib/server/db.js';
 import { OpError } from '#lib/server/ops/types.js';
 import { formValue } from '#lib/server/restBody.js';
@@ -19,15 +25,19 @@ const UploadPayloadSchema = z.object({
 /** A submission's outcome, rendered above the form: the file was taken, or why not. */
 export type UploadOutcome = { uploaded: true } | { refusal: string };
 
-/** The refusal's own words: a validation failure's issues (such as a type other than WAV or
- *  MP3), else its title. */
-function refusalText(error: OpError): string {
-  if (!Array.isArray(error.detail)) {
-    return error.title;
+/** The page's text for a refusal, in the tenant's language: a failing token is a link that has
+ *  expired since the page opened, invalid input a file other than WAV or MP3. */
+function refusalText(error: OpError, dict: Dictionary['upload']): string {
+  switch (error.status) {
+    case HTTP_UNAUTHORIZED:
+      return dict.expired;
+    case HTTP_FORBIDDEN:
+      return dict.forbidden;
+    case HTTP_UNPROCESSABLE_CONTENT:
+      return dict.invalid;
+    default:
+      return dict.failed;
   }
-  return error.detail
-    .map(issue => (isRecord(issue) ? String(issue.message) : ''))
-    .join('; ');
 }
 
 /**
@@ -37,16 +47,18 @@ function refusalText(error: OpError): string {
 export const upload = form(
   UploadPayloadSchema,
   async ({ link, upload: file }): Promise<UploadOutcome> => {
+    const db = getDb();
     try {
       await runUploadLink(
-        { db: getDb(), jwtSecret: env.JWT_SECRET },
+        { db, jwtSecret: env.JWT_SECRET },
         new URL(link, originFromEnv()),
         async () => ({ upload: await formValue(file) })
       );
       return { uploaded: true };
     } catch (error) {
       if (error instanceof OpError) {
-        return { refusal: refusalText(error) };
+        const dict = (await loadBranding(db)).dictionary.upload;
+        return { refusal: refusalText(error, dict) };
       }
       throw error;
     }

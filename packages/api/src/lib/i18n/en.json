@@ -51,6 +51,9 @@
     "file": "WAV or MP3 file",
     "submit": "Upload",
     "uploaded": "The file was uploaded. You can close this page.",
-    "expired": "This upload link has expired. Ask for a new one."
+    "expired": "This upload link has expired. Ask for a new one.",
+    "forbidden": "Your account is not allowed to upload this file.",
+    "invalid": "Only WAV and MP3 files can be uploaded.",
+    "failed": "The file could not be uploaded. Please try again."
   }
 }

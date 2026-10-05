@@ -63,6 +63,9 @@ export type Dictionary = {
     submit: string;
     uploaded: string;
     expired: string;
+    forbidden: string;
+    invalid: string;
+    failed: string;
   };
 };
 

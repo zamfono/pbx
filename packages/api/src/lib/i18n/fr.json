@@ -51,6 +51,9 @@
     "file": "Fichier WAV ou MP3",
     "submit": "Envoyer",
     "uploaded": "Le fichier a été envoyé. Vous pouvez fermer cette page.",
-    "expired": "Ce lien d'envoi a expiré. Demandez-en un nouveau."
+    "expired": "Ce lien d'envoi a expiré. Demandez-en un nouveau.",
+    "forbidden": "Votre compte n'est pas autorisé à envoyer ce fichier.",
+    "invalid": "Seuls les fichiers WAV et MP3 peuvent être envoyés.",
+    "failed": "Le fichier n'a pas pu être envoyé. Veuillez réessayer."
   }
 }
