@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Db } from '@zamfono/shared';
 
 import { connectCoreEvents } from '../coreEvents.js';
+import { startRelayCheck } from '../mail/relayCheck.js';
 import { propagateAtBoot } from '../propagation.js';
 import type { Keyring } from '../secretbox.js';
 import { seedIfEmpty } from '../seed.js';
@@ -50,6 +51,9 @@ vi.mock('./certSync.js', () => ({
     notify: vi.fn(),
     stop: vi.fn()
   }))
+}));
+vi.mock('../mail/relayCheck.js', () => ({
+  startRelayCheck: vi.fn(() => ({ stop: vi.fn() }))
 }));
 vi.mock('../coreEvents.js', () => ({
   connectCoreEvents: vi.fn(() => ({ close: vi.fn() }))
@@ -172,6 +176,7 @@ describe('startBackgroundJobs', () => {
       vi.mocked(scheduleRetention).mock.results[0]?.value,
       vi.mocked(startCertSync).mock.results[0]?.value,
       vi.mocked(scheduleAutoUpdate).mock.results[0]?.value,
+      vi.mocked(startRelayCheck).mock.results[0]?.value,
       vi.mocked(connectCoreEvents).mock.results[0]?.value
     ] as ({ stop?: () => void; close?: () => void } | undefined)[];
     for (const job of stopped) {

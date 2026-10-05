@@ -14,6 +14,16 @@ export type RelayConfig = {
   fromName: string;
 };
 
+/** Whether a relay is configured, as `relayFromSettings` reads it, without decrypting its password. */
+export async function isRelayConfigured(db: Db): Promise<boolean> {
+  const settings = await db
+    .selectFrom('settings')
+    .select(['smtpHost', 'mailFrom'])
+    .where('id', '=', 1)
+    .executeTakeFirstOrThrow();
+  return settings.smtpHost !== null && settings.mailFrom !== null;
+}
+
 /** The tenant's mail relay (§11.4 `smtp_*`, `mail_from`), or `null` while `smtp_host` is unset. */
 export async function relayFromSettings(
   db: Db,

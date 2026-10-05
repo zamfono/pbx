@@ -53,6 +53,7 @@ async function healthOf(
     keyring: kr,
     certificateSync: { state: 'ok', at: '2026-10-05T12:00:00.000Z' },
     sipBanHelper: { running: true, heartbeat: '2026-10-05T12:00:00Z' },
+    mailRelay: null,
     ...deps
   });
 }

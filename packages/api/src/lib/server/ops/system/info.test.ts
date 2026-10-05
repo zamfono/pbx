@@ -76,6 +76,7 @@ describe('system.info', () => {
       autoUpdate: { enabled: false, failed: null },
       maintenanceGate: { certSync: null, autoUpdate: null },
       ringotel: { profilePending: false, rosterPending: false },
+      mail: null,
       stack: { domain: 'pbx.test', ipv4: '192.0.2.10' }
     });
   });
@@ -116,6 +117,7 @@ describe('system.info', () => {
       autoUpdate: { enabled: false, failed: null },
       maintenanceGate: { certSync: null, autoUpdate: null },
       ringotel: { profilePending: false, rosterPending: false },
+      mail: null,
       stack: { domain: 'pbx.test', ipv4: '192.0.2.10' }
     });
   });

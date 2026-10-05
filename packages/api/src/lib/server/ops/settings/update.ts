@@ -17,6 +17,7 @@ import {
   type SettingsColumns
 } from './_shared.js';
 import {
+  maybeCheckRelay,
   maybePushTenantProfile,
   maybeRenderSipBanList,
   reloadKindsFor
@@ -122,6 +123,7 @@ export const update = defineOperation({
     }
     await maybePushTenantProfile(ctx, columns);
     maybeRenderSipBanList(ctx, columns);
+    maybeCheckRelay(ctx, before, columns);
     return rowToWire(ctx.db, await loadSettings(ctx.db));
   }
 });

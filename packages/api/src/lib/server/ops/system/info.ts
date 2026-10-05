@@ -6,6 +6,11 @@ import { processStartedAtIso, resolveVersion, type Db } from '@zamfono/shared';
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { errorMessage } from '#lib/server/errors.js';
 import { lastGiveUps } from '#lib/server/jobs/maintenanceGiveUp.js';
+import {
+  isRelayConfigured,
+  RELAY_ERROR_CLASSES,
+  relayState
+} from '#lib/server/mail/index.js';
 import { isProfilePending } from '#lib/server/provisioning/profilePending.js';
 import { stackIpv4 } from '#lib/server/stackAddress.js';
 
@@ -59,6 +64,18 @@ const outputSchema = z.object({
     .describe(
       'profilePending: a tenant profile change is in force on the PBX but has not reached Ringotel yet; rosterPending: a roster change is, likewise.'
     ),
+  mail: z
+    .object({
+      ok: z.boolean(),
+      at: z.string(),
+      error: z
+        .object({ class: z.enum(RELAY_ERROR_CLASSES), message: z.string() })
+        .nullable()
+    })
+    .nullable()
+    .describe(
+      "The mail relay's last check or send: whether it succeeded, when, and on a failure its class (unreachable, tls, authentication or rejected) and the relay's own message; null while no relay is configured or before the first."
+    ),
   stack: z
     .object({ domain: z.string(), ipv4: z.string() })
     .describe(
@@ -96,13 +113,13 @@ async function autoUpdateStatus(db: Db): Promise<Output['autoUpdate']> {
 
 /**
  * `GET /system/info` (§7 "Version", §10.3): the version and commit `api` and `core` each run and
- * since when, when Asterisk started, the latest release with how the last update went and who asked for it, whether automatic updates are on and why the last one failed, after how many attempts (§6.3 "Automatic updates"), when and why the maintenance gate last gave up (§6.4), whether a tenant profile or roster change still waits for Ringotel (§10.4), and the stack's domain and public IPv4 address (§6.1), for anyone signed in. The MCP `serverInfo.version` carries `api`'s too, but only in the connection
+ * since when, when Asterisk started, the latest release with how the last update went and who asked for it, whether automatic updates are on and why the last one failed, after how many attempts (§6.3 "Automatic updates"), when and why the maintenance gate last gave up (§6.4), whether a tenant profile or roster change still waits for Ringotel (§10.4), the mail relay's last check or send (§10.2 "Relay check"), and the stack's domain and public IPv4 address (§6.1), for anyone signed in. The MCP `serverInfo.version` carries `api`'s too, but only in the connection
  * handshake, which no tool can read; `/healthz` answers without a login and never shows it.
  */
 export const info = defineOperation({
   name: 'system.info',
   description:
-    'Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update with who asked for it, whether automatic updates are on and why and how often the last one failed, when and why the maintenance gate last gave up, whether a tenant profile or roster change still waits for Ringotel, and the domain of the stack and the public IPv4 address its SIP and media use.',
+    'Reads the version, commit and start time of api and core separately, when Asterisk started, the latest release and last update with who asked for it, whether automatic updates are on and why and how often the last one failed, when and why the maintenance gate last gave up, whether a tenant profile or roster change still waits for Ringotel, how the last check or send of the mail relay went, and the domain of the stack and the public IPv4 address its SIP and media use.',
   input: z.object({}).strict(),
   output: outputSchema,
   minRole: 'user',
@@ -115,7 +132,8 @@ export const info = defineOperation({
       autoUpdate,
       maintenanceGate,
       profilePending,
-      rosterPending
+      rosterPending,
+      relayConfigured
     ] = await Promise.all([
       getCoreClient()
         .version()
@@ -124,7 +142,8 @@ export const info = defineOperation({
       autoUpdateStatus(ctx.db),
       lastGiveUps(ctx.db),
       isProfilePending(ctx.db),
-      isRosterPending(ctx.db)
+      isRosterPending(ctx.db),
+      isRelayConfigured(ctx.db)
     ]);
     return {
       api: { ...resolveVersion(env), startedAt: apiStartedAt },
@@ -133,6 +152,7 @@ export const info = defineOperation({
       autoUpdate,
       maintenanceGate,
       ringotel: { profilePending, rosterPending },
+      mail: relayConfigured ? relayState() : null,
       stack: { domain: env.FQDN, ipv4: stackIpv4(env) }
     };
   }

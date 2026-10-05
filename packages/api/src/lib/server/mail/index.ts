@@ -8,7 +8,16 @@ export {
   resolveTemplate,
   type CompiledTemplate
 } from './render.js';
-export { relayFromSettings, type RelayConfig } from './relay.js';
+export {
+  isRelayConfigured,
+  relayFromSettings,
+  type RelayConfig
+} from './relay.js';
+export {
+  RELAY_ERROR_CLASSES,
+  relayState,
+  type RelayOutcome
+} from './relayState.js';
 export {
   sendMail,
   type AnyMailRequest,

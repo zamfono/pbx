@@ -11,6 +11,8 @@ import {
 
 import type { CertSyncStatus } from './jobs/certSync.js';
 import { countKeyRotationRemaining } from './jobs/keyRotation.js';
+import { isRelayConfigured } from './mail/relay.js';
+import type { RelayOutcome } from './mail/relayState.js';
 import { isRosterPending } from './ops/roster.js';
 import { updateNews } from './ops/system/_state.js';
 import { hasEmergencyTrunk } from './ops/trunks/_shared.js';
@@ -31,6 +33,8 @@ export type ApiHealthDeps = {
   keyring: Keyring;
   certificateSync: CertificateSyncState;
   sipBanHelper: SipBanHelperState;
+  /** The mail relay's latest check or send, `null` before the first. */
+  mailRelay: RelayOutcome | null;
 };
 
 /** `certificate:sync`'s status per state of the sync (§10.3 "Health"). */
@@ -80,11 +84,36 @@ async function coreChecks(deps: ApiHealthDeps): Promise<HealthChecks> {
   return { 'core:reachable': [{ status: 'pass' }], ...Object.fromEntries(own) };
 }
 
+/**
+ * `mail:relay`, only while a relay is configured: `warn` before the first outcome and after a
+ * failed one, naming only its class, since `/healthz` is public (§10.2 "Relay check").
+ */
+async function relayCheck(
+  db: Db,
+  outcome: RelayOutcome | null
+): Promise<HealthChecks> {
+  if (!(await isRelayConfigured(db))) {
+    return {};
+  }
+  if (outcome === null) {
+    return { 'mail:relay': [{ status: 'warn' }] };
+  }
+  return {
+    'mail:relay': [
+      outcome.error === null
+        ? { status: 'pass', time: outcome.at }
+        : { status: 'warn', output: outcome.error.class, time: outcome.at }
+    ]
+  };
+}
+
 /** The checks read from the tables, which only a migrated database holds. */
-async function tableChecks(db: Db, kr: Keyring): Promise<HealthChecks> {
+async function tableChecks(deps: ApiHealthDeps): Promise<HealthChecks> {
+  const { db, keyring: kr } = deps;
   const remaining = await countKeyRotationRemaining(db, kr);
   return {
     'trunks:emergency': check(!(await hasEmergencyTrunk(db)), 'fail'),
+    ...(await relayCheck(db, deps.mailRelay)),
     'secrets:keyRotation': check(remaining > 0, 'warn', {
       observedValue: remaining
     }),
@@ -120,8 +149,6 @@ export async function apiHealth(deps: ApiHealthDeps): Promise<HealthDocument> {
       'fail',
       heartbeat === null ? {} : { time: heartbeat }
     ),
-    ...(database[0].status === 'pass'
-      ? await tableChecks(deps.db, deps.keyring)
-      : {})
+    ...(database[0].status === 'pass' ? await tableChecks(deps) : {})
   });
 }

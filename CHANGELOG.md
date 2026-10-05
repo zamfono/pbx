@@ -17,6 +17,8 @@ why the specified behaviour changed; the commit history, how.
   the thresholds and steps are settings, bans and an allowlist are at `/sipBans` and `/sipAllowlist`.
 - `/.well-known/api-catalog` links the API's OpenAPI document and `/healthz`, and every public
   endpoint, the OpenAPI document among them, is open to browsers on any origin (CORS).
+- A configured mail relay is checked in the background (`smtpCheckIntervalS`, 900 s by default);
+  `/healthz` warns `mail:relay` while it fails, `/system/info` says why.
 
 ### Changed
 

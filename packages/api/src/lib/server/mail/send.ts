@@ -11,6 +11,7 @@ import type { Keyring } from '../secretbox.js';
 import { tenantTimeZone } from '../tenantTimeZone.js';
 import { resolveRecipients } from './recipients.js';
 import { createTransportFor, relayFromSettings } from './relay.js';
+import { relayOutcomeRecorder } from './relayState.js';
 import { resolveTemplate } from './render.js';
 
 const logger = pino({ name: 'mail' });
@@ -151,6 +152,8 @@ export async function sendMail(
     recipients.emails.length > 1
       ? { to: from, bcc: recipients.emails }
       : { to: recipients.emails[0] };
+  // Every attempt's outcome is the relay's state too (§10.2 "Relay check").
+  const outcome = relayOutcomeRecorder();
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       // eslint-disable-next-line no-await-in-loop -- each attempt must see the previous one's outcome before retrying
@@ -162,8 +165,10 @@ export async function sendMail(
         html: rendered.html ?? undefined,
         attachments
       });
+      outcome.ok();
       return 'sent';
     } catch (error) {
+      outcome.failed(error);
       if (attempt === attempts) {
         // §7: a mail about a call is a call-related line, so it carries the call's id.
         logger.warn(

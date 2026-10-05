@@ -10,6 +10,7 @@ import { getCoreClient } from '#lib/server/coreClient.js';
 import { getDb } from '#lib/server/db.js';
 import { apiHealth } from '#lib/server/health.js';
 import { certSyncLastPass, certSyncStatus } from '#lib/server/jobs/certSync.js';
+import { relayState } from '#lib/server/mail/relayState.js';
 import { keyringFromEnv } from '#lib/server/secretbox.js';
 import { sipBanHelperState } from '#lib/server/sipBanList.js';
 
@@ -33,7 +34,8 @@ export async function GET(): Promise<Response> {
     coreChecks,
     keyring: keyringFromEnv(env),
     certificateSync: { state: certSyncStatus(), at: certSyncLastPass() },
-    sipBanHelper: await sipBanHelperState()
+    sipBanHelper: await sipBanHelperState(),
+    mailRelay: relayState()
   });
   return new Response(JSON.stringify(document), {
     status: healthHttpStatus(document),

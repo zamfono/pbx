@@ -2,8 +2,9 @@
  * Every background job `api` runs, started once from `hooks.server.ts`'s `init`: the first-boot
  * seed and the boot render (§6.3 "First boot", §3.1, §9.1), the key-rotation sweep (§5.4), the
  * certificate sync (§6.4), backups (§6.5), the automatic update (§6.3 "Updates"), the daily purge
- * (§5.9), webhook delivery and the relay of `core`'s event stream (§3.1 "Events", §10.6), and the
- * Ringotel re-registration after an Asterisk restart (§10.4).
+ * (§5.9), the mail relay check (§10.2 "Relay check"), webhook delivery and the relay of `core`'s
+ * event stream (§3.1 "Events", §10.6), and the Ringotel re-registration after an Asterisk restart
+ * (§10.4).
  *
  * They all live in the SvelteKit bundle, the one that also holds `runOperation` and every
  * operation: an operation hands a job its work by calling it (`backups.runs.start` →
@@ -23,6 +24,7 @@ import { getCoreClient } from '../coreClient.js';
 import { connectCoreEvents } from '../coreEvents.js';
 import { publishEvent } from '../eventSink.js';
 import { updateMailSender } from '../mail/owners.js';
+import { startRelayCheck } from '../mail/relayCheck.js';
 import { onceConfigPropagated } from '../ops/afterCommit.js';
 import { oweDevicePushesAtStart } from '../ops/devices/_restartPush.js';
 import { retryPendingRoster } from '../ops/roster.js';
@@ -212,11 +214,13 @@ export async function startBackgroundJobs(
   const backups = scheduleBackups(db, kr, backupDeps);
   const autoUpdate = startAutoUpdate(db, kr, backupDeps, log);
   const retention = scheduleRetention(db);
+  const relayCheck = startRelayCheck({ db, kr });
   const coreEvents = relayCoreEvents(db, dispatcher, log);
   return {
     stop: () => {
       coreEvents.close();
       retention.stop();
+      relayCheck.stop();
       autoUpdate?.stop();
       backups.stop();
       certSync?.stop();

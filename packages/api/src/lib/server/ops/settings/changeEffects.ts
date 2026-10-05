@@ -1,8 +1,9 @@
+import { relaySettingsChanged } from '#lib/server/mail/relayCheck.js';
 import { renderSipBanList } from '#lib/server/sipBanList.js';
 
 import { afterCommit } from '../afterCommit.js';
 import type { Context } from '../types.js';
-import type { SettingsColumns } from './_shared.js';
+import type { SettingsColumns, SettingsRow } from './_shared.js';
 import { pushProfileAfterCommit } from './profilePush.js';
 
 /** The reload kinds a changed set of columns requires (§3.1): `pjsip` and/or `moh`. The hold
@@ -68,6 +69,43 @@ export function maybeRenderSipBanList(
     afterCommit(ctx, async db => {
       await renderSipBanList(db);
       return null;
+    });
+  }
+}
+
+// The columns that make the relay `verify()` checks (§10.2 "Relay check"); `mail_from` is not one.
+const RELAY_COLUMNS = [
+  'smtpHost',
+  'smtpPort',
+  'smtpSecurity',
+  'smtpUser',
+  'smtpPasswordEnc'
+];
+
+/** Whether `row` configures a relay: `smtp_host` and `mail_from` both set (§11.4). */
+const configuresRelay = (row: {
+  smtpHost?: string | null;
+  mailFrom?: string | null;
+}): boolean =>
+  (row.smtpHost ?? null) !== null && (row.mailFrom ?? null) !== null;
+
+/**
+ * Checks the relay once a change of it, or one that configures it, `mail_from` included, has
+ * committed, and times the next periodic check anew once a change of `smtp_check_interval_s`
+ * has (§10.2 "Relay check").
+ */
+export function maybeCheckRelay(
+  ctx: Context,
+  before: SettingsRow,
+  columns: SettingsColumns
+): void {
+  const relay =
+    RELAY_COLUMNS.some(column => column in columns) ||
+    (!configuresRelay(before) && configuresRelay({ ...before, ...columns }));
+  if (relay || 'smtpCheckIntervalS' in columns) {
+    afterCommit(ctx, () => {
+      relaySettingsChanged({ relay });
+      return Promise.resolve(null);
     });
   }
 }
