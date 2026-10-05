@@ -1,8 +1,7 @@
 import { error, type RequestEvent } from '@sveltejs/kit';
 
-import { HTTP_TOO_MANY_REQUESTS } from '@zamfono/shared';
+import { addressKey, HTTP_TOO_MANY_REQUESTS } from '@zamfono/shared';
 
-import { addressKey } from '#lib/server/addressKey.js';
 import { limiter } from '#lib/server/limiter.js';
 
 /**

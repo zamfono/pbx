@@ -10,6 +10,7 @@ export * from './featureCodes.js';
 export * from './jsonColumns.js';
 export * from './trunks.js';
 export * from './cidr.js';
+export * from './addressKey.js';
 export * from './columnValues.js';
 export * from './sipHeaders.js';
 export * from './events.js';

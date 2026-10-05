@@ -6,6 +6,7 @@ import * as env from '$app/env/private';
 import pino from 'pino';
 
 import {
+  addressKey,
   HTTP_NOT_FOUND,
   HTTP_TOO_MANY_REQUESTS,
   HTTP_UNAUTHORIZED,
@@ -13,7 +14,6 @@ import {
   stackTimeZoneError
 } from '@zamfono/shared';
 
-import { addressKey } from '#lib/server/addressKey.js';
 import {
   authenticateLink,
   authenticateRequest

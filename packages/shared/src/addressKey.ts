@@ -73,10 +73,11 @@ function embeddedIpv4(groups: number[], ip: string): string | undefined {
 }
 
 /**
- * The limiter's per-address key: an IPv4 address verbatim, its embedded form for an
- * IPv4-mapped/compatible/translated IPv6 address, or else the IPv6 address's canonical
- * /64 prefix, since one subscriber controls a whole /64 (§5.5). An unparsable address
- * shares one bucket, since the value reaches the limiter from a client-controlled header.
+ * The per-address key of the HTTP limiter (§5.5) and of `core`'s count of failed SIP attempts
+ * (§5.6): an IPv4 address verbatim, its embedded form for an IPv4-mapped/compatible/translated
+ * IPv6 address, or else the IPv6 address's canonical /64 prefix, since one subscriber controls a
+ * whole /64. An unparsable address shares one bucket, since the value reaches the limiter from a
+ * client-controlled header.
  */
 export function addressKey(ip: string): string {
   if (isIPv4(ip)) {

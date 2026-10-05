@@ -10,11 +10,10 @@ import * as env from '$app/env/private';
 import pino from 'pino';
 import { z } from 'zod';
 
-import { nowIso, type Db } from '@zamfono/shared';
+import { addressKey, nowIso, type Db } from '@zamfono/shared';
 
 import { MIN_PASSWORD_LENGTH } from '#lib/auth/passwordPolicy.js';
 
-import { addressKey } from '../addressKey.js';
 import { notifyUsersChanged } from '../eventSink.js';
 import { limiter } from '../limiter.js';
 import { sendMail } from '../mail/index.js';
