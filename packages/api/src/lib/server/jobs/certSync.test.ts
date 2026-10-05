@@ -47,6 +47,7 @@ type StubCoreClient = CoreClient & {
 
 const LIVE_CALL: StateResponse['calls'][number] = {
   callId: 'call-1',
+  legs: [],
   direction: 'inbound',
   from: '+491701234567',
   to: '+490000000',

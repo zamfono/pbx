@@ -4,6 +4,8 @@
  * by the `*8<ext>` feature code, which finds the call by the extension it rings, and the API
  * pickup (`pickupAction.ts`), which names the call.
  */
+import { newId } from '@zamfono/shared';
+
 import { ignoreGone, logUnlessGone } from '../ari/failures.js';
 import { SIP_NOT_FOUND } from '../sipCodes.js';
 import { bridgeAnswered, claimAnswer } from './answer.js';
@@ -34,6 +36,7 @@ function claimPickup(
   target: Call
 ): Leg | null {
   const leg: Leg = {
+    id: newId(),
     channelId: picker.channelId,
     kind: 'device',
     userId: picker.userId,

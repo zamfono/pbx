@@ -2,7 +2,7 @@
  * routing cursor; SQLite holds durable outcomes alone, via the CDR writer. */
 import type { Selectable } from 'kysely';
 
-import type { CallLogLevel, DB, Scope } from '@zamfono/shared';
+import { newId, type CallLogLevel, type DB, type Scope } from '@zamfono/shared';
 
 import { CallLog } from '../callLog.js';
 import type { Diversion } from './forwardContext.js';
@@ -15,6 +15,8 @@ export type CallsRow = Selectable<DB['calls']>;
  * `placing` from before its channel is created until it is dialled (`legOriginate.ts`): such a leg
  * is its placement's to settle, never shown, counted as ringing or hung up by anything else. */
 export type Leg = {
+  /** The leg's own id in the live calls (§10.3 "Live calls"), never Asterisk's. */
+  id: string;
   channelId: string;
   kind: 'device' | 'findMe' | 'trunk' | 'member';
   userId: string | null;
@@ -24,6 +26,8 @@ export type Leg = {
    * routing trace's `answered` line (§7). */
   deviceId?: string;
   trunkId?: string;
+  /** The number or SIP target a `trunk` leg dials (§10.3 "Live calls"). */
+  target?: string;
   /** The ring group that placed a `member` leg, whose `record_calls` counts for it (§10.2
    * "Recording semantics"). */
   ringGroupId?: string;
@@ -39,6 +43,11 @@ export type Call = {
    * only rings (`userStep.ts`, `ringGroup.ts`): a forward, mailbox or release has no caller to
    * act on. */
   callerChannelId: string | null;
+  /** The live-calls id of the caller's leg (§10.3 "Live calls"), new whenever another party's
+   * channel takes the caller's place. */
+  callerLegId: string;
+  /** The trunk an inbound caller's channel arrived on. */
+  callerTrunkId?: string;
   from: string;
   to: string;
   didId: string | null;
@@ -117,6 +126,7 @@ export function newCall(params: NewCallParams): Call {
   const { logLevel, callLogMaxBytes, ...base } = params;
   return {
     ...base,
+    callerLegId: newId(),
     didId: null,
     callerUserId: null,
     calleeUserId: null,

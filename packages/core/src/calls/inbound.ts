@@ -200,6 +200,9 @@ export async function handleInboundStart(
     logLevel: snapshot.settings.callLogLevel,
     callLogMaxBytes: pipeline.deps.callLogMaxBytes
   });
+  if (trunkId !== null) {
+    call.callerTrunkId = trunkId;
+  }
   // §7: the delivering trunk's diagnostics override counts toward the call's level.
   raiseLogLevel(
     call.log,

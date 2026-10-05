@@ -8,19 +8,40 @@ import { HTTP_CONFLICT, type ParkRequest } from '@zamfono/shared';
 import { ActionError, notBridged } from './actionError.js';
 import type { Call } from './call.js';
 import { bridgedParty, channelOf } from './callLookup.js';
+import { namedParty } from './liveLegs.js';
+import { userOfChannel } from './onwardCall.js';
 import { parkParty } from './parking.js';
 import type { Pipeline } from './pipeline.js';
 
-/** `req.userId` parks the other party of `call` as `*70` would. No feature dial hears the slot,
- * so it is returned instead; the parker's own channel in the call is hung up as `*70` hangs it
- * up. 409 when `req.userId` has no channel in the call (`notInCall`), the call is not bridged
- * (`notBridged`, a party added to a call included) or every slot is taken (`noFreeSlot`). */
-export async function parkOnRequest(
+/** `req.userId` parks the other party of `call` as `*70` would, or the other side of the leg
+ * `req.legId` parks that leg. No feature dial hears the slot, so it is returned instead; the
+ * parker's own channel in the call is hung up as `*70` hangs it up. 409 when `req.userId` has no
+ * channel in the call (`notInCall`), the named leg's other side is no user's (`noParker`), the
+ * call is not bridged (`notBridged`, a party added to a call included) or every slot is taken
+ * (`noFreeSlot`). */
+function parkerOf(
   pipeline: Pipeline,
   call: Call,
   req: ParkRequest
-): Promise<{ slot: string }> {
-  const { presence } = pipeline.deps;
+): {
+  parker: { userId: string; channelId: string };
+  conversation: { bridgeId: string; party: string };
+} {
+  if (req.legId !== undefined) {
+    const conversation = namedParty(pipeline, call, req.legId);
+    const userId = userOfChannel(call, conversation.byChannelId);
+    if (userId === null) {
+      throw new ActionError(
+        HTTP_CONFLICT,
+        'noParker',
+        "the leg's other side is no user's"
+      );
+    }
+    return {
+      parker: { userId, channelId: conversation.byChannelId },
+      conversation
+    };
+  }
   const channelId = channelOf(call, req.userId);
   if (channelId === null) {
     throw new ActionError(
@@ -33,11 +54,20 @@ export async function parkOnRequest(
   if (conversation === null) {
     throw notBridged();
   }
+  return { parker: { userId: req.userId, channelId }, conversation };
+}
+
+export async function parkOnRequest(
+  pipeline: Pipeline,
+  call: Call,
+  req: ParkRequest
+): Promise<{ slot: string }> {
+  const { parker, conversation } = parkerOf(pipeline, call, req);
   const slot = await parkParty(
     pipeline,
-    presence,
+    pipeline.deps.presence,
     call,
-    { ...req, channelId },
+    { ...parker, actorUserId: req.actorUserId },
     conversation
   );
   if (slot === null) {

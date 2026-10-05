@@ -95,6 +95,7 @@ describe('renderMetrics', () => {
       calls: [
         {
           callId: 'c1',
+          legs: [],
           direction: 'inbound',
           from: '+1',
           to: '101',

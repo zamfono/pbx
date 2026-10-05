@@ -5,6 +5,8 @@
  * `externalAttempt.ts`, the cursor `externalLegRoutes.ts`, the terminal outcomes `answer.ts` and
  * `conclude.ts`.
  */
+import { newId } from '@zamfono/shared';
+
 import type { AriClient } from '../ari/client.js';
 import { ignoreGone, logUnlessGone } from '../ari/failures.js';
 import { shouldFallThrough, type AttemptFailure } from '../routing/trunk.js';
@@ -108,12 +110,14 @@ async function attemptOnce(
     candidate,
     channelId => {
       leg = {
+        id: newId(),
         channelId,
         kind: 'trunk',
         userId: null,
         state: 'placing',
         endCause: null,
-        trunkId: candidate.trunk.id
+        trunkId: candidate.trunk.id,
+        target: cursor.number
       };
       call.legs.set(channelId, leg);
     },

@@ -262,7 +262,10 @@ describe('ringGroup', () => {
         .filter(event => event.userIds.includes(userId))
         .map(event => `${event.state}${event.usersOnly ? '*' : ''}`);
     const live = (): LiveCall =>
-      liveView(pipeline.deps.state.calls.get(call.id) ?? expect.unreachable());
+      liveView(
+        pipeline.deps.state,
+        pipeline.deps.state.calls.get(call.id) ?? expect.unreachable()
+      );
     const liveUsers = (): string[] => [...live().userIds].sort();
     fakeAri.answerAfterMs = 60_000;
 

@@ -86,6 +86,7 @@ async function placeDevice(
   const { placed } = own;
   const { host, sipCall, userId, callerId, language } = params;
   const leg: Leg = {
+    id: newId(),
     channelId: newId(),
     kind: 'device',
     userId,

@@ -238,7 +238,8 @@ describe('startInternalServer', () => {
           startedAt: call.startedAt,
           ringGroupId: null,
           userIds: [],
-          connectedUserIds: []
+          connectedUserIds: [],
+          legs: [{ id: call.callerLegId, role: 'caller', state: 'ringing' }]
         }
       ],
       trunks: { mainTrunk: trunk },

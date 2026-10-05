@@ -15,31 +15,26 @@ import {
 } from '@zamfono/shared';
 
 import { logFailure, logUnlessGone } from '../ari/failures.js';
-import { ActionError, notBridged } from './actionError.js';
+import { ActionError } from './actionError.js';
 import { dialAddedLeg, newAddedLeg } from './addedParty.js';
 import { handOver } from './attendedTransfer.js';
 import type { Call } from './call.js';
-import { bridgedParty, ownBridge, transferrerChannel } from './callLookup.js';
+import { ownBridge } from './callLookup.js';
+import { callUp } from './callState.js';
 import { consultationLive, endHold, holdOf, holdParty } from './hold.js';
 import { closeCall } from './liveCall.js';
+import { actedParty, namedLeg } from './liveLegs.js';
 import { userOfChannel } from './onwardCall.js';
 import type { Pipeline } from './pipeline.js';
 
-/** `POST /internal/calls/{id}/consult`: holds the other party and dials `target` from the actor;
- * the consultation's own call. */
+/** `POST /internal/calls/{id}/consult`: holds the other party, or the leg `req.legId`, and dials
+ * `target` from the actor, or from the named leg's other side; the consultation's own call. */
 export async function consult(
   pipeline: Pipeline,
   call: Call,
   req: ConsultRequest
 ): Promise<{ callId: string }> {
-  const conversation = bridgedParty(
-    call,
-    transferrerChannel(call, req.actorUserId)
-  );
-  if (conversation === null) {
-    throw notBridged();
-  }
-  const { bridgeId, party, byChannelId } = conversation;
+  const { bridgeId, party, byChannelId } = actedParty(pipeline, call, req);
   if (consultationLive(pipeline, call)) {
     throw new ActionError(
       HTTP_CONFLICT,
@@ -59,6 +54,7 @@ export async function consult(
     (await holdParty(pipeline, call, byChannelId, party));
   hold.consultationCallId = consultation.id;
   hold.consultationJoined = false;
+  callUp(pipeline.deps, call);
   dialAddedLeg(pipeline, consultation, bridgeId, req.target, () => {
     hold.consultationJoined = true;
   });
@@ -66,8 +62,8 @@ export async function consult(
 }
 
 /**
- * `POST /internal/calls/{id}/attendedTransfer`: the held party of `call` takes the actor's place
- * in `consultation`, which carries on with `parent_call_id` set to `call`; the actor's channel
+ * `POST /internal/calls/{id}/attendedTransfer`: the held party of `call`, which `req.legId`
+ * names where given (409 `notHeld` for another), takes the actor's place in `consultation`, which carries on with `parent_call_id` set to `call`; the actor's channel
  * leaves both and `call` closes. Each row keeps its own parties, and the transferee's
  * participation in the consultation is evaluated for recording as its own (§10.2).
  */
@@ -85,6 +81,12 @@ export async function transferToConsultation(
       'notConsultation',
       'call is not consulting that call'
     );
+  }
+  if (
+    req.legId !== undefined &&
+    namedLeg(pipeline, call, req.legId).channelId !== hold.channelId
+  ) {
+    throw new ActionError(HTTP_CONFLICT, 'notHeld', 'the leg is not held');
   }
   // Joined once its dial settled, so the dial's own end no longer acts on its caller channel.
   if (

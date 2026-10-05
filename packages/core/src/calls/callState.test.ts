@@ -22,6 +22,7 @@ type CallStateEvent = Extract<Envelope, { type: 'call.state' }>;
 
 function leg(userId: string, state: Leg['state']): Leg {
   return {
+    id: newId(),
     channelId: newId(),
     kind: 'device',
     userId,
@@ -31,7 +32,7 @@ function leg(userId: string, state: Leg['state']): Leg {
 }
 
 function groupLeg(userId: string, state: GroupLeg['state']): GroupLeg {
-  return { channelId: newId(), userId, memberKey: userId, state };
+  return { id: newId(), channelId: newId(), userId, memberKey: userId, state };
 }
 
 /** The parts of a `Pipeline` that `trackLeg` and `endLeg` touch. */
@@ -72,6 +73,7 @@ describe('a live call’s users (§10.3 "Live calls", §10.6)', () => {
 
   function live(): { userIds: string[]; connectedUserIds: string[] } {
     const view = liveView(
+      deps.state,
       deps.state.calls.get(call.id) ?? expect.unreachable()
     );
     return {
@@ -157,6 +159,25 @@ describe('a live call’s users (§10.3 "Live calls", §10.6)', () => {
       expect(event.userIds).not.toContain('member');
       expect(event.usersOnly).toBeUndefined();
     }
+  });
+
+  it('carries the call’s legs on each event, none once it ended (§10.6)', () => {
+    const pipeline = fakePipeline(deps);
+    const ringing = leg('member', 'ringing');
+    trackLeg(pipeline, call, ringing);
+    callRinging(deps, call);
+    expect(events.at(-1)?.legs).toEqual([
+      {
+        id: call.callerLegId,
+        role: 'caller',
+        state: 'ringing',
+        userId: 'caller'
+      },
+      { id: ringing.id, role: 'callee', state: 'ringing', userId: 'member' }
+    ]);
+
+    callEnded(deps, call);
+    expect(events.at(-1)?.legs).toEqual([]);
   });
 
   it('sends a user whose leg starts ringing the call’s state, to them alone', () => {

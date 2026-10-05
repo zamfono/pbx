@@ -107,7 +107,7 @@ export async function allQuiet(rig: Rig, timers: CoreTimers): Promise<void> {
       findMeTimers: pipeline.findMeTimers.size,
       pendingFindMeAccept: pipeline.pendingFindMeAccept.size,
       activeBatches: pipeline.activeBatches.size,
-      holds: pipeline.holds.size,
+      holds: pipeline.deps.state.holds.size,
       parkingSlots: pipeline.parkingSlots.size,
       parkedSlotByChannel: pipeline.parkedSlotByChannel.size,
       pendingTransfers: pipeline.pendingTransfers.entries.size,

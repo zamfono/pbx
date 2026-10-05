@@ -182,6 +182,7 @@ export async function answeredCall(
   call.status = 'answered';
   call.bridgeId = bridge.id;
   call.legs.set(leg.id, {
+    id: newId(),
     channelId: leg.id,
     kind: 'device',
     userId,

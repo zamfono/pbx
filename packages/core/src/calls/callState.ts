@@ -12,6 +12,7 @@ import type { StateStore } from '../internal/stateStore.js';
 import type { Call, Leg } from './call.js';
 import { presentCallerUserId } from './callLookup.js';
 import type { GroupLeg } from './groupLegs.js';
+import { liveLegs } from './liveLegs.js';
 
 /** The two collaborators the live view needs, so `CdrWriter` can publish the end as well. */
 export type CallStateDeps = { state: StateStore; bus: EventBus };
@@ -89,7 +90,7 @@ function peerOf(call: Call): string {
 
 /** What `GET /internal/state` serves of `entry` (§3.1), read from the call when served, so a leg
  * that starts or stops ringing counts from that moment. */
-export function liveView(entry: LiveEntry): LiveCall {
+export function liveView(store: StateStore, entry: LiveEntry): LiveCall {
   const { call } = entry;
   return {
     callId: call.id,
@@ -100,7 +101,8 @@ export function liveView(entry: LiveEntry): LiveCall {
     startedAt: call.startedAt,
     ringGroupId: call.ringGroupId,
     userIds: participants(call),
-    connectedUserIds: connected(call)
+    connectedUserIds: connected(call),
+    legs: liveLegs(store, call)
   };
 }
 
@@ -118,6 +120,7 @@ function emit(
     peer: peerOf(call),
     ringGroupId: call.ringGroupId,
     userId: call.answeredByUserId ?? call.calleeUserId,
+    legs: state === 'ended' ? [] : liveLegs(deps.state, call),
     // §10.6 "a user receives events about ... own calls": every participant, the caller too, whom
     // `userId` (the answerer, else the callee) leaves out.
     userIds,

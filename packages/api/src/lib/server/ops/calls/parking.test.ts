@@ -32,6 +32,7 @@ const admin: Actor = { id: 'admin', name: 'Admin', role: 'admin' };
 const CALLS: LiveCall[] = [
   {
     callId: 'answered',
+    legs: [],
     direction: 'inbound',
     from: '+491701234567',
     to: '101',
@@ -43,6 +44,7 @@ const CALLS: LiveCall[] = [
   },
   {
     callId: 'parked',
+    legs: [],
     direction: 'inbound',
     from: '+491701234567',
     to: '101',

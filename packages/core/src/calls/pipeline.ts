@@ -5,7 +5,6 @@ import { isEvent, type AriEvent, type AriEventOf } from '../ari/events.js';
 import type { Call } from './call.js';
 import { noteHangupRequest } from './callEnd.js';
 import type { ActiveBatch } from './groupPickup.js';
-import type { Hold } from './hold.js';
 import { handleInboundStart } from './inbound.js';
 import {
   handleDtmf,
@@ -36,8 +35,6 @@ export class Pipeline {
   readonly pendingFindMeAccept = new Map<string, FindMeAcceptWait>();
   /** The ring-group batch ringing each call right now, by call id (`groupPickup.ts`). */
   readonly activeBatches = new Map<string, ActiveBatch>();
-  /** The hold on each conversation, by its bridge (`hold.ts`). */
-  readonly holds = new Map<string, Hold>();
   /** The occupied parking slots, by extension, and the slot each parked party's own channel
    * occupies, by channel (`parking.ts`, §10.2 "Call parking"). */
   readonly parkingSlots = new Map<string, ParkedEntry>();

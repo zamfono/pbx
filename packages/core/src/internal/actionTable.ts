@@ -19,6 +19,7 @@ import {
   originateRequestSchema,
   parkRequestSchema,
   pickupRequestSchema,
+  resumeRequestSchema,
   transferRequestSchema
 } from '@zamfono/shared';
 
@@ -92,7 +93,7 @@ export const CALL_ROUTES: Record<string, (callId: string) => ActionRoute> = {
       return NO_CONTENT;
     }),
   resume: callId =>
-    route(holdRequestSchema, async (actions, body) => {
+    route(resumeRequestSchema, async (actions, body) => {
       await actions.resume(callId, body);
       return NO_CONTENT;
     }),

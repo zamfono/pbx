@@ -133,6 +133,7 @@ describe('calls', () => {
     const db = await makeTestDb();
     const ownCall: LiveCall = {
       callId: 'call-1',
+      legs: [],
       direction: 'internal',
       from: '101',
       to: '102',
@@ -144,6 +145,7 @@ describe('calls', () => {
     };
     const otherCall: LiveCall = {
       callId: 'call-2',
+      legs: [],
       direction: 'internal',
       from: '103',
       to: '104',

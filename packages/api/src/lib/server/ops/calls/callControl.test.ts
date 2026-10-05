@@ -20,6 +20,7 @@ const admin: Actor = { id: 'admin', name: 'Admin', role: 'admin' };
 function liveCall(callId: string, connectedUserIds: string[]): LiveCall {
   return {
     callId,
+    legs: [],
     direction: 'inbound',
     from: '+491701234567',
     to: '+4930123456',

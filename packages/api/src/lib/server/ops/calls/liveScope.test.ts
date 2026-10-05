@@ -24,6 +24,7 @@ function liveCall(
 ): LiveCall {
   return {
     callId,
+    legs: [],
     direction: 'inbound',
     from: '+491701234567',
     to: '+4930123456',

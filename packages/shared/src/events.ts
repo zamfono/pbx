@@ -4,7 +4,7 @@
  */
 
 import type { PresenceStatus } from './columnValues.js';
-import type { MwiMailbox, TrunkStatus } from './internalApi.js';
+import type { LiveLeg, MwiMailbox, TrunkStatus } from './internalApi.js';
 
 export type Scope =
   'tenant' | `user:${string}` | `ringGroup:${string}` | `menu:${string}`;
@@ -39,6 +39,8 @@ type EventFields = {
     peer: string | null;
     ringGroupId: string | null;
     userId: string | null;
+    /** The call's legs as the live calls list them at the event (§10.3), none once `ended`. */
+    legs: LiveLeg[];
     /**
      * Every user the call is theirs to see (§10.6 "own calls"): the caller, the callee, the
      * answerer and every user with a leg ringing or up right now. Routing data for `api`'s
@@ -95,6 +97,7 @@ export function publicEnvelope(envelope: Envelope): PublicEnvelope {
     return envelope;
   }
   // The fields §10.6 lists, named one by one so an internal field added later stays internal.
-  const { id, at, type, callId, state, peer, ringGroupId, userId } = envelope;
-  return { id, at, type, callId, state, peer, ringGroupId, userId };
+  const { id, at, type, callId, state, peer, ringGroupId, userId, legs } =
+    envelope;
+  return { id, at, type, callId, state, peer, ringGroupId, userId, legs };
 }

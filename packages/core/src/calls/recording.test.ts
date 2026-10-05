@@ -90,6 +90,7 @@ function buildCall(ringGroupId: string | null): Call {
 
 function buildLeg(overrides: Partial<Leg> & { channelId: string }): Leg {
   return {
+    id: overrides.channelId,
     kind: 'device',
     userId: null,
     state: 'up',

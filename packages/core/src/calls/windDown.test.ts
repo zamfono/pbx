@@ -68,6 +68,7 @@ describe('winding calls down as core stops', () => {
     });
     call.calleeUserId = userId;
     call.legs.set(ringing.id, {
+      id: ringing.id,
       channelId: ringing.id,
       kind: 'device',
       userId,

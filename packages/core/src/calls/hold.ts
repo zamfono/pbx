@@ -4,20 +4,22 @@
  * group's caller hears its music while members ring, and the one holding stays in the bridge,
  * hearing nobody and heard by nobody. Resuming puts the party back. The phone knows nothing of
  * it, so a hold or resume the phone signals (re-INVITE) is a separate matter for Asterisk. The
- * holds are the `Pipeline`'s, keyed by the conversation's bridge, since every row sharing that
+ * holds are the live state's (`StateStore.holds`), keyed by the conversation's bridge, since every row sharing that
  * bridge (a party added to it, a consultation) must count the held party as still in it. Also
  * the `calls.hold` and `calls.resume` actions themselves.
  */
-import { HTTP_CONFLICT, type HoldRequest } from '@zamfono/shared';
+import {
+  HTTP_CONFLICT,
+  type HoldRequest,
+  type ResumeRequest
+} from '@zamfono/shared';
 
 import { ignoreGone } from '../ari/failures.js';
-import { ActionError, notBridged } from './actionError.js';
+import { ActionError } from './actionError.js';
 import type { Call } from './call.js';
-import {
-  bridgedParty,
-  findLiveCall,
-  transferrerChannel
-} from './callLookup.js';
+import { findLiveCall } from './callLookup.js';
+import { callUp } from './callState.js';
+import { actedParty } from './liveLegs.js';
 import type { Pipeline } from './pipeline.js';
 
 export type Hold = {
@@ -38,7 +40,9 @@ export function holdIn(
   pipeline: Pipeline,
   bridgeId: string | null
 ): Hold | null {
-  return bridgeId === null ? null : (pipeline.holds.get(bridgeId) ?? null);
+  return bridgeId === null
+    ? null
+    : (pipeline.deps.state.holds.get(bridgeId) ?? null);
 }
 
 /** `call`'s own hold: one of its parties held in its bridge. */
@@ -69,7 +73,7 @@ export async function holdParty(
     consultationJoined: false
   };
   // Registered before the bridge is left, so the party's absence is never read as their leaving.
-  pipeline.holds.set(bridgeId, hold);
+  pipeline.deps.state.holds.set(bridgeId, hold);
   const snapshot = await pipeline.deps.cache.get();
   const { ari } = pipeline.deps;
   await ari.bridges.removeChannel(bridgeId, partyChannelId).catch(ignoreGone);
@@ -94,7 +98,7 @@ export async function endHold(
   if (hold === null || bridgeId === null) {
     return false;
   }
-  pipeline.holds.delete(bridgeId);
+  pipeline.deps.state.holds.delete(bridgeId);
   if (intoBridgeId === null) {
     return true;
   }
@@ -110,20 +114,14 @@ export function consultationLive(pipeline: Pipeline, call: Call): boolean {
   return id !== null && findLiveCall(pipeline, live => live.id === id) !== null;
 }
 
-/** `POST /internal/calls/{id}/hold`: the other party leaves the bridge for the hold music. */
+/** `POST /internal/calls/{id}/hold`: the other party, or the leg `req.legId`, leaves the bridge
+ * for the hold music, held by the other side; the call's state goes out again with its legs. */
 export async function holdOnRequest(
   pipeline: Pipeline,
   call: Call,
   req: HoldRequest
 ): Promise<void> {
-  const conversation = bridgedParty(
-    call,
-    transferrerChannel(call, req.actorUserId)
-  );
-  if (conversation === null) {
-    throw notBridged();
-  }
-  const { bridgeId, party, byChannelId } = conversation;
+  const { bridgeId, party, byChannelId } = actedParty(pipeline, call, req);
   if (holdIn(pipeline, bridgeId) !== null) {
     throw new ActionError(HTTP_CONFLICT, 'held', 'call is on hold');
   }
@@ -133,6 +131,7 @@ export async function holdOnRequest(
     channelId: party
   });
   await holdParty(pipeline, call, byChannelId, party);
+  callUp(pipeline.deps, call);
 }
 
 /** `POST /internal/calls/{id}/resume`: the held party returns to the bridge. During a
@@ -140,7 +139,7 @@ export async function holdOnRequest(
 export async function resumeOnRequest(
   pipeline: Pipeline,
   call: Call,
-  req: HoldRequest
+  req: ResumeRequest
 ): Promise<void> {
   const hold = holdOf(pipeline, call);
   if (hold === null) {
@@ -151,4 +150,5 @@ export async function resumeOnRequest(
     call.threeWayInitiatorChannelId = hold.byChannelId;
   }
   await endHold(pipeline, call.bridgeId, call.bridgeId);
+  callUp(pipeline.deps, call);
 }

@@ -10,6 +10,8 @@
  * then moves the transferee into the consultation's bridge and ends the pair, so the conversation
  * is one bridge of two parties again and ends like any other when either of them leaves.
  */
+import { newId } from '@zamfono/shared';
+
 import type { AriEventOf } from '../ari/events.js';
 import { ignoreGone, logFailure } from '../ari/failures.js';
 import type { Call } from './call.js';
@@ -62,6 +64,7 @@ export function handOver(
       })
     );
     consultation.callerChannelId = transferee.channelId;
+    consultation.callerLegId = newId();
     consultation.callerChannelUserId = transferee.userId;
     pipeline.registerCall(consultation);
     callPartiesChanged(pipeline.deps, consultation);
@@ -77,6 +80,7 @@ export function handOver(
     leg.state = 'ended';
   }
   consultation.legs.set(transferee.channelId, {
+    id: newId(),
     channelId: transferee.channelId,
     kind: 'device',
     userId: transferee.userId,

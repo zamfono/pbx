@@ -85,6 +85,7 @@ describe('handleChannelEnded, the caller channel', () => {
   /** An answered member leg, the state a ring group leaves behind once someone picks up. */
   function answeredLeg(): Leg {
     const leg: Leg = {
+      id: MEMBER_CHANNEL,
       channelId: MEMBER_CHANNEL,
       kind: 'member',
       userId: MEMBER_USER,
@@ -178,6 +179,7 @@ describe('handleChannelEnded, the caller channel', () => {
     const trunkChannel = 'trunk-1';
     fakeAri.addChannel({ id: CALLER_CHANNEL });
     call.legs.set(trunkChannel, {
+      id: trunkChannel,
       channelId: trunkChannel,
       kind: 'trunk',
       userId: null,
@@ -211,6 +213,7 @@ describe('handleChannelEnded, the caller channel', () => {
       });
       const legs = causes.map((cause, index) => {
         const leg: Leg = {
+          id: `device-${index}`,
           channelId: `device-${index}`,
           kind: 'device',
           userId: MEMBER_USER,
@@ -323,6 +326,7 @@ describe('handleChannelEnded, the caller channel', () => {
       '(alaw)'
     );
     call.legs.set(trunkChannel, {
+      id: trunkChannel,
       channelId: trunkChannel,
       kind: 'trunk',
       userId: null,

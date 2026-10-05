@@ -7,6 +7,8 @@ import { logUnlessGone } from '../ari/failures.js';
 import type { Pipeline } from './pipeline.js';
 
 export type GroupLeg = {
+  /** As a `Leg`'s `id`: its own once it wins (`ringGroupWin.ts`). */
+  id: string;
   channelId: string;
   userId: string | null;
   memberKey: string;

@@ -12,12 +12,12 @@ import {
 
 import { logUnlessGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
-import { ActionError, notBridged } from './actionError.js';
+import { ActionError } from './actionError.js';
 import { type Call } from './call.js';
-import { bridgedParty, transferrerChannel } from './callLookup.js';
 import { ownerForExt } from './extensionOwner.js';
 import { endHold } from './hold.js';
 import { closeCall } from './liveCall.js';
+import { actedParty } from './liveLegs.js';
 import {
   startOnwardCall,
   userOfChannel,
@@ -101,9 +101,10 @@ function onwardOf(snapshot: Snapshot, req: TransferRequest): Onward {
 
 /**
  * `POST /internal/calls/{id}/transfer` (§10.1 "Transfers and pickup"): blind-transfers the other
- * party of the bridged `call` to `req.target`, with `req.voicemail` into its owner's mailbox, as
- * their own new call, returned; the transferrer's participation, and with it `call`, ends. 409
- * for a call that is not bridged (`bridgedParty`).
+ * party of the bridged `call`, or the leg `req.legId`, to `req.target`, with `req.voicemail` into
+ * its owner's mailbox, as their own new call, returned; the transferrer's participation, the
+ * named leg's other side's, and with it `call`, ends. 409 for a call that is not bridged
+ * (`actedParty`).
  */
 export async function transferCall(
   pipeline: Pipeline,
@@ -111,18 +112,11 @@ export async function transferCall(
   req: TransferRequest
 ): Promise<Call> {
   const onward = onwardOf(await pipeline.deps.cache.get(), req);
-  const conversation = bridgedParty(
-    call,
-    transferrerChannel(call, req.actorUserId)
-  );
-  if (conversation === null) {
-    throw notBridged();
-  }
   const {
     bridgeId,
     party: transferee,
     byChannelId: transferrer
-  } = conversation;
+  } = actedParty(pipeline, call, req);
   // A transferee held through the API (`hold.ts`) leaves from the bridge it was held out of.
   await endHold(pipeline, bridgeId, bridgeId);
   call.log.event({

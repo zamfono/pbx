@@ -94,6 +94,7 @@ export const INPUTS: Record<
 export function liveCall(callId: string, userId: string): LiveCall {
   return {
     callId,
+    legs: [],
     direction: 'internal',
     from: '101',
     to: '102',

@@ -140,6 +140,7 @@ async function routeParkedParty(
   if (route === null) {
     // The party is the one channel left for the release to end.
     parked.callerChannelId = partyChannelId;
+    parked.callerLegId = newId();
     await release(pipeline, parked, SIP_NOT_FOUND, 'answered');
     return;
   }

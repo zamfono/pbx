@@ -19,10 +19,11 @@ import {
   type ParkingResponse,
   type ParkRequest,
   type PickupRequest,
+  type ResumeRequest,
   type TransferRequest
 } from '@zamfono/shared';
 
-import { logFailure } from '../ari/failures.js';
+import { ignoreGone, logFailure } from '../ari/failures.js';
 import { ActionError } from './actionError.js';
 import { addPartyOnRequest } from './addedParty.js';
 import type { Call } from './call.js';
@@ -36,6 +37,7 @@ import { consult, transferToConsultation } from './consultation.js';
 import { decline } from './decline.js';
 import { holdOnRequest, resumeOnRequest } from './hold.js';
 import { closeCall } from './liveCall.js';
+import { namedLeg } from './liveLegs.js';
 import { abandonOwnRing, ringOwnDevices, ringTimeoutOf } from './ownDevices.js';
 import { parkOnRequest } from './parkingActions.js';
 import { parkedCalls } from './parkingView.js';
@@ -109,9 +111,20 @@ export class CallActions {
     await pickupOnRequest(this.pipeline, this.findCall(callId), req);
   }
 
-  /** `POST /internal/calls/{id}/hangup`: ends every channel of the call and writes its history entry. */
+  /** `POST /internal/calls/{id}/hangup`: ends every channel of the call and writes its history
+   * entry; with `legId` hangs up that leg alone, as its phone hanging up would. */
   async hangup(callId: string, req: HangupRequest): Promise<void> {
     const call = this.findCall(callId);
+    if (req.legId !== undefined) {
+      const { channelId } = namedLeg(this.pipeline, call, req.legId);
+      call.log.event({
+        event: 'hangup',
+        actorUserId: req.actorUserId,
+        legId: req.legId
+      });
+      await this.pipeline.deps.ari.channels.hangup(channelId).catch(ignoreGone);
+      return;
+    }
     call.log.event({ event: 'hangup', actorUserId: req.actorUserId });
     // A ring that is all a call with no caller channel has stops outright.
     if (call.callerChannelId === null) {
@@ -162,7 +175,7 @@ export class CallActions {
     return holdOnRequest(this.pipeline, this.findCall(callId), req);
   }
 
-  resume(callId: string, req: HoldRequest): Promise<void> {
+  resume(callId: string, req: ResumeRequest): Promise<void> {
     return resumeOnRequest(this.pipeline, this.findCall(callId), req);
   }
 

@@ -253,6 +253,7 @@ describe('ring-group ringability and fallback rules', () => {
     });
     const legChannel = fakeAri.addChannel({ caller: { number: '', name: '' } });
     added.legs.set(legChannel.id, {
+      id: legChannel.id,
       channelId: legChannel.id,
       kind: 'device',
       userId: busyId,

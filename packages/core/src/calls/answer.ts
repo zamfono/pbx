@@ -7,6 +7,8 @@
  * its participations offered to the recorder (§10.2 "Recording semantics"), and the live view
  * told the call is up (§10.6).
  */
+import { newId } from '@zamfono/shared';
+
 import { isGone, logUnlessGone } from '../ari/failures.js';
 import {
   callerChannel,
@@ -191,6 +193,7 @@ export async function settleAnswered(
   channelId: string
 ): Promise<boolean> {
   const leg: Leg = call.legs.get(channelId) ?? {
+    id: newId(),
     channelId,
     kind: 'trunk',
     userId: null,

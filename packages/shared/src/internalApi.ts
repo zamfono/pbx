@@ -25,6 +25,25 @@ export type TrunkStatus = {
   statusChangedAt: string | null;
 };
 
+/** A live leg's side of its call (§10.3 "Live calls"): the caller's own channel, a leg dialled
+ * for the call, or a party added to its conversation (§10.2 "Three-way calls"). */
+export const LIVE_LEG_ROLES = ['caller', 'callee', 'added'] as const;
+/** A live leg's state; `held` while the core holds it out of the bridge (§10.2 "Hold music"). */
+export const LIVE_LEG_STATES = ['ringing', 'up', 'held'] as const;
+
+/** One party in a live call (§10.3 "Live calls"): `id` is the core's own, never Asterisk's, and
+ * names the leg in the live-call actions (`legId`); the rest is whichever applies. */
+export type LiveLeg = {
+  id: string;
+  role: (typeof LIVE_LEG_ROLES)[number];
+  state: (typeof LIVE_LEG_STATES)[number];
+  userId?: string;
+  deviceId?: string;
+  trunkId?: string;
+  /** The number or SIP target a trunk leg dials. */
+  target?: string;
+};
+
 export type LiveCall = {
   callId: string;
   direction: CallDirection;
@@ -39,6 +58,7 @@ export type LiveCall = {
   /** The users who may end or transfer it (§10.3 "Live calls"): the caller and every user with a
    * leg up in it. For `api`'s check alone; `calls.list` leaves it out. */
   connectedUserIds: string[];
+  legs: LiveLeg[];
 };
 
 export type Presence = {
@@ -87,37 +107,36 @@ export type OriginateRequest = z.infer<typeof originateRequestSchema>;
 export const transferRequestSchema = z.object({
   target: z.string(),
   actorUserId: z.string(),
+  /** The leg that moves (§10.3 "Live calls"); absent, the actor's other party. */
+  legId: z.string().optional(),
   /** Deposits the transferee in `target`'s mailbox without ringing, as `*97<ext>` does (§9.3). */
   voicemail: z.boolean().optional()
 });
 export type TransferRequest = z.infer<typeof transferRequestSchema>;
 
-/** A request naming the user it acts for, and the actor. */
-const forUserRequestSchema = z.object({
-  userId: z.string(),
-  actorUserId: z.string()
-});
-
-/** A request naming its target, and the actor. */
-const targetRequestSchema = z.object({
-  target: z.string(),
-  actorUserId: z.string()
-});
-
 /** A request naming only the actor. */
 const actorRequestSchema = z.object({ actorUserId: z.string() });
+
+/** A request naming the actor and, optionally, the leg it acts on (§10.3 "Live calls"): 404
+ * `legNotFound` for a leg the call does not hold, 409 `legNotUp` for one still ringing. */
+const legRequestSchema = actorRequestSchema.extend({
+  legId: z.string().optional()
+});
 
 /** `POST /internal/calls/{id}/pickup` → 204. */
 export const pickupRequestSchema = actorRequestSchema;
 export type PickupRequest = z.infer<typeof pickupRequestSchema>;
 
-/** `POST /internal/calls/{id}/hangup` → 204. */
-export const hangupRequestSchema = actorRequestSchema;
+/** `POST /internal/calls/{id}/hangup` → 204: the whole call, or with `legId` that leg alone. */
+export const hangupRequestSchema = legRequestSchema;
 export type HangupRequest = z.infer<typeof hangupRequestSchema>;
 
 /** `POST /internal/calls/{id}/park` → 200 `{ slot }`: `userId`, who must be in the call, parks
- * its other party (§10.2 "Call parking"); 409 `notInCall`, `notBridged` or `noFreeSlot`. */
-export const parkRequestSchema = forUserRequestSchema;
+ * its other party, or the other side of `legId` parks that leg (§10.2 "Call parking"); 409
+ * `notInCall`, `noParker`, `notBridged` or `noFreeSlot`. */
+export const parkRequestSchema = legRequestSchema.extend({
+  userId: z.string()
+});
 export type ParkRequest = z.infer<typeof parkRequestSchema>;
 
 /** One occupied parking slot (§10.2 "Call parking"), as every user's BLF shows it. */
@@ -136,26 +155,33 @@ export type ParkingResponse = { parked: ParkedCall[] };
 /** `POST /internal/calls/{id}/parties` → 201 `{ callId }`, the added leg's own call (§10.2
  * "Three-way calls"). A refused action answers its status as a problem whose `detail` is the
  * reason, a target no party answers on (`invalidTarget`) with 422. */
-export const addPartyRequestSchema = targetRequestSchema;
+export const addPartyRequestSchema = actorRequestSchema.extend({
+  target: z.string()
+});
 export type AddPartyRequest = z.infer<typeof addPartyRequestSchema>;
 
 /** `POST /internal/calls/{id}/consult` → 201 `{ callId }`, the consultation call. */
-export const consultRequestSchema = targetRequestSchema;
+export const consultRequestSchema = legRequestSchema.extend({
+  target: z.string()
+});
 export type ConsultRequest = z.infer<typeof consultRequestSchema>;
 
 /** `POST /internal/calls/{id}/attendedTransfer` → 204: the held party joins the consultation
  * `toCallId` in the actor's place (§10.1 "Transfers and pickup"). */
-export const attendedTransferRequestSchema = z.object({
-  toCallId: z.string(),
-  actorUserId: z.string()
+export const attendedTransferRequestSchema = legRequestSchema.extend({
+  toCallId: z.string()
 });
 export type AttendedTransferRequest = z.infer<
   typeof attendedTransferRequestSchema
 >;
 
-/** `POST /internal/calls/{id}/hold` and `POST /internal/calls/{id}/resume` → 204. */
-export const holdRequestSchema = actorRequestSchema;
+/** `POST /internal/calls/{id}/hold` → 204: the actor's other party, or `legId`, is held. */
+export const holdRequestSchema = legRequestSchema;
 export type HoldRequest = z.infer<typeof holdRequestSchema>;
+
+/** `POST /internal/calls/{id}/resume` → 204: the held party returns. */
+export const resumeRequestSchema = actorRequestSchema;
+export type ResumeRequest = z.infer<typeof resumeRequestSchema>;
 
 /** `POST /internal/calls/{id}/decline` → 204: the actor's own legs ringing for the call end as
  * declined (§10.1 steps 4 and 5). */

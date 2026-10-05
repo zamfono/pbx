@@ -263,7 +263,7 @@ describe('call control', () => {
     // The history's caller stays the member; the live control is the parties' still in it.
     expect(consultation.callerUserId).toBe(memberId);
     expect(
-      liveView(state.calls.get(consultation.id) ?? expect.unreachable())
+      liveView(state, state.calls.get(consultation.id) ?? expect.unreachable())
         .connectedUserIds
     ).toEqual([targetId]);
     const original = await eventually(async () => {
@@ -465,6 +465,7 @@ describe('call control', () => {
     pipeline.registerCall(call);
     const ringing = fakeAri.addChannel({});
     call.legs.set(ringing.id, {
+      id: ringing.id,
       channelId: ringing.id,
       kind: 'device',
       userId: memberId,
@@ -520,6 +521,7 @@ describe('call control', () => {
       [
         own.id,
         {
+          id: own.id,
           channelId: own.id,
           userId: memberId,
           memberKey: 'a',
@@ -529,6 +531,7 @@ describe('call control', () => {
       [
         other.id,
         {
+          id: other.id,
           channelId: other.id,
           userId: newId(),
           memberKey: 'b',

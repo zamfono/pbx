@@ -71,6 +71,7 @@ describe('pickup', () => {
     await cdr.open(target);
     const deviceChannel = fakeAri.addChannel({});
     target.legs.set(deviceChannel.id, {
+      id: deviceChannel.id,
       channelId: deviceChannel.id,
       kind: 'device',
       userId: targetUserId,
@@ -136,6 +137,7 @@ describe('pickup', () => {
     await cdr.open(target);
     const deviceChannel = fakeAri.addChannel({});
     target.legs.set(deviceChannel.id, {
+      id: deviceChannel.id,
       channelId: deviceChannel.id,
       kind: 'device',
       userId: targetUserId,
@@ -292,6 +294,7 @@ describe('pickup', () => {
     await cdr.open(target);
     const deviceChannel = fakeAri.addChannel({});
     target.legs.set(deviceChannel.id, {
+      id: deviceChannel.id,
       channelId: deviceChannel.id,
       kind: 'device',
       userId: targetUserId,

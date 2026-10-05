@@ -2,6 +2,8 @@
  * Retrieving a parked call (§10.2 "Call parking": "Dialling the slot from any device takes the
  * call out of the bridge"; §9.3 table); `parking.ts` owns the slot registry.
  */
+import { newId } from '@zamfono/shared';
+
 import { ignoreGone } from '../ari/failures.js';
 import type { Presence } from '../presence.js';
 import { callerChannel, type Call, type Leg } from './call.js';
@@ -24,6 +26,7 @@ async function joinRetriever(
   call: Call
 ): Promise<void> {
   const leg: Leg = {
+    id: newId(),
     channelId: callerChannel(call),
     kind: 'device',
     userId: call.callerUserId,

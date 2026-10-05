@@ -453,7 +453,9 @@ describe('Pipeline', () => {
     // While up, the call is in the live view `GET /internal/state` serves.
     const live = pipeline.deps.state.calls.get(call?.id ?? '');
     expect(live?.state).toBe('up');
-    expect(liveView(live ?? expect.unreachable()).userIds).toContain(userId);
+    expect(
+      liveView(pipeline.deps.state, live ?? expect.unreachable()).userIds
+    ).toContain(userId);
   });
 
   it('hands the answered participation to the recorder (§10.2 "Call recording")', async () => {

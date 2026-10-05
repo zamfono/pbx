@@ -31,6 +31,7 @@ export async function winBatch(
     winner === undefined
       ? null
       : {
+          id: winner.id,
           channelId: winningChannelId,
           kind: 'member',
           userId: winner.userId,

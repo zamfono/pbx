@@ -78,6 +78,7 @@ describe('closeCall', () => {
     });
     call.status = 'answered';
     call.legs.set(leg.id, {
+      id: leg.id,
       channelId: leg.id,
       kind: 'device',
       userId: null,

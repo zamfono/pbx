@@ -2,6 +2,8 @@
  * A ring-group member's leg to the external number or SIP target of its unconditional forward
  * (§10.1 step 5), one of the legs `ringGroupOriginate.ts` originates for a batch.
  */
+import { newId } from '@zamfono/shared';
+
 import type { Snapshot } from '../internal/snapshot.js';
 import type { ForwardTarget } from '../routing/targets.js';
 import type { Call } from './call.js';
@@ -57,6 +59,7 @@ export async function originateExternalLeg(
     {
       place: channelId => {
         tracked.set(channelId, {
+          id: newId(),
           channelId,
           userId: null,
           memberKey,

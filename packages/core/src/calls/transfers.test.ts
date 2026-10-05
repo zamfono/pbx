@@ -586,6 +586,7 @@ describe('transfers', () => {
       callLogMaxBytes: 1_048_576
     });
     call.legs.set('trunk-leg', {
+      id: 'trunk-leg',
       channelId: 'trunk-leg',
       kind: 'trunk',
       userId: null,
@@ -644,6 +645,7 @@ describe('transfers', () => {
     consultation.status = 'answered';
     consultation.bridgeId = bridge2.id;
     consultation.legs.set(targetLeg.id, {
+      id: targetLeg.id,
       channelId: targetLeg.id,
       kind: 'device',
       userId: targetId,

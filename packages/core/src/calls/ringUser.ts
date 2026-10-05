@@ -47,6 +47,7 @@ async function ringDevice(
 ): Promise<void> {
   const { userId } = ring;
   const leg: Leg = {
+    id: newId(),
     channelId: newId(),
     kind: 'device',
     userId,

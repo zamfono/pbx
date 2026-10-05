@@ -2,7 +2,7 @@
  * Find-me legs (§10.1 step 4): the delayed external legs a user's `find_me` list adds to their own
  * ring, and the accept prompt that keeps a voicemail box on the far end from swallowing the call.
  */
-import { MS_PER_SECOND } from '@zamfono/shared';
+import { MS_PER_SECOND, newId } from '@zamfono/shared';
 
 import { logFailure } from '../ari/failures.js';
 import { defaultPrompt } from '../prompts.js';
@@ -55,6 +55,7 @@ function findMeOwner(
   return {
     place: channelId => {
       trackLeg(pipeline, call, {
+        id: newId(),
         channelId,
         kind: 'findMe',
         userId,

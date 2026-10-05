@@ -94,6 +94,7 @@ describe('parking', () => {
     }
     const answeredLeg: Leg = parkerIsCaller
       ? {
+          id: customerChannel.id,
           channelId: customerChannel.id,
           kind: 'trunk',
           userId: null,
@@ -101,6 +102,7 @@ describe('parking', () => {
           endCause: null
         }
       : {
+          id: parkerChannel.id,
           channelId: parkerChannel.id,
           kind: 'device',
           userId: parkerUserId,
@@ -523,6 +525,7 @@ describe('parking', () => {
       callLogMaxBytes: 1_048_576
     });
     activeCall.legs.set(parkerChannel.id, {
+      id: parkerChannel.id,
       channelId: parkerChannel.id,
       kind: 'device',
       userId: parkerUserId,
@@ -600,6 +603,7 @@ describe('parking', () => {
       callLogMaxBytes: 1_048_576
     });
     activeCall.legs.set(parkerChannel.id, {
+      id: parkerChannel.id,
       channelId: parkerChannel.id,
       kind: 'device',
       userId: parkerUserId,
@@ -684,6 +688,7 @@ describe('parking', () => {
     );
     expect(
       liveView(
+        pipeline.deps.state,
         pipeline.deps.state.calls.get(activeCall.id) ?? expect.unreachable()
       ).connectedUserIds
     ).toEqual([parkerUserId]);
@@ -698,6 +703,7 @@ describe('parking', () => {
       ['ringback', 'parker']
     ] as const) {
       call.legs.set(channelId, {
+        id: channelId,
         channelId,
         kind: userId === null ? 'trunk' : 'device',
         userId,

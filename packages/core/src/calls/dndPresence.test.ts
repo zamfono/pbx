@@ -333,6 +333,7 @@ describe('do not disturb and call presence', () => {
       );
       activeCall.status = 'answered';
       activeCall.legs.set(userAChannel.id, {
+        id: userAChannel.id,
         channelId: userAChannel.id,
         kind: 'device',
         userId: userA,

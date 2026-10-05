@@ -78,6 +78,7 @@ describe('add party', () => {
       callLogMaxBytes: 1_048_576
     });
     activeCall.legs.set(userAChannel.id, {
+      id: userAChannel.id,
       channelId: userAChannel.id,
       kind: 'device',
       userId: userA,
@@ -168,6 +169,7 @@ describe('add party', () => {
       callLogMaxBytes: 1_048_576
     });
     activeCall.legs.set(userAChannel.id, {
+      id: userAChannel.id,
       channelId: userAChannel.id,
       kind: 'device',
       userId: userA,
@@ -220,6 +222,7 @@ describe('add party', () => {
       callLogMaxBytes: 1_048_576
     });
     activeCall.legs.set(userAChannel.id, {
+      id: userAChannel.id,
       channelId: userAChannel.id,
       kind: 'device',
       userId: userA,
@@ -303,6 +306,7 @@ describe('add party', () => {
     });
     activeCall.status = 'answered';
     activeCall.legs.set(userAChannel.id, {
+      id: userAChannel.id,
       channelId: userAChannel.id,
       kind: 'device',
       userId: userA,
@@ -571,6 +575,7 @@ describe('add party', () => {
       callLogMaxBytes: 1_048_576
     });
     activeCall.legs.set(userAChannel.id, {
+      id: userAChannel.id,
       channelId: userAChannel.id,
       kind: 'device',
       userId: userA,
@@ -654,6 +659,7 @@ describe('add party', () => {
     });
     activeCall.status = 'answered';
     activeCall.legs.set(userAChannel.id, {
+      id: userAChannel.id,
       channelId: userAChannel.id,
       kind: 'device',
       userId: userA,
@@ -762,6 +768,7 @@ describe('add party', () => {
       callLogMaxBytes: 1_048_576
     });
     activeCall.legs.set(userAChannel.id, {
+      id: userAChannel.id,
       channelId: userAChannel.id,
       kind: 'device',
       userId: userA,

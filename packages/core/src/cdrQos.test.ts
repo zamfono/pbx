@@ -56,6 +56,7 @@ function holding(ids: string[]): { list: () => Promise<Channel[]> } {
 
 function answerWith(call: Call, channelId: string): void {
   call.legs.set(channelId, {
+    id: channelId,
     channelId,
     kind: 'device',
     userId: null,

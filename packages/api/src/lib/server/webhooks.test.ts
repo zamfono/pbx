@@ -182,6 +182,7 @@ describe('WebhookDispatcher', () => {
       at: nowIso(),
       type: 'call.state',
       callId: 'c1',
+      legs: [],
       state: 'up',
       peer: '+15550100',
       ringGroupId: null,
@@ -200,7 +201,8 @@ describe('WebhookDispatcher', () => {
       state: 'up',
       peer: '+15550100',
       ringGroupId: null,
-      userId: 'u2'
+      userId: 'u2',
+      legs: []
     });
   });
 
@@ -215,6 +217,7 @@ describe('WebhookDispatcher', () => {
       at: nowIso(),
       type: 'call.state',
       callId: 'c1',
+      legs: [],
       state: 'ended',
       peer: '+15550100',
       ringGroupId: 'group-1',

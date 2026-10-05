@@ -50,6 +50,7 @@ async function originateDevice(
 ): Promise<void> {
   const { owner } = member;
   const leg: GroupLeg = {
+    id: newId(),
     channelId: newId(),
     userId: owner.userId,
     memberKey: owner.memberKey,

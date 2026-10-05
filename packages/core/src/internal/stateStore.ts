@@ -5,6 +5,7 @@
 import type { Presence, StateResponse, TrunkStatus } from '@zamfono/shared';
 
 import { liveView, type LiveEntry } from '../calls/callState.js';
+import type { Hold } from '../calls/hold.js';
 
 /** The part of `GET /internal/state` held in memory: the readings derived when it is served
  * (registered devices, recording-mix failures, Asterisk's channels, recordings in progress) are
@@ -19,6 +20,8 @@ type StoredState = Pick<
 export class StateStore {
   /** The calls in progress, served through `liveView` (`callState.ts`). */
   readonly calls = new Map<string, LiveEntry>();
+  /** The hold on each conversation, by its bridge (`hold.ts`), which the calls' legs show. */
+  readonly holds = new Map<string, Hold>();
   readonly trunks = new Map<string, TrunkStatus>();
   /** Active legs per trunk id (§9.4 "Channels"), which `TrunkState` counts. */
   readonly trunkChannels = new Map<string, number>();
@@ -27,7 +30,7 @@ export class StateStore {
   /** The state held here; `/internal/state` adds the readings derived when it is served. */
   snapshot(): StoredState {
     return {
-      calls: [...this.calls.values()].map(liveView),
+      calls: [...this.calls.values()].map(entry => liveView(this, entry)),
       trunks: Object.fromEntries(this.trunks),
       trunkChannels: Object.fromEntries(this.trunkChannels),
       presence: Object.fromEntries(this.presence)
