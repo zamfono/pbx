@@ -39,7 +39,9 @@
     "signature": "Non è stato possibile verificare questo accesso.",
     "nonce": "Non è stato possibile verificare questo accesso.",
     "generic": "Si è verificato un errore durante l'accesso.",
-    "backToLogin": "Torna all'accesso"
+    "backToLogin": "Torna all'accesso",
+    "unavailableTitle": "Pagina non disponibile",
+    "unavailable": "Impossibile mostrare questa pagina."
   },
   "done": {
     "title": "Hai effettuato l'accesso",
@@ -54,6 +56,7 @@
     "expired": "Questo link di caricamento è scaduto. Richiedine uno nuovo.",
     "forbidden": "Il tuo account non è autorizzato a caricare questo file.",
     "invalid": "Si possono caricare solo file WAV e MP3.",
-    "failed": "Non è stato possibile caricare il file. Riprova."
+    "failed": "Non è stato possibile caricare il file. Riprova.",
+    "error": "Non è stato possibile caricare il file. Sono accettati file WAV o MP3 fino a 50 MB."
   }
 }

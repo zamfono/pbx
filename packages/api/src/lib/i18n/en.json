@@ -39,7 +39,9 @@
     "signature": "This sign-in could not be verified.",
     "nonce": "This sign-in could not be verified.",
     "generic": "Something went wrong while signing in.",
-    "backToLogin": "Back to sign in"
+    "backToLogin": "Back to sign in",
+    "unavailableTitle": "Page unavailable",
+    "unavailable": "This page could not be shown."
   },
   "done": {
     "title": "You are signed in",
@@ -54,6 +56,7 @@
     "expired": "This upload link has expired. Ask for a new one.",
     "forbidden": "Your account is not allowed to upload this file.",
     "invalid": "Only WAV and MP3 files can be uploaded.",
-    "failed": "The file could not be uploaded. Please try again."
+    "failed": "The file could not be uploaded. Please try again.",
+    "error": "The file could not be uploaded. An upload is a WAV or MP3 file of at most 50 MB."
   }
 }

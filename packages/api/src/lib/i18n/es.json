@@ -39,7 +39,9 @@
     "signature": "Este inicio de sesión no pudo verificarse.",
     "nonce": "Este inicio de sesión no pudo verificarse.",
     "generic": "Algo salió mal al iniciar sesión.",
-    "backToLogin": "Volver al inicio de sesión"
+    "backToLogin": "Volver al inicio de sesión",
+    "unavailableTitle": "Página no disponible",
+    "unavailable": "No se pudo mostrar esta página."
   },
   "done": {
     "title": "Has iniciado sesión",
@@ -54,6 +56,7 @@
     "expired": "Este enlace de subida ha caducado. Solicite uno nuevo.",
     "forbidden": "Su cuenta no tiene permiso para subir este archivo.",
     "invalid": "Solo se pueden subir archivos WAV y MP3.",
-    "failed": "No se pudo subir el archivo. Inténtelo de nuevo."
+    "failed": "No se pudo subir el archivo. Inténtelo de nuevo.",
+    "error": "No se pudo subir el archivo. Se admiten archivos WAV o MP3 de hasta 50 MB."
   }
 }

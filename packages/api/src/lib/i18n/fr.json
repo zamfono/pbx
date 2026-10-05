@@ -39,7 +39,9 @@
     "signature": "Cette connexion n'a pas pu être vérifiée.",
     "nonce": "Cette connexion n'a pas pu être vérifiée.",
     "generic": "Une erreur est survenue lors de la connexion.",
-    "backToLogin": "Retour à la connexion"
+    "backToLogin": "Retour à la connexion",
+    "unavailableTitle": "Page indisponible",
+    "unavailable": "Cette page n'a pas pu être affichée."
   },
   "done": {
     "title": "Vous êtes connecté",
@@ -54,6 +56,7 @@
     "expired": "Ce lien d'envoi a expiré. Demandez-en un nouveau.",
     "forbidden": "Votre compte n'est pas autorisé à envoyer ce fichier.",
     "invalid": "Seuls les fichiers WAV et MP3 peuvent être envoyés.",
-    "failed": "Le fichier n'a pas pu être envoyé. Veuillez réessayer."
+    "failed": "Le fichier n'a pas pu être envoyé. Veuillez réessayer.",
+    "error": "Le fichier n'a pas pu être envoyé. Seuls les fichiers WAV ou MP3 de 50 Mo au plus sont acceptés."
   }
 }

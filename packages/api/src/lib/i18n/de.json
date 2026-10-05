@@ -39,7 +39,9 @@
     "signature": "Diese Anmeldung konnte nicht überprüft werden.",
     "nonce": "Diese Anmeldung konnte nicht überprüft werden.",
     "generic": "Bei der Anmeldung ist ein Fehler aufgetreten.",
-    "backToLogin": "Zurück zur Anmeldung"
+    "backToLogin": "Zurück zur Anmeldung",
+    "unavailableTitle": "Seite nicht verfügbar",
+    "unavailable": "Diese Seite konnte nicht angezeigt werden."
   },
   "done": {
     "title": "Sie sind angemeldet",
@@ -54,6 +56,7 @@
     "expired": "Dieser Upload-Link ist abgelaufen. Bitte fordern Sie einen neuen an.",
     "forbidden": "Ihr Konto darf diese Datei nicht hochladen.",
     "invalid": "Es können nur WAV- und MP3-Dateien hochgeladen werden.",
-    "failed": "Die Datei konnte nicht hochgeladen werden. Bitte versuchen Sie es erneut."
+    "failed": "Die Datei konnte nicht hochgeladen werden. Bitte versuchen Sie es erneut.",
+    "error": "Die Datei konnte nicht hochgeladen werden. Hochgeladen werden können WAV- oder MP3-Dateien bis 50 MB."
   }
 }

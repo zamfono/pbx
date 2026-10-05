@@ -51,6 +51,8 @@ export type Dictionary = {
     nonce: string;
     generic: string;
     backToLogin: string;
+    unavailableTitle: string;
+    unavailable: string;
   };
   done: {
     title: string;
@@ -65,6 +67,7 @@ export type Dictionary = {
     expired: string;
     forbidden: string;
     invalid: string;
+    error: string;
     failed: string;
   };
 };
