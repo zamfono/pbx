@@ -25,7 +25,13 @@
     "copied": "Copied",
     "download": "Download (.txt)",
     "saved": "I have saved my recovery codes",
-    "continue": "Continue"
+    "continue": "Continue",
+    "usePasskey": "Use a passkey",
+    "passkeyFailed": "The passkey could not be verified.",
+    "passkeyDefaultName": "Passkey",
+    "passkeyOr": "Or set up a passkey instead, with this device or a security key:",
+    "passkeyName": "Name of this passkey",
+    "addPasskey": "Set up a passkey"
   },
   "forgot": {
     "title": "Forgot password",

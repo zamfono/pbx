@@ -25,7 +25,13 @@
     "copied": "Copiato",
     "download": "Scarica (.txt)",
     "saved": "Ho salvato i miei codici di recupero",
-    "continue": "Continua"
+    "continue": "Continua",
+    "usePasskey": "Usa una passkey",
+    "passkeyFailed": "Non è stato possibile verificare la passkey.",
+    "passkeyDefaultName": "Passkey",
+    "passkeyOr": "Oppure configura invece una passkey, con questo dispositivo o una chiave di sicurezza:",
+    "passkeyName": "Nome di questa passkey",
+    "addPasskey": "Configura una passkey"
   },
   "forgot": {
     "title": "Password dimenticata",

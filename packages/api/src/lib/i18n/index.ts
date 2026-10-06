@@ -38,6 +38,12 @@ export type Dictionary = {
     download: string;
     saved: string;
     continue: string;
+    usePasskey: string;
+    passkeyFailed: string;
+    passkeyDefaultName: string;
+    passkeyOr: string;
+    passkeyName: string;
+    addPasskey: string;
   };
   forgot: {
     title: string;

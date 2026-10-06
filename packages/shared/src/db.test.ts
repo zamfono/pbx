@@ -5,14 +5,14 @@ import { migrateForTest, MIGRATIONS_DIR } from './testDb.js';
 
 test('migrates and enforces the schema', async () => {
   const db = openDb(':memory:');
-  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(7);
+  expect(await pendingMigrations(db, MIGRATIONS_DIR)).toHaveLength(8);
   await migrateForTest(db);
   expect(await pendingMigrations(db, MIGRATIONS_DIR)).toEqual([]);
 
   const tables = (await db.introspection.getTables())
     .map(table => table.name)
     .sort();
-  expect(tables).toHaveLength(50);
+  expect(tables).toHaveLength(51);
 
   // settings.smtp_check_interval_s: 900 by default, NULL for no periodic relay check (§11.4)
   const settings = (await db.introspection.getTables()).find(

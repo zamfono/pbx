@@ -54,6 +54,7 @@ describe('the login page (§5.2 "Authentication pages")', () => {
       step: 'enrol',
       qrSvg: '<svg data-qr="1"></svg>',
       secret: 'MZXW 6YTB OI',
+      passkey: { challenge: 'c' },
       error: null
     };
     second.result = undefined;
@@ -66,10 +67,15 @@ describe('the login page (§5.2 "Authentication pages")', () => {
       /<input[^>]*autocomplete="one-time-code"[^>]*name="code"/u
     );
     expect(body).not.toContain('name="_password"');
+    // A passkey's response is submitted past the code box's `required`.
+    expect(body).toMatch(
+      /<button[^>]*hidden[^>]*formnovalidate[^>]*name="action"[^>]*value="passkey"/u
+    );
+    expect(body).toMatch(/<input[^>]*name="passkeyName"/u);
   });
 
   it('shows a refused code as an alert the code box is described by', () => {
-    second.result = { step: 'verify', error: 'wrong' };
+    second.result = { step: 'verify', passkey: null, error: 'wrong' };
     const { body } = render(Page, { props: { data } });
     expect(body).toMatch(
       /<p[^>]*id="code-refusal"[^>]*role="alert"[^>]*>wrong/u

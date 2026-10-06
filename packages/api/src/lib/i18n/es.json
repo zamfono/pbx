@@ -25,7 +25,13 @@
     "copied": "Copiado",
     "download": "Descargar (.txt)",
     "saved": "He guardado mis códigos de recuperación",
-    "continue": "Continuar"
+    "continue": "Continuar",
+    "usePasskey": "Usar una llave de acceso",
+    "passkeyFailed": "No se pudo verificar la llave de acceso.",
+    "passkeyDefaultName": "Llave de acceso",
+    "passkeyOr": "O configura en su lugar una llave de acceso, con este dispositivo o una llave de seguridad:",
+    "passkeyName": "Nombre de esta llave de acceso",
+    "addPasskey": "Configurar una llave de acceso"
   },
   "forgot": {
     "title": "Contraseña olvidada",

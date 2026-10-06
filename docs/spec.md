@@ -83,7 +83,7 @@ Three long-running application services run per stack, plus the TLS proxy, the `
 
 **Write ownership.** Each SQLite table has a primary writer. Both processes read everything; WAL mode, `busy_timeout` and transactions that begin `IMMEDIATE` make concurrent writers safe (a read-only transaction begins `DEFERRED` and takes no write lock), so a cross-write is allowed where a flow naturally lands in the other process.
 
-- `api` owns the configuration tables: users, devices, trunks, trunk_hosts, outbound_routes, outbound_route_users, outbound_route_user_groups, outbound_route_numbers, dids, did_blocks, ring_groups, ring_group_members, user_groups, user_group_users, user_group_groups, extensions, device_blf_keys, forward_targets, user_forward_rules, ring_group_forward_rules, opening_hours, opening_hours_intervals, audio_assets, contacts, contact_phones, settings, ooo_rules, menus, menu_targets, blocked_numbers, sip_allowlist, sip_bans, mail_templates, tokens, oauth_clients, personal_access_tokens, totp_credentials, recovery_codes, webhooks, webhook_deliveries, backup_targets, backup_runs, update_state, maintenance_gate, audit_log.
+- `api` owns the configuration tables: users, devices, trunks, trunk_hosts, outbound_routes, outbound_route_users, outbound_route_user_groups, outbound_route_numbers, dids, did_blocks, ring_groups, ring_group_members, user_groups, user_group_users, user_group_groups, extensions, device_blf_keys, forward_targets, user_forward_rules, ring_group_forward_rules, opening_hours, opening_hours_intervals, audio_assets, contacts, contact_phones, settings, ooo_rules, menus, menu_targets, blocked_numbers, sip_allowlist, sip_bans, mail_templates, tokens, oauth_clients, personal_access_tokens, totp_credentials, webauthn_credentials, recovery_codes, webhooks, webhook_deliveries, backup_targets, backup_runs, update_state, maintenance_gate, audit_log.
 - `core` owns the runtime tables: calls, call_qos, voicemails, recordings, presence_log.
 - Known cross-writes: `api` updates and deletes `voicemails` and `recordings` rows through their REST endpoints and, after a voicemail change, calls `core`'s internal `/internal/mwi/{mailbox}` so the MWI counts follow (§9.3). `core` toggles `users.dnd` through the `*90`/`*91` feature codes and stamps `devices.last_registered_at` when a `PeerStatusChange` event reports the device's endpoint `Reachable`, a timestamp of an event rather than a state: the last time the device became reachable, not its latest REGISTER, since Asterisk raises no event for a registration refresh; a greeting recorded by phone (§10.2) makes `core` insert the `audio_assets` row, write its file to `media/prompts/` and set the mailbox's `mailbox_audio_id`. Live state such as a trunk's registration status never lands in a table (§10.1); `api` reads it from the core when a request needs it.
 
@@ -171,7 +171,7 @@ SSO rules:
 - Users may be SSO-only (`password_hash NULL`). Every owner who can log in has a local password, as break-glass against identity-provider outages: an owner without one, created by an owner or promoted from SSO-only, cannot log in at all (no password login, SSO login, refresh-token rotation or personal access token) until they set it through their set-password link, and the SSO callback shows them the error page saying so. Promoting an SSO-only user to owner revokes their sessions and personal access tokens in the same transaction and returns that link, as `POST /users/{id}/resetPassword` does. A user without an e-mail (§11.2) has no login of any kind: no set-password link, password, SSO login or personal access token.
 - The `sso_*` settings are owner-only (§11.4): whoever controls the issuer decides who logs in as whom, since the first login after a provider change binds by e-mail.
 
-**Two-factor authentication.** Every password login of a user who has a second factor, or who must have one, passes a second step on the login page, between the password and the consent step: a code from an authenticator app (TOTP, RFC 6238: HMAC-SHA-1, 6 digits, 30-second steps, one step either side; a step already accepted is never accepted again) or one of the user's recovery codes; an owner's break-glass login is no exception. Owners and admins must have a second factor, every user once `settings.mfa_required_for_all` is set. A user who must have one and has none sets it up in that same login, before consent, with no way to skip it: the page shows the `otpauth://totp/<issuer>:<email>` URI as a QR code, the issuer being `settings.company_name`, and its 160-bit secret as base32 text, and the method counts once one code from it is accepted. Setting up the first method issues ten single-use recovery codes of 80 random bits, shown once with copy and download and an "I have saved them" confirmation before the login continues. SSO logins skip the step, since the identity provider's own MFA applies; there is no remember-device. Between its two steps a login lives in `api`'s memory for 5 minutes, single-use, reached only through the random id of an HttpOnly cookie, and an `api` restart voids it. Each code submitted counts against the account lock and the per-address login limit as a password attempt does (§5.5). The secret is stored encrypted (§5.4), each recovery code as its SHA-256 hash. No operation creates a method; only the person sets one up. `POST /users/{id}/resetMfa` removes a user's methods and codes and ends their sessions (§10.3), and a user who must have a second factor sets one up again at the next login; an owner whom no other owner can reset is reset on the host with `docker compose exec api node reset-mfa.mjs <email>`, which the audit log records under the system's actor. A method set up, removed or reset is mailed to the user (`mfaChanged`, §10.2 "Mail").
+**Two-factor authentication.** Every password login of a user who has a second factor, or who must have one, passes a second step on the login page, between the password and the consent step: a code from an authenticator app (TOTP, RFC 6238: HMAC-SHA-1, 6 digits, 30-second steps, one step either side; a step already accepted is never accepted again), a passkey (WebAuthn: the stack's FQDN as relying party at `https://<FQDN>`, user verification preferred, no attestation; a user may hold several, each named) or one of the user's recovery codes; an owner's break-glass login is no exception. Owners and admins must have a second factor, every user once `settings.mfa_required_for_all` is set. A user who must have one and has none sets it up in that same login, before consent, with no way to skip it: an authenticator app, for which the page shows the `otpauth://totp/<issuer>:<email>` URI as a QR code, the issuer being `settings.company_name`, and its 160-bit secret as base32 text, and which counts once one code from it is accepted; or a passkey, through the browser's own prompt. Setting up the first method issues ten single-use recovery codes of 80 random bits, shown once with copy and download and an "I have saved them" confirmation before the login continues. SSO logins skip the step, since the identity provider's own MFA applies; there is no remember-device. Between its two steps a login lives in `api`'s memory for 5 minutes, single-use, reached only through the random id of an HttpOnly cookie, and an `api` restart voids it. Each code or passkey submitted counts against the account lock and the per-address login limit as a password attempt does (§5.5). The secret is stored encrypted (§5.4), a passkey as its credential id, public key, signature counter and transports, each recovery code as its SHA-256 hash; each passkey challenge is answered once at most, and a counter that goes back is refused. No operation creates a method; only the person sets one up. `POST /users/{id}/resetMfa` removes a user's methods and codes and ends their sessions (§10.3), and a user who must have a second factor sets one up again at the next login; an owner whom no other owner can reset is reset on the host with `docker compose exec api node reset-mfa.mjs <email>`, which the audit log records under the system's actor. A method set up, removed or reset is mailed to the user (`mfaChanged`, §10.2 "Mail").
 
 **Authentication pages.** The browser-served surface of the MVP: five SvelteKit pages inside `api`, server-rendered in `settings.language`, in one design that carries `settings.company_name` as its title.
 
@@ -1617,7 +1617,7 @@ WAL mode, `foreign_keys=ON`, write ownership split per §3.1 (`api` = config tab
 - `settings`: a singleton, never deleted;
 - `update_state`: `api`'s own singleton, never deleted, without undo (§6.3 "Automatic updates");
 - `maintenance_gate`: `api`'s own record of the maintenance gate, a row per work, never deleted, without undo (§6.4 "Maintenance gate");
-- `tokens`, `oauth_clients`, `personal_access_tokens`, `totp_credentials` and `recovery_codes`: security artifacts without undo;
+- `tokens`, `oauth_clients`, `personal_access_tokens`, `totp_credentials`, `webauthn_credentials` and `recovery_codes`: security artifacts without undo;
 - `sip_bans`: a security artifact without undo; a ban ends at its `expires_at`, never for a permanent one, or by `sipBans.lift` (§5.6);
 - `webhook_deliveries`: the webhook outbox, without undo; deleting a hook deletes its pending rows (§10.6);
 - `audit_log`: append-only.
@@ -2376,6 +2376,26 @@ CREATE TABLE totp_credentials (
   last_step  INTEGER NOT NULL,
   created_at TEXT    NOT NULL
 );
+
+-- webauthn_credentials — a user's passkeys, a second factor of a password login (§5.2).
+--   credential_id:   base64url, as the authenticator names it
+--   public_key:      the COSE public key
+--   sign_count:      the authenticator's signature counter at its last use; one that goes back
+--                    is refused
+--   transports_json: JSON array of the transports the browser reported; NULL = none reported
+--   name:            the user's name for it
+CREATE TABLE webauthn_credentials (
+  id              TEXT    PRIMARY KEY,
+  user_id         TEXT    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  credential_id   TEXT    NOT NULL UNIQUE,
+  public_key      BLOB    NOT NULL,
+  sign_count      INTEGER NOT NULL,
+  transports_json TEXT,
+  name            TEXT    NOT NULL,
+  created_at      TEXT    NOT NULL,
+  last_used_at    TEXT
+);
+CREATE INDEX webauthn_credentials_user ON webauthn_credentials(user_id);
 
 -- recovery_codes — a user's single-use recovery codes (§5.2); a code is deleted when it is used,
 -- and setting up a new set replaces the old one.

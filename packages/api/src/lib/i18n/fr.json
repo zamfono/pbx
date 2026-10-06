@@ -25,7 +25,13 @@
     "copied": "Copié",
     "download": "Télécharger (.txt)",
     "saved": "J’ai enregistré mes codes de récupération",
-    "continue": "Continuer"
+    "continue": "Continuer",
+    "usePasskey": "Utiliser une clé d’accès",
+    "passkeyFailed": "La clé d’accès n’a pas pu être vérifiée.",
+    "passkeyDefaultName": "Clé d’accès",
+    "passkeyOr": "Ou configurez plutôt une clé d’accès, avec cet appareil ou une clé de sécurité :",
+    "passkeyName": "Nom de cette clé d’accès",
+    "addPasskey": "Configurer une clé d’accès"
   },
   "forgot": {
     "title": "Mot de passe oublié",

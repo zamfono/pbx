@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { tick } from 'svelte';
+
+  import PasskeyButton from '#lib/auth/PasskeyButton.svelte';
   import RecoveryCodes from '#lib/auth/RecoveryCodes.svelte';
   import TotpSetup from '#lib/auth/TotpSetup.svelte';
   import type { Dictionary } from '#lib/i18n/index.js';
@@ -6,8 +9,9 @@
   import { secondFactor } from './authorize.remote.js';
   import type { SecondFactorStep } from './secondFactorSubmit.js';
 
-  // The second step of a password sign-in (§5.2 "Two-factor authentication"): a code, the
-  // enrolment of an authenticator app, or the recovery codes that enrolment issued.
+  // The second step of a password sign-in (§5.2 "Two-factor authentication"): a code or a
+  // passkey, the enrolment of an authenticator app or a passkey, or the recovery codes that
+  // enrolment issued.
   const {
     step,
     companyName,
@@ -19,7 +23,19 @@
   } = $props();
 
   const refusal = $derived('error' in step ? step.error : null);
+  // The verify step's passkey options, while the user has a passkey.
+  const request = $derived(step.step === 'verify' ? step.passkey : null);
   const busy = $derived(secondFactor.pending > 0);
+
+  // A passkey's response travels in a hidden field, submitted by a hidden button that skips the
+  // code box's `required`.
+  let passkeyResponse = $state('');
+  let passkeySubmit: HTMLButtonElement | undefined = $state();
+  async function submitPasskey(json: string): Promise<void> {
+    passkeyResponse = json;
+    await tick();
+    passkeySubmit?.form?.requestSubmit(passkeySubmit);
+  }
 </script>
 
 {#if step.step === 'recoveryCodes'}
@@ -66,5 +82,37 @@
     >
       {step.step === 'enrol' ? dict.enrolSubmit : dict.verifySubmit}
     </button>
+    <input {...secondFactor.fields.passkey.as('hidden', passkeyResponse)} />
+    <button
+      hidden
+      formnovalidate
+      bind:this={passkeySubmit}
+      {...secondFactor.fields.action.as('submit', 'passkey')}
+    ></button>
+    {#if step.step === 'enrol'}
+      <p class="auth-note">{dict.passkeyOr}</p>
+      <div class="auth-field">
+        <label for="passkey-name">{dict.passkeyName}</label>
+        <input
+          id="passkey-name"
+          maxlength="100"
+          {...secondFactor.fields.passkeyName.as('text')}
+          placeholder={dict.passkeyDefaultName}
+        />
+      </div>
+      <PasskeyButton
+        options={{ kind: 'register', json: step.passkey }}
+        label={dict.addPasskey}
+        failed={dict.passkeyFailed}
+        onresponse={submitPasskey}
+      />
+    {:else if request !== null}
+      <PasskeyButton
+        options={{ kind: 'authenticate', json: request }}
+        label={dict.usePasskey}
+        failed={dict.passkeyFailed}
+        onresponse={submitPasskey}
+      />
+    {/if}
   </form>
 {/if}

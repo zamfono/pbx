@@ -544,6 +544,18 @@ export interface Voicemails {
   read: Generated<number>;
 }
 
+export interface WebauthnCredentials {
+  createdAt: string;
+  credentialId: string;
+  id: string;
+  lastUsedAt: string | null;
+  name: string;
+  publicKey: Buffer;
+  signCount: number;
+  transportsJson: string | null;
+  userId: string;
+}
+
 export interface WebhookDeliveries {
   attempts: Generated<number>;
   bodyJson: string;
@@ -619,6 +631,7 @@ export interface DB {
   userGroupUsers: UserGroupUsers;
   users: Users;
   voicemails: Voicemails;
+  webauthnCredentials: WebauthnCredentials;
   webhookDeliveries: WebhookDeliveries;
   webhooks: Webhooks;
 }

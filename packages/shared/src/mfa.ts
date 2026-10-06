@@ -15,12 +15,17 @@ export type MfaMethods = {
 
 /** `userId`'s methods. */
 export async function mfaMethods(db: Db, userId: string): Promise<MfaMethods> {
-  const [totp, codes] = await Promise.all([
+  const [totp, passkeys, codes] = await Promise.all([
     db
       .selectFrom('totpCredentials')
       .select('id')
       .where('userId', '=', userId)
       .executeTakeFirst(),
+    db
+      .selectFrom('webauthnCredentials')
+      .select(eb => eb.fn.countAll<number>().as('n'))
+      .where('userId', '=', userId)
+      .executeTakeFirstOrThrow(),
     db
       .selectFrom('recoveryCodes')
       .select(eb => eb.fn.countAll<number>().as('n'))
@@ -29,7 +34,7 @@ export async function mfaMethods(db: Db, userId: string): Promise<MfaMethods> {
   ]);
   return {
     totp: totp !== undefined,
-    passkeys: 0,
+    passkeys: passkeys.n,
     recoveryCodesLeft: codes.n
   };
 }
@@ -37,6 +42,10 @@ export async function mfaMethods(db: Db, userId: string): Promise<MfaMethods> {
 /** Deletes every second-factor method and recovery code of `userId`. */
 export async function removeMfaMethods(db: Db, userId: string): Promise<void> {
   await db.deleteFrom('totpCredentials').where('userId', '=', userId).execute();
+  await db
+    .deleteFrom('webauthnCredentials')
+    .where('userId', '=', userId)
+    .execute();
   await db.deleteFrom('recoveryCodes').where('userId', '=', userId).execute();
 }
 

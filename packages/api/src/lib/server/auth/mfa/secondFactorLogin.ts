@@ -31,6 +31,8 @@ export type SecondFactorLogin = {
   client: { authorize: PendingAuthorize; clientName: string } | null;
   /** Enrolment: the authenticator secret awaiting its first code, else `null`. */
   totpSecret: Buffer | null;
+  /** The WebAuthn challenge of the passkey options the page shows last, else `null`. */
+  challenge: string | null;
   /** Enrolment done: the recovery codes awaiting the person's "saved", else `null`. */
   recoveryCodes: string[] | null;
 };

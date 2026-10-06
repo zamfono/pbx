@@ -25,7 +25,13 @@
     "copied": "Kopiert",
     "download": "Herunterladen (.txt)",
     "saved": "Ich habe meine Wiederherstellungscodes gespeichert",
-    "continue": "Weiter"
+    "continue": "Weiter",
+    "usePasskey": "Passkey verwenden",
+    "passkeyFailed": "Der Passkey konnte nicht geprüft werden.",
+    "passkeyDefaultName": "Passkey",
+    "passkeyOr": "Oder richten Sie stattdessen einen Passkey ein, mit diesem Gerät oder einem Sicherheitsschlüssel:",
+    "passkeyName": "Name dieses Passkeys",
+    "addPasskey": "Passkey einrichten"
   },
   "forgot": {
     "title": "Passwort vergessen",

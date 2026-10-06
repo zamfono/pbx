@@ -1,38 +1,28 @@
 import { randomBytes } from 'node:crypto';
 import process from 'node:process';
-import { isHttpError, isRedirect, type RequestEvent } from '@sveltejs/kit';
-import * as privateEnv from '$app/env/private';
+import { isHttpError, isRedirect } from '@sveltejs/kit';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { type Db, type UserRole } from '@zamfono/shared';
-import {
-  migrateForTest,
-  seedSettings,
-  seedUser
-} from '@zamfono/shared/testDb.js';
+import { migrateForTest, seedSettings } from '@zamfono/shared/testDb.js';
 
-import { encodeMetadataClientId } from '#lib/server/auth/clients.js';
 import { totpAt } from '#lib/server/auth/mfa/totp.js';
-import { hashPassword } from '#lib/server/auth/password.js';
 import { getDb } from '#lib/server/db.js';
 import { limiter } from '#lib/server/limiter.js';
-import { keyringFromEnv } from '#lib/server/secretbox.js';
+import { cookieJar, type CookieJar } from '#testing/requestEvent.js';
 import {
-  cookieJar,
-  requestEvent,
-  type CookieJar
-} from '#testing/requestEvent.js';
+  eventFor,
+  ORIGIN,
+  PASSWORD,
+  secretOf,
+  seedPerson,
+  signIn,
+  submitSecond
+} from '#testing/signInKit.js';
 
-import { loginSubmit, type LoginResult } from './loginSubmit.js';
-import { secondFactorSubmit } from './secondFactorSubmit.js';
+import { loginSubmit } from './loginSubmit.js';
 
 const KEY_BYTE_LENGTH = 32;
-const ORIGIN = 'https://pbx.example.com';
-const PASSWORD = 'correct horse battery staple';
 const STEP_MS = 30_000;
-const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-const BITS_PER_CHAR = 5;
-const BITS_PER_BYTE = 8;
 const RECOVERY_CODES = 10;
 // §5.5: five failed attempts lock the account.
 const LOCK_AFTER = 5;
@@ -51,67 +41,8 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-/** The secret an enrolment step shows as grouped base32, as an authenticator app reads it. */
-function secretOf(result: LoginResult): Buffer {
-  if (!('step' in result) || result.step !== 'enrol') {
-    throw new Error(
-      `expected the enrolment step, got ${JSON.stringify(result)}`
-    );
-  }
-  let bits = '';
-  for (const char of result.secret.replaceAll(' ', '')) {
-    bits += BASE32.indexOf(char).toString(2).padStart(BITS_PER_CHAR, '0');
-  }
-  const bytes = bits.match(new RegExp(`.{${BITS_PER_BYTE}}`, 'gu')) ?? [];
-  return Buffer.from(bytes.map(byte => Number.parseInt(byte, 2)));
-}
-
-async function seedPerson(
-  db: Db,
-  email: string,
-  role: UserRole
-): Promise<string> {
-  return seedUser(db, {
-    name: 'Anna',
-    email,
-    role,
-    passwordHash: await hashPassword(PASSWORD)
-  });
-}
-
-function eventFor(cookies: CookieJar): RequestEvent {
-  return requestEvent(`${ORIGIN}/oauth/authorize`, {
-    cookies,
-    clientAddress: '203.0.113.1'
-  });
-}
-
-/** A client the sign-in is for, so a passed sign-in answers the consent step, not a redirect. */
-function forClient(): Record<string, string> {
-  const redirectUri = 'https://client.example.com/callback';
-  return {
-    client_id: encodeMetadataClientId(keyringFromEnv(privateEnv), {
-      name: 'Test Client',
-      redirectUris: [redirectUri],
-      applicationType: 'web'
-    }),
-    redirect_uri: redirectUri,
-    code_challenge: 'challenge',
-    scope: ''
-  };
-}
-
-async function signIn(cookies: CookieJar, email: string): Promise<LoginResult> {
-  return loginSubmit(eventFor(cookies), {
-    ...forClient(),
-    email,
-    _password: PASSWORD,
-    action: 'password'
-  });
-}
-
 function submitCode(cookies: CookieJar, code: string): Promise<unknown> {
-  return secondFactorSubmit(eventFor(cookies), { code, action: 'code' });
+  return submitSecond(cookies, { code, action: 'code' });
 }
 
 /** Enrols `email`'s authenticator through the sign-in, answering its secret and recovery codes. */
@@ -124,7 +55,7 @@ async function enrol(
   if (!(step && typeof step === 'object' && 'codes' in step)) {
     throw new Error('expected the recovery codes');
   }
-  await secondFactorSubmit(eventFor(cookies), { code: '', action: 'saved' });
+  await submitSecond(cookies, { action: 'saved' });
   return { secret, codes: step.codes as string[] };
 }
 
@@ -146,7 +77,7 @@ describe('the second step of a password sign-in (§5.2 "Two-factor authenticatio
     const first = await signIn(cookies, 'enrol-wrong@example.com');
     const again = await submitCode(cookies, '000000');
     expect(again).toMatchObject({ step: 'enrol', error: 'Incorrect code.' });
-    expect(secretOf(again as LoginResult)).toEqual(secretOf(first));
+    expect(secretOf(again)).toEqual(secretOf(first));
   });
 
   it('stores the confirmed authenticator encrypted, shows ten recovery codes, then the consent step', async () => {
@@ -172,10 +103,7 @@ describe('the second step of a password sign-in (§5.2 "Two-factor authenticatio
     expect(hashes.map(row => row.codeHash)).not.toContain(
       (codes as { codes: string[] }).codes[0]
     );
-    const done = await secondFactorSubmit(eventFor(cookies), {
-      code: '',
-      action: 'saved'
-    });
+    const done = await submitSecond(cookies, { action: 'saved' });
     expect(done).toMatchObject({
       needsConsent: true,
       clientName: 'Test Client'
@@ -190,11 +118,13 @@ describe('the second step of a password sign-in (§5.2 "Two-factor authenticatio
     const cookies = cookieJar();
     expect(await signIn(cookies, 'replay@example.com')).toEqual({
       step: 'verify',
+      passkey: null,
       error: null
     });
     // The enrolment's own code: its step is spent.
     expect(await submitCode(cookies, totpAt(secret, Date.now()))).toEqual({
       step: 'verify',
+      passkey: null,
       error: 'Incorrect code.'
     });
     vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + STEP_MS });
@@ -216,6 +146,7 @@ describe('the second step of a password sign-in (§5.2 "Two-factor authenticatio
     await signIn(second, 'recovery@example.com');
     expect(await submitCode(second, code)).toEqual({
       step: 'verify',
+      passkey: null,
       error: 'Incorrect code.'
     });
   });
@@ -234,6 +165,7 @@ describe('the second step of a password sign-in (§5.2 "Two-factor authenticatio
     expect(limiter.isLocked('lock@example.com').locked).toBe(true);
     expect(await submitCode(cookies, totpAt(secret, Date.now()))).toEqual({
       step: 'verify',
+      passkey: null,
       error: 'Incorrect code.'
     });
   });
