@@ -11,6 +11,8 @@ why the specified behaviour changed; the commit history, how.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-06
+
 ### Added
 
 - `/metrics` counts the packets and bytes the SIP ban dropped.
@@ -20,6 +22,7 @@ why the specified behaviour changed; the commit history, how.
 ### Changed
 
 - `/auth/resetRequest` and `/auth/reset` send no CORS headers: only the stack's own pages call them.
+- A forward target refuses fields its kind does not take with 422 instead of ignoring them.
 
 ### Fixed
 
@@ -597,7 +600,8 @@ The first 0.2 release; its `v0.2.0` tag was never published.
 
 The first tagged version, before any deployment.
 
-[Unreleased]: https://github.com/zamfono/pbx/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/zamfono/pbx/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/zamfono/pbx/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/zamfono/pbx/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/zamfono/pbx/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/zamfono/pbx/compare/v0.1.0...v0.2.1
