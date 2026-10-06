@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import type { UpdateState } from '@zamfono/shared';
 
-import type { Release, Releases } from './releases.js';
+import { GitHubRateLimited, type Release, type Releases } from './releases.js';
 import type { Runner } from './runner.js';
 import { createServer, type ServerDeps } from './server.js';
 import type { UpdateVerdict } from './stack.js';
@@ -250,5 +250,30 @@ describe('the updater API', () => {
     });
     expect(status).toBe(HTTP_ACCEPTED);
     expect(body).toMatchObject({ from: 'edge', to: 'edge' });
+  });
+
+  it('looks the latest up afresh, and passes a spent GitHub rate limit on with when to retry', async () => {
+    const base = await serve(deps());
+    const { status, body } = await call(base, 'POST', '/check');
+    expect(status).toBe(HTTP_OK);
+    expect(body).toMatchObject({ latest: { version: '0.0.7' } });
+    const limited = await serve(
+      deps({
+        releases: {
+          ...fakeReleases([0, 0, 7]),
+          latest: () =>
+            Promise.reject(
+              new GitHubRateLimited('rate limited', Date.now() + 120_000)
+            )
+        }
+      })
+    );
+    const response = await fetch(`${limited}/check`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${TOKEN}` }
+    });
+    expect(response.status).toBe(HTTP_SERVICE_UNAVAILABLE);
+    expect(response.headers.get('retry-after')).toBe('120');
+    expect(await response.json()).toEqual({ error: 'rate limited' });
   });
 });

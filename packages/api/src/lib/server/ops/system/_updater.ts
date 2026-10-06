@@ -13,18 +13,21 @@ import {
 
 import { tryReadJson } from '#lib/server/json.js';
 
-/** A refusal the updater answered with, its status and message passed on to the caller. */
+/** A refusal the updater answered with, its status, message and `Retry-After` in seconds passed
+ * on to the caller. */
 export class UpdaterRefusal extends Error {
   constructor(
     readonly status: number,
-    message: string
+    message: string,
+    readonly retryAfterS?: number
   ) {
     super(message);
   }
 }
 
 export type UpdaterClient = {
-  status: () => Promise<UpdaterStatus>;
+  /** `GET /status`, or with `fresh` `POST /check`, which asks GitHub now. */
+  status: (fresh?: boolean) => Promise<UpdaterStatus>;
   /** `POST /update`: the latest release, or `version`; resolves once the updater has begun. */
   update: (
     version: string | undefined,
@@ -48,11 +51,13 @@ async function call<T>(
   });
   const body = await tryReadJson(response);
   if (!response.ok) {
+    const retryAfter = response.headers.get('retry-after');
     throw new UpdaterRefusal(
       response.status,
       isRecord(body) && typeof body.error === 'string'
         ? body.error
-        : `the updater answered ${response.status}`
+        : `the updater answered ${response.status}`,
+      retryAfter === null ? undefined : Number(retryAfter)
     );
   }
   return body as T;
@@ -65,7 +70,10 @@ export function updaterClient(): UpdaterClient | undefined {
     return undefined;
   }
   return {
-    status: async () => call<UpdaterStatus>('/status', { token }),
+    status: async fresh =>
+      fresh === true
+        ? call<UpdaterStatus>('/check', { token, method: 'POST' })
+        : call<UpdaterStatus>('/status', { token }),
     update: async (version, requester) =>
       call<UpdateState>('/update', {
         token,

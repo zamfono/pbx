@@ -4,7 +4,7 @@ import http from 'node:http';
 import type { RunRequester, UpdateState } from '@zamfono/shared';
 
 import { errorMessage } from './errors.js';
-import type { Releases } from './releases.js';
+import { GitHubRateLimited, type Releases } from './releases.js';
 import type { Runner } from './runner.js';
 import type { UpdateVerdict } from './stack.js';
 import { describeStatus } from './status.js';
@@ -18,7 +18,8 @@ import {
 
 /**
  * The updater's HTTP API on the stack's internal network (§6.3 "Updates"), no port published:
- * `GET /status` and `POST /update`, each only with `UPDATER_TOKEN`, which `api` alone holds.
+ * `GET /status`, `POST /check` and `POST /update`, each only with `UPDATER_TOKEN`, which `api`
+ * alone holds.
  */
 const HTTP_OK = 200;
 const HTTP_ACCEPTED = 202;
@@ -29,6 +30,7 @@ const HTTP_CONFLICT = 409;
 const HTTP_SERVICE_UNAVAILABLE = 503;
 const MAX_BODY_BYTES = 4096;
 const MAX_BY_LENGTH = 200;
+const MS_PER_SECOND = 1000;
 const PINS_NO_RELEASE =
   'the stack directory runs no release to update from: .env sets ZAMFONO_VERSION to an immutable sha- build, or the directory has no VERSION file; update.sh --current says which';
 
@@ -188,9 +190,10 @@ async function update(deps: ServerDeps, body: unknown): Promise<UpdateState> {
 function send(
   response: http.ServerResponse,
   code: number,
-  body: unknown
+  body: unknown,
+  headers: Record<string, string> = {}
 ): void {
-  response.writeHead(code, { 'content-type': 'application/json' });
+  response.writeHead(code, { 'content-type': 'application/json', ...headers });
   response.end(JSON.stringify(body));
 }
 
@@ -208,6 +211,9 @@ async function route(
   if (key === 'GET /status') {
     return [HTTP_OK, await describeStatus(deps)];
   }
+  if (key === 'POST /check') {
+    return [HTTP_OK, await describeStatus(deps, true)];
+  }
   if (key === 'POST /update') {
     return [HTTP_ACCEPTED, await update(deps, await readBody(request))];
   }
@@ -223,6 +229,18 @@ export function createServer(deps: ServerDeps): http.Server {
       (error: unknown) => {
         if (error instanceof HttpError) {
           send(response, error.status, { error: error.message });
+          return;
+        }
+        if (error instanceof GitHubRateLimited) {
+          const seconds = Math.ceil(
+            (error.retryAt - Date.now()) / MS_PER_SECOND
+          );
+          send(
+            response,
+            HTTP_SERVICE_UNAVAILABLE,
+            { error: error.message },
+            { 'retry-after': String(Math.max(1, seconds)) }
+          );
           return;
         }
         send(response, HTTP_SERVICE_UNAVAILABLE, {

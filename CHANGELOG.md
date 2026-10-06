@@ -14,6 +14,7 @@ why the specified behaviour changed; the commit history, how.
 ### Added
 
 - `/metrics` counts the packets and bytes the SIP ban dropped.
+- `system.checkUpdate` asks GitHub for the latest release now instead of within the hour.
 
 ### Fixed
 

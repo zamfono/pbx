@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { GitHubRateLimited } from './releases.js';
 import type { ServerDeps } from './server.js';
 import type { UpdateVerdict } from './stack.js';
 import { describeStatus } from './status.js';
@@ -63,5 +64,30 @@ describe('describeStatus on an edge stack', () => {
       updatable: false
     });
     expect(deps.checked).toEqual([]);
+  });
+});
+
+describe('describeStatus asked to look afresh', () => {
+  it('asks for the latest afresh, and fails on a spent GitHub rate limit that a cached look reports', async () => {
+    const fresh: (boolean | undefined)[] = [];
+    const limited = new GitHubRateLimited('GitHub answered 403', 0);
+    const deps: ServerDeps = {
+      ...edgeDeps(RUNNING_COMMIT),
+      currentVersion: () => Promise.resolve([0, 0, 6]),
+      releases: {
+        latest: asked => {
+          fresh.push(asked);
+          return Promise.reject(limited);
+        },
+        byVersion: () => Promise.resolve(undefined),
+        latestEdge: () => Promise.reject(new Error('not edge'))
+      }
+    };
+    await expect(describeStatus(deps, true)).rejects.toBe(limited);
+    expect(await describeStatus(deps)).toMatchObject({
+      latest: null,
+      latestError: 'GitHub answered 403'
+    });
+    expect(fresh).toEqual([true, false]);
   });
 });

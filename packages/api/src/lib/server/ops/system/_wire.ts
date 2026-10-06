@@ -49,6 +49,14 @@ export const updaterStatusOut = z.object({
     .describe('Why the updater cannot update at all.')
 });
 
+/** `system.info`'s and `system.checkUpdate`'s `update`: the updater's status, or why there is
+ * none. */
+export const updateOut = z
+  .union([updaterStatusOut, z.object({ unavailable: z.string() })])
+  .describe(
+    "The updater's view (§6.3): the latest release, whether system.update can take the stack there, and how the last update went and who asked for it; unavailable says why there is none."
+  );
+
 /** A process's version (`ZamfonoVersion`, §7 "Version"). */
 export const versionOut = z.object({
   version: z.string(),

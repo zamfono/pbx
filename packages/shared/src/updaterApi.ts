@@ -1,6 +1,7 @@
 /**
  * The updater's HTTP API (§6.3 "Updates"), which `api` calls on the stack's internal network:
- * `GET /status` and `POST /update`, each with `UPDATER_TOKEN`.
+ * `GET /status`, `POST /check` (the same status, GitHub asked now) and `POST /update`, each with
+ * `UPDATER_TOKEN`.
  */
 
 /**
@@ -25,7 +26,7 @@ export type RunRequester =
  * the record while it holds no run. */
 export type RunTrigger = RunRequester | { trigger: 'host' };
 
-/** `GET /status`. */
+/** `GET /status` and `POST /check`. */
 export type UpdaterStatus = {
   current: string | null;
   /** On an `edge` stack, `commit` names main's newest build. */

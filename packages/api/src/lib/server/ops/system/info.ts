@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { processStartedAtIso, resolveVersion, type Db } from '@zamfono/shared';
 
 import { getCoreClient } from '#lib/server/coreClient.js';
-import { errorMessage } from '#lib/server/errors.js';
 import { lastGiveUps } from '#lib/server/jobs/maintenanceGiveUp.js';
 import {
   isRelayConfigured,
@@ -22,8 +21,9 @@ import {
   autoUpdateFailureOut,
   loadUpdateState
 } from './_state.js';
+import { updateStatus } from './_status.js';
 import { updaterClient } from './_updater.js';
-import { updaterStatusOut, versionOut } from './_wire.js';
+import { updateOut, versionOut } from './_wire.js';
 
 // When this process started, however late this module loads, so a restart is visible (§10.3).
 const apiStartedAt = processStartedAtIso();
@@ -44,11 +44,7 @@ const outputSchema = z.object({
     .describe(
       'What core runs, since when, and since when its Asterisk runs (null while ARI is down); null while core does not answer.'
     ),
-  update: z
-    .union([updaterStatusOut, z.object({ unavailable: z.string() })])
-    .describe(
-      "The updater's view (§6.3): the latest release, whether system.update can take the stack there, and how the last update went and who asked for it; unavailable says why there is none."
-    ),
+  update: updateOut,
   autoUpdate: z
     .object({ enabled: z.boolean(), failed: autoUpdateFailureOut.nullable() })
     .describe(
@@ -83,23 +79,6 @@ const outputSchema = z.object({
     )
 });
 type Output = z.infer<typeof outputSchema>;
-
-async function updateStatus(): Promise<Output['update']> {
-  const client = updaterClient();
-  if (client === undefined) {
-    return {
-      unavailable:
-        'UPDATER_TOKEN is not set in .env; updates run only by update.sh on the host'
-    };
-  }
-  try {
-    return await client.status();
-  } catch (error) {
-    return {
-      unavailable: `the updater did not answer: ${errorMessage(error)}`
-    };
-  }
-}
 
 /** `failed` stays `null` without an updater, which automatic updates need; the record is kept. */
 async function autoUpdateStatus(db: Db): Promise<Output['autoUpdate']> {

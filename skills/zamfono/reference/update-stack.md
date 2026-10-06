@@ -18,6 +18,8 @@ the work; it takes only a published release that is newer than the running one a
    all, usually a missing `UPDATER_TOKEN` or `CONTAINER_SOCKET` in `.env`. On a test stack whose
    `ZAMFONO_VERSION` is `edge`, `current` and `latest` both say `edge`, `latest` naming main's
    newest build; `updatable: true` means the stack runs an older one, and the update pulls it.
+   The updater asks GitHub once an hour; `system.checkUpdate` (`POST /api/v1/system/updateCheck`)
+   has it ask now, at most once a minute, and answers with the same `update` field.
 2. Back up first: `backups.runs.start` (`POST /api/v1/backups/runs`) on a target from
    `backups.targets.list` (`GET /api/v1/backups/targets`), then read the run with `backups.runs.get`
    (`GET /api/v1/backups/runs/{id}`) until its `status` is `ok`. The update is refused without a

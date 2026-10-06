@@ -114,10 +114,12 @@ export type ProblemStatus = 400 | 401 | 403 | 404 | 409 | 422 | 502 | 503;
 
 /** Thrown by an operation's `run`, or by the runner itself, to answer with an RFC 9457 problem. */
 export class OpError extends Error {
+  /** `headers` are wire headers of the REST answer, such as `Retry-After` on a 503. */
   constructor(
     public status: ProblemStatus,
     public title: string,
-    public detail?: unknown
+    public detail?: unknown,
+    public headers?: Record<string, string>
   ) {
     super(title);
     this.name = 'OpError';

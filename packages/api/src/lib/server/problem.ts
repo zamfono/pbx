@@ -73,7 +73,7 @@ function isBodyTooLarge(error: unknown): boolean {
  */
 export function problemFromError(error: unknown): Response {
   if (error instanceof OpError) {
-    return problem(error.status, error.title, error.detail);
+    return problem(error.status, error.title, error.detail, error.headers);
   }
   if (isHttpError(error)) {
     return problem(error.status, error.body.message);
