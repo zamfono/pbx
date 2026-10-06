@@ -531,6 +531,76 @@ describe('add party', () => {
     expect(row).toEqual({ toUri: '+15557777', calleeUserId: userC });
   });
 
+  it("*5 to an own DID forwarding to another own DID's number follows it to that DID's target, one hop on, never over a trunk", async () => {
+    await setUp();
+    const { addPartyCall, bridgeId } = await externalAddParty();
+    const userC = await seedUser(db);
+    await seedExtension(db, '300', { userId: userC });
+    await seedDevice(db, userC, 'e300-dabc');
+    await registerWithPresence(rig, 'e300-dabc');
+    await seedDid(
+      db,
+      '+15556666',
+      await seedForwardTarget(db, { userId: userC })
+    );
+    await seedDid(
+      db,
+      '+15557777',
+      await seedForwardTarget(db, { external: '+15556666' })
+    );
+    pipeline.deps.cache.invalidate();
+
+    await handleFeature(
+      pipeline,
+      presence,
+      addPartyCall,
+      'addParty',
+      '+15557777'
+    );
+
+    expect(addPartyCall.bridgeId).toBe(bridgeId);
+    const endpoints = fakeAri.calls
+      .filter(entry => isPlacement(entry))
+      .map(entry => (entry.body as { endpoint?: string }).endpoint);
+    expect(endpoints).toEqual([contactEndpoint('e300-dabc')]);
+    // §10.1 step 7: an own DID followed counts a hop whatever its target's kind.
+    expect(addPartyCall.hops).toBe(1);
+  });
+
+  it('*5 to own DIDs forwarding to each other is refused with 480 at the hop limit, nothing dialled', async () => {
+    await setUp();
+    const { addPartyCall } = await externalAddParty();
+    await seedDid(
+      db,
+      '+15556666',
+      await seedForwardTarget(db, { external: '+15557777' })
+    );
+    await seedDid(
+      db,
+      '+15557777',
+      await seedForwardTarget(db, { external: '+15556666' })
+    );
+    pipeline.deps.cache.invalidate();
+
+    await handleFeature(
+      pipeline,
+      presence,
+      addPartyCall,
+      'addParty',
+      '+15557777'
+    );
+
+    expect(fakeAri.calls.some(entry => isPlacement(entry))).toBe(false);
+    expect(
+      fakeAri.calls.some(
+        entry =>
+          entry.method === 'DELETE' &&
+          entry.path === `channels/${addPartyCall.callerChannelId}` &&
+          entry.qs === `reason_code=${sipToHangupCause(480)}`
+      )
+    ).toBe(true);
+  });
+
   /**
    * `*5+15557777`, an own DID whose target is `target`, with a recorder that records; the added
    * party leaves once two snoops record it (§10.2 "Three-way calls": the added leg's recording

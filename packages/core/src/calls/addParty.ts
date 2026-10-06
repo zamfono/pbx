@@ -63,6 +63,7 @@ async function ringInternalTarget(
   activeBridgeId: string,
   target: Extract<AddedTarget, { kind: 'user' | 'ringGroup' }>
 ): Promise<boolean> {
+  call.hops = target.hops;
   if (call.callerChannelId !== null) {
     const entered =
       target.kind === 'user'
