@@ -58,6 +58,7 @@ async function healthOf(
       dropped: null
     },
     mailRelay: null,
+    skippedConfigRows: 0,
     ...deps
   });
 }
@@ -111,6 +112,7 @@ describe('apiHealth (§6.3 "Health", §10.3 "Health")', () => {
           }
         ],
         'sipBan:helper': [{ status: 'pass', time: '2026-10-05T12:00:00Z' }],
+        'config:render': [{ status: 'pass', observedValue: 0 }],
         'trunks:emergency': [{ status: 'pass' }],
         'secrets:keyRotation': [{ status: 'pass', observedValue: 0 }],
         'config:propagation': [{ status: 'pass' }],
@@ -126,6 +128,7 @@ describe('apiHealth (§6.3 "Health", §10.3 "Health")', () => {
       'core:ari',
       'certificate:sync',
       'sipBan:helper',
+      'config:render',
       'trunks:emergency',
       'secrets:keyRotation',
       'config:propagation',
@@ -148,7 +151,8 @@ describe('apiHealth (§6.3 "Health", §10.3 "Health")', () => {
         'database:status': [{ status: 'fail', output: 'migrationPending' }],
         'core:reachable': [{ status: 'fail' }],
         'certificate:sync': [{ status: 'warn', observedValue: 'unknown' }],
-        'sipBan:helper': [{ status: 'fail' }]
+        'sipBan:helper': [{ status: 'fail' }],
+        'config:render': [{ status: 'pass', observedValue: 0 }]
       }
     });
     expect(healthHttpStatus(health)).toBe(HTTP_SERVICE_UNAVAILABLE);
@@ -214,6 +218,17 @@ describe('apiHealth (§6.3 "Health", §10.3 "Health")', () => {
     expect(health.checks['sipBan:helper']).toEqual([
       { status: 'fail', time: '2026-10-05T11:00:00Z' }
     ]);
+  });
+
+  it('warns config:render with the count of rows the latest render left out, and nothing of which', async () => {
+    const db = await makeTestDb();
+    await seedSettings(db);
+    await seedTrunk(db, 'local', 1, 1);
+    const health = await healthOf(db, { skippedConfigRows: 2 });
+    expect(health.checks['config:render']).toStrictEqual([
+      { status: 'warn', observedValue: 2, output: 'skipped' }
+    ]);
+    expect(health.status).toBe('warn');
   });
 });
 

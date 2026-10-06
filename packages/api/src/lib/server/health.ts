@@ -36,6 +36,8 @@ export type ApiHealthDeps = {
   sipBanHelper: SipBanHelperState;
   /** The mail relay's latest check or send, `null` before the first. */
   mailRelay: RelayOutcome | null;
+  /** How many rows the latest config render left out (§3.1 "Config propagation"). */
+  skippedConfigRows: number;
 };
 
 /** `certificate:sync`'s status per state of the sync (§10.3 "Health"). */
@@ -116,6 +118,16 @@ async function relayCheck(
   };
 }
 
+/**
+ * `config:render`: `warn` while the latest render left rows out, their count as `observedValue`
+ * and nothing of which, since `/healthz` is public (§3.1 "Config propagation").
+ */
+function configRenderCheck(skipped: number): [HealthCheck] {
+  return skipped > 0
+    ? [{ status: 'warn', observedValue: skipped, output: 'skipped' }]
+    : [{ status: 'pass', observedValue: 0 }];
+}
+
 /** The checks read from the tables, which only a migrated database holds. */
 async function tableChecks(deps: ApiHealthDeps): Promise<HealthChecks> {
   const { keyring: kr } = deps;
@@ -159,6 +171,7 @@ export async function apiHealth(deps: ApiHealthDeps): Promise<HealthDocument> {
       'fail',
       heartbeat === null ? {} : { time: heartbeat }
     ),
+    'config:render': configRenderCheck(deps.skippedConfigRows),
     ...(database[0].status === 'pass' ? await tableChecks(deps) : {})
   });
 }

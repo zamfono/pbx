@@ -13,6 +13,7 @@ import {
   type ZamfonoVersion
 } from '@zamfono/shared';
 
+import { skippedConfigRows } from './configRenderSkips.js';
 import type { CertSyncStatus } from './jobs/certSync.js';
 import {
   apiRequestHistogramLines,
@@ -45,14 +46,19 @@ function gaugeLines(name: string, value: number): string[] {
   return [`# TYPE ${name} gauge`, `${name} ${value}`];
 }
 
-/** §3.1 "Config propagation": whether one is owed, and the failures since `api` started. */
+/** §3.1 "Config propagation": whether one is owed, the failures since `api` started, and the rows
+ * the latest render left out. */
 async function configPropagationLines(db: Db): Promise<string[]> {
   return [
     ...gaugeLines(
       'zamfono_config_propagation_pending',
       (await isPropagationPending(db)) ? 1 : 0
     ),
-    ...configPropagationFailureLines()
+    ...configPropagationFailureLines(),
+    ...gaugeLines(
+      'zamfono_config_render_skipped_rows',
+      skippedConfigRows().length
+    )
   ];
 }
 

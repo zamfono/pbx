@@ -54,7 +54,7 @@ function renderTrunk(trunk: Trunk): string {
     trunks: [trunk],
     moh: []
   };
-  return render(input)['pjsip_trunks.conf'];
+  return render(input).files['pjsip_trunks.conf'];
 }
 
 describe('renderTrunksConf escaping', () => {
@@ -132,6 +132,37 @@ describe('renderTrunksConf registration retries', () => {
     expect(configValues(conf, 'fatal_retry_interval')).toEqual(['45']);
     expect(configValues(conf, 'max_retries')).toEqual(['4294967295']);
     expect(configValues(conf, 'auth_rejection_permanent')).toEqual(['no']);
+  });
+
+  test('a registration trunk without a registrar is left out, the other trunks rendered', () => {
+    const { files, skipped } = render({
+      settings: {
+        codecs: ['alaw'],
+        ringotelMaxRegs: 3,
+        extLength: 3,
+        holdMohClass: 'default'
+      },
+      users: [],
+      devices: [],
+      ringGroups: [],
+      parkingSlots: [],
+      trunks: [
+        {
+          ...registrationTrunk,
+          hosts: registrationTrunk.hosts.map(host => ({
+            ...host,
+            direction: 'inbound'
+          }))
+        },
+        { ...registrationTrunk, id: 't2', name: 'Trunk B' }
+      ],
+      moh: []
+    });
+    expect(skipped).toEqual([
+      { type: 'trunk', id: 't1', field: 'trunk.hosts' }
+    ]);
+    expect(files['pjsip_trunks.conf']).not.toContain('[trunk-t1]');
+    expect(files['pjsip_trunks.conf']).toContain('[trunk-t2]');
   });
 
   test("a trunk without register_retry_s retries at Asterisk's own 60 s", () => {

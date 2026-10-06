@@ -14,6 +14,11 @@ import {
   type Rendered,
   type RenderInput
 } from './shared.js';
+import {
+  renderRows,
+  UnrenderableValueError,
+  type SkippedRow
+} from './skippedRows.js';
 import { renderTrunksConf } from './trunks.js';
 
 function assertSafeDevice(device: Device, ringGroupIds: string[]): void {
@@ -95,7 +100,7 @@ function deviceAclLines(allowedIps: string[]): string[] {
  * dropped, and a `;` escaped so the config parser does not read it as a comment.
  */
 function formatCallerId(name: string, ext: string): string {
-  assertExtension(ext);
+  assertExtension(ext, 'user.ext');
   // eslint-disable-next-line no-control-regex -- control characters are exactly what is removed
   const safeName = name.replaceAll(/["\\\u0000-\u001f\u007f]/gu, '').trim();
   return `callerid = "${escapeConfigValue(safeName)}" <${ext}>`;
@@ -132,67 +137,100 @@ function renderDeviceEndpoint(
   return lines.join('\n');
 }
 
-function renderUsersConf(input: RenderInput): string {
+// A device without a live owner holding an extension has no caller ID or mailbox to render.
+function renderUsersConf(input: RenderInput, skipped: SkippedRow[]): string {
   const usersById = new Map(input.users.map(user => [user.id, user]));
   const devices = [...input.devices].sort((left, right) =>
     compareStrings(left.sipUsername, right.sipUsername)
   );
   assertSafeId(input.settings.holdMohClass, 'settings.holdMohClass');
-  const sections = devices.flatMap(device => {
-    const owner = usersById.get(device.userId);
-    if (owner === undefined) {
-      throw new Error(
-        `render: device ${device.id} has no owner among the users`
-      );
-    }
-    assertSafeDevice(device, owner.ringGroupIds);
-    return [
-      renderDeviceAor(
-        device,
-        input.settings.ringotelMaxRegs,
-        owner.ringGroupIds
-      ),
-      renderDeviceAuth(device),
-      renderDeviceEndpoint(device, owner, input.settings)
-    ];
-  });
+  const sections = renderRows(
+    devices,
+    device => ({ type: 'device', id: device.id }),
+    device => {
+      const owner = usersById.get(device.userId);
+      if (owner === undefined) {
+        throw new UnrenderableValueError('device.userId');
+      }
+      assertSafeDevice(device, owner.ringGroupIds);
+      return [
+        renderDeviceAor(
+          device,
+          input.settings.ringotelMaxRegs,
+          owner.ringGroupIds
+        ),
+        renderDeviceAuth(device),
+        renderDeviceEndpoint(device, owner, input.settings)
+      ];
+    },
+    skipped
+  );
   return joinSections(sections);
 }
 
-function renderHintsConf(input: RenderInput): string {
-  const exts = [
-    ...input.users.map(user => user.ext),
-    ...input.ringGroups.map(group => group.ext),
-    ...input.parkingSlots
-  ].sort(compareStrings);
-  const lines = exts.map(ext => {
-    assertExtension(ext);
-    return `exten => ${ext},hint,${presenceHintDevice(ext)}`;
-  });
+/** Every extension's hint, by extension; a parking slot is known by its extension alone. */
+function renderHintsConf(input: RenderInput, skipped: SkippedRow[]): string {
+  const holders: (Pick<SkippedRow, 'type' | 'id'> & { ext: string })[] = [
+    ...input.users.map(user => ({ type: 'user' as const, ...user })),
+    ...input.ringGroups.map(group => ({
+      type: 'ringGroup' as const,
+      ...group
+    })),
+    ...input.parkingSlots.map(ext => ({
+      type: 'parkingSlot' as const,
+      id: ext,
+      ext
+    }))
+  ].sort((left, right) => compareStrings(left.ext, right.ext));
+  const lines = renderRows(
+    holders,
+    ({ type, id }) => ({ type, id }),
+    ({ type, ext }) => {
+      assertExtension(ext, `${type}.ext`);
+      return [`exten => ${ext},hint,${presenceHintDevice(ext)}`];
+    },
+    skipped
+  );
   return `${lines.join('\n')}\n`;
 }
 
 /** One class per `moh` asset (§10.2); Asterisk's own built-in `default` class is not rendered here. */
-function renderMohConf(input: RenderInput): string {
+function renderMohConf(input: RenderInput, skipped: SkippedRow[]): string {
   const assets = [...input.moh].sort((left, right) =>
     compareStrings(left.id, right.id)
   );
-  const sections = assets.map(asset => {
-    assertSafeId(asset.id, 'moh.id');
-    return [
-      `[${asset.id}]`,
-      'mode = files',
-      `directory = /media/${MOH_CLASSES_DIR}/${asset.id}/`
-    ].join('\n');
-  });
+  const sections = renderRows(
+    assets,
+    asset => ({ type: 'audioAsset', id: asset.id }),
+    asset => {
+      assertSafeId(asset.id, 'audioAsset.id');
+      return [
+        [
+          `[${asset.id}]`,
+          'mode = files',
+          `directory = /media/${MOH_CLASSES_DIR}/${asset.id}/`
+        ].join('\n')
+      ];
+    },
+    skipped
+  );
   return joinSections(sections);
 }
 
-export function render(input: RenderInput): Rendered {
-  return {
-    'pjsip_users.conf': renderUsersConf(input),
-    'pjsip_trunks.conf': renderTrunksConf(input),
-    'extensions_hints.conf': renderHintsConf(input),
-    'musiconhold.conf': renderMohConf(input)
+/**
+ * The four generated files, and the rows left out of them since a value of theirs cannot be
+ * written into the config (§3.1 "Config propagation").
+ */
+export function render(input: RenderInput): {
+  files: Rendered;
+  skipped: SkippedRow[];
+} {
+  const skipped: SkippedRow[] = [];
+  const files: Rendered = {
+    'pjsip_users.conf': renderUsersConf(input, skipped),
+    'pjsip_trunks.conf': renderTrunksConf(input, skipped),
+    'extensions_hints.conf': renderHintsConf(input, skipped),
+    'musiconhold.conf': renderMohConf(input, skipped)
   };
+  return { files, skipped };
 }

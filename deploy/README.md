@@ -451,8 +451,9 @@ Point an uptime check at `https://<FQDN>/healthz`; its HTTP status suffices. The
 `application/health+json`: one entry per check under `checks`, and a `status` that is the worst
 of theirs. `fail` (a closed or unmigrated database, `core` or its Asterisk down, no emergency
 trunk, no usable certificate, a stopped SIP ban helper) answers 503; `warn` (an owed config
-propagation or Ringotel push, a failed automatic update, an expiring certificate, secrets left
-under a retired key) answers 200 and is worth an alert of its own.
+propagation or Ringotel push, configuration rows left out of the render, which `system.info`
+names, a failed automatic update, an expiring certificate, secrets left under a retired key)
+answers 200 and is worth an alert of its own.
 
 ```bash
 curl -sS https://pbx.example.com/healthz | jq -e '.status == "pass"'
@@ -478,6 +479,7 @@ scrape_configs:
 | `zamfono_backup_last_success_age_seconds{target}`                                 | above your backup interval plus a few hours (26 h for the nightly default) |
 | `zamfono_certificate_sync_ok`                                                     | 0 for more than an hour                                                    |
 | `zamfono_config_propagation_pending`, `zamfono_config_propagation_failures_total` | pending is 1                                                               |
+| `zamfono_config_render_skipped_rows`                                              | above 0: `system.info` names the rows left out                             |
 | `zamfono_auto_update_failed`, `zamfono_auto_update_failed_attempts`               | 1                                                                          |
 | `zamfono_breaking_update_available`                                               | 1: a release waits for `update.sh`                                         |
 | `zamfono_recording_mix_failures_total`                                            | it increases: raw recording files await salvage                            |

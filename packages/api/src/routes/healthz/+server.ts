@@ -6,6 +6,7 @@ import {
   type HealthChecks
 } from '@zamfono/shared';
 
+import { skippedConfigRows } from '#lib/server/configRenderSkips.js';
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { getDb } from '#lib/server/db.js';
 import { apiHealth } from '#lib/server/health.js';
@@ -35,7 +36,8 @@ export async function GET(): Promise<Response> {
     keyring: keyringFromEnv(env),
     certificateSync: { state: certSyncStatus(), at: certSyncLastPass() },
     sipBanHelper: await sipBanHelperState(),
-    mailRelay: relayState()
+    mailRelay: relayState(),
+    skippedConfigRows: skippedConfigRows().length
   });
   return new Response(JSON.stringify(document), {
     status: healthHttpStatus(document),

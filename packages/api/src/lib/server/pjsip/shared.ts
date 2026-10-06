@@ -10,6 +10,8 @@ import type {
   TrunkTransport
 } from '@zamfono/shared';
 
+import { UnrenderableValueError } from './skippedRows.js';
+
 export type RenderInput = {
   // holdMohClass: the MoH class a party hears while a device holds them (§10.2 "Hold music"):
   // the class of `settings.hold_moh_audio_id`, else Asterisk's static `default`.
@@ -96,16 +98,16 @@ const FIRST_UNSTRIPPED_CODE_POINT = 0x21;
 const ID_PATTERN = /^[0-9a-z-]+$/iu;
 
 /** Throws when `ext` is not dialplan-safe digits (§9.3), since it is written into config verbatim. */
-export function assertExtension(ext: string): void {
+export function assertExtension(ext: string, field: string): void {
   if (!EXTENSION_PATTERN.test(ext)) {
-    throw new Error(`render: invalid extension ${JSON.stringify(ext)}`);
+    throw new UnrenderableValueError(field);
   }
 }
 
 /** Throws when `value` could break out of its PJSIP line or section. */
 export function assertSafeConfigValue(value: string, field: string): void {
   if (UNSAFE_CONFIG_PATTERN.test(value)) {
-    throw new Error(`render: unsafe value for ${field}`);
+    throw new UnrenderableValueError(field);
   }
 }
 
@@ -127,7 +129,7 @@ export function isWholeConfigValue(value: string): boolean {
 /** Throws when `value` would not read back from its line as written (`isWholeConfigValue`). */
 export function assertWholeConfigValue(value: string, field: string): void {
   if (!isWholeConfigValue(value)) {
-    throw new Error(`render: unsafe value for ${field}`);
+    throw new UnrenderableValueError(field);
   }
 }
 
@@ -144,7 +146,7 @@ export function escapeConfigValue(value: string): string {
 /** Throws when `id` is not a bare UUIDv7 shape, since it becomes a filesystem path segment. */
 export function assertSafeId(id: string, field: string): void {
   if (!ID_PATTERN.test(id)) {
-    throw new Error(`render: unsafe value for ${field}`);
+    throw new UnrenderableValueError(field);
   }
 }
 

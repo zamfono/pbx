@@ -27,6 +27,7 @@ why the specified behaviour changed; the commit history, how.
 - Registration trunks over TCP or TLS register afresh after every Asterisk restart or update.
 - Trunk INVITEs name the stack's public address in `From`, not the container's, in the ports mode.
 - Trunk passwords may contain `[` and `]`.
+- A configuration row Asterisk cannot take is left out, and logged, instead of blocking every config change; `/healthz` warns `config:render`.
 
 ## [0.3.1] - 2026-10-05
 

@@ -11,6 +11,7 @@ import pino, { type Logger } from 'pino';
 
 import { reloadKindSchema, type Db, type ReloadKind } from '@zamfono/shared';
 
+import { recordSkippedConfigRows } from './configRenderSkips.js';
 import { getCoreClient } from './coreClient.js';
 import { recordConfigPropagationFailure } from './metricsCounters.js';
 import { runRestartPush, runWaitingHooks } from './ops/afterCommit.js';
@@ -54,18 +55,19 @@ const serialized = serialQueue();
 /**
  * Renders the PJSIP/hints/MoH configuration from the live database onto the `asterisk-config`
  * volume (§9.1). All four files are rewritten together, since a partial rewrite could leave them
- * inconsistent with each other.
+ * inconsistent with each other; the rows the render left out are recorded once they are.
  */
 async function renderConfig(db: Db): Promise<void> {
   const input = await loadRenderInput(db, keyringFromEnv(env));
-  const rendered = render(input);
+  const { files, skipped } = render(input);
   const dir = env.ASTERISK_GEN_DIR;
   await mkdir(dir, { recursive: true });
   await Promise.all(
-    Object.entries(rendered).map(([filename, contents]) =>
+    Object.entries(files).map(([filename, contents]) =>
       writeFileAtomically(path.join(dir, filename), contents)
     )
   );
+  recordSkippedConfigRows(skipped);
 }
 
 /**

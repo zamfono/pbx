@@ -91,7 +91,8 @@ describe('an owed config propagation', () => {
       keyring: kr,
       certificateSync: { state: 'unknown', at: null },
       sipBanHelper: { running: false, heartbeat: null, dropped: null },
-      mailRelay: null
+      mailRelay: null,
+      skippedConfigRows: 0
     });
     expect(health.checks['config:propagation']).toEqual([{ status: 'warn' }]);
     const metrics = await renderMetrics({

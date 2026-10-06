@@ -138,7 +138,11 @@ if (trunkA === undefined || trunkB === undefined || deviceA === undefined) {
 }
 
 describe('render', () => {
-  const rendered = render(input);
+  const { files: rendered, skipped } = render(input);
+
+  test('every row of the fixture is rendered', () => {
+    expect(skipped).toEqual([]);
+  });
 
   test('pjsip_users.conf matches the fixture', () => {
     expect(rendered['pjsip_users.conf']).toBe(fixture('pjsip_users.conf'));
@@ -204,7 +208,7 @@ describe('render', () => {
     // Authorization username; `trunk-<id>` never is, so the digest match needs a section named
     // by the trunk's username, bound to the trunk's own auth section (§9.4, §5.6).
     const section = render(noHosts)
-      ['pjsip_trunks.conf'].split('\n\n')
+      .files['pjsip_trunks.conf'].split('\n\n')
       .find(block => block.startsWith('[ipuser]\n'))
       ?.trimEnd();
     expect(section).toBe(
@@ -235,7 +239,7 @@ describe('render', () => {
   });
 
   test('an inbound_auth trunk with no host list is identified by auth username alone', () => {
-    const trunksConf = render(noHosts)['pjsip_trunks.conf'];
+    const trunksConf = render(noHosts).files['pjsip_trunks.conf'];
     expect(trunksConf).toContain('[ipuser]\n');
     expect(trunksConf).toContain('identify_by = auth_username');
     // `trunk-<id>` keeps `identify_by = ip`, which with no `identify` section matches nothing.
@@ -309,7 +313,7 @@ describe('render', () => {
     const conf = render({
       ...input,
       trunks: [{ ...trunkB, callerIdHeader: 'both' }]
-    })['pjsip_trunks.conf'];
+    }).files['pjsip_trunks.conf'];
     expect(conf).toContain('send_pai = yes\ntrust_id_outbound = yes\n');
     expect(conf).not.toContain('from_user');
     expect(conf).not.toContain('from_domain');
@@ -387,7 +391,7 @@ describe('render', () => {
     expect(moh).toContain('directory = /media/prompts/moh/m2/');
   });
 
-  test('render refuses an invalid extension', () => {
+  test('render leaves out the hint of a user with an invalid extension', () => {
     const bad: RenderInput = {
       ...input,
       users: [
@@ -398,7 +402,10 @@ describe('render', () => {
       parkingSlots: [],
       trunks: []
     };
-    expect(() => render(bad)).toThrow(/invalid extension/u);
+    expect(render(bad).skipped).toEqual([
+      { type: 'user', id: 'u1', field: 'user.ext' }
+    ]);
+    expect(render(bad).files['extensions_hints.conf']).toBe('\n');
   });
 
   test('a registration trunk with an outbound proxy sends its registration and its static contact through it', () => {
@@ -410,7 +417,7 @@ describe('render', () => {
       parkingSlots: [],
       trunks: [{ ...trunkA, outboundProxy: 'sip:sbc.provider-a.example' }]
     };
-    const trunksConf = render(withProxy)['pjsip_trunks.conf'];
+    const trunksConf = render(withProxy).files['pjsip_trunks.conf'];
     const aorSection = trunksConf.split('type = identify')[0];
     const registrationSection = trunksConf
       .split('type = registration')[1]
@@ -430,25 +437,30 @@ describe('render', () => {
       parkingSlots: [],
       trunks: [{ ...trunkB, inboundAuth: false }]
     };
-    const trunksConf = render(noInboundAuth)['pjsip_trunks.conf'];
+    const trunksConf = render(noInboundAuth).files['pjsip_trunks.conf'];
     expect(trunksConf).not.toContain('type = auth');
     expect(trunksConf).not.toContain('outbound_auth');
     expect(trunksConf).not.toContain('identify_by = auth_username');
   });
 
-  test('render refuses a trunk password carrying a newline', () => {
+  test('render leaves out a trunk whose password carries a newline, and renders the others', () => {
     const bad: RenderInput = {
       ...input,
       users: [],
       devices: [],
       ringGroups: [],
       parkingSlots: [],
-      trunks: [{ ...trunkA, password: 'x\n[anonymous]\ntype=endpoint' }]
+      trunks: [{ ...trunkA, password: 'x\n[anonymous]\ntype=endpoint' }, trunkB]
     };
-    expect(() => render(bad)).toThrow(/unsafe value/u);
+    expect(render(bad).skipped).toEqual([
+      { type: 'trunk', id: 't1', field: 'trunk.password' }
+    ]);
+    const trunksConf = render(bad).files['pjsip_trunks.conf'];
+    expect(trunksConf).not.toContain('[trunk-t1]');
+    expect(trunksConf).toContain('[trunk-t2]');
   });
 
-  test('render refuses a trunk host carrying a newline', () => {
+  test('render leaves out a trunk whose host carries a newline', () => {
     const bad: RenderInput = {
       ...input,
       users: [],
@@ -469,21 +481,32 @@ describe('render', () => {
         }
       ]
     };
-    expect(() => render(bad)).toThrow(/unsafe value/u);
+    expect(render(bad).skipped).toEqual([
+      { type: 'trunk', id: 't1', field: 'trunk.hosts.host' }
+    ]);
   });
 
-  test('render refuses a device sipUsername carrying a bracket', () => {
+  test('render leaves out a device whose sipUsername carries a bracket, and renders the others', () => {
     const bad: RenderInput = {
       ...input,
       ringGroups: [],
       parkingSlots: [],
       trunks: [],
-      devices: [{ ...deviceA, sipUsername: 'e101]\n[anonymous' }]
+      devices: input.devices.map(device =>
+        device.id === 'd1'
+          ? { ...device, sipUsername: 'e101]\n[anonymous' }
+          : device
+      )
     };
-    expect(() => render(bad)).toThrow(/unsafe value/u);
+    expect(render(bad).skipped).toEqual([
+      { type: 'device', id: 'd1', field: 'device.sipUsername' }
+    ]);
+    const usersConf = render(bad).files['pjsip_users.conf'];
+    expect(usersConf).not.toContain('anonymous');
+    expect(usersConf).toContain('[e101-dz9k2]');
   });
 
-  test('render refuses a device allowed-IP entry carrying a newline', () => {
+  test('render leaves out a device whose allowed-IP entry carries a newline', () => {
     const bad: RenderInput = {
       ...input,
       ringGroups: [],
@@ -491,10 +514,12 @@ describe('render', () => {
       trunks: [],
       devices: [{ ...deviceA, allowedIps: ['10.0.0.0/8\n[anonymous]'] }]
     };
-    expect(() => render(bad)).toThrow(/unsafe value/u);
+    expect(render(bad).skipped).toEqual([
+      { type: 'device', id: 'd1', field: 'device.allowedIps' }
+    ]);
   });
 
-  test('render refuses a ring group id carrying a bracket', () => {
+  test('render leaves out the devices of a user whose ring group id carries a bracket', () => {
     const bad: RenderInput = {
       ...input,
       users: [
@@ -509,10 +534,13 @@ describe('render', () => {
       parkingSlots: [],
       trunks: []
     };
-    expect(() => render(bad)).toThrow(/unsafe value/u);
+    expect(render(bad).skipped).toEqual([
+      { type: 'device', id: 'd1', field: 'user.ringGroupIds' },
+      { type: 'device', id: 'd2', field: 'user.ringGroupIds' }
+    ]);
   });
 
-  test('render refuses a moh asset id carrying a bracket', () => {
+  test('render leaves out a moh asset whose id carries a bracket', () => {
     const bad: RenderInput = {
       ...input,
       users: [],
@@ -522,10 +550,12 @@ describe('render', () => {
       trunks: [],
       moh: [{ id: 'm1]\n[anonymous', filename: 'track1.wav' }]
     };
-    expect(() => render(bad)).toThrow(/unsafe value/u);
+    expect(render(bad).skipped).toEqual([
+      { type: 'audioAsset', id: 'm1]\n[anonymous', field: 'audioAsset.id' }
+    ]);
   });
 
-  test('render refuses a moh asset id that would escape the media directory', () => {
+  test('render leaves out a moh asset whose id would escape the media directory', () => {
     const bad: RenderInput = {
       ...input,
       users: [],
@@ -535,10 +565,12 @@ describe('render', () => {
       trunks: [],
       moh: [{ id: '../../etc', filename: 'track1.wav' }]
     };
-    expect(() => render(bad)).toThrow(/unsafe value/u);
+    expect(render(bad).skipped).toEqual([
+      { type: 'audioAsset', id: '../../etc', field: 'audioAsset.id' }
+    ]);
   });
 
-  test('render refuses a trunk id carrying a bracket', () => {
+  test('render leaves out a trunk whose id carries a bracket', () => {
     const bad: RenderInput = {
       ...input,
       users: [],
@@ -547,12 +579,14 @@ describe('render', () => {
       parkingSlots: [],
       trunks: [{ ...trunkA, id: 't1]\n[anonymous' }]
     };
-    expect(() => render(bad)).toThrow(/unsafe value/u);
+    expect(render(bad).skipped).toEqual([
+      { type: 'trunk', id: 't1]\n[anonymous', field: 'trunk.id' }
+    ]);
   });
 
   /** The endpoint section of `input`'s first device, rendered with `patch` applied. */
   function firstEndpoint(patch: Partial<RenderInput>): string[] {
-    const users = render({ ...input, ...patch })['pjsip_users.conf'];
+    const users = render({ ...input, ...patch }).files['pjsip_users.conf'];
     const section = users
       .split('\n\n')
       .find(block => block.includes('type = endpoint'));
@@ -580,14 +614,16 @@ describe('render', () => {
 
   test("a device's password reads back whole whatever it holds, a `;` and brackets included", () => {
     const sipPassword = '[a;b]=>c\\;';
-    const users = render({ ...input, devices: [{ ...deviceA, sipPassword }] })[
-      'pjsip_users.conf'
-    ];
+    const users = render({ ...input, devices: [{ ...deviceA, sipPassword }] })
+      .files['pjsip_users.conf'];
     expect(configValues(users, 'password')).toEqual([sipPassword]);
   });
 
-  test('render refuses a device whose owner is not among the users', () => {
-    expect(() => render({ ...input, users: [] })).toThrow(/no owner/u);
+  test('render leaves out a device whose owner is not among the users', () => {
+    expect(render({ ...input, users: [] }).skipped).toEqual([
+      { type: 'device', id: 'd1', field: 'device.userId' },
+      { type: 'device', id: 'd2', field: 'device.userId' }
+    ]);
   });
 
   test('a held party hears the hold class every device endpoint suggests (§10.2 "Hold music")', () => {
@@ -603,6 +639,6 @@ describe('render', () => {
         ...input,
         settings: { ...input.settings, holdMohClass: 'm1\n[anonymous]' }
       })
-    ).toThrow(/unsafe value/u);
+    ).toThrow(/unrenderable value/u);
   });
 });

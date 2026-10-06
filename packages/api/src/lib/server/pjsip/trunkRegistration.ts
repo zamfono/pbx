@@ -11,6 +11,7 @@ import {
   trunkTransport,
   type Trunk
 } from './shared.js';
+import { UnrenderableValueError } from './skippedRows.js';
 
 // Asterisk's own `retry_interval` default, which a trunk without `register_retry_s` keeps.
 const DEFAULT_RETRY_S = 60;
@@ -51,9 +52,13 @@ export function renderTrunkRegistration(trunk: Trunk): string | null {
     return null;
   }
   const name = trunkSectionName(trunk.id);
+  const registrars = hostsByDirection(trunk, ['outbound', 'both']);
+  if (registrars.length === 0) {
+    throw new UnrenderableValueError('trunk.hosts');
+  }
   const { clientUri, serverUri } = registrationUris({
     username: trunk.username,
-    hosts: hostsByDirection(trunk, ['outbound', 'both'])
+    hosts: registrars
   });
   const lines = [
     `[${name}]`,

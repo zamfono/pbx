@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Db } from '@zamfono/shared';
 import { seedSettings } from '@zamfono/shared/testDb.js';
 
+import { recordSkippedConfigRows } from '#lib/server/configRenderSkips.js';
 import { getCoreClient } from '#lib/server/coreClient.js';
 import { stubCoreClient } from '#testing/coreClientStub.js';
 import { makeTestDb } from '#testing/testDb.js';
@@ -43,6 +44,7 @@ afterEach(() => {
   vi.mocked(getCoreClient).mockReset();
   vi.mocked(updaterClient).mockReset();
   vi.unstubAllEnvs();
+  recordSkippedConfigRows([]);
 });
 
 /** A test database with the tenant settings row every running `api` has. */
@@ -75,6 +77,7 @@ describe('system.info', () => {
       maintenanceGate: { certSync: null, autoUpdate: null },
       ringotel: { profilePending: false, rosterPending: false },
       mail: null,
+      skippedConfigRows: [],
       stack: { domain: 'pbx.test', ipv4: '192.0.2.10' }
     });
   });
@@ -116,6 +119,7 @@ describe('system.info', () => {
       maintenanceGate: { certSync: null, autoUpdate: null },
       ringotel: { profilePending: false, rosterPending: false },
       mail: null,
+      skippedConfigRows: [],
       stack: { domain: 'pbx.test', ipv4: '192.0.2.10' }
     });
   });
@@ -220,6 +224,22 @@ describe('system.info', () => {
 
     expect(await runOperation(db, 'system.info', {}, asUser)).toMatchObject({
       ringotel: { profilePending: false, rosterPending: true }
+    });
+  });
+
+  it('names the rows the latest config render left out, by type, id and field, never the value (§3.1)', async () => {
+    recordSkippedConfigRows([
+      { type: 'trunk', id: 't1', field: 'trunk.password' },
+      { type: 'device', id: 'd1', field: 'device.allowedIps' }
+    ]);
+
+    expect(
+      await runOperation(await tenantDb(), 'system.info', {}, asUser)
+    ).toMatchObject({
+      skippedConfigRows: [
+        { type: 'trunk', id: 't1', field: 'trunk.password' },
+        { type: 'device', id: 'd1', field: 'device.allowedIps' }
+      ]
     });
   });
 

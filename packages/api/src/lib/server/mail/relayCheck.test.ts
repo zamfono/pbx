@@ -143,7 +143,8 @@ describe('mail:relay and system.info mail', () => {
       keyring: testKeyring(),
       certificateSync: { state: 'ok', at: null },
       sipBanHelper: { running: true, heartbeat: null, dropped: null },
-      mailRelay: relayState()
+      mailRelay: relayState(),
+      skippedConfigRows: 0
     });
   const info = async (db: Db): Promise<unknown> =>
     ((await runOperation(db, 'system.info', {}, asRun())) as { mail: unknown })

@@ -14,6 +14,11 @@ import {
   type Trunk,
   type TrunkHost
 } from './shared.js';
+import {
+  renderRows,
+  UnrenderableValueError,
+  type SkippedRow
+} from './skippedRows.js';
 import { renderTrunkRegistration } from './trunkRegistration.js';
 
 // PJSIP OPTIONS-probes an `ip` trunk's static contact at this interval, so its reachability
@@ -219,7 +224,7 @@ function renderTrunkAuthEndpoint(
     return null;
   }
   if (trunk.username.includes(';')) {
-    throw new Error('render: an inbound-auth username cannot carry a `;`');
+    throw new UnrenderableValueError('trunk.username');
   }
   return [
     `[${trunk.username}]`,
@@ -237,20 +242,28 @@ function renderTrunkAuthEndpoint(
   ].join('\n');
 }
 
-export function renderTrunksConf(input: RenderInput): string {
+export function renderTrunksConf(
+  input: RenderInput,
+  skipped: SkippedRow[]
+): string {
   const trunks = [...input.trunks].sort((left, right) =>
     compareStrings(left.name, right.name)
   );
-  const sections = trunks.flatMap(trunk => {
-    assertSafeTrunk(trunk);
-    return [
-      renderTrunkAuth(trunk),
-      renderTrunkAor(trunk),
-      renderTrunkIdentify(trunk),
-      renderTrunkRegistration(trunk),
-      renderTrunkEndpoint(trunk, input.settings.codecs),
-      renderTrunkAuthEndpoint(trunk, input.settings.codecs)
-    ].filter((section): section is string => section !== null);
-  });
+  const sections = renderRows(
+    trunks,
+    trunk => ({ type: 'trunk', id: trunk.id }),
+    trunk => {
+      assertSafeTrunk(trunk);
+      return [
+        renderTrunkAuth(trunk),
+        renderTrunkAor(trunk),
+        renderTrunkIdentify(trunk),
+        renderTrunkRegistration(trunk),
+        renderTrunkEndpoint(trunk, input.settings.codecs),
+        renderTrunkAuthEndpoint(trunk, input.settings.codecs)
+      ].filter((section): section is string => section !== null);
+    },
+    skipped
+  );
   return joinSections(sections);
 }
