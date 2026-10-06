@@ -14,6 +14,7 @@ why the specified behaviour changed; the commit history, how.
 ### Added
 
 - `*5` to an own DID whose external forward target records is recorded too.
+- `*5` and `calls.addParty` to an own DID that forwards to a SIP target dial that target.
 
 ### Changed
 

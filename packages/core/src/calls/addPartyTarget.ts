@@ -7,7 +7,7 @@
  */
 import type { Snapshot } from '../internal/snapshot.js';
 import { resolveDialed } from '../routing/outbound.js';
-import { findForwardTarget } from '../routing/targets.js';
+import { findForwardTarget, type ForwardTarget } from '../routing/targets.js';
 import { SIP_NOT_FOUND } from '../sipCodes.js';
 import { extensionOf } from './extensionOwner.js';
 import { recordingOf, type ForwardLeg } from './forwardContext.js';
@@ -16,9 +16,9 @@ import { resolveDialedContext } from './outboundLookup.js';
 /**
  * The added leg's target and its `calls.to_uri` in the pipeline's vocabulary (§11.2 `calls`):
  * the extension for a colleague or a group, the E.164 form for a number. `clir` is the per-call
- * CLIR prefix, if one was dialled; an external target with a `forward` leg is a DID's own forward,
- * dialled as no user's call and recorded when that target records, like an ordinary dial of that
- * DID (§10.1 step 7).
+ * CLIR prefix, if one was dialled; an external target with a `forward` leg, and a `sip` target,
+ * is a DID's own forward, dialled as no user's call and recorded when that target records, like
+ * an ordinary dial of that DID (§10.1 step 7); a `sip` target's `to` is the DID's number.
  */
 export type AddedTarget =
   | { kind: 'user'; userId: string; to: string }
@@ -29,6 +29,7 @@ export type AddedTarget =
       clir: boolean | null;
       forward?: ForwardLeg;
     }
+  | { kind: 'sip'; target: Extract<ForwardTarget, { kind: 'sip' }>; to: string }
   | { kind: 'emergency'; number: string }
   | { kind: 'refuse'; code: number };
 
@@ -42,8 +43,8 @@ function didNumber(snapshot: Snapshot, didId: string): string {
 }
 
 /** An own DID dialled as `*5`'s target (§10.1 Outbound step 5): its user or ring-group target is
- * rung like that extension, an external one dialled; a mailbox, an announcement or a menu is no
- * party that could join a conversation, so it is refused like an unowned number. */
+ * rung like that extension, an external or SIP one dialled; a mailbox, an announcement or a menu is
+ * no party that could join a conversation, so it is refused like an unowned number. */
 function ownDidTarget(
   snapshot: Snapshot,
   targetId: string,
@@ -64,6 +65,9 @@ function ownDidTarget(
       // The DID forwards, diverting nobody.
       forward: { diversions: [], headers: [], ...recordingOf(target) }
     };
+  }
+  if (target.kind === 'sip') {
+    return { kind: 'sip', target, to: number };
   }
   return { kind: 'refuse', code: SIP_NOT_FOUND };
 }

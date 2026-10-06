@@ -3,13 +3,12 @@ import { ignoreGone } from '../ari/failures.js';
 import type { Snapshot } from '../internal/snapshot.js';
 import { SIP_FORBIDDEN, SIP_TEMPORARILY_UNAVAILABLE } from '../sipCodes.js';
 import { resolveAddedTarget, type AddedTarget } from './addPartyTarget.js';
-import { settleAnswered } from './answer.js';
 import { type Call } from './call.js';
 import { activeCallOf, channelOf } from './callLookup.js';
-import { concludeExhausted, concludeFinal } from './conclude.js';
 import { dialEmergency } from './emergency.js';
+import { dialSipTarget } from './forwardDial.js';
 import { enterTarget } from './inbound.js';
-import { originateExternalLeg } from './outboundExternal.js';
+import { dialExternal } from './outboundExternal.js';
 import type { Pipeline } from './pipeline.js';
 import { release } from './release.js';
 import { ringGroup } from './ringGroup.js';
@@ -40,6 +39,19 @@ async function releaseFeatureDial(
     .catch(ignoreGone);
 }
 
+/** Once the added leg's dial settled: the feature dial released if the leg answered, and whether
+ * the added party joined `activeBridgeId`. */
+async function joinedAfterDial(
+  pipeline: Pipeline,
+  call: Call,
+  activeBridgeId: string
+): Promise<boolean> {
+  if (call.status === 'answered') {
+    await releaseFeatureDial(pipeline, call);
+  }
+  return call.bridgeId === activeBridgeId;
+}
+
 /** An internal target on a fresh pass over `call`, its win joining `activeBridgeId`: `*5`'s
  * enters at Entry like any dialled extension, OOO and opening hours included (§10.1); `api`'s,
  * with no caller channel, is only rung (§10.1 steps 4-5), a forward or mailbox handed back left
@@ -63,10 +75,7 @@ async function ringInternalTarget(
   } else {
     await ringGroup(pipeline, call, target.ringGroupId);
   }
-  if (call.status === 'answered') {
-    await releaseFeatureDial(pipeline, call);
-  }
-  return call.bridgeId === activeBridgeId;
+  return joinedAfterDial(pipeline, call, activeBridgeId);
 }
 
 /** An external number dialled through `outbound_routes` (§9.4), as the initiator's call with the
@@ -78,38 +87,27 @@ async function dialExternalTarget(
   activeBridgeId: string,
   target: Extract<AddedTarget, { kind: 'external' }>
 ): Promise<boolean> {
-  const { pipeline } = ctx;
-  const result = await originateExternalLeg(
+  await dialExternal(
     { ...ctx, forward: target.forward },
     call,
     target.number,
     target.forward === undefined ? call.callerUserId : null,
     target.clir
   );
-  if (result.kind === 'answered') {
-    await settleAnswered(pipeline, call, result.channelId);
-    await releaseFeatureDial(pipeline, call);
-    return call.bridgeId === activeBridgeId;
-  }
-  if (result.kind === 'final') {
-    await concludeFinal(pipeline, call, result.failure);
-    return false;
-  }
-  await concludeExhausted(pipeline, call, result.lastFailureKind);
-  return false;
+  return joinedAfterDial(ctx.pipeline, call, activeBridgeId);
 }
 
 /**
  * Dials `*5`'s target, resolved like any dialled string (`addPartyTarget.ts`): a user or
  * ring-group target enters the normal routing (`ringInternalTarget`), so its OOO rule, forward
  * rules, find-me legs and the ring group's own strategy all apply exactly as they would for any
- * other call to it. An external number goes through §9.4's route selection, an emergency number
- * through `emergency.ts`. Whichever answers joins `activeBridgeId` in place of a bridge of its
- * own, through `Call.joinBridgeId` (as `parking.ts`'s ring-back also sets it). `call.to` and
- * `call.direction` become the pipeline's view of the target (§11.2 `calls`). `call`'s own
- * channel, never part of the added leg, is released once the dial settles. Whether the added
- * party joined. Shared with the party `api` adds (`addedParty.ts`), whose call has no caller
- * channel.
+ * other call to it. An external number goes through §9.4's route selection, an own DID's SIP
+ * target over its own trunk (§9.4 "SIP targets"), an emergency number through `emergency.ts`.
+ * Whichever answers joins `activeBridgeId` in place of a bridge of its own, through
+ * `Call.joinBridgeId` (as `parking.ts`'s ring-back also sets it). `call.to` and `call.direction`
+ * become the pipeline's view of the target (§11.2 `calls`). `call`'s own channel, never part of
+ * the added leg, is released once the dial settles. Whether the added party joined. Shared with
+ * the party `api` adds (`addedParty.ts`), whose call has no caller channel.
  */
 export async function dialAddPartyTarget(
   pipeline: Pipeline,
@@ -136,9 +134,20 @@ export async function dialAddPartyTarget(
         target
       );
     }
-    call.to = target.number;
     call.direction = 'outbound';
     const { trunkChannels } = pipeline.deps;
+    if (target.kind === 'sip') {
+      call.to = target.to;
+      // The DID forwards, as nobody's call (§10.1 step 7).
+      await dialSipTarget(
+        { pipeline, trunkChannels },
+        call,
+        target.target,
+        null
+      );
+      return await joinedAfterDial(pipeline, call, activeBridgeId);
+    }
+    call.to = target.number;
     if (target.kind === 'external') {
       return await dialExternalTarget(
         { pipeline, trunkChannels },

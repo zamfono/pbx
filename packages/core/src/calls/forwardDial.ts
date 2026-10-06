@@ -43,9 +43,10 @@ function unusableCause(
  * Dials `target.user` over `target.trunkId` alone (§9.4 "SIP targets"): the trunk's pre-checks and
  * the caller identity as a route-less attempt, every outbound host in turn for an `ip` trunk, then
  * the answer or the release the last route's failure would give. A trunk soft-deleted since, or
- * one with no outbound host, is released with 503 as an external forward no route carries.
+ * one with no outbound host, is released with 503 as an external forward no route carries. A
+ * `*5` to an own DID dials its SIP target here too, its answer joining `call.joinBridgeId`.
  */
-async function dialSipTarget(
+export async function dialSipTarget(
   ctx: { pipeline: Pipeline; trunkChannels: TrunkChannels },
   call: Call,
   target: SipTarget,

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { newId, nowIso, type Db } from '@zamfono/shared';
+import { DEFAULT_SIP_HEADERS, newId, nowIso, type Db } from '@zamfono/shared';
 import { seedDid, seedUser } from '@zamfono/shared/testDb.js';
 
 import type { AriClient } from '../ari/client.js';
@@ -30,7 +30,8 @@ import {
   seedExtension,
   seedExternalRoute,
   seedForwardTarget,
-  seedRingGroup
+  seedRingGroup,
+  seedTrunk
 } from '../testing/seedRows.js';
 import { newCall, type Call, type Leg } from './call.js';
 import { handleFeature } from './features.js';
@@ -530,14 +531,17 @@ describe('add party', () => {
     expect(row).toEqual({ toUri: '+15557777', calleeUserId: userC });
   });
 
-  it("*5 to one of the tenant's own DIDs whose external target records records the added leg as nobody's", async () => {
-    await setUp();
-    const { addPartyCall } = await externalAddParty();
-    await seedDid(
-      db,
-      '+15557777',
-      await seedForwardTarget(db, { external: '+15558888', recordCalls: 1 })
-    );
+  /**
+   * `*5+15557777`, an own DID whose target is `target`, with a recorder that records; the added
+   * party leaves once two snoops record it (§10.2 "Three-way calls": the added leg's recording
+   * follows the target's own flag, a snoop pair on the trunk leg). The recordings rows, and every
+   * channel placed.
+   */
+  async function addOwnDidRecorded(
+    addPartyCall: Call,
+    target: Parameters<typeof seedForwardTarget>[1]
+  ): Promise<{ recordings: unknown[]; endpoints: (string | undefined)[] }> {
+    await seedDid(db, '+15557777', await seedForwardTarget(db, target));
     rig.cache.invalidate();
     pipeline.deps.recorder = new Recorder({
       ari,
@@ -561,8 +565,6 @@ describe('add party', () => {
       '+15557777'
     );
 
-    // §10.2 "Three-way calls": the added leg's recording follows the target's own flag, a snoop
-    // pair on the trunk leg.
     await eventually(() => {
       expect(recordRequests()).toHaveLength(2);
     });
@@ -585,11 +587,48 @@ describe('add party', () => {
         recording: { name: (entry.body as { name?: string }).name }
       });
     }
-    await eventually(async () => {
-      expect(
-        await db.selectFrom('recordings').select(['callId', 'userId']).execute()
-      ).toEqual([{ callId: addPartyCall.id, userId: null }]);
+    const recordings = await eventually(async () => {
+      const rows = await db
+        .selectFrom('recordings')
+        .select(['callId', 'userId'])
+        .execute();
+      expect(rows).toHaveLength(1);
+      return rows;
     });
+    const endpoints = fakeAri.calls
+      .filter(entry => isPlacement(entry))
+      .map(entry => (entry.body as { endpoint?: string }).endpoint);
+    return { recordings, endpoints };
+  }
+
+  it("*5 to one of the tenant's own DIDs whose external target records records the added leg as nobody's", async () => {
+    await setUp();
+    const { addPartyCall } = await externalAddParty();
+    const { recordings } = await addOwnDidRecorded(addPartyCall, {
+      external: '+15558888',
+      recordCalls: 1
+    });
+    expect(recordings).toEqual([{ callId: addPartyCall.id, userId: null }]);
+  });
+
+  it("*5 to one of the tenant's own DIDs whose sip target records dials it over that trunk and records the added leg as nobody's", async () => {
+    await setUp();
+    const { addPartyCall, bridgeId } = await externalAddParty();
+    const trunkId = await seedTrunk(db, { authMode: 'ip', priority: 2 }, [
+      'sip.api.openai.com'
+    ]);
+    const { recordings, endpoints } = await addOwnDidRecorded(addPartyCall, {
+      sipTrunkId: trunkId,
+      sipUser: 'proj_abc123',
+      sipHeadersJson: JSON.stringify(DEFAULT_SIP_HEADERS),
+      recordCalls: 1
+    });
+    // §9.4 "SIP targets": over its own trunk, no route to match.
+    expect(endpoints).toEqual([
+      `PJSIP/proj_abc123@trunk-${trunkId}/sip:sip.api.openai.com`
+    ]);
+    expect(addPartyCall.bridgeId).toBe(bridgeId);
+    expect(recordings).toEqual([{ callId: addPartyCall.id, userId: null }]);
   });
 
   it('*5 to a parking slot is refused: a parked call is retrieved, not added', async () => {
